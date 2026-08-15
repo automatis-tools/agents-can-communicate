@@ -1,11 +1,13 @@
-import { createHash, randomUUID } from "node:crypto";
 import { mkdir, rename, rmdir, unlink } from "node:fs/promises";
 import path from "node:path";
+import { isDeepStrictEqual } from "node:util";
 
 import { readJsonStrict, writeJsonAtomic } from "./atomic-json.mjs";
+import { staleClaimLockDestination, writeClaimAudit } from "./claims-audit.mjs";
 import { claimFilePath, requireValidClaimRecords } from "./claim-records.mjs";
 import { CommsError, EXIT } from "./errors.mjs";
 import { requireOpenAgent } from "./identity.mjs";
+import { inspectRecoveryAudits } from "./recovery-audits.mjs";
 import {
   validateAgentId,
   validateClaim,
@@ -107,45 +109,6 @@ function expiresAt(context, seconds = DEFAULT_LEASE_SECONDS) {
 }
 function claimIsStale(claim, context) {
   return Date.parse(claim.expires_at) <= context.now().getTime();
-}
-function auditName(context) {
-  const uuid = (context.randomUUID ?? randomUUID)();
-  return path.join(context.paths.quarantine, `claims-audit-${uuid}.json`);
-}
-function validateAudit(value) {
-  const keys = ["action", "actor_agent", "recorded_at", "schema_version", "target"];
-  const validShape = value.schema_version === 1
-    && Object.keys(value).sort().join() === keys.join();
-  const timestamp = Date.parse(value.recorded_at);
-  if (!validShape || !Number.isFinite(timestamp)
-    || new Date(timestamp).toISOString() !== value.recorded_at) {
-    throw new CommsError("invalid claims audit", EXIT.DATA);
-  }
-  if (value.actor_agent !== null) validateAgentId(value.actor_agent);
-  if (value.action === "force_release_stale_claim") validateClaim(value.target);
-  else if (value.action === "repair_stale_claim_lock") validateLock(value.target);
-  else throw new CommsError("invalid claims audit action", EXIT.DATA);
-  return value;
-}
-async function writeAudit(context, action, actorAgent, target) {
-  const audit = validateAudit({
-    schema_version: 1,
-    action,
-    actor_agent: actorAgent,
-    recorded_at: context.now().toISOString(),
-    target,
-  });
-  await writeJsonAtomic(auditName(context), audit, {
-    tmpDir: context.paths.tmp,
-    exclusive: true,
-  });
-}
-function staleLockDestination(context, owner) {
-  const canonical = JSON.stringify([
-    owner.schema_version, owner.owner_agent, owner.pid, owner.acquired_at,
-  ]);
-  const digest = createHash("sha256").update(canonical).digest("hex");
-  return path.join(context.paths.quarantine, `claims-lock-stale-${digest}`);
 }
 function findExactClaim(items, scope) {
   return items.find(item => item.record.scope === scope) ?? null;
@@ -264,8 +227,8 @@ export async function forceReleaseStaleScope(context, input) {
     if (!claimIsStale(claim.record, context)) {
       conflict("active claim cannot be force-released", { owner, scope });
     }
-    await writeAudit(context, "force_release_stale_claim", actor.agent_id, claim.record);
-    await unlink(claim.file);
+    await writeClaimAudit(context, "force_release_stale_claim", actor.agent_id, claim.record);
+    await (context.unlinkClaimRecord ?? unlink)(claim.file);
     return claim.record;
   });
 }
@@ -275,8 +238,12 @@ export async function repairStaleClaimLock(context) {
   if (owner === null) return false;
   const age = context.now().getTime() - Date.parse(owner.acquired_at);
   if (age <= STALE_LOCK_MS || context.pidIsAlive(owner.pid)) return false;
-  await writeAudit(context, "repair_stale_claim_lock", null, owner);
-  const destination = staleLockDestination(context, owner);
+  const recovery = await inspectRecoveryAudits(context);
+  if (recovery.corrupt.length > 0) throw new CommsError("corrupt claim recovery audit",
+    EXIT.DATA, { paths: recovery.corrupt });
+  if (!recovery.pending_claim_locks.some(item => isDeepStrictEqual(item.audit.target, owner)))
+    await writeClaimAudit(context, "repair_stale_claim_lock", null, owner);
+  const destination = staleClaimLockDestination(context, owner);
   try {
     await (context.renameClaimLock ?? rename)(paths.directory, destination);
   } catch (error) {
@@ -285,4 +252,23 @@ export async function repairStaleClaimLock(context) {
     return false;
   }
   return true;
+}
+export async function repairPendingForceReleases(context) {
+  const recovery = await inspectRecoveryAudits(context);
+  if (recovery.corrupt.length > 0) throw new CommsError("corrupt claim recovery audit",
+    EXIT.DATA, { paths: recovery.corrupt });
+  const repairs = [];
+  for (const pending of recovery.pending_force_releases) {
+    const removed = await withClaimLock(context, pending.audit.actor_agent, async () => {
+      const current = (await requireValidClaimRecords(context))
+        .find(item => item.file === pending.source_path);
+      if (current === undefined) return false;
+      if (!isDeepStrictEqual(current.record, pending.audit.target))
+        throw new CommsError("pending force-release generation changed", EXIT.DATA);
+      await (context.unlinkClaimRecord ?? unlink)(current.file); return true;
+    });
+    if (removed) repairs.push({ action: "complete_pending_force_release",
+      path: pending.source_path, audit_path: pending.audit_path });
+  }
+  return repairs;
 }
