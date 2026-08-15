@@ -1,7 +1,7 @@
-import { mkdir } from "node:fs/promises";
 import path from "node:path";
 
 import { CommsError, EXIT } from "./errors.mjs";
+import { ensureManagedDirectory } from "./safe-directory.mjs";
 
 const DIRECTORY_NAMES = Object.freeze([
   "registry",
@@ -19,7 +19,14 @@ const DIRECTORY_NAMES = Object.freeze([
 ]);
 
 export async function resolveBusDir({ cwd, env = process.env, runGit }) {
-  if (env.PW2_AGENT_BUS_DIR) return path.resolve(env.PW2_AGENT_BUS_DIR);
+  if (env.PW2_AGENT_BUS_DIR !== undefined) {
+    if (typeof env.PW2_AGENT_BUS_DIR !== "string"
+      || !path.isAbsolute(env.PW2_AGENT_BUS_DIR)) {
+      throw new CommsError("PW2_AGENT_BUS_DIR must be absolute", EXIT.DATA,
+        { value: env.PW2_AGENT_BUS_DIR });
+    }
+    return path.resolve(env.PW2_AGENT_BUS_DIR);
+  }
   const commonDir = path.resolve(cwd, (await runGit(cwd)).trim());
   if (path.basename(commonDir) !== ".git") {
     throw new CommsError(
@@ -67,5 +74,8 @@ export function createBusPaths(busDir) {
 }
 
 export async function ensureBusLayout(paths) {
-  await Promise.all(DIRECTORY_NAMES.map(name => mkdir(paths[name], { recursive: true })));
+  await ensureManagedDirectory(paths.root, paths.root);
+  for (const name of DIRECTORY_NAMES) {
+    await ensureManagedDirectory(paths.root, paths[name]);
+  }
 }

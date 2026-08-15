@@ -1,8 +1,9 @@
-import { readFile } from "node:fs/promises";
+import { readJsonStrict } from "./atomic-json.mjs";
 
 export async function protocolCompatibilityIssue(context) {
   try {
-    const value = JSON.parse(await readFile(context.paths.protocol, "utf8"));
+    const value = await readJsonStrict(context.paths.protocol, record => record,
+      context.paths.root);
     if (value?.schema_version !== 1) return { code: "UNKNOWN_SCHEMA_VERSION",
       severity: "error", path: context.paths.protocol, message: "unknown schema version" };
     if (value?.protocol_version !== 1) return { code: "UNKNOWN_PROTOCOL_VERSION",

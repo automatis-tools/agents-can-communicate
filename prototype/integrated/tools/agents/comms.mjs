@@ -79,8 +79,9 @@ async function attachments(context, options) {
 }
 
 async function openAgentIds(context) {
-  const records = await Promise.all((await listJsonFiles(context.paths.registry)).map(file =>
-    readJsonStrict(file, validateRegistry)));
+  const records = await Promise.all((await listJsonFiles(context.paths.registry,
+    { root: context.paths.root })).map(file =>
+    readJsonStrict(file, validateRegistry, context.paths.root)));
   return records.filter(record => record.status === "open").map(record => record.agent_id).sort();
 }
 

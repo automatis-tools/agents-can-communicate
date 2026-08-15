@@ -1,16 +1,19 @@
 import { randomUUID } from "node:crypto";
-import { access, readFile } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
+import path from "node:path";
 import { isDeepStrictEqual } from "node:util";
 
 import { verifyAttachment } from "./attachments.mjs";
 import {
+  archiveFileNoReplace,
   listJsonFiles,
-  moveFileAtomic,
   readJsonStrict,
   writeJsonAtomic,
 } from "./atomic-json.mjs";
 import { CommsError, EXIT } from "./errors.mjs";
 import { requireOpenAgent } from "./identity.mjs";
+import { validateMessageId } from "./message-id.mjs";
+import { readJsonRegularNoFollow } from "./safe-file.mjs";
 import {
   MESSAGE_TYPES,
   SEVERITIES,
@@ -18,16 +21,6 @@ import {
   validateMessage,
   validateSeenReceipt,
 } from "./schema.mjs";
-
-async function exists(filePath) {
-  try {
-    await access(filePath);
-    return true;
-  } catch (error) {
-    if (error.code === "ENOENT") return false;
-    throw error;
-  }
-}
 
 function messageId(timestamp, sender, uuid) {
   return `${timestamp.replaceAll("-", "").replaceAll(":", "")}-${sender}-${uuid}`;
@@ -71,14 +64,6 @@ function buildMessage(context, input, sender, body) {
   };
 }
 
-function assertMessageId(value) {
-  if (typeof value !== "string" || value.length === 0
-    || value.includes("/") || value.includes("\\")) {
-    throw new CommsError("invalid message id", EXIT.DATA, { value });
-  }
-  return value;
-}
-
 function selected(value, allowed, name) {
   if (value === undefined) return null;
   if (!Array.isArray(value) || value.some(item => !allowed.includes(item))) {
@@ -87,9 +72,23 @@ function selected(value, allowed, name) {
   return new Set(value);
 }
 
-async function readMessageIfPresent(filePath) {
+function assertMessageBinding(message, filePath, recipient) {
+  if (path.basename(filePath) !== `${message.id}.json`
+    || path.basename(path.dirname(filePath)) !== recipient
+    || message.to !== recipient) {
+    throw new CommsError("message does not match its recipient path", EXIT.DATA, {
+      filePath,
+      messageId: message.id,
+      recipient,
+    });
+  }
+}
+
+async function readMessageIfPresent(filePath, recipient, root) {
   try {
-    return await readJsonStrict(filePath, validateMessage);
+    const stored = await readJsonRegularNoFollow(filePath, validateMessage, root);
+    assertMessageBinding(stored.record, filePath, recipient);
+    return { message: stored.record, bytes: stored.bytes };
   } catch (error) {
     if (error.code === "ENOENT") return null;
     throw error;
@@ -97,12 +96,13 @@ async function readMessageIfPresent(filePath) {
 }
 
 async function messageForRecipient(context, recipient, id) {
-  const inboxPath = context.paths.inboxFile(recipient, id);
-  const archivePath = context.paths.archiveFile(recipient, id);
-  const inboxMessage = await readMessageIfPresent(inboxPath);
-  if (inboxMessage !== null) return { message: inboxMessage, inboxPath, archivePath };
-  const archivedMessage = await readMessageIfPresent(archivePath);
-  if (archivedMessage !== null) return { message: archivedMessage, inboxPath, archivePath };
+  const validId = validateMessageId(id);
+  const inboxPath = context.paths.inboxFile(recipient, validId);
+  const archivePath = context.paths.archiveFile(recipient, validId);
+  const inbox = await readMessageIfPresent(inboxPath, recipient, context.paths.root);
+  if (inbox !== null) return { ...inbox, inboxPath, archivePath };
+  const archived = await readMessageIfPresent(archivePath, recipient, context.paths.root);
+  if (archived !== null) return { ...archived, inboxPath, archivePath };
   throw new CommsError("message does not exist for recipient", EXIT.DATA, {
     messageId: id,
     recipient,
@@ -126,16 +126,18 @@ export async function listInbox(context, input) {
   const recipient = (await requireOpenAgent(context, input.agentId)).agent_id;
   const types = selected(input.types, MESSAGE_TYPES, "type");
   const severities = selected(input.severities, SEVERITIES, "severity");
-  const files = await listJsonFiles(context.paths.inboxDir(recipient));
+  const files = await listJsonFiles(context.paths.inboxDir(recipient), {
+    root: context.paths.root,
+  });
   const items = [];
   for (const filePath of files) {
-    const message = await readJsonStrict(filePath, validateMessage);
-    if (message.to !== recipient) {
-      throw new CommsError("inbox message has wrong recipient", EXIT.DATA, { filePath });
-    }
+    const stored = await readMessageIfPresent(filePath, recipient, context.paths.root);
+    if (stored === null) continue;
+    const message = stored.message;
     const acknowledgement = await receiptIfPresent(
       context.paths.ackFile(message.id, recipient),
       validateAcknowledgement,
+      context.paths.root,
     );
     if (acknowledgement !== null) {
       assertReceiptBinding(acknowledgement, message.id, recipient, "acknowledgement");
@@ -146,6 +148,7 @@ export async function listInbox(context, input) {
     const seen = await receiptIfPresent(
       context.paths.seenFile(message.id, recipient),
       validateSeenReceipt,
+      context.paths.root,
     );
     if (seen !== null) assertReceiptBinding(seen, message.id, recipient, "seen receipt");
     const state = seen === null ? "unseen" : "seen";
@@ -162,8 +165,10 @@ export async function markSeen(context, message, recipient) {
   }
   const persisted = await readMessageIfPresent(
     context.paths.inboxFile(agent.agent_id, validMessage.id),
+    agent.agent_id,
+    context.paths.root,
   );
-  if (persisted === null || !isDeepStrictEqual(persisted, validMessage)) {
+  if (persisted === null || !isDeepStrictEqual(persisted.message, validMessage)) {
     throw new CommsError("seen receipt requires the persisted inbox message", EXIT.DATA, {
       messageId: validMessage.id,
       recipient: agent.agent_id,
@@ -183,16 +188,16 @@ export async function markSeen(context, message, recipient) {
     });
   } catch (error) {
     if (!(error instanceof CommsError) || error.exitCode !== EXIT.CONFLICT) throw error;
-    const existing = await readJsonStrict(filePath, validateSeenReceipt);
+    const existing = await readJsonStrict(filePath, validateSeenReceipt, context.paths.root);
     assertReceiptBinding(existing, validMessage.id, agent.agent_id, "seen receipt");
     return existing;
   }
   return receipt;
 }
 
-async function receiptIfPresent(filePath, validate) {
+async function receiptIfPresent(filePath, validate, root) {
   try {
-    return await readJsonStrict(filePath, validate);
+    return await readJsonStrict(filePath, validate, root);
   } catch (error) {
     if (error.code === "ENOENT") return null;
     throw error;
@@ -210,7 +215,7 @@ function assertReceiptBinding(receipt, messageId, recipient, name) {
 
 export async function ackMessage(context, input) {
   const recipient = (await requireOpenAgent(context, input.agentId)).agent_id;
-  const id = assertMessageId(input.messageId);
+  const id = validateMessageId(input.messageId);
   const stored = await messageForRecipient(context, recipient, id);
   if (stored.message.to !== recipient) {
     throw new CommsError("only the message recipient can acknowledge it", EXIT.CONFLICT);
@@ -218,6 +223,7 @@ export async function ackMessage(context, input) {
   let acknowledgement = await receiptIfPresent(
     context.paths.ackFile(id, recipient),
     validateAcknowledgement,
+    context.paths.root,
   );
   if (acknowledgement !== null) {
     assertReceiptBinding(acknowledgement, id, recipient, "acknowledgement");
@@ -239,17 +245,15 @@ export async function ackMessage(context, input) {
       acknowledgement = await readJsonStrict(
         context.paths.ackFile(id, recipient),
         validateAcknowledgement,
+        context.paths.root,
       );
       assertReceiptBinding(acknowledgement, id, recipient, "acknowledgement");
     }
   }
-  if (await exists(stored.inboxPath)) {
-    try {
-      await moveFileAtomic(stored.inboxPath, stored.archivePath);
-    } catch (error) {
-      if (error.code !== "ENOENT" || !(await exists(stored.archivePath))) throw error;
-    }
-  }
+  await archiveFileNoReplace(stored.inboxPath, stored.archivePath, {
+    root: context.paths.root,
+    expectedBytes: stored.bytes,
+  });
   return acknowledgement;
 }
 
@@ -258,7 +262,7 @@ export async function replyToMessage(context, input) {
   const original = (await messageForRecipient(
     context,
     sender,
-    assertMessageId(input.messageId),
+    validateMessageId(input.messageId),
   )).message;
   return sendMessage(context, {
     ...input,

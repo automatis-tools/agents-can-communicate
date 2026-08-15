@@ -1,9 +1,9 @@
 import { createHash, randomUUID } from "node:crypto";
-import { lstat, mkdir, readdir, rename, rmdir, unlink } from "node:fs/promises";
+import { lstat, mkdir, rename, rmdir, unlink } from "node:fs/promises";
 import path from "node:path";
 import { isDeepStrictEqual } from "node:util";
 
-import { readJsonStrict, writeJsonAtomic } from "./atomic-json.mjs";
+import { listDirectoryEntries, readJsonStrict, writeJsonAtomic } from "./atomic-json.mjs";
 import { CommsError, EXIT } from "./errors.mjs";
 import { readJsonRegularNoFollow } from "./safe-file.mjs";
 import { validateAgentId } from "./schema.mjs";
@@ -35,7 +35,7 @@ async function readOwnerSnapshot(context, directory) {
   const before = await lstat(directory);
   if (!before.isDirectory() || before.isSymbolicLink()) throw new Error("unsafe mutex path");
   const snapshot = await readJsonRegularNoFollow(ownerPath(directory), validateOwner,
-    context.openMutexOwner);
+    context.paths.root, context.openMutexOwner);
   const after = await lstat(directory);
   if (before.dev !== after.dev || before.ino !== after.ino) throw new Error("mutex changed");
   return { owner: snapshot.record, bytes: snapshot.bytes };
@@ -122,13 +122,14 @@ function validateAudit(value) {
 }
 export async function scanRepairMutexAudits(context) {
   const corrupt = [];
-  const entries = await readdir(context.paths.quarantine, { withFileTypes: true });
+  const entries = await listDirectoryEntries(context.paths.quarantine,
+    { root: context.paths.root });
   const names = new Set(entries.map(entry => entry.name));
   for (const entry of entries.filter(item => item.name.startsWith("mutex-audit-"))) {
     const auditPath = path.join(context.paths.quarantine, entry.name);
     try {
       const { record: audit } = await readJsonRegularNoFollow(auditPath, validateAudit,
-        context.openMutexAudit);
+        context.paths.root, context.openMutexAudit);
       const match = /^mutex-audit-([a-f0-9]{64})\.json$/.exec(entry.name);
       const digest = createHash("sha256").update(JSON.stringify(audit.target)).digest("hex");
       const destination = path.join(context.paths.quarantine, `mutex-stale-${digest}`);
@@ -157,7 +158,7 @@ export async function repairStaleRepairMutex(context, kind, agentId = null) {
   try { await writeJsonAtomic(paths.audit, audit, { tmpDir: context.paths.tmp, exclusive: true }); }
   catch (error) {
     if (!(error instanceof CommsError) || error.exitCode !== EXIT.CONFLICT) throw error;
-    const existing = await readJsonStrict(paths.audit, validateAudit);
+    const existing = await readJsonStrict(paths.audit, validateAudit, context.paths.root);
     if (!isDeepStrictEqual(existing, { ...audit, recorded_at: existing.recorded_at })) throw error;
   }
   try { await (context.renameRepairMutex ?? rename)(inspected.path, paths.destination); }

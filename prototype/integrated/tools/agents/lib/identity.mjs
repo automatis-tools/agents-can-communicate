@@ -14,9 +14,9 @@ import {
 
 const STALE_HEARTBEAT_MS = 45_000;
 
-async function readIfPresent(filePath, validate) {
+async function readIfPresent(paths, filePath, validate) {
   try {
-    return await readJsonStrict(filePath, validate);
+    return await readJsonStrict(filePath, validate, paths.root);
   } catch (error) {
     if (error.code === "ENOENT") return null;
     throw error;
@@ -24,11 +24,11 @@ async function readIfPresent(filePath, validate) {
 }
 
 async function readRegistryIfPresent(paths, agentId) {
-  return readIfPresent(paths.registryFile(agentId), validateRegistry);
+  return readIfPresent(paths, paths.registryFile(agentId), validateRegistry);
 }
 
 async function readPresenceIfPresent(paths, agentId) {
-  return readIfPresent(paths.presenceFile(agentId), validatePresence);
+  return readIfPresent(paths, paths.presenceFile(agentId), validatePresence);
 }
 
 function inputAgentId(input) {
@@ -91,7 +91,7 @@ async function checkoutIdentity(paths) {
 
 export async function initBus(context) {
   await ensureBusLayout(context.paths);
-  const existing = await readIfPresent(context.paths.protocol, validateProtocol);
+  const existing = await readIfPresent(context.paths, context.paths.protocol, validateProtocol);
   if (existing !== null) return existing;
 
   const identity = await checkoutIdentity(context.paths);
@@ -110,7 +110,7 @@ export async function initBus(context) {
     return record;
   } catch (error) {
     if (!(error instanceof CommsError) || error.exitCode !== EXIT.CONFLICT) throw error;
-    return readJsonStrict(context.paths.protocol, validateProtocol);
+    return readJsonStrict(context.paths.protocol, validateProtocol, context.paths.root);
   }
 }
 
