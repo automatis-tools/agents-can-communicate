@@ -30,7 +30,7 @@ All commands were run from the repository root unless noted.
 
 | Command | Result |
 |---|---|
-| `npm run test:integrated` | **269 tests, 269 pass, 0 fail**, exit 0, three consecutive runs (~50 s each) |
+| `npm run test:integrated` | **271 tests, 271 pass, 0 fail**, exit 0 (269 at certification, plus 2 harness-hermeticity regressions) |
 | `find prototype/integrated/tools/agents -name '*.mjs' \| xargs -n1 node --check` | exit 0 |
 | `git diff --check` | exit 0 |
 | line-count policy, `$1 >= 300` | exit 0; the largest file is 299 lines |
@@ -150,6 +150,20 @@ recovery state. Restored, 4/4 pass.
    fail, and since every scanner wraps its read in `catch { corrupt.add(...) }`,
    the reconciled tree would have declared all recovery artifacts corrupt. Root
    is now threaded through every managed read; a multi-line scan verifies it.
+5. **The fixtures were not hermetic, and it caused real damage.** Git exports
+   `GIT_DIR`, `GIT_WORK_TREE`, and `GIT_INDEX_FILE` into every hook environment.
+   The first run of the new pre-push hook therefore executed the suite with
+   those variables set, and `createGitWorktreeFixture` spawned `git` without
+   stripping them, so every fixture operated on the real repository: it flipped
+   `core.bare` to `true`, created a stray `linked` branch, registered a stray
+   worktree under `/tmp`, and stacked empty `fixture` commits onto the working
+   branch. No content was lost — the branch tree stayed byte-identical to its
+   last real commit — and the repository was fully restored. The flaw is latent
+   in the preserved baseline and only manifests when the suite runs with git
+   repository variables set. Fixtures now build their environment through
+   `hermeticEnv()`, which strips every `GIT_*` variable, and the hook unsets
+   them as a second barrier. `harness-hermeticity.test.mjs` guards both: with
+   the filter removed, it fails.
 
 ## Remaining limitations
 
@@ -172,3 +186,11 @@ recovery state. Restored, 4/4 pass.
    are unchanged here by design. Renaming belongs to the extraction plan.
 5. **Not certified beyond this platform.** All evidence is from one macOS arm64
    host on Node 24.4.0. No Linux or Windows run exists yet.
+6. **Production git resolution still inherits the ambient environment.**
+   `defaultGitQuery` in `tools/agents/comms.mjs` runs `git` with the inherited
+   environment, so running the CLI from inside a git hook would resolve another
+   repository's identity. Only the test harness was made hermetic here, because
+   changing production git resolution is a behaviour change no archived patch
+   covers. The extraction plan already injects a `gitProbe` port
+   (`docs/superpowers/plans/2026-08-15-acc-core-extraction.md`, Task 6), which is
+   the right place to fix this — ACC adapters are hook-driven by design.

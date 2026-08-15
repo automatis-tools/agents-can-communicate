@@ -4,8 +4,18 @@
 # Never bypass with --no-verify; fix the failure instead.
 set -e
 
+# The lint step runs first, while git's own repository variables are still set,
+# so `git ls-files` resolves this repository without relying on discovery.
 echo "pre-push: syntax-checking tracked .mjs files"
 git ls-files -z '*.mjs' | xargs -0 -n1 node --check
+
+# Git exports GIT_DIR, GIT_WORK_TREE and friends into every hook. The suite
+# spawns git inside temporary fixture repositories, and inheriting these makes
+# those commands operate on THIS repository instead. The fixtures strip the
+# variables themselves; this is the second barrier, so a future test that
+# forgets cannot damage the working repository.
+unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_COMMON_DIR GIT_OBJECT_DIRECTORY
+unset GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_PREFIX GIT_QUARANTINE_PATH
 
 if node -e "process.exit(require('./package.json').scripts?.['test:integrated'] ? 0 : 1)" 2>/dev/null
 then

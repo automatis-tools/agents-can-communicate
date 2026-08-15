@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import test from "node:test";
 
-import { createGitWorktreeFixture, runCli, startCli } from "./helpers.mjs";
+import { createGitWorktreeFixture, hermeticEnv, runCli, startCli } from "./helpers.mjs";
 
 const execFileAsync = promisify(execFile);
 const delay = milliseconds => new Promise(resolve => setTimeout(resolve, milliseconds));
@@ -91,7 +91,8 @@ test("the executable covers every command and stable process exit", async t => {
   await jsonCli(fixture, ["release", "--id", "models", "--scope", "game/models"],
     { cwd: fixture.worktree });
 
-  const revision = (await execFileAsync("git", ["rev-parse", "HEAD"], { cwd: fixture.worktree })).stdout.trim();
+  const revision = (await execFileAsync("git", ["rev-parse", "HEAD"],
+    { cwd: fixture.worktree, env: hermeticEnv() })).stdout.trim();
   await writeFile(path.join(fixture.worktree, "proof.txt"), "proof");
   await writeFile(path.join(fixture.worktree, "verification.json"), JSON.stringify([
     { command: "node --test", exitCode: 0, summary: "passed" },
