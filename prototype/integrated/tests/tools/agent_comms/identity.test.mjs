@@ -18,6 +18,8 @@ import {
   registerAgent,
   requireOpenAgent,
 } from "../../../tools/agents/lib/identity.mjs";
+import { acquireWatcherOwnership, writePresenceIfWatcherOwner }
+  from "../../../tools/agents/lib/watcher-ownership.mjs";
 
 const HEAD = "a".repeat(40);
 
@@ -153,7 +155,7 @@ test("a live duplicate id is rejected", async t => {
   );
 });
 
-test("registration becomes stale without a live heartbeat", async t => {
+test("stale open registration still requires an explicit resume", async t => {
   const fixture = await createBusFixture();
   t.after(fixture.cleanup);
   const context = contextFor(fixture, { pidIsAlive: () => true });
@@ -161,8 +163,8 @@ test("registration becomes stale without a live heartbeat", async t => {
   await writeLivePresence(context, "visual", 1234);
   fixture.clock.advance(45_001);
 
-  const replacement = await registerAgent(context, registration("visual", "/tmp/worktree-b"));
-  assert.equal(replacement.worktree, "/tmp/worktree-b");
+  await assert.rejects(registerAgent(context, registration("visual", "/tmp/worktree-b")),
+    error => error.exitCode === EXIT.CONFLICT);
 });
 
 test("resume requires the same worktree and task", async t => {
@@ -244,10 +246,10 @@ test("close refuses a live watcher and releases only the closed agent claims", a
   });
   await registerAgent(context, registration("visual", "/tmp/worktree-a"));
   await registerAgent(context, registration("models", "/tmp/worktree-b"));
-  await writeLivePresence(context, "visual", 1234);
+  const owner = await acquireWatcherOwnership(context, "visual", 1234);
 
   await assert.rejects(closeAgent(context, "visual"), error => error.exitCode === EXIT.CONFLICT);
-  await seedPresence(context, { agentId: "visual", pid: 1234, status: "offline" });
+  await writePresenceIfWatcherOwner(context, owner, "offline", true);
   const closed = await closeAgent(context, "visual");
   const presence = await readPresence(context, "visual");
 

@@ -44,6 +44,9 @@ async function readOwnership(context, agentId) {
 function withMutex(context, agentId, operation) {
   return withRepairMutex(context, "watcher", agentId, operation);
 }
+export function withWatcherLifecycle(context, agentId, operation) {
+  return withMutex(context, agentId, operation);
+}
 async function writePresence(context, agentId, pid, status) {
   const record = validatePresence({ schema_version: 1, agent_id: agentId, pid, status,
     heartbeat_at: context.now().toISOString() });
@@ -59,8 +62,9 @@ export async function inspectWatcherOwnership(context, agentId) {
     repairable: age > STALE_OWNERSHIP_MS && !context.pidIsAlive(owner.pid) });
 }
 
-export async function acquireWatcherOwnership(context, agentId, pid) {
+export async function acquireWatcherOwnership(context, agentId, pid, assertAllowed) {
   return withMutex(context, agentId, async () => {
+    await assertAllowed?.();
     const owner = validateOwnership({ schema_version: 1, agent_id: agentId, pid,
       token: (context.randomUUID ?? randomUUID)(),
       acquired_at: context.now().toISOString() });

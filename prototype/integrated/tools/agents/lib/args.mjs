@@ -18,7 +18,7 @@ const COMMANDS = Object.freeze({
   release: { required: ["id", "scope"], flags: ["force-stale"], optional: ["owner", "json"] },
   handoff: { required: ["id", "to", "task", "result", "branch", "base", "verification-file",
     "contracts-file", "limitations-file"], optional: ["commit", "json"], flags: ["uncommitted"],
-  repeated: ["changed", "follow-up", "artifact"] },
+  repeated: ["changed", "follow-up", "artifact", "ephemeral-artifact"] },
   status: { flags: ["fail-on-stale", "fail-on-pending"], optional: ["json"] },
   doctor: { repeated: ["require-live"], flags: ["repair"], optional: ["json"] },
 });
@@ -29,6 +29,9 @@ function messageSpec(required) {
 }
 
 function usage(message) { throw new CommsError(message, EXIT.USAGE); }
+export function errorPayload(error, exitCode) { return { error: {
+  message: error instanceof CommsError ? error.message : error.stack, exit_code: exitCode,
+  details: error instanceof CommsError ? error.details : null } }; }
 function keyFor(option) {
   return option.replace(/-([a-z])/g, (_, letter) => letter.toUpperCase());
 }
