@@ -1,6 +1,6 @@
-import { access, readdir } from "node:fs/promises";
+import { access } from "node:fs/promises";
 import path from "node:path";
-import { listJsonFiles, readJsonStrict } from "./atomic-json.mjs";
+import { listDirectoryEntries, listJsonFiles, readJsonStrict } from "./atomic-json.mjs";
 import { inspectClaimRecords } from "./claim-records.mjs";
 import { repairStaleClaimLock } from "./claims.mjs";
 import { archiveAcknowledged, quarantineCorrupt, scanDoctorAudits }
@@ -17,27 +17,25 @@ async function exists(filePath) { try { await access(filePath); return true; }
   catch (error) { if (error.code === "ENOENT") return false; throw error; }
 }
 function addCorrupt(state, filePath) { if (!state.corrupt.includes(filePath)) state.corrupt.push(filePath); }
-async function safeRead(filePath, validate, state) {
-  try { return await readJsonStrict(filePath, validate); }
+async function safeRead(context, filePath, validate, state) {
+  try { return await readJsonStrict(filePath, validate, context.paths.root); }
   catch (error) {
     if (error.code === "ENOENT") return null;
     addCorrupt(state, filePath);
     return null; }
 }
-async function nestedJsonFiles(root) {
-  let entries;
-  try { entries = await readdir(root, { withFileTypes: true }); }
-  catch (error) { if (error.code === "ENOENT") return []; throw error; }
+async function nestedJsonFiles(context, root) {
+  const entries = await listDirectoryEntries(root, { root: context.paths.root });
   const directories = entries.filter(entry => entry.isDirectory())
     .sort((a, b) => a.name.localeCompare(b.name));
   return (await Promise.all(directories.map(entry =>
-    listJsonFiles(path.join(root, entry.name))))).flat();
+    listJsonFiles(path.join(root, entry.name), { root: context.paths.root })))).flat();
 }
 function fileStem(filePath) { return path.basename(filePath, ".json"); }
 function sortRecords(records, field) { return records.sort(
   (a, b) => a[field].localeCompare(b[field])); }
 async function readProtocol(context, state) {
-  const record = await safeRead(context.paths.protocol, validateProtocol, state);
+  const record = await safeRead(context, context.paths.protocol, validateProtocol, state);
   if (record === null) {
     addCorrupt(state, context.paths.protocol);
     return { schema_version: null, protocol_version: null, checkout_id: null };
@@ -47,15 +45,15 @@ async function readProtocol(context, state) {
 }
 async function readAgents(context, state) {
   const presence = new Map();
-  for (const filePath of await listJsonFiles(context.paths.presence)) {
-    const record = await safeRead(filePath, validatePresence, state);
+  for (const filePath of await listJsonFiles(context.paths.presence, { root: context.paths.root })) {
+    const record = await safeRead(context, filePath, validatePresence, state);
     if (record === null) continue;
     if (fileStem(filePath) !== record.agent_id) { addCorrupt(state, filePath); continue; }
     presence.set(record.agent_id, record);
   }
   const agents = { live: [], stale: [], offline: [] };
-  for (const filePath of await listJsonFiles(context.paths.registry)) {
-    const registry = await safeRead(filePath, validateRegistry, state);
+  for (const filePath of await listJsonFiles(context.paths.registry, { root: context.paths.root })) {
+    const registry = await safeRead(context, filePath, validateRegistry, state);
     if (registry === null) continue;
     if (fileStem(filePath) !== registry.agent_id) { addCorrupt(state, filePath); continue; }
     const heartbeat = presence.get(registry.agent_id) ?? null;
@@ -77,8 +75,8 @@ async function readMessages(context, state) {
   const stored = new Map();
   for (const [location, root] of [["inbox", context.paths.inbox],
     ["archive", context.paths.archive]]) {
-    for (const filePath of await nestedJsonFiles(root)) {
-      const message = await safeRead(filePath, validateMessage, state);
+    for (const filePath of await nestedJsonFiles(context, root)) {
+      const message = await safeRead(context, filePath, validateMessage, state);
       if (message === null) continue;
       const recipient = path.basename(path.dirname(filePath));
       if (recipient !== message.to || fileStem(filePath) !== message.id
@@ -93,8 +91,8 @@ async function readReceipts(context, state, stored, kind) {
   const root = acknowledgements ? context.paths.acknowledgements : context.paths.seen;
   const validate = acknowledgements ? validateAcknowledgement : validateSeenReceipt;
   const records = new Map();
-  for (const filePath of await listJsonFiles(root)) {
-    const receipt = await safeRead(filePath, validate, state);
+  for (const filePath of await listJsonFiles(root, { root: context.paths.root })) {
+    const receipt = await safeRead(context, filePath, validate, state);
     if (receipt === null) continue;
     const expected = acknowledgements
       ? context.paths.ackFile(receipt.message_id, receipt.recipient)
@@ -140,8 +138,8 @@ async function readClaims(context, state) {
 }
 async function readHandoffs(context, state) {
   const records = [];
-  for (const filePath of await listJsonFiles(context.paths.handoffs)) {
-    const record = await safeRead(filePath, validateHandoff, state);
+  for (const filePath of await listJsonFiles(context.paths.handoffs, { root: context.paths.root })) {
+    const record = await safeRead(context, filePath, validateHandoff, state);
     if (record !== null && fileStem(filePath) === record.id) records.push(record);
     else if (record !== null) addCorrupt(state, filePath);
   }
@@ -159,7 +157,7 @@ function counts(report) {
 }
 async function readLockCorruption(context, state) {
   const ownerPath = path.join(context.paths.locks, "claims.lock", "owner.json");
-  if (await exists(ownerPath)) await safeRead(ownerPath, validateLock, state);
+  if (await exists(ownerPath)) await safeRead(context, ownerPath, validateLock, state);
   for (const agentId of await watcherIds(context)) try {
     await inspectWatcherOwnership(context, agentId);
   } catch { addCorrupt(state,
@@ -183,7 +181,7 @@ function issue(code, filePath, message, severity = "error") { return {
 function isRepairStoragePath(context, filePath) { return path.dirname(filePath) === context.paths.quarantine
   && /^(doctor-audit-|mutex-audit-|mutex-stale-)/.test(path.basename(filePath)); }
 async function watcherIds(context) {
-  const entries = await readdir(context.paths.locks, { withFileTypes: true });
+  const entries = await listDirectoryEntries(context.paths.locks, { root: context.paths.root });
   return entries.filter(entry => entry.isFile() && /^watcher-.+\.json$/.test(entry.name))
     .map(entry => entry.name.slice(8, -5)).sort();
 }
@@ -216,7 +214,7 @@ async function operationalIssues(context, report, input) {
   if (await exists(lockDir) && !await exists(lockOwner)) issues.push(issue(
     "CLAIM_LOCK_OWNER_MISSING", lockDir, "claim lock has no owner record"));
   else if (await exists(lockOwner)) {
-    const owner = await safeRead(lockOwner, validateLock, { corrupt: [] });
+    const owner = await safeRead(context, lockOwner, validateLock, { corrupt: [] });
     if (owner !== null && context.now().getTime() - Date.parse(owner.acquired_at) > 60_000
       && !context.pidIsAlive(owner.pid)) issues.push(issue("STALE_CLAIM_LOCK", lockOwner,
       "claim lock owner is dead and older than sixty seconds", "warning"));

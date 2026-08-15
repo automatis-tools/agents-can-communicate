@@ -12,8 +12,9 @@ export function claimFilePath(context, scope) {
 
 export async function inspectClaimRecords(context) {
   const records = [], corrupt = [];
-  for (const file of await listJsonFiles(context.paths.claims)) {
-    try { records.push({ file, record: await readJsonStrict(file, validateClaim) }); }
+  for (const file of await listJsonFiles(context.paths.claims, { root: context.paths.root })) {
+    try { records.push({ file,
+      record: await readJsonStrict(file, validateClaim, context.paths.root) }); }
     catch { corrupt.push(file); }
   }
   const counts = new Map();

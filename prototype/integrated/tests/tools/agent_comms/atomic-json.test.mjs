@@ -29,7 +29,7 @@ test("exclusive writes never replace an immutable record", async t => {
     error => error.exitCode === EXIT.CONFLICT,
   );
   assert.deepEqual(JSON.parse(await readFile(target, "utf8")), { value: 1 });
-  assert.deepEqual(await listJsonFiles(fixture.paths.tmp), []);
+  assert.deepEqual(await listJsonFiles(fixture.paths.tmp, { root: fixture.paths.root }), []);
 });
 
 test("mutable writes atomically replace the published value", async t => {
@@ -77,7 +77,7 @@ test("malformed JSON fails the corrupt-data gate", async t => {
   await writeFile(target, "{not-json", "utf8");
 
   await assert.rejects(
-    readJsonStrict(target, value => value),
+    readJsonStrict(target, value => value, fixture.paths.root),
     error => error.exitCode === EXIT.DATA && error.details.filePath === target,
   );
 });
@@ -92,7 +92,7 @@ test("strict reads return the original validated value", async t => {
   const result = await readJsonStrict(target, value => {
     parsed = value;
     return value;
-  });
+  }, fixture.paths.root);
 
   assert.equal(result, parsed);
 });
@@ -106,11 +106,13 @@ test("JSON listings include only regular JSON files in lexical order", async t =
   await writeFile(path.join(directory, "a.json"), "{}", "utf8");
   await mkdir(path.join(directory, "directory.json"));
 
-  assert.deepEqual(await listJsonFiles(directory), [
+  assert.deepEqual(await listJsonFiles(directory, { root: fixture.paths.root }), [
     path.join(directory, "a.json"),
     path.join(directory, "b.json"),
   ]);
-  assert.deepEqual(await listJsonFiles(path.join(fixture.root, "missing")), []);
+  assert.deepEqual(await listJsonFiles(fixture.paths.inboxDir("missing"), {
+    root: fixture.paths.root,
+  }), []);
 });
 
 test("atomic moves create the destination directory and remove the source", async t => {
@@ -120,7 +122,7 @@ test("atomic moves create the destination directory and remove the source", asyn
   const destination = fixture.paths.archiveFile("models", "message");
   await writeFile(source, '{"value":1}\n', "utf8");
 
-  await moveFileAtomic(source, destination);
+  await moveFileAtomic(source, destination, { root: fixture.paths.root });
 
   assert.equal(await pathExists(source), false);
   assert.deepEqual(JSON.parse(await readFile(destination, "utf8")), { value: 1 });

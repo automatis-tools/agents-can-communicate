@@ -1,10 +1,11 @@
-import { readdir } from "node:fs/promises";
 import path from "node:path";
 
+import { listDirectoryEntries } from "./atomic-json.mjs";
 import { inspectRepairMutex, repairStaleRepairMutex } from "./repair-mutex.mjs";
 
 async function watcherMutexIds(context) {
-  const entries = await readdir(context.paths.locks, { withFileTypes: true });
+  const entries = await listDirectoryEntries(context.paths.locks,
+    { root: context.paths.root });
   return entries.filter(entry => /^watcher-.+\.lock$/.test(entry.name))
     .map(entry => entry.name.slice(8, -5)).sort();
 }

@@ -29,7 +29,8 @@ function validateOwnership(value) {
 }
 async function readOwnership(context, agentId) {
   try {
-    const owner = await readJsonStrict(ownershipPath(context, agentId), validateOwnership);
+    const owner = await readJsonStrict(ownershipPath(context, agentId), validateOwnership,
+      context.paths.root);
     if (owner.agent_id !== agentId) {
       throw new CommsError("watcher ownership agent does not match its path", EXIT.DATA,
         { agentId, ownerAgentId: owner.agent_id });
@@ -104,11 +105,13 @@ export async function repairStaleWatcherOwnership(context, agentId) {
     catch (error) {
       if (error.code === "ENOENT") return false;
       if (error.code !== "EEXIST") throw error;
-      const quarantined = await readJsonStrict(destination, validateOwnership);
+      const quarantined = await readJsonStrict(destination, validateOwnership,
+        context.paths.root);
       if (!isDeepStrictEqual(quarantined, inspected.owner)) return false;
     }
     const [current, quarantined] = await Promise.all([
-      readOwnership(context, agentId), readJsonStrict(destination, validateOwnership) ]);
+      readOwnership(context, agentId),
+      readJsonStrict(destination, validateOwnership, context.paths.root) ]);
     if (current === null || !isDeepStrictEqual(current, inspected.owner)
       || !isDeepStrictEqual(quarantined, inspected.owner)) return false;
     await unlink(active);

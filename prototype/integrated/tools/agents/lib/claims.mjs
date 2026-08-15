@@ -39,7 +39,7 @@ function leaseSeconds(input) {
 }
 function claimLockPaths(context) {
   const directory = path.join(context.paths.locks, "claims.lock");
-  return { directory, owner: path.join(directory, "owner.json") };
+  return { directory, owner: path.join(directory, "owner.json"), root: context.paths.root };
 }
 async function removeIfPresent(file) {
   try {
@@ -51,7 +51,7 @@ async function removeIfPresent(file) {
 }
 async function readLockIfPresent(paths) {
   try {
-    return await readJsonStrict(paths.owner, validateLock);
+    return await readJsonStrict(paths.owner, validateLock, paths.root);
   } catch (error) {
     if (error.code === "ENOENT") return null;
     throw error;

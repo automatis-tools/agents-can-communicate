@@ -1,6 +1,7 @@
 import path from "node:path";
 
 import { CommsError, EXIT } from "./errors.mjs";
+import { validateMessageId } from "./message-id.mjs";
 
 export const MESSAGE_TYPES = Object.freeze([
   "status",
@@ -192,8 +193,7 @@ export function validateMessage(value) {
     "task", "reply_to", "requires_ack", "created_at", "sender_head", "attachments",
   ]);
   version(value.schema_version);
-  string(value.id, "message.id");
-  if (value.id.includes("/") || value.id.includes("\\")) invalid("invalid message id", { value: value.id });
+  validateMessageId(value.id, "message id");
   validateAgentId(value.from);
   validateAgentId(value.to);
   oneOf(value.type, MESSAGE_TYPES, "message type");
@@ -201,7 +201,7 @@ export function validateMessage(value) {
   string(value.subject, "subject");
   string(value.body, "body", { empty: true });
   string(value.task, "task");
-  if (value.reply_to !== null) string(value.reply_to, "reply_to");
+  if (value.reply_to !== null) validateMessageId(value.reply_to, "reply_to");
   boolean(value.requires_ack, "requires_ack");
   isoTimestamp(value.created_at, "created_at");
   validateGitSha(value.sender_head);
@@ -212,7 +212,7 @@ export function validateMessage(value) {
 function validateReceipt(value, timestampField, name) {
   record(value, name, ["schema_version", "message_id", "recipient", timestampField]);
   version(value.schema_version);
-  string(value.message_id, "message_id");
+  validateMessageId(value.message_id, "message_id");
   validateAgentId(value.recipient);
   isoTimestamp(value[timestampField], timestampField);
   return value;

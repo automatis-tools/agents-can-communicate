@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
-import { link, lstat, mkdir, readFile, unlink } from "node:fs/promises";
+import { link, lstat, mkdir, unlink } from "node:fs/promises";
 import path from "node:path";
 import { isDeepStrictEqual } from "node:util";
 
@@ -79,7 +79,8 @@ async function publishAudit(context, sourcePath, bytes, paths) {
       { tmpDir: context.paths.tmp, exclusive: true });
   } catch (error) {
     if (!(error instanceof CommsError) || error.exitCode !== EXIT.CONFLICT) throw error;
-    const existing = await readJsonStrict(paths.auditPath, validateDoctorAudit);
+    const existing = await readJsonStrict(paths.auditPath, validateDoctorAudit,
+      context.paths.root);
     if (!isDeepStrictEqual(existing, { ...audit, recorded_at: existing.recorded_at }))
       throw new CommsError("repair audit conflicts with snapshot", EXIT.DATA);
   }
@@ -91,10 +92,11 @@ async function unlinkIfPresent(filePath) {
 
 export async function scanDoctorAudits(context) {
   const corrupt = [];
-  for (const auditPath of await listJsonFiles(context.paths.quarantine)) {
+  for (const auditPath of await listJsonFiles(context.paths.quarantine,
+    { root: context.paths.root })) {
     if (!path.basename(auditPath).startsWith("doctor-audit-")) continue;
     try {
-      const audit = await readJsonStrict(auditPath, validateDoctorAudit);
+      const audit = await readJsonStrict(auditPath, validateDoctorAudit, context.paths.root);
       const match = /^doctor-audit-([a-f0-9]{64})\.json$/.exec(path.basename(auditPath));
       if (match === null || !inside(context.paths.root, audit.source_path)
         || immutableDescriptor(context, audit.source_path) === null) throw new Error("unsafe audit");
@@ -102,7 +104,7 @@ export async function scanDoctorAudits(context) {
         `corrupt-${match[1]}.data`);
       if (audit.quarantine_path !== canonicalQuarantine) throw new Error("unsafe quarantine path");
       const bytes = await readRegularNoFollow(canonicalQuarantine,
-        context.openImmutableRecord);
+        context.paths.root, context.openImmutableRecord);
       const paths = auditPaths(context, audit.source_path, bytes);
       const checksum = createHash("sha256").update(bytes).digest("hex");
       if (auditPath !== paths.auditPath || audit.quarantine_path !== paths.quarantinePath
@@ -120,7 +122,9 @@ export async function quarantineCorrupt(context, sourcePath) {
     try { await (context.linkCorruptRecord ?? link)(sourcePath, snapshot); }
     catch (error) { if (error.code === "ENOENT") return null; throw error; }
     const [bytes, sourceBytes, snapshotStat, sourceStat] = await Promise.all([
-      readFile(snapshot), readFile(sourcePath), lstat(snapshot), lstat(sourcePath),
+      readRegularNoFollow(snapshot, context.paths.root),
+      readRegularNoFollow(sourcePath, context.paths.root),
+      lstat(snapshot), lstat(sourcePath),
     ]);
     if (!sameGeneration(snapshotStat, sourceStat) || !bytes.equals(sourceBytes)) return null;
     if (bytesAreValid(context, sourcePath, bytes)) return null;
@@ -128,15 +132,17 @@ export async function quarantineCorrupt(context, sourcePath) {
     try { await link(snapshot, paths.quarantinePath); }
     catch (error) {
       if (error.code !== "EEXIST") throw error;
-      if (!(await readFile(paths.quarantinePath)).equals(bytes)) {
+      if (!(await readRegularNoFollow(paths.quarantinePath, context.paths.root)).equals(bytes)) {
         throw new CommsError("quarantine snapshot conflicts", EXIT.DATA);
       }
     }
-    if (!(await readFile(paths.quarantinePath)).equals(bytes)) {
+    if (!(await readRegularNoFollow(paths.quarantinePath, context.paths.root)).equals(bytes)) {
       throw new CommsError("quarantine snapshot changed", EXIT.DATA);
     }
     await publishAudit(context, sourcePath, bytes, paths);
-    const [currentBytes, currentStat] = await Promise.all([readFile(sourcePath), lstat(sourcePath)]);
+    const [currentBytes, currentStat] = await Promise.all([
+      readRegularNoFollow(sourcePath, context.paths.root), lstat(sourcePath),
+    ]);
     if (!sameGeneration(snapshotStat, currentStat) || !bytes.equals(currentBytes)) return null;
     await (context.unlinkCorruptRecord ?? unlink)(sourcePath);
     return { action: "quarantine_corrupt_json", path: sourcePath,
@@ -151,7 +157,7 @@ export async function archiveAcknowledged(context, message) {
   async function validateDestination() {
     let existing;
     try { existing = (await readJsonRegularNoFollow(destination, validateMessage,
-      context.openArchiveRecord)).record; }
+      context.paths.root, context.openArchiveRecord)).record; }
     catch (error) {
       if (error.code === "ENOENT") throw new CommsError(
         "archive destination is missing after inbox disappeared", EXIT.DATA);
@@ -167,13 +173,13 @@ export async function archiveAcknowledged(context, message) {
     if (error.code === "ENOENT") { await validateDestination(); return null; }
     if (error.code !== "EEXIST") throw error;
     let sourceBytes;
-    try { sourceBytes = await readFile(source); }
+    try { sourceBytes = await readRegularNoFollow(source, context.paths.root); }
     catch (sourceError) {
       if (sourceError.code !== "ENOENT") throw sourceError;
       await validateDestination();
       return null;
     }
-    const destinationBytes = await readFile(destination);
+    const destinationBytes = await readRegularNoFollow(destination, context.paths.root);
     if (!sourceBytes.equals(destinationBytes)) {
       throw new CommsError("archive destination conflicts with inbox message", EXIT.DATA);
     }

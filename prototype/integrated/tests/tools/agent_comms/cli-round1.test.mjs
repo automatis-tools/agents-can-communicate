@@ -12,6 +12,7 @@ import { createGitWorktreeFixture, pathExists, runCli, startCli } from "./helper
 const delay = milliseconds => new Promise(resolve => setTimeout(resolve, milliseconds));
 const WATCHER_READY_TIMEOUT_MS = 10_000;
 const WATCHER_POLL_MS = 5;
+const STDIN_LIVENESS_TIMEOUT_MS = 30_000;
 
 function describeChild(child, prefix) {
   return `${prefix}; stdout=${JSON.stringify(child.collected.stdout)}`
@@ -33,7 +34,7 @@ async function waitForWatcherOnline(fixture, child, agentId) {
       assert.fail(describeChild(child, `watcher exited before publishing ownership: ${JSON.stringify(exit)}`));
     }
     if (await pathExists(ownership)) {
-      const record = await readJsonStrict(presence, validatePresence)
+      const record = await readJsonStrict(presence, validatePresence, fixture.bus)
         .catch(error => { if (error.code === "ENOENT") return null; throw error; });
       if (record?.status === "online" && record.pid === child.pid) return record;
     }
@@ -50,16 +51,28 @@ async function bootstrap(fixture) {
   }
 }
 
-async function openStdinResult(child) {
+// The property under test is liveness -- the command must not read stdin -- not
+// latency. A command that truly waits on an unclosed stdin blocks forever, so a
+// generous ceiling still catches it, while a short race deadline only converts
+// ordinary scheduling delay under parallel load into a false failure.
+async function openStdinResult(child, argv) {
   const exited = new Promise((resolve, reject) => {
     child.once("error", reject);
     child.once("close", (code, signal) => resolve({ code, signal }));
   });
-  const result = await Promise.race([exited, delay(300).then(() => null)]);
+  // Promise.race does not cancel the loser: an uncleared ceiling timer would
+  // keep the runner alive for its full duration after the child already exited.
+  let ceiling;
+  const expired = new Promise(resolve => {
+    ceiling = setTimeout(resolve, STDIN_LIVENESS_TIMEOUT_MS, null);
+  });
+  const result = await Promise.race([exited, expired]);
+  clearTimeout(ceiling);
   if (result !== null) return result;
   child.kill("SIGKILL");
   await exited;
-  assert.fail("command waited for stdin despite an explicit body source");
+  assert.fail(describeChild(child, `${argv[0]} waited for stdin for `
+    + `${STDIN_LIVENESS_TIMEOUT_MS}ms despite an explicit body source`));
 }
 
 test("explicit body sources let send broadcast and reply exit with stdin left open", async t => {
@@ -83,7 +96,7 @@ test("explicit body sources let send broadcast and reply exit with stdin left op
       "--subject", "reply", "--body-file", "body.txt"],
   ];
   for (const argv of commands) {
-    const result = await openStdinResult(startCli(fixture, argv, { cwd: fixture.worktree }));
+    const result = await openStdinResult(startCli(fixture, argv, { cwd: fixture.worktree }), argv);
     assert.equal(result.code, 0, `${argv[0]} did not exit cleanly`);
   }
 });
@@ -132,7 +145,8 @@ test("a latched startup signal stops the watcher after publication", async t => 
   assert.equal(await runWithSignals(["register", "--id", "visual", "--role", "artist", "--task", "M2.7"],
     runtime, signals), 0);
   assert.equal(await runWithSignals(["watch", "--id", "visual"], runtime, signals), 0);
-  const presence = await readJsonStrict(`${fixture.bus}/presence/visual.json`, validatePresence);
+  const presence = await readJsonStrict(`${fixture.bus}/presence/visual.json`, validatePresence,
+    fixture.bus);
   assert.equal(presence.status, "offline");
 });
 
