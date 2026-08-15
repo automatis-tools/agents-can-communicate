@@ -14,7 +14,7 @@ The project is at the standalone extraction handoff boundary.
 - [x] Standalone product direction documented.
 - [x] Core, adapter, and productization execution plans drafted.
 - [x] User explicitly approves the proposed ambient-workspace/workstream model (2026-08-15).
-- [ ] Hardening patches integrated into one verified prototype snapshot.
+- [x] Hardening patches integrated into one verified prototype snapshot.
 - [ ] Papercut assumptions removed behind project-agnostic interfaces.
 - [ ] Standalone package layout created.
 - [ ] Native Codex adapter implemented.
@@ -29,9 +29,9 @@ Closed 2026-08-15. The user approved all five ambient-model points and, the same
 
 ## Next implementation action
 
-Execute `docs/superpowers/plans/2026-08-15-acc-prototype-reconciliation.md` from Task 1 in an isolated worktree under `.gitworktrees/`. The first deliverable is one integrated prototype snapshot with all four hardening sets reconciled and verified together.
+Execute `docs/superpowers/plans/2026-08-15-acc-core-extraction.md` from Task 1 in an isolated worktree under `.gitworktrees/`. Its precondition is met: `prototype/integrated/COMBINED_VERIFICATION.md` records 269/269 passing with mutation evidence for every protection group.
 
-Then execute the core extraction plan. Do not start native adapters before the project-agnostic core passes its complete regression suite.
+Do not start native adapters before the project-agnostic core passes its complete regression suite.
 
 ## Historical verification evidence
 
