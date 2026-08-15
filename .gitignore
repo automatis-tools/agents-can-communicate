@@ -1,0 +1,7 @@
+.idea/
+.agents/
+.worktrees/
+node_modules/
+coverage/
+dist/
+*.log
