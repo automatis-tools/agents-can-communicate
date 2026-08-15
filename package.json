@@ -6,6 +6,7 @@
   "description": "Model- and harness-agnostic coordination for independent AI agent sessions.",
   "scripts": {
     "test:prototype": "cd prototype/papercut-agent-comms && node --test tests/tools/agent_comms/*.test.mjs",
-    "test:prototype:sigterm": "cd prototype/papercut-agent-comms && node --test --test-name-pattern='SIGTERM is accepted' tests/tools/agent_comms/cli-round1.test.mjs"
+    "test:prototype:sigterm": "cd prototype/papercut-agent-comms && node --test --test-name-pattern='SIGTERM is accepted' tests/tools/agent_comms/cli-round1.test.mjs",
+    "test:integrated": "cd prototype/integrated && node --test tests/tools/agent_comms/*.test.mjs"
   }
 }
