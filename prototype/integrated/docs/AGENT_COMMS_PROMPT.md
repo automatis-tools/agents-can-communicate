@@ -5,13 +5,17 @@ ownership is `<OWNERSHIP>`. This local transport coordinates parallel work; it
 does not replace `AGENTS.md`, `TRACKS.md`, Git, committed contracts, or the
 human merge decision.
 
+First, read `AGENTS.md` and `docs/AGENT_COMMS.md` completely before running
+commands or editing files. After registration, report your id, task, and
+ownership scopes to the orchestrator so the active coordination map is explicit.
+
 Before editing files, start the bus and register this exact identity:
 
 ```bash
 node tools/agents/comms.mjs init
-node tools/agents/comms.mjs register --id <AGENT_ID> --role <ROLE> --task <TASK> --ownership <OWNERSHIP>
-node tools/agents/comms.mjs inbox --id <AGENT_ID>
-node tools/agents/comms.mjs watch --id <AGENT_ID>
+node tools/agents/comms.mjs register --id <AGENT_ID_SHELL> --role <ROLE_SHELL> --task <TASK_SHELL> --ownership <OWNERSHIP_SHELL>
+node tools/agents/comms.mjs inbox --id <AGENT_ID_SHELL>
+node tools/agents/comms.mjs watch --id <AGENT_ID_SHELL>
 ```
 
 Run the blocking watcher in a dedicated, long-lived terminal or process and
@@ -53,5 +57,5 @@ changed paths, verification command exit/result evidence, contracts
 added/changed/consumed, artifacts with checksums, follow-up owners, and known
 limitations. Create that evidence-bearing handoff even when blocked; say what
 is blocked and what evidence was obtained. Release claims, stop the watcher
-orderly with SIGINT/SIGTERM, then run `close --id <AGENT_ID>`. Never put
+orderly with SIGINT/SIGTERM, then run `close --id <AGENT_ID_SHELL>`. Never put
 secrets, tokens, or credentials in this plaintext local mailbox.

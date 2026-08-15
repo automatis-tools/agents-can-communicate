@@ -9,6 +9,14 @@ function valueWithoutNul(value, name) {
   return value;
 }
 
+function shellQuote(value) {
+  return `'${value.replaceAll("'", `'"'"'`)}'`;
+}
+
+function shellOwnership(value) {
+  return value.split(" --ownership ").map(shellQuote).join(" --ownership ");
+}
+
 export async function renderPrompt(input) {
   const templatePath = valueWithoutNul(input.templatePath, "template path");
   const agentId = validateAgentId(valueWithoutNul(input.agentId, "agent id"));
@@ -17,6 +25,10 @@ export async function renderPrompt(input) {
   const ownership = valueWithoutNul(input.ownership, "ownership");
   const template = await readFile(templatePath, "utf8");
   return template
+    .replaceAll("<AGENT_ID_SHELL>", shellQuote(agentId))
+    .replaceAll("<ROLE_SHELL>", shellQuote(role))
+    .replaceAll("<TASK_SHELL>", shellQuote(task))
+    .replaceAll("<OWNERSHIP_SHELL>", shellOwnership(ownership))
     .replaceAll("<AGENT_ID>", agentId)
     .replaceAll("<ROLE>", role)
     .replaceAll("<TASK>", task)

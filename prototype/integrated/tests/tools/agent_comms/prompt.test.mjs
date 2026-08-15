@@ -20,6 +20,10 @@ test("rendered prompt is the committed template with literal substitutions", asy
     ownership: "game/presentation",
   });
   const expected = template
+    .replaceAll("<AGENT_ID_SHELL>", "'visual-m2-7'")
+    .replaceAll("<ROLE_SHELL>", "'visual'")
+    .replaceAll("<TASK_SHELL>", "'M2.7'")
+    .replaceAll("<OWNERSHIP_SHELL>", "'game/presentation'")
     .replaceAll("<AGENT_ID>", "visual-m2-7")
     .replaceAll("<ROLE>", "visual")
     .replaceAll("<TASK>", "M2.7")
@@ -28,7 +32,8 @@ test("rendered prompt is the committed template with literal substitutions", asy
   assert.equal(rendered, expected);
   assert.deepEqual(
     [...new Set(template.match(/<[A-Z_]+>/gu) ?? [])].sort(),
-    ["<AGENT_ID>", "<OWNERSHIP>", "<ROLE>", "<TASK>"],
+    ["<AGENT_ID>", "<AGENT_ID_SHELL>", "<OWNERSHIP>", "<OWNERSHIP_SHELL>",
+      "<ROLE>", "<ROLE_SHELL>", "<TASK>", "<TASK_SHELL>"],
   );
 });
 
@@ -57,6 +62,22 @@ test("canonical prompt requires the complete safe coordination lifecycle", async
   assert.match(rendered, /`action` or `blocker`[\s\S]*`reply`[\s\S]*`ack`/u);
   assert.match(rendered, /evidence-bearing handoff even when blocked[\s\S]*`close/u);
   assert.match(rendered, /may not interrupt an active reasoning-turn/u);
+  assert.match(rendered, /read `AGENTS\.md` and `docs\/AGENT_COMMS\.md` completely before/u);
+  assert.match(rendered, /report your id, task, and\s+ownership scopes to the orchestrator/u);
+});
+
+test("rendered bootstrap shell-quotes every substituted command value", async () => {
+  const rendered = await renderPrompt({
+    templatePath,
+    agentId: "visual",
+    role: "visual lead",
+    task: "actor's polish",
+    ownership: "game/presentation --ownership contract:camera rig-v1",
+  });
+
+  assert.match(rendered, /--id 'visual' --role 'visual lead' --task 'actor'"'"'s polish'/u);
+  assert.match(rendered,
+    /--ownership 'game\/presentation' --ownership 'contract:camera rig-v1'/u);
 });
 
 test("renderer rejects unsafe agent identifiers and NUL-bearing values", async () => {
