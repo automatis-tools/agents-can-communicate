@@ -1,6 +1,6 @@
 # Decisions
 
-This file separates explicit user decisions from proposals. A new session must preserve that distinction.
+This file separates explicit user decisions from open technical decisions. As of 2026-08-15 no design proposals remain unapproved; a new session must not silently resolve an open technical item.
 
 ## Approved by the user
 
@@ -16,23 +16,20 @@ This file separates explicit user decisions from proposals. A new session must p
 | Generic MCP integration exists as a fallback | Approved |
 | Setup should feel automatic, using hooks and skills where clients support them | Approved |
 | Product must be model-agnostic and allow agents from different companies to collaborate | Approved |
-
-## Strong direction inferred from the latest discussion
-
-These are central design recommendations but still need one explicit user confirmation before implementation treats them as locked.
-
-| Proposal | Rationale |
-|---|---|
-| Gemini CLI becomes a first-class native adapter in the first adapter wave | The product promise explicitly names Codex, Claude, and Gemini |
-| Sessions automatically attach to workspace awareness | Removes repetitive user commands |
-| No permanent project-wide orchestrator | Independent workstreams must not depend on whichever chat opened first |
-| Optional coordinator per workstream | Preserves subagent-team ergonomics without central ownership |
-| `Intent` is a first-class object | Agents need to expose informal exploration and review, not only formal tasks |
-| Claims are workspace-global even when workstreams are independent | Prevents cross-team collisions |
-| Runtime state lives outside the repository | Avoids dirty worktrees and makes the tool standalone |
-| Project config is optional and committed only when the team wants shared policies | Zero-config by default, reproducible customization when needed |
-| ACC does not launch or own agent processes in the first release | The core use case is attaching already-open human-driven sessions |
-| Durable state is authoritative; realtime delivery is an optional acceleration | Closed or dormant models cannot be universally awakened |
+| Every supported session silently attaches to workspace awareness | Approved 2026-08-15 |
+| No session becomes a permanent project-wide orchestrator | Approved 2026-08-15 |
+| Workstream coordinators are optional, scoped, and replaceable | Approved 2026-08-15 |
+| `Intent` is first-class; formal Tasks remain optional | Approved 2026-08-15 |
+| The first release does not launch or own agent processes | Approved 2026-08-15 |
+| Attach policy: attach everywhere with lazy durable materialization — durable state appears on the second live session or the first claim/message/other durable object; until then presence and Intent are ephemeral | Approved 2026-08-15 |
+| Idle presence: v1 ships no detached heartbeat helper; idle sessions are truthfully reported `stale` | Approved 2026-08-15 |
+| Gemini CLI is a first-class native adapter in the first adapter wave | Approved 2026-08-15 |
+| Claims are workspace-global even when workstreams are independent | Approved 2026-08-15 |
+| Runtime state lives outside the repository | Approved 2026-08-15 |
+| Project config is optional and committed only when the team wants shared policies | Approved 2026-08-15 |
+| Durable state is authoritative; realtime delivery is an optional acceleration | Approved 2026-08-15 |
+| Peer equality: any top-level session can represent the whole Workspace — it answers whole-system questions from shared state (including other participants' subagents) and relays human requests to any participant; authority differences apply to mutation only, never to knowledge | Approved 2026-08-15 |
+| Solo zero-overhead: a lone session pays nothing visible — no injected coordination context, no required protocol actions, guards short-circuit against the empty roster; coordination kicks in at the first safe point after a second session attaches or a durable object exists | Approved 2026-08-15 |
 
 ## Open technical decisions
 
@@ -43,6 +40,7 @@ These are central design recommendations but still need one explicit user confir
 5. Whether remote/cloud coordination belongs in v2 or a separate product.
 6. Whether an optional process-launching runner is ever part of ACC or remains an external integration.
 7. Multi-root workspace configuration and discovery rules.
+8. Default claim lease length and renewal cadence for hook-only adapters. The prototype pairs 1800-second leases with a 15-second watcher heartbeat; a hook-only session cannot sustain that cadence, so lease policy must not assume it.
 
 ## Rejected directions
 

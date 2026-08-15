@@ -1,6 +1,6 @@
 # Standalone Agents Can Communicate Design
 
-**Status:** Proposed design handoff
+**Status:** Approved design (gate closed 2026-08-15; see §14)
 
 **Date:** 2026-08-15
 
@@ -28,6 +28,7 @@ The imported Papercut implementation proves much of the low-level messaging, own
 8. Degrade honestly on clients that support only MCP or CLI.
 9. Keep protocol state independent of any model's context window or lifetime.
 10. Provide a clean adapter contract for future clients.
+11. Let any session answer for the whole Workspace: every top-level session can read the complete coordination state — including other participants' subagents — and relay human requests to any participant. Knowledge is symmetric; only mutation authority is scoped.
 
 ### 2.2 Engineering goals
 
@@ -58,9 +59,13 @@ A Workspace is the durable collaboration boundary. It may represent one director
 
 Runtime state is stored outside the project. An optional project config provides stable identity and shared policy but never stores presence, messages, locks, or credentials.
 
+Materialization is lazy (approved 2026-08-15): a lone session writes only ephemeral presence and Intent records. Durable state — protocol identity, event log, materialized views — is created exactly once, when a second live session attaches or the first durable object (claim, message, task, workstream, decision, artifact, or handoff) is created; current ephemeral records are recorded durably at that moment. An ephemeral-only Workspace vanishes once its sessions close.
+
 ### 4.2 Participant and Session
 
 A Participant is a persistent human or agent identity. A Session is one concrete harness conversation. All mutable ownership uses the Session's exact generation token so a restarted or duplicate process cannot impersonate a prior generation.
+
+Session presence is online, stale, or offline. Heartbeats arrive only at moments the harness exposes, so an idle but open hook-only session is truthfully reported stale; the first release ships no detached heartbeat helper (approved 2026-08-15). Liveness probes and claim lease expiry, never staleness alone, govern ownership replacement.
 
 ### 4.3 Intent
 
@@ -69,6 +74,8 @@ Intent answers “what is this session doing now?” with one concise summary, m
 ### 4.4 Workstream and coordinator
 
 A Workstream groups related collaboration. It may have a coordinator lease but does not require one for transport or persistence. The first session is never made global Workspace orchestrator merely because it arrived first.
+
+The coordinator is a planning role, never an information gatekeeper (approved 2026-08-15): any session answers about any Workstream from durable state, and the human may route a request to any participant through whichever session they happen to be talking to.
 
 ### 4.5 Task
 
@@ -96,7 +103,7 @@ The CLI detects installed harnesses and offers native adapter installation. Chan
 A lifecycle-capable adapter:
 
 1. discovers Workspace;
-2. validates protocol identity;
+2. validates protocol identity where durable state exists (§4.1 lazy materialization);
 3. acquires exact session ownership;
 4. starts heartbeat;
 5. obtains a compact snapshot/delta;
@@ -106,9 +113,13 @@ A lifecycle-capable adapter:
 
 The adapter supplies a skill instruction. After understanding the request, the model publishes one-line Intent. The user does not manually register an agent or create a task.
 
+While the session is alone in the Workspace (approved 2026-08-15), the adapter injects no coordination context and demands no protocol action: a simple solo task pays zero visible overhead. The Intent prompt appears at the first safe point after a peer attaches; until then the peer sees the session as active with intent pending.
+
 ### 5.4 Before mutation
 
 Where supported, a pre-tool hook extracts the target resource and asks core to guard it. A conflict blocks or asks; an unclaimed non-conflicting resource can trigger an internal claim workflow. The guard cannot claim to protect out-of-band writes.
+
+When the Workspace has no other live sessions and no claims, the guard short-circuits against the ephemeral roster and adds no perceptible latency.
 
 ### 5.5 Sync and delivery
 
@@ -122,7 +133,7 @@ The semantic skill creates a handoff while the model is active. Session-end hook
 
 ### 6.1 Packages
 
-Proposed monorepo layout:
+Monorepo layout:
 
 ```text
 packages/
@@ -220,7 +231,7 @@ The first native wave targets Codex, Claude Code, and Gemini CLI. Generic MCP ex
 
 Prefer six high-level operations:
 
-1. `sync`: snapshot/delta and attention.
+1. `sync`: snapshot/delta and attention; supports an explicit full-Workspace scope so any session can answer whole-system questions, including collapsed child sessions of other participants.
 2. `work`: announce/update Intent and workstream membership.
 3. `claim`: acquire/renew/release generic resources atomically.
 4. `message`: send/reply/mark/ack typed communication.
@@ -331,12 +342,14 @@ Every protection gate requires an intentional mutation showing the expected non-
 9. Add installer and public product documentation.
 10. Perform real cross-vendor acceptance before first release.
 
-## 14. Open approval gate
+## 14. Approval gate status
 
-Implementation beyond preservation requires explicit user confirmation of the proposed ambient model:
+Closed 2026-08-15. The user explicitly approved the ambient model:
 
 - every supported session silently attaches to Workspace awareness;
 - no first-session global orchestrator;
 - optional coordinator per Workstream;
 - Intent is always available while formal Tasks remain optional;
 - first release does not own or launch agent processes.
+
+Two follow-up decisions were approved the same day: attach everywhere with lazy durable materialization (§4.1), and truthful stale presence with no heartbeat helper in the first release (§4.2). `docs/DECISIONS.md` records the exact wording, the remaining proposals, and the open technical decisions; none of them block Phase 0.
