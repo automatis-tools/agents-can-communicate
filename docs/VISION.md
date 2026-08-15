@@ -60,6 +60,10 @@ Routine attachment, heartbeat, and non-conflicting awareness should not interrup
 
 Every supported session can participate in ambient workspace awareness. Workstreams, tasks, and coordinators appear only when the work needs them.
 
+### Any session speaks for the whole workspace
+
+The human may ask any open session about the entire system — who is active, what other models and their subagents are doing, what was decided — and route a request to any participant through it. This is collective work among equals, not one boss with dumb workers: knowledge is symmetric, and only mutation authority is scoped.
+
 ### Durable before realtime
 
 A state transition is recorded before delivery is attempted. Realtime notification accelerates delivery but never becomes the source of truth.

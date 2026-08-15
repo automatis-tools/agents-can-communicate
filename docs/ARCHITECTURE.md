@@ -1,6 +1,6 @@
-# Proposed architecture
+# Architecture
 
-This document describes the recommended target. Items not yet approved are marked in `docs/DECISIONS.md`.
+This document describes the approved target (design approved 2026-08-15). Approved decisions and the remaining open technical items are recorded in `docs/DECISIONS.md`.
 
 ## Control plane, not execution plane
 
@@ -115,6 +115,12 @@ Resolution order:
 
 Multiple Git worktrees of one repository share workspace awareness while retaining distinct checkout metadata. Non-Git directories remain fully supported.
 
+## Lazy workspace materialization
+
+Attachment is universal, but durable state is not created merely because a session opened somewhere (approved 2026-08-15). A lone session writes only ephemeral presence and Intent records in the runtime area. The Workspace materializes durable state — protocol identity, event log, materialized views — exactly once, at the first moment coordination actually exists: a second live session attaches, or the session creates its first durable object (claim, message, task, workstream, decision, artifact, or handoff). At that moment current ephemeral presence and Intents are recorded durably and the event log begins. Ephemeral-only workspaces vanish without a trace once their sessions close; `acc doctor` may garbage-collect any that were abandoned.
+
+A lone session also pays no attention cost: adapters inject no coordination context while the roster has no peers and no attention items, and tool guards short-circuit against the empty claim set.
+
 ## Event model
 
 Every meaningful mutation appends an immutable event and updates materialized state atomically.
@@ -165,9 +171,11 @@ If the coordinator disappears:
 - decisions requiring coordination become attention items;
 - another participant or the human may acquire the coordinator role according to policy.
 
+The coordinator is a planning convenience, never an information gatekeeper: any session can answer for the whole Workspace and relay human requests to any participant. Authority differences apply to mutation only, never to knowledge.
+
 ## Native subagents
 
-Adapters may report parent/child session relationships. Short-lived children remain collapsed unless they obtain a task, claim a resource, send an external message, or exceed the adapter's visibility threshold.
+Adapters may report parent/child session relationships. Short-lived children remain collapsed unless they obtain a task, claim a resource, send an external message, or exceed the adapter's visibility threshold. Collapse reduces noise; it is not secrecy — any session may query collapsed children on demand through a full-scope sync.
 
 ## Realtime and wake behavior
 
@@ -180,3 +188,7 @@ No universal wake guarantee exists. Capabilities distinguish:
 - managed process wake, reserved for a possible future runner.
 
 Delivery status must reflect the strongest observed fact, not intent.
+
+## Presence freshness
+
+Presence has three observable states: online, stale, and offline. Heartbeats arrive only at moments the harness actually exposes — hook safe points for native adapters, tool calls for MCP clients — so an idle but open session naturally degrades to stale. That is truthful reporting, not an error. Each adapter declares its expected heartbeat cadence, and the staleness window derives from that declaration rather than one global constant. The first release ships no heartbeat helper: an idle session is truthfully reported stale, and that display is expected, not an error (approved 2026-08-15). A detached helper (the prototype's watcher pattern) remains a possible later opt-in. Liveness probes and claim lease expiry, never presence staleness alone, decide when ownership may be replaced.

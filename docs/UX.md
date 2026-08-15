@@ -27,19 +27,9 @@ The exact package and binary names remain subject to publication checks.
 
 ## First session
 
-The first supported session in a directory silently creates or discovers a Workspace and registers itself. The user asks an ordinary question; no ACC-specific phrase is required.
+The first supported session in a directory silently creates or discovers a Workspace and registers itself. The user asks an ordinary question; no ACC-specific phrase is required. A lone session leaves only ephemeral presence behind; durable Workspace state appears the moment a second session attaches or the first claim, message, or other durable object is created.
 
-The adapter injects concise internal context such as:
-
-```text
-ACC workspace: Papercut Warzone 2
-Active: none
-Direct requests: none
-Conflicting claims: none
-Before tracked edits, publish a one-line work intent and acquire needed claims.
-```
-
-The model announces its Intent through a high-level tool without asking the user to operate the protocol.
+While the session is alone, the adapter injects nothing and asks nothing of the model: a simple solo task looks exactly as if ACC were not installed. Coordination context and the one-line Intent prompt appear at the first safe point after a second session attaches, and the model then announces its Intent through a high-level tool without asking the user to operate the protocol.
 
 ## Additional session
 
@@ -53,6 +43,19 @@ No direct requests. No claim conflicts.
 ```
 
 This context is normally hidden from the human-facing response.
+
+## Any session answers for the whole system
+
+The user may ask whichever chat is in front of them about the entire Workspace, and that session answers from shared state instead of claiming ignorance:
+
+```text
+User: what is happening in the project right now?
+Claude: visual-codex is editing the camera (2 subagents: shaders,
+lighting-review); physics-gemini is waiting for confirmation of the
+tank-scale contract. No conflicts; one decision is waiting on you.
+```
+
+The same session can relay a request to any participant — “tell Gemini the contract is confirmed” becomes an ACC message with the human's authority attributed, delivered at the recipient's next safe point.
 
 ## Workstream joining policy
 

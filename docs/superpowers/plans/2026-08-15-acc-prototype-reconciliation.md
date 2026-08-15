@@ -8,6 +8,8 @@
 
 **Tech Stack:** Node.js ESM, Node built-in `node:test`, dependency-free filesystem storage, Git patches as evidence.
 
+**Spec:** `docs/superpowers/specs/2026-08-15-standalone-acc-design.md` §13 plus `docs/MIGRATION.md` (semantic contents, conflict points, required combined regressions).
+
 ## Global Constraints
 
 - Do not edit `prototype/papercut-agent-comms/` or `migration/patches/*.patch`.
@@ -42,12 +44,10 @@ npm run test:prototype
 
 Expected historical baseline: 181 tests. Record the exact observed count and outcome in `prototype/integrated/SOURCE.md`; do not hide the known fixed-delay failure if it occurs.
 
-Also run the focused SIGTERM test and the parallel diagnostic:
+Also run the focused SIGTERM test and the parallel diagnostic using the scripts that already exist in the root `package.json`:
 
 ```bash
-cd prototype/papercut-agent-comms
-node --test --test-name-pattern='SIGTERM is accepted' tests/tools/agent_comms/cli-round1.test.mjs
-cd ../../..
+npm run test:prototype:sigterm
 npm run test:prototype
 ```
 
@@ -125,7 +125,7 @@ listJsonFiles(dir, { root, readDirectory })
 
 - [ ] **Step 1: Reconstruct storage tests from the archived patch**
 
-Port only test additions from `0003-storage-and-messages.patch`. Adjust paths so they target `prototype/integrated/tools/agents/`.
+Port every test change from `0003-storage-and-messages.patch`: the new `*-storage.test.mjs` and `*-process-storage.test.mjs` files plus the patch's modifications to the existing `atomic-json.test.mjs` and `cli-round1.test.mjs` (those hunks pass the new explicit `root` argument into the safe-read helpers; without them the legacy tests break as soon as Step 3 lands the new signatures). The `cli-round1.test.mjs` hunk does not overlap Task 1's SIGTERM readiness change; keep both. Do not port production changes yet. Adjust paths so they target `prototype/integrated/tools/agents/`.
 
 - [ ] **Step 2: Run focused tests to verify RED**
 
@@ -151,14 +151,16 @@ return publishWithoutReplacement(source, destination);
 
 Run the Step 2 command. Expected: every focused test passes.
 
-- [ ] **Step 5: Run compatibility tests**
+- [ ] **Step 5: Run compatibility tests and the full integrated suite**
 
 ```bash
 cd prototype/integrated
-node --test tests/tools/agent_comms/{atomic-json,identity,messages,paths,schema,claims,status,repair-mutex}.test.mjs
+node --test tests/tools/agent_comms/{atomic-json,identity,messages,paths,schema,claims,status,repair-mutex,cli-round1}.test.mjs
+cd ../..
+npm run test:integrated
 ```
 
-Expected: all selected legacy behavior remains green.
+Expected: all legacy behavior remains green, including `cli-round1.test.mjs`, which now exercises the ported root-aware read signature. Do not commit a snapshot whose full suite is red.
 
 - [ ] **Step 6: Commit**
 
@@ -193,15 +195,15 @@ Expected: the baseline permits at least protocol mutation, stale open identity r
 
 - [ ] **Step 3: Port lifecycle behavior, not old helper signatures**
 
-Implement these command preconditions:
+Implement these command preconditions using the guard name the archived patch actually introduces (`requireCheckoutProtocol` in `tools/agents/lib/identity.mjs`; `comms.mjs` calls it for every command outside `init` and `prompt`):
 
 ```js
-if (command !== "init" && command !== "prompt") {
-  await requireCompatibleWorkspace(context);
+if (!["init", "prompt"].includes(parsed.command)) {
+  await requireCheckoutProtocol(context);
 }
 ```
 
-`requireCompatibleWorkspace` must validate schema version, protocol version, workspace identity, and root before mutation. Preserve Task 2's managed-root reads.
+`requireCheckoutProtocol` must validate schema version, protocol version, workspace identity, and root before mutation. Keep the archived prototype vocabulary here; renaming to standalone Workspace terms belongs to the extraction plan, not this one. Preserve Task 2's managed-root reads.
 
 Serialize register, resume, close, watcher start, and watcher stop through one per-participant ownership critical section.
 
@@ -327,7 +329,8 @@ git commit -m "fix: complete integrated protocol prompt"
 
 **Files:**
 - Create: `prototype/integrated/COMBINED_VERIFICATION.md`
-- Create: `prototype/integrated/tests/tools/agent_comms/combined-hardening.test.mjs`
+- Create: `prototype/integrated/tests/tools/agent_comms/combined-hardening.test.mjs` (split into `combined-hardening-<area>.test.mjs` files if the 300-line test limit requires it)
+- Modify: `docs/PROGRESS.md`
 
 **Interfaces:**
 - Consumes: Tasks 1–5
@@ -335,7 +338,7 @@ git commit -m "fix: complete integrated protocol prompt"
 
 - [ ] **Step 1: Add cross-patch regressions**
 
-The focused file must exercise all twelve cases listed in `docs/MIGRATION.md` under “Required combined regressions.” Use real CLI subprocesses for workspace identity and stdout/exit-code assertions; use deterministic injected seams for race windows.
+The focused file must exercise all twelve cases listed in `docs/MIGRATION.md` under “Required combined regressions.” Use real CLI subprocesses for workspace identity and stdout/exit-code assertions; use deterministic injected seams for race windows. Subprocess-heavy cases are verbose: if one file cannot hold all twelve under the 300-line limit, split them into at most three `combined-hardening-<area>.test.mjs` files (for example `-storage`, `-lifecycle`, `-doctor`), keeping each case in exactly one file.
 
 - [ ] **Step 2: Capture RED liveness for each protection group**
 
@@ -347,7 +350,7 @@ For storage, lifecycle, and doctor groups, temporarily neutralize one exact pred
 find prototype/integrated/tools/agents -name '*.mjs' -print0 | xargs -0 -n1 node --check
 npm run test:integrated
 git diff --check
-find prototype/integrated/tools prototype/integrated/tests -name '*.mjs' -print0 | xargs -0 wc -l | awk '$1 >= 300 { print; failed=1 } END { exit failed }'
+find prototype/integrated/tools prototype/integrated/tests -name '*.mjs' -print0 | xargs -0 wc -l | awk '$2 != "total" && $1 >= 300 { print; failed=1 } END { exit failed }'
 ```
 
 Expected: syntax green; all tests pass; diff check green; no listed file reaches 300 lines.
@@ -356,9 +359,13 @@ Expected: syntax green; all tests pass; diff check green; no listed file reaches
 
 `COMBINED_VERIFICATION.md` must contain exact HEAD, commands, exit codes, test counts, mutation RED evidence, and remaining limitations. Do not copy historical counts.
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 5: Update the progress ledger**
+
+In `docs/PROGRESS.md`, mark “Hardening patches integrated into one verified prototype snapshot” complete and change “Next implementation action” to the core extraction plan. Do not change any other checkbox.
+
+- [ ] **Step 6: Commit**
 
 ```bash
-git add prototype/integrated
+git add prototype/integrated docs/PROGRESS.md
 git commit -m "test: certify combined protocol hardening"
 ```

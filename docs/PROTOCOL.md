@@ -1,6 +1,6 @@
 # Protocol model
 
-This is the proposed model-facing and adapter-facing domain vocabulary.
+This is the approved model-facing and adapter-facing domain vocabulary (design approved 2026-08-15).
 
 ## Identity hierarchy
 
@@ -89,6 +89,10 @@ export interface ResourceClaim {
 
 Adapters may provide path-aware overlap logic, but core mutation is atomic and project-agnostic.
 
+### Claim lifetime and stale owners
+
+Claims are leases. `expiresAt` bounds every claim, and renewal requires the owner's exact session generation. A conflicting claim whose owner session has stale presence still conflicts: the staleness is reported to the requester, but only lease expiry or an explicit force release removes the claim. Force release requires human or policy authority and records actor, reason, and the replaced generation. Presence staleness alone never auto-releases a claim, because an idle-but-open session may resume at any moment.
+
 ## Messages
 
 Message types are semantic, not vendor-specific:
@@ -174,3 +178,5 @@ Adapters request deltas since a cursor. Core computes attention items from expli
 - capability failure that weakened protection.
 
 Semantic relevance may be assessed by the receiving model, but correctness cannot depend on a hidden central LLM classifier.
+
+Sync also supports an explicit full-Workspace scope: any session may request the complete snapshot — roster, intents, workstreams, tasks, claims, and other participants' collapsed child sessions — to answer whole-system questions. Bounded deltas are the ambient default; the full scope exists so no session ever has to say it cannot see the rest of the system.

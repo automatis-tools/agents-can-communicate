@@ -13,7 +13,7 @@ The project is at the standalone extraction handoff boundary.
 - [x] Competitor and native-harness research summarized.
 - [x] Standalone product direction documented.
 - [x] Core, adapter, and productization execution plans drafted.
-- [ ] User explicitly approves the proposed ambient-workspace/workstream model.
+- [x] User explicitly approves the proposed ambient-workspace/workstream model (2026-08-15).
 - [ ] Hardening patches integrated into one verified prototype snapshot.
 - [ ] Papercut assumptions removed behind project-agnostic interfaces.
 - [ ] Standalone package layout created.
@@ -25,17 +25,11 @@ The project is at the standalone extraction handoff boundary.
 
 ## Active gate
 
-Before implementation continues, review the proposed decisions in `docs/DECISIONS.md`. In particular, confirm:
-
-1. every supported session silently attaches to workspace awareness;
-2. no session becomes a permanent project-wide orchestrator;
-3. workstream coordinators are optional, scoped, and replaceable;
-4. `Intent` is first-class and tasks remain optional;
-5. the first product release does not launch or own agent processes.
+Closed 2026-08-15. The user approved all five ambient-model points and, the same day, every remaining design proposal: attach everywhere with lazy durable materialization, truthful `stale` presence with no heartbeat sidecar, peer equality (any session answers for the whole Workspace), solo zero-overhead, Gemini as a first-wave native adapter, workspace-global claims, runtime state outside the repository, optional project config, and durable-state authority. See `docs/DECISIONS.md` for exact wording. No design proposal remains unapproved; no gate blocks Phase 0.
 
 ## Next implementation action
 
-After approval, execute `docs/superpowers/plans/2026-08-15-acc-prototype-reconciliation.md` from Task 1. The first deliverable is one integrated prototype snapshot with all four hardening sets reconciled and verified together.
+Execute `docs/superpowers/plans/2026-08-15-acc-prototype-reconciliation.md` from Task 1 in an isolated worktree under `.gitworktrees/`. The first deliverable is one integrated prototype snapshot with all four hardening sets reconciled and verified together.
 
 Then execute the core extraction plan. Do not start native adapters before the project-agnostic core passes its complete regression suite.
 

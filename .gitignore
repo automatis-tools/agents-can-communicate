@@ -1,6 +1,7 @@
 .idea/
 .agents/
 .worktrees/
+.gitworktrees/
 node_modules/
 coverage/
 dist/
