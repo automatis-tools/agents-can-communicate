@@ -3,7 +3,7 @@ import { lstat, mkdir, rename, rmdir, unlink } from "node:fs/promises";
 import path from "node:path";
 import { isDeepStrictEqual } from "node:util";
 
-import { listDirectoryEntries, readJsonStrict, writeJsonAtomic } from "./atomic-json.mjs";
+import { listDirectoryEntries, writeJsonAtomic } from "./atomic-json.mjs";
 import { CommsError, EXIT } from "./errors.mjs";
 import { readJsonRegularNoFollow } from "./safe-file.mjs";
 import { validateAgentId } from "./schema.mjs";
@@ -135,9 +135,18 @@ export async function scanRepairMutexAudits(context) {
       const destination = path.join(context.paths.quarantine, `mutex-stale-${digest}`);
       if (match?.[1] !== digest || audit.quarantine_path !== destination)
         throw new Error("mutex audit binding mismatch");
-      const moved = await readOwnerSnapshot(context, destination);
-      if (!isDeepStrictEqual(moved.owner, audit.target)
-        || createHash("sha256").update(moved.bytes).digest("hex") !== audit.owner_sha256)
+      let snapshot, ownerSha;
+      try { snapshot = await readOwnerSnapshot(context, destination);
+        ownerSha = createHash("sha256").update(snapshot.bytes).digest("hex"); }
+      catch (error) {
+        if (error.code !== "ENOENT") throw error;
+        try { await lstat(destination); throw new Error("mutex quarantine owner is missing"); }
+        catch (missing) { if (missing.code !== "ENOENT") throw missing; }
+        const pending = await inspectRepairMutex(context, audit.target.kind, audit.target.agent_id);
+        if (pending?.state !== "stale") throw error;
+        snapshot = { owner: pending.owner }; ownerSha = pending.owner_sha256;
+      }
+      if (!isDeepStrictEqual(snapshot.owner, audit.target) || ownerSha !== audit.owner_sha256)
         throw new Error("mutex audit target mismatch");
     } catch { corrupt.push(auditPath); }
   }
@@ -158,7 +167,8 @@ export async function repairStaleRepairMutex(context, kind, agentId = null) {
   try { await writeJsonAtomic(paths.audit, audit, { tmpDir: context.paths.tmp, exclusive: true }); }
   catch (error) {
     if (!(error instanceof CommsError) || error.exitCode !== EXIT.CONFLICT) throw error;
-    const existing = await readJsonStrict(paths.audit, validateAudit, context.paths.root);
+    const { record: existing } = await readJsonRegularNoFollow(paths.audit, validateAudit,
+      context.paths.root, context.openMutexAudit);
     if (!isDeepStrictEqual(existing, { ...audit, recorded_at: existing.recorded_at })) throw error;
   }
   try { await (context.renameRepairMutex ?? rename)(inspected.path, paths.destination); }

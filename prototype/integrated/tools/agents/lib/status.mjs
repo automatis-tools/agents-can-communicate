@@ -2,20 +2,21 @@ import { access } from "node:fs/promises";
 import path from "node:path";
 import { listDirectoryEntries, listJsonFiles, readJsonStrict } from "./atomic-json.mjs";
 import { inspectClaimRecords } from "./claim-records.mjs";
-import { repairStaleClaimLock } from "./claims.mjs";
+import { repairPendingForceReleases, repairStaleClaimLock } from "./claims.mjs";
 import { archiveAcknowledged, quarantineCorrupt, scanDoctorAudits }
   from "./doctor-storage.mjs";
 import { protocolCompatibilityIssue } from "./doctor-protocol.mjs";
 import { EXIT } from "./errors.mjs";
 import { inspectWatcherOwnership, presenceState, repairStaleWatcherOwnership } from "./presence.mjs";
+import { inspectRecoveryAudits, isRecoveryArtifactPath, recoveryIssues }
+  from "./recovery-audits.mjs";
 import { repairStaleRepairMutex, scanRepairMutexAudits, withRepairMutex } from "./repair-mutex.mjs";
 import { collectMutexStatus, mutexIssues, repairStaleWatcherMutexes } from "./status-locks.mjs";
 import { validateAcknowledgement, validateHandoff, validateLock,
   validateMessage, validatePresence, validateProtocol, validateRegistry,
   validateSeenReceipt } from "./schema.mjs";
-async function exists(filePath) { try { await access(filePath); return true; }
-  catch (error) { if (error.code === "ENOENT") return false; throw error; }
-}
+async function exists(filePath) { try { await access(filePath); return true; } catch (error) {
+  if (error.code === "ENOENT") return false; throw error; } }
 function addCorrupt(state, filePath) { if (!state.corrupt.includes(filePath)) state.corrupt.push(filePath); }
 async function safeRead(context, filePath, validate, state) {
   try { return await readJsonStrict(filePath, validate, context.paths.root); }
@@ -32,8 +33,7 @@ async function nestedJsonFiles(context, root) {
     listJsonFiles(path.join(root, entry.name), { root: context.paths.root })))).flat();
 }
 function fileStem(filePath) { return path.basename(filePath, ".json"); }
-function sortRecords(records, field) { return records.sort(
-  (a, b) => a[field].localeCompare(b[field])); }
+function sortRecords(records, field) { return records.sort((a, b) => a[field].localeCompare(b[field])); }
 async function readProtocol(context, state) {
   const record = await safeRead(context, context.paths.protocol, validateProtocol, state);
   if (record === null) {
@@ -164,22 +164,20 @@ async function readLockCorruption(context, state) {
     path.join(context.paths.locks, `watcher-${agentId}.json`)); }
 }
 export async function collectStatus(context) {
-  const state = { corrupt: [] };
+  const state = { corrupt: [] }, recovery = await inspectRecoveryAudits(context);
   await readLockCorruption(context, state);
-  for (const auditPath of [...await scanDoctorAudits(context),
-    ...await scanRepairMutexAudits(context)]) addCorrupt(state, auditPath);
+  for (const auditPath of [...await scanDoctorAudits(context), ...await scanRepairMutexAudits(context),
+    ...recovery.corrupt]) addCorrupt(state, auditPath);
   const report = { protocol: await readProtocol(context, state),
     agents: await readAgents(context, state),
     messages: await messageStatus(context, state), claims: await readClaims(context, state),
-    handoffs: await readHandoffs(context, state), locks: await collectMutexStatus(context),
+    handoffs: await readHandoffs(context, state), recovery, locks: await collectMutexStatus(context),
     corrupt: state.corrupt.sort() };
   report.counts = counts(report);
   return report;
 }
-function issue(code, filePath, message, severity = "error") { return {
-  code, severity, path: filePath, message }; }
-function isRepairStoragePath(context, filePath) { return path.dirname(filePath) === context.paths.quarantine
-  && /^(doctor-audit-|mutex-audit-|mutex-stale-)/.test(path.basename(filePath)); }
+function issue(code, filePath, message, severity = "error") {
+  return { code, severity, path: filePath, message }; }
 async function watcherIds(context) {
   const entries = await listDirectoryEntries(context.paths.locks, { root: context.paths.root });
   return entries.filter(entry => entry.isFile() && /^watcher-.+\.json$/.test(entry.name))
@@ -195,6 +193,7 @@ async function operationalIssues(context, report, input) {
   if (protectedProtocol !== null) issues.push(protectedProtocol);
   issues.push(...mutexIssues(report.locks, issue).filter(item =>
     !(input.doctorMutexHeld && item.code === "DOCTOR_MUTEX_LIVE")));
+  issues.push(...recoveryIssues(report.recovery, issue));
   for (const filePath of report.corrupt) if (filePath !== context.paths.protocol
     || (!protocolMissing && protectedProtocol === null)) issues.push(issue("CORRUPT_JSON", filePath,
     "invalid or inconsistent protocol record"));
@@ -252,6 +251,7 @@ async function performRepairs(context, issues) {
   if (issues.some(item => item.code === "STALE_CLAIM_LOCK")
     && await repairStaleClaimLock(context)) repairs.push({
     action: "repair_stale_claim_lock", path: path.join(context.paths.locks, "claims.lock") });
+  repairs.push(...await repairPendingForceReleases(context));
   for (const agentId of await watcherIds(context)) if (
     await repairStaleWatcherOwnership(context, agentId)) repairs.push({
     action: "repair_stale_watcher_owner",
@@ -265,7 +265,7 @@ export async function runDoctor(context, input = {}) {
   const incompatible = issues.some(item => ["PROTOCOL_MISSING", "UNKNOWN_PROTOCOL_VERSION",
     "UNKNOWN_SCHEMA_VERSION"]
     .includes(item.code));
-  const corruptAudit = report.corrupt.some(filePath => isRepairStoragePath(context, filePath));
+  const corruptAudit = report.corrupt.some(filePath => isRecoveryArtifactPath(context, filePath));
   let repairs = [];
   if (input.repair && !incompatible && !corruptAudit) {
     if (report.locks.doctor?.state === "stale"
@@ -279,7 +279,7 @@ export async function runDoctor(context, input = {}) {
         const lockedIncompatible = lockedIssues.some(item => ["PROTOCOL_MISSING",
           "UNKNOWN_PROTOCOL_VERSION", "UNKNOWN_SCHEMA_VERSION"].includes(item.code));
         const lockedCorruptAudit = lockedReport.corrupt.some(filePath =>
-          isRepairStoragePath(context, filePath));
+          isRecoveryArtifactPath(context, filePath));
         return lockedIncompatible || lockedCorruptAudit ? []
           : performRepairs(context, lockedIssues);
       }));
