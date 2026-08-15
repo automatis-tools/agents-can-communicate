@@ -1,0 +1,18 @@
+#!/bin/sh
+# Pre-push gate: lint validation plus the protocol regression suite.
+# Enable once per clone with:  git config core.hooksPath .githooks
+# Never bypass with --no-verify; fix the failure instead.
+set -e
+
+echo "pre-push: syntax-checking tracked .mjs files"
+git ls-files -z '*.mjs' | xargs -0 -n1 node --check
+
+if node -e "process.exit(require('./package.json').scripts?.['test:integrated'] ? 0 : 1)" 2>/dev/null
+then
+  echo "pre-push: running the integrated protocol suite"
+  npm run test:integrated
+else
+  echo "pre-push: no test:integrated script in this revision; skipping the suite"
+fi
+
+echo "pre-push: all gates passed"

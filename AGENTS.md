@@ -44,6 +44,7 @@ This repository is the standalone Agents Can Communicate product. It is not part
 - Prefer Node built-ins and dependency-free code. Before adding a dependency, verify the latest stable release from its primary source and pin it exactly.
 - Keep production modules and focused test files below 300 lines or add an explicit header explaining why splitting would damage cohesion.
 - Keep adapter-specific behavior inside adapter packages. Core code must not branch on vendor names.
+- Enable the tracked pre-push gate once per clone with `git config core.hooksPath .githooks`. It syntax-checks every tracked `.mjs` file and runs the protocol suite.
 - Never bypass hooks with `--no-verify`.
 - Commit changes in focused, independently reviewable commits. Do not push or merge unless the user explicitly requests it.
 
