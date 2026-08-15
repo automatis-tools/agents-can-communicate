@@ -13,8 +13,17 @@ import {
 
 const execFileAsync = promisify(execFile);
 
+// Git exports GIT_DIR, GIT_WORK_TREE, GIT_INDEX_FILE and friends into the
+// environment of anything it runs, hooks included. Inheriting them makes every
+// fixture operate on the ambient repository instead of its own temporary one,
+// so they are stripped unconditionally rather than only when a hook is noticed.
+export function hermeticEnv(overrides = {}) {
+  const inherited = Object.entries(process.env).filter(([key]) => !key.startsWith("GIT_"));
+  return { ...Object.fromEntries(inherited), ...overrides };
+}
+
 async function git(cwd, args) {
-  const { stdout } = await execFileAsync("git", args, { cwd });
+  const { stdout } = await execFileAsync("git", args, { cwd, env: hermeticEnv() });
   return stdout;
 }
 
@@ -109,11 +118,10 @@ export function startCli(fixture, argv, options = {}) {
   const executable = path.resolve(testDirectory, "../../../tools/agents/comms.mjs");
   const child = spawn(process.execPath, [executable, ...argv], {
     cwd: options.cwd ?? fixture.repo,
-    env: {
-      ...process.env,
+    env: hermeticEnv({
       PW2_AGENT_BUS_DIR: fixture.bus,
       ...options.env,
-    },
+    }),
     stdio: ["pipe", "pipe", "pipe"],
   });
 
