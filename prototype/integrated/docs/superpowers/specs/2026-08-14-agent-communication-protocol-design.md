@@ -1,7 +1,7 @@
 # Локальний протокол комунікації агентів
 
 **Дата:** 2026-08-14
-**Статус:** design approved; implementation pending
+**Статус:** design approved; implementation complete; primary integration pending
 **Скоуп:** локальні LLM-агенти, які працюють у різних сесіях і worktree одного checkout Papercut Warzone 2
 
 ## Проблема

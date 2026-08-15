@@ -73,7 +73,9 @@ node tools/agents/comms.mjs reply --from models --message MESSAGE_ID --type cont
 `handoff` requires all of `--id`, `--to`, `--task`, `--result`, `--branch`,
 `--base`, `--verification-file`, `--contracts-file`, and `--limitations-file`,
 plus either `--commit SHA` or `--uncommitted` (never both). `--changed`,
-`--follow-up`, and `--artifact` may repeat. A committed handoff is:
+`--follow-up`, `--artifact`, and `--ephemeral-artifact` may repeat. Use
+`--artifact` for a committed repository file and `--ephemeral-artifact` for
+ignored evidence under `.agents/artifacts/`. A committed handoff is:
 
 ```bash
 node tools/agents/comms.mjs handoff --id visual --to orchestrator --task M2.7 --result ready --branch m2/visual --commit COMMIT_SHA --base BASE_SHA --changed game/presentation/view.gd --verification-file verification.json --contracts-file contracts.json --limitations-file limitations.json
@@ -125,6 +127,10 @@ handoff, release claims, stop `watch` orderly with SIGINT/SIGTERM, and `close`.
 | `5` | Identity, claim, or lock conflict. |
 | `6` | Required agent is stale/offline or a required acknowledgement is pending. |
 
+With `--json`, success and failure each produce exactly one JSON value on
+stdout. Failures use `{ "error": { "message", "exit_code", "details" } }` and
+leave stderr empty; human mode prints the error on stderr.
+
 Records are plaintext local files: never send secrets, tokens, credentials, or
 personal data that does not belong in the repository. JSON schema/version
 errors fail closed with exit 4. `doctor --repair` quarantines corrupt immutable
@@ -132,6 +138,13 @@ records and may repair proven stale locks or complete safe archive transitions;
 it never silently resets a bus, steals a live claim, or migrates an unknown
 schema. Investigate the reported path, use `status`/`doctor`, and coordinate
 with the orchestrator before any repair affecting shared work.
+
+The transport rejects symlinked managed paths, canonical escapes, and observed
+directory-generation changes. Its security boundary is cooperative same-user
+agents: portable dependency-free Node cannot make path traversal atomic against
+a deliberately adversarial local process that swaps and restores an ancestor
+directory between checks. Do not use the bus as a secret store or cross-user
+security boundary.
 
 ## Rollout boundary
 
