@@ -51,6 +51,10 @@ test("the executable covers every command and stable process exit", async t => {
   { cwd: fixture.worktree });
   await jsonCli(fixture, ["send", "--from", "visual", "--to", "models", "--type", "status",
     "--severity", "info", "--subject", "third"], { cwd: fixture.worktree, input: "stdin" });
+  await writeFile(path.join(fixture.bus, "presence", "models.json"), `${JSON.stringify({
+    schema_version: 1, agent_id: "models", pid: process.pid, status: "online",
+    heartbeat_at: new Date().toISOString(),
+  })}\n`);
   const broadcast = await jsonCli(fixture, ["broadcast", "--from", "visual", "--severity", "info",
     "--subject", "notice", "--body", "all"], { cwd: fixture.worktree });
   assert.equal(broadcast.length, 1);

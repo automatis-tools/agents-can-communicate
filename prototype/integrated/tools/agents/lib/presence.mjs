@@ -119,7 +119,8 @@ export async function startWatcher(context, input) {
     })();
     return terminalPromise;
   }
-  ownership = await acquireWatcherOwnership(context, agentId, pid);
+  ownership = await acquireWatcherOwnership(context, agentId, pid,
+    () => requireOpenAgent(context, agentId));
   heartbeatHandle = scheduler.setInterval(() => queueHeartbeat().catch(() => undefined),
     heartbeatMs);
   try {

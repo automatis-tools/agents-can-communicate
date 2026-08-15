@@ -2,7 +2,7 @@
 import { randomUUID } from "node:crypto";
 import { execFile } from "node:child_process";
 import { watch as fsWatch } from "node:fs";
-import { access, readFile } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { promisify } from "node:util";
 
@@ -11,15 +11,15 @@ import { claimScope, extendClaims, forceReleaseStaleScope, releaseOwnedClaims, r
   from "./lib/claims.mjs";
 import { CommsError, EXIT } from "./lib/errors.mjs";
 import { createHandoff } from "./lib/handoff.mjs";
-import { closeAgent, initBus, registerAgent } from "./lib/identity.mjs";
+import { closeAgent, initBus, registerAgent, requireCheckoutProtocol } from "./lib/identity.mjs";
 import { renderPrompt } from "./lib/prompt.mjs";
 import { ackMessage, broadcastMessage, listInbox, markSeen, replyToMessage, sendMessage }
   from "./lib/messages.mjs";
 import { createBusPaths, resolveBusDir } from "./lib/paths.mjs";
-import { startWatcher, waitForMessage } from "./lib/presence.mjs";
-import { parseArgs } from "./lib/args.mjs";
+import { presenceState, startWatcher, waitForMessage } from "./lib/presence.mjs";
+import { errorPayload, parseArgs } from "./lib/args.mjs";
 import { listJsonFiles, readJsonStrict } from "./lib/atomic-json.mjs";
-import { validateRegistry } from "./lib/schema.mjs";
+import { validatePresence, validateRegistry } from "./lib/schema.mjs";
 import { withSignalStop } from "./lib/signal-stop.mjs";
 import { collectStatus, enforcementExit, runDoctor } from "./lib/status.mjs";
 
@@ -78,19 +78,19 @@ async function attachments(context, options) {
   return Promise.all([...regular, ...ephemeral].map(item => describeAttachment(context, item)));
 }
 
-async function openAgentIds(context) {
+async function activeAgentIds(context) {
   const records = await Promise.all((await listJsonFiles(context.paths.registry,
     { root: context.paths.root })).map(file =>
     readJsonStrict(file, validateRegistry, context.paths.root)));
-  return records.filter(record => record.status === "open").map(record => record.agent_id).sort();
-}
-
-async function requireInitialized(context) {
-  try { await access(context.paths.protocol); }
-  catch (error) {
-    if (error.code === "ENOENT") throw new CommsError("agent bus protocol is not initialized; run init", EXIT.DATA);
-    throw error;
-  }
+  const active = await Promise.all(records.filter(record => record.status === "open").map(async record => {
+    try {
+      const presence = await readJsonStrict(context.paths.presenceFile(record.agent_id),
+        validatePresence, context.paths.root);
+      return presenceState(presence, context.now(), context.pidIsAlive) === "online"
+        ? record.agent_id : null;
+    } catch (error) { if (error.code === "ENOENT") return null; throw error; }
+  }));
+  return active.filter(agentId => agentId !== null).sort();
 }
 
 async function emit(context, value, json, human) {
@@ -117,7 +117,6 @@ async function runPrompt(context, options) {
 }
 
 async function runRegister(context, options) {
-  await requireInitialized(context);
   const value = await registerAgent(context, { agentId: options.id, role: options.role, task: options.task,
     ownership: options.ownership ?? [], client: options.client, resume: options.resume === true,
     worktree: context.cwd });
@@ -126,7 +125,6 @@ async function runRegister(context, options) {
 }
 
 async function runClose(context, options) {
-  await requireInitialized(context);
   const value = await closeAgent(context, options.id);
   await emit(context, value, options.json, `closed ${value.agent_id}`);
   return EXIT.OK;
@@ -141,7 +139,6 @@ async function messageInput(context, options, extra = {}) {
 }
 
 async function runSend(context, options) {
-  await requireInitialized(context);
   const input = await messageInput(context, options);
   input.attachments = await attachments(context, options);
   const value = await sendMessage(context, input);
@@ -150,7 +147,6 @@ async function runSend(context, options) {
 }
 
 async function runBroadcast(context, options) {
-  await requireInitialized(context);
   const input = await messageInput(context, options);
   input.attachments = await attachments(context, options);
   const value = await broadcastMessage(context, input);
@@ -159,7 +155,6 @@ async function runBroadcast(context, options) {
 }
 
 async function runInbox(context, options) {
-  await requireInitialized(context);
   const value = await listInbox(context, { agentId: options.id, types: options.type, severities: options.severity });
   await emit(context, value, options.json, value.map(item => `${item.state}: ${item.message.subject}`).join("\n") || "inbox empty");
   for (const item of value) await markSeen(context, item.message, options.id);
@@ -167,14 +162,12 @@ async function runInbox(context, options) {
 }
 
 async function runAck(context, options) {
-  await requireInitialized(context);
   const value = await ackMessage(context, { agentId: options.id, messageId: options.message });
   await emit(context, value, options.json, `acknowledged ${value.message_id}`);
   return EXIT.OK;
 }
 
 async function runReply(context, options) {
-  await requireInitialized(context);
   const input = await messageInput(context, options, { messageId: options.message });
   input.attachments = await attachments(context, options);
   const value = await replyToMessage(context, input);
@@ -183,7 +176,6 @@ async function runReply(context, options) {
 }
 
 async function runWatch(context, options) {
-  await requireInitialized(context);
   const watcher = await startWatcher(context, { agentId: options.id, heartbeatMs: options.heartbeat && seconds(options.heartbeat, "heartbeat"),
     scanIntervalMs: options.scanInterval && seconds(options.scanInterval, "scan interval") });
   await context.beforeWatcherPublish?.(watcher);
@@ -193,18 +185,20 @@ async function runWatch(context, options) {
 }
 
 async function runWait(context, options) {
-  await requireInitialized(context);
   const value = await waitForMessage(context, { agentId: options.id,
     timeoutMs: options.timeout === undefined ? undefined : seconds(options.timeout, "timeout"),
     scanIntervalMs: options.scanInterval && seconds(options.scanInterval, "scan interval") });
-  if (value === null) return EXIT.TIMEOUT;
+  if (value === null) {
+    if (options.json) await emit(context,
+      errorPayload(new CommsError("wait timed out", EXIT.TIMEOUT), EXIT.TIMEOUT), true, "");
+    return EXIT.TIMEOUT;
+  }
   await emit(context, value, options.json, `message: ${value.subject}`);
   await markSeen(context, value, options.id);
   return EXIT.OK;
 }
 
 async function runClaim(context, options) {
-  await requireInitialized(context);
   const value = await claimScope(context, { agentId: options.id, scope: options.scope, reason: options.reason,
     leaseSeconds: options.lease === undefined ? undefined : Number(options.lease) });
   await emit(context, value, options.json, `claimed ${value.scope}`);
@@ -212,7 +206,6 @@ async function runClaim(context, options) {
 }
 
 async function runRelease(context, options) {
-  await requireInitialized(context);
   const value = options.forceStale ? await forceReleaseStaleScope(context, { agentId: options.id,
     owner: options.owner, scope: options.scope }) : await releaseScope(context, { agentId: options.id, scope: options.scope });
   await emit(context, value, options.json, `released ${value.scope}`);
@@ -220,14 +213,16 @@ async function runRelease(context, options) {
 }
 
 async function runHandoff(context, options) {
-  await requireInitialized(context);
   const [verification, contracts, limitations] = await Promise.all([
     jsonFile(context.cwd, options.verificationFile, "verification file"),
     jsonFile(context.cwd, options.contractsFile, "contracts file"),
     jsonFile(context.cwd, options.limitationsFile, "limitations file"),
   ]);
-  const artifacts = await Promise.all((options.artifact ?? []).map(file => describeAttachment(context, {
-    path: file, ephemeral: false, ...(options.commit === undefined ? {} : { commit: options.commit }) })));
+  const artifacts = await Promise.all([
+    ...(options.artifact ?? []).map(path => ({ path, ephemeral: false,
+      ...(options.commit === undefined ? {} : { commit: options.commit }) })),
+    ...(options.ephemeralArtifact ?? []).map(path => ({ path, ephemeral: true })),
+  ].map(input => describeAttachment(context, input)));
   const value = await createHandoff(context, { from: options.id, to: options.to, task: options.task,
     result: options.result, branch: options.branch, commit: options.commit ?? null, base: options.base,
     changedPaths: options.changed ?? [], verification, contracts, followUp: options.followUp ?? [], artifacts, limitations,
@@ -237,19 +232,18 @@ async function runHandoff(context, options) {
 }
 
 async function runStatus(context, options) {
-  await requireInitialized(context);
   const value = await collectStatus(context);
   await emit(context, value, options.json, `agents: ${value.counts.live_agents} live; pending: ${value.counts.required_unacked}`);
   return enforcementExit(value, options);
 }
 
 async function runDoctorCommand(context, options) {
-  await requireInitialized(context);
   const value = await runDoctor(context, { repair: options.repair === true,
     requireLive: (options.requireLive ?? []).flatMap(value => value.split(",")).filter(Boolean) });
   await emit(context, value, options.json, value.ok ? "doctor: healthy" : `doctor: ${value.issues.length} issue(s)`);
   if (value.ok) return EXIT.OK;
-  if (value.issues.some(item => item.code.includes("CORRUPT") || item.code === "PROTOCOL_MISSING")) return EXIT.DATA;
+  if (value.issues.some(item => item.code.includes("CORRUPT") || item.code === "PROTOCOL_MISSING"
+    || item.code === "UNKNOWN_SCHEMA_VERSION" || item.code === "UNKNOWN_PROTOCOL_VERSION")) return EXIT.DATA;
   if (value.issues.some(item => item.code.startsWith("REQUIRED_") || item.code === "ACKED_MESSAGE_NOT_ARCHIVED")) return EXIT.REQUIRED;
   return EXIT.CONFLICT;
 }
@@ -270,11 +264,15 @@ export async function main(argv, runtime = {}) {
     pid: runtime.pid ?? process.pid, pidIsAlive: runtime.pidIsAlive ?? defaultPidIsAlive,
     randomUUID: runtime.uuid ?? randomUUID, scheduler: runtime.scheduler, watchDirectory: runtime.watchDirectory ?? fallbackWatch,
     setActiveWatcher: runtime.setActiveWatcher, beforeWatcherPublish: runtime.beforeWatcherPublish,
+    gitCommonDir: () => runGit(cwd, ["rev-parse", "--path-format=absolute", "--git-common-dir"]),
     gitState: async directory => ({ branch: (await runGit(directory, ["branch", "--show-current"])).trim(),
       head: (await runGit(directory, ["rev-parse", "HEAD"])).trim() }),
     releaseOwnedClaims: agentId => releaseOwnedClaims(context, agentId),
-    extendOwnedClaims: agentId => extendClaims(context, agentId), listActiveAgentIds: () => openAgentIds(context),
+    extendOwnedClaims: agentId => extendClaims(context, agentId), listActiveAgentIds: () => activeAgentIds(context),
     output: async event => { await write(context.stdout, `${JSON.stringify(event)}\n`); await write(context.stderr, "\u0007"); } };
+  if (!["init", "prompt"].includes(parsed.command)) await requireCheckoutProtocol(context,
+    { allowInvalid: parsed.command === "doctor",
+      repair: parsed.command === "doctor" && parsed.options.repair === true });
   return COMMANDS[parsed.command](context, parsed.options);
 }
 
@@ -283,10 +281,13 @@ export function runWithSignals(argv, runtime = {}, signals = process) {
 }
 
 async function invoke() {
-  try { process.exitCode = await runWithSignals(process.argv.slice(2)); }
+  const argv = process.argv.slice(2);
+  try { process.exitCode = await runWithSignals(argv); }
   catch (error) {
     process.exitCode = error instanceof CommsError ? error.exitCode : 1;
-    await write(process.stderr, `${error instanceof CommsError ? error.message : error.stack}\n`);
+    if (argv.includes("--json")) await write(process.stdout,
+      `${JSON.stringify(errorPayload(error, process.exitCode))}\n`);
+    else await write(process.stderr, `${error instanceof CommsError ? error.message : error.stack}\n`);
   }
 }
 
