@@ -8,6 +8,8 @@
 
 **Tech Stack:** Node.js ESM, Node built-in tests, official client plugin/extension formats, MCP stdio server.
 
+**Spec:** `docs/superpowers/specs/2026-08-15-standalone-acc-design.md` §7 plus `docs/ADAPTERS.md` (capability matrix, tiers, and conformance suite).
+
 ## Global Constraints
 
 - Precondition: the complete core extraction plan is green.
@@ -17,6 +19,8 @@
 - Installer changes are idempotent, preserve unrelated user configuration, and are exactly reversible.
 - Keep model-facing operations to the six high-level ACC tools.
 - Retain real-client evidence for every capability marked true.
+- Every adapter skill instructs the model to publish Intent, to answer whole-Workspace questions from `sync`/`status` data — including other vendors' sessions and their subagents — and to relay user requests to other participants as ACC messages, instead of claiming it cannot see other models (peer equality, approved 2026-08-15).
+- Solo sessions are zero-overhead (approved 2026-08-15): when the Workspace has no peers and no attention items, adapters inject no coordination context — zero bytes, not a "none" banner — and guards short-circuit; coordination surfaces at the first safe point after a peer attaches.
 
 ---
 
@@ -27,13 +31,15 @@
 - Create: `packages/adapter-sdk/src/capabilities.mjs`
 - Create: `packages/adapter-sdk/src/context-projector.mjs`
 - Create: `packages/adapter-sdk/src/config-merge.mjs`
+- Create: `packages/adapter-sdk/src/session-binding.mjs`
 - Create: `packages/adapter-sdk/src/index.mjs`
 - Create: `packages/adapter-sdk/test/capabilities.test.mjs`
 - Create: `packages/adapter-sdk/test/context-projector.test.mjs`
+- Create: `packages/adapter-sdk/test/session-binding.test.mjs`
 - Create: `tests/conformance/adapter-contract.mjs`
 
 **Interfaces:**
-- Produces `defineAdapter`, `assertCapabilities`, `projectContext`, `mergeOwnedConfig`, and `runAdapterConformance`
+- Produces `defineAdapter`, `assertCapabilities`, `projectContext`, `mergeOwnedConfig`, `storeSessionBinding`, `loadSessionBinding`, `clearSessionBinding`, and `runAdapterConformance`
 
 `defineAdapter` returns this contract:
 
@@ -46,6 +52,16 @@
 ```
 
 Each operation returns `{ ok, changes, diagnostics }`; `normalizeHook` returns `{ kind, sessionId, cwd, model, parentSessionId, tool }` with nullable optional fields.
+
+Hook executables are ephemeral processes, so the SDK also persists the harness-to-ACC session mapping under the runtime directory (never the project):
+
+```js
+storeSessionBinding({ runtimeDir, harnessSessionId, accSessionId, generation }): Promise<void>
+loadSessionBinding({ runtimeDir, harnessSessionId }): Promise<{ accSessionId, generation } | null>
+clearSessionBinding({ runtimeDir, harnessSessionId }): Promise<void>
+```
+
+Every hook after session start loads the binding to reuse the exact session generation; `clearSessionBinding` runs at session end.
 
 - [ ] **Step 1: Write capability RED**
 
@@ -61,7 +77,7 @@ Add tests that omitted capabilities resolve to false and unknown capability keys
 
 - [ ] **Step 2: Write context-budget RED**
 
-Create a `SyncResult` larger than the configured byte budget. Assert direct requests and conflicts remain, routine roster detail becomes references, and output is deterministic.
+Create a `SyncResult` larger than the configured byte budget. Assert direct requests and conflicts remain, routine roster detail becomes references, and output is deterministic. Include one hostile peer message containing fake system instructions and terminal escape sequences: the projected output must keep sender attribution and message-type labels, escape control sequences, and confine peer text to a clearly delimited data block that cannot read as ACC policy (`docs/SECURITY.md` rendering properties). Add the solo case: a `SyncResult` with no peers and no attention items projects to an empty string — zero bytes, never a "none" banner.
 
 - [ ] **Step 3: Run RED**
 
@@ -71,11 +87,11 @@ node --test packages/adapter-sdk/test/*.test.mjs
 
 - [ ] **Step 4: Implement SDK**
 
-`defineAdapter` freezes the manifest. `mergeOwnedConfig` stores an ACC ownership marker and removes only owned entries on uninstall.
+`defineAdapter` freezes the manifest. `mergeOwnedConfig` stores an ACC ownership marker and removes only owned entries on uninstall. Session bindings are single JSON files written atomically under the runtime directory. `projectContext` escapes terminal control sequences and renders peer content inside attributed data blocks.
 
 - [ ] **Step 5: Implement conformance runner**
 
-The runner accepts adapter factory plus fixture harness and checks detection, double install, unrelated-config preservation, normalization, context budgets, declared capabilities, double uninstall, and cleanup.
+The runner accepts adapter factory plus fixture harness and checks detection, double install, unrelated-config preservation, normalization, context budgets, injection-safe peer rendering, session-binding reuse across two consecutive hook events, solo zero-overhead (empty projection and guard short-circuit when no peers and no claims exist), declared capabilities, double uninstall, and cleanup.
 
 - [ ] **Step 6: Mutation proof and commit**
 
@@ -97,35 +113,42 @@ git commit -m "feat: define harness adapter contract"
 - Create: `packages/mcp-server/src/resources.mjs`
 - Create: `packages/mcp-server/test/server.test.mjs`
 - Create: `packages/mcp-server/test/tools.test.mjs`
+- Create: `packages/mcp-server/COMPATIBILITY.md`
 - Create: `bin/acc-mcp.mjs`
 
 **Interfaces:**
 - Produces MCP tools `acc_sync`, `acc_work`, `acc_claim`, `acc_message`, `acc_task`, `acc_finish`
 - Produces read-only resources for Workspace snapshot, roster, workstream, task, and inbox
 
-- [ ] **Step 1: Write MCP surface RED**
+- [ ] **Step 1: Choose and record the MCP transport implementation**
+
+Decide explicitly between a dependency-free JSON-RPC 2.0 stdio implementation targeting the current MCP specification revision and the official `@modelcontextprotocol/sdk` verified from its primary source and pinned exactly (the AGENTS.md dependency rule). Record the choice, the MCP protocol revision, and any pinned version in `packages/mcp-server/COMPATIBILITY.md`.
+
+- [ ] **Step 2: Write MCP surface RED**
 
 Start the stdio server in a test client. Assert exactly six public tools, strict JSON schemas, and descriptions that state polling semantics.
 
-- [ ] **Step 2: Run RED**
+- [ ] **Step 3: Run RED**
 
 ```bash
 node --test packages/mcp-server/test/*.test.mjs
 ```
 
-- [ ] **Step 3: Implement thin tool translation**
+- [ ] **Step 4: Implement thin tool translation**
 
 Each tool maps one request into a high-level core operation and returns structured content plus stable machine data. Tool code contains no duplicate claim or lifecycle rules.
 
-- [ ] **Step 4: Add hostile peer-content test**
+Session identity: the server opens one ACC session during the MCP `initialize` handshake (participant name derived from `clientInfo`, Workspace discovered from the server's launch directory), heartbeats it on every tool call, and closes it on stdin EOF or a termination signal. Conversation boundaries inside the client remain unobservable, so the capability manifest still declares no lifecycle capability — process attach is what actually happens, and `acc status` must label it that way.
+
+- [ ] **Step 5: Add hostile peer-content test**
 
 Store a message containing fake system instructions and terminal escapes. The resource output must preserve attribution and escape display control sequences rather than promoting text to protocol policy.
 
-- [ ] **Step 5: Add polling truthfulness test**
+- [ ] **Step 6: Add polling truthfulness test**
 
 The adapter manifest declares `polling: true`, `activeNotification: false`, `wakeDormantSession: false`, and no lifecycle or guard capabilities.
 
-- [ ] **Step 6: Verify and commit**
+- [ ] **Step 7: Verify and commit**
 
 ```bash
 node --test packages/mcp-server/test/*.test.mjs
@@ -148,6 +171,8 @@ git commit -m "feat: add generic MCP coordination fallback"
 - Create: `packages/adapter-codex/test/adapter.test.mjs`
 - Create: `packages/adapter-codex/test/hooks.test.mjs`
 - Create: `packages/adapter-codex/test/install.test.mjs`
+- Create: `tests/conformance/codex.test.mjs`
+- Create: `packages/adapter-codex/COMPATIBILITY.md`
 
 **Interfaces:**
 - Consumes: adapter SDK and CLI
@@ -196,6 +221,7 @@ git commit -m "feat: integrate Codex sessions"
 - Create: `packages/adapter-claude-code/test/adapter.test.mjs`
 - Create: `packages/adapter-claude-code/test/hooks.test.mjs`
 - Create: `packages/adapter-claude-code/test/install.test.mjs`
+- Create: `tests/conformance/claude-code.test.mjs`
 
 **Interfaces:**
 - Consumes: adapter SDK and CLI
@@ -244,6 +270,7 @@ git commit -m "feat: integrate Claude Code sessions"
 - Create: `packages/adapter-gemini-cli/test/adapter.test.mjs`
 - Create: `packages/adapter-gemini-cli/test/hooks.test.mjs`
 - Create: `packages/adapter-gemini-cli/test/install.test.mjs`
+- Create: `tests/conformance/gemini-cli.test.mjs`
 
 **Interfaces:**
 - Consumes: adapter SDK and CLI

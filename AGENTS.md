@@ -39,7 +39,7 @@ This repository is the standalone Agents Can Communicate product. It is not part
 
 ## Development workflow
 
-- After the bootstrap commit, do not work directly on `main`. Create a project-local ignored worktree under `.worktrees/` and a focused branch.
+- After the bootstrap commit, do not work directly on `main`. Create a project-local ignored worktree under `.gitworktrees/<branch-name>` at the repository root and a focused branch.
 - Use test-driven development. Show the new or corrected gate failing on the intended mutation before claiming it protects anything.
 - Prefer Node built-ins and dependency-free code. Before adding a dependency, verify the latest stable release from its primary source and pin it exactly.
 - Keep production modules and focused test files below 300 lines or add an explicit header explaining why splitting would damage cohesion.

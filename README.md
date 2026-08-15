@@ -10,7 +10,7 @@ This repository is a design and migration handoff, not a released package.
 
 - The validated Papercut Warzone 2 prototype is preserved under `prototype/papercut-agent-comms/`.
 - Four independently verified but not yet combined hardening patch sets are preserved under `migration/patches/`.
-- The proposed standalone architecture and product UX are documented under `docs/`.
+- The approved standalone architecture and product UX are documented under `docs/`.
 - Detailed execution plans are under `docs/superpowers/plans/`.
 - No standalone runtime or published npm package exists yet.
 
@@ -41,7 +41,7 @@ The currently selected direction is:
 - project-wide awareness and claims;
 - optional workstreams and coordinators, rather than one permanent global orchestrator.
 
-Some items remain proposed rather than approved. The exact boundary is recorded in [`docs/DECISIONS.md`](docs/DECISIONS.md).
+The design direction was fully approved on 2026-08-15; the remaining open technical decisions (storage backend, package names, license, and similar) are recorded in [`docs/DECISIONS.md`](docs/DECISIONS.md).
 
 ## Prototype verification
 

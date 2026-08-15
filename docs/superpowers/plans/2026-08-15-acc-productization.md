@@ -8,6 +8,8 @@
 
 **Tech Stack:** npm workspaces, Node.js current LTS selected at execution time from official release data, GitHub Actions pinned to exact current stable revisions, Markdown documentation.
 
+**Spec:** `docs/superpowers/specs/2026-08-15-standalone-acc-design.md` §§5, 9–11 plus `docs/UX.md` and `docs/SECURITY.md`.
+
 ## Global Constraints
 
 - Precondition: cross-vendor adapter acceptance is green.
@@ -34,6 +36,8 @@
 - [ ] **Step 1: Check publication namespaces**
 
 Query npm registry for `agents-can-communicate`, the selected organization scope, and `acc` binary collisions. Record results in the PR description. If the unscoped package is unavailable, use the approved organization scope without changing the binary name unless that binary also conflicts.
+
+This step also resolves two open decisions from `docs/DECISIONS.md` with the user before any manifest changes: the public license (open decision 3) and the publication model — one publishable CLI package that bundles the workspaces versus scoped per-package publication (part of open decision 2). `npx agents-can-communicate install` from `docs/UX.md` requires the entry package to be publishable, so the root manifest cannot stay `private: true` unless a dedicated entry package replaces it. Record both answers in `docs/DECISIONS.md` as user-approved.
 
 - [ ] **Step 2: Verify current Node LTS**
 
@@ -255,7 +259,7 @@ Run supported Node LTS on macOS, Linux, and Windows. Gates: clean install, synta
 
 - [ ] **Step 3: Write package verifier**
 
-`scripts/verify-package.mjs` installs the tarball into a clean temp directory, runs `acc --json doctor`, exercises a non-Git Workspace, and proves uninstall cleanup.
+`scripts/verify-package.mjs` packs every publishable workspace, rewrites inter-package dependency specifiers to the freshly packed local tarballs (before first publication they cannot resolve from the public registry), installs the entry tarball into a clean temp directory, runs `acc --json doctor`, exercises a non-Git Workspace, and proves uninstall cleanup.
 
 - [ ] **Step 4: Prove CI gate liveness locally**
 

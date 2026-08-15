@@ -8,6 +8,8 @@
 
 **Tech Stack:** Node.js ESM, Node built-in `node:test`, npm workspaces, dependency-free runtime during extraction.
 
+**Spec:** `docs/superpowers/specs/2026-08-15-standalone-acc-design.md` §§6–10 plus `docs/ARCHITECTURE.md` and `docs/PROTOCOL.md` (canonical interfaces and vocabulary).
+
 ## Global Constraints
 
 - Precondition: `prototype/integrated/COMBINED_VERIFICATION.md` is green and committed.
@@ -65,10 +67,12 @@ Root `package.json` gains:
 ```json
 "workspaces": ["packages/*"],
 "scripts": {
-  "test": "node --test tests/*.test.mjs tests/*/*.test.mjs packages/*/test/*.test.mjs",
+  "test": "node --test tests packages",
   "check": "find packages -name '*.mjs' -print0 | xargs -0 -n1 node --check"
 }
 ```
+
+Node's test runner searches directory arguments recursively for `*.test.mjs`, so the script stays correct while packages and test folders are still being created; shell globs would pass unmatched patterns through and fail. It never descends into `prototype/` because only `tests` and `packages` are listed.
 
 Each package manifest sets `private: true`, `type: module`, and explicit `exports`. Do not add runtime dependencies.
 
@@ -140,6 +144,8 @@ export function createId(kind, randomBytes = defaultRandomBytes) {
 
 JSON failure envelopes include `ok: false`, stable `code`, human `message`, and structured `details` without stack traces.
 
+The reconciled prototype also defines `TIMEOUT: 3` and uses `REQUIRED: 6` where this table says `ATTENTION: 6`. Keep numeric slot 3 reserved for timeout semantics rather than reassigning it, and map `REQUIRED` to `ATTENTION` when porting tests, so ported process tests keep their exit-code meaning.
+
 - [ ] **Step 4: Mutation proof**
 
 Temporarily permit `/` in `assertPortableId`. Run `ids.test.mjs`; expected failure names path-safety behavior. Restore and rerun green.
@@ -200,7 +206,7 @@ node --test packages/protocol/test/{schema,states}.test.mjs
 
 - [ ] **Step 3: Implement strict validators**
 
-Reject unknown schema versions and unknown required enum values. Preserve optional forward-compatible metadata only under a named `extensions` object.
+Reject unknown schema versions and unknown required enum values. Preserve optional forward-compatible metadata only under a named `extensions` object. Keep record and field names mappable to the A2A Agent Card, Task, Message, and Artifact concepts (spec §11) without importing any A2A transport.
 
 - [ ] **Step 4: Mutation proof**
 
@@ -234,9 +240,10 @@ tx.get(kind, id): object | null
 tx.put(kind, id, record, expectedGeneration): void
 tx.list(kind, predicate): object[]
 store.eventsSince(workspaceId, cursor, limit): Promise<EventPage>
+store.snapshot(workspaceId): Promise<WorkspaceSnapshot>
 ```
 
-`CoordinationTransaction` is the object exposing `append`, `get`, `put`, and `list` above. `CoordinationService` is an object whose methods are added in Tasks 6–8; the factory freezes injected ports and exposes no global singleton.
+`CoordinationTransaction` is the object exposing `append`, `get`, `put`, and `list` above. `CoordinationService` is an object whose methods are added in Tasks 7–9; the factory freezes injected ports and exposes no global singleton.
 
 - [ ] **Step 1: Write RED for atomic event/state behavior**
 
@@ -250,7 +257,7 @@ node --test packages/core/test/service-contract.test.mjs
 
 - [ ] **Step 3: Implement the memory contract and service factory**
 
-Use copied maps inside a transaction and swap only after callback success. Production core accepts no global clock or random source.
+Use copied maps inside a transaction and swap only after callback success. Implement `snapshot` from the materialized maps. Production core accepts no global clock or random source.
 
 - [ ] **Step 4: Add optimistic generation conflict test**
 
@@ -266,7 +273,95 @@ git commit -m "feat: add coordination storage port"
 
 ---
 
-### Task 5: Extract Workspace discovery and runtime paths
+### Task 5: Extract the filesystem storage adapter and recovery
+
+**Files:**
+- Create: `packages/storage-filesystem/src/store.mjs`
+- Create: `packages/storage-filesystem/src/atomic-json.mjs`
+- Create: `packages/storage-filesystem/src/safe-file.mjs`
+- Create: `packages/storage-filesystem/src/safe-directory.mjs`
+- Create: `packages/storage-filesystem/src/record-id.mjs`
+- Create: `packages/storage-filesystem/src/recovery.mjs`
+- Create: `packages/storage-filesystem/test/store-contract.test.mjs`
+- Create: `packages/storage-filesystem/test/recovery.test.mjs`
+- Create: `tests/process/store-concurrency.test.mjs`
+- Modify: `packages/core/test/service-contract.test.mjs`
+
+**Interfaces:**
+- Consumes: `CoordinationStore`/`CoordinationTransaction` ports from Task 4; reconciled storage behavior preserved under `prototype/integrated/tools/agents/lib/`
+- Produces:
+
+```js
+openFilesystemStore({ root, clock, ids }): Promise<CoordinationStore>
+diagnoseFilesystemStore({ root }): Promise<RepairReport>
+repairFilesystemStore({ root, clock }): Promise<RepairReport>
+/** @typedef {{ healthy: boolean, repaired: string[], blocked: string[],
+ * corrupt: string[] }} RepairReport */
+```
+
+`diagnoseFilesystemStore` is read-only; `repairFilesystemStore` applies only unambiguous repairs and fails closed on everything listed under `blocked` or `corrupt`.
+
+- [ ] **Step 1: Make the store contract suite store-agnostic**
+
+Refactor `packages/core/test/service-contract.test.mjs` so every contract test runs through an exported factory runner:
+
+```js
+export function runStoreContract(name, makeStore) {
+  test(`${name}: transaction rollback hides state and events`, async () => { /* existing body */ });
+  test(`${name}: stale generation write fails with EXIT.CONFLICT`, async () => { /* existing body */ });
+}
+```
+
+Keep the memory-store invocation in the same file. Create `packages/storage-filesystem/test/store-contract.test.mjs` that calls `runStoreContract("filesystem", () => openFilesystemStore({ root, clock, ids }))` inside a temp directory from `withTempWorkspace`.
+
+- [ ] **Step 2: Run RED**
+
+```bash
+node --test packages/storage-filesystem/test/store-contract.test.mjs
+```
+
+Expected: module-not-found failure for `openFilesystemStore`.
+
+- [ ] **Step 3: Port the reconciled storage behavior**
+
+Port from `prototype/integrated/tools/agents/lib/` without changing semantics: atomic write plus no-replace publication (`atomic-json.mjs`), no-follow regular-file reads and managed-root containment (`safe-file.mjs`, `safe-directory.mjs`), record/filename binding (`record-id.mjs`), and the directory-based owner mutex from `repair-mutex.mjs` as the per-workspace writer mutex (owner file with pid, token, and acquisition time; stale takeover only under its existing rules). Preserve injected opener and directory-reader seams as final arguments.
+
+The event log is new code built on those ported primitives — the prototype has no event feed. Inside the writer mutex a transaction allocates the next sequence number, writes one write-ahead journal entry listing every intended record and event publication (the generalization of the prototype's claims-audit pattern), publishes each file with no-replace semantics, and then retires the journal entry. Event filenames embed the zero-padded sequence so lexicographic directory order equals event order; the cursor is the last consumed sequence. A failed callback publishes nothing and appends no event.
+
+- [ ] **Step 4: Port recovery and audits**
+
+Port the reconciled claims-audit and recovery-audit semantics into `recovery.mjs`: an audit with the exact still-active source generation and absent destination is pending and replayable; a replacement generation, mismatched bytes, orphan target, or conflicting destination is corrupt and blocks repair. Neither function mutates a store whose protocol identity or schema version does not validate.
+
+- [ ] **Step 5: Add the crash-window replay test**
+
+In `packages/storage-filesystem/test/recovery.test.mjs`, use the injected failure seam to abort a transaction (a) after the journal entry is written but before any publication, and (b) after the event file is published but before the state record. Reopening the store, and running `repairFilesystemStore`, must either complete the journaled publications exactly or roll them back; `eventsSince` never exposes a partially published transaction, and running repair twice changes nothing.
+
+- [ ] **Step 6: Run focused GREEN**
+
+```bash
+node --test packages/storage-filesystem/test/*.test.mjs packages/core/test/service-contract.test.mjs
+```
+
+Expected: the same contract suite passes against both memory and filesystem stores; recovery and crash-window tests pass.
+
+- [ ] **Step 7: Add the process-level concurrency test**
+
+`tests/process/store-concurrency.test.mjs` spawns independent Node child processes that perform conflicting `put` calls with the same expected generation against one filesystem store. Exactly one process succeeds; every other exits with `EXIT.CONFLICT`; the event log afterward has no gaps and no duplicate sequence numbers.
+
+- [ ] **Step 8: Mutation proof**
+
+Temporarily allow replacement in the publication step through the injected seam. The no-replace contract test and the concurrency test must fail by name. Restore production behavior and rerun green.
+
+- [ ] **Step 9: Commit**
+
+```bash
+git add packages/storage-filesystem packages/core tests/process
+git commit -m "feat: extract filesystem coordination store"
+```
+
+---
+
+### Task 6: Extract Workspace discovery and runtime paths
 
 **Files:**
 - Create: `packages/cli/src/workspace-discovery.mjs`
@@ -286,8 +381,10 @@ runtimePaths({ dataHome, workspaceId }): RuntimePaths
 
 ```js
 /** @typedef {{ root: string, protocol: string, events: string, state: string,
- * locks: string, quarantine: string }} RuntimePaths */
+ * locks: string, quarantine: string, ephemeral: string }} RuntimePaths */
 ```
+
+`ephemeral` holds presence and Intent records for workspaces that have not yet materialized durable state (`docs/ARCHITECTURE.md`, “Lazy workspace materialization”).
 
 - [ ] **Step 1: Write discovery RED fixtures**
 
@@ -301,7 +398,7 @@ node --test packages/cli/test/{workspace-discovery,runtime-paths}.test.mjs
 
 - [ ] **Step 3: Implement non-Git discovery first**
 
-Canonicalize the selected root and derive a stable directory-source ID. Runtime path uses the platform user-data root and portable Workspace ID.
+Canonicalize the selected root and derive a stable directory-source ID. Runtime path uses the platform user-data root and portable Workspace ID. Keep `workspace-discovery.mjs` free of CLI side effects — no argument parsing, no `process.exit`, no stdout — because `packages/mcp-server` and native adapters import it directly.
 
 - [ ] **Step 4: Add optional Git enrichment**
 
@@ -318,7 +415,7 @@ git commit -m "feat: discover standalone workspaces"
 
 ---
 
-### Task 6: Implement participant, session, and Intent services
+### Task 7: Implement participant, session, and Intent services
 
 **Files:**
 - Create: `packages/core/src/sessions.mjs`
@@ -333,13 +430,16 @@ git commit -m "feat: discover standalone workspaces"
 openSession(input): Promise<Session>
 heartbeatSession(input): Promise<Session>
 closeSession(input): Promise<Session>
+classifySessionPresence(session, now, probe): "online" | "stale" | "offline"
 setIntent(input): Promise<WorkIntent>
 clearIntent(input): Promise<void>
 ```
 
 - [ ] **Step 1: Write lifecycle and Intent RED**
 
-Test unique generation, duplicate-live rejection, stale generation replacement policy, old-close cannot close successor, heartbeat boundary, exact Intent owner, and no raw prompt field accepted.
+Test unique generation, duplicate-live rejection, stale generation replacement policy, old-close cannot close successor, heartbeat boundary, exact Intent owner, and no raw prompt field accepted. Also test presence classification: a recent heartbeat is `online`; a heartbeat older than the session's declared cadence window is `stale` (hook-only adapters cannot heartbeat while the harness is idle, so `stale` is a normal truthful state, not an error); a closed session or a failed liveness probe is `offline`.
+
+Also test lazy materialization (approved 2026-08-15): a lone session with no durable objects leaves only ephemeral presence and Intent records; the workspace materializes durable state exactly once — when a second live session attaches or the first durable object is created — and current presence and Intents are recorded durably at that moment; closing the only session of an ephemeral-only workspace leaves nothing behind.
 
 - [ ] **Step 2: Run RED**
 
@@ -349,7 +449,9 @@ node --test packages/core/test/{sessions,intents}.test.mjs
 
 - [ ] **Step 3: Implement transactional lifecycle**
 
-Every lifecycle mutation checks Workspace and generation inside one store transaction. A Session close transitions state; it does not delete durable history.
+Every lifecycle mutation checks Workspace and generation inside one store transaction. A Session close transitions state; it does not delete durable history. `heartbeatSession` updates an ephemeral presence view without appending to the semantic event feed (spec §6.4); only open/close and online/stale/offline transitions surface through cursor sync.
+
+`openSession` writes ephemeral presence while the workspace has no durable state. Materialization is a single transaction that establishes protocol identity, starts the event log, and records current presence and Intents; it is triggered by the second live session or the first durable object, never by a lone quiet session.
 
 - [ ] **Step 4: Implement Intent rules**
 
@@ -366,7 +468,7 @@ git commit -m "feat: track sessions and work intent"
 
 ---
 
-### Task 7: Implement workstreams, tasks, and claims
+### Task 8: Implement workstreams, tasks, and claims
 
 **Files:**
 - Create: `packages/core/src/workstreams.mjs`
@@ -388,11 +490,12 @@ transitionTask(input): Promise<Task>
 acquireClaim(input): Promise<ResourceClaim>
 renewClaim(input): Promise<ResourceClaim>
 releaseClaim(input): Promise<void>
+forceReleaseClaim(input): Promise<void>
 ```
 
 - [ ] **Step 1: Write RED for optional coordination**
 
-Test Workspace with Intents but no Workstream, Workstream with no coordinator, coordinator lease replacement only after policy permits it, task dependency unblocking, and global claim conflict across two Workstreams.
+Test Workspace with Intents but no Workstream, Workstream with no coordinator, coordinator lease replacement only after policy permits it, task dependency unblocking, and global claim conflict across two Workstreams. Also test claim lease expiry (an expired claim stops conflicting and its old generation cannot renew), staleness metadata (a conflict against a claim whose owner session is stale reports that staleness but still blocks until expiry or force release), and force-release authority (a peer session cannot force-release; a human or policy actor can).
 
 - [ ] **Step 2: Run RED**
 
@@ -408,9 +511,11 @@ Coordinator is a scoped lease. Completing a dependency updates derived claimabil
 
 Claims compare canonical resource namespace plus adapter-provided overlap key. Workspace-global conflict is independent of Workstream ID.
 
+Port the prototype's lease semantics: every claim carries `expiresAt` and renewal demands the exact owner generation. Replace the prototype's orchestrator-only force release with the standalone authority model — `forceReleaseClaim` requires human or policy authority (a coordinator lease does not extend outside its Workstream) and appends an audit event recording actor, reason, and the replaced generation. Presence staleness alone never auto-releases a claim.
+
 - [ ] **Step 5: Concurrent claim process test**
 
-Add `tests/process/concurrent-claim.test.mjs` that starts independent processes against the filesystem store. Exactly one exclusive contender succeeds; the others return conflict.
+Add `tests/process/concurrent-claim.test.mjs` that starts independent processes against the filesystem store from Task 5. Exactly one exclusive contender succeeds; the others return conflict.
 
 - [ ] **Step 6: Verify mutation and commit**
 
@@ -423,7 +528,7 @@ git commit -m "feat: coordinate workstreams tasks and claims"
 
 ---
 
-### Task 8: Implement communication, sync, status, and CLI composition
+### Task 9: Implement communication, sync, status, and CLI composition
 
 **Files:**
 - Create: `packages/core/src/communication.mjs`
@@ -431,18 +536,22 @@ git commit -m "feat: coordinate workstreams tasks and claims"
 - Create: `packages/core/src/status.mjs`
 - Create: `packages/core/test/communication.test.mjs`
 - Create: `packages/core/test/sync.test.mjs`
+- Create: `packages/core/test/status.test.mjs`
 - Create: `packages/cli/src/main.mjs`
 - Create: `packages/cli/src/args.mjs`
+- Create: `packages/cli/src/doctor-command.mjs`
 - Create: `packages/cli/test/integration.test.mjs`
 - Create: `bin/acc.mjs`
 
 **Interfaces:**
+- Consumes: session lifecycle services from Task 7 (`openSession`, `heartbeatSession`, `closeSession`) and `diagnoseFilesystemStore`/`repairFilesystemStore` from Task 5
 - Produces high-level operations `sync`, `work`, `claim`, `message`, `task`, `finish`, `status`, `doctor`
+- Produces adapter-facing lifecycle commands `attach`, `heartbeat`, `detach` (they map to `openSession`, `heartbeatSession`, `closeSession`; they are not advertised as model tools)
 - Produces stable `--json` envelopes from `@agents-can-communicate/protocol`
 
 - [ ] **Step 1: Write communication and sync RED**
 
-Test typed message, per-recipient delivery state, immutable acknowledgement, Decision authority, artifact digest, handoff evidence, cursor replay, attention ordering, and bounded projection.
+Test typed message, per-recipient delivery state, immutable acknowledgement, Decision authority, artifact digest, handoff evidence, cursor replay, attention ordering, and bounded projection. Also test full-scope sync (peer equality, approved 2026-08-15): any session requests `scope: "full"` and receives the complete Workspace snapshot including another participant's collapsed child sessions; the ambient default remains a bounded delta; no session gets a reduced full view because of its role. Also test the solo case (solo zero-overhead, approved 2026-08-15): a Workspace with one live session, no claims, and no messages yields empty attention and an empty bounded projection.
 
 - [ ] **Step 2: Write CLI RED**
 
@@ -450,11 +559,13 @@ Spawn `node bin/acc.mjs --json status` in a temp non-Git Workspace. Expected ini
 
 - [ ] **Step 3: Implement communication and sync**
 
-Use one transaction for message plus recipient queues. Sync returns a new cursor and priority-sorted attention without changing delivery to seen unless the caller explicitly confirms injection/visibility.
+Use one transaction for message plus recipient queues. Sync returns a new cursor and priority-sorted attention without changing delivery to seen unless the caller explicitly confirms injection/visibility. `sync` accepts `scope: "delta" | "full"`; the full scope returns `store.snapshot(workspaceId)` with collapsed child sessions included and is available to every session equally.
 
 - [ ] **Step 4: Implement CLI composition**
 
 `bin/acc.mjs` delegates to `packages/cli/src/main.mjs` and exits with `AccError.code`. Human errors use stderr; JSON mode writes exactly one JSON object to stdout and no human diagnostics.
+
+`attach` opens a session and prints the session ID plus generation token so the adapter can later heartbeat and `detach` the exact generation; `detach` with a stale generation fails with `EXIT.CONFLICT`. `doctor` composes `diagnoseFilesystemStore` (read-only) with core health rules; `doctor --repair` calls `repairFilesystemStore` and fails closed when the report lists `blocked` or `corrupt` entries.
 
 - [ ] **Step 5: Run focused and complete tests**
 
@@ -468,7 +579,7 @@ git diff --check
 - [ ] **Step 6: Project-specific token scan**
 
 ```bash
-rg -n 'PW2_|Papercut|papercut-warzone|docs/plan|game/' packages bin tests
+rg -n 'PW2_|Papercut|papercut-warzone|docs/plan|game/|orchestrator' packages bin tests
 ```
 
 Expected: no matches outside an explicit migration fixture.
