@@ -1,0 +1,20 @@
+{
+  "hooks": {
+    "SessionStart": [
+      { "hooks": [ { "type": "command", "command": "./scripts/acc-hook.mjs sessionStart" } ] }
+    ],
+    "UserPromptSubmit": [
+      { "hooks": [ { "type": "command", "command": "./scripts/acc-hook.mjs beforeTurn" } ] }
+    ],
+    "PreToolUse": [
+      { "matcher": "Write|Edit|Bash",
+        "hooks": [ { "type": "command", "command": "./scripts/acc-hook.mjs guard" } ] }
+    ],
+    "Stop": [
+      { "hooks": [ { "type": "command", "command": "./scripts/acc-hook.mjs finish" } ] }
+    ],
+    "SessionEnd": [
+      { "hooks": [ { "type": "command", "command": "./scripts/acc-hook.mjs sessionEnd" } ] }
+    ]
+  }
+}
