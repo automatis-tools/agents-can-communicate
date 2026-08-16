@@ -33,6 +33,38 @@ Conditional: `prompt_id`, `permission_mode`, `effort`, `agent_id`, `agent_type`.
 `agent_id` and `agent_type` are supplied on subagent calls, so parent/child session
 mapping rests on documented metadata rather than inference.
 
+## Observed in a real session
+
+Captured 2026-08-16 from `claude -p` on 2.1.233, using `--plugin-dir` so the capture
+plugin was loaded for that session only and never installed into the operator's
+configuration. Fixtures are in `fixtures/`.
+
+Fired and completed: `SessionStart`, `UserPromptSubmit`, `PreToolUse`, `PostToolUse`,
+`Stop`, `SessionEnd`. The payloads match the published documentation exactly - unlike
+Codex, where nothing was published and the tool vocabulary turned out to differ.
+
+**`PreToolUse` genuinely denies.** Returning
+
+```json
+{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny",
+ "permissionDecisionReason":"..."}}
+```
+
+blocked a `Write` - the file was never created - and a `Bash` call - `echo probe` never
+ran. In both cases the model received the reason, explained it to the user, and declined
+to route around the guard.
+
+**`UserPromptSubmit` injection reaches the model.** A hook returning
+`hookSpecificOutput.additionalContext` put its marker into the session, and the model
+reported it as an observation rather than acting on it - which is the property the design
+depends on: injected coordination context is data, not instruction.
+
+Tool names confirmed: `Write` with `tool_input: { file_path, content }`, `Bash` with
+`tool_input: { command, description }`. Not `apply_patch`, which is what Codex uses.
+
+`PreToolUse` also carries `effort`; `Stop` carries `background_tasks` and
+`session_crons` alongside `stop_hook_active` and `last_assistant_message`.
+
 ## Privacy consequence
 
 `transcript_path` is supplied on **every** event. "Raw transcripts are not collected by
