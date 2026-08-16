@@ -176,23 +176,23 @@ git commit -m "feat: install and diagnose ACC adapters"
 **Interfaces:**
 - Produces complete user and adapter-author onboarding
 
-- [ ] **Step 1: Write documentation command RED**
+- [x] **Step 1: Write documentation command RED**
 
 Extract fenced commands marked `<!-- test:command -->` and run them against a temporary installation. The initial test fails because public docs do not yet contain the required flows.
 
-- [ ] **Step 2: Write three-minute getting started**
+- [x] **Step 2: Write three-minute getting started**
 
 Cover install, ordinary session opening, automatic attach, status, conflict, message, and uninstall. Separate automatic native behavior from MCP fallback behavior.
 
-- [ ] **Step 3: Document adapter authoring**
+- [x] **Step 3: Document adapter authoring**
 
 Include manifest schema, capability rules, hook normalization, config ownership, conformance runner, delivery semantics, and one minimal Tier-1 MCP adapter.
 
-- [ ] **Step 4: Add concise examples**
+- [x] **Step 4: Add concise examples**
 
 Papercut example uses visual, models, and physics workstreams with global claims. Non-Git example coordinates research and document review without Git concepts.
 
-- [ ] **Step 5: Run docs test and commit**
+- [x] **Step 5: Run docs test and commit**
 
 ```bash
 node --test tests/docs/commands.test.mjs
