@@ -46,11 +46,10 @@ Reasons, in order of weight:
   `-32022` UnsupportedProtocolVersion. `-32000`–`-32019` are legacy and must not be used;
   `-32002` and `-32042` must not be emitted.
 
-## Divergence from the original plan
+## Why the session is not tied to `initialize`
 
-`docs/superpowers/plans/2026-08-15-acc-adapters.md` Task 2 Step 4 specified that the
-server "opens one ACC session during the MCP `initialize` handshake … and closes it on
-stdin EOF". That is invalid at revision 2026-07-28 on three counts:
+The obvious design — open one ACC session during the MCP `initialize` handshake and close it
+on stdin EOF — is invalid at revision 2026-07-28 on three counts:
 
 1. `initialize` is the **legacy** era. Modern clients probe with `server/discover` and
    receive a `DiscoverResult` listing `supportedVersions`.

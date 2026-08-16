@@ -1,6 +1,7 @@
 import { AccError, EXIT, assertPortableId } from "@agents-can-communicate/protocol";
 
-// The capability surface from docs/ADAPTERS.md. False is the default for every
+// The capability surface, documented in docs/ADAPTER_AUTHORING.md and measured
+// per client in docs/CAPABILITIES.md. False is the default for every
 // entry: an adapter earns a true value by implementing the method that backs it
 // and by proving it in the conformance suite. Optimistic defaults are how a
 // tool ends up claiming protection it cannot deliver.

@@ -32,12 +32,40 @@ export function createExampleAdapter() {
 }
 ```
 
-## Capability rule
+## Capabilities
+
+Seventeen booleans in five groups:
+
+| Group | Entries |
+|---|---|
+| `lifecycle` | `sessionStart` `sessionResume` `sessionEnd` `heartbeat` `childSessions` |
+| `context` | `startupInjection` `beforeTurnInjection` `safePointInjection` |
+| `guards` | `beforeRead` `beforeWrite` `beforeShell` |
+| `delivery` | `polling` `activeNotification` `wakeDormantSession` |
+| `execution` | `launch` `resume` `terminate` |
 
 **False by default. `true` requires a backing method *and* an observed capture.**
 
-`defineAdapter` enforces the method. Nothing enforces the capture except you — so declare
-only what you have watched happen, and say in the code why the rest is false.
+`defineAdapter` enforces the method — declaring `guards.beforeWrite: true` without
+`guardWrite()` is a usage error at construction. Nothing enforces the capture except you, so
+declare only what you have watched happen, and say in the code why the rest is false.
+
+`lifecycle.heartbeat` is deliberately not a flavour of `delivery.polling`. Polling happens
+when the client reaches a hook, which for most harnesses means when the user takes a turn —
+an idle session stops refreshing and goes stale while its process is alive. Heartbeat fires
+on a timer instead.
+
+## How far you can get
+
+| Tier | You register | You get | You do not get |
+|---|---|---|---|
+| 0 | nothing — humans run `acc` | durable messages, status, claims | anything automatic |
+| 1 | the MCP server | attach on first call, read, claim, message | guards, session end |
+| 2 | hooks + skill | automatic attach, turn context, write guards, cleanup | realtime |
+| 3 | + realtime surface | delivery receipts, safe-point injection, child sessions | — |
+
+Every shipped adapter is tier 2. Tier 3 is claimed only where a public harness contract
+genuinely supports it — no client observed so far does.
 
 ## normalizeHook
 
@@ -96,11 +124,6 @@ node --test tests/process/hook-wiring.test.mjs
 
 The second one *executes* what your install wrote. Three adapters once shipped a hook
 command that did not exist anywhere; every test was green.
-
-## Minimal Tier 1
-
-No hooks at all — register the MCP server and stop. You get attach, read, claim, message.
-You do not get guards or session end, and the roster will say so.
 
 ## Record what you learned
 

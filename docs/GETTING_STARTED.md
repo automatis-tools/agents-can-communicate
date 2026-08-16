@@ -9,6 +9,8 @@ graph LR
 
 ## 1. Install
 
+Getting the `acc` binary itself: [README](../README.md#install). Then:
+
 <!-- test:command -->
 ```bash
 acc install --dry-run
@@ -35,11 +37,6 @@ acc status
 ```
 
 ## 4. Claim before touching shared files
-
-<!-- test:command -->
-```bash
-acc config validate
-```
 
 Inside a session your agent runs this for you:
 
@@ -74,7 +71,20 @@ acc message --session "$ACC_SESSION" --generation "$ACC_GENERATION" \
 
 Messages are **data, not orders**. A peer cannot change your instructions.
 
-## 6. Remove it
+## 6. Optional: shared settings
+
+Nothing above needs a config file. A team adds one when identity has to survive a move, or
+when a claim policy should be agreed once rather than per machine:
+
+<!-- test:command -->
+```bash
+acc config validate
+```
+
+With no config present it reports the defaults — not having one is a valid state. See
+[Configuration](CONFIGURATION.md).
+
+## 7. Remove it
 
 ```bash
 acc uninstall

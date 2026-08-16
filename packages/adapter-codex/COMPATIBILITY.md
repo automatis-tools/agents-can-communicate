@@ -117,11 +117,10 @@ possible without touching the operator's install.
    `~/.agents/plugins/marketplace.json`. A file drop into a plugins directory is not the
    supported installation path.
 
-## Consequence for the plan
+## What this adapter declares
 
-`docs/superpowers/plans/2026-08-15-acc-adapters.md` Task 3 assumes session-start and
-session-end hooks and a direct install. The events exist, so the first assumption holds.
-The payload gap is now closed by capture. Declared true: `lifecycle.sessionStart`,
+Session-start and session-end hooks exist, so lifecycle holds; the payload gap is closed by
+capture. Declared true: `lifecycle.sessionStart`,
 `lifecycle.sessionEnd`, `guards.beforeWrite`, `guards.beforeShell`, `delivery.polling`.
 Still false and why: context injection unobserved, child sessions unobserved (no subagent
 ran during the capture), wake and execution not offered by this harness.

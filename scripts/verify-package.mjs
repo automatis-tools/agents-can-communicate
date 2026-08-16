@@ -27,11 +27,10 @@ const runNpm = (args, options = {}) => (isWindows
   ? run("npm.cmd", args.map(argument => `"${argument}"`), { ...options, shell: true })
   : run("npm", args, options));
 
-// Never published: development scaffolding, other people's captures, evidence
-// from this machine, and anything carrying a live session.
+// Never published: the test suite, local configuration, capture material
+// carrying paths from the machine that made it, and anything that looks like a
+// live session.
 const FORBIDDEN = [
-  { pattern: /^prototype\//, why: "development scaffolding" },
-  { pattern: /^migration\//, why: "development scaffolding" },
   { pattern: /^tests\//, why: "test suite" },
   { pattern: /^\.github\//, why: "CI configuration" },
   { pattern: /^\.githooks\//, why: "local git hooks" },

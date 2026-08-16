@@ -68,7 +68,7 @@ export function createSyncService(ports, sessions) {
 
   /**
    * Any session may request the full Workspace scope. Peer equality is a
-   * knowledge property (approved 2026-08-15): no session receives a reduced
+   * knowledge property: no session receives a reduced
    * view because of its role. The bounded delta is only the ambient default.
    */
   async function sync(input = {}) {
@@ -102,7 +102,7 @@ export function createSyncService(ports, sessions) {
       presence: classifySessionPresence(item, now),
     }));
 
-    // Solo zero-overhead (approved 2026-08-15): one live session, no claims and
+    // Solo zero-overhead: one live session, no claims and
     // no attention means an empty result, not a "nothing to report" banner.
     const peers = roster.filter(item => item.sessionId !== session?.sessionId
       && item.presence !== "offline");
