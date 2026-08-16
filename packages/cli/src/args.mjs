@@ -22,6 +22,11 @@ export const COMMANDS = Object.freeze({
     optional: ["status", "to"], repeated: ["completed", "remaining", "blocker"] },
   status: { required: [], optional: ["participant"] },
   doctor: { required: [], optional: [], flags: ["repair"] },
+  // The one command with a subcommand. Kept as an explicit list rather than a
+  // free positional: `acc config delete` should fail at the parser, not deep
+  // inside a handler that has already decided what to do.
+  config: { required: [], optional: [], flags: ["yes"],
+    subcommands: ["init", "validate"] },
 });
 
 const GLOBAL = Object.freeze(["json", "workspace", "cwd"]);
@@ -34,9 +39,19 @@ const camel = name => name.replace(/-([a-z])/g, (_, letter) => letter.toUpperCas
 
 export function parseArgs(argv) {
   if (!Array.isArray(argv) || argv.length === 0) usage("a command is required");
-  const [command, ...tokens] = argv;
+  const [command, ...rest] = argv;
   const spec = COMMANDS[command];
   if (spec === undefined) usage(`unknown command: ${command}`, { command });
+
+  let tokens = rest;
+  let subcommand;
+  if (spec.subcommands !== undefined) {
+    [subcommand, ...tokens] = rest;
+    if (subcommand === undefined || !spec.subcommands.includes(subcommand)) {
+      usage(`${command} requires one of: ${spec.subcommands.join(", ")}`,
+        { command, subcommand: subcommand ?? null });
+    }
+  }
 
   const repeated = new Set(spec.repeated ?? []);
   const flags = new Set([...(spec.flags ?? []), "json"]);
@@ -88,7 +103,7 @@ export function parseArgs(argv) {
       usage(`${command} requires --${name}`, { command, option: name });
     }
   }
-  return { command, options };
+  return { command, options: subcommand === undefined ? options : { ...options, subcommand } };
 }
 
 export function positiveNumber(value, name) {

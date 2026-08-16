@@ -184,3 +184,79 @@ test("discovery performs no CLI side effects", async t => {
   assert.equal(typeof (await discoverWorkspace({ cwd: root, env: {}, gitProbe: noGit })).id,
     "string");
 });
+
+test("a config in the workspace root is found without being named", async t => {
+  const root = await tempRoot(t);
+  await writeFile(path.join(root, "acc.workspace.json"),
+    `${JSON.stringify({ schemaVersion: 1, workspaceId: "workspace_found",
+      displayName: "Found" })}\n`);
+
+  const descriptor = await discoverWorkspace({ cwd: root, env: {}, gitProbe: noGit });
+
+  // A team commits this file so everyone shares one identity. Requiring a flag
+  // to notice it would mean the identity applies only to whoever remembers.
+  assert.equal(descriptor.source, "config");
+  assert.equal(descriptor.id, "workspace_found");
+});
+
+test("a config is found from a subdirectory of the workspace", async t => {
+  const root = await tempRoot(t);
+  const nested = path.join(root, "packages", "core");
+  await mkdir(nested, { recursive: true });
+  await writeFile(path.join(root, "acc.workspace.json"),
+    `${JSON.stringify({ schemaVersion: 1, workspaceId: "workspace_found" })}\n`);
+
+  const descriptor = await discoverWorkspace({ cwd: nested, env: {}, gitProbe: noGit });
+
+  // Sessions start wherever the human happens to be. A config that only counts
+  // at the top would apply to some sessions and not others in one project.
+  assert.equal(descriptor.id, "workspace_found");
+});
+
+test("the search stops at the filesystem root rather than climbing forever", async t => {
+  const root = await tempRoot(t);
+  const nested = path.join(root, "a", "b");
+  await mkdir(nested, { recursive: true });
+
+  const descriptor = await discoverWorkspace({ cwd: nested, env: {}, gitProbe: noGit });
+
+  assert.equal(descriptor.source, "directory");
+});
+
+test("declared roots are resolved against the config, not the cwd", async t => {
+  const root = await tempRoot(t);
+  const nested = path.join(root, "apps", "web");
+  await mkdir(nested, { recursive: true });
+  await writeFile(path.join(root, "acc.workspace.json"),
+    `${JSON.stringify({ schemaVersion: 1, workspaceId: "workspace_multi",
+      roots: [".", "apps/web"] })}\n`);
+
+  const descriptor = await discoverWorkspace({ cwd: nested, env: {}, gitProbe: noGit });
+
+  // Runtime containment is checked against these, so a root resolved against
+  // the wrong base would let state land inside a directory it should not.
+  assert.deepEqual([...descriptor.roots].sort(), [root, nested].sort());
+});
+
+test("a config carrying runtime state is refused, not ignored", async t => {
+  const root = await tempRoot(t);
+  await writeFile(path.join(root, "acc.workspace.json"),
+    `${JSON.stringify({ schemaVersion: 1, workspaceId: "workspace_bad",
+      sessions: [{ sessionId: "session_injected" }] })}\n`);
+
+  await assert.rejects(discoverWorkspace({ cwd: root, env: {}, gitProbe: noGit }),
+    error => error.code === EXIT.DATA && /runtime state/.test(error.message));
+});
+
+test("a config reached through a symlink is refused", async t => {
+  const root = await tempRoot(t);
+  const real = path.join(root, "elsewhere.json");
+  await writeFile(real, `${JSON.stringify({ schemaVersion: 1,
+    workspaceId: "workspace_linked" })}\n`);
+  await symlink(real, path.join(root, "acc.workspace.json"));
+
+  // A link may point anywhere, including outside the workspace at a file the
+  // repository does not control.
+  await assert.rejects(discoverWorkspace({ cwd: root, env: {}, gitProbe: noGit }),
+    error => error.code === EXIT.DATA);
+});
