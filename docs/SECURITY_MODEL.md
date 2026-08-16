@@ -99,6 +99,8 @@ gate runs. Each rule is written as an attack rather than a description:
 | Peer text cannot forge or close the fence | `peer-injection.test.mjs` |
 | Peer text cannot repaint the terminal | `peer-injection.test.mjs` |
 | Flooding cannot bury a conflict warning | `peer-injection.test.mjs` |
+| The budget never cuts a peer block in half | `context-projector.test.mjs` |
+| A message nobody was shown is never reported delivered | `message-delivery.test.mjs` |
 | No path escapes the managed root | `storage-boundary.test.mjs` |
 | A workspace id cannot traverse | `storage-boundary.test.mjs` |
 | A config cannot point roots outside itself | `storage-boundary.test.mjs` |
