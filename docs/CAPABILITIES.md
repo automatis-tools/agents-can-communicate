@@ -61,9 +61,16 @@ path out of a command would block work at random and still miss real writes. She
 therefore declare no targets on every adapter.
 
 Where the guard cannot help, the turn context does: it names the claims other sessions
-hold and says which way this session stands with them - unenforced entirely, or enforced
-for file edits but not for anything done through a shell. Unenforceable is not the same as
-unknown.
+hold and says which way this session stands with them. Two facts decide the wording -
+what the claim's owner asked for, and whether ACC can stop this session at all:
+
+| Claim | This session | Note |
+|---|---|---|
+| guarded | can be guarded | `file edits are blocked; edits made through a shell are not` |
+| guarded | cannot be guarded | `not enforced for this session; do not edit it` |
+| advisory | either | `advisory; nothing will stop you, the owner is asking` |
+
+Unenforceable is not the same as unknown - and neither is it the same as unclaimed.
 
 **`lifecycle.sessionEnd` on `kimi` is false and it matters.** Each `kimi -p` run leaves an
 attached session that only ages out on its declared 60s cadence, so a peer reading the

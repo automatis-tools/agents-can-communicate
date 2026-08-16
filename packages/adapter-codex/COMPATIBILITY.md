@@ -236,3 +236,15 @@ write, so it says so before the turn instead:
 
 Captured from a real session: the peer held the claim, and the Codex model was told before
 it started. Unenforceable is not the same as unknown.
+
+The note has three forms, because two separate facts decide it - what the claim's owner
+asked for, and whether ACC can stop this particular session:
+
+| Claim | This session | Note |
+|---|---|---|
+| guarded | can be guarded | `file edits are blocked; edits made through a shell are not` |
+| guarded | cannot be guarded | `not enforced for this session; do not edit it` |
+| advisory | either | `advisory; nothing will stop you, the owner is asking` |
+
+Reading only the session's capability would announce a block on an advisory claim that
+will never happen - and its owner explicitly did not ask for one.

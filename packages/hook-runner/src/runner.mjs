@@ -114,10 +114,15 @@ const HANDLERS = {
       workspaceId: context.descriptor.id });
     const mine = status.participants
       .find(participant => participant.sessionId === binding.accSessionId);
+    // Two independent facts, and both are needed. `enforceable` is whether ACC
+    // could stop *this* session at all; `enforcement` is what the claim's owner
+    // asked for. A guarded session facing an advisory claim is not blocked from
+    // anything, so reporting either one alone mislabels the other case.
     const enforceable = mine?.enforcement === "guarded";
     const claims = status.claims
       .filter(claim => claim.ownerSessionId !== binding.accSessionId)
-      .map(claim => ({ resource: claim.resource, enforceable,
+      .map(claim => ({ resource: claim.resource, enforcement: claim.enforcement,
+        enforceable,
         ownerParticipantId: status.participants
           .find(p => p.sessionId === claim.ownerSessionId)?.participantId
           ?? claim.ownerSessionId }));
