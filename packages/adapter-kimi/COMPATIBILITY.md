@@ -115,6 +115,37 @@ does **not** unwrap `additionalContext` — it wraps a hook's entire stdout in
 Emitting Claude Code's JSON envelope here puts the envelope itself into the conversation,
 so ACC injects plain text.
 
+## Coordination, verified against the real client
+
+The strongest check here is not a fixture. A peer session claimed a file, the real
+client tried to write it through ACC's real hooks and real runtime, and then the claim
+was released and the same run repeated:
+
+```text
+peer claims file:hello.txt (guarded)
+kimi -p "Create hello.txt with the word hello"   ->  refused by ACC
+peer releases the claim
+kimi -p "Create hello.txt with the word hello"   ->  written
+```
+
+The contrast is the point. A guard observed only denying proves as little as one observed
+only allowing; either alone is consistent with a guard that is simply stuck.
+
+One operational consequence falls out of it. Because `SessionEnd` never fires, each
+`kimi -p` run leaves an attached session behind, and two runs show up as two live
+participants:
+
+```text
+models   harness=cli    presence=online
+kimi     harness=kimi   presence=online
+kimi     harness=kimi   presence=online
+```
+
+They are not leaked: presence is derived from the declared 60s cadence, so a finished
+session stops beating and ages out to stale and then offline on its own. But a peer
+reading the roster within that window sees sessions that have already exited. Interactive
+sessions, which live long enough to heartbeat, do not have this problem.
+
 ## End-to-end verification
 
 The adapter was not only unit-tested. ACC's own `installKimiPlugin` wrote into an isolated
