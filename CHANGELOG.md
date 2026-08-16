@@ -1,0 +1,62 @@
+# Changelog
+
+## 0.0.0 — release candidate (unpublished)
+
+Built and verified locally. **Not published**: no npm release, no tag, no GitHub
+release.
+
+| | |
+|---|---|
+| Tarball | `agents-can-communicate-0.0.0.tgz`, 83 KB, 99 entries |
+| sha256 | `5c4e496e8b39f27707ff4642f0100bec3219ce35f7792262451f9957c65f5551` |
+| Tests | 585 passing, 0 failing |
+| Node | 24 (current production LTS) |
+| Verified on | macOS 15, darwin 25.5.0, arm64 |
+
+### What it does
+
+Coordinates independent agent sessions in one workspace: presence, intent,
+workspace-global claims, typed messages, handoffs. No session is in charge.
+
+### Clients
+
+| Client | Version | Attach | Guard writes | Inject | Heartbeat |
+|---|---|---|---|---|---|
+| Codex | 0.147.0 | yes | yes¹ | yes | – |
+| Claude Code | 2.1.233 | yes | yes | yes | – |
+| Gemini CLI | 0.37.0, 0.55.1 | yes | yes² | yes | – |
+| Kimi Code | 0.36.1 | yes | yes | yes | yes (60s) |
+| Any MCP client | rev 2026-07-28 | yes | – | – | – |
+
+¹ only models that offer `apply_patch`; others edit through the shell, which
+names no resource · ² only approval modes that expose edit tools
+
+Full matrix and what the `yes` values do **not** promise:
+[docs/CAPABILITIES.md](docs/CAPABILITIES.md).
+
+### Known limitations
+
+- **Kimi Code fires no `SessionEnd`.** Prompt-mode sessions age out on their 60s
+  cadence, so a roster read inside that window shows sessions that have exited.
+- **Codex needs hook trust.** ACC completes the install; trusting the plugin is
+  the client's own step.
+- **No shell guard is resource-aware.** A command names no path, so a claim
+  cannot be matched against it. The turn context says so instead.
+- **One unguardable participant makes the workspace advisory.** An MCP client or
+  a shell-editing model means a guarded claim is advice, and status reports that.
+- **Gemini headless returns 403 on the account used here.** Not ACC's doing —
+  reproduced with a plain `gemini -p` outside ACC entirely.
+- **No subagent visibility.** `lifecycle.childSessions` is false everywhere; no
+  subagent was observed during capture.
+- **macOS only, so far.** CI runs Linux and Windows, but no capability was
+  certified there.
+
+### Not included
+
+Remote coordination, process launching, push delivery, wake-on-message. All out
+of scope for the first release.
+
+### Before publishing
+
+See [docs/RELEASING.md](docs/RELEASING.md). Publication, tagging, and a GitHub
+release are deliberate acts and need explicit approval.
