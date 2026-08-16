@@ -4,7 +4,7 @@ Verified 2026-08-16 against the installed client and its live configuration.
 
 | Item | Value |
 |---|---|
-| Client | **0.37.0** |
+| Client | **0.37.0** and **0.55.1** (re-certified; see the last section) |
 | Primary docs | <https://geminicli.com/docs/extensions/>, <https://geminicli.com/docs/hooks/> |
 | Local evidence | `~/.gemini/settings.json`, `gemini hooks --help`, `gemini extensions` |
 
@@ -102,3 +102,34 @@ prefer these surfaces over hand-editing settings where they cover the operation.
 Task 5 of the adapters plan is accurate. Add `name` and `timeout` to every installed hook
 entry: `name` is what lets uninstall remove exactly ACC's entries, which is otherwise a
 guess by command string.
+
+
+## Re-certified on 0.55.1 (2026-08-16)
+
+The installed client moved from 0.37.0 to 0.55.1 mid-certification. Everything above was
+measured again against the new version rather than assumed to carry over.
+
+**Unchanged.** The hook event names, the payload fields, the deny contract and the
+injection contract are all identical. `exit 2` and `{"decision":"block"}` deny;
+`hookSpecificOutput.permissionDecision` still does not. Injection still needs the
+`hookSpecificOutput` envelope and still arrives as `<hook_context>...</hook_context>`
+appended to the user turn.
+
+**Changed, and both stop a headless run before the first turn:**
+
+1. An auth method must be chosen explicitly. Without
+   `security.auth.selectedType` in settings, the client exits with
+   `Invalid auth method selected.` - 0.37.0 defaulted instead. Accepted values are
+   `gemini-api-key`, `oauth-personal`, `vertex-ai`, `cloud-shell`.
+2. The workspace must be trusted. An untrusted folder downgrades the approval mode and
+   then refuses, naming `--skip-trust` or `GEMINI_CLI_TRUST_WORKSPACE=true`.
+
+**Changed, and relevant only to capture:** a turn is now routed by first asking a small
+model to score its complexity, with a JSON schema attached. A stand-in endpoint that
+answers that call with prose makes the client retry and give up before offering any tool,
+so nothing fires and it looks like the model simply declined.
+
+The account still receives HTTP 403 from the real model API in headless mode - verified
+with a plain `gemini -p` outside ACC entirely, so it is neither ACC's doing nor the
+client's. ACC's own hooks were observed firing against the real API on 0.55.1 regardless:
+a real session attached and closed through ACC's runtime before the model call failed.
