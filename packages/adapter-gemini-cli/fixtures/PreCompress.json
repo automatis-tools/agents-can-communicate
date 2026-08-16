@@ -1,0 +1,8 @@
+{
+  "session_id": "7ef20672-f749-4370-8d9f-300ab00aad65",
+  "transcript_path": "<redacted: conversation transcript>",
+  "cwd": "/tmp/example-workspace",
+  "hook_event_name": "PreCompress",
+  "timestamp": "2026-08-16T05:49:19.296Z",
+  "trigger": "auto"
+}
