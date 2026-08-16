@@ -1,0 +1,26 @@
+{
+  "session_id": "460de412-a31e-4000-ae8b-c4efbf4eda00",
+  "transcript_path": "<redacted: conversation transcript>",
+  "cwd": "/tmp/example-workspace",
+  "prompt_id": "0523c5ff-fcbc-4c32-bb24-ab348283a76c",
+  "permission_mode": "bypassPermissions",
+  "effort": {
+    "level": "xhigh"
+  },
+  "hook_event_name": "PostToolUse",
+  "tool_name": "Write",
+  "tool_input": {
+    "file_path": "/private/tmp/claude-501/-Users-mmykola87-work-automatis-tools-agents-can-communicate/fd1969cf-02e0-482a-9291-2e56f4e059f8/scratchpad/cc/project/guarded.txt",
+    "content": "<redacted>"
+  },
+  "tool_response": {
+    "type": "create",
+    "filePath": "/private/tmp/claude-501/-Users-mmykola87-work-automatis-tools-agents-can-communicate/fd1969cf-02e0-482a-9291-2e56f4e059f8/scratchpad/cc/project/guarded.txt",
+    "content": "hello\n",
+    "structuredPatch": [],
+    "originalFile": null,
+    "userModified": false
+  },
+  "tool_use_id": "toolu_01Ma4JanzEvatnZgXU7hYmMY",
+  "duration_ms": 2
+}

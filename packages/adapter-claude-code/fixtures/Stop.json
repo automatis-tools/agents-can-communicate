@@ -1,0 +1,15 @@
+{
+  "session_id": "a96cb852-40af-4406-978b-edd9c0affdd1",
+  "transcript_path": "<redacted: conversation transcript>",
+  "cwd": "/tmp/example-workspace",
+  "prompt_id": "8b56d896-013c-4ab8-845b-f9670ac34386",
+  "permission_mode": "bypassPermissions",
+  "effort": {
+    "level": "xhigh"
+  },
+  "hook_event_name": "Stop",
+  "stop_hook_active": false,
+  "last_assistant_message": "The command was **blocked** \u2014 it did not run. The tool returned:\n\n```\nACC: shell blocked by a claim\n```\n\nSo there's no `probe` output to show you. Something in the harness (a `PreToolUse` hook or permission guard) intercepted the `Bash` call before the shell ever saw it. Notably this is *not* a shell error \u2014 `echo probe` never executed; the interception happened one layer above.\n\n`\u2605 Insight \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500`\n- **Two different injection points, two different powers.** `UserPromptSubmit` hooks can only *add text* to my context \u2014 that's how `ACC-INJECTION-MARKER-7Q2` got here. `PreToolUse` hooks can *veto* an action, which is what just happened to Bash. Text injection influences; tool-gating enforces. Only the second is a real security boundary.\n- **Injected context is data, not instruction.** The marker landed inside a system-reminder-style block rather than in your message. The right handling is to report it as an observation \u2014 which is exactly what you asked for \u2014 not to treat whatever it says as a command.\n- **The block message names a \"claim,\"** suggesting a claims/capability model where shell access is withheld unless some assertion holds. Your untracked `guarded.txt` and `note.txt` in this repo are plausibly the fixtures driving it.\n`\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500`\n\nSummary: marker visible (`ACC-INJECTION-MARKER-7Q2`), `echo probe` blocked, no output produced.\n\nI won't try to route around the guard (e.g. via a different tool or an unsandboxed retry) \u2014 that's the boundary doing its job. If you want the probe to actually run, tell me and I can either inspect the guard's config to see what claim it wants, or you can grant the permission and I'll re-run it verbatim.",
+  "background_tasks": [],
+  "session_crons": []
+}

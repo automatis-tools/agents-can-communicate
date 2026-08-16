@@ -1,0 +1,17 @@
+{
+  "session_id": "a96cb852-40af-4406-978b-edd9c0affdd1",
+  "transcript_path": "<redacted: conversation transcript>",
+  "cwd": "/tmp/example-workspace",
+  "prompt_id": "8b56d896-013c-4ab8-845b-f9670ac34386",
+  "permission_mode": "bypassPermissions",
+  "effort": {
+    "level": "xhigh"
+  },
+  "hook_event_name": "PreToolUse",
+  "tool_name": "Bash",
+  "tool_input": {
+    "command": "echo probe",
+    "description": "Run echo probe"
+  },
+  "tool_use_id": "toolu_01DwntPqjB3f7otHzHhGoFGH"
+}
