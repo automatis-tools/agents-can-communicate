@@ -7,12 +7,28 @@ release.
 
 | | |
 |---|---|
+| Built from | `70b793b` |
 | Tarball | `agents-can-communicate-0.0.0.tgz`, 84 KB, 99 entries |
-| sha256 | `91914b8e57a85da422d66d687bb6f2b74c3b1f8de9e5495dfac1cdc2a3c8f6d6` |
-| Tests | 593 passing, 0 failing |
+| sha256 | `a5c8bb1de3e811694633f4cc4a0c238790b79774c546d9bc7cefaaa36eb7cdfa` |
+| Tests | 598 passing, 0 failing |
 | Node | 24 (current production LTS) |
 | Verified on | macOS 15 (darwin 25.5.0, arm64) and Linux in CI |
 | Not supported | Windows — see below |
+
+This is a measurement, not a promise about `main`. Every workspace travels inside the
+tarball, so any change to shipped code changes the digest — and the commit named above is
+necessarily an ancestor of the one recording it, because no commit can contain its own
+hash. Only `bin/`, `README.md`, `LICENSE`, `docs/CAPABILITIES.md`, and the workspaces are
+packed, so changes to tests, scripts, or the rest of `docs/` leave the digest alone.
+
+To check it, or to record a newer candidate:
+
+```bash
+node scripts/verify-package.mjs
+```
+
+It prints the digest and the revision on one line, and refuses to imply reproducibility
+when the working tree is dirty.
 
 ### What it does
 
