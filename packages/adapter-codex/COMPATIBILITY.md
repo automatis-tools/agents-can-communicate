@@ -49,9 +49,58 @@ Related vocabulary in the same binary: `HookSource` (`codex`, `system`, `project
 carrying `event_name`, `handler_type`, `execution_mode`, `source_path`, `display_order`,
 and `status_message`.
 
+## Observed in a real session
+
+Captured 2026-08-16 from `codex exec` on 0.147.0, run against an isolated `CODEX_HOME` so
+the operator's own configuration was never touched. Fixtures are in `fixtures/`.
+
+Fired and completed: `SessionStart`, `UserPromptSubmit`, `PreToolUse`, `PostToolUse`,
+`Stop`, `SessionEnd`.
+
+Payload shape, common to every event: `session_id`, `transcript_path`, `cwd`,
+`hook_event_name`, `model`, `permission_mode`. `SessionStart` adds `source`;
+`UserPromptSubmit` adds `turn_id` and `prompt`; `PreToolUse` adds `turn_id`, `tool_name`,
+`tool_input`, `tool_use_id`; `Stop` adds `stop_hook_active` and `last_assistant_message`;
+`SessionEnd` adds `reason` and omits `model` and `permission_mode`.
+
+**`PreToolUse` genuinely blocks.** A hook exiting 2 with a reason on stderr produced
+
+```text
+error=Command blocked by PreToolUse hook: ACC: blocked by a resource claim held by
+another session
+hook: PreToolUse Blocked
+```
+
+and the model reported the reason back to the user in its own words. Verified for both a
+shell command and a file edit; the edit never reached disk.
+
+Three findings that change the adapter:
+
+1. **Codex names its edit tool `apply_patch`**, not `Write` or `Edit`. A matcher borrowed
+   from another harness's vocabulary would never have fired on a file edit, so the adapter
+   would have reported edits as guarded while letting every one through.
+2. **Hook commands must be absolute paths.** A relative `./scripts/x.sh` - which is what
+   the bundled example plugins use - failed on every event with no output.
+3. **Conversation content is handed to hooks directly**: `transcript_path` on every event,
+   the raw `prompt` on `UserPromptSubmit`, `last_assistant_message` on `Stop`. Whitelist
+   normalisation is what keeps it out of coordination state.
+
+## Installation mechanics, observed
+
+A marketplace is a directory whose manifest lives at
+`<root>/.agents/plugins/marketplace.json`, with `plugins` as an **array** of
+`{ name, source: { source: "local", path }, policy, category }`. It is registered with
+`codex plugin marketplace add <dir>`, which writes `[marketplaces.<name>]` into
+`$CODEX_HOME/config.toml`; a plugin is then installed with
+`codex plugin add <plugin>@<marketplace>`, which records `[plugins."<p>@<m>"] enabled` and
+copies the plugin into `$CODEX_HOME/plugins/cache/<marketplace>/<plugin>/<version>`.
+
+`CODEX_HOME` relocates the whole configuration root, which is what made this capture
+possible without touching the operator's install.
+
 ## Open risks
 
-1. **The hook payload shape is unknown.** The event names are settled (above), but
+1. **Context injection is unverified.** The event names are settled (above), but
    nothing published or bundled describes what a Codex hook receives on stdin. Claude
    Code documents `session_id`, `cwd`, `transcript_path`, and `hook_event_name`; Codex
    documents nothing equivalent, and the binary's `HookRunSummary` fields describe the
@@ -72,7 +121,7 @@ and `status_message`.
 
 `docs/superpowers/plans/2026-08-15-acc-adapters.md` Task 3 assumes session-start and
 session-end hooks and a direct install. The events exist, so the first assumption holds.
-The remaining gap is the payload shape: capabilities stay false and `doctor` reports the
-adapter as uncaptured until a real Codex session has been observed and its hook payloads
-recorded as fixtures. Installation must also account for hook trust and the marketplace
-path rather than writing files directly.
+The payload gap is now closed by capture. Declared true: `lifecycle.sessionStart`,
+`lifecycle.sessionEnd`, `guards.beforeWrite`, `guards.beforeShell`, `delivery.polling`.
+Still false and why: context injection unobserved, child sessions unobserved (no subagent
+ran during the capture), wake and execution not offered by this harness.

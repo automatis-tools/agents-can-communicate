@@ -100,26 +100,66 @@ test("detect is read-only and reports registration honestly", async t => {
   assert.equal((await read()).plugins["someone-elses-plugin"] !== undefined, true);
 });
 
-test("every capability is false until a payload has been captured", () => {
-  const adapter = createCodexAdapter();
+test("only capabilities observed in a real session are declared true", () => {
+  const { capabilities } = createCodexAdapter();
 
-  for (const [group, values] of Object.entries(adapter.capabilities)) {
-    for (const [name, value] of Object.entries(values)) {
-      assert.equal(value, false, `${group}.${name} was declared without evidence`);
-    }
-  }
+  // Observed firing on codex-cli 0.147.0; fixtures are in fixtures/.
+  assert.equal(capabilities.lifecycle.sessionStart, true);
+  assert.equal(capabilities.lifecycle.sessionEnd, true);
+  assert.equal(capabilities.guards.beforeWrite, true);
+  assert.equal(capabilities.guards.beforeShell, true);
+
+  // Not observed, so not claimed. Injection was never seen reaching the model,
+  // and no subagent ran during the capture.
+  assert.equal(capabilities.context.beforeTurnInjection, false);
+  assert.equal(capabilities.lifecycle.childSessions, false);
+  assert.equal(capabilities.delivery.wakeDormantSession, false);
+  for (const value of Object.values(capabilities.execution)) assert.equal(value, false);
 });
 
-test("doctor says the adapter is uncaptured and mentions hook trust", async t => {
+test("doctor reports the capture and the trust requirement", async t => {
   const { context } = await fixture(t);
   const adapter = createCodexAdapter();
   await adapter.install(context);
 
   const report = await adapter.doctor(context);
 
-  assert.equal(report.ok, false, "doctor reported healthy without captured payloads");
-  assert.match(report.diagnostics.join(" "), /not captured/);
+  assert.match(report.diagnostics.join(" "), /captured/);
   assert.match(report.diagnostics.join(" "), /trusted/);
+});
+
+test("the guard matches the tools this client actually uses", async t => {
+  const { context } = await fixture(t);
+  await createCodexAdapter().install(context);
+  const wired = JSON.parse(await readFile(path.join(context.home, "plugins",
+    "agents-can-communicate", "hooks.json"), "utf8"));
+
+  // Codex names its edit tool apply_patch. A matcher copied from another
+  // harness's vocabulary would never fire on a file edit, and the adapter would
+  // report edits as guarded while letting every one through.
+  const matcher = wired.hooks.PreToolUse[0].matcher;
+  assert.match(matcher, /apply_patch/);
+  assert.doesNotMatch(matcher, /\bWrite\b|\bEdit\b/);
+});
+
+test("real captured payloads normalise without guesswork", async () => {
+  const captured = ["SessionStart", "UserPromptSubmit", "PreToolUse", "Stop", "SessionEnd"];
+  const kinds = { SessionStart: "sessionStart", UserPromptSubmit: "beforeTurn",
+    PreToolUse: "beforeTool", Stop: "turnEnd", SessionEnd: "sessionEnd" };
+
+  for (const event of captured) {
+    const payload = JSON.parse(await readFile(new URL(`../fixtures/${event}.json`,
+      import.meta.url), "utf8"));
+    const normalised = normalizeCodexHook(payload);
+
+    assert.equal(normalised.kind, kinds[event], `${event} normalised wrongly`);
+    assert.equal(normalised.sessionId, payload.session_id);
+    assert.equal(normalised.cwd, payload.cwd);
+    // Conversation content is dropped by the whitelist, not carried along.
+    assert.deepEqual(Object.keys(normalised).sort(),
+      ["cwd", "kind", "model", "parentSessionId", "sessionId", "tool"]);
+    assert.equal(JSON.stringify(normalised).includes("redacted"), false);
+  }
 });
 
 test("an unrecognised hook payload is refused rather than guessed", () => {

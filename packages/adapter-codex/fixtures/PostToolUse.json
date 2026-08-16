@@ -1,0 +1,15 @@
+{
+  "session_id": "01a00909-2043-71a0-ae91-df1a62c1f959",
+  "turn_id": "01a00909-2081-7142-b34c-b4e9007d1d21",
+  "transcript_path": "<redacted: conversation transcript>",
+  "cwd": "/tmp/example-workspace",
+  "hook_event_name": "PostToolUse",
+  "model": "gpt-5.6-sol",
+  "permission_mode": "bypassPermissions",
+  "tool_name": "Bash",
+  "tool_input": {
+    "command": "echo hi"
+  },
+  "tool_response": "hi\n",
+  "tool_use_id": "exec-1608a66c-0cc6-4a1b-8e2a-6855ca4753f2"
+}
