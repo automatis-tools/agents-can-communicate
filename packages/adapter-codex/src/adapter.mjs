@@ -1,6 +1,6 @@
 import { defineAdapter, projectContext } from "@agents-can-communicate/adapter-sdk";
 
-import { normalizeCodexHook } from "./hooks.mjs";
+import { allowOutcome, denyOutcome, normalizeCodexHook } from "./hooks.mjs";
 import { detectCodex, installCodexPlugin, uninstallCodexPlugin } from "./install.mjs";
 
 export const CODEX_VERSION = "0.147.0";
@@ -56,6 +56,8 @@ export function createCodexAdapter() {
       };
     },
 
+    denyOutcome,
+    allowOutcome,
     normalizeHook: payload => normalizeCodexHook(payload),
     renderContext: sync => projectContext(sync),
   });

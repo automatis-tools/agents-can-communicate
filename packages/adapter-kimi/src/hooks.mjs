@@ -112,3 +112,14 @@ export function allowResponse() {
 export function injectResponse(context) {
   return context === "" ? null : context;
 }
+
+// How a denial and an injection reach this client. Both were measured; they use
+// different mechanisms, and neither matches all three of the other adapters.
+export function denyOutcome(reason) {
+  return { stdout: `${JSON.stringify(denyResponse(reason))}\n`, stderr: "", exitCode: 0 };
+}
+
+export function injectOutcome(context) {
+  const rendered = injectResponse(context);
+  return { stdout: rendered === null ? "" : `${rendered}\n`, stderr: "", exitCode: 0 };
+}

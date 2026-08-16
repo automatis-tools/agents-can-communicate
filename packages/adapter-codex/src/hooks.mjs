@@ -96,3 +96,22 @@ export function patchTargets(tool, input) {
   }
   return targets;
 }
+
+/**
+ * Deny a tool call the way this client understands it.
+ *
+ * Alone among the four, this one has no structured reply: a hook denies by
+ * exiting 2 with the reason on stderr. Observed on 0.147.0 for both a shell
+ * command and a file edit - the edit never reached disk, and the model reported
+ * the reason back to the user in its own words.
+ *
+ * Returning JSON on stdout here, which is what the other three want, denies
+ * nothing at all.
+ */
+export function denyOutcome(reason) {
+  return { stdout: "", stderr: reason, exitCode: 2 };
+}
+
+export function allowOutcome() {
+  return { stdout: "", stderr: "", exitCode: 0 };
+}
