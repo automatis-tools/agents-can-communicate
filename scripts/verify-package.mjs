@@ -8,7 +8,8 @@
 //
 // Usage: node scripts/verify-package.mjs [tarball]
 import { execFile } from "node:child_process";
-import { mkdtemp, readFile, readdir, realpath, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, readdir, realpath, rm, writeFile }
+  from "node:fs/promises";
 import { createHash } from "node:crypto";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -16,6 +17,9 @@ import { promisify } from "node:util";
 
 const run = promisify(execFile);
 const repo = path.resolve(import.meta.dirname, "..");
+
+// npm is a .cmd shim on Windows, which execFile cannot spawn.
+const npm = process.platform === "win32" ? "npm.cmd" : "npm";
 
 // Never published: development scaffolding, other people's captures, evidence
 // from this machine, and anything carrying a live session.
@@ -41,7 +45,7 @@ function fail(message, detail = "") {
 }
 
 async function packTarball(into) {
-  const { stdout } = await run("npm", ["pack", "--pack-destination", into], { cwd: repo });
+  const { stdout } = await run(npm, ["pack", "--pack-destination", into], { cwd: repo });
   return path.join(into, stdout.trim().split("\n").at(-1));
 }
 
@@ -56,8 +60,11 @@ async function main() {
   const project = path.join(workspace, "project");
   const dataHome = path.join(workspace, "data");
   const clientHome = path.join(workspace, "home");
+  // Node's own mkdir rather than the shell's. `mkdir -p` is a cmd builtin on
+  // Windows, not an executable execFile can find, so spawning it fails there -
+  // and CI runs this matrix on windows-latest.
   for (const dir of [consumer, project, dataHome, clientHome]) {
-    await run("mkdir", ["-p", dir]);
+    await mkdir(dir, { recursive: true });
   }
 
   try {
@@ -90,7 +97,7 @@ async function main() {
     step("install into a clean directory");
     await writeFile(path.join(consumer, "package.json"),
       '{"name":"acc-verify","version":"1.0.0","private":true}\n');
-    await run("npm", ["install", "--silent", tarball], { cwd: consumer });
+    await run(npm, ["install", "--silent", tarball], { cwd: consumer });
     const bin = path.join(consumer, "node_modules", ".bin");
     ok((await readdir(bin)).join(", "));
 
