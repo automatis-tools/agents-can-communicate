@@ -1,17 +1,25 @@
 # Codex hook fixtures
 
-Empty on purpose.
+Captured 2026-08-16 from a real `codex exec` session on codex-cli 0.147.0, run against an
+isolated `CODEX_HOME` so nothing in the operator's own configuration was touched.
 
-The event names Codex 0.147.0 supports are settled — they are an enum inside the installed
-binary, recorded in `../COMPATIBILITY.md`. What is *not* settled is the payload a hook
-receives on stdin. Nothing in the published documentation or in the material bundled with
-the client describes it, and the binary's `HookRunSummary` fields describe the result of a
-hook run rather than its input.
+Each file is the exact payload the named hook received on stdin, with three fields
+replaced: `transcript_path`, `prompt`, and `last_assistant_message`. A fixture records the
+*shape*, which is what was unknown; it must never carry a transcript.
 
-A fixture here is a payload recorded from a real Codex session, one file per event, named
-after the event: `SessionStart.json`, `PreToolUse.json`, and so on.
+## Why these exist
 
-Until at least `SessionStart` and `SessionEnd` are captured, the adapter declares every
-capability false and `doctor` reports it as uncaptured. That is the honest state: an
-adapter that normalised an unrecognised shape would attach the wrong session, or a fresh
-one on every hook, and would look like it was working.
+The event names were already settled from an enum in the binary. The payload shape was
+not documented anywhere, so until this capture the adapter declared every capability false
+and refused to normalise a shape it had never seen.
+
+## What the capture changed
+
+- Codex's file-editing tool is `apply_patch`, not `Write` or `Edit`. The hook matcher
+  originally copied from Claude Code's vocabulary would never have fired on a file edit,
+  so the adapter would have reported edits as guarded while letting every one through.
+- Hook commands must be absolute paths. A relative `./scripts/x.sh`, which is what the
+  installed example plugins use, failed on every event.
+- Every payload carries `transcript_path`, `UserPromptSubmit` carries the raw `prompt`,
+  and `Stop` carries `last_assistant_message`. Codex hands conversation content to hooks
+  directly, so whitelist normalisation is what keeps it out of coordination state.

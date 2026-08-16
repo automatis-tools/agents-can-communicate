@@ -1,20 +1,55 @@
 {
   "hooks": {
     "SessionStart": [
-      { "hooks": [ { "type": "command", "command": "./scripts/acc-hook.mjs sessionStart" } ] }
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "acc-hook sessionStart"
+          }
+        ]
+      }
     ],
     "UserPromptSubmit": [
-      { "hooks": [ { "type": "command", "command": "./scripts/acc-hook.mjs beforeTurn" } ] }
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "acc-hook beforeTurn"
+          }
+        ]
+      }
     ],
     "PreToolUse": [
-      { "matcher": "Write|Edit|Bash",
-        "hooks": [ { "type": "command", "command": "./scripts/acc-hook.mjs guard" } ] }
+      {
+        "matcher": "apply_patch|Bash|shell",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "acc-hook guard"
+          }
+        ]
+      }
     ],
     "Stop": [
-      { "hooks": [ { "type": "command", "command": "./scripts/acc-hook.mjs finish" } ] }
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "acc-hook finish"
+          }
+        ]
+      }
     ],
     "SessionEnd": [
-      { "hooks": [ { "type": "command", "command": "./scripts/acc-hook.mjs sessionEnd" } ] }
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "acc-hook sessionEnd"
+          }
+        ]
+      }
     ]
   }
 }
