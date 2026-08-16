@@ -1,6 +1,8 @@
-import { cp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { access, cp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+
+import { AccError, EXIT } from "@agents-can-communicate/protocol";
 
 const bundle = fileURLToPath(new URL("../plugin", import.meta.url));
 const PLUGIN_NAME = "agents-can-communicate";
@@ -104,7 +106,24 @@ const registerPlugin = (registry, root) => {
     plugins: [...plugins, { id: PLUGIN_NAME, root, source: "local", enabled: true }] };
 };
 
+export const runnerExists = async runner => {
+  try {
+    await access(runner);
+    return true;
+  } catch {
+    return false;
+  }
+};
+
 export async function installKimiPlugin({ home, runner = defaultRunner(), node }) {
+  // A hook whose command does not exist fails silently, on every event, for as
+  // long as it stays installed: the client reports nothing and ACC simply never
+  // sees a session. Writing that entry and hoping is worse than refusing.
+  if (!await runnerExists(runner)) {
+    throw new AccError(EXIT.DATA,
+      "refusing to install: the hook runner does not exist", { runner });
+  }
+
   const target = pluginPath(home);
   await rm(target, { recursive: true, force: true });
   await cp(bundle, target, { recursive: true });
@@ -149,7 +168,7 @@ export async function uninstallKimiPlugin({ home }) {
   return { ok: true, changes, diagnostics: [] };
 }
 
-export async function detectKimi({ home }) {
+export async function detectKimi({ home, runner = defaultRunner() }) {
   const source = await readText(configPath(home), "");
   const installed = source.includes(BEGIN);
   const registry = await readJson(registryPath(home), null);
@@ -157,5 +176,8 @@ export async function detectKimi({ home }) {
   return { ok: true, changes: [], diagnostics: [
     installed ? "acc hooks registered in config.toml" : "acc hooks not registered",
     registered ? "acc plugin registered" : "acc plugin not registered",
+    await runnerExists(runner)
+      ? `hook runner present at ${runner}`
+      : `hook runner MISSING at ${runner}; every hook would fail silently`,
   ] };
 }
