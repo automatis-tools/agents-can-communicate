@@ -50,13 +50,27 @@ function attentionLines(attention) {
  * is the whole mitigation: ACC will not intercept the write, so respecting the
  * claim is this session's own responsibility and it needs to know that.
  */
+function claimNote(claim) {
+  // Enforcement is declared per claim, and the guard only ever blocks a guarded
+  // one. Reading this session's capability alone would announce a block that
+  // will never happen, on a claim whose owner explicitly did not ask for one.
+  if (claim.enforcement !== "guarded") {
+    return " - advisory; nothing will stop you, the owner is asking";
+  }
+  if (claim.enforceable === false) {
+    return " - not enforced for this session; do not edit it";
+  }
+  // Guarded, and this session can be stopped - but only on a file edit. No
+  // harness intercepts a shell command, so an edit made through one goes
+  // through whatever the claim says, and a session told merely "this is
+  // claimed" would reasonably assume otherwise.
+  return " - file edits are blocked; edits made through a shell are not";
+}
+
 function claimLines(claims) {
   return claims.map(claim => {
     const owner = claim.ownerParticipantId ?? claim.ownerSessionId ?? "another session";
-    const note = claim.enforceable === false
-      ? " - not enforced for this session; do not edit it"
-      : "";
-    return `- [claim] ${claim.resource} held by ${owner}${note}`;
+    return `- [claim] ${claim.resource} held by ${owner}${claimNote(claim)}`;
   });
 }
 

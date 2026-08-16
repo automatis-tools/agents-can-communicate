@@ -131,11 +131,12 @@ test("a session that cannot be stopped is told so, not left to assume", () => {
   const projected = projectContext({ solo: false, cursor: "c1", roster: [],
     attention: [], messages: [],
     claims: [{ resource: "file:src/**", ownerParticipantId: "models",
-      enforceable: false }] });
+      enforcement: "guarded", enforceable: false }] });
 
-  // The honest case: a Codex model that edits through the shell, or any MCP
-  // client. ACC cannot intercept the write, so the only thing left is to say
-  // that respecting the claim is now this session's own responsibility.
+  // The honest case: the owner asked for enforcement, and this session is one
+  // ACC cannot intercept - a Codex model that edits through the shell, or any
+  // MCP client. The only thing left is to say that respecting the claim is now
+  // this session's own responsibility.
   assert.match(projected, /cannot be enforced|not enforced/i);
   assert.match(projected, /file:src\/\*\*/);
 });
@@ -158,4 +159,38 @@ test("no claims means no section at all", () => {
     attention: [], messages: [], claims: [] });
 
   assert.doesNotMatch(projected, /claim/i);
+});
+
+test("a guarded session is told the limit of its own guard", () => {
+  const projected = projectContext(syncResult({ roster: [],
+    claims: [{ resource: "file:src/**", ownerParticipantId: "models",
+      enforcement: "guarded", enforceable: true }] }));
+
+  // Being guarded is not the same as being safe: no harness intercepts a shell
+  // command, so an edit made through one is never stopped. A session told only
+  // "this is claimed" would reasonably assume ACC has it covered.
+  assert.match(projected, /through a shell are not/);
+});
+
+test("a claim its owner declared advisory is never described as blocking", () => {
+  const projected = projectContext(syncResult({ roster: [],
+    claims: [{ resource: "file:src/**", ownerParticipantId: "models",
+      enforcement: "advisory", enforceable: true }] }));
+
+  // Enforcement is declared per claim, and the guard only blocks guarded ones.
+  // Reading this session's own capability alone would announce a block that
+  // will never happen - and the owner explicitly did not ask for one.
+  assert.doesNotMatch(projected, /blocked/);
+  assert.match(projected, /advisory/);
+  assert.match(projected, /file:src\/\*\*/);
+});
+
+test("an advisory claim reads the same however capable the session is", () => {
+  const render = enforceable => projectContext(syncResult({ roster: [],
+    claims: [{ resource: "file:src/**", ownerParticipantId: "models",
+      enforcement: "advisory", enforceable }] }));
+
+  // Whether this session could have been stopped is irrelevant to a claim
+  // nobody asked to be enforced.
+  assert.equal(render(true), render(false));
 });

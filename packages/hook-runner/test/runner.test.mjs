@@ -378,3 +378,27 @@ test("a session is not warned about its own claim", async t => {
   // exactly backwards.
   assert.doesNotMatch(turn.stdout, /file:src/);
 });
+
+test("an advisory claim is passed through as advisory, not as a block", async t => {
+  const place = await workspace(t);
+  const peer = await run("kimi", event("sessionStart", { sessionId: "peer" }), place);
+  await peer.service.acquireClaim({ sessionId: peer.accSessionId,
+    generation: peer.generation, resource: "file:src/**", mode: "exclusive",
+    enforcement: "advisory", reason: "just asking" });
+
+  // A session that genuinely can be guarded. The guard still will not block an
+  // advisory claim, so telling this session its edits are blocked would be an
+  // announcement of something that never happens.
+  const guarding = { ...kimi, id: "guarding",
+    capabilities: { guards: { beforeWrite: true }, lifecycle: { sessionEnd: true } },
+    renderContext: sync => (sync.claims ?? [])
+      .map(c => `${c.resource}|${c.enforcement}|${c.enforceable}`).join(" ") };
+  const adapters = { ...ADAPTERS, guarding };
+
+  await runHook({ adapterId: "guarding", adapters, dataHome: place.dataHome,
+    payload: event("sessionStart", { cwd: place.root }) });
+  const turn = await runHook({ adapterId: "guarding", adapters, dataHome: place.dataHome,
+    payload: event("beforeTurn", { cwd: place.root }) });
+
+  assert.match(turn.stdout, /file:src\/\*\*\|advisory\|true/);
+});
