@@ -3,17 +3,35 @@
   "version": "0.0.0",
   "type": "module",
   "description": "Model- and harness-agnostic coordination for independent AI agent sessions.",
+  "keywords": [
+    "agents",
+    "coordination",
+    "mcp",
+    "hooks",
+    "codex",
+    "claude-code",
+    "gemini-cli",
+    "kimi",
+    "multi-agent",
+    "cli"
+  ],
+  "homepage": "https://github.com/automatis-tools/agents-can-communicate#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/automatis-tools/agents-can-communicate.git"
+  },
+  "bugs": {
+    "url": "https://github.com/automatis-tools/agents-can-communicate/issues"
+  },
   "workspaces": [
     "packages/*"
   ],
   "scripts": {
     "test": "node scripts/run-tests.mjs",
-    "check": "node scripts/check-syntax.mjs",
-    "test:prototype": "cd prototype/papercut-agent-comms && node --test tests/tools/agent_comms/*.test.mjs",
-    "test:prototype:sigterm": "cd prototype/papercut-agent-comms && node --test --test-name-pattern='SIGTERM is accepted' tests/tools/agent_comms/cli-round1.test.mjs",
-    "test:integrated": "cd prototype/integrated && node --test tests/tools/agent_comms/*.test.mjs"
+    "check": "node scripts/check-syntax.mjs"
   },
   "license": "MIT",
+  "author": "Mykola Maksymenko",
   "engines": {
     "node": ">=24"
   },
