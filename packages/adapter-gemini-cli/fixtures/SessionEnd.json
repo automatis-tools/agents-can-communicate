@@ -1,8 +1,8 @@
 {
-  "session_id": "7ef20672-f749-4370-8d9f-300ab00aad65",
+  "session_id": "4fe4a52a-ad70-451d-a5d1-3a58a309f291",
   "transcript_path": "<redacted: conversation transcript>",
   "cwd": "/tmp/example-workspace",
   "hook_event_name": "SessionEnd",
-  "timestamp": "2026-08-16T05:49:20.818Z",
+  "timestamp": "2026-08-16T07:28:20.484Z",
   "reason": "exit"
 }

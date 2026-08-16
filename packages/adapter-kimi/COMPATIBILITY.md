@@ -43,8 +43,14 @@ The same probe gives the entry shape: `event` and `command` are required, `match
 `enabled` and `cwd` were all rejected. An entry copied from another harness does not
 merely misbehave here; it fails validation and takes the whole config with it.
 
-`timeout` is in **seconds**. A hook that sleeps 3s dies under `timeout = 1`. Copying
-Gemini's `10000` would have meant nearly three hours.
+`timeout` is in **seconds**, and the schema caps it at 600. The cap is the decisive
+evidence: 600 milliseconds would be a nonsensical ceiling for a hook, and copying Gemini's
+`10000` — which is correct there, where the unit *is* milliseconds — fails validation
+outright and takes every hook in the file down with it.
+
+Confirmed from both directions rather than one: `timeout = 60` lets a hook that sleeps 3s
+finish and deny, while `timeout = 1` kills it. A single failing direction proves nothing
+here, because a hook dies under `timeout = 1` whichever unit it is.
 
 ## What was observed firing
 

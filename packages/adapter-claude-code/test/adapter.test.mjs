@@ -88,7 +88,7 @@ test("captured payloads normalise and drop conversation content", async () => {
     assert.equal(normalised.kind, kind, `${event} normalised wrongly`);
     assert.equal(normalised.sessionId, payload.session_id);
     assert.deepEqual(Object.keys(normalised).sort(),
-      ["cwd", "kind", "model", "parentSessionId", "sessionId", "tool"]);
+      ["cwd", "kind", "model", "parentSessionId", "sessionId", "targets", "tool"]);
     // Every payload carries a transcript path, and some carry the prompt or the
     // model's last message. None of it may survive normalisation.
     assert.equal(JSON.stringify(normalised).includes("redacted"), false,
@@ -111,6 +111,35 @@ test("the guard sees this client's real tool names", async () => {
   assert.match(matcher, /Write/);
   assert.match(matcher, /Bash/);
   assert.doesNotMatch(matcher, /apply_patch/);
+});
+
+test("an edit declares the path it would write, a shell call declares none", async () => {
+  // Captured from 2.1.233: Write takes file_path/content, Edit takes file_path
+  // with old_string/new_string. Without the path a guard has nothing to compare
+  // against a claim.
+  const edit = normalizeClaudeHook(await captured("PreToolUse-Edit"));
+  assert.equal(edit.tool, "Edit");
+  assert.deepEqual([...edit.targets], ["/tmp/example-workspace/notes.txt"]);
+
+  // The surviving PreToolUse fixture is the Bash one.
+  assert.deepEqual([...normalizeClaudeHook(await captured("PreToolUse")).targets], []);
+});
+
+test("reading a file is not a write", () => {
+  // Read takes file_path too. Treating it as a target would have sessions
+  // blocking each other for looking at things.
+  const normalised = normalizeClaudeHook({ hook_event_name: "PreToolUse",
+    session_id: "s", cwd: "/tmp", tool_name: "Read",
+    tool_input: { file_path: "/tmp/notes.txt" } });
+
+  assert.deepEqual([...normalised.targets], []);
+});
+
+test("the file's contents never reach the event, only its path", async () => {
+  const payload = await captured("PreToolUse-Edit");
+  assert.equal(JSON.stringify(payload.tool_input).includes("redacted"), true);
+
+  assert.equal(JSON.stringify(normalizeClaudeHook(payload)).includes("redacted"), false);
 });
 
 test("a deny response uses this client's exact structured shape", () => {

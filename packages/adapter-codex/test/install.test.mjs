@@ -157,7 +157,7 @@ test("real captured payloads normalise without guesswork", async () => {
     assert.equal(normalised.cwd, payload.cwd);
     // Conversation content is dropped by the whitelist, not carried along.
     assert.deepEqual(Object.keys(normalised).sort(),
-      ["cwd", "kind", "model", "parentSessionId", "sessionId", "tool"]);
+      ["cwd", "kind", "model", "parentSessionId", "sessionId", "targets", "tool"]);
     assert.equal(JSON.stringify(normalised).includes("redacted"), false);
   }
 });
@@ -177,6 +177,52 @@ test("a recognised payload normalises to the shared event shape", () => {
   const normalised = normalizeCodexHook({ hook_event_name: "PreToolUse",
     session_id: "abc-123", cwd: "/tmp/project", tool_name: "Write" });
 
-  assert.deepEqual(normalised, { kind: "beforeTool", sessionId: "abc-123",
-    cwd: "/tmp/project", model: null, parentSessionId: null, tool: "Write" });
+  assert.deepEqual({ ...normalised, targets: [...normalised.targets] },
+    { kind: "beforeTool", sessionId: "abc-123", cwd: "/tmp/project", model: null,
+      parentSessionId: null, tool: "Write", targets: [] });
+});
+
+test("the write target is read out of the patch body, where this client puts it", async () => {
+  // Unlike every other harness, this client's editor takes no path argument:
+  // the paths are inside the patch. Reading tool_input.path here would find
+  // nothing and leave every edit unguarded while looking correct.
+  const payload = JSON.parse(await readFile(
+    new URL("../fixtures/PreToolUse.json", import.meta.url), "utf8"));
+
+  assert.deepEqual([...normalizeCodexHook(payload).targets], ["guarded.txt"]);
+});
+
+test("a patch touching several files declares all of them", () => {
+  const body = ["*** Begin Patch", "*** Update File: src/a.mjs", "+one",
+    "*** Add File: src/b.mjs", "+two", "*** Delete File: src/c.mjs",
+    "*** Move to: src/d.mjs", "*** End Patch"].join("\n");
+
+  const normalised = normalizeCodexHook({ hook_event_name: "PreToolUse",
+    session_id: "s", cwd: "/tmp", tool_name: "apply_patch",
+    tool_input: { command: body } });
+
+  // A single call here can touch several files, so a guard that checked only
+  // the first would let the rest through.
+  assert.deepEqual([...normalised.targets],
+    ["src/a.mjs", "src/b.mjs", "src/c.mjs", "src/d.mjs"]);
+});
+
+test("the patch's content lines are never read as paths", () => {
+  // A `+` line can say anything, including something that looks like a header.
+  const body = ["*** Begin Patch", "*** Add File: real.txt",
+    "+*** Add File: not-a-path.txt", "*** End Patch"].join("\n");
+
+  const normalised = normalizeCodexHook({ hook_event_name: "PreToolUse",
+    session_id: "s", cwd: "/tmp", tool_name: "apply_patch",
+    tool_input: { command: body } });
+
+  assert.deepEqual([...normalised.targets], ["real.txt"]);
+});
+
+test("a shell call declares no target rather than a guessed one", () => {
+  const normalised = normalizeCodexHook({ hook_event_name: "PreToolUse",
+    session_id: "s", cwd: "/tmp", tool_name: "shell",
+    tool_input: { command: "rm -rf src/" } });
+
+  assert.deepEqual([...normalised.targets], []);
 });

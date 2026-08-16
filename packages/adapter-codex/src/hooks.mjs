@@ -1,3 +1,4 @@
+import { normalizedEvent } from "@agents-can-communicate/adapter-sdk";
 import { AccError, EXIT } from "@agents-can-communicate/protocol";
 
 // The event names are settled: they are an enum in the installed 0.147.0 binary,
@@ -59,12 +60,39 @@ export function normalizeCodexHook(payload) {
       "unrecognised Codex hook payload: no session id or working directory",
       { event, received: Object.keys(payload ?? {}) });
   }
-  return {
+  const tool = pick(payload, FIELD_CANDIDATES.tool);
+  return normalizedEvent({
     kind: KIND_BY_EVENT[event] ?? "other",
     sessionId,
     cwd,
     model: pick(payload, FIELD_CANDIDATES.model),
     parentSessionId: pick(payload, FIELD_CANDIDATES.parentSessionId),
-    tool: pick(payload, FIELD_CANDIDATES.tool),
-  };
+    tool,
+    targets: patchTargets(tool, payload?.tool_input),
+  });
+}
+
+// This client's editor takes no path argument at all: the paths live inside the
+// patch body, one per operation, so a single call can touch several files.
+// Reading `tool_input.path` here - the shape every other harness uses - would
+// find nothing and leave every edit unguarded.
+const PATCH_OPERATION = /^\*\*\* (?:Add|Update|Delete) File: (.+)$/;
+const PATCH_MOVE = /^\*\*\* Move to: (.+)$/;
+
+/**
+ * Paths an `apply_patch` call would write, read out of the patch envelope.
+ *
+ * A rename writes both sides, so both are returned. The `+`/`-` content lines
+ * are never read: they are the file's contents, which ACC has no use for.
+ */
+export function patchTargets(tool, input) {
+  if (tool !== "apply_patch") return [];
+  const body = input?.command ?? input?.patch ?? input?.input;
+  if (typeof body !== "string") return [];
+  const targets = [];
+  for (const line of body.split("\n")) {
+    const operation = PATCH_OPERATION.exec(line) ?? PATCH_MOVE.exec(line);
+    if (operation !== null) targets.push(operation[1].trim());
+  }
+  return targets;
 }

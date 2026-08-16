@@ -7,7 +7,8 @@ import test from "node:test";
 import { EXIT } from "@agents-can-communicate/protocol";
 
 import { createGeminiCliAdapter } from "../src/adapter.mjs";
-import { normalizeGeminiHook } from "../src/hooks.mjs";
+import { allowResponse, denyResponse, injectResponse, normalizeGeminiHook }
+  from "../src/hooks.mjs";
 
 // The user already has a hook of their own on an event ACC also uses, with a
 // command string that is easy to confuse for ours.
@@ -117,20 +118,51 @@ test("only capabilities observed firing are declared true", () => {
 
   assert.equal(capabilities.lifecycle.sessionStart, true);
   assert.equal(capabilities.lifecycle.sessionEnd, true);
+  // Observed on a real turn served by a local stand-in endpoint: write_file and
+  // run_shell_command were each intercepted and each denied.
+  assert.equal(capabilities.guards.beforeWrite, true);
+  assert.equal(capabilities.guards.beforeShell, true);
+  assert.equal(capabilities.context.beforeTurnInjection, true);
 
-  // BeforeTool is configurable and accepted by the client, but it never fired
-  // during the capture: the account received 403 from the model API, so no turn
-  // ran. An event accepted in configuration is not an event observed protecting
-  // anything.
-  assert.equal(capabilities.guards.beforeWrite, false);
-  assert.equal(capabilities.guards.beforeShell, false);
-  assert.equal(capabilities.context.beforeTurnInjection, false);
+  // Still unobserved: no subagent ran, and this client fires no heartbeat.
   assert.equal(capabilities.lifecycle.childSessions, false);
+  assert.equal(capabilities.lifecycle.heartbeat, false);
+  assert.equal(capabilities.guards.beforeRead, false);
+});
+
+test("a deny uses the shape this client acts on, not the one two others accept", () => {
+  // Measured against a real session: {"decision":"block"} denies, and the
+  // hookSpecificOutput shape that Claude Code and Kimi Code both honour does
+  // not - the write went through every time. This is the single most portable-
+  // looking mistake an adapter can make.
+  assert.deepEqual(denyResponse("held by peer"),
+    { decision: "block", reason: "held by peer" });
+  assert.deepEqual(allowResponse(), {});
+});
+
+test("injection uses the envelope, which is the opposite of the deny contract", () => {
+  // Also measured: a bare string and {"additionalContext": ...} are both
+  // dropped silently here, while the envelope reaches the model. The two
+  // contracts disagree within the same client, so neither was assumed.
+  assert.deepEqual(injectResponse("2 peers"), { hookSpecificOutput: {
+    hookEventName: "BeforeAgent", additionalContext: "2 peers" } });
+  assert.deepEqual(injectResponse(""), {}, "solo injected an empty banner");
+});
+
+test("an edit declares the path it would write, a shell call declares none", async () => {
+  const edit = normalizeGeminiHook(await captured("BeforeTool"));
+  assert.equal(edit.tool, "write_file");
+  assert.deepEqual([...edit.targets], ["/tmp/example-workspace/notes.txt"]);
+
+  const shell = normalizeGeminiHook(await captured("BeforeTool-shell"));
+  assert.equal(shell.tool, "run_shell_command");
+  assert.deepEqual([...shell.targets], []);
 });
 
 test("captured payloads normalise and drop conversation content", async () => {
   const kinds = { SessionStart: "sessionStart", BeforeAgent: "beforeTurn",
-    SessionEnd: "sessionEnd", PreCompress: "other" };
+    SessionEnd: "sessionEnd", PreCompress: "other", BeforeTool: "beforeTool",
+    AfterTool: "afterTool", AfterAgent: "turnEnd" };
 
   for (const [event, kind] of Object.entries(kinds)) {
     const payload = await captured(event);
@@ -139,7 +171,7 @@ test("captured payloads normalise and drop conversation content", async () => {
     assert.equal(normalised.kind, kind, `${event} normalised wrongly`);
     assert.equal(normalised.sessionId, payload.session_id);
     assert.deepEqual(Object.keys(normalised).sort(),
-      ["cwd", "kind", "model", "parentSessionId", "sessionId", "tool"]);
+      ["cwd", "kind", "model", "parentSessionId", "sessionId", "targets", "tool"]);
     assert.equal(JSON.stringify(normalised).includes("redacted"), false,
       `${event} carried conversation content through`);
   }
@@ -152,13 +184,16 @@ test("an unrecognised event or a payload without identity is refused", () => {
     error => error.code === EXIT.DATA);
 });
 
-test("doctor names the reason no guard is declared", async t => {
+test("doctor warns that the deny shape here is not the portable-looking one", async t => {
   const { context } = await fixture(t);
   const adapter = createGeminiCliAdapter();
   await adapter.install(context);
 
-  const report = await adapter.doctor(context);
+  const said = (await adapter.doctor(context)).diagnostics.join(" ");
 
-  assert.match(report.diagnostics.join(" "), /no guard is declared/);
-  assert.match(report.diagnostics.join(" "), /403/);
+  assert.match(said, /decision.*block/);
+  assert.match(said, /does not deny on this client/);
+  // Plan mode declares no write tool at all, so a guard that never fires there
+  // is the client's doing, not a broken install.
+  assert.match(said, /plan mode/);
 });

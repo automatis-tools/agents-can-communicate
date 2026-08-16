@@ -1,0 +1,10 @@
+{
+  "session_id": "4fe4a52a-ad70-451d-a5d1-3a58a309f291",
+  "transcript_path": "<redacted: conversation transcript>",
+  "cwd": "/tmp/example-workspace",
+  "hook_event_name": "AfterAgent",
+  "timestamp": "2026-08-16T07:28:20.470Z",
+  "prompt": "<redacted: conversation content>",
+  "prompt_response": "<redacted: conversation content>",
+  "stop_hook_active": false
+}

@@ -6,17 +6,19 @@ import { detectGemini, installGeminiExtension, uninstallGeminiExtension } from "
 export const GEMINI_CLI_VERSION = "0.37.0";
 
 /**
- * Fewer capabilities than the other two adapters, and the reason is external.
+ * The gap this adapter used to carry is closed.
  *
- * SessionStart, BeforeAgent, SessionEnd and PreCompress were observed firing
- * with real payloads. BeforeTool, AfterTool and AfterAgent are configurable and
- * accepted by the client, but never fired during the capture because the
- * account received HTTP 403 from the model API, so no turn ever ran. Guards and
- * injection therefore stay false: an event that is accepted in configuration is
- * not an event observed protecting anything.
+ * BeforeTool, AfterTool and AfterAgent were undeclarable for a long time: the
+ * capture account received HTTP 403 from the model API, so no turn ever ran and
+ * no tool event fired. Pointing the client at a local stand-in endpoint with
+ * GOOGLE_GEMINI_BASE_URL served one canned turn, and all three fired with real
+ * payloads. Only the model was stubbed; the client really wrote the file and
+ * really ran the shell command, and a deny really stopped each of them.
  *
- * This is the honest gap, and it closes as soon as one turn completes on an
- * account that can reach the model.
+ * The two contracts here disagree with each other, which is why both were
+ * measured rather than assumed: a deny must be `{"decision":"block"}`, while an
+ * injection must be the `hookSpecificOutput` envelope. Swapping them silently
+ * does nothing at all.
  */
 export function createGeminiCliAdapter() {
   return defineAdapter({
@@ -24,11 +26,15 @@ export function createGeminiCliAdapter() {
     displayName: "Gemini CLI",
     capabilities: {
       lifecycle: { sessionStart: true, sessionEnd: true },
+      context: { beforeTurnInjection: true },
+      guards: { beforeWrite: true, beforeShell: true },
       delivery: { polling: true },
     },
 
     startSession: async () => ({ ok: true, changes: [], diagnostics: [] }),
     endSession: async () => ({ ok: true, changes: [], diagnostics: [] }),
+    guardWrite: async () => ({ ok: true, changes: [], diagnostics: [] }),
+    guardShell: async () => ({ ok: true, changes: [], diagnostics: [] }),
     poll: async () => ({ ok: true, changes: [], diagnostics: [] }),
 
     detect: context => detectGemini(context),
@@ -39,9 +45,11 @@ export function createGeminiCliAdapter() {
       const detected = await detectGemini(context);
       return { ok: true, changes: [], diagnostics: [
         ...detected.diagnostics,
-        "lifecycle payloads captured from Gemini CLI 0.37.0",
-        "BeforeTool was never observed firing, so no guard is declared; "
-          + "the capture account received HTTP 403 from the model API",
+        "lifecycle, guard and injection payloads captured from Gemini CLI 0.37.0",
+        "a deny here must be {\"decision\":\"block\"}; the hookSpecificOutput shape "
+          + "that Claude Code and Kimi Code accept does not deny on this client",
+        "write guards need an approval mode that offers the edit tools; in plan "
+          + "mode the client declares no write tool at all",
       ] };
     },
 
