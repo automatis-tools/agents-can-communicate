@@ -9,6 +9,24 @@ Verified 2026-08-16 against the primary specification at
 | Transport | stdio, newline-delimited JSON-RPC 2.0 |
 | Transport implementation | dependency-free (see decision below) |
 
+## Transport decision
+
+Dependency-free JSON-RPC 2.0 over stdio, targeting revision `2026-07-28`. The official
+`@modelcontextprotocol/sdk` was considered and not adopted.
+
+Reasons, in order of weight:
+
+1. AGENTS.md prefers Node built-ins and dependency-free code, and the repository currently
+   has zero runtime dependencies. This package is reached through `npx`, so every
+   dependency is install weight and supply-chain surface for a fallback adapter.
+2. The surface ACC needs is small and fully specified: `server/discover`, `tools/list`,
+   `tools/call`, `resources/list`, `resources/read`, plus newline-delimited framing. The
+   stdio binding is, in the specification's own words, "just newline-delimited JSON-RPC
+   over a byte stream".
+3. The cost is ours to carry: tracking future revisions is now this package's job. The
+   revision is pinned in code and asserted by tests, so a drift shows up as a failure
+   rather than as silent misbehaviour.
+
 ## Verified rules
 
 - Messages are newline-delimited and **MUST NOT** contain embedded newlines.
