@@ -113,12 +113,15 @@ test("paths with quotes or spaces survive into the command the shell runs", () =
 test("hook entries carry a timeout in the unit this client uses", () => {
   const block = renderBlock("/opt/acc/bin/acc-hook.mjs", "/usr/bin/node");
 
-  // Seconds. A hook that sleeps 3s dies under `timeout = 1`, which is how this
-  // was settled - another harness's 10000 would be nearly three hours here.
+  // Seconds, and this client's schema caps the field at 600 - a ceiling that
+  // only makes sense in seconds. Gemini's 10000 is correct on Gemini, where the
+  // unit is milliseconds, and here it fails validation and takes every hook in
+  // the file down with it. ACC stays far below the cap: a hook holds up a turn.
   for (const line of block.split("\n").filter(l => l.startsWith("timeout"))) {
     const value = Number(line.split("=")[1].trim());
     assert.equal(Number.isInteger(value) && value > 0 && value <= 120, true,
       `${line} is not a plausible timeout in seconds`);
+    assert.equal(value <= 600, true, `${line} exceeds the client's own maximum`);
   }
 });
 
@@ -178,7 +181,7 @@ test("captured payloads normalise and drop conversation content", async () => {
     assert.equal(normalised.kind, kind, `${name} normalised wrongly`);
     assert.equal(normalised.sessionId, payload.session_id);
     assert.deepEqual(Object.keys(normalised).sort(),
-      ["cwd", "kind", "model", "parentSessionId", "sessionId", "tool"]);
+      ["cwd", "kind", "model", "parentSessionId", "sessionId", "targets", "tool"]);
     // The prompt, the tool output, the written file's contents and the error
     // text are all handed to hooks by this client. None may survive.
     assert.equal(JSON.stringify(normalised).includes("redacted"), false,
@@ -189,6 +192,30 @@ test("captured payloads normalise and drop conversation content", async () => {
 test("the guard sees the real tool name on both a write and a shell call", async () => {
   assert.equal(normalizeKimiHook(await captured("PreToolUse-Write")).tool, "Write");
   assert.equal(normalizeKimiHook(await captured("PreToolUse-Bash")).tool, "Bash");
+});
+
+test("a write declares the path it would touch, a shell call declares none", async () => {
+  // Both editing tools take `path`, confirmed from their declared schemas.
+  // Without this the guard has nothing to compare against a claim.
+  assert.deepEqual(normalizeKimiHook(await captured("PreToolUse-Write")).targets,
+    ["/workspace/project/notes.txt"]);
+
+  // A command can write anywhere; a path guessed from one would be wrong in
+  // both directions.
+  assert.deepEqual(normalizeKimiHook(await captured("PreToolUse-Bash")).targets, []);
+
+  assert.deepEqual(normalizeKimiHook(await captured("SessionStart")).targets, []);
+});
+
+test("the file's contents never reach the event, only its path", async () => {
+  const payload = await captured("PreToolUse-Write");
+  assert.equal(payload.tool_input.content.includes("redacted"), true,
+    "the fixture no longer carries content for the whitelist to drop");
+
+  const normalised = normalizeKimiHook(payload);
+
+  assert.equal(JSON.stringify(normalised).includes("redacted"), false);
+  assert.equal(normalised.targets.length, 1);
 });
 
 test("the model is read only from the event that carries it", async () => {

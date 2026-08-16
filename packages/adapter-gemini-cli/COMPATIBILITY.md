@@ -44,16 +44,52 @@ particular to this client - neither Codex nor Claude Code supplies one.
 
 `gemini extensions validate` accepts the ACC extension bundle, exit 0.
 
-## Not observed, and why
+## The guard gap, and how it was closed
 
-`BeforeTool`, `AfterTool`, and `AfterAgent` never fired. The account used for the capture
-received HTTP 403 from `cloudcode-pa.googleapis.com`, so no model turn ever ran and no
-tool was ever called. The events are configurable and the client accepts them, but an
-event accepted in configuration is not an event observed protecting anything, so this
-adapter declares no guard and no injection.
+`BeforeTool`, `AfterTool` and `AfterAgent` were undeclarable for a long time: the capture
+account received HTTP 403 from `cloudcode-pa.googleapis.com`, so no model turn ever ran
+and no tool was ever called. An event accepted in configuration is not an event observed
+protecting anything, so the adapter declared no guard and no injection.
 
-This gap closes as soon as one turn completes on an account that can reach the model API.
-It is an account-state problem, not a protocol or client limitation.
+The 403 was never the real obstacle — reaching *a* model was. Setting
+`GOOGLE_GEMINI_BASE_URL` to a local endpoint (with `GEMINI_API_KEY` set to anything, and
+an isolated `HOME` so the client does not fall back to OAuth) makes the client run a real
+turn against a canned reply. Only the model is stubbed: the client really called
+`write_file`, really called `run_shell_command`, and a deny really stopped each of them.
+
+Two details decide whether a guard fires at all:
+
+- **Approval mode.** In the default and `plan` modes this client declares no write tool to
+  the model — the toolset is `list_directory`, `read_file`, `grep_search`, `glob`,
+  `google_web_search`, `enter_plan_mode` and friends. `write_file` and `replace` appear
+  under `auto_edit`, and `run_shell_command` under `yolo`. A guard that never fires in
+  plan mode is the client's doing, not a broken install.
+- **Workspace containment.** The client refuses a path outside the workspace before the
+  tool runs, with `Path not in workspace`.
+
+## The deny contract, and the trap in it
+
+Five candidate replies were run against a real session:
+
+| Reply | Denied? |
+|---|---|
+| exit code 2 | yes |
+| `{"decision":"block","reason":"..."}` | yes |
+| `{"hookSpecificOutput":{...,"permissionDecision":"deny",...}}` | **no** |
+| exit code 1 | no |
+| `{"permission":"deny","reason":"..."}` | no |
+
+The third row is the trap. That shape denies on both Claude Code and Kimi Code, and here
+it lets the write through every time, silently.
+
+Context injection inverts it: a bare string and `{"additionalContext": "..."}` are both
+dropped, while the `hookSpecificOutput` envelope works — the client unwraps it and appends
+the text to the user turn as `<hook_context>...</hook_context>`. Two contracts, opposite
+shapes, same client.
+
+`timeout` here is in **milliseconds**, confirmed from both directions: `2000` kills a hook
+that sleeps 3s and `10000` lets it finish. (Kimi Code's field is seconds — the same number
+means very different things across these clients.)
 
 ## Management surface
 

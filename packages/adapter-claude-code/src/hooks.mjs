@@ -1,3 +1,4 @@
+import { normalizedEvent } from "@agents-can-communicate/adapter-sdk";
 import { AccError, EXIT } from "@agents-can-communicate/protocol";
 
 // Confirmed by capture on 2.1.233, and matching the published documentation
@@ -38,7 +39,8 @@ export function normalizeClaudeHook(payload) {
     throw new AccError(EXIT.DATA, "hook payload has no session id or working directory",
       { event, received: Object.keys(payload) });
   }
-  return {
+  const tool = typeof payload.tool_name === "string" ? payload.tool_name : null;
+  return normalizedEvent({
     kind: KIND_BY_EVENT[event] ?? "other",
     sessionId: payload.session_id,
     cwd: payload.cwd,
@@ -46,8 +48,31 @@ export function normalizeClaudeHook(payload) {
     // agent_id and agent_type are documented on subagent calls, so a child
     // session is mapped from metadata rather than guessed from timing.
     parentSessionId: typeof payload.agent_id === "string" ? payload.session_id : null,
-    tool: typeof payload.tool_name === "string" ? payload.tool_name : null,
-  };
+    tool,
+    targets: writeTargets(tool, payload.tool_input),
+  });
+}
+
+// Confirmed by capture on 2.1.233: Write takes `file_path` and `content`, Edit
+// takes `file_path` with `old_string`/`new_string`. Read also takes `file_path`
+// and is deliberately absent - reading is not a write, and treating it as one
+// would have sessions blocking each other for looking.
+export const CLAUDE_EDIT_TOOLS = Object.freeze(["Write", "Edit", "MultiEdit",
+  "NotebookEdit"]);
+
+/**
+ * The paths a tool call would write.
+ *
+ * Only the path is taken. `content`, `old_string` and `new_string` are the
+ * file's contents, which ACC has no use for and must not carry.
+ *
+ * `Bash` declares nothing: a command can write anywhere, and a path guessed out
+ * of one gives a guard that is wrong in both directions.
+ */
+function writeTargets(tool, input) {
+  if (!CLAUDE_EDIT_TOOLS.includes(tool)) return [];
+  const target = input?.file_path ?? input?.notebook_path;
+  return typeof target === "string" && target !== "" ? [target] : [];
 }
 
 /**

@@ -1,3 +1,4 @@
+import { normalizedEvent } from "@agents-can-communicate/adapter-sdk";
 import { AccError, EXIT } from "@agents-can-communicate/protocol";
 
 // Not read from documentation and not guessed: this client validates its config
@@ -48,7 +49,8 @@ export function normalizeKimiHook(payload) {
     throw new AccError(EXIT.DATA, "hook payload has no session id or working directory",
       { event, received: Object.keys(payload) });
   }
-  return {
+  const tool = typeof payload.tool_name === "string" ? payload.tool_name : null;
+  return normalizedEvent({
     kind: KIND_BY_EVENT[event] ?? "other",
     sessionId: payload.session_id,
     cwd: payload.cwd,
@@ -58,8 +60,27 @@ export function normalizeKimiHook(payload) {
     // No subagent was observed running, so there is no field to map yet and
     // nothing is invented from timing.
     parentSessionId: null,
-    tool: typeof payload.tool_name === "string" ? payload.tool_name : null,
-  };
+    tool,
+    targets: writeTargets(tool, payload.tool_input),
+  });
+}
+
+/**
+ * The paths a tool call would write.
+ *
+ * Both editing tools take `path` - confirmed from their declared schemas, where
+ * `Write` requires `path` and `content` and `Edit` requires `path`,
+ * `old_string` and `new_string`. Nothing else is read: the contents and the
+ * replacement strings are conversation content and stay out.
+ *
+ * `Bash` declares nothing. A command can write anywhere, and a path guessed out
+ * of one would give a guard that blocks work it holds no claim over while
+ * missing writes it does.
+ */
+function writeTargets(tool, input) {
+  if (!KIMI_EDIT_TOOLS.includes(tool)) return [];
+  const path = input?.path;
+  return typeof path === "string" && path !== "" ? [path] : [];
 }
 
 /**
