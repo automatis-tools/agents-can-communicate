@@ -57,6 +57,6 @@ export function createKimiAdapter() {
     denyOutcome,
     injectOutcome,
     normalizeHook: payload => normalizeKimiHook(payload),
-    renderContext: sync => projectContext(sync),
+    renderContext: (sync, options) => projectContext(sync, options),
   });
 }

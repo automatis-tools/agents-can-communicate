@@ -1,4 +1,8 @@
 const DEFAULT_BUDGET_BYTES = 6_000;
+// Held back from the required lines so the "not shown" note can always be
+// written. A projection that silently drops what it could not fit is how an
+// agent ends up confidently unaware.
+const NOTE_RESERVE = 48;
 const FENCE = "```";
 // A peer cannot close a block it cannot name. The fence carries a marker that
 // is stripped from peer content, so forged delimiters stay inside the block.
@@ -74,10 +78,24 @@ function claimLines(claims) {
   });
 }
 
+/**
+ * One group per message, never a flat list of lines.
+ *
+ * A block that the budget cuts in half is worse than a block that was left out:
+ * the fence never closes, and everything after it reads as ACC's own words
+ * rather than as a peer's. So a message is included whole or not at all.
+ *
+ * The id is carried because the reader needs it to acknowledge the message, and
+ * because the caller needs it to tell which messages actually reached the model
+ * before recording any of them as delivered. Ids, session ids and types are
+ * generated or schema-validated; only the subject and body are peer-authored,
+ * and only those are escaped.
+ */
 function peerBlocks(messages) {
-  return messages.flatMap(message => [
+  return messages.map(message => [
     `${FENCE}${BLOCK}`,
-    `from ${message.fromSessionId} | type ${message.type} | untrusted peer message`,
+    `id ${message.messageId} | from ${message.fromSessionId} | type ${message.type}`
+    + " | untrusted peer message",
     escapePeerText(message.subject),
     escapePeerText(message.body),
     FENCE,
@@ -104,9 +122,11 @@ export function projectContext(sync, { budgetBytes = DEFAULT_BUDGET_BYTES } = {}
   const roster = sync.roster ?? [];
   const claims = sync.claims ?? [];
 
+  // Every entry is a group that appears whole or not at all. Single-line groups
+  // may still be truncated - there is no fence in them to leave open.
   const required = [
-    ...attentionLines(attention),
-    ...claimLines(claims),
+    ...attentionLines(attention).map(line => [line]),
+    ...claimLines(claims).map(line => [line]),
     ...peerBlocks(messages),
   ];
   const optional = roster.map(item =>
@@ -116,11 +136,29 @@ export function projectContext(sync, { budgetBytes = DEFAULT_BUDGET_BYTES } = {}
   const lines = [header];
   let used = bytes(header);
 
-  for (const line of required) {
-    const candidate = truncate(line, Math.max(0, budgetBytes - used - 1));
-    if (candidate === "" || used + bytes(candidate) + 1 > budgetBytes) break;
-    lines.push(candidate);
-    used += bytes(candidate) + 1;
+  // Reserved so the note below always fits. Without it the projection could run
+  // out of room to say that it ran out of room.
+  const ceiling = budgetBytes - NOTE_RESERVE;
+  let dropped = 0;
+  for (const group of required) {
+    if (group.length === 1) {
+      const candidate = truncate(group[0], Math.max(0, ceiling - used - 1));
+      if (candidate === "" || used + bytes(candidate) + 1 > ceiling) { dropped += 1; continue; }
+      lines.push(candidate);
+      used += bytes(candidate) + 1;
+      continue;
+    }
+    const size = group.reduce((total, line) => total + bytes(line) + 1, 0);
+    // Skipped rather than stopped at: the groups are ordered by priority, and a
+    // large message must not hide the shorter ones behind it.
+    if (used + size > ceiling) { dropped += 1; continue; }
+    lines.push(...group);
+    used += size;
+  }
+  if (dropped > 0) {
+    const note = `- +${dropped} not shown, over budget`;
+    lines.push(note);
+    used += bytes(note) + 1;
   }
 
   let shown = 0;

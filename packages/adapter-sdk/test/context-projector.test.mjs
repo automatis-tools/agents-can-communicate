@@ -195,3 +195,71 @@ test("an advisory claim reads the same however capable the session is", () => {
   // nobody asked to be enforced.
   assert.equal(render(true), render(false));
 });
+
+const peerMessage = (overrides = {}) => ({ messageId: "message_a",
+  fromSessionId: "session_peer", type: "question", subject: "src/store",
+  body: "Need 20 minutes.", ...overrides });
+
+test("a peer message reaches the projection whole, with the id needed to answer it", () => {
+  const rendered = projectContext(syncResult({ messages: [peerMessage()] }));
+
+  assert.match(rendered, /id message_a \| from session_peer \| type question/);
+  assert.match(rendered, /Need 20 minutes\./);
+});
+
+test("a message that does not fit is left out rather than cut in half", () => {
+  // Half a block is worse than no block: the fence never closes, and everything
+  // after it reads as ACC's own words. Before peer messages were ever delivered
+  // this could not happen, because the projector never received any.
+  const rendered = projectContext(syncResult({
+    roster: [],
+    messages: [peerMessage({ body: "x".repeat(4_000) })],
+  }), { budgetBytes: 300 });
+
+  const fences = rendered.split("\n").filter(line => line.startsWith("```")).length;
+  assert.equal(fences, 0, `a partial block was emitted:\n${rendered}`);
+  assert.equal(rendered.includes("xxxx"), false, "peer text leaked without its fence");
+});
+
+test("what the budget leaves out is stated, not silently dropped", () => {
+  const rendered = projectContext(syncResult({
+    roster: [],
+    messages: [peerMessage({ body: "x".repeat(4_000) })],
+  }), { budgetBytes: 300 });
+
+  assert.match(rendered, /- \+1 not shown, over budget/);
+});
+
+test("a large message does not hide the shorter ones queued behind it", () => {
+  // The loop skips what does not fit instead of stopping at it. Stopping would
+  // let one oversized message silence every message after it.
+  const rendered = projectContext(syncResult({
+    roster: [],
+    messages: [
+      peerMessage({ messageId: "message_big", body: "x".repeat(4_000) }),
+      peerMessage({ messageId: "message_small", body: "short" }),
+    ],
+  }), { budgetBytes: 400 });
+
+  assert.match(rendered, /id message_small/);
+  assert.equal(rendered.includes("message_big"), false);
+  assert.match(rendered, /- \+1 not shown, over budget/);
+});
+
+test("every emitted block is closed, whatever the budget", () => {
+  // Swept rather than spot-checked: the failure is a fence count that goes odd
+  // at one particular budget, and a single size would miss it.
+  for (let budgetBytes = 120; budgetBytes <= 1_200; budgetBytes += 20) {
+    const rendered = projectContext(syncResult({
+      roster: [],
+      messages: [peerMessage({ messageId: "message_a", body: "a".repeat(200) }),
+        peerMessage({ messageId: "message_b", body: "b".repeat(600) })],
+    }), { budgetBytes });
+
+    const fences = rendered.split("\n").filter(line => line === "```"
+      || line === "```acc-peer-message").length;
+    assert.equal(fences % 2, 0, `unbalanced fences at ${budgetBytes} bytes:\n${rendered}`);
+    assert.equal(Buffer.byteLength(rendered, "utf8") <= budgetBytes, true,
+      `projection overran ${budgetBytes} bytes`);
+  }
+});

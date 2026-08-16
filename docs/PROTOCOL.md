@@ -126,6 +126,12 @@ recorded -> queued -> injected -> seen -> acknowledged
 
 States are monotonic. One recipient's receipt cannot alter another recipient's state. `seen` means exposed to the receiving session or explicitly marked, not that the model obeyed it.
 
+`sendMessage` leaves a receipt at `queued`. It advances to `injected` when a recipient's
+turn context actually carried the message — and only then. A message the context budget
+could not fit stays `queued` and goes out on a later turn, because a receipt claiming
+delivery for text nobody was shown tells the sender something untrue. Whatever the budget
+left out is stated in the projection rather than dropped in silence.
+
 ## Decisions
 
 Decisions are separate durable objects rather than ordinary chat messages:
