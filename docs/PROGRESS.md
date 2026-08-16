@@ -15,8 +15,8 @@ The project is at the standalone extraction handoff boundary.
 - [x] Core, adapter, and productization execution plans drafted.
 - [x] User explicitly approves the proposed ambient-workspace/workstream model (2026-08-15).
 - [x] Hardening patches integrated into one verified prototype snapshot.
-- [ ] Papercut assumptions removed behind project-agnostic interfaces.
-- [ ] Standalone package layout created.
+- [x] Papercut assumptions removed behind project-agnostic interfaces.
+- [x] Standalone package layout created.
 - [ ] Native Codex adapter implemented.
 - [ ] Native Claude Code adapter implemented.
 - [ ] Native Gemini CLI adapter implemented.
@@ -29,7 +29,7 @@ Closed 2026-08-15. The user approved all five ambient-model points and, the same
 
 ## Next implementation action
 
-Execute `docs/superpowers/plans/2026-08-15-acc-core-extraction.md` from Task 1 in an isolated worktree under `.gitworktrees/`. Its precondition is met: `prototype/integrated/COMBINED_VERIFICATION.md` records 271/271 passing with mutation evidence for every protection group.
+Execute `docs/superpowers/plans/2026-08-15-acc-adapters.md` from Task 1 in an isolated worktree under `.gitworktrees/`. Its precondition is met: the core extraction plan is complete and `npm test` reports 283/283, including process-level concurrency and a CLI integration suite driven through `bin/acc.mjs`.
 
 Do not start native adapters before the project-agnostic core passes its complete regression suite.
 
