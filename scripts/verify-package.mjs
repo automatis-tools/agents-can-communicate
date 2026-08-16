@@ -15,6 +15,8 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
 
+import { gitProvenance } from "./git-provenance.mjs";
+
 const run = promisify(execFile);
 const repo = path.resolve(import.meta.dirname, "..");
 
@@ -76,13 +78,25 @@ async function main() {
     step("pack");
     // Resolved before use: the install runs from a temporary directory, and a
     // path relative to the caller's shell would not exist there.
-    const tarball = process.argv[2] === undefined
+    const packed = process.argv[2] === undefined;
+    const tarball = packed
       ? await packTarball(workspace)
       : path.resolve(process.argv[2]);
     const bytes = await readFile(tarball);
     const digest = createHash("sha256").update(bytes).digest("hex");
     ok(`${path.basename(tarball)}  ${(bytes.length / 1024).toFixed(0)} KB`);
     ok(`sha256 ${digest}`);
+
+    const { commit, dirty, why } = packed
+      ? await gitProvenance(repo)
+      : { commit: null, dirty: false, why: "a tarball was supplied; HEAD is unrelated to it" };
+    if (commit === null) {
+      console.log(`   --  revision unknown: ${why}`);
+    } else {
+      ok(`built from ${commit}${dirty
+        ? "  WITH UNCOMMITTED CHANGES - this tarball cannot be rebuilt"
+        : ""}`);
+    }
 
     step("tarball contents");
     const listed = await entries(tarball);
@@ -141,7 +155,10 @@ async function main() {
     if (after !== before) fail("uninstall did not restore the client config");
     ok("client config restored byte for byte");
 
-    console.log(`\nPASS  ${path.basename(tarball)}  sha256 ${digest}`);
+    // One line to copy into the changelog, complete enough to be checkable
+    // later: which file, which bytes, and which revision produced them.
+    console.log(`\nPASS  ${path.basename(tarball)}  sha256 ${digest}`
+      + `${commit === null ? "" : `  built from ${commit}${dirty ? " (dirty)" : ""}`}`);
   } finally {
     await rm(workspace, { recursive: true, force: true });
   }
