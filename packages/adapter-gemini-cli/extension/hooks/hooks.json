@@ -1,0 +1,69 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "name": "acc-sessionStart",
+            "type": "command",
+            "command": "acc-hook sessionStart",
+            "timeout": 10000
+          }
+        ]
+      }
+    ],
+    "BeforeAgent": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "name": "acc-beforeTurn",
+            "type": "command",
+            "command": "acc-hook beforeTurn",
+            "timeout": 10000
+          }
+        ]
+      }
+    ],
+    "BeforeTool": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "name": "acc-guard",
+            "type": "command",
+            "command": "acc-hook guard",
+            "timeout": 10000
+          }
+        ]
+      }
+    ],
+    "AfterAgent": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "name": "acc-finish",
+            "type": "command",
+            "command": "acc-hook finish",
+            "timeout": 10000
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "name": "acc-sessionEnd",
+            "type": "command",
+            "command": "acc-hook sessionEnd",
+            "timeout": 10000
+          }
+        ]
+      }
+    ]
+  }
+}

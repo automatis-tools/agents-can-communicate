@@ -1,0 +1,10 @@
+{
+  "session_id": "01a0090b-1d56-7df0-92b7-0512e339f3da",
+  "turn_id": "01a0090b-1d8e-7062-8c92-3e312d3150df",
+  "transcript_path": "<redacted: conversation transcript>",
+  "cwd": "/tmp/example-workspace",
+  "hook_event_name": "UserPromptSubmit",
+  "model": "gpt-5.6-sol",
+  "permission_mode": "bypassPermissions",
+  "prompt": "<redacted: user prompt>"
+}

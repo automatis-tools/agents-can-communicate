@@ -1,0 +1,9 @@
+{
+  "session_id": "a96cb852-40af-4406-978b-edd9c0affdd1",
+  "transcript_path": "<redacted: conversation transcript>",
+  "cwd": "/tmp/example-workspace",
+  "prompt_id": "8b56d896-013c-4ab8-845b-f9670ac34386",
+  "permission_mode": "bypassPermissions",
+  "hook_event_name": "UserPromptSubmit",
+  "prompt": "<redacted: user prompt>"
+}

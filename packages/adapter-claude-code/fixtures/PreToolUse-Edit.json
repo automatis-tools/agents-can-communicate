@@ -1,0 +1,19 @@
+{
+  "session_id": "a96cb852-40af-4406-978b-edd9c0affdd1",
+  "transcript_path": "<redacted: conversation transcript>",
+  "cwd": "/tmp/example-workspace",
+  "prompt_id": "082bbc2b-f77b-4571-88ce-92a4faaf7ecd",
+  "permission_mode": "auto",
+  "effort": {
+    "level": "xhigh"
+  },
+  "hook_event_name": "PreToolUse",
+  "tool_name": "Edit",
+  "tool_input": {
+    "file_path": "/tmp/example-workspace/notes.txt",
+    "old_string": "<redacted: file contents>",
+    "new_string": "<redacted: file contents>",
+    "replace_all": false
+  },
+  "tool_use_id": "toolu_0000000000000000000000"
+}

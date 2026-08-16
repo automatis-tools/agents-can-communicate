@@ -1,0 +1,8 @@
+{
+  "session_id": "4fe4a52a-ad70-451d-a5d1-3a58a309f291",
+  "transcript_path": "<redacted: conversation transcript>",
+  "cwd": "/tmp/example-workspace",
+  "hook_event_name": "BeforeAgent",
+  "timestamp": "2026-08-16T07:26:52.819Z",
+  "prompt": "<redacted: conversation content>"
+}

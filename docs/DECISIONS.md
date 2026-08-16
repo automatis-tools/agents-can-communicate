@@ -30,6 +30,7 @@ This file separates explicit user decisions from open technical decisions. As of
 | Durable state is authoritative; realtime delivery is an optional acceleration | Approved 2026-08-15 |
 | Peer equality: any top-level session can represent the whole Workspace — it answers whole-system questions from shared state (including other participants' subagents) and relays human requests to any participant; authority differences apply to mutation only, never to knowledge | Approved 2026-08-15 |
 | Solo zero-overhead: a lone session pays nothing visible — no injected coordination context, no required protocol actions, guards short-circuit against the empty roster; coordination kicks in at the first safe point after a second session attaches or a durable object exists | Approved 2026-08-15 |
+| MCP session model: the ACC session is derived from the MCP server's own launch configuration (participant name and workspace), never from `initialize`, connection identity, or `clientInfo`; presence refreshes per tool call and a restarted process resolves to the same session | Approved 2026-08-16 |
 
 ## Open technical decisions
 
