@@ -2,7 +2,7 @@ import { cp, mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { removeTomlBlock, stripBlock, tomlString, writeHookShim, writeTomlBlock }
+import { removeInstalledTree, removeTomlBlock, stripBlock, tomlString, writeHookShim, writeTomlBlock }
   from "@agents-can-communicate/adapter-sdk";
 import { AccError, EXIT } from "@agents-can-communicate/protocol";
 
@@ -121,12 +121,15 @@ export async function installCodexPlugin({ home, agentsHome = home,
   await rm(cached, { recursive: true, force: true });
   await cp(target, cached, { recursive: true });
 
-  return { ok: true, changes: [target, file, config, cached],
+  // The cache *root* rather than the versioned directory inside it: that is
+  // what ACC owns and what uninstall removes, and reporting the version would
+  // make the record stale the moment the plugin version changes.
+  return { ok: true, changes: [target, file, config, cacheRoot(codexHome)],
     diagnostics: ["hooks require explicit trust in Codex before they run"] };
 }
 
 export async function uninstallCodexPlugin({ home, agentsHome = home,
-  codexHome = path.join(home, ".codex") }) {
+  codexHome = path.join(home, ".codex"), keep = [] }) {
   const file = marketplacePath(agentsHome);
   const existing = await readJson(file, null);
   const changes = [];
@@ -138,8 +141,8 @@ export async function uninstallCodexPlugin({ home, agentsHome = home,
   if (await removeTomlBlock(configPath(codexHome))) changes.push(configPath(codexHome));
   // The marketplace directory is ACC's too, so it goes rather than being left
   // behind empty.
-  await rm(cacheRoot(codexHome), { recursive: true, force: true });
-  await rm(pluginPath(agentsHome), { recursive: true, force: true });
+  await removeInstalledTree(cacheRoot(codexHome), keep);
+  await removeInstalledTree(pluginPath(agentsHome), keep);
   return { ok: true, changes, diagnostics: [] };
 }
 
@@ -163,4 +166,21 @@ export async function detectCodex({ home, agentsHome = home,
       ? "plugin installed in the client's cache"
       : `plugin not installed yet; run: codex plugin add ${QUALIFIED}`,
   ] };
+}
+
+/**
+ * The paths an install would write, without writing them.
+ *
+ * Derived from the same helpers the install itself uses, so `--dry-run` cannot
+ * describe one thing while install does another. A conformance test compares
+ * this against what install actually reports changing.
+ */
+export function planCodexInstall({ home, agentsHome = home,
+  codexHome = path.join(home, ".codex") }) {
+  return [
+    { path: pluginPath(agentsHome), kind: "tree" },
+    { path: cacheRoot(codexHome), kind: "tree" },
+    { path: marketplacePath(agentsHome), kind: "merge" },
+    { path: configPath(codexHome), kind: "merge" },
+  ];
 }

@@ -95,3 +95,27 @@ Before the first public release, add a structured threat model covering:
 - MCP tool poisoning;
 - local database corruption;
 - remote transport, if later introduced.
+
+## Enforced, not documented
+
+Everything above is asserted by `tests/security/*.test.mjs`, which the release
+gate runs. Each rule is written as an attack rather than a description:
+
+| Rule | Test |
+|---|---|
+| Peer text cannot leave its quoted block | `peer-injection.test.mjs` |
+| Peer text cannot forge or close the fence | `peer-injection.test.mjs` |
+| Peer text cannot repaint the terminal | `peer-injection.test.mjs` |
+| Flooding cannot bury a conflict warning | `peer-injection.test.mjs` |
+| No path escapes the managed root | `storage-boundary.test.mjs` |
+| A workspace id cannot traverse | `storage-boundary.test.mjs` |
+| A config cannot point roots outside itself | `storage-boundary.test.mjs` |
+| A symlinked config is refused, not followed | `storage-boundary.test.mjs` |
+| A committed config cannot carry runtime state | `storage-boundary.test.mjs` |
+| Uninstall deletes only bytes it recognises | `installer.test.mjs` |
+| A shared config is never deleted | `installer.test.mjs` |
+| A corrupt install record stops the run | `installer.test.mjs` |
+| A dry run cannot be tricked into writing | `installer.test.mjs` |
+
+Scenarios, consequences, and residual risk: [THREAT_MODEL.md](THREAT_MODEL.md).
+Reporting: [SECURITY.md](../SECURITY.md) at the repository root.

@@ -1,8 +1,11 @@
-import { AccError, EXIT, failure, ok } from "@agents-can-communicate/protocol";
+import { AccError, CONFIG_FILENAME, EXIT, failure, ok }
+  from "@agents-can-communicate/protocol";
 import { createCoordinationService } from "@agents-can-communicate/core";
 import { openFilesystemStore } from "@agents-can-communicate/storage-filesystem";
 
 import { parseArgs, positiveNumber } from "./args.mjs";
+import { runConfigCommand } from "./config-command.mjs";
+import { runInstallCommand } from "./install-command.mjs";
 import { runDoctor } from "./doctor-command.mjs";
 import { createGitProbe } from "./git-probe.mjs";
 import { platformDataHome, runtimePaths } from "./runtime-paths.mjs";
@@ -130,7 +133,30 @@ const HANDLERS = Object.freeze({
     return { data: status, text };
   },
 
-  doctor: async ({ options, context }) => runDoctor({ options, context }),
+  config: async ({ options, runtime }) => {
+    const result = await runConfigCommand({ subcommand: options.subcommand,
+      cwd: options.cwd ?? runtime.cwd,
+      // A pipe is not a person. Without a TTY there is nobody to answer, so the
+      // command demands --yes rather than hanging or assuming consent.
+      interactive: runtime.stdout?.isTTY === true,
+      yes: options.yes === true,
+      confirm: runtime.confirm ?? (async () => false),
+      ids: runtime.ids });
+    if (result.subcommand === "validate") {
+      return { data: result, text: result.present
+        ? `${result.file} is valid` : `no ${CONFIG_FILENAME}; defaults apply` };
+    }
+    return { data: result,
+      text: result.written ? `wrote ${result.file}` : `not written: ${result.file}` };
+  },
+
+  install: async ({ options, runtime }) =>
+    runInstallCommand({ options, runtime, action: "install" }),
+
+  uninstall: async ({ options, runtime }) =>
+    runInstallCommand({ options, runtime, action: "uninstall" }),
+
+  doctor: async ({ options, context, runtime }) => runDoctor({ options, context, runtime }),
 });
 
 /**
@@ -142,8 +168,18 @@ export async function main(argv, runtime) {
   let parsed;
   try {
     parsed = parseArgs(argv);
-    const context = await openContext(parsed.options, runtime);
-    const { data, text } = await HANDLERS[parsed.command]({ options: parsed.options, context });
+    // `config` is the one command that must work on a workspace ACC cannot
+    // open. Discovery validates the config too, so a broken one would fail
+    // there first and `acc config validate` - the command a user runs to find
+    // out what is wrong - would never reach its own report.
+    // These three work on a machine, not a workspace. `config` must run even
+    // when discovery cannot open the workspace - that is what a user is trying
+    // to find out - and install touches client configuration, not ACC state.
+    const context = ["config", "install", "uninstall"].includes(parsed.command)
+      ? null
+      : await openContext(parsed.options, runtime);
+    const { data, text } = await HANDLERS[parsed.command]({ options: parsed.options,
+      context, runtime });
     // Machine mode writes exactly one JSON object to stdout and nothing else.
     if (parsed.options.json === true) await write(runtime.stdout, `${JSON.stringify(ok(data))}\n`);
     else if (text !== "") await write(runtime.stdout, `${human(text)}\n`);

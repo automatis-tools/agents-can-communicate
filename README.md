@@ -1,62 +1,83 @@
-# Agents Can Communicate
+# agents-can-communicate
 
-Agents Can Communicate (ACC) is a local-first coordination layer for independent AI-agent sessions. Its goal is to let Codex, Claude Code, Gemini CLI, and other compatible clients understand who else is active, what each participant is doing, which resources are claimed, what decisions were made, and what needs a response.
+Two agents editing the same repo don't know about each other. ACC is the layer that makes
+them aware — without one of them being in charge.
 
-ACC is not another subagent framework. It does not require one model to own or launch the others. Each participant keeps its own conversation, permissions, model, context window, and human relationship. ACC supplies the shared coordination plane above those separate harnesses.
+```mermaid
+graph LR
+  subgraph Before
+    A1[Codex] --> R1[(repo)]
+    B1[Claude Code] --> R1
+    C1[Kimi] --> R1
+  end
+  subgraph With ACC
+    A2[Codex] --- ACC{{ACC}}
+    B2[Claude Code] --- ACC
+    C2[Kimi] --- ACC
+    ACC --> R2[(repo)]
+  end
+```
 
-## Repository status
+Each session keeps its own model, permissions, context, and human. ACC adds only what they
+share: **who is here, what they're doing, and what's already claimed.**
 
-This repository is a design and migration handoff, not a released package.
+## Install
 
-- The validated Papercut Warzone 2 prototype is preserved under `prototype/papercut-agent-comms/`.
-- Four independently verified but not yet combined hardening patch sets are preserved under `migration/patches/`.
-- The approved standalone architecture and product UX are documented under `docs/`.
-- Detailed execution plans are under `docs/superpowers/plans/`.
-- No standalone runtime or published npm package exists yet.
-
-Do not treat the prototype as the target architecture. It is evidence, reusable behavior, and a regression suite.
-
-## Start here
-
-For a new agent session, read these files in order:
-
-1. [`AGENTS.md`](AGENTS.md)
-2. [`docs/PROGRESS.md`](docs/PROGRESS.md)
-3. [`docs/DECISIONS.md`](docs/DECISIONS.md)
-4. [`docs/superpowers/specs/2026-08-15-standalone-acc-design.md`](docs/superpowers/specs/2026-08-15-standalone-acc-design.md)
-5. [`docs/ROADMAP.md`](docs/ROADMAP.md)
-6. [`docs/NEXT_SESSION.md`](docs/NEXT_SESSION.md)
-
-## Product shape
-
-The currently selected direction is:
-
-- npm/npx CLI plus adapter packages;
-- native integrations for Codex, Claude Code, and Gemini CLI;
-- generic MCP fallback for other clients;
-- local-only and same-machine in the first release;
-- Git enrichment when available, but no Git requirement;
-- automatic session attachment with optional project configuration;
-- runtime state outside the project repository;
-- project-wide awareness and claims;
-- optional workstreams and coordinators, rather than one permanent global orchestrator.
-
-The design direction was fully approved on 2026-08-15; the remaining open technical decisions (storage backend, package names, license, and similar) are recorded in [`docs/DECISIONS.md`](docs/DECISIONS.md).
-
-## Prototype verification
-
-The imported baseline is kept runnable in its original directory shape:
-
+<!-- test:command -->
 ```bash
-npm run test:prototype
+acc install --dry-run
 ```
 
-The archived hardening patches were tested independently in the source repository. They overlap and must be integrated deliberately; see [`migration/README.md`](migration/README.md).
+Shows exactly what would change. Drop the flag to apply it.
 
-## Remote
+## What happens then
 
-Canonical repository:
-
-```text
-git@github.com:automatis-tools/agents-can-communicate.git
+```mermaid
+sequenceDiagram
+  participant H as You
+  participant C as Your client
+  participant ACC
+  H->>C: normal prompt
+  C->>ACC: session starts (hook)
+  ACC-->>C: 2 peers; file:src/** claimed by models
+  C->>ACC: about to write src/a.mjs
+  ACC-->>C: denied — claimed by models
 ```
+
+No new commands to learn. Attach, presence, and guards happen inside the session.
+
+## Alone? Nothing changes
+
+One session pays nothing: no injected context, no banners, no protocol. Coordination
+starts when a second session shows up.
+
+## Supported clients
+
+| Client | Attach | Guard writes | Inject context | Heartbeat |
+|---|---|---|---|---|
+| Codex | yes | yes¹ | yes | – |
+| Claude Code | yes | yes | yes | – |
+| Gemini CLI | yes | yes² | yes | – |
+| Kimi Code | yes | yes | yes | yes |
+| Any MCP client | yes | – | – | – |
+
+¹ models that use `apply_patch` · ² approval modes that expose edit tools ·
+full detail in [CAPABILITIES.md](docs/CAPABILITIES.md)
+
+## Docs
+
+[Getting started](docs/GETTING_STARTED.md) ·
+[CLI](docs/CLI.md) ·
+[MCP](docs/MCP.md) ·
+[Configuration](docs/CONFIGURATION.md) ·
+[Writing an adapter](docs/ADAPTER_AUTHORING.md) ·
+[Troubleshooting](docs/TROUBLESHOOTING.md)
+
+Examples: [workstreams](examples/papercut-workstreams.md) ·
+[research, no Git](examples/non-git-research.md)
+
+## Requirements
+
+Node 24+. No database, no daemon, no service. Git optional.
+
+MIT.
