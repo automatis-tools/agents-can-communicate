@@ -1,7 +1,7 @@
 import { defineAdapter, projectContext } from "@agents-can-communicate/adapter-sdk";
 
 import { denyOutcome, injectOutcome, normalizeGeminiHook } from "./hooks.mjs";
-import { detectGemini, installGeminiExtension, uninstallGeminiExtension } from "./install.mjs";
+import { planGeminiInstall, detectGemini, installGeminiExtension, uninstallGeminiExtension } from "./install.mjs";
 
 // Verified on both. The version jump changed how a session is authenticated and
 // how a turn is routed, and changed neither the hook events nor either of the
@@ -41,6 +41,7 @@ export function createGeminiCliAdapter() {
     guardShell: async () => ({ ok: true, changes: [], diagnostics: [] }),
     poll: async () => ({ ok: true, changes: [], diagnostics: [] }),
 
+    planInstall: context => planGeminiInstall(context),
     detect: context => detectGemini(context),
     install: context => installGeminiExtension(context),
     uninstall: context => uninstallGeminiExtension(context),

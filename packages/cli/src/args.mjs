@@ -21,12 +21,14 @@ export const COMMANDS = Object.freeze({
   finish: { required: ["session", "generation", "goal"],
     optional: ["status", "to"], repeated: ["completed", "remaining", "blocker"] },
   status: { required: [], optional: ["participant"] },
-  doctor: { required: [], optional: [], flags: ["repair"] },
+  doctor: { required: [], optional: ["home"], flags: ["repair"] },
   // The one command with a subcommand. Kept as an explicit list rather than a
   // free positional: `acc config delete` should fail at the parser, not deep
   // inside a handler that has already decided what to do.
   config: { required: [], optional: [], flags: ["yes"],
     subcommands: ["init", "validate"] },
+  install: { required: [], optional: ["adapter", "home"], flags: ["dry-run", "yes"] },
+  uninstall: { required: [], optional: ["adapter", "home"], flags: ["yes"] },
 });
 
 const GLOBAL = Object.freeze(["json", "workspace", "cwd"]);

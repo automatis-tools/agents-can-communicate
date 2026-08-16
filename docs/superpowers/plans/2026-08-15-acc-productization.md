@@ -133,23 +133,23 @@ git commit -m "feat: add optional workspace configuration"
 **Interfaces:**
 - Produces `acc install`, `acc install --dry-run`, `acc uninstall`, and unified `acc doctor`
 
-- [ ] **Step 1: Write installation-plan RED**
+- [x] **Step 1: Write installation-plan RED**
 
 Fixtures contain zero, one, and all supported clients plus existing unrelated configs. Dry-run returns exact planned paths and semantic changes without touching bytes.
 
-- [ ] **Step 2: Write crash/idempotence RED**
+- [x] **Step 2: Write crash/idempotence RED**
 
 Inject failure between two adapter writes. Re-run install and assert it completes safely without duplicate entries. Uninstall removes only operations whose ownership record matches current installed bytes.
 
-- [ ] **Step 3: Implement detect/plan/apply split**
+- [x] **Step 3: Implement detect/plan/apply split**
 
 Detection is read-only. Plan is deterministic JSON. Apply uses no-replace or compare-and-swap semantics per config format and records ownership outside project repositories.
 
-- [ ] **Step 4: Integrate doctor**
+- [x] **Step 4: Integrate doctor**
 
 Doctor reports client binary/version, adapter installed version, hook registration, actual capabilities, runtime health, pending migrations, and exact remediation command.
 
-- [ ] **Step 5: Verify and commit**
+- [x] **Step 5: Verify and commit**
 
 ```bash
 node --test packages/installer/test/*.test.mjs
