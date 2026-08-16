@@ -3,7 +3,11 @@ import { defineAdapter, projectContext } from "@agents-can-communicate/adapter-s
 import { denyOutcome, injectOutcome, normalizeGeminiHook } from "./hooks.mjs";
 import { detectGemini, installGeminiExtension, uninstallGeminiExtension } from "./install.mjs";
 
-export const GEMINI_CLI_VERSION = "0.37.0";
+// Verified on both. The version jump changed how a session is authenticated and
+// how a turn is routed, and changed neither the hook events nor either of the
+// two response contracts.
+export const GEMINI_CLI_VERSIONS = Object.freeze(["0.37.0", "0.55.1"]);
+export const GEMINI_CLI_VERSION = "0.55.1";
 
 /**
  * The gap this adapter used to carry is closed.
@@ -45,11 +49,15 @@ export function createGeminiCliAdapter() {
       const detected = await detectGemini(context);
       return { ok: true, changes: [], diagnostics: [
         ...detected.diagnostics,
-        "lifecycle, guard and injection payloads captured from Gemini CLI 0.37.0",
+        `lifecycle, guard and injection payloads captured from Gemini CLI ${GEMINI_CLI_VERSIONS.join(" and ")}`,
         "a deny here must be {\"decision\":\"block\"}; the hookSpecificOutput shape "
           + "that Claude Code and Kimi Code accept does not deny on this client",
         "write guards need an approval mode that offers the edit tools; in plan "
           + "mode the client declares no write tool at all",
+        // Both appeared with 0.55.1 and stop a headless session before any hook
+        // beyond SessionStart can matter.
+        "0.55.x needs an explicit security.auth.selectedType and a trusted "
+          + "workspace; without either, a headless run stops before the first turn",
       ] };
     },
 
