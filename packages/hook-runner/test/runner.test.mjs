@@ -306,3 +306,75 @@ test("attach declares what the adapter proved, not that it is an adapter", async
   assert.equal(byHarness.blind.enforcement, "advisory");
   assert.equal(byHarness.blind.lifecycle, "manual");
 });
+
+test("the turn context names claims this session cannot be stopped from breaking",
+  async t => {
+    const place = await workspace(t);
+    const peer = await run("kimi", event("sessionStart", { sessionId: "peer" }), place);
+    await peer.service.acquireClaim({ sessionId: peer.accSessionId,
+      generation: peer.generation, resource: "file:src/**", mode: "exclusive",
+      enforcement: "guarded", reason: "porting" });
+
+    // A session whose harness cannot guard writes: a Codex model that edits
+    // through the shell, or an MCP client. Nothing will intercept it, so the
+    // only protection left is telling it before the turn.
+    const unguarded = { ...kimi, id: "unguarded",
+      capabilities: { guards: { beforeWrite: false }, lifecycle: { sessionEnd: false } },
+      renderContext: sync => (sync.claims ?? [])
+        .map(c => `${c.resource}|${c.enforceable}`).join(" ") };
+    const adapters = { ...ADAPTERS, unguarded };
+
+    await runHook({ adapterId: "unguarded", adapters, dataHome: place.dataHome,
+      payload: event("sessionStart", { cwd: place.root }) });
+    const turn = await runHook({ adapterId: "unguarded", adapters, dataHome: place.dataHome,
+      payload: event("beforeTurn", { cwd: place.root }) });
+
+    assert.match(turn.stdout, /file:src\/\*\*/);
+    assert.match(turn.stdout, /\|false/, "the session was not told it is unenforced");
+  });
+
+test("a guarded session is told about the claim, and that it is enforced", async t => {
+  const place = await workspace(t);
+  const peer = await run("kimi", event("sessionStart", { sessionId: "peer" }), place);
+  await peer.service.acquireClaim({ sessionId: peer.accSessionId,
+    generation: peer.generation, resource: "file:src/**", mode: "exclusive",
+    enforcement: "guarded", reason: "porting" });
+
+  const guarding = { ...kimi, id: "guarding",
+    capabilities: { guards: { beforeWrite: true }, lifecycle: { sessionEnd: true } },
+    renderContext: sync => (sync.claims ?? [])
+      .map(c => `${c.resource}|${c.enforceable}`).join(" ") };
+  const adapters = { ...ADAPTERS, guarding };
+
+  await runHook({ adapterId: "guarding", adapters, dataHome: place.dataHome,
+    payload: event("sessionStart", { cwd: place.root }) });
+  const turn = await runHook({ adapterId: "guarding", adapters, dataHome: place.dataHome,
+    payload: event("beforeTurn", { cwd: place.root }) });
+
+  assert.match(turn.stdout, /\|true/);
+});
+
+test("a session is not warned about its own claim", async t => {
+  const place = await workspace(t);
+  // An adapter that actually renders claims. The default mock renders only the
+  // roster, so asserting the absence of a claim through it would prove nothing
+  // whatever the runner did.
+  const rendering = { ...kimi, id: "rendering",
+    renderContext: sync => (sync.claims ?? []).map(c => c.resource).join(" ") };
+  const adapters = { ...ADAPTERS, rendering };
+
+  const mine = await runHook({ adapterId: "rendering", adapters,
+    dataHome: place.dataHome, payload: event("sessionStart", { cwd: place.root }) });
+  await mine.service.acquireClaim({ sessionId: mine.accSessionId,
+    generation: mine.generation, resource: "file:src/**", mode: "exclusive",
+    enforcement: "guarded", reason: "mine" });
+  await runHook({ adapterId: "rendering", adapters, dataHome: place.dataHome,
+    payload: event("sessionStart", { sessionId: "peer", cwd: place.root }) });
+
+  const turn = await runHook({ adapterId: "rendering", adapters,
+    dataHome: place.dataHome, payload: event("beforeTurn", { cwd: place.root }) });
+
+  // Telling a session to avoid the thing it deliberately reserved would be
+  // exactly backwards.
+  assert.doesNotMatch(turn.stdout, /file:src/);
+});

@@ -18,9 +18,16 @@ const QUALIFIED = `${PLUGIN_NAME}@${MARKETPLACE}`;
 const marketplacePath = root => path.join(root, ".agents", "plugins", "marketplace.json");
 const pluginPath = (root, name = PLUGIN_NAME) => path.join(root, "plugins", name);
 const configPath = codexHome => path.join(codexHome, "config.toml");
-// Where `codex plugin add` leaves the copy it actually runs.
-const cachePath = codexHome =>
-  path.join(codexHome, "plugins", "cache", MARKETPLACE, PLUGIN_NAME);
+// Where `codex plugin add` leaves the copy it actually runs. All three
+// components are ACC's own - the marketplace it created, the plugin name it
+// chose, and the version in the manifest it ships - so ACC can write this copy
+// itself rather than asking the user to run a command. Verified on 0.147.0:
+// diffing the home around `codex plugin add` shows that copy is the only thing
+// it does, and a real session against a cache ACC wrote fires every hook.
+const cacheRoot = codexHome => path.join(codexHome, "plugins", "cache", MARKETPLACE);
+const cachePath = codexHome => path.join(cacheRoot(codexHome), PLUGIN_NAME);
+const cachedVersionPath = (codexHome, version) =>
+  path.join(cachePath(codexHome), version);
 
 async function readJson(file, fallback) {
   try {
@@ -106,7 +113,15 @@ export async function installCodexPlugin({ home, agentsHome = home,
     "enabled = true",
   ]);
 
-  return { ok: true, changes: [target, file, config],
+  // The client runs the cached copy, so this has to happen after the shim and
+  // the rewritten hooks.json are in place.
+  const { version } = await readJson(
+    path.join(target, ".codex-plugin", "plugin.json"), { version: "0.0.0" });
+  const cached = cachedVersionPath(codexHome, version);
+  await rm(cached, { recursive: true, force: true });
+  await cp(target, cached, { recursive: true });
+
+  return { ok: true, changes: [target, file, config, cached],
     diagnostics: ["hooks require explicit trust in Codex before they run"] };
 }
 
@@ -121,6 +136,9 @@ export async function uninstallCodexPlugin({ home, agentsHome = home,
     await writeJson(file, { ...existing, plugins: kept });
   }
   if (await removeTomlBlock(configPath(codexHome))) changes.push(configPath(codexHome));
+  // The marketplace directory is ACC's too, so it goes rather than being left
+  // behind empty.
+  await rm(cacheRoot(codexHome), { recursive: true, force: true });
   await rm(pluginPath(agentsHome), { recursive: true, force: true });
   return { ok: true, changes, diagnostics: [] };
 }

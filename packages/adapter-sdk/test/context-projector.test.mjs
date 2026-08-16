@@ -113,3 +113,49 @@ test("the budget is respected even when a single item is oversized", () => {
     `projection was ${Buffer.byteLength(rendered, "utf8")} bytes`);
   assert.equal(rendered.includes("…"), true, "an oversized item was not marked as truncated");
 });
+
+test("claims held by other sessions are named in the turn context", () => {
+  const projected = projectContext({ solo: false, cursor: "c1", roster: [],
+    attention: [], messages: [],
+    claims: [{ resource: "file:src/**", ownerParticipantId: "models",
+      enforceable: true }] });
+
+  // A peer's claim is only useful if the other session knows about it before it
+  // starts editing. Rendering it after the fact is a conflict report, not
+  // coordination.
+  assert.match(projected, /file:src\/\*\*/);
+  assert.match(projected, /models/);
+});
+
+test("a session that cannot be stopped is told so, not left to assume", () => {
+  const projected = projectContext({ solo: false, cursor: "c1", roster: [],
+    attention: [], messages: [],
+    claims: [{ resource: "file:src/**", ownerParticipantId: "models",
+      enforceable: false }] });
+
+  // The honest case: a Codex model that edits through the shell, or any MCP
+  // client. ACC cannot intercept the write, so the only thing left is to say
+  // that respecting the claim is now this session's own responsibility.
+  assert.match(projected, /cannot be enforced|not enforced/i);
+  assert.match(projected, /file:src\/\*\*/);
+});
+
+test("claims are ranked above the roster when the budget is tight", () => {
+  const projected = projectContext({ solo: false, cursor: "c1",
+    attention: [], messages: [],
+    roster: Array.from({ length: 40 }, (_, index) =>
+      ({ sessionId: `session_${index}`, harness: "codex", presence: "online" })),
+    claims: [{ resource: "file:critical/**", ownerParticipantId: "models",
+      enforceable: false }] }, { budgetBytes: 300 });
+
+  // Roster detail is the first thing to drop. A claim this session can break
+  // without being stopped is the last.
+  assert.match(projected, /file:critical/);
+});
+
+test("no claims means no section at all", () => {
+  const projected = projectContext({ solo: false, cursor: "c1", roster: [],
+    attention: [], messages: [], claims: [] });
+
+  assert.doesNotMatch(projected, /claim/i);
+});
