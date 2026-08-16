@@ -3,14 +3,8 @@ import { constants } from "node:fs";
 import { open, realpath } from "node:fs/promises";
 import path from "node:path";
 
-import { AccError, EXIT, assertPortableId } from "@agents-can-communicate/protocol";
-
-const CONFIG_SCHEMA_VERSION = 1;
-// Project config carries identity and shared policy. Presence, messages,
-// claims, receipts, and tokens belong to the runtime directory; a repository is
-// the wrong place for them and a config that contains them is refused.
-const RUNTIME_KEYS = ["sessions", "participants", "messages", "claims", "receipts",
-  "intents", "events", "tokens", "credentials"];
+import { AccError, CONFIG_FILENAME, EXIT, validateProjectConfig }
+  from "@agents-can-communicate/protocol";
 
 /**
  * @typedef {{ id: string, roots: string[], source: "config" | "git" | "directory",
@@ -46,22 +40,24 @@ async function readConfigNoFollow(configPath) {
   }
 }
 
-function validateConfig(config, configPath) {
-  if (config === null || typeof config !== "object" || Array.isArray(config)) {
-    throw new AccError(EXIT.DATA, "the workspace config must be an object", { configPath });
+/**
+ * Walk up looking for the one config filename.
+ *
+ * Sessions start wherever the human happens to be, so a config that only counted
+ * at the top of the tree would apply to some sessions in a project and not
+ * others. The walk stops at the filesystem root: climbing past it would let a
+ * stray file in a home directory claim every project underneath.
+ */
+async function findConfig(start) {
+  let directory = start;
+  for (;;) {
+    const candidate = path.join(directory, CONFIG_FILENAME);
+    const config = await readConfigNoFollow(candidate);
+    if (config !== null) return { config, configPath: candidate, base: directory };
+    const parent = path.dirname(directory);
+    if (parent === directory) return null;
+    directory = parent;
   }
-  if (config.schemaVersion !== CONFIG_SCHEMA_VERSION) {
-    throw new AccError(EXIT.DATA, "unknown workspace config schemaVersion",
-      { configPath, schemaVersion: config.schemaVersion });
-  }
-  const runtime = RUNTIME_KEYS.filter(key => Object.hasOwn(config, key));
-  if (runtime.length > 0) {
-    throw new AccError(EXIT.DATA,
-      `the workspace config must not carry runtime state: ${runtime.join(", ")}`,
-      { configPath, keys: runtime });
-  }
-  assertPortableId(config.workspaceId, "workspace id");
-  return config;
 }
 
 async function canonical(directory, label) {
@@ -98,9 +94,13 @@ export async function discoverWorkspace({ cwd, env = {}, gitProbe, explicitConfi
   const start = await canonical(
     typeof override === "string" && override.length > 0 ? override : cwd, "workspace root");
 
-  const config = explicitConfig === undefined
+  const found = explicitConfig === undefined
+    ? await findConfig(start)
+    : { config: await readConfigNoFollow(explicitConfig), configPath: explicitConfig,
+      base: path.dirname(explicitConfig) };
+  const config = found?.config == null
     ? null
-    : validateConfig(await readConfigNoFollow(explicitConfig), explicitConfig);
+    : validateProjectConfig(found.config, { source: found.configPath });
 
   const git = await probeGit(gitProbe, start);
   const enrichment = git === null ? {} : {
@@ -114,11 +114,18 @@ export async function discoverWorkspace({ cwd, env = {}, gitProbe, explicitConfi
   };
 
   if (config !== null) {
+    // Declared roots are relative to the config, never to the working
+    // directory. Runtime containment is checked against these, so resolving
+    // them against the wrong base would let state land somewhere it must not.
+    const roots = await Promise.all(config.roots
+      .map(root => canonical(path.resolve(found.base, root), "declared workspace root")));
     return Object.freeze({
       id: config.workspaceId,
-      roots: Object.freeze([start]),
+      roots: Object.freeze([...new Set(roots)]),
       source: "config",
-      displayName: config.displayName ?? path.basename(start),
+      displayName: config.displayName ?? path.basename(found.base),
+      policy: config.policy,
+      requiredAdapters: config.requiredAdapters,
       ...enrichment,
     });
   }

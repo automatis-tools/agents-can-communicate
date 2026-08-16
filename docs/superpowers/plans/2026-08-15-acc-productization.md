@@ -80,11 +80,11 @@ Expected tarball excludes `prototype/`, `migration/`, `.agents/`, build evidence
 **Interfaces:**
 - Produces `acc config init`, `acc config validate`, and schema-versioned project config
 
-- [ ] **Step 1: Write config RED**
+- [x] **Step 1: Write config RED**
 
 Test no-config defaults, stable Workspace ID, multi-root declarations, claim policy, context budget, required adapters, unknown version rejection, runtime-key rejection, and symlink escape.
 
-- [ ] **Step 2: Define minimal config schema**
+- [x] **Step 2: Define minimal config schema**
 
 ```json
 {
@@ -102,11 +102,11 @@ Test no-config defaults, stable Workspace ID, multi-root declarations, claim pol
 
 Reject messages, sessions, claims, tokens, transcripts, and absolute runtime paths in project config.
 
-- [ ] **Step 3: Implement commands and docs**
+- [x] **Step 3: Implement commands and docs**
 
 `config init` writes only after preview/confirmation in human mode and requires explicit `--yes` in non-interactive mode. `validate` is read-only.
 
-- [ ] **Step 4: Mutation proof and commit**
+- [x] **Step 4: Mutation proof and commit**
 
 Temporarily allow `sessions` in config; the runtime-key test must fail. Restore.
 
