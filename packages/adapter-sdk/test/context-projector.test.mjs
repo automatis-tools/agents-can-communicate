@@ -113,3 +113,84 @@ test("the budget is respected even when a single item is oversized", () => {
     `projection was ${Buffer.byteLength(rendered, "utf8")} bytes`);
   assert.equal(rendered.includes("…"), true, "an oversized item was not marked as truncated");
 });
+
+test("claims held by other sessions are named in the turn context", () => {
+  const projected = projectContext({ solo: false, cursor: "c1", roster: [],
+    attention: [], messages: [],
+    claims: [{ resource: "file:src/**", ownerParticipantId: "models",
+      enforceable: true }] });
+
+  // A peer's claim is only useful if the other session knows about it before it
+  // starts editing. Rendering it after the fact is a conflict report, not
+  // coordination.
+  assert.match(projected, /file:src\/\*\*/);
+  assert.match(projected, /models/);
+});
+
+test("a session that cannot be stopped is told so, not left to assume", () => {
+  const projected = projectContext({ solo: false, cursor: "c1", roster: [],
+    attention: [], messages: [],
+    claims: [{ resource: "file:src/**", ownerParticipantId: "models",
+      enforcement: "guarded", enforceable: false }] });
+
+  // The honest case: the owner asked for enforcement, and this session is one
+  // ACC cannot intercept - a Codex model that edits through the shell, or any
+  // MCP client. The only thing left is to say that respecting the claim is now
+  // this session's own responsibility.
+  assert.match(projected, /cannot be enforced|not enforced/i);
+  assert.match(projected, /file:src\/\*\*/);
+});
+
+test("claims are ranked above the roster when the budget is tight", () => {
+  const projected = projectContext({ solo: false, cursor: "c1",
+    attention: [], messages: [],
+    roster: Array.from({ length: 40 }, (_, index) =>
+      ({ sessionId: `session_${index}`, harness: "codex", presence: "online" })),
+    claims: [{ resource: "file:critical/**", ownerParticipantId: "models",
+      enforceable: false }] }, { budgetBytes: 300 });
+
+  // Roster detail is the first thing to drop. A claim this session can break
+  // without being stopped is the last.
+  assert.match(projected, /file:critical/);
+});
+
+test("no claims means no section at all", () => {
+  const projected = projectContext({ solo: false, cursor: "c1", roster: [],
+    attention: [], messages: [], claims: [] });
+
+  assert.doesNotMatch(projected, /claim/i);
+});
+
+test("a guarded session is told the limit of its own guard", () => {
+  const projected = projectContext(syncResult({ roster: [],
+    claims: [{ resource: "file:src/**", ownerParticipantId: "models",
+      enforcement: "guarded", enforceable: true }] }));
+
+  // Being guarded is not the same as being safe: no harness intercepts a shell
+  // command, so an edit made through one is never stopped. A session told only
+  // "this is claimed" would reasonably assume ACC has it covered.
+  assert.match(projected, /through a shell are not/);
+});
+
+test("a claim its owner declared advisory is never described as blocking", () => {
+  const projected = projectContext(syncResult({ roster: [],
+    claims: [{ resource: "file:src/**", ownerParticipantId: "models",
+      enforcement: "advisory", enforceable: true }] }));
+
+  // Enforcement is declared per claim, and the guard only blocks guarded ones.
+  // Reading this session's own capability alone would announce a block that
+  // will never happen - and the owner explicitly did not ask for one.
+  assert.doesNotMatch(projected, /blocked/);
+  assert.match(projected, /advisory/);
+  assert.match(projected, /file:src\/\*\*/);
+});
+
+test("an advisory claim reads the same however capable the session is", () => {
+  const render = enforceable => projectContext(syncResult({ roster: [],
+    claims: [{ resource: "file:src/**", ownerParticipantId: "models",
+      enforcement: "advisory", enforceable }] }));
+
+  // Whether this session could have been stopped is irrelevant to a claim
+  // nobody asked to be enforced.
+  assert.equal(render(true), render(false));
+});

@@ -7,7 +7,7 @@ import test from "node:test";
 import { EXIT } from "@agents-can-communicate/protocol";
 
 import { createCodexAdapter } from "../src/adapter.mjs";
-import { CODEX_HOOK_EVENTS, normalizeCodexHook } from "../src/hooks.mjs";
+import { CODEX_HOOK_EVENTS, injectOutcome, normalizeCodexHook } from "../src/hooks.mjs";
 
 // A marketplace the user already owns, in the shape this client actually
 // parses. `plugins` is a sequence; a map is rejected and takes the whole file
@@ -120,9 +120,7 @@ test("only capabilities observed in a real session are declared true", () => {
   assert.equal(capabilities.guards.beforeWrite, true);
   assert.equal(capabilities.guards.beforeShell, true);
 
-  // Not observed, so not claimed. Injection was never seen reaching the model,
-  // and no subagent ran during the capture.
-  assert.equal(capabilities.context.beforeTurnInjection, false);
+  // Not observed, so not claimed: no subagent ran during the capture.
   assert.equal(capabilities.lifecycle.childSessions, false);
   assert.equal(capabilities.delivery.wakeDormantSession, false);
   for (const value of Object.values(capabilities.execution)) assert.equal(value, false);
@@ -309,17 +307,20 @@ test("uninstall takes the config registration back out", async t => {
   assert.equal(await readFile(configFile, "utf8"), "model = \"gpt-5\"\n");
 });
 
-test("detect says plainly that the client still has to install the plugin", async t => {
+test("detect names the client's own command if the cache is gone", async t => {
   const { context } = await realFixture(t);
   const adapter = createCodexAdapter();
-
   await adapter.install(context);
-  const report = await adapter.detect(context);
 
   // Publishing, registering and enabling are all necessary and still not
-  // sufficient: hooks stay silent until the client copies the plugin into its
-  // own cache, which only `codex plugin add` does. Verified against 0.147.0.
-  const said = report.diagnostics.join(" ");
+  // sufficient: hooks stay silent unless the plugin is in the client's cache.
+  // ACC writes that copy now, so this is the state after someone clears the
+  // cache or the client changes where it keeps one - and then the supported
+  // command is the answer to name.
+  await rm(path.join(context.codexHome, "plugins", "cache"),
+    { recursive: true, force: true });
+
+  const said = (await adapter.detect(context)).diagnostics.join(" ");
   assert.match(said, /codex plugin add agents-can-communicate@acc-local/);
   assert.match(said, /not installed/);
 });
@@ -351,4 +352,78 @@ test("install refuses rather than duplicating a marketplace the user already add
 
   assert.equal(await readFile(config, "utf8"),
     '[marketplaces.acc-local]\nsource_type = "local"\n');
+});
+
+test("install finishes the job the client's own command would have done", async t => {
+  const { context } = await realFixture(t);
+
+  await createCodexAdapter().install(context);
+
+  // `codex plugin add` does exactly one thing: copies the plugin into
+  // $CODEX_HOME/plugins/cache/<marketplace>/<plugin>/<version>. Nothing else
+  // changes - not config.toml, not anything under HOME - and all three path
+  // components are ACC's own. Verified on 0.147.0 by diffing the home around
+  // the command, and by running a real session against a cache ACC wrote:
+  // all five hooks fired.
+  const cached = path.join(context.codexHome, "plugins", "cache", "acc-local",
+    "agents-can-communicate", "0.0.0");
+  assert.deepEqual((await readdir(cached)).sort(),
+    [".codex-plugin", "acc-hook.sh", "hooks.json", "skills"].sort());
+});
+
+test("the cached copy carries the same absolute hook command", async t => {
+  const { context } = await realFixture(t);
+
+  await createCodexAdapter().install(context);
+
+  // The client runs the cached copy, not the published one. A command relative
+  // to the bundle would not survive the copy; an absolute one does, which is
+  // the whole reason the shim is written with absolute paths.
+  const cached = JSON.parse(await readFile(path.join(context.codexHome, "plugins",
+    "cache", "acc-local", "agents-can-communicate", "0.0.0", "hooks.json"), "utf8"));
+  const command = Object.values(cached.hooks)[0][0].hooks[0].command;
+  const executable = command.match(/"([^"]+)"/)[1];
+  assert.equal(path.isAbsolute(executable), true, `relative command: ${command}`);
+});
+
+test("detect reports the plugin as installed straight after install", async t => {
+  const { context } = await realFixture(t);
+  const adapter = createCodexAdapter();
+
+  await adapter.install(context);
+
+  // No remaining manual step to name.
+  const said = (await adapter.detect(context)).diagnostics.join(" ");
+  assert.match(said, /plugin installed in the client's cache/);
+  assert.doesNotMatch(said, /codex plugin add/);
+});
+
+test("uninstall removes the cached copy too", async t => {
+  const { context } = await realFixture(t);
+  const adapter = createCodexAdapter();
+  await adapter.install(context);
+
+  await adapter.uninstall(context);
+
+  await assert.rejects(readdir(path.join(context.codexHome, "plugins", "cache",
+    "acc-local")), error => error.code === "ENOENT");
+});
+
+test("context injection is declared, because it was finally observed", () => {
+  const { capabilities } = createCodexAdapter();
+
+  // Previously false with the honest reason "never seen reaching the model".
+  // It has now been seen: a UserPromptSubmit hook's stdout arrives as a
+  // `developer` role message in the request to the model, unwrapped. Verified
+  // on 0.147.0 against a local stand-in endpoint that records the wire.
+  assert.equal(capabilities.context.beforeTurnInjection, true);
+});
+
+test("injection is plain text, because this client wraps nothing", () => {
+  // No envelope of any kind: whatever the hook prints becomes the message.
+  // Emitting Claude Code's JSON envelope here would put the envelope itself
+  // into the conversation, exactly as it would on Kimi Code.
+  assert.deepEqual(injectOutcome("2 peers"),
+    { stdout: "2 peers\n", stderr: "", exitCode: 0 });
+  assert.deepEqual(injectOutcome(""), { stdout: "", stderr: "", exitCode: 0 });
 });
