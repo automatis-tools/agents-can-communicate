@@ -1,0 +1,134 @@
+import assert from "node:assert/strict";
+import { execFile } from "node:child_process";
+import { access, mkdtemp, readdir, readFile, realpath, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import path from "node:path";
+import test from "node:test";
+import { fileURLToPath } from "node:url";
+import { promisify } from "node:util";
+
+import { EXIT, SCHEMA_VERSION } from "@agents-can-communicate/protocol";
+
+import { openFilesystemStore } from "../../packages/storage-filesystem/src/store.mjs";
+import { createFakeClock, createFakeIds } from "../helpers/memory-store.mjs";
+
+const execFileAsync = promisify(execFile);
+const repoRoot = fileURLToPath(new URL("../..", import.meta.url));
+const storeModule = new URL("../../packages/storage-filesystem/src/store.mjs", import.meta.url).href;
+
+const NOW = "2026-08-16T01:00:00.000Z";
+const WORKSPACE = "workspace_a";
+const CONTENDERS = 5;
+
+const workspaceRecord = displayName => ({ schemaVersion: SCHEMA_VERSION,
+  workspaceId: WORKSPACE, displayName, source: "directory", roots: ["/tmp/example"],
+  createdAt: NOW });
+
+// Independent processes, not concurrent promises: the writer mutex, the
+// journal, and the no-replace publication only mean anything across real
+// process boundaries.
+const child = (root, barrier, label, generation) => `
+import { openFilesystemStore } from ${JSON.stringify(storeModule)};
+import { access } from "node:fs/promises";
+
+const clock = { now: () => ${JSON.stringify(NOW)} };
+let counter = 0;
+const ids = { next: kind => \`\${kind}_\${${JSON.stringify(label)}}_\${counter += 1}\` };
+const store = await openFilesystemStore({ root: ${JSON.stringify(root)}, clock, ids,
+  workspaceId: ${JSON.stringify(WORKSPACE)} });
+
+for (let attempt = 0; attempt < 2000; attempt += 1) {
+  try { await access(${JSON.stringify(barrier)}); break; } catch {
+    await new Promise(resolve => setTimeout(resolve, 2));
+  }
+}
+
+try {
+  await store.transaction(async tx => {
+    tx.put("workspace", ${JSON.stringify(WORKSPACE)}, ${JSON.stringify(workspaceRecord(label))},
+      ${JSON.stringify(generation)});
+    tx.append({ schemaVersion: ${SCHEMA_VERSION}, eventId: \`event_${label}\`,
+      workspaceId: ${JSON.stringify(WORKSPACE)}, actorSessionId: "session_a",
+      type: "workspace.renamed", occurredAt: ${JSON.stringify(NOW)}, payload: {} });
+  });
+  process.stdout.write("won");
+  process.exit(0);
+} catch (error) {
+  process.stdout.write(String(error.code ?? "unknown"));
+  process.exit(typeof error.code === "number" ? error.code : 1);
+}
+`;
+
+test("independent processes cannot both win the same optimistic write", async t => {
+  const root = await realpath(await mkdtemp(path.join(tmpdir(), "acc-concurrency-")));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const barrier = path.join(root, "start");
+
+  const store = await openFilesystemStore({ root, clock: createFakeClock(NOW),
+    ids: createFakeIds(), workspaceId: WORKSPACE });
+  await store.transaction(async tx => {
+    tx.put("workspace", WORKSPACE, workspaceRecord("seed"));
+    tx.append({ schemaVersion: SCHEMA_VERSION, eventId: "event_seed",
+      workspaceId: WORKSPACE, actorSessionId: "session_a", type: "workspace.created",
+      occurredAt: NOW, payload: {} });
+  });
+  const generation = await store.transaction(async tx => tx.generationOf("workspace", WORKSPACE));
+
+  const runs = Array.from({ length: CONTENDERS }, (_, index) =>
+    execFileAsync(process.execPath,
+      ["--input-type=module", "--eval", child(root, barrier, `c${index}`, generation)],
+      { cwd: repoRoot })
+      .then(({ stdout }) => ({ code: 0, stdout }))
+      .catch(error => ({ code: error.code, stdout: error.stdout ?? "" })));
+
+  await writeFile(barrier, "go");
+  const results = await Promise.all(runs);
+
+  const winners = results.filter(result => result.code === 0);
+  const losers = results.filter(result => result.code !== 0);
+
+  assert.equal(winners.length, 1, `expected exactly one winner, saw ${winners.length}`);
+  assert.equal(losers.length, CONTENDERS - 1);
+  for (const loser of losers) {
+    assert.equal(loser.code, EXIT.CONFLICT,
+      `a losing process exited ${loser.code} rather than EXIT.CONFLICT`);
+  }
+});
+
+test("the event log has no gaps and no duplicate sequences after contention", async t => {
+  const root = await realpath(await mkdtemp(path.join(tmpdir(), "acc-concurrency-")));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const barrier = path.join(root, "start");
+
+  const store = await openFilesystemStore({ root, clock: createFakeClock(NOW),
+    ids: createFakeIds(), workspaceId: WORKSPACE });
+  await store.transaction(async tx => {
+    tx.put("workspace", WORKSPACE, workspaceRecord("seed"));
+    tx.append({ schemaVersion: SCHEMA_VERSION, eventId: "event_seed",
+      workspaceId: WORKSPACE, actorSessionId: "session_a", type: "workspace.created",
+      occurredAt: NOW, payload: {} });
+  });
+  const generation = await store.transaction(async tx => tx.generationOf("workspace", WORKSPACE));
+
+  const runs = Array.from({ length: CONTENDERS }, (_, index) =>
+    execFileAsync(process.execPath,
+      ["--input-type=module", "--eval", child(root, barrier, `d${index}`, generation)],
+      { cwd: repoRoot }).catch(() => undefined));
+  await writeFile(barrier, "go");
+  await Promise.all(runs);
+
+  const files = (await readdir(path.join(root, "events"))).sort();
+  const sequences = files.map(file => Number(path.basename(file, ".json")));
+
+  assert.deepEqual(sequences, [1, 2], "the event log gained a gap or a duplicate");
+  assert.equal(new Set(sequences).size, sequences.length);
+  assert.deepEqual(await readdir(path.join(root, "journal")), [],
+    "a journal entry outlived the transaction that wrote it");
+
+  // A losing process must leave nothing behind at all, not even an event.
+  const events = await Promise.all(files.map(async file =>
+    JSON.parse(await readFile(path.join(root, "events", file), "utf8"))));
+  assert.deepEqual(events.map(event => event.type),
+    ["workspace.created", "workspace.renamed"]);
+  await access(path.join(root, "protocol.json"));
+});
