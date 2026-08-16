@@ -30,9 +30,11 @@ async function fixture(t) {
   const home = await realpath(await mkdtemp(path.join(tmpdir(), "acc-kimi-")));
   t.after(() => rm(home, { recursive: true, force: true }));
   await writeFile(path.join(home, "config.toml"), EXISTING);
+  // A real runner file, because install refuses to wire one that is not there.
+  const runner = path.join(home, "acc-hook.mjs");
+  await writeFile(runner, "// stand-in for the runner\n");
   const read = () => readFile(path.join(home, "config.toml"), "utf8");
-  return { context: { home, runner: "/opt/acc/bin/acc-hook.mjs", node: "/usr/bin/node" },
-    read };
+  return { context: { home, runner, node: "/usr/bin/node" }, read };
 }
 
 const captured = async name => JSON.parse(await readFile(
@@ -255,6 +257,29 @@ test("uninstall on a config that was never installed into changes nothing", asyn
 
   assert.equal(await read(), EXISTING);
   assert.deepEqual(result.changes, []);
+});
+
+test("install refuses to wire a runner that is not there", async t => {
+  const { context, read } = await fixture(t);
+
+  // The three earlier adapters all wire a command named `acc-hook`, and no such
+  // program exists in this repository. A hook whose command is missing fails
+  // silently, on every event, for as long as it stays installed - the client
+  // reports nothing and ACC sees no sessions. Refusing to write the entry is the
+  // only way that failure is ever noticed.
+  await assert.rejects(
+    createKimiAdapter().install({ ...context, runner: "/nonexistent/acc-hook.mjs" }),
+    error => error.code === EXIT.DATA && /runner/.test(error.message));
+
+  assert.equal(await read(), EXISTING, "a refused install still edited the config");
+});
+
+test("doctor says whether the wired runner can actually be executed", async t => {
+  const { context } = await fixture(t);
+  const adapter = createKimiAdapter();
+  await adapter.install(context);
+
+  assert.match((await adapter.doctor(context)).diagnostics.join(" "), /runner/);
 });
 
 test("the end marker is what closes the block", () => {
