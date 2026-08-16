@@ -46,6 +46,24 @@ test("a true capability is accepted once its method exists", () => {
   assert.equal(adapter.capabilities.guards.beforeRead, false);
 });
 
+test("a client-driven heartbeat is a capability of its own, not polling", () => {
+  // Kimi Code fires SessionHeartbeat on a timer, so an idle session keeps its
+  // presence fresh. The other three only reach a hook when the user takes a
+  // turn, so an idle session there goes stale however alive it is. Presence in
+  // this system is derived from a declared cadence, so the difference decides
+  // whether a session can be trusted to say it is still there.
+  assert.equal(CAPABILITY_SHAPE.lifecycle.includes("heartbeat"), true);
+
+  assert.throws(() => defineAdapter(base({ capabilities: { lifecycle: { heartbeat: true } } })),
+    /heartbeat\(\)/);
+
+  const adapter = defineAdapter(base({ capabilities: { lifecycle: { heartbeat: true } },
+    heartbeat: async () => ({ ok: true, changes: [], diagnostics: [] }) }));
+  assert.equal(adapter.capabilities.lifecycle.heartbeat, true);
+  assert.equal(adapter.capabilities.delivery.polling, false,
+    "heartbeat must not imply polling; they are separately earned");
+});
+
 test("an unknown capability key or group fails validation", () => {
   assert.throws(() => assertCapabilities({ guards: { beforeThink: true } }, {}),
     error => error.code === EXIT.USAGE && error.message.includes("beforeThink"));

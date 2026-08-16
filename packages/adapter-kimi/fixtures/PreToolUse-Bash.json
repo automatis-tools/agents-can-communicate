@@ -1,0 +1,12 @@
+{
+  "hook_event_name": "PreToolUse",
+  "session_id": "session_00000000-0000-4000-8000-000000000000",
+  "cwd": "/workspace/project",
+  "client_type": "kimi_code_cli",
+  "tool_name": "Bash",
+  "tool_input": {
+    "command": "redacted content",
+    "description": "redacted content"
+  },
+  "tool_call_id": "call_Bash_2"
+}
