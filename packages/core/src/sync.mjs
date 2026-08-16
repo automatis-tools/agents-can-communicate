@@ -5,12 +5,15 @@ const DEFAULT_LIMIT = 100;
 
 // Attention is computed from explicit rules, never from a hidden classifier.
 // Lower priority sorts first.
-const PRIORITY = Object.freeze({
+//
+// Exported so a test can prove every kind listed here is reachable. A fifth
+// entry once sat here with no rule behind it, which read as a feature in review
+// and produced nothing at runtime.
+export const ATTENTION_PRIORITY = Object.freeze({
   direct_request: 1,
   claim_conflict: 2,
   task_unblocked: 3,
   coordinator_missing: 4,
-  nearby_intent: 5,
 });
 
 function directRequests(snapshot, participantId) {
@@ -20,7 +23,7 @@ function directRequests(snapshot, participantId) {
     if (receipt.state === "acknowledged" || receipt.state === "failed") continue;
     const message = (snapshot.messages ?? []).find(item => item.messageId === receipt.messageId);
     if (message === undefined || !message.requiresAck) continue;
-    items.push({ kind: "direct_request", priority: PRIORITY.direct_request,
+    items.push({ kind: "direct_request", priority: ATTENTION_PRIORITY.direct_request,
       sourceId: message.messageId, summary: message.subject });
   }
   return items;
@@ -33,7 +36,7 @@ function claimConflicts(snapshot, session, now) {
     .filter(claim => claim.ownerSessionId !== session.sessionId
       && Date.parse(claim.expiresAt) > Date.parse(now)
       && mine.resourceHints.some(hint => overlaps(hint, claim.resource)))
-    .map(claim => ({ kind: "claim_conflict", priority: PRIORITY.claim_conflict,
+    .map(claim => ({ kind: "claim_conflict", priority: ATTENTION_PRIORITY.claim_conflict,
       sourceId: claim.claimId,
       summary: `${claim.resource} is claimed by ${claim.ownerSessionId}` }));
 }
@@ -41,7 +44,7 @@ function claimConflicts(snapshot, session, now) {
 function unblockedTasks(snapshot, session) {
   return (snapshot.tasks ?? [])
     .filter(task => task.state === "pending" && task.assigneeSessionId === session?.sessionId)
-    .map(task => ({ kind: "task_unblocked", priority: PRIORITY.task_unblocked,
+    .map(task => ({ kind: "task_unblocked", priority: ATTENTION_PRIORITY.task_unblocked,
       sourceId: task.taskId, summary: task.title }));
 }
 
@@ -49,7 +52,8 @@ function coordinatorGaps(snapshot) {
   return (snapshot.workstreams ?? [])
     .filter(workstream => workstream.state === "open"
       && workstream.coordinatorSessionId === null)
-    .map(workstream => ({ kind: "coordinator_missing", priority: PRIORITY.coordinator_missing,
+    .map(workstream => ({ kind: "coordinator_missing",
+      priority: ATTENTION_PRIORITY.coordinator_missing,
       sourceId: workstream.workstreamId, summary: workstream.title }));
 }
 

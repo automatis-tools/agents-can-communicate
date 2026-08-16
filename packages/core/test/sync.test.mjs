@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { createCoordinationService } from "../src/service.mjs";
+import { ATTENTION_PRIORITY, computeAttention } from "../src/sync.mjs";
 import { createFakeClock, createFakeIds, createMemoryStore }
   from "../../../tests/helpers/memory-store.mjs";
 
@@ -131,4 +132,35 @@ test("a message that needs no acknowledgement is not an attention item", async (
   const result = await service.sync({ sessionId: second.sessionId });
 
   assert.deepEqual(result.attention.filter(item => item.kind === "direct_request"), []);
+});
+
+test("every attention kind in the priority table is one a rule can produce", () => {
+  // The guard for a specific failure: a kind listed here with nothing behind
+  // it. `nearby_intent` sat in this table with no rule, so it read as a shipped
+  // feature in review, was documented as one, and produced nothing at runtime.
+  //
+  // The snapshot below is built to trigger all four rules at once. Adding a
+  // fifth entry to the table without a rule fails this test; adding one with a
+  // rule fails it until the snapshot exercises it, which is the point.
+  const snapshot = {
+    messages: [{ messageId: "message_a", subject: "Need slots", requiresAck: true }],
+    receipts: [{ messageId: "message_a", recipientParticipantId: "participant_a",
+      state: "injected" }],
+    intents: [{ sessionId: "session_a", resourceHints: ["file:src/**"] }],
+    claims: [{ claimId: "claim_a", ownerSessionId: "session_b", resource: "file:src/main.mjs",
+      expiresAt: "2026-08-16T02:00:00.000Z" }],
+    tasks: [{ taskId: "task_a", state: "pending", assigneeSessionId: "session_a",
+      title: "port the store" }],
+    workstreams: [{ workstreamId: "workstream_a", state: "open",
+      coordinatorSessionId: null, title: "directed-visuals" }],
+  };
+
+  const produced = computeAttention(snapshot, { session: { sessionId: "session_a" },
+    participantId: "participant_a", now: NOW });
+
+  assert.deepEqual([...new Set(produced.map(item => item.kind))].sort(),
+    Object.keys(ATTENTION_PRIORITY).sort());
+  // Ordering is the table's, so a new kind cannot quietly outrank a conflict.
+  assert.deepEqual(produced.map(item => item.priority),
+    [...produced.map(item => item.priority)].sort((left, right) => left - right));
 });
