@@ -2,7 +2,8 @@ import { cp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { writeHookShim } from "@agents-can-communicate/adapter-sdk";
+import { removeInstalledTree, writeHookShim }
+  from "@agents-can-communicate/adapter-sdk";
 
 const bundle = fileURLToPath(new URL("../extension", import.meta.url));
 const EXTENSION_NAME = "agents-can-communicate";
@@ -68,7 +69,7 @@ export async function installGeminiExtension({ home, runner, node }) {
   return { ok: true, changes: [target, file], diagnostics: [] };
 }
 
-export async function uninstallGeminiExtension({ home }) {
+export async function uninstallGeminiExtension({ home, keep = [] }) {
   const file = settingsPath(home);
   const existing = await readJson(file, null);
   const changes = [];
@@ -86,7 +87,7 @@ export async function uninstallGeminiExtension({ home }) {
     else delete next.hooks;
     await writeJson(file, next);
   }
-  await rm(extensionPath(home), { recursive: true, force: true });
+  await removeInstalledTree(extensionPath(home), keep);
   return { ok: true, changes, diagnostics: [] };
 }
 
@@ -96,4 +97,15 @@ export async function detectGemini({ home }) {
     .some(entries => entries.some(entry => (entry.hooks ?? []).some(isOurs)));
   return { ok: true, changes: [],
     diagnostics: [installed ? "acc hooks registered" : "acc hooks not registered"] };
+}
+
+/**
+ * The paths an install would write, without writing them. Same helpers as the
+ * install, so a dry run cannot drift from what actually happens.
+ */
+export function planGeminiInstall({ home }) {
+  return [
+    { path: extensionPath(home), kind: "tree" },
+    { path: settingsPath(home), kind: "merge" },
+  ];
 }

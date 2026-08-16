@@ -2,7 +2,7 @@ import { cp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { mergeOwnedConfig, ownedKeys, removeOwnedConfig, writeHookShim }
+import { mergeOwnedConfig, ownedKeys, removeInstalledTree, removeOwnedConfig, writeHookShim }
   from "@agents-can-communicate/adapter-sdk";
 
 const bundle = fileURLToPath(new URL("../plugin", import.meta.url));
@@ -46,7 +46,7 @@ export async function installClaudePlugin({ configDir, runner, node }) {
   return { ok: true, changes: [target, file], diagnostics: [] };
 }
 
-export async function uninstallClaudePlugin({ configDir }) {
+export async function uninstallClaudePlugin({ configDir, keep = [] }) {
   const file = settingsPath(configDir);
   const existing = await readJson(file, null);
   const changes = [];
@@ -54,7 +54,7 @@ export async function uninstallClaudePlugin({ configDir }) {
     changes.push(...ownedKeys(existing));
     await writeJson(file, removeOwnedConfig(existing));
   }
-  await rm(pluginPath(configDir), { recursive: true, force: true });
+  await removeInstalledTree(pluginPath(configDir), keep);
   return { ok: true, changes, diagnostics: [] };
 }
 
@@ -63,4 +63,15 @@ export async function detectClaude({ configDir }) {
   const installed = ownedKeys(existing ?? {}).includes("accPlugins");
   return { ok: true, changes: [],
     diagnostics: [installed ? "acc plugin registered" : "acc plugin not registered"] };
+}
+
+/**
+ * The paths an install would write, without writing them. Same helpers as the
+ * install, so a dry run cannot drift from what actually happens.
+ */
+export function planClaudeInstall({ configDir }) {
+  return [
+    { path: pluginPath(configDir), kind: "tree" },
+    { path: settingsPath(configDir), kind: "merge" },
+  ];
 }

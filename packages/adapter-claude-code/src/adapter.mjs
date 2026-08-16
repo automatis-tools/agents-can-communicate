@@ -1,7 +1,7 @@
 import { defineAdapter, projectContext } from "@agents-can-communicate/adapter-sdk";
 
 import { denyOutcome, injectOutcome, normalizeClaudeHook } from "./hooks.mjs";
-import { detectClaude, installClaudePlugin, uninstallClaudePlugin } from "./install.mjs";
+import { planClaudeInstall, detectClaude, installClaudePlugin, uninstallClaudePlugin } from "./install.mjs";
 
 export const CLAUDE_CODE_VERSION = "2.1.233";
 
@@ -36,6 +36,7 @@ export function createClaudeCodeAdapter() {
     guardShell: async () => ({ ok: true, changes: [], diagnostics: [] }),
     poll: async () => ({ ok: true, changes: [], diagnostics: [] }),
 
+    planInstall: context => planClaudeInstall(context),
     detect: context => detectClaude(context),
     install: context => installClaudePlugin(context),
     uninstall: context => uninstallClaudePlugin(context),

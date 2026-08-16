@@ -5,6 +5,7 @@ import { openFilesystemStore } from "@agents-can-communicate/storage-filesystem"
 
 import { parseArgs, positiveNumber } from "./args.mjs";
 import { runConfigCommand } from "./config-command.mjs";
+import { runInstallCommand } from "./install-command.mjs";
 import { runDoctor } from "./doctor-command.mjs";
 import { createGitProbe } from "./git-probe.mjs";
 import { platformDataHome, runtimePaths } from "./runtime-paths.mjs";
@@ -149,7 +150,13 @@ const HANDLERS = Object.freeze({
       text: result.written ? `wrote ${result.file}` : `not written: ${result.file}` };
   },
 
-  doctor: async ({ options, context }) => runDoctor({ options, context }),
+  install: async ({ options, runtime }) =>
+    runInstallCommand({ options, runtime, action: "install" }),
+
+  uninstall: async ({ options, runtime }) =>
+    runInstallCommand({ options, runtime, action: "uninstall" }),
+
+  doctor: async ({ options, context, runtime }) => runDoctor({ options, context, runtime }),
 });
 
 /**
@@ -165,7 +172,10 @@ export async function main(argv, runtime) {
     // open. Discovery validates the config too, so a broken one would fail
     // there first and `acc config validate` - the command a user runs to find
     // out what is wrong - would never reach its own report.
-    const context = parsed.command === "config"
+    // These three work on a machine, not a workspace. `config` must run even
+    // when discovery cannot open the workspace - that is what a user is trying
+    // to find out - and install touches client configuration, not ACC state.
+    const context = ["config", "install", "uninstall"].includes(parsed.command)
       ? null
       : await openContext(parsed.options, runtime);
     const { data, text } = await HANDLERS[parsed.command]({ options: parsed.options,

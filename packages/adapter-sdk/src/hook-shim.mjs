@@ -1,4 +1,4 @@
-import { access, chmod, mkdir, writeFile } from "node:fs/promises";
+import { access, chmod, mkdir, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -57,4 +57,19 @@ export async function writeHookShim({ dir, adapterId, runner = defaultRunner(),
   ].join("\n"));
   await chmod(target, 0o755);
   return target;
+}
+
+/**
+ * Remove a directory this adapter installed, unless it has been kept back.
+ *
+ * The installer decides what may be deleted by comparing what is on disk
+ * against what ACC recorded writing. An adapter that removed its layout
+ * unconditionally would undo that decision - and the case it undoes is exactly
+ * the one that matters: someone put their own work inside a directory ACC
+ * created, and a recognised path is not a reason to delete it.
+ */
+export async function removeInstalledTree(target, keep = []) {
+  if (keep.includes(target)) return false;
+  await rm(target, { recursive: true, force: true });
+  return true;
 }

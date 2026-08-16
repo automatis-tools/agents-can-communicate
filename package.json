@@ -37,6 +37,7 @@
     "@agents-can-communicate/cli": "*",
     "@agents-can-communicate/core": "*",
     "@agents-can-communicate/hook-runner": "*",
+    "@agents-can-communicate/installer": "*",
     "@agents-can-communicate/mcp-server": "*",
     "@agents-can-communicate/protocol": "*",
     "@agents-can-communicate/storage-filesystem": "*"
@@ -50,6 +51,7 @@
     "@agents-can-communicate/cli",
     "@agents-can-communicate/core",
     "@agents-can-communicate/hook-runner",
+    "@agents-can-communicate/installer",
     "@agents-can-communicate/mcp-server",
     "@agents-can-communicate/protocol",
     "@agents-can-communicate/storage-filesystem"
