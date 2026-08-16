@@ -96,3 +96,11 @@ export function injectResponse(context) {
   return context === "" ? {} : { hookSpecificOutput: {
     hookEventName: "UserPromptSubmit", additionalContext: context } };
 }
+
+export function denyOutcome(reason) {
+  return { stdout: `${JSON.stringify(denyResponse(reason))}\n`, stderr: "", exitCode: 0 };
+}
+
+export function injectOutcome(context) {
+  return { stdout: `${JSON.stringify(injectResponse(context))}\n`, stderr: "", exitCode: 0 };
+}

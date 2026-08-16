@@ -1,6 +1,6 @@
 import { defineAdapter, projectContext } from "@agents-can-communicate/adapter-sdk";
 
-import { normalizeGeminiHook } from "./hooks.mjs";
+import { denyOutcome, injectOutcome, normalizeGeminiHook } from "./hooks.mjs";
 import { detectGemini, installGeminiExtension, uninstallGeminiExtension } from "./install.mjs";
 
 export const GEMINI_CLI_VERSION = "0.37.0";
@@ -53,6 +53,8 @@ export function createGeminiCliAdapter() {
       ] };
     },
 
+    denyOutcome,
+    injectOutcome,
     normalizeHook: payload => normalizeGeminiHook(payload),
     renderContext: sync => projectContext(sync),
   });

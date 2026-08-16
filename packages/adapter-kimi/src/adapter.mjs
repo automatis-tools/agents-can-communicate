@@ -1,6 +1,6 @@
 import { defineAdapter, projectContext } from "@agents-can-communicate/adapter-sdk";
 
-import { normalizeKimiHook } from "./hooks.mjs";
+import { denyOutcome, injectOutcome, normalizeKimiHook } from "./hooks.mjs";
 import { detectKimi, installKimiPlugin, uninstallKimiPlugin } from "./install.mjs";
 
 export const KIMI_CODE_VERSION = "0.36.1";
@@ -53,6 +53,8 @@ export function createKimiAdapter() {
       ] };
     },
 
+    denyOutcome,
+    injectOutcome,
     normalizeHook: payload => normalizeKimiHook(payload),
     renderContext: sync => projectContext(sync),
   });

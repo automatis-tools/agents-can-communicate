@@ -97,3 +97,13 @@ export function injectResponse(context) {
   return context === "" ? {} : { hookSpecificOutput: {
     hookEventName: "BeforeAgent", additionalContext: context } };
 }
+
+// Deny and inject take opposite shapes on this client, so they are rendered
+// separately rather than through one envelope helper.
+export function denyOutcome(reason) {
+  return { stdout: `${JSON.stringify(denyResponse(reason))}\n`, stderr: "", exitCode: 0 };
+}
+
+export function injectOutcome(context) {
+  return { stdout: `${JSON.stringify(injectResponse(context))}\n`, stderr: "", exitCode: 0 };
+}
