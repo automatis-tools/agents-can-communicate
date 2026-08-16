@@ -1,0 +1,74 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# Actions are pinned to immutable commit SHAs. A moving tag is a dependency
+# somebody else can change after review.
+jobs:
+  test:
+    name: ${{ matrix.os }} · node ${{ matrix.node }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        # Windows is not here because ACC does not work there yet, not because
+        # nobody thought of it. The store fsyncs a directory after a rename for
+        # durability, which Windows refuses with EPERM, and O_NOFOLLOW does not
+        # protect a config the same way. See CHANGELOG.md; the run that proved
+        # it is on this branch.
+        os: [ubuntu-latest, macos-latest]
+        node: ['24']
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: ${{ matrix.node }}
+
+      - name: Install
+        run: npm ci
+
+      - name: Syntax
+        run: npm run check
+
+      - name: Tests
+        # Unit, process, conformance, docs, security, and packaging - the whole
+        # suite, because splitting it invites a job nobody notices is skipped.
+        # The runner resolves its own file list and fails on an empty one: this
+        # job once reported success having run zero tests, because the globs in
+        # the old npm script are expanded by sh and passed through literally by
+        # PowerShell.
+        run: npm test
+        env:
+          # Git exports these into every child process. The suite spawns git in
+          # temporary fixture repositories, and inheriting them makes those
+          # commands operate on this checkout instead. This repository has been
+          # damaged by exactly that once.
+          GIT_DIR: ''
+          GIT_WORK_TREE: ''
+
+  package:
+    name: package · ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        # Same reason as the test matrix: Windows support is not there yet.
+        os: [ubuntu-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24'
+
+      - run: npm ci
+
+      - name: Pack and verify the tarball
+        # Installs into a clean directory with no workspace anywhere, then
+        # drives doctor, a non-Git workspace, and an install/uninstall round
+        # trip. Development cannot catch this: the workspace symlinks are always
+        # present there, so an unbundled package imports fine until someone else
+        # installs it.
+        run: node scripts/verify-package.mjs

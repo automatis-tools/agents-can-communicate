@@ -78,6 +78,9 @@ Examples: [workstreams](examples/papercut-workstreams.md) ·
 
 ## Requirements
 
-Node 24+. No database, no daemon, no service. Git optional.
+Node 24+, macOS or Linux. No database, no daemon, no service. Git optional.
+
+Windows is not supported yet — the reasons are measured and listed in
+[CHANGELOG.md](CHANGELOG.md).
 
 MIT.
