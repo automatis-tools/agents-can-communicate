@@ -40,8 +40,13 @@ const RECORDS = Object.freeze({
   participant: { participantId: id, workspaceId: id, displayName: line,
     kind: oneOf("agent", "human"), createdAt: timestamp },
 
+  // `enforcement` and `lifecycle` are what this session's harness can actually
+  // do, declared at attach. The harness name does not imply them: the same
+  // client guards or does not depending on its model and its approval mode, and
+  // a peer deciding whether to rely on a claim needs the answer, not the brand.
   session: { sessionId: id, participantId: id, workspaceId: id, generation: id,
     harness: line, state: oneOf("open", "closed"), parentSessionId: nullable(id),
+    enforcement: oneOf("guarded", "advisory"), lifecycle: oneOf("managed", "manual"),
     heartbeatCadenceMs: positiveInteger, startedAt: timestamp, heartbeatAt: timestamp },
 
   intent: { sessionId: id, workspaceId: id, summary,

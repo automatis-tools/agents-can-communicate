@@ -27,6 +27,11 @@ const sessionRecord = (input, now, generation) => validateRecord("session", {
   harness: input.harness,
   state: "open",
   parentSessionId: input.parentSessionId ?? null,
+  // Both default to the weaker reading. A session that declares nothing is a
+  // session nothing intercepts - an MCP client, or a CLI user - and claiming
+  // otherwise would promise enforcement that is not there.
+  enforcement: input.enforcement ?? "advisory",
+  lifecycle: input.lifecycle ?? "manual",
   heartbeatCadenceMs: input.heartbeatCadenceMs,
   startedAt: now,
   heartbeatAt: now,

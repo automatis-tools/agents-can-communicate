@@ -12,6 +12,7 @@ export interface AdapterCapabilities {
     sessionStart: boolean;
     sessionResume: boolean;
     sessionEnd: boolean;
+    heartbeat: boolean;
     childSessions: boolean;
   };
   context: {
@@ -38,6 +39,13 @@ export interface AdapterCapabilities {
 ```
 
 False is the default for every capability. An adapter test must prove each true value.
+
+`lifecycle.heartbeat` is separate from `delivery.polling` on purpose. Polling
+happens when the client reaches a hook, which for most harnesses means when the
+user takes a turn: an idle session stops refreshing and goes stale even though
+its process is alive. A client with `lifecycle.heartbeat` fires on a timer
+instead, so presence stays accurate while the session sits idle. Only Kimi Code
+was observed doing this, at a fixed 60s cadence.
 
 ## Integration tiers
 

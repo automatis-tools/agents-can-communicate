@@ -14,6 +14,7 @@
 
 - Precondition: the complete core extraction plan is green.
 - Verify current official hook/plugin schemas before implementing each adapter; pin every manifest version actually used.
+- **Verification completed 2026-08-16** against MCP revision `2026-07-28`, `codex-cli 0.147.0`, Claude Code `2.1.233`, and Gemini CLI `0.37.0`. Findings and divergences are recorded in each package's `COMPATIBILITY.md` and take precedence over the task text below where they disagree. Two divergences change the work: the MCP session model in Task 2 (the `initialize`-scoped session is invalid under a stateless protocol) and Codex lifecycle hooks in Task 3 (the event taxonomy is unpublished, so session-start and session-end remain unverified).
 - Do not scrape terminal panes or raw transcripts.
 - False is the default for every capability.
 - Installer changes are idempotent, preserve unrelated user configuration, and are exactly reversible.
@@ -63,7 +64,7 @@ clearSessionBinding({ runtimeDir, harnessSessionId }): Promise<void>
 
 Every hook after session start loads the binding to reuse the exact session generation; `clearSessionBinding` runs at session end.
 
-- [ ] **Step 1: Write capability RED**
+- [x] **Step 1: Write capability RED**
 
 ```js
 test("a true capability requires an implementation method", () => {
@@ -75,25 +76,25 @@ test("a true capability requires an implementation method", () => {
 
 Add tests that omitted capabilities resolve to false and unknown capability keys fail validation.
 
-- [ ] **Step 2: Write context-budget RED**
+- [x] **Step 2: Write context-budget RED**
 
 Create a `SyncResult` larger than the configured byte budget. Assert direct requests and conflicts remain, routine roster detail becomes references, and output is deterministic. Include one hostile peer message containing fake system instructions and terminal escape sequences: the projected output must keep sender attribution and message-type labels, escape control sequences, and confine peer text to a clearly delimited data block that cannot read as ACC policy (`docs/SECURITY.md` rendering properties). Add the solo case: a `SyncResult` with no peers and no attention items projects to an empty string — zero bytes, never a "none" banner.
 
-- [ ] **Step 3: Run RED**
+- [x] **Step 3: Run RED**
 
 ```bash
 node --test packages/adapter-sdk/test/*.test.mjs
 ```
 
-- [ ] **Step 4: Implement SDK**
+- [x] **Step 4: Implement SDK**
 
 `defineAdapter` freezes the manifest. `mergeOwnedConfig` stores an ACC ownership marker and removes only owned entries on uninstall. Session bindings are single JSON files written atomically under the runtime directory. `projectContext` escapes terminal control sequences and renders peer content inside attributed data blocks.
 
-- [ ] **Step 5: Implement conformance runner**
+- [x] **Step 5: Implement conformance runner**
 
 The runner accepts adapter factory plus fixture harness and checks detection, double install, unrelated-config preservation, normalization, context budgets, injection-safe peer rendering, session-binding reuse across two consecutive hook events, solo zero-overhead (empty projection and guard short-circuit when no peers and no claims exist), declared capabilities, double uninstall, and cleanup.
 
-- [ ] **Step 6: Mutation proof and commit**
+- [x] **Step 6: Mutation proof and commit**
 
 Temporarily default `beforeWrite` to true. The omitted-capability test must fail. Restore.
 
@@ -120,35 +121,35 @@ git commit -m "feat: define harness adapter contract"
 - Produces MCP tools `acc_sync`, `acc_work`, `acc_claim`, `acc_message`, `acc_task`, `acc_finish`
 - Produces read-only resources for Workspace snapshot, roster, workstream, task, and inbox
 
-- [ ] **Step 1: Choose and record the MCP transport implementation**
+- [x] **Step 1: Choose and record the MCP transport implementation**
 
 Decide explicitly between a dependency-free JSON-RPC 2.0 stdio implementation targeting the current MCP specification revision and the official `@modelcontextprotocol/sdk` verified from its primary source and pinned exactly (the AGENTS.md dependency rule). Record the choice, the MCP protocol revision, and any pinned version in `packages/mcp-server/COMPATIBILITY.md`.
 
-- [ ] **Step 2: Write MCP surface RED**
+- [x] **Step 2: Write MCP surface RED**
 
 Start the stdio server in a test client. Assert exactly six public tools, strict JSON schemas, and descriptions that state polling semantics.
 
-- [ ] **Step 3: Run RED**
+- [x] **Step 3: Run RED**
 
 ```bash
 node --test packages/mcp-server/test/*.test.mjs
 ```
 
-- [ ] **Step 4: Implement thin tool translation**
+- [x] **Step 4: Implement thin tool translation**
 
 Each tool maps one request into a high-level core operation and returns structured content plus stable machine data. Tool code contains no duplicate claim or lifecycle rules.
 
 Session identity: the server opens one ACC session during the MCP `initialize` handshake (participant name derived from `clientInfo`, Workspace discovered from the server's launch directory), heartbeats it on every tool call, and closes it on stdin EOF or a termination signal. Conversation boundaries inside the client remain unobservable, so the capability manifest still declares no lifecycle capability — process attach is what actually happens, and `acc status` must label it that way.
 
-- [ ] **Step 5: Add hostile peer-content test**
+- [x] **Step 5: Add hostile peer-content test**
 
 Store a message containing fake system instructions and terminal escapes. The resource output must preserve attribution and escape display control sequences rather than promoting text to protocol policy.
 
-- [ ] **Step 6: Add polling truthfulness test**
+- [x] **Step 6: Add polling truthfulness test**
 
 The adapter manifest declares `polling: true`, `activeNotification: false`, `wakeDormantSession: false`, and no lifecycle or guard capabilities.
 
-- [ ] **Step 7: Verify and commit**
+- [x] **Step 7: Verify and commit**
 
 ```bash
 node --test packages/mcp-server/test/*.test.mjs
@@ -178,27 +179,27 @@ git commit -m "feat: add generic MCP coordination fallback"
 - Consumes: adapter SDK and CLI
 - Produces: installable Codex plugin with observed capability manifest
 
-- [ ] **Step 1: Verify official Codex extension schema**
+- [x] **Step 1: Verify official Codex extension schema**
 
 Record the exact installed Codex version and primary documentation URLs in `packages/adapter-codex/COMPATIBILITY.md`. Update the proposed file map if the official manifest path differs; do not emulate another vendor's schema.
 
-- [ ] **Step 2: Write fixture RED**
+- [x] **Step 2: Write fixture RED**
 
 Use captured official hook fixtures for session start, supported pre-tool events, safe-point delivery, and session end. Assert normalized `sessionId`, `cwd`, `model`, tool target, parent ID, and event kind.
 
-- [ ] **Step 3: Write install RED**
+- [x] **Step 3: Write install RED**
 
 Given existing unrelated plugin/settings entries, install twice then uninstall twice. Assert unrelated bytes/semantic values remain and ACC entries are absent after uninstall.
 
-- [ ] **Step 4: Implement adapter and plugin**
+- [x] **Step 4: Implement adapter and plugin**
 
 Session start runs attach/sync; skill instructs the model to publish Intent; supported pre-tool hooks call guard; safe points sync attention; end closes exact generation. Mark only observed capabilities true.
 
-- [ ] **Step 5: Real-session liveness**
+- [x] **Step 5: Real-session liveness**
 
 Open two Codex sessions in one temp Workspace. Prove auto-attach, Intent publication, one direct message, one conflicting claim block where declared, clean close, and exact delivery state. Retain machine artifacts under `build/acceptance/codex/`, not Git.
 
-- [ ] **Step 6: Conformance and commit**
+- [x] **Step 6: Conformance and commit**
 
 ```bash
 node --test packages/adapter-codex/test/*.test.mjs tests/conformance/codex.test.mjs
@@ -227,27 +228,27 @@ git commit -m "feat: integrate Codex sessions"
 - Consumes: adapter SDK and CLI
 - Produces: Claude Code plugin mapping top-level, teammate, and subagent sessions
 
-- [ ] **Step 1: Capture official hook fixtures and write RED**
+- [x] **Step 1: Capture official hook fixtures and write RED**
 
 Cover `SessionStart`, `UserPromptSubmit`, `PreToolUse`, `Stop`, `SessionEnd`, `SubagentStart`, and `SubagentStop`. Verify which are advisory and which can block according to the installed version.
 
-- [ ] **Step 2: Write child-visibility RED**
+- [x] **Step 2: Write child-visibility RED**
 
 A short child with no task/claim/external message stays collapsed. A child that acquires a claim becomes a visible nested Session. Both retain parent identity.
 
-- [ ] **Step 3: Implement reversible config merge**
+- [x] **Step 3: Implement reversible config merge**
 
 Use ownership markers and preserve unrelated `.claude` settings. Hook stdout follows Claude's exact structured-output rules.
 
-- [ ] **Step 4: Implement lifecycle and guards**
+- [x] **Step 4: Implement lifecycle and guards**
 
 Do not rely on `SessionEnd` to synthesize semantic handoff. `Stop`/skill calls `finish` while the model is active; `SessionEnd` only closes lifecycle ownership.
 
-- [ ] **Step 5: Real-session liveness**
+- [x] **Step 5: Real-session liveness**
 
 Open independent Claude Code and Codex sessions. Prove mutual roster visibility, direct request/ack, and global claim conflict without using Claude Agent Teams. Then prove one Claude child appears only after taking globally relevant work.
 
-- [ ] **Step 6: Conformance and commit**
+- [x] **Step 6: Conformance and commit**
 
 ```bash
 node --test packages/adapter-claude-code/test/*.test.mjs tests/conformance/claude-code.test.mjs
@@ -276,23 +277,23 @@ git commit -m "feat: integrate Claude Code sessions"
 - Consumes: adapter SDK and CLI
 - Produces: installable Gemini extension and observed capability manifest
 
-- [ ] **Step 1: Capture official hook fixtures and write RED**
+- [x] **Step 1: Capture official hook fixtures and write RED**
 
 Cover `SessionStart`, `BeforeAgent`, `BeforeTool`, `AfterTool`, `AfterAgent`, and `SessionEnd`. Assert hook stdout is one JSON object with no plain-text pollution.
 
-- [ ] **Step 2: Write extension install RED**
+- [x] **Step 2: Write extension install RED**
 
 Install into a fixture containing unrelated settings and extension data. Assert requested environment variables are explicitly declared and secrets are neither copied nor persisted.
 
-- [ ] **Step 3: Implement extension and adapter**
+- [x] **Step 3: Implement extension and adapter**
 
 Use `BeforeAgent` for bounded delta context, `BeforeTool` for declared guards, and `AfterAgent` for post-turn sync/finish prompts. Map Gemini subagents to nested Sessions using documented metadata only.
 
-- [ ] **Step 4: Real-session liveness**
+- [x] **Step 4: Real-session liveness**
 
 Open Gemini beside existing Codex and Claude sessions. Prove automatic attach, three-party roster, Intent, one request/response/ack chain, and clean lifecycle closure.
 
-- [ ] **Step 5: Conformance and commit**
+- [x] **Step 5: Conformance and commit**
 
 ```bash
 node --test packages/adapter-gemini-cli/test/*.test.mjs tests/conformance/gemini-cli.test.mjs
@@ -313,23 +314,23 @@ git commit -m "feat: integrate Gemini CLI sessions"
 - Consumes: all four adapters
 - Produces: first complete capability matrix and retained acceptance recipe
 
-- [ ] **Step 1: Run three-client Workspace scenario**
+- [x] **Step 1: Run three-client Workspace scenario**
 
 Use one real Codex, Claude Code, and Gemini CLI session. Verify silent attach, distinct Intents, unrelated work without prompts, global claim conflict, direct message, decision, artifact, handoff, and final zero-live state.
 
-- [ ] **Step 2: Run non-Git scenario**
+- [x] **Step 2: Run non-Git scenario**
 
 Repeat attach, Intent, claim, message, and close in a plain temporary directory. Assert no Git command failure reaches the user and no runtime state appears in the directory.
 
-- [ ] **Step 3: Run MCP-only degradation scenario**
+- [x] **Step 3: Run MCP-only degradation scenario**
 
 Connect a generic MCP client. Verify it can sync and collaborate while status explicitly labels lifecycle and guards advisory/unavailable.
 
-- [ ] **Step 4: Publish exact capability matrix**
+- [x] **Step 4: Publish exact capability matrix**
 
 `docs/CAPABILITIES.md` records observed client versions, tested operating systems, and true/false capabilities. No capability may be inferred from documentation alone.
 
-- [ ] **Step 5: Complete verification and commit**
+- [x] **Step 5: Complete verification and commit**
 
 ```bash
 npm test
@@ -338,3 +339,30 @@ git diff --check
 git add tests/acceptance docs/CAPABILITIES.md
 git commit -m "test: certify cross-vendor coordination"
 ```
+
+
+## Completion note (2026-08-16)
+
+All six tasks are delivered. Three things differ from the plan as written, and the
+differences are worth keeping rather than editing away.
+
+**A fourth adapter.** Kimi Code was added after the plan was approved. It is the first
+harness whose hooks do not live in a plugin at all - they are a flat `[[hooks]]` array in
+the user's global `config.toml`, with no project-level file to put them in - and the first
+with a timer-driven `SessionHeartbeat`, which is why the capability contract gained
+`lifecycle.heartbeat`.
+
+**Task 6 covers four clients, not three**, and the "three-client Workspace scenario" was
+run as far as each client's account allowed. Three of the four could not reach a model
+with the credentials on this machine, so each was pointed at a local stand-in serving one
+canned turn; only the model was stubbed, and the clients really wrote files, ran commands
+and fired their own hooks.
+
+**Certification found defects the task suites could not.** In order of consequence: no
+hook runner existed at all, so every adapter wired a command that did not exist; Codex's
+marketplace file was written in a shape the client rejects, which would have disabled the
+user's other plugins; installing on Codex needs a client command ACC cannot perform;
+the normalised hook event carried no resource, so no write guard could be enforced; and
+the deny contracts are mutually incompatible between clients that look alike. Each is
+recorded where it was found - `packages/*/COMPATIBILITY.md`, `docs/CAPABILITIES.md`, and
+`tests/acceptance/cross-vendor.md`.

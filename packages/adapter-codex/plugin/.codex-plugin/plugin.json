@@ -1,0 +1,17 @@
+{
+  "name": "agents-can-communicate",
+  "version": "0.0.0",
+  "description": "Coordinate this Codex session with other AI agent sessions working in the same workspace.",
+  "license": "UNLICENSED",
+  "keywords": ["coordination", "multi-agent", "claims", "handoff"],
+  "skills": "./skills/",
+  "hooks": "./hooks.json",
+  "interface": {
+    "displayName": "Agents Can Communicate",
+    "shortDescription": "See who else is working here, claim resources, and hand off cleanly",
+    "longDescription": "Attaches this session to a local coordination plane shared with Codex, Claude Code, Gemini CLI, and MCP clients working in the same workspace. Publishes what this session is doing, warns before two sessions edit the same resource, carries typed messages between participants, and records a handoff at the end.",
+    "developerName": "automatis-tools",
+    "category": "Developer Tools",
+    "capabilities": ["Read", "Write"]
+  }
+}

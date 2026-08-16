@@ -1,0 +1,9 @@
+{
+  "session_id": "01a0090b-1d56-7df0-92b7-0512e339f3da",
+  "transcript_path": "<redacted: conversation transcript>",
+  "cwd": "/tmp/example-workspace",
+  "hook_event_name": "SessionStart",
+  "model": "gpt-5.6-sol",
+  "permission_mode": "bypassPermissions",
+  "source": "startup"
+}
