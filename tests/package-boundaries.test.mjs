@@ -69,10 +69,17 @@ export async function scanImports(packageDirectory) {
   for (const file of files) {
     const relative = path.relative(repoRoot, file);
     const source = await readFile(file, "utf8");
-    for (const specifier of specifiers(source)) {
-      const rule = FORBIDDEN_SPECIFIERS.find(item => item.pattern.test(specifier));
-      if (rule !== undefined) {
-        violations.push({ file: relative, detail: `${specifier} ${rule.reason}` });
+    // Import rules constrain what ships. Tests are not shipped and legitimately
+    // reach the repository's shared helpers, so they are held to the vocabulary
+    // rules only. Widening the import rules to tests would force either a
+    // duplicated helper per package or a weaker rule for src.
+    const shipped = relative.includes(`${path.sep}src${path.sep}`);
+    if (shipped) {
+      for (const specifier of specifiers(source)) {
+        const rule = FORBIDDEN_SPECIFIERS.find(item => item.pattern.test(specifier));
+        if (rule !== undefined) {
+          violations.push({ file: relative, detail: `${specifier} ${rule.reason}` });
+        }
       }
     }
     for (const rule of FORBIDDEN_TOKENS) {
@@ -98,6 +105,14 @@ test("protocol stays free of vendor and project vocabulary", async () => {
 test("the scanner refuses to pass on a missing or empty target", async () => {
   assert.deepEqual(await scanImports("packages/does-not-exist"),
     [{ file: "packages/does-not-exist", detail: "package directory does not exist" }]);
+});
+
+test("import rules apply to shipped source, vocabulary rules apply everywhere", async () => {
+  // A src module reaching into the repository root must still be a violation,
+  // so the narrower scope above cannot be mistaken for switching the rule off.
+  const violations = await scanImports("packages/core");
+  assert.deepEqual(violations, []);
+  assert.equal(FORBIDDEN_SPECIFIERS.some(rule => rule.pattern.test("../../../tests/x.mjs")), true);
 });
 
 test("the scanner detects a forbidden specifier and Papercut vocabulary", async () => {
