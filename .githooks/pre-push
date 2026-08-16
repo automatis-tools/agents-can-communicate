@@ -17,12 +17,20 @@ git ls-files -z '*.mjs' | xargs -0 -n1 node --check
 unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_COMMON_DIR GIT_OBJECT_DIRECTORY
 unset GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_PREFIX GIT_QUARANTINE_PATH
 
-if node -e "process.exit(require('./package.json').scripts?.['test:integrated'] ? 0 : 1)" 2>/dev/null
-then
-  echo "pre-push: running the integrated protocol suite"
-  npm run test:integrated
-else
-  echo "pre-push: no test:integrated script in this revision; skipping the suite"
-fi
+run_if_present() {
+  if node -e "process.exit(require('./package.json').scripts?.['$1'] ? 0 : 1)" 2>/dev/null
+  then
+    echo "pre-push: running $1"
+    npm run "$1"
+  else
+    echo "pre-push: no $1 script in this revision; skipping it"
+  fi
+}
+
+# Both suites: the reconciled prototype is the regression baseline, and the
+# extracted packages are what actually ships. A gate that covers only one of
+# them stops protecting the moment the other is where the work happens.
+run_if_present test:integrated
+run_if_present test
 
 echo "pre-push: all gates passed"
