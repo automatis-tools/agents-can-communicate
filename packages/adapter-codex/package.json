@@ -1,0 +1,9 @@
+{
+  "name": "@agents-can-communicate/adapter-codex",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/adapter.mjs"
+  }
+}
