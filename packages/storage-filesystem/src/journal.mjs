@@ -24,8 +24,11 @@ export function journalEntry(transactionId, firstSequence, publications, started
     startedAt,
     publications: publications.map(item => ({
       path: item.path,
-      bytes: item.bytes.toString("base64"),
+      // A removal is journalled like any other publication, so a crash between
+      // two deletions replays to the same end state rather than a partial one.
+      bytes: item.remove === true ? null : item.bytes.toString("base64"),
       replace: item.replace === true,
+      remove: item.remove === true,
     })),
   };
 }
@@ -64,9 +67,16 @@ export async function readOpenJournals(paths, root) {
 export async function rollForward(paths, options, entry) {
   const published = [];
   for (const publication of entry.publications) {
+    const destination = path.resolve(options.root, publication.path);
+    if (publication.remove === true) {
+      await removeIfPresent(destination);
+      published.push(publication.path);
+      await options.failAt?.(`after:${publication.path}`);
+      continue;
+    }
     const bytes = Buffer.from(publication.bytes, "base64");
-    const outcome = await publishAtomic(path.resolve(options.root, publication.path),
-      bytes, { ...options, replace: publication.replace === true });
+    const outcome = await publishAtomic(destination, bytes,
+      { ...options, replace: publication.replace === true });
     if (outcome === "published") published.push(publication.path);
     // Seam for the crash-window tests: abort between two publications of the
     // same decided transaction.

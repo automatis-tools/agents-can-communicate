@@ -86,7 +86,10 @@ export async function openFilesystemStore({ root, clock, ids, workspaceId, failA
       const events = [];
       let sequence = await nextSequence(paths, root);
       const firstSequence = pad(sequence);
-      const entryFor = key => staged.get(key) ?? loaded.get(key) ?? null;
+      const entryFor = key => {
+        const entry = staged.get(key) ?? loaded.get(key) ?? null;
+        return entry?.removed === true ? null : entry;
+      };
 
       const tx = Object.freeze({
         get(kind, id) {
@@ -102,7 +105,8 @@ export async function openFilesystemStore({ root, clock, ids, workspaceId, failA
               if (entry.kind === kind) merged.set(key, entry);
             }
           }
-          return [...merged.values()].map(entry => entry.record).filter(predicate);
+          return [...merged.values()].filter(entry => entry.removed !== true)
+            .map(entry => entry.record).filter(predicate);
         },
         put(kind, id, record, expectedGeneration = null) {
           const key = `${kind}:${id}`;
@@ -115,6 +119,15 @@ export async function openFilesystemStore({ root, clock, ids, workspaceId, failA
           const generation = ids.next("generation");
           staged.set(key, { kind, id, record, generation });
           return generation;
+        },
+        remove(kind, id, expectedGeneration = null) {
+          const key = `${kind}:${id}`;
+          const actual = entryFor(key)?.generation ?? null;
+          if (actual !== expectedGeneration) {
+            throw new AccError(EXIT.CONFLICT, `${kind} ${id} changed under this transaction`,
+              { kind, id, expectedGeneration, actualGeneration: actual });
+          }
+          staged.set(key, { kind, id, removed: true });
         },
         append(event) {
           const stamped = { ...event, sequence: pad(sequence) };
@@ -136,11 +149,13 @@ export async function openFilesystemStore({ root, clock, ids, workspaceId, failA
           bytes: encode(event),
           replace: false,
         })),
-        ...[...staged.values()].map(entry => ({
-          path: path.relative(root, statePath(paths, entry.kind, entry.id)),
-          bytes: encode(stateEnvelope(entry.kind, entry.id, entry.generation, entry.record)),
-          replace: true,
-        })),
+        ...[...staged.values()].map(entry => (entry.removed === true
+          ? { path: path.relative(root, statePath(paths, entry.kind, entry.id)), remove: true }
+          : {
+            path: path.relative(root, statePath(paths, entry.kind, entry.id)),
+            bytes: encode(stateEnvelope(entry.kind, entry.id, entry.generation, entry.record)),
+            replace: true,
+          })),
       ];
       if (publications.length === 0) return result;
 

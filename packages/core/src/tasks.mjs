@@ -1,0 +1,133 @@
+import { AccError, EXIT, SCHEMA_VERSION, createId, transitionTask as stepTask, validateRecord }
+  from "@agents-can-communicate/protocol";
+
+import { ensureMaterialised } from "./materialisation.mjs";
+
+// Dependency completion unblocks tasks deterministically, inside the same
+// transaction that completed the dependency. It must never depend on a model
+// remembering to re-evaluate the graph.
+//
+// Exported because a caller may supply its own task id - an adapter mirroring
+// an external tracker, for instance - and that is the only way a create can
+// close a cycle. Without an explicit id the guard would be unreachable.
+export function wouldCycle(tasks, taskId, dependsOn) {
+  const byId = new Map(tasks.map(task => [task.taskId, task]));
+  const seen = new Set();
+  const stack = [...dependsOn];
+  while (stack.length > 0) {
+    const current = stack.pop();
+    if (current === taskId) return true;
+    if (seen.has(current)) continue;
+    seen.add(current);
+    stack.push(...(byId.get(current)?.dependsOn ?? []));
+  }
+  return false;
+}
+
+const blockedBy = (task, byId) => task.dependsOn
+  .filter(id => (byId.get(id)?.state ?? "pending") !== "done");
+
+export function createTaskService(ports, workstreams) {
+  const { store, clock, ids } = ports;
+
+  async function createTask(input) {
+    const session = await workstreams.requireOpenSession(input, "create a task");
+    const workspaceId = session.workspaceId;
+    await ensureMaterialised(ports, { workspaceId, descriptor: input.descriptor,
+      reason: "durable_object" });
+    const now = clock.now();
+    const taskId = input.taskId ?? createId("task");
+    let record = null;
+    await store.transaction(async tx => {
+      const existing = tx.list("task");
+      const dependsOn = input.dependsOn ?? [];
+      for (const dependency of dependsOn) {
+        if (tx.get("task", dependency) === null) {
+          throw new AccError(EXIT.DATA, "a dependency does not exist", { dependency });
+        }
+      }
+      if (wouldCycle(existing, taskId, dependsOn)) {
+        throw new AccError(EXIT.DATA, "the dependency graph would contain a cycle", { taskId });
+      }
+      record = validateRecord("task", {
+        schemaVersion: SCHEMA_VERSION,
+        taskId,
+        workstreamId: input.workstreamId,
+        workspaceId,
+        title: input.title,
+        state: blockedBy({ dependsOn }, new Map(existing.map(task => [task.taskId, task])))
+          .length > 0 ? "blocked" : "pending",
+        assigneeSessionId: null,
+        dependsOn,
+        acceptance: input.acceptance ?? [],
+        createdAt: now,
+      });
+      tx.put("task", taskId, record);
+      tx.append({ schemaVersion: SCHEMA_VERSION, eventId: ids.next("event"), workspaceId,
+        actorSessionId: session.sessionId, type: "task.created", occurredAt: now,
+        payload: { taskId, state: record.state } });
+    });
+    return record;
+  }
+
+  async function claimTask(input) {
+    const session = await workstreams.requireOpenSession(input, "claim a task");
+    const now = clock.now();
+    let record = null;
+    await store.transaction(async tx => {
+      const existing = tx.get("task", input.taskId);
+      if (existing === null) {
+        throw new AccError(EXIT.DATA, "the task does not exist", { taskId: input.taskId });
+      }
+      if (existing.assigneeSessionId !== null
+        && existing.assigneeSessionId !== session.sessionId) {
+        throw new AccError(EXIT.CONFLICT, "the task already has an assignee",
+          { taskId: input.taskId, assigneeSessionId: existing.assigneeSessionId });
+      }
+      record = { ...existing, assigneeSessionId: session.sessionId,
+        state: stepTask(existing.state, "in_progress") };
+      tx.put("task", input.taskId, record, tx.generationOf("task", input.taskId));
+      tx.append({ schemaVersion: SCHEMA_VERSION, eventId: ids.next("event"),
+        workspaceId: session.workspaceId, actorSessionId: session.sessionId,
+        type: "task.claimed", occurredAt: now, payload: { taskId: input.taskId } });
+    });
+    return record;
+  }
+
+  async function transitionTask(input) {
+    const session = await workstreams.requireOpenSession(input, "transition a task");
+    const now = clock.now();
+    let record = null;
+    await store.transaction(async tx => {
+      const existing = tx.get("task", input.taskId);
+      if (existing === null) {
+        throw new AccError(EXIT.DATA, "the task does not exist", { taskId: input.taskId });
+      }
+      record = { ...existing, state: stepTask(existing.state, input.state) };
+      tx.put("task", input.taskId, record, tx.generationOf("task", input.taskId));
+      tx.append({ schemaVersion: SCHEMA_VERSION, eventId: ids.next("event"),
+        workspaceId: session.workspaceId, actorSessionId: session.sessionId,
+        type: "task.transitioned", occurredAt: now,
+        payload: { taskId: input.taskId, state: record.state } });
+
+      if (record.state !== "done") return;
+      // Unblock dependents here, in the same transaction, so the graph is
+      // never left in a state that needs someone to notice it later.
+      const byId = new Map(tx.list("task").map(task => [task.taskId, task]));
+      byId.set(record.taskId, record);
+      for (const dependent of byId.values()) {
+        if (dependent.state !== "blocked") continue;
+        if (blockedBy(dependent, byId).length > 0) continue;
+        const unblocked = { ...dependent, state: "pending" };
+        tx.put("task", dependent.taskId, unblocked,
+          tx.generationOf("task", dependent.taskId));
+        tx.append({ schemaVersion: SCHEMA_VERSION, eventId: ids.next("event"),
+          workspaceId: session.workspaceId, actorSessionId: session.sessionId,
+          type: "task.unblocked", occurredAt: now, payload: { taskId: dependent.taskId } });
+      }
+    });
+    return record;
+  }
+
+  return { createTask, claimTask, transitionTask };
+}

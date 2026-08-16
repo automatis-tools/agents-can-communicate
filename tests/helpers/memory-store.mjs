@@ -44,6 +44,14 @@ export function createMemoryStore({ clock, ids, workspaceId }) {
         staged.set(key(kind, id), { kind, id, record, generation });
         return generation;
       },
+      remove(kind, id, expectedGeneration = null) {
+        const actual = staged.get(key(kind, id))?.generation ?? null;
+        if (actual !== expectedGeneration) {
+          throw new AccError(EXIT.CONFLICT, `${kind} ${id} changed under this transaction`,
+            { kind, id, expectedGeneration, actualGeneration: actual });
+        }
+        staged.delete(key(kind, id));
+      },
       append(event) {
         const stamped = { ...event, sequence: pad(sequence) };
         sequence += 1;
