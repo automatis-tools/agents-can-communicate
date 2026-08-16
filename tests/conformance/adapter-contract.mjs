@@ -4,7 +4,7 @@ import test from "node:test";
 import { CAPABILITY_SHAPE, projectContext } from "@agents-can-communicate/adapter-sdk";
 
 /**
- * The shared matrix from docs/ADAPTERS.md. Every adapter is held to it, so a
+ * The shared matrix behind docs/ADAPTER_AUTHORING.md. Every adapter is held to it, so a
  * capability is a claim the suite can check rather than a line in a manifest.
  *
  * @param {string} name

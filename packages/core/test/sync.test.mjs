@@ -31,7 +31,7 @@ test("a solo session syncs to silence", async () => {
 
   const result = await service.sync({ sessionId: session.sessionId });
 
-  // Solo zero-overhead (approved 2026-08-15): no peers, no attention, no
+  // Solo zero-overhead: no peers, no attention, no
   // claims. The adapter injects zero bytes, not a "nothing to report" banner.
   assert.equal(result.solo, true);
   assert.deepEqual(result.attention, []);

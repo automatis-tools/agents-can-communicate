@@ -1,6 +1,6 @@
 import { SCHEMA_VERSION } from "@agents-can-communicate/protocol";
 
-// Lazy workspace materialisation (approved 2026-08-15). Attachment is
+// Lazy workspace materialisation. Attachment is
 // universal; durable state is not created merely because a session opened
 // somewhere. A lone session writes ephemeral presence and Intent only. The
 // workspace materialises exactly once - at the second live session or the first
