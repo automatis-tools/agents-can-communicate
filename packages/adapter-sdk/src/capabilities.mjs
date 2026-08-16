@@ -5,7 +5,7 @@ import { AccError, EXIT, assertPortableId } from "@agents-can-communicate/protoc
 // and by proving it in the conformance suite. Optimistic defaults are how a
 // tool ends up claiming protection it cannot deliver.
 export const CAPABILITY_SHAPE = Object.freeze({
-  lifecycle: ["sessionStart", "sessionResume", "sessionEnd", "childSessions"],
+  lifecycle: ["sessionStart", "sessionResume", "sessionEnd", "heartbeat", "childSessions"],
   context: ["startupInjection", "beforeTurnInjection", "safePointInjection"],
   guards: ["beforeRead", "beforeWrite", "beforeShell"],
   delivery: ["polling", "activeNotification", "wakeDormantSession"],
@@ -17,6 +17,10 @@ const BACKING_METHOD = Object.freeze({
   "lifecycle.sessionStart": "startSession",
   "lifecycle.sessionResume": "resumeSession",
   "lifecycle.sessionEnd": "endSession",
+  // A timer-driven event from the client, distinct from delivery.polling: it
+  // keeps presence fresh while the session is idle, which turn-driven hooks
+  // cannot do.
+  "lifecycle.heartbeat": "heartbeat",
   "lifecycle.childSessions": "mapChildSession",
   "context.startupInjection": "renderContext",
   "context.beforeTurnInjection": "renderContext",

@@ -1,0 +1,13 @@
+{
+  "hook_event_name": "PostToolUse",
+  "session_id": "session_00000000-0000-4000-8000-000000000000",
+  "cwd": "/workspace/project",
+  "client_type": "kimi_code_cli",
+  "tool_name": "Write",
+  "tool_input": {
+    "path": "/workspace/project/redacted.txt",
+    "content": "redacted content"
+  },
+  "tool_call_id": "call_Write_1",
+  "tool_output": "redacted content"
+}
