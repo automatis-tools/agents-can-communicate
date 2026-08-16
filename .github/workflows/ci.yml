@@ -14,7 +14,12 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        # Windows is not here because ACC does not work there yet, not because
+        # nobody thought of it. The store fsyncs a directory after a rename for
+        # durability, which Windows refuses with EPERM, and O_NOFOLLOW does not
+        # protect a config the same way. See CHANGELOG.md; the run that proved
+        # it is on this branch.
+        os: [ubuntu-latest, macos-latest]
         node: ['24']
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -46,14 +51,12 @@ jobs:
 
   package:
     name: package · ${{ matrix.os }}
-    # Windows is here on purpose: the verifier used to spawn POSIX-only tools,
-    # and running it only on Linux is how that survives. Portability claimed is
-    # not portability checked.
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest]
+        # Same reason as the test matrix: Windows support is not there yet.
+        os: [ubuntu-latest, macos-latest]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0

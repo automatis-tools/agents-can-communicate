@@ -11,7 +11,8 @@ release.
 | sha256 | `5c4e496e8b39f27707ff4642f0100bec3219ce35f7792262451f9957c65f5551` |
 | Tests | 585 passing, 0 failing |
 | Node | 24 (current production LTS) |
-| Verified on | macOS 15, darwin 25.5.0, arm64 |
+| Verified on | macOS 15 (darwin 25.5.0, arm64) and Linux in CI |
+| Not supported | Windows — see below |
 
 ### What it does
 
@@ -48,8 +49,14 @@ Full matrix and what the `yes` values do **not** promise:
   reproduced with a plain `gemini -p` outside ACC entirely.
 - **No subagent visibility.** `lifecycle.childSessions` is false everywhere; no
   subagent was observed during capture.
-- **macOS only, so far.** CI runs Linux and Windows, but no capability was
-  certified there.
+- **Windows does not work.** Not "untested" — measured. Once CI actually ran the
+  suite there, 86 of 587 tests failed. Two root causes so far: the store fsyncs a
+  directory after a rename for durability, which Windows refuses with `EPERM`,
+  and `O_NOFOLLOW` does not refuse a symlinked config the way it does on POSIX —
+  so the symlink defence does not hold. macOS and Linux are supported; Windows
+  is future work.
+- **Client capabilities were certified on macOS only.** Linux runs the suite in
+  CI, but no adapter was exercised against a real client there.
 
 ### Not included
 

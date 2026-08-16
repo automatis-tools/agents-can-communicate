@@ -55,5 +55,9 @@
     "@agents-can-communicate/mcp-server",
     "@agents-can-communicate/protocol",
     "@agents-can-communicate/storage-filesystem"
+  ],
+  "os": [
+    "darwin",
+    "linux"
   ]
 }
