@@ -100,6 +100,7 @@ gate runs. Each rule is written as an attack rather than a description:
 | Peer text cannot repaint the terminal | `peer-injection.test.mjs` |
 | Flooding cannot bury a conflict warning | `peer-injection.test.mjs` |
 | No path escapes the managed root | `storage-boundary.test.mjs` |
+| A claim holds however the path is spelled | `symlinked-workspace.test.mjs` |
 | A workspace id cannot traverse | `storage-boundary.test.mjs` |
 | A config cannot point roots outside itself | `storage-boundary.test.mjs` |
 | A symlinked config is refused, not followed | `storage-boundary.test.mjs` |

@@ -1,4 +1,5 @@
 import { randomBytes } from "node:crypto";
+import { realpath } from "node:fs/promises";
 import path from "node:path";
 
 import { clearSessionBinding, loadSessionBinding, storeSessionBinding }
@@ -21,6 +22,9 @@ const CADENCE_MS = 60_000;
 const defaultRuntime = () => ({
   clock: { now: () => new Date().toISOString() },
   ids: { next: kind => createId(kind, randomBytes) },
+  // Injected rather than imported at the call site so a test can drive the
+  // resolution without needing a real symlink on the filesystem it runs on.
+  realpath,
 });
 
 /**
@@ -35,6 +39,40 @@ export function resourceFor(root, target) {
   const relative = path.relative(root, absolute);
   if (relative === "" || relative.startsWith("..") || path.isAbsolute(relative)) return null;
   return `file:${relative.split(path.sep).join("/")}`;
+}
+
+/**
+ * The same path, spelled the way the workspace root is spelled.
+ *
+ * Discovery resolves its root through `realpath`, so the descriptor is always
+ * canonical. A hook payload is not: it carries whatever the client had, and a
+ * client's cwd is whatever the human typed. When the two differ only by a
+ * symlinked ancestor - `/tmp` and `/var` on macOS, a symlinked checkout
+ * anywhere - `resourceFor` relativised to `../..`, the target list emptied, and
+ * every write was allowed while `acc status` still said `protection guarded`.
+ *
+ * The leaf usually does not exist yet, because the tool call being guarded is
+ * what would create it. So the deepest existing ancestor is resolved and the
+ * remainder appended, which is also what keeps this from following a symlink
+ * the write itself would replace.
+ */
+export async function canonicalTarget(realpath, target) {
+  let current = path.resolve(target);
+  const trailing = [];
+  for (;;) {
+    try {
+      return path.join(await realpath(current), ...trailing);
+    } catch (error) {
+      if (error.code !== "ENOENT" && error.code !== "ENOTDIR") return path.resolve(target);
+      const parent = path.dirname(current);
+      // Reached the filesystem root without finding anything that exists. The
+      // unresolved path is the best answer available, and `resourceFor` will
+      // reject it if it is outside the workspace.
+      if (parent === current) return path.resolve(target);
+      trailing.unshift(path.basename(current));
+      current = parent;
+    }
+  }
 }
 
 // Same rule as the core's claim overlap, applied to a concrete path: a claim on
@@ -56,7 +94,7 @@ async function openContext({ cwd, dataHome, runtime, env }) {
   });
   const store = await openFilesystemStore({ root: paths.root, clock: runtime.clock,
     ids: runtime.ids, workspaceId: descriptor.id });
-  return { descriptor, paths,
+  return { descriptor, paths, realpath: runtime.realpath ?? realpath,
     service: createCoordinationService({ store, clock: runtime.clock, ids: runtime.ids }) };
 }
 
@@ -145,7 +183,9 @@ const HANDLERS = {
     const status = await context.service.collectStatus({
       workspaceId: context.descriptor.id });
     const root = context.descriptor.roots[0];
-    const wanted = event.targets
+    const resolved = await Promise.all(event.targets
+      .map(target => canonicalTarget(context.realpath, target)));
+    const wanted = resolved
       .map(target => resourceFor(root, target))
       .filter(resource => resource !== null);
 
