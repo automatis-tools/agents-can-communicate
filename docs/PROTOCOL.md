@@ -1,6 +1,7 @@
-# Protocol model
+# Protocol
 
-This is the approved model-facing and adapter-facing domain vocabulary (design approved 2026-08-15).
+The domain vocabulary shared by models, adapters, and the CLI. Field names below are the
+ones the records actually carry.
 
 ## Identity hierarchy
 
@@ -39,7 +40,7 @@ Workstreams group related collaboration. Tasks are optional and appear only when
 
 ```ts
 export interface Workstream {
-  id: string;
+  workstreamId: string;
   title: string;
   objective: string;
   coordinatorSessionId: string | null;
@@ -47,7 +48,7 @@ export interface Workstream {
 }
 
 export interface Task {
-  id: string;
+  taskId: string;
   workstreamId: string;
   title: string;
   state: "pending" | "in_progress" | "review" | "done" | "blocked";
@@ -57,7 +58,10 @@ export interface Task {
 }
 ```
 
-Dependency completion unblocks tasks deterministically. It must not depend on an LLM remembering to re-evaluate the graph.
+A task whose dependencies are unmet is created `blocked`. Finishing the last dependency flips
+its dependents to `pending` in the same transaction, so `pending` always means ready and no
+LLM has to remember to re-evaluate the graph. A dependency that would close a cycle is
+refused.
 
 ## Generic resource claims
 
@@ -74,12 +78,12 @@ url:https://example.test/spec
 
 ```ts
 export interface ResourceClaim {
-  id: string;
+  claimId: string;
   workspaceId: string;
   ownerSessionId: string;
   resource: string;
-  mode: "shared" | "exclusive";
-  enforcement: "advisory" | "guarded";
+  mode: "shared" | "exclusive";        // default: exclusive
+  enforcement: "advisory" | "guarded"; // default: advisory
   reason: string;
   acquiredAt: string;
   expiresAt: string;
@@ -91,7 +95,7 @@ Adapters may provide path-aware overlap logic, but core mutation is atomic and p
 
 ### Claim lifetime and stale owners
 
-Claims are leases. `expiresAt` bounds every claim, and renewal requires the owner's exact session generation. A conflicting claim whose owner session has stale presence still conflicts: the staleness is reported to the requester, but only lease expiry or an explicit force release removes the claim. Force release requires human or policy authority and records actor, reason, and the replaced generation. Presence staleness alone never auto-releases a claim, because an idle-but-open session may resume at any moment.
+Claims are leases. `expiresAt` bounds every claim — `leaseSeconds` defaults to 1800 — and renewal requires the owner's exact session generation. A conflicting claim whose owner session has stale presence still conflicts: the staleness is reported to the requester, but only lease expiry or an explicit force release removes the claim. Force release requires human or policy authority and records actor, reason, and the replaced generation. Presence staleness alone never auto-releases a claim, because an idle-but-open session may resume at any moment.
 
 ## Messages
 
@@ -128,7 +132,7 @@ Decisions are separate durable objects rather than ordinary chat messages:
 
 ```ts
 export interface Decision {
-  id: string;
+  decisionId: string;
   workstreamId: string | null;
   title: string;
   outcome: string;
@@ -168,14 +172,9 @@ A handoff contains:
 
 ## Sync and attention
 
-Adapters request deltas since a cursor. Core computes attention items from explicit rules:
-
-- direct unacknowledged request;
-- conflicting claim;
-- required task dependency now unblocked;
-- coordinator missing while a decision is waiting;
-- corrupt or stale ownership state;
-- capability failure that weakened protection.
+Adapters request deltas since a cursor. Core computes attention items from four explicit
+rules — `direct_request`, `claim_conflict`, `task_unblocked`, `coordinator_missing` — listed
+with their exact trigger in [ARCHITECTURE.md](ARCHITECTURE.md).
 
 Semantic relevance may be assessed by the receiving model, but correctness cannot depend on a hidden central LLM classifier.
 

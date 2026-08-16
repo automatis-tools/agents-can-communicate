@@ -1,194 +1,121 @@
 # Architecture
 
-This document describes the approved target (design approved 2026-08-15). Approved decisions and the remaining open technical items are recorded in `docs/DECISIONS.md`.
+ACC is a control plane. It owns coordination state and nothing else — not inference, not
+conversation history, not permissions, not process lifecycle.
 
-## Control plane, not execution plane
-
-ACC owns coordination state. It does not own model inference, conversation history, permissions, sandboxes, or process lifecycle.
-
-```text
-┌──────────────────────────────────────────────────────────────┐
-│ Execution planes                                             │
-│ Codex │ Claude Code │ Gemini CLI │ MCP client │ native child │
-└───────┬─────────────┬────────────┬────────────┬───────────────┘
-        │ adapters    │            │            │
-┌───────▼─────────────▼────────────▼────────────▼───────────────┐
-│ ACC coordination plane                                       │
-│ identity · sessions · intents · workstreams · tasks · claims │
-│ messages · decisions · artifacts · handoffs · delivery state │
-└──────────────────────────┬───────────────────────────────────┘
-                           │
-┌──────────────────────────▼───────────────────────────────────┐
-│ Durable local store + optional realtime notifier             │
-└──────────────────────────────────────────────────────────────┘
+```mermaid
+graph TB
+  subgraph "Execution planes — not ours"
+    X1[Codex] & X2[Claude Code] & X3[Gemini CLI] & X4[Kimi] & X5[MCP client]
+  end
+  X1 & X2 & X3 & X4 --> HR[acc-hook runtime]
+  X5 --> MS[acc-mcp]
+  HR & MS --> CO["core — sessions · intents · claims<br/>messages · tasks · sync"]
+  CO --> ST[(filesystem store<br/>outside every repo)]
 ```
 
-## Components
+## Packages
 
-### Core domain
+| Package | Owns |
+|---|---|
+| `protocol` | Ids, schemas, error codes, exit codes, project-config validation |
+| `core` | The rules. No Git, no vendor, no filesystem |
+| `storage-filesystem` | The durable store behind `CoordinationStore` |
+| `adapter-sdk` | Shared adapter machinery: hook shim, context projector, TOML block editing |
+| `adapter-*` | One client each. Everything vendor-specific lives here |
+| `hook-runner` | The `acc-hook` binary every adapter's hook actually invokes |
+| `mcp-server` | The `acc-mcp` binary for clients with no adapter |
+| `installer` | Detect → plan → apply, with content-hashed ownership |
+| `cli` | The `acc` binary; the universal adapter boundary |
 
-Pure project-agnostic rules and validation:
+`core` cannot import a vendor, a harness, or `node:child_process`. That is enforced by
+`tests/package-boundaries.test.mjs`, not by convention.
 
-- identifiers and schemas;
-- session lifecycle;
-- intents and workstreams;
-- tasks and dependencies;
-- generic resource claims;
-- messages, decisions, artifacts, and handoffs;
-- delivery state transitions;
-- status and health rules.
+## The storage port
 
-Core cannot import Git, Codex, Claude, Gemini, MCP, or project-specific policy.
-
-### Storage port
-
-The domain consumes a storage interface with transactions, immutable event append, cursor reads, and materialized state access.
-
-The first extraction should retain the hardened filesystem backend long enough to preserve behavior. A transactional backend can then be added behind the same interface. This prevents the storage rewrite from being mixed with product-semantic changes.
-
-Runtime state belongs in a user data directory, not the project tree. Project configuration only contains optional shared policy and stable workspace identity.
-
-### CLI
-
-The CLI is the universal adapter boundary and human diagnostic surface. Commands return stable JSON envelopes in machine mode and concise text in human mode.
-
-Expected high-level commands:
-
-```text
-acc attach
-acc sync
-acc work
-acc claim
-acc message
-acc task
-acc finish
-acc status
-acc doctor
-acc install
+```js
+transaction(callback)                    // atomic: read, write, append events
+eventsSince(workspaceId, cursor, limit)  // ordered page of events
+snapshot(workspaceId)                    // materialised state
+store.ephemeral                          // presence and Intent before materialisation
 ```
 
-Do not expose every internal transition as a separate model tool. High-level commands may perform atomic macro operations.
+Ephemeral records hang off the store rather than becoming a fourth port. They append no
+events and vanish with their session — deliberately outside transactions.
 
-### Adapter SDK
-
-Adapters translate a harness lifecycle into core operations. They contain vendor-specific file formats, hook inputs, safe-point delivery, and tool-guard extraction.
-
-An adapter declares capabilities rather than inheriting optimistic defaults.
-
-### Native adapter packages
-
-- Codex plugin: skill, MCP server registration, and supported lifecycle hooks.
-- Claude Code plugin: hooks, skill, MCP tools/resources, and subagent lifecycle mapping.
-- Gemini CLI extension: hooks, skills, MCP server, policy rules where appropriate, and subagent mapping.
-- Generic MCP server: explicit tools/resources with polling semantics and no implied lifecycle guarantees.
-
-### Optional notifier
-
-A lightweight local process may watch durable events and notify connected adapters. It is never authoritative. CLI and hooks remain correct if it is absent or crashes.
+Ports are validated at construction. A core that silently falls back to ambient time or
+randomness produces tests that pass for the wrong reason.
 
 ## Workspace discovery
 
-Discovery returns a `WorkspaceDescriptor`:
-
-```ts
-export interface WorkspaceDescriptor {
-  id: string;
-  roots: string[];
-  source: "config" | "git" | "directory";
-  displayName: string;
-  git?: {
-    commonDir: string;
-    worktreeRoot: string;
-    branch: string | null;
-    head: string | null;
-    remote: string | null;
-  };
-}
+```mermaid
+graph LR
+  A[explicit --cwd] --> B{acc.workspace.json<br/>walking up?}
+  B -->|yes| C[source: config]
+  B -->|no| D{Git common dir?}
+  D -->|yes| E[source: git]
+  D -->|no| F[source: directory]
 ```
 
-Resolution order:
+Every branch returns the same descriptor — `{ id, roots, source, displayName, git? }` — so
+nothing downstream knows or cares which one produced it. Multiple Git worktrees of one
+repository share awareness while keeping distinct checkout metadata.
 
-1. explicit CLI/env override;
-2. nearest optional project config;
-3. Git common directory identity, if present;
-4. canonical workspace root path.
+## Lazy materialisation
 
-Multiple Git worktrees of one repository share workspace awareness while retaining distinct checkout metadata. Non-Git directories remain fully supported.
+A lone session writes only ephemeral presence and Intent. Durable state — protocol
+identity, event log, materialised views — appears exactly once, at the first moment
+coordination exists: a second live session attaches, or the session creates its first
+durable object. Workspaces that never got there vanish without a trace.
 
-## Lazy workspace materialization
+A lone session also pays no attention cost: adapters inject nothing while the roster has no
+peers, and guards short-circuit against the empty claim set.
 
-Attachment is universal, but durable state is not created merely because a session opened somewhere (approved 2026-08-15). A lone session writes only ephemeral presence and Intent records in the runtime area. The Workspace materializes durable state — protocol identity, event log, materialized views — exactly once, at the first moment coordination actually exists: a second live session attaches, or the session creates its first durable object (claim, message, task, workstream, decision, artifact, or handoff). At that moment current ephemeral presence and Intents are recorded durably and the event log begins. Ephemeral-only workspaces vanish without a trace once their sessions close; `acc doctor` may garbage-collect any that were abandoned.
+## Events
 
-A lone session also pays no attention cost: adapters inject no coordination context while the roster has no peers and no attention items, and tool guards short-circuit against the empty claim set.
+Every meaningful mutation appends an immutable event and updates materialised state in one
+transaction. Sequence numbers are zero-padded strings, so a lexical sort is a chronological
+sort and a cursor is just the last sequence seen.
 
-## Event model
+Adapters sync with that cursor and receive `{ cursor, events, attention }`.
 
-Every meaningful mutation appends an immutable event and updates materialized state atomically.
+## Attention
 
-```ts
-export interface AccEvent<T = unknown> {
-  sequence: bigint;
-  eventId: string;
-  workspaceId: string;
-  actorSessionId: string;
-  type: string;
-  occurredAt: string;
-  payload: T;
-}
-```
+Computed from explicit rules, never from a hidden classifier. Lower sorts first:
 
-Adapters sync with a cursor:
+| Priority | Kind | Fires when |
+|---|---|---|
+| 1 | `direct_request` | A message addressed to you requires an ack and has not had one |
+| 2 | `claim_conflict` | Your declared resource hints overlap a live claim you do not own |
+| 3 | `task_unblocked` | A task assigned to you is `pending` — every dependency is `done` |
+| 4 | `coordinator_missing` | An open workstream has no coordinator |
 
-```ts
-export interface SyncResult {
-  cursor: string;
-  snapshot?: WorkspaceSnapshot;
-  events: AccEvent[];
-  attention: AttentionItem[];
-}
-```
+A task with unmet dependencies is `blocked`, and finishing the last one flips its dependents
+to `pending`. So `pending` already means ready, and nothing has to re-evaluate the graph.
 
-The core compacts routine heartbeat noise. The model receives a concise snapshot or delta, not an event dump.
+Semantic relevance is the receiving model's job. Correctness is not allowed to depend on it.
 
-## Consistency boundaries
+## Consistency
 
 - Workspace identity is checked before any mutation.
 - Claims are acquired and conflict-checked atomically.
-- Event publication and materialized state update are one transaction.
+- Event publication and state update are one transaction.
 - Acknowledgements never overwrite messages or earlier receipts.
-- Force operations record actor, reason, and prior generation.
-- Recovery and doctor operations fail closed on ambiguous ownership.
-- Unsupported adapter capabilities never silently fall back to stronger claims.
+- Force operations record actor, reason, and the replaced generation.
+- Doctor fails closed on ambiguous ownership.
+- A weaker adapter capability never silently becomes a stronger claim.
 
-## Coordinator semantics
+## Presence
 
-A workstream may have zero or one active coordinator lease. The coordinator plans and synthesizes; it is not the transport or durable owner.
+Three observable states: online, stale, offline. Heartbeats arrive only where a harness
+exposes them — hook safe points, or tool calls for MCP. An idle-but-open session degrades
+to `stale`, and that is truthful reporting rather than an error. Only Kimi Code fires on a
+timer; see [CAPABILITIES.md](CAPABILITIES.md).
 
-If the coordinator disappears:
+Lease expiry decides when ownership may be replaced. Presence staleness alone never does —
+an idle session may resume at any moment.
 
-- existing claims and tasks remain valid until their own expiry or completion;
-- peers may continue within already agreed scopes;
-- decisions requiring coordination become attention items;
-- another participant or the human may acquire the coordinator role according to policy.
+## A hook never fails closed
 
-The coordinator is a planning convenience, never an information gatekeeper: any session can answer for the whole Workspace and relay human requests to any participant. Authority differences apply to mutation only, never to knowledge.
-
-## Native subagents
-
-Adapters may report parent/child session relationships. Short-lived children remain collapsed unless they obtain a task, claim a resource, send an external message, or exceed the adapter's visibility threshold. Collapse reduces noise; it is not secrecy — any session may query collapsed children on demand through a full-scope sync.
-
-## Realtime and wake behavior
-
-No universal wake guarantee exists. Capabilities distinguish:
-
-- durable queue only;
-- poll on prompt or tool boundary;
-- inject at next safe point;
-- realtime notification to an active harness;
-- managed process wake, reserved for a possible future runner.
-
-Delivery status must reflect the strongest observed fact, not intent.
-
-## Presence freshness
-
-Presence has three observable states: online, stale, and offline. Heartbeats arrive only at moments the harness actually exposes — hook safe points for native adapters, tool calls for MCP clients — so an idle but open session naturally degrades to stale. That is truthful reporting, not an error. Each adapter declares its expected heartbeat cadence, and the staleness window derives from that declaration rather than one global constant. The first release ships no heartbeat helper: an idle session is truthfully reported stale, and that display is expected, not an error (approved 2026-08-15). A detached helper (the prototype's watcher pattern) remains a possible later opt-in. Liveness probes and claim lease expiry, never presence staleness alone, decide when ownership may be replaced.
+The runtime has a 5-second budget and allows the tool call on anything it cannot answer in
+time. A coordination tool must not be the reason a session stops working.

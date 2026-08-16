@@ -93,7 +93,7 @@ function peerBlocks(messages) {
  * how an agent ends up confidently unaware.
  */
 export function projectContext(sync, { budgetBytes = DEFAULT_BUDGET_BYTES } = {}) {
-  // Solo zero-overhead (approved 2026-08-15): a lone session pays nothing
+  // Solo zero-overhead: a lone session pays nothing
   // visible, and "no peers" is still a cost when injected into every turn.
   if (sync.solo === true) return "";
 

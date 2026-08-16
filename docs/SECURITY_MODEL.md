@@ -81,20 +81,12 @@ Default excluded data:
 
 Transcript or artifact ingestion must be an explicit, scoped action.
 
-## Threat-model deliverable
+## Scenarios
 
-Before the first public release, add a structured threat model covering:
-
-- malicious or compromised peer agent;
-- accidental duplicate identities;
-- stale/crashed sessions;
-- symlink and path traversal;
-- message spoofing and replay;
-- denial through claims or inbox spam;
-- installer/config takeover;
-- MCP tool poisoning;
-- local database corruption;
-- remote transport, if later introduced.
+Ten of them — malicious peer, flooding, stale process, symlink escape, replay, claim denial
+of service, installer takeover, MCP tool poisoning, corrupt store, and a project config
+carrying runtime state — each with its prevention, detection, and residual risk:
+[THREAT_MODEL.md](THREAT_MODEL.md).
 
 ## Enforced, not documented
 
@@ -117,5 +109,4 @@ gate runs. Each rule is written as an attack rather than a description:
 | A corrupt install record stops the run | `installer.test.mjs` |
 | A dry run cannot be tricked into writing | `installer.test.mjs` |
 
-Scenarios, consequences, and residual risk: [THREAT_MODEL.md](THREAT_MODEL.md).
-Reporting: [SECURITY.md](../SECURITY.md) at the repository root.
+Reporting a vulnerability: [SECURITY.md](../SECURITY.md) at the repository root.
