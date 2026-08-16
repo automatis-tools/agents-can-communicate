@@ -19,6 +19,12 @@ const REQUIRED = Object.freeze({
   ids: ["next"],
 });
 
+// Ephemeral records - presence and Intent before a workspace has materialised -
+// are storage too, so they hang off the store rather than becoming a fourth
+// port. They are deliberately outside transactions: they append no events and
+// vanish with their session.
+const EPHEMERAL = ["get", "put", "delete", "list"];
+
 // Ports are validated at construction rather than at first use. A core that
 // silently falls back to ambient time or randomness produces tests that pass
 // for the wrong reason and races that only appear on someone else's machine.
@@ -33,6 +39,17 @@ export function assertPorts(ports) {
         throw new AccError(EXIT.USAGE, `the ${name} port must implement ${method}()`,
           { port: name, method });
       }
+    }
+  }
+  const ephemeral = ports.store.ephemeral;
+  if (ephemeral === null || typeof ephemeral !== "object") {
+    throw new AccError(EXIT.USAGE, "the store port must expose an ephemeral area",
+      { port: "store" });
+  }
+  for (const method of EPHEMERAL) {
+    if (typeof ephemeral[method] !== "function") {
+      throw new AccError(EXIT.USAGE, `the store ephemeral area must implement ${method}()`,
+        { port: "store.ephemeral", method });
     }
   }
   return ports;

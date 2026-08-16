@@ -2,7 +2,8 @@ import path from "node:path";
 
 import { AccError, EXIT, validateRecord } from "@agents-can-communicate/protocol";
 
-import { encode, listDirectoryEntries, listJsonFiles, readJsonIfPresent } from "./atomic-json.mjs";
+import { encode, listDirectoryEntries, listJsonFiles, publishAtomic, readJsonIfPresent,
+  removeIfPresent } from "./atomic-json.mjs";
 import { requireStoreIdentity } from "./identity.mjs";
 import { journalEntry, readOpenJournals, rollForward, writeJournalEntry } from "./journal.mjs";
 import { assertEventBinding, assertStateBinding, eventPath, stateEnvelope, statePath }
@@ -12,7 +13,7 @@ import { withWriterMutex } from "./writer-mutex.mjs";
 
 const SEQUENCE_WIDTH = 16;
 export const ZERO_CURSOR = "0".repeat(SEQUENCE_WIDTH);
-const DIRECTORIES = ["state", "events", "journal", "locks", "quarantine", "tmp"];
+const DIRECTORIES = ["state", "events", "journal", "locks", "quarantine", "ephemeral", "tmp"];
 
 const pad = value => String(value).padStart(SEQUENCE_WIDTH, "0");
 
@@ -188,5 +189,32 @@ export async function openFilesystemStore({ root, clock, ids, workspaceId, failA
     };
   }
 
-  return Object.freeze({ transaction, eventsSince, snapshot, paths, root, workspaceId });
+  // Ephemeral records are published by replace and never journalled: they carry
+  // no history, append no events, and are expected to disappear.
+  const ephemeralPath = (kind, id) => path.join(paths.ephemeral, kind, `${id}.json`);
+  const ephemeral = Object.freeze({
+    async get(kind, id) {
+      const found = await readJsonIfPresent(ephemeralPath(kind, id), root);
+      return found?.value ?? null;
+    },
+    async put(kind, id, record) {
+      await publishAtomic(ephemeralPath(kind, id), encode(record),
+        { root, tmpDir: paths.tmp, replace: true });
+      return record;
+    },
+    async delete(kind, id) {
+      await removeIfPresent(ephemeralPath(kind, id));
+    },
+    async list(kind) {
+      const records = [];
+      for (const filePath of await listJsonFiles(path.join(paths.ephemeral, kind), { root })) {
+        const found = await readJsonIfPresent(filePath, root);
+        if (found !== null) records.push(found.value);
+      }
+      return records;
+    },
+  });
+
+  return Object.freeze({ transaction, eventsSince, snapshot, ephemeral, paths, root,
+    workspaceId });
 }

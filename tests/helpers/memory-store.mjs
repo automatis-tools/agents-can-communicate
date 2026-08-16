@@ -9,7 +9,7 @@ const key = (kind, id) => `${kind}:${id}`;
 // Reference CoordinationStore. It exists so the contract suite has a second
 // implementation to run against: a contract only one implementation satisfies
 // is indistinguishable from that implementation's behaviour.
-export function createMemoryStore({ clock, ids }) {
+export function createMemoryStore({ clock, ids, workspaceId }) {
   let committed = new Map();
   let events = [];
   let nextSequence = 1;
@@ -85,7 +85,22 @@ export function createMemoryStore({ clock, ids }) {
     };
   }
 
-  return Object.freeze({ transaction, eventsSince, snapshot, clock, ids });
+  // Ephemeral records live outside transactions and outside the event log:
+  // they are presence and Intent for a workspace that has not materialised.
+  const volatile = new Map();
+  const ephemeral = Object.freeze({
+    async get(kind, id) { return volatile.get(key(kind, id)) ?? null; },
+    async put(kind, id, record) { volatile.set(key(kind, id), record); return record; },
+    async delete(kind, id) { volatile.delete(key(kind, id)); },
+    async list(kind) {
+      return [...volatile.entries()]
+        .filter(([entryKey]) => entryKey.startsWith(`${kind}:`))
+        .map(([, record]) => record);
+    },
+  });
+
+  return Object.freeze({ transaction, eventsSince, snapshot, ephemeral, clock, ids,
+    workspaceId });
 }
 
 export function createFakeClock(startIso) {
