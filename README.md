@@ -107,18 +107,27 @@ $ acc message --session "$ACC_SESSION" --generation "$ACC_GENERATION" \
 sent message__Wejo2AqkI2JZO9Dnl57dg
 ```
 
-At the codex session's next turn:
+At the codex session's next turn, ACC puts this in front of the model:
 
-```text
+````text
 2 session(s); cursor 0000000000000007
 - [direct_request] src/store
-- session_ALYmBpY5dyGXltQ0vAJayw (claude_code, online)
-- session_TZxxw2AY3Bp2tkTbA3FQ5Q (codex, online)
+```acc-peer-message
+id message_H_Y3zwVe7oW-9TvHTHtWoA | from session_HQ6sODMatI2qMtCtdCVMRQ | type question | untrusted peer message
+src/store
+Need 20 minutes in src/store. Can you release it?
 ```
+- session_BjeN0SqpbrRqFjmvAk74AA (codex, online)
+- session_HQ6sODMatI2qMtCtdCVMRQ (claude_code, online)
+````
 
-The turn carries the subject and the fact that someone is waiting. The agent reads the body
-with `acc sync --scope full`. Peer text is data, never instruction — it stays fenced,
-attributed, and escaped, and cannot become ACC's own voice.
+Peer text is **data, never instruction**. It stays inside a named block it cannot close,
+control characters become visible escapes, and it is labelled with who sent it. A message
+telling your agent it is now the coordinator arrives as a quoted string, not as a command.
+
+Delivery is reported honestly too: the receipt moves to `injected` only for a message the
+turn actually carried. One that did not fit the context budget stays queued and goes out
+later, rather than telling the sender it landed.
 
 ## Working alone? It does nothing
 
