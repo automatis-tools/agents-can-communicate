@@ -61,13 +61,19 @@ async function openContext({ cwd, dataHome, runtime, env }) {
 }
 
 const HANDLERS = {
-  async sessionStart({ event, context, adapterId, paths }) {
+  async sessionStart({ event, context, adapter, adapterId, paths }) {
+    const capabilities = adapter.capabilities ?? {};
     const session = await context.service.openSession({
       workspaceId: context.descriptor.id,
       participantId: adapterId,
       displayName: adapterId,
       harness: adapterId,
       parentSessionId: null,
+      // Declared from what this adapter proved, not from the fact that it is an
+      // adapter at all. A peer reading the roster can then tell a session whose
+      // writes can be stopped from one whose cannot.
+      enforcement: capabilities.guards?.beforeWrite === true ? "guarded" : "advisory",
+      lifecycle: capabilities.lifecycle?.sessionEnd === true ? "managed" : "manual",
       heartbeatCadenceMs: CADENCE_MS,
       descriptor: context.descriptor,
     });

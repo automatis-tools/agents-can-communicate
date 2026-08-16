@@ -284,3 +284,25 @@ test("a client that denies by exit code is served that way, not with JSON", asyn
   assert.equal(denied.stdout, "");
   assert.match(denied.stderr, /file:src/);
 });
+
+test("attach declares what the adapter proved, not that it is an adapter", async t => {
+  const place = await workspace(t);
+  const guarding = { ...kimi, capabilities: { guards: { beforeWrite: true },
+    lifecycle: { sessionEnd: true } } };
+  const blind = { ...kimi, id: "blind",
+    capabilities: { guards: { beforeWrite: false }, lifecycle: { sessionEnd: false } } };
+  const adapters = { kimi: guarding, blind };
+
+  await runHook({ adapterId: "kimi", adapters, dataHome: place.dataHome,
+    payload: event("sessionStart", { sessionId: "a", cwd: place.root }) });
+  const after = await runHook({ adapterId: "blind", adapters, dataHome: place.dataHome,
+    payload: event("sessionStart", { sessionId: "b", cwd: place.root }) });
+
+  const byHarness = Object.fromEntries(after.sessions.map(s => [s.harness, s]));
+  assert.equal(byHarness.kimi.enforcement, "guarded");
+  assert.equal(byHarness.kimi.lifecycle, "managed");
+  // Kimi Code fires no SessionEnd and Codex cannot guard a shell edit; both are
+  // real cases, and both have to read as the weaker thing on the roster.
+  assert.equal(byHarness.blind.enforcement, "advisory");
+  assert.equal(byHarness.blind.lifecycle, "manual");
+});
