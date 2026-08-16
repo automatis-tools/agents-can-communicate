@@ -1,6 +1,6 @@
 import { AccError, EXIT } from "./errors.mjs";
-import { flag, id, invalid, listOf, nullable, oneOf, plainObject, resourceUri,
-  sequence, text, timestamp } from "./fields.mjs";
+import { flag, id, invalid, listOf, nullable, oneOf, plainObject, positiveInteger,
+  resourceUri, sequence, text, timestamp } from "./fields.mjs";
 
 export const SCHEMA_VERSION = 1;
 
@@ -42,7 +42,7 @@ const RECORDS = Object.freeze({
 
   session: { sessionId: id, participantId: id, workspaceId: id, generation: id,
     harness: line, state: oneOf("open", "closed"), parentSessionId: nullable(id),
-    startedAt: timestamp, heartbeatAt: timestamp },
+    heartbeatCadenceMs: positiveInteger, startedAt: timestamp, heartbeatAt: timestamp },
 
   intent: { sessionId: id, workspaceId: id, summary,
     mode: oneOf("observe", "explore", "edit", "review", "coordinate", "wait"),

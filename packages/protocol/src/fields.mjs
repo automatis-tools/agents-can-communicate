@@ -74,6 +74,13 @@ export const listOf = inner => (value, field) => {
 export const nullable = inner => (value, field) =>
   (value === null ? null : inner(value, field));
 
+export const positiveInteger = (value, field) => {
+  if (!Number.isSafeInteger(value) || value <= 0) {
+    invalid(field, "must be a positive integer", value);
+  }
+  return value;
+};
+
 export const flag = (value, field) => {
   if (typeof value !== "boolean") invalid(field, "must be a boolean", value);
   return value;
