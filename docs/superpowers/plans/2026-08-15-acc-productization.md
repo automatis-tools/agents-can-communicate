@@ -215,19 +215,19 @@ git commit -m "docs: explain cross-model collaboration"
 **Interfaces:**
 - Produces public vulnerability-reporting policy and release-blocking security suite
 
-- [ ] **Step 1: Write threat scenarios**
+- [x] **Step 1: Write threat scenarios**
 
 For each actor and asset, record preconditions, attack, consequence, prevention, detection, and residual risk. Include malicious peer, stale process, symlink escape, replay, claim denial, installer takeover, MCP tool poisoning, and corrupt store.
 
-- [ ] **Step 2: Write RED security tests**
+- [x] **Step 2: Write RED security tests**
 
 Demonstrate attributed peer content cannot become policy, storage cannot escape its managed root, and installer ownership cannot delete unrelated config.
 
-- [ ] **Step 3: Implement only evidence-backed fixes**
+- [x] **Step 3: Implement only evidence-backed fixes**
 
 Run focused tests after each minimal change. Do not broaden permissions or add transcript filtering heuristics unrelated to the failing fixture.
 
-- [ ] **Step 4: Full security verification and commit**
+- [x] **Step 4: Full security verification and commit**
 
 ```bash
 node --test tests/security/*.test.mjs
