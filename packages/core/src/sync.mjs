@@ -79,7 +79,16 @@ export function createSyncService(ports, sessions) {
       : await sessions.locateSession(input.sessionId, workspaceId);
     const session = located?.record ?? null;
 
-    const snapshot = await store.snapshot(workspaceId);
+    const durable = await store.snapshot(workspaceId);
+    // A workspace that has not materialised still has a truthful roster: its
+    // sessions live in the ephemeral area. Reading only the durable snapshot
+    // would make a lone session invisible to itself, and would disagree with
+    // what `status` reports from the same state.
+    const snapshot = durable.workspace !== null
+      ? durable
+      : { ...durable,
+        sessions: await store.ephemeral.list("session"),
+        intents: await store.ephemeral.list("intent") };
     const page = await store.eventsSince(workspaceId, input.cursor ?? null,
       input.limit ?? DEFAULT_LIMIT);
     const attention = computeAttention(snapshot, { session,
