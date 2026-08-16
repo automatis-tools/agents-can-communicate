@@ -1,6 +1,7 @@
 import { defineAdapter, projectContext } from "@agents-can-communicate/adapter-sdk";
 
-import { allowOutcome, denyOutcome, normalizeCodexHook } from "./hooks.mjs";
+import { allowOutcome, denyOutcome, injectOutcome, normalizeCodexHook }
+  from "./hooks.mjs";
 import { detectCodex, installCodexPlugin, uninstallCodexPlugin } from "./install.mjs";
 
 export const CODEX_VERSION = "0.147.0";
@@ -24,6 +25,8 @@ export function createCodexAdapter() {
     displayName: "Codex CLI",
     capabilities: {
       lifecycle: { sessionStart: true, sessionEnd: true },
+      // Observed reaching the model as a `developer` role message, unwrapped.
+      context: { beforeTurnInjection: true },
       // PreToolUse was observed blocking both a shell command and an
       // apply_patch edit, with the reason reaching the model verbatim.
       guards: { beforeWrite: true, beforeShell: true },
@@ -66,6 +69,7 @@ export function createCodexAdapter() {
 
     denyOutcome,
     allowOutcome,
+    injectOutcome,
     normalizeHook: payload => normalizeCodexHook(payload),
     renderContext: sync => projectContext(sync),
   });
