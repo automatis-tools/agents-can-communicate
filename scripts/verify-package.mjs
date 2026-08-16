@@ -18,8 +18,14 @@ import { promisify } from "node:util";
 const run = promisify(execFile);
 const repo = path.resolve(import.meta.dirname, "..");
 
-// npm is a .cmd shim on Windows, which execFile cannot spawn.
-const npm = process.platform === "win32" ? "npm.cmd" : "npm";
+// Node 20.12 and later refuse to spawn a .cmd or .bat without a shell (the
+// CVE-2024-27980 fix), and npm on Windows is exactly that - a .cmd shim. So npm
+// runs through a shell there, with arguments quoted because a temp path can
+// contain spaces.
+const isWindows = process.platform === "win32";
+const runNpm = (args, options = {}) => (isWindows
+  ? run("npm.cmd", args.map(argument => `"${argument}"`), { ...options, shell: true })
+  : run("npm", args, options));
 
 // Never published: development scaffolding, other people's captures, evidence
 // from this machine, and anything carrying a live session.
@@ -45,7 +51,7 @@ function fail(message, detail = "") {
 }
 
 async function packTarball(into) {
-  const { stdout } = await run(npm, ["pack", "--pack-destination", into], { cwd: repo });
+  const { stdout } = await runNpm(["pack", "--pack-destination", into], { cwd: repo });
   return path.join(into, stdout.trim().split("\n").at(-1));
 }
 
@@ -97,7 +103,7 @@ async function main() {
     step("install into a clean directory");
     await writeFile(path.join(consumer, "package.json"),
       '{"name":"acc-verify","version":"1.0.0","private":true}\n');
-    await run(npm, ["install", "--silent", tarball], { cwd: consumer });
+    await runNpm(["install", "--silent", tarball], { cwd: consumer });
     const bin = path.join(consumer, "node_modules", ".bin");
     ok((await readdir(bin)).join(", "));
 

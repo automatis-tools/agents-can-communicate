@@ -7,8 +7,8 @@
     "packages/*"
   ],
   "scripts": {
-    "test": "node --test 'tests/**/*.test.mjs' 'packages/**/*.test.mjs'",
-    "check": "find packages bin -name '*.mjs' -print0 | xargs -0 -n1 node --check",
+    "test": "node scripts/run-tests.mjs",
+    "check": "node scripts/check-syntax.mjs",
     "test:prototype": "cd prototype/papercut-agent-comms && node --test tests/tools/agent_comms/*.test.mjs",
     "test:prototype:sigterm": "cd prototype/papercut-agent-comms && node --test --test-name-pattern='SIGTERM is accepted' tests/tools/agent_comms/cli-round1.test.mjs",
     "test:integrated": "cd prototype/integrated && node --test tests/tools/agent_comms/*.test.mjs"

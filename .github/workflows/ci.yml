@@ -31,6 +31,10 @@ jobs:
       - name: Tests
         # Unit, process, conformance, docs, security, and packaging - the whole
         # suite, because splitting it invites a job nobody notices is skipped.
+        # The runner resolves its own file list and fails on an empty one: this
+        # job once reported success having run zero tests, because the globs in
+        # the old npm script are expanded by sh and passed through literally by
+        # PowerShell.
         run: npm test
         env:
           # Git exports these into every child process. The suite spawns git in
