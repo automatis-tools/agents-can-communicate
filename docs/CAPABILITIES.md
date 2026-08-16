@@ -27,7 +27,7 @@ should be re-run before claiming another platform.
 | `lifecycle.heartbeat` | no | no | no | yes |
 | `lifecycle.childSessions` | no | no | no | no |
 | `context.startupInjection` | no | no | no | no |
-| `context.beforeTurnInjection` | no | yes | yes | yes |
+| `context.beforeTurnInjection` | yes | yes | yes | yes |
 | `context.safePointInjection` | no | no | no | no |
 | `guards.beforeRead` | no | no | no | no |
 | `guards.beforeWrite` | yes | yes | yes | yes |
@@ -59,6 +59,11 @@ toolset contained no `apply_patch`.
 ACC does not parse commands. The guard fires and is allowed through, because guessing a
 path out of a command would block work at random and still miss real writes. Shell calls
 therefore declare no targets on every adapter.
+
+Where the guard cannot help, the turn context does: it names the claims other sessions
+hold and says which way this session stands with them - unenforced entirely, or enforced
+for file edits but not for anything done through a shell. Unenforceable is not the same as
+unknown.
 
 **`lifecycle.sessionEnd` on `kimi` is false and it matters.** Each `kimi -p` run leaves an
 attached session that only ages out on its declared 60s cadence, so a peer reading the
@@ -95,10 +100,14 @@ client reports nothing.
 
 Context injection does not follow the deny contract even within one client:
 
-| Injection | claude_code | gemini_cli | kimi |
-|---|---|---|---|
-| `hookSpecificOutput.additionalContext` | works | works | works, but **not unwrapped** |
-| plain text on stdout | - | dropped | works |
+| Injection | codex | claude_code | gemini_cli | kimi |
+|---|---|---|---|---|
+| `hookSpecificOutput.additionalContext` | - | works | works | works, but **not unwrapped** |
+| plain text on stdout | works | - | dropped | works |
+
+Codex delivers a hook's stdout as a `developer` role message, verbatim - the most direct
+of the four channels, and a reason for care rather than comfort: at that role a model
+reads text as instruction, so peer-authored text has to stay framed as data.
 
 Kimi Code shows the model whatever a hook printed, wrapped in
 `<hook_result hook_event="…">`, so the JSON envelope itself would end up in the
@@ -113,16 +122,17 @@ the user turn, and drops a bare string entirely.
 | Project-level config | no | no | yes | **no** |
 | Hook `timeout` unit | - | - | milliseconds | **seconds** (max 600) |
 | Command path | absolute required | `${CLAUDE_PLUGIN_ROOT}` | absolute required | absolute required |
-| Extra step by the user | `codex plugin add` **and** hook trust | - | - | - |
+| Extra step by the user | hook trust | - | - | - |
 
 Kimi Code is the only one with no project-level config, so ACC edits the user's global
 `config.toml` - as a delimited block it owns, because ACC ships without dependencies and a
 hand-written TOML round-tripper would take the user's comments and formatting with it.
 
-Codex is the only one ACC cannot finish installing on its own. Publishing, registering and
-enabling are all necessary and still not sufficient: hooks stay silent until the client
-copies the plugin into its own cache, which only `codex plugin add` does. `acc doctor`
-reports the remaining command.
+Codex needs four things before a hook runs, not one: the plugin directory, a parseable
+marketplace, both `[marketplaces.…]` and `[plugins."…"]` registered in its config, and the
+plugin copied into `plugins/cache/<marketplace>/<plugin>/<version>/`. ACC does all four -
+that last copy is exactly and only what `codex plugin add` does, measured by diffing the
+home around it. Hook trust remains a manual step, which is the client's security model.
 
 ## What a participant declares about itself
 
