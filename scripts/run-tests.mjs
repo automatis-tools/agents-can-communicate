@@ -12,10 +12,9 @@ import path from "node:path";
 
 const repo = path.resolve(import.meta.dirname, "..");
 
-// Everything that ships or guards. `prototype/` is the preserved reference and
-// has its own script; node_modules is not ours.
+// Everything that ships or guards. node_modules is not ours.
 const ROOTS = ["tests", "packages"];
-const SKIP = new Set(["node_modules", ".git", "prototype", "migration"]);
+const SKIP = new Set(["node_modules", ".git"]);
 
 async function collect(root) {
   const found = [];

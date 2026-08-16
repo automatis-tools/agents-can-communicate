@@ -83,8 +83,7 @@ test("nothing private, local, or irrelevant is published", async t => {
   const entries = await entriesOf(tarball);
   const top = new Set(entries.map(entry => entry.split("/")[0]));
 
-  for (const excluded of ["prototype", "migration", ".agents", ".github",
-    ".githooks", "tests", ".gitworktrees"]) {
+  for (const excluded of [".agents", ".github", ".githooks", "tests", ".gitworktrees"]) {
     assert.equal(top.has(excluded), false, `${excluded}/ is in the tarball`);
   }
   // A capture or a fixture would carry a real path from the machine that made

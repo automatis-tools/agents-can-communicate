@@ -30,7 +30,6 @@ installs it.
 
 | Refused | Why |
 |---|---|
-| `prototype/`, `migration/` | development scaffolding |
 | `tests/`, `test/` | test suite |
 | `fixtures/` | capture material carrying paths from one machine |
 | `.github/`, `.githooks/`, `.agents/` | local configuration |
