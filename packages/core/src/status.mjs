@@ -1,11 +1,19 @@
 import { classifySessionPresence } from "./sessions.mjs";
 import { computeAttention } from "./sync.mjs";
 
-// Protection level is reported from what adapters actually declared, never
-// inferred. An unguarded workspace says so rather than implying enforcement it
-// cannot deliver.
-function protectionOf(claims) {
+/**
+ * Protection level, reported from what is actually enforceable.
+ *
+ * A guarded claim only protects anything if every live session can be stopped
+ * from writing through it. One MCP client with no hooks, or one harness whose
+ * model edits through the shell, and the claim is advice - so the workspace is
+ * advisory however the claims were written. Reporting "guarded" there would
+ * promise enforcement that demonstrably is not present.
+ */
+function protectionOf(claims, live) {
   if (claims.length === 0) return "none";
+  const enforceable = live.every(item => item.session.enforcement === "guarded");
+  if (!enforceable) return "advisory";
   return claims.every(claim => claim.enforcement === "guarded") ? "guarded" : "advisory";
 }
 
@@ -33,12 +41,14 @@ export function createStatusService(ports, sessions) {
     return {
       workspaceId,
       materialised: durable,
-      protection: protectionOf(claims),
+      protection: protectionOf(claims, live),
       participants: sessionRecords.map(session => ({
         sessionId: session.sessionId,
         participantId: session.participantId,
         harness: session.harness,
         parentSessionId: session.parentSessionId,
+        enforcement: session.enforcement ?? "advisory",
+        lifecycle: session.lifecycle ?? "manual",
         presence: classifySessionPresence(session, now),
         intent: intents.find(intent => intent.sessionId === session.sessionId)?.summary ?? null,
       })),
