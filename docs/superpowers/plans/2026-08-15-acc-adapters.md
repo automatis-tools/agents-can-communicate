@@ -14,6 +14,7 @@
 
 - Precondition: the complete core extraction plan is green.
 - Verify current official hook/plugin schemas before implementing each adapter; pin every manifest version actually used.
+- **Verification completed 2026-08-16** against MCP revision `2026-07-28`, `codex-cli 0.147.0`, Claude Code `2.1.233`, and Gemini CLI `0.37.0`. Findings and divergences are recorded in each package's `COMPATIBILITY.md` and take precedence over the task text below where they disagree. Two divergences change the work: the MCP session model in Task 2 (the `initialize`-scoped session is invalid under a stateless protocol) and Codex lifecycle hooks in Task 3 (the event taxonomy is unpublished, so session-start and session-end remain unverified).
 - Do not scrape terminal panes or raw transcripts.
 - False is the default for every capability.
 - Installer changes are idempotent, preserve unrelated user configuration, and are exactly reversible.
