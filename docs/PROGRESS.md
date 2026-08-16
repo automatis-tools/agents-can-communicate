@@ -29,7 +29,7 @@ Closed 2026-08-15. The user approved all five ambient-model points and, the same
 
 ## Next implementation action
 
-Execute `docs/superpowers/plans/2026-08-15-acc-core-extraction.md` from Task 1 in an isolated worktree under `.gitworktrees/`. Its precondition is met: `prototype/integrated/COMBINED_VERIFICATION.md` records 269/269 passing with mutation evidence for every protection group.
+Execute `docs/superpowers/plans/2026-08-15-acc-core-extraction.md` from Task 1 in an isolated worktree under `.gitworktrees/`. Its precondition is met: `prototype/integrated/COMBINED_VERIFICATION.md` records 271/271 passing with mutation evidence for every protection group.
 
 Do not start native adapters before the project-agnostic core passes its complete regression suite.
 
