@@ -44,23 +44,43 @@ export function parseArgs(argv) {
     ...repeated, ...(spec.flags ?? []), ...GLOBAL]);
   const options = {};
 
+  // Free-text values legitimately start with "--": a message body carrying a
+  // diff begins "--- a/file", and agents exchanging evidence is the point of
+  // this tool. So a following token is only treated as a missing value when it
+  // names a real option of this command, which still catches the actual typo
+  // (--subject --body x). --name=value is the unambiguous form for the rest.
+  const looksLikeOption = value => typeof value === "string" && value.startsWith("--")
+    && known.has(value.slice(2).split("=", 1)[0]);
+
   for (let index = 0; index < tokens.length; index += 1) {
     const token = tokens[index];
     if (!token.startsWith("--") || token.length === 2) usage(`unexpected argument: ${token}`);
-    const name = token.slice(2);
+    const separator = token.indexOf("=");
+    const name = separator === -1 ? token.slice(2) : token.slice(2, separator);
+    const inline = separator === -1 ? undefined : token.slice(separator + 1);
     if (!known.has(name)) usage(`unknown option for ${command}: --${name}`, { command, name });
     const key = camel(name);
+
     if (flags.has(name)) {
+      if (inline !== undefined) usage(`option --${name} does not take a value`);
       if (Object.hasOwn(options, key)) usage(`option --${name} may be used only once`);
       options[key] = true;
       continue;
     }
-    const value = tokens[index + 1];
-    if (value === undefined || value.startsWith("--")) usage(`option --${name} requires a value`);
+
+    let value = inline;
+    if (value === undefined) {
+      const next = tokens[index + 1];
+      if (next === undefined || looksLikeOption(next)) {
+        usage(`option --${name} requires a value`);
+      }
+      value = next;
+      index += 1;
+    }
+    if (value === "") usage(`option --${name} requires a value`);
     if (repeated.has(name)) (options[key] ??= []).push(value);
     else if (Object.hasOwn(options, key)) usage(`option --${name} may be used only once`);
     else options[key] = value;
-    index += 1;
   }
 
   for (const name of spec.required ?? []) {
