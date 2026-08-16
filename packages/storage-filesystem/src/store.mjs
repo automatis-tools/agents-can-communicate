@@ -1,3 +1,4 @@
+import { mkdir } from "node:fs/promises";
 import path from "node:path";
 
 import { AccError, EXIT, validateRecord } from "@agents-can-communicate/protocol";
@@ -52,6 +53,10 @@ async function nextSequence(paths, root) {
 
 export async function openFilesystemStore({ root, clock, ids, workspaceId, failAt }) {
   const paths = storePaths(root);
+  // The caller owns the root path, so its ancestors are created here. Inside the
+  // root, containment rules apply and each level is created individually so a
+  // symlinked ancestor cannot be created past.
+  await mkdir(root, { recursive: true });
   for (const name of DIRECTORIES) await ensureManagedDirectory(root, paths[name]);
   // Identity is settled before any read or write. Adopting a directory that
   // already belongs to another workspace is the failure this fails closed on.
@@ -201,6 +206,10 @@ export async function openFilesystemStore({ root, clock, ids, workspaceId, failA
       workstreams: await of("workstream"),
       tasks: await of("task"),
       claims: await of("claim"),
+      messages: await of("message"),
+      receipts: await of("receipt"),
+      decisions: await of("decision"),
+      handoffs: await of("handoff"),
     };
   }
 

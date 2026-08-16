@@ -90,6 +90,10 @@ export function createMemoryStore({ clock, ids, workspaceId }) {
       workstreams: of("workstream"),
       tasks: of("task"),
       claims: of("claim"),
+      messages: of("message"),
+      receipts: of("receipt"),
+      decisions: of("decision"),
+      handoffs: of("handoff"),
     };
   }
 
