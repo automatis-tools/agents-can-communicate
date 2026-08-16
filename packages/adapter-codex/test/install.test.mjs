@@ -31,7 +31,7 @@ test("install places the plugin and registers it in the marketplace", async t =>
   assert.equal(result.ok, true);
   const plugin = path.join(context.home, "plugins", "agents-can-communicate");
   assert.deepEqual((await readdir(plugin)).sort(),
-    [".codex-plugin", "hooks.json", "skills"]);
+    [".codex-plugin", "acc-hook.sh", "hooks.json", "skills"].sort());
   const manifest = JSON.parse(await readFile(
     path.join(plugin, ".codex-plugin", "plugin.json"), "utf8"));
   assert.equal(manifest.hooks, "./hooks.json");

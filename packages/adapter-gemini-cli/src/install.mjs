@@ -2,6 +2,8 @@ import { cp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { writeHookShim } from "@agents-can-communicate/adapter-sdk";
+
 const bundle = fileURLToPath(new URL("../extension", import.meta.url));
 const EXTENSION_NAME = "agents-can-communicate";
 const OWNER_PREFIX = "acc-";
@@ -25,6 +27,14 @@ const writeJson = async (file, value) => {
 
 const isOurs = hook => typeof hook?.name === "string" && hook.name.startsWith(OWNER_PREFIX);
 
+// Replace the bundle's placeholder command with the shim that was just written.
+const withShim = (wiring, shim) => ({ hooks: Object.fromEntries(
+  Object.entries(wiring.hooks).map(([event, entries]) => [event, entries.map(entry => ({
+    ...entry,
+    hooks: entry.hooks.map(hook => ({ ...hook,
+      command: `sh "${shim}" ${hook.command.split(" ").pop()}` })),
+  }))])) });
+
 /**
  * Merge ACC's hook entries into the user's settings, keyed by the `name` field
  * this client supports. Ownership by name is what makes uninstall exact: a
@@ -34,12 +44,17 @@ const isOurs = hook => typeof hook?.name === "string" && hook.name.startsWith(OW
  * No environment variable is copied or persisted. The extension declares what
  * it needs; secrets stay where the user put them.
  */
-export async function installGeminiExtension({ home }) {
+export async function installGeminiExtension({ home, runner, node }) {
   const target = extensionPath(home);
   await rm(target, { recursive: true, force: true });
   await cp(bundle, target, { recursive: true });
+  // This client offers no plugin-root variable in a hook command, so the shim's
+  // absolute path is written in at install time.
+  const shim = await writeHookShim({ dir: path.join(target, "hooks"),
+    adapterId: "gemini_cli", runner, node });
 
-  const ours = await readJson(path.join(bundle, "hooks", "hooks.json"), { hooks: {} });
+  const ours = withShim(await readJson(path.join(bundle, "hooks", "hooks.json"),
+    { hooks: {} }), shim);
   const file = settingsPath(home);
   const existing = await readJson(file, {});
   const merged = { ...existing, hooks: { ...(existing.hooks ?? {}) } };
