@@ -33,7 +33,8 @@ test("direct requests and conflicts survive a budget that drops routine detail",
       { kind: "direct_request", priority: 1, sourceId: "message_a", summary: "Need slots" },
       { kind: "claim_conflict", priority: 2, sourceId: "claim_a",
         summary: "file:src/main.mjs is claimed by session_1" },
-      { kind: "nearby_intent", priority: 5, sourceId: "session_9", summary: "browsing" },
+      { kind: "coordinator_missing", priority: 4, sourceId: "workstream_a",
+        summary: "directed-visuals" },
     ],
   }), { budgetBytes: 400 });
 
