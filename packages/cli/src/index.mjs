@@ -4,3 +4,4 @@ export { COMMANDS, parseArgs } from "./args.mjs";
 export { discoverWorkspace } from "./workspace-discovery.mjs";
 export { createGitProbe, hermeticEnv } from "./git-probe.mjs";
 export { platformDataHome, runtimePaths } from "./runtime-paths.mjs";
+export { platformPaths } from "./platform-paths.mjs";

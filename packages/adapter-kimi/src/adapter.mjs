@@ -1,7 +1,7 @@
 import { defineAdapter, projectContext } from "@agents-can-communicate/adapter-sdk";
 
 import { denyOutcome, injectOutcome, normalizeKimiHook } from "./hooks.mjs";
-import { detectKimi, installKimiPlugin, uninstallKimiPlugin } from "./install.mjs";
+import { planKimiInstall, detectKimi, installKimiPlugin, uninstallKimiPlugin } from "./install.mjs";
 
 export const KIMI_CODE_VERSION = "0.36.1";
 
@@ -37,6 +37,7 @@ export function createKimiAdapter() {
     guardShell: async () => ({ ok: true, changes: [], diagnostics: [] }),
     poll: async () => ({ ok: true, changes: [], diagnostics: [] }),
 
+    planInstall: context => planKimiInstall(context),
     detect: context => detectKimi(context),
     install: context => installKimiPlugin(context),
     uninstall: context => uninstallKimiPlugin(context),

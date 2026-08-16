@@ -28,26 +28,27 @@
 - Modify: `packages/*/package.json`
 - Create: `packages/cli/src/platform-paths.mjs`
 - Create: `packages/cli/test/platform-paths.test.mjs`
-- Create: `.npmignore`
+- Create: `.npmignore` — superseded by `files` in the manifests, which is an
+  allowlist rather than a denylist; see the completion note
 
 **Interfaces:**
 - Produces final npm scope/name, `acc` binary mapping, Node engine floor, and platform data/config/cache paths
 
-- [ ] **Step 1: Check publication namespaces**
+- [x] **Step 1: Check publication namespaces**
 
 Query npm registry for `agents-can-communicate`, the selected organization scope, and `acc` binary collisions. Record results in the PR description. If the unscoped package is unavailable, use the approved organization scope without changing the binary name unless that binary also conflicts.
 
 This step also resolves two open decisions from `docs/DECISIONS.md` with the user before any manifest changes: the public license (open decision 3) and the publication model — one publishable CLI package that bundles the workspaces versus scoped per-package publication (part of open decision 2). `npx agents-can-communicate install` from `docs/UX.md` requires the entry package to be publishable, so the root manifest cannot stay `private: true` unless a dedicated entry package replaces it. Record both answers in `docs/DECISIONS.md` as user-approved.
 
-- [ ] **Step 2: Verify current Node LTS**
+- [x] **Step 2: Verify current Node LTS**
 
 Use <https://nodejs.org/en/about/previous-releases>. Pin the current production LTS major in `engines.node`; do not select a Current-only release.
 
-- [ ] **Step 3: Write platform-path RED**
+- [x] **Step 3: Write platform-path RED**
 
 Test macOS, Linux/XDG, and Windows environment fixtures. Assert config, data, and cache paths are outside a Workspace and portable IDs remain filename-safe.
 
-- [ ] **Step 4: Implement and run GREEN**
+- [x] **Step 4: Implement and run GREEN**
 
 Implement injected environment/platform resolution. Run:
 
@@ -55,7 +56,7 @@ Implement injected environment/platform resolution. Run:
 node --test packages/cli/test/platform-paths.test.mjs
 ```
 
-- [ ] **Step 5: Inspect npm tarball and commit**
+- [x] **Step 5: Inspect npm tarball and commit**
 
 ```bash
 npm pack --dry-run
@@ -79,11 +80,11 @@ Expected tarball excludes `prototype/`, `migration/`, `.agents/`, build evidence
 **Interfaces:**
 - Produces `acc config init`, `acc config validate`, and schema-versioned project config
 
-- [ ] **Step 1: Write config RED**
+- [x] **Step 1: Write config RED**
 
 Test no-config defaults, stable Workspace ID, multi-root declarations, claim policy, context budget, required adapters, unknown version rejection, runtime-key rejection, and symlink escape.
 
-- [ ] **Step 2: Define minimal config schema**
+- [x] **Step 2: Define minimal config schema**
 
 ```json
 {
@@ -101,11 +102,11 @@ Test no-config defaults, stable Workspace ID, multi-root declarations, claim pol
 
 Reject messages, sessions, claims, tokens, transcripts, and absolute runtime paths in project config.
 
-- [ ] **Step 3: Implement commands and docs**
+- [x] **Step 3: Implement commands and docs**
 
 `config init` writes only after preview/confirmation in human mode and requires explicit `--yes` in non-interactive mode. `validate` is read-only.
 
-- [ ] **Step 4: Mutation proof and commit**
+- [x] **Step 4: Mutation proof and commit**
 
 Temporarily allow `sessions` in config; the runtime-key test must fail. Restore.
 
@@ -132,23 +133,23 @@ git commit -m "feat: add optional workspace configuration"
 **Interfaces:**
 - Produces `acc install`, `acc install --dry-run`, `acc uninstall`, and unified `acc doctor`
 
-- [ ] **Step 1: Write installation-plan RED**
+- [x] **Step 1: Write installation-plan RED**
 
 Fixtures contain zero, one, and all supported clients plus existing unrelated configs. Dry-run returns exact planned paths and semantic changes without touching bytes.
 
-- [ ] **Step 2: Write crash/idempotence RED**
+- [x] **Step 2: Write crash/idempotence RED**
 
 Inject failure between two adapter writes. Re-run install and assert it completes safely without duplicate entries. Uninstall removes only operations whose ownership record matches current installed bytes.
 
-- [ ] **Step 3: Implement detect/plan/apply split**
+- [x] **Step 3: Implement detect/plan/apply split**
 
 Detection is read-only. Plan is deterministic JSON. Apply uses no-replace or compare-and-swap semantics per config format and records ownership outside project repositories.
 
-- [ ] **Step 4: Integrate doctor**
+- [x] **Step 4: Integrate doctor**
 
 Doctor reports client binary/version, adapter installed version, hook registration, actual capabilities, runtime health, pending migrations, and exact remediation command.
 
-- [ ] **Step 5: Verify and commit**
+- [x] **Step 5: Verify and commit**
 
 ```bash
 node --test packages/installer/test/*.test.mjs
@@ -175,23 +176,23 @@ git commit -m "feat: install and diagnose ACC adapters"
 **Interfaces:**
 - Produces complete user and adapter-author onboarding
 
-- [ ] **Step 1: Write documentation command RED**
+- [x] **Step 1: Write documentation command RED**
 
 Extract fenced commands marked `<!-- test:command -->` and run them against a temporary installation. The initial test fails because public docs do not yet contain the required flows.
 
-- [ ] **Step 2: Write three-minute getting started**
+- [x] **Step 2: Write three-minute getting started**
 
 Cover install, ordinary session opening, automatic attach, status, conflict, message, and uninstall. Separate automatic native behavior from MCP fallback behavior.
 
-- [ ] **Step 3: Document adapter authoring**
+- [x] **Step 3: Document adapter authoring**
 
 Include manifest schema, capability rules, hook normalization, config ownership, conformance runner, delivery semantics, and one minimal Tier-1 MCP adapter.
 
-- [ ] **Step 4: Add concise examples**
+- [x] **Step 4: Add concise examples**
 
 Papercut example uses visual, models, and physics workstreams with global claims. Non-Git example coordinates research and document review without Git concepts.
 
-- [ ] **Step 5: Run docs test and commit**
+- [x] **Step 5: Run docs test and commit**
 
 ```bash
 node --test tests/docs/commands.test.mjs
@@ -214,19 +215,19 @@ git commit -m "docs: explain cross-model collaboration"
 **Interfaces:**
 - Produces public vulnerability-reporting policy and release-blocking security suite
 
-- [ ] **Step 1: Write threat scenarios**
+- [x] **Step 1: Write threat scenarios**
 
 For each actor and asset, record preconditions, attack, consequence, prevention, detection, and residual risk. Include malicious peer, stale process, symlink escape, replay, claim denial, installer takeover, MCP tool poisoning, and corrupt store.
 
-- [ ] **Step 2: Write RED security tests**
+- [x] **Step 2: Write RED security tests**
 
 Demonstrate attributed peer content cannot become policy, storage cannot escape its managed root, and installer ownership cannot delete unrelated config.
 
-- [ ] **Step 3: Implement only evidence-backed fixes**
+- [x] **Step 3: Implement only evidence-backed fixes**
 
 Run focused tests after each minimal change. Do not broaden permissions or add transcript filtering heuristics unrelated to the failing fixture.
 
-- [ ] **Step 4: Full security verification and commit**
+- [x] **Step 4: Full security verification and commit**
 
 ```bash
 node --test tests/security/*.test.mjs

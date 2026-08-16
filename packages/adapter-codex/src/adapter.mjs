@@ -2,7 +2,7 @@ import { defineAdapter, projectContext } from "@agents-can-communicate/adapter-s
 
 import { allowOutcome, denyOutcome, injectOutcome, normalizeCodexHook }
   from "./hooks.mjs";
-import { detectCodex, installCodexPlugin, uninstallCodexPlugin } from "./install.mjs";
+import { planCodexInstall, detectCodex, installCodexPlugin, uninstallCodexPlugin } from "./install.mjs";
 
 export const CODEX_VERSION = "0.147.0";
 
@@ -39,6 +39,7 @@ export function createCodexAdapter() {
     guardShell: async () => ({ ok: true, changes: [], diagnostics: [] }),
     poll: async () => ({ ok: true, changes: [], diagnostics: [] }),
 
+    planInstall: context => planCodexInstall(context),
     detect: context => detectCodex(context),
     install: context => installCodexPlugin(context),
     uninstall: context => uninstallCodexPlugin(context),

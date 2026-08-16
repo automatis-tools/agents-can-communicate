@@ -2,7 +2,7 @@ import { cp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { assertRunner, defaultRunner, runnerExists }
+import { assertRunner, defaultRunner, removeInstalledTree, runnerExists }
   from "@agents-can-communicate/adapter-sdk";
 
 const bundle = fileURLToPath(new URL("../plugin", import.meta.url));
@@ -133,7 +133,7 @@ export async function installKimiPlugin({ home, runner = defaultRunner(), node }
   return { ok: true, changes: [target, file, registry], diagnostics: [] };
 }
 
-export async function uninstallKimiPlugin({ home }) {
+export async function uninstallKimiPlugin({ home, keep = [] }) {
   const file = configPath(home);
   const existing = await readText(file, null);
   const changes = [];
@@ -151,7 +151,7 @@ export async function uninstallKimiPlugin({ home }) {
     await writeFile(registry, `${JSON.stringify({ ...loaded, plugins }, null, 2)}\n`);
   }
 
-  await rm(pluginPath(home), { recursive: true, force: true });
+  await removeInstalledTree(pluginPath(home), keep);
   return { ok: true, changes, diagnostics: [] };
 }
 
@@ -167,4 +167,16 @@ export async function detectKimi({ home, runner = defaultRunner() }) {
       ? `hook runner present at ${runner}`
       : `hook runner MISSING at ${runner}; every hook would fail silently`,
   ] };
+}
+
+/**
+ * The paths an install would write, without writing them. Same helpers as the
+ * install, so a dry run cannot drift from what actually happens.
+ */
+export function planKimiInstall({ home }) {
+  return [
+    { path: pluginPath(home), kind: "tree" },
+    { path: configPath(home), kind: "merge" },
+    { path: registryPath(home), kind: "merge" },
+  ];
 }

@@ -1,7 +1,6 @@
 {
   "name": "agents-can-communicate",
   "version": "0.0.0",
-  "private": true,
   "type": "module",
   "description": "Model- and harness-agnostic coordination for independent AI agent sessions.",
   "workspaces": [
@@ -13,5 +12,48 @@
     "test:prototype": "cd prototype/papercut-agent-comms && node --test tests/tools/agent_comms/*.test.mjs",
     "test:prototype:sigterm": "cd prototype/papercut-agent-comms && node --test --test-name-pattern='SIGTERM is accepted' tests/tools/agent_comms/cli-round1.test.mjs",
     "test:integrated": "cd prototype/integrated && node --test tests/tools/agent_comms/*.test.mjs"
-  }
+  },
+  "license": "MIT",
+  "engines": {
+    "node": ">=24"
+  },
+  "bin": {
+    "acc": "./bin/acc.mjs",
+    "acc-mcp": "./bin/acc-mcp.mjs",
+    "acc-hook": "./bin/acc-hook.mjs"
+  },
+  "files": [
+    "bin/",
+    "docs/CAPABILITIES.md",
+    "README.md",
+    "LICENSE"
+  ],
+  "dependencies": {
+    "@agents-can-communicate/adapter-claude-code": "*",
+    "@agents-can-communicate/adapter-codex": "*",
+    "@agents-can-communicate/adapter-gemini-cli": "*",
+    "@agents-can-communicate/adapter-kimi": "*",
+    "@agents-can-communicate/adapter-sdk": "*",
+    "@agents-can-communicate/cli": "*",
+    "@agents-can-communicate/core": "*",
+    "@agents-can-communicate/hook-runner": "*",
+    "@agents-can-communicate/installer": "*",
+    "@agents-can-communicate/mcp-server": "*",
+    "@agents-can-communicate/protocol": "*",
+    "@agents-can-communicate/storage-filesystem": "*"
+  },
+  "bundleDependencies": [
+    "@agents-can-communicate/adapter-claude-code",
+    "@agents-can-communicate/adapter-codex",
+    "@agents-can-communicate/adapter-gemini-cli",
+    "@agents-can-communicate/adapter-kimi",
+    "@agents-can-communicate/adapter-sdk",
+    "@agents-can-communicate/cli",
+    "@agents-can-communicate/core",
+    "@agents-can-communicate/hook-runner",
+    "@agents-can-communicate/installer",
+    "@agents-can-communicate/mcp-server",
+    "@agents-can-communicate/protocol",
+    "@agents-can-communicate/storage-filesystem"
+  ]
 }
