@@ -1,8 +1,9 @@
-import { access, cp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { cp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { AccError, EXIT } from "@agents-can-communicate/protocol";
+import { assertRunner, defaultRunner, runnerExists }
+  from "@agents-can-communicate/adapter-sdk";
 
 const bundle = fileURLToPath(new URL("../plugin", import.meta.url));
 const PLUGIN_NAME = "agents-can-communicate";
@@ -39,8 +40,6 @@ const registryPath = home => path.join(home, "plugins", "installed.json");
 // unlike the plugin manifests of the other three, which expand a plugin root -
 // so the runner is written in as an absolute path at install time. Codex taught
 // this the hard way: a relative hook command fails silently, hook after hook.
-export const defaultRunner = () =>
-  fileURLToPath(new URL("../../../bin/acc-hook.mjs", import.meta.url));
 
 // TOML basic strings take backslash escapes. A path is user-controlled input
 // here, so it is escaped rather than trusted to be boring.
@@ -106,23 +105,11 @@ const registerPlugin = (registry, root) => {
     plugins: [...plugins, { id: PLUGIN_NAME, root, source: "local", enabled: true }] };
 };
 
-export const runnerExists = async runner => {
-  try {
-    await access(runner);
-    return true;
-  } catch {
-    return false;
-  }
-};
-
 export async function installKimiPlugin({ home, runner = defaultRunner(), node }) {
   // A hook whose command does not exist fails silently, on every event, for as
   // long as it stays installed: the client reports nothing and ACC simply never
   // sees a session. Writing that entry and hoping is worse than refusing.
-  if (!await runnerExists(runner)) {
-    throw new AccError(EXIT.DATA,
-      "refusing to install: the hook runner does not exist", { runner });
-  }
+  await assertRunner(runner);
 
   const target = pluginPath(home);
   await rm(target, { recursive: true, force: true });

@@ -2,7 +2,7 @@ import { cp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { mergeOwnedConfig, ownedKeys, removeOwnedConfig }
+import { mergeOwnedConfig, ownedKeys, removeOwnedConfig, writeHookShim }
   from "@agents-can-communicate/adapter-sdk";
 
 const bundle = fileURLToPath(new URL("../plugin", import.meta.url));
@@ -20,6 +20,14 @@ async function readJson(file, fallback) {
   }
 }
 
+// Replace the bundle's placeholder command with the shim just written.
+const withShim = (wiring, shim) => ({ ...wiring, hooks: Object.fromEntries(
+  Object.entries(wiring.hooks).map(([event, entries]) => [event, entries.map(entry => ({
+    ...entry,
+    hooks: entry.hooks.map(hook => ({ ...hook,
+      command: `sh "${shim}" ${hook.command.split(" ").pop()}` })),
+  }))])) });
+
 const writeJson = async (file, value) => {
   await mkdir(path.dirname(file), { recursive: true });
   await writeFile(file, `${JSON.stringify(value, null, 2)}\n`);
@@ -33,10 +41,15 @@ const writeJson = async (file, value) => {
  * sees. Existing marketplace entries are preserved and the ACC entry is
  * recorded as owned, so uninstall removes exactly what was added.
  */
-export async function installCodexPlugin({ home, agentsHome = home }) {
+export async function installCodexPlugin({ home, agentsHome = home, runner, node }) {
   const target = pluginPath(home);
   await rm(target, { recursive: true, force: true });
   await cp(bundle, target, { recursive: true });
+  // This client rejects a relative hook command silently, on every event, so
+  // the shim's absolute path is written into the wiring at install time.
+  const shim = await writeHookShim({ dir: target, adapterId: "codex", runner, node });
+  await writeJson(path.join(target, "hooks.json"),
+    withShim(await readJson(path.join(bundle, "hooks.json"), { hooks: {} }), shim));
 
   const file = marketplacePath(agentsHome);
   const existing = await readJson(file, { name: "personal", plugins: {} });

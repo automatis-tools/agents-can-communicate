@@ -2,7 +2,7 @@ import { cp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { mergeOwnedConfig, ownedKeys, removeOwnedConfig }
+import { mergeOwnedConfig, ownedKeys, removeOwnedConfig, writeHookShim }
   from "@agents-can-communicate/adapter-sdk";
 
 const bundle = fileURLToPath(new URL("../plugin", import.meta.url));
@@ -31,10 +31,14 @@ const writeJson = async (file, value) => {
  * added rather than guessing by shape - a user's own PreToolUse hook can look
  * very much like ours.
  */
-export async function installClaudePlugin({ configDir }) {
+export async function installClaudePlugin({ configDir, runner, node }) {
   const target = pluginPath(configDir);
   await rm(target, { recursive: true, force: true });
   await cp(bundle, target, { recursive: true });
+  // The bundle's hooks.json names this script; until now nothing wrote it, so
+  // every hook resolved to a command that does not exist and failed silently.
+  await writeHookShim({ dir: path.join(target, "hooks"), adapterId: "claude_code",
+    runner, node });
 
   const file = settingsPath(configDir);
   const existing = await readJson(file, {});
