@@ -104,7 +104,30 @@ const HANDLERS = {
     // Solo costs nothing: nothing to say means nothing printed, not a banner
     // announcing that nobody else is here.
     if (sync.solo) return { stdout: "" };
-    const projected = await adapter.renderContext?.(sync) ?? "";
+
+    // Claims held by others, and whether this session can actually be stopped
+    // from breaking them. For a harness that guards writes this is useful
+    // warning; for one that cannot - a Codex model editing through the shell,
+    // an MCP client - it is the only protection there is, so it has to say
+    // plainly that the responsibility has moved to the session itself.
+    const status = await context.service.collectStatus({
+      workspaceId: context.descriptor.id });
+    const mine = status.participants
+      .find(participant => participant.sessionId === binding.accSessionId);
+    // Two independent facts, and both are needed. `enforceable` is whether ACC
+    // could stop *this* session at all; `enforcement` is what the claim's owner
+    // asked for. A guarded session facing an advisory claim is not blocked from
+    // anything, so reporting either one alone mislabels the other case.
+    const enforceable = mine?.enforcement === "guarded";
+    const claims = status.claims
+      .filter(claim => claim.ownerSessionId !== binding.accSessionId)
+      .map(claim => ({ resource: claim.resource, enforcement: claim.enforcement,
+        enforceable,
+        ownerParticipantId: status.participants
+          .find(p => p.sessionId === claim.ownerSessionId)?.participantId
+          ?? claim.ownerSessionId }));
+
+    const projected = await adapter.renderContext?.({ ...sync, claims }) ?? "";
     if (projected === "") return { stdout: "" };
     // Same again: Kimi Code shows the model a hook's raw stdout, while Gemini
     // and Claude Code want an envelope and drop a bare string.

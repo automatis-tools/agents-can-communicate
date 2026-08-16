@@ -161,9 +161,19 @@ Four things must all be true before a single hook runs:
 4. the client has **installed** it - `codex plugin add agents-can-communicate@acc-local` -
    which copies it into `$CODEX_HOME/plugins/cache/`.
 
-ACC does 1-3. Step 4 is the client's own command and ACC cannot do it by writing files, so
-`detect` reports it and names the command. Verified: with steps 1-3 done and step 4 not,
-the plugin lists as `not installed` and no hook fires.
+ACC does all four. Step 4 looked like the client's own business until it was measured:
+diffing `$CODEX_HOME` around `codex plugin add` shows the command does exactly one thing -
+copy the plugin into `plugins/cache/<marketplace>/<plugin>/<version>/`. Nothing else
+changes, not `config.toml` and nothing under `HOME`, and all three path components are
+ACC's own: the marketplace it created, the plugin name it chose, and the version in the
+manifest it ships.
+
+So ACC writes that copy itself, and a real session against an ACC-written cache fires
+every hook. `detect` still names `codex plugin add` for the case where the cache is
+missing - someone cleared it, or the client moved where it keeps one - because then the
+supported command is the right answer.
+
+Hook trust remains a manual step. That one is the client's security model, not a gap.
 
 Because the client runs the *cached copy*, a hook command relative to the bundle would not
 survive installation. ACC's shim is written with absolute paths, so it does.
@@ -194,3 +204,47 @@ that matters for a matcher is the one hooks see.
 Unlike Kimi Code, this client fires `SessionEnd`. Observed across a full run: `SessionStart`,
 `UserPromptSubmit`, `PreToolUse`, `Stop`, `SessionEnd` - and afterwards ACC's runtime state
 held no session record and no binding. Nothing is left to age out.
+
+
+## Context injection, finally observed
+
+Declared false for a long time with the honest reason "never seen reaching the model".
+It has now been seen. A `UserPromptSubmit` hook's stdout arrives in the request as a
+**`developer` role message**, verbatim and unwrapped:
+
+```json
+{"type":"message","role":"developer","content":[{"type":"input_text","text":"…"}]}
+```
+
+No envelope of any kind, so the injection is plain text - Claude Code's JSON envelope
+would put the envelope itself into the conversation, exactly as it would on Kimi Code.
+
+The `developer` role is the most direct channel of the four, which is a reason for care
+rather than comfort: at that role a model reads text as instruction, so anything a peer
+wrote has to stay framed as data. The shared projector does that framing.
+
+This matters most where the guard cannot help. With a model that has no `apply_patch`,
+edits run through the shell and no claim can be matched against them. ACC cannot stop that
+write, so it says so before the turn instead:
+
+```text
+2 session(s); cursor 0000000000000004
+- [claim] file:src/** held by models - file edits are blocked; edits made through a shell are not
+- session_9Xo… (cli, online)
+- session_BlU… (codex, online)
+```
+
+Captured from a real session: the peer held the claim, and the Codex model was told before
+it started. Unenforceable is not the same as unknown.
+
+The note has three forms, because two separate facts decide it - what the claim's owner
+asked for, and whether ACC can stop this particular session:
+
+| Claim | This session | Note |
+|---|---|---|
+| guarded | can be guarded | `file edits are blocked; edits made through a shell are not` |
+| guarded | cannot be guarded | `not enforced for this session; do not edit it` |
+| advisory | either | `advisory; nothing will stop you, the owner is asking` |
+
+Reading only the session's capability would announce a block on an advisory claim that
+will never happen - and its owner explicitly did not ask for one.

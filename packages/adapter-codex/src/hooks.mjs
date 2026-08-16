@@ -115,3 +115,19 @@ export function denyOutcome(reason) {
 export function allowOutcome() {
   return { stdout: "", stderr: "", exitCode: 0 };
 }
+
+/**
+ * Context for the next turn.
+ *
+ * This client wraps nothing: a UserPromptSubmit hook's stdout arrives at the
+ * model as a `developer` role message, verbatim. So the injection is plain
+ * text - emitting Claude Code's JSON envelope would put the envelope itself
+ * into the conversation, the same mistake it would be on Kimi Code.
+ *
+ * The developer role is the most direct channel of the four, which is a reason
+ * to be careful with what goes into it: anything a peer wrote must stay framed
+ * as data, because at this role the model reads text as instruction.
+ */
+export function injectOutcome(context) {
+  return { stdout: context === "" ? "" : `${context}\n`, stderr: "", exitCode: 0 };
+}

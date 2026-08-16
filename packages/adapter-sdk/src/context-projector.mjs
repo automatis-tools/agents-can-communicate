@@ -40,6 +40,40 @@ function attentionLines(attention) {
   return attention.map(item => `- [${item.kind}] ${item.summary}`);
 }
 
+/**
+ * Claims other sessions hold, and whether this session can be stopped from
+ * breaking them.
+ *
+ * Ranked with the required lines rather than the roster, because a claim is
+ * what changes what this session should do next. When it cannot be enforced -
+ * a model that edits through the shell, an MCP client with no hooks - saying so
+ * is the whole mitigation: ACC will not intercept the write, so respecting the
+ * claim is this session's own responsibility and it needs to know that.
+ */
+function claimNote(claim) {
+  // Enforcement is declared per claim, and the guard only ever blocks a guarded
+  // one. Reading this session's capability alone would announce a block that
+  // will never happen, on a claim whose owner explicitly did not ask for one.
+  if (claim.enforcement !== "guarded") {
+    return " - advisory; nothing will stop you, the owner is asking";
+  }
+  if (claim.enforceable === false) {
+    return " - not enforced for this session; do not edit it";
+  }
+  // Guarded, and this session can be stopped - but only on a file edit. No
+  // harness intercepts a shell command, so an edit made through one goes
+  // through whatever the claim says, and a session told merely "this is
+  // claimed" would reasonably assume otherwise.
+  return " - file edits are blocked; edits made through a shell are not";
+}
+
+function claimLines(claims) {
+  return claims.map(claim => {
+    const owner = claim.ownerParticipantId ?? claim.ownerSessionId ?? "another session";
+    return `- [claim] ${claim.resource} held by ${owner}${claimNote(claim)}`;
+  });
+}
+
 function peerBlocks(messages) {
   return messages.flatMap(message => [
     `${FENCE}${BLOCK}`,
@@ -68,9 +102,11 @@ export function projectContext(sync, { budgetBytes = DEFAULT_BUDGET_BYTES } = {}
       || left.sourceId.localeCompare(right.sourceId));
   const messages = sync.messages ?? [];
   const roster = sync.roster ?? [];
+  const claims = sync.claims ?? [];
 
   const required = [
     ...attentionLines(attention),
+    ...claimLines(claims),
     ...peerBlocks(messages),
   ];
   const optional = roster.map(item =>
