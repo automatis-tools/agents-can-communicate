@@ -26,7 +26,7 @@ const run = promisify(execFile);
  */
 const ADAPTERS = [
   { name: "codex", create: createCodexAdapter,
-    context: home => ({ home }),
+    context: home => ({ home, codexHome: path.join(home, ".codex") }),
     commands: async home => {
       const wired = JSON.parse(await readFile(path.join(home, "plugins",
         "agents-can-communicate", "hooks.json"), "utf8"));
@@ -70,8 +70,9 @@ async function home(t, name) {
   await writeFile(path.join(dir, ".gemini", "settings.json"), "{}\n");
   await writeFile(path.join(dir, "settings.json"), "{}\n");
   await mkdir(path.join(dir, ".agents", "plugins"), { recursive: true });
+  // The sequence shape this client parses; a map fails to load entirely.
   await writeFile(path.join(dir, ".agents", "plugins", "marketplace.json"),
-    '{"name":"personal","plugins":{}}\n');
+    '{"name":"acc-local","plugins":[]}\n');
   return dir;
 }
 
