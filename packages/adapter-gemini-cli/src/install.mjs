@@ -1,0 +1,84 @@
+import { cp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+const bundle = fileURLToPath(new URL("../extension", import.meta.url));
+const EXTENSION_NAME = "agents-can-communicate";
+const OWNER_PREFIX = "acc-";
+
+const settingsPath = home => path.join(home, ".gemini", "settings.json");
+const extensionPath = home => path.join(home, ".gemini", "extensions", EXTENSION_NAME);
+
+async function readJson(file, fallback) {
+  try {
+    return JSON.parse(await readFile(file, "utf8"));
+  } catch (error) {
+    if (error.code === "ENOENT") return fallback;
+    throw error;
+  }
+}
+
+const writeJson = async (file, value) => {
+  await mkdir(path.dirname(file), { recursive: true });
+  await writeFile(file, `${JSON.stringify(value, null, 2)}\n`);
+};
+
+const isOurs = hook => typeof hook?.name === "string" && hook.name.startsWith(OWNER_PREFIX);
+
+/**
+ * Merge ACC's hook entries into the user's settings, keyed by the `name` field
+ * this client supports. Ownership by name is what makes uninstall exact: a
+ * user's own entry can carry an identical command string, and removing by
+ * command would take theirs with ours.
+ *
+ * No environment variable is copied or persisted. The extension declares what
+ * it needs; secrets stay where the user put them.
+ */
+export async function installGeminiExtension({ home }) {
+  const target = extensionPath(home);
+  await rm(target, { recursive: true, force: true });
+  await cp(bundle, target, { recursive: true });
+
+  const ours = await readJson(path.join(bundle, "hooks", "hooks.json"), { hooks: {} });
+  const file = settingsPath(home);
+  const existing = await readJson(file, {});
+  const merged = { ...existing, hooks: { ...(existing.hooks ?? {}) } };
+  for (const [event, entries] of Object.entries(ours.hooks)) {
+    const foreign = (merged.hooks[event] ?? [])
+      .map(entry => ({ ...entry, hooks: (entry.hooks ?? []).filter(hook => !isOurs(hook)) }))
+      .filter(entry => entry.hooks.length > 0);
+    merged.hooks[event] = [...foreign, ...entries];
+  }
+  await writeJson(file, merged);
+  return { ok: true, changes: [target, file], diagnostics: [] };
+}
+
+export async function uninstallGeminiExtension({ home }) {
+  const file = settingsPath(home);
+  const existing = await readJson(file, null);
+  const changes = [];
+  if (existing !== null) {
+    const hooks = {};
+    for (const [event, entries] of Object.entries(existing.hooks ?? {})) {
+      const kept = entries
+        .map(entry => ({ ...entry, hooks: (entry.hooks ?? []).filter(hook => !isOurs(hook)) }))
+        .filter(entry => entry.hooks.length > 0);
+      if (kept.length > 0) hooks[event] = kept;
+      else changes.push(event);
+    }
+    const next = { ...existing };
+    if (Object.keys(hooks).length > 0) next.hooks = hooks;
+    else delete next.hooks;
+    await writeJson(file, next);
+  }
+  await rm(extensionPath(home), { recursive: true, force: true });
+  return { ok: true, changes, diagnostics: [] };
+}
+
+export async function detectGemini({ home }) {
+  const existing = await readJson(settingsPath(home), null);
+  const installed = Object.values(existing?.hooks ?? {})
+    .some(entries => entries.some(entry => (entry.hooks ?? []).some(isOurs)));
+  return { ok: true, changes: [],
+    diagnostics: [installed ? "acc hooks registered" : "acc hooks not registered"] };
+}

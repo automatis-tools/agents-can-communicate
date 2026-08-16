@@ -29,6 +29,32 @@ Two fields the plan does not mention are real and useful: `name`, which makes an
 identifiable for ownership-scoped uninstall, and `timeout` in milliseconds, which bounds a
 hook rather than letting it hang a turn.
 
+## Observed in a real session
+
+Captured 2026-08-16 from `gemini -p` on 0.37.0, with the capture hooks configured in a
+temporary project's `.gemini/settings.json` so no global configuration was changed.
+Fixtures are in `fixtures/`.
+
+Fired with real payloads: `SessionStart`, `BeforeAgent`, `SessionEnd`, `PreCompress`.
+
+Payload shape, common to every event: `session_id`, `transcript_path`, `cwd`,
+`hook_event_name`, `timestamp`. `SessionStart` adds `source`; `BeforeAgent` adds `prompt`;
+`SessionEnd` adds `reason`; `PreCompress` adds `trigger`. The `timestamp` field is
+particular to this client - neither Codex nor Claude Code supplies one.
+
+`gemini extensions validate` accepts the ACC extension bundle, exit 0.
+
+## Not observed, and why
+
+`BeforeTool`, `AfterTool`, and `AfterAgent` never fired. The account used for the capture
+received HTTP 403 from `cloudcode-pa.googleapis.com`, so no model turn ever ran and no
+tool was ever called. The events are configurable and the client accepts them, but an
+event accepted in configuration is not an event observed protecting anything, so this
+adapter declares no guard and no injection.
+
+This gap closes as soon as one turn completes on an account that can reach the model API.
+It is an account-state problem, not a protocol or client limitation.
+
 ## Management surface
 
 `gemini hooks` exists as a subcommand, currently offering `gemini hooks migrate` for
