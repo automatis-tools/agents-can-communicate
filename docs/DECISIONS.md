@@ -31,17 +31,17 @@ This file separates explicit user decisions from open technical decisions. As of
 | Peer equality: any top-level session can represent the whole Workspace — it answers whole-system questions from shared state (including other participants' subagents) and relays human requests to any participant; authority differences apply to mutation only, never to knowledge | Approved 2026-08-15 |
 | Solo zero-overhead: a lone session pays nothing visible — no injected coordination context, no required protocol actions, guards short-circuit against the empty roster; coordination kicks in at the first safe point after a second session attaches or a durable object exists | Approved 2026-08-15 |
 | MCP session model: the ACC session is derived from the MCP server's own launch configuration (participant name and workspace), never from `initialize`, connection identity, or `clientInfo`; presence refreshes per tool call and a restarted process resolves to the same session | Approved 2026-08-16 |
+| Public license is MIT | Approved 2026-08-16 |
+| Publication model: one publishable package, `agents-can-communicate`, carrying the workspaces inside it — one version and one release rather than eight coordinated ones. Verified available on npm the same day, as was the `@agents-can-communicate` scope; the npm package `acc` exists but declares no binary, so the `acc` command collides with nothing published | Approved 2026-08-16 |
+| Minimum Node.js is the current production LTS, 24 (`v24.19.0` Krypton, released 2026-08-03) | Approved 2026-08-16 |
 
 ## Open technical decisions
 
 1. Storage after extraction: keep the hardened filesystem backend for the first standalone release, or add a transactional SQLite backend behind the same interface. `node:sqlite` is still release-candidate quality in the current Node LTS line, so this must not be selected merely to avoid an external dependency.
-2. Exact npm package names and binary name. `acc` is preferred as the human command but availability must be checked before publication.
-3. Public license.
-4. Minimum Node.js version. Node 24 is the current LTS at the time of this handoff; pin only when packaging begins.
-5. Whether remote/cloud coordination belongs in v2 or a separate product.
-6. Whether an optional process-launching runner is ever part of ACC or remains an external integration.
-7. Multi-root workspace configuration and discovery rules.
-8. Default claim lease length and renewal cadence for hook-only adapters. The prototype pairs 1800-second leases with a 15-second watcher heartbeat; a hook-only session cannot sustain that cadence, so lease policy must not assume it.
+2. Whether remote/cloud coordination belongs in v2 or a separate product.
+3. Whether an optional process-launching runner is ever part of ACC or remains an external integration.
+4. Multi-root workspace configuration and discovery rules.
+5. Default claim lease length and renewal cadence for hook-only adapters. The prototype pairs 1800-second leases with a 15-second watcher heartbeat; a hook-only session cannot sustain that cadence, so lease policy must not assume it.
 
 ## Rejected directions
 

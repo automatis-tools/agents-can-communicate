@@ -28,26 +28,27 @@
 - Modify: `packages/*/package.json`
 - Create: `packages/cli/src/platform-paths.mjs`
 - Create: `packages/cli/test/platform-paths.test.mjs`
-- Create: `.npmignore`
+- Create: `.npmignore` — superseded by `files` in the manifests, which is an
+  allowlist rather than a denylist; see the completion note
 
 **Interfaces:**
 - Produces final npm scope/name, `acc` binary mapping, Node engine floor, and platform data/config/cache paths
 
-- [ ] **Step 1: Check publication namespaces**
+- [x] **Step 1: Check publication namespaces**
 
 Query npm registry for `agents-can-communicate`, the selected organization scope, and `acc` binary collisions. Record results in the PR description. If the unscoped package is unavailable, use the approved organization scope without changing the binary name unless that binary also conflicts.
 
 This step also resolves two open decisions from `docs/DECISIONS.md` with the user before any manifest changes: the public license (open decision 3) and the publication model — one publishable CLI package that bundles the workspaces versus scoped per-package publication (part of open decision 2). `npx agents-can-communicate install` from `docs/UX.md` requires the entry package to be publishable, so the root manifest cannot stay `private: true` unless a dedicated entry package replaces it. Record both answers in `docs/DECISIONS.md` as user-approved.
 
-- [ ] **Step 2: Verify current Node LTS**
+- [x] **Step 2: Verify current Node LTS**
 
 Use <https://nodejs.org/en/about/previous-releases>. Pin the current production LTS major in `engines.node`; do not select a Current-only release.
 
-- [ ] **Step 3: Write platform-path RED**
+- [x] **Step 3: Write platform-path RED**
 
 Test macOS, Linux/XDG, and Windows environment fixtures. Assert config, data, and cache paths are outside a Workspace and portable IDs remain filename-safe.
 
-- [ ] **Step 4: Implement and run GREEN**
+- [x] **Step 4: Implement and run GREEN**
 
 Implement injected environment/platform resolution. Run:
 
@@ -55,7 +56,7 @@ Implement injected environment/platform resolution. Run:
 node --test packages/cli/test/platform-paths.test.mjs
 ```
 
-- [ ] **Step 5: Inspect npm tarball and commit**
+- [x] **Step 5: Inspect npm tarball and commit**
 
 ```bash
 npm pack --dry-run
