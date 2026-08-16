@@ -125,3 +125,72 @@ The payload gap is now closed by capture. Declared true: `lifecycle.sessionStart
 `lifecycle.sessionEnd`, `guards.beforeWrite`, `guards.beforeShell`, `delivery.polling`.
 Still false and why: context injection unobserved, child sessions unobserved (no subagent
 ran during the capture), wake and execution not offered by this harness.
+
+## Certification findings (2026-08-16)
+
+Running the cross-vendor scenario against a real 0.147.0 client turned up three things
+that unit tests could not, because all three concern what the *client* does with what ACC
+writes.
+
+### Placing files is not installing
+
+The install used to write a marketplace file and stop. That is not enough, and worse, the
+file was in a shape this client rejects:
+
+```text
+Error: invalid marketplace file .../marketplace.json:
+  invalid type: map, expected a sequence at line 3 column 13
+```
+
+`plugins` is a **sequence**, and each entry carries its own `name`, `source`
+(`{source: "local", path}`), `policy` and `category`. `authentication` accepts only
+`ON_INSTALL` or `ON_USE` - anything else fails validation. Because a rejected file fails
+to load *entirely*, an ACC install into the user's own marketplace would have taken every
+plugin they had with it.
+
+ACC's ownership marker used to be written as an extra key beside the plugins, which in a
+sequence becomes a nameless entry the client tries to load. Ownership is now the entry's
+own name.
+
+Four things must all be true before a single hook runs:
+
+1. the plugin directory exists;
+2. it is published in a marketplace file the client can parse;
+3. `[marketplaces.acc-local]` and `[plugins."agents-can-communicate@acc-local"]` are
+   registered in the client's `config.toml`;
+4. the client has **installed** it - `codex plugin add agents-can-communicate@acc-local` -
+   which copies it into `$CODEX_HOME/plugins/cache/`.
+
+ACC does 1-3. Step 4 is the client's own command and ACC cannot do it by writing files, so
+`detect` reports it and names the command. Verified: with steps 1-3 done and step 4 not,
+the plugin lists as `not installed` and no hook fires.
+
+Because the client runs the *cached copy*, a hook command relative to the bundle would not
+survive installation. ACC's shim is written with absolute paths, so it does.
+
+A marketplace already registered by hand makes ACC's block a duplicate table, which this
+client refuses to load. Install now refuses with a conflict instead of writing it.
+
+### Write guards depend on the model, not on ACC
+
+In the observed configuration the client offered `exec_command`, `write_stdin`,
+`update_plan`, `request_user_input`, `view_image`, `multi_agent_v1`, the goal tools and
+`web_search` - **no `apply_patch`**. Whether `apply_patch` is offered is a property of the
+model's metadata (`apply_patch_tool_type`), not a user setting.
+
+With such a model, an edit runs through `exec_command`, which reaches hooks as
+`tool_name: "Bash"` with a `command` string. A command names no resource, so a write guard
+has nothing to compare against a claim. `guards.beforeWrite` stays true - it was observed
+denying a real `apply_patch` edit - but it protects only models that use that tool.
+
+### Tool names are normalised for hooks
+
+The model calls `exec_command`; the hook receives `tool_name: "Bash"`. The adapter's
+matcher already covers `Bash`, but the two vocabularies are not the same list, and the one
+that matters for a matcher is the one hooks see.
+
+### The lifecycle is clean
+
+Unlike Kimi Code, this client fires `SessionEnd`. Observed across a full run: `SessionStart`,
+`UserPromptSubmit`, `PreToolUse`, `Stop`, `SessionEnd` - and afterwards ACC's runtime state
+held no session record and no binding. Nothing is left to age out.

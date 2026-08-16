@@ -50,6 +50,14 @@ export function createCodexAdapter() {
           ...detected.diagnostics,
           "hook payloads captured from codex-cli 0.147.0",
           "guards cover apply_patch and shell; Codex names its edit tool apply_patch",
+          // Certification found this: whether apply_patch is offered at all is a
+          // property of the model's metadata (apply_patch_tool_type), not a user
+          // setting. With a model that does not have it, edits go through
+          // exec_command, which reaches hooks as tool_name \"Bash\" carrying a
+          // command string - and a command names no resource, so a write guard
+          // has nothing to match. Verified on 0.147.0.
+          "write guards apply only to models that offer apply_patch; with the rest, "
+            + "edits run through the shell and cannot be matched to a claim",
           "Codex requires hooks to be trusted before they run; an untrusted plugin is "
             + "installed but inert",
         ],

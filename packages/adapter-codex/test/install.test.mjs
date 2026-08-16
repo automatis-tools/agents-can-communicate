@@ -9,9 +9,21 @@ import { EXIT } from "@agents-can-communicate/protocol";
 import { createCodexAdapter } from "../src/adapter.mjs";
 import { CODEX_HOOK_EVENTS, normalizeCodexHook } from "../src/hooks.mjs";
 
-// A marketplace the user already owns, with an unrelated plugin in it.
-const EXISTING = { name: "personal", plugins: {
-  "someone-elses-plugin": { source: "./plugins/someone-elses-plugin" } } };
+// A marketplace the user already owns, in the shape this client actually
+// parses. `plugins` is a sequence; a map is rejected and takes the whole file
+// with it, so the earlier map-shaped fixture was testing a format that could
+// never have worked.
+const EXISTING = {
+  name: "local-marketplace",
+  interface: { displayName: "Local Plugins" },
+  plugins: [{ name: "someone-elses-plugin",
+    source: { source: "local", path: "./plugins/someone-elses-plugin" },
+    policy: { installation: "INSTALLED_BY_DEFAULT", authentication: "ON_INSTALL" },
+    category: "Coding" }],
+};
+
+const named = (marketplace, name) =>
+  marketplace.plugins.find(entry => entry.name === name);
 
 async function fixture(t) {
   const home = await realpath(await mkdtemp(path.join(tmpdir(), "acc-codex-")));
@@ -20,7 +32,7 @@ async function fixture(t) {
   await mkdir(path.dirname(marketplace), { recursive: true });
   await writeFile(marketplace, `${JSON.stringify(EXISTING, null, 2)}\n`);
   const read = async () => JSON.parse(await readFile(marketplace, "utf8"));
-  return { context: { home }, marketplace, read };
+  return { context: { home, codexHome: path.join(home, ".codex") }, marketplace, read };
 }
 
 test("install places the plugin and registers it in the marketplace", async t => {
@@ -35,7 +47,7 @@ test("install places the plugin and registers it in the marketplace", async t =>
   const manifest = JSON.parse(await readFile(
     path.join(plugin, ".codex-plugin", "plugin.json"), "utf8"));
   assert.equal(manifest.hooks, "./hooks.json");
-  assert.equal((await read()).plugins["agents-can-communicate"] !== undefined, true);
+  assert.equal(named(await read(), "agents-can-communicate") !== undefined, true);
 });
 
 test("install is idempotent and leaves the user's own plugin alone", async t => {
@@ -47,9 +59,8 @@ test("install is idempotent and leaves the user's own plugin alone", async t => 
   await adapter.install(context);
 
   assert.deepEqual(await read(), afterFirst, "a second install changed the marketplace");
-  assert.deepEqual(afterFirst.plugins["someone-elses-plugin"],
-    EXISTING.plugins["someone-elses-plugin"]);
-  assert.equal(afterFirst.name, "personal");
+  assert.deepEqual(named(afterFirst, "someone-elses-plugin"), EXISTING.plugins[0]);
+  assert.equal(afterFirst.name, "local-marketplace");
 });
 
 test("uninstall removes only what ACC owns, twice safely", async t => {
@@ -97,7 +108,7 @@ test("detect is read-only and reports registration honestly", async t => {
   const after = await adapter.detect(context);
 
   assert.match(after.diagnostics.join(" "), /registered/);
-  assert.equal((await read()).plugins["someone-elses-plugin"] !== undefined, true);
+  assert.equal(named(await read(), "someone-elses-plugin") !== undefined, true);
 });
 
 test("only capabilities observed in a real session are declared true", () => {
@@ -225,4 +236,119 @@ test("a shell call declares no target rather than a guessed one", () => {
     tool_input: { command: "rm -rf src/" } });
 
   assert.deepEqual([...normalised.targets], []);
+});
+
+const realFixture = fixture;
+
+test("the marketplace entry is written in the shape this client parses", async t => {
+  const { context, read } = await realFixture(t);
+
+  await createCodexAdapter().install(context);
+
+  const marketplace = await read();
+  // A map here is rejected outright - "invalid type: map, expected a sequence" -
+  // and the client then fails to load the whole file, taking the user's own
+  // plugins down with it.
+  assert.equal(Array.isArray(marketplace.plugins), true);
+  const ours = marketplace.plugins.find(entry => entry.name === "agents-can-communicate");
+  assert.deepEqual(ours.source, { source: "local", path: "./plugins/agents-can-communicate" });
+  // Only ON_INSTALL and ON_USE are accepted; anything else fails validation.
+  assert.equal(["ON_INSTALL", "ON_USE"].includes(ours.policy.authentication), true);
+  assert.equal(typeof ours.policy.installation, "string");
+});
+
+test("ACC's bookkeeping never appears as a plugin", async t => {
+  const { context, read } = await realFixture(t);
+
+  await createCodexAdapter().install(context);
+
+  // Ownership used to be recorded as an extra key beside the plugins, which in
+  // a sequence becomes a nameless entry the client tries to load.
+  for (const entry of (await read()).plugins) {
+    assert.equal(typeof entry.name, "string");
+    assert.equal(entry.name.startsWith("acc:"), false, `${entry.name} is bookkeeping`);
+  }
+});
+
+test("uninstall removes our entry and leaves the user's marketplace intact", async t => {
+  const { context, read } = await realFixture(t);
+  const adapter = createCodexAdapter();
+  await adapter.install(context);
+
+  await adapter.uninstall(context);
+
+  assert.deepEqual(await read(), EXISTING);
+});
+
+test("install registers the marketplace and enables the plugin", async t => {
+  const { context } = await realFixture(t);
+
+  await createCodexAdapter().install(context);
+
+  // Placing files is not installing. Without these two, the client never lists
+  // the plugin and no hook ever runs - the install looks successful and does
+  // nothing at all.
+  const config = await readFile(path.join(context.codexHome, "config.toml"), "utf8");
+  assert.match(config, /\[marketplaces\.acc-local\]/);
+  assert.match(config, /source_type = "local"/);
+  assert.match(config, /\[plugins\."agents-can-communicate@acc-local"\]/);
+  assert.match(config, /enabled = true/);
+});
+
+test("uninstall takes the config registration back out", async t => {
+  const { context } = await realFixture(t);
+  const adapter = createCodexAdapter();
+  const configFile = path.join(context.codexHome, "config.toml");
+  await writeFile(configFile, "model = \"gpt-5\"\n").catch(() => {});
+  await mkdir(context.codexHome, { recursive: true });
+  await writeFile(configFile, "model = \"gpt-5\"\n");
+
+  await adapter.install(context);
+  await adapter.uninstall(context);
+
+  assert.equal(await readFile(configFile, "utf8"), "model = \"gpt-5\"\n");
+});
+
+test("detect says plainly that the client still has to install the plugin", async t => {
+  const { context } = await realFixture(t);
+  const adapter = createCodexAdapter();
+
+  await adapter.install(context);
+  const report = await adapter.detect(context);
+
+  // Publishing, registering and enabling are all necessary and still not
+  // sufficient: hooks stay silent until the client copies the plugin into its
+  // own cache, which only `codex plugin add` does. Verified against 0.147.0.
+  const said = report.diagnostics.join(" ");
+  assert.match(said, /codex plugin add agents-can-communicate@acc-local/);
+  assert.match(said, /not installed/);
+});
+
+test("detect reports the plugin as installed once the client has cached it", async t => {
+  const { context } = await realFixture(t);
+  const adapter = createCodexAdapter();
+  await adapter.install(context);
+
+  // What `codex plugin add` leaves behind.
+  await mkdir(path.join(context.codexHome, "plugins", "cache", "acc-local",
+    "agents-can-communicate", "0.0.0"), { recursive: true });
+
+  assert.match((await adapter.detect(context)).diagnostics.join(" "),
+    /plugin installed in the client's cache/);
+});
+
+test("install refuses rather than duplicating a marketplace the user already added", async t => {
+  const { context } = await realFixture(t);
+  const config = path.join(context.codexHome, "config.toml");
+  await mkdir(context.codexHome, { recursive: true });
+  // What `codex plugin marketplace add` writes if the user ran it themselves.
+  await writeFile(config, '[marketplaces.acc-local]\nsource_type = "local"\n');
+
+  // Appending our block on top produces a duplicate table, and this client then
+  // refuses to load the config at all - every plugin the user has stops working.
+  await assert.rejects(createCodexAdapter().install(context),
+    error => /already registered/.test(error.message));
+
+  assert.equal(await readFile(config, "utf8"),
+    '[marketplaces.acc-local]\nsource_type = "local"\n');
 });
