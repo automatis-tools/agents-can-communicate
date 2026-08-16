@@ -174,5 +174,34 @@ export function createCommunicationService(ports, sessions, claims) {
     return record;
   }
 
-  return { sendMessage, markDelivery, recordDecision, finishSession };
+  /**
+   * Messages addressed to this participant that nothing has shown a model yet.
+   *
+   * `queued` is where `sendMessage` leaves a receipt. Anything further along has
+   * already been put in front of the recipient, and delivery states only move
+   * forward - so re-injecting would misreport what happened rather than repeat
+   * harmlessly.
+   *
+   * A session never receives its own message back. Another session of the same
+   * participant does, because it is a different reader.
+   */
+  async function pendingMessages(input = {}) {
+    const participantId = input.participantId;
+    if (typeof participantId !== "string" || participantId === "") return [];
+    const workspaceId = input.workspaceId ?? store.workspaceId;
+    const snapshot = await store.snapshot(workspaceId);
+    const waiting = new Set((snapshot.receipts ?? [])
+      .filter(receipt => receipt.recipientParticipantId === participantId
+        && (receipt.state === "queued" || receipt.state === "recorded"))
+      .map(receipt => receipt.messageId));
+    return (snapshot.messages ?? [])
+      .filter(message => waiting.has(message.messageId)
+        && message.fromSessionId !== input.exceptSessionId)
+      // Oldest first, and the id breaks ties so two messages sent in the same
+      // millisecond still project in a stable order.
+      .sort((left, right) => left.sentAt.localeCompare(right.sentAt)
+        || left.messageId.localeCompare(right.messageId));
+  }
+
+  return { sendMessage, markDelivery, pendingMessages, recordDecision, finishSession };
 }

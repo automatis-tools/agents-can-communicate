@@ -55,6 +55,6 @@ export function createClaudeCodeAdapter() {
     denyOutcome,
     injectOutcome,
     normalizeHook: payload => normalizeClaudeHook(payload),
-    renderContext: sync => projectContext(sync),
+    renderContext: (sync, options) => projectContext(sync, options),
   });
 }

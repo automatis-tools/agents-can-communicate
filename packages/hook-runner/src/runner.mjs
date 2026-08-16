@@ -127,11 +127,44 @@ const HANDLERS = {
           .find(p => p.sessionId === claim.ownerSessionId)?.participantId
           ?? claim.ownerSessionId }));
 
-    const projected = await adapter.renderContext?.({ ...sync, claims }) ?? "";
+    // What peers have said to this participant and no model has been shown yet.
+    // Without this the projector's peer block never ran in production: an agent
+    // saw only the subject of a message through its attention line, and the
+    // `injected` delivery state was unreachable.
+    const messages = await context.service.pendingMessages({
+      workspaceId: context.descriptor.id,
+      participantId: mine?.participantId,
+      exceptSessionId: binding.accSessionId });
+
+    // The ceiling a team agreed on in `acc.workspace.json`, or the default when
+    // there is no config. Validated by the protocol and, until now, never read:
+    // the projector was always called with its own default.
+    const projected = await adapter.renderContext?.({ ...sync, claims, messages },
+      { budgetBytes: context.descriptor.policy?.contextBudgetBytes }) ?? "";
     if (projected === "") return { stdout: "" };
+
+    // Only what the model was actually shown is recorded as delivered. The
+    // budget can leave a message out, and a receipt reading `injected` for text
+    // nobody saw is worse than one still reading `queued` - the sender would be
+    // told it landed. A message left behind stays queued and goes out next turn.
+    const failures = [];
+    for (const message of messages) {
+      if (!projected.includes(message.messageId)) continue;
+      await context.service.markDelivery({ sessionId: binding.accSessionId,
+        generation: binding.generation, messageId: message.messageId,
+        recipientParticipantId: mine.participantId, state: "injected" })
+        .catch(error => failures.push(`${message.messageId}: ${error.message}`));
+    }
     // Same again: Kimi Code shows the model a hook's raw stdout, while Gemini
     // and Claude Code want an envelope and drop a bare string.
-    return { stdout: "", ...adapter.injectOutcome?.(projected) };
+    // Reported rather than swallowed. The context still goes out - losing it
+    // over bookkeeping would be the worse trade - but a receipt that failed to
+    // advance has to be visible somewhere, and stdout belongs to the model.
+    const outcome = { stdout: "", ...adapter.injectOutcome?.(projected) };
+    if (failures.length === 0) return outcome;
+    return { ...outcome,
+      stderr: [outcome.stderr, `acc: delivery not recorded for ${failures.join(", ")}`]
+        .filter(Boolean).join("\n") };
   },
 
   async beforeTool({ binding, context, event, adapter }) {
