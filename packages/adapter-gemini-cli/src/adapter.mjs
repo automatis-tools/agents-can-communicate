@@ -65,6 +65,6 @@ export function createGeminiCliAdapter() {
     denyOutcome,
     injectOutcome,
     normalizeHook: payload => normalizeGeminiHook(payload),
-    renderContext: sync => projectContext(sync),
+    renderContext: (sync, options) => projectContext(sync, options),
   });
 }

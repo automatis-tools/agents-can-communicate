@@ -84,7 +84,7 @@ function createAdapter() {
       tool: payload.tool_name ?? null,
     }),
 
-    renderContext: async sync => projectContext(sync),
+    renderContext: async (sync, options) => projectContext(sync, options),
   });
 }
 

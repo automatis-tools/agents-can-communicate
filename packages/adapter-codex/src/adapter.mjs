@@ -72,6 +72,6 @@ export function createCodexAdapter() {
     allowOutcome,
     injectOutcome,
     normalizeHook: payload => normalizeCodexHook(payload),
-    renderContext: sync => projectContext(sync),
+    renderContext: (sync, options) => projectContext(sync, options),
   });
 }
