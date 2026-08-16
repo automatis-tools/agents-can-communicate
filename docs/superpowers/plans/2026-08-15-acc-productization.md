@@ -250,23 +250,23 @@ git commit -m "security: define ACC trust boundaries"
 **Interfaces:**
 - Produces reproducible CI and local release-candidate verification; does not publish without approval
 
-- [ ] **Step 1: Verify and pin Actions**
+- [x] **Step 1: Verify and pin Actions**
 
 Check official repositories for the latest stable checkout and setup-node Actions. Pin exact immutable commit SHAs and annotate human versions in YAML comments.
 
-- [ ] **Step 2: Define CI matrix**
+- [x] **Step 2: Define CI matrix**
 
 Run supported Node LTS on macOS, Linux, and Windows. Gates: clean install, syntax, unit/process/conformance/docs/security tests, package-boundary scan, line-count policy, `npm pack`, and tarball inspection.
 
-- [ ] **Step 3: Write package verifier**
+- [x] **Step 3: Write package verifier**
 
 `scripts/verify-package.mjs` packs every publishable workspace, rewrites inter-package dependency specifiers to the freshly packed local tarballs (before first publication they cannot resolve from the public registry), installs the entry tarball into a clean temp directory, runs `acc --json doctor`, exercises a non-Git Workspace, and proves uninstall cleanup.
 
-- [ ] **Step 4: Prove CI gate liveness locally**
+- [x] **Step 4: Prove CI gate liveness locally**
 
 Temporarily include `prototype/` in the npm tarball. `verify-package.mjs` must fail on forbidden content. Restore exclusions and rerun green.
 
-- [ ] **Step 5: Build release candidate without publishing**
+- [x] **Step 5: Build release candidate without publishing**
 
 ```bash
 npm ci
@@ -279,7 +279,7 @@ git diff --check
 
 Record tarball name, digest, test counts, client capability matrix, and known limitations in `CHANGELOG.md`.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add .github CHANGELOG.md docs/RELEASING.md scripts/verify-package.mjs
@@ -287,3 +287,26 @@ git commit -m "ci: prepare ACC release candidate"
 ```
 
 Stop before npm publication, Git tag, GitHub release, or remote install test. Request explicit user approval for those external mutations.
+
+
+## Completion note (2026-08-16)
+
+All six tasks are delivered. Three deviations, each deliberate:
+
+**One package, not eight.** The user approved a single publishable
+`agents-can-communicate` carrying its workspaces. That removes Task 3's
+requirement to rewrite inter-package dependency specifiers to locally packed
+tarballs - there is nothing to rewrite. `bundleDependencies` does the work, and
+`scripts/verify-package.mjs` proves the result installs and runs with no
+workspace anywhere.
+
+**`files` instead of `.npmignore`.** An allowlist rather than a denylist. Having
+both means reading two files to answer one question.
+
+**camelCase config, not the plan's snake_case example.** Every protocol record is
+camelCase and workspace discovery already read `schemaVersion`; following the
+illustration literally would have cost a second convention for one hand-edited
+file.
+
+Nothing was published. No npm release, no tag, no GitHub release - those need
+explicit approval and are described in `docs/RELEASING.md`.

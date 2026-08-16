@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
-import { mkdtemp, readFile, realpath, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, readdir, realpath, rm, writeFile }
+  from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -8,6 +9,27 @@ import { promisify } from "node:util";
 
 const run = promisify(execFile);
 const repo = path.resolve(import.meta.dirname, "..", "..");
+
+// Node 20.12 and later refuse to spawn a .cmd or .bat without a shell (the
+// CVE-2024-27980 fix), and npm on Windows is exactly that - a .cmd shim. So npm
+// runs through a shell there, with arguments quoted because a temp path can
+// contain spaces.
+const isWindows = process.platform === "win32";
+const runNpm = (args, options = {}) => (isWindows
+  ? run("npm.cmd", args.map(argument => `"${argument}"`), { ...options, shell: true })
+  : run("npm", args, options));
+
+/** Files under a directory whose contents contain `needle`. */
+async function filesContaining(root, needle) {
+  const entries = await readdir(root, { recursive: true, withFileTypes: true });
+  const hits = [];
+  for (const entry of entries) {
+    if (!entry.isFile()) continue;
+    const file = path.join(entry.parentPath ?? entry.path, entry.name);
+    if ((await readFile(file, "utf8").catch(() => "")).includes(needle)) hits.push(file);
+  }
+  return hits;
+}
 
 /**
  * What a user actually receives.
@@ -27,7 +49,7 @@ const repo = path.resolve(import.meta.dirname, "..", "..");
 async function packed(t) {
   const into = await realpath(await mkdtemp(path.join(tmpdir(), "acc-pack-")));
   t.after(() => rm(into, { recursive: true, force: true }));
-  const { stdout } = await run("npm", ["pack", "--pack-destination", into],
+  const { stdout } = await runNpm(["pack", "--pack-destination", into],
     { cwd: repo, env: { ...process.env } });
   const name = stdout.trim().split("\n").at(-1);
   return { into, tarball: path.join(into, name) };
@@ -77,14 +99,18 @@ test("no absolute path from this machine survives into the tarball", async t => 
   const { tarball, into } = await packed(t);
   const extracted = path.join(into, "extracted");
 
-  await run("mkdir", ["-p", extracted]);
+  // Not `mkdir -p`: on Windows that is a cmd builtin, not something execFile
+  // can spawn, and this test runs on the Windows matrix.
+  await mkdir(extracted, { recursive: true });
   await run("tar", ["-xzf", tarball, "-C", extracted]);
-  const { stdout } = await run("grep",
-    ["-rl", "/Users/", path.join(extracted, "package")]).catch(() => ({ stdout: "" }));
+  // Searched in Node rather than with grep. grep does not exist on Windows, and
+  // the previous version swallowed that in a catch - so on the Windows matrix
+  // this test passed while checking nothing at all.
+  const hits = await filesContaining(path.join(extracted, "package"), "/Users/");
 
   // The hook shim bakes absolute paths at install time, which is correct - but
   // one baked at *pack* time would ship one machine's layout to everyone.
-  assert.equal(stdout.trim(), "", `published files carry local paths:\n${stdout}`);
+  assert.deepEqual(hits, [], `published files carry local paths:\n${hits.join("\n")}`);
 });
 
 test("a clean install runs the CLI and attaches a session", async t => {
@@ -96,7 +122,7 @@ test("a clean install runs the CLI and attaches a session", async t => {
   await writeFile(path.join(consumer, "package.json"),
     '{"name":"consumer","version":"1.0.0","private":true}\n');
 
-  await run("npm", ["install", "--silent", tarball], { cwd: consumer });
+  await runNpm(["install", "--silent", tarball], { cwd: consumer });
 
   // The whole point: installed from a tarball, with no workspace anywhere.
   const env = { ...process.env, ACC_DATA_HOME: dataHome,
