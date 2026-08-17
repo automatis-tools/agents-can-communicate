@@ -15,8 +15,16 @@ const PLUGIN_NAME = "agents-can-communicate";
 const MARKETPLACE = "acc-local";
 const QUALIFIED = `${PLUGIN_NAME}@${MARKETPLACE}`;
 
-const marketplacePath = root => path.join(root, ".agents", "plugins", "marketplace.json");
-const pluginPath = (root, name = PLUGIN_NAME) => path.join(root, "plugins", name);
+// A marketplace is a directory whose manifest sits at
+// `<root>/.agents/plugins/marketplace.json`, and every `source.path` in that
+// manifest is relative to the manifest's own directory - `./plugins/<name>`,
+// as the client's own entries are written. Resolving the plugin from `root`
+// instead put the files two levels above where the manifest pointed, so the
+// entry named a directory that did not exist and the client loaded nothing.
+const marketplaceDir = root => path.join(root, ".agents", "plugins");
+const marketplacePath = root => path.join(marketplaceDir(root), "marketplace.json");
+const pluginPath = (root, name = PLUGIN_NAME) =>
+  path.join(marketplaceDir(root), "plugins", name);
 const configPath = codexHome => path.join(codexHome, "config.toml");
 // Where `codex plugin add` leaves the copy it actually runs. All three
 // components are ACC's own - the marketplace it created, the plugin name it

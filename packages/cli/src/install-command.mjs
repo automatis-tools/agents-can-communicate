@@ -14,11 +14,15 @@ import { platformPaths } from "./platform-paths.mjs";
 // Where each client keeps its own configuration. All of it derives from one
 // home, so a test - or an operator with a second account - can point the whole
 // installation somewhere else in one move.
+// Each client keeps its own directory under the user's home, and an adapter
+// pointed at the home itself writes beside them rather than inside them. That
+// install reports success and the client never reads a byte of it.
 export const clientContext = home => ({
   home,
   configDir: path.join(home, ".claude"),
   agentsHome: home,
   codexHome: path.join(home, ".codex"),
+  kimiHome: path.join(home, ".kimi-code"),
 });
 
 export const ALL_ADAPTERS = () => [createClaudeCodeAdapter(), createCodexAdapter(),

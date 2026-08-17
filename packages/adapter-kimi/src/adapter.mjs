@@ -3,6 +3,9 @@ import { defineAdapter, projectContext } from "@agents-can-communicate/adapter-s
 import { denyOutcome, injectOutcome, normalizeKimiHook } from "./hooks.mjs";
 import { planKimiInstall, detectKimi, installKimiPlugin, uninstallKimiPlugin } from "./install.mjs";
 
+/** The installer works in this client's own home, wherever the caller put it. */
+const forClient = context => ({ ...context, home: context.kimiHome ?? context.home });
+
 export const KIMI_CODE_VERSION = "0.36.1";
 
 /**
@@ -24,6 +27,10 @@ export function createKimiAdapter() {
   return defineAdapter({
     id: "kimi",
     displayName: "Kimi Code",
+    // The binary this client actually installs. Probed for a version to
+    // decide whether the client is on this machine, so it has to be the
+    // real command rather than the adapter id: `0.36.1`.
+    client: { command: "kimi", versionArgs: ["--version"] },
     capabilities: {
       lifecycle: { sessionStart: true, heartbeat: true },
       context: { beforeTurnInjection: true },
@@ -37,10 +44,14 @@ export function createKimiAdapter() {
     guardShell: async () => ({ ok: true, changes: [], diagnostics: [] }),
     poll: async () => ({ ok: true, changes: [], diagnostics: [] }),
 
-    planInstall: context => planKimiInstall(context),
-    detect: context => detectKimi(context),
-    install: context => installKimiPlugin(context),
-    uninstall: context => uninstallKimiPlugin(context),
+    // This client keeps everything under its own directory, so the installer is
+    // handed that rather than the user's home. Pointed at the home itself it
+    // wrote `~/config.toml` and `~/plugins/` beside the client instead of
+    // inside it - an install that reports success and is never read.
+    planInstall: context => planKimiInstall(forClient(context)),
+    detect: context => detectKimi(forClient(context)),
+    install: context => installKimiPlugin(forClient(context)),
+    uninstall: context => uninstallKimiPlugin(forClient(context)),
 
     doctor: async context => {
       const detected = await detectKimi(context);
