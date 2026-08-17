@@ -17,6 +17,7 @@ const base = (overrides = {}) => ({
   doctor: noop,
   normalizeHook: () => ({ kind: "sessionStart", sessionId: "s", cwd: "/tmp" }),
   renderContext: () => "",
+  client: { command: "example", versionArgs: ["--version"] },
   ...overrides,
 });
 
@@ -98,4 +99,17 @@ test("an adapter must declare an id, a display name, and the base operations", (
       error => error.code === EXIT.USAGE && error.message.includes(method),
       `a missing ${method} was accepted`);
   }
+});
+
+test("an adapter without a client binary is refused at construction", () => {
+  // Detection spawns this to decide whether the client is on the machine. When
+  // it was optional the probe fell back to the adapter id, so `claude_code` and
+  // `gemini_cli` ran commands that exist nowhere and `acc install` reported
+  // both absent on every machine while claiming success.
+  const { client, ...withoutClient } = base();
+
+  assert.throws(() => defineAdapter(withoutClient),
+    error => error.code === EXIT.USAGE && /client\.command/.test(error.message));
+  assert.throws(() => defineAdapter({ ...base(), client: { command: "  " } }),
+    error => error.code === EXIT.USAGE);
 });
