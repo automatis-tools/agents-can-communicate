@@ -12,9 +12,14 @@ Workspace
         └── optional child Session
 ```
 
-- `Participant` is a persistent logical identity such as a named Codex role or human operator.
+- `Participant` is one running agent. Two Codex sessions are two participants, even in
+  the same directory. `ACC_PARTICIPANT` pins a durable name, which is what lets work
+  addressed to an agent survive it restarting.
 - `Session` is one live or resumable conversation in one harness.
 - A participant may have several sessions, but ownership and claims are attached to an exact session generation.
+- A session records the checkout it is working in — `checkoutRoot` and `branch`. One
+  workspace spans every worktree of a repository, so the workspace id cannot say who is
+  where, and nothing else can: the agents a clean-up asks about are the ones not running.
 
 ## Intent
 

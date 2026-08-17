@@ -47,6 +47,8 @@ export function createStatusService(ports, sessions) {
         participantId: session.participantId,
         harness: session.harness,
         parentSessionId: session.parentSessionId,
+        checkoutRoot: session.checkoutRoot ?? null,
+        branch: session.branch ?? null,
         enforcement: session.enforcement ?? "advisory",
         lifecycle: session.lifecycle ?? "manual",
         presence: classifySessionPresence(session, now),

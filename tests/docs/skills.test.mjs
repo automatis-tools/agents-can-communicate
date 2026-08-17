@@ -22,12 +22,12 @@ const repo = path.resolve(import.meta.dirname, "..", "..");
 // `heartbeat`, `detach`) are deliberately absent — a skill that taught those
 // would have models running the installer.
 const TAUGHT = Object.freeze(["sync", "work", "claim", "request", "task", "message",
-  "finish"]);
+  "finish", "status"]);
 
 // Reachable by an agent but not worth a section: `release` is covered by
-// `finish`, `status` by `sync --scope full`, `workstream` only matters once work
+// `finish`, `workstream` only matters once work
 // is large enough that the model will have read the CLI reference anyway.
-const OPTIONAL = Object.freeze(["release", "status", "workstream"]);
+const OPTIONAL = Object.freeze(["release", "workstream"]);
 
 /** Every SKILL.md an adapter ships. */
 async function skills() {
