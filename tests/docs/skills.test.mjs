@@ -55,8 +55,12 @@ test("every adapter ships a skill", async () => {
 test("each skill teaches the operations an agent is expected to use", async () => {
   for (const { file, text } of await skills()) {
     for (const command of TAUGHT) {
-      assert.match(text, new RegExp(`acc ${command}\\b`),
-        `${file} never mentions acc ${command}, so no agent will ever run it`);
+      // `{{ACC}}` is the placeholder the installer replaces with this
+      // machine's absolute invocation. The shipped file carries it; a skill
+      // saying a bare `acc` would be telling agents to run something that is
+      // not on PATH on every machine.
+      assert.match(text, new RegExp(`\\{\\{ACC\\}\\} ${command}\\b`),
+        `${file} never runs ${command}, so no agent will ever do it`);
     }
   }
 });

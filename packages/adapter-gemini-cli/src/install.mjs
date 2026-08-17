@@ -2,7 +2,7 @@ import { cp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { removeInstalledTree, writeHookShim }
+import { bakeSkillCommand, removeInstalledTree, writeHookShim }
   from "@agents-can-communicate/adapter-sdk";
 
 const bundle = fileURLToPath(new URL("../extension", import.meta.url));
@@ -49,6 +49,9 @@ export async function installGeminiExtension({ home, runner, node }) {
   const target = extensionPath(home);
   await rm(target, { recursive: true, force: true });
   await cp(bundle, target, { recursive: true });
+  // The skill ships with a placeholder where the command belongs: `acc` is
+  // not on PATH everywhere, and an agent that cannot run it improvises.
+  await bakeSkillCommand({ root: target, node });
   // This client offers no plugin-root variable in a hook command, so the shim's
   // absolute path is written in at install time.
   const shim = await writeHookShim({ dir: path.join(target, "hooks"),

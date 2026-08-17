@@ -25,12 +25,12 @@ export function runStoreContract(name, makeStore) {
 
     await store.transaction(async tx => {
       tx.put("workspace", WORKSPACE, workspaceRecord());
-      tx.append(eventRecord("workspace.created"));
+      tx.append(eventRecord("workspace.materialised"));
     });
 
     const page = await store.eventsSince(WORKSPACE, null, 10);
     assert.equal(page.events.length, 1);
-    assert.equal(page.events[0].type, "workspace.created");
+    assert.equal(page.events[0].type, "workspace.materialised");
     assert.equal((await store.snapshot(WORKSPACE)).workspace.displayName, "Example");
   });
 
@@ -40,7 +40,7 @@ export function runStoreContract(name, makeStore) {
 
     await assert.rejects(store.transaction(async tx => {
       tx.put("workspace", WORKSPACE, workspaceRecord());
-      tx.append(eventRecord("workspace.created"));
+      tx.append(eventRecord("workspace.materialised"));
       throw boom;
     }), boom);
 
@@ -52,7 +52,7 @@ export function runStoreContract(name, makeStore) {
     const store = await makeStore();
     await store.transaction(async tx => {
       tx.put("workspace", WORKSPACE, workspaceRecord());
-      tx.append(eventRecord("workspace.created"));
+      tx.append(eventRecord("workspace.materialised"));
     });
     const generationA = await store.transaction(async tx => tx.generationOf("workspace", WORKSPACE));
 
@@ -62,12 +62,12 @@ export function runStoreContract(name, makeStore) {
 
     await assert.rejects(store.transaction(async tx => {
       tx.put("workspace", WORKSPACE, { ...workspaceRecord(), displayName: "C" }, generationA);
-      tx.append(eventRecord("workspace.renamed"));
+      tx.append(eventRecord("session.opened"));
     }), error => error.code === EXIT.CONFLICT);
 
     assert.equal((await store.snapshot(WORKSPACE)).workspace.displayName, "B");
     assert.deepEqual((await store.eventsSince(WORKSPACE, null, 10)).events.map(e => e.type),
-      ["workspace.created"]);
+      ["workspace.materialised"]);
   });
 
   test(`${name}: creating an existing record without an expectation conflicts`, async () => {
