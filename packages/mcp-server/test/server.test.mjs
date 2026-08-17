@@ -1,4 +1,6 @@
 import assert from "node:assert/strict";
+
+import { PUBLIC_TOOLS } from "../src/tools.mjs";
 import { spawn } from "node:child_process";
 import { mkdtemp, realpath, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -112,11 +114,11 @@ test("an unsupported protocol version is refused with the reserved code", async 
   });
 });
 
-test("tools/list publishes the six operations", async t => {
+test("tools/list publishes every model-facing operation", async t => {
   await withServer(t, async ({ request, meta }) => {
     const response = await request("tools/list", { _meta: meta });
 
-    assert.equal(response.result.tools.length, 6);
+    assert.equal(response.result.tools.length, PUBLIC_TOOLS.length);
     assert.equal(response.result.resultType, "complete");
   });
 });
