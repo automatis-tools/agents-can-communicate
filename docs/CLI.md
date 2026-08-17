@@ -34,9 +34,10 @@ graph LR
 |---|---|
 | `acc status` | Who is here, claims, protection level |
 | `acc sync` | New events since a cursor; silent when alone |
-| `acc work` | Publish what this session is doing |
+| `acc work` | Publish what this session is doing. `--clear` when it has stopped |
 | `acc claim` | Reserve a resource. Exit `5` on conflict |
 | `acc release` | Give it back |
+| `acc ack` | Answer a message that asked for one, so it stops asking |
 | `acc message` | Send a typed message to participants |
 | `acc request` | Ask another agent to do something. One call: the work plus why |
 | `acc task` | Create work, `--take` it, or `--state` it along |
@@ -70,6 +71,11 @@ acc request --session "$ACC_SESSION" --generation "$ACC_GENERATION" \
   --to claude_code --title "finish the store tests" \
   --detail "I ported src/store but ran out of time on the concurrency cases."
 ```
+
+Finishing the task answers the request it came from, so the message stops demanding an
+acknowledgement. `acc ack --message <id>` does the same for messages that are not tied to a
+task — and a session can only mark its own receipt, since reading something is a statement
+only the reader can make.
 
 One write. The recipient learns about it twice, and the two facts are different: the work
 appears as an attention item addressed to them, and the message explains why. A task with

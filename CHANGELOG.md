@@ -7,10 +7,10 @@ release.
 
 | | |
 |---|---|
-| Built from | `484e02b` |
-| Tarball | `agents-can-communicate-0.0.0.tgz`, 88 KB, 99 entries |
-| sha256 | `1d47407b2ee0e7ae6e7729c1e9ad3eff6796b6653a44a7b03fba72a923962c24` |
-| Tests | 615 passing, 0 failing |
+| Built from | `60817fb` |
+| Tarball | `agents-can-communicate-0.0.0.tgz`, 101 KB, 100 entries |
+| sha256 | `848ad59785f0a35fa34102e818869b6acf780f833f674122d4c0e74a41b30184` |
+| Tests | 662 passing, 0 failing |
 | Node | 24 (current production LTS) |
 | Verified on | macOS 15 (darwin 25.5.0, arm64) and Linux in CI |
 | Not supported | Windows — see below |
@@ -44,6 +44,11 @@ Claims are enforced however the workspace path is spelled. A project reached
 through a symlink — `/tmp` and `/var` on macOS, a symlinked checkout anywhere —
 used to pass every write through while still reporting `protection guarded`.
 
+Installing edits configuration for four other tools, so uninstall removes the
+entries ACC recorded writing and nothing else. A settings key ACC had to create
+goes only when it is empty: plugins the user enabled afterwards live in that same
+key, and taking it outright took them too.
+
 ### Clients
 
 | Client | Version | Attach | Guard writes | Inject | Heartbeat |
@@ -53,6 +58,13 @@ used to pass every write through while still reporting `protection guarded`.
 | Gemini CLI | 0.37.0, 0.55.1 | yes | yes² | yes | – |
 | Kimi Code | 0.36.1 | yes | yes | yes | yes (60s) |
 | Any MCP client | rev 2026-07-28 | yes | – | – | – |
+
+A live model completed the full request loop on Codex - one session found who
+owned the work, asked for it, and the other took it, fixed the code and reported
+back. Claude Code attaches by itself and its agent used ACC's commands from the
+skill. Kimi Code fired every hook and its model never ran: the account's quota is
+spent. Gemini CLI fired every hook and its model never ran either: the account
+returns a permission error in headless mode.
 
 ¹ only models that offer `apply_patch`; others edit through the shell, which
 names no resource · ² only approval modes that expose edit tools
@@ -71,7 +83,11 @@ Full matrix and what the `yes` values do **not** promise:
 - **One unguardable participant makes the workspace advisory.** An MCP client or
   a shell-editing model means a guarded claim is advice, and status reports that.
 - **Gemini headless returns 403 on the account used here.** Not ACC's doing —
-  reproduced with a plain `gemini -p` outside ACC entirely.
+  reproduced with a plain `gemini -p` outside ACC entirely. Headless runs also
+  need `GEMINI_CLI_TRUST_WORKSPACE=true`.
+- **No live model has driven Kimi Code or Gemini CLI.** Both fire every hook
+  against the real client; neither account can complete a turn. Their matrix rows
+  rest on hook captures, not on a finished exchange.
 - **No subagent visibility.** `lifecycle.childSessions` is false everywhere; no
   subagent was observed during capture.
 - **Windows does not work.** Not "untested" — measured. Once CI actually ran the

@@ -2,15 +2,55 @@ import { cp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { bakeSkillCommand, mergeOwnedConfig, ownedKeys, removeInstalledTree,
-  removeOwnedConfig, writeHookShim }
+import { bakeSkillCommand, mergeOwnedEntries, ownedEntries, removeInstalledTree,
+  removeOwnedEntries, writeHookShim }
   from "@agents-can-communicate/adapter-sdk";
 
 const bundle = fileURLToPath(new URL("../plugin", import.meta.url));
-const PLUGIN_NAME = "agents-can-communicate";
+const manifest = fileURLToPath(new URL("../plugin/.claude-plugin/plugin.json",
+  import.meta.url));
 
+const PLUGIN_NAME = "agents-can-communicate";
+const MARKETPLACE = "acc-local";
+const QUALIFIED = `${PLUGIN_NAME}@${MARKETPLACE}`;
+
+/**
+ * How this client actually installs a plugin.
+ *
+ * The previous version wrote a settings key called `accPlugins` and stopped.
+ * There is no such setting: the client never loaded the plugin, no hook ever
+ * fired, and no session attached - on any machine. It looked installed from
+ * every direction, including `acc doctor`.
+ *
+ * Measured by running the client's own commands against a home and diffing it:
+ *
+ *   claude plugin marketplace add <dir>
+ *   claude plugin install agents-can-communicate@acc-local --scope user
+ *
+ * Four things result, and all four are needed:
+ *
+ *   plugins/known_marketplaces.json   the marketplace, sourced from a directory
+ *   plugins/installed_plugins.json    version 2, one entry per scope
+ *   plugins/cache/<m>/<p>/<version>/  the copy the client runs from
+ *   settings.json                     extraKnownMarketplaces + enabledPlugins
+ *
+ * Verified by registering it this way on a real machine: a `claude -p` run with
+ * nothing about ACC in the prompt attached a session by itself.
+ */
 const settingsPath = configDir => path.join(configDir, "settings.json");
-const pluginPath = configDir => path.join(configDir, "plugins", PLUGIN_NAME);
+const pluginsDir = configDir => path.join(configDir, "plugins");
+const marketplaceDir = configDir => path.join(pluginsDir(configDir), "marketplaces",
+  MARKETPLACE);
+const sourceDir = configDir => path.join(marketplaceDir(configDir), PLUGIN_NAME);
+const marketplaceFile = configDir => path.join(marketplaceDir(configDir),
+  ".claude-plugin", "marketplace.json");
+const knownMarketplacesPath = configDir =>
+  path.join(pluginsDir(configDir), "known_marketplaces.json");
+const installedPluginsPath = configDir =>
+  path.join(pluginsDir(configDir), "installed_plugins.json");
+const cacheRoot = configDir => path.join(pluginsDir(configDir), "cache", MARKETPLACE);
+const cachePath = (configDir, version) =>
+  path.join(cacheRoot(configDir), PLUGIN_NAME, version);
 
 async function readJson(file, fallback) {
   try {
@@ -27,46 +67,142 @@ const writeJson = async (file, value) => {
 };
 
 /**
- * Merge ACC's plugin registration into the user's settings without disturbing
- * anything else. Ownership is recorded, so uninstall removes exactly what was
- * added rather than guessing by shape - a user's own PreToolUse hook can look
- * very much like ours.
+ * Write a registry the client owns, in the client's own shape.
+ *
+ * Measured: it writes these with two-space indent and **no** trailing newline.
+ * Adding one made uninstall leave a one-byte difference in a file ACC had only
+ * borrowed - the content restored exactly and the bytes did not, which is the
+ * promise this tool makes about other people's files.
+ *
+ * Unchanged content is not rewritten at all, so a no-op install touches nothing.
  */
-export async function installClaudePlugin({ configDir, runner, node }) {
-  const target = pluginPath(configDir);
+const writeClientJson = async (file, value) => {
+  const text = JSON.stringify(value, null, 2);
+  const current = await readFile(file, "utf8").catch(() => null);
+  if (current === text) return;
+  await mkdir(path.dirname(file), { recursive: true });
+  await writeFile(file, text);
+};
+
+const pluginVersion = async () => (await readJson(manifest, {})).version ?? "0.0.0";
+
+/** The marketplace manifest, in the shape the client's own directory sources use. */
+const marketplaceManifest = () => ({
+  name: MARKETPLACE,
+  owner: { name: PLUGIN_NAME },
+  metadata: { description: "Local ACC coordination plugin", version: "1.0.0" },
+  plugins: [{
+    name: PLUGIN_NAME,
+    source: `./${PLUGIN_NAME}`,
+    description: "Coordination between AI coding agents sharing a project",
+    category: "productivity",
+  }],
+});
+
+/** A plugin tree with the shim written and the skill's command baked in. */
+async function layOutPlugin(target, { runner, node }) {
   await rm(target, { recursive: true, force: true });
   await cp(bundle, target, { recursive: true });
-  // The skill ships with a placeholder where the command belongs: `acc` is
-  // not on PATH everywhere, and an agent that cannot run it improvises.
+  // The skill ships with a placeholder where the command belongs: `acc` is not
+  // on PATH everywhere, and an agent that cannot run it improvises.
   await bakeSkillCommand({ root: target, node });
-  // The bundle's hooks.json names this script; until now nothing wrote it, so
-  // every hook resolved to a command that does not exist and failed silently.
+  // The bundle's hooks.json names this script, and nothing else writes it.
   await writeHookShim({ dir: path.join(target, "hooks"), adapterId: "claude_code",
     runner, node });
+}
+
+export async function installClaudePlugin({ configDir, runner, node, now = new Date() }) {
+  const version = await pluginVersion();
+  const stamp = now.toISOString();
+  const source = sourceDir(configDir);
+  const cached = cachePath(configDir, version);
+
+  await layOutPlugin(source, { runner, node });
+  await writeJson(marketplaceFile(configDir), marketplaceManifest());
+  // The copy the client runs from. Written here rather than asking the user to
+  // run `claude plugin install`, exactly as the Codex adapter does, because the
+  // command's only effect is this copy plus the two registry entries below.
+  await layOutPlugin(cached, { runner, node });
+
+  const known = await readJson(knownMarketplacesPath(configDir), {});
+  await writeClientJson(knownMarketplacesPath(configDir), {
+    ...known,
+    [MARKETPLACE]: {
+      source: { source: "directory", path: marketplaceDir(configDir) },
+      installLocation: marketplaceDir(configDir),
+      lastUpdated: stamp,
+    },
+  });
+
+  const installed = await readJson(installedPluginsPath(configDir),
+    { version: 2, plugins: {} });
+  await writeClientJson(installedPluginsPath(configDir), {
+    ...installed,
+    version: 2,
+    plugins: {
+      ...installed.plugins,
+      [QUALIFIED]: [{ scope: "user", installPath: cached, version,
+        installedAt: stamp, lastUpdated: stamp }],
+    },
+  });
 
   const file = settingsPath(configDir);
   const existing = await readJson(file, {});
-  await writeJson(file, mergeOwnedConfig(existing, { accPlugins: [target] }));
-  return { ok: true, changes: [target, file], diagnostics: [] };
+  // Entry-level ownership: `enabledPlugins` holds every plugin the user has, so
+  // taking the whole key would destroy them and handing it back on uninstall
+  // would destroy them again.
+  await writeJson(file, mergeOwnedEntries(existing, {
+    extraKnownMarketplaces: {
+      [MARKETPLACE]: { source: { source: "directory", path: marketplaceDir(configDir) } },
+    },
+    enabledPlugins: { [QUALIFIED]: true },
+  }));
+
+  return { ok: true,
+    changes: [source, cached, marketplaceFile(configDir),
+      knownMarketplacesPath(configDir), installedPluginsPath(configDir), file],
+    diagnostics: [] };
 }
 
 export async function uninstallClaudePlugin({ configDir, keep = [] }) {
-  const file = settingsPath(configDir);
-  const existing = await readJson(file, null);
   const changes = [];
-  if (existing !== null) {
-    changes.push(...ownedKeys(existing));
-    await writeJson(file, removeOwnedConfig(existing));
+  const file = settingsPath(configDir);
+  const settings = await readJson(file, null);
+  if (settings !== null) {
+    changes.push(...ownedEntries(settings).map(pair => pair.join("/")));
+    await writeJson(file, removeOwnedEntries(settings));
   }
-  await removeInstalledTree(pluginPath(configDir), keep);
+
+  // The registries belong to the client. Only ACC's own entry is taken out.
+  const known = await readJson(knownMarketplacesPath(configDir), null);
+  if (known !== null && Object.hasOwn(known, MARKETPLACE)) {
+    const { [MARKETPLACE]: _removed, ...rest } = known;
+    await writeClientJson(knownMarketplacesPath(configDir), rest);
+    changes.push(MARKETPLACE);
+  }
+  const installed = await readJson(installedPluginsPath(configDir), null);
+  if (installed !== null && Object.hasOwn(installed.plugins ?? {}, QUALIFIED)) {
+    const { [QUALIFIED]: _gone, ...rest } = installed.plugins;
+    await writeClientJson(installedPluginsPath(configDir), { ...installed, plugins: rest });
+    changes.push(QUALIFIED);
+  }
+
+  await removeInstalledTree(cacheRoot(configDir), keep);
+  await removeInstalledTree(sourceDir(configDir), keep);
+  await removeInstalledTree(marketplaceDir(configDir), keep);
   return { ok: true, changes, diagnostics: [] };
 }
 
 export async function detectClaude({ configDir }) {
-  const existing = await readJson(settingsPath(configDir), null);
-  const installed = ownedKeys(existing ?? {}).includes("accPlugins");
+  const settings = await readJson(settingsPath(configDir), null);
+  const enabled = settings?.enabledPlugins?.[QUALIFIED] === true;
+  const registered = Object.hasOwn(
+    (await readJson(installedPluginsPath(configDir), { plugins: {} })).plugins ?? {},
+    QUALIFIED);
   return { ok: true, changes: [],
-    diagnostics: [installed ? "acc plugin registered" : "acc plugin not registered"] };
+    diagnostics: [enabled && registered
+      ? "acc plugin registered and enabled"
+      : "acc plugin not registered"] };
 }
 
 /**
@@ -75,7 +211,10 @@ export async function detectClaude({ configDir }) {
  */
 export function planClaudeInstall({ configDir }) {
   return [
-    { path: pluginPath(configDir), kind: "tree" },
+    { path: marketplaceDir(configDir), kind: "tree" },
+    { path: cacheRoot(configDir), kind: "tree" },
+    { path: knownMarketplacesPath(configDir), kind: "merge" },
+    { path: installedPluginsPath(configDir), kind: "merge" },
     { path: settingsPath(configDir), kind: "merge" },
   ];
 }

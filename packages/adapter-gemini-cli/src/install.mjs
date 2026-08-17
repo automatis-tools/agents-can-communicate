@@ -49,6 +49,13 @@ export async function installGeminiExtension({ home, runner, node }) {
   const target = extensionPath(home);
   await rm(target, { recursive: true, force: true });
   await cp(bundle, target, { recursive: true });
+  // The bundle's hooks.json is the template the settings entries are built
+  // from, not something to ship. This client loads an extension's own
+  // hooks.json *in addition to* settings, so shipping it registered ACC
+  // twice: once with the shim, and once with the literal placeholder
+  // `acc-hook`, which is not on PATH. The client reported the second one
+  // failing on every event while the first quietly did the work.
+  await rm(path.join(target, "hooks", "hooks.json"), { force: true });
   // The skill ships with a placeholder where the command belongs: `acc` is
   // not on PATH everywhere, and an agent that cannot run it improvises.
   await bakeSkillCommand({ root: target, node });

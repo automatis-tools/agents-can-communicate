@@ -18,6 +18,10 @@ Once you understand the request, publish one line of Intent:
   --summary "porting the claim model" --mode edit
 ```
 
+When you stop working on something and are not starting anything else, say so with
+`{{ACC}} work --clear`. An intent left standing reads to peers as work still in
+progress.
+
 `--mode` is one of `observe`, `explore`, `edit`, `review`, `coordinate`, `wait`. Update it
 when the work changes character. Intent is awareness, not a reservation: it tells peers
 what you are up to, it does not stop anyone editing anything.
@@ -67,6 +71,13 @@ If you are not going to do it, reply with `acc message` instead of leaving it pe
 agent that asked is waiting on an answer, and silence is not one.
 
 ## Work someone asked of you, continued
+
+Marking it done answers the request it came from, so it stops appearing in your turn.
+For a message that asked for an acknowledgement and is not tied to a task:
+
+```bash
+{{ACC}} ack --session "$ACC_SESSION" --generation "$ACC_GENERATION" --message message_x
+```
 
 If you are not going to do it, say so. A request left pending looks exactly like
 one you have not read yet, and the agent that asked is waiting on an answer:
