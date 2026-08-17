@@ -7,10 +7,10 @@ release.
 
 | | |
 |---|---|
-| Built from | `70b793b` |
-| Tarball | `agents-can-communicate-0.0.0.tgz`, 84 KB, 99 entries |
-| sha256 | `a5c8bb1de3e811694633f4cc4a0c238790b79774c546d9bc7cefaaa36eb7cdfa` |
-| Tests | 598 passing, 0 failing |
+| Built from | `484e02b` |
+| Tarball | `agents-can-communicate-0.0.0.tgz`, 88 KB, 99 entries |
+| sha256 | `1d47407b2ee0e7ae6e7729c1e9ad3eff6796b6653a44a7b03fba72a923962c24` |
+| Tests | 615 passing, 0 failing |
 | Node | 24 (current production LTS) |
 | Verified on | macOS 15 (darwin 25.5.0, arm64) and Linux in CI |
 | Not supported | Windows — see below |
@@ -34,6 +34,15 @@ when the working tree is dirty.
 
 Coordinates independent agent sessions in one workspace: presence, intent,
 workspace-global claims, typed messages, handoffs. No session is in charge.
+
+A peer's message reaches the recipient's turn as a fenced, attributed, escaped
+block, and its receipt advances to `injected` only for what the turn actually
+carried — a message the context budget could not fit stays queued rather than
+telling the sender it landed. The ceiling is `policy.contextBudgetBytes`.
+
+Claims are enforced however the workspace path is spelled. A project reached
+through a symlink — `/tmp` and `/var` on macOS, a symlinked checkout anywhere —
+used to pass every write through while still reporting `protection guarded`.
 
 ### Clients
 
