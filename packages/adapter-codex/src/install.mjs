@@ -2,7 +2,8 @@ import { cp, mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { removeInstalledTree, removeTomlBlock, stripBlock, tomlString, writeHookShim, writeTomlBlock }
+import { bakeSkillCommand, removeInstalledTree, removeTomlBlock, stripBlock, tomlString,
+  writeHookShim, writeTomlBlock }
   from "@agents-can-communicate/adapter-sdk";
 import { AccError, EXIT } from "@agents-can-communicate/protocol";
 
@@ -89,6 +90,9 @@ export async function installCodexPlugin({ home, agentsHome = home,
   const target = pluginPath(agentsHome);
   await rm(target, { recursive: true, force: true });
   await cp(bundle, target, { recursive: true });
+  // The skill ships with a placeholder where the command belongs: `acc` is
+  // not on PATH everywhere, and an agent that cannot run it improvises.
+  await bakeSkillCommand({ root: target, node });
   const shim = await writeHookShim({ dir: target, adapterId: "codex", runner, node });
   await writeJson(path.join(target, "hooks.json"),
     withShim(await readJson(path.join(bundle, "hooks.json"), { hooks: {} }), shim));

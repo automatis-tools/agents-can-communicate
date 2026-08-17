@@ -49,7 +49,7 @@ try {
       ${JSON.stringify(generation)});
     tx.append({ schemaVersion: ${SCHEMA_VERSION}, eventId: \`event_${label}\`,
       workspaceId: ${JSON.stringify(WORKSPACE)}, actorSessionId: "session_a",
-      type: "workspace.renamed", occurredAt: ${JSON.stringify(NOW)}, payload: {} });
+      type: "session.opened", occurredAt: ${JSON.stringify(NOW)}, payload: {} });
   });
   process.stdout.write("won");
   process.exit(0);
@@ -69,7 +69,7 @@ test("independent processes cannot both win the same optimistic write", async t 
   await store.transaction(async tx => {
     tx.put("workspace", WORKSPACE, workspaceRecord("seed"));
     tx.append({ schemaVersion: SCHEMA_VERSION, eventId: "event_seed",
-      workspaceId: WORKSPACE, actorSessionId: "session_a", type: "workspace.created",
+      workspaceId: WORKSPACE, actorSessionId: "session_a", type: "workspace.materialised",
       occurredAt: NOW, payload: {} });
   });
   const generation = await store.transaction(async tx => tx.generationOf("workspace", WORKSPACE));
@@ -105,7 +105,7 @@ test("the event log has no gaps and no duplicate sequences after contention", as
   await store.transaction(async tx => {
     tx.put("workspace", WORKSPACE, workspaceRecord("seed"));
     tx.append({ schemaVersion: SCHEMA_VERSION, eventId: "event_seed",
-      workspaceId: WORKSPACE, actorSessionId: "session_a", type: "workspace.created",
+      workspaceId: WORKSPACE, actorSessionId: "session_a", type: "workspace.materialised",
       occurredAt: NOW, payload: {} });
   });
   const generation = await store.transaction(async tx => tx.generationOf("workspace", WORKSPACE));
@@ -129,6 +129,6 @@ test("the event log has no gaps and no duplicate sequences after contention", as
   const events = await Promise.all(files.map(async file =>
     JSON.parse(await readFile(path.join(root, "events", file), "utf8"))));
   assert.deepEqual(events.map(event => event.type),
-    ["workspace.created", "workspace.renamed"]);
+    ["workspace.materialised", "session.opened"]);
   await access(path.join(root, "protocol.json"));
 });
