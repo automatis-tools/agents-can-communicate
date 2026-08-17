@@ -2,6 +2,7 @@ import { AccError, EXIT, SCHEMA_VERSION, advanceDelivery, createId, validateReco
   from "@agents-can-communicate/protocol";
 
 import { ensureMaterialised } from "./materialisation.mjs";
+import { writeTask } from "./tasks.mjs";
 
 const receiptId = (messageId, recipient) => `${messageId}--${recipient}`;
 
@@ -203,5 +204,70 @@ export function createCommunicationService(ports, sessions, claims) {
         || left.messageId.localeCompare(right.messageId));
   }
 
-  return { sendMessage, markDelivery, pendingMessages, recordDecision, finishSession };
+  /**
+   * Ask another agent to do something.
+   *
+   * One write, because the two halves are useless apart. A task addressed to
+   * someone who was never told about it is work nobody knows exists, and a
+   * message describing work that was never recorded is a request with nothing
+   * to point at.
+   *
+   * The recipient learns about it twice over, and both paths already existed:
+   * the task raises a `task_unblocked` attention item for the participant it
+   * names, and the message reaches their turn as quoted peer text.
+   */
+  async function requestWork(input) {
+    const session = await requireOpenSession(input, "request work");
+    const workspaceId = session.workspaceId;
+    const recipient = input.toParticipantId;
+    if (typeof recipient !== "string" || recipient === "") {
+      throw new AccError(EXIT.USAGE, "a request needs a recipient participant");
+    }
+    await ensureMaterialised(ports, { workspaceId, descriptor: input.descriptor,
+      reason: "durable_object" });
+    const now = clock.now();
+    const messageId = createId("message");
+    let task = null;
+    let message = null;
+
+    await store.transaction(async tx => {
+      task = writeTask(tx, { session, workspaceId, now, ids,
+        input: { ...input, assigneeParticipantId: recipient } });
+      message = validateRecord("message", {
+        schemaVersion: SCHEMA_VERSION,
+        messageId,
+        workspaceId,
+        fromSessionId: session.sessionId,
+        toParticipantIds: [recipient],
+        type: "work_request",
+        subject: input.title,
+        body: input.detail ?? input.title,
+        priority: input.priority ?? "normal",
+        workstreamId: task.workstreamId,
+        taskId: task.taskId,
+        inReplyTo: input.inReplyTo ?? null,
+        // A request is a question, so the sender is entitled to know whether it
+        // was taken up. Silence and refusal are different answers.
+        requiresAck: true,
+        artifacts: input.artifacts ?? [],
+        sentAt: now,
+      });
+      tx.put("message", messageId, message);
+      tx.put("receipt", receiptId(messageId, recipient), validateRecord("receipt", {
+        schemaVersion: SCHEMA_VERSION,
+        messageId,
+        workspaceId,
+        recipientParticipantId: recipient,
+        state: "queued",
+        updatedAt: now,
+      }));
+      tx.append({ schemaVersion: SCHEMA_VERSION, eventId: ids.next("event"), workspaceId,
+        actorSessionId: session.sessionId, type: "work.requested", occurredAt: now,
+        payload: { taskId: task.taskId, messageId, recipient } });
+    });
+    return { task, message };
+  }
+
+  return { sendMessage, markDelivery, pendingMessages, requestWork, recordDecision,
+    finishSession };
 }

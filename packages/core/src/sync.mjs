@@ -41,9 +41,22 @@ function claimConflicts(snapshot, session, now) {
       summary: `${claim.resource} is claimed by ${claim.ownerSessionId}` }));
 }
 
-function unblockedTasks(snapshot, session) {
+/**
+ * Work waiting on me.
+ *
+ * Addressed by participant, so a request survives the recipient restarting -
+ * the next session of that agent is told about it. A task already taken by one
+ * of my sessions matches too, since that session may have been replaced.
+ *
+ * Unaddressed tasks are deliberately absent. Anyone may take one, but pushing
+ * every open task into every turn is how a coordination layer becomes noise.
+ */
+function unblockedTasks(snapshot, session, participantId) {
+  const mine = task => (task.assigneeParticipantId !== null
+    && task.assigneeParticipantId === participantId)
+    || (task.assigneeSessionId !== null && task.assigneeSessionId === session?.sessionId);
   return (snapshot.tasks ?? [])
-    .filter(task => task.state === "pending" && task.assigneeSessionId === session?.sessionId)
+    .filter(task => task.state === "pending" && mine(task))
     .map(task => ({ kind: "task_unblocked", priority: ATTENTION_PRIORITY.task_unblocked,
       sourceId: task.taskId, summary: task.title }));
 }
@@ -61,7 +74,7 @@ export function computeAttention(snapshot, { session, participantId, now }) {
   return [
     ...directRequests(snapshot, participantId),
     ...claimConflicts(snapshot, session, now),
-    ...unblockedTasks(snapshot, session),
+    ...unblockedTasks(snapshot, session, participantId),
     ...coordinatorGaps(snapshot),
   ].sort((left, right) => left.priority - right.priority
     || left.sourceId.localeCompare(right.sourceId));
