@@ -28,8 +28,8 @@ const ADAPTERS = [
   { name: "codex", create: createCodexAdapter,
     context: home => ({ home, codexHome: path.join(home, ".codex") }),
     commands: async home => {
-      const wired = JSON.parse(await readFile(path.join(home, "plugins",
-        "agents-can-communicate", "hooks.json"), "utf8"));
+      const wired = JSON.parse(await readFile(path.join(home, ".agents", "plugins",
+        "plugins", "agents-can-communicate", "hooks.json"), "utf8"));
       return Object.values(wired.hooks)
         .flatMap(entries => entries.flatMap(entry => entry.hooks.map(h => h.command)));
     } },

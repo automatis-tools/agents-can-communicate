@@ -42,6 +42,7 @@ function createAdapter() {
   return defineAdapter({
     id: "example_harness",
     displayName: "Example Harness",
+    client: { command: "example", versionArgs: ["--version"] },
     capabilities: {
       lifecycle: { sessionStart: true, sessionEnd: true },
       context: { startupInjection: true },

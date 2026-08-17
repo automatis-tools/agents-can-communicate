@@ -48,8 +48,10 @@ export async function detectInstallation({ adapters, context, probe = spawnProbe
 
       try {
         const output = await withTimeout(
-          Promise.resolve(probe(adapter.client?.command ?? adapter.id,
-            adapter.client?.versionArgs ?? ["--version"])),
+          // The declared binary, never the adapter id. Guessing the id made
+          // every client whose command differs from it look uninstalled.
+          Promise.resolve(probe(adapter.client.command,
+            adapter.client.versionArgs ?? ["--version"])),
           probeTimeoutMs, `${adapter.id} version probe`);
         if (typeof output === "string" && output !== "") {
           entry.present = true;
