@@ -131,6 +131,13 @@ const HANDLERS = Object.freeze({
       text: `requested ${task.taskId} of ${options.to}` };
   },
 
+  ack: async ({ options, context }) => {
+    const receipt = await context.service.markDelivery({ sessionId: options.session,
+      generation: options.generation, messageId: options.message,
+      state: options.state ?? "acknowledged" });
+    return { data: receipt, text: `${receipt.messageId} ${receipt.state}` };
+  },
+
   workstream: async ({ options, context }) => {
     const workstream = await context.service.createWorkstream({
       sessionId: options.session, generation: options.generation,

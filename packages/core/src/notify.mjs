@@ -1,4 +1,5 @@
-import { SCHEMA_VERSION, createId, validateRecord } from "@agents-can-communicate/protocol";
+import { SCHEMA_VERSION, advanceDelivery, createId, validateRecord }
+  from "@agents-can-communicate/protocol";
 
 const receiptId = (messageId, recipient) => `${messageId}--${recipient}`;
 
@@ -60,4 +61,34 @@ export function writeWorkResponse(tx, { task, actor, workspaceId, now, ids, outc
     actorSessionId: actor.sessionId, type: `work.${outcome}`, occurredAt: now,
     payload: { taskId: task.taskId, messageId, asker } });
   return record;
+}
+
+/**
+ * Close the request a task came from, once it has been answered.
+ *
+ * `acc request` marks its message as needing an acknowledgement, which raises a
+ * `direct_request` attention item for the recipient. Finishing the work did not
+ * clear it, and nothing else could: the operation existed in the core and was
+ * reachable from no surface. So every completed request left a line repeating in
+ * the doer's turn for good.
+ *
+ * Doing the work is the acknowledgement. An explicit `acc ack` exists for
+ * messages that are not tied to a task.
+ */
+export function closeRequestReceipt(tx, { task, actor, now, ids }) {
+  for (const message of tx.list("message")) {
+    if (message.taskId !== task.taskId || message.type !== "work_request") continue;
+    if (!message.toParticipantIds.includes(actor.participantId)) continue;
+    const id = `${message.messageId}--${actor.participantId}`;
+    const existing = tx.get("receipt", id);
+    if (existing === null || existing.state === "acknowledged") continue;
+    const record = { ...existing, state: advanceDelivery(existing.state, "acknowledged"),
+      updatedAt: now };
+    tx.put("receipt", id, record, tx.generationOf("receipt", id));
+    tx.append({ schemaVersion: SCHEMA_VERSION, eventId: ids.next("event"),
+      workspaceId: existing.workspaceId, actorSessionId: actor.sessionId,
+      type: "message.acknowledged", occurredAt: now,
+      payload: { messageId: message.messageId,
+        recipientParticipantId: actor.participantId } });
+  }
 }

@@ -175,3 +175,50 @@ test("accepting and finishing both answer the agent that asked", async t => {
   assert.match(finished, /done: tank sinks into mud/,
     "the requester was never told the work was finished");
 });
+
+test("finishing the work answers the request it came from", async t => {
+  // `acc request` marks its message as needing an acknowledgement, which raises
+  // a `direct_request` item for the recipient. Nothing cleared it: the operation
+  // existed in the core and was reachable from no surface, so every completed
+  // request left a line repeating in the doer's turn for good. A live Claude
+  // Code session reported exactly this and refused to clear it by hand, which
+  // was the right call and left it stuck.
+  const { place, doer, task } = await inFlight(t);
+
+  const before = await turn(place, "kimi", "phys", "physics");
+  assert.match(before, /\[direct_request\] tank sinks into mud/);
+
+  await cli(place, "task", "--session", doer.accSessionId, "--generation", doer.generation,
+    "--task", task.taskId, "--state", "done");
+  const after = await turn(place, "kimi", "phys", "physics");
+
+  assert.equal(after.includes("[direct_request]"), false,
+    `the request kept asking after the work was done:\n${after}`);
+});
+
+test("declining answers it too", async t => {
+  const { place, doer, task } = await inFlight(t);
+
+  await cli(place, "task", "--session", doer.accSessionId, "--generation", doer.generation,
+    "--task", task.taskId, "--decline", "--reason", "not mine");
+  const after = await turn(place, "kimi", "phys", "physics");
+
+  assert.equal(after.includes("[direct_request]"), false, after);
+});
+
+test("a message not tied to a task can be answered directly", async t => {
+  const place = await workspace(t);
+  const asker = await attach(place, "codex", "gfx", "graphics");
+  const doer = await attach(place, "kimi", "phys", "physics");
+  const { stdout } = await cli(place, "message", "--session", asker.accSessionId,
+    "--generation", asker.generation, "--to", "physics", "--type", "question",
+    "--subject", "scale", "--body", "Is the tank scale settled?", "--requires-ack");
+  const messageId = stdout.trim().replace(/^sent /, "");
+
+  assert.match(await turn(place, "kimi", "phys", "physics"), /\[direct_request\] scale/);
+  await cli(place, "ack", "--session", doer.accSessionId, "--generation", doer.generation,
+    "--message", messageId);
+
+  const after = await turn(place, "kimi", "phys", "physics");
+  assert.equal(after.includes("[direct_request]"), false, after);
+});

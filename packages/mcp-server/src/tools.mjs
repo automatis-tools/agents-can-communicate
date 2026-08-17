@@ -95,6 +95,16 @@ export const PUBLIC_TOOLS = Object.freeze([
     }, ["toParticipantId", "title"]),
   },
   {
+    name: "acc_ack",
+    description: `Answer a message that asked for an acknowledgement, so it stops `
+      + `demanding one. Finishing a task answers the request it came from `
+      + `automatically. ${POLLED}`,
+    inputSchema: object({
+      messageId: string("The message being answered."),
+      state: { type: "string", enum: ["seen", "acknowledged"] },
+    }, ["messageId"]),
+  },
+  {
     name: "acc_workstream",
     description: `Group related work so several agents can see it as one thing. Optional: `
       + `a single request needs no workstream. ${POLLED}`,

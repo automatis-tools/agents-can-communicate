@@ -113,6 +113,9 @@ async function callTool(name, args, context) {
       return service.requestWork({ ...owner, toParticipantId: args.toParticipantId,
         title: args.title, detail: args.detail, workstreamId: args.workstreamId,
         priority: args.priority, dependsOn: args.dependsOn ?? [] });
+    case "acc_ack":
+      return service.markDelivery({ ...owner, messageId: args.messageId,
+        state: args.state ?? "acknowledged" });
     case "acc_workstream":
       return service.createWorkstream({ ...owner, title: args.title,
         objective: args.objective });

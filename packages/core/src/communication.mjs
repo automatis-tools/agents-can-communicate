@@ -73,10 +73,18 @@ export function createCommunicationService(ports, sessions, claims) {
 
   async function markDelivery(input) {
     const session = await requireOpenSession(input, "update delivery");
+    // Your own receipt, unless you say otherwise and mean it. A session
+    // advancing another participant's receipt would be reporting that someone
+    // else had read something.
+    const recipient = input.recipientParticipantId ?? session.participantId;
+    if (recipient !== session.participantId) {
+      throw new AccError(EXIT.CONFLICT, "a session can only mark its own receipt",
+        { recipient, participantId: session.participantId });
+    }
     const now = clock.now();
     let record = null;
     await store.transaction(async tx => {
-      const id = receiptId(input.messageId, input.recipientParticipantId);
+      const id = receiptId(input.messageId, recipient);
       const existing = tx.get("receipt", id);
       if (existing === null) {
         throw new AccError(EXIT.DATA, "no receipt exists for that recipient", { id });
@@ -90,7 +98,7 @@ export function createCommunicationService(ports, sessions, claims) {
         workspaceId: existing.workspaceId, actorSessionId: session.sessionId,
         type: `message.${record.state}`, occurredAt: now,
         payload: { messageId: input.messageId,
-          recipientParticipantId: input.recipientParticipantId } });
+          recipientParticipantId: recipient } });
     });
     return record;
   }
