@@ -66,6 +66,10 @@ const RECORDS = Object.freeze({
   task: { taskId: id, workstreamId: nullable(id), workspaceId: id, title: line,
     state: oneOf("pending", "in_progress", "review", "done", "blocked"),
     assigneeParticipantId: nullable(id), assigneeSessionId: nullable(id),
+    // Who asked. Without it nothing could tell the requester that their work
+    // was accepted, declined or finished - the task knew who it was for and
+    // had no idea who was waiting on it.
+    requestedByParticipantId: nullable(id),
     dependsOn: listOf(id), acceptance: listOf(line), detail: nullable(prose),
     createdAt: timestamp },
 
@@ -77,7 +81,7 @@ const RECORDS = Object.freeze({
     toParticipantIds: listOf(id),
     type: oneOf("note", "question", "answer", "contract_request", "contract_response",
       "decision_proposal", "decision_result", "blocker", "review_request",
-      "review_result", "handoff", "work_request"),
+      "review_result", "handoff", "work_request", "work_response"),
     subject: line, body: prose, priority: oneOf("low", "normal", "high", "urgent"),
     workstreamId: nullable(id), taskId: nullable(id), inReplyTo: nullable(id),
     requiresAck: flag, artifacts: listOf(artifactRef), sentAt: timestamp },

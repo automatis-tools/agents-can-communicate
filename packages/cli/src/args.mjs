@@ -23,8 +23,8 @@ export const COMMANDS = Object.freeze({
   // Create a task, or act on one with --task. A workstream is optional: small
   // requests should not have to invent a project first.
   task: { required: ["session", "generation"],
-    optional: ["workstream", "title", "detail", "assignee", "state", "task"],
-    repeated: ["depends-on"], flags: ["take"] },
+    optional: ["workstream", "title", "detail", "assignee", "state", "task", "reason"],
+    repeated: ["depends-on"], flags: ["take", "decline", "force"] },
   workstream: { required: ["session", "generation", "title", "objective"], optional: [] },
   finish: { required: ["session", "generation", "goal"],
     optional: ["status", "to"], repeated: ["completed", "remaining", "blocker"] },
