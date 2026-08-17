@@ -43,6 +43,8 @@ export const PUBLIC_TOOLS = Object.freeze([
         enum: ["observe", "explore", "edit", "review", "coordinate", "wait"] },
       state: { type: "string", enum: ["active", "blocked", "waiting", "done"] },
       workstreamId: string("Optional workstream this work belongs to."),
+      clear: { type: "boolean",
+        description: "Say this session has stopped working on anything." },
       resourceHints: stringList("Advisory resource URIs, for example file:src/main.mjs."),
     }, ["summary", "mode"]),
   },

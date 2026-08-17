@@ -40,7 +40,8 @@ async function installed(t, adapterId, relative) {
 
 const ADAPTERS = [
   ["kimi", ".kimi-code/plugins/managed/agents-can-communicate/skills/acc/SKILL.md"],
-  ["claude_code", ".claude/plugins/agents-can-communicate/skills/acc/SKILL.md"],
+  ["claude_code",
+    ".claude/plugins/marketplaces/acc-local/agents-can-communicate/skills/acc/SKILL.md"],
   ["codex", ".agents/plugins/plugins/agents-can-communicate/skills/acc/SKILL.md"],
   ["gemini_cli", ".gemini/extensions/agents-can-communicate/skills/acc/SKILL.md"],
 ];

@@ -7,10 +7,10 @@ release.
 
 | | |
 |---|---|
-| Built from | `484e02b` |
+| Built from | `PENDING` |
 | Tarball | `agents-can-communicate-0.0.0.tgz`, 88 KB, 99 entries |
 | sha256 | `1d47407b2ee0e7ae6e7729c1e9ad3eff6796b6653a44a7b03fba72a923962c24` |
-| Tests | 615 passing, 0 failing |
+| Tests | 659 passing, 0 failing |
 | Node | 24 (current production LTS) |
 | Verified on | macOS 15 (darwin 25.5.0, arm64) and Linux in CI |
 | Not supported | Windows — see below |
@@ -53,6 +53,13 @@ used to pass every write through while still reporting `protection guarded`.
 | Gemini CLI | 0.37.0, 0.55.1 | yes | yes² | yes | – |
 | Kimi Code | 0.36.1 | yes | yes | yes | yes (60s) |
 | Any MCP client | rev 2026-07-28 | yes | – | – | – |
+
+A live model completed the full request loop on Codex - one session found who
+owned the work, asked for it, and the other took it, fixed the code and reported
+back. Claude Code attaches by itself and its agent used ACC's commands from the
+skill. Kimi Code fired every hook and its model never ran: the account's quota is
+spent. Gemini CLI fired every hook and its model never ran either: the account
+returns a permission error in headless mode.
 
 ¹ only models that offer `apply_patch`; others edit through the shell, which
 names no resource · ² only approval modes that expose edit tools
