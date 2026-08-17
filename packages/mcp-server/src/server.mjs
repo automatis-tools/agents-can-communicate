@@ -99,7 +99,10 @@ async function callTool(name, args, context) {
         priority: args.priority, requiresAck: args.requiresAck === true,
         workstreamId: args.workstreamId ?? null });
     case "acc_task":
-      if (args.action === "claim") return service.claimTask({ ...owner, taskId: args.taskId });
+      if (args.action === "claim") return service.claimTask({ ...owner,
+        taskId: args.taskId, force: args.force === true });
+      if (args.action === "decline") return service.declineTask({ ...owner,
+        taskId: args.taskId, reason: args.reason });
       if (args.action === "transition") return service.transitionTask({ ...owner,
         taskId: args.taskId, state: args.state });
       return service.createTask({ ...owner, workstreamId: args.workstreamId,

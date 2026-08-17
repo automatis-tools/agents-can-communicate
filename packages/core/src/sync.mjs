@@ -14,6 +14,7 @@ export const ATTENTION_PRIORITY = Object.freeze({
   claim_conflict: 2,
   task_unblocked: 3,
   coordinator_missing: 4,
+  request_stalled: 5,
 });
 
 function directRequests(snapshot, participantId) {
@@ -61,6 +62,39 @@ function unblockedTasks(snapshot, session, participantId) {
       sourceId: task.taskId, summary: task.title }));
 }
 
+/**
+ * Work you asked for that nobody is doing any more.
+ *
+ * A task taken by a session that then crashed stayed `in_progress` for good:
+ * the requester was told nothing and nobody else could take it. Unlike the
+ * one-shot answers a request produces, this repeats until it is resolved,
+ * because it stays true until someone picks the work back up.
+ */
+function stalledRequests(snapshot, participantId, now) {
+  const live = new Map((snapshot.sessions ?? [])
+    .map(session => [session.sessionId, classifySessionPresence(session, now)]));
+  const onlineParticipants = new Set((snapshot.sessions ?? [])
+    .filter(session => classifySessionPresence(session, now) === "online")
+    .map(session => session.participantId));
+  const goingNowhere = task => {
+    // Taken by someone who has gone quiet.
+    if (task.state === "in_progress") {
+      return task.assigneeSessionId !== null
+        && live.get(task.assigneeSessionId) !== "online";
+    }
+    // Or waiting on an agent that is not here - including one that closed and
+    // never came back, which leaves the work addressed to nobody at all.
+    return task.state === "pending" && task.assigneeParticipantId !== null
+      && !onlineParticipants.has(task.assigneeParticipantId);
+  };
+  return (snapshot.tasks ?? [])
+    .filter(task => task.requestedByParticipantId === participantId
+      && goingNowhere(task))
+    .map(task => ({ kind: "request_stalled", priority: ATTENTION_PRIORITY.request_stalled,
+      sourceId: task.taskId,
+      summary: `${task.title} - nobody is working on it` }));
+}
+
 function coordinatorGaps(snapshot) {
   return (snapshot.workstreams ?? [])
     .filter(workstream => workstream.state === "open"
@@ -76,6 +110,7 @@ export function computeAttention(snapshot, { session, participantId, now }) {
     ...claimConflicts(snapshot, session, now),
     ...unblockedTasks(snapshot, session, participantId),
     ...coordinatorGaps(snapshot),
+    ...stalledRequests(snapshot, participantId, now),
   ].sort((left, right) => left.priority - right.priority
     || left.sourceId.localeCompare(right.sourceId));
 }

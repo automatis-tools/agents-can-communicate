@@ -145,8 +145,15 @@ const HANDLERS = Object.freeze({
     // stay one command rather than three the model has to choose between.
     if (options.take === true) {
       if (options.task === undefined) throw usage("task --take requires --task");
-      const taken = await context.service.claimTask({ ...owner, taskId: options.task });
+      const taken = await context.service.claimTask({ ...owner, taskId: options.task,
+        force: options.force === true });
       return { data: taken, text: `${taken.taskId} ${taken.state}` };
+    }
+    if (options.decline === true) {
+      if (options.task === undefined) throw usage("task --decline requires --task");
+      const refused = await context.service.declineTask({ ...owner,
+        taskId: options.task, reason: options.reason });
+      return { data: refused, text: `${refused.taskId} declined` };
     }
     if (options.state !== undefined) {
       if (options.task === undefined) throw usage("task --state requires --task");
