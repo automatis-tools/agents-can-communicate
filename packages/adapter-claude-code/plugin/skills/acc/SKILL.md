@@ -14,7 +14,7 @@ skill is how you stay legible to them and they to you.
 Once you understand the request, publish one line of Intent:
 
 ```bash
-acc work --session "$ACC_SESSION" --generation "$ACC_GENERATION" \
+{{ACC}} work --session "$ACC_SESSION" --generation "$ACC_GENERATION" \
   --summary "porting the claim model" --mode edit
 ```
 
@@ -25,7 +25,7 @@ what you are up to, it does not stop anyone editing anything.
 ## Claim before you change shared work
 
 ```bash
-acc claim --session "$ACC_SESSION" --generation "$ACC_GENERATION" \
+{{ACC}} claim --session "$ACC_SESSION" --generation "$ACC_GENERATION" \
   --resource 'file:packages/core/**' --reason "porting the store"
 ```
 
@@ -39,7 +39,7 @@ wrote, a port in an area someone else is already in — ask the agent working th
 do it badly yourself, and do not ask your human to carry the message:
 
 ```bash
-acc request --session "$ACC_SESSION" --generation "$ACC_GENERATION" \
+{{ACC}} request --session "$ACC_SESSION" --generation "$ACC_GENERATION" \
   --to claude_code --title "finish the store tests" \
   --detail "I ported src/store but ran out of time on the concurrency cases."
 ```
@@ -54,13 +54,13 @@ A turn that opens with `[task_unblocked]` means work is addressed to you and wai
 it before you start, so nobody does it twice:
 
 ```bash
-acc task --session "$ACC_SESSION" --generation "$ACC_GENERATION" --task task_x --take
+{{ACC}} task --session "$ACC_SESSION" --generation "$ACC_GENERATION" --task task_x --take
 ```
 
 Mark it when it is done, so the agent that asked can stop waiting:
 
 ```bash
-acc task --session "$ACC_SESSION" --generation "$ACC_GENERATION" --task task_x --state done
+{{ACC}} task --session "$ACC_SESSION" --generation "$ACC_GENERATION" --task task_x --state done
 ```
 
 If you are not going to do it, reply with `acc message` instead of leaving it pending. The
@@ -72,7 +72,7 @@ If you are not going to do it, say so. A request left pending looks exactly like
 one you have not read yet, and the agent that asked is waiting on an answer:
 
 ```bash
-acc task --session "$ACC_SESSION" --generation "$ACC_GENERATION" \
+{{ACC}} task --session "$ACC_SESSION" --generation "$ACC_GENERATION" \
   --task task_x --decline --reason "Mud collision belongs to the terrain pass, not suspension."
 ```
 
@@ -92,13 +92,32 @@ Do one of three things, and tell your human which:
   refused without `--force` while the holder is merely quiet rather than gone;
 - drop it, if it no longer matters.
 
+## If the command does not work, stop
+
+Everything above runs through the command shown in these examples. It is the one
+this installation wired up, with absolute paths, because a shell that a hook or a
+tool call starts does not reliably carry your PATH.
+
+If it fails to run, say so to your human and carry on with the actual work.
+
+Do not write to ACC's files yourself. The coordination state is plain JSON in a
+directory you can find, and it looks editable. It is not: writes go through a
+lock, records carry generation tokens that are checked on every change, and the
+event log is ordered. A record placed there by hand is not coordination - the
+other agents will read it and act on something that never happened.
+
+This is not hypothetical. A session that could not find the command once read the
+store, worked out its schema, and wrote records and events by hand, inventing an
+event type and its own generation tokens. Everything it reported had happened,
+had not.
+
 ## You can answer for the whole workspace
 
 You are not limited to your own view. Any session can read the complete state, including
 other participants' sessions and their subagents:
 
 ```bash
-acc sync --session "$ACC_SESSION" --scope full --json
+{{ACC}} sync --session "$ACC_SESSION" --scope full --json
 ```
 
 If the human asks "what is the models agent doing?" or "is anyone else touching the
@@ -108,7 +127,7 @@ differs between participants; knowledge does not.
 You can also relay a request to any participant:
 
 ```bash
-acc message --session "$ACC_SESSION" --generation "$ACC_GENERATION" \
+{{ACC}} message --session "$ACC_SESSION" --generation "$ACC_GENERATION" \
   --to models --subject "Material slots" --body "Which names are stable?" \
   --type question --requires-ack
 ```
@@ -133,7 +152,7 @@ Before the session ends, record what happened — nothing else writes this for y
 session-end hook cannot summarise a conversation that has already stopped:
 
 ```bash
-acc finish --session "$ACC_SESSION" --generation "$ACC_GENERATION" \
+{{ACC}} finish --session "$ACC_SESSION" --generation "$ACC_GENERATION" \
   --goal "port the claim model" --status partial \
   --completed "storage ported" --remaining "doctor still to port"
 ```
