@@ -82,6 +82,7 @@ async function callTool(name, args, context) {
       return service.sync({ ...owner, cursor: args.cursor ?? null, scope: args.scope,
         limit: args.limit });
     case "acc_work":
+      if (args.clear === true) return service.clearIntent({ ...owner });
       return service.setIntent({ ...owner, summary: args.summary, mode: args.mode,
         state: args.state, workstreamId: args.workstreamId ?? null,
         resourceHints: args.resourceHints ?? [] });

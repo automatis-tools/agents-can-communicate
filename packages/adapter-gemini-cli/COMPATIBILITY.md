@@ -133,3 +133,43 @@ The account still receives HTTP 403 from the real model API in headless mode - v
 with a plain `gemini -p` outside ACC entirely, so it is neither ACC's doing nor the
 client's. ACC's own hooks were observed firing against the real API on 0.55.1 regardless:
 a real session attached and closed through ACC's runtime before the model call failed.
+
+## The extension's hooks.json is a template, measured 2026-08-17 on 0.55.1
+
+This client loads an extension's own `hooks/hooks.json` **in addition to** the
+entries in `settings.json`. ACC shipped that file, so every event carried two ACC
+hooks: the shimmed one from settings, and the bundled one whose command is still
+the literal placeholder `acc-hook`. A hook's environment carries no PATH, so the
+second could never run.
+
+What the client reported, on every event:
+
+```
+Hook registry initialized with 18 hook entries
+Expanding hook command: sh "…/hooks/acc-hook.sh" sessionStart
+Expanding hook command: acc-hook sessionStart
+Hook execution for SessionStart: 2 succeeded, 1 failed (acc-sessionStart)
+```
+
+The work was being done the whole time by the entry that worked, which is why it
+looked like a mystery rather than a duplicate. After the template stops shipping:
+
+```
+Hook registry initialized with 13 hook entries
+Hook execution for SessionStart: 2 hooks executed successfully
+```
+
+Found only by reading the client's own `--debug` output. The failure was invisible
+from ACC's side: the hook it ran exited 0 and did its work.
+
+## What a live model could not confirm here
+
+Hook wiring is verified against the real client. The model call is not: this
+account returns `Permission 'cloudaicompanion.companions.generateChat' denied`
+in headless mode, which is the same account limitation already recorded in
+`CHANGELOG.md`. So no Gemini session has been driven by a live model, and the
+matrix rows for this client rest on hook captures rather than on a completed
+turn.
+
+Headless runs also need workspace trust: `GEMINI_CLI_TRUST_WORKSPACE=true`, or
+`--skip-trust`.

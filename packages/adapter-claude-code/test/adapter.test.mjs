@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
-import { mkdtemp, readFile, readdir, realpath, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, readdir, realpath, rm, writeFile }
+  from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -39,8 +40,49 @@ test("install registers the plugin and preserves the user's own hook", async t =
   const settings = await read();
   assert.deepEqual(settings.hooks, EXISTING.hooks, "install disturbed a foreign hook");
   assert.equal(settings.theme, "dark");
+  // Two trees, both needed: the marketplace the client reads the manifest from,
+  // and the cache copy it actually runs.
   assert.deepEqual(await readdir(path.join(context.configDir, "plugins",
-    "agents-can-communicate")), [".claude-plugin", "hooks", "skills"].sort());
+    "marketplaces", "acc-local", "agents-can-communicate")),
+  [".claude-plugin", "hooks", "skills"].sort());
+  assert.deepEqual(await readdir(path.join(context.configDir, "plugins", "cache",
+    "acc-local", "agents-can-communicate", "0.0.0")),
+  [".claude-plugin", "hooks", "skills"].sort());
+
+  // Registered the way the client registers plugins, measured from its own
+  // commands. `accPlugins` was ACC's invention and loaded nothing.
+  assert.equal(settings.enabledPlugins["agents-can-communicate@acc-local"], true);
+  assert.equal(settings.extraKnownMarketplaces["acc-local"].source.source, "directory");
+  const installed = JSON.parse(await readFile(path.join(context.configDir, "plugins",
+    "installed_plugins.json"), "utf8"));
+  assert.equal(installed.version, 2);
+  assert.equal(installed.plugins["agents-can-communicate@acc-local"][0].scope, "user");
+});
+
+test("a user's own enabled plugins survive install and uninstall", async t => {
+  // `enabledPlugins` holds every plugin the user has. Taking the whole key would
+  // destroy them, and handing it back on uninstall would destroy them again -
+  // this machine had twenty-three entries in it.
+  const { context, read } = await fixture(t);
+  const mine = { "superpowers@claude-plugins-official": true,
+    "github@claude-plugins-official": false };
+  const file = path.join(context.configDir, "settings.json");
+  await writeFile(file, `${JSON.stringify({ ...EXISTING, enabledPlugins: mine,
+    extraKnownMarketplaces: { thedotmack: { source: { source: "github" } } } },
+  null, 2)}\n`);
+  const adapter = createClaudeCodeAdapter();
+
+  await adapter.install(context);
+  const after = await read();
+  assert.equal(after.enabledPlugins["superpowers@claude-plugins-official"], true);
+  assert.equal(after.enabledPlugins["github@claude-plugins-official"], false);
+  assert.equal(after.enabledPlugins["agents-can-communicate@acc-local"], true);
+
+  await adapter.uninstall(context);
+  const restored = await read();
+  assert.deepEqual(restored.enabledPlugins, mine, "a user's plugins were disturbed");
+  assert.deepEqual(restored.extraKnownMarketplaces,
+    { thedotmack: { source: { source: "github" } } });
 });
 
 test("install is idempotent and uninstall restores exactly", async t => {
@@ -176,4 +218,25 @@ test("doctor states that the handoff is not written at SessionEnd", async t => {
   // summarise anything. Saying so in doctor keeps the limitation visible.
   assert.match(report.diagnostics.join(" "), /while the model is active/);
   assert.match(report.diagnostics.join(" "), /captured/);
+});
+
+test("the client's own registries come back byte for byte", async t => {
+  // The client writes these with no trailing newline. ACC added one, so the
+  // content restored exactly and the bytes did not - which is the promise this
+  // tool makes about files it only borrowed.
+  const { context } = await fixture(t);
+  const registries = ["known_marketplaces.json", "installed_plugins.json"]
+    .map(name => path.join(context.configDir, "plugins", name));
+  const original = { version: 2, plugins: { "someone@else": [{ scope: "user" }] } };
+  await mkdir(path.dirname(registries[0]), { recursive: true });
+  await writeFile(registries[0], JSON.stringify({ theirs: { source: {} } }, null, 2));
+  await writeFile(registries[1], JSON.stringify(original, null, 2));
+  const before = await Promise.all(registries.map(file => readFile(file, "utf8")));
+
+  const adapter = createClaudeCodeAdapter();
+  await adapter.install(context);
+  await adapter.uninstall(context);
+
+  const after = await Promise.all(registries.map(file => readFile(file, "utf8")));
+  assert.deepEqual(after, before, "a borrowed registry came back changed");
 });

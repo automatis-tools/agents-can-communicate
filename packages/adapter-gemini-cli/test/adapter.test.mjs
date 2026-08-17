@@ -197,3 +197,22 @@ test("doctor warns that the deny shape here is not the portable-looking one", as
   // is the client's doing, not a broken install.
   assert.match(said, /plan mode/);
 });
+
+test("the hook template is not shipped into the installed extension", async t => {
+  // This client loads an extension's own hooks.json *in addition to* the
+  // settings entries, so shipping the template registered ACC twice: once with
+  // the shim, and once with the literal placeholder `acc-hook`, which is not on
+  // PATH. Measured on 0.55.1: the client reported `acc-sessionStart` failing on
+  // every event while the shimmed one quietly did the work, and its registry
+  // held eighteen entries where thirteen were real.
+  const { context } = await fixture(t);
+
+  await createGeminiCliAdapter().install(context);
+
+  const shipped = path.join(context.home, ".gemini", "extensions",
+    "agents-can-communicate", "hooks");
+  const present = await readdir(shipped);
+  assert.equal(present.includes("hooks.json"), false,
+    "the template shipped, so every event has a second entry that cannot run");
+  assert.equal(present.includes("acc-hook.sh"), true, "the shim is missing");
+});

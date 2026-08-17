@@ -18,6 +18,10 @@ Once you understand the request, publish one line of Intent:
   --summary "porting the claim model" --mode edit
 ```
 
+When you stop working on something and are not starting anything else, say so with
+`{{ACC}} work --clear`. An intent left standing reads to peers as work still in
+progress.
+
 `--mode` is one of `observe`, `explore`, `edit`, `review`, `coordinate`, `wait`. Update it
 when the work changes character. Intent is awareness, not a reservation: it tells peers
 what you are up to, it does not stop anyone editing anything.

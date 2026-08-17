@@ -78,3 +78,44 @@ state by default.
 Task 4 of the adapters plan lists seven events and is accurate for the ones ACC uses.
 `TeammateIdle` is worth noting separately: ACC does not replace Claude Agent Teams, and
 that event is the documented signal that a teammate is idle.
+
+## Installation, measured 2026-08-17 on 2.1.233
+
+The adapter used to write a settings key called `accPlugins`. There is no such
+setting. The client never loaded the plugin, no hook ever fired, and no session
+attached - on any machine. Nothing showed it: `acc install` reported success,
+`acc doctor` reported the plugin registered, and the capability matrix claimed
+`lifecycle.sessionStart: yes`.
+
+Measured by running the client's own commands against a home and diffing it:
+
+```
+claude plugin marketplace add <dir>
+claude plugin install agents-can-communicate@acc-local --scope user
+```
+
+Four results, all required:
+
+| File | Shape |
+|---|---|
+| `plugins/known_marketplaces.json` | `{ "<m>": { source: { source: "directory", path }, installLocation, lastUpdated } }` |
+| `plugins/installed_plugins.json` | `{ version: 2, plugins: { "<p>@<m>": [{ scope, installPath, version, installedAt, lastUpdated }] } }` |
+| `plugins/cache/<m>/<p>/<version>/` | the copy the client runs from |
+| `settings.json` | `extraKnownMarketplaces` and `enabledPlugins["<p>@<m>"] = true` |
+
+A directory-sourced marketplace stays where it is: `installLocation` is the source
+path rather than a clone under `marketplaces/`. ACC still puts its own marketplace
+under `plugins/marketplaces/acc-local` so uninstall has one tree to remove.
+
+Two details that only a diff shows:
+
+- the client writes both registries with two-space indent and **no** trailing
+  newline. Adding one left uninstall a byte off in a file ACC had only borrowed;
+- `enabledPlugins` holds every plugin the user has - twenty-three on the machine
+  this was measured on. Taking the whole key would destroy them, and giving it
+  back on uninstall would destroy them again, so ACC records ownership of its own
+  entry rather than of the container.
+
+Verified on a real machine: after `acc install --adapter claude_code`, a
+`claude -p` run with nothing about ACC in the prompt attached a session by
+itself, and `acc uninstall` restored all three files byte for byte.

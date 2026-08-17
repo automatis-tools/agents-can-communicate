@@ -34,7 +34,7 @@ graph LR
 |---|---|
 | `acc status` | Who is here, claims, protection level |
 | `acc sync` | New events since a cursor; silent when alone |
-| `acc work` | Publish what this session is doing |
+| `acc work` | Publish what this session is doing. `--clear` when it has stopped |
 | `acc claim` | Reserve a resource. Exit `5` on conflict |
 | `acc release` | Give it back |
 | `acc ack` | Answer a message that asked for one, so it stops asking |
