@@ -149,8 +149,16 @@ test("every attention kind in the priority table is one a rule can produce", () 
     intents: [{ sessionId: "session_a", resourceHints: ["file:src/**"] }],
     claims: [{ claimId: "claim_a", ownerSessionId: "session_b", resource: "file:src/main.mjs",
       expiresAt: "2026-08-16T02:00:00.000Z" }],
-    tasks: [{ taskId: "task_a", state: "pending", assigneeSessionId: "session_a",
-      title: "port the store" }],
+    tasks: [
+      { taskId: "task_a", state: "pending", assigneeSessionId: "session_a",
+        title: "port the store" },
+      // Taken by a session that then went quiet. The requester is still waiting.
+      { taskId: "task_b", state: "in_progress", assigneeSessionId: "session_gone",
+        assigneeParticipantId: "physics", requestedByParticipantId: "participant_a",
+        title: "tank sinks into mud" },
+    ],
+    sessions: [{ sessionId: "session_gone", state: "closed",
+      heartbeatAt: NOW, heartbeatCadenceMs: 30_000 }],
     workstreams: [{ workstreamId: "workstream_a", state: "open",
       coordinatorSessionId: null, title: "directed-visuals" }],
   };
