@@ -80,6 +80,30 @@ export const PUBLIC_TOOLS = Object.freeze([
     }, ["to", "subject", "body"]),
   },
   {
+    name: "acc_request",
+    description: `Ask another agent to do something. Creates the work addressed to them `
+      + `and tells them why, as one call. Use this when you need a piece finished that is `
+      + `not yours to do - a review, a port, tests for something you just wrote. `
+      + `${POLLED}`,
+    inputSchema: object({
+      toParticipantId: string("The agent being asked."),
+      title: string("What needs doing, in one line."),
+      detail: string("Context the other agent needs to start."),
+      workstreamId: string("Optional workstream context."),
+      priority: { type: "string", enum: ["low", "normal", "high", "urgent"] },
+      dependsOn: stringList("Task ids this waits for."),
+    }, ["toParticipantId", "title"]),
+  },
+  {
+    name: "acc_workstream",
+    description: `Group related work so several agents can see it as one thing. Optional: `
+      + `a single request needs no workstream. ${POLLED}`,
+    inputSchema: object({
+      title: string("Short name."),
+      objective: string("What finishing it would mean."),
+    }, ["title", "objective"]),
+  },
+  {
     name: "acc_task",
     description: `Create or transition an optional task within a workstream. Tasks are for `
       + `work that needs assignment, dependencies, or acceptance tracking; ordinary work `
@@ -88,6 +112,8 @@ export const PUBLIC_TOOLS = Object.freeze([
       action: { type: "string", enum: ["create", "claim", "transition"] },
       workstreamId: string("Workstream the task belongs to."),
       title: string("Task title, required when creating."),
+      detail: string("Context for whoever picks it up."),
+      assigneeParticipantId: string("Agent this is for. Only they can take it."),
       taskId: string("Required for claim and transition."),
       state: { type: "string", enum: ["pending", "in_progress", "review", "done", "blocked"] },
       dependsOn: stringList("Task ids this task waits for."),

@@ -87,7 +87,7 @@ Computed from explicit rules, never from a hidden classifier. Lower sorts first:
 |---|---|---|
 | 1 | `direct_request` | A message addressed to you requires an ack and has not had one |
 | 2 | `claim_conflict` | Your declared resource hints overlap a live claim you do not own |
-| 3 | `task_unblocked` | A task assigned to you is `pending` — every dependency is `done` |
+| 3 | `task_unblocked` | Work addressed to your participant is `pending` — every dependency is `done` |
 | 4 | `coordinator_missing` | An open workstream has no coordinator |
 
 A task with unmet dependencies is `blocked`, and finishing the last one flips its dependents

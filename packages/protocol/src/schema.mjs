@@ -58,9 +58,15 @@ const RECORDS = Object.freeze({
     coordinatorSessionId: nullable(id),
     state: oneOf("open", "paused", "complete", "cancelled"), createdAt: timestamp },
 
-  task: { taskId: id, workstreamId: id, workspaceId: id, title: line,
+  // Two assignees, deliberately. `assigneeParticipantId` is who the work is
+  // for and survives that agent restarting; `assigneeSessionId` is the exact
+  // session doing it right now and dies with the process. Asking one field to
+  // be both would either lose the request when a terminal closes or claim a
+  // dead session is still working.
+  task: { taskId: id, workstreamId: nullable(id), workspaceId: id, title: line,
     state: oneOf("pending", "in_progress", "review", "done", "blocked"),
-    assigneeSessionId: nullable(id), dependsOn: listOf(id), acceptance: listOf(line),
+    assigneeParticipantId: nullable(id), assigneeSessionId: nullable(id),
+    dependsOn: listOf(id), acceptance: listOf(line), detail: nullable(prose),
     createdAt: timestamp },
 
   claim: { claimId: id, workspaceId: id, ownerSessionId: id, resource: resourceUri,
@@ -71,7 +77,7 @@ const RECORDS = Object.freeze({
     toParticipantIds: listOf(id),
     type: oneOf("note", "question", "answer", "contract_request", "contract_response",
       "decision_proposal", "decision_result", "blocker", "review_request",
-      "review_result", "handoff"),
+      "review_result", "handoff", "work_request"),
     subject: line, body: prose, priority: oneOf("low", "normal", "high", "urgent"),
     workstreamId: nullable(id), taskId: nullable(id), inReplyTo: nullable(id),
     requiresAck: flag, artifacts: listOf(artifactRef), sentAt: timestamp },

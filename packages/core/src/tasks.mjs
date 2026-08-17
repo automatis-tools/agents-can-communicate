@@ -27,6 +27,58 @@ export function wouldCycle(tasks, taskId, dependsOn) {
 const blockedBy = (task, byId) => task.dependsOn
   .filter(id => (byId.get(id)?.state ?? "pending") !== "done");
 
+/**
+ * Write one task inside a transaction the caller already owns.
+ *
+ * Separated so that `acc request` - which creates the task and tells the
+ * recipient about it - can do both as one write. A request that produced a task
+ * and then failed to mention it would leave work addressed to an agent that was
+ * never told, which is worse than no request at all.
+ */
+export function writeTask(tx, { input, session, workspaceId, now, ids }) {
+  const taskId = input.taskId ?? createId("task");
+  const existing = tx.list("task");
+  const dependsOn = input.dependsOn ?? [];
+  for (const dependency of dependsOn) {
+    if (tx.get("task", dependency) === null) {
+      throw new AccError(EXIT.DATA, "a dependency does not exist", { dependency });
+    }
+  }
+  if (wouldCycle(existing, taskId, dependsOn)) {
+    throw new AccError(EXIT.DATA, "the dependency graph would contain a cycle", { taskId });
+  }
+  // A workstream is optional - "finish these tests for me" should not require
+  // inventing a project first - but a named one has to exist, or the task hangs
+  // off nothing and nobody notices.
+  const workstreamId = input.workstreamId ?? null;
+  if (workstreamId !== null && tx.get("workstream", workstreamId) === null) {
+    throw new AccError(EXIT.DATA, "the workstream does not exist", { workstreamId });
+  }
+  const record = validateRecord("task", {
+    schemaVersion: SCHEMA_VERSION,
+    taskId,
+    workstreamId,
+    workspaceId,
+    title: input.title,
+    detail: input.detail ?? null,
+    state: blockedBy({ dependsOn }, new Map(existing.map(task => [task.taskId, task])))
+      .length > 0 ? "blocked" : "pending",
+    // Addressed to a participant, so the request survives that agent closing
+    // its terminal. Whoever picks it up is recorded separately.
+    assigneeParticipantId: input.assigneeParticipantId ?? null,
+    assigneeSessionId: null,
+    dependsOn,
+    acceptance: input.acceptance ?? [],
+    createdAt: now,
+  });
+  tx.put("task", taskId, record);
+  tx.append({ schemaVersion: SCHEMA_VERSION, eventId: ids.next("event"), workspaceId,
+    actorSessionId: session.sessionId, type: "task.created", occurredAt: now,
+    payload: { taskId, state: record.state,
+      assigneeParticipantId: record.assigneeParticipantId } });
+  return record;
+}
+
 export function createTaskService(ports, workstreams) {
   const { store, clock, ids } = ports;
 
@@ -36,36 +88,9 @@ export function createTaskService(ports, workstreams) {
     await ensureMaterialised(ports, { workspaceId, descriptor: input.descriptor,
       reason: "durable_object" });
     const now = clock.now();
-    const taskId = input.taskId ?? createId("task");
     let record = null;
     await store.transaction(async tx => {
-      const existing = tx.list("task");
-      const dependsOn = input.dependsOn ?? [];
-      for (const dependency of dependsOn) {
-        if (tx.get("task", dependency) === null) {
-          throw new AccError(EXIT.DATA, "a dependency does not exist", { dependency });
-        }
-      }
-      if (wouldCycle(existing, taskId, dependsOn)) {
-        throw new AccError(EXIT.DATA, "the dependency graph would contain a cycle", { taskId });
-      }
-      record = validateRecord("task", {
-        schemaVersion: SCHEMA_VERSION,
-        taskId,
-        workstreamId: input.workstreamId,
-        workspaceId,
-        title: input.title,
-        state: blockedBy({ dependsOn }, new Map(existing.map(task => [task.taskId, task])))
-          .length > 0 ? "blocked" : "pending",
-        assigneeSessionId: null,
-        dependsOn,
-        acceptance: input.acceptance ?? [],
-        createdAt: now,
-      });
-      tx.put("task", taskId, record);
-      tx.append({ schemaVersion: SCHEMA_VERSION, eventId: ids.next("event"), workspaceId,
-        actorSessionId: session.sessionId, type: "task.created", occurredAt: now,
-        payload: { taskId, state: record.state } });
+      record = writeTask(tx, { input, session, workspaceId, now, ids });
     });
     return record;
   }
@@ -84,7 +109,17 @@ export function createTaskService(ports, workstreams) {
         throw new AccError(EXIT.CONFLICT, "the task already has an assignee",
           { taskId: input.taskId, assigneeSessionId: existing.assigneeSessionId });
       }
+      // Work addressed to one participant is not picked up by another. Taking
+      // an unaddressed task is open to anyone, which is what makes a request
+      // with no named recipient a request to the room.
+      if (existing.assigneeParticipantId !== null
+        && existing.assigneeParticipantId !== session.participantId) {
+        throw new AccError(EXIT.CONFLICT, "the task is addressed to another participant",
+          { taskId: input.taskId,
+            assigneeParticipantId: existing.assigneeParticipantId });
+      }
       record = { ...existing, assigneeSessionId: session.sessionId,
+        assigneeParticipantId: existing.assigneeParticipantId ?? session.participantId,
         state: stepTask(existing.state, "in_progress") };
       tx.put("task", input.taskId, record, tx.generationOf("task", input.taskId));
       tx.append({ schemaVersion: SCHEMA_VERSION, eventId: ids.next("event"),
