@@ -7,9 +7,9 @@ release.
 
 | | |
 |---|---|
-| Built from | `PENDING` |
-| Tarball | `agents-can-communicate-0.0.0.tgz`, 88 KB, 99 entries |
-| sha256 | `1d47407b2ee0e7ae6e7729c1e9ad3eff6796b6653a44a7b03fba72a923962c24` |
+| Built from | `2e030f8` |
+| Tarball | `agents-can-communicate-0.0.0.tgz`, 101 KB, 100 entries |
+| sha256 | `0d2a568e6e07d7ce99ce421850bd2ccd5b4adfafe2b6581cc60a3637e469e1e5` |
 | Tests | 659 passing, 0 failing |
 | Node | 24 (current production LTS) |
 | Verified on | macOS 15 (darwin 25.5.0, arm64) and Linux in CI |
@@ -78,7 +78,11 @@ Full matrix and what the `yes` values do **not** promise:
 - **One unguardable participant makes the workspace advisory.** An MCP client or
   a shell-editing model means a guarded claim is advice, and status reports that.
 - **Gemini headless returns 403 on the account used here.** Not ACC's doing —
-  reproduced with a plain `gemini -p` outside ACC entirely.
+  reproduced with a plain `gemini -p` outside ACC entirely. Headless runs also
+  need `GEMINI_CLI_TRUST_WORKSPACE=true`.
+- **No live model has driven Kimi Code or Gemini CLI.** Both fire every hook
+  against the real client; neither account can complete a turn. Their matrix rows
+  rest on hook captures, not on a finished exchange.
 - **No subagent visibility.** `lifecycle.childSessions` is false everywhere; no
   subagent was observed during capture.
 - **Windows does not work.** Not "untested" — measured. Once CI actually ran the
