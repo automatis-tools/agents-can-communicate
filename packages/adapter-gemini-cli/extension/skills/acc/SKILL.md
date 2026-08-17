@@ -92,6 +92,31 @@ Do one of three things, and tell your human which:
   refused without `--force` while the holder is merely quiet rather than gone;
 - drop it, if it no longer matters.
 
+## Who is working where
+
+One workspace spans every worktree of a repository, so the roster is how you find
+out which checkout each agent is in:
+
+```bash
+{{ACC}} status --json
+```
+
+Each live session reports its `checkoutRoot`, its `branch`, and what it said it
+was doing. That answers "who owns this worktree" without asking anyone - and
+asking would not answer it anyway, because the agents worth asking about are the
+ones that are not running.
+
+So for a request like "clean up the worktrees": list what is on disk, subtract
+the checkouts that have a live session, and the remainder has no owner here.
+
+Two things this does not tell you, and both matter before deleting anything:
+
+- an agent that is merely stopped right now still owns its work. ACC reports who
+  is *here*, not what is safe to remove;
+- unmerged commits and open pull requests are outside ACC entirely. Check them.
+
+Say which worktrees you found unowned and why, and let your human decide.
+
 ## If the command does not work, stop
 
 Everything above runs through the command shown in these examples. It is the one

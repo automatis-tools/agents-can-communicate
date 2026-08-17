@@ -151,6 +151,7 @@ export function createSyncService(ports, sessions) {
       participantId: item.participantId,
       parentSessionId: item.parentSessionId,
       harness: item.harness,
+      branch: item.branch ?? null,
       presence: classifySessionPresence(item, now),
     }));
 

@@ -58,8 +58,12 @@ graph LR
 ```
 
 Every branch returns the same descriptor — `{ id, roots, source, displayName, git? }` — so
-nothing downstream knows or cares which one produced it. Multiple Git worktrees of one
-repository share awareness while keeping distinct checkout metadata.
+nothing downstream knows or cares which one produced it. Multiple Git worktrees of one repository share
+awareness while keeping distinct checkout metadata: each session records its
+`checkoutRoot` and `branch`, so the roster answers which agent is in which worktree.
+
+The boundary is the repository, not the machine. Two unrelated projects resolve to two
+workspaces and share nothing.
 
 ## Lazy materialisation
 

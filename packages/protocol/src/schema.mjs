@@ -70,8 +70,14 @@ const RECORDS = Object.freeze({
   // do, declared at attach. The harness name does not imply them: the same
   // client guards or does not depending on its model and its approval mode, and
   // a peer deciding whether to rely on a claim needs the answer, not the brand.
+  // A workspace spans every worktree of one repository, so the workspace id
+  // cannot say which checkout a session is sitting in. Recorded at attach from
+  // what discovery already resolved: without it nobody can tell which worktrees
+  // have an owner, and asking cannot answer for the agents that are not running
+  // - which are exactly the ones a clean-up is looking for.
   session: { sessionId: id, participantId: id, workspaceId: id, generation: id,
     harness: line, state: oneOf("open", "closed"), parentSessionId: nullable(id),
+    checkoutRoot: nullable(line), branch: nullable(line),
     enforcement: oneOf("guarded", "advisory"), lifecycle: oneOf("managed", "manual"),
     heartbeatCadenceMs: positiveInteger, startedAt: timestamp, heartbeatAt: timestamp },
 
