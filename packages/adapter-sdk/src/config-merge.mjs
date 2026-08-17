@@ -4,6 +4,10 @@ const MARKER = "acc:owned";
 // has, so taking the whole key would destroy them - and giving it back on
 // uninstall would destroy them again.
 const ENTRY_MARKER = "acc:ownedEntries";
+// Containers ACC had to create. Recorded separately from whole owned keys:
+// creating one is permission to remove it when it ends up empty, not permission
+// to take whatever the user has put in it since.
+const CREATED_MARKER = "acc:createdContainers";
 
 /**
  * Merge ACC entries into a user's config and record ownership, so uninstall can
@@ -43,37 +47,35 @@ export function ownedKeys(existing, { owner = MARKER } = {}) {
  * Add entries inside containers ACC shares with the user.
  *
  * Records `[container, key]` pairs, so uninstall removes exactly the entries ACC
- * added. A container ACC had to create is additionally recorded as a whole owned
- * key, since removing the last entry from something nobody else wanted should
- * take the container with it.
+ * added. A container ACC had to create is recorded too, but as a container it may
+ * clean up rather than as a key it owns: an empty one left behind is litter, and
+ * one the user has since put their own entries into is theirs.
  */
 export function mergeOwnedEntries(existing, additions,
-  { owner = MARKER, entryOwner = ENTRY_MARKER } = {}) {
+  { entryOwner = ENTRY_MARKER, createdOwner = CREATED_MARKER } = {}) {
   const merged = { ...existing };
-  const owned = new Set(existing?.[owner] ?? []);
   const entries = new Map((existing?.[entryOwner] ?? [])
     .map(pair => [`${pair[0]}\u0000${pair[1]}`, pair]));
+  const created = new Set(existing?.[createdOwner] ?? []);
 
   for (const [container, values] of Object.entries(additions)) {
-    const had = Object.hasOwn(existing ?? {}, container);
+    if (!Object.hasOwn(existing ?? {}, container)) created.add(container);
     merged[container] = { ...(existing?.[container] ?? {}) };
     for (const [key, value] of Object.entries(values)) {
       merged[container][key] = value;
       entries.set(`${container}\u0000${key}`, [container, key]);
     }
-    // Ours entirely, so uninstall may remove it outright.
-    if (!had) owned.add(container);
   }
 
-  merged[owner] = [...owned].sort();
   merged[entryOwner] = [...entries.values()]
     .sort((left, right) => left.join("/").localeCompare(right.join("/")));
+  if (created.size > 0) merged[createdOwner] = [...created].sort();
   return merged;
 }
 
 /** Remove only the entries ACC recorded adding, leaving every other one. */
 export function removeOwnedEntries(existing,
-  { owner = MARKER, entryOwner = ENTRY_MARKER } = {}) {
+  { owner = MARKER, entryOwner = ENTRY_MARKER, createdOwner = CREATED_MARKER } = {}) {
   const result = { ...(existing ?? {}) };
   for (const [container, key] of result[entryOwner] ?? []) {
     if (result[container] === null || typeof result[container] !== "object") continue;
@@ -81,8 +83,17 @@ export function removeOwnedEntries(existing,
     delete remaining[key];
     result[container] = remaining;
   }
+  // A container ACC created goes only if nothing is left in it. Taking it
+  // outright would delete entries the user added after the install - the exact
+  // loss that recording ownership per entry exists to prevent.
+  for (const container of result[createdOwner] ?? []) {
+    const value = result[container];
+    if (value !== null && typeof value === "object" && Object.keys(value).length === 0) {
+      delete result[container];
+    }
+  }
   delete result[entryOwner];
-  // Whole keys ACC created are handled by the same ownership record as before.
+  delete result[createdOwner];
   return removeOwnedConfig(result, { owner });
 }
 
