@@ -49,10 +49,12 @@ export interface Workstream {
 
 export interface Task {
   taskId: string;
-  workstreamId: string;
+  workstreamId: string | null;        // optional: a request needs no project
   title: string;
+  detail: string | null;
   state: "pending" | "in_progress" | "review" | "done" | "blocked";
-  assigneeSessionId: string | null;
+  assigneeParticipantId: string | null;  // who it is for, survives their restart
+  assigneeSessionId: string | null;      // who is doing it now, dies with the process
   dependsOn: string[];
   acceptance: string[];
 }
@@ -113,9 +115,25 @@ blocker
 review_request
 review_result
 handoff
+work_request
 ```
 
 Every message records sender, recipients, workstream, optional task, priority, reply thread, and evidence descriptors. Message bodies are untrusted peer content.
+
+## Requesting work
+
+`requestWork` writes a task and a message in one transaction. Apart they are useless: a task
+nobody was told about is work nobody knows exists, and a message describing work that was
+never recorded is a request with nothing to point at.
+
+Two assignee fields, because they answer different questions. `assigneeParticipantId` is who
+the work is for and outlives that agent restarting — the next session of that participant is
+told about it. `assigneeSessionId` is who is actually doing it, and dies with the process.
+One field asked to be both would either lose the request when a terminal closes or claim a
+dead session is still working.
+
+Only the named participant may take an addressed task. A task with no assignee is open to
+anyone, which is what makes a request without a recipient a request to the room.
 
 ## Delivery lifecycle
 

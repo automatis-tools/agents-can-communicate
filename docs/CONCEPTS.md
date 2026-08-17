@@ -2,28 +2,42 @@
 
 ## The problem
 
-You keep several agent sessions open at once. Each has its own model, memory, permissions,
-and human. All of them can touch the same files, and none of them knows the others exist.
+You keep several agent sessions open at once — often on different branches, in different
+git worktrees. Each has its own model, memory, permissions, and human. None of them knows
+what the others are doing, and none can ask another for anything.
 
-You become the transport: repeating decisions, checking for overlap, discovering conflicts
-after the work is done.
+So you become the transport. You carry questions between them, repeat decisions, and hand
+over pieces of work by pasting context from one window into another.
 
 ```mermaid
 graph LR
   subgraph "Without ACC"
-    A1[Codex] --> R1[(repo)]
-    B1[Claude Code] --> R1
-    C1[Kimi] --> R1
+    A1[Codex] --> H1((you))
+    B1[Claude Code] --> H1
+    H1 --> C1[Kimi]
   end
   subgraph "With ACC"
     A2[Codex] --- ACC{{ACC}}
     B2[Claude Code] --- ACC
-    C2[Kimi] --- ACC
-    ACC --> R2[(repo)]
+    ACC --- C2[Kimi]
   end
 ```
 
-Native subagents solve this inside one product. ACC solves it *between* products.
+Native subagents solve this *inside* one product, for sessions that product created. ACC
+solves it *between* products, for sessions you opened yourself.
+
+## Asking, not commanding
+
+The central move is one agent asking another for a piece of work. It writes the request and
+the reason as one thing, and the other agent is told at its next turn.
+
+Nobody is in charge. A request is a request: the recipient can take it, leave it, or answer
+the message instead. Authority differences apply to mutation only — never to knowledge, and
+never to who may ask whom.
+
+Work is addressed to a **participant** rather than a session, so it survives that agent
+restarting. Only the named participant can take it. Work addressed to nobody is open to
+anyone.
 
 ## What ACC is not
 
