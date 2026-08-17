@@ -66,6 +66,32 @@ acc task --session "$ACC_SESSION" --generation "$ACC_GENERATION" --task task_x -
 If you are not going to do it, reply with `acc message` instead of leaving it pending. The
 agent that asked is waiting on an answer, and silence is not one.
 
+## Work someone asked of you, continued
+
+If you are not going to do it, say so. A request left pending looks exactly like
+one you have not read yet, and the agent that asked is waiting on an answer:
+
+```bash
+acc task --session "$ACC_SESSION" --generation "$ACC_GENERATION" \
+  --task task_x --decline --reason "Mud collision belongs to the terrain pass, not suspension."
+```
+
+While you work on it, keep your Intent current with `acc work`. That is how the
+agent waiting on you can see the thing is moving without asking.
+
+## Work you asked for that has stopped
+
+A turn carrying `[request_stalled]` means work you requested is going nowhere -
+the agent that took it has gone quiet, or the one it is addressed to is not
+here. It repeats every turn until it is resolved, because it stays true.
+
+Do one of three things, and tell your human which:
+
+- ask someone else, with `acc request` to a participant that is online;
+- take it on yourself with `acc task --task task_x --take --force`, which is
+  refused without `--force` while the holder is merely quiet rather than gone;
+- drop it, if it no longer matters.
+
 ## You can answer for the whole workspace
 
 You are not limited to your own view. Any session can read the complete state, including

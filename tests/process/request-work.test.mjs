@@ -45,19 +45,24 @@ async function project(t) {
   return { base, main, second, env };
 }
 
-async function attach({ env }, adapter, clientSessionId, cwd) {
-  const child = run(process.execPath, [hook, adapter, "sessionStart"], { env });
+async function attach({ env }, adapter, clientSessionId, cwd, participant = adapter) {
+  // Named on launch. Without a name each running agent gets its own generated
+  // one, which is what keeps two Codex sessions apart - but a test that wants
+  // to address someone has to know what to call them, and so does a person.
+  const named = { ...env, ACC_PARTICIPANT: participant };
+  const child = run(process.execPath, [hook, adapter, "sessionStart"], { env: named });
   child.child.stdin.end(JSON.stringify({ hook_event_name: "SessionStart",
     session_id: clientSessionId, cwd, source: "startup" }));
   await child;
   const { stdout } = await run(process.execPath,
-    [acc, "doctor", "--cwd", cwd, "--json"], { env });
+    [acc, "doctor", "--cwd", cwd, "--json"], { env: named });
   return loadSessionBinding({ runtimeDir: JSON.parse(stdout).data.runtimeRoot,
     harnessSessionId: clientSessionId });
 }
 
-async function turn({ env }, adapter, clientSessionId, cwd) {
-  const child = run(process.execPath, [hook, adapter, "userPromptSubmit"], { env });
+async function turn({ env }, adapter, clientSessionId, cwd, participant = adapter) {
+  const child = run(process.execPath, [hook, adapter, "userPromptSubmit"],
+    { env: { ...env, ACC_PARTICIPANT: participant } });
   child.child.stdin.end(JSON.stringify({ hook_event_name: "UserPromptSubmit",
     session_id: clientSessionId, cwd, prompt: "carry on" }));
   const { stdout } = await child;

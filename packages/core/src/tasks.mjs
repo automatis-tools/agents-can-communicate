@@ -2,6 +2,8 @@ import { AccError, EXIT, SCHEMA_VERSION, createId, transitionTask as stepTask, v
   from "@agents-can-communicate/protocol";
 
 import { ensureMaterialised } from "./materialisation.mjs";
+import { classifySessionPresence } from "./sessions.mjs";
+import { writeWorkResponse } from "./notify.mjs";
 
 // Dependency completion unblocks tasks deterministically, inside the same
 // transaction that completed the dependency. It must never depend on a model
@@ -67,6 +69,7 @@ export function writeTask(tx, { input, session, workspaceId, now, ids }) {
     // its terminal. Whoever picks it up is recorded separately.
     assigneeParticipantId: input.assigneeParticipantId ?? null,
     assigneeSessionId: null,
+    requestedByParticipantId: input.requestedByParticipantId ?? null,
     dependsOn,
     acceptance: input.acceptance ?? [],
     createdAt: now,
@@ -106,8 +109,25 @@ export function createTaskService(ports, workstreams) {
       }
       if (existing.assigneeSessionId !== null
         && existing.assigneeSessionId !== session.sessionId) {
-        throw new AccError(EXIT.CONFLICT, "the task already has an assignee",
-          { taskId: input.taskId, assigneeSessionId: existing.assigneeSessionId });
+        // A holder that is gone is not a holder. Closing a session hands its
+        // work back, so this is the crash case: no session end ever arrived and
+        // presence has decayed. Staleness alone does not release it - that is
+        // the same rule claims follow, because an idle agent may be thinking
+        // rather than dead - but it can be taken over deliberately.
+        const holder = tx.get("session", existing.assigneeSessionId);
+        const presence = holder === null
+          ? "offline"
+          : classifySessionPresence(holder, now);
+        if (presence === "online") {
+          throw new AccError(EXIT.CONFLICT, "the task already has an assignee",
+            { taskId: input.taskId, assigneeSessionId: existing.assigneeSessionId });
+        }
+        if (presence === "stale" && input.force !== true) {
+          throw new AccError(EXIT.CONFLICT,
+            "the task is held by a session that has gone quiet; take it with force",
+            { taskId: input.taskId, assigneeSessionId: existing.assigneeSessionId,
+              presence });
+        }
       }
       // Work addressed to one participant is not picked up by another. Taking
       // an unaddressed task is open to anyone, which is what makes a request
@@ -121,6 +141,9 @@ export function createTaskService(ports, workstreams) {
       record = { ...existing, assigneeSessionId: session.sessionId,
         assigneeParticipantId: existing.assigneeParticipantId ?? session.participantId,
         state: stepTask(existing.state, "in_progress") };
+      // Whoever asked is waiting on an answer, and "someone is on it" is one.
+      writeWorkResponse(tx, { task: record, actor: session,
+        workspaceId: session.workspaceId, now, ids, outcome: "accepted" });
       tx.put("task", input.taskId, record, tx.generationOf("task", input.taskId));
       tx.append({ schemaVersion: SCHEMA_VERSION, eventId: ids.next("event"),
         workspaceId: session.workspaceId, actorSessionId: session.sessionId,
@@ -145,6 +168,10 @@ export function createTaskService(ports, workstreams) {
         type: "task.transitioned", occurredAt: now,
         payload: { taskId: input.taskId, state: record.state } });
 
+      if (record.state === "done" || record.state === "review") {
+        writeWorkResponse(tx, { task: record, actor: session,
+          workspaceId: session.workspaceId, now, ids, outcome: record.state });
+      }
       if (record.state !== "done") return;
       // Unblock dependents here, in the same transaction, so the graph is
       // never left in a state that needs someone to notice it later.
@@ -164,5 +191,35 @@ export function createTaskService(ports, workstreams) {
     return record;
   }
 
-  return { createTask, claimTask, transitionTask };
+  /**
+   * Refuse a request, with a reason.
+   *
+   * The task returns to unclaimed rather than being deleted: the work is still
+   * wanted, it is just not this agent's. Leaving a request pending forever was
+   * the only way to say no, and it looks identical to not having read it.
+   */
+  async function declineTask(input) {
+    const session = await workstreams.requireOpenSession(input, "decline a task");
+    const now = clock.now();
+    let record = null;
+    await store.transaction(async tx => {
+      const existing = tx.get("task", input.taskId);
+      if (existing === null) {
+        throw new AccError(EXIT.DATA, "the task does not exist", { taskId: input.taskId });
+      }
+      record = { ...existing, assigneeParticipantId: null, assigneeSessionId: null,
+        state: "pending" };
+      tx.put("task", input.taskId, record, tx.generationOf("task", input.taskId));
+      writeWorkResponse(tx, { task: existing, actor: session,
+        workspaceId: session.workspaceId, now, ids, outcome: "declined",
+        reason: input.reason ?? null });
+      tx.append({ schemaVersion: SCHEMA_VERSION, eventId: ids.next("event"),
+        workspaceId: session.workspaceId, actorSessionId: session.sessionId,
+        type: "task.declined", occurredAt: now,
+        payload: { taskId: input.taskId, reason: input.reason ?? null } });
+    });
+    return record;
+  }
+
+  return { createTask, claimTask, transitionTask, declineTask };
 }

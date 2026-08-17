@@ -111,10 +111,6 @@ function peerBlocks(messages) {
  * how an agent ends up confidently unaware.
  */
 export function projectContext(sync, { budgetBytes = DEFAULT_BUDGET_BYTES } = {}) {
-  // Solo zero-overhead: a lone session pays nothing
-  // visible, and "no peers" is still a cost when injected into every turn.
-  if (sync.solo === true) return "";
-
   const attention = [...(sync.attention ?? [])]
     .sort((left, right) => left.priority - right.priority
       || left.sourceId.localeCompare(right.sourceId));
@@ -129,6 +125,13 @@ export function projectContext(sync, { budgetBytes = DEFAULT_BUDGET_BYTES } = {}
     ...claimLines(claims).map(line => [line]),
     ...peerBlocks(messages),
   ];
+  // Solo costs nothing: a lone session pays no visible price, and "no peers" is
+  // still a cost when injected into every turn. But this is decided after the
+  // required lines are built, not before - a message already addressed to you,
+  // or a claim you could break, is not nothing, and returning early swallowed
+  // exactly the things worth saying to someone working alone.
+  if (sync.solo === true && required.length === 0) return "";
+
   const optional = roster.map(item =>
     `- ${item.sessionId} (${item.harness}, ${item.presence})`);
 

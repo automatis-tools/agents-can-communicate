@@ -1,4 +1,4 @@
-import { randomBytes } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import { realpath } from "node:fs/promises";
 import path from "node:path";
 
@@ -84,6 +84,31 @@ export const covers = (resource, target) => {
   return target === prefix || target.startsWith(`${prefix}/`);
 };
 
+// A participant is one running agent, not one brand of client. Two Codex
+// sessions are two agents even in the same directory, so identity cannot be
+// derived from where they run - deriving it from the branch made two agents in
+// one checkout indistinguishable again.
+//
+// The default distinguishes them by the client's own session, which is stable
+// for as long as that agent is running and changes when it restarts. An agent
+// meant to be addressable across restarts is named by whoever launches it:
+//
+//   ACC_PARTICIPANT=backend-codex codex
+//
+// Work is addressed to a participant, so a pinned name is what makes a request
+// survive the recipient closing its terminal.
+const PORTABLE = /[^A-Za-z0-9._-]+/g;
+
+export function participantFor(adapterId, harnessSessionId, env = {}) {
+  const declared = env.ACC_PARTICIPANT;
+  if (typeof declared === "string" && declared.trim() !== "") {
+    return declared.trim().replace(PORTABLE, "-").slice(0, 60);
+  }
+  const suffix = createHash("sha256").update(String(harnessSessionId))
+    .digest("base64url").slice(0, 6);
+  return `${adapterId}-${suffix}`;
+}
+
 async function openContext({ cwd, dataHome, runtime, env }) {
   const descriptor = await discoverWorkspace({ cwd, env: env ?? {},
     gitProbe: createGitProbe() });
@@ -94,7 +119,7 @@ async function openContext({ cwd, dataHome, runtime, env }) {
   });
   const store = await openFilesystemStore({ root: paths.root, clock: runtime.clock,
     ids: runtime.ids, workspaceId: descriptor.id });
-  return { descriptor, paths, realpath: runtime.realpath ?? realpath,
+  return { descriptor, paths, env: env ?? {}, realpath: runtime.realpath ?? realpath,
     service: createCoordinationService({ store, clock: runtime.clock, ids: runtime.ids }) };
 }
 
@@ -103,8 +128,8 @@ const HANDLERS = {
     const capabilities = adapter.capabilities ?? {};
     const session = await context.service.openSession({
       workspaceId: context.descriptor.id,
-      participantId: adapterId,
-      displayName: adapterId,
+      participantId: participantFor(adapterId, event.sessionId, context.env),
+      displayName: participantFor(adapterId, event.sessionId, context.env),
       harness: adapterId,
       parentSessionId: null,
       // Declared from what this adapter proved, not from the fact that it is an
@@ -139,9 +164,6 @@ const HANDLERS = {
     if (binding === null) return {};
     const sync = await context.service.sync({ sessionId: binding.accSessionId,
       cursor: null, scope: "delta" });
-    // Solo costs nothing: nothing to say means nothing printed, not a banner
-    // announcing that nobody else is here.
-    if (sync.solo) return { stdout: "" };
 
     // Claims held by others, and whether this session can actually be stopped
     // from breaking them. For a harness that guards writes this is useful
@@ -173,6 +195,13 @@ const HANDLERS = {
       workspaceId: context.descriptor.id,
       participantId: mine?.participantId,
       exceptSessionId: binding.accSessionId });
+
+    // Solo costs nothing: nothing to say means nothing printed, not a banner
+    // announcing that nobody else is here. But something already said to you is
+    // not nothing - the check used to run before the inbox was read, so the
+    // answer to your own request vanished the moment the agent working on it
+    // closed and left you as the only session.
+    if (sync.solo && messages.length === 0) return { stdout: "" };
 
     // The ceiling a team agreed on in `acc.workspace.json`, or the default when
     // there is no config. Validated by the protocol and, until now, never read:

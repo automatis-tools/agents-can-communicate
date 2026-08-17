@@ -232,7 +232,8 @@ export function createCommunicationService(ports, sessions, claims) {
 
     await store.transaction(async tx => {
       task = writeTask(tx, { session, workspaceId, now, ids,
-        input: { ...input, assigneeParticipantId: recipient } });
+        input: { ...input, assigneeParticipantId: recipient,
+          requestedByParticipantId: session.participantId } });
       message = validateRecord("message", {
         schemaVersion: SCHEMA_VERSION,
         messageId,

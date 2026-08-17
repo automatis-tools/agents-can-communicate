@@ -39,7 +39,8 @@ async function place(t, policy = null) {
     GIT_DIR: "", GIT_WORK_TREE: "" };
 
   const start = async (adapter, clientSessionId) => {
-    const child = run(process.execPath, [hook, adapter, "sessionStart"], { env });
+    const child = run(process.execPath, [hook, adapter, "sessionStart"],
+      { env: { ...env, ACC_PARTICIPANT: adapter } });
     child.child.stdin.end(JSON.stringify({ hook_event_name: "SessionStart",
       session_id: clientSessionId, cwd: project, source: "startup" }));
     await child;
@@ -64,7 +65,8 @@ async function place(t, policy = null) {
  * content rather than about whose envelope it arrived in.
  */
 async function turn({ project, env }, adapter, clientSessionId) {
-  const child = run(process.execPath, [hook, adapter, "userPromptSubmit"], { env });
+  const child = run(process.execPath, [hook, adapter, "userPromptSubmit"],
+    { env: { ...env, ACC_PARTICIPANT: adapter } });
   child.child.stdin.end(JSON.stringify({ hook_event_name: "UserPromptSubmit",
     session_id: clientSessionId, cwd: project, prompt: "carry on" }));
   const { stdout } = await child;
@@ -158,4 +160,27 @@ test("a message the budget could not fit stays queued rather than reported deliv
   assert.match(context, /not shown, over budget/);
   assert.deepEqual((await receipts(where)).map(receipt => receipt.state), ["queued"],
     "the receipt says injected for text the model never saw - the sender is misinformed");
+});
+
+test("a lone session is still shown what was already said to it", async t => {
+  // The exact hole: "solo costs nothing" ran before the inbox was read, so a
+  // message waiting for you vanished the moment you became the only session.
+  // A note needing no acknowledgement raises no attention item, so nothing else
+  // keeps the projection alive - this is the case where the rule bites.
+  const where = await place(t);
+  await run(process.execPath, [acc, "message", "--session", where.sender.accSessionId,
+    "--generation", where.sender.generation, "--cwd", where.project, "--to", "codex",
+    "--type", "note", "--subject", "handover", "--body", "Left the parser half-done."],
+  { env: where.env });
+
+  // The sender leaves. The reader is now alone, with mail.
+  const child = run(process.execPath, [hook, "claude_code", "sessionEnd"], { env: where.env });
+  child.child.stdin.end(JSON.stringify({ hook_event_name: "SessionEnd",
+    session_id: "sender-1", cwd: where.project, reason: "exit" }));
+  await child;
+
+  const shown = await turn(where, "codex", "reader-1");
+
+  assert.match(shown, /Left the parser half-done\./,
+    "being the only session left swallowed a message already addressed to it");
 });

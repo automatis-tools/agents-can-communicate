@@ -109,7 +109,7 @@ export const PUBLIC_TOOLS = Object.freeze([
       + `work that needs assignment, dependencies, or acceptance tracking; ordinary work `
       + `needs only Intent. ${POLLED}`,
     inputSchema: object({
-      action: { type: "string", enum: ["create", "claim", "transition"] },
+      action: { type: "string", enum: ["create", "claim", "transition", "decline"] },
       workstreamId: string("Workstream the task belongs to."),
       title: string("Task title, required when creating."),
       detail: string("Context for whoever picks it up."),
@@ -117,6 +117,9 @@ export const PUBLIC_TOOLS = Object.freeze([
       taskId: string("Required for claim and transition."),
       state: { type: "string", enum: ["pending", "in_progress", "review", "done", "blocked"] },
       dependsOn: stringList("Task ids this task waits for."),
+      reason: string("Why, when declining."),
+      force: { type: "boolean",
+        description: "Take work held by a session that has gone quiet." },
     }, ["action"]),
   },
   {
