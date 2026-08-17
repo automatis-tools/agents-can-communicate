@@ -2,7 +2,8 @@ import { cp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { mergeOwnedConfig, ownedKeys, removeInstalledTree, removeOwnedConfig, writeHookShim }
+import { bakeSkillCommand, mergeOwnedConfig, ownedKeys, removeInstalledTree,
+  removeOwnedConfig, writeHookShim }
   from "@agents-can-communicate/adapter-sdk";
 
 const bundle = fileURLToPath(new URL("../plugin", import.meta.url));
@@ -35,6 +36,9 @@ export async function installClaudePlugin({ configDir, runner, node }) {
   const target = pluginPath(configDir);
   await rm(target, { recursive: true, force: true });
   await cp(bundle, target, { recursive: true });
+  // The skill ships with a placeholder where the command belongs: `acc` is
+  // not on PATH everywhere, and an agent that cannot run it improvises.
+  await bakeSkillCommand({ root: target, node });
   // The bundle's hooks.json names this script; until now nothing wrote it, so
   // every hook resolved to a command that does not exist and failed silently.
   await writeHookShim({ dir: path.join(target, "hooks"), adapterId: "claude_code",

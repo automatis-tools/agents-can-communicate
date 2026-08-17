@@ -1,4 +1,5 @@
-import { access, chmod, mkdir, rm, writeFile } from "node:fs/promises";
+import { access, chmod, mkdir, readFile, readdir, rm, writeFile }
+  from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -28,6 +29,9 @@ export async function assertRunner(runner) {
   }
   return runner;
 }
+
+// What the shipped skill carries where the runnable command belongs.
+const PLACEHOLDER = "{{ACC}}";
 
 // Shell metacharacters in a path are the caller's problem to survive, not the
 // shell's to interpret.
@@ -72,4 +76,42 @@ export async function removeInstalledTree(target, keep = []) {
   if (keep.includes(target)) return false;
   await rm(target, { recursive: true, force: true });
   return true;
+}
+
+/** Where the CLI lives, resolved from this package rather than from PATH. */
+export const defaultCli = () =>
+  fileURLToPath(new URL("../../../bin/acc.mjs", import.meta.url));
+
+/**
+ * Bake the runnable command into the skill this adapter installs.
+ *
+ * The skill is what tells an agent how to coordinate, and it used to say `acc`.
+ * A hook never depends on PATH - its command is pinned at install time - but the
+ * skill did, and on a machine where the package is not installed globally the
+ * word `acc` runs nothing.
+ *
+ * A model that cannot run the command does not stop. Observed on a real Claude
+ * Code session: told to take a task and finding no `acc`, it read the store's
+ * JSON, worked out the schema, and wrote records and events by hand - inventing
+ * an event type, a harness name, and its own generation tokens. So the command
+ * is pinned here for the same reason it is pinned in the shim.
+ */
+export async function bakeSkillCommand({ root, node = process.execPath,
+  cli = defaultCli() }) {
+  const command = `${quote(node)} ${quote(cli)}`;
+  const baked = [];
+  const walk = async directory => {
+    for (const entry of await readdir(directory, { withFileTypes: true })) {
+      const full = path.join(directory, entry.name);
+      if (entry.isDirectory()) await walk(full);
+      else if (entry.name === "SKILL.md") {
+        const text = await readFile(full, "utf8");
+        if (!text.includes(PLACEHOLDER)) continue;
+        await writeFile(full, text.replaceAll(PLACEHOLDER, command));
+        baked.push(full);
+      }
+    }
+  };
+  await walk(root);
+  return baked;
 }

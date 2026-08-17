@@ -33,6 +33,32 @@ const artifactRef = (value, field) => {
   return value;
 };
 
+// Every event ACC itself appends. Closed on purpose: `type` used to be free
+// text, so a record written by hand validated cleanly and `acc doctor` called
+// the store healthy. That is not theoretical - a session that could not run the
+// CLI wrote its own events, inventing `task.completed`, and the store reported
+// no problem.
+const EVENT_TYPES = Object.freeze([
+  "workspace.materialised",
+  "session.opened", "session.closed",
+  "intent.published", "intent.cleared",
+  "workstream.created", "workstream.coordinator_acquired",
+  "workstream.coordinator_released",
+  "task.created", "task.claimed", "task.transitioned", "task.unblocked",
+  "task.declined", "task.released",
+  "claim.acquired", "claim.released", "claim.renewed", "claim.force_released",
+  "message.sent", "decision.recorded", "handoff.created",
+  // Delivery transitions and request outcomes are templated from their state,
+  // so the set has to carry each one they can produce.
+  ...["recorded", "queued", "injected", "seen", "acknowledged", "failed"]
+    .map(state => `message.${state}`),
+  ...["accepted", "declined", "review", "done", "released"]
+    .map(outcome => `work.${outcome}`),
+  "work.requested",
+]);
+
+const eventType = oneOf(...EVENT_TYPES);
+
 const RECORDS = Object.freeze({
   workspace: { workspaceId: id, displayName: line, source: oneOf("config", "git", "directory"),
     roots: listOf(line), createdAt: timestamp },
@@ -102,7 +128,7 @@ const RECORDS = Object.freeze({
     remaining: listOf(line), blockers: listOf(line), claimsToRelease: listOf(resourceUri),
     verification: listOf(artifactRef), artifacts: listOf(artifactRef), createdAt: timestamp },
 
-  event: { sequence, eventId: id, workspaceId: id, actorSessionId: id, type: line,
+  event: { sequence, eventId: id, workspaceId: id, actorSessionId: id, type: eventType,
     occurredAt: timestamp, payload: plainObject },
 });
 

@@ -26,7 +26,7 @@ const workspaceRecord = () => ({ schemaVersion: SCHEMA_VERSION, workspaceId: WOR
   displayName: "Example", source: "directory", roots: ["/tmp/example"], createdAt: NOW });
 
 const eventRecord = id => ({ schemaVersion: SCHEMA_VERSION, eventId: id,
-  workspaceId: WORKSPACE, actorSessionId: "session_a", type: "workspace.created",
+  workspaceId: WORKSPACE, actorSessionId: "session_a", type: "workspace.materialised",
   occurredAt: NOW, payload: {} });
 
 function crashAt(marker) {
