@@ -38,9 +38,20 @@ installs it.
 
 ## Record the evidence
 
-Put the tarball name, sha256, test counts, capability matrix, and known
-limitations in `CHANGELOG.md`. A release without them is a release nobody can
-audit later.
+Put the tarball name, sha256, **the commit it was built from**, test counts,
+capability matrix, and known limitations in `CHANGELOG.md`. A release without
+them is a release nobody can audit later.
+
+The commit is not optional detail. Every workspace travels inside the tarball,
+so any change to shipped code changes the digest — a digest recorded alone goes
+stale on the next merge and then reads as a false claim about the current tree
+rather than a true one about an older commit. `verify-package.mjs` prints both
+on one line for exactly this reason, and refuses to imply reproducibility when
+the working tree is dirty:
+
+```text
+PASS  agents-can-communicate-0.0.0.tgz  sha256 a5c8bb1d…  built from 39d0dcf
+```
 
 ## Then stop
 
