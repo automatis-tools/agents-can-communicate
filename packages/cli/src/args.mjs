@@ -16,8 +16,16 @@ export const COMMANDS = Object.freeze({
   message: { required: ["session", "generation", "subject", "body"],
     optional: ["type", "priority", "workstream"], repeated: ["to"],
     flags: ["requires-ack"] },
-  task: { required: ["session", "generation", "workstream", "title"],
-    optional: ["state", "task"], repeated: ["depends-on"] },
+  // Asking another agent to do something: one call, because a task nobody was
+  // told about and a message pointing at no task are each useless.
+  request: { required: ["session", "generation", "to", "title"],
+    optional: ["detail", "workstream", "priority"], repeated: ["depends-on"] },
+  // Create a task, or act on one with --task. A workstream is optional: small
+  // requests should not have to invent a project first.
+  task: { required: ["session", "generation"],
+    optional: ["workstream", "title", "detail", "assignee", "state", "task"],
+    repeated: ["depends-on"], flags: ["take"] },
+  workstream: { required: ["session", "generation", "title", "objective"], optional: [] },
   finish: { required: ["session", "generation", "goal"],
     optional: ["status", "to"], repeated: ["completed", "remaining", "blocker"] },
   status: { required: [], optional: ["participant"] },

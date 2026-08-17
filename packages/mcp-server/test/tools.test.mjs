@@ -5,11 +5,13 @@ import { MCP_CAPABILITIES, PUBLIC_TOOLS, RESOURCES } from "../src/tools.mjs";
 
 const names = PUBLIC_TOOLS.map(tool => tool.name);
 
-test("exactly six model-facing tools are published", () => {
-  // The design keeps the model-facing surface to six high-level operations.
-  // Granular internal transitions stay available to adapters and out of here.
+test("the model-facing surface is exactly this list", () => {
+  // The surface stays small and high level: granular internal transitions are
+  // reachable by adapters and stay out of here. Named rather than counted, so
+  // a tool swapped for another still trips this.
   assert.deepEqual(names.sort(),
-    ["acc_claim", "acc_finish", "acc_message", "acc_sync", "acc_task", "acc_work"]);
+    ["acc_claim", "acc_finish", "acc_message", "acc_request", "acc_sync", "acc_task",
+      "acc_work", "acc_workstream"]);
 });
 
 test("every tool declares a strict 2020-12 input schema", () => {

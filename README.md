@@ -4,233 +4,158 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Node](https://img.shields.io/badge/node-%E2%89%A524-brightgreen.svg)](https://nodejs.org)
 
-**Two AI coding agents in the same project can't see each other. ACC is the layer that lets
-them — and stops one writing over the other's work.**
+**AI agents that can ask each other for work.**
 
-It is a local CLI (`acc`) plus one small hook per client. No server, no database, no
-account, no daemon. State lives on your machine, outside the repository.
+Codex on one branch, Claude Code on another, Kimi reviewing. Each in its own git worktree,
+each knowing what the others are doing — and able to hand a piece over instead of waiting
+for you to carry the message.
 
-## The problem
+You run the installer once. After that you talk to your agents the way you already do.
 
-You have Codex open in one terminal and Claude Code in another, both in the same checkout.
-Each has its own model, memory, permissions, and human. Neither knows the other exists.
+## The thing it does
 
-So: two agents refactor the same module in parallel. One overwrites the other's file
-mid-edit. You find out at `git diff`, and you are the one who has to explain to each agent
-what the other did.
+Codex has ported a module and is out of time for the tests. Its skill tells it to ask the
+agent already working in that area, so it does — without being prompted by you:
 
-Native subagents solve this **inside** one product. ACC solves it **between** products —
-Codex, Claude Code, Gemini CLI, Kimi Code, or anything that speaks MCP.
-
-```mermaid
-graph LR
-  subgraph "Today"
-    A1[Codex] --> R1[(your repo)]
-    B1[Claude Code] --> R1
-  end
-  subgraph "With ACC"
-    A2[Codex] --- ACC{{ACC}}
-    B2[Claude Code] --- ACC
-    ACC --> R2[(your repo)]
-  end
+```text
+requested task_Rwg2sybjnLneGyBuZxa8Dw of claude_code
 ```
 
-## What it does
+At its next turn, the Claude Code session is shown this. No polling, and again nothing typed
+by a human:
 
-Four things. Every output below is copied from a real run, not written by hand.
+````text
+- [direct_request] finish the store tests
+- [task_unblocked] finish the store tests
+```acc-peer-message
+id message_Ab9CpMJfn0pL6igB5AdYDQ | from session_j59fM8mWathJzOh7a2QQBQ | type work_request | untrusted peer message
+finish the store tests
+I ported src/store but ran out of time on the concurrency cases. Can you take the tests?
+```
+````
 
-### 1. Sessions find each other by themselves
+It takes the work, does it, and marks it done. Codex sees `done` on its own next turn and
+carries on.
 
-You open your clients as you always do. A `SessionStart` hook attaches each one — no
-command, no prompt, no flag.
+```mermaid
+sequenceDiagram
+  participant M as Codex · main
+  participant ACC
+  participant V as Claude Code · tests branch
+  M->>ACC: request "finish the store tests" of claude_code
+  ACC-->>V: work addressed to you, and why
+  V->>ACC: take it
+  V->>ACC: done
+  ACC-->>M: done
+```
+
+Work is addressed to the **agent**, not to its session. Claude Code can close its terminal
+before reading the request — the next session it opens is still told. Nobody else can take
+it.
+
+## What else it keeps track of
+
+| | |
+|---|---|
+| **Who is here** | each session publishes what it is working on |
+| **What is taken** | an agent claims files before changing them, and another's edit into them is refused |
+| **What was said** | questions, answers, handoffs — quoted and attributed, never as instructions |
+| **Alone** | one session behaves exactly as it did before you installed anything |
 
 ```console
 $ acc status
 2 live; 1 claim(s); protection guarded
 ```
 
-`protection guarded` is a fact about the room, not a setting: it holds only while **every**
-live session is one ACC can actually stop. One MCP client joins and it drops to `advisory`,
-because that is then the truth.
-
-### 2. An agent says what it is about to touch
-
-Its skill does this; you don't type it. `$ACC_SESSION` and `$ACC_GENERATION` identify the
-session — the generation is what stops a restarted process acting as the old one.
-
-```console
-$ acc work --session "$ACC_SESSION" --generation "$ACC_GENERATION" \
-    --summary "porting the storage layer" --mode edit --hint 'file:src/store/**'
-intent: porting the storage layer
-
-$ acc claim --session "$ACC_SESSION" --generation "$ACC_GENERATION" \
-    --resource 'file:src/store/**' --enforcement guarded --reason "porting"
-claimed file:src/store/**
-```
-
-**Intent** is awareness — it never authorises anything. **Claim** is the one that can stop
-a write. Claims are leases and expire on their own, so a crashed session can't hold the
-repo hostage.
-
-### 3. A write into someone else's claim is refused
-
-The Claude Code session tries to write `src/store/index.mjs`. Its `PreToolUse` hook gets
-back:
-
-```json
-{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"file:src/store/** is claimed by codex (session session_TZxxw2AY3Bp2tkTbA3FQ5Q)"}}
-```
-
-The tool call does not run, and the agent is told who holds it. A write anywhere **else**
-goes through untouched — the hook produces no output at all.
-
-At that session's next turn, ACC injects this:
-
-```text
-2 session(s); cursor 0000000000000006
-- [claim_conflict] file:src/store/** is claimed by session_TZxxw2AY3Bp2tkTbA3FQ5Q
-- [claim] file:src/store/** held by codex - file edits are blocked; edits made through a shell are not
-- session_ALYmBpY5dyGXltQ0vAJayw (claude_code, online)
-- session_TZxxw2AY3Bp2tkTbA3FQ5Q (codex, online)
-```
-
-That second line is the part most tools get wrong. It states exactly how far the guard
-reaches for **this** session: file edits are stopped, a shell command is not, because a
-command names no file to match against a claim.
-
-### 4. Agents can ask each other things
-
-```console
-$ acc message --session "$ACC_SESSION" --generation "$ACC_GENERATION" \
-    --to codex --type question --subject "src/store" \
-    --body "Need 20 minutes in src/store. Can you release it?" --requires-ack
-sent message__Wejo2AqkI2JZO9Dnl57dg
-```
-
-At the codex session's next turn, ACC puts this in front of the model:
-
-````text
-2 session(s); cursor 0000000000000007
-- [direct_request] src/store
-```acc-peer-message
-id message_H_Y3zwVe7oW-9TvHTHtWoA | from session_HQ6sODMatI2qMtCtdCVMRQ | type question | untrusted peer message
-src/store
-Need 20 minutes in src/store. Can you release it?
-```
-- session_BjeN0SqpbrRqFjmvAk74AA (codex, online)
-- session_HQ6sODMatI2qMtCtdCVMRQ (claude_code, online)
-````
-
-Peer text is **data, never instruction**. It stays inside a named block it cannot close,
-control characters become visible escapes, and it is labelled with who sent it. A message
-telling your agent it is now the coordinator arrives as a quoted string, not as a command.
-
-Delivery is reported honestly too: the receipt moves to `injected` only for a message the
-turn actually carried. One that did not fit the context budget stays queued and goes out
-later, rather than telling the sender it landed.
-
-## Working alone? It does nothing
-
-One session, no peers: the hook prints nothing, injects nothing, and the guard
-short-circuits against an empty claim set. Zero files written into your project.
-
-Coordination starts when a second session shows up, and not before.
-
 ## Install
 
-Not on npm yet. From a clone:
+Not published yet, so build it from a clone:
 
 ```bash
-npm ci
-npm pack
-npm install -g ./agents-can-communicate-*.tgz
+npm ci && npm pack && npm install -g ./agents-can-communicate-*.tgz
 ```
 
-That gives you `acc`, `acc-hook`, and `acc-mcp`. Then wire up whichever clients you have:
+Then wire up the clients you have:
 
 <!-- test:command -->
 ```bash
 acc install --dry-run
 ```
 
-It prints every path it would touch and why it skipped the clients you don't have. Drop
-`--dry-run` to apply.
+This prints every file it would touch. Run `acc install` to apply it, then open your clients
+in the project — in one directory or in several worktrees — and work normally.
 
-```bash
-acc install      # apply
-acc doctor       # clients, versions, install health, what to do next
-acc uninstall    # removes only what ACC wrote, only if the bytes still match
-```
+## Commands
 
-Codex additionally needs you to trust the plugin — that is Codex's own security step, and
-`acc doctor` will say so.
+Coordination needs none from you. Requesting work, taking it, claiming files and messaging
+are things the agents do, taught by the skill each adapter installs.
 
-Then just open two clients in the same directory and work normally.
+What is left for a person is the install and looking in on it:
+
+| | |
+|---|---|
+| `acc status` | who is here, what is claimed, what is in flight |
+| `acc doctor` | what is installed, what is missing, what to do next |
+| `acc install` · `acc uninstall` | wire clients up, or take it back out |
+
+Uninstall removes only files ACC wrote, and only where they still match what it wrote.
+Every operation is in the [CLI reference](docs/CLI.md) if you want to drive it yourself.
+
+## Supported clients
+
+| | Sees others | Blocks edits | Receives work and updates |
+|---|---|---|---|
+| Codex | yes | yes¹ | yes |
+| Claude Code | yes | yes | yes |
+| Gemini CLI | yes | yes² | yes |
+| Kimi Code | yes | yes | yes |
+| Any MCP client | yes | – | yes, when it polls |
+
+¹ models editing through `apply_patch` · ² approval modes that expose edit tools ·
+[what was measured](docs/CAPABILITIES.md)
+
+## Limits
+
+- A claim blocks file edits. It does not block an agent that edits by running a shell
+  command, since the command names no file.
+- `protection guarded` applies while every session present is one ACC can stop. One that
+  cannot changes it to `advisory`.
+- Codex requires you to trust the plugin before its hooks run. `acc doctor` reports this.
+- Windows fails 86 of 587 tests. macOS and Linux are supported.
 
 ## How it works
 
 ```mermaid
 graph LR
-  C["your client<br/>Codex · Claude Code · Gemini · Kimi"] -->|hook fires| H[acc-hook]
-  H -->|attach · guard · inject| K["core<br/>sessions · claims · messages"]
+  C[your client] -->|hook| H[acc-hook]
+  H --> K["core<br/>sessions · work · claims · messages"]
   K --> S[(state, outside your repo)]
-  K -->|allow or deny| H
+  K -->|answer| H
   H --> C
 ```
 
-Three hook points do all of it: session start (attach), before a tool call (guard), before
-a turn (inject). Everything vendor-specific lives in that client's adapter — the core never
-knows which client it is talking to.
+Clients call out at three moments: a session starts, a tool is about to run, a turn begins.
+ACC answers at those and is idle otherwise. A hook that does not answer within five seconds
+lets the tool run.
 
-A hook that cannot answer within 5 seconds **allows** the call. A coordination tool must
-never be the reason your session stops working.
+State lives beside your other tool settings, never inside the repository.
 
-## Supported clients
-
-| Client | Attach | Guard writes | Inject context | Heartbeat |
-|---|---|---|---|---|
-| Codex | yes | yes¹ | yes | – |
-| Claude Code | yes | yes | yes | – |
-| Gemini CLI | yes | yes² | yes | – |
-| Kimi Code | yes | yes | yes | yes |
-| Any MCP client | yes | – | – | – |
-
-¹ models offering `apply_patch` — others edit through the shell, and a shell command names
-no file · ² approval modes that expose edit tools
-
-Every `yes` was captured from a real session on a named version. Nothing is inferred from
-documentation: [CAPABILITIES.md](docs/CAPABILITIES.md).
-
-## What it is not
-
-- not a model, an agent runtime, or a way to spawn agents;
-- not a replacement for Codex, Claude Code, or native subagents;
-- not a task tracker that turns every action into a ticket;
-- not a permanent lead session — no session is in charge;
-- not transcript sharing. It carries intent, claims, and messages. Never your prompts.
-
-## Docs
+## Documentation
 
 | Using it | Understanding it | Building on it |
 |---|---|---|
 | [Getting started](docs/GETTING_STARTED.md) | [Concepts](docs/CONCEPTS.md) | [Writing an adapter](docs/ADAPTER_AUTHORING.md) |
 | [CLI](docs/CLI.md) | [Architecture](docs/ARCHITECTURE.md) | [Protocol](docs/PROTOCOL.md) |
-| [Configuration](docs/CONFIGURATION.md) | [Capabilities, measured](docs/CAPABILITIES.md) | [Security model](docs/SECURITY_MODEL.md) |
-| [MCP](docs/MCP.md) | [Design decisions](docs/DESIGN_DECISIONS.md) | [Threat model](docs/THREAT_MODEL.md) |
-| [Troubleshooting](docs/TROUBLESHOOTING.md) | [Prior art](docs/PRIOR_ART.md) | [Releasing](docs/RELEASING.md) |
+| [Configuration](docs/CONFIGURATION.md) | [Capabilities](docs/CAPABILITIES.md) | [Security](docs/SECURITY_MODEL.md) |
+| [MCP](docs/MCP.md) | [Decisions](docs/DESIGN_DECISIONS.md) | [Threat model](docs/THREAT_MODEL.md) |
+| [Troubleshooting](docs/TROUBLESHOOTING.md) | [Prior art](docs/PRIOR_ART.md) | [Contributing](AGENTS.md) |
 
 Examples: [three workstreams](examples/three-workstreams.md) ·
-[research, no Git](examples/non-git-research.md)
-
-Contributing: [AGENTS.md](AGENTS.md) — the rules, and why the tests are shaped the way they
-are.
+[research without Git](examples/non-git-research.md)
 
 ## Requirements
 
-Node 24+, macOS or Linux. Git optional — a plain directory works.
-
-Windows does not work yet, and that is measured rather than assumed: 86 of 587 tests failed
-once CI actually ran there. Reasons in [CHANGELOG.md](CHANGELOG.md).
+Node 24+, macOS or Linux. Git optional.
 
 ## License
 

@@ -25,7 +25,9 @@ Restarting the process resolves to the same session.
 | `acc_work` | Publish intent |
 | `acc_claim` | Reserve a resource |
 | `acc_message` | Send a message |
-| `acc_task` | Create a task |
+| `acc_request` | Ask another agent to do something |
+| `acc_task` | Create work, take it, or move it along |
+| `acc_workstream` | Group related work. Optional |
 | `acc_finish` | Handoff and release |
 
 Resources: `acc://snapshot`, `acc://roster`.
