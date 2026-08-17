@@ -41,7 +41,7 @@ test("install places the plugin and registers it in the marketplace", async t =>
   const result = await createCodexAdapter().install(context);
 
   assert.equal(result.ok, true);
-  const plugin = path.join(context.home, "plugins", "agents-can-communicate");
+  const plugin = path.join(context.home, ".agents", "plugins", "plugins", "agents-can-communicate");
   assert.deepEqual((await readdir(plugin)).sort(),
     [".codex-plugin", "acc-hook.sh", "hooks.json", "skills"].sort());
   const manifest = JSON.parse(await readFile(
@@ -75,7 +75,7 @@ test("uninstall removes only what ACC owns, twice safely", async t => {
   assert.deepEqual(afterFirst.plugins, EXISTING.plugins,
     "uninstall did not restore the marketplace");
   assert.deepEqual(await read(), afterFirst);
-  await assert.rejects(readdir(path.join(context.home, "plugins", "agents-can-communicate")),
+  await assert.rejects(readdir(path.join(context.home, ".agents", "plugins", "plugins", "agents-can-communicate")),
     error => error.code === "ENOENT");
 });
 
@@ -83,7 +83,7 @@ test("the hooks file wires only events this client actually has", async t => {
   const { context } = await fixture(t);
   await createCodexAdapter().install(context);
 
-  const wired = JSON.parse(await readFile(path.join(context.home, "plugins",
+  const wired = JSON.parse(await readFile(path.join(context.home, ".agents", "plugins", "plugins",
     "agents-can-communicate", "hooks.json"), "utf8"));
 
   for (const event of Object.keys(wired.hooks)) {
@@ -140,7 +140,7 @@ test("doctor reports the capture and the trust requirement", async t => {
 test("the guard matches the tools this client actually uses", async t => {
   const { context } = await fixture(t);
   await createCodexAdapter().install(context);
-  const wired = JSON.parse(await readFile(path.join(context.home, "plugins",
+  const wired = JSON.parse(await readFile(path.join(context.home, ".agents", "plugins", "plugins",
     "agents-can-communicate", "hooks.json"), "utf8"));
 
   // Codex names its edit tool apply_patch. A matcher copied from another

@@ -80,6 +80,15 @@ export function defineAdapter(manifest) {
   if (typeof manifest.displayName !== "string" || manifest.displayName.trim() === "") {
     usage("an adapter must declare a displayName", { id: manifest.id });
   }
+  // Detection spawns this to decide whether the client is on the machine.
+  // Left undeclared it used to fall back to the adapter id, so `claude_code`
+  // and `gemini_cli` probed binaries that do not exist and were reported absent
+  // on every machine - `acc install` silently skipped half its clients.
+  const command = manifest.client?.command;
+  if (typeof command !== "string" || command.trim() === "") {
+    usage("an adapter must declare client.command, the binary its client installs",
+      { id: manifest.id });
+  }
   for (const method of BASE_METHODS) {
     if (typeof manifest[method] !== "function") {
       usage(`an adapter must implement ${method}()`, { id: manifest.id, method });

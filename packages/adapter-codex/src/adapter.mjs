@@ -23,6 +23,10 @@ export function createCodexAdapter() {
   return defineAdapter({
     id: "codex",
     displayName: "Codex CLI",
+    // The binary this client actually installs. Probed for a version to
+    // decide whether the client is on this machine, so it has to be the
+    // real command rather than the adapter id: `codex-cli 0.147.0`.
+    client: { command: "codex", versionArgs: ["--version"] },
     capabilities: {
       lifecycle: { sessionStart: true, sessionEnd: true },
       // Observed reaching the model as a `developer` role message, unwrapped.

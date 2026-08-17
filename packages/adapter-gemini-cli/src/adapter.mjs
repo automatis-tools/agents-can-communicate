@@ -28,6 +28,10 @@ export function createGeminiCliAdapter() {
   return defineAdapter({
     id: "gemini_cli",
     displayName: "Gemini CLI",
+    // The binary this client actually installs. Probed for a version to
+    // decide whether the client is on this machine, so it has to be the
+    // real command rather than the adapter id: `0.55.1`.
+    client: { command: "gemini", versionArgs: ["--version"] },
     capabilities: {
       lifecycle: { sessionStart: true, sessionEnd: true },
       context: { beforeTurnInjection: true },
