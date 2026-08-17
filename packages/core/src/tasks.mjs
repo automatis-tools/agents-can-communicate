@@ -3,7 +3,7 @@ import { AccError, EXIT, SCHEMA_VERSION, createId, transitionTask as stepTask, v
 
 import { ensureMaterialised } from "./materialisation.mjs";
 import { classifySessionPresence } from "./sessions.mjs";
-import { writeWorkResponse } from "./notify.mjs";
+import { closeRequestReceipt, writeWorkResponse } from "./notify.mjs";
 
 // Dependency completion unblocks tasks deterministically, inside the same
 // transaction that completed the dependency. It must never depend on a model
@@ -172,6 +172,8 @@ export function createTaskService(ports, workstreams) {
         writeWorkResponse(tx, { task: record, actor: session,
           workspaceId: session.workspaceId, now, ids, outcome: record.state });
       }
+      // Doing the work answers the request that asked for it.
+      if (record.state === "done") closeRequestReceipt(tx, { task: record, actor: session, now, ids });
       if (record.state !== "done") return;
       // Unblock dependents here, in the same transaction, so the graph is
       // never left in a state that needs someone to notice it later.
@@ -213,6 +215,8 @@ export function createTaskService(ports, workstreams) {
       writeWorkResponse(tx, { task: existing, actor: session,
         workspaceId: session.workspaceId, now, ids, outcome: "declined",
         reason: input.reason ?? null });
+      // Refusing is also an answer, so the request stops demanding one.
+      closeRequestReceipt(tx, { task: existing, actor: session, now, ids });
       tx.append({ schemaVersion: SCHEMA_VERSION, eventId: ids.next("event"),
         workspaceId: session.workspaceId, actorSessionId: session.sessionId,
         type: "task.declined", occurredAt: now,

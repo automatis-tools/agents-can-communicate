@@ -68,6 +68,13 @@ agent that asked is waiting on an answer, and silence is not one.
 
 ## Work someone asked of you, continued
 
+Marking it done answers the request it came from, so it stops appearing in your turn.
+For a message that asked for an acknowledgement and is not tied to a task:
+
+```bash
+{{ACC}} ack --session "$ACC_SESSION" --generation "$ACC_GENERATION" --message message_x
+```
+
 If you are not going to do it, say so. A request left pending looks exactly like
 one you have not read yet, and the agent that asked is waiting on an answer:
 
