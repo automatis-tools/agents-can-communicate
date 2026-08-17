@@ -138,6 +138,10 @@ const HANDLERS = {
       enforcement: capabilities.guards?.beforeWrite === true ? "guarded" : "advisory",
       lifecycle: capabilities.lifecycle?.sessionEnd === true ? "managed" : "manual",
       heartbeatCadenceMs: CADENCE_MS,
+      // Which checkout this agent is in. One workspace spans every worktree of
+      // a repository, so this is the only thing that distinguishes them.
+      checkoutRoot: context.descriptor.git?.worktreeRoot ?? context.descriptor.roots[0],
+      branch: context.descriptor.git?.branch ?? null,
       descriptor: context.descriptor,
     });
     await storeSessionBinding({ runtimeDir: paths.root, harnessSessionId: event.sessionId,

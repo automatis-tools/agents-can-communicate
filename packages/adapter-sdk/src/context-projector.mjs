@@ -132,8 +132,16 @@ export function projectContext(sync, { budgetBytes = DEFAULT_BUDGET_BYTES } = {}
   // exactly the things worth saying to someone working alone.
   if (sync.solo === true && required.length === 0) return "";
 
-  const optional = roster.map(item =>
-    `- ${item.sessionId} (${item.harness}, ${item.presence})`);
+  // Named by participant, because that is what another agent addresses work to
+  // - a session id cannot be used with `--to`. The branch says where they are,
+  // which is how a workspace spanning several worktrees stays legible.
+  const optional = roster.map(item => {
+    const who = item.participantId ?? item.sessionId;
+    const place = item.branch === null || item.branch === undefined
+      ? ""
+      : ` on ${item.branch}`;
+    return `- ${who}${place} (${item.harness}, ${item.presence})`;
+  });
 
   const header = `${roster.length} session(s); cursor ${sync.cursor}`;
   const lines = [header];
