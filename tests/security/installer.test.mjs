@@ -5,6 +5,7 @@ import path from "node:path";
 import test from "node:test";
 
 import { createKimiAdapter } from "@agents-can-communicate/adapter-kimi";
+import { ALL_ADAPTERS, clientContext } from "@agents-can-communicate/cli";
 import { applyPlan, loadOwnership, planInstallation, recordInstall, removeOwned }
   from "@agents-can-communicate/installer";
 import { EXIT } from "@agents-can-communicate/protocol";
@@ -122,6 +123,68 @@ test("install and uninstall restore a foreign config byte for byte", async t => 
   // The user's settings are the asset here. A tool that edits them must be able
   // to prove it can put them back.
   assert.equal(await readFile(path.join(home, "config.toml"), "utf8"), original);
+});
+
+/**
+ * The user's own entries in a container ACC had to create.
+ *
+ * Recording ownership per entry exists so uninstall leaves `enabledPlugins`
+ * alone except for ACC's line. Creating the container undid that: it was also
+ * recorded as a whole owned key, so uninstall removed the key outright - and
+ * every plugin the user had enabled since the install went with it. The record
+ * that would have saved them was there, and the coarser one won.
+ */
+async function claudeHome(t) {
+  const home = await realpath(await mkdtemp(path.join(tmpdir(), "acc-sec-claude-")));
+  t.after(() => rm(home, { recursive: true, force: true }));
+  const context = clientContext(home);
+  const settings = path.join(context.configDir, "settings.json");
+  const adapter = ALL_ADAPTERS().find(item => item.id === "claude_code");
+  const read = async () => JSON.parse(await readFile(settings, "utf8"));
+  return { adapter, context, settings, read };
+}
+
+test("uninstall keeps plugins the user enabled after the install", async t => {
+  const { adapter, context, settings, read } = await claudeHome(t);
+  await adapter.install(context);
+
+  // Enabling a plugin is the ordinary next thing a user does, and the client
+  // writes it into the same key ACC just created.
+  const mine = await read();
+  mine.enabledPlugins["their-plugin@their-marketplace"] = true;
+  await writeFile(settings, `${JSON.stringify(mine, null, 2)}\n`);
+
+  await adapter.uninstall(context);
+
+  const after = await read();
+  assert.deepEqual(after.enabledPlugins, { "their-plugin@their-marketplace": true },
+    "uninstall took the whole key, and the user's plugin with it");
+  assert.equal(Object.hasOwn(after, "acc:createdContainers"), false);
+});
+
+test("uninstall leaves no empty container behind either", async t => {
+  const { adapter, context, read } = await claudeHome(t);
+  await adapter.install(context);
+  await adapter.uninstall(context);
+
+  // Nothing else ever wanted the key, so keeping it would be litter in a file
+  // ACC only borrowed - the same standard as restoring a config byte for byte.
+  const after = await read();
+  assert.equal(Object.hasOwn(after, "enabledPlugins"), false);
+  assert.equal(Object.hasOwn(after, "extraKnownMarketplaces"), false);
+});
+
+test("a container the user already had survives uninstall", async t => {
+  const { adapter, context, settings, read } = await claudeHome(t);
+  await mkdir(context.configDir, { recursive: true });
+  // Empty, and theirs. ACC adds an entry to it rather than creating it, so
+  // uninstall has to hand back the empty object it found.
+  await writeFile(settings, `${JSON.stringify({ enabledPlugins: {} }, null, 2)}\n`);
+
+  await adapter.install(context);
+  await adapter.uninstall(context);
+
+  assert.deepEqual(await read(), { enabledPlugins: {} });
 });
 
 test("a dry run cannot be tricked into writing", async t => {
