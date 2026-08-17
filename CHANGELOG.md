@@ -7,10 +7,10 @@ release.
 
 | | |
 |---|---|
-| Built from | `2e030f8` |
+| Built from | `60817fb` |
 | Tarball | `agents-can-communicate-0.0.0.tgz`, 101 KB, 100 entries |
-| sha256 | `0d2a568e6e07d7ce99ce421850bd2ccd5b4adfafe2b6581cc60a3637e469e1e5` |
-| Tests | 659 passing, 0 failing |
+| sha256 | `848ad59785f0a35fa34102e818869b6acf780f833f674122d4c0e74a41b30184` |
+| Tests | 662 passing, 0 failing |
 | Node | 24 (current production LTS) |
 | Verified on | macOS 15 (darwin 25.5.0, arm64) and Linux in CI |
 | Not supported | Windows — see below |
@@ -43,6 +43,11 @@ telling the sender it landed. The ceiling is `policy.contextBudgetBytes`.
 Claims are enforced however the workspace path is spelled. A project reached
 through a symlink — `/tmp` and `/var` on macOS, a symlinked checkout anywhere —
 used to pass every write through while still reporting `protection guarded`.
+
+Installing edits configuration for four other tools, so uninstall removes the
+entries ACC recorded writing and nothing else. A settings key ACC had to create
+goes only when it is empty: plugins the user enabled afterwards live in that same
+key, and taking it outright took them too.
 
 ### Clients
 
