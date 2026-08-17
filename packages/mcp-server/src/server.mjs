@@ -103,7 +103,16 @@ async function callTool(name, args, context) {
       if (args.action === "transition") return service.transitionTask({ ...owner,
         taskId: args.taskId, state: args.state });
       return service.createTask({ ...owner, workstreamId: args.workstreamId,
-        title: args.title, taskId: args.taskId, dependsOn: args.dependsOn ?? [] });
+        title: args.title, detail: args.detail, taskId: args.taskId,
+        assigneeParticipantId: args.assigneeParticipantId,
+        dependsOn: args.dependsOn ?? [] });
+    case "acc_request":
+      return service.requestWork({ ...owner, toParticipantId: args.toParticipantId,
+        title: args.title, detail: args.detail, workstreamId: args.workstreamId,
+        priority: args.priority, dependsOn: args.dependsOn ?? [] });
+    case "acc_workstream":
+      return service.createWorkstream({ ...owner, title: args.title,
+        objective: args.objective });
     case "acc_finish":
       return service.finishSession({ ...owner, goal: args.goal, status: args.status,
         completed: args.completed ?? [], remaining: args.remaining ?? [],

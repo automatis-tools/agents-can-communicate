@@ -8,7 +8,7 @@ graph LR
     I[acc install] --- D[acc doctor] --- CF[acc config] --- UN[acc uninstall]
   end
   subgraph Your agent
-    W[acc work] --- CL[acc claim] --- MS[acc message] --- TK[acc task] --- FN[acc finish] --- ST[acc status] --- SY[acc sync] --- RL[acc release]
+    W[acc work] --- CL[acc claim] --- RQ[acc request] --- MS[acc message] --- TK[acc task] --- WS[acc workstream] --- FN[acc finish] --- ST[acc status] --- SY[acc sync] --- RL[acc release]
   end
   subgraph Adapters only
     AT[acc attach] --- HB[acc heartbeat] --- DT[acc detach]
@@ -38,7 +38,9 @@ graph LR
 | `acc claim` | Reserve a resource. Exit `5` on conflict |
 | `acc release` | Give it back |
 | `acc message` | Send a typed message to participants |
-| `acc task` | Create a task in a workstream |
+| `acc request` | Ask another agent to do something. One call: the work plus why |
+| `acc task` | Create work, `--take` it, or `--state` it along |
+| `acc workstream` | Group related work. Optional |
 | `acc finish` | Write the handoff and release claims |
 
 ## Adapters only
@@ -60,3 +62,34 @@ graph LR
 
 Anything that mutates needs `--session` and `--generation`. The generation is what stops a
 restarted process from acting as the old one.
+
+## Asking another agent
+
+```bash
+acc request --session "$ACC_SESSION" --generation "$ACC_GENERATION" \
+  --to claude_code --title "finish the store tests" \
+  --detail "I ported src/store but ran out of time on the concurrency cases."
+```
+
+One write. The recipient learns about it twice, and the two facts are different: the work
+appears as an attention item addressed to them, and the message explains why. A task with
+no message is work nobody understands; a message with no task is a request nothing tracks.
+
+Work is addressed to a **participant**, not a session. The agent can close its terminal and
+the next session it opens is still told. Only that participant can take it:
+
+```bash
+acc task --session … --generation … --task task_x --take     # exit 5 if it is not yours
+acc task --session … --generation … --task task_x --state review
+```
+
+`--assignee` on `acc task` addresses work without sending a message. `acc request` is the
+same thing with the explanation attached, which is almost always what you want.
+
+A workstream is optional. `acc request --to models --title "review the migration"` needs no
+project around it. Create one when several pieces belong together:
+
+```bash
+acc workstream --session … --generation … \
+  --title "Storage" --objective "port the store and its tests"
+```

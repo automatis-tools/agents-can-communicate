@@ -4,6 +4,10 @@ import { createCoordinationService } from "@agents-can-communicate/core";
 import { openFilesystemStore } from "@agents-can-communicate/storage-filesystem";
 
 import { parseArgs, positiveNumber } from "./args.mjs";
+
+// A usage error names what is missing rather than failing deeper in a service
+// with the argument already half-applied.
+const usage = message => new AccError(EXIT.USAGE, message);
 import { runConfigCommand } from "./config-command.mjs";
 import { runInstallCommand } from "./install-command.mjs";
 import { runDoctor } from "./doctor-command.mjs";
@@ -110,11 +114,51 @@ const HANDLERS = Object.freeze({
     return { data: message, text: `sent ${message.messageId}` };
   },
 
-  task: async ({ options, context }) => {
-    const task = await context.service.createTask({ sessionId: options.session,
-      generation: options.generation, workstreamId: options.workstream,
-      title: options.title, taskId: options.task, dependsOn: options.dependsOn ?? [],
+  /**
+   * Ask another agent to do something. One call, one write.
+   *
+   * The recipient hears about it twice by design: the task raises an attention
+   * item for the participant it names, and the message reaches their turn as
+   * quoted peer text explaining why.
+   */
+  request: async ({ options, context }) => {
+    const { task, message } = await context.service.requestWork({
+      sessionId: options.session, generation: options.generation,
+      toParticipantId: options.to, title: options.title, detail: options.detail,
+      workstreamId: options.workstream, priority: options.priority,
+      dependsOn: options.dependsOn ?? [], descriptor: context.descriptor });
+    return { data: { task, message },
+      text: `requested ${task.taskId} of ${options.to}` };
+  },
+
+  workstream: async ({ options, context }) => {
+    const workstream = await context.service.createWorkstream({
+      sessionId: options.session, generation: options.generation,
+      title: options.title, objective: options.objective,
       descriptor: context.descriptor });
+    return { data: workstream, text: `${workstream.workstreamId} ${workstream.state}` };
+  },
+
+  task: async ({ options, context }) => {
+    const owner = { sessionId: options.session, generation: options.generation };
+    // Taking work and moving it along are the same noun as creating it, so they
+    // stay one command rather than three the model has to choose between.
+    if (options.take === true) {
+      if (options.task === undefined) throw usage("task --take requires --task");
+      const taken = await context.service.claimTask({ ...owner, taskId: options.task });
+      return { data: taken, text: `${taken.taskId} ${taken.state}` };
+    }
+    if (options.state !== undefined) {
+      if (options.task === undefined) throw usage("task --state requires --task");
+      const moved = await context.service.transitionTask({ ...owner,
+        taskId: options.task, state: options.state });
+      return { data: moved, text: `${moved.taskId} ${moved.state}` };
+    }
+    if (options.title === undefined) throw usage("task requires --title");
+    const task = await context.service.createTask({ ...owner,
+      workstreamId: options.workstream, title: options.title, detail: options.detail,
+      assigneeParticipantId: options.assignee, taskId: options.task,
+      dependsOn: options.dependsOn ?? [], descriptor: context.descriptor });
     return { data: task, text: `${task.taskId} ${task.state}` };
   },
 
