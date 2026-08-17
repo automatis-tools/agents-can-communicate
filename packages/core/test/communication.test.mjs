@@ -46,12 +46,14 @@ test("a message creates one receipt per recipient", async () => {
 
 test("one recipient's receipt never moves another's", async () => {
   const { service, store } = makeService();
-  const { first } = await pair(service);
+  const { first, second } = await pair(service);
   const message = await service.sendMessage(sending(first,
     { toParticipantIds: ["participant_b", "participant_c"] }));
 
-  await service.markDelivery({ sessionId: first.sessionId, generation: first.generation,
-    messageId: message.messageId, recipientParticipantId: "participant_b", state: "seen" });
+  // The recipient marks its own. Reading a message is something only the
+  // reader can report.
+  await service.markDelivery({ sessionId: second.sessionId, generation: second.generation,
+    messageId: message.messageId, state: "seen" });
 
   const receipts = (await store.snapshot(WORKSPACE)).receipts;
   assert.equal(receipts.find(item => item.recipientParticipantId === "participant_b").state,
@@ -62,11 +64,10 @@ test("one recipient's receipt never moves another's", async () => {
 
 test("delivery cannot move backwards", async () => {
   const { service } = makeService();
-  const { first } = await pair(service);
+  const { first, second } = await pair(service);
   const message = await service.sendMessage(sending(first));
-  const advance = state => service.markDelivery({ sessionId: first.sessionId,
-    generation: first.generation, messageId: message.messageId,
-    recipientParticipantId: "participant_b", state });
+  const advance = state => service.markDelivery({ sessionId: second.sessionId,
+    generation: second.generation, messageId: message.messageId, state });
   await advance("acknowledged");
 
   await assert.rejects(advance("seen"), error => error.code === EXIT.CONFLICT);
@@ -135,4 +136,17 @@ test("message bodies are data: nothing in them can grant authority", async () =>
   // The body round-trips verbatim as content and touches no policy field.
   assert.equal(message.body.includes("SYSTEM:"), true);
   assert.equal("authority" in message, false);
+});
+
+test("a session cannot report that someone else has read a message", async () => {
+  // The receipt is the reader's own statement. Letting any session advance
+  // another participant's would let a sender mark its own message as read.
+  const { service } = makeService();
+  const { first } = await pair(service);
+  const message = await service.sendMessage(sending(first));
+
+  await assert.rejects(service.markDelivery({ sessionId: first.sessionId,
+    generation: first.generation, messageId: message.messageId,
+    recipientParticipantId: "participant_b", state: "seen" }),
+  error => error.code === EXIT.CONFLICT);
 });

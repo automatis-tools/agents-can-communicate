@@ -43,6 +43,8 @@ export const PUBLIC_TOOLS = Object.freeze([
         enum: ["observe", "explore", "edit", "review", "coordinate", "wait"] },
       state: { type: "string", enum: ["active", "blocked", "waiting", "done"] },
       workstreamId: string("Optional workstream this work belongs to."),
+      clear: { type: "boolean",
+        description: "Say this session has stopped working on anything." },
       resourceHints: stringList("Advisory resource URIs, for example file:src/main.mjs."),
     }, ["summary", "mode"]),
   },
@@ -93,6 +95,16 @@ export const PUBLIC_TOOLS = Object.freeze([
       priority: { type: "string", enum: ["low", "normal", "high", "urgent"] },
       dependsOn: stringList("Task ids this waits for."),
     }, ["toParticipantId", "title"]),
+  },
+  {
+    name: "acc_ack",
+    description: `Answer a message that asked for an acknowledgement, so it stops `
+      + `demanding one. Finishing a task answers the request it came from `
+      + `automatically. ${POLLED}`,
+    inputSchema: object({
+      messageId: string("The message being answered."),
+      state: { type: "string", enum: ["seen", "acknowledged"] },
+    }, ["messageId"]),
   },
   {
     name: "acc_workstream",

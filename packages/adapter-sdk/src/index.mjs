@@ -8,6 +8,7 @@ export { assertRunner, bakeSkillCommand, defaultCli, defaultRunner, removeInstal
 export { BEGIN, END, removeTomlBlock, renderBlock, stripBlock, tomlString, writeTomlBlock }
   from "./toml-block.mjs";
 export { projectContext } from "./context-projector.mjs";
-export { mergeOwnedConfig, ownedKeys, removeOwnedConfig } from "./config-merge.mjs";
+export { mergeOwnedConfig, mergeOwnedEntries, ownedEntries, ownedKeys,
+  removeOwnedConfig, removeOwnedEntries } from "./config-merge.mjs";
 export { clearSessionBinding, loadSessionBinding, storeSessionBinding }
   from "./session-binding.mjs";

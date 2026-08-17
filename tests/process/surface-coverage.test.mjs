@@ -1,0 +1,118 @@
+import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
+import path from "node:path";
+import test from "node:test";
+
+import { COMMANDS } from "@agents-can-communicate/cli";
+import { createCoordinationService } from "@agents-can-communicate/core";
+import { PUBLIC_TOOLS } from "../../packages/mcp-server/src/tools.mjs";
+
+import { createFakeClock, createFakeIds, createMemoryStore } from "../helpers/memory-store.mjs";
+
+const repo = path.resolve(import.meta.dirname, "..", "..");
+
+/**
+ * An operation nothing can call does not exist.
+ *
+ * This has been the recurring defect of the project, six times over. Each one
+ * was implemented in the core, tested at the core, and reachable from nothing:
+ *
+ *   createWorkstream   no command, no tool - and `acc task` required a workstream,
+ *                      so from a clean install tasks could not be made at all
+ *   claimTask          taking a task
+ *   transitionTask     moving one along
+ *   assignment         `createTask` hard-coded `assigneeSessionId: null`
+ *   markDelivery       so a `requiresAck` message raised an attention item that
+ *                      could never be cleared
+ *   nearby_intent      an attention kind with no rule behind it
+ *
+ * Every one passed its own tests. This is the gate that makes the seventh
+ * impossible to add quietly: a new core operation has to be given a surface, or
+ * be named here as deliberately internal.
+ */
+function coreOperations() {
+  const clock = createFakeClock("2026-08-17T00:00:00.000Z");
+  const store = createMemoryStore({ clock, ids: createFakeIds(), workspaceId: "workspace_a" });
+  const service = createCoordinationService({ store, clock, ids: createFakeIds() });
+  return Object.entries(service)
+    .filter(([, value]) => typeof value === "function")
+    .map(([name]) => name)
+    .sort();
+}
+
+// Reachable by a person or an agent through `acc <command>`.
+const BY_CLI = Object.freeze({
+  openSession: "attach", heartbeatSession: "heartbeat", closeSession: "detach",
+  sync: "sync", setIntent: "work", clearIntent: "work", acquireClaim: "claim", releaseClaim: "release",
+  forceReleaseClaim: "release", sendMessage: "message", markDelivery: "ack",
+  requestWork: "request", createTask: "task", claimTask: "task",
+  transitionTask: "task", declineTask: "task", createWorkstream: "workstream",
+  finishSession: "finish", collectStatus: "status",
+});
+
+// Deliberately internal, each for a stated reason rather than by omission.
+const INTERNAL = Object.freeze({
+  ensureMaterialised: "called by every write that needs durable state",
+  requireOpenSession: "the ownership check every mutation runs first",
+  locateSession: "a lookup the other operations share",
+  pendingMessages: "read by the hook runtime when it builds a turn",
+  renewClaim: "reached through `acc claim` on a claim this session already holds",
+  acquireCoordinator: "no workstream coordination surface yet - tracked, not forgotten",
+  releaseCoordinator: "same",
+  recordDecision: "no decision surface yet - tracked, not forgotten",
+});
+
+test("every core operation is reachable, or named as internal on purpose", () => {
+  const unreachable = coreOperations().filter(name =>
+    !Object.hasOwn(BY_CLI, name) && !Object.hasOwn(INTERNAL, name));
+
+  assert.deepEqual(unreachable, [],
+    "these exist in the core and nothing can call them - give them a surface or "
+    + "say here why they are internal");
+});
+
+test("every command the CLI claims to route actually exists", () => {
+  const missing = [...new Set(Object.values(BY_CLI))]
+    .filter(command => !Object.hasOwn(COMMANDS, command));
+
+  // Guards the map above rather than the code: a renamed command would
+  // otherwise leave this test passing against a command nobody can run.
+  assert.deepEqual(missing, []);
+});
+
+test("the internal list stays a list of decisions, not of leftovers", () => {
+  const stale = Object.keys(INTERNAL).filter(name => !coreOperations().includes(name));
+
+  // An entry for an operation that no longer exists is a note about nothing, and
+  // hides the next one that does need a decision.
+  assert.deepEqual(stale, []);
+});
+
+test("an operation an agent needs is offered over MCP as well", async () => {
+  // A client with no adapter reaches ACC only through tools. The agent-facing
+  // set is what an agent has to be able to do; setup and lifecycle are not part
+  // of it, since a model should not be running the installer.
+  const names = new Set(PUBLIC_TOOLS.map(tool => tool.name));
+  for (const operation of ["sync", "setIntent", "acquireClaim", "sendMessage",
+    "markDelivery", "requestWork", "createTask", "createWorkstream", "finishSession"]) {
+    const expected = { sync: "acc_sync", setIntent: "acc_work", acquireClaim: "acc_claim",
+      sendMessage: "acc_message", markDelivery: "acc_ack", requestWork: "acc_request",
+      createTask: "acc_task", createWorkstream: "acc_workstream",
+      finishSession: "acc_finish" }[operation];
+    assert.equal(names.has(expected), true, `${operation} has no MCP tool`);
+  }
+});
+
+test("the CLI reference documents every command, and invents none", async () => {
+  const reference = await readFile(path.join(repo, "docs", "CLI.md"), "utf8");
+  const documented = new Set([...reference.matchAll(/`acc ([a-z-]+)/g)]
+    .map(match => match[1]));
+
+  for (const command of Object.keys(COMMANDS)) {
+    assert.equal(documented.has(command), true, `acc ${command} is not documented`);
+  }
+  for (const name of documented) {
+    assert.equal(Object.hasOwn(COMMANDS, name), true,
+      `docs/CLI.md documents \`acc ${name}\`, which the CLI does not accept`);
+  }
+});

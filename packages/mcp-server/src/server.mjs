@@ -82,6 +82,7 @@ async function callTool(name, args, context) {
       return service.sync({ ...owner, cursor: args.cursor ?? null, scope: args.scope,
         limit: args.limit });
     case "acc_work":
+      if (args.clear === true) return service.clearIntent({ ...owner });
       return service.setIntent({ ...owner, summary: args.summary, mode: args.mode,
         state: args.state, workstreamId: args.workstreamId ?? null,
         resourceHints: args.resourceHints ?? [] });
@@ -113,6 +114,9 @@ async function callTool(name, args, context) {
       return service.requestWork({ ...owner, toParticipantId: args.toParticipantId,
         title: args.title, detail: args.detail, workstreamId: args.workstreamId,
         priority: args.priority, dependsOn: args.dependsOn ?? [] });
+    case "acc_ack":
+      return service.markDelivery({ ...owner, messageId: args.messageId,
+        state: args.state ?? "acknowledged" });
     case "acc_workstream":
       return service.createWorkstream({ ...owner, title: args.title,
         objective: args.objective });

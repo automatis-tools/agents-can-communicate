@@ -36,9 +36,12 @@ const ADAPTERS = [
   { name: "claude_code", create: createClaudeCodeAdapter,
     context: home => ({ configDir: home }),
     commands: async home => {
-      const wired = JSON.parse(await readFile(path.join(home, "plugins",
-        "agents-can-communicate", ".claude-plugin", "..", "hooks", "hooks.json"), "utf8"));
-      const root = path.join(home, "plugins", "agents-can-communicate");
+      // The copy the client runs from, under the marketplace cache. Reading the
+      // marketplace source instead would test a tree the client never loads.
+      const root = path.join(home, "plugins", "cache", "acc-local",
+        "agents-can-communicate", "0.0.0");
+      const wired = JSON.parse(await readFile(path.join(root, "hooks", "hooks.json"),
+        "utf8"));
       return Object.values(wired.hooks)
         .flatMap(entries => entries.flatMap(entry => entry.hooks.map(h =>
           h.command.replaceAll("${CLAUDE_PLUGIN_ROOT}", root))));

@@ -7,8 +7,9 @@ export const COMMANDS = Object.freeze({
   heartbeat: { required: ["session", "generation"], optional: [] },
   detach: { required: ["session", "generation"], optional: [] },
   sync: { required: [], optional: ["session", "cursor", "limit", "scope"] },
-  work: { required: ["session", "generation", "summary"],
-    optional: ["mode", "state", "workstream"], repeated: ["hint"] },
+  work: { required: ["session", "generation"],
+    optional: ["summary", "mode", "state", "workstream"], repeated: ["hint"],
+    flags: ["clear"] },
   claim: { required: ["session", "generation", "resource"],
     optional: ["mode", "enforcement", "reason", "lease"] },
   release: { required: ["session", "generation", "claim"],
@@ -26,6 +27,9 @@ export const COMMANDS = Object.freeze({
     optional: ["workstream", "title", "detail", "assignee", "state", "task", "reason"],
     repeated: ["depends-on"], flags: ["take", "decline", "force"] },
   workstream: { required: ["session", "generation", "title", "objective"], optional: [] },
+  // Messages not tied to a task need a way to be answered too. Without one a
+  // `requiresAck` message raised an attention item nothing could ever clear.
+  ack: { required: ["session", "generation", "message"], optional: ["state"] },
   finish: { required: ["session", "generation", "goal"],
     optional: ["status", "to"], repeated: ["completed", "remaining", "blocker"] },
   status: { required: [], optional: ["participant"] },

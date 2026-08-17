@@ -80,6 +80,15 @@ const HANDLERS = Object.freeze({
   },
 
   work: async ({ options, context }) => {
+    // Saying nothing and saying "I have stopped" are different. Without this an
+    // intent stayed on the roster until the session closed, so peers read a
+    // finished piece of work as still in progress.
+    if (options.clear === true) {
+      const cleared = await context.service.clearIntent({ sessionId: options.session,
+        generation: options.generation });
+      return { data: cleared, text: "intent cleared" };
+    }
+    if (options.summary === undefined) throw usage("work requires --summary");
     const intent = await context.service.setIntent({ sessionId: options.session,
       generation: options.generation, summary: options.summary, mode: options.mode ?? "edit",
       state: options.state, workstreamId: options.workstream ?? null,
@@ -129,6 +138,13 @@ const HANDLERS = Object.freeze({
       dependsOn: options.dependsOn ?? [], descriptor: context.descriptor });
     return { data: { task, message },
       text: `requested ${task.taskId} of ${options.to}` };
+  },
+
+  ack: async ({ options, context }) => {
+    const receipt = await context.service.markDelivery({ sessionId: options.session,
+      generation: options.generation, messageId: options.message,
+      state: options.state ?? "acknowledged" });
+    return { data: receipt, text: `${receipt.messageId} ${receipt.state}` };
   },
 
   workstream: async ({ options, context }) => {
