@@ -1,6 +1,6 @@
 ---
 name: acc
-description: Use when other AI sessions may be working in this workspace - to say what you are doing, to check who else is here before editing shared files, to answer questions about the whole system, and to hand off cleanly at the end.
+description: Use when other AI sessions may be working in this workspace - to say what you are doing, to ask another agent for a piece of work and to take work asked of you, to check who else is here before editing shared files, to answer questions about the whole system, and to hand off cleanly at the end.
 ---
 
 # Coordinating with other sessions
@@ -31,6 +31,40 @@ acc claim --session "$ACC_SESSION" --generation "$ACC_GENERATION" \
 
 Exit code 5 means someone else holds it. The error names the owner and whether their
 session is stale. Do not work around a conflict silently — say so, or ask the human.
+
+## Ask another agent for a piece of work
+
+When something needs doing that is not yours to do — a review, tests for what you just
+wrote, a port in an area someone else is already in — ask the agent working there. Do not
+do it badly yourself, and do not ask your human to carry the message:
+
+```bash
+acc request --session "$ACC_SESSION" --generation "$ACC_GENERATION" \
+  --to claude_code --title "finish the store tests" \
+  --detail "I ported src/store but ran out of time on the concurrency cases."
+```
+
+One call records the work and tells them why. `--to` is a participant from the roster;
+`acc status --json` lists who is here. They are told at their next turn and may take it,
+leave it, or reply. It is a request, not an order.
+
+## Work someone asked of you
+
+A turn that opens with `[task_unblocked]` means work is addressed to you and waiting. Take
+it before you start, so nobody does it twice:
+
+```bash
+acc task --session "$ACC_SESSION" --generation "$ACC_GENERATION" --task task_x --take
+```
+
+Mark it when it is done, so the agent that asked can stop waiting:
+
+```bash
+acc task --session "$ACC_SESSION" --generation "$ACC_GENERATION" --task task_x --state done
+```
+
+If you are not going to do it, reply with `acc message` instead of leaving it pending. The
+agent that asked is waiting on an answer, and silence is not one.
 
 ## You can answer for the whole workspace
 
