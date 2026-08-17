@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
 
-import { covers, resourceFor, runHook } from "../src/runner.mjs";
+import { canonicalTarget, covers, resourceFor, runHook } from "../src/runner.mjs";
 
 // Two adapters whose deny shapes disagree, because that disagreement is the
 // point: the runner must speak each client's own contract, and a shape borrowed
@@ -401,4 +401,50 @@ test("an advisory claim is passed through as advisory, not as a block", async t 
     payload: event("beforeTurn", { cwd: place.root }) });
 
   assert.match(turn.stdout, /file:src\/\*\*\|advisory\|true/);
+});
+
+/**
+ * The leaf of a guarded path is usually the file the tool call is about to
+ * create, so resolution has to work on a path that does not exist yet. These
+ * drive an injected realpath rather than the filesystem, because the branch
+ * that matters - how far up the walk goes - is otherwise invisible.
+ */
+const fakeRealpath = existing => async target => {
+  if (existing.has(target)) return existing.get(target);
+  const error = new Error(`ENOENT: ${target}`);
+  error.code = "ENOENT";
+  throw error;
+};
+
+test("a path whose leaf does not exist resolves through its deepest real parent", async () => {
+  const resolve = fakeRealpath(new Map([["/link/project", "/real/project"]]));
+
+  assert.equal(await canonicalTarget(resolve, "/link/project/src/store/index.mjs"),
+    "/real/project/src/store/index.mjs");
+});
+
+test("an existing path resolves outright", async () => {
+  const resolve = fakeRealpath(new Map([["/link/a.mjs", "/real/a.mjs"]]));
+
+  assert.equal(await canonicalTarget(resolve, "/link/a.mjs"), "/real/a.mjs");
+});
+
+test("nothing resolvable leaves the path as given rather than inventing one", async () => {
+  // Not a silent empty string: `resourceFor` still gets a real path to judge,
+  // and rejects it if it is outside the workspace.
+  assert.equal(await canonicalTarget(fakeRealpath(new Map()), "/nowhere/at/all.mjs"),
+    "/nowhere/at/all.mjs");
+});
+
+test("an error that is not absence stops the walk instead of climbing past it", async () => {
+  // EACCES on a parent means the answer is unknown, not "keep going until
+  // something answers" - climbing would resolve some unrelated ancestor and
+  // graft the rest onto it.
+  const resolve = async () => {
+    const error = new Error("EACCES");
+    error.code = "EACCES";
+    throw error;
+  };
+
+  assert.equal(await canonicalTarget(resolve, "/guarded/src/a.mjs"), "/guarded/src/a.mjs");
 });
