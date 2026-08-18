@@ -61,14 +61,29 @@ graph LR
 
 ## Ownership arguments
 
-Anything that mutates needs `--session` and `--generation`. The generation is what stops a
-restarted process from acting as the old one.
+Anything that mutates acts as a session, and proves it with that session's generation —
+which is what stops a restarted process from acting as the old one. You do not pass
+either. `acc` works out which session is running it, from the binding the adapter wrote
+when the session started:
+
+| It uses | When |
+|---|---|
+| `--session` and `--generation` | you passed them — adapters and scripts do |
+| `--session` alone | you have an id from `acc status --json`; the rest is looked up |
+| the client's own session id in the environment | the client exports one, under any name |
+| the checkout you are in | several sessions here, each in its own worktree |
+| the only live session | you are the only one attached |
+
+If two live sessions in one checkout both fit, it stops and names them rather than
+guessing — acting as the wrong session is exactly what the generation prevents.
+
+The generation is never printed by `acc status`, on purpose: it is proof of ownership, not
+public information.
 
 ## Asking another agent
 
 ```bash
-acc request --session "$ACC_SESSION" --generation "$ACC_GENERATION" \
-  --to claude_code --title "finish the store tests" \
+acc request --to claude_code --title "finish the store tests" \
   --detail "I ported src/store but ran out of time on the concurrency cases."
 ```
 
@@ -85,8 +100,8 @@ Work is addressed to a **participant**, not a session. The agent can close its t
 the next session it opens is still told. Only that participant can take it:
 
 ```bash
-acc task --session … --generation … --task task_x --take     # exit 5 if it is not yours
-acc task --session … --generation … --task task_x --state review
+acc task --task task_x --take     # exit 5 if it is not yours
+acc task --task task_x --state review
 ```
 
 `--assignee` on `acc task` addresses work without sending a message. `acc request` is the
@@ -96,6 +111,6 @@ A workstream is optional. `acc request --to models --title "review the migration
 project around it. Create one when several pieces belong together:
 
 ```bash
-acc workstream --session … --generation … \
+acc workstream \
   --title "Storage" --objective "port the store and its tests"
 ```

@@ -40,8 +40,21 @@ function truncate(line, limit) {
   return `${cut}…`;
 }
 
+/**
+ * An attention line an agent can act on without a round trip.
+ *
+ * `- [task_unblocked] Tank sinks through mud` says work is waiting and does not
+ * say which work. The commands that take it - `acc task --take --task <id>` -
+ * all need the id, and the only other place it appears is `acc sync --json`. An
+ * agent that is told to act and not told on what improvises, which in this
+ * project has already meant one hand-editing the store rather than admitting it
+ * could not name the task.
+ */
 function attentionLines(attention) {
-  return attention.map(item => `- [${item.kind}] ${item.summary}`);
+  return attention.map(item => (typeof item.sourceId === "string"
+    && item.sourceId.startsWith("task_")
+    ? `- [${item.kind}] ${item.sourceId} ${item.summary}`
+    : `- [${item.kind}] ${item.summary}`));
 }
 
 /**
@@ -115,7 +128,14 @@ export function projectContext(sync, { budgetBytes = DEFAULT_BUDGET_BYTES } = {}
     .sort((left, right) => left.priority - right.priority
       || left.sourceId.localeCompare(right.sourceId));
   const messages = sync.messages ?? [];
-  const roster = sync.roster ?? [];
+  // Who is here, which is not the same as who has ever been here. The roster
+  // keeps closed sessions - `sync` needs them to decide what a cursor has missed
+  // - and a turn that lists them says "3 session(s)" for two participants, one
+  // of them shown twice with contradictory presence. Left alone it also grows
+  // without limit: every session ever opened would take a line out of the
+  // context budget, crowding out messages actually addressed to the reader.
+  // Stale stays: a session that crashed holding a claim is very much news.
+  const roster = (sync.roster ?? []).filter(item => item.presence !== "offline");
   const claims = sync.claims ?? [];
 
   // Every entry is a group that appears whole or not at all. Single-line groups

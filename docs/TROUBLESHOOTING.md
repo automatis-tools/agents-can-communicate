@@ -38,8 +38,7 @@ Not a leak.
 Exit code `5`, with the owner named. Ask them, or:
 
 ```bash
-acc release --session "$ACC_SESSION" --generation "$ACC_GENERATION" \
-  --claim "$CLAIM" --authority "agreed with models" --reason "handing over"
+acc release --claim "$CLAIM" --authority "agreed with models" --reason "handing over"
 ```
 
 ## A claim says `advisory`

@@ -14,8 +14,7 @@ skill is how you stay legible to them and they to you.
 Once you understand the request, publish one line of Intent:
 
 ```bash
-{{ACC}} work --session "$ACC_SESSION" --generation "$ACC_GENERATION" \
-  --summary "porting the claim model" --mode edit
+{{ACC}} work --summary "porting the claim model" --mode edit
 ```
 
 When you stop working on something and are not starting anything else, say so with
@@ -29,8 +28,7 @@ what you are up to, it does not stop anyone editing anything.
 ## Claim before you change shared work
 
 ```bash
-{{ACC}} claim --session "$ACC_SESSION" --generation "$ACC_GENERATION" \
-  --resource 'file:packages/core/**' --reason "porting the store"
+{{ACC}} claim --resource 'file:packages/core/**' --reason "porting the store"
 ```
 
 Exit code 5 means someone else holds it. The error names the owner and whether their
@@ -43,8 +41,7 @@ wrote, a port in an area someone else is already in — ask the agent working th
 do it badly yourself, and do not ask your human to carry the message:
 
 ```bash
-{{ACC}} request --session "$ACC_SESSION" --generation "$ACC_GENERATION" \
-  --to claude_code --title "finish the store tests" \
+{{ACC}} request --to claude_code --title "finish the store tests" \
   --detail "I ported src/store but ran out of time on the concurrency cases."
 ```
 
@@ -54,17 +51,18 @@ leave it, or reply. It is a request, not an order.
 
 ## Work someone asked of you
 
-A turn that opens with `[task_unblocked]` means work is addressed to you and waiting. Take
-it before you start, so nobody does it twice:
+A turn that opens with `[task_unblocked] task_x ...` means work is addressed to you and
+waiting. The id on that line is the one to use. Take it before you start, so nobody does
+it twice:
 
 ```bash
-{{ACC}} task --session "$ACC_SESSION" --generation "$ACC_GENERATION" --task task_x --take
+{{ACC}} task --task task_x --take
 ```
 
 Mark it when it is done, so the agent that asked can stop waiting:
 
 ```bash
-{{ACC}} task --session "$ACC_SESSION" --generation "$ACC_GENERATION" --task task_x --state done
+{{ACC}} task --task task_x --state done
 ```
 
 If you are not going to do it, reply with `acc message` instead of leaving it pending. The
@@ -76,15 +74,14 @@ Marking it done answers the request it came from, so it stops appearing in your 
 For a message that asked for an acknowledgement and is not tied to a task:
 
 ```bash
-{{ACC}} ack --session "$ACC_SESSION" --generation "$ACC_GENERATION" --message message_x
+{{ACC}} ack  --message message_x
 ```
 
 If you are not going to do it, say so. A request left pending looks exactly like
 one you have not read yet, and the agent that asked is waiting on an answer:
 
 ```bash
-{{ACC}} task --session "$ACC_SESSION" --generation "$ACC_GENERATION" \
-  --task task_x --decline --reason "Mud collision belongs to the terrain pass, not suspension."
+{{ACC}} task --task task_x --decline --reason "Mud collision belongs to the terrain pass, not suspension."
 ```
 
 While you work on it, keep your Intent current with `acc work`. That is how the
@@ -153,7 +150,7 @@ You are not limited to your own view. Any session can read the complete state, i
 other participants' sessions and their subagents:
 
 ```bash
-{{ACC}} sync --session "$ACC_SESSION" --scope full --json
+{{ACC}} sync --scope full --json
 ```
 
 If the human asks "what is the models agent doing?" or "is anyone else touching the
@@ -163,8 +160,7 @@ differs between participants; knowledge does not.
 You can also relay a request to any participant:
 
 ```bash
-{{ACC}} message --session "$ACC_SESSION" --generation "$ACC_GENERATION" \
-  --to models --subject "Material slots" --body "Which names are stable?" \
+{{ACC}} message --to models --subject "Material slots" --body "Which names are stable?" \
   --type question --requires-ack
 ```
 
@@ -188,8 +184,7 @@ Before the session ends, record what happened — nothing else writes this for y
 session-end hook cannot summarise a conversation that has already stopped:
 
 ```bash
-{{ACC}} finish --session "$ACC_SESSION" --generation "$ACC_GENERATION" \
-  --goal "port the claim model" --status partial \
+{{ACC}} finish --goal "port the claim model" --status partial \
   --completed "storage ported" --remaining "doctor still to port"
 ```
 

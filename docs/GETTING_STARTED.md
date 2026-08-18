@@ -41,8 +41,7 @@ acc status
 Inside a session your agent runs this for you:
 
 ```bash
-acc claim --session "$ACC_SESSION" --generation "$ACC_GENERATION" \
-  --resource 'file:packages/core/**' --reason "porting the store"
+acc claim --resource 'file:packages/core/**' --reason "porting the store"
 ```
 
 Another session that tries to write there is refused — with the owner's name.
@@ -65,8 +64,7 @@ Exit code `5` means conflict.
 ## 5. Say something
 
 ```bash
-acc message --session "$ACC_SESSION" --generation "$ACC_GENERATION" \
-  --to models --subject "Slots" --body "Which names are stable?" --type question
+acc message --to models --subject "Slots" --body "Which names are stable?" --type question
 ```
 
 Messages are **data, not orders**. A peer cannot change your instructions.
