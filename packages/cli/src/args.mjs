@@ -43,7 +43,7 @@ export const COMMANDS = Object.freeze({
   // The one command with a subcommand. Kept as an explicit list rather than a
   // free positional: `acc config delete` should fail at the parser, not deep
   // inside a handler that has already decided what to do.
-  config: { required: [], optional: [], flags: ["yes"],
+  config: { required: [], optional: [], flags: ["yes", "force"],
     subcommands: ["init", "validate"] },
   install: { required: [], optional: ["adapter", "home"], flags: ["dry-run", "yes"] },
   uninstall: { required: [], optional: ["adapter", "home"], flags: ["yes"] },

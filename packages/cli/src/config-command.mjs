@@ -48,12 +48,49 @@ async function readConfig(cwd) {
   }
 }
 
-async function initConfig({ cwd, interactive, yes, confirm, ids, displayName }) {
+/**
+ * Sessions that would stop seeing each other the moment this file lands.
+ *
+ * The config carries its own `workspaceId`, so writing one moves the project to
+ * a new workspace. Sessions attached to the old one keep heartbeating it and
+ * vanish from everyone else's roster - measured: `1 live` before, `0 live`
+ * after. They do not recover on their own either: a session re-attaches at
+ * SessionStart and at nothing else, so the client has to be restarted.
+ *
+ * A coordination tool that silently stops coordinating is the worst way for
+ * this to be found, so it is refused unless the caller says to go ahead.
+ */
+async function attachedSessions(probeWorkspace) {
+  if (typeof probeWorkspace !== "function") return [];
+  try {
+    const context = await probeWorkspace();
+    const status = await context.service.collectStatus({});
+    return status.participants.filter(item => item.presence !== "offline");
+  } catch {
+    // Nothing to warn about if the workspace cannot be opened at all - and this
+    // command must still run on a workspace ACC cannot read, which is half of
+    // what it is for.
+    return [];
+  }
+}
+
+async function initConfig({ cwd, interactive, yes, confirm, ids, displayName,
+  force = false, probeWorkspace }) {
   const file = configPathIn(cwd);
   if (await readConfig(cwd) !== null) {
     // A committed identity is shared by everyone on the project. Replacing it
     // on a mistyped command would split one workspace into two.
     throw new AccError(EXIT.CONFLICT, `${CONFIG_FILENAME} already exists`, { file });
+  }
+
+  const attached = await attachedSessions(probeWorkspace);
+  if (attached.length > 0 && !force) {
+    const who = attached.map(item => `${item.participantId} (${item.harness})`).join(", ");
+    throw new AccError(EXIT.CONFLICT,
+      `${attached.length} session(s) are attached here and would stop seeing each `
+      + `other: ${who}. They re-attach only when their client starts, so close them `
+      + "first, or pass --force to write anyway.",
+      { file, sessions: attached.map(item => item.sessionId) });
   }
 
   const preview = renderConfig({ ids, displayName: displayName ?? path.basename(cwd) });
@@ -101,9 +138,11 @@ async function validateConfig({ cwd }) {
  * find out what is wrong must not change the thing it is inspecting.
  */
 export async function runConfigCommand({ subcommand, cwd, interactive = true, yes = false,
-  confirm, displayName, ids = { next: kind => createId(kind) } }) {
+  confirm, displayName, force = false, probeWorkspace,
+  ids = { next: kind => createId(kind) } }) {
   if (subcommand === "init") {
-    return initConfig({ cwd, interactive, yes, confirm, ids, displayName });
+    return initConfig({ cwd, interactive, yes, confirm, ids, displayName,
+      force, probeWorkspace });
   }
   if (subcommand === "validate") return validateConfig({ cwd });
   throw new AccError(EXIT.USAGE, `unknown config subcommand: ${subcommand}`, { subcommand });
