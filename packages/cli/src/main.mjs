@@ -12,6 +12,7 @@ import { runConfigCommand } from "./config-command.mjs";
 import { runInstallCommand } from "./install-command.mjs";
 import { runDoctor } from "./doctor-command.mjs";
 import { createGitProbe } from "./git-probe.mjs";
+import { canonicalClaim } from "./claim-spelling.mjs";
 import { platformDataHome, runtimePaths } from "./runtime-paths.mjs";
 import { resolveOwner } from "./session-owner.mjs";
 import { discoverWorkspace } from "./workspace-discovery.mjs";
@@ -99,7 +100,8 @@ const HANDLERS = Object.freeze({
 
   claim: async ({ options, context }) => {
     const claim = await context.service.acquireClaim({ sessionId: options.session,
-      generation: options.generation, resource: options.resource,
+      generation: options.generation,
+      resource: await canonicalClaim(options.resource, context.descriptor),
       mode: options.mode ?? "exclusive", enforcement: options.enforcement ?? "advisory",
       reason: options.reason ?? "unspecified",
       leaseSeconds: options.lease ? positiveNumber(options.lease, "lease") : undefined,

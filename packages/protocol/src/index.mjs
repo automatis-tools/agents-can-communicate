@@ -6,3 +6,4 @@ export { RECORD_KINDS, SCHEMA_VERSION, validateRecord } from "./schema.mjs";
 export { CONFIG_FILENAME, CONFIG_SCHEMA_VERSION, RUNTIME_KEYS, defaultProjectConfig,
   validateProjectConfig } from "./config.mjs";
 export { DELIVERY_STATES, TASK_STATES, advanceDelivery, transitionTask } from "./states.mjs";
+export { normaliseResource } from "./resources.mjs";

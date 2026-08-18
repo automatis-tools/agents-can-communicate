@@ -1,4 +1,4 @@
-import { AccError, EXIT, SCHEMA_VERSION, createId, validateRecord }
+import { AccError, EXIT, SCHEMA_VERSION, createId, normaliseResource, validateRecord }
   from "@agents-can-communicate/protocol";
 
 import { ensureMaterialised } from "./materialisation.mjs";
@@ -65,6 +65,9 @@ export function createClaimService(ports, sessions) {
 
   async function acquireClaim(input) {
     const session = await requireOwner(input, "claim");
+    // One name for one file, decided here rather than at each surface, so a
+    // claim taken over MCP and one taken from the CLI mean the same thing.
+    const resource = normaliseResource(input.resource);
     const workspaceId = session.workspaceId;
     await ensureMaterialised(ports, { workspaceId, descriptor: input.descriptor,
       reason: "durable_object" });
@@ -77,8 +80,8 @@ export function createClaimService(ports, sessions) {
     await store.transaction(async tx => {
       const live = tx.list("claim", claim => isLive(claim, now));
       const mine = live.find(claim => claim.ownerSessionId === session.sessionId
-        && claim.resource === input.resource);
-      const blocking = live.find(claim => overlaps(claim.resource, input.resource)
+        && claim.resource === resource);
+      const blocking = live.find(claim => overlaps(claim.resource, resource)
         && claim.ownerSessionId !== session.sessionId
         && (claim.mode === "exclusive" || input.mode === "exclusive"));
       if (blocking !== undefined) throw conflictWith(blocking, session, now, snapshot.sessions);
@@ -89,7 +92,7 @@ export function createClaimService(ports, sessions) {
         claimId,
         workspaceId,
         ownerSessionId: session.sessionId,
-        resource: input.resource,
+        resource,
         mode: input.mode ?? "exclusive",
         enforcement: input.enforcement ?? "advisory",
         reason: input.reason,
@@ -101,7 +104,7 @@ export function createClaimService(ports, sessions) {
       tx.append({ schemaVersion: SCHEMA_VERSION, eventId: ids.next("event"), workspaceId,
         actorSessionId: session.sessionId, type: mine === undefined ? "claim.acquired"
           : "claim.renewed", occurredAt: now,
-        payload: { claimId, resource: input.resource, mode: record.mode } });
+        payload: { claimId, resource, mode: record.mode } });
     });
     return record;
   }
