@@ -209,6 +209,11 @@ const HANDLERS = Object.freeze({
       interactive: runtime.stdout?.isTTY === true,
       yes: options.yes === true,
       confirm: runtime.confirm ?? (async () => false),
+      force: options.force === true,
+      // Opened lazily and only by `init`: `config validate` has to work on a
+      // workspace discovery cannot open, which is what a reader runs it to
+      // find out.
+      probeWorkspace: () => openContext(options, runtime),
       ids: runtime.ids });
     if (result.subcommand === "validate") {
       return { data: result, text: result.present

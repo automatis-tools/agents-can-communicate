@@ -24,8 +24,7 @@ Writes `acc.workspace.json` with an id that survives a rename.
 ## Divide the work
 
 ```bash
-acc claim --session "$ACC_SESSION" --generation "$ACC_GENERATION" \
-  --resource 'file:notes/sources.md' --reason "collecting sources"
+acc claim --resource 'file:notes/sources.md' --reason "collecting sources"
 ```
 
 The reviewer claims `file:notes/summary.md`. Neither overwrites the other.
@@ -33,8 +32,7 @@ The reviewer claims `file:notes/summary.md`. Neither overwrites the other.
 ## Hand over a finding
 
 ```bash
-acc message --session "$ACC_SESSION" --generation "$ACC_GENERATION" \
-  --to review --subject "Two sources disagree" \
+acc message --to review --subject "Two sources disagree" \
   --body "Fig. 3 vs Table 2 — which do we trust?" --type question --requires-ack
 ```
 

@@ -17,11 +17,9 @@ other.
 ## What each session does
 
 ```bash
-acc work --session "$ACC_SESSION" --generation "$ACC_GENERATION" \
-  --summary "porting the material slots" --mode edit
+acc work --summary "porting the material slots" --mode edit
 
-acc claim --session "$ACC_SESSION" --generation "$ACC_GENERATION" \
-  --resource 'file:packages/core/**' --enforcement guarded --reason "porting"
+acc claim --resource 'file:packages/core/**' --enforcement guarded --reason "porting"
 ```
 
 ## When two want the same thing
@@ -46,7 +44,7 @@ Nobody is in charge. The conflict is surfaced; the humans and agents settle it.
 Any session can answer for the whole workspace:
 
 ```bash
-acc sync --session "$ACC_SESSION" --scope full --json
+acc sync --scope full --json
 ```
 
 "What is physics doing?" is answerable from visual's session. Authority differs;
@@ -55,8 +53,7 @@ knowledge does not.
 ## Ending
 
 ```bash
-acc finish --session "$ACC_SESSION" --generation "$ACC_GENERATION" \
-  --goal "port the material slots" --status partial \
+acc finish --goal "port the material slots" --status partial \
   --completed "slots ported" --remaining "physics review"
 ```
 
