@@ -7,10 +7,10 @@ release.
 
 | | |
 |---|---|
-| Built from | `d72b6a1` |
-| Tarball | `agents-can-communicate-0.0.0.tgz`, 104 KB, 101 entries |
-| sha256 | `efce17db97375af414baeffd315fb64d7eb6ddbd10b0f556c956fabb453de00b` |
-| Tests | 670 passing, 0 failing |
+| Built from | `26a1525` |
+| Tarball | `agents-can-communicate-0.0.0.tgz`, 105 KB, 101 entries |
+| sha256 | `b9caa5dc83afd0018481350645b98f0adcee385d382d7dfc2b68ab4305e3de3c` |
+| Tests | 677 passing, 0 failing |
 | Node | 24 (current production LTS) |
 | Verified on | macOS 15 (darwin 25.5.0, arm64) and Linux in CI |
 | Not supported | Windows — see below |
@@ -50,6 +50,11 @@ pass two environment variables nothing has ever set — so on all four native
 clients the documented workflow could not be carried out at all. `acc` now works
 out which session is running it, and stops rather than guessing when two live
 sessions in one checkout both fit.
+
+`acc config init` refuses while sessions are attached. The config carries the
+workspace identity, so writing one moved the project to a different workspace and
+left every running session heartbeating the old one, invisible to everyone and
+not recovering until its client restarted.
 
 Installing edits configuration for four other tools, so uninstall removes the
 entries ACC recorded writing and nothing else. A settings key ACC had to create
