@@ -7,10 +7,10 @@ release.
 
 | | |
 |---|---|
-| Built from | `60817fb` |
-| Tarball | `agents-can-communicate-0.0.0.tgz`, 101 KB, 100 entries |
-| sha256 | `848ad59785f0a35fa34102e818869b6acf780f833f674122d4c0e74a41b30184` |
-| Tests | 662 passing, 0 failing |
+| Built from | `d72b6a1` |
+| Tarball | `agents-can-communicate-0.0.0.tgz`, 104 KB, 101 entries |
+| sha256 | `efce17db97375af414baeffd315fb64d7eb6ddbd10b0f556c956fabb453de00b` |
+| Tests | 670 passing, 0 failing |
 | Node | 24 (current production LTS) |
 | Verified on | macOS 15 (darwin 25.5.0, arm64) and Linux in CI |
 | Not supported | Windows — see below |
@@ -43,6 +43,13 @@ telling the sender it landed. The ceiling is `policy.contextBudgetBytes`.
 Claims are enforced however the workspace path is spelled. A project reached
 through a symlink — `/tmp` and `/var` on macOS, a symlinked checkout anywhere —
 used to pass every write through while still reporting `protection guarded`.
+
+An agent can run the commands its skill teaches. Every mutating command took a
+session id and a generation on the command line, and the skills told agents to
+pass two environment variables nothing has ever set — so on all four native
+clients the documented workflow could not be carried out at all. `acc` now works
+out which session is running it, and stops rather than guessing when two live
+sessions in one checkout both fit.
 
 Installing edits configuration for four other tools, so uninstall removes the
 entries ACC recorded writing and nothing else. A settings key ACC had to create
