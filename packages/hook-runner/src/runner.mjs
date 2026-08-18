@@ -55,20 +55,29 @@ export function resourceFor(root, target) {
  * what would create it. So the deepest existing ancestor is resolved and the
  * remainder appended, which is also what keeps this from following a symlink
  * the write itself would replace.
+ *
+ * A relative target is resolved against `base` - the session's own cwd, as the
+ * payload states it - and never against this process's. A hook is a child whose
+ * working directory belongs to the client, and Codex's `apply_patch` names its
+ * files relative to the session. Resolving those against wherever the hook
+ * happened to start sent them outside the workspace, `resourceFor` returned
+ * null, and every write was allowed while `acc status` said `protection
+ * guarded`. It only ever worked because a client usually starts hooks in the
+ * project directory - and "usually" is what made it invisible.
  */
-export async function canonicalTarget(realpath, target) {
-  let current = path.resolve(target);
+export async function canonicalTarget(realpath, target, base = process.cwd()) {
+  let current = path.resolve(base, target);
   const trailing = [];
   for (;;) {
     try {
       return path.join(await realpath(current), ...trailing);
     } catch (error) {
-      if (error.code !== "ENOENT" && error.code !== "ENOTDIR") return path.resolve(target);
+      if (error.code !== "ENOENT" && error.code !== "ENOTDIR") return path.resolve(base, target);
       const parent = path.dirname(current);
       // Reached the filesystem root without finding anything that exists. The
       // unresolved path is the best answer available, and `resourceFor` will
       // reject it if it is outside the workspace.
-      if (parent === current) return path.resolve(target);
+      if (parent === current) return path.resolve(base, target);
       trailing.unshift(path.basename(current));
       current = parent;
     }
@@ -248,9 +257,20 @@ const HANDLERS = {
 
     const status = await context.service.collectStatus({
       workspaceId: context.descriptor.id });
-    const root = context.descriptor.roots[0];
+    // Anchored to the repository, not to wherever this session was started. A
+    // session opened in `repo/src` relativised the same file to
+    // `file:physics.mjs` where one at `repo` called it `file:src/physics.mjs`,
+    // so a claim on either did not cover the other and both agents edited it
+    // freely. Repository-relative is also the convention every documented claim
+    // already uses - `file:packages/core/**` means one thing in a project.
+    //
+    // A declared config is the exception: its roots are the stated boundary, and
+    // they may deliberately not be the checkout.
+    const root = context.descriptor.source === "git" && context.descriptor.git !== undefined
+      ? context.descriptor.git.worktreeRoot
+      : context.descriptor.roots[0];
     const resolved = await Promise.all(event.targets
-      .map(target => canonicalTarget(context.realpath, target)));
+      .map(target => canonicalTarget(context.realpath, target, event.cwd)));
     const wanted = resolved
       .map(target => resourceFor(root, target))
       .filter(resource => resource !== null);
