@@ -26,9 +26,18 @@ const repo = path.resolve(import.meta.dirname, "..", "..");
  *                      could never be cleared
  *   nearby_intent      an attention kind with no rule behind it
  *
- * Every one passed its own tests. This is the gate that makes the seventh
- * impossible to add quietly: a new core operation has to be given a surface, or
- * be named here as deliberately internal.
+ * Every one passed its own tests. This is the gate that makes another of *this*
+ * shape impossible to add quietly: a new core operation has to be given a
+ * surface, or be named here as deliberately internal.
+ *
+ * The next one had a different shape and walked straight past this gate. Every
+ * agent-facing command existed, was routed, and was documented - and required
+ * `--session` and `--generation`, which no agent could obtain: nothing exported
+ * them, and the generation is deliberately absent from `acc status`. An
+ * operation whose required argument is unobtainable is as unreachable as one
+ * with no command at all. That shape is gated by
+ * `tests/process/session-resolution.test.mjs`, which runs each command the way
+ * the skill tells an agent to run it.
  */
 function coreOperations() {
   const clock = createFakeClock("2026-08-17T00:00:00.000Z");

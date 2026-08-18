@@ -13,6 +13,7 @@ import { runInstallCommand } from "./install-command.mjs";
 import { runDoctor } from "./doctor-command.mjs";
 import { createGitProbe } from "./git-probe.mjs";
 import { platformDataHome, runtimePaths } from "./runtime-paths.mjs";
+import { resolveOwner } from "./session-owner.mjs";
 import { discoverWorkspace } from "./workspace-discovery.mjs";
 
 const DEFAULT_CADENCE_MS = 30_000;
@@ -245,8 +246,13 @@ export async function main(argv, runtime) {
     const context = ["config", "install", "uninstall"].includes(parsed.command)
       ? null
       : await openContext(parsed.options, runtime);
-    const { data, text } = await HANDLERS[parsed.command]({ options: parsed.options,
-      context, runtime });
+    // Which session is calling is answered once, here, rather than by each
+    // handler: every one of them needs the same pair, and a handler that forgot
+    // to ask would be an operation an agent cannot reach.
+    const options = context === null ? parsed.options
+      : await resolveOwner({ command: parsed.command, options: parsed.options,
+        context, env: runtime.env });
+    const { data, text } = await HANDLERS[parsed.command]({ options, context, runtime });
     // Machine mode writes exactly one JSON object to stdout and nothing else.
     if (parsed.options.json === true) await write(runtime.stdout, `${JSON.stringify(ok(data))}\n`);
     else if (text !== "") await write(runtime.stdout, `${human(text)}\n`);
