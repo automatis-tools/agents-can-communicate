@@ -1,7 +1,7 @@
-import { realpath } from "node:fs/promises";
+import { realpath, stat } from "node:fs/promises";
 import path from "node:path";
 
-import { normaliseResource } from "@agents-can-communicate/protocol";
+import { AccError, EXIT, normaliseResource } from "@agents-can-communicate/protocol";
 
 /**
  * The spelling the filesystem itself uses.
@@ -58,6 +58,19 @@ export async function canonicalClaim(resource, descriptor) {
   if (body === "") return normalised;
 
   const resolved = await onDisk(path.resolve(root, body));
+  // A directory claimed without the glob covers exactly itself, which is to say
+  // nothing anyone writes. Saying so beats storing a claim that reads like
+  // protection and is not.
+  //
+  // The protocol refuses the shapes a string alone can condemn - a trailing
+  // slash, a `*` that is not the understood glob - so that a surface with no
+  // filesystem still refuses them. This is the half only the filesystem knows:
+  // whether `file:src` happens to be a directory.
+  if (!glob && await stat(resolved).then(entry => entry.isDirectory(), () => false)) {
+    throw new AccError(EXIT.USAGE,
+      `${normalised} is a directory; claim ${normalised}/** to cover what is in it`,
+      { resource });
+  }
   const relative = path.relative(await onDisk(root), resolved);
   if (relative === "" || relative.startsWith("..") || path.isAbsolute(relative)) {
     return normalised;
