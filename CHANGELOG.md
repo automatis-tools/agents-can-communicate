@@ -7,10 +7,10 @@ release.
 
 | | |
 |---|---|
-| Built from | `26a1525` |
+| Built from | `6a94e9a` |
 | Tarball | `agents-can-communicate-0.0.0.tgz`, 105 KB, 101 entries |
-| sha256 | `b9caa5dc83afd0018481350645b98f0adcee385d382d7dfc2b68ab4305e3de3c` |
-| Tests | 677 passing, 0 failing |
+| sha256 | `d4347217a21e9f3551043e2060950e7a664b99ddd0827f02ecdb4d4fa449d1cc` |
+| Tests | 682 passing, 0 failing |
 | Node | 24 (current production LTS) |
 | Verified on | macOS 15 (darwin 25.5.0, arm64) and Linux in CI |
 | Not supported | Windows — see below |
@@ -40,9 +40,13 @@ block, and its receipt advances to `injected` only for what the turn actually
 carried — a message the context budget could not fit stays queued rather than
 telling the sender it landed. The ceiling is `policy.contextBudgetBytes`.
 
-Claims are enforced however the workspace path is spelled. A project reached
-through a symlink — `/tmp` and `/var` on macOS, a symlinked checkout anywhere —
-used to pass every write through while still reporting `protection guarded`.
+Claims are enforced however the workspace path is spelled, and wherever the
+client starts its hooks. A project reached through a symlink — `/tmp` and `/var`
+on macOS, a symlinked checkout anywhere — used to pass every write through while
+still reporting `protection guarded`. So did a relative target when the hook
+process began somewhere other than the session's own directory, and so did a file
+named from a subdirectory of the project, which gave one file two names. A claim
+taken in one worktree stops a write in another worktree of the same repository.
 
 An agent can run the commands its skill teaches. Every mutating command took a
 session id and a generation on the command line, and the skills told agents to
