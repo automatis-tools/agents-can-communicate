@@ -108,7 +108,7 @@ test("the agent waiting is told, even when it is the only session left", async t
 
   const shown = await turn(place, "codex", "gfx", "graphics");
 
-  assert.match(shown, /\[request_stalled\] tank sinks into mud/,
+  assert.match(shown, /\[request_stalled\] task_\S+ tank sinks into mud/,
     "the requester was left waiting with nothing said");
 });
 

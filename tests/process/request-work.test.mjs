@@ -93,8 +93,9 @@ test("an agent in one worktree can ask an agent in another to finish something",
 
     const shown = await turn(place, "claude_code", "doer", place.second);
     // Both halves reach them: the task as work waiting, the message as the
-    // reason. Either alone leaves the recipient guessing.
-    assert.match(shown, /\[task_unblocked\] finish the store tests/);
+    // reason. Either alone leaves the recipient guessing - and the line carries
+    // the task id, since every command that acts on it needs one.
+    assert.match(shown, /\[task_unblocked\] task_\S+ finish the store tests/);
     assert.match(shown, /type work_request/);
     assert.match(shown, /I ran out of time on the concurrency cases\./);
   });
@@ -120,7 +121,7 @@ test("work outlives the session it was addressed to", async t => {
   assert.notEqual(second.accSessionId, first.accSessionId, "the same session came back");
 
   const shown = await turn(place, "claude_code", "doer-2", place.second);
-  assert.match(shown, /\[task_unblocked\] finish the store tests/,
+  assert.match(shown, /\[task_unblocked\] task_\S+ finish the store tests/,
     "a restarted agent was never told about work waiting for it");
 });
 

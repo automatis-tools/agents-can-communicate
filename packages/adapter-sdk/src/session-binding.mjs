@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 import { AccError, EXIT } from "@agents-can-communicate/protocol";
@@ -59,4 +59,37 @@ export async function loadSessionBinding({ runtimeDir, harnessSessionId }) {
 
 export async function clearSessionBinding({ runtimeDir, harnessSessionId }) {
   await rm(fileFor(runtimeDir, harnessSessionId), { force: true });
+}
+
+/**
+ * Every binding in this workspace, whole.
+ *
+ * `loadSessionBinding` answers "which session is *this* harness session", which
+ * needs the harness id up front. The CLI has the opposite problem: an agent runs
+ * `acc work` from a shell that was never told any id, so the question is which
+ * of the live bindings is the one that spawned it.
+ *
+ * A file that cannot be read is skipped rather than fatal - the caller is trying
+ * to identify itself among several, and one unreadable neighbour should not stop
+ * it recognising its own.
+ */
+export async function listSessionBindings({ runtimeDir }) {
+  const dir = path.join(runtimeDir, "bindings");
+  let names;
+  try {
+    names = await readdir(dir);
+  } catch (error) {
+    if (error.code === "ENOENT") return [];
+    throw error;
+  }
+  const bindings = [];
+  for (const name of names) {
+    if (!name.endsWith(".json")) continue;
+    const record = await readFile(path.join(dir, name), "utf8")
+      .then(JSON.parse).catch(() => null);
+    if (record?.schemaVersion !== SCHEMA_VERSION) continue;
+    bindings.push({ harnessSessionId: record.harnessSessionId,
+      accSessionId: record.accSessionId, generation: record.generation });
+  }
+  return bindings;
 }
