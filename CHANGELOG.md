@@ -7,10 +7,10 @@ release.
 
 | | |
 |---|---|
-| Built from | `6a94e9a` |
-| Tarball | `agents-can-communicate-0.0.0.tgz`, 105 KB, 101 entries |
-| sha256 | `d4347217a21e9f3551043e2060950e7a664b99ddd0827f02ecdb4d4fa449d1cc` |
-| Tests | 682 passing, 0 failing |
+| Built from | `9fd4542` |
+| Tarball | `agents-can-communicate-0.0.0.tgz`, 107 KB, 103 entries |
+| sha256 | `0d46d8b54b28e1f7c87965438f4143cfd1c236d62c715d461a066677deb21048` |
+| Tests | 689 passing, 0 failing |
 | Node | 24 (current production LTS) |
 | Verified on | macOS 15 (darwin 25.5.0, arm64) and Linux in CI |
 | Not supported | Windows — see below |

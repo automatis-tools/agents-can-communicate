@@ -81,6 +81,12 @@ agent that names it opened at the root, in `src/`, or in another worktree of the
 repository. One name for one file is what makes a claim mean anything — two agents calling
 it two things is the same as no claim at all.
 
+The spelling is settled for you. `./src/a.mjs`, `src//a.mjs` and `src/x/../a.mjs` are
+stored as `file:src/a.mjs`, and letter case is resolved by asking the filesystem rather
+than by a rule: where `src/A.mjs` and `src/a.mjs` are one file they become one resource,
+and where they are two files they stay two. `acc claim` echoes back the name it stored,
+which is the name peers will see.
+
 ## When coordination starts
 
 ```mermaid
