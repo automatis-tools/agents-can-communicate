@@ -54,6 +54,7 @@ some sessions in a project and not others.
 
 ## Commands
 
+<!-- test:illustration asks a person to confirm; there is nobody to ask in a test -->
 ```bash
 acc config init        # preview, then write after you agree
 acc config validate    # read-only; reports what applies
@@ -63,6 +64,23 @@ acc config validate    # read-only; reports what applies
 CI job, an agent - there is nobody to ask, so it refuses unless you pass `--yes`. It never
 overwrites an existing config: a committed identity is shared by everyone on the project,
 and replacing it on a mistyped command would split one workspace into two.
+
+### Writing one while sessions are running
+
+The config carries the workspace identity, so writing one moves the project to a new
+workspace. Sessions already attached stay on the old one: they keep heartbeating it, they
+drop off everyone else's roster, and claims they hold stop being seen. They do not recover
+by themselves either - a session attaches when its client starts and at no other point.
+
+So `init` refuses while sessions are attached, and names them:
+
+```text
+2 session(s) are attached here and would stop seeing each other: graphics (claude_code),
+physics (codex). They re-attach only when their client starts, so close them first, or
+pass --force to write anyway.
+```
+
+Close them, or pass `--force` if you mean it — and restart them afterwards.
 
 `validate` only reads. A command someone runs to find out what is wrong must not change
 the thing it is inspecting. With no config present it reports the defaults rather than
