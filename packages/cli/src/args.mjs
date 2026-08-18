@@ -2,36 +2,42 @@ import { AccError, EXIT } from "@agents-can-communicate/protocol";
 
 // Commands the model is offered stay few and high level; attach, heartbeat, and
 // detach exist for adapters and are deliberately not advertised as model tools.
+//
+// `--session` and `--generation` are optional on every agent-facing command:
+// the CLI works out which session is calling it (see session-owner.mjs). They
+// stay accepted because an adapter, a script, or an agent holding a session id
+// from `acc status --json` has a reason to be explicit. They remain required on
+// attach, heartbeat and detach, which are the adapter's own lifecycle calls.
 export const COMMANDS = Object.freeze({
   attach: { required: ["participant"], optional: ["harness", "cadence", "parent", "session"] },
   heartbeat: { required: ["session", "generation"], optional: [] },
   detach: { required: ["session", "generation"], optional: [] },
   sync: { required: [], optional: ["session", "cursor", "limit", "scope"] },
-  work: { required: ["session", "generation"],
-    optional: ["summary", "mode", "state", "workstream"], repeated: ["hint"],
-    flags: ["clear"] },
-  claim: { required: ["session", "generation", "resource"],
-    optional: ["mode", "enforcement", "reason", "lease"] },
-  release: { required: ["session", "generation", "claim"],
-    optional: ["authority", "reason"] },
-  message: { required: ["session", "generation", "subject", "body"],
-    optional: ["type", "priority", "workstream"], repeated: ["to"],
-    flags: ["requires-ack"] },
+  work: { required: [], optional: ["session", "generation", "summary", "mode",
+    "state", "workstream"], repeated: ["hint"], flags: ["clear"] },
+  claim: { required: ["resource"],
+    optional: ["session", "generation", "mode", "enforcement", "reason", "lease"] },
+  release: { required: ["claim"],
+    optional: ["session", "generation", "authority", "reason"] },
+  message: { required: ["subject", "body"],
+    optional: ["session", "generation", "type", "priority", "workstream"],
+    repeated: ["to"], flags: ["requires-ack"] },
   // Asking another agent to do something: one call, because a task nobody was
   // told about and a message pointing at no task are each useless.
-  request: { required: ["session", "generation", "to", "title"],
-    optional: ["detail", "workstream", "priority"], repeated: ["depends-on"] },
+  request: { required: ["to", "title"],
+    optional: ["session", "generation", "detail", "workstream", "priority"],
+    repeated: ["depends-on"] },
   // Create a task, or act on one with --task. A workstream is optional: small
   // requests should not have to invent a project first.
-  task: { required: ["session", "generation"],
-    optional: ["workstream", "title", "detail", "assignee", "state", "task", "reason"],
+  task: { required: [], optional: ["session", "generation", "workstream", "title",
+    "detail", "assignee", "state", "task", "reason"],
     repeated: ["depends-on"], flags: ["take", "decline", "force"] },
-  workstream: { required: ["session", "generation", "title", "objective"], optional: [] },
+  workstream: { required: ["title", "objective"], optional: ["session", "generation"] },
   // Messages not tied to a task need a way to be answered too. Without one a
   // `requiresAck` message raised an attention item nothing could ever clear.
-  ack: { required: ["session", "generation", "message"], optional: ["state"] },
-  finish: { required: ["session", "generation", "goal"],
-    optional: ["status", "to"], repeated: ["completed", "remaining", "blocker"] },
+  ack: { required: ["message"], optional: ["session", "generation", "state"] },
+  finish: { required: ["goal"], optional: ["session", "generation", "status", "to"],
+    repeated: ["completed", "remaining", "blocker"] },
   status: { required: [], optional: ["participant"] },
   doctor: { required: [], optional: ["home"], flags: ["repair"] },
   // The one command with a subcommand. Kept as an explicit list rather than a

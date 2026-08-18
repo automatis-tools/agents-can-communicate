@@ -10,5 +10,6 @@ export { BEGIN, END, removeTomlBlock, renderBlock, stripBlock, tomlString, write
 export { projectContext } from "./context-projector.mjs";
 export { mergeOwnedConfig, mergeOwnedEntries, ownedEntries, ownedKeys,
   removeOwnedConfig, removeOwnedEntries } from "./config-merge.mjs";
-export { clearSessionBinding, loadSessionBinding, storeSessionBinding }
+export { clearSessionBinding, listSessionBindings, loadSessionBinding,
+  storeSessionBinding }
   from "./session-binding.mjs";
