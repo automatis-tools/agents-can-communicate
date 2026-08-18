@@ -35,10 +35,10 @@ Not a leak.
 
 ## My write was blocked
 
-Exit code `5`, with the owner named. Ask them, or:
+Exit code `5`, with the owner and the claim id named. Ask them, or:
 
 ```bash
-acc release --claim "$CLAIM" --authority "agreed with models" --reason "handing over"
+acc release --claim claim_x --authority "agreed with models" --reason "handing over"
 ```
 
 ## A claim says `advisory`
