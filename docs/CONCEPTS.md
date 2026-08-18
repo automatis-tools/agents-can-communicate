@@ -75,6 +75,12 @@ graph TB
 a write. The two are deliberately separate: announcing that you are editing is cheap and
 constant; reserving a resource is a commitment other sessions are held to.
 
+A file resource is named relative to the **repository**, not to wherever a session happens
+to have been started: `file:src/physics.mjs` means one file in the project, whether the
+agent that names it opened at the root, in `src/`, or in another worktree of the same
+repository. One name for one file is what makes a claim mean anything — two agents calling
+it two things is the same as no claim at all.
+
 ## When coordination starts
 
 ```mermaid
