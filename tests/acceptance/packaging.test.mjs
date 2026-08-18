@@ -140,6 +140,39 @@ test("a clean install runs the CLI and attaches a session", async t => {
   assert.equal(status.participants[0].harness, "kimi");
 });
 
+/**
+ * A fresh clone has to stay clean through `npm install`.
+ *
+ * `"os": ["darwin", "linux"]` went into the manifest when Windows support was
+ * withdrawn, and the lockfile was never regenerated. Nothing failed: `npm ci`
+ * tolerates it and CI stayed green for the whole difference. What broke was the
+ * evidence - `npm install` rewrote the lockfile, so the next
+ * `scripts/verify-package.mjs` printed `(dirty)` and refused to claim
+ * reproducibility, on a tree where nobody had changed anything.
+ *
+ * `--package-lock-only` reads the manifests and nothing else, and the package
+ * has no runtime dependencies, so `--offline` needs no cache and no network.
+ */
+test("the committed lockfile is the one these manifests produce", async t => {
+  const into = await realpath(await mkdtemp(path.join(tmpdir(), "acc-lock-")));
+  t.after(() => rm(into, { recursive: true, force: true }));
+
+  const manifests = ["package.json", "package-lock.json"];
+  for (const entry of await readdir(path.join(repo, "packages"), { withFileTypes: true })) {
+    if (entry.isDirectory()) manifests.push(path.join("packages", entry.name, "package.json"));
+  }
+  for (const relative of manifests) {
+    await mkdir(path.dirname(path.join(into, relative)), { recursive: true });
+    await writeFile(path.join(into, relative), await readFile(path.join(repo, relative)));
+  }
+
+  await runNpm(["install", "--package-lock-only", "--offline", "--silent"], { cwd: into });
+
+  assert.equal(await readFile(path.join(into, "package-lock.json"), "utf8"),
+    await readFile(path.join(repo, "package-lock.json"), "utf8"),
+    "`npm install` rewrites the lockfile, so a clone is dirty before anyone edits it");
+});
+
 test("the manifest declares the binaries and the engine it was certified on", async t => {
   const manifest = JSON.parse(await readFile(path.join(repo, "package.json"), "utf8"));
 
