@@ -81,6 +81,10 @@ agent that names it opened at the root, in `src/`, or in another worktree of the
 repository. One name for one file is what makes a claim mean anything — two agents calling
 it two things is the same as no claim at all.
 
+A directory is claimed as `file:src/**`. Only that trailing glob is understood, so
+`file:src`, `file:src/`, `file:src/*` and `file:src/*.mjs` are refused rather than stored:
+each of them used to be accepted and cover nothing, which reads like protection and is not.
+
 The spelling is settled for you. `./src/a.mjs`, `src//a.mjs` and `src/x/../a.mjs` are
 stored as `file:src/a.mjs`, and letter case is resolved by asking the filesystem rather
 than by a rule: where `src/A.mjs` and `src/a.mjs` are one file they become one resource,
