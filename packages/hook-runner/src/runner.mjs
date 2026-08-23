@@ -255,7 +255,12 @@ const HANDLERS = {
       return { decision: "allow", unguarded: true };
     }
 
-    const status = await context.service.collectStatus({
+    // The narrow read: who holds a live claim, and what that owner is called.
+    // `collectStatus` answers a person's question and reads the whole store,
+    // which put the cost of guarding one write in proportion to every message
+    // the workspace had ever carried. This runs in front of every file an agent
+    // writes, and the budget that keeps it from failing open is five seconds.
+    const status = await context.service.guardState({
       workspaceId: context.descriptor.id });
     // Anchored to the repository, not to wherever this session was started. A
     // session opened in `repo/src` relativised the same file to
