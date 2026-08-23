@@ -186,7 +186,7 @@ test("finishing the work answers the request it came from", async t => {
   const { place, doer, task } = await inFlight(t);
 
   const before = await turn(place, "kimi", "phys", "physics");
-  assert.match(before, /\[direct_request\] tank sinks into mud/);
+  assert.match(before, /\[direct_request\] message_\S+ tank sinks into mud/);
 
   await cli(place, "task", "--session", doer.accSessionId, "--generation", doer.generation,
     "--task", task.taskId, "--state", "done");
@@ -215,7 +215,8 @@ test("a message not tied to a task can be answered directly", async t => {
     "--subject", "scale", "--body", "Is the tank scale settled?", "--requires-ack");
   const messageId = stdout.trim().replace(/^sent /, "");
 
-  assert.match(await turn(place, "kimi", "phys", "physics"), /\[direct_request\] scale/);
+  assert.match(await turn(place, "kimi", "phys", "physics"),
+    /\[direct_request\] message_\S+ scale/);
   await cli(place, "ack", "--session", doer.accSessionId, "--generation", doer.generation,
     "--message", messageId);
 
