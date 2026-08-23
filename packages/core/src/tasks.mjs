@@ -94,7 +94,8 @@ export function createTaskService(ports, workstreams) {
     let record = null;
     await store.transaction(async tx => {
       record = writeTask(tx, { input, session, workspaceId, now, ids });
-    });
+    // `writeTask` reads and writes on this handle, so its kinds are ours.
+    }, { kinds: ["session", "task", "workstream"] });
     return record;
   }
 
@@ -148,7 +149,7 @@ export function createTaskService(ports, workstreams) {
       tx.append({ schemaVersion: SCHEMA_VERSION, eventId: ids.next("event"),
         workspaceId: session.workspaceId, actorSessionId: session.sessionId,
         type: "task.claimed", occurredAt: now, payload: { taskId: input.taskId } });
-    });
+    }, { kinds: ["message", "receipt", "session", "task"] });
     return record;
   }
 
@@ -189,7 +190,7 @@ export function createTaskService(ports, workstreams) {
           workspaceId: session.workspaceId, actorSessionId: session.sessionId,
           type: "task.unblocked", occurredAt: now, payload: { taskId: dependent.taskId } });
       }
-    });
+    }, { kinds: ["message", "receipt", "task"] });
     return record;
   }
 
@@ -221,7 +222,7 @@ export function createTaskService(ports, workstreams) {
         workspaceId: session.workspaceId, actorSessionId: session.sessionId,
         type: "task.declined", occurredAt: now,
         payload: { taskId: input.taskId, reason: input.reason ?? null } });
-    });
+    }, { kinds: ["message", "receipt", "task"] });
     return record;
   }
 

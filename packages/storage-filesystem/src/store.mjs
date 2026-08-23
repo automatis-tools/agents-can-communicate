@@ -34,10 +34,11 @@ async function listState(paths, root, kind) {
   return envelopes;
 }
 
-async function loadAllState(paths, root) {
+async function loadAllState(paths, root, wanted = null) {
   const loaded = new Map();
   const kinds = (await listDirectoryEntries(paths.state, { root }))
-    .filter(entry => entry.isDirectory()).map(entry => entry.name);
+    .filter(entry => entry.isDirectory()).map(entry => entry.name)
+    .filter(kind => wanted === null || wanted.has(kind));
   for (const kind of kinds) {
     for (const envelope of await listState(paths, root, kind)) {
       loaded.set(`${envelope.kind}:${envelope.id}`, envelope);
@@ -82,11 +83,35 @@ export async function openFilesystemStore({ root, clock, ids, workspaceId, failA
     });
   }
 
-  async function transaction(callback) {
+  /**
+   * Run a write, having read the kinds it declared and no others.
+   *
+   * A transaction used to read every record the workspace held, for the
+   * generation checks `put` makes. That put the cost of `acc message` in
+   * proportion to everything the workspace already contained - 400 messages
+   * written one after another took 163 seconds, the last of them half a second
+   * each - and some of these transactions run inside hooks, where the budget is
+   * five seconds and running out means failing open.
+   *
+   * `kinds` is enforced, not merely honoured: reaching for an undeclared kind
+   * throws. A silent empty list would be the worst of both, since every check
+   * these transactions make reads as "nothing conflicts" when it finds nothing.
+   * Declaring nothing reads everything, which is what this always did.
+   */
+  async function transaction(callback, { kinds } = {}) {
+    const wanted = kinds === undefined ? null : new Set(kinds);
+    const declared = kind => {
+      if (wanted !== null && !wanted.has(kind)) {
+        throw new AccError(EXIT.DATA,
+          `this transaction did not declare ${kind}, so it was never read`,
+          { kind, declared: [...wanted] });
+      }
+      return kind;
+    };
     return withWriterMutex(paths, publishOptions, async () => {
       // Reads are loaded once per transaction so get, list, and the generation
       // that put() compares against all describe the same instant.
-      const loaded = await loadAllState(paths, root);
+      const loaded = await loadAllState(paths, root, wanted);
       const staged = new Map();
       const events = [];
       let sequence = await nextSequence(paths, root);
@@ -98,12 +123,15 @@ export async function openFilesystemStore({ root, clock, ids, workspaceId, failA
 
       const tx = Object.freeze({
         get(kind, id) {
+          declared(kind);
           return entryFor(`${kind}:${id}`)?.record ?? null;
         },
         generationOf(kind, id) {
+          declared(kind);
           return entryFor(`${kind}:${id}`)?.generation ?? null;
         },
         list(kind, predicate = () => true) {
+          declared(kind);
           const merged = new Map();
           for (const source of [loaded, staged]) {
             for (const [key, entry] of source) {
@@ -114,6 +142,7 @@ export async function openFilesystemStore({ root, clock, ids, workspaceId, failA
             .map(entry => entry.record).filter(predicate);
         },
         put(kind, id, record, expectedGeneration = null) {
+          declared(kind);
           const key = `${kind}:${id}`;
           const actual = entryFor(key)?.generation ?? null;
           if (actual !== expectedGeneration) {
@@ -126,6 +155,7 @@ export async function openFilesystemStore({ root, clock, ids, workspaceId, failA
           return generation;
         },
         remove(kind, id, expectedGeneration = null) {
+          declared(kind);
           const key = `${kind}:${id}`;
           const actual = entryFor(key)?.generation ?? null;
           if (actual !== expectedGeneration) {

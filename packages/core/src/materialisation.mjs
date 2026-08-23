@@ -17,7 +17,8 @@ const EPHEMERAL_KINDS = Object.freeze([
 ]);
 
 export async function isMaterialised(store, workspaceId) {
-  return (await store.snapshot(workspaceId)).workspace !== null;
+  // One record answers this, and it is asked before every durable write.
+  return (await store.snapshot(workspaceId, { kinds: ["workspace"] })).workspace !== null;
 }
 
 export async function materialise({ store, clock, ids }, { workspaceId, descriptor, reason }) {
@@ -50,7 +51,10 @@ export async function materialise({ store, clock, ids }, { workspaceId, descript
           payload: { sessionId: record.sessionId } });
       }
     }
-  });
+  // The promoted kinds are named by the loop above, not written literally in
+  // the body, so they are derived rather than repeated: a new ephemeral kind
+  // added to that list is read here without anyone remembering to say so.
+  }, { kinds: ["workspace", ...EPHEMERAL_KINDS.map(entry => entry.kind)] });
 
   // The ephemeral copies are retired only after the durable transaction
   // committed, so a crash in between leaves a recoverable duplicate rather than

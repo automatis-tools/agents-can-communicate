@@ -7,10 +7,10 @@ release.
 
 | | |
 |---|---|
-| Built from | `08195df` |
+| Built from | `121f2f9` |
 | Tarball | `agents-can-communicate-0.0.0.tgz`, 109 KB, 103 entries |
-| sha256 | `082cc3389b169375d3879b785251cc58b8f1aacc2f687d450a556518d224ad39` |
-| Tests | 720 passing, 0 failing |
+| sha256 | `fcda1defbb0aacca7b3ea9a033b55dd3a9226b16ea0455e75aa00e3132b31420` |
+| Tests | 726 passing, 0 failing |
 | Node | 24 (current production LTS) |
 | Verified on | macOS 15 (darwin 25.5.0, arm64) and Linux in CI |
 | Not supported | Windows — see below |
@@ -121,12 +121,12 @@ Full matrix and what the `yes` values do **not** promise:
   and `O_NOFOLLOW` does not refuse a symlinked config the way it does on POSIX —
   so the symlink defence does not hold. macOS and Linux are supported; Windows
   is future work.
-- **Writing does not scale the way reading now does.** Every write opens a
-  transaction that reads the whole store, so the cost of `acc message` or
-  `acc task` grows with everything the workspace already holds: 400 messages
-  written one after another took 163 seconds, the last of them about 0.5s each.
-  The write guard no longer works this way and the write path still does. Fine
-  for a project's worth of coordination, not for an archive; nothing prunes yet.
+- **A turn still costs more in a busy workspace.** Attaching and heartbeating are
+  bounded by what is live, and the write guard is too. Building a turn is not: it
+  has to know which messages are pending for you, and messages are the kind that
+  grows. Measured against 900 records, `beforeTurn` took 693ms against a floor of
+  88ms. Fine for a project's worth of coordination, not for an archive, and
+  nothing prunes yet.
 - **Client capabilities were certified on macOS only.** Linux runs the suite in
   CI, but no adapter was exercised against a real client there.
 
