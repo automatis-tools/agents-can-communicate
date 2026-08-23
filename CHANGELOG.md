@@ -7,10 +7,10 @@ release.
 
 | | |
 |---|---|
-| Built from | `add6d30` |
+| Built from | `08195df` |
 | Tarball | `agents-can-communicate-0.0.0.tgz`, 109 KB, 103 entries |
-| sha256 | `efa2083a53ea9db5f1436c887f533fa73db6798e64d6be15bcd6a051a8803c24` |
-| Tests | 710 passing, 0 failing |
+| sha256 | `082cc3389b169375d3879b785251cc58b8f1aacc2f687d450a556518d224ad39` |
+| Tests | 720 passing, 0 failing |
 | Node | 24 (current production LTS) |
 | Verified on | macOS 15 (darwin 25.5.0, arm64) and Linux in CI |
 | Not supported | Windows — see below |
@@ -68,8 +68,9 @@ workspace identity, so writing one moved the project to a different workspace an
 left every running session heartbeating the old one, invisible to everyone and
 not recovering until its client restarted.
 
-Installing edits configuration for four other tools, so uninstall removes the
-entries ACC recorded writing and nothing else. A settings key ACC had to create
+Installing edits configuration for four other tools, and every one of their homes
+comes back as it was found — byte for byte, with nothing left behind and nothing
+reformatted. Uninstall removes the entries ACC recorded writing and nothing else. A settings key ACC had to create
 goes only when it is empty: plugins the user enabled afterwards live in that same
 key, and taking it outright took them too.
 

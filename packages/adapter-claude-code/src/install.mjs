@@ -3,7 +3,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { bakeSkillCommand, mergeOwnedEntries, ownedEntries, removeInstalledTree,
-  removeOwnedEntries, writeHookShim }
+  removeOwnedEntries, writeForeignJson, writeHookShim }
   from "@agents-can-communicate/adapter-sdk";
 
 const bundle = fileURLToPath(new URL("../plugin", import.meta.url));
@@ -84,6 +84,26 @@ const writeClientJson = async (file, value) => {
   await writeFile(file, text);
 };
 
+// Settings are the user's own file. The two registries above are the client's
+// and keep the convention measured from it; this one keeps whatever the user
+// has.
+const writeSettings = (file, value) =>
+  writeForeignJson(file, value, { readFile, writeFile, mkdir });
+
+/**
+ * Put a registry back, or take it away if ACC is all that was ever in it.
+ *
+ * These two files exist because a plugin was installed. Removing the last entry
+ * and leaving `{}` behind is litter in a home that had neither file before -
+ * measured: an uninstall left both, holding nothing. An empty registry and an
+ * absent one mean the same thing to this client, which defaults to exactly what
+ * removing the entry produced.
+ */
+const writeRegistry = async (file, value, remaining) => {
+  if (remaining > 0) return writeClientJson(file, value);
+  return rm(file, { force: true });
+};
+
 const pluginVersion = async () => (await readJson(manifest, {})).version ?? "0.0.0";
 
 /** The marketplace manifest, in the shape the client's own directory sources use. */
@@ -130,19 +150,24 @@ export async function installClaudePlugin({ configDir, runner, node, now = new D
     [MARKETPLACE]: {
       source: { source: "directory", path: marketplaceDir(configDir) },
       installLocation: marketplaceDir(configDir),
-      lastUpdated: stamp,
+      lastUpdated: known[MARKETPLACE]?.lastUpdated ?? stamp,
     },
   });
 
   const installed = await readJson(installedPluginsPath(configDir),
     { version: 2, plugins: {} });
+  // A re-install of the same version from the same path is not an event, and
+  // stamping it moved bytes in a file ACC only borrows. The comment above
+  // promised a no-op install touched nothing; the timestamps made that false.
+  const [recorded] = installed.plugins?.[QUALIFIED] ?? [];
+  const unchanged = recorded?.installPath === cached && recorded?.version === version;
   await writeClientJson(installedPluginsPath(configDir), {
     ...installed,
     version: 2,
     plugins: {
       ...installed.plugins,
-      [QUALIFIED]: [{ scope: "user", installPath: cached, version,
-        installedAt: stamp, lastUpdated: stamp }],
+      [QUALIFIED]: [unchanged ? recorded : { scope: "user", installPath: cached, version,
+        installedAt: recorded?.installedAt ?? stamp, lastUpdated: stamp }],
     },
   });
 
@@ -151,7 +176,7 @@ export async function installClaudePlugin({ configDir, runner, node, now = new D
   // Entry-level ownership: `enabledPlugins` holds every plugin the user has, so
   // taking the whole key would destroy them and handing it back on uninstall
   // would destroy them again.
-  await writeJson(file, mergeOwnedEntries(existing, {
+  await writeSettings(file, mergeOwnedEntries(existing, {
     extraKnownMarketplaces: {
       [MARKETPLACE]: { source: { source: "directory", path: marketplaceDir(configDir) } },
     },
@@ -170,20 +195,21 @@ export async function uninstallClaudePlugin({ configDir, keep = [] }) {
   const settings = await readJson(file, null);
   if (settings !== null) {
     changes.push(...ownedEntries(settings).map(pair => pair.join("/")));
-    await writeJson(file, removeOwnedEntries(settings));
+    await writeSettings(file, removeOwnedEntries(settings));
   }
 
   // The registries belong to the client. Only ACC's own entry is taken out.
   const known = await readJson(knownMarketplacesPath(configDir), null);
   if (known !== null && Object.hasOwn(known, MARKETPLACE)) {
     const { [MARKETPLACE]: _removed, ...rest } = known;
-    await writeClientJson(knownMarketplacesPath(configDir), rest);
+    await writeRegistry(knownMarketplacesPath(configDir), rest, Object.keys(rest).length);
     changes.push(MARKETPLACE);
   }
   const installed = await readJson(installedPluginsPath(configDir), null);
   if (installed !== null && Object.hasOwn(installed.plugins ?? {}, QUALIFIED)) {
     const { [QUALIFIED]: _gone, ...rest } = installed.plugins;
-    await writeClientJson(installedPluginsPath(configDir), { ...installed, plugins: rest });
+    await writeRegistry(installedPluginsPath(configDir), { ...installed, plugins: rest },
+      Object.keys(rest).length);
     changes.push(QUALIFIED);
   }
 
