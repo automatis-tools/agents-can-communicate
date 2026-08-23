@@ -7,10 +7,10 @@ release.
 
 | | |
 |---|---|
-| Built from | `121f2f9` |
+| Built from | `2e4b57b` |
 | Tarball | `agents-can-communicate-0.0.0.tgz`, 109 KB, 103 entries |
-| sha256 | `fcda1defbb0aacca7b3ea9a033b55dd3a9226b16ea0455e75aa00e3132b31420` |
-| Tests | 726 passing, 0 failing |
+| sha256 | `6e4c3ae84f15a9f902b06c27c6b8e8e2a668317dc440d1f8bec375a59ad0b6c5` |
+| Tests | 730 passing, 0 failing |
 | Node | 24 (current production LTS) |
 | Verified on | macOS 15 (darwin 25.5.0, arm64) and Linux in CI |
 | Not supported | Windows — see below |
@@ -34,6 +34,11 @@ when the working tree is dirty.
 
 Coordinates independent agent sessions in one workspace: presence, intent,
 workspace-global claims, typed messages, handoffs. No session is in charge.
+
+A hook killed by its client no longer takes the workspace down with it. Every
+client puts a timeout on hooks; one killed mid-write used to leave the writer
+lock behind and stop every write for the next sixty seconds — silently, since
+hooks fail open and the session simply never appeared.
 
 An agent that asked and got no answer is told so. Work that stalls and a question
 nobody is left to answer raise the same attention item, because they are the same
