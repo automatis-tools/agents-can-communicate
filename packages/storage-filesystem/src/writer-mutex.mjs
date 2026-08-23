@@ -27,12 +27,31 @@ async function readOwner(directory, root) {
   return found?.value ?? null;
 }
 
+/**
+ * Reclaim a lock nobody is holding.
+ *
+ * A hook is a process a client is free to kill, and clients do: they all put a
+ * timeout on it. Killed mid-write, it leaves this directory behind with its own
+ * pid in it. Requiring the lock to be *both* dead and a minute old meant that
+ * for the next sixty seconds no write in the workspace could proceed - no
+ * intent, no claim, no message, and no session could attach. Hooks fail open,
+ * so none of it was visible: the session simply never appeared, and `acc
+ * status` went on reporting the ones that had.
+ *
+ * A dead owner is reclaimed at once. There is nothing to wait for: the lock
+ * holds no state beyond its own owner file, and the process that would have
+ * finished the write is gone.
+ *
+ * The age still matters for the one case liveness cannot answer. A pid is
+ * recycled, so a dead owner's number can come back attached to something
+ * unrelated, and then `pidIsAlive` says yes forever. Sixty seconds is far longer
+ * than any write here takes - the hook budget is five - so a holder that old is
+ * not a writer that is still going.
+ */
 async function takeStaleOwnership(directory, root, owner, now, pidIsAlive) {
   if (owner === null) return false;
   const age = Date.parse(now) - Date.parse(owner.acquiredAt);
-  if (!(age > STALE_MS) || pidIsAlive(owner.pid)) return false;
-  // The owner is both old and gone. Removing the whole directory is safe
-  // because the lock holds no state beyond its own owner file.
+  if (pidIsAlive(owner.pid) && !(age > STALE_MS)) return false;
   await rm(directory, { recursive: true, force: true });
   return true;
 }
