@@ -7,10 +7,10 @@ release.
 
 | | |
 |---|---|
-| Built from | `d354e0f` |
-| Tarball | `agents-can-communicate-0.0.0.tgz`, 108 KB, 103 entries |
-| sha256 | `93233ce6a4b34f4ae99b4c79ee2218adaaf0a36de6741b98a89a293d3f798206` |
-| Tests | 699 passing, 0 failing |
+| Built from | `7096118` |
+| Tarball | `agents-can-communicate-0.0.0.tgz`, 109 KB, 103 entries |
+| sha256 | `715ec12757f05f8e564bd779e9b14523f302bf749b70d3cdeffba3fee59dce8e` |
+| Tests | 705 passing, 0 failing |
 | Node | 24 (current production LTS) |
 | Verified on | macOS 15 (darwin 25.5.0, arm64) and Linux in CI |
 | Not supported | Windows — see below |
@@ -34,6 +34,10 @@ when the working tree is dirty.
 
 Coordinates independent agent sessions in one workspace: presence, intent,
 workspace-global claims, typed messages, handoffs. No session is in charge.
+
+An agent that asked and got no answer is told so. Work that stalls and a question
+nobody is left to answer raise the same attention item, because they are the same
+fact: you asked, and there is nobody there.
 
 Every line of an injected turn can be acted on. An attention line carries the id
 of the thing it is about — the same id the command that answers it takes — and a
