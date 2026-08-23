@@ -70,6 +70,39 @@ function unblockedTasks(snapshot, session, participantId) {
  * one-shot answers a request produces, this repeats until it is resolved,
  * because it stays true until someone picks the work back up.
  */
+/**
+ * A question nobody is left to answer.
+ *
+ * The task rule below tells a requester when work they asked for is going
+ * nowhere. A `requiresAck` message had no such rule, and a message is the other
+ * half of the same act: an agent asked a peer a direct question, the peer's
+ * session ended without answering, and the asker's next turn was empty. Not
+ * "still waiting" - empty. Measured, with the only other agent gone and an
+ * unanswered question standing between them.
+ *
+ * The same kind as the task case, because it is the same fact about the world:
+ * you asked, and there is nobody there.
+ */
+function unansweredQuestions(snapshot, participantId, onlineParticipants) {
+  const senderOf = new Map((snapshot.sessions ?? [])
+    .map(session => [session.sessionId, session.participantId]));
+  const items = [];
+  for (const receipt of snapshot.receipts ?? []) {
+    if (receipt.state === "acknowledged" || receipt.state === "failed") continue;
+    const message = (snapshot.messages ?? [])
+      .find(item => item.messageId === receipt.messageId);
+    if (message === undefined || !message.requiresAck) continue;
+    if (senderOf.get(message.fromSessionId) !== participantId) continue;
+    // Not answered yet by someone who is here is ordinary waiting, and saying so
+    // every turn would be noise the reader learns to skip.
+    if (onlineParticipants.has(receipt.recipientParticipantId)) continue;
+    items.push({ kind: "request_stalled", priority: ATTENTION_PRIORITY.request_stalled,
+      sourceId: message.messageId,
+      summary: `${message.subject} - ${receipt.recipientParticipantId} is not here to answer` });
+  }
+  return items;
+}
+
 function stalledRequests(snapshot, participantId, now) {
   const live = new Map((snapshot.sessions ?? [])
     .map(session => [session.sessionId, classifySessionPresence(session, now)]));
@@ -87,12 +120,15 @@ function stalledRequests(snapshot, participantId, now) {
     return task.state === "pending" && task.assigneeParticipantId !== null
       && !onlineParticipants.has(task.assigneeParticipantId);
   };
-  return (snapshot.tasks ?? [])
-    .filter(task => task.requestedByParticipantId === participantId
-      && goingNowhere(task))
-    .map(task => ({ kind: "request_stalled", priority: ATTENTION_PRIORITY.request_stalled,
-      sourceId: task.taskId,
-      summary: `${task.title} - nobody is working on it` }));
+  return [
+    ...(snapshot.tasks ?? [])
+      .filter(task => task.requestedByParticipantId === participantId
+        && goingNowhere(task))
+      .map(task => ({ kind: "request_stalled", priority: ATTENTION_PRIORITY.request_stalled,
+        sourceId: task.taskId,
+        summary: `${task.title} - nobody is working on it` })),
+    ...unansweredQuestions(snapshot, participantId, onlineParticipants),
+  ];
 }
 
 function coordinatorGaps(snapshot) {

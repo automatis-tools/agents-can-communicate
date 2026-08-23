@@ -93,6 +93,7 @@ Computed from explicit rules, never from a hidden classifier. Lower sorts first:
 | 2 | `claim_conflict` | Your declared resource hints overlap a live claim you do not own |
 | 3 | `task_unblocked` | Work addressed to your participant is `pending` — every dependency is `done` |
 | 4 | `coordinator_missing` | An open workstream has no coordinator |
+| 5 | `request_stalled` | You asked for something and nobody is on it: work you requested is held by a session that has gone quiet or addressed to a participant that is not here, or a question of yours needing an answer is addressed to a participant that is not here |
 
 A task with unmet dependencies is `blocked`, and finishing the last one flips its dependents
 to `pending`. So `pending` already means ready, and nothing has to re-evaluate the graph.

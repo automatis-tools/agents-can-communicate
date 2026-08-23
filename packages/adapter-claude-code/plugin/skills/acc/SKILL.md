@@ -59,6 +59,7 @@ to the command that answers it:
 - [task_unblocked] task_x       work is waiting for you          -> task --take
 - [claim_conflict] claim_x      someone holds what you want      -> ask, or release
 - [request_stalled] task_x      you asked and nobody is on it    -> ask again, or take it back
+- [request_stalled] message_x   you asked and nobody is there    -> ask someone else
 ```
 
 A turn is written to a byte budget, so it can end with

@@ -223,3 +223,70 @@ test("a message not tied to a task can be answered directly", async t => {
   const after = await turn(place, "kimi", "phys", "physics");
   assert.equal(after.includes("[direct_request]"), false, after);
 });
+
+test("a direct question outlives the agent it was put to", async t => {
+  const place = await workspace(t);
+  const asker = await attach(place, "codex", "gfx", "graphics");
+  await attach(place, "kimi", "phys", "physics");
+  await cli(place, "message", "--session", asker.accSessionId,
+    "--generation", asker.generation, "--to", "physics",
+    "--subject", "which way should the hull clamp?",
+    "--body", "It is blocking my rendering work.", "--requires-ack");
+
+  // Ordinary waiting while they are here. Saying so every turn is noise a
+  // reader learns to skip, and then skips the turn that matters.
+  const waiting = await turn(place, "codex", "gfx", "graphics");
+  assert.equal(waiting.includes("request_stalled"), false, waiting);
+
+  await hookEvent(place, "kimi", "phys", "physics", "sessionEnd",
+    { hook_event_name: "SessionEnd", reason: "exit" });
+
+  // The asker's turn was empty here - not "still waiting", empty. A question
+  // requiring an answer, the only agent who could give one gone, and nothing
+  // said. The task path had a rule for this and the message path had none.
+  const alone = await turn(place, "codex", "gfx", "graphics");
+  assert.match(alone, /\[request_stalled\] message_\S+ which way should the hull clamp\?/,
+    `the asker was left waiting on a question nobody can answer:\n${alone}`);
+  assert.match(alone, /physics is not here to answer/);
+});
+
+test("an answered question stops being reported, even once its author leaves", async t => {
+  const place = await workspace(t);
+  const asker = await attach(place, "codex", "gfx", "graphics");
+  const doer = await attach(place, "kimi", "phys", "physics");
+  await cli(place, "message", "--session", asker.accSessionId,
+    "--generation", asker.generation, "--to", "physics",
+    "--subject", "which way should the hull clamp?", "--body", "Blocking me.",
+    "--requires-ack");
+  const [pending] = JSON.parse((await cli(place, "sync", "--session", doer.accSessionId,
+    "--scope", "full", "--json")).stdout).data.snapshot.messages;
+
+  await cli(place, "ack", "--session", doer.accSessionId,
+    "--generation", doer.generation, "--message", pending.messageId);
+  await hookEvent(place, "kimi", "phys", "physics", "sessionEnd",
+    { hook_event_name: "SessionEnd", reason: "exit" });
+
+  // Answered is answered. A rule that fired on every departure would report
+  // every conversation the workspace has ever had.
+  const after = await turn(place, "codex", "gfx", "graphics");
+  assert.equal(after.includes("request_stalled"), false, after);
+});
+
+test("only the agent who asked is told", async t => {
+  const place = await workspace(t);
+  const asker = await attach(place, "codex", "gfx", "graphics");
+  await attach(place, "kimi", "phys", "physics");
+  const bystander = await attach(place, "claude_code", "snd", "sound");
+  await cli(place, "message", "--session", asker.accSessionId,
+    "--generation", asker.generation, "--to", "physics",
+    "--subject", "which way should the hull clamp?", "--body", "Blocking me.",
+    "--requires-ack");
+  await hookEvent(place, "kimi", "phys", "physics", "sessionEnd",
+    { hook_event_name: "SessionEnd", reason: "exit" });
+
+  // Someone else's unanswered question is not this session's problem, and a
+  // turn that carries everyone's is a turn nobody reads.
+  const seen = await turn(place, "claude_code", "snd", "sound");
+  assert.equal(seen.includes("request_stalled"), false, seen);
+  assert.equal(typeof bystander.accSessionId, "string");
+});
