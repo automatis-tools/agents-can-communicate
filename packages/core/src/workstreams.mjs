@@ -43,14 +43,15 @@ export function createWorkstreamService(ports, sessions) {
       tx.append({ schemaVersion: SCHEMA_VERSION, eventId: ids.next("event"), workspaceId,
         actorSessionId: session.sessionId, type: "workstream.created", occurredAt: now,
         payload: { workstreamId } });
-    });
+    }, { kinds: ["workstream"] });
     return record;
   }
 
   async function acquireCoordinator(input) {
     const session = await requireOpenSession(input, "coordinate");
     const now = clock.now();
-    const snapshot = await store.snapshot(session.workspaceId);
+    const snapshot = await store.snapshot(session.workspaceId,
+      { kinds: ["session", "workstream"] });
     let record = null;
     await store.transaction(async tx => {
       const existing = tx.get("workstream", input.workstreamId);
@@ -79,7 +80,7 @@ export function createWorkstreamService(ports, sessions) {
         workspaceId: session.workspaceId, actorSessionId: session.sessionId,
         type: "workstream.coordinator_acquired", occurredAt: now,
         payload: { workstreamId: input.workstreamId, replaced: held } });
-    });
+    }, { kinds: ["workstream"] });
     return record;
   }
 
@@ -100,7 +101,7 @@ export function createWorkstreamService(ports, sessions) {
         workspaceId: session.workspaceId, actorSessionId: session.sessionId,
         type: "workstream.coordinator_released", occurredAt: now,
         payload: { workstreamId: input.workstreamId } });
-    });
+    }, { kinds: ["workstream"] });
     return record;
   }
 

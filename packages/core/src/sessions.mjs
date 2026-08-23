@@ -58,7 +58,7 @@ export function createSessionService(ports) {
     if (ephemeral !== null) return { record: ephemeral, durable: false };
     const resolved = workspaceId ?? store.workspaceId;
     if (resolved === undefined) return null;
-    const durable = (await store.snapshot(resolved)).sessions
+    const durable = (await store.snapshot(resolved, { kinds: ["session"] })).sessions
       .find(session => session.sessionId === sessionId) ?? null;
     return durable === null ? null : { record: durable, durable: true };
   }
@@ -105,7 +105,7 @@ export function createSessionService(ports) {
         tx.append({ schemaVersion: SCHEMA_VERSION, eventId: ids.next("event"), workspaceId,
           actorSessionId: sessionId, type: "session.opened", occurredAt: now,
           payload: { replaced } });
-      });
+      }, { kinds: ["participant", "session"] });
       return session;
     }
 
@@ -134,7 +134,8 @@ export function createSessionService(ports) {
       return beaten;
     }
     await store.transaction(async tx =>
-      tx.put("session", sessionId, beaten, tx.generationOf("session", sessionId)));
+      tx.put("session", sessionId, beaten, tx.generationOf("session", sessionId)),
+    { kinds: ["session"] });
     return beaten;
   }
 
@@ -174,7 +175,8 @@ export function createSessionService(ports) {
       tx.append({ schemaVersion: SCHEMA_VERSION, eventId: ids.next("event"),
         workspaceId: closed.workspaceId, actorSessionId: sessionId, type: "session.closed",
         occurredAt: now, payload: {} });
-    });
+    // `writeWorkResponse` tells whoever asked, on this same handle.
+    }, { kinds: ["message", "receipt", "session", "task"] });
     return closed;
   }
 

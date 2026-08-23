@@ -67,7 +67,7 @@ export function createCommunicationService(ports, sessions, claims) {
       tx.append({ schemaVersion: SCHEMA_VERSION, eventId: ids.next("event"), workspaceId,
         actorSessionId: session.sessionId, type: "message.sent", occurredAt: now,
         payload: { messageId, type: record.type, recipients } });
-    });
+    }, { kinds: ["message", "receipt"] });
     return record;
   }
 
@@ -99,7 +99,7 @@ export function createCommunicationService(ports, sessions, claims) {
         type: `message.${record.state}`, occurredAt: now,
         payload: { messageId: input.messageId,
           recipientParticipantId: recipient } });
-    });
+    }, { kinds: ["receipt"] });
     return record;
   }
 
@@ -136,7 +136,7 @@ export function createCommunicationService(ports, sessions, claims) {
       tx.append({ schemaVersion: SCHEMA_VERSION, eventId: ids.next("event"), workspaceId,
         actorSessionId: session.sessionId, type: "decision.recorded", occurredAt: now,
         payload: { decisionId, authority: record.authority } });
-    });
+    }, { kinds: ["decision"] });
     return record;
   }
 
@@ -151,7 +151,7 @@ export function createCommunicationService(ports, sessions, claims) {
     await ensureMaterialised(ports, { workspaceId, reason: "durable_object" });
     const now = clock.now();
     const handoffId = createId("handoff");
-    const owned = (await store.snapshot(workspaceId)).claims
+    const owned = (await store.snapshot(workspaceId, { kinds: ["claim"] })).claims
       .filter(claim => claim.ownerSessionId === session.sessionId);
     const record = validateRecord("handoff", {
       schemaVersion: SCHEMA_VERSION,
@@ -175,7 +175,7 @@ export function createCommunicationService(ports, sessions, claims) {
       tx.append({ schemaVersion: SCHEMA_VERSION, eventId: ids.next("event"), workspaceId,
         actorSessionId: session.sessionId, type: "handoff.created", occurredAt: now,
         payload: { handoffId, released: record.claimsToRelease } });
-    });
+    }, { kinds: ["handoff"] });
     for (const claim of owned) {
       await claims.releaseClaim({ claimId: claim.claimId, sessionId: session.sessionId,
         generation: session.generation, workspaceId });
@@ -198,7 +198,10 @@ export function createCommunicationService(ports, sessions, claims) {
     const participantId = input.participantId;
     if (typeof participantId !== "string" || participantId === "") return [];
     const workspaceId = input.workspaceId ?? store.workspaceId;
-    const snapshot = await store.snapshot(workspaceId);
+    // Messages and receipts are the two unbounded kinds and this read needs
+    // both. Nothing else, though, and it runs in front of every turn.
+    const snapshot = await store.snapshot(workspaceId,
+      { kinds: ["message", "receipt"] });
     const waiting = new Set((snapshot.receipts ?? [])
       .filter(receipt => receipt.recipientParticipantId === participantId
         && (receipt.state === "queued" || receipt.state === "recorded"))
@@ -273,7 +276,8 @@ export function createCommunicationService(ports, sessions, claims) {
       tx.append({ schemaVersion: SCHEMA_VERSION, eventId: ids.next("event"), workspaceId,
         actorSessionId: session.sessionId, type: "work.requested", occurredAt: now,
         payload: { taskId: task.taskId, messageId, recipient } });
-    });
+    // `writeTask` runs on this handle, so what it reads is read here.
+    }, { kinds: ["message", "receipt", "session", "task", "workstream"] });
     return { task, message };
   }
 
