@@ -30,6 +30,32 @@ function normalisePath(value) {
   return segments.join("/");
 }
 
+/**
+ * A claim that cannot match anything is worse than no claim.
+ *
+ * Only a trailing `/**` is understood. Every other shape an agent reaches for -
+ * `file:src` for a directory, `file:src/`, `file:src/*.mjs`, `file:src/*` - was
+ * accepted, stored, and reported by `acc status` as `protection guarded`, and
+ * covered nothing at all. Measured: four spellings, four claims taken, four
+ * writes allowed, and only `file:src/**` denied.
+ *
+ * Refusing is the honest answer. The claim was going to be useless either way;
+ * this way its author finds out, and is told the form that works.
+ */
+export function assertMatchableResource(resource, fail) {
+  if (typeof resource !== "string" || !resource.startsWith("file:")) return resource;
+  const rest = resource.slice("file:".length);
+  if (rest.endsWith("/") && rest !== "/") {
+    fail(`${resource} names a directory; claim ${resource}** to cover what is in it`);
+  }
+  const body = rest.endsWith(GLOB) ? rest.slice(0, -GLOB.length) : rest;
+  if (body.includes("*")) {
+    fail(`${resource} matches nothing: only a trailing /** is understood, `
+      + `so a directory is claimed as file:<path>/**`);
+  }
+  return resource;
+}
+
 export function normaliseResource(resource) {
   if (typeof resource !== "string") return resource;
   const colon = resource.indexOf(":");

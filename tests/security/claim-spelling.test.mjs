@@ -115,6 +115,35 @@ test("a glob keeps its meaning through normalisation", async t => {
   assert.equal(await place.write("README.md"), "allow");
 });
 
+for (const [spelling, expected] of [
+  ["file:src", /is a directory; claim file:src\/\*\* to cover/],
+  ["file:src/", /is a directory; claim file:src\/\*\* to cover/],
+  ["file:src/*.mjs", /matches nothing: only a trailing \/\*\* is understood/],
+  ["file:src/*", /matches nothing: only a trailing \/\*\* is understood/],
+]) {
+  test(`${spelling} is refused rather than stored as protection`, async t => {
+    const place = await project(t);
+
+    // Each of these was accepted, stored, and reported as `protection guarded`
+    // while covering nothing at all. The claim was useless either way; refusing
+    // is how its author finds out.
+    const failure = await place.claim(spelling).then(() => null, error => error);
+
+    assert.notEqual(failure, null, `${spelling} was stored and protects nothing`);
+    assert.match(failure.stderr, expected);
+  });
+}
+
+test("a path that does not exist yet can still be claimed", async t => {
+  const place = await project(t);
+
+  // Claiming before creating is the point of a claim, so an absent path is not
+  // evidence of a mistake the way a directory is.
+  const { stdout } = await place.claim("file:src/renderer.mjs");
+
+  assert.match(stdout, /claimed file:src\/renderer\.mjs/);
+});
+
 test("a resource that is not a file is left exactly as it is", async t => {
   const place = await project(t);
 

@@ -1,5 +1,5 @@
-import { AccError, EXIT, SCHEMA_VERSION, createId, normaliseResource, validateRecord }
-  from "@agents-can-communicate/protocol";
+import { AccError, EXIT, SCHEMA_VERSION, assertMatchableResource, createId,
+  normaliseResource, validateRecord } from "@agents-can-communicate/protocol";
 
 import { ensureMaterialised } from "./materialisation.mjs";
 import { classifySessionPresence } from "./sessions.mjs";
@@ -66,7 +66,11 @@ export function createClaimService(ports, sessions) {
   async function acquireClaim(input) {
     const session = await requireOwner(input, "claim");
     // One name for one file, decided here rather than at each surface, so a
-    // claim taken over MCP and one taken from the CLI mean the same thing.
+    // claim taken over MCP and one taken from the CLI mean the same thing - and
+    // a shape that could never match is refused rather than stored.
+    assertMatchableResource(input.resource, message => {
+      throw new AccError(EXIT.USAGE, message, { resource: input.resource });
+    });
     const resource = normaliseResource(input.resource);
     const workspaceId = session.workspaceId;
     await ensureMaterialised(ports, { workspaceId, descriptor: input.descriptor,
