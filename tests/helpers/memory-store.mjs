@@ -76,14 +76,19 @@ export function createMemoryStore({ clock, ids, workspaceId }) {
     return { cursor: page.at(-1)?.sequence ?? after, events: page };
   }
 
-  async function snapshot(workspaceId) {
-    const of = kind => [...committed.values()]
+  // `kinds` narrows the read, exactly as the filesystem store does. A double
+  // that ignores an option the real store honours lets a caller pass its tests
+  // and behave differently in the only place that matters.
+  async function snapshot(workspaceId, { kinds } = {}) {
+    const wanted = kinds === undefined ? null : new Set(kinds);
+    const of = kind => (wanted !== null && !wanted.has(kind) ? [] : [...committed.values()]
       .filter(entry => entry.kind === kind && entry.record.workspaceId === workspaceId)
-      .map(entry => entry.record);
+      .map(entry => entry.record));
     return {
-      workspace: [...committed.values()]
-        .find(entry => entry.kind === "workspace" && entry.record.workspaceId === workspaceId)
-        ?.record ?? null,
+      workspace: (wanted !== null && !wanted.has("workspace") ? null
+        : [...committed.values()]
+          .find(entry => entry.kind === "workspace"
+            && entry.record.workspaceId === workspaceId)?.record ?? null),
       participants: of("participant"),
       sessions: of("session"),
       intents: of("intent"),

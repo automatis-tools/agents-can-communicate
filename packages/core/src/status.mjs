@@ -17,6 +17,43 @@ function protectionOf(claims, live) {
   return claims.every(claim => claim.enforcement === "guarded") ? "guarded" : "advisory";
 }
 
+/**
+ * The two things the write guard has to know, and nothing else.
+ *
+ * `collectStatus` answers a person's question and reads the whole store to do
+ * it. The guard asks a much smaller one - who holds a live claim, and what is
+ * that owner called - in front of *every file an agent writes*. Reading
+ * everything there made the cost grow with the number of messages the workspace
+ * had ever carried: measured at about 1.4ms per stored record, so a workspace
+ * with a few thousand crosses the hook's five-second budget, after which it
+ * fails open and the write goes through unguarded.
+ *
+ * Sessions and claims are bounded by what is live. Messages, receipts, tasks and
+ * events are not bounded by anything, and none of them decides whether a write
+ * is allowed.
+ */
+export function createGuardStateService(ports) {
+  const { store, clock } = ports;
+
+  return async function guardState(input = {}) {
+    const workspaceId = input.workspaceId ?? store.workspaceId;
+    const now = clock.now();
+    const snapshot = await store.snapshot(workspaceId, { kinds: ["workspace", "session", "claim"] });
+    const sessions = snapshot.workspace !== null
+      ? snapshot.sessions
+      : await store.ephemeral.list("session");
+
+    return {
+      claims: snapshot.claims
+        .filter(claim => Date.parse(claim.expiresAt) > Date.parse(now)),
+      participants: sessions.map(session => ({
+        sessionId: session.sessionId,
+        participantId: session.participantId,
+      })),
+    };
+  };
+}
+
 export function createStatusService(ports, sessions) {
   const { store, clock } = ports;
 
