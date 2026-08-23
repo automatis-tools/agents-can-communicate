@@ -1,3 +1,5 @@
+import path from "node:path";
+
 const MARKER = "acc:owned";
 // Ownership of single entries inside a container someone else also writes to.
 // `enabledPlugins` in a Claude Code settings file holds every plugin the user
@@ -99,4 +101,62 @@ export function removeOwnedEntries(existing,
 
 export function ownedEntries(existing, { entryOwner = ENTRY_MARKER } = {}) {
   return (existing?.[entryOwner] ?? []).map(pair => [...pair]);
+}
+
+/**
+ * Write JSON back into someone else's file, in that file's own style.
+ *
+ * ACC re-emits what it edits, and re-emitting with a fixed style rewrites bytes
+ * it was not asked to touch. Measured after an install and uninstall that
+ * changed nothing else: three clients' configs came back one byte longer, a
+ * trailing newline appended to files that had none. It is the same defect that
+ * was found once in Claude Code's registries and fixed there by hand - fixed for
+ * two files rather than for the shape, so the other three kept doing it.
+ *
+ * The style is read from the file rather than declared per client: what a client
+ * writes is a fact about the client, and asking the file cannot go stale.
+ * Absent file, absent style: a file ACC creates is its own, and gets the
+ * conventional trailing newline.
+ */
+export function jsonStyleOf(text) {
+  if (typeof text !== "string") return { indent: 2, trailingNewline: true };
+  // The whitespace itself, not a count of it. `JSON.stringify` takes a string
+  // for its indent, so a tab-indented file stays tab-indented; measuring the
+  // length instead turned one tab into one space and reformatted every line of
+  // a file this exists to leave alone. Matched without `\s`, which would span
+  // the blank line before an indented one and report its own newline as indent.
+  const indented = /\n([ \t]+)\S/.exec(text);
+  // A file written on one line was written that way on purpose, and expanding it
+  // is the same unasked-for rewrite as changing its indent.
+  const oneLine = !text.trimEnd().includes("\n");
+  // Ten is what `JSON.stringify` itself honours; more is silently truncated,
+  // and truncating here keeps what is written equal to what was measured.
+  return {
+    indent: oneLine ? 0 : (indented === null ? 2 : indented[1].slice(0, 10)),
+    trailingNewline: text.endsWith("\n"),
+  };
+}
+
+/**
+ * Write a file ACC did not create, keeping the shape of what was there.
+ *
+ * Unchanged content is not rewritten at all, so a second install touches
+ * nothing. A file that does not exist yet is ACC's to create, and gets the
+ * conventional trailing newline.
+ */
+export async function writeForeignJson(file, value, { readFile, writeFile, mkdir }) {
+  const current = await readFile(file, "utf8").catch(() => null);
+  const text = formatJsonAs(value, jsonStyleOf(current));
+  if (current === text) return false;
+  await mkdir(path.dirname(file), { recursive: true });
+  await writeFile(file, text);
+  return true;
+}
+
+export function formatJsonAs(value, style) {
+  const measured = style?.indent;
+  const indent = typeof measured === "string" && measured !== "" ? measured
+    : (Number.isInteger(measured) && measured >= 0 ? measured : 2);
+  const text = JSON.stringify(value, null, indent);
+  return style?.trailingNewline === false ? text : `${text}\n`;
 }

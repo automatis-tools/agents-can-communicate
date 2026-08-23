@@ -2,7 +2,7 @@ import { cp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { bakeSkillCommand, removeInstalledTree, writeHookShim }
+import { bakeSkillCommand, removeInstalledTree, writeForeignJson, writeHookShim }
   from "@agents-can-communicate/adapter-sdk";
 
 const bundle = fileURLToPath(new URL("../extension", import.meta.url));
@@ -21,10 +21,9 @@ async function readJson(file, fallback) {
   }
 }
 
-const writeJson = async (file, value) => {
-  await mkdir(path.dirname(file), { recursive: true });
-  await writeFile(file, `${JSON.stringify(value, null, 2)}\n`);
-};
+// Settings are the user's file, with their own hooks and their own formatting.
+const writeJson = (file, value) => writeForeignJson(file, value,
+  { readFile, writeFile, mkdir });
 
 const isOurs = hook => typeof hook?.name === "string" && hook.name.startsWith(OWNER_PREFIX);
 
