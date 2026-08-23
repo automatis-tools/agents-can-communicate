@@ -93,7 +93,11 @@ export async function readJsonIfPresent(filePath, root) {
   try {
     return { value: JSON.parse(bytes.toString("utf8")), bytes };
   } catch (error) {
-    throw new AccError(EXIT.DATA, "invalid JSON record", { filePath, cause: error.message });
+    // Named in the message, not only in the details: human mode prints the
+    // message alone, and "invalid JSON record" sent a reader looking through a
+    // whole workspace for a file the error already knew.
+    throw new AccError(EXIT.DATA, `invalid JSON record: ${filePath}`,
+      { filePath, cause: error.message });
   }
 }
 

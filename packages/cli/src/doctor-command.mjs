@@ -47,8 +47,25 @@ export async function runDoctor({ options, context, runtime }) {
   const report = options.repair === true
     ? await repairFilesystemStore({ root, clock: context.service.clock })
     : await diagnoseFilesystemStore({ root });
-  const status = await context.service.collectStatus({});
   const adapters = await diagnoseAdapters({ options, runtime });
+
+  // Before the store is read for anything else. `collectStatus` reads every
+  // record, so on the store this command exists to describe it threw first and
+  // took the diagnosis with it: one truncated file and `acc doctor` answered
+  // "invalid JSON record", naming nothing, while `inspect` had already found
+  // the file and put it in a list nobody ever saw.
+  if (!report.healthy) {
+    const broken = [...report.blocked, ...report.corrupt];
+    throw new AccError(EXIT.DATA,
+      `store state is ambiguous; repair is blocked. ${broken.length} unreadable:\n  `
+      + `${broken.slice(0, 10).join("\n  ")}`
+      + (broken.length > 10 ? `\n  and ${broken.length - 10} more` : ""),
+      { workspaceId: context.descriptor.id, source: context.descriptor.source,
+        runtimeRoot: root, store: report, adapters,
+        remediation: ["inspect blocked and corrupt paths before repairing"] });
+  }
+
+  const status = await context.service.collectStatus({});
 
   const data = {
     workspaceId: context.descriptor.id,
@@ -59,14 +76,8 @@ export async function runDoctor({ options, context, runtime }) {
     store: report,
     // Capabilities are reported from what is actually installed, never assumed.
     adapters,
-    remediation: [
-      ...(report.healthy ? [] : ["inspect blocked and corrupt paths before repairing"]),
-      ...adapters.flatMap(adapter => adapter.remediation),
-    ],
+    remediation: adapters.flatMap(adapter => adapter.remediation),
   };
-  if (!report.healthy) {
-    throw new AccError(EXIT.DATA, "store state is ambiguous; repair is blocked", data);
-  }
   const installed = adapters.filter(adapter => adapter.installed).length;
   const text = `store healthy; ${status.counts.live} live session(s); `
     + `protection ${status.protection}; ${installed} of ${adapters.length} adapter(s) installed`;

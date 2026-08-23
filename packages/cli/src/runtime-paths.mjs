@@ -2,11 +2,11 @@ import path from "node:path";
 
 import { AccError, EXIT, assertPortableId } from "@agents-can-communicate/protocol";
 
-const AREAS = ["protocol", "events", "state", "locks", "quarantine", "ephemeral"];
+const AREAS = ["protocol", "events", "state", "locks", "ephemeral"];
 
 /**
  * @typedef {{ root: string, protocol: string, events: string, state: string,
- *   locks: string, quarantine: string, ephemeral: string }} RuntimePaths
+ *   locks: string, ephemeral: string }} RuntimePaths
  */
 
 /**
