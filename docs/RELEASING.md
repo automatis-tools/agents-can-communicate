@@ -53,6 +53,13 @@ the working tree is dirty:
 PASS  agents-can-communicate-0.0.0.tgz  sha256 a5c8bb1d…  built from 39d0dcf
 ```
 
+It went stale four times in a row anyway, each caught by hand and only because
+someone happened to run the script. So `npm test` now checks it:
+`tests/acceptance/recorded-candidate.test.mjs` fails when shipped code has
+changed since the recorded commit, and names the files. A shallow clone that
+does not have the commit reports that instead of failing — the check is of the
+record, not of the checkout depth.
+
 ## Then stop
 
 Publishing, tagging, and cutting a GitHub release are **external mutations**.
