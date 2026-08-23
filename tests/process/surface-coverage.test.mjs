@@ -70,6 +70,9 @@ const INTERNAL = Object.freeze({
   acquireCoordinator: "no workstream coordination surface yet - tracked, not forgotten",
   releaseCoordinator: "same",
   recordDecision: "no decision surface yet - tracked, not forgotten",
+  guardState: "the write guard's own read, kept narrow on purpose: `collectStatus` "
+    + "answers the same question and reads the whole store, which put the cost of "
+    + "guarding one write in proportion to every message the workspace had carried",
 });
 
 test("every core operation is reachable, or named as internal on purpose", () => {
