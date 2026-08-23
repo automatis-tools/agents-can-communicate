@@ -2,7 +2,8 @@ import { cp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { assertRunner, bakeSkillCommand, defaultRunner, removeInstalledTree, runnerExists }
+import { assertRunner, bakeSkillCommand, defaultRunner, removeInstalledTree,
+  runnerExists, writeForeignJson }
   from "@agents-can-communicate/adapter-sdk";
 
 const bundle = fileURLToPath(new URL("../plugin", import.meta.url));
@@ -129,9 +130,9 @@ export async function installKimiPlugin({ home, runner = defaultRunner(), node }
 
   const registry = registryPath(home);
   await mkdir(path.dirname(registry), { recursive: true });
-  await writeFile(registry, `${JSON.stringify(
+  await writeForeignJson(registry,
     registerPlugin(await readJson(registry, { version: 1, plugins: [] }), target),
-    null, 2)}\n`);
+    { readFile, writeFile, mkdir });
 
   return { ok: true, changes: [target, file, registry], diagnostics: [] };
 }
@@ -151,7 +152,16 @@ export async function uninstallKimiPlugin({ home, keep = [] }) {
   if (loaded !== null) {
     const plugins = (loaded.plugins ?? []).filter(entry => entry.id !== PLUGIN_NAME);
     if (plugins.length !== (loaded.plugins ?? []).length) changes.push(registry);
-    await writeFile(registry, `${JSON.stringify({ ...loaded, plugins }, null, 2)}\n`);
+    // The registry exists because a plugin was installed. Leaving an empty one
+    // behind is litter in a home that had no such file - measured after an
+    // uninstall that was otherwise clean. An empty registry and an absent one
+    // mean the same thing to this client.
+    if (plugins.length > 0) {
+      await writeForeignJson(registry, { ...loaded, plugins },
+        { readFile, writeFile, mkdir });
+    } else {
+      await rm(registry, { force: true });
+    }
   }
 
   await removeInstalledTree(pluginPath(home), keep);

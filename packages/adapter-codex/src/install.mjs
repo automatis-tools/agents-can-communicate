@@ -3,7 +3,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { bakeSkillCommand, removeInstalledTree, removeTomlBlock, stripBlock, tomlString,
-  writeHookShim, writeTomlBlock }
+  writeForeignJson, writeHookShim, writeTomlBlock }
   from "@agents-can-communicate/adapter-sdk";
 import { AccError, EXIT } from "@agents-can-communicate/protocol";
 
@@ -62,6 +62,11 @@ const writeJson = async (file, value) => {
   await writeFile(file, `${JSON.stringify(value, null, 2)}\n`);
 };
 
+// The marketplace manifest is the user's: their own plugins are listed beside
+// ACC's. Re-emitting it in ACC's style changed bytes nobody asked to change.
+const writeMarketplace = (file, value) =>
+  writeForeignJson(file, value, { readFile, writeFile, mkdir });
+
 /**
  * The marketplace entry, in the shape this client's parser accepts.
  *
@@ -104,7 +109,7 @@ export async function installCodexPlugin({ home, agentsHome = home,
   // plugins - which is what this used to do - puts a nameless entry into a
   // sequence the client then tries to load.
   const others = (existing.plugins ?? []).filter(entry => entry.name !== PLUGIN_NAME);
-  await writeJson(file, { ...existing, plugins: [...others, entryFor()] });
+  await writeMarketplace(file, { ...existing, plugins: [...others, entryFor()] });
 
   const config = configPath(codexHome);
   // A marketplace declared twice makes this client refuse the whole config, and
@@ -148,7 +153,7 @@ export async function uninstallCodexPlugin({ home, agentsHome = home,
   if (existing !== null) {
     const kept = (existing.plugins ?? []).filter(entry => entry.name !== PLUGIN_NAME);
     if (kept.length !== (existing.plugins ?? []).length) changes.push(PLUGIN_NAME);
-    await writeJson(file, { ...existing, plugins: kept });
+    await writeMarketplace(file, { ...existing, plugins: kept });
   }
   if (await removeTomlBlock(configPath(codexHome))) changes.push(configPath(codexHome));
   // The marketplace directory is ACC's too, so it goes rather than being left
