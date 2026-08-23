@@ -7,10 +7,10 @@ release.
 
 | | |
 |---|---|
-| Built from | `e5026ba` |
+| Built from | `d354e0f` |
 | Tarball | `agents-can-communicate-0.0.0.tgz`, 108 KB, 103 entries |
-| sha256 | `85f1665b3a07918941a28f41dcde555da5d5cbc2dea193c0bff129a75c77fc6d` |
-| Tests | 694 passing, 0 failing |
+| sha256 | `93233ce6a4b34f4ae99b4c79ee2218adaaf0a36de6741b98a89a293d3f798206` |
+| Tests | 699 passing, 0 failing |
 | Node | 24 (current production LTS) |
 | Verified on | macOS 15 (darwin 25.5.0, arm64) and Linux in CI |
 | Not supported | Windows — see below |
@@ -34,6 +34,10 @@ when the working tree is dirty.
 
 Coordinates independent agent sessions in one workspace: presence, intent,
 workspace-global claims, typed messages, handoffs. No session is in charge.
+
+Every line of an injected turn can be acted on. An attention line carries the id
+of the thing it is about — the same id the command that answers it takes — and a
+turn the byte budget truncated says how to read what it withheld.
 
 A peer's message reaches the recipient's turn as a fenced, attributed, escaped
 block, and its receipt advances to `injected` only for what the turn actually
