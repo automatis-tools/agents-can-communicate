@@ -2,7 +2,11 @@ const DEFAULT_BUDGET_BYTES = 6_000;
 // Held back from the required lines so the "not shown" note can always be
 // written. A projection that silently drops what it could not fit is how an
 // agent ends up confidently unaware.
-const NOTE_RESERVE = 48;
+// Enough for the note *and* the command that reads what the note is about. It
+// said only that something had been withheld, and nothing anywhere - not the
+// skills, not the docs - said how to see it. A turn that reports a thing the
+// reader cannot reach is how an agent ends up inventing its own way in.
+const NOTE_RESERVE = 80;
 const FENCE = "```";
 // A peer cannot close a block it cannot name. The fence carries a marker that
 // is stripped from peer content, so forged delimiters stay inside the block.
@@ -49,10 +53,14 @@ function truncate(line, limit) {
  * agent that is told to act and not told on what improvises, which in this
  * project has already meant one hand-editing the store rather than admitting it
  * could not name the task.
+ *
+ * Every kind carries such an id and every one is the argument to a command:
+ * a message to `acc ack --message`, a task to `acc task --task`, a claim to
+ * `acc release --claim`. So they are all shown, not only the ones that happened
+ * to be noticed first.
  */
 function attentionLines(attention) {
-  return attention.map(item => (typeof item.sourceId === "string"
-    && item.sourceId.startsWith("task_")
+  return attention.map(item => (typeof item.sourceId === "string" && item.sourceId !== ""
     ? `- [${item.kind}] ${item.sourceId} ${item.summary}`
     : `- [${item.kind}] ${item.summary}`));
 }
@@ -187,7 +195,8 @@ export function projectContext(sync, { budgetBytes = DEFAULT_BUDGET_BYTES } = {}
     used += size;
   }
   if (dropped > 0) {
-    const note = `- +${dropped} not shown, over budget`;
+    const note = `- +${dropped} not shown, over budget; read them with `
+      + "`acc sync --scope full --json`";
     lines.push(note);
     used += bytes(note) + 1;
   }
