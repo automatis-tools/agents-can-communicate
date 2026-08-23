@@ -78,7 +78,8 @@ export function createClaimService(ports, sessions) {
     const now = clock.now();
     const expiresAt = new Date(Date.parse(now) + (input.leaseSeconds ?? 1800) * 1000)
       .toISOString();
-    const snapshot = await store.snapshot(workspaceId);
+    // Only to name the owner of a conflicting claim in the error.
+    const snapshot = await store.snapshot(workspaceId, { kinds: ["session"] });
 
     let record = null;
     await store.transaction(async tx => {
@@ -109,7 +110,7 @@ export function createClaimService(ports, sessions) {
         actorSessionId: session.sessionId, type: mine === undefined ? "claim.acquired"
           : "claim.renewed", occurredAt: now,
         payload: { claimId, resource, mode: record.mode } });
-    });
+    }, { kinds: ["claim"] });
     return record;
   }
 
@@ -130,7 +131,7 @@ export function createClaimService(ports, sessions) {
       tx.append({ schemaVersion: SCHEMA_VERSION, eventId: ids.next("event"),
         workspaceId: existing.workspaceId, actorSessionId: session.sessionId,
         type: "claim.renewed", occurredAt: now, payload: { claimId: input.claimId } });
-    });
+    }, { kinds: ["claim"] });
     return record;
   }
 
@@ -159,7 +160,7 @@ export function createClaimService(ports, sessions) {
         type: owned ? "claim.released" : "claim.force_released", occurredAt: now,
         payload: { claimId: input.claimId, authority: authority ?? null,
           reason: reason ?? null, replacedGeneration: existing.generation } });
-    });
+    }, { kinds: ["claim"] });
   }
 
   return {

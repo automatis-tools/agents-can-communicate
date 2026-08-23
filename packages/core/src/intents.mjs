@@ -49,7 +49,7 @@ export function createIntentService(ports, sessions) {
       tx.append({ schemaVersion: SCHEMA_VERSION, eventId: ids.next("event"), workspaceId,
         actorSessionId: input.sessionId, type: "intent.published", occurredAt: now,
         payload: { mode: intent.mode, state: intent.state } });
-    });
+    }, { kinds: ["intent"] });
     return intent;
   }
 
@@ -68,7 +68,7 @@ export function createIntentService(ports, sessions) {
         tx.generationOf("intent", input.sessionId));
       tx.append({ schemaVersion: SCHEMA_VERSION, eventId: ids.next("event"), workspaceId,
         actorSessionId: input.sessionId, type: "intent.cleared", occurredAt: now, payload: {} });
-    });
+    }, { kinds: ["intent"] });
   }
 
   return { setIntent, clearIntent };
