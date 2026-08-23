@@ -3,7 +3,7 @@ import { createCommunicationService } from "./communication.mjs";
 import { createIntentService } from "./intents.mjs";
 import { assertPorts } from "./ports.mjs";
 import { createSessionService } from "./sessions.mjs";
-import { createStatusService } from "./status.mjs";
+import { createGuardStateService, createStatusService } from "./status.mjs";
 import { createSyncService } from "./sync.mjs";
 import { createTaskService } from "./tasks.mjs";
 import { createWorkstreamService } from "./workstreams.mjs";
@@ -25,6 +25,7 @@ export function createCoordinationService({ store, clock, ids, policies = {} }) 
   const communication = createCommunicationService(ports, sessions, claims);
   const sync = createSyncService(ports, sessions);
   const status = createStatusService(ports, sessions);
+  const guardState = createGuardStateService(ports);
   return Object.freeze({
     store,
     clock,
@@ -38,5 +39,6 @@ export function createCoordinationService({ store, clock, ids, policies = {} }) 
     ...communication,
     ...sync,
     ...status,
+    guardState,
   });
 }

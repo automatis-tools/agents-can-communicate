@@ -194,10 +194,23 @@ export async function openFilesystemStore({ root, clock, ids, workspaceId, failA
     return { cursor: events.at(-1)?.sequence ?? after, events };
   }
 
-  async function snapshot(workspace) {
-    const of = async kind => (await listState(paths, root, kind))
-      .map(envelope => envelope.record)
-      .filter(record => record.workspaceId === workspace);
+  /**
+   * Read the durable state, or the part of it a caller actually needs.
+   *
+   * Every kind is read by default, which is what most callers want and what
+   * this always did. `kinds` exists because one caller runs in front of every
+   * file an agent writes: reading the whole store there made the write guard
+   * cost grow with the number of messages the workspace had ever carried, and
+   * the hook budget is five seconds after which it allows the write.
+   */
+  async function snapshot(workspace, { kinds } = {}) {
+    const wanted = kinds === undefined ? null : new Set(kinds);
+    const of = async kind => {
+      if (wanted !== null && !wanted.has(kind)) return [];
+      return (await listState(paths, root, kind))
+        .map(envelope => envelope.record)
+        .filter(record => record.workspaceId === workspace);
+    };
     return {
       workspace: (await of("workspace"))[0] ?? null,
       participants: await of("participant"),
