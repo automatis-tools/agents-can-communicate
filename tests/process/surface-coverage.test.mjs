@@ -4,7 +4,8 @@ import path from "node:path";
 import test from "node:test";
 
 import { COMMANDS } from "@agents-can-communicate/cli";
-import { createCoordinationService } from "@agents-can-communicate/core";
+import { ATTENTION_PRIORITY, createCoordinationService }
+  from "@agents-can-communicate/core";
 import { PUBLIC_TOOLS } from "../../packages/mcp-server/src/tools.mjs";
 
 import { createFakeClock, createFakeIds, createMemoryStore } from "../helpers/memory-store.mjs";
@@ -109,6 +110,34 @@ test("an operation an agent needs is offered over MCP as well", async () => {
       createTask: "acc_task", createWorkstream: "acc_workstream",
       finishSession: "acc_finish" }[operation];
     assert.equal(names.has(expected), true, `${operation} has no MCP tool`);
+  }
+});
+
+test("every attention rule is documented, and the documentation invents none", async () => {
+  // `request_stalled` was added, shipped, and never written down: the protocol
+  // reference said "four explicit rules" and named four while the code computed
+  // five. A rule an agent is never told about is one it cannot be expected to
+  // act on, and the skills are generated from the same vocabulary.
+  const architecture = await readFile(path.join(repo, "docs", "ARCHITECTURE.md"), "utf8");
+  const protocol = await readFile(path.join(repo, "docs", "PROTOCOL.md"), "utf8");
+  const kinds = Object.keys(ATTENTION_PRIORITY);
+
+  for (const kind of kinds) {
+    assert.match(architecture, new RegExp(`\\\`${kind}\\\``),
+      `${kind} has no row in the architecture table`);
+    assert.match(protocol, new RegExp(`\\\`${kind}\\\``),
+      `${kind} is not named in the protocol reference`);
+  }
+  // The count in the prose is the part that goes stale silently.
+  const counted = ["zero", "one", "two", "three", "four", "five", "six", "seven"][kinds.length];
+  assert.match(protocol, new RegExp(`${counted} explicit\\s+rules`),
+    `the protocol reference does not say there are ${counted} rules`);
+
+  // Only the priority table: the document has other tables, and one of them has
+  // a row called `protocol`.
+  for (const [, named] of architecture.matchAll(/^\| \d+ \| `([a-z_]+)` \|/gm)) {
+    assert.equal(kinds.includes(named), true,
+      `the architecture table describes \`${named}\`, which the core does not compute`);
   }
 });
 
