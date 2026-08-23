@@ -7,10 +7,10 @@ release.
 
 | | |
 |---|---|
-| Built from | `7096118` |
+| Built from | `add6d30` |
 | Tarball | `agents-can-communicate-0.0.0.tgz`, 109 KB, 103 entries |
-| sha256 | `715ec12757f05f8e564bd779e9b14523f302bf749b70d3cdeffba3fee59dce8e` |
-| Tests | 705 passing, 0 failing |
+| sha256 | `efa2083a53ea9db5f1436c887f533fa73db6798e64d6be15bcd6a051a8803c24` |
+| Tests | 710 passing, 0 failing |
 | Node | 24 (current production LTS) |
 | Verified on | macOS 15 (darwin 25.5.0, arm64) and Linux in CI |
 | Not supported | Windows — see below |
@@ -120,6 +120,12 @@ Full matrix and what the `yes` values do **not** promise:
   and `O_NOFOLLOW` does not refuse a symlinked config the way it does on POSIX —
   so the symlink defence does not hold. macOS and Linux are supported; Windows
   is future work.
+- **Writing does not scale the way reading now does.** Every write opens a
+  transaction that reads the whole store, so the cost of `acc message` or
+  `acc task` grows with everything the workspace already holds: 400 messages
+  written one after another took 163 seconds, the last of them about 0.5s each.
+  The write guard no longer works this way and the write path still does. Fine
+  for a project's worth of coordination, not for an archive; nothing prunes yet.
 - **Client capabilities were certified on macOS only.** Linux runs the suite in
   CI, but no adapter was exercised against a real client there.
 
