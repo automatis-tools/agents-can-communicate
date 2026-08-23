@@ -49,6 +49,27 @@ One call records the work and tells them why. `--to` is a participant from the r
 `acc status --json` lists who is here. They are told at their next turn and may take it,
 leave it, or reply. It is a request, not an order.
 
+## Reading your turn
+
+Every attention line carries the id of the thing it is about, and that id is the argument
+to the command that answers it:
+
+```text
+- [direct_request] message_x    someone addressed this to you    -> ack
+- [task_unblocked] task_x       work is waiting for you          -> task --take
+- [claim_conflict] claim_x      someone holds what you want      -> ask, or release
+- [request_stalled] task_x      you asked and nobody is on it    -> ask again, or take it back
+```
+
+A turn is written to a byte budget, so it can end with
+
+```text
+- +2 not shown, over budget; read them with `acc sync --scope full --json`
+```
+
+Run that. Two things were addressed to you and the turn had no room for them; they are
+not gone, and nobody will repeat them.
+
 ## Work someone asked of you
 
 A turn that opens with `[task_unblocked] task_x ...` means work is addressed to you and
