@@ -14,7 +14,18 @@ export function createMemoryStore({ clock, ids, workspaceId }) {
   let events = [];
   let nextSequence = 1;
 
-  async function transaction(callback) {
+  // `kinds` is enforced here exactly as the filesystem store enforces it. A
+  // double that waves the declaration through lets a transaction reach for
+  // something it never read, pass every test, and find nothing in production.
+  async function transaction(callback, { kinds } = {}) {
+    const wanted = kinds === undefined ? null : new Set(kinds);
+    const declared = kind => {
+      if (wanted !== null && !wanted.has(kind)) {
+        throw new AccError(EXIT.DATA,
+          `this transaction did not declare ${kind}, so it was never read`,
+          { kind, declared: [...wanted] });
+      }
+    };
     // Staged copies, swapped in only on success. A failed callback must leave
     // neither a record nor an event behind.
     const staged = new Map(committed);
@@ -23,17 +34,21 @@ export function createMemoryStore({ clock, ids, workspaceId }) {
 
     const tx = Object.freeze({
       get(kind, id) {
+        declared(kind);
         return staged.get(key(kind, id))?.record ?? null;
       },
       generationOf(kind, id) {
+        declared(kind);
         return staged.get(key(kind, id))?.generation ?? null;
       },
       list(kind, predicate = () => true) {
+        declared(kind);
         return [...staged.values()]
           .filter(entry => entry.kind === kind && predicate(entry.record))
           .map(entry => entry.record);
       },
       put(kind, id, record, expectedGeneration = null) {
+        declared(kind);
         const actual = staged.get(key(kind, id))?.generation ?? null;
         if (actual !== expectedGeneration) {
           throw new AccError(EXIT.CONFLICT, `${kind} ${id} changed under this transaction`,
@@ -45,6 +60,7 @@ export function createMemoryStore({ clock, ids, workspaceId }) {
         return generation;
       },
       remove(kind, id, expectedGeneration = null) {
+        declared(kind);
         const actual = staged.get(key(kind, id))?.generation ?? null;
         if (actual !== expectedGeneration) {
           throw new AccError(EXIT.CONFLICT, `${kind} ${id} changed under this transaction`,
