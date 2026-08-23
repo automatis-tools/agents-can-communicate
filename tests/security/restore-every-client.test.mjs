@@ -111,3 +111,35 @@ for (const adapterId of ["codex", "claude_code", "gemini_cli", "kimi"]) {
       `${adapterId} writes something different the second time: ${differing.join(", ")}`);
   });
 }
+
+/**
+ * The style is read from the file, so every style a file can be in has to
+ * survive being read and written back. Counting the indent characters instead
+ * of keeping them turned one tab into one space and reformatted every line of a
+ * file this exists to leave alone.
+ */
+test("a foreign file keeps its own formatting, whatever that is", async t => {
+  const { formatJsonAs, jsonStyleOf } = await import("@agents-can-communicate/adapter-sdk");
+  const shapes = {
+    "tab indented": "{\n\t\"a\": 1\n}",
+    "two spaces": "{\n  \"a\": 1\n}",
+    "four spaces, trailing newline": "{\n    \"a\": 1\n}\n",
+    "all on one line": "{\"a\":1}",
+    "one line, trailing newline": "{\"a\":1}\n",
+    "empty": "{}",
+  };
+
+  for (const [label, text] of Object.entries(shapes)) {
+    const written = formatJsonAs(JSON.parse(text), jsonStyleOf(text));
+    assert.equal(written, text, `${label} came back as ${JSON.stringify(written)}`);
+  }
+  assert.equal(t.name.length > 0, true);
+});
+
+test("a file ACC creates gets the conventional shape", async () => {
+  const { formatJsonAs, jsonStyleOf } = await import("@agents-can-communicate/adapter-sdk");
+
+  // No file, no style to preserve. Two spaces and a trailing newline is what
+  // everything else in this repository writes.
+  assert.equal(formatJsonAs({ a: 1 }, jsonStyleOf(null)), '{\n  "a": 1\n}\n');
+});

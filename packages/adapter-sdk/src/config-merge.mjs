@@ -120,9 +120,19 @@ export function ownedEntries(existing, { entryOwner = ENTRY_MARKER } = {}) {
  */
 export function jsonStyleOf(text) {
   if (typeof text !== "string") return { indent: 2, trailingNewline: true };
-  const indented = /\n(\s+)\S/.exec(text);
+  // The whitespace itself, not a count of it. `JSON.stringify` takes a string
+  // for its indent, so a tab-indented file stays tab-indented; measuring the
+  // length instead turned one tab into one space and reformatted every line of
+  // a file this exists to leave alone. Matched without `\s`, which would span
+  // the blank line before an indented one and report its own newline as indent.
+  const indented = /\n([ \t]+)\S/.exec(text);
+  // A file written on one line was written that way on purpose, and expanding it
+  // is the same unasked-for rewrite as changing its indent.
+  const oneLine = !text.trimEnd().includes("\n");
+  // Ten is what `JSON.stringify` itself honours; more is silently truncated,
+  // and truncating here keeps what is written equal to what was measured.
   return {
-    indent: indented === null ? 2 : indented[1].replace(/\n/g, "").length,
+    indent: oneLine ? 0 : (indented === null ? 2 : indented[1].slice(0, 10)),
     trailingNewline: text.endsWith("\n"),
   };
 }
@@ -144,7 +154,9 @@ export async function writeForeignJson(file, value, { readFile, writeFile, mkdir
 }
 
 export function formatJsonAs(value, style) {
-  const indent = Number.isInteger(style?.indent) && style.indent > 0 ? style.indent : 2;
+  const measured = style?.indent;
+  const indent = typeof measured === "string" && measured !== "" ? measured
+    : (Number.isInteger(measured) && measured >= 0 ? measured : 2);
   const text = JSON.stringify(value, null, indent);
   return style?.trailingNewline === false ? text : `${text}\n`;
 }
