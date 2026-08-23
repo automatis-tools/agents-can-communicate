@@ -201,9 +201,10 @@ A handoff contains:
 
 ## Sync and attention
 
-Adapters request deltas since a cursor. Core computes attention items from four explicit
-rules — `direct_request`, `claim_conflict`, `task_unblocked`, `coordinator_missing` — listed
-with their exact trigger in [ARCHITECTURE.md](ARCHITECTURE.md).
+Adapters request deltas since a cursor. Core computes attention items from five explicit
+rules — `direct_request`, `claim_conflict`, `task_unblocked`, `coordinator_missing`,
+`request_stalled` — listed with their exact trigger in
+[ARCHITECTURE.md](ARCHITECTURE.md).
 
 Semantic relevance may be assessed by the receiving model, but correctness cannot depend on a hidden central LLM classifier.
 
