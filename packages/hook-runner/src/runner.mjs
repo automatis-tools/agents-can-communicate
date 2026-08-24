@@ -26,6 +26,20 @@ const DEFAULT_BUDGET_MS = 5_000;
 const CADENCE_MS = 60_000;
 const REFRESH_AFTER_MS = CADENCE_MS / 2;
 
+/**
+ * Whether the write guard should spend a write saying this session is alive.
+ *
+ * A value that is not a timestamp means nothing is known about its last sign of
+ * life, so it gets one. Said outright rather than left to `Date.parse`: the
+ * previous form leaned on `Date.parse(0)` coercing to the string "0" and landing
+ * in the year 2000, which gives the right answer and reads like an accident,
+ * because it is one.
+ */
+export function needsRefresh(heartbeatAt, now) {
+  const last = Date.parse(heartbeatAt ?? "");
+  return !Number.isFinite(last) || now - last > REFRESH_AFTER_MS;
+}
+
 const defaultRuntime = () => ({
   clock: { now: () => new Date().toISOString() },
   ids: { next: kind => createId(kind, randomBytes) },
@@ -278,8 +292,7 @@ const HANDLERS = {
     // so guarding a write stays a read in the ordinary case.
     const mine = status.participants
       .find(participant => participant.sessionId === binding.accSessionId);
-    if (mine !== undefined && Date.now()
-      - Date.parse(mine.heartbeatAt ?? 0) > REFRESH_AFTER_MS) {
+    if (mine !== undefined && needsRefresh(mine.heartbeatAt, Date.now())) {
       await context.service.heartbeatSession({ sessionId: binding.accSessionId,
         generation: binding.generation }).catch(() => null);
     }
