@@ -7,10 +7,10 @@ release.
 
 | | |
 |---|---|
-| Built from | `beadee3` |
+| Built from | `d0b1afc` |
 | Tarball | `agents-can-communicate-0.0.0.tgz`, 109 KB, 103 entries |
-| sha256 | `7d487399ced19f37ddbec932d9997dae5a4997a097b1f350b6eeb869856a2cf9` |
-| Tests | 772 passing, 0 failing |
+| sha256 | `4746b75ae70c63f35f74e2926e7faedaec4a47404573346f5539c02273a6632d` |
+| Tests | 778 passing, 0 failing |
 | Node | 24 (current production LTS) |
 | Verified on | macOS 15 (darwin 25.5.0, arm64) and Linux in CI |
 | Not supported | Windows — see below |
@@ -62,6 +62,11 @@ fact: you asked, and there is nobody there.
 Every line of an injected turn can be acted on. An attention line carries the id
 of the thing it is about — the same id the command that answers it takes — and a
 turn the byte budget truncated says how to read what it withheld.
+
+A decision can be recorded. The protocol has described the object from the start
+and nothing could make one; the rule that an agent cannot record a human decision
+by itself is now reachable rather than only implemented. Every core operation has
+a surface — the register of "tracked, not forgotten" is empty.
 
 An open workstream can be taken on. Creating one used to put
 `coordinator_missing` in every turn from then on with no way to answer it: the
