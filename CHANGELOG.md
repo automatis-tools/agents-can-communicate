@@ -7,10 +7,10 @@ release.
 
 | | |
 |---|---|
-| Built from | `9e10333` |
+| Built from | `b6d2cb1` |
 | Tarball | `agents-can-communicate-0.0.0.tgz`, 109 KB, 103 entries |
-| sha256 | `e0ab2514697f1f11d277ad00720315e2d6142369dfd228a3f5f9aec61d06d63e` |
-| Tests | 749 passing, 0 failing |
+| sha256 | `8e079d309cf33eda4947ef09cbfe3a216c6a3581d1ca57f5c267af7743c9d5b6` |
+| Tests | 756 passing, 0 failing |
 | Node | 24 (current production LTS) |
 | Verified on | macOS 15 (darwin 25.5.0, arm64) and Linux in CI |
 | Not supported | Windows — see below |
@@ -62,6 +62,15 @@ fact: you asked, and there is nobody there.
 Every line of an injected turn can be acted on. An attention line carries the id
 of the thing it is about — the same id the command that answers it takes — and a
 turn the byte budget truncated says how to read what it withheld.
+
+Agents that start at the same time in a workspace none of them has opened all get
+in. Three of four used to fail: the identity document each writes first carries
+the moment it was written, and materialisation asked whether it was needed before
+taking the lock that would have answered.
+
+An MCP client is handed its messages by `acc_sync`, body and all, and its receipts
+move — it had only ever seen a subject line, and the sender was told its message
+was undelivered by an agent that had answered it.
 
 A peer's message reaches the recipient's turn as a fenced, attributed, escaped
 block, and its receipt advances to `injected` only for what the turn actually
