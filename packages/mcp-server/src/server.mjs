@@ -154,6 +154,12 @@ async function callTool(name, args, context) {
       return service.markDelivery({ ...owner, messageId: args.messageId,
         state: args.state ?? "acknowledged" });
     case "acc_workstream":
+      if (args.action === "coordinate") {
+        return service.acquireCoordinator({ ...owner, workstreamId: args.workstreamId });
+      }
+      if (args.action === "release") {
+        return service.releaseCoordinator({ ...owner, workstreamId: args.workstreamId });
+      }
       return service.createWorkstream({ ...owner, title: args.title,
         objective: args.objective });
     case "acc_finish":
