@@ -121,7 +121,12 @@ Every operation is in the [CLI reference](docs/CLI.md) if you want to drive it y
 - `protection guarded` applies while every session present is one ACC can stop. One that
   cannot changes it to `advisory`.
 - Codex requires you to trust the plugin before its hooks run. `acc doctor` reports this.
-- Windows fails 86 of 587 tests. macOS and Linux are supported.
+- Nothing is pruned yet. A workspace that has carried thousands of messages makes each turn
+  slower to build; a project's worth of coordination is fine, an archive is not.
+- Windows does not work: the store fsyncs a directory after a rename, which Windows
+  refuses, and `O_NOFOLLOW` does not hold there. Last measured at 86 failures out of 587
+  tests; the suite has grown a good deal since and nobody has run it there again. macOS and
+  Linux are supported and both run in CI.
 
 ## How it works
 
@@ -134,11 +139,21 @@ graph LR
   H --> C
 ```
 
-Clients call out at three moments: a session starts, a tool is about to run, a turn begins.
-ACC answers at those and is idle otherwise. A hook that does not answer within five seconds
-lets the tool run.
+Clients call out when a session starts and ends, when a turn begins, and before a tool
+runs — plus a heartbeat, on the one client that sends them. ACC answers at those and is
+idle otherwise. A hook that does not answer within five seconds lets the tool run, so ACC
+can be slow or broken without stopping anyone's work.
 
-State lives beside your other tool settings, never inside the repository.
+State lives beside your other tool settings, never inside the repository:
+
+```text
+~/Library/Application Support/acc     macOS
+~/.local/share/acc                    Linux
+```
+
+Inside it, one directory per workspace — keyed by the repository rather than the folder, so
+every worktree of it is one workspace and two unrelated projects share nothing. Deleting a
+workspace directory loses that project's coordination history and nothing else.
 
 ## Documentation
 
