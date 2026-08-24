@@ -2,6 +2,7 @@ import { AccError, EXIT, SCHEMA_VERSION, createId, transitionTask as stepTask, v
   from "@agents-can-communicate/protocol";
 
 import { ensureMaterialised } from "./materialisation.mjs";
+import { assertKnownParticipants } from "./participants.mjs";
 import { classifySessionPresence } from "./sessions.mjs";
 import { closeRequestReceipt, writeWorkResponse } from "./notify.mjs";
 
@@ -90,6 +91,13 @@ export function createTaskService(ports, workstreams) {
     const workspaceId = session.workspaceId;
     await ensureMaterialised(ports, { workspaceId, descriptor: input.descriptor,
       reason: "durable_object" });
+    // The same rule as addressing a message. `acc task --assignee physcis` was
+    // accepted and left work `pending` for a participant nobody has ever been:
+    // invisible to every roster, raising `task_unblocked` for nobody, and not
+    // even stalled, since nothing was waiting on it that could be told.
+    if (input.assigneeParticipantId != null) {
+      await assertKnownParticipants(store, workspaceId, [input.assigneeParticipantId]);
+    }
     const now = clock.now();
     let record = null;
     await store.transaction(async tx => {
