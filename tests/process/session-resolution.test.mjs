@@ -164,7 +164,10 @@ const AGENT_FACING = Object.freeze([
 // Setup and lifecycle: a model should not be running the installer, and these
 // three are the adapter's own calls, which pass their identity explicitly.
 const NOT_AGENT_FACING = Object.freeze(["install", "uninstall", "doctor", "config",
-  "attach", "heartbeat", "detach"]);
+  "attach", "heartbeat", "detach",
+  // These answer about the program itself, so they need no session and must
+  // work in a directory that is no workspace.
+  "help", "version"]);
 
 test("the list above is every command an agent can run", async () => {
   // Remembered lists rot. `acc decide` was added, needed an identity like the

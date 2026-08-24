@@ -71,7 +71,10 @@ test("the taught set stays honest about what the CLI offers", async () => {
   // added to the CLI has to be classified here on purpose, which is the moment
   // to notice it also needs teaching.
   const known = new Set([...TAUGHT, ...OPTIONAL,
-    "install", "uninstall", "doctor", "config", "attach", "heartbeat", "detach"]);
+    "install", "uninstall", "doctor", "config", "attach", "heartbeat", "detach",
+    // Describe the program rather than the workspace: nothing to teach an agent,
+    // which already receives the command list in its skill.
+    "help", "version"]);
   const unclassified = Object.keys(COMMANDS).filter(command => !known.has(command));
 
   assert.deepEqual(unclassified, [],

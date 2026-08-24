@@ -8,6 +8,7 @@ import { parseArgs, positiveNumber } from "./args.mjs";
 // A usage error names what is missing rather than failing deeper in a service
 // with the argument already half-applied.
 const usage = message => new AccError(EXIT.USAGE, message);
+import { describeCommands, helpText } from "./help.mjs";
 import { runConfigCommand } from "./config-command.mjs";
 import { runInstallCommand } from "./install-command.mjs";
 import { runDoctor } from "./doctor-command.mjs";
@@ -273,11 +274,28 @@ const HANDLERS = Object.freeze({
     runInstallCommand({ options, runtime, action: "uninstall" }),
 
   doctor: async ({ options, context, runtime }) => runDoctor({ options, context, runtime }),
+
+  help: async () => ({ data: { commands: describeCommands() }, text: helpText() }),
+
+  version: async ({ runtime }) => {
+    // Read by the composition root from the package manifest: `bin/` sits at
+    // the same depth in the published package as it does in this tree, which is
+    // not true of anything under `packages/`. A version typed into the source
+    // would be one more place the next bump has to reach, and the kind that
+    // goes stale without failing.
+    if (typeof runtime.version !== "function") {
+      throw new AccError(EXIT.DATA, "this build was assembled without a version to report");
+    }
+    const version = await runtime.version();
+    return { data: { version }, text: version };
+  },
 });
 
 /**
  * @returns {Promise<number>} the process exit code
  */
+const NO_WORKSPACE = Object.freeze(["config", "install", "uninstall", "help", "version"]);
+
 export async function main(argv, runtime) {
   const write = (stream, text) => new Promise((resolve, reject) =>
     stream.write(text, error => (error ? reject(error) : resolve())));
@@ -288,10 +306,11 @@ export async function main(argv, runtime) {
     // open. Discovery validates the config too, so a broken one would fail
     // there first and `acc config validate` - the command a user runs to find
     // out what is wrong - would never reach its own report.
-    // These three work on a machine, not a workspace. `config` must run even
-    // when discovery cannot open the workspace - that is what a user is trying
-    // to find out - and install touches client configuration, not ACC state.
-    const context = ["config", "install", "uninstall"].includes(parsed.command)
+    // These work on a machine, not a workspace. `config` must run even when
+    // discovery cannot open the workspace - that is what a user is trying to
+    // find out - install touches client configuration rather than ACC state,
+    // and `help` has to answer in a directory that is no workspace at all.
+    const context = NO_WORKSPACE.includes(parsed.command)
       ? null
       : await openContext(parsed.options, runtime);
     // Which session is calling is answered once, here, rather than by each
