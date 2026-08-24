@@ -20,7 +20,7 @@ import { AccError, EXIT } from "@agents-can-communicate/protocol";
  * answers that from something the caller demonstrably has.
  */
 const NEEDS_OWNER = Object.freeze(new Set(["work", "claim", "release", "message",
-  "request", "ack", "workstream", "task", "finish"]));
+  "request", "ack", "workstream", "task", "finish", "decide"]));
 
 /**
  * Reads that are answers about *you*.

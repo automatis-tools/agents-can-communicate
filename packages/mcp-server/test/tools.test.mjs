@@ -10,8 +10,8 @@ test("the model-facing surface is exactly this list", () => {
   // reachable by adapters and stay out of here. Named rather than counted, so
   // a tool swapped for another still trips this.
   assert.deepEqual(names.sort(),
-    ["acc_ack", "acc_claim", "acc_finish", "acc_message", "acc_request", "acc_sync",
-      "acc_task", "acc_work", "acc_workstream"]);
+    ["acc_ack", "acc_claim", "acc_decide", "acc_finish", "acc_message", "acc_request",
+      "acc_sync", "acc_task", "acc_work", "acc_workstream"]);
 });
 
 test("every tool declares a strict 2020-12 input schema", () => {

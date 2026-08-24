@@ -42,6 +42,7 @@ graph LR
 | `acc request` | Ask another agent to do something. One call: the work plus why |
 | `acc task` | Create work, `--take` it, or `--state` it along |
 | `acc workstream` | Group related work. Optional. `--take` / `--release` steer one |
+| `acc decide` | Record what was settled, so the next session does not reopen it |
 | `acc finish` | Write the handoff and release claims |
 
 ## Adapters only
@@ -92,6 +93,24 @@ acc status --all
 
 That is how a cleanup asks: each entry carries `checkoutRoot`, `branch` and `presence`, so
 a worktree with no live session behind it can be told apart from someone's desk.
+
+## Recording what was settled
+
+A decision outlives the conversation that produced it, which is why it is a durable object
+rather than another message in the log.
+
+```bash
+acc decide --title "hull clamps at half height" \
+  --outcome "settle() clamps to GROUND_Y + height/2; renderer draws what physics returns"
+```
+
+`--authority` is who settled it: `workstream` (the default) for an agreement between
+agents, `policy` for a rule that already existed, and `human` only when a person actually
+said so — which needs `--human` as well. A peer proposal cannot become a human-authority
+decision on its own; that is the one way this record could launder an agent's opinion into
+a ruling.
+
+`--supersedes` points at the decision this replaces, and the one it names has to exist.
 
 ## Asking another agent
 
