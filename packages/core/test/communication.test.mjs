@@ -24,6 +24,10 @@ async function pair(service) {
   const first = await service.openSession(opening());
   const second = await service.openSession(opening({ participantId: "participant_b",
     displayName: "models" }));
+  // A third, because several of these address two recipients and a message may
+  // only name a participant this workspace has seen.
+  await service.openSession(opening({ participantId: "participant_c",
+    displayName: "physics" }));
   return { first, second };
 }
 
