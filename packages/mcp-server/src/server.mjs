@@ -153,6 +153,11 @@ async function callTool(name, args, context) {
     case "acc_ack":
       return service.markDelivery({ ...owner, messageId: args.messageId,
         state: args.state ?? "acknowledged" });
+    case "acc_decide":
+      return service.recordDecision({ ...owner, title: args.title, outcome: args.outcome,
+        authority: args.authority ?? "workstream", workstreamId: args.workstreamId ?? null,
+        decidedBy: args.decidedBy, supersedes: args.supersedes ?? null,
+        humanConfirmed: args.humanConfirmed === true });
     case "acc_workstream":
       if (args.action === "coordinate") {
         return service.acquireCoordinator({ ...owner, workstreamId: args.workstreamId });
