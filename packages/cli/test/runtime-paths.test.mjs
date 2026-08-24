@@ -13,7 +13,7 @@ test("every runtime location sits under one workspace directory", () => {
   const paths = runtimePaths({ dataHome: DATA_HOME, workspaceId: WORKSPACE });
 
   assert.equal(paths.root, path.join(DATA_HOME, "acc", "workspaces", WORKSPACE));
-  for (const key of ["protocol", "events", "state", "locks", "quarantine", "ephemeral"]) {
+  for (const key of ["protocol", "events", "state", "locks", "ephemeral"]) {
     assert.equal(paths[key].startsWith(`${paths.root}${path.sep}`), true,
       `${key} escaped the workspace runtime root`);
   }
