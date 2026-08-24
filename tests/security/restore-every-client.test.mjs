@@ -113,6 +113,45 @@ for (const adapterId of ["codex", "claude_code", "gemini_cli", "kimi"]) {
 }
 
 /**
+ * A home that had none of these files to begin with.
+ *
+ * The fixture above seeds every config, so the branch where ACC *creates* one
+ * was never taken. In a home that starts empty, install and uninstall left four
+ * files behind - two of them empty, one a marketplace manifest naming ACC's own
+ * marketplace. Two registries had already been fixed for exactly this; the
+ * instance was fixed and the shape was not, so this checks both fixtures.
+ */
+test("a home that had nothing is left with nothing", async t => {
+  const home = await realpath(await mkdtemp(path.join(tmpdir(), "acc-empty-")));
+  t.after(() => rm(home, { recursive: true, force: true }));
+
+  for (const adapter of ALL_ADAPTERS()) {
+    await adapter.install(clientContext(home));
+    await adapter.uninstall(clientContext(home));
+  }
+
+  const left = [...(await fingerprint(home)).keys()].sort();
+  assert.deepEqual(left, [],
+    `an install and its removal left files in a home that had none: ${left.join(", ")}`);
+});
+
+test("a file with anything of the user's in it is not removed as empty", async t => {
+  const { blankJson, blankText } = await import("@agents-can-communicate/adapter-sdk");
+
+  // The rule is "nothing left", not "nothing ACC recognises". A key the user
+  // added, a value in a container, a line of TOML - any of them means the file
+  // is theirs and stays.
+  assert.equal(blankText("   \n "), true);
+  assert.equal(blankText('model = "o3"\n'), false);
+  assert.equal(blankJson()("{}"), true);
+  assert.equal(blankJson()('{ "enabledPlugins": {} }'), true);
+  assert.equal(blankJson()('{ "enabledPlugins": { "theirs": true } }'), false);
+  assert.equal(blankJson()('{ "theme": "Dracula" }'), false);
+  assert.equal(blankJson(["name"])('{ "name": "acc-local", "plugins": [] }'), true);
+  assert.equal(blankJson(["name"])('{ "name": "acc-local", "plugins": [{ "x": 1 }] }'), false);
+});
+
+/**
  * The style is read from the file, so every style a file can be in has to
  * survive being read and written back. Counting the indent characters instead
  * of keeping them turned one tab into one space and reformatted every line of a

@@ -4,7 +4,9 @@ import path from "node:path";
 import { AccError, EXIT } from "@agents-can-communicate/protocol";
 import { fileURLToPath } from "node:url";
 
-import { bakeSkillCommand, mergeOwnedEntries, ownedEntries, removeInstalledTree,
+import { acccreatedFile, bakeSkillCommand, blankJson, mergeOwnedEntries, ownedEntries,
+  removeIfEmpty,
+  removeInstalledTree,
   removeOwnedEntries, writeForeignJson, writeHookShim }
   from "@agents-can-communicate/adapter-sdk";
 
@@ -154,7 +156,7 @@ export async function installClaudePlugin({ configDir, runner, node, now = new D
   // behind, no ownership recorded, and an uninstall that hit the same file and
   // refused. What the user had to do about it was delete a directory by hand
   // that nothing had told them the name of.
-  const settings = await readJson(settingsPath(configDir), {});
+  const settings = await readJson(settingsPath(configDir), null);
   const known = await readJson(knownMarketplacesPath(configDir), {});
   const installed = await readJson(installedPluginsPath(configDir),
     { version: 2, plugins: {} });
@@ -197,15 +199,16 @@ export async function installClaudePlugin({ configDir, runner, node, now = new D
 
   const file = settingsPath(configDir);
   const existing = settings;
+  const createdFile = settings === null;
   // Entry-level ownership: `enabledPlugins` holds every plugin the user has, so
   // taking the whole key would destroy them and handing it back on uninstall
   // would destroy them again.
-  await writeSettings(file, mergeOwnedEntries(existing, {
+  await writeSettings(file, mergeOwnedEntries(existing ?? {}, {
     extraKnownMarketplaces: {
       [MARKETPLACE]: { source: { source: "directory", path: marketplaceDir(configDir) } },
     },
     enabledPlugins: { [QUALIFIED]: true },
-  }));
+  }, { createdFile }));
 
   return { ok: true,
     changes: [source, cached, marketplaceFile(configDir),
@@ -236,6 +239,11 @@ export async function uninstallClaudePlugin({ configDir, keep = [] }) {
       Object.keys(rest).length);
     changes.push(QUALIFIED);
   }
+
+  // Only if ACC made it. A settings file holding `{}` looks the same whether
+  // ACC created it or the user did, which is why the install recorded it.
+  await removeIfEmpty(settingsPath(configDir),
+    { readFile, rm, isEmpty: blankJson(), created: acccreatedFile(settings) });
 
   await removeInstalledTree(cacheRoot(configDir), keep);
   await removeInstalledTree(sourceDir(configDir), keep);
