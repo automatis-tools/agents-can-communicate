@@ -7,9 +7,9 @@ release.
 
 | | |
 |---|---|
-| Built from | `b5750dc` |
+| Built from | `2359027` |
 | Tarball | `agents-can-communicate-0.0.0.tgz`, 109 KB, 103 entries |
-| sha256 | `8cf52b89586a403374a8ff14d675a7ffebaede4d0687bfc2118ee9ba3ccd717a` |
+| sha256 | `626ff0b987d70afc374bd16dd632c9371a46a9d7a5e59dd3000feab2df941d5b` |
 | Tests | 800 passing, 0 failing |
 | Node | 24 (current production LTS) |
 | Verified on | macOS 15 (darwin 25.5.0, arm64) and Linux in CI |
