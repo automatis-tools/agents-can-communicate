@@ -7,10 +7,10 @@ release.
 
 | | |
 |---|---|
-| Built from | `2e4b57b` |
+| Built from | `196898c` |
 | Tarball | `agents-can-communicate-0.0.0.tgz`, 109 KB, 103 entries |
-| sha256 | `6e4c3ae84f15a9f902b06c27c6b8e8e2a668317dc440d1f8bec375a59ad0b6c5` |
-| Tests | 730 passing, 0 failing |
+| sha256 | `a27db53d03b6a067e86bfcc66339cbb41edbc5a3ac13290a8a7316e8dced6a19` |
+| Tests | 735 passing, 0 failing |
 | Node | 24 (current production LTS) |
 | Verified on | macOS 15 (darwin 25.5.0, arm64) and Linux in CI |
 | Not supported | Windows — see below |
@@ -34,6 +34,10 @@ when the working tree is dirty.
 
 Coordinates independent agent sessions in one workspace: presence, intent,
 workspace-global claims, typed messages, handoffs. No session is in charge.
+
+`acc doctor` works on a store nobody can read, which is the only store worth
+running it on. One truncated record used to make it answer "invalid JSON record"
+and name nothing, while the diagnosis it had already built was thrown away.
 
 A hook killed by its client no longer takes the workspace down with it. Every
 client puts a timeout on hooks; one killed mid-write used to leave the writer

@@ -14,7 +14,12 @@ import { withWriterMutex } from "./writer-mutex.mjs";
 
 const SEQUENCE_WIDTH = 16;
 export const ZERO_CURSOR = "0".repeat(SEQUENCE_WIDTH);
-const DIRECTORIES = ["state", "events", "journal", "locks", "quarantine", "ephemeral", "tmp"];
+// No quarantine area. One was created in every workspace, named in the path
+// typedef, and written to by nothing: repair deliberately refuses to move a
+// corrupt record, so nothing ever had a reason to put one aside. An empty
+// directory that reads as a feature is the same mistake as an attention kind
+// with no rule behind it. If quarantining is ever built, it comes back with it.
+const DIRECTORIES = ["state", "events", "journal", "locks", "ephemeral", "tmp"];
 
 const pad = value => String(value).padStart(SEQUENCE_WIDTH, "0");
 
