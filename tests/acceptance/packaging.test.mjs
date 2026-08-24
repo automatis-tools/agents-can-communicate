@@ -5,6 +5,7 @@ import { mkdir, mkdtemp, readFile, readdir, realpath, rm, writeFile }
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
+import { pathToFileURL } from "node:url";
 import { promisify } from "node:util";
 
 const run = promisify(execFile);
@@ -171,6 +172,36 @@ test("the committed lockfile is the one these manifests produce", async t => {
   assert.equal(await readFile(path.join(into, "package-lock.json"), "utf8"),
     await readFile(path.join(repo, "package-lock.json"), "utf8"),
     "`npm install` rewrites the lockfile, so a clone is dirty before anyone edits it");
+});
+
+test("the installed package can find its own hook runner", async t => {
+  const { tarball } = await packed(t);
+  const consumer = await realpath(await mkdtemp(path.join(tmpdir(), "acc-runner-")));
+  t.after(() => rm(consumer, { recursive: true, force: true }));
+  await writeFile(path.join(consumer, "package.json"),
+    '{"name":"consumer","version":"1.0.0","private":true}\n');
+  await runNpm(["install", "--silent", tarball], { cwd: consumer });
+
+  // Every adapter writes a shim that runs this file, and refuses to install
+  // when it is missing. The path was counted out in `../` from the SDK's own
+  // directory, which is one level shallower once the workspaces are bundled -
+  // so `acc install` refused for every client on the machine, from a clean
+  // install of the package, and said so while exiting 0.
+  // Imported by path from inside the package: the workspaces are bundled, so
+  // they are nested under it rather than hoisted where a consumer could name
+  // them - which is the whole layout difference this is about.
+  const sdk = path.join(consumer, "node_modules", "agents-can-communicate",
+    "node_modules", "@agents-can-communicate", "adapter-sdk", "src", "hook-shim.mjs");
+  const { stdout } = await run(process.execPath, ["--input-type=module", "--eval",
+    `import { defaultRunner } from ${JSON.stringify(pathToFileURL(sdk).href)};
+     import { existsSync } from "node:fs";
+     const runner = defaultRunner();
+     console.log(JSON.stringify({ runner, exists: existsSync(runner) }));`],
+  { cwd: consumer });
+
+  const found = JSON.parse(stdout);
+  assert.equal(found.exists, true,
+    `the installed package looks for its hook runner at ${found.runner}`);
 });
 
 test("the manifest declares the binaries and the engine it was certified on", async t => {

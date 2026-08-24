@@ -260,7 +260,12 @@ export async function main(argv, runtime) {
     const options = context === null ? parsed.options
       : await resolveOwner({ command: parsed.command, options: parsed.options,
         context, env: runtime.env });
-    const { data, text } = await HANDLERS[parsed.command]({ options, context, runtime });
+    const { data, text, error: outcome } = await HANDLERS[parsed.command](
+      { options, context, runtime });
+    // A handler may have done real work and still failed: `acc install` writes
+    // for the clients it could and reports the one it could not. The data is
+    // printed either way, and the command still fails.
+    if (outcome != null) throw Object.assign(outcome, { details: { ...outcome.details, ...data } });
     // Machine mode writes exactly one JSON object to stdout and nothing else.
     if (parsed.options.json === true) await write(runtime.stdout, `${JSON.stringify(ok(data))}\n`);
     else if (text !== "") await write(runtime.stdout, `${human(text)}\n`);
