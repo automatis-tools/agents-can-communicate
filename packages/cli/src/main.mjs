@@ -151,8 +151,26 @@ const HANDLERS = Object.freeze({
   },
 
   workstream: async ({ options, context }) => {
-    const workstream = await context.service.createWorkstream({
-      sessionId: options.session, generation: options.generation,
+    const owner = { sessionId: options.session, generation: options.generation };
+    // Taking the coordination of one and creating one are the same noun, so
+    // they stay one command rather than two the model has to choose between -
+    // the same shape `acc task` already has.
+    if (options.take === true || options.release === true) {
+      if (options.workstream === undefined) {
+        throw usage(`workstream --${options.take === true ? "take" : "release"} `
+          + "requires --workstream");
+      }
+      const acted = options.take === true
+        ? await context.service.acquireCoordinator({ ...owner,
+          workstreamId: options.workstream })
+        : await context.service.releaseCoordinator({ ...owner,
+          workstreamId: options.workstream });
+      return { data: acted,
+        text: `${acted.workstreamId} ${options.take === true ? "coordinated" : "released"}` };
+    }
+    if (options.title === undefined) throw usage("workstream requires --title");
+    if (options.objective === undefined) throw usage("workstream requires --objective");
+    const workstream = await context.service.createWorkstream({ ...owner,
       title: options.title, objective: options.objective,
       descriptor: context.descriptor });
     return { data: workstream, text: `${workstream.workstreamId} ${workstream.state}` };

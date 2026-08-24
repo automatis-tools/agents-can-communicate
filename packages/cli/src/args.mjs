@@ -32,7 +32,12 @@ export const COMMANDS = Object.freeze({
   task: { required: [], optional: ["session", "generation", "workstream", "title",
     "detail", "assignee", "state", "task", "reason"],
     repeated: ["depends-on"], flags: ["take", "decline", "force"] },
-  workstream: { required: ["title", "objective"], optional: ["session", "generation"] },
+  // Create one, or take and hand back the coordination of one that exists.
+  // Creating a workstream raised `coordinator_missing` on every turn from then
+  // on, and nothing could answer it: the two core operations that do had no
+  // surface at all.
+  workstream: { required: [], optional: ["session", "generation", "title", "objective",
+    "workstream"], flags: ["take", "release"] },
   // Messages not tied to a task need a way to be answered too. Without one a
   // `requiresAck` message raised an attention item nothing could ever clear.
   ack: { required: ["message"], optional: ["session", "generation", "state"] },
