@@ -7,10 +7,10 @@ release.
 
 | | |
 |---|---|
-| Built from | `ab633b1` |
+| Built from | `beadee3` |
 | Tarball | `agents-can-communicate-0.0.0.tgz`, 109 KB, 103 entries |
-| sha256 | `cf9f25c11957ade145f783f2c429ac13217541abc67c43e15d929e93adb115c3` |
-| Tests | 767 passing, 0 failing |
+| sha256 | `7d487399ced19f37ddbec932d9997dae5a4997a097b1f350b6eeb869856a2cf9` |
+| Tests | 772 passing, 0 failing |
 | Node | 24 (current production LTS) |
 | Verified on | macOS 15 (darwin 25.5.0, arm64) and Linux in CI |
 | Not supported | Windows — see below |
@@ -62,6 +62,10 @@ fact: you asked, and there is nobody there.
 Every line of an injected turn can be acted on. An attention line carries the id
 of the thing it is about — the same id the command that answers it takes — and a
 turn the byte budget truncated says how to read what it withheld.
+
+An open workstream can be taken on. Creating one used to put
+`coordinator_missing` in every turn from then on with no way to answer it: the
+two operations that do had no command and no tool.
 
 A handoff reaches the agent it hands over to. `acc finish --to physics` wrote a
 durable record that nothing in the codebase read: not the successor's turn, not
