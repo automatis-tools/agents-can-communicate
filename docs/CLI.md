@@ -41,7 +41,7 @@ graph LR
 | `acc message` | Send a typed message to participants |
 | `acc request` | Ask another agent to do something. One call: the work plus why |
 | `acc task` | Create work, `--take` it, or `--state` it along |
-| `acc workstream` | Group related work. Optional |
+| `acc workstream` | Group related work. Optional. `--take` / `--release` steer one |
 | `acc finish` | Write the handoff and release claims |
 
 ## Adapters only
@@ -133,3 +133,13 @@ project around it. Create one when several pieces belong together:
 acc workstream \
   --title "Storage" --objective "port the store and its tests"
 ```
+
+An open workstream with nobody steering it raises `coordinator_missing` for everyone, every
+turn, until somebody takes it on. Taking it is saying so; releasing it asks again.
+
+```bash
+acc workstream --workstream workstream_x --take
+acc workstream --workstream workstream_x --release
+```
+
+Only the session holding the lease can hand it back.

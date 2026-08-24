@@ -57,6 +57,7 @@ const BY_CLI = Object.freeze({
   forceReleaseClaim: "release", sendMessage: "message", markDelivery: "ack",
   requestWork: "request", createTask: "task", claimTask: "task",
   transitionTask: "task", declineTask: "task", createWorkstream: "workstream",
+  acquireCoordinator: "workstream", releaseCoordinator: "workstream",
   finishSession: "finish", collectStatus: "status",
 });
 
@@ -67,8 +68,6 @@ const INTERNAL = Object.freeze({
   locateSession: "a lookup the other operations share",
   pendingMessages: "read by the hook runtime when it builds a turn",
   renewClaim: "reached through `acc claim` on a claim this session already holds",
-  acquireCoordinator: "no workstream coordination surface yet - tracked, not forgotten",
-  releaseCoordinator: "same",
   recordDecision: "no decision surface yet - tracked, not forgotten",
   guardState: "the write guard's own read, kept narrow on purpose: `collectStatus` "
     + "answers the same question and reads the whole store, which put the cost of "
@@ -107,10 +106,12 @@ test("an operation an agent needs is offered over MCP as well", async () => {
   // of it, since a model should not be running the installer.
   const names = new Set(PUBLIC_TOOLS.map(tool => tool.name));
   for (const operation of ["sync", "setIntent", "acquireClaim", "sendMessage",
-    "markDelivery", "requestWork", "createTask", "createWorkstream", "finishSession"]) {
+    "markDelivery", "requestWork", "createTask", "createWorkstream", "acquireCoordinator",
+    "releaseCoordinator", "finishSession"]) {
     const expected = { sync: "acc_sync", setIntent: "acc_work", acquireClaim: "acc_claim",
       sendMessage: "acc_message", markDelivery: "acc_ack", requestWork: "acc_request",
       createTask: "acc_task", createWorkstream: "acc_workstream",
+      acquireCoordinator: "acc_workstream", releaseCoordinator: "acc_workstream",
       finishSession: "acc_finish" }[operation];
     assert.equal(names.has(expected), true, `${operation} has no MCP tool`);
   }

@@ -108,12 +108,17 @@ export const PUBLIC_TOOLS = Object.freeze([
   },
   {
     name: "acc_workstream",
-    description: `Group related work so several agents can see it as one thing. Optional: `
-      + `a single request needs no workstream. ${POLLED}`,
+    description: `Group related work so several agents can see it as one thing, or take `
+      + `on steering one that exists. Optional: a single request needs no workstream. `
+      + `An open workstream with no coordinator is reported to everyone until somebody `
+      + `takes it. ${POLLED}`,
     inputSchema: object({
-      title: string("Short name."),
-      objective: string("What finishing it would mean."),
-    }, ["title", "objective"]),
+      action: { type: "string", enum: ["create", "coordinate", "release"],
+        description: "Default: create." },
+      title: string("Short name. Creating one."),
+      objective: string("What finishing it would mean. Creating one."),
+      workstreamId: string("The workstream to coordinate or hand back."),
+    }, []),
   },
   {
     name: "acc_task",
