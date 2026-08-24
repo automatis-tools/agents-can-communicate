@@ -58,7 +58,7 @@ const BY_CLI = Object.freeze({
   requestWork: "request", createTask: "task", claimTask: "task",
   transitionTask: "task", declineTask: "task", createWorkstream: "workstream",
   acquireCoordinator: "workstream", releaseCoordinator: "workstream",
-  finishSession: "finish", collectStatus: "status",
+  finishSession: "finish", collectStatus: "status", recordDecision: "decide",
 });
 
 // Deliberately internal, each for a stated reason rather than by omission.
@@ -68,7 +68,6 @@ const INTERNAL = Object.freeze({
   locateSession: "a lookup the other operations share",
   pendingMessages: "read by the hook runtime when it builds a turn",
   renewClaim: "reached through `acc claim` on a claim this session already holds",
-  recordDecision: "no decision surface yet - tracked, not forgotten",
   guardState: "the write guard's own read, kept narrow on purpose: `collectStatus` "
     + "answers the same question and reads the whole store, which put the cost of "
     + "guarding one write in proportion to every message the workspace had carried",

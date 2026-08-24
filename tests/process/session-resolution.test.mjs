@@ -6,6 +6,8 @@ import path from "node:path";
 import test from "node:test";
 import { promisify } from "node:util";
 
+import { COMMANDS } from "@agents-can-communicate/cli";
+
 const run = promisify(execFile);
 const repo = path.resolve(import.meta.dirname, "..", "..");
 const acc = path.join(repo, "bin", "acc.mjs");
@@ -142,6 +144,8 @@ test("a session that has closed is not mistaken for the caller", async t => {
  * no command. This runs each agent-facing command the way the skill tells an
  * agent to, and fails if any of them refuses for want of identity.
  */
+// Arguments for the ones that need them; every other command in the CLI is
+// covered by the derivation below rather than by being remembered here.
 const AGENT_FACING = Object.freeze([
   ["sync", []],
   ["status", []],
@@ -153,7 +157,26 @@ const AGENT_FACING = Object.freeze([
   ["workstream", ["--title", "a stream", "--objective", "an objective"]],
   ["ack", ["--message", "message_absent"]],
   ["finish", ["--goal", "what this session was for"]],
+  ["decide", ["--title", "settled", "--outcome", "what was settled"]],
+  ["release", ["--claim", "claim_absent"]],
 ]);
+
+// Setup and lifecycle: a model should not be running the installer, and these
+// three are the adapter's own calls, which pass their identity explicitly.
+const NOT_AGENT_FACING = Object.freeze(["install", "uninstall", "doctor", "config",
+  "attach", "heartbeat", "detach"]);
+
+test("the list above is every command an agent can run", async () => {
+  // Remembered lists rot. `acc decide` was added, needed an identity like the
+  // rest, and was not in this list - so the gate for exactly that defect passed
+  // while the command refused every agent that tried it.
+  const covered = new Set([...AGENT_FACING.map(([command]) => command),
+    ...NOT_AGENT_FACING]);
+  const forgotten = Object.keys(COMMANDS).filter(command => !covered.has(command));
+
+  assert.deepEqual(forgotten, [],
+    "a command exists that this gate does not exercise");
+});
 
 test("no agent-facing command refuses for want of an identity", async t => {
   const { cli } = await stage(t,
