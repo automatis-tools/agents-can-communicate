@@ -7,10 +7,10 @@ release.
 
 | | |
 |---|---|
-| Built from | `229bbe8` |
+| Built from | `b5750dc` |
 | Tarball | `agents-can-communicate-0.0.0.tgz`, 109 KB, 103 entries |
-| sha256 | `ecfbcf9dd1491a934c03a64f9d825a860600e261a160130e35906b6447b0af98` |
-| Tests | 795 passing, 0 failing |
+| sha256 | `8cf52b89586a403374a8ff14d675a7ffebaede4d0687bfc2118ee9ba3ccd717a` |
+| Tests | 800 passing, 0 failing |
 | Node | 24 (current production LTS) |
 | Verified on | macOS 15 (darwin 25.5.0, arm64) and Linux in CI |
 | Not supported | Windows — see below |
@@ -62,6 +62,10 @@ fact: you asked, and there is nobody there.
 Every line of an injected turn can be acted on. An attention line carries the id
 of the thing it is about — the same id the command that answers it takes — and a
 turn the byte budget truncated says how to read what it withheld.
+
+A cursor that is not a cursor is refused, and so is a scope that is not a scope —
+`--scope ful` used to answer the one question the full scope exists for with a
+delta carrying no snapshot.
 
 A cursor that is not a cursor is refused. It used to answer "nothing new" every
 time, for as long as it was held, so a corrupt one looked exactly like a quiet
