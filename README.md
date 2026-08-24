@@ -92,6 +92,7 @@ What is left for a person is the install and looking in on it:
 
 | | |
 |---|---|
+| `acc help` | every command, one line each |
 | `acc status` | who is here, what is claimed, what is in flight |
 | `acc doctor` | what is installed, what is missing, what to do next |
 | `acc install` · `acc uninstall` | wire clients up, or take it back out |
