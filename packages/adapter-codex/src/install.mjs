@@ -2,7 +2,8 @@ import { cp, mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { bakeSkillCommand, removeInstalledTree, removeTomlBlock, stripBlock, tomlString,
+import { bakeSkillCommand, blankJson, blankText, removeIfEmpty, removeInstalledTree,
+  removeTomlBlock, stripBlock, tomlString,
   writeForeignJson, writeHookShim, writeTomlBlock }
   from "@agents-can-communicate/adapter-sdk";
 import { AccError, EXIT } from "@agents-can-communicate/protocol";
@@ -175,6 +176,20 @@ export async function uninstallCodexPlugin({ home, agentsHome = home,
   if (await removeTomlBlock(configPath(codexHome))) changes.push(configPath(codexHome));
   // The marketplace directory is ACC's too, so it goes rather than being left
   // behind empty.
+  // A blank TOML config and an absent one are the same to this client, and a
+  // file with nothing in it holds nothing to lose - so no record of who created
+  // it is needed here, unlike the JSON settings where `{}` can be a container
+  // the user made.
+  await removeIfEmpty(configPath(codexHome), { readFile, rm, isEmpty: blankText });
+  // The manifest goes only when what is left is ACC's own marketplace with no
+  // plugins in it. A manifest naming someone else's marketplace is theirs, empty
+  // or not.
+  await removeIfEmpty(marketplacePath(agentsHome), { readFile, rm,
+    isEmpty: text => {
+      const value = JSON.parse(text);
+      return value?.name === MARKETPLACE && (value.plugins ?? []).length === 0;
+    } });
+
   await removeInstalledTree(cacheRoot(codexHome), keep);
   await removeInstalledTree(pluginPath(agentsHome), keep);
   return { ok: true, changes, diagnostics: [] };

@@ -4,7 +4,9 @@ import path from "node:path";
 import { AccError, EXIT } from "@agents-can-communicate/protocol";
 import { fileURLToPath } from "node:url";
 
-import { bakeSkillCommand, removeInstalledTree, writeForeignJson, writeHookShim }
+import { acccreatedFile, bakeSkillCommand, blankJson, removeIfEmpty,
+  removeInstalledTree,
+  writeForeignJson, writeHookShim }
   from "@agents-can-communicate/adapter-sdk";
 
 const bundle = fileURLToPath(new URL("../extension", import.meta.url));
@@ -63,7 +65,8 @@ const withShim = (wiring, shim) => ({ hooks: Object.fromEntries(
 export async function installGeminiExtension({ home, runner, node }) {
   // Read before writing: a settings file that will not parse must not be found
   // out after the extension tree is already on disk.
-  const existing = await readJson(settingsPath(home), {});
+  const found = await readJson(settingsPath(home), null);
+  const existing = found ?? {};
 
   const target = extensionPath(home);
   await rm(target, { recursive: true, force: true });
@@ -87,6 +90,9 @@ export async function installGeminiExtension({ home, runner, node }) {
     { hooks: {} }), shim);
   const file = settingsPath(home);
   const merged = { ...existing, hooks: { ...(existing.hooks ?? {}) } };
+  // Recorded now: afterwards a settings file holding `{}` looks the same
+  // whether ACC created it or the user did.
+  if (found === null) merged["acc:createdFile"] = true;
   for (const [event, entries] of Object.entries(ours.hooks)) {
     const foreign = (merged.hooks[event] ?? [])
       .map(entry => ({ ...entry, hooks: (entry.hooks ?? []).filter(hook => !isOurs(hook)) }))
@@ -113,8 +119,12 @@ export async function uninstallGeminiExtension({ home, keep = [] }) {
     const next = { ...existing };
     if (Object.keys(hooks).length > 0) next.hooks = hooks;
     else delete next.hooks;
+    delete next["acc:createdFile"];
     await writeJson(file, next);
   }
+  await removeIfEmpty(settingsPath(home),
+    { readFile, rm, isEmpty: blankJson(), created: acccreatedFile(existing) });
+
   await removeInstalledTree(extensionPath(home), keep);
   return { ok: true, changes, diagnostics: [] };
 }
