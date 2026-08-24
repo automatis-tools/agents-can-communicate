@@ -123,3 +123,104 @@ test("the MCP client sees the peer's claim, so it can choose to respect it", asy
   assert.equal(text.includes("file:src/**"), true,
     "the claim was not visible to the MCP client");
 });
+
+/**
+ * A poll is this client's turn.
+ *
+ * The hook runtime hands a session its pending messages when it builds a turn.
+ * An MCP client has no turn and no hook, and no tool handed it anything: it saw
+ * a `direct_request` line carrying a subject and an id, and to read what a peer
+ * had actually said it had to ask for the whole snapshot and search every
+ * message in the workspace for its own name. The receipt stayed `queued` for as
+ * long as the client ran, so the sender was told its message had not been
+ * delivered by an agent that had answered it.
+ */
+async function mailed(t, { requiresAck = true } = {}) {
+  const place = await workspace(t);
+  const client = connectMcp({ ...place, participant: "mcp_reader" });
+  t.after(() => client.close());
+  const call = async (name, args = {}) => {
+    const out = await client.request("tools/call", { name, arguments: args, _meta: meta });
+    assert.equal(out.error, undefined, JSON.stringify(out.error));
+    return JSON.parse(out.result.content[0].text);
+  };
+  await call("acc_work", { summary: "reading", mode: "explore" });
+
+  const sender = await cli(place, ["attach", "--participant", "sender", "--harness", "cli"]);
+  await cli(place, ["message", "--session", sender.sessionId,
+    "--generation", sender.generation, "--to", "mcp_reader",
+    "--subject", "which way should the hull clamp?", "--body", "Blocking me.",
+    ...(requiresAck ? ["--requires-ack"] : [])]);
+  const receipts = async () => (await cli(place, ["sync", "--session", sender.sessionId,
+    "--scope", "full"])).snapshot.receipts.map(receipt => receipt.state);
+  return { place, call, sender, receipts };
+}
+
+test("a message addressed to an MCP client reaches it, body and all", async t => {
+  const { call } = await mailed(t);
+
+  const synced = await call("acc_sync");
+
+  const [message] = synced.messages ?? [];
+  assert.notEqual(message, undefined,
+    `nothing was handed over: ${JSON.stringify(Object.keys(synced))}`);
+  assert.equal(message.subject, "which way should the hull clamp?");
+  assert.equal(message.body, "Blocking me.");
+});
+
+test("what has been handed over is not handed over again", async t => {
+  const { call } = await mailed(t);
+  await call("acc_sync");
+
+  const second = await call("acc_sync");
+
+  // A client that polls every few seconds would otherwise be told the same
+  // thing until it acknowledged it, and most messages ask for no answer.
+  assert.deepEqual(second.messages ?? [], []);
+});
+
+test("the sender stops being told its message is undelivered", async t => {
+  const { call, receipts } = await mailed(t);
+  assert.deepEqual(await receipts(), ["queued"]);
+
+  await call("acc_sync");
+
+  assert.deepEqual(await receipts(), ["injected"]);
+});
+
+test("being shown something is still not agreeing to it", async t => {
+  const { call, receipts } = await mailed(t);
+  const synced = await call("acc_sync");
+  const [message] = synced.messages;
+
+  await call("acc_ack", { messageId: message.messageId });
+
+  // Delivery and acknowledgement are different facts, and the sender asked for
+  // the second one.
+  assert.deepEqual(await receipts(), ["acknowledged"]);
+});
+
+test("an MCP client can ask a hooked peer for work and be told it is done", async t => {
+  const place = await workspace(t);
+  const client = connectMcp({ ...place, participant: "graphics" });
+  t.after(() => client.close());
+  const call = async (name, args = {}) => {
+    const out = await client.request("tools/call", { name, arguments: args, _meta: meta });
+    assert.equal(out.error, undefined, JSON.stringify(out.error));
+    return JSON.parse(out.result.content[0].text);
+  };
+  const peer = await cli(place, ["attach", "--participant", "physics", "--harness", "cli"]);
+
+  const asked = await call("acc_request", { toParticipantId: "physics",
+    title: "Tank sinks through mud", detail: "Not mine to fix. Can you take it?" });
+  await cli(place, ["task", "--session", peer.sessionId, "--generation", peer.generation,
+    "--task", asked.task.taskId, "--take"]);
+  await cli(place, ["task", "--session", peer.sessionId, "--generation", peer.generation,
+    "--task", asked.task.taskId, "--state", "done"]);
+
+  // The whole loop, from the tier with no hooks at all: asked, taken, finished,
+  // and the answer arrives where this client can see it.
+  const synced = await call("acc_sync");
+  const answers = (synced.messages ?? []).map(message => message.subject);
+  assert.deepEqual(answers, ["accepted: Tank sinks through mud", "done: Tank sinks through mud"]);
+});

@@ -31,19 +31,32 @@ export async function materialise({ store, clock, ids }, { workspaceId, descript
     ?? "session_bootstrap";
 
   await store.transaction(async tx => {
-    tx.put("workspace", workspaceId, {
-      schemaVersion: SCHEMA_VERSION,
-      workspaceId,
-      displayName: descriptor?.displayName ?? workspaceId,
-      source: descriptor?.source ?? "directory",
-      roots: descriptor?.roots ?? [],
-      createdAt: now,
-    });
-    tx.append({ schemaVersion: SCHEMA_VERSION, eventId: ids.next("event"), workspaceId,
-      actorSessionId, type: "workspace.materialised", occurredAt: now, payload: { reason } });
+    // Asked again inside the lock. `ensureMaterialised` asks before taking it,
+    // which is a check-then-act across processes: agents starting together in a
+    // workspace neither had opened - the ordinary way two agents start - all saw
+    // "not materialised", and every one but the first was refused with
+    // `workspace ... changed under this transaction` and could not attach.
+    const already = tx.get("workspace", workspaceId) !== null;
+    if (!already) {
+      tx.put("workspace", workspaceId, {
+        schemaVersion: SCHEMA_VERSION,
+        workspaceId,
+        displayName: descriptor?.displayName ?? workspaceId,
+        source: descriptor?.source ?? "directory",
+        roots: descriptor?.roots ?? [],
+        createdAt: now,
+      });
+      tx.append({ schemaVersion: SCHEMA_VERSION, eventId: ids.next("event"), workspaceId,
+        actorSessionId, type: "workspace.materialised", occurredAt: now,
+        payload: { reason } });
+    }
 
     for (const entry of staged) {
       for (const record of entry.records) {
+        // Whoever got here first may have promoted this record already, and
+        // promoting is a copy: the ephemeral and durable shapes are the same,
+        // so the one already there is the one this would write.
+        if (tx.get(entry.kind, record[entry.key]) !== null) continue;
         tx.put(entry.kind, record[entry.key], record);
         if (entry.event === null) continue;
         tx.append({ schemaVersion: SCHEMA_VERSION, eventId: ids.next("event"), workspaceId,

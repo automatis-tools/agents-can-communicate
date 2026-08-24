@@ -38,7 +38,20 @@ export async function requireStoreIdentity(paths, { workspaceId, clock, create =
     throw new AccError(EXIT.DATA, "store is not initialised", { filePath });
   }
   const record = { storeVersion: STORE_VERSION, workspaceId, initialisedAt: clock.now() };
-  await publishAtomic(filePath, encode(record), { root: paths.root, tmpDir: paths.tmp });
+  try {
+    await publishAtomic(filePath, encode(record), { root: paths.root, tmpDir: paths.tmp });
+  } catch (error) {
+    // Losing this race is not a failure. Two agents starting together in a
+    // workspace neither has opened before is the ordinary case, and the two
+    // identity documents they write differ in one field - the moment each was
+    // written - so the second was refused for "different bytes" and that agent
+    // could not attach at all.
+    //
+    // What the store has to refuse is a directory belonging to a *different*
+    // workspace, and that is decided below by reading what is actually there
+    // rather than by whose bytes arrived first.
+    if (error.code !== EXIT.CONFLICT) throw error;
+  }
   const published = await readJsonIfPresent(filePath, paths.root);
   return assertIdentity(published.value, workspaceId, filePath);
 }

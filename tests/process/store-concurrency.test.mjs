@@ -132,3 +132,53 @@ test("the event log has no gaps and no duplicate sequences after contention", as
     ["workspace.materialised", "session.opened"]);
   await access(path.join(root, "protocol.json"));
 });
+
+/** A workspace nobody has opened, and the CLI, for the first-run race. */
+async function freshWorkspace(t) {
+  const cwd = await realpath(await mkdtemp(path.join(tmpdir(), "acc-fresh-")));
+  const dataHome = await realpath(await mkdtemp(path.join(tmpdir(), "acc-fresh-data-")));
+  t.after(() => Promise.all([rm(cwd, { recursive: true, force: true }),
+    rm(dataHome, { recursive: true, force: true })]));
+  const env = { ...process.env, ACC_DATA_HOME: dataHome, GIT_DIR: "", GIT_WORK_TREE: "" };
+  const attach = participant => execFileAsync(process.execPath,
+    [path.join(repoRoot, "bin", "acc.mjs"), "attach", "--participant", participant,
+      "--harness", "cli", "--cwd", cwd, "--json"], { env });
+  return { cwd, dataHome, env, attach };
+}
+
+test("agents starting together in a fresh workspace all get in", async t => {
+  const place = await freshWorkspace(t);
+
+  // The first thing every process does is establish the store's identity, and
+  // that document carries the moment it was written. Two of them racing wrote
+  // records differing in exactly that field, so the loser was refused for
+  // "record already published with different bytes" and could not attach at all
+  // - in a workspace neither had opened before, which is the ordinary way two
+  // agents start.
+  const outcomes = await Promise.all(["alpha", "beta", "gamma", "delta"]
+    .map(participant => place.attach(participant)
+      .then(({ stdout }) => JSON.parse(stdout).ok, error => error.stdout ?? error.message)));
+
+  assert.deepEqual(outcomes, [true, true, true, true],
+    `an agent could not open a workspace because another was opening it: ${
+      JSON.stringify(outcomes.filter(outcome => outcome !== true))}`);
+});
+
+test("a directory belonging to another workspace is still refused", async t => {
+  const place = await freshWorkspace(t);
+  await place.attach("alpha");
+
+  // Tolerating the race must not tolerate adopting someone else's store. What
+  // decides it is the identity on disk, not whose bytes arrived first.
+  const workspaces = path.join(place.dataHome, "acc", "workspaces");
+  const [existing] = await readdir(workspaces);
+  const file = path.join(workspaces, existing, "protocol.json");
+  const record = JSON.parse(await readFile(file, "utf8"));
+  await writeFile(file,
+    `${JSON.stringify({ ...record, workspaceId: "workspace_someone_else" })}\n`);
+
+  const refused = await place.attach("beta").then(() => null, error => error);
+
+  assert.notEqual(refused, null, "a store belonging to another workspace was adopted");
+  assert.match(refused.stdout, /different workspace/);
+});
