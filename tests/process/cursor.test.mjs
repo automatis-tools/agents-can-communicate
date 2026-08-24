@@ -44,7 +44,9 @@ async function workspace(t) {
   const session = JSON.parse((await cli("status")).stdout).data.participants[0].sessionId;
   const syncFrom = cursor => cli("sync", "--session", session,
     ...(cursor === undefined ? [] : ["--cursor", cursor]));
-  return { project, env, cli, session, syncFrom };
+  const syncScope = scope => cli("sync", "--session", session,
+    ...(scope === undefined ? [] : ["--scope", scope]));
+  return { project, env, cli, session, syncFrom, syncScope };
 }
 
 for (const cursor of ["not-a-cursor", "-1", "0000000000000001; DROP", "1", "00000000000000001"]) {
@@ -87,4 +89,36 @@ test("a turn still works, because that is where cursors actually come from", asy
     session_id: "worker", cwd: place.project, prompt: "go" }));
 
   await child;
+});
+
+/**
+ * The scope that answers "show me everything".
+ *
+ * An unknown one became `delta`. So `--scope ful` answered the one question the
+ * full scope exists for - a session that cannot see the rest of the system - with
+ * a delta carrying no snapshot at all, and the agent had no way to tell that from
+ * a workspace with nothing in it.
+ */
+for (const scope of ["ful", "FULL", "nonsense", ""]) {
+  test(`a scope of ${JSON.stringify(scope)} is refused, not turned into a delta`, async t => {
+    const place = await workspace(t);
+
+    const refused = await place.syncScope(scope).then(() => null, error => error);
+
+    assert.notEqual(refused, null, `${scope} was quietly answered with a delta`);
+    assert.match(JSON.parse(refused.stdout ?? "{}").error?.message ?? refused.stderr,
+      /scope is one of|requires a value/);
+  });
+}
+
+test("the two scopes that exist still work, and one is the default", async t => {
+  const place = await workspace(t);
+
+  const full = JSON.parse((await place.syncScope("full")).stdout).data;
+  const delta = JSON.parse((await place.syncScope("delta")).stdout).data;
+  const plain = JSON.parse((await place.syncScope()).stdout).data;
+
+  assert.equal("snapshot" in full, true, "the full scope carried no snapshot");
+  assert.equal("snapshot" in delta, false);
+  assert.equal(plain.scope, "delta");
 });
