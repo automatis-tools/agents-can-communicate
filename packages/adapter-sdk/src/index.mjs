@@ -9,7 +9,8 @@ export { BEGIN, END, removeTomlBlock, renderBlock, stripBlock, tomlString, write
   from "./toml-block.mjs";
 export { projectContext } from "./context-projector.mjs";
 export { formatJsonAs, jsonStyleOf, mergeOwnedConfig, mergeOwnedEntries, ownedEntries, ownedKeys,
-  removeOwnedConfig, removeOwnedEntries, writeForeignJson } from "./config-merge.mjs";
+  acccreatedFile, removeIfEmpty, removeOwnedConfig, removeOwnedEntries, writeForeignJson,
+  blankJson, blankText } from "./config-merge.mjs";
 export { clearSessionBinding, listSessionBindings, loadSessionBinding,
   storeSessionBinding }
   from "./session-binding.mjs";
