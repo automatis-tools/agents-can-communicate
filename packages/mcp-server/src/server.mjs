@@ -71,6 +71,43 @@ async function resolveSession(context) {
   return session;
 }
 
+/**
+ * A poll is this client's turn.
+ *
+ * The hook runtime hands a session its pending messages when it builds a turn,
+ * and marks them delivered. An MCP client has no turn and no hook, and no tool
+ * ever handed it anything: it saw a `direct_request` line carrying a subject and
+ * an id, and to read what a peer had actually said it had to ask for the whole
+ * snapshot and search every message in the workspace for its own name.
+ *
+ * The receipt never moved either. It stayed `queued` for as long as the client
+ * ran, so the sender was told its message had not been delivered by an agent
+ * that had answered it.
+ *
+ * Returning them here is delivery, in the same sense and with the same honesty
+ * as the turn: what is handed over is marked `injected`, and nothing else is.
+ * Acknowledgement stays a separate act, because being shown something is not
+ * agreeing to it.
+ */
+async function syncWithMail(service, owner, context, args) {
+  const sync = await service.sync({ ...owner, cursor: args.cursor ?? null,
+    scope: args.scope, limit: args.limit });
+  const messages = await service.pendingMessages({
+    workspaceId: context.workspaceId,
+    participantId: context.participantId,
+    exceptSessionId: owner.sessionId });
+  if (messages.length === 0) return sync;
+
+  for (const message of messages) {
+    // One failure must not swallow the rest: the client is holding the message
+    // either way, and a receipt that cannot be written is not a reason to hide
+    // what a peer said.
+    await service.markDelivery({ ...owner, messageId: message.messageId,
+      state: "injected" }).catch(() => null);
+  }
+  return { ...sync, messages };
+}
+
 async function callTool(name, args, context) {
   const session = await resolveSession(context);
   const owner = { sessionId: session.sessionId, generation: session.generation,
@@ -79,8 +116,7 @@ async function callTool(name, args, context) {
 
   switch (name) {
     case "acc_sync":
-      return service.sync({ ...owner, cursor: args.cursor ?? null, scope: args.scope,
-        limit: args.limit });
+      return syncWithMail(service, owner, context, args);
     case "acc_work":
       if (args.clear === true) return service.clearIntent({ ...owner });
       return service.setIntent({ ...owner, summary: args.summary, mode: args.mode,
