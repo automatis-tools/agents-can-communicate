@@ -7,10 +7,10 @@ release.
 
 | | |
 |---|---|
-| Built from | `b6d2cb1` |
+| Built from | `b9bc09f` |
 | Tarball | `agents-can-communicate-0.0.0.tgz`, 109 KB, 103 entries |
-| sha256 | `8e079d309cf33eda4947ef09cbfe3a216c6a3581d1ca57f5c267af7743c9d5b6` |
-| Tests | 756 passing, 0 failing |
+| sha256 | `550019651a24c6f9086828fc119321da90198c675bc22c85f96063e21f7287af` |
+| Tests | 761 passing, 0 failing |
 | Node | 24 (current production LTS) |
 | Verified on | macOS 15 (darwin 25.5.0, arm64) and Linux in CI |
 | Not supported | Windows — see below |
@@ -62,6 +62,13 @@ fact: you asked, and there is nobody there.
 Every line of an injected turn can be acted on. An attention line carries the id
 of the thing it is about — the same id the command that answers it takes — and a
 turn the byte budget truncated says how to read what it withheld.
+
+A peer nobody has ever been cannot be addressed. `acc message --to physcis` used
+to answer "sent", and `acc request` made a task assigned to nobody that its
+requester then waited on. The refusal names who is here, and it bounds the
+recipient list by construction — one message naming three thousand participants
+took 24.8 seconds and left every session in that workspace paying five to attach
+and take a turn.
 
 Agents that start at the same time in a workspace none of them has opened all get
 in. Three of four used to fail: the identity document each writes first carries
