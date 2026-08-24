@@ -15,9 +15,16 @@ import { createGitProbe, discoverWorkspace, platformDataHome, runtimePaths }
 const DEFAULT_BUDGET_MS = 5_000;
 
 // Declared by this process on the session it opens, so peers can tell an idle
-// session from a dead one. Adapters whose client fires no heartbeat still get a
-// truthful cadence: they refresh on every turn instead.
+// session from a dead one. Only one of the four clients fires a heartbeat event,
+// so the rest refresh here: on every turn, and during a long one whenever the
+// last sign of life is older than half the cadence.
+//
+// Until they did, a session went stale three minutes after it started and stayed
+// stale however hard it was working. Every roster showed every peer as stale, so
+// the word stopped meaning anything - and a requester was told "nobody is
+// working on it" about work a peer had accepted and was doing.
 const CADENCE_MS = 60_000;
+const REFRESH_AFTER_MS = CADENCE_MS / 2;
 
 const defaultRuntime = () => ({
   clock: { now: () => new Date().toISOString() },
@@ -175,6 +182,10 @@ const HANDLERS = {
 
   async beforeTurn({ binding, context, adapter }) {
     if (binding === null) return {};
+    // A turn is the clearest sign a session is alive. Never a reason to fail:
+    // this runs in front of somebody's prompt.
+    await context.service.heartbeatSession({ sessionId: binding.accSessionId,
+      generation: binding.generation }).catch(() => null);
     const sync = await context.service.sync({ sessionId: binding.accSessionId,
       cursor: null, scope: "delta" });
 
@@ -262,6 +273,16 @@ const HANDLERS = {
     // writes, and the budget that keeps it from failing open is five seconds.
     const status = await context.service.guardState({
       workspaceId: context.descriptor.id });
+    // A turn that runs for half an hour is one turn, and a session working that
+    // hard should not look dead to its peers. Written at most twice a cadence,
+    // so guarding a write stays a read in the ordinary case.
+    const mine = status.participants
+      .find(participant => participant.sessionId === binding.accSessionId);
+    if (mine !== undefined && Date.now()
+      - Date.parse(mine.heartbeatAt ?? 0) > REFRESH_AFTER_MS) {
+      await context.service.heartbeatSession({ sessionId: binding.accSessionId,
+        generation: binding.generation }).catch(() => null);
+    }
     // Anchored to the repository, not to wherever this session was started. A
     // session opened in `repo/src` relativised the same file to
     // `file:physics.mjs` where one at `repo` called it `file:src/physics.mjs`,

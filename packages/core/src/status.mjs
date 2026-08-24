@@ -49,6 +49,9 @@ export function createGuardStateService(ports) {
       participants: sessions.map(session => ({
         sessionId: session.sessionId,
         participantId: session.participantId,
+        // So the guard can tell whether this session has looked alive recently
+        // without a second read. Bounded like the rest of what it asks for.
+        heartbeatAt: session.heartbeatAt,
       })),
     };
   };
