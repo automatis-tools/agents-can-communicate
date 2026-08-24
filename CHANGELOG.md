@@ -8,10 +8,10 @@ thing in here that was not measured.
 
 | | |
 |---|---|
-| Built from | `e861a20` |
-| Tarball | `agents-can-communicate-0.1.0.tgz`, 121 KB, 104 entries |
-| sha256 | `d43d2bf323f1efe110a9069101a228d729e4cd10e5c83a87a9be8389e9635e27` |
-| Tests | 800 passing, 0 failing |
+| Built from | `c318458` |
+| Tarball | `agents-can-communicate-0.1.0.tgz`, 123 KB, 105 entries |
+| sha256 | `e4ed773feb25dd40a0fb5d2bb010f66261613a3cac14882750b431f3ab2a3480` |
+| Tests | 808 passing, 0 failing |
 | Node | 24 (current production LTS) |
 | Verified on | macOS 15 (darwin 25.5.0, arm64) and Linux in CI |
 | Not supported | Windows — see below |
