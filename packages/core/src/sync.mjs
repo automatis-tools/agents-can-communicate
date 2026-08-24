@@ -10,6 +10,19 @@ const DEFAULT_LIMIT = 100;
 // has.
 const CURSOR = /^[0-9]{16}$/;
 
+// The two a caller may ask for. An unknown one used to become `delta`, so
+// `--scope ful` answered the one question the full scope exists for - "show me
+// everything, I cannot see the rest of the system" - with a delta carrying no
+// snapshot at all, and the agent concluded there was nothing to see.
+const SCOPES = Object.freeze(["delta", "full"]);
+
+function assertScope(scope) {
+  if (scope != null && !SCOPES.includes(scope)) {
+    throw new AccError(EXIT.USAGE,
+      `scope is one of ${SCOPES.join(", ")}; leave it out for ${SCOPES[0]}`, { scope });
+  }
+}
+
 function assertCursor(cursor) {
   if (typeof cursor !== "string" || !CURSOR.test(cursor)) {
     throw new AccError(EXIT.USAGE,
@@ -206,6 +219,7 @@ export function createSyncService(ports, sessions) {
     // workspace rather than a mistake. `"0000000000000001; DROP"` was quietly
     // taken as the sequence it starts with.
     if (input.cursor != null) assertCursor(input.cursor);
+    assertScope(input.scope);
     const workspaceId = input.workspaceId ?? store.workspaceId;
     const now = clock.now();
     const located = input.sessionId === undefined
