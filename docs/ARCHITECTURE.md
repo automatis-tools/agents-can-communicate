@@ -94,6 +94,7 @@ Computed from explicit rules, never from a hidden classifier. Lower sorts first:
 | 3 | `task_unblocked` | Work addressed to your participant is `pending` — every dependency is `done` |
 | 4 | `coordinator_missing` | An open workstream has no coordinator |
 | 5 | `request_stalled` | You asked for something and nobody is on it: work you requested is held by a session that has gone quiet or addressed to a participant that is not here, or a question of yours needing an answer is addressed to a participant that is not here |
+| 6 | `claim_expired` | A claim you took has run out. Peers can write to it again, and until now nothing said so |
 
 A task with unmet dependencies is `blocked`, and finishing the last one flips its dependents
 to `pending`. So `pending` already means ready, and nothing has to re-evaluate the graph.

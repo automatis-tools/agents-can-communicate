@@ -139,16 +139,21 @@ test("every attention kind in the priority table is one a rule can produce", () 
   // it. `nearby_intent` sat in this table with no rule, so it read as a shipped
   // feature in review, was documented as one, and produced nothing at runtime.
   //
-  // The snapshot below is built to trigger all four rules at once. Adding a
-  // fifth entry to the table without a rule fails this test; adding one with a
-  // rule fails it until the snapshot exercises it, which is the point.
+  // The snapshot below is built to trigger every rule at once. An entry added to
+  // the table without a rule fails this test; one added with a rule fails it
+  // until the snapshot exercises it, which is the point.
   const snapshot = {
     messages: [{ messageId: "message_a", subject: "Need slots", requiresAck: true }],
     receipts: [{ messageId: "message_a", recipientParticipantId: "participant_a",
       state: "injected" }],
     intents: [{ sessionId: "session_a", resourceHints: ["file:src/**"] }],
-    claims: [{ claimId: "claim_a", ownerSessionId: "session_b", resource: "file:src/main.mjs",
-      expiresAt: "2026-08-16T02:00:00.000Z" }],
+    claims: [
+      { claimId: "claim_a", ownerSessionId: "session_b", resource: "file:src/main.mjs",
+        expiresAt: "2026-08-16T02:00:00.000Z" },
+      // This session's own, and its lease has run out.
+      { claimId: "claim_b", ownerSessionId: "session_a", resource: "file:src/lapsed.mjs",
+        expiresAt: "2026-08-16T00:30:00.000Z" },
+    ],
     tasks: [
       { taskId: "task_a", state: "pending", assigneeSessionId: "session_a",
         title: "port the store" },
