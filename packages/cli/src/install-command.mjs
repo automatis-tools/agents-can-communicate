@@ -52,6 +52,34 @@ function selectAdapters(requested) {
  * the plan and stops - so what an operator approves is the same object that is
  * then carried out, not a description of it produced somewhere else.
  */
+/**
+ * What the command says it did.
+ *
+ * `installed 0 adapter(s)` was the whole report whether four clients were
+ * absent, one refused, or nothing was asked for. The reasons existed - the plan
+ * carries one per skipped adapter and the result one per failure - and only
+ * `--json` ever showed them.
+ */
+export function describeOutcome({ action, acted, failed = [], skipped = [] }) {
+  return [`${action}ed ${acted} adapter(s)`
+    + (failed.length > 0 ? `; ${failed.length} failed` : ""),
+  ...skipped.map(entry => `  skip ${entry.adapterId}: ${entry.reason}`),
+  ...failed.map(entry => `  ${entry.adapterId}: ${entry.error}`)].join("\n");
+}
+
+/**
+ * A failed adapter ends the command.
+ *
+ * It used to be counted in a line that began with a success and exit 0, which is
+ * what a malformed `~/.claude/settings.json` produced: the adapter refused,
+ * correctly, and the script that ran the installer was told it had worked.
+ */
+export function failureOf({ action, acted, failed = [] }) {
+  if (failed.length === 0) return null;
+  return new AccError(EXIT.DATA,
+    describeOutcome({ action, acted, failed }), { failed });
+}
+
 export async function runInstallCommand({ options, runtime, action = "install" }) {
   const adapters = selectAdapters(options.adapter);
   const home = options.home ?? runtime.env?.HOME ?? homedir();
@@ -66,11 +94,14 @@ export async function runInstallCommand({ options, runtime, action = "install" }
   const result = await applyPlan({ plan, adapters, context, dataHome, dryRun });
 
   const acted = result.operations.filter(operation => operation.applied).length;
-  const text = dryRun
-    ? [`would ${action}:`, ...plan.operations.flatMap(operation => operation.summary),
-      ...plan.skipped.map(entry => `skip ${entry.adapterId}: ${entry.reason}`)].join("\n")
-    : `${action}ed ${acted} adapter(s)`
-      + (result.failed.length > 0 ? `; ${result.failed.length} failed` : "");
+  if (dryRun) {
+    return { data: { ...result, plan, dataHome },
+      text: [`would ${action}:`, ...plan.operations.flatMap(operation => operation.summary),
+        ...plan.skipped.map(entry => `skip ${entry.adapterId}: ${entry.reason}`)].join("\n") };
+  }
 
-  return { data: { ...result, plan, dataHome }, text };
+  return { data: { ...result, plan, dataHome },
+    text: describeOutcome({ action, acted, failed: result.failed,
+      skipped: plan.skipped }),
+    error: failureOf({ action, acted, failed: result.failed }) };
 }

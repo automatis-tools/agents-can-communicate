@@ -38,12 +38,26 @@ const cachePath = codexHome => path.join(cacheRoot(codexHome), PLUGIN_NAME);
 const cachedVersionPath = (codexHome, version) =>
   path.join(cachePath(codexHome), version);
 
+/**
+ * Read a client's own JSON, and say which file when it will not parse.
+ *
+ * A malformed config is the user's to fix, and the message they get has to name
+ * it. `Unexpected end of JSON input` arrived with no path attached, from an
+ * install that touches four clients' homes, and left them to guess which.
+ */
 async function readJson(file, fallback) {
+  let source;
   try {
-    return JSON.parse(await readFile(file, "utf8"));
+    source = await readFile(file, "utf8");
   } catch (error) {
     if (error.code === "ENOENT") return fallback;
     throw error;
+  }
+  try {
+    return JSON.parse(source);
+  } catch (error) {
+    throw new AccError(EXIT.DATA, `${file} is not valid JSON: ${error.message}`,
+      { file, cause: error.message });
   }
 }
 
@@ -92,6 +106,12 @@ const entryFor = () => ({
  */
 export async function installCodexPlugin({ home, agentsHome = home,
   codexHome = path.join(home, ".codex"), runner, node }) {
+  // Read before writing, so a manifest that will not parse is found before a
+  // plugin tree is laid down that nothing will then be able to remove.
+  const existing = await readJson(marketplacePath(agentsHome), { name: MARKETPLACE,
+    interface: { displayName: "Agents Can Communicate" }, plugins: [] });
+  const before = await readFile(configPath(codexHome), "utf8").catch(() => "");
+
   const target = pluginPath(agentsHome);
   await rm(target, { recursive: true, force: true });
   await cp(bundle, target, { recursive: true });
@@ -103,8 +123,6 @@ export async function installCodexPlugin({ home, agentsHome = home,
     withShim(await readJson(path.join(bundle, "hooks.json"), { hooks: {} }), shim));
 
   const file = marketplacePath(agentsHome);
-  const existing = await readJson(file, { name: MARKETPLACE,
-    interface: { displayName: "Agents Can Communicate" }, plugins: [] });
   // Ownership is the entry's own name. Recording it as an extra key beside the
   // plugins - which is what this used to do - puts a nameless entry into a
   // sequence the client then tries to load.
@@ -115,7 +133,6 @@ export async function installCodexPlugin({ home, agentsHome = home,
   // A marketplace declared twice makes this client refuse the whole config, and
   // then every plugin the user has stops working. If they registered it
   // themselves, say so rather than appending a duplicate table.
-  const before = await readFile(config, "utf8").catch(() => "");
   if (stripBlock(before).includes(`[marketplaces.${MARKETPLACE}]`)) {
     throw new AccError(EXIT.CONFLICT,
       `marketplace ${MARKETPLACE} is already registered in this config; `

@@ -1,5 +1,7 @@
 import { cp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
+
+import { AccError, EXIT } from "@agents-can-communicate/protocol";
 import { fileURLToPath } from "node:url";
 
 import { bakeSkillCommand, mergeOwnedEntries, ownedEntries, removeInstalledTree,
@@ -52,12 +54,26 @@ const cacheRoot = configDir => path.join(pluginsDir(configDir), "cache", MARKETP
 const cachePath = (configDir, version) =>
   path.join(cacheRoot(configDir), PLUGIN_NAME, version);
 
+/**
+ * Read a client's own JSON, and say which file when it will not parse.
+ *
+ * A malformed config is the user's to fix, and the message they get has to name
+ * it. `Unexpected end of JSON input` arrived with no path attached, from an
+ * install that touches four clients' homes, and left them to guess which.
+ */
 async function readJson(file, fallback) {
+  let source;
   try {
-    return JSON.parse(await readFile(file, "utf8"));
+    source = await readFile(file, "utf8");
   } catch (error) {
     if (error.code === "ENOENT") return fallback;
     throw error;
+  }
+  try {
+    return JSON.parse(source);
+  } catch (error) {
+    throw new AccError(EXIT.DATA, `${file} is not valid JSON: ${error.message}`,
+      { file, cause: error.message });
   }
 }
 
@@ -132,6 +148,17 @@ async function layOutPlugin(target, { runner, node }) {
 }
 
 export async function installClaudePlugin({ configDir, runner, node, now = new Date() }) {
+  // Everything this will merge into, read before a byte is written. A settings
+  // file that will not parse used to be discovered after the plugin tree was
+  // already on disk, and the install then failed with nineteen files left
+  // behind, no ownership recorded, and an uninstall that hit the same file and
+  // refused. What the user had to do about it was delete a directory by hand
+  // that nothing had told them the name of.
+  const settings = await readJson(settingsPath(configDir), {});
+  const known = await readJson(knownMarketplacesPath(configDir), {});
+  const installed = await readJson(installedPluginsPath(configDir),
+    { version: 2, plugins: {} });
+
   const version = await pluginVersion();
   const stamp = now.toISOString();
   const source = sourceDir(configDir);
@@ -144,7 +171,6 @@ export async function installClaudePlugin({ configDir, runner, node, now = new D
   // command's only effect is this copy plus the two registry entries below.
   await layOutPlugin(cached, { runner, node });
 
-  const known = await readJson(knownMarketplacesPath(configDir), {});
   await writeClientJson(knownMarketplacesPath(configDir), {
     ...known,
     [MARKETPLACE]: {
@@ -154,8 +180,6 @@ export async function installClaudePlugin({ configDir, runner, node, now = new D
     },
   });
 
-  const installed = await readJson(installedPluginsPath(configDir),
-    { version: 2, plugins: {} });
   // A re-install of the same version from the same path is not an event, and
   // stamping it moved bytes in a file ACC only borrows. The comment above
   // promised a no-op install touched nothing; the timestamps made that false.
@@ -172,7 +196,7 @@ export async function installClaudePlugin({ configDir, runner, node, now = new D
   });
 
   const file = settingsPath(configDir);
-  const existing = await readJson(file, {});
+  const existing = settings;
   // Entry-level ownership: `enabledPlugins` holds every plugin the user has, so
   // taking the whole key would destroy them and handing it back on uninstall
   // would destroy them again.
