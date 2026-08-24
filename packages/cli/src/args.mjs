@@ -41,6 +41,12 @@ export const COMMANDS = Object.freeze({
   // Messages not tied to a task need a way to be answered too. Without one a
   // `requiresAck` message raised an attention item nothing could ever clear.
   ack: { required: ["message"], optional: ["session", "generation", "state"] },
+  // Recording what was settled, so the next session does not reopen it. The
+  // protocol has described this object from the start and nothing could make
+  // one: no command, no tool.
+  decide: { required: ["title", "outcome"],
+    optional: ["session", "generation", "authority", "workstream", "supersedes"],
+    repeated: ["decided-by"], flags: ["human"] },
   finish: { required: ["goal"], optional: ["session", "generation", "status", "to"],
     repeated: ["completed", "remaining", "blocker"] },
   status: { required: [], optional: ["participant"], flags: ["all"] },

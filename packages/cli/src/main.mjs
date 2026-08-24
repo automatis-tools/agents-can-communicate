@@ -150,6 +150,28 @@ const HANDLERS = Object.freeze({
     return { data: receipt, text: `${receipt.messageId} ${receipt.state}` };
   },
 
+  /**
+   * What was settled, and on whose authority.
+   *
+   * `--human` is the caller stating that a person actually decided this. The
+   * core refuses `--authority human` without it, because a peer proposal
+   * becoming a human decision on its own is the one way this record could
+   * launder an agent's opinion into a ruling.
+   */
+  decide: async ({ options, context }) => {
+    const decision = await context.service.recordDecision({
+      sessionId: options.session, generation: options.generation,
+      title: options.title, outcome: options.outcome,
+      authority: options.authority ?? "workstream",
+      workstreamId: options.workstream ?? null,
+      decidedBy: options.decidedBy,
+      supersedes: options.supersedes ?? null,
+      humanConfirmed: options.human === true,
+      descriptor: context.descriptor });
+    return { data: decision,
+      text: `${decision.decisionId} ${decision.authority}: ${decision.title}` };
+  },
+
   workstream: async ({ options, context }) => {
     const owner = { sessionId: options.session, generation: options.generation };
     // Taking the coordination of one and creating one are the same noun, so

@@ -107,6 +107,25 @@ export const PUBLIC_TOOLS = Object.freeze([
     }, ["messageId"]),
   },
   {
+    name: "acc_decide",
+    description: `Record what was settled, so the next session does not reopen it. `
+      + `Separate from a message because a decision outlives the conversation that `
+      + `produced it. \`authority\` is who settled it: \`workstream\` for an agreement `
+      + `between agents, \`policy\` for a rule that already existed, \`human\` only when a `
+      + `person actually said so - which needs \`humanConfirmed\`. ${POLLED}`,
+    inputSchema: object({
+      title: string("What was decided, in one line."),
+      outcome: string("What was settled, and enough of why to act on it."),
+      authority: { type: "string", enum: ["workstream", "policy", "human"],
+        description: "Default: workstream." },
+      humanConfirmed: { type: "boolean",
+        description: "A person said so. Required for human authority." },
+      workstreamId: string("Optional workstream context."),
+      supersedes: string("A decision this replaces."),
+      decidedBy: stringList("Participants who settled it. Defaults to you."),
+    }, ["title", "outcome"]),
+  },
+  {
     name: "acc_workstream",
     description: `Group related work so several agents can see it as one thing, or take `
       + `on steering one that exists. Optional: a single request needs no workstream. `
