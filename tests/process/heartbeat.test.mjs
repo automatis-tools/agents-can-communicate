@@ -7,6 +7,8 @@ import path from "node:path";
 import test from "node:test";
 import { promisify } from "node:util";
 
+import { needsRefresh } from "@agents-can-communicate/hook-runner";
+
 const run = promisify(execFile);
 const repo = path.resolve(import.meta.dirname, "..", "..");
 const acc = path.join(repo, "bin", "acc.mjs");
@@ -143,4 +145,17 @@ test("work in progress is not reported as going nowhere", async t => {
   // opposite of the truth about work somebody is doing right now.
   const shown = await place.turn("asker");
   assert.equal(shown.includes("nobody is working on it"), false, shown);
+});
+
+test("a session with no recorded sign of life gets one", async () => {
+  const now = Date.now();
+
+  // `heartbeatAt` is required by the schema, so an absent one cannot happen
+  // today. The point is that the decision does not rest on how `Date.parse`
+  // treats something that is not a timestamp - it used to, and got the right
+  // answer by accident.
+  assert.equal(needsRefresh(undefined, now), true);
+  assert.equal(needsRefresh("not a date", now), true);
+  assert.equal(needsRefresh(new Date(now - 5_000).toISOString(), now), false);
+  assert.equal(needsRefresh(new Date(now - 120_000).toISOString(), now), true);
 });
