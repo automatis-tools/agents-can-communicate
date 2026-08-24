@@ -150,6 +150,26 @@ export function createCommunicationService(ports, sessions, claims) {
    * is written while the model is still active; session end only closes
    * lifecycle ownership.
    */
+  /**
+   * What the successor needs, in the order they need it: what this was for, how
+   * far it got, what is left, and what is in the way.
+   */
+  function describeHandoff(record) {
+    const section = (label, items) => (items.length === 0
+      ? [] : [`${label}:`, ...items.map(item => `- ${item}`)]);
+    return [
+      // The goal is the subject; repeating it here costs a line of everyone's
+      // turn to say the same thing twice.
+      record.status,
+      ...section("done", record.completed),
+      // Not "left": the status line above already uses that word for how far
+      // this got, and the two meanings sat one line apart.
+      ...section("still to do", record.remaining),
+      ...section("in the way", record.blockers),
+      ...section("released", record.claimsToRelease),
+    ].join("\n");
+  }
+
   async function finishSession(input) {
     const session = await requireOpenSession(input, "finish");
     const workspaceId = session.workspaceId;
@@ -158,12 +178,17 @@ export function createCommunicationService(ports, sessions, claims) {
     const handoffId = createId("handoff");
     const owned = (await store.snapshot(workspaceId, { kinds: ["claim"] })).claims
       .filter(claim => claim.ownerSessionId === session.sessionId);
+    const successor = input.toParticipantId ?? null;
+    // The same rule as addressing anything else: handing your work to a name
+    // nobody has is a typo, and the summary is the last thing this session will
+    // ever say.
+    if (successor !== null) await assertKnownParticipants(store, workspaceId, [successor]);
     const record = validateRecord("handoff", {
       schemaVersion: SCHEMA_VERSION,
       handoffId,
       workspaceId,
       fromSessionId: session.sessionId,
-      toParticipantId: input.toParticipantId ?? null,
+      toParticipantId: successor,
       goal: input.goal,
       status: input.status ?? "partial",
       completed: input.completed ?? [],
@@ -181,6 +206,22 @@ export function createCommunicationService(ports, sessions, claims) {
         actorSessionId: session.sessionId, type: "handoff.created", occurredAt: now,
         payload: { handoffId, released: record.claimsToRelease } });
     }, { kinds: ["handoff"] });
+
+    // A handoff nobody is told about is a note to the store. Written, durable,
+    // and reaching the agent it names through nothing at all: not their turn,
+    // not their attention, not `acc status` - only a full snapshot they would
+    // have to scan for their own name. The message type for this has been in the
+    // schema all along, and this is the half that was never built.
+    if (successor !== null) {
+      await sendMessage({
+        sessionId: session.sessionId, generation: input.generation,
+        toParticipantIds: [successor], type: "handoff",
+        subject: `handing over: ${record.goal}`,
+        body: describeHandoff(record),
+        descriptor: input.descriptor,
+      });
+    }
+
     for (const claim of owned) {
       await claims.releaseClaim({ claimId: claim.claimId, sessionId: session.sessionId,
         generation: session.generation, workspaceId });
