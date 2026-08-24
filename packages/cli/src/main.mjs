@@ -197,7 +197,8 @@ const HANDLERS = Object.freeze({
   },
 
   status: async ({ options, context }) => {
-    const status = await context.service.collectStatus({ participantId: options.participant });
+    const status = await context.service.collectStatus({
+      participantId: options.participant, all: options.all === true });
     const text = `${status.counts.live} live; ${status.counts.claims} claim(s); `
       + `protection ${status.protection}`;
     return { data: status, text };

@@ -79,7 +79,15 @@ export function createStatusService(ports, sessions) {
       workspaceId,
       materialised: durable,
       protection: protectionOf(claims, live),
-      participants: sessionRecords.map(session => ({
+      // Who is here, unless the caller asks for everyone who ever was. A closed
+      // session is never removed - a message is attributed to its sender, and
+      // the roster is where "which worktree was that agent in" is answered - so
+      // after a month of work this listed sixty entries for one live session.
+      // `acc status --all` is how the worktree-cleanup question is asked.
+      participants: sessionRecords
+        .filter(session => input.all === true
+          || classifySessionPresence(session, now) !== "offline")
+        .map(session => ({
         sessionId: session.sessionId,
         participantId: session.participantId,
         harness: session.harness,

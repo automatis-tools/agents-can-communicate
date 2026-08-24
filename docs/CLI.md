@@ -32,7 +32,7 @@ graph LR
 
 | Command | Does |
 |---|---|
-| `acc status` | Who is here, claims, protection level |
+| `acc status` | Who is here, claims, protection level. `--all` adds everyone who has been |
 | `acc sync` | New events since a cursor; silent when alone |
 | `acc work` | Publish what this session is doing. `--clear` when it has stopped |
 | `acc claim` | Reserve a resource. Exit `5` on conflict |
@@ -79,6 +79,19 @@ guessing — acting as the wrong session is exactly what the generation prevents
 
 The generation is never printed by `acc status`, on purpose: it is proof of ownership, not
 public information.
+
+## Who has been here
+
+`acc status` lists the sessions that are present. A closed session is kept — a message is
+attributed to whoever sent it, and the roster is the only place that answers which checkout
+an agent was working in, which is a question its session cannot answer once it has gone.
+
+```bash
+acc status --all
+```
+
+That is how a cleanup asks: each entry carries `checkoutRoot`, `branch` and `presence`, so
+a worktree with no live session behind it can be told apart from someone's desk.
 
 ## Asking another agent
 
