@@ -7,10 +7,10 @@ release.
 
 | | |
 |---|---|
-| Built from | `4dd9548` |
+| Built from | `229bbe8` |
 | Tarball | `agents-can-communicate-0.0.0.tgz`, 109 KB, 103 entries |
-| sha256 | `c183218ad4bdecd9cf20e45c36e0710271493277bb793727e23b99a399cf5a61` |
-| Tests | 787 passing, 0 failing |
+| sha256 | `ecfbcf9dd1491a934c03a64f9d825a860600e261a160130e35906b6447b0af98` |
+| Tests | 795 passing, 0 failing |
 | Node | 24 (current production LTS) |
 | Verified on | macOS 15 (darwin 25.5.0, arm64) and Linux in CI |
 | Not supported | Windows — see below |
@@ -62,6 +62,10 @@ fact: you asked, and there is nobody there.
 Every line of an injected turn can be acted on. An attention line carries the id
 of the thing it is about — the same id the command that answers it takes — and a
 turn the byte budget truncated says how to read what it withheld.
+
+A cursor that is not a cursor is refused. It used to answer "nothing new" every
+time, for as long as it was held, so a corrupt one looked exactly like a quiet
+workspace.
 
 A session that is working looks alive. Only one of the four clients fires a
 heartbeat event, so every other session went stale three minutes after starting
