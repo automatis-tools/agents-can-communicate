@@ -149,11 +149,15 @@ recorded -> queued -> injected -> seen -> acknowledged
 
 States are monotonic. One recipient's receipt cannot alter another recipient's state. `seen` means exposed to the receiving session or explicitly marked, not that the model obeyed it.
 
-`sendMessage` leaves a receipt at `queued`. It advances to `injected` when a recipient's
-turn context actually carried the message — and only then. A message the context budget
-could not fit stays `queued` and goes out on a later turn, because a receipt claiming
-delivery for text nobody was shown tells the sender something untrue. Whatever the budget
-left out is stated in the projection rather than dropped in silence.
+`sendMessage` leaves a receipt at `queued`. It advances to `injected` when the message was
+actually handed to the recipient — and only then. For a hooked session that means the turn
+context carried it: one the budget could not fit stays `queued` and goes out on a later
+turn, because a receipt claiming delivery for text nobody was shown tells the sender
+something untrue, and whatever the budget left out is stated in the projection rather than
+dropped in silence. For a client with no hooks it means `acc_sync` returned it, which is
+that client's turn — until it did, such a receipt stayed `queued` for the life of the
+client and the sender was told its message had not arrived by an agent that had answered
+it.
 
 ## Decisions
 
