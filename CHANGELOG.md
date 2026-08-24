@@ -7,10 +7,10 @@ release.
 
 | | |
 |---|---|
-| Built from | `e81aae2` |
+| Built from | `9e10333` |
 | Tarball | `agents-can-communicate-0.0.0.tgz`, 109 KB, 103 entries |
-| sha256 | `d020b9bb50e055a7b848cd26478d2391af1b6e0c4ee93ab7ea1fe97f1448a8cd` |
-| Tests | 747 passing, 0 failing |
+| sha256 | `e0ab2514697f1f11d277ad00720315e2d6142369dfd228a3f5f9aec61d06d63e` |
+| Tests | 749 passing, 0 failing |
 | Node | 24 (current production LTS) |
 | Verified on | macOS 15 (darwin 25.5.0, arm64) and Linux in CI |
 | Not supported | Windows — see below |
@@ -89,7 +89,8 @@ left every running session heartbeating the old one, invisible to everyone and
 not recovering until its client restarted.
 
 Installing edits configuration for four other tools, and every one of their homes
-comes back as it was found — byte for byte, with nothing left behind and nothing
+comes back as it was found — including a home that had none of those files, which
+is left with none of them — byte for byte, with nothing left behind and nothing
 reformatted. Uninstall removes the entries ACC recorded writing and nothing else. A settings key ACC had to create
 goes only when it is empty: plugins the user enabled afterwards live in that same
 key, and taking it outright took them too.
