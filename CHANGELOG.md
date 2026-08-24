@@ -7,10 +7,10 @@ release.
 
 | | |
 |---|---|
-| Built from | `196898c` |
+| Built from | `3f7293d` |
 | Tarball | `agents-can-communicate-0.0.0.tgz`, 109 KB, 103 entries |
-| sha256 | `a27db53d03b6a067e86bfcc66339cbb41edbc5a3ac13290a8a7316e8dced6a19` |
-| Tests | 735 passing, 0 failing |
+| sha256 | `ed4288a2412273705d19a26deb294931a9ae4ab17394bd95e72ca3615c86fa3f` |
+| Tests | 739 passing, 0 failing |
 | Node | 24 (current production LTS) |
 | Verified on | macOS 15 (darwin 25.5.0, arm64) and Linux in CI |
 | Not supported | Windows — see below |
@@ -34,6 +34,10 @@ when the working tree is dirty.
 
 Coordinates independent agent sessions in one workspace: presence, intent,
 workspace-global claims, typed messages, handoffs. No session is in charge.
+
+`acc status` lists who is here. Closed sessions are kept — the roster is the only
+place that answers which checkout an agent was working in — and `acc status --all`
+is how a worktree cleanup asks for them.
 
 `acc doctor` works on a store nobody can read, which is the only store worth
 running it on. One truncated record used to make it answer "invalid JSON record"
@@ -130,6 +134,11 @@ Full matrix and what the `yes` values do **not** promise:
   and `O_NOFOLLOW` does not refuse a symlinked config the way it does on POSIX —
   so the symlink defence does not hold. macOS and Linux are supported; Windows
   is future work.
+- **Nothing retires a closed session.** One record per session, kept forever. A
+  message now carries the participant that sent it, so attribution no longer
+  depends on the record surviving — which was the thing preventing retirement.
+  How much history a project keeps is that project's decision, and no policy is
+  imposed here.
 - **A turn still costs more in a busy workspace.** Attaching and heartbeating are
   bounded by what is live, and the write guard is too. Building a turn is not: it
   has to know which messages are pending for you, and messages are the kind that
