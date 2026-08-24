@@ -4,6 +4,8 @@ import { mkdir, mkdtemp, readFile, realpath, rm, stat, writeFile } from "node:fs
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
+
+import { CLAUDE_PLUGIN, pluginVersion } from "../helpers/plugin-version.mjs";
 import { promisify } from "node:util";
 
 import { createClaudeCodeAdapter } from "@agents-can-communicate/adapter-claude-code";
@@ -39,7 +41,7 @@ const ADAPTERS = [
       // The copy the client runs from, under the marketplace cache. Reading the
       // marketplace source instead would test a tree the client never loads.
       const root = path.join(home, "plugins", "cache", "acc-local",
-        "agents-can-communicate", "0.0.0");
+        "agents-can-communicate", await pluginVersion(CLAUDE_PLUGIN));
       const wired = JSON.parse(await readFile(path.join(root, "hooks", "hooks.json"),
         "utf8"));
       return Object.values(wired.hooks)
