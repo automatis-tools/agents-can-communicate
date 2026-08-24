@@ -1,7 +1,23 @@
+import { AccError, EXIT } from "@agents-can-communicate/protocol";
+
 import { classifySessionPresence } from "./sessions.mjs";
 import { overlaps } from "./claims.mjs";
 
 const DEFAULT_LIMIT = 100;
+
+// The shape every event carries, and the only thing a caller may ask to resume
+// from. `null` means the beginning, which is what a session with no cursor yet
+// has.
+const CURSOR = /^[0-9]{16}$/;
+
+function assertCursor(cursor) {
+  if (typeof cursor !== "string" || !CURSOR.test(cursor)) {
+    throw new AccError(EXIT.USAGE,
+      "a cursor is the 16-digit sequence a previous sync returned; "
+      + "leave it out to start from the beginning",
+      { cursor });
+  }
+}
 
 // Attention is computed from explicit rules, never from a hidden classifier.
 // Lower priority sorts first.
@@ -183,6 +199,13 @@ export function createSyncService(ports, sessions) {
    * view because of its role. The bounded delta is only the ambient default.
    */
   async function sync(input = {}) {
+    // A cursor that is not a cursor answered "nothing new", every time, for as
+    // long as it was held. `eventsSince` compares sequences as strings, so
+    // `not-a-cursor` sorts after every event there has ever been - and an
+    // adapter holding a corrupt one, or an agent that invented one, saw a quiet
+    // workspace rather than a mistake. `"0000000000000001; DROP"` was quietly
+    // taken as the sequence it starts with.
+    if (input.cursor != null) assertCursor(input.cursor);
     const workspaceId = input.workspaceId ?? store.workspaceId;
     const now = clock.now();
     const located = input.sessionId === undefined
