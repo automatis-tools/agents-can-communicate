@@ -69,10 +69,8 @@ $ acc status
 
 ## Install
 
-Not published yet, so build it from a clone:
-
 ```bash
-npm ci && npm pack && npm install -g ./agents-can-communicate-*.tgz
+npm install -g agents-can-communicate
 ```
 
 Then wire up the clients you have:

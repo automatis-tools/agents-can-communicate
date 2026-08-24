@@ -1,14 +1,15 @@
 # Changelog
 
-## 0.0.0 — release candidate (unpublished)
+## 0.1.0 — first release
 
-Built and verified locally. **Not published**: no npm release, no tag, no GitHub
-release.
+Published to npm. `0.x` because the surfaces are young: several of them changed
+in the week before this, and a version that promised otherwise would be the first
+thing in here that was not measured.
 
 | | |
 |---|---|
 | Built from | `2359027` |
-| Tarball | `agents-can-communicate-0.0.0.tgz`, 109 KB, 103 entries |
+| Tarball | `agents-can-communicate-0.1.0.tgz`, 109 KB, 103 entries |
 | sha256 | `626ff0b987d70afc374bd16dd632c9371a46a9d7a5e59dd3000feab2df941d5b` |
 | Tests | 800 passing, 0 failing |
 | Node | 24 (current production LTS) |

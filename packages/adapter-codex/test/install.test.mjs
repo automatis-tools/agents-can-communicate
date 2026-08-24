@@ -4,6 +4,8 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
 
+import { CODEX_PLUGIN, pluginVersion } from "../../../tests/helpers/plugin-version.mjs";
+
 import { EXIT } from "@agents-can-communicate/protocol";
 
 import { createCodexAdapter } from "../src/adapter.mjs";
@@ -332,7 +334,7 @@ test("detect reports the plugin as installed once the client has cached it", asy
 
   // What `codex plugin add` leaves behind.
   await mkdir(path.join(context.codexHome, "plugins", "cache", "acc-local",
-    "agents-can-communicate", "0.0.0"), { recursive: true });
+    "agents-can-communicate", await pluginVersion(CODEX_PLUGIN)), { recursive: true });
 
   assert.match((await adapter.detect(context)).diagnostics.join(" "),
     /plugin installed in the client's cache/);
@@ -366,7 +368,7 @@ test("install finishes the job the client's own command would have done", async 
   // the command, and by running a real session against a cache ACC wrote:
   // all five hooks fired.
   const cached = path.join(context.codexHome, "plugins", "cache", "acc-local",
-    "agents-can-communicate", "0.0.0");
+    "agents-can-communicate", await pluginVersion(CODEX_PLUGIN));
   assert.deepEqual((await readdir(cached)).sort(),
     [".codex-plugin", "acc-hook.sh", "hooks.json", "skills"].sort());
 });
@@ -380,7 +382,8 @@ test("the cached copy carries the same absolute hook command", async t => {
   // to the bundle would not survive the copy; an absolute one does, which is
   // the whole reason the shim is written with absolute paths.
   const cached = JSON.parse(await readFile(path.join(context.codexHome, "plugins",
-    "cache", "acc-local", "agents-can-communicate", "0.0.0", "hooks.json"), "utf8"));
+    "cache", "acc-local", "agents-can-communicate", await pluginVersion(CODEX_PLUGIN),
+  "hooks.json"), "utf8"));
   const command = Object.values(cached.hooks)[0][0].hooks[0].command;
   const executable = command.match(/"([^"]+)"/)[1];
   assert.equal(path.isAbsolute(executable), true, `relative command: ${command}`);
