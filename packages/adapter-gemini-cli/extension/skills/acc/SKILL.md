@@ -49,6 +49,10 @@ One call records the work and tells them why. `--to` is a participant from the r
 `acc status --json` lists who is here. They are told at their next turn and may take it,
 leave it, or reply. It is a request, not an order.
 
+A name nobody here has is refused, and the refusal lists the names there are — so a
+mistyped peer costs one command rather than a request that goes nowhere. The same is true
+of `--assignee` on a task.
+
 ## Reading your turn
 
 Every attention line carries the id of the thing it is about, and that id is the argument
