@@ -38,7 +38,7 @@ export const COMMANDS = Object.freeze({
   ack: { required: ["message"], optional: ["session", "generation", "state"] },
   finish: { required: ["goal"], optional: ["session", "generation", "status", "to"],
     repeated: ["completed", "remaining", "blocker"] },
-  status: { required: [], optional: ["participant"] },
+  status: { required: [], optional: ["participant"], flags: ["all"] },
   doctor: { required: [], optional: ["home"], flags: ["repair"] },
   // The one command with a subcommand. Kept as an explicit list rather than a
   // free positional: `acc config delete` should fail at the parser, not deep
