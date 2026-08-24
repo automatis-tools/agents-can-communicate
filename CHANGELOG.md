@@ -7,10 +7,10 @@ release.
 
 | | |
 |---|---|
-| Built from | `d0b1afc` |
+| Built from | `991df4c` |
 | Tarball | `agents-can-communicate-0.0.0.tgz`, 109 KB, 103 entries |
-| sha256 | `4746b75ae70c63f35f74e2926e7faedaec4a47404573346f5539c02273a6632d` |
-| Tests | 778 passing, 0 failing |
+| sha256 | `56914a392bdd204bef999cb3b26bc3e3b054f48c9a3bf6096122ed34ebb1fbdf` |
+| Tests | 782 passing, 0 failing |
 | Node | 24 (current production LTS) |
 | Verified on | macOS 15 (darwin 25.5.0, arm64) and Linux in CI |
 | Not supported | Windows — see below |
@@ -62,6 +62,10 @@ fact: you asked, and there is nobody there.
 Every line of an injected turn can be acted on. An attention line carries the id
 of the thing it is about — the same id the command that answers it takes — and a
 turn the byte budget truncated says how to read what it withheld.
+
+An agent is told when the claim it is relying on has run out. The lease lapsed on
+the clock, peers could write again, and the holder's turn said nothing — it went
+on working on a file it believed it had reserved.
 
 A decision can be recorded. The protocol has described the object from the start
 and nothing could make one; the rule that an agent cannot record a human decision

@@ -15,6 +15,7 @@ export const ATTENTION_PRIORITY = Object.freeze({
   task_unblocked: 3,
   coordinator_missing: 4,
   request_stalled: 5,
+  claim_expired: 6,
 });
 
 function directRequests(snapshot, participantId) {
@@ -28,6 +29,29 @@ function directRequests(snapshot, participantId) {
       sourceId: message.messageId, summary: message.subject });
   }
   return items;
+}
+
+/**
+ * A claim of yours that has run out.
+ *
+ * A lease lapses on the clock, and nothing said so. Measured: while it held, a
+ * peer's write into the file was refused; three seconds later the same write
+ * went through, and the holder's turn was identical before and after. It went on
+ * working on a file it believed it had reserved, and everyone else was free to
+ * change it.
+ *
+ * Only for the session that took it, and only while that session is the one
+ * asking: a lapsed claim is news to its owner and nobody else's business.
+ * Re-claiming refreshes the lease and clears this; releasing it clears it too.
+ */
+function expiredClaims(snapshot, session, now) {
+  if (session == null) return [];
+  return (snapshot.claims ?? [])
+    .filter(claim => claim.ownerSessionId === session.sessionId
+      && Date.parse(claim.expiresAt) <= Date.parse(now))
+    .map(claim => ({ kind: "claim_expired", priority: ATTENTION_PRIORITY.claim_expired,
+      sourceId: claim.claimId,
+      summary: `${claim.resource} - your claim has run out, and peers can write to it` }));
 }
 
 function claimConflicts(snapshot, session, now) {
@@ -142,6 +166,7 @@ export function computeAttention(snapshot, { session, participantId, now }) {
   return [
     ...directRequests(snapshot, participantId),
     ...claimConflicts(snapshot, session, now),
+    ...expiredClaims(snapshot, session, now),
     ...unblockedTasks(snapshot, session, participantId),
     ...coordinatorGaps(snapshot),
     ...stalledRequests(snapshot, participantId, now),

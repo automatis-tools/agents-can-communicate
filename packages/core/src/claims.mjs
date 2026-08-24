@@ -84,8 +84,13 @@ export function createClaimService(ports, sessions) {
     let record = null;
     await store.transaction(async tx => {
       const live = tx.list("claim", claim => isLive(claim, now));
-      const mine = live.find(claim => claim.ownerSessionId === session.sessionId
-        && claim.resource === resource);
+      // This session's own claim on this resource, live or lapsed. Looking only
+      // among the live ones left the expired record behind and made a fresh one
+      // beside it, so taking a resource back after a lease ran out reported
+      // success while the workspace still held a dead claim saying otherwise -
+      // and the owner went on being told its claim had run out.
+      const mine = tx.list("claim", claim => claim.ownerSessionId === session.sessionId
+        && claim.resource === resource).at(0);
       const blocking = live.find(claim => overlaps(claim.resource, resource)
         && claim.ownerSessionId !== session.sessionId
         && (claim.mode === "exclusive" || input.mode === "exclusive"));
@@ -101,7 +106,9 @@ export function createClaimService(ports, sessions) {
         mode: input.mode ?? "exclusive",
         enforcement: input.enforcement ?? "advisory",
         reason: input.reason,
-        acquiredAt: mine?.acquiredAt ?? now,
+        // A lapsed claim taken again is a new period of holding it, not a
+        // continuation of one that ended.
+        acquiredAt: mine !== undefined && isLive(mine, now) ? mine.acquiredAt : now,
         expiresAt,
         generation: ids.next("generation"),
       });
