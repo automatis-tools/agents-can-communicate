@@ -95,6 +95,12 @@ a worktree with no live session behind it can be told apart from someone's desk.
 
 ## Asking another agent
 
+`--to` and `--assignee` name a participant from the roster. One nobody here has is refused
+rather than accepted: a message to a name that does not exist used to report `sent` and go
+nowhere, and a request made a task assigned to nobody that its author then waited on. A
+participant who has closed their terminal is still a participant — that is the whole reason
+work is addressed to one.
+
 ```bash
 acc request --to claude_code --title "finish the store tests" \
   --detail "I ported src/store but ran out of time on the concurrency cases."

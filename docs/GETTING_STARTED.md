@@ -63,6 +63,9 @@ Exit code `5` means conflict.
 
 ## 5. Say something
 
+`--to` takes a name from the roster — `acc status` above is where you get it. Using one
+nobody here has is refused, and the refusal lists the names there are.
+
 ```bash
 acc message --to models --subject "Slots" --body "Which names are stable?" --type question
 ```
