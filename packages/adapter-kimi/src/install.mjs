@@ -4,8 +4,8 @@ import path from "node:path";
 import { AccError, EXIT } from "@agents-can-communicate/protocol";
 import { fileURLToPath } from "node:url";
 
-import { assertRunner, bakeSkillCommand, defaultRunner, removeInstalledTree,
-  runnerExists, writeForeignJson }
+import { assertRunner, bakeSkillCommand, blankText, defaultRunner, removeIfEmpty,
+  removeInstalledTree, runnerExists, writeForeignJson }
   from "@agents-can-communicate/adapter-sdk";
 
 const bundle = fileURLToPath(new URL("../plugin", import.meta.url));
@@ -179,6 +179,11 @@ export async function uninstallKimiPlugin({ home, keep = [] }) {
       await rm(registry, { force: true });
     }
   }
+
+  // Blank and absent are the same to this client, so there is nothing to lose
+  // by removing a config that holds nothing - and no record of who created it is
+  // needed, unlike a JSON settings file where `{}` can be the user's own.
+  await removeIfEmpty(configPath(home), { readFile, rm, isEmpty: blankText });
 
   await removeInstalledTree(pluginPath(home), keep);
   return { ok: true, changes, diagnostics: [] };

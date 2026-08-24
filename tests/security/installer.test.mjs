@@ -162,16 +162,18 @@ test("uninstall keeps plugins the user enabled after the install", async t => {
   assert.equal(Object.hasOwn(after, "acc:createdContainers"), false);
 });
 
-test("uninstall leaves no empty container behind either", async t => {
-  const { adapter, context, read } = await claudeHome(t);
+test("uninstall leaves no empty container behind, nor the file that held it", async t => {
+  const { adapter, context, settings } = await claudeHome(t);
   await adapter.install(context);
   await adapter.uninstall(context);
 
-  // Nothing else ever wanted the key, so keeping it would be litter in a file
-  // ACC only borrowed - the same standard as restoring a config byte for byte.
-  const after = await read();
-  assert.equal(Object.hasOwn(after, "enabledPlugins"), false);
-  assert.equal(Object.hasOwn(after, "extraKnownMarketplaces"), false);
+  // Nothing else ever wanted the key, and this home had no settings file before
+  // the install, so the file goes with it. Keeping either would be litter in a
+  // place ACC only borrowed - the same standard as restoring a config byte for
+  // byte. Which of the two happens depends on whether ACC created the file, and
+  // the install records that because afterwards `{}` looks identical either way.
+  assert.equal(await readFile(settings, "utf8").then(() => true, () => false), false,
+    "a settings file ACC created and then emptied was left behind");
 });
 
 test("a container the user already had survives uninstall", async t => {

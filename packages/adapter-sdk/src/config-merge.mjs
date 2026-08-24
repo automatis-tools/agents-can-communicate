@@ -10,6 +10,11 @@ const ENTRY_MARKER = "acc:ownedEntries";
 // creating one is permission to remove it when it ends up empty, not permission
 // to take whatever the user has put in it since.
 const CREATED_MARKER = "acc:createdContainers";
+// The file itself, as opposed to a container inside it. Recorded at install
+// because uninstall cannot tell afterwards: a settings file holding `{}` looks
+// the same whether ACC made it or the user did, and deleting the user's would
+// be the same overreach as taking a container they had put entries in.
+const CREATED_FILE = "acc:createdFile";
 
 /**
  * Merge ACC entries into a user's config and record ownership, so uninstall can
@@ -54,8 +59,9 @@ export function ownedKeys(existing, { owner = MARKER } = {}) {
  * one the user has since put their own entries into is theirs.
  */
 export function mergeOwnedEntries(existing, additions,
-  { entryOwner = ENTRY_MARKER, createdOwner = CREATED_MARKER } = {}) {
+  { entryOwner = ENTRY_MARKER, createdOwner = CREATED_MARKER, createdFile } = {}) {
   const merged = { ...existing };
+  if (createdFile === true) merged[CREATED_FILE] = true;
   const entries = new Map((existing?.[entryOwner] ?? [])
     .map(pair => [`${pair[0]}\u0000${pair[1]}`, pair]));
   const created = new Set(existing?.[createdOwner] ?? []);
@@ -96,6 +102,7 @@ export function removeOwnedEntries(existing,
   }
   delete result[entryOwner];
   delete result[createdOwner];
+  delete result[CREATED_FILE];
   return removeOwnedConfig(result, { owner });
 }
 
@@ -160,3 +167,49 @@ export function formatJsonAs(value, style) {
   const text = JSON.stringify(value, null, indent);
   return style?.trailingNewline === false ? text : `${text}\n`;
 }
+
+/**
+ * Remove a file ACC wrote once nothing is left in it.
+ *
+ * The same rule as a container ACC created: what is empty was ACC's alone, and
+ * leaving it is litter in a home that did not have it. Measured after an install
+ * and uninstall in a home that started with nothing - four files left behind,
+ * two of them empty, one a marketplace manifest naming ACC's own marketplace.
+ *
+ * It was already fixed for two registries. The fixture that proved it seeded
+ * every config first, so the branch where ACC creates the file was never taken:
+ * the instance was fixed and the shape was not.
+ */
+export function acccreatedFile(value) {
+  return value?.[CREATED_FILE] === true;
+}
+
+export async function removeIfEmpty(file, { readFile, rm, isEmpty, created = true }) {
+  if (created !== true) return false;
+  const current = await readFile(file, "utf8").catch(() => null);
+  if (current === null) return false;
+  let empty;
+  try {
+    empty = isEmpty(current);
+  } catch {
+    // Unparseable is not empty. A file nobody can read is the user's to fix,
+    // and deleting it would take whatever it was meant to hold.
+    return false;
+  }
+  if (!empty) return false;
+  await rm(file, { force: true });
+  return true;
+}
+
+/** Nothing but whitespace, for the clients whose config is TOML. */
+export const blankText = text => text.trim() === "";
+
+/** An object with no keys, or only the ones named as ACC's own. */
+export const blankJson = (ours = []) => text => {
+  const value = JSON.parse(text);
+  if (value === null || typeof value !== "object") return false;
+  return Object.entries(value)
+    .every(([key, held]) => ours.includes(key)
+      || (Array.isArray(held) ? held.length === 0
+        : held !== null && typeof held === "object" && Object.keys(held).length === 0));
+};
