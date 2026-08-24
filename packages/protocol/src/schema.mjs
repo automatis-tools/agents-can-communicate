@@ -109,8 +109,12 @@ const RECORDS = Object.freeze({
     mode: oneOf("shared", "exclusive"), enforcement: oneOf("advisory", "guarded"),
     reason: line, acquiredAt: timestamp, expiresAt: timestamp, generation: id },
 
+  // `fromParticipantId` beside the session: a session ends, and the one fact
+  // that has to outlive it is who was speaking. Resolving the sender by looking
+  // its session up meant the record could never be retired, and an agent whose
+  // client had restarted stopped being told about its own unanswered question.
   message: { messageId: id, workspaceId: id, fromSessionId: id,
-    toParticipantIds: listOf(id),
+    fromParticipantId: id, toParticipantIds: listOf(id),
     type: oneOf("note", "question", "answer", "contract_request", "contract_response",
       "decision_proposal", "decision_result", "blocker", "review_request",
       "review_result", "handoff", "work_request", "work_response"),

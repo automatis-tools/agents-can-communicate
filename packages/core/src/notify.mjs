@@ -34,6 +34,7 @@ export function writeWorkResponse(tx, { task, actor, workspaceId, now, ids, outc
     messageId,
     workspaceId,
     fromSessionId: actor.sessionId,
+    fromParticipantId: actor.participantId,
     toParticipantIds: [asker],
     type: "work_response",
     subject: `${outcome}: ${task.title}`,

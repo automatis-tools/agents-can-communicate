@@ -84,15 +84,13 @@ function unblockedTasks(snapshot, session, participantId) {
  * you asked, and there is nobody there.
  */
 function unansweredQuestions(snapshot, participantId, onlineParticipants) {
-  const senderOf = new Map((snapshot.sessions ?? [])
-    .map(session => [session.sessionId, session.participantId]));
   const items = [];
   for (const receipt of snapshot.receipts ?? []) {
     if (receipt.state === "acknowledged" || receipt.state === "failed") continue;
     const message = (snapshot.messages ?? [])
       .find(item => item.messageId === receipt.messageId);
     if (message === undefined || !message.requiresAck) continue;
-    if (senderOf.get(message.fromSessionId) !== participantId) continue;
+    if (message.fromParticipantId !== participantId) continue;
     // Not answered yet by someone who is here is ordinary waiting, and saying so
     // every turn would be noise the reader learns to skip.
     if (onlineParticipants.has(receipt.recipientParticipantId)) continue;
