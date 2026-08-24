@@ -1,5 +1,6 @@
 import { access, chmod, mkdir, readFile, readdir, rm, writeFile }
   from "node:fs/promises";
+import { existsSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -10,8 +11,38 @@ import { AccError, EXIT } from "@agents-can-communicate/protocol";
  * up on PATH. A hook's environment does not reliably carry the user's PATH, and
  * a command that cannot be found fails silently on every event.
  */
-export const defaultRunner = () =>
-  fileURLToPath(new URL("../../../bin/acc-hook.mjs", import.meta.url));
+/**
+ * The hook runner, found rather than counted to.
+ *
+ * `../../../bin/acc-hook.mjs` is the answer in a development checkout and only
+ * there. Published, this module sits at
+ * `<package>/node_modules/@agents-can-communicate/adapter-sdk/src/`, which is one
+ * level deeper, so the path resolved to `node_modules/bin/acc-hook.mjs` and
+ * every install refused: `the hook runner does not exist`, for every client on
+ * the machine, from a clean `npm install` of the package.
+ *
+ * Nothing caught it. `acc install` exited 0 with the failures counted in a line
+ * that began with a success, and the release check threw that output away - so
+ * the gate reported PASS on a package whose main command could not run.
+ *
+ * Walking up for it holds in both layouts and in whatever a future one is: the
+ * nearest `bin/acc-hook.mjs` above this file is the one that belongs to this
+ * copy of the package.
+ */
+export const defaultRunner = () => {
+  let directory = fileURLToPath(new URL(".", import.meta.url));
+  for (;;) {
+    const candidate = path.join(directory, "bin", "acc-hook.mjs");
+    if (existsSync(candidate)) return candidate;
+    const parent = path.dirname(directory);
+    // Reached the root without finding one. The development answer is returned
+    // so the refusal that follows names a path a reader can recognise.
+    if (parent === directory) {
+      return fileURLToPath(new URL("../../../bin/acc-hook.mjs", import.meta.url));
+    }
+    directory = parent;
+  }
+};
 
 export const runnerExists = async runner => {
   try {

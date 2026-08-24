@@ -149,8 +149,13 @@ async function main() {
     step("install and uninstall");
     await writeFile(path.join(clientHome, "config.toml"), 'default_model = "k3"\n');
     const before = await readFile(path.join(clientHome, "config.toml"), "utf8");
-    await acc("install", "--home", clientHome);
-    await acc("uninstall", "--home", clientHome);
+    // `acc install` fails the command when an adapter fails, so its output is
+    // the diagnosis rather than something to discard.
+    const installed = await acc("install", "--home", clientHome)
+      .catch(error => { fail("install failed", error.stdout || error.message); });
+    const removed = await acc("uninstall", "--home", clientHome)
+      .catch(error => { fail("uninstall failed", error.stdout || error.message); });
+    void installed; void removed;
     const after = await readFile(path.join(clientHome, "config.toml"), "utf8");
     if (after !== before) fail("uninstall did not restore the client config");
     ok("client config restored byte for byte");

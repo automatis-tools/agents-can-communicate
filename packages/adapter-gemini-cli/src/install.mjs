@@ -1,5 +1,7 @@
 import { cp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
+
+import { AccError, EXIT } from "@agents-can-communicate/protocol";
 import { fileURLToPath } from "node:url";
 
 import { bakeSkillCommand, removeInstalledTree, writeForeignJson, writeHookShim }
@@ -12,12 +14,26 @@ const OWNER_PREFIX = "acc-";
 const settingsPath = home => path.join(home, ".gemini", "settings.json");
 const extensionPath = home => path.join(home, ".gemini", "extensions", EXTENSION_NAME);
 
+/**
+ * Read a client's own JSON, and say which file when it will not parse.
+ *
+ * A malformed config is the user's to fix, and the message they get has to name
+ * it. `Unexpected end of JSON input` arrived with no path attached, from an
+ * install that touches four clients' homes, and left them to guess which.
+ */
 async function readJson(file, fallback) {
+  let source;
   try {
-    return JSON.parse(await readFile(file, "utf8"));
+    source = await readFile(file, "utf8");
   } catch (error) {
     if (error.code === "ENOENT") return fallback;
     throw error;
+  }
+  try {
+    return JSON.parse(source);
+  } catch (error) {
+    throw new AccError(EXIT.DATA, `${file} is not valid JSON: ${error.message}`,
+      { file, cause: error.message });
   }
 }
 
@@ -45,6 +61,10 @@ const withShim = (wiring, shim) => ({ hooks: Object.fromEntries(
  * it needs; secrets stay where the user put them.
  */
 export async function installGeminiExtension({ home, runner, node }) {
+  // Read before writing: a settings file that will not parse must not be found
+  // out after the extension tree is already on disk.
+  const existing = await readJson(settingsPath(home), {});
+
   const target = extensionPath(home);
   await rm(target, { recursive: true, force: true });
   await cp(bundle, target, { recursive: true });
@@ -66,7 +86,6 @@ export async function installGeminiExtension({ home, runner, node }) {
   const ours = withShim(await readJson(path.join(bundle, "hooks", "hooks.json"),
     { hooks: {} }), shim);
   const file = settingsPath(home);
-  const existing = await readJson(file, {});
   const merged = { ...existing, hooks: { ...(existing.hooks ?? {}) } };
   for (const [event, entries] of Object.entries(ours.hooks)) {
     const foreign = (merged.hooks[event] ?? [])

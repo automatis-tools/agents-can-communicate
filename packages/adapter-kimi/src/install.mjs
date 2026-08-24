@@ -1,5 +1,7 @@
 import { cp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
+
+import { AccError, EXIT } from "@agents-can-communicate/protocol";
 import { fileURLToPath } from "node:url";
 
 import { assertRunner, bakeSkillCommand, defaultRunner, removeInstalledTree,
@@ -55,10 +57,22 @@ async function readText(file, fallback) {
   }
 }
 
+/**
+ * Read a client's own JSON, and say which file when it will not parse.
+ *
+ * A malformed config is the user's to fix, and the message they get has to name
+ * it. `Unexpected end of JSON input` arrived with no path attached, from an
+ * install that touches four clients' homes, and left them to guess which.
+ */
 async function readJson(file, fallback) {
   const source = await readText(file, null);
   if (source === null) return fallback;
-  return JSON.parse(source);
+  try {
+    return JSON.parse(source);
+  } catch (error) {
+    throw new AccError(EXIT.DATA, `${file} is not valid JSON: ${error.message}`,
+      { file, cause: error.message });
+  }
 }
 
 /**
@@ -111,6 +125,9 @@ export async function installKimiPlugin({ home, runner = defaultRunner(), node }
   // long as it stays installed: the client reports nothing and ACC simply never
   // sees a session. Writing that entry and hoping is worse than refusing.
   await assertRunner(runner);
+  // Read before writing: a registry that will not parse must be found before a
+  // plugin tree is laid down that nothing will then be able to remove.
+  const registered = await readJson(registryPath(home), { version: 1, plugins: [] });
 
   const target = pluginPath(home);
   await rm(target, { recursive: true, force: true });
@@ -130,8 +147,7 @@ export async function installKimiPlugin({ home, runner = defaultRunner(), node }
 
   const registry = registryPath(home);
   await mkdir(path.dirname(registry), { recursive: true });
-  await writeForeignJson(registry,
-    registerPlugin(await readJson(registry, { version: 1, plugins: [] }), target),
+  await writeForeignJson(registry, registerPlugin(registered, target),
     { readFile, writeFile, mkdir });
 
   return { ok: true, changes: [target, file, registry], diagnostics: [] };

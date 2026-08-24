@@ -7,10 +7,10 @@ release.
 
 | | |
 |---|---|
-| Built from | `3f7293d` |
+| Built from | `e81aae2` |
 | Tarball | `agents-can-communicate-0.0.0.tgz`, 109 KB, 103 entries |
-| sha256 | `ed4288a2412273705d19a26deb294931a9ae4ab17394bd95e72ca3615c86fa3f` |
-| Tests | 739 passing, 0 failing |
+| sha256 | `d020b9bb50e055a7b848cd26478d2391af1b6e0c4ee93ab7ea1fe97f1448a8cd` |
+| Tests | 747 passing, 0 failing |
 | Node | 24 (current production LTS) |
 | Verified on | macOS 15 (darwin 25.5.0, arm64) and Linux in CI |
 | Not supported | Windows — see below |
@@ -34,6 +34,13 @@ when the working tree is dirty.
 
 Coordinates independent agent sessions in one workspace: presence, intent,
 workspace-global claims, typed messages, handoffs. No session is in charge.
+
+`acc install` works from a published package, and says so when it does not. The
+hook runner was located by counting directories up from the SDK, which is right
+in a development checkout and one level short once the workspaces are bundled —
+so every install refused, for every client, from a clean install of the package.
+Nothing caught it: the command counted its failures in a line beginning with a
+success, exited 0, and the release check threw that output away.
 
 `acc status` lists who is here. Closed sessions are kept — the roster is the only
 place that answers which checkout an agent was working in — and `acc status --all`
