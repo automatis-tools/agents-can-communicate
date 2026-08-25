@@ -2,6 +2,8 @@ import { execFile } from "node:child_process";
 import { mkdir, writeFile } from "node:fs/promises";
 import { promisify } from "node:util";
 
+import { AccError, EXIT } from "@agents-can-communicate/protocol";
+
 import { platformPaths } from "./platform-paths.mjs";
 import { checkingIsOff, fetchLatest, isNewer, writeCachedCheck } from "./update-check.mjs";
 
@@ -26,13 +28,24 @@ const spell = ([command, argv]) => `  ${command} ${argv.join(" ")}`;
 export async function runUpdateCommand({ options, runtime }) {
   const env = runtime.env ?? {};
   const { data: dataHome } = platformPaths({ platform: runtime.platform, env });
-  const running = typeof runtime.version === "function" ? await runtime.version() : null;
+  const running = typeof runtime.version === "function"
+    ? await runtime.version().catch(() => null)
+    : null;
 
   // Off means off, and it says so rather than reporting that nothing is newer -
   // which is a different fact, and one this run did not establish.
   if (checkingIsOff(env)) {
     return { data: { checked: false, running, latest: null },
       text: "update checking is off (ACC_NO_UPDATE_CHECK); nothing was asked" };
+  }
+
+  // Caught, and then refused rather than degraded. `doctor` and `install` can
+  // carry on without knowing which ACC is running - they say less - but this
+  // command is the comparison, and `isNewer(latest, null)` is false: carrying on
+  // would answer "you have the latest" on the strength of not knowing.
+  if (running === null) {
+    throw new AccError(EXIT.DATA,
+      "cannot read the installed version, so there is nothing to compare against");
   }
 
   const latest = await fetchLatest({ get: runtime.fetch });
