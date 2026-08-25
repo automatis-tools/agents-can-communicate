@@ -1,6 +1,7 @@
 // Composition root: discovery, runtime locations, and the CLI surface.
 export { main } from "./main.mjs";
 export { COMMANDS, parseArgs } from "./args.mjs";
+export { askConfirmation } from "./confirm.mjs";
 // Exported so a test can hold every adapter to where it plans to write and
 // which binary decides it runs at all.
 export { ALL_ADAPTERS, clientContext } from "./install-command.mjs";

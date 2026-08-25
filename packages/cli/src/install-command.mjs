@@ -60,11 +60,52 @@ function selectAdapters(requested) {
  * carries one per skipped adapter and the result one per failure - and only
  * `--json` ever showed them.
  */
-export function describeOutcome({ action, acted, failed = [], skipped = [] }) {
+const shorten = (file, home) =>
+  typeof home === "string" && home !== "" && file.startsWith(`${home}/`)
+    ? `~${file.slice(home.length)}`
+    : file;
+
+/**
+ * What one adapter did, path by path.
+ *
+ * `installed 3 adapter(s)` was the whole account of a command that had just
+ * written into three other tools' configuration inside someone's home. The list
+ * existed all along - it is what `--dry-run` prints - and the run that actually
+ * did the work printed a number.
+ *
+ * An install says what it wrote from the plan it carried out, in the same words
+ * the preview uses. An uninstall says what was removed and what was held back,
+ * because those are decided while it runs: bytes that stopped matching what ACC
+ * wrote are someone's now, and are kept.
+ */
+export function describeChanges(operation, home) {
+  const artifacts = operation.artifacts ?? [];
+  const edited = artifacts.filter(artifact => artifact.kind === "merge")
+    .map(artifact => `  edited  ${shorten(artifact.path, home)}`);
+  if (operation.action !== "uninstall") {
+    return [...artifacts.filter(artifact => artifact.kind !== "merge")
+      .map(artifact => `  created ${shorten(artifact.path, home)}`), ...edited];
+  }
+  return [
+    ...(operation.removed ?? []).map(file => `  removed ${shorten(file, home)}`),
+    ...edited,
+    ...(operation.kept ?? [])
+      .map(file => `  kept    ${shorten(file, home)} - changed since ACC wrote it`),
+  ];
+}
+
+export function describeOutcome({ action, acted, failed = [], skipped = [],
+  operations = [], home }) {
   return [`${action}ed ${acted} adapter(s)`
     + (failed.length > 0 ? `; ${failed.length} failed` : ""),
+  ...operations.filter(operation => operation.applied)
+    .flatMap(operation => describeChanges(operation, home)),
   ...skipped.map(entry => `  skip ${entry.adapterId}: ${entry.reason}`),
-  ...failed.map(entry => `  ${entry.adapterId}: ${entry.error}`)].join("\n");
+  ...failed.map(entry => `  ${entry.adapterId}: ${entry.error}`),
+  // Said once, where it is needed: the reader has just been shown a list of
+  // their own files with ACC's name in them.
+  ...(action === "install" && acted > 0 ? ["", "undo with: acc uninstall"] : []),
+  ].join("\n");
 }
 
 /**
@@ -123,6 +164,6 @@ export async function runInstallCommand({ options, runtime, action = "install" }
 
   return { data: { ...result, plan, dataHome },
     text: describeOutcome({ action, acted, failed: result.failed,
-      skipped: plan.skipped }),
+      skipped: plan.skipped, operations: result.operations, home }),
     error: failureOf({ action, acted, failed: result.failed }) };
 }
