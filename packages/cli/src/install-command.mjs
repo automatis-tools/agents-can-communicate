@@ -5,7 +5,7 @@ import { createClaudeCodeAdapter } from "@agents-can-communicate/adapter-claude-
 import { createCodexAdapter } from "@agents-can-communicate/adapter-codex";
 import { createGeminiCliAdapter } from "@agents-can-communicate/adapter-gemini-cli";
 import { createKimiAdapter } from "@agents-can-communicate/adapter-kimi";
-import { applyPlan, detectInstallation, planInstallation }
+import { applyPlan, detectInstallation, loadOwnership, planInstallation }
   from "@agents-can-communicate/installer";
 import { AccError, EXIT } from "@agents-can-communicate/protocol";
 
@@ -80,6 +80,21 @@ export function failureOf({ action, acted, failed = [] }) {
     describeOutcome({ action, acted, failed }), { failed });
 }
 
+/**
+ * How many adapters this actually did something to.
+ *
+ * `applied` means the adapter's own step ran, which on an uninstall is true of
+ * every client on the machine whether ACC had ever written to it or not. So
+ * `uninstalled 3 adapter(s)` was the report on a machine where ACC had installed
+ * nothing at all - printed by the same run that skipped the one client it had
+ * actually written to.
+ */
+export function actedOn(result) {
+  return result.operations.filter(operation => operation.applied
+    && (result.action === "install"
+      || (operation.removed?.length ?? 0) + (operation.changes?.length ?? 0) > 0)).length;
+}
+
 export async function runInstallCommand({ options, runtime, action = "install" }) {
   const adapters = selectAdapters(options.adapter);
   const home = options.home ?? runtime.env?.HOME ?? homedir();
@@ -88,12 +103,18 @@ export async function runInstallCommand({ options, runtime, action = "install" }
     env: runtime.env ?? {} });
 
   const detected = await detectInstallation({ adapters, context });
-  const plan = planInstallation({ adapters, detected, context, action });
+  // An uninstall is planned from what ACC recorded writing, not only from what
+  // is on the machine now. A client can be removed after ACC installed into it,
+  // and its configuration directory - with ACC's files in it - stays behind.
+  const recorded = action === "uninstall"
+    ? (await loadOwnership({ dataHome })).installs
+    : [];
+  const plan = planInstallation({ adapters, detected, context, action, recorded });
 
   const dryRun = options.dryRun === true;
   const result = await applyPlan({ plan, adapters, context, dataHome, dryRun });
 
-  const acted = result.operations.filter(operation => operation.applied).length;
+  const acted = actedOn(result);
   if (dryRun) {
     return { data: { ...result, plan, dataHome },
       text: [`would ${action}:`, ...plan.operations.flatMap(operation => operation.summary),

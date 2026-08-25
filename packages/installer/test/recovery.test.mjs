@@ -122,3 +122,114 @@ test("uninstall after a crash removes only what is still ACC's", async t => {
   assert.equal(await readFile(path.join(plugin, "skills", "acc", "SKILL.md"), "utf8"),
     "my own notes\n");
 });
+
+/**
+ * The machine changing under a recorded install.
+ *
+ * A client can be uninstalled after ACC has written into it, and its
+ * configuration directory outlives it. Planning an uninstall from detection
+ * alone meant ACC skipped exactly the client it had written to, reported
+ * success, and said the same thing on every run afterwards - so the tree it
+ * created and the entries it added to the user's own settings could never be
+ * removed by the tool that put them there.
+ */
+const absent = adapter => [{ adapterId: adapter.id, displayName: adapter.displayName,
+  present: false, version: null, versionOutput: null, installed: false,
+  diagnostics: [], capabilities: adapter.capabilities, error: null }];
+
+test("an install can still be removed after the client leaves the machine", async t => {
+  const place = await machine(t);
+  const [gemini] = adapters();
+  const extension = path.join(place.home, ".gemini", "extensions",
+    "agents-can-communicate", "gemini-extension.json");
+  const settings = path.join(place.home, ".gemini", "settings.json");
+
+  const install = planInstallation({ adapters: [gemini], detected: detected([gemini]),
+    context: place.context, action: "install" });
+  await applyPlan({ plan: install, adapters: [gemini], context: place.context,
+    dataHome: place.dataHome });
+  assert.equal((await readFile(settings, "utf8")).includes("agents-can-communicate"), true,
+    "the install wrote nothing to unpick, so the test proves nothing");
+
+  // The client is removed from the machine. Everything ACC wrote stays where it is.
+  const recorded = (await loadOwnership({ dataHome: place.dataHome })).installs;
+  const plan = planInstallation({ adapters: [gemini], detected: absent(gemini),
+    context: place.context, action: "uninstall", recorded });
+
+  assert.deepEqual(plan.skipped, [], "the one client ACC wrote to was skipped");
+  assert.equal(plan.operations.length, 1);
+  assert.equal(plan.operations[0].clientPresent, false, "the plan does not say the client is gone");
+
+  await applyPlan({ plan, adapters: [gemini], context: place.context,
+    dataHome: place.dataHome });
+
+  await assert.rejects(readFile(extension), "ACC's own tree outlived the uninstall");
+  assert.equal((await readFile(settings, "utf8")).includes("agents-can-communicate"), false,
+    "ACC's entries were left in a file the user owns");
+  assert.deepEqual((await loadOwnership({ dataHome: place.dataHome })).installs, [],
+    "the record still claims an install that nothing can act on");
+});
+
+test("removing for a client that is gone keeps what the user wrote", async t => {
+  const place = await machine(t);
+  const [gemini] = adapters();
+  const settings = path.join(place.home, ".gemini", "settings.json");
+
+  const install = planInstallation({ adapters: [gemini], detected: detected([gemini]),
+    context: place.context, action: "install" });
+  await applyPlan({ plan: install, adapters: [gemini], context: place.context,
+    dataHome: place.dataHome });
+
+  const recorded = (await loadOwnership({ dataHome: place.dataHome })).installs;
+  await applyPlan({
+    plan: planInstallation({ adapters: [gemini], detected: absent(gemini),
+      context: place.context, action: "uninstall", recorded }),
+    adapters: [gemini], context: place.context, dataHome: place.dataHome });
+
+  // The file was the user's before ACC edited it, so it is still theirs after.
+  assert.deepEqual(JSON.parse(await readFile(settings, "utf8")), { theme: "dark" });
+});
+
+test("a client that is not here is still never installed into", async t => {
+  const place = await machine(t);
+  const [gemini] = adapters();
+
+  // The record is what makes an uninstall visit an absent client. An install
+  // must not read it the same way and write to a machine that has no client.
+  const plan = planInstallation({ adapters: [gemini], detected: absent(gemini),
+    context: place.context, action: "install",
+    recorded: [{ adapterId: gemini.id, version: "1.0.0", artifacts: [] }] });
+
+  assert.deepEqual(plan.operations, []);
+  assert.equal(plan.skipped.length, 1);
+  assert.match(plan.skipped[0].reason, /not installed on this machine/);
+});
+
+test("an absent client ACC never wrote to is still skipped, and said so", async t => {
+  const place = await machine(t);
+  const [gemini] = adapters();
+
+  const plan = planInstallation({ adapters: [gemini], detected: absent(gemini),
+    context: place.context, action: "uninstall", recorded: [] });
+
+  assert.deepEqual(plan.operations, []);
+  assert.match(plan.skipped[0].reason, /not installed on this machine/);
+});
+
+test("what is removed is what was written, not what would be written today", async t => {
+  const place = await machine(t);
+  const old = path.join(place.home, ".gemini", "where-it-went");
+  // An adapter whose layout has moved since the install. Planning the removal
+  // from the adapter would name today's path and leave the install where it
+  // actually is - the record is the only account of that.
+  const moved = { ...createGeminiCliAdapter(),
+    planInstall: () => [{ path: path.join(place.home, ".gemini", "where-it-goes-now"),
+      kind: "tree" }] };
+
+  const plan = planInstallation({ adapters: [moved], detected: absent(moved),
+    context: place.context, action: "uninstall",
+    recorded: [{ adapterId: moved.id, version: "0.55.1",
+      artifacts: [{ path: old, kind: "tree" }] }] });
+
+  assert.deepEqual(plan.operations[0].artifacts.map(artifact => artifact.path), [old]);
+});
