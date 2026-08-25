@@ -4,13 +4,23 @@
 
 | | |
 |---|---|
-| Built from | `2690761` |
+| Built from | `47a9b24` |
 | Tarball | `agents-can-communicate-0.1.0.tgz`, 123 KB, 105 entries |
-| sha256 | `017dd35976535010784fa5c5754108fabfc41932815cf2a3ad7027aa0ba70d67` |
-| Tests | 817 passing, 0 failing |
+| sha256 | `144fba47a46202f04320d063fb8e1630cd78c5935fab540fe0bf03fd80cf13bf` |
+| Tests | 828 passing, 0 failing |
 
 Not published. A published record says what the registry serves and is not
 rewritten, so shipped code that changes after a release is measured here instead.
+
+A config ACC edits is edited rather than reprinted. Reading the style back out
+of the file kept the indentation and still reformatted what the style could not
+describe: a nested object written on one line came back as three, and a blank
+line between sections was gone. Unchanged values are copied across verbatim now,
+so the byte-for-byte round trip the security tests have claimed since before
+this - and proved on `config.toml` - holds for JSON as well.
+
+Reading a config with a `__proto__` key set the prototype of the object being
+built instead of adding a key to it, so the key vanished from what was read.
 
 An install could not be removed once its client left the machine. `acc
 uninstall` skipped exactly the client ACC had written to, reported success, and
