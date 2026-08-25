@@ -12,6 +12,13 @@
 Not published. A published record says what the registry serves and is not
 rewritten, so shipped code that changes after a release is measured here instead.
 
+Running `acc` in a home directory says what is wrong with that. A home is no
+checkout, so discovery falls back to the directory you are standing in - and the
+platform's own state directory is inside a home by definition, so every command
+that opens a workspace refused with "runtime state must not live inside the
+workspace". True, and written for somebody who had put the state in a project on
+purpose. It names the directory, the state it holds, and the two ways out now.
+
 The Codex install is an install. `acc install` reported success for this client
 and `codex plugin list` said `not installed`, which is the failure the adapter's
 own doc-comment warns about: placing files is not installing.

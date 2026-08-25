@@ -23,11 +23,24 @@ export function runtimePaths({ dataHome, workspaceId, workspaceRoots = [] }) {
   // Enforced here rather than only asserted in a test, because "just put it in
   // .agents next to the project" is the exact regression this design exists to
   // prevent, and it would otherwise look like it works.
+  //
+  // The message names both paths and what to do, because the case a person
+  // actually meets is not the one this was written for. Running `acc` in a home
+  // directory makes that directory the workspace - it is no checkout, so
+  // discovery falls back to where you are - and the platform's own state
+  // directory is inside a home by definition. So `acc status` in `~` answered
+  // "runtime state must not live inside the workspace", which reads as a
+  // misconfiguration and tells the reader nothing they can act on.
   for (const workspaceRoot of workspaceRoots) {
     const relative = path.relative(workspaceRoot, root);
     if (relative === "" || (!path.isAbsolute(relative) && !relative.startsWith(".."))) {
-      throw new AccError(EXIT.USAGE, "runtime state must not live inside the workspace",
-        { root, workspaceRoot });
+      throw new AccError(EXIT.USAGE,
+        // The data home rather than the workspace's own directory inside it:
+        // that is the one a reader can move, and the one the remedy names.
+        `${workspaceRoot} holds ACC's own state at ${path.join(dataHome, "acc")}, `
+        + "so it cannot be a workspace. Run acc inside a project, or point "
+        + "ACC_DATA_HOME outside this directory.",
+        { root, dataHome, workspaceRoot });
     }
   }
   return Object.freeze(Object.fromEntries([["root", root],
