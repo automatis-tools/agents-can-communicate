@@ -4,13 +4,20 @@
 
 | | |
 |---|---|
-| Built from | `e9b58e5` |
+| Built from | `537211c` |
 | Tarball | `agents-can-communicate-0.1.2.tgz`, 135 KB, 109 entries |
-| sha256 | `ca630e0197475601d3de0daa5f366886242583bf1945d6621bd5175c830f2246` |
-| Tests | 864 passing, 0 failing |
+| sha256 | `fc7279c065bdfff8892f04c2a9ff4f873c3ec52bd482ab135bfe47c10101dc31` |
+| Tests | 868 passing, 0 failing |
 
 Not published. A published record says what the registry serves and is not
 rewritten, so shipped code that changes after a release is measured here instead.
+
+Running `acc` in a home directory says what is wrong with that. A home is no
+checkout, so discovery falls back to the directory you are standing in - and the
+platform's own state directory is inside a home by definition, so every command
+that opens a workspace refused with "runtime state must not live inside the
+workspace". True, and written for somebody who had put the state in a project on
+purpose. It names the directory, the state it holds, and the two ways out now.
 
 The Codex install is an install. `acc install` reported success for this client
 and `codex plugin list` said `not installed`, which is the failure the adapter's
