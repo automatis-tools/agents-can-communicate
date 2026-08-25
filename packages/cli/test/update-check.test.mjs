@@ -5,6 +5,8 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
 
+import { EXIT } from "@agents-can-communicate/protocol";
+
 import { checkDue, checkingIsOff, fetchLatest, isNewer, noticeUpdate }
   from "../src/update-check.mjs";
 import { runUpdateCommand, upgradeSteps } from "../src/update-command.mjs";
@@ -160,4 +162,19 @@ test("with the switch on, `acc update` asks nothing at all", async t => {
       latest: "9.9.9" }) });
 
   assert.match(text, /off \(ACC_NO_UPDATE_CHECK\)/);
+});
+
+test("a build that cannot read its own version refuses to compare", async t => {
+  const dataHome = await machine(t);
+  let asked = 0;
+  const runtime = { ...runtimeFor(dataHome, { latest: "9.9.9" }),
+    version: async () => { throw new Error("ENOENT: package.json"); },
+    fetch: async () => { asked += 1; return { ok: true, json: async () => ({}) }; } };
+
+  // `doctor` and `install` carry on without it and say less. Here the
+  // comparison is the command, and `isNewer(latest, null)` is false - so
+  // degrading would answer "you have the latest" on the strength of not knowing.
+  await assert.rejects(runUpdateCommand({ options: {}, runtime }),
+    error => error.code === EXIT.DATA && /nothing to compare against/.test(error.message));
+  assert.equal(asked, 0, "the registry was asked a question that could not be answered");
 });
