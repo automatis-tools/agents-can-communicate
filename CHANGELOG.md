@@ -9,10 +9,10 @@ turned out to be that something was already broken and saying nothing about it.
 
 | | |
 |---|---|
-| Built from | `634f87b` |
+| Built from | `200b847` |
 | Tarball | `agents-can-communicate-0.1.2.tgz`, 134 KB, 109 entries |
-| sha256 | `6bfc928d5758a64e51c1e66623e36bb1f029186eda53700b7129a0e03d46c196` |
-| Tests | 860 passing, 0 failing |
+| sha256 | `c0103bd03f157308db30b30deaf29180df7c67086f873e293d2b8d52b3167d5c` |
+| Tests | 861 passing, 0 failing |
 | Node | 24 (current production LTS) |
 | Verified on | macOS 15 (darwin 25.5.0, arm64) and Linux in CI |
 | Not supported | Windows — untested rather than known-broken |
