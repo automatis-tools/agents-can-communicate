@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
-import { mkdir, mkdtemp, readFile, realpath, rm, writeFile } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, readFile, realpath, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -21,21 +21,31 @@ async function machine(t) {
   const home = await realpath(await mkdtemp(path.join(tmpdir(), "acc-doctor-home-")));
   const dataHome = await realpath(await mkdtemp(path.join(tmpdir(), "acc-doctor-data-")));
   const project = path.join(home, "project");
+  const bin = path.join(home, "bin");
   await mkdir(project, { recursive: true });
+  await mkdir(bin, { recursive: true });
   t.after(() => Promise.all([home, dataHome]
     .map(dir => rm(dir, { recursive: true, force: true }))));
+
+  // A client of this machine's own, so the test asks the same questions
+  // everywhere. Detection spawns the real binary, and CI has none of the four
+  // installed - which is how a test about an install comes to prove nothing
+  // there while passing on the machine it was written on.
+  const claude = path.join(bin, "claude");
+  await writeFile(claude, "#!/bin/sh\necho \"2.1.233 (Claude Code)\"\n");
+  await chmod(claude, 0o755);
+
+  const env = { ...process.env, PATH: `${bin}${path.delimiter}${process.env.PATH}`,
+    HOME: home, ACC_DATA_HOME: dataHome, GIT_DIR: "", GIT_WORK_TREE: "" };
 
   // Nothing here asks the registry: the check is switched off, except where a
   // test seeds an answer that is still fresh so none is needed.
   const doctor = async (extra = {}) => (await run(process.execPath,
     [acc, "doctor", "--cwd", project],
-    { env: { ...process.env, HOME: home, ACC_DATA_HOME: dataHome,
-      ACC_NO_UPDATE_CHECK: "1", GIT_DIR: "", GIT_WORK_TREE: "", ...extra } })).stdout;
+    { env: { ...env, ACC_NO_UPDATE_CHECK: "1", ...extra } })).stdout;
 
   const install = () => run(process.execPath,
-    [acc, "install", "--adapter", "claude_code", "--home", home, "--cwd", project],
-    { env: { ...process.env, HOME: home, ACC_DATA_HOME: dataHome,
-      GIT_DIR: "", GIT_WORK_TREE: "" } });
+    [acc, "install", "--adapter", "claude_code", "--home", home, "--cwd", project], { env });
 
   const record = path.join(dataHome, "acc", "installs.json");
   return { home, dataHome, project, doctor, install, record };
@@ -48,7 +58,7 @@ test("doctor prints what to run next, not only the summary", async t => {
 
   assert.match(text, /store healthy/);
   // A client that is here and not wired up is the whole reason to run this.
-  assert.match(text, /acc install --adapter/,
+  assert.match(text, /acc install --adapter claude_code/,
     "the remediation was computed and shown only to --json");
 });
 
@@ -79,6 +89,7 @@ test("an install records the acc that made it", async t => {
   const manifest = JSON.parse(await readFile(path.join(repo, "package.json"), "utf8"));
 
   assert.deepEqual(record.installs.map(install => install.accVersion), [manifest.version]);
+  assert.deepEqual(record.installs.map(install => install.adapterId), ["claude_code"]);
 });
 
 test("an install with no recorded acc version is not called stale", async t => {
