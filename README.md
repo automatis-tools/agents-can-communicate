@@ -84,10 +84,11 @@ Open or restart your agent client inside a project. Each new session joins that 
 room automatically. Open another session in the same project and the two can coordinate;
 run `acc status` from the project directory whenever you want to see the room yourself.
 
-ACC stores coordination data in the standard application-data location for your system:
-`~/Library/Application Support/acc` on macOS and `~/.local/share/acc` on Linux. Project
-files stay unchanged. Git worktrees from one repository share a room, and plain folders
-receive the same coordination experience.
+ACC stores coordination data in the standard application-data location for your system.
+The defaults are `~/Library/Application Support/acc` on macOS and `~/.local/share/acc` on
+Linux; `XDG_DATA_HOME` and `ACC_DATA_HOME` can relocate it as described in
+[configuration](docs/CONFIGURATION.md). Project files stay unchanged. Git worktrees from
+one repository share a room, and plain folders receive the same coordination experience.
 
 Keep ACC current with `acc update --apply`. It installs the latest release and refreshes
 the client integrations together. `acc doctor` points to that action when their versions
@@ -132,6 +133,10 @@ macOS or Linux. Each client retains its session lifecycle and full conversation 
 The [capability evidence](docs/CAPABILITIES.md) records exactly what each integration has
 demonstrated in a real client.
 
+ACC currently retains every coordination record. It is sized for an active project's
+history; thousands of messages make each turn slower to assemble, so use your project
+documentation for long-term archives.
+
 ## Everyday controls
 
 The installed guidance teaches agents how to claim files, ask questions, request work,
@@ -139,7 +144,7 @@ and complete handoffs. These commands give you a direct view and control when yo
 
 | Command | What it is for |
 |---|---|
-| `acc status` | See active sessions, claimed work, and open handoffs |
+| `acc status` | See active sessions, claimed work, and the room's protection level |
 | `acc doctor` | Confirm which client integrations are active |
 | `acc update --apply` | Install the latest release and refresh integrations |
 | `acc uninstall` | Remove ACC's client integrations safely |
@@ -150,7 +155,7 @@ Every operation is documented in the [CLI reference](docs/CLI.md).
 
 - **Start using ACC:** [getting started](docs/GETTING_STARTED.md) ·
   [configuration](docs/CONFIGURATION.md) · [troubleshooting](docs/TROUBLESHOOTING.md)
-- **Understand the promise:** [concepts](docs/CONCEPTS.md) ·
+- **Understand the promise:** [why ACC](docs/WHY_ACC.md) · [concepts](docs/CONCEPTS.md) ·
   [capabilities](docs/CAPABILITIES.md) · [security](docs/SECURITY_MODEL.md)
 - **Build on ACC:** [MCP](docs/MCP.md) · [writing an adapter](docs/ADAPTER_AUTHORING.md) ·
   [protocol](docs/PROTOCOL.md)
