@@ -11,11 +11,19 @@ graph LR
 ## Register
 
 ```json
-{ "command": "acc-mcp", "env": { "ACC_MCP_PARTICIPANT": "research" } }
+{ "command": "acc-mcp", "env": {
+  "ACC_MCP_PARTICIPANT": "research",
+  "ACC_MCP_WORKSPACE": "/path/to/the/project"
+} }
 ```
 
 The session comes from **this configuration**, never from `initialize` or `clientInfo`.
 Restarting the process resolves to the same session.
+
+`ACC_MCP_WORKSPACE` is the project this server joins. Without it the server takes the
+directory the client launched it in, which is rarely the project and is silent about it —
+`acc_sync` answers `solo` from a workspace nobody else is in. There is nothing to pass on
+the command line: `acc-mcp` takes no arguments and says so rather than ignoring them.
 
 ## Tools
 

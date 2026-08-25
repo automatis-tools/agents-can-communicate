@@ -1,5 +1,29 @@
 # Changelog
 
+## Unreleased
+
+| | |
+|---|---|
+| Built from | `PENDING` |
+| Tarball | `PENDING` |
+| sha256 | `PENDING` |
+| Tests | 871 passing, 0 failing |
+
+Not published. A published record says what the registry serves and is not
+rewritten, so shipped code that changes after a release is measured here instead.
+
+`acc-mcp` refuses arguments instead of ignoring them. It reads nothing from the
+command line, and accepted anything: writing `acc-mcp --cwd <project>` - the
+habit `acc` teaches - started a server rooted wherever the client happened to
+launch it, alone in a workspace nobody else was in, saying nothing. It now names
+the two variables that configure it and exits 2.
+
+Every variable the code reads from the environment is written down. Four were
+not, and one of them - `ACC_MCP_WORKSPACE` - decides which project an MCP client
+joins. A test scans what is read from `env` and fails on anything no document
+mentions; the shim's own `ACC_NODE` and `ACC_RUNNER` are shell variables of its
+own, not configuration, and are outside it.
+
 ## 0.1.3
 
 Two of them broke a promise in silence, and both were found by installing 0.1.2

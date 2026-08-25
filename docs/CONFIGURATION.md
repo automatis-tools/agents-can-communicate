@@ -117,6 +117,10 @@ file the repository does not control.
 | `ACC_PARTICIPANT` | Which participant a session belongs to, when the client does not say |
 | `ACC_NO_UPDATE_CHECK=1` | Never ask npm whether a newer ACC exists. `acc update` then says it is off, which is a different answer from "nothing is newer" |
 | `ACC_PROBE_TIMEOUT_MS` | How long to wait for a client to print its version. Three seconds by default: generous on an idle machine, and not always enough on a busy one, where a client that overruns it is reported as not installed |
+| `ACC_WORKSPACE_ROOT` | The project to work in, instead of discovering one from the working directory. Absolute, or it is refused |
+| `ACC_SESSION` · `ACC_GENERATION` | Which session a command acts as, when it is not being worked out. Both, or neither: the generation is what proves the caller is still that session |
+| `ACC_MCP_PARTICIPANT` | Who `acc-mcp` takes part as. `mcp` by default |
+| `ACC_MCP_WORKSPACE` | The project `acc-mcp` joins. Without it the server takes the directory the client launched it in, which is rarely the project |
 
 ## Relationship to runtime paths
 
