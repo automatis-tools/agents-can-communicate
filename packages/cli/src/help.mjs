@@ -16,7 +16,7 @@ const GROUPS = Object.freeze([
   ["In a session", ["status", "sync", "work", "claim", "release", "ack", "message",
     "request", "task", "workstream", "decide", "finish"]],
   ["Driven by adapters, not by people", ["attach", "heartbeat", "detach"]],
-  ["About acc", ["help", "version"]],
+  ["About acc", ["help", "version", "update"]],
 ]);
 
 const SUMMARY = Object.freeze({
@@ -41,6 +41,7 @@ const SUMMARY = Object.freeze({
   detach: "close a session",
   help: "this list",
   version: "print the version that is installed",
+  update: "ask npm whether a newer acc exists; --apply installs it",
 });
 
 /** The same list `acc help --json` returns, so a tool can read it too. */

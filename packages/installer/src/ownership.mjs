@@ -102,7 +102,14 @@ async function saveOwnership({ dataHome, record }) {
  * second run's record describes what is actually on disk now, and an accumulated
  * one would list artifacts from a layout that no longer exists.
  */
-export async function recordInstall({ dataHome, adapterId, version, artifacts }) {
+/**
+ * @param version the client's version, as detected. `accVersion` is ACC's own,
+ * which is what tells a later run that the plugin in the client is older than
+ * the code now running: updating the npm package replaces the CLI and the hook
+ * runtime, and leaves the bundle inside the client exactly where it was.
+ */
+export async function recordInstall({ dataHome, adapterId, version, accVersion = null,
+  artifacts }) {
   const stamped = await Promise.all(artifacts.map(async artifact => ({
     path: artifact.path,
     kind: artifact.kind ?? "file",
@@ -113,7 +120,7 @@ export async function recordInstall({ dataHome, adapterId, version, artifacts })
   const record = await loadOwnership({ dataHome });
   await saveOwnership({ dataHome, record: { schemaVersion: SCHEMA_VERSION,
     installs: [...record.installs.filter(install => install.adapterId !== adapterId),
-      { adapterId, version, artifacts: stamped }] } });
+      { adapterId, version, accVersion, artifacts: stamped }] } });
 }
 
 const installFor = (record, adapterId) =>

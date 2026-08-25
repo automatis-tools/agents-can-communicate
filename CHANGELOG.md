@@ -12,6 +12,31 @@
 Not published. A published record says what the registry serves and is not
 rewritten, so shipped code that changes after a release is measured here instead.
 
+`acc update` asks npm whether there is a newer ACC, and `--apply` installs it and
+re-runs `acc install`. An upgrade lands in two places: `npm install -g` replaces
+the CLI and the hook runtime - a client runs the runtime out of the npm directory
+rather than a copy - and leaves the bundle written into that client alone,
+including the skills the agents read. Measured: after an upgrade the client still
+had `0.1.0` while `acc --version` said `0.1.1`, and doctor called it healthy.
+
+`acc doctor` now says so. The install record carries the ACC that wrote it, and a
+client wired to an older one is named with the command that fixes it. Nothing is
+said when the record predates the field: "your plugin might be old" on every run
+is not a diagnosis.
+
+`acc doctor` also prints its remediation. It computed a list of what to run next,
+put it in the data, and printed a one-line summary - so the command documented as
+saying "what to run next" said it only to `--json`. There were no tests for this
+command at all.
+
+The update check is the only part of ACC that reaches the network, and it is
+kept to one file. `acc update` asks; `acc doctor` reads what that remembered and
+asks at most once a day; `ACC_NO_UPDATE_CHECK=1` turns both off and then says it
+is off rather than reporting that nothing is newer. Nothing on the hook path
+asks, which a test enforces by scanning every package a turn loads: a hook runs
+each turn inside a five-second budget and fails open, so a stalled socket there
+would be invisible by design.
+
 `acc install` says what it wrote. `installed 3 adapter(s)` was the whole account
 of a command that had just written into three other tools' configuration inside
 someone's home; the list existed all along, since `--dry-run` prints it, and the

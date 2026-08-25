@@ -153,7 +153,13 @@ export async function runInstallCommand({ options, runtime, action = "install" }
   const plan = planInstallation({ adapters, detected, context, action, recorded });
 
   const dryRun = options.dryRun === true;
-  const result = await applyPlan({ plan, adapters, context, dataHome, dryRun });
+  // Recorded with the install, so a later run can tell that the bundle sitting
+  // in a client is older than the code now running. Updating the npm package
+  // replaces this CLI and the hook runtime and leaves that bundle untouched.
+  const accVersion = typeof runtime.version === "function"
+    ? await runtime.version().catch(() => null)
+    : null;
+  const result = await applyPlan({ plan, adapters, context, dataHome, dryRun, accVersion });
 
   const acted = actedOn(result);
   if (dryRun) {

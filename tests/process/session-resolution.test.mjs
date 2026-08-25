@@ -167,7 +167,7 @@ const NOT_AGENT_FACING = Object.freeze(["install", "uninstall", "doctor", "confi
   "attach", "heartbeat", "detach",
   // These answer about the program itself, so they need no session and must
   // work in a directory that is no workspace.
-  "help", "version"]);
+  "help", "version", "update"]);
 
 test("the list above is every command an agent can run", async () => {
   // Remembered lists rot. `acc decide` was added, needed an identity like the
