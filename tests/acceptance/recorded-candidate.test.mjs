@@ -50,8 +50,15 @@ test("the changelog's digest describes the code that is here now", async () => {
     return;
   }
 
-  const changed = (await git("diff", "--name-only", `${recorded}..HEAD`, "--", ...PACKED))
-    .split("\n").filter(Boolean);
+  // Commits, and the working tree beside them. Comparing only commits meant
+  // `npm test` passed on an edited README and the pre-push hook caught it a
+  // moment later - the right answer at the wrong time, when the fix is a
+  // re-record and the commit is already made.
+  const changed = [...new Set([
+    ...(await git("diff", "--name-only", `${recorded}..HEAD`, "--", ...PACKED)).split("\n"),
+    ...(await git("status", "--porcelain", "--", ...PACKED))
+      .split("\n").map(line => line.slice(3)),
+  ])].filter(Boolean).sort();
 
   assert.deepEqual(changed, [],
     `shipped code changed since ${recorded}, so the recorded digest describes nothing `
