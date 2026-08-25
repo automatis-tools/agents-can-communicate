@@ -5,6 +5,7 @@ import path from "node:path";
 import test from "node:test";
 
 import { recordInstall } from "@agents-can-communicate/installer";
+import { EXIT } from "@agents-can-communicate/protocol";
 
 import { runInstallCommand } from "../src/install-command.mjs";
 
@@ -106,4 +107,62 @@ test("a removal can be previewed, the same way an install can", async t => {
   // The whole point of a preview.
   assert.equal((await readFile(path.join(extension, "gemini-extension.json"), "utf8"))
     .includes("acc"), true, "the dry run removed the thing it was previewing");
+});
+
+test("a command that wrote into someone's home says what it wrote", async () => {
+  const { describeOutcome } = await import("../src/install-command.mjs");
+  const home = "/Users/someone";
+  const text = describeOutcome({ action: "install", acted: 1, home, operations: [{
+    adapterId: "claude_code", action: "install", applied: true, artifacts: [
+      { path: `${home}/.claude/plugins/cache/acc-local`, kind: "tree" },
+      { path: `${home}/.claude/settings.json`, kind: "merge" }] }] });
+
+  // `installed 1 adapter(s)` was the whole account of a command that had just
+  // written into another tool's configuration inside someone's home.
+  assert.equal(text, ["installed 1 adapter(s)",
+    "  created ~/.claude/plugins/cache/acc-local",
+    "  edited  ~/.claude/settings.json",
+    "",
+    "undo with: acc uninstall"].join("\n"));
+});
+
+test("an uninstall says what it removed and what it would not", async () => {
+  const { describeOutcome } = await import("../src/install-command.mjs");
+  const home = "/Users/someone";
+  const text = describeOutcome({ action: "uninstall", acted: 1, home, operations: [{
+    adapterId: "claude_code", action: "uninstall", applied: true,
+    artifacts: [{ path: `${home}/.claude/settings.json`, kind: "merge" }],
+    removed: [`${home}/.claude/plugins/cache/acc-local`],
+    kept: [`${home}/.claude/plugins/marketplaces/acc-local`] }] });
+
+  // What was held back is the line that matters: those bytes stopped matching
+  // what ACC wrote, so they are someone's now and were left alone.
+  assert.equal(text, ["uninstalled 1 adapter(s)",
+    "  removed ~/.claude/plugins/cache/acc-local",
+    "  edited  ~/.claude/settings.json",
+    "  kept    ~/.claude/plugins/marketplaces/acc-local - changed since ACC wrote it",
+  ].join("\n"));
+});
+
+test("nothing done is still reported as nothing done", async () => {
+  const { describeOutcome } = await import("../src/install-command.mjs");
+
+  assert.equal(describeOutcome({ action: "uninstall", acted: 0, operations: [
+    { adapterId: "kimi", action: "uninstall", applied: true, artifacts: [],
+      removed: [], kept: [] }],
+    skipped: [{ adapterId: "gemini_cli", reason: "Gemini CLI is not installed" }] }),
+  ["uninstalled 0 adapter(s)",
+    "  skip gemini_cli: Gemini CLI is not installed"].join("\n"));
+});
+
+test("`--yes` is gone from the commands that never asked", async () => {
+  const { parseArgs } = await import("../src/args.mjs");
+  // It agreed to nothing: neither command has ever had a confirmation to skip,
+  // and the flag was read by no code at all.
+  for (const command of ["install", "uninstall"]) {
+    assert.throws(() => parseArgs([command, "--yes"]),
+      error => error.code === EXIT.USAGE && error.message.includes("--yes"), command);
+  }
+  // `config init` does ask, so there it still means something.
+  assert.equal(parseArgs(["config", "init", "--yes"]).options.yes, true);
 });

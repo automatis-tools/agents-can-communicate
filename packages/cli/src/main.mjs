@@ -252,7 +252,12 @@ const HANDLERS = Object.freeze({
       // command demands --yes rather than hanging or assuming consent.
       interactive: runtime.stdout?.isTTY === true,
       yes: options.yes === true,
-      confirm: runtime.confirm ?? (async () => false),
+      // Not a silent no. A build that cannot ask says so: falling back to
+      // "declined" is how `acc config init` came to print `not written` in a
+      // terminal where nobody had been asked anything.
+      confirm: runtime.confirm ?? (async () => {
+        throw new AccError(EXIT.DATA, "this build was assembled without a way to ask");
+      }),
       force: options.force === true,
       // Opened lazily and only by `init`: `config validate` has to work on a
       // workspace discovery cannot open, which is what a reader runs it to

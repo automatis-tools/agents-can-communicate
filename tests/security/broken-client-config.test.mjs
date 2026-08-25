@@ -47,7 +47,7 @@ async function home(t, { broken } = {}) {
     await mkdir(path.join(place, path.dirname(broken)), { recursive: true });
     await writeFile(path.join(place, broken), BROKEN);
   }
-  const cli = (...argv) => run(process.execPath, [acc, ...argv, "--home", place, "--yes"],
+  const cli = (...argv) => run(process.execPath, [acc, ...argv, "--home", place],
     { env });
   const ours = async () => (await readdir(place, { recursive: true }))
     .filter(entry => entry.includes("agents-can-communicate"));

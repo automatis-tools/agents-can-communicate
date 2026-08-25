@@ -49,11 +49,17 @@ async function workspace(t) {
 test("the owner is told when its claim runs out", async t => {
   const place = await workspace(t);
   await place.attach("holder");
+  // Two leases, because the two halves want opposite things from the clock. The
+  // first used to share the two-second lease with the second and raced it: under
+  // a loaded suite the turn started after the lease had already lapsed, and the
+  // test failed saying the report came too early.
+  await place.cli("claim", "--resource", "file:src/held.mjs", "--reason", "editing",
+    "--lease", "600");
+  assert.equal((await place.turn("holder")).includes("claim_expired"), false,
+    "reported while the claim was still held");
+
   await place.cli("claim", "--resource", "file:src/x.mjs", "--reason", "editing",
     "--lease", "2");
-  assert.equal((await place.turn("holder")).includes("claim_expired"), false,
-    "reported before the lease had run out");
-
   await place.lapse();
 
   assert.match(await place.turn("holder"),
