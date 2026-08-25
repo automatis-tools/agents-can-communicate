@@ -1,4 +1,4 @@
-import { cp, mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { cp, mkdir, readFile, rm, rmdir, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -11,22 +11,35 @@ import { AccError, EXIT } from "@agents-can-communicate/protocol";
 const bundle = fileURLToPath(new URL("../plugin", import.meta.url));
 const PLUGIN_NAME = "agents-can-communicate";
 
-// The marketplace ACC owns. Registering a separate one rather than editing the
-// user's keeps the two apart: uninstall removes a marketplace ACC created and
-// never touches entries someone else put in theirs.
+// The marketplace ACC owns, and its own root inside the agents home.
+//
+// Registering a separate one rather than joining the user's keeps the two
+// apart. ACC used to write into `<home>/.agents/plugins/marketplace.json` -
+// which is the marketplace this client discovers by itself, with no config
+// entry at all, under whatever that manifest calls itself. So ACC merged its
+// entry into someone else's marketplace and then enabled `…@acc-local`, an id
+// this client never forms: `acc install` reported success and `codex plugin
+// list` said `not installed`. Measured against Codex 0.147.0, then measured
+// again to confirm a root of ACC's own is accepted and reported enabled.
 const MARKETPLACE = "acc-local";
 const QUALIFIED = `${PLUGIN_NAME}@${MARKETPLACE}`;
 
-// A marketplace is a directory whose manifest sits at
-// `<root>/.agents/plugins/marketplace.json`, and every `source.path` in that
-// manifest is relative to the manifest's own directory - `./plugins/<name>`,
-// as the client's own entries are written. Resolving the plugin from `root`
-// instead put the files two levels above where the manifest pointed, so the
-// entry named a directory that did not exist and the client loaded nothing.
-const marketplaceDir = root => path.join(root, ".agents", "plugins");
-const marketplacePath = root => path.join(marketplaceDir(root), "marketplace.json");
-const pluginPath = (root, name = PLUGIN_NAME) =>
-  path.join(marketplaceDir(root), "plugins", name);
+// A marketplace is a root holding `.agents/plugins/marketplace.json`, and every
+// `source.path` in that manifest - `./plugins/<name>` - is resolved by this
+// client against the *root*, not against the manifest's directory. Measured:
+// `codex plugin list` prints the path it resolved, and for a plugin the user
+// installed themselves it printed `<root>/plugins/x` from an entry spelled
+// `./plugins/x`. The comment that used to be here said the opposite, and ACC
+// wrote its tree two directories below where the client then looked.
+//
+// The root is under `.agents/` rather than the home itself: `<home>/plugins/`
+// is where this client would put it, and nothing of ACC's belongs at the top of
+// somebody's home.
+const marketplaceRoot = agentsHome => path.join(agentsHome, ".agents", MARKETPLACE);
+const marketplacePath = agentsHome =>
+  path.join(marketplaceRoot(agentsHome), ".agents", "plugins", "marketplace.json");
+const pluginPath = (agentsHome, name = PLUGIN_NAME) =>
+  path.join(marketplaceRoot(agentsHome), "plugins", name);
 const configPath = codexHome => path.join(codexHome, "config.toml");
 // Where `codex plugin add` leaves the copy it actually runs. All three
 // components are ACC's own - the marketplace it created, the plugin name it
@@ -111,6 +124,11 @@ export async function installCodexPlugin({ home, agentsHome = home,
   // plugin tree is laid down that nothing will then be able to remove.
   const existing = await readJson(marketplacePath(agentsHome), { name: MARKETPLACE,
     interface: { displayName: "Agents Can Communicate" }, plugins: [] });
+  // The name in the manifest, which is the one this client forms plugin ids
+  // from. ACC used its own regardless, so on a machine that already had a
+  // marketplace at this root - discovered without any config entry, under
+  // whatever its manifest calls itself - the id ACC enabled was one the client
+  // never forms, and the plugin sat there listed and not installed.
   const before = await readFile(configPath(codexHome), "utf8").catch(() => "");
 
   const target = pluginPath(agentsHome);
@@ -142,7 +160,7 @@ export async function installCodexPlugin({ home, agentsHome = home,
   await writeTomlBlock(config, [
     `[marketplaces.${MARKETPLACE}]`,
     `source_type = "local"`,
-    `source = ${tomlString(agentsHome)}`,
+    `source = ${tomlString(marketplaceRoot(agentsHome))}`,
     "",
     `[plugins.${tomlString(QUALIFIED)}]`,
     "enabled = true",
@@ -156,11 +174,24 @@ export async function installCodexPlugin({ home, agentsHome = home,
   await rm(cached, { recursive: true, force: true });
   await cp(target, cached, { recursive: true });
 
-  // The cache *root* rather than the versioned directory inside it: that is
-  // what ACC owns and what uninstall removes, and reporting the version would
+  // The plugin's own directory in the cache. Not the versioned one inside it,
+  // which goes stale the moment the version changes - and not the marketplace
+  // cache root above it, which belongs to whoever's marketplace this is: that
+  // root holds every plugin installed from it, and removing it took a plugin
+  // the user had installed themselves. Measured, on a real machine.
+  //
+  // The old comment here said the root was "what ACC owns", which was true only
+  // while ACC invented its own marketplace name and so had a root to itself.
   // make the record stale the moment the plugin version changes.
-  return { ok: true, changes: [target, file, config, cacheRoot(codexHome)],
+  return { ok: true, changes: [target, file, config, cachePath(codexHome)],
     diagnostics: ["hooks require explicit trust in Codex before they run"] };
+}
+
+/** Remove each directory that is empty, in the order given. */
+async function removeEmptyDirs(directories) {
+  for (const directory of directories) {
+    await rmdir(directory).catch(() => {});
+  }
 }
 
 export async function uninstallCodexPlugin({ home, agentsHome = home,
@@ -190,8 +221,20 @@ export async function uninstallCodexPlugin({ home, agentsHome = home,
       return value?.name === MARKETPLACE && (value.plugins ?? []).length === 0;
     } });
 
-  await removeInstalledTree(cacheRoot(codexHome), keep);
+  await removeInstalledTree(cachePath(codexHome), keep);
   await removeInstalledTree(pluginPath(agentsHome), keep);
+  // The directories ACC made to hold those, once nothing is in them. They are
+  // ACC's own - a marketplace root it created and the cache directory named
+  // after it - and an empty one left behind is litter in a home that did not
+  // have it. Anything the user put inside stops this: the directory is not
+  // empty, and it stays.
+  await removeEmptyDirs([
+    path.join(marketplaceRoot(agentsHome), "plugins"),
+    path.dirname(marketplacePath(agentsHome)),
+    path.dirname(path.dirname(marketplacePath(agentsHome))),
+    marketplaceRoot(agentsHome),
+    cacheRoot(codexHome),
+  ]);
   return { ok: true, changes, diagnostics: [] };
 }
 
@@ -202,7 +245,8 @@ export async function detectCodex({ home, agentsHome = home,
   const config = await readFile(configPath(codexHome), "utf8").catch(() => "");
   const registered = config.includes(`[marketplaces.${MARKETPLACE}]`);
   const enabled = config.includes(`[plugins."${QUALIFIED}"]`);
-  const cached = await stat(cachePath(codexHome)).then(() => true).catch(() => false);
+  const cached = await stat(cachePath(codexHome))
+    .then(() => true).catch(() => false);
   return { ok: true, changes: [], diagnostics: [
     published ? "acc plugin published in the marketplace" : "acc plugin not registered",
     registered && enabled
@@ -228,7 +272,7 @@ export function planCodexInstall({ home, agentsHome = home,
   codexHome = path.join(home, ".codex") }) {
   return [
     { path: pluginPath(agentsHome), kind: "tree" },
-    { path: cacheRoot(codexHome), kind: "tree" },
+    { path: cachePath(codexHome), kind: "tree" },
     { path: marketplacePath(agentsHome), kind: "merge" },
     { path: configPath(codexHome), kind: "merge" },
   ];

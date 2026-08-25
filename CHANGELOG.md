@@ -1,5 +1,48 @@
 # Changelog
 
+## Unreleased
+
+| | |
+|---|---|
+| Built from | `PENDING` |
+| Tarball | `PENDING` |
+| sha256 | `PENDING` |
+| Tests | 864 passing, 0 failing |
+
+Not published. A published record says what the registry serves and is not
+rewritten, so shipped code that changes after a release is measured here instead.
+
+The Codex install is an install. `acc install` reported success for this client
+and `codex plugin list` said `not installed`, which is the failure the adapter's
+own doc-comment warns about: placing files is not installing.
+
+Three things were wrong, and one root cause. ACC wrote into
+`<home>/.agents/plugins/marketplace.json` - the marketplace this client
+discovers by itself, with no config entry at all, under whatever that manifest
+calls itself. So ACC was a guest in somebody else's marketplace while naming its
+own: it enabled `agents-can-communicate@acc-local`, an id this client never
+forms; it cached the plugin under `acc-local` while the client looks under the
+marketplace's real name; and it placed the tree relative to the manifest's
+directory while this client resolves `./plugins/<name>` against the marketplace
+root.
+
+ACC registers a marketplace of its own now, rooted at `<home>/.agents/acc-local`
+- its own name, its own manifest, its own cache directory, and the user's
+marketplace untouched. Under `.agents/` rather than the home itself, because the
+root is what `./plugins/<name>` resolves against and nothing of ACC's belongs at
+the top of somebody's home.
+
+Measured against Codex 0.147.0 throughout, including the fix: `codex plugin
+list` reports `agents-can-communicate@acc-local  installed, enabled  0.1.2`, and
+after `acc uninstall` reports nothing and leaves the directories gone.
+
+Uninstall no longer removes a directory it shares. While ACC was a guest, the
+cache root it deleted was the marketplace's - and it took a plugin the user had
+installed themselves. Found by doing it to a real machine. ACC owns its own
+marketplace again, and removes its own plugin from the cache rather than the
+directory above it; the ownership hashes had already refused to delete the
+shared one on the run after, which is what made it visible.
+
 ## 0.1.2
 
 Six defects, and not one of them came out of running the tests again. Three
