@@ -25,7 +25,14 @@ const repo = path.resolve(import.meta.dirname, "..", "..");
  * the CI matrix builds on two platforms.
  */
 const PACKED = Object.freeze(["bin/", "packages/", "README.md", "LICENSE",
-  "docs/CAPABILITIES.md"]);
+  "docs/CAPABILITIES.md", "package.json"]);
+
+// npm packs these whatever `files` says, which is why `files` cannot be the
+// whole answer: the manifest always travels, and the bundled workspaces come
+// from the dependency list. `package.json` was missing from the list above, so
+// editing the manifest - a version bump, `npm pkg fix` - changed the digest
+// while this file reported the record still described the tree.
+const UNDECLARED = Object.freeze(["packages/", "package.json"]);
 
 const git = async (...argv) => {
   const env = { ...process.env };
@@ -72,9 +79,10 @@ test("the packed set this checks is the packed set that ships", async () => {
   // The list above is a copy, and a copy drifts. `packages/` stands in for every
   // bundled workspace, which npm packs from the dependency list rather than
   // from `files`.
+  //
   const declared = new Set(manifest.files);
   for (const entry of PACKED) {
-    if (entry === "packages/") continue;
+    if (UNDECLARED.includes(entry)) continue;
     assert.equal(declared.has(entry), true, `${entry} is no longer published`);
   }
   for (const entry of declared) {
@@ -83,4 +91,29 @@ test("the packed set this checks is the packed set that ships", async () => {
   }
   assert.equal((manifest.bundleDependencies ?? []).length > 0, true,
     "nothing is bundled, so `packages/` no longer stands for anything shipped");
+});
+
+test("nothing reaches the tarball that this file would not notice changing", async () => {
+  // Asks npm what it would pack rather than reading `files` and reasoning about
+  // it. `--dry-run` writes nothing and answers in a fifth of a second, and it is
+  // the only account of the tarball that cannot drift from the tarball.
+  //
+  // Listing entries is portable in a way comparing digests is not: a gzip stream
+  // carries mtimes, and the CI matrix builds on two platforms.
+  const { stdout } = await run("npm", ["pack", "--dry-run", "--json"], { cwd: repo });
+  const [packed] = JSON.parse(stdout);
+  // Bundled workspaces arrive under `node_modules/` and are built from
+  // `packages/`, which the list above already watches.
+  const bundled = "node_modules/@agents-can-communicate/";
+
+  const unwatched = packed.files.map(file => file.path)
+    .filter(entry => !entry.startsWith(bundled))
+    .filter(entry => !PACKED.some(watched => (watched.endsWith("/")
+      ? entry.startsWith(watched) : entry === watched)))
+    .sort();
+
+  assert.deepEqual(unwatched, [],
+    "these travel in the tarball and nothing above watches them, so a change to "
+    + "one would leave the recorded digest describing a tarball nobody can build:"
+    + `\n  ${unwatched.join("\n  ")}`);
 });

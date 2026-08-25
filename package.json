@@ -36,9 +36,9 @@
     "node": ">=24"
   },
   "bin": {
-    "acc": "./bin/acc.mjs",
-    "acc-mcp": "./bin/acc-mcp.mjs",
-    "acc-hook": "./bin/acc-hook.mjs"
+    "acc": "bin/acc.mjs",
+    "acc-mcp": "bin/acc-mcp.mjs",
+    "acc-hook": "bin/acc-hook.mjs"
   },
   "files": [
     "bin/",
