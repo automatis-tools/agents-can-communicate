@@ -9,9 +9,9 @@ turned out to be that something was already broken and saying nothing about it.
 
 | | |
 |---|---|
-| Built from | `PENDING` |
-| Tarball | `PENDING` |
-| sha256 | `PENDING` |
+| Built from | `634f87b` |
+| Tarball | `agents-can-communicate-0.1.2.tgz`, 134 KB, 109 entries |
+| sha256 | `6bfc928d5758a64e51c1e66623e36bb1f029186eda53700b7129a0e03d46c196` |
 | Tests | 860 passing, 0 failing |
 | Node | 24 (current production LTS) |
 | Verified on | macOS 15 (darwin 25.5.0, arm64) and Linux in CI |
@@ -53,8 +53,10 @@ profile - but the pinned pair moves: a version manager changes the interpreter
 and the directory global packages live in, and the shim then failed on every
 event with exit 126 and an empty stdout. No presence, no claims, no messages, and
 nothing anywhere saying why. Measured, then fixed: the pinned pair is still tried
-first, then `acc-hook` as npm links it, then the current node against the
-recorded runtime. With nothing left to run it says which path is gone and how to
+first, then `acc-hook` as npm links it - and only when node is on PATH, since
+its shebang is `env node` and an `exec` that fails ends the shim where it stands,
+which the release check caught as exit 127 in place of the line that says what to
+do - then the current node against the recorded runtime. With nothing left to run it says which path is gone and how to
 re-wire, and exits 0 - hooks fail open, and a broken install is not a reason for
 somebody's session to stop working.
 
