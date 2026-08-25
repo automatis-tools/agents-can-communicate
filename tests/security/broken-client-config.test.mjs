@@ -32,7 +32,7 @@ const CONFIGS = Object.freeze({
   claude_code: ".claude/settings.json",
   gemini_cli: ".gemini/settings.json",
   kimi: ".kimi-code/plugins/installed.json",
-  codex: ".agents/plugins/marketplace.json",
+  codex: ".agents/acc-local/.agents/plugins/marketplace.json",
 });
 const BROKEN = '{ "enabledPlugins": ';
 

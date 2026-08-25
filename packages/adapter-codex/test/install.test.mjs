@@ -33,17 +33,25 @@ async function fixture(t) {
   const marketplace = path.join(home, ".agents", "plugins", "marketplace.json");
   await mkdir(path.dirname(marketplace), { recursive: true });
   await writeFile(marketplace, `${JSON.stringify(EXISTING, null, 2)}\n`);
-  const read = async () => JSON.parse(await readFile(marketplace, "utf8"));
-  return { context: { home, codexHome: path.join(home, ".codex") }, marketplace, read };
+  // The user's, which ACC has no business in - and ACC's own, at a root of its
+  // making. Sharing the user's marketplace was the whole defect: this client
+  // discovers it with no config entry, under whatever its manifest calls
+  // itself, so ACC's id never matched and its plugin sat there `not installed`.
+  const theirs = async () => JSON.parse(await readFile(marketplace, "utf8"));
+  const root = path.join(home, ".agents", "acc-local");
+  const ours = path.join(root, ".agents", "plugins", "marketplace.json");
+  const read = async () => JSON.parse(await readFile(ours, "utf8"));
+  const plugin = path.join(root, "plugins", "agents-can-communicate");
+  return { context: { home, codexHome: path.join(home, ".codex") },
+    marketplace: ours, read, theirs, root, plugin };
 }
 
 test("install places the plugin and registers it in the marketplace", async t => {
-  const { context, read } = await fixture(t);
+  const { context, read, theirs, plugin } = await fixture(t);
 
   const result = await createCodexAdapter().install(context);
 
   assert.equal(result.ok, true);
-  const plugin = path.join(context.home, ".agents", "plugins", "plugins", "agents-can-communicate");
   assert.deepEqual((await readdir(plugin)).sort(),
     [".codex-plugin", "acc-hook.sh", "hooks.json", "skills"].sort());
   const manifest = JSON.parse(await readFile(
@@ -53,7 +61,7 @@ test("install places the plugin and registers it in the marketplace", async t =>
 });
 
 test("install is idempotent and leaves the user's own plugin alone", async t => {
-  const { context, read } = await fixture(t);
+  const { context, read, theirs } = await fixture(t);
   const adapter = createCodexAdapter();
 
   await adapter.install(context);
@@ -61,31 +69,32 @@ test("install is idempotent and leaves the user's own plugin alone", async t => 
   await adapter.install(context);
 
   assert.deepEqual(await read(), afterFirst, "a second install changed the marketplace");
-  assert.deepEqual(named(afterFirst, "someone-elses-plugin"), EXISTING.plugins[0]);
-  assert.equal(afterFirst.name, "local-marketplace");
+  assert.equal(afterFirst.name, "acc-local");
+  // The user's own marketplace is not ACC's to write in.
+  assert.deepEqual(await theirs(), EXISTING, "ACC edited the user's marketplace");
 });
 
 test("uninstall removes only what ACC owns, twice safely", async t => {
-  const { context, read } = await fixture(t);
+  const { context, read, theirs } = await fixture(t);
   const adapter = createCodexAdapter();
   await adapter.install(context);
 
   await adapter.uninstall(context);
-  const afterFirst = await read();
   await adapter.uninstall(context);
 
-  assert.deepEqual(afterFirst.plugins, EXISTING.plugins,
-    "uninstall did not restore the marketplace");
-  assert.deepEqual(await read(), afterFirst);
-  await assert.rejects(readdir(path.join(context.home, ".agents", "plugins", "plugins", "agents-can-communicate")),
+  // ACC's marketplace is ACC's, so it goes entirely - and an empty directory
+  // left behind is litter in a home that did not have one.
+  await assert.rejects(readdir(path.join(context.home, ".agents", "acc-local")),
     error => error.code === "ENOENT");
+  // The user's is not ACC's, and was never written to in the first place.
+  assert.deepEqual(await theirs(), EXISTING, "ACC touched the user's marketplace");
 });
 
 test("the hooks file wires only events this client actually has", async t => {
   const { context } = await fixture(t);
   await createCodexAdapter().install(context);
 
-  const wired = JSON.parse(await readFile(path.join(context.home, ".agents", "plugins", "plugins",
+  const wired = JSON.parse(await readFile(path.join(context.home, ".agents", "acc-local", "plugins",
     "agents-can-communicate", "hooks.json"), "utf8"));
 
   for (const event of Object.keys(wired.hooks)) {
@@ -100,7 +109,7 @@ test("the hooks file wires only events this client actually has", async t => {
 });
 
 test("detect is read-only and reports registration honestly", async t => {
-  const { context, read } = await fixture(t);
+  const { context, read, theirs } = await fixture(t);
   const adapter = createCodexAdapter();
 
   const before = await adapter.detect(context);
@@ -110,7 +119,7 @@ test("detect is read-only and reports registration honestly", async t => {
   const after = await adapter.detect(context);
 
   assert.match(after.diagnostics.join(" "), /registered/);
-  assert.equal(named(await read(), "someone-elses-plugin") !== undefined, true);
+  assert.deepEqual(await theirs(), EXISTING, "ACC edited the user's marketplace");
 });
 
 test("only capabilities observed in a real session are declared true", () => {
@@ -142,7 +151,7 @@ test("doctor reports the capture and the trust requirement", async t => {
 test("the guard matches the tools this client actually uses", async t => {
   const { context } = await fixture(t);
   await createCodexAdapter().install(context);
-  const wired = JSON.parse(await readFile(path.join(context.home, ".agents", "plugins", "plugins",
+  const wired = JSON.parse(await readFile(path.join(context.home, ".agents", "acc-local", "plugins",
     "agents-can-communicate", "hooks.json"), "utf8"));
 
   // Codex names its edit tool apply_patch. A matcher copied from another
@@ -271,13 +280,15 @@ test("ACC's bookkeeping never appears as a plugin", async t => {
 });
 
 test("uninstall removes our entry and leaves the user's marketplace intact", async t => {
-  const { context, read } = await realFixture(t);
+  const { context, theirs } = await realFixture(t);
   const adapter = createCodexAdapter();
   await adapter.install(context);
 
   await adapter.uninstall(context);
 
-  assert.deepEqual(await read(), EXISTING);
+  assert.deepEqual(await theirs(), EXISTING);
+  await assert.rejects(readdir(path.join(context.home, ".agents", "acc-local")),
+    error => error.code === "ENOENT", "ACC's own marketplace outlived the uninstall");
 });
 
 test("install registers the marketplace and enables the plugin", async t => {
@@ -429,4 +440,70 @@ test("injection is plain text, because this client wraps nothing", () => {
   assert.deepEqual(injectOutcome("2 peers"),
     { stdout: "2 peers\n", stderr: "", exitCode: 0 });
   assert.deepEqual(injectOutcome(""), { stdout: "", stderr: "", exitCode: 0 });
+});
+
+/**
+ * The name in the manifest, and the cache it is not allowed to own.
+ *
+ * This client discovers a marketplace at the agents home without any config
+ * entry at all, and forms plugin ids and cache paths from whatever that
+ * manifest calls itself. ACC used its own name for all three, so on a machine
+ * that already had a marketplace here the id it enabled was one the client
+ * never forms - `codex plugin list` said `not installed` while `acc install`
+ * said it had worked. Measured against Codex 0.147.0.
+ */
+test("ACC registers a marketplace of its own, not the user's", async t => {
+  const { context, theirs } = await fixture(t);
+  await createCodexAdapter().install(context);
+
+  const config = await readFile(path.join(context.codexHome, "config.toml"), "utf8");
+  assert.match(config, /\[marketplaces\.acc-local\]/);
+  assert.match(config, /\[plugins\."agents-can-communicate@acc-local"\]/);
+  // The root it names is ACC's own, inside the agents home rather than at the
+  // top of it: this client resolves a manifest entry against the root, so
+  // joining the user's marketplace would put ACC's tree in `~/plugins/`.
+  assert.match(config, /source = "[^"]*\/\.agents\/acc-local"/);
+
+  // Which is the whole point: the marketplace this client discovers by itself
+  // is the user's, named by its own manifest. ACC merged into it and then
+  // enabled `…@acc-local`, an id this client never forms - so `acc install`
+  // reported success and `codex plugin list` said `not installed`.
+  assert.deepEqual(await theirs(), EXISTING);
+});
+
+test("uninstall removes ACC's own copy and nothing it did not put there", async t => {
+  const { context } = await fixture(t);
+  await createCodexAdapter().install(context);
+  const root = path.join(context.codexHome, "plugins", "cache", "acc-local");
+  // Something that is not ACC's, inside ACC's own cache directory. Neither the
+  // plugin removal nor the empty-directory cleanup may reach it. This is the
+  // shape of what actually happened on a real machine while ACC shared the
+  // marketplace's cache root: it removed the root and took a plugin the user
+  // had installed themselves.
+  const theirs = path.join(root, "not-ours");
+  await mkdir(theirs, { recursive: true });
+  await writeFile(path.join(theirs, "marker"), "theirs\n");
+
+  await createCodexAdapter().uninstall(context);
+
+  assert.equal(await readFile(path.join(theirs, "marker"), "utf8"), "theirs\n",
+    "uninstall reached past its own directory");
+  await assert.rejects(readdir(path.join(root, "agents-can-communicate")),
+    error => error.code === "ENOENT", "ACC left its own copy behind");
+});
+
+test("a marketplace ACC creates itself is still its own", async t => {
+  // Nothing here before ACC: it writes the manifest, names it, and the id and
+  // the cache follow that name.
+  const home = await realpath(await mkdtemp(path.join(tmpdir(), "acc-codex-fresh-")));
+  t.after(() => rm(home, { recursive: true, force: true }));
+  const context = { home, codexHome: path.join(home, ".codex") };
+
+  await createCodexAdapter().install(context);
+
+  const config = await readFile(path.join(context.codexHome, "config.toml"), "utf8");
+  assert.match(config, /\[marketplaces\.acc-local\]/);
+  assert.match(config, /\[plugins\."agents-can-communicate@acc-local"\]/);
+  assert.deepEqual(await readdir(path.join(context.codexHome, "plugins", "cache",
+    "acc-local")), ["agents-can-communicate"]);
 });
