@@ -28,6 +28,20 @@ export const clientContext = home => ({
 export const ALL_ADAPTERS = () => [createClaudeCodeAdapter(), createCodexAdapter(),
   createGeminiCliAdapter(), createKimiAdapter()];
 
+/**
+ * How long to wait for a client to say its version.
+ *
+ * Detection spawns the client's own binary, and three seconds is generous on an
+ * idle machine and not always enough on a busy one: a cold start that overruns
+ * it makes an installed client look absent, and the installer skips it saying so
+ * in as many words. Raising it is for the machine that needs it - a loaded CI
+ * runner, a slow disk - rather than a default nobody can change.
+ */
+export function probeTimeout(env) {
+  const asked = Number.parseInt(env?.ACC_PROBE_TIMEOUT_MS ?? "", 10);
+  return Number.isFinite(asked) && asked > 0 ? asked : undefined;
+}
+
 function selectAdapters(requested) {
   const all = ALL_ADAPTERS();
   if (requested === undefined) return all;
@@ -143,7 +157,8 @@ export async function runInstallCommand({ options, runtime, action = "install" }
   const { data: dataHome } = platformPaths({ platform: runtime.platform,
     env: runtime.env ?? {} });
 
-  const detected = await detectInstallation({ adapters, context });
+  const detected = await detectInstallation({ adapters, context,
+    probeTimeoutMs: probeTimeout(runtime.env) });
   // An uninstall is planned from what ACC recorded writing, not only from what
   // is on the machine now. A client can be removed after ACC installed into it,
   // and its configuration directory - with ACC's files in it - stays behind.
