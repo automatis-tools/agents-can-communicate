@@ -2,14 +2,15 @@
 
 ## 0.1.4
 
-One trap, wearing two hats. Found while configuring an MCP client during an
-end-to-end run and wondering where everybody had gone.
+The public documentation rewritten around what a reader is trying to do, and one
+trap closed - found while configuring an MCP client during an end-to-end run and
+wondering where everybody had gone.
 
 | | |
 |---|---|
-| Built from | `69e94bf` |
+| Built from | `508795e` |
 | Tarball | `agents-can-communicate-0.1.4.tgz`, 135 KB, 109 entries |
-| sha256 | `e76bb71bed24c5729fe699b8e9a4de7a29d008ab8f4b1911aa32c85259f308a8` |
+| sha256 | `bb210f6b88ba150bba6c9238600bb4677e1446e5f7b8dd61f812fcbd95c373a9` |
 | Tests | 872 passing, 0 failing |
 | Node | 24 (current production LTS) |
 | Verified on | macOS 15 (darwin 25.5.0, arm64) and Linux in CI |
