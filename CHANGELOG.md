@@ -1,5 +1,34 @@
 # Changelog
 
+## Unreleased
+
+| | |
+|---|---|
+| Built from | `PENDING` |
+| Tarball | `PENDING` |
+| sha256 | `PENDING` |
+| Tests | 872 passing, 0 failing |
+
+Not published. A published record says what the registry serves and is not
+rewritten, so shipped code that changes after a release is measured here instead.
+
+The skill every agent is given names a command that runs. It named
+`<package>/node_modules/bin/acc.mjs`, which does not exist, so an agent that
+followed the skill got `MODULE_NOT_FOUND` - in every client, on every install
+from the registry.
+
+The path was counted out in `../` from the SDK's own directory, which is right
+in a development checkout and one level shallow once the workspaces are bundled.
+That was found once for the hook runner and fixed for the runner alone; the CLI
+kept the count. Both are found by walking up now, through one function, so the
+next binary cannot inherit the count. The packaging test checks the installed
+layout for both rather than for the runner alone.
+
+Found by asking a real Claude Code session to edit a file another agent had
+claimed. The guard refused it, and the agent said so - and reported, on the way,
+that the command in the skill had failed and that it had gone looking for the
+real one.
+
 ## 0.1.4
 
 The public documentation rewritten around what a reader is trying to do, and one

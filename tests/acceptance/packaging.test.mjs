@@ -174,7 +174,7 @@ test("the committed lockfile is the one these manifests produce", async t => {
     "`npm install` rewrites the lockfile, so a clone is dirty before anyone edits it");
 });
 
-test("the installed package can find its own hook runner", async t => {
+test("the installed package can find the binaries it names", async t => {
   const { tarball } = await packed(t);
   const consumer = await realpath(await mkdtemp(path.join(tmpdir(), "acc-runner-")));
   t.after(() => rm(consumer, { recursive: true, force: true }));
@@ -193,15 +193,23 @@ test("the installed package can find its own hook runner", async t => {
   const sdk = path.join(consumer, "node_modules", "agents-can-communicate",
     "node_modules", "@agents-can-communicate", "adapter-sdk", "src", "hook-shim.mjs");
   const { stdout } = await run(process.execPath, ["--input-type=module", "--eval",
-    `import { defaultRunner } from ${JSON.stringify(pathToFileURL(sdk).href)};
+    `import { defaultCli, defaultRunner } from ${JSON.stringify(pathToFileURL(sdk).href)};
      import { existsSync } from "node:fs";
      const runner = defaultRunner();
-     console.log(JSON.stringify({ runner, exists: existsSync(runner) }));`],
+     const cli = defaultCli();
+     console.log(JSON.stringify({ runner, cli,
+       runnerExists: existsSync(runner), cliExists: existsSync(cli) }));`],
   { cwd: consumer });
 
   const found = JSON.parse(stdout);
-  assert.equal(found.exists, true,
+  assert.equal(found.runnerExists, true,
     `the installed package looks for its hook runner at ${found.runner}`);
+  // The same count, the same mistake, and it was fixed for the runner alone.
+  // The CLI is what every installed skill tells an agent to run: with the count
+  // left in, the path named `node_modules/bin/acc.mjs` and an agent following
+  // the skill got `MODULE_NOT_FOUND`.
+  assert.equal(found.cliExists, true,
+    `the installed package looks for its CLI at ${found.cli}`);
 });
 
 test("the manifest declares the binaries and the engine it was certified on", async t => {
