@@ -4,10 +4,10 @@
 
 | | |
 |---|---|
-| Built from | `dc896db` |
-| Tarball | `agents-can-communicate-0.1.1.tgz`, 133 KB, 109 entries |
-| sha256 | `5c8eeae79e053aa97e5f89108cfaff1c55bdf27ddfeea7106916e1d47f5a4456` |
-| Tests | 854 passing, 0 failing |
+| Built from | `ed278ef` |
+| Tarball | `agents-can-communicate-0.1.1.tgz`, 129 KB, 107 entries |
+| sha256 | `fbbe443d6e0014a5649a69540c13af79ad279c6e6f9bd94810335ec8e0d8e621` |
+| Tests | 842 passing, 0 failing |
 
 Not published. A published record says what the registry serves and is not
 rewritten, so shipped code that changes after a release is measured here instead.
@@ -41,6 +41,17 @@ would be invisible by design.
 version. Three seconds is generous on an idle machine and not always enough on a
 busy one, where a cold start that overruns it makes an installed client look
 absent and the installer skips it saying so.
+
+The hook shim survives the node it was written for. Its paths are pinned on
+purpose - a hook runs with an environment that may carry neither PATH nor a shell
+profile - but the pinned pair moves: a version manager changes the interpreter
+and the directory global packages live in, and the shim then failed on every
+event with exit 126 and an empty stdout. No presence, no claims, no messages, and
+nothing anywhere saying why. Measured, then fixed: the pinned pair is still tried
+first, then `acc-hook` as npm links it, then the current node against the
+recorded runtime. With nothing left to run it says which path is gone and how to
+re-wire, and exits 0 - hooks fail open, and a broken install is not a reason for
+somebody's session to stop working.
 
 `acc install` says what it wrote. `installed 3 adapter(s)` was the whole account
 of a command that had just written into three other tools' configuration inside
