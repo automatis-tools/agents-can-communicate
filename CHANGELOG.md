@@ -4,9 +4,9 @@
 
 | | |
 |---|---|
-| Built from | `c767692` |
+| Built from | `dc896db` |
 | Tarball | `agents-can-communicate-0.1.1.tgz`, 133 KB, 109 entries |
-| sha256 | `cbd392ea0534290b1e1a25274fcb53c00ffc5c88599d0038235edf4308dce0d4` |
+| sha256 | `5c8eeae79e053aa97e5f89108cfaff1c55bdf27ddfeea7106916e1d47f5a4456` |
 | Tests | 854 passing, 0 failing |
 
 Not published. A published record says what the registry serves and is not
@@ -36,6 +36,11 @@ is off rather than reporting that nothing is newer. Nothing on the hook path
 asks, which a test enforces by scanning every package a turn loads: a hook runs
 each turn inside a five-second budget and fails open, so a stalled socket there
 would be invisible by design.
+
+`ACC_PROBE_TIMEOUT_MS` raises how long detection waits for a client to print its
+version. Three seconds is generous on an idle machine and not always enough on a
+busy one, where a cold start that overruns it makes an installed client look
+absent and the installer skips it saying so.
 
 `acc install` says what it wrote. `installed 3 adapter(s)` was the whole account
 of a command that had just written into three other tools' configuration inside
