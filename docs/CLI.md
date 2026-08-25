@@ -2,6 +2,15 @@
 
 Every command takes `--json` for machine output and `--cwd` to pick the workspace.
 
+`acc help` prints this list in short form, and `acc version` prints what is installed.
+Both work anywhere, including a directory that is no workspace at all.
+
+<!-- test:command -->
+```bash
+acc help
+acc version
+```
+
 ```mermaid
 graph LR
   subgraph You
@@ -48,6 +57,13 @@ graph LR
 ## Adapters only
 
 `acc attach`, `acc heartbeat`, `acc detach` — driven by hooks, not by people.
+
+## About acc
+
+| Command | Does |
+|---|---|
+| `acc help` | Every command with one line each. `--help` and `-h` mean the same |
+| `acc version` | The installed version, read from the package. `--version` and `-v` too |
 
 ## Exit codes
 

@@ -69,10 +69,8 @@ $ acc status
 
 ## Install
 
-Not published yet, so build it from a clone:
-
 ```bash
-npm ci && npm pack && npm install -g ./agents-can-communicate-*.tgz
+npm install -g agents-can-communicate
 ```
 
 Then wire up the clients you have:
@@ -94,6 +92,7 @@ What is left for a person is the install and looking in on it:
 
 | | |
 |---|---|
+| `acc help` | every command, one line each |
 | `acc status` | who is here, what is claimed, what is in flight |
 | `acc doctor` | what is installed, what is missing, what to do next |
 | `acc install` · `acc uninstall` | wire clients up, or take it back out |
