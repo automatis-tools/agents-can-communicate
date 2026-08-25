@@ -1,5 +1,10 @@
 # Security model
 
+Independent peers need an explicit authority boundary. No session owns another, so peer
+text can carry context and requests but can never silently become policy or human
+instruction. This is what lets ACC connect differently trusted sessions without merging
+their conversations or trust models.
+
 ## Trust boundaries
 
 ACC coordinates processes running under the same local user in the first release. Same-user access is not equivalent to trusted model output.
