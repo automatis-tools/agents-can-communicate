@@ -4,13 +4,26 @@
 
 | | |
 |---|---|
-| Built from | `1c08754` |
+| Built from | `2690761` |
 | Tarball | `agents-can-communicate-0.1.0.tgz`, 123 KB, 105 entries |
-| sha256 | `d61b4d516e4a43cd97f19b5a43ae0f7f47f2e9ce17ab6837607e3aba64145790` |
-| Tests | 809 passing, 0 failing |
+| sha256 | `017dd35976535010784fa5c5754108fabfc41932815cf2a3ad7027aa0ba70d67` |
+| Tests | 817 passing, 0 failing |
 
 Not published. A published record says what the registry serves and is not
 rewritten, so shipped code that changes after a release is measured here instead.
+
+An install could not be removed once its client left the machine. `acc
+uninstall` skipped exactly the client ACC had written to, reported success, and
+said the same thing on every run afterwards - leaving ACC's tree in the client's
+configuration directory and ACC's entries in the user's own settings file. The
+plan was built from detection; it is built from the installation record as well
+now, which is the only account of what was written.
+
+`uninstalled N adapter(s)` counted every adapter whose uninstall ran, which on a
+machine ACC had never touched was all of them. It counts the ones it changed.
+
+`--dry-run` works on `acc uninstall`. The preview was computed for either action
+from the start and only `install` had a flag to ask for it.
 
 `package.json` is shipped code: npm packs the manifest whatever `files` says.
 It was not in the set the record's own test watches, so editing the manifest
