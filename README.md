@@ -91,6 +91,27 @@ changes nothing. `acc uninstall` takes it all back out.
 acc install --dry-run
 ```
 
+## Keeping it current
+
+```bash
+acc update            # asks npm; --apply installs it and re-wires the clients
+```
+
+An upgrade is two steps, because it lands in two places. `npm install -g` replaces the CLI
+and the hook runtime — a client runs the runtime out of the npm directory rather than a copy
+— and leaves the bundle written into that client alone, including the skills the agents
+read. `acc install` refreshes it, and `acc doctor` says so when the two disagree:
+
+```console
+$ acc doctor
+store healthy; 2 live session(s); protection guarded; 3 of 4 adapter(s) installed
+  acc install --adapter claude_code  # plugin is 0.1.1, acc is 0.2.0
+```
+
+`acc update` is the only command that reaches the network. `acc doctor` reads what it
+remembered and asks at most once a day; nothing on the hook path ever asks, since a hook
+runs on every turn inside a five-second budget. `ACC_NO_UPDATE_CHECK=1` turns both off.
+
 ## Commands
 
 Coordination needs none from you. Requesting work, taking it, claiming files and messaging

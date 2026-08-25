@@ -12,7 +12,8 @@ import { recordInstall, removeOwned } from "./ownership.mjs";
  * A failure does not end the run. Someone installing four clients wants the
  * three that work, plus the name of the one that did not.
  */
-export async function applyPlan({ plan, adapters, context, dataHome, dryRun = false }) {
+export async function applyPlan({ plan, adapters, context, dataHome, dryRun = false,
+  accVersion = null }) {
   const byId = new Map(adapters.map(adapter => [adapter.id, adapter]));
   const results = { action: plan.action, dryRun, operations: [], skipped: plan.skipped,
     failed: [] };
@@ -34,7 +35,8 @@ export async function applyPlan({ plan, adapters, context, dataHome, dryRun = fa
         // did not happen. The reverse order would leave uninstall trying to
         // remove files nothing created.
         await recordInstall({ dataHome, adapterId: adapter.id,
-          version: operation.clientVersion ?? null, artifacts: operation.artifacts });
+          version: operation.clientVersion ?? null, accVersion,
+          artifacts: operation.artifacts });
         results.operations.push({ ...operation, applied: true,
           changes: outcome.changes ?? [], diagnostics: outcome.diagnostics ?? [] });
       } else {
