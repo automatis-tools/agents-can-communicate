@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { randomBytes } from "node:crypto";
 
-import { createId } from "@agents-can-communicate/protocol";
+import { EXIT, createId } from "@agents-can-communicate/protocol";
 import { createCoordinationService } from "@agents-can-communicate/core";
 import { openFilesystemStore } from "@agents-can-communicate/storage-filesystem";
 import { createGitProbe, discoverWorkspace, platformDataHome, runtimePaths }
@@ -12,6 +12,18 @@ import { serve } from "@agents-can-communicate/mcp-server";
 // randomness. The participant name comes from configuration, never from the
 // client: the protocol says clientInfo is self-reported and must not drive
 // behaviour, and the session is derived from this configuration alone.
+// Nothing is read from the command line, so nothing may be passed on it. It
+// used to accept and ignore anything: writing `acc-mcp --cwd <project>` - the
+// habit `acc` teaches - started a server rooted wherever the client happened to
+// launch it, alone in a workspace nobody else was in, with no warning at all.
+if (process.argv.length > 2) {
+  process.stderr.write("acc-mcp takes no arguments. It is configured by environment:\n"
+    + "  ACC_MCP_PARTICIPANT   who this server takes part as (default: mcp)\n"
+    + "  ACC_MCP_WORKSPACE     the project it joins (default: the working directory)\n"
+    + `refusing: ${process.argv.slice(2).join(" ")}\n`);
+  process.exit(EXIT.USAGE);
+}
+
 const participantId = process.env.ACC_MCP_PARTICIPANT ?? "mcp";
 const clock = { now: () => new Date().toISOString() };
 const ids = { next: kind => createId(kind, randomBytes) };

@@ -237,3 +237,42 @@ test("no shipped skill or document teaches a variable nothing sets", async () =>
       `${file} still tells an agent to pass a session id it has no way to obtain`);
   }
 });
+
+test("every variable the code reads from the environment is written down", async () => {
+  // The other direction, and the one that bit: `ACC_MCP_WORKSPACE` decides which
+  // project an MCP client joins, and appeared in no document at all. Without it
+  // the server takes the directory it was launched in, answers `solo` from a
+  // workspace nobody else is in, and says nothing - found by configuring one and
+  // wondering where everybody was.
+  const code = [];
+  for (const root of ["packages", "bin"]) {
+    const entries = await readdir(path.join(repo, root),
+      { recursive: true, withFileTypes: true });
+    for (const entry of entries) {
+      if (!entry.isFile() || !entry.name.endsWith(".mjs")) continue;
+      const file = path.join(entry.parentPath ?? entry.path, entry.name);
+      if (file.includes("node_modules") || file.includes(`${path.sep}test${path.sep}`)) continue;
+      code.push(await readFile(file, "utf8"));
+    }
+  }
+
+  // Read *from the environment*, which is what makes a name configuration. The
+  // generated hook shim has `ACC_NODE` and `ACC_RUNNER` in it, and those are
+  // shell variables of its own that nobody sets.
+  const read = new Set();
+  for (const text of code) {
+    for (const [, name] of text.matchAll(/env\??\.(ACC_[A-Z_]+)|env\["(ACC_[A-Z_]+)"\]/g)) {
+      if (name !== undefined) read.add(name);
+    }
+  }
+  assert.equal(read.size > 5, true, "the scan found almost nothing, so it proves nothing");
+
+  const documentation = (await Promise.all([...await readdir(path.join(repo, "docs"))]
+    .filter(name => name.endsWith(".md"))
+    .map(name => readFile(path.join(repo, "docs", name), "utf8"))
+    .concat([readFile(path.join(repo, "README.md"), "utf8")]))).join("\n");
+
+  const undocumented = [...read].filter(name => !documentation.includes(name)).sort();
+  assert.deepEqual(undocumented, [],
+    "these change what the product does and are written down nowhere");
+});
