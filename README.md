@@ -75,13 +75,21 @@ npm install -g agents-can-communicate
 
 Then wire up the clients you have:
 
+```bash
+acc install
+```
+
+It names every file it wrote, in your own home-relative paths, and how to undo it. Open your
+clients in the project afterwards — in one directory or in several worktrees — and work
+normally.
+
+If you would rather look before it writes, `acc install --dry-run` prints the same list and
+changes nothing. `acc uninstall` takes it all back out.
+
 <!-- test:command -->
 ```bash
 acc install --dry-run
 ```
-
-This prints every file it would touch. Run `acc install` to apply it, then open your clients
-in the project — in one directory or in several worktrees — and work normally.
 
 ## Commands
 

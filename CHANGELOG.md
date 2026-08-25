@@ -1,5 +1,45 @@
 # Changelog
 
+## Unreleased
+
+| | |
+|---|---|
+| Built from | `621bab2` |
+| Tarball | `agents-can-communicate-0.1.1.tgz`, 129 KB, 107 entries |
+| sha256 | `04d058e2e2b099a38eb27342335480438ee0bf1a43836787c31a44ce17263eab` |
+| Tests | 837 passing, 0 failing |
+
+Not published. A published record says what the registry serves and is not
+rewritten, so shipped code that changes after a release is measured here instead.
+
+`acc install` says what it wrote. `installed 3 adapter(s)` was the whole account
+of a command that had just written into three other tools' configuration inside
+someone's home; the list existed all along, since `--dry-run` prints it, and the
+run that did the work printed a number. An uninstall says what it removed and
+what it held back, which is decided while it runs: bytes that stopped matching
+what ACC wrote are someone's, and are kept.
+
+`--yes` is gone from `acc install` and `acc uninstall`. Neither has ever asked
+anything, and the flag was read by no code at all - a promise that a
+confirmation exists to be skipped. It stays on `acc config init`, which does ask.
+
+`acc config init` can be answered. It had the code to ask, but no confirmation
+port was ever handed to it, so the question went to a fallback that always
+answered no: in a real terminal the command printed `not written` and never said
+why, and `--yes` - documented for runs with nobody to ask - was the only way to
+write the file. Verified against a pseudo-terminal: `y` writes, `n` does not,
+and closing the input is a refusal rather than an error. A build assembled
+without a way to ask now says so instead of declining on the reader's behalf.
+
+The README leads with `acc install` rather than `acc install --dry-run`. The
+preview is for scripts, for CI, and for anyone who wants to look first - not the
+first thing a person should have to run to install something.
+
+One test raced the clock. `the owner is told when its claim runs out` took a
+two-second lease, then asserted the expiry was not reported yet; under a loaded
+suite the turn began after the lease had already lapsed. The two halves hold
+separate leases now.
+
 ## 0.1.1
 
 Four defects that 0.1.0 shipped with, all of them found by installing the
