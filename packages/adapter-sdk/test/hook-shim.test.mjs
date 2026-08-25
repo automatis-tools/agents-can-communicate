@@ -78,6 +78,9 @@ test("when the package moved too, the binary npm links is asked for", async t =>
   // package, which is how a reinstall under any node is found.
   await rm(here.runner);
   const linked = await here.script("acc-hook", 'echo "acc-hook ran $*"');
+  // Both, because they arrive together: npm links its binaries into the same
+  // directory as the node they were installed under.
+  await here.script("node", 'echo "the wrong branch ran"');
 
   const { stdout } = await here.fire(shim, `${path.dirname(linked)}:/usr/bin:/bin`);
 
@@ -114,4 +117,21 @@ test("a path with a space in it survives being written into a shell script", asy
     node, runner: here.runner });
 
   assert.match((await here.fire(shim)).stdout, /ran /);
+});
+
+test("a linked binary that cannot run without node is not run", async t => {
+  const here = await place(t);
+  const shim = await writeHookShim({ dir: here.root, adapterId: "claude_code",
+    node: path.join(here.root, "gone", "node"), runner: here.runner });
+  await rm(here.runner);
+  // What npm links is a script with `#!/usr/bin/env node`, so without node on
+  // PATH it cannot start - and `exec` that fails ends the shim where it stands,
+  // taking the line that says what to do with it. Found by installing the
+  // tarball and breaking the pinned path: exit 127, `env: node: not found`.
+  await here.script("acc-hook", "#!/usr/bin/env node\nconsole.log('never');");
+
+  const finished = await here.fire(shim);
+
+  assert.equal(finished.code ?? 0, 0, "a hook that could not start took the turn with it");
+  assert.match(finished.stderr, /acc install/);
 });

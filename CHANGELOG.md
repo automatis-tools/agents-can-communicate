@@ -1,16 +1,21 @@
 # Changelog
 
-## Unreleased
+## 0.1.2
+
+Six defects, and not one of them came out of running the tests again. Three
+questions found them: what a person needs `--dry-run` for, whether there is an
+auto-updater, and what happens when a version manager moves node. Each answer
+turned out to be that something was already broken and saying nothing about it.
 
 | | |
 |---|---|
-| Built from | `e19404d` |
-| Tarball | `agents-can-communicate-0.1.1.tgz`, 134 KB, 109 entries |
-| sha256 | `b3f0d96d56be2bb8c23d35d0af577c7bb188b0ee7e755dcc52592ea1d3f8f9db` |
-| Tests | 860 passing, 0 failing |
-
-Not published. A published record says what the registry serves and is not
-rewritten, so shipped code that changes after a release is measured here instead.
+| Built from | `200b847` |
+| Tarball | `agents-can-communicate-0.1.2.tgz`, 134 KB, 109 entries |
+| sha256 | `c0103bd03f157308db30b30deaf29180df7c67086f873e293d2b8d52b3167d5c` |
+| Tests | 861 passing, 0 failing |
+| Node | 24 (current production LTS) |
+| Verified on | macOS 15 (darwin 25.5.0, arm64) and Linux in CI |
+| Not supported | Windows — untested rather than known-broken |
 
 `acc update` asks npm whether there is a newer ACC, and `--apply` installs it and
 re-runs `acc install`. An upgrade lands in two places: `npm install -g` replaces
@@ -48,8 +53,10 @@ profile - but the pinned pair moves: a version manager changes the interpreter
 and the directory global packages live in, and the shim then failed on every
 event with exit 126 and an empty stdout. No presence, no claims, no messages, and
 nothing anywhere saying why. Measured, then fixed: the pinned pair is still tried
-first, then `acc-hook` as npm links it, then the current node against the
-recorded runtime. With nothing left to run it says which path is gone and how to
+first, then `acc-hook` as npm links it - and only when node is on PATH, since
+its shebang is `env node` and an `exec` that fails ends the shim where it stands,
+which the release check caught as exit 127 in place of the line that says what to
+do - then the current node against the recorded runtime. With nothing left to run it says which path is gone and how to
 re-wire, and exits 0 - hooks fail open, and a broken install is not a reason for
 somebody's session to stop working.
 
