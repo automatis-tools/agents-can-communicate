@@ -1,6 +1,6 @@
 {
   "name": "agents-can-communicate",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "type": "module",
   "description": "Model- and harness-agnostic coordination for independent AI agent sessions.",
   "keywords": [
