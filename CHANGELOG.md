@@ -1,5 +1,27 @@
 # Changelog
 
+## Unreleased
+
+| | |
+|---|---|
+| Built from | `1c08754` |
+| Tarball | `agents-can-communicate-0.1.0.tgz`, 123 KB, 105 entries |
+| sha256 | `d61b4d516e4a43cd97f19b5a43ae0f7f47f2e9ce17ab6837607e3aba64145790` |
+| Tests | 809 passing, 0 failing |
+
+Not published. A published record says what the registry serves and is not
+rewritten, so shipped code that changes after a release is measured here instead.
+
+`package.json` is shipped code: npm packs the manifest whatever `files` says.
+It was not in the set the record's own test watches, so editing the manifest
+changed the digest while every gate stayed green. The set is asked of `npm pack
+--dry-run` now rather than copied by hand, and any path that reaches the tarball
+unwatched fails by name.
+
+The manifest itself carries `npm pkg fix`: npm rewrote `./bin/acc.mjs` to
+`bin/acc.mjs` in the registry metadata on every publish and warned about it. The
+tarball was never affected.
+
 ## 0.1.0 — first release
 
 Published to npm. `0.x` because the surfaces are young: several of them changed
@@ -8,7 +30,7 @@ thing in here that was not measured.
 
 | | |
 |---|---|
-| Built from | `c318458` |
+| Built from | `c318458`, published from `b428ca7` — the merge changed nothing packed |
 | Tarball | `agents-can-communicate-0.1.0.tgz`, 123 KB, 105 entries |
 | sha256 | `e4ed773feb25dd40a0fb5d2bb010f66261613a3cac14882750b431f3ab2a3480` |
 | Tests | 808 passing, 0 failing |
@@ -21,6 +43,14 @@ tarball, so any change to shipped code changes the digest — and the commit nam
 necessarily an ancestor of the one recording it, because no commit can contain its own
 hash. Only `bin/`, `README.md`, `LICENSE`, `docs/CAPABILITIES.md`, and the workspaces are
 packed, so changes to tests, scripts, or the rest of `docs/` leave the digest alone.
+
+The registry serves that digest. Checked after publishing by downloading the
+tarball back rather than by trusting the local pack:
+
+```bash
+curl -sSL -O "$(npm view agents-can-communicate dist.tarball)"
+shasum -a 256 agents-can-communicate-0.1.0.tgz
+```
 
 To check it, or to record a newer candidate:
 
