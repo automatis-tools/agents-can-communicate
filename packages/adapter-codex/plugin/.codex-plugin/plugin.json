@@ -1,6 +1,6 @@
 {
   "name": "agents-can-communicate",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "Coordinate this Codex session with other AI agent sessions working in the same workspace.",
   "license": "UNLICENSED",
   "keywords": ["coordination", "multi-agent", "claims", "handoff"],
