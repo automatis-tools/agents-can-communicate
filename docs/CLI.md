@@ -9,6 +9,7 @@ Both work anywhere, including a directory that is no workspace at all.
 ```bash
 acc help
 acc version
+acc uninstall --dry-run
 ```
 
 ```mermaid
@@ -31,7 +32,8 @@ graph LR
 | `acc install` | Install adapters for the clients on this machine |
 | `acc install --dry-run` | Print the exact plan, change nothing |
 | `acc install --adapter kimi` | One client only |
-| `acc uninstall` | Remove what ACC wrote, keep what you edited |
+| `acc uninstall` | Remove what ACC wrote, keep what you edited — including for a client that has since left the machine |
+| `acc uninstall --dry-run` | Print exactly what would be removed, change nothing |
 | `acc doctor` | Clients, versions, install health, what to run next |
 | `acc doctor --repair` | Repair store state; refuses if it is ambiguous |
 | `acc config init` | Write `acc.workspace.json` after showing it |
