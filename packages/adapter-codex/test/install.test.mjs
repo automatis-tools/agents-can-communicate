@@ -471,22 +471,25 @@ test("ACC registers a marketplace of its own, not the user's", async t => {
   assert.deepEqual(await theirs(), EXISTING);
 });
 
-test("uninstall leaves the marketplace's other plugins in the cache", async t => {
+test("uninstall removes ACC's own copy and nothing it did not put there", async t => {
   const { context } = await fixture(t);
   await createCodexAdapter().install(context);
-  // Somebody else's plugin, cached from the same marketplace. The cache root is
-  // per marketplace, so it is shared - and ACC removed the whole of it, taking
-  // a plugin the user had installed themselves. Measured on a real machine.
-  const theirs = path.join(context.codexHome, "plugins", "cache", "acc-local",
-    "someone-elses-plugin", "0.1.0");
+  const root = path.join(context.codexHome, "plugins", "cache", "acc-local");
+  // Something that is not ACC's, inside ACC's own cache directory. Neither the
+  // plugin removal nor the empty-directory cleanup may reach it. This is the
+  // shape of what actually happened on a real machine while ACC shared the
+  // marketplace's cache root: it removed the root and took a plugin the user
+  // had installed themselves.
+  const theirs = path.join(root, "not-ours");
   await mkdir(theirs, { recursive: true });
   await writeFile(path.join(theirs, "marker"), "theirs\n");
 
   await createCodexAdapter().uninstall(context);
 
-  assert.equal(await readFile(path.join(theirs, "marker"), "utf8"), "theirs\n");
-  await assert.rejects(readdir(path.join(context.codexHome, "plugins", "cache",
-    "local-marketplace", "agents-can-communicate")), "ACC left its own copy behind");
+  assert.equal(await readFile(path.join(theirs, "marker"), "utf8"), "theirs\n",
+    "uninstall reached past its own directory");
+  await assert.rejects(readdir(path.join(root, "agents-can-communicate")),
+    error => error.code === "ENOENT", "ACC left its own copy behind");
 });
 
 test("a marketplace ACC creates itself is still its own", async t => {
