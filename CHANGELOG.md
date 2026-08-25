@@ -1,16 +1,19 @@
 # Changelog
 
-## Unreleased
+## 0.1.4
+
+One trap, wearing two hats. Found while configuring an MCP client during an
+end-to-end run and wondering where everybody had gone.
 
 | | |
 |---|---|
-| Built from | `b84ea51` |
-| Tarball | `agents-can-communicate-0.1.3.tgz`, 135 KB, 109 entries |
-| sha256 | `ad51d0e24b4631e28315a64c5fd7d4c9298f4467306860752137a488938798b4` |
+| Built from | `PENDING` |
+| Tarball | `PENDING` |
+| sha256 | `PENDING` |
 | Tests | 872 passing, 0 failing |
-
-Not published. A published record says what the registry serves and is not
-rewritten, so shipped code that changes after a release is measured here instead.
+| Node | 24 (current production LTS) |
+| Verified on | macOS 15 (darwin 25.5.0, arm64) and Linux in CI |
+| Not supported | Windows — untested rather than known-broken |
 
 `acc-mcp` refuses arguments instead of ignoring them. It reads nothing from the
 command line, and accepted anything: writing `acc-mcp --cwd <project>` - the
