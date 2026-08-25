@@ -64,6 +64,9 @@ export const COMMANDS = Object.freeze({
   // only `install` could ask for it. Removal is the side that reaches into a
   // client's configuration - including a client that has left the machine.
   uninstall: { required: [], optional: ["adapter", "home"], flags: ["dry-run"] },
+  // Asking npm whether there is a newer ACC. The one command that touches the
+  // network, and never on the hook path.
+  update: { required: [], optional: [], flags: ["apply"] },
   // The two things a person types first after installing from a registry. The
   // CLI answered neither: `acc --version` and `acc --help` were both "unknown
   // command", and `acc` on its own asked for a command without naming one.

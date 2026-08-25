@@ -74,7 +74,10 @@ test("the taught set stays honest about what the CLI offers", async () => {
     "install", "uninstall", "doctor", "config", "attach", "heartbeat", "detach",
     // Describe the program rather than the workspace: nothing to teach an agent,
     // which already receives the command list in its skill.
-    "help", "version"]);
+    "help", "version",
+    // Asks npm about the package, which is a thing a person does to their
+    // machine and not something an agent should be doing mid-turn.
+    "update"]);
   const unclassified = Object.keys(COMMANDS).filter(command => !known.has(command));
 
   assert.deepEqual(unclassified, [],

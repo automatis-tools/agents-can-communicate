@@ -5,6 +5,15 @@ Every command takes `--json` for machine output and `--cwd` to pick the workspac
 `acc help` prints this list in short form, and `acc version` prints what is installed.
 Both work anywhere, including a directory that is no workspace at all.
 
+`acc update` is the only command that touches the network. `acc doctor` reads what it
+remembered, asking at most once a day, and `ACC_NO_UPDATE_CHECK=1` turns both off. Nothing
+on the hook path ever asks: a hook runs every turn inside a five-second budget.
+
+Updating matters in two places at once. `npm install -g` replaces this CLI and the hook
+runtime — the shim a client runs points into the npm directory rather than at a copy — and
+leaves the bundle written into the client alone, including the skills the agents read. That
+is why an upgrade is two commands, and why `acc doctor` says so when they disagree.
+
 <!-- test:command -->
 ```bash
 acc help
@@ -66,6 +75,8 @@ graph LR
 |---|---|
 | `acc help` | Every command with one line each. `--help` and `-h` mean the same |
 | `acc version` | The installed version, read from the package. `--version` and `-v` too |
+| `acc update` | Ask npm whether a newer acc exists |
+| `acc update --apply` | Install it, then re-run `acc install` so the clients get the new bundle |
 
 ## Exit codes
 
