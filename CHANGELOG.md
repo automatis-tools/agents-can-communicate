@@ -1,16 +1,20 @@
 # Changelog
 
-## Unreleased
+## 0.1.3
+
+Two of them broke a promise in silence, and both were found by installing 0.1.2
+and using it rather than by running the tests again: an install this client
+reported as not installed, and a message that told the reader nothing.
 
 | | |
 |---|---|
-| Built from | `537211c` |
-| Tarball | `agents-can-communicate-0.1.2.tgz`, 135 KB, 109 entries |
-| sha256 | `fc7279c065bdfff8892f04c2a9ff4f873c3ec52bd482ab135bfe47c10101dc31` |
+| Built from | `8679ae8` |
+| Tarball | `agents-can-communicate-0.1.3.tgz`, 135 KB, 109 entries |
+| sha256 | `b3821785071c578a5198d869c2dfb03c25226c34a14a8669ba8882f153477c6d` |
 | Tests | 868 passing, 0 failing |
-
-Not published. A published record says what the registry serves and is not
-rewritten, so shipped code that changes after a release is measured here instead.
+| Node | 24 (current production LTS) |
+| Verified on | macOS 15 (darwin 25.5.0, arm64) and Linux in CI |
+| Not supported | Windows — untested rather than known-broken |
 
 Running `acc` in a home directory says what is wrong with that. A home is no
 checkout, so discovery falls back to the directory you are standing in - and the
