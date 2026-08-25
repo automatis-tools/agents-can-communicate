@@ -1,16 +1,20 @@
 # Changelog
 
-## Unreleased
+## 0.1.4
+
+The public documentation rewritten around what a reader is trying to do, and one
+trap closed - found while configuring an MCP client during an end-to-end run and
+wondering where everybody had gone.
 
 | | |
 |---|---|
-| Built from | `26cda0a` |
-| Tarball | `agents-can-communicate-0.1.3.tgz`, 135 KB, 109 entries |
-| sha256 | `ec472740ad33334d649f437fd52215ecb2f707f93d50f16bdc55fc97d67cfcd7` |
-| Tests | 871 passing, 1 skipped, 0 failing |
-
-Not published. A published record says what the registry serves and is not
-rewritten, so shipped code that changes after a release is measured here instead.
+| Built from | `508795e` |
+| Tarball | `agents-can-communicate-0.1.4.tgz`, 135 KB, 109 entries |
+| sha256 | `bb210f6b88ba150bba6c9238600bb4677e1446e5f7b8dd61f812fcbd95c373a9` |
+| Tests | 872 passing, 0 failing |
+| Node | 24 (current production LTS) |
+| Verified on | macOS 15 (darwin 25.5.0, arm64) and Linux in CI |
+| Not supported | Windows — untested rather than known-broken |
 
 Public documentation now tells ACC's story from the user's problem: opening more agent
 sessions should let those sessions carry coordination while the human focuses on the
