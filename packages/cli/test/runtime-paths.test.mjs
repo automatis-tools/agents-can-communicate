@@ -38,10 +38,38 @@ test("a data home inside the workspace is refused outright", () => {
   assert.throws(() => runtimePaths({ dataHome: path.join(workspaceRoot, ".agents"),
     workspaceId: WORKSPACE, workspaceRoots: [workspaceRoot] }),
   error => error.code === EXIT.USAGE
-    && error.message.includes("must not live inside the workspace"));
+    && error.message.includes("cannot be a workspace"));
 
   assert.throws(() => runtimePaths({ dataHome: workspaceRoot, workspaceId: WORKSPACE,
     workspaceRoots: [workspaceRoot] }), error => error.code === EXIT.USAGE);
+});
+
+test("the refusal names the directory, the state, and what to do about it", () => {
+  // The case a person actually meets is not the one the rule was written for.
+  // A home directory is no checkout, so discovery falls back to it - and the
+  // platform's own state directory is inside a home by definition. `acc status`
+  // in `~` answered "runtime state must not live inside the workspace", which
+  // reads as a misconfiguration and gives the reader nothing to act on.
+  const home = "/home/example";
+  const thrown = (() => {
+    try {
+      runtimePaths({ dataHome: path.join(home, ".local", "share"),
+        workspaceId: WORKSPACE, workspaceRoots: [home] });
+      return null;
+    } catch (error) {
+      return error;
+    }
+  })();
+
+  assert.notEqual(thrown, null, "a home directory was accepted as a workspace");
+  assert.equal(thrown.message.includes(home), true, "the directory is not named");
+  assert.equal(thrown.message.includes(path.join(home, ".local", "share", "acc")), true,
+    "the state it holds is not named");
+  assert.match(thrown.message, /Run acc inside a project/);
+  assert.match(thrown.message, /ACC_DATA_HOME/);
+  // The workspace's own directory inside the data home is not what a reader can
+  // move, so it is in the details rather than the sentence.
+  assert.equal(thrown.details.workspaceRoot, home);
 });
 
 test("a sibling directory sharing a name prefix is not treated as inside", () => {
