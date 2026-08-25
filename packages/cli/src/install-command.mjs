@@ -28,6 +28,20 @@ export const clientContext = home => ({
 export const ALL_ADAPTERS = () => [createClaudeCodeAdapter(), createCodexAdapter(),
   createGeminiCliAdapter(), createKimiAdapter()];
 
+/**
+ * How long to wait for a client to say its version.
+ *
+ * Detection spawns the client's own binary, and three seconds is generous on an
+ * idle machine and not always enough on a busy one: a cold start that overruns
+ * it makes an installed client look absent, and the installer skips it saying so
+ * in as many words. Raising it is for the machine that needs it - a loaded CI
+ * runner, a slow disk - rather than a default nobody can change.
+ */
+export function probeTimeout(env) {
+  const asked = Number.parseInt(env?.ACC_PROBE_TIMEOUT_MS ?? "", 10);
+  return Number.isFinite(asked) && asked > 0 ? asked : undefined;
+}
+
 function selectAdapters(requested) {
   const all = ALL_ADAPTERS();
   if (requested === undefined) return all;
@@ -143,7 +157,8 @@ export async function runInstallCommand({ options, runtime, action = "install" }
   const { data: dataHome } = platformPaths({ platform: runtime.platform,
     env: runtime.env ?? {} });
 
-  const detected = await detectInstallation({ adapters, context });
+  const detected = await detectInstallation({ adapters, context,
+    probeTimeoutMs: probeTimeout(runtime.env) });
   // An uninstall is planned from what ACC recorded writing, not only from what
   // is on the machine now. A client can be removed after ACC installed into it,
   // and its configuration directory - with ACC's files in it - stays behind.
@@ -153,7 +168,13 @@ export async function runInstallCommand({ options, runtime, action = "install" }
   const plan = planInstallation({ adapters, detected, context, action, recorded });
 
   const dryRun = options.dryRun === true;
-  const result = await applyPlan({ plan, adapters, context, dataHome, dryRun });
+  // Recorded with the install, so a later run can tell that the bundle sitting
+  // in a client is older than the code now running. Updating the npm package
+  // replaces this CLI and the hook runtime and leaves that bundle untouched.
+  const accVersion = typeof runtime.version === "function"
+    ? await runtime.version().catch(() => null)
+    : null;
+  const result = await applyPlan({ plan, adapters, context, dataHome, dryRun, accVersion });
 
   const acted = actedOn(result);
   if (dryRun) {

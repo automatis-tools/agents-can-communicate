@@ -109,6 +109,15 @@ anything ACC does not define.
 A config reached through a symlink is refused. A link can point anywhere, including at a
 file the repository does not control.
 
+## Environment
+
+| | |
+|---|---|
+| `ACC_DATA_HOME` · `ACC_CONFIG_HOME` · `ACC_CACHE_HOME` | Where state is kept, instead of the platform's own locations |
+| `ACC_PARTICIPANT` | Which participant a session belongs to, when the client does not say |
+| `ACC_NO_UPDATE_CHECK=1` | Never ask npm whether a newer ACC exists. `acc update` then says it is off, which is a different answer from "nothing is newer" |
+| `ACC_PROBE_TIMEOUT_MS` | How long to wait for a client to print its version. Three seconds by default: generous on an idle machine, and not always enough on a busy one, where a client that overruns it is reported as not installed |
+
 ## Relationship to runtime paths
 
 Nothing here says where state is stored, and nothing here can. That is

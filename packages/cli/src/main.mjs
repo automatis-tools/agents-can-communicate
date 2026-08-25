@@ -9,6 +9,7 @@ import { parseArgs, positiveNumber } from "./args.mjs";
 // with the argument already half-applied.
 const usage = message => new AccError(EXIT.USAGE, message);
 import { describeCommands, helpText } from "./help.mjs";
+import { runUpdateCommand } from "./update-command.mjs";
 import { runConfigCommand } from "./config-command.mjs";
 import { runInstallCommand } from "./install-command.mjs";
 import { runDoctor } from "./doctor-command.mjs";
@@ -280,6 +281,8 @@ const HANDLERS = Object.freeze({
 
   doctor: async ({ options, context, runtime }) => runDoctor({ options, context, runtime }),
 
+  update: async ({ options, runtime }) => runUpdateCommand({ options, runtime }),
+
   help: async () => ({ data: { commands: describeCommands() }, text: helpText() }),
 
   version: async ({ runtime }) => {
@@ -299,7 +302,8 @@ const HANDLERS = Object.freeze({
 /**
  * @returns {Promise<number>} the process exit code
  */
-const NO_WORKSPACE = Object.freeze(["config", "install", "uninstall", "help", "version"]);
+const NO_WORKSPACE = Object.freeze(["config", "install", "uninstall", "help", "version",
+  "update"]);
 
 export async function main(argv, runtime) {
   const write = (stream, text) => new Promise((resolve, reject) =>
