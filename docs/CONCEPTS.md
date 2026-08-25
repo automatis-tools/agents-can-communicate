@@ -23,8 +23,19 @@ graph LR
   end
 ```
 
-Native subagents solve this *inside* one product, for sessions that product created. ACC
-solves it *between* products, for sessions you opened yourself.
+Subagents created inside one session solve a different problem: delegated work under an
+owner. ACC connects sessions you opened yourself while leaving their lifecycle,
+permissions, context, and human direction independent.
+
+## Why peers instead of workers
+
+The sessions ACC joins may have different models, clients, trust settings, or people
+behind them. Treating one as the permanent authority would misrepresent that reality and
+make coordination depend on its process staying alive.
+
+ACC therefore keeps durable state below every session. Peers may ask, answer, reserve,
+handoff, or coordinate a workstream; none can silently acquire ownership of another. This
+is the useful middle ground between isolated terminals and a managed runtime.
 
 ## Asking, not commanding
 

@@ -3,6 +3,10 @@
 ACC is a control plane. It owns coordination state and nothing else — not inference, not
 conversation history, not permissions, not process lifecycle.
 
+That boundary is the reason ACC can improve independently opened sessions without taking
+them over. Clients keep their own execution and trust models; the shared layer supplies
+only the facts needed to avoid isolation, duplicate work, and unsafe handoffs.
+
 ```mermaid
 graph TB
   subgraph "Execution planes — not ours"

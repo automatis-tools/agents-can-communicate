@@ -1,5 +1,10 @@
 # Capabilities
 
+Capability honesty is part of the product, not an implementation footnote. ACC coordinates
+sessions it does not own, so the workspace can promise only what every session actually
+exposes. One weaker participant lowers the reported protection level instead of inheriting
+a stronger label from its peers.
+
 What each harness was **observed** doing, on the versions named here. Nothing in this
 table is inferred from documentation: every `yes` has a fixture captured from a real
 session, and every `no` means it was not seen, not that it is impossible.
