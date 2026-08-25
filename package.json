@@ -2,10 +2,12 @@
   "name": "agents-can-communicate",
   "version": "0.1.4",
   "type": "module",
-  "description": "Model- and harness-agnostic coordination for independent AI agent sessions.",
+  "description": "Local-first coordination for independently opened AI agent sessions.",
   "keywords": [
     "agents",
     "coordination",
+    "local-first",
+    "agent-handoff",
     "mcp",
     "hooks",
     "codex",

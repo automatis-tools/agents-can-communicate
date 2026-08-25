@@ -15,6 +15,16 @@ end-to-end run and wondering where everybody had gone.
 | Verified on | macOS 15 (darwin 25.5.0, arm64) and Linux in CI |
 | Not supported | Windows — untested rather than known-broken |
 
+Public documentation now tells ACC's story from the user's problem: opening more agent
+sessions should let those sessions carry coordination while the human focuses on the
+work. The README follows a handoff in plain language, gives the required installation and
+activation commands, explains where ACC runs and stores its state, and focuses the rest
+of the journey on visible outcomes and supported scope. Protocol output, internal
+delivery states, architecture wiring, and detailed capability matrices live in the
+reference guides. The promises use affirmative language about local operation, client
+ownership, private transcripts, and supported scope. Mermaid diagrams show the human
+setting direction and agents carrying a handoff through ACC's shared room.
+
 `acc-mcp` refuses arguments instead of ignoring them. It reads nothing from the
 command line, and accepted anything: writing `acc-mcp --cwd <project>` - the
 habit `acc` teaches - started a server rooted wherever the client happened to

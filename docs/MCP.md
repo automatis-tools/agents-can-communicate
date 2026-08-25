@@ -1,6 +1,9 @@
 # MCP
 
-For clients with no ACC adapter. Tier 1: it can read and take part; nothing intercepts it.
+For clients with no native ACC adapter. This is the participation tier: the client can
+share durable coordination state, but nothing intercepts its lifecycle or writes. That
+limit is useful because it extends the workspace without pretending a generic tool
+surface can provide native control.
 
 ```mermaid
 graph LR
@@ -39,6 +42,13 @@ the command line: `acc-mcp` takes no arguments and says so rather than ignoring 
 | `acc_finish` | Handoff and release |
 
 Resources: `acc://snapshot`, `acc://roster`.
+
+## When this tier fits
+
+Use MCP when shared presence, requests, claims, and handoffs matter more than automatic
+delivery or guarded writes. Move to a native adapter when the client exposes hooks that
+can prove those stronger capabilities. The stored coordination model stays the same; only
+the integration's reach changes.
 
 ## What you do not get
 

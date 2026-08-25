@@ -2,6 +2,9 @@
 
 Three minutes, end to end.
 
+The short setup is part of the design: ACC coordinates sessions you already open, so
+there is no scheduler, daemon, dashboard, or replacement workflow to start first.
+
 ```mermaid
 graph LR
   I[acc install] --> S[open your client<br/>as usual] --> P[peers appear] --> C[claims guard writes] --> U[acc uninstall]
@@ -23,7 +26,8 @@ It only installs for clients you actually have. Missing ones are listed with the
 ## 2. Open a session — normally
 
 No ACC command. Just start Codex, Claude Code, Gemini, or Kimi as you always do. A hook
-attaches the session.
+attaches the session. It keeps its own client, permissions, checkout, and human
+instructions; ACC adds a shared coordination view around it.
 
 ## 3. See who is here
 
@@ -108,7 +112,11 @@ graph TB
 An MCP participant shows as `advisory` on the roster, and a workspace with one in it
 reports `advisory` protection — a guarded claim is advice while it is connected.
 
+That downgrade is deliberate. MCP is enough to participate in durable coordination, but
+it does not expose the lifecycle and write boundaries needed for ambient attachment and
+guards. ACC reports the difference instead of presenting both integrations as equivalent.
+
 ## Next
 
-[CLI reference](CLI.md) · [Configuration](CONFIGURATION.md) ·
+[Why ACC](WHY_ACC.md) · [CLI reference](CLI.md) · [Configuration](CONFIGURATION.md) ·
 [Troubleshooting](TROUBLESHOOTING.md)

@@ -62,7 +62,7 @@ const DOCS = "https://github.com/automatis-tools/agents-can-communicate"
 
 export function helpText() {
   const width = Math.max(...Object.keys(COMMANDS).map(name => name.length)) + 4;
-  const lines = ["acc - several agents in one workspace, none of them in charge", ""];
+  const lines = ["acc - coordinate the agent sessions you already opened", ""];
   for (const { heading, commands } of describeCommands()) {
     lines.push(heading);
     for (const { name, summary } of commands) {
