@@ -238,6 +238,35 @@ test("no shipped skill or document teaches a variable nothing sets", async () =>
   }
 });
 
+/**
+ * The `ACC_*` names a piece of code takes out of the environment.
+ *
+ * Both spellings, and both taken: the pattern has an alternative per spelling,
+ * so one capture group is always undefined and reading only the first threw
+ * away every bracketed read - a scan that reported nothing wrong because it had
+ * looked at half of what it claimed to.
+ */
+export function readsFromEnvironment(text) {
+  const found = new Set();
+  for (const [, dotted, bracketed]
+    of text.matchAll(/env\??\.(ACC_[A-Z_]+)|env\[["`'](ACC_[A-Z_]+)["`']\]/g)) {
+    found.add(dotted ?? bracketed);
+  }
+  return found;
+}
+
+test("the scan reads both ways of asking the environment", () => {
+  // Neither spelling is hypothetical: the first is what the code uses today,
+  // and the second is what it would use for a computed name tomorrow.
+  assert.deepEqual([...readsFromEnvironment(`
+    const a = env.ACC_DOTTED;
+    const b = process.env?.ACC_OPTIONAL;
+    const c = env["ACC_BRACKETED"];
+    const d = runtime.env['ACC_SINGLE'];
+    const untouched = "ACC_MENTIONED_IN_PROSE";
+  `)].sort(), ["ACC_BRACKETED", "ACC_DOTTED", "ACC_OPTIONAL", "ACC_SINGLE"]);
+});
+
 test("every variable the code reads from the environment is written down", async () => {
   // The other direction, and the one that bit: `ACC_MCP_WORKSPACE` decides which
   // project an MCP client joins, and appeared in no document at all. Without it
@@ -259,12 +288,7 @@ test("every variable the code reads from the environment is written down", async
   // Read *from the environment*, which is what makes a name configuration. The
   // generated hook shim has `ACC_NODE` and `ACC_RUNNER` in it, and those are
   // shell variables of its own that nobody sets.
-  const read = new Set();
-  for (const text of code) {
-    for (const [, name] of text.matchAll(/env\??\.(ACC_[A-Z_]+)|env\["(ACC_[A-Z_]+)"\]/g)) {
-      if (name !== undefined) read.add(name);
-    }
-  }
+  const read = new Set(code.flatMap(text => [...readsFromEnvironment(text)]));
   assert.equal(read.size > 5, true, "the scan found almost nothing, so it proves nothing");
 
   const documentation = (await Promise.all([...await readdir(path.join(repo, "docs"))]
