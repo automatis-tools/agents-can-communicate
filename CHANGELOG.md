@@ -1,16 +1,28 @@
 # Changelog
 
-## Unreleased
+## 0.1.1
+
+Four defects that 0.1.0 shipped with, all of them found by installing the
+published tarball and using it rather than by running the tests again. Every one
+of them survived because everything was green: the tests knew which command to
+run, the record's own gate watched the wrong set of files, an uninstall was
+planned from the wrong source, and the byte-for-byte claim was proved on a
+different file format than the one that broke it.
 
 | | |
 |---|---|
-| Built from | `47a9b24` |
-| Tarball | `agents-can-communicate-0.1.0.tgz`, 123 KB, 105 entries |
-| sha256 | `144fba47a46202f04320d063fb8e1630cd78c5935fab540fe0bf03fd80cf13bf` |
+| Built from | `PENDING` |
+| Tarball | `PENDING` |
+| sha256 | `PENDING` |
 | Tests | 828 passing, 0 failing |
+| Node | 24 (current production LTS) |
+| Verified on | macOS 15 (darwin 25.5.0, arm64) and Linux in CI |
+| Not supported | Windows — untested rather than known-broken |
 
-Not published. A published record says what the registry serves and is not
-rewritten, so shipped code that changes after a release is measured here instead.
+`acc --version` and `acc help` answer. Neither existed: the first two things a
+person types after installing from a registry were both "unknown command", and
+`acc` on its own asked for a command without naming one. The list is generated
+from the command table, so a command that exists is always listed.
 
 A config ACC edits is edited rather than reprinted. Reading the style back out
 of the file kept the indentation and still reformatted what the style could not
