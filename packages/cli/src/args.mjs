@@ -58,7 +58,19 @@ export const COMMANDS = Object.freeze({
     subcommands: ["init", "validate"] },
   install: { required: [], optional: ["adapter", "home"], flags: ["dry-run", "yes"] },
   uninstall: { required: [], optional: ["adapter", "home"], flags: ["yes"] },
+  // The two things a person types first after installing from a registry. The
+  // CLI answered neither: `acc --version` and `acc --help` were both "unknown
+  // command", and `acc` on its own asked for a command without naming one.
+  help: { required: [], optional: [] },
+  version: { required: [], optional: [] },
 });
+
+// Spelled as the commands they mean, and only in first position. A message body
+// legitimately begins with "--" - exchanging diffs is the point of this tool -
+// so reading them anywhere in the argv would make `acc message --body "--help"`
+// print the help instead of sending it.
+const ALIASES = Object.freeze({ "--help": "help", "-h": "help",
+  "--version": "version", "-v": "version", "-V": "version" });
 
 const GLOBAL = Object.freeze(["json", "workspace", "cwd"]);
 
@@ -69,10 +81,15 @@ function usage(message, details = {}) {
 const camel = name => name.replace(/-([a-z])/g, (_, letter) => letter.toUpperCase());
 
 export function parseArgs(argv) {
-  if (!Array.isArray(argv) || argv.length === 0) usage("a command is required");
-  const [command, ...rest] = argv;
+  if (!Array.isArray(argv) || argv.length === 0) {
+    usage("a command is required - `acc help` lists them");
+  }
+  const [first, ...rest] = argv;
+  const command = ALIASES[first] ?? first;
   const spec = COMMANDS[command];
-  if (spec === undefined) usage(`unknown command: ${command}`, { command });
+  if (spec === undefined) {
+    usage(`unknown command: ${command} - \`acc help\` lists them`, { command });
+  }
 
   let tokens = rest;
   let subcommand;

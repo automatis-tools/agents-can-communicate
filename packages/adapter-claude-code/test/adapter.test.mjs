@@ -5,6 +5,8 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
 
+import { CLAUDE_PLUGIN, pluginVersion } from "../../../tests/helpers/plugin-version.mjs";
+
 import { EXIT } from "@agents-can-communicate/protocol";
 
 import { createClaudeCodeAdapter } from "../src/adapter.mjs";
@@ -46,7 +48,7 @@ test("install registers the plugin and preserves the user's own hook", async t =
     "marketplaces", "acc-local", "agents-can-communicate")),
   [".claude-plugin", "hooks", "skills"].sort());
   assert.deepEqual(await readdir(path.join(context.configDir, "plugins", "cache",
-    "acc-local", "agents-can-communicate", "0.0.0")),
+    "acc-local", "agents-can-communicate", await pluginVersion(CLAUDE_PLUGIN))),
   [".claude-plugin", "hooks", "skills"].sort());
 
   // Registered the way the client registers plugins, measured from its own
