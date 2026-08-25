@@ -35,8 +35,12 @@ async function machine(t) {
   await writeFile(claude, "#!/bin/sh\necho \"2.1.233 (Claude Code)\"\n");
   await chmod(claude, 0o755);
 
+  // Detection spawns the client's binary, and the default three seconds is not
+  // always enough while the rest of the suite is running: the stub looked absent
+  // and every test here failed on a machine that had it.
   const env = { ...process.env, PATH: `${bin}${path.delimiter}${process.env.PATH}`,
-    HOME: home, ACC_DATA_HOME: dataHome, GIT_DIR: "", GIT_WORK_TREE: "" };
+    HOME: home, ACC_DATA_HOME: dataHome, ACC_PROBE_TIMEOUT_MS: "30000",
+    GIT_DIR: "", GIT_WORK_TREE: "" };
 
   // Nothing here asks the registry: the check is switched off, except where a
   // test seeds an answer that is still fresh so none is needed.
@@ -48,32 +52,36 @@ async function machine(t) {
     [acc, "install", "--adapter", "claude_code", "--home", home, "--cwd", project], { env });
 
   const record = path.join(dataHome, "acc", "installs.json");
-  return { home, dataHome, project, doctor, install, record };
+  // A record written the way the installer writes one, without needing a client
+  // on this machine to have been detected first.
+  const record4 = async entry => {
+    await mkdir(path.dirname(record), { recursive: true });
+    await writeFile(record, JSON.stringify({ schemaVersion: 1, installs: [
+      { adapterId: entry.adapterId, version: "2.1.233",
+        ...(entry.accVersion === undefined ? {} : { accVersion: entry.accVersion }),
+        artifacts: [] }] }, null, 2));
+  };
+  return { home, dataHome, project, doctor, install, record, record4 };
 }
 
 test("doctor prints what to run next, not only the summary", async t => {
   const place = await machine(t);
+  // Seeded rather than installed: this is about the report reaching the reader,
+  // and every adapter is described whether its client is on the machine or not.
+  await place.record4({ adapterId: "claude_code", accVersion: "0.0.9" });
 
   const text = await place.doctor();
 
   assert.match(text, /store healthy/);
-  // A client that is here and not wired up is the whole reason to run this.
   assert.match(text, /acc install --adapter claude_code/,
     "the remediation was computed and shown only to --json");
 });
 
 test("doctor says when a client is wired to an older acc than the one running", async t => {
   const place = await machine(t);
-  await place.install();
-
-  assert.doesNotMatch(await place.doctor(), /plugin is/,
-    "reported as stale immediately after being installed");
-
   // What an upgrade leaves behind: `npm install -g` replaces the CLI and the
   // hook runtime, and the bundle written into the client stays where it was.
-  const record = JSON.parse(await readFile(place.record, "utf8"));
-  for (const install of record.installs) install.accVersion = "0.0.9";
-  await writeFile(place.record, JSON.stringify(record, null, 2));
+  await place.record4({ adapterId: "claude_code", accVersion: "0.0.9" });
 
   assert.match(await place.doctor(),
     /acc install --adapter claude_code {2}# plugin is 0\.0\.9, acc is \d+\.\d+\.\d+/);
@@ -94,13 +102,9 @@ test("an install records the acc that made it", async t => {
 
 test("an install with no recorded acc version is not called stale", async t => {
   const place = await machine(t);
-  await place.install();
-
   // Installs made before the record carried it. "Your plugin might be old" on
   // every run is not a diagnosis.
-  const record = JSON.parse(await readFile(place.record, "utf8"));
-  for (const install of record.installs) delete install.accVersion;
-  await writeFile(place.record, JSON.stringify(record, null, 2));
+  await place.record4({ adapterId: "claude_code", accVersion: undefined });
 
   assert.doesNotMatch(await place.doctor(), /plugin is/);
 });

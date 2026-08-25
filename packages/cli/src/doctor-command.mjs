@@ -5,7 +5,7 @@ import { detectInstallation, loadOwnership, verifyOwned }
   from "@agents-can-communicate/installer";
 import { AccError, EXIT } from "@agents-can-communicate/protocol";
 
-import { ALL_ADAPTERS, clientContext } from "./install-command.mjs";
+import { ALL_ADAPTERS, clientContext, probeTimeout } from "./install-command.mjs";
 import { platformPaths } from "./platform-paths.mjs";
 import { noticeUpdate } from "./update-check.mjs";
 import { diagnoseFilesystemStore, repairFilesystemStore }
@@ -41,7 +41,8 @@ async function diagnoseAdapters({ options, runtime }) {
   const { data: dataHome } = platformPaths({ platform: runtime?.platform,
     env: runtime?.env ?? {} });
   const adapters = ALL_ADAPTERS();
-  const detected = await detectInstallation({ adapters, context: clients });
+  const detected = await detectInstallation({ adapters, context: clients,
+    probeTimeoutMs: probeTimeout(runtime?.env) });
   const record = await loadOwnership({ dataHome });
   const running = typeof runtime?.version === "function"
     ? await runtime.version().catch(() => null)
