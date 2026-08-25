@@ -1,5 +1,7 @@
 import path from "node:path";
 
+import { editJson } from "./json-text.mjs";
+
 const MARKER = "acc:owned";
 // Ownership of single entries inside a container someone else also writes to.
 // `enabledPlugins` in a Claude Code settings file holds every plugin the user
@@ -150,10 +152,23 @@ export function jsonStyleOf(text) {
  * Unchanged content is not rewritten at all, so a second install touches
  * nothing. A file that does not exist yet is ACC's to create, and gets the
  * conventional trailing newline.
+ *
+ * What is there is edited rather than re-emitted. Reading the style back out of
+ * the file kept the indentation, and still reformatted everything the style
+ * could not describe: a nested object a person had written on one line came
+ * back as three, and a blank line between sections was gone. The bytes are
+ * theirs, and the diff ACC leaves should be of what it changed.
  */
 export async function writeForeignJson(file, value, { readFile, writeFile, mkdir }) {
   const current = await readFile(file, "utf8").catch(() => null);
-  const text = formatJsonAs(value, jsonStyleOf(current));
+  const style = jsonStyleOf(current);
+  // Null when the original cannot be read, or when the edit came back meaning
+  // something other than it was asked to write. Then this is the whole-file
+  // re-emit it has always been.
+  const spliced = typeof current === "string" ? editJson(current, value, style.indent) : null;
+  const text = spliced === null
+    ? formatJsonAs(value, style)
+    : (style.trailingNewline === false ? spliced : `${spliced}\n`);
   if (current === text) return false;
   await mkdir(path.dirname(file), { recursive: true });
   await writeFile(file, text);
