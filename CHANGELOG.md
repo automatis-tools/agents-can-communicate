@@ -1,16 +1,21 @@
 # Changelog
 
-## Unreleased
+## 0.1.2
+
+Six defects, and not one of them came out of running the tests again. Three
+questions found them: what a person needs `--dry-run` for, whether there is an
+auto-updater, and what happens when a version manager moves node. Each answer
+turned out to be that something was already broken and saying nothing about it.
 
 | | |
 |---|---|
-| Built from | `e19404d` |
-| Tarball | `agents-can-communicate-0.1.1.tgz`, 134 KB, 109 entries |
-| sha256 | `b3f0d96d56be2bb8c23d35d0af577c7bb188b0ee7e755dcc52592ea1d3f8f9db` |
+| Built from | `PENDING` |
+| Tarball | `PENDING` |
+| sha256 | `PENDING` |
 | Tests | 860 passing, 0 failing |
-
-Not published. A published record says what the registry serves and is not
-rewritten, so shipped code that changes after a release is measured here instead.
+| Node | 24 (current production LTS) |
+| Verified on | macOS 15 (darwin 25.5.0, arm64) and Linux in CI |
+| Not supported | Windows — untested rather than known-broken |
 
 `acc update` asks npm whether there is a newer ACC, and `--apply` installs it and
 re-runs `acc install`. An upgrade lands in two places: `npm install -g` replaces
