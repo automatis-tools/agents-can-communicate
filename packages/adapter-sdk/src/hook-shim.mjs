@@ -29,20 +29,35 @@ import { AccError, EXIT } from "@agents-can-communicate/protocol";
  * nearest `bin/acc-hook.mjs` above this file is the one that belongs to this
  * copy of the package.
  */
-export const defaultRunner = () => {
+/**
+ * A binary of this package's own, found by walking up rather than counted to.
+ *
+ * `../../../bin/<name>` is the answer in a development checkout and only there.
+ * Published, this module sits at
+ * `<package>/node_modules/@agents-can-communicate/adapter-sdk/src/`, one level
+ * deeper - so the count landed on `node_modules/bin/<name>`, which does not
+ * exist. That was found once for the hook runner and fixed for the runner
+ * alone. The CLI kept the count, and every skill installed for every agent
+ * named a command that could not run: an agent that followed it got
+ * `MODULE_NOT_FOUND`. Found by asking a real client to edit a claimed file and
+ * reading what it reported.
+ */
+const ownBinary = name => {
   let directory = fileURLToPath(new URL(".", import.meta.url));
   for (;;) {
-    const candidate = path.join(directory, "bin", "acc-hook.mjs");
+    const candidate = path.join(directory, "bin", name);
     if (existsSync(candidate)) return candidate;
     const parent = path.dirname(directory);
     // Reached the root without finding one. The development answer is returned
     // so the refusal that follows names a path a reader can recognise.
     if (parent === directory) {
-      return fileURLToPath(new URL("../../../bin/acc-hook.mjs", import.meta.url));
+      return fileURLToPath(new URL(`../../../bin/${name}`, import.meta.url));
     }
     directory = parent;
   }
 };
+
+export const defaultRunner = () => ownBinary("acc-hook.mjs");
 
 export const runnerExists = async runner => {
   try {
@@ -137,8 +152,7 @@ export async function removeInstalledTree(target, keep = []) {
 }
 
 /** Where the CLI lives, resolved from this package rather than from PATH. */
-export const defaultCli = () =>
-  fileURLToPath(new URL("../../../bin/acc.mjs", import.meta.url));
+export const defaultCli = () => ownBinary("acc.mjs");
 
 /**
  * Bake the runnable command into the skill this adapter installs.
