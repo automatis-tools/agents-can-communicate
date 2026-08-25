@@ -7,9 +7,9 @@ end-to-end run and wondering where everybody had gone.
 
 | | |
 |---|---|
-| Built from | `PENDING` |
-| Tarball | `PENDING` |
-| sha256 | `PENDING` |
+| Built from | `69e94bf` |
+| Tarball | `agents-can-communicate-0.1.4.tgz`, 135 KB, 109 entries |
+| sha256 | `e76bb71bed24c5729fe699b8e9a4de7a29d008ab8f4b1911aa32c85259f308a8` |
 | Tests | 872 passing, 0 failing |
 | Node | 24 (current production LTS) |
 | Verified on | macOS 15 (darwin 25.5.0, arm64) and Linux in CI |
