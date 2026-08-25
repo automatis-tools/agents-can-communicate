@@ -56,11 +56,14 @@ export const COMMANDS = Object.freeze({
   // inside a handler that has already decided what to do.
   config: { required: [], optional: [], flags: ["yes", "force"],
     subcommands: ["init", "validate"] },
-  install: { required: [], optional: ["adapter", "home"], flags: ["dry-run", "yes"] },
+  // No `--yes`: neither of these ever asked, so the flag agreed to nothing. It
+  // was accepted and read by nobody, which is a promise that a confirmation
+  // exists to be skipped.
+  install: { required: [], optional: ["adapter", "home"], flags: ["dry-run"] },
   // `--dry-run` on both, because the preview was computed for either action and
   // only `install` could ask for it. Removal is the side that reaches into a
   // client's configuration - including a client that has left the machine.
-  uninstall: { required: [], optional: ["adapter", "home"], flags: ["dry-run", "yes"] },
+  uninstall: { required: [], optional: ["adapter", "home"], flags: ["dry-run"] },
   // The two things a person types first after installing from a registry. The
   // CLI answered neither: `acc --version` and `acc --help` were both "unknown
   // command", and `acc` on its own asked for a command without naming one.
