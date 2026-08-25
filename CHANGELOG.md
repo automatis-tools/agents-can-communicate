@@ -11,9 +11,9 @@ different file format than the one that broke it.
 
 | | |
 |---|---|
-| Built from | `PENDING` |
-| Tarball | `PENDING` |
-| sha256 | `PENDING` |
+| Built from | `de01634` |
+| Tarball | `agents-can-communicate-0.1.1.tgz`, 127 KB, 106 entries |
+| sha256 | `fbe2c3e0f169159af447e3a48428181b77e0cc89acbf3da5884d33db78a8bda7` |
 | Tests | 828 passing, 0 failing |
 | Node | 24 (current production LTS) |
 | Verified on | macOS 15 (darwin 25.5.0, arm64) and Linux in CI |
