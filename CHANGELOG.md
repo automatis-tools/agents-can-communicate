@@ -1,16 +1,19 @@
 # Changelog
 
-## Unreleased
+## 0.1.5
+
+One fix, and the most serious so far: every published version taught agents a
+command that could not run. `0.1.0` through `0.1.4` are affected.
 
 | | |
 |---|---|
-| Built from | `065beb1` |
-| Tarball | `agents-can-communicate-0.1.4.tgz`, 135 KB, 109 entries |
-| sha256 | `3fc727eb2158d66415635b4d63bd6a44d94e4df2c5fe8055c45ab1d8b690337c` |
+| Built from | `479b240` |
+| Tarball | `agents-can-communicate-0.1.5.tgz`, 135 KB, 109 entries |
+| sha256 | `5022560495d527fec8e37cf2ba9ea37ff4df3dcbafa2bef468f22108c7e925f5` |
 | Tests | 872 passing, 0 failing |
-
-Not published. A published record says what the registry serves and is not
-rewritten, so shipped code that changes after a release is measured here instead.
+| Node | 24 (current production LTS) |
+| Verified on | macOS 15 (darwin 25.5.0, arm64) and Linux in CI |
+| Not supported | Windows — untested rather than known-broken |
 
 The skill every agent is given names a command that runs. It named
 `<package>/node_modules/bin/acc.mjs`, which does not exist, so an agent that
