@@ -7,9 +7,9 @@ command that could not run. `0.1.0` through `0.1.4` are affected.
 
 | | |
 |---|---|
-| Built from | `PENDING` |
-| Tarball | `PENDING` |
-| sha256 | `PENDING` |
+| Built from | `479b240` |
+| Tarball | `agents-can-communicate-0.1.5.tgz`, 135 KB, 109 entries |
+| sha256 | `5022560495d527fec8e37cf2ba9ea37ff4df3dcbafa2bef468f22108c7e925f5` |
 | Tests | 872 passing, 0 failing |
 | Node | 24 (current production LTS) |
 | Verified on | macOS 15 (darwin 25.5.0, arm64) and Linux in CI |
