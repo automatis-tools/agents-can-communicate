@@ -4,7 +4,7 @@
 
 | | |
 |---|---|
-| Built from | `374ef8d` |
+| Built from | `16b49da` |
 | Tarball | `agents-can-communicate-0.1.3.tgz`, 135 KB, 109 entries |
 | sha256 | `52a1e3bfe365e78271dee9d93f326b31f820819806606d9592842b69fe0953b4` |
 | Tests | 872 passing, 0 failing |
