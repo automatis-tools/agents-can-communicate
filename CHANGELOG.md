@@ -8,9 +8,9 @@ reported as not installed, and a message that told the reader nothing.
 
 | | |
 |---|---|
-| Built from | `PENDING` |
-| Tarball | `PENDING` |
-| sha256 | `PENDING` |
+| Built from | `8679ae8` |
+| Tarball | `agents-can-communicate-0.1.3.tgz`, 135 KB, 109 entries |
+| sha256 | `b3821785071c578a5198d869c2dfb03c25226c34a14a8669ba8882f153477c6d` |
 | Tests | 868 passing, 0 failing |
 | Node | 24 (current production LTS) |
 | Verified on | macOS 15 (darwin 25.5.0, arm64) and Linux in CI |
