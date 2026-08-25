@@ -8,6 +8,7 @@ export { assertRunner, bakeSkillCommand, defaultCli, defaultRunner, removeInstal
 export { BEGIN, END, removeTomlBlock, renderBlock, stripBlock, tomlString, writeTomlBlock }
   from "./toml-block.mjs";
 export { projectContext } from "./context-projector.mjs";
+export { editJson, readJson } from "./json-text.mjs";
 export { formatJsonAs, jsonStyleOf, mergeOwnedConfig, mergeOwnedEntries, ownedEntries, ownedKeys,
   acccreatedFile, removeIfEmpty, removeOwnedConfig, removeOwnedEntries, writeForeignJson,
   blankJson, blankText } from "./config-merge.mjs";

@@ -125,6 +125,29 @@ test("install and uninstall restore a foreign config byte for byte", async t => 
   assert.equal(await readFile(path.join(home, "config.toml"), "utf8"), original);
 });
 
+test("install and uninstall restore a foreign JSON config byte for byte", async t => {
+  const { context, home } = await machine(t);
+  const adapter = ALL_ADAPTERS().find(item => item.id === "gemini_cli");
+  const settings = path.join(home, ".gemini", "settings.json");
+  // Written the way a person writes one, not the way a serialiser prints one:
+  // tabs, a blank line between sections, and a small object kept on its line.
+  const original = ["{", '\t"theme": "dark",', "",
+    '\t"mcpServers": {', '\t\t"mine": { "command": "my-server" }', "\t}", "}", ""].join("\n");
+  await mkdir(path.dirname(settings), { recursive: true });
+  await writeFile(settings, original);
+
+  await adapter.install(context);
+  const installed = await readFile(settings, "utf8");
+  assert.match(installed, /"mine": \{ "command": "my-server" \}/,
+    "an install reformatted a line it was not asked to touch");
+  assert.match(installed, /\n\n\t"mcpServers"/, "an install removed the user's blank line");
+
+  await adapter.uninstall(context);
+
+  // The claim the TOML test above makes, made for the other three clients too.
+  assert.equal(await readFile(settings, "utf8"), original);
+});
+
 /**
  * The user's own entries in a container ACC had to create.
  *
