@@ -30,7 +30,10 @@ const ADAPTERS = [
   { name: "codex", create: createCodexAdapter,
     context: home => ({ home, codexHome: path.join(home, ".codex") }),
     commands: async home => {
-      const wired = JSON.parse(await readFile(path.join(home, ".agents", "plugins",
+      // ACC's own marketplace root, not the one this client discovers by
+      // itself: joining the user's put ACC's tree where the client never
+      // looked, and enabled an id it never forms.
+      const wired = JSON.parse(await readFile(path.join(home, ".agents", "acc-local",
         "plugins", "agents-can-communicate", "hooks.json"), "utf8"));
       return Object.values(wired.hooks)
         .flatMap(entries => entries.flatMap(entry => entry.hooks.map(h => h.command)));
