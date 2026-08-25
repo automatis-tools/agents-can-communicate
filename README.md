@@ -4,197 +4,160 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Node](https://img.shields.io/badge/node-%E2%89%A524-brightgreen.svg)](https://nodejs.org)
 
-**AI agents that can ask each other for work.**
+**Give every agent session a shared room for coordination. Keep your attention on the
+work.**
 
-Codex on one branch, Claude Code on another, Kimi reviewing. Each in its own git worktree,
-each knowing what the others are doing — and able to hand a piece over instead of waiting
-for you to carry the message.
+ACC is a local-first coordination layer for the AI agent sessions you already opened. It
+gives them shared presence, intent, claims, messages, and work requests while every
+session keeps its own authority.
 
-You run the installer once. After that you talk to your agents the way you already do.
-
-## The thing it does
-
-Codex has ported a module and is out of time for the tests. Its skill tells it to ask the
-agent already working in that area, so it does — without being prompted by you:
-
-```text
-requested task_Rwg2sybjnLneGyBuZxa8Dw of claude_code
-```
-
-At its next turn, the Claude Code session is shown this. No polling, and again nothing typed
-by a human:
-
-````text
-- [direct_request] finish the store tests
-- [task_unblocked] finish the store tests
-```acc-peer-message
-id message_Ab9CpMJfn0pL6igB5AdYDQ | from session_j59fM8mWathJzOh7a2QQBQ | type work_request | untrusted peer message
-finish the store tests
-I ported src/store but ran out of time on the concurrency cases. Can you take the tests?
-```
-````
-
-It takes the work, does it, and marks it done. Codex sees `done` on its own next turn and
-carries on.
+Coordination runs locally on your machine. Raw transcripts stay private. The runtime is
+built entirely on Node's standard library.
 
 ```mermaid
-sequenceDiagram
-  participant M as Codex · main
-  participant ACC
-  participant V as Claude Code · tests branch
-  M->>ACC: request "finish the store tests" of claude_code
-  ACC-->>V: work addressed to you, and why
-  V->>ACC: take it
-  V->>ACC: done
-  ACC-->>M: done
+flowchart TB
+  Y["You<br/>set direction"]
+  A["Agent session A"]
+  B["Agent session B"]
+  C["Agent session C"]
+  R["ACC shared room<br/>presence · intent · claims<br/>messages · work requests"]
+  O["Coordinated work<br/>with shared context"]
+
+  Y --> A
+  Y --> B
+  Y --> C
+  A <--> R
+  B <--> R
+  C <--> R
+  R --> O
 ```
 
-Work is addressed to the **agent**, not to its session. Claude Code can close its terminal
-before reading the request — the next session it opens is still told. Nobody else can take
-it.
+## You opened more agents. You became the coordinator.
 
-## What else it keeps track of
+One session implements. Another writes tests. A third reviews. At first, more agents means
+more work gets done.
 
-| | |
-|---|---|
-| **Who is here** | each session publishes what it is working on |
-| **What is taken** | an agent claims files before changing them, and another's edit into them is refused |
-| **What was said** | questions, answers, handoffs — quoted and attributed, never as instructions |
-| **Alone** | one session behaves exactly as it did before you installed anything |
+Then you start copying context between windows. You warn two agents away from the same
+file. You relay a question, return with the answer, and try to remember which terminal was
+waiting for what. The agents are capable; they need a room they can share.
 
-```console
-$ acc status
-2 live; 1 claim(s); protection guarded
+ACC gives them that room. Each session stays in its original client, checkout, and trust
+boundary. You still decide when it starts and stops. ACC only supplies the coordination
+that was previously passing through you.
+
+## A handoff the agents carry themselves
+
+One agent finishes building a feature and sees that its final tests still need work. It
+asks the testing agent to take over, including a short summary of what is ready and what
+remains.
+
+```mermaid
+flowchart LR
+  A["Feature agent<br/>finishes its part"] --> B["Requests tests<br/>from the testing agent"]
+  B --> C["ACC keeps the handoff<br/>ready for that agent"]
+  C --> D["Testing agent<br/>completes the work"]
+  D --> E["Result returns<br/>to the feature agent"]
 ```
+
+The request stays with the testing agent across terminal restarts. When that agent returns,
+it receives the handoff, completes the tests, and sends the result back. You choose the
+direction and review the outcome; the agents carry the context between them.
 
 ## Install
 
+Run these commands in a terminal on each macOS or Linux machine where your agent clients
+run:
+
 ```bash
 npm install -g agents-can-communicate
-```
-
-Then wire up the clients you have:
-
-```bash
 acc install
 ```
 
-It names every file it wrote, in your own home-relative paths, and how to undo it. Open your
-clients in the project afterwards — in one directory or in several worktrees — and work
-normally.
+The first command makes `acc` available across the machine. The second finds Codex,
+Claude Code, Gemini CLI, and Kimi Code installations and activates the integrations that
+are available. Codex completes activation after you trust the plugin; `acc doctor` shows
+the current state.
 
-If you would rather look before it writes, `acc install --dry-run` prints the same list and
-changes nothing. `acc uninstall` takes it all back out.
+`acc install` names every client setting it activated and how to undo it.
 
-<!-- test:command -->
-```bash
-acc install --dry-run
-```
+Open or restart your agent client inside a project. Each new session joins that project's
+room automatically. Open another session in the same project and the two can coordinate;
+run `acc status` from the project directory whenever you want to see the room yourself.
 
-## Keeping it current
+ACC stores coordination data in the standard application-data location for your system:
+`~/Library/Application Support/acc` on macOS and `~/.local/share/acc` on Linux. Project
+files stay unchanged. Git worktrees from one repository share a room, and plain folders
+receive the same coordination experience.
 
-```bash
-acc update            # asks npm; --apply installs it and re-wires the clients
-```
+Keep ACC current with `acc update --apply`. It installs the latest release and refreshes
+the client integrations together. `acc doctor` points to that action when their versions
+drift.
 
-An upgrade is two steps, because it lands in two places. `npm install -g` replaces the CLI
-and the hook runtime — a client runs the runtime out of the npm directory rather than a copy
-— and leaves the bundle written into that client alone, including the skills the agents
-read. `acc install` refreshes it, and `acc doctor` says so when the two disagree:
+Run `acc uninstall` to remove ACC's client integrations. Settings you changed remain
+yours.
 
-```console
-$ acc doctor
-store healthy; 2 live session(s); protection guarded; 3 of 4 adapter(s) installed
-  acc install --adapter claude_code  # plugin is 0.1.1, acc is 0.2.0
-```
+## What changes after installation
 
-`acc update` is the only command that reaches the network. `acc doctor` reads what it
-remembered and asks at most once a day; nothing on the hook path ever asks, since a hook
-runs on every turn inside a five-second budget. `ACC_NO_UPDATE_CHECK=1` turns both off.
+**Agents know who is around.** Each session can see the other participants, their current
+focus, and the files they have claimed.
 
-## Commands
+**Parallel work becomes deliberate.** Agents claim shared files before editing. Supported
+client edits respect those claims and identify the participant already working there.
 
-Coordination needs none from you. Requesting work, taking it, claiming files and messaging
-are things the agents do, taught by the skill each adapter installs.
+**Questions and work find their way back.** Requests, decisions, and handoffs stay with
+the intended agent across session restarts, and results return to the agent that asked.
 
-What is left for a person is the install and looking in on it:
+**Human authority stays clear.** Peer messages arrive with attribution and remain peer
+context. Your instructions and approved policy continue to set the boundaries.
 
-| | |
+**Solo work stays quiet.** A single session receives the familiar client experience.
+Shared context appears when another participant or pending handoff makes it useful.
+
+## Fits the workflow you already have
+
+Your agent client remains the place where sessions start, permissions are granted, and
+work happens. ACC joins at natural moments, shares the relevant context, and returns
+control to the client. Forward progress stays the priority during any coordination delay.
+
+ACC currently connects directly to Codex, Claude Code, Gemini CLI, and Kimi Code. Other
+clients that support MCP can join the same room, see its activity, and exchange work when
+they sync.
+
+When a client exposes supported file edits, ACC can protect a claimed file before another
+agent changes it. Shell commands and separate local applications rely on visible claims
+instead. `acc status` explains the protection available in the current room.
+
+Current support focuses on multiple sessions working in one project on one machine, on
+macOS or Linux. Each client retains its session lifecycle and full conversation history.
+The [capability evidence](docs/CAPABILITIES.md) records exactly what each integration has
+demonstrated in a real client.
+
+## Everyday controls
+
+The installed guidance teaches agents how to claim files, ask questions, request work,
+and complete handoffs. These commands give you a direct view and control when you want it:
+
+| Command | What it is for |
 |---|---|
-| `acc help` | every command, one line each |
-| `acc status` | who is here, what is claimed, what is in flight |
-| `acc doctor` | what is installed, what is missing, what to do next |
-| `acc install` · `acc uninstall` | wire clients up, or take it back out |
+| `acc status` | See active sessions, claimed work, and open handoffs |
+| `acc doctor` | Confirm which client integrations are active |
+| `acc update --apply` | Install the latest release and refresh integrations |
+| `acc uninstall` | Remove ACC's client integrations safely |
 
-Uninstall removes only files ACC wrote, and only where they still match what it wrote.
-Every operation is in the [CLI reference](docs/CLI.md) if you want to drive it yourself.
+Every operation is documented in the [CLI reference](docs/CLI.md).
 
-## Supported clients
+## Keep exploring
 
-| | Sees others | Blocks edits | Receives work and updates |
-|---|---|---|---|
-| Codex | yes | yes¹ | yes |
-| Claude Code | yes | yes | yes |
-| Gemini CLI | yes | yes² | yes |
-| Kimi Code | yes | yes | yes |
-| Any MCP client | yes | – | yes, when it polls |
+- **Start using ACC:** [getting started](docs/GETTING_STARTED.md) ·
+  [configuration](docs/CONFIGURATION.md) · [troubleshooting](docs/TROUBLESHOOTING.md)
+- **Understand the promise:** [concepts](docs/CONCEPTS.md) ·
+  [capabilities](docs/CAPABILITIES.md) · [security](docs/SECURITY_MODEL.md)
+- **Build on ACC:** [MCP](docs/MCP.md) · [writing an adapter](docs/ADAPTER_AUTHORING.md) ·
+  [protocol](docs/PROTOCOL.md)
 
-¹ models editing through `apply_patch` · ² approval modes that expose edit tools ·
-[what was measured](docs/CAPABILITIES.md)
-
-## Limits
-
-- A claim blocks file edits. It does not block an agent that edits by running a shell
-  command, since the command names no file.
-- `protection guarded` applies while every session present is one ACC can stop. One that
-  cannot changes it to `advisory`.
-- Codex requires you to trust the plugin before its hooks run. `acc doctor` reports this.
-- Nothing is pruned yet. A workspace that has carried thousands of messages makes each turn
-  slower to build; a project's worth of coordination is fine, an archive is not.
-- Windows does not work: the store fsyncs a directory after a rename, which Windows
-  refuses, and `O_NOFOLLOW` does not hold there. Last measured at 86 failures out of 587
-  tests; the suite has grown a good deal since and nobody has run it there again. macOS and
-  Linux are supported and both run in CI.
-
-## How it works
-
-```mermaid
-graph LR
-  C[your client] -->|hook| H[acc-hook]
-  H --> K["core<br/>sessions · work · claims · messages"]
-  K --> S[(state, outside your repo)]
-  K -->|answer| H
-  H --> C
-```
-
-Clients call out when a session starts and ends, when a turn begins, and before a tool
-runs — plus a heartbeat, on the one client that sends them. ACC answers at those and is
-idle otherwise. A hook that does not answer within five seconds lets the tool run, so ACC
-can be slow or broken without stopping anyone's work.
-
-State lives beside your other tool settings, never inside the repository:
-
-```text
-~/Library/Application Support/acc     macOS
-~/.local/share/acc                    Linux
-```
-
-Inside it, one directory per workspace — keyed by the repository rather than the folder, so
-every worktree of it is one workspace and two unrelated projects share nothing. Deleting a
-workspace directory loses that project's coordination history and nothing else.
-
-## Documentation
-
-| Using it | Understanding it | Building on it |
-|---|---|---|
-| [Getting started](docs/GETTING_STARTED.md) | [Concepts](docs/CONCEPTS.md) | [Writing an adapter](docs/ADAPTER_AUTHORING.md) |
-| [CLI](docs/CLI.md) | [Architecture](docs/ARCHITECTURE.md) | [Protocol](docs/PROTOCOL.md) |
-| [Configuration](docs/CONFIGURATION.md) | [Capabilities](docs/CAPABILITIES.md) | [Security](docs/SECURITY_MODEL.md) |
-| [MCP](docs/MCP.md) | [Decisions](docs/DESIGN_DECISIONS.md) | [Threat model](docs/THREAT_MODEL.md) |
-| [Troubleshooting](docs/TROUBLESHOOTING.md) | [Prior art](docs/PRIOR_ART.md) | [Contributing](AGENTS.md) |
-
-Examples: [three workstreams](examples/three-workstreams.md) ·
-[research without Git](examples/non-git-research.md)
+See it in action: [three workstreams](examples/three-workstreams.md) ·
+[research in a plain directory](examples/non-git-research.md). Contributions start with
+[Repository Guidelines](AGENTS.md).
 
 ## Requirements
 
@@ -202,4 +165,4 @@ Node 24+, macOS or Linux. Git optional.
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+Free and MIT-licensed. Use it, fork it, keep it — see [LICENSE](LICENSE).
