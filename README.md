@@ -86,9 +86,10 @@ run `acc status` from the project directory whenever you want to see the room yo
 
 ACC stores coordination data in the standard application-data location for your system.
 The defaults are `~/Library/Application Support/acc` on macOS and `~/.local/share/acc` on
-Linux; `XDG_DATA_HOME` and `ACC_DATA_HOME` can relocate it as described in
-[configuration](docs/CONFIGURATION.md). Project files stay unchanged. Git worktrees from
-one repository share a room, and plain folders receive the same coordination experience.
+Linux. `XDG_DATA_HOME` relocates the Linux default; `ACC_DATA_HOME` overrides either
+platform, as described in [configuration](docs/CONFIGURATION.md). Project files stay
+unchanged. Git worktrees from one repository share a room, and plain folders receive the
+same coordination experience.
 
 Keep ACC current with `acc update --apply`. It installs the latest release and refreshes
 the client integrations together. `acc doctor` points to that action when their versions
