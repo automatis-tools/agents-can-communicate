@@ -4,13 +4,23 @@
 
 | | |
 |---|---|
-| Built from | `b84ea51` |
+| Built from | `374ef8d` |
 | Tarball | `agents-can-communicate-0.1.3.tgz`, 135 KB, 109 entries |
-| sha256 | `ad51d0e24b4631e28315a64c5fd7d4c9298f4467306860752137a488938798b4` |
+| sha256 | `52a1e3bfe365e78271dee9d93f326b31f820819806606d9592842b69fe0953b4` |
 | Tests | 872 passing, 0 failing |
 
 Not published. A published record says what the registry serves and is not
 rewritten, so shipped code that changes after a release is measured here instead.
+
+Public documentation now tells ACC's story from the user's problem: opening more agent
+sessions should let those sessions carry coordination while the human focuses on the
+work. The README follows a handoff in plain language, gives the required installation and
+activation commands, explains where ACC runs and stores its state, and focuses the rest
+of the journey on visible outcomes and supported scope. Protocol output, internal
+delivery states, architecture wiring, and detailed capability matrices live in the
+reference guides. The promises use affirmative language about local operation, client
+ownership, private transcripts, and supported scope. Mermaid diagrams show the human
+setting direction and agents carrying a handoff through ACC's shared room.
 
 `acc-mcp` refuses arguments instead of ignoring them. It reads nothing from the
 command line, and accepted anything: writing `acc-mcp --cwd <project>` - the

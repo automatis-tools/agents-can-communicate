@@ -3,6 +3,10 @@
 ACC runs with your rights, edits four other tools' configs, and carries text
 written by models other people are prompting.
 
+Its value comes from connecting independently controlled sessions; its main risk comes
+from confusing that connection with trust. The boundaries below keep coordination useful
+without treating a peer as a manager.
+
 ```mermaid
 graph TB
   subgraph Trusted

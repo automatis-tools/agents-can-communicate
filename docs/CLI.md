@@ -1,5 +1,9 @@
 # CLI
 
+ACC keeps setup commands human-facing and coordination commands agent-facing. That split
+lets it disappear into sessions you already use instead of becoming a new console that
+owns the work.
+
 Every command takes `--json` for machine output and `--cwd` to pick the workspace.
 
 `acc help` prints this list in short form, and `acc version` prints what is installed.
