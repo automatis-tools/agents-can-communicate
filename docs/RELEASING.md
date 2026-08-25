@@ -53,6 +53,16 @@ the working tree is dirty:
 PASS  agents-can-communicate-0.0.0.tgz  sha256 a5c8bb1d…  built from 39d0dcf
 ```
 
+`package.json` is part of shipped code for this purpose. npm packs the manifest
+whatever `files` says, so a version bump or an `npm pkg fix` changes the digest —
+and for a while the check watched every packed path except that one.
+
+Once a version is published its record is history: it describes what the registry
+serves and is not rewritten. Shipped code that changes afterwards gets a new
+`## Unreleased` entry at the top of `CHANGELOG.md` carrying its own measurement.
+The check reads the first record in the file, so an unreleased tree is held to
+the same standard without disturbing the published one.
+
 It went stale four times in a row anyway, each caught by hand and only because
 someone happened to run the script. So `npm test` now checks it:
 `tests/acceptance/recorded-candidate.test.mjs` fails when shipped code has
@@ -63,6 +73,18 @@ record, not of the checkout depth.
 ## Then stop
 
 Publishing, tagging, and cutting a GitHub release are **external mutations**.
-They need explicit approval from the maintainer, every time. The `Release`
+They need explicit approval from the maintainer, every time.
+
+With two-factor authentication set to `auth-and-writes` — which is what `npm
+profile get` reports for this account — every publish needs a code, and npm does
+not prompt for one:
+
+```bash
+npm publish --otp=123456
+```
+
+An npm *Automation* token, or a granular token with write access, publishes
+without a code. A granular token scoped to selected packages cannot create a
+package that does not exist yet, which is the case exactly once per package. The `Release`
 workflow builds and verifies a candidate and uploads it as an artifact; it does
 not publish.
