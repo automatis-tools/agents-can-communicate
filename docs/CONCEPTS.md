@@ -140,7 +140,10 @@ asked what the whole system is doing.
 
 ## Protection is a property of the room
 
-A claim is `guarded` only while every live session can actually be stopped. One MCP client,
-one shell-editing model, and the workspace reports `advisory` — because that is the truth.
+A claim is `guarded` only while every live session can actually be stopped. One MCP client
+and the workspace reports `advisory` — because that is the truth.
+
+Being stoppable is not the same as being unevadable. A guarded claim stops file edits and
+the shell writes ACC can read; a language runtime opening the file gets past either way.
 
 See [CAPABILITIES.md](CAPABILITIES.md) for what each client was measured doing.

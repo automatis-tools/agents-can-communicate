@@ -139,7 +139,7 @@ test("an advisory claim does not block, it informs", async t => {
   assert.equal(allowed.decision, "allow");
 });
 
-test("a shell call declares no target, so there is nothing to match", async t => {
+test("a command the guard cannot read declares no target, so nothing matches", async t => {
   const place = await workspace(t);
   const peer = await run("kimi", event("sessionStart", { sessionId: "peer" }), place);
   await peer.service.acquireClaim({ sessionId: peer.accSessionId,
@@ -149,8 +149,9 @@ test("a shell call declares no target, so there is nothing to match", async t =>
 
   const allowed = await run("kimi", event("beforeTool", { tool: "Bash", targets: [] }), place);
 
-  // Honest rather than convenient: the runner cannot tell what a command
-  // touches, and pretending otherwise would block work at random.
+  // Honest rather than convenient: a command whose write positions the adapter
+  // could not read arrives with no targets, and the runner does not invent one.
+  // The commands it can read arrive with targets and are matched like any edit.
   assert.equal(allowed.decision, "allow");
   assert.equal(allowed.unguarded, true);
 });

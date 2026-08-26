@@ -1,4 +1,4 @@
-import { normalizedEvent } from "@agents-can-communicate/adapter-sdk";
+import { normalizedEvent, shellWriteTargets } from "@agents-can-communicate/adapter-sdk";
 import { AccError, EXIT } from "@agents-can-communicate/protocol";
 
 // Not read from documentation and not guessed: this client validates its config
@@ -73,11 +73,12 @@ export function normalizeKimiHook(payload) {
  * `old_string` and `new_string`. Nothing else is read: the contents and the
  * replacement strings are conversation content and stay out.
  *
- * `Bash` declares nothing. A command can write anywhere, and a path guessed out
- * of one would give a guard that blocks work it holds no claim over while
- * missing writes it does.
+ * `Bash` declares no path of its own, so the command is read for the positions
+ * where a write is unambiguous. Reading positions are left alone: naming a file
+ * is not touching it.
  */
 function writeTargets(tool, input) {
+  if (tool === "Bash") return shellWriteTargets(input?.command);
   if (!KIMI_EDIT_TOOLS.includes(tool)) return [];
   const path = input?.path;
   return typeof path === "string" && path !== "" ? [path] : [];

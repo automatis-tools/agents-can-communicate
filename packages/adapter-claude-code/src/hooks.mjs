@@ -1,4 +1,4 @@
-import { normalizedEvent } from "@agents-can-communicate/adapter-sdk";
+import { normalizedEvent, shellWriteTargets } from "@agents-can-communicate/adapter-sdk";
 import { AccError, EXIT } from "@agents-can-communicate/protocol";
 
 // Confirmed by capture on 2.1.233, and matching the published documentation
@@ -66,10 +66,15 @@ export const CLAUDE_EDIT_TOOLS = Object.freeze(["Write", "Edit", "MultiEdit",
  * Only the path is taken. `content`, `old_string` and `new_string` are the
  * file's contents, which ACC has no use for and must not carry.
  *
- * `Bash` declares nothing: a command can write anywhere, and a path guessed out
- * of one gives a guard that is wrong in both directions.
+ * `Bash` declares no path, but its command names the ones it would write. Those
+ * are read out of the write positions only - a redirection, an operand of a
+ * command whose job is to put bytes somewhere - because a session told to prefer
+ * the shell would otherwise walk through every claim in the workspace. The
+ * command string itself is conversation content and stays out; only paths leave
+ * this function.
  */
 function writeTargets(tool, input) {
+  if (tool === "Bash") return shellWriteTargets(input?.command);
   if (!CLAUDE_EDIT_TOOLS.includes(tool)) return [];
   const target = input?.file_path ?? input?.notebook_path;
   return typeof target === "string" && target !== "" ? [target] : [];

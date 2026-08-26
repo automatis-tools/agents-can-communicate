@@ -170,7 +170,7 @@ test("a guarded session is told the limit of its own guard", () => {
   // Being guarded is not the same as being safe: no harness intercepts a shell
   // command, so an edit made through one is never stopped. A session told only
   // "this is claimed" would reasonably assume ACC has it covered.
-  assert.match(projected, /through a shell are not/);
+  assert.match(projected, /recognised shell writes are blocked/);
 });
 
 test("a claim its owner declared advisory is never described as blocking", () => {

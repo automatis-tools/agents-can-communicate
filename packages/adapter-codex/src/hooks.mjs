@@ -1,4 +1,4 @@
-import { normalizedEvent } from "@agents-can-communicate/adapter-sdk";
+import { normalizedEvent, shellWriteTargets } from "@agents-can-communicate/adapter-sdk";
 import { AccError, EXIT } from "@agents-can-communicate/protocol";
 
 // The event names are settled: they are an enum in the installed 0.147.0 binary,
@@ -68,7 +68,7 @@ export function normalizeCodexHook(payload) {
     model: pick(payload, FIELD_CANDIDATES.model),
     parentSessionId: pick(payload, FIELD_CANDIDATES.parentSessionId),
     tool,
-    targets: patchTargets(tool, payload?.tool_input),
+    targets: writeTargets(tool, payload?.tool_input),
   });
 }
 
@@ -76,6 +76,7 @@ export function normalizeCodexHook(payload) {
 // patch body, one per operation, so a single call can touch several files.
 // Reading `tool_input.path` here - the shape every other harness uses - would
 // find nothing and leave every edit unguarded.
+const PATCH_ENVELOPE = "*** Begin Patch";
 const PATCH_OPERATION = /^\*\*\* (?:Add|Update|Delete) File: (.+)$/;
 const PATCH_MOVE = /^\*\*\* Move to: (.+)$/;
 
@@ -86,15 +87,33 @@ const PATCH_MOVE = /^\*\*\* Move to: (.+)$/;
  * are never read: they are the file's contents, which ACC has no use for.
  */
 export function patchTargets(tool, input) {
-  if (tool !== "apply_patch") return [];
   const body = input?.command ?? input?.patch ?? input?.input;
   if (typeof body !== "string") return [];
+  if (tool !== "apply_patch" && !body.trimStart().startsWith(PATCH_ENVELOPE)) return [];
   const targets = [];
   for (const line of body.split("\n")) {
     const operation = PATCH_OPERATION.exec(line) ?? PATCH_MOVE.exec(line);
     if (operation !== null) targets.push(operation[1].trim());
   }
   return targets;
+}
+
+/**
+ * The paths a tool call would write.
+ *
+ * The guard is wired to three tool names here, and which one a shell command
+ * arrives under is a property of the model's metadata rather than of this
+ * config. So the shape decides instead of the name: a patch envelope is read as
+ * a patch, and any other command string is read as a shell command. Reading
+ * positions in that command are left alone.
+ */
+export function writeTargets(tool, input) {
+  const patched = patchTargets(tool, input);
+  if (patched.length > 0) return patched;
+  const command = input?.command ?? input?.input;
+  if (typeof command !== "string") return [];
+  if (command.trimStart().startsWith(PATCH_ENVELOPE)) return [];
+  return shellWriteTargets(command);
 }
 
 /**

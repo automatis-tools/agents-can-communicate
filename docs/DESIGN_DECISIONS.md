@@ -35,6 +35,20 @@ Why ACC is shaped the way it is, and what is deliberately still open.
 | Reporting queued messages as delivered | A delivery state that overstates itself is worse than no state. |
 | Guessing file paths out of shell commands | It would block work at random and still miss real writes. See [CAPABILITIES.md](CAPABILITIES.md). |
 
+**Reversed in 0.1.7: reading write positions out of shell commands.** The row above still
+holds against *guessing*, and it is kept rather than deleted because the reasoning behind
+it is what shaped the replacement. What changed is the evidence: a live Codex session was
+asked to append a line to a file another agent held guarded, and `printf ... >> file` went
+through untouched. Meanwhile agents in this harness are told to prefer the shell for file
+edits, so the gap was not an edge case but the common path.
+
+The answer is not to guess. Write positions are read - a redirection, the operand of a
+command whose job is to put bytes somewhere - and nothing else is. A read is never
+reported, so the "blocks work at random" failure the original row feared cannot occur: the
+only paths declared are ones the command would write. Coverage is deliberately partial and
+[CAPABILITIES.md](CAPABILITIES.md) says where it ends, because an agent that knows where a
+guard stops behaves better than one that believes it absolute.
+
 ## Still open
 
 1. **Storage backend.** The hardened filesystem store ships first. A transactional backend

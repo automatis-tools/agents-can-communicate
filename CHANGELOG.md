@@ -1,5 +1,71 @@
 # Changelog
 
+## Unreleased
+
+| | |
+|---|---|
+| Built from | `PENDING` |
+| Tarball | `PENDING` |
+| sha256 | `PENDING` |
+| Tests | 906 passing, 0 failing |
+
+Not published. A published record says what the registry serves and is not
+rewritten, so shipped code that changes after a release is measured here instead.
+
+A claim now holds against the shell. Found by asking a live Codex session to
+append a line to a file another agent held guarded, and watching it succeed.
+
+`printf '%s\n' '// via shell' >> src/parser.mjs` went through untouched, on a
+`guarded` claim, in a workspace ACC reported as protected. So did `sed -i`, `mv`,
+`rm` and every other shell write - on all four clients. The guard only ever read
+the path out of an editing tool's arguments, and a shell call declares no path.
+
+That was a deliberate decision, and its reasoning was sound: a command can write
+anywhere, and a path *guessed* out of one blocks work at random while still
+missing real writes. What it did not account for is that agents in these harness
+are told to prefer the shell for file edits - this session's own instructions say
+exactly that - so the uncovered path is not the exotic one. It is the default
+one.
+
+The answer is not to guess. The command is read for the positions where a write
+is unambiguous, and for nothing else:
+
+- a redirection - `> file`, `>> file`, `2> file` - but never `< file`, and never
+  `/dev/null`
+- the operands of commands whose whole job is to put bytes somewhere: `tee`,
+  `touch`, `truncate`, `dd of=`, `rm`, `mv`, `cp`, `ln`, `install`
+- in-place editors, only when the in-place flag is present: `sed -i`, `perl -i`
+- `git restore` and `git checkout --`, which overwrite whatever a peer was
+  holding
+
+A read is never reported. `cat file`, `grep file`, `sed` without `-i` and
+`git diff file` all name a path and write nothing, and blocking a session for
+looking would be a worse failure than the one being fixed. Quoted text is text,
+a heredoc body is content, and every command in a `&&` chain or a pipeline is
+read rather than only the first.
+
+Coverage is partial on purpose and the injected context now says so, where an
+agent reads it: `file edits and recognised shell writes are blocked; a runtime
+can still get past`. It used to promise the opposite - `edits made through a
+shell are not` - which was honest about the gap and, read by an agent under
+instructions to use the shell, amounted to directions around the guard. A
+language runtime opening the file itself is still unseen. An agent that knows
+where a guard ends behaves better than one that believes it absolute.
+
+A claim is given back the way it was taken. `acc claim` takes `--resource` and
+`acc release` took `--claim`, so handing one back meant a round trip through
+`acc status --json` to find an id the caller never chose. Watched costing a live
+agent a step mid-task. `--resource` now works on `release`; the id still works,
+and stays the precise answer when an authority releases someone else's claim.
+
+`acc uninstall` clears the trust record Codex keeps about ACC's hooks. That
+client writes one table per hook, keyed by the plugin that declared them; ACC
+writes none of them, so five were left behind naming a plugin that no longer
+existed, and five more arrived on the next install. Checked before touching
+them: a hook whose recorded hash no longer matches still runs, so this is
+tidiness rather than repair. Only keys carrying ACC's own
+`plugin@marketplace` prefix are removed.
+
 ## 0.1.6
 
 Five fixes, and the one that matters most is that an agent in Codex can act at

@@ -60,10 +60,17 @@ toolset contained no `apply_patch`.
 `plan` modes the client declares no write tool to the model at all. `write_file` and
 `replace` appear under `auto_edit`; `run_shell_command` under `yolo`.
 
-**`guards.beforeShell` is never resource-aware.** A shell command can write anywhere, and
-ACC does not parse commands. The guard fires and is allowed through, because guessing a
-path out of a command would block work at random and still miss real writes. Shell calls
-therefore declare no targets on every adapter.
+**`guards.beforeShell` is resource-aware where the write is unambiguous.** ACC reads the
+command for its write positions only - a redirection, an operand of a command whose whole
+job is to put bytes somewhere - and declares those paths as targets. Reading positions are
+left alone: `cat file` and `grep file` name a path and write nothing, and treating them as
+writes would have sessions blocking each other for looking.
+
+What it does not see is a language runtime opening the file itself (`python3 -c
+"open(...)"`), a command assembled at runtime, or an `eval`. A shell can still evade the
+guard. Until 0.1.7 every shell write did, which is why partial sight is the improvement it
+is: a session told to prefer the shell for file changes walked through every claim in the
+workspace.
 
 Where the guard cannot help, the turn context does: it names the claims other sessions
 hold and says which way this session stands with them. Two facts decide the wording -
@@ -71,7 +78,7 @@ what the claim's owner asked for, and whether ACC can stop this session at all:
 
 | Claim | This session | Note |
 |---|---|---|
-| guarded | can be guarded | `file edits are blocked; edits made through a shell are not` |
+| guarded | can be guarded | `file edits and recognised shell writes are blocked; a runtime can still get past` |
 | guarded | cannot be guarded | `not enforced for this session; do not edit it` |
 | advisory | either | `advisory; nothing will stop you, the owner is asking` |
 
@@ -154,5 +161,9 @@ harness name. Both default to the weaker reading, so a generic MCP client or a h
 the CLI reads as advisory and manual.
 
 A workspace reports `protection: guarded` only when every live session can be stopped. One
-MCP client, one Kimi session, or one Codex session on a shell-editing model, and a guarded
-claim is advice - so the workspace says `advisory`, whatever its claims were declared as.
+MCP client and a guarded claim is advice - so the workspace says `advisory`, whatever its
+claims were declared as.
+
+"Stoppable" is not "unevadable". Even in a guarded workspace, a session that writes through
+a language runtime rather than a recognised shell form gets past. The claim still says who
+is working where; enforcement is the floor, not the ceiling.
