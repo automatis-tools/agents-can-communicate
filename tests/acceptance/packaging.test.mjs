@@ -217,7 +217,16 @@ test("every binary the manifest declares is executable in the repository", async
   // somebody runs the file out of a checkout - or until `npm install -g .`
   // sets it and leaves the working tree dirty, which is how this was noticed.
   const manifest = JSON.parse(await readFile(path.join(repo, "package.json"), "utf8"));
-  const { stdout } = await run("git", ["ls-files", "-s", "bin/"], { cwd: repo });
+  // Without the inherited pair, which describe whoever's repository the runner
+  // or a hook was pointed at rather than this one.
+  const env = { ...process.env };
+  for (const name of ["GIT_DIR", "GIT_WORK_TREE"]) delete env[name];
+  // Its own message on failure: CI reported only `Command failed: git ls-files`,
+  // which says nothing about which repository it was standing in or why.
+  const { stdout } = await run("git", ["ls-files", "-s", "bin/"], { cwd: repo, env })
+    .catch(error => {
+      throw new Error(`git ls-files failed in ${repo}: ${error.stderr || error.message}`);
+    });
   const modes = new Map(stdout.trim().split("\n")
     .map(line => line.split(/\s+/))
     .map(([mode, , , file]) => [file, mode]));
