@@ -239,12 +239,35 @@ test("the patch's content lines are never read as paths", () => {
   assert.deepEqual([...normalised.targets], ["real.txt"]);
 });
 
-test("a shell call declares no target rather than a guessed one", () => {
+test("a shell call declares the paths it would write", () => {
+  // Until 0.1.6 this declared nothing, and a session told to prefer the shell
+  // walked through every claim in the workspace. Proven against a live session:
+  // `printf ... >> src/parser.mjs` modified a file another agent held.
+  const shell = command => normalizeCodexHook({ hook_event_name: "PreToolUse",
+    session_id: "s", cwd: "/tmp", tool_name: "shell",
+    tool_input: { command } });
+
+  assert.deepEqual([...shell("rm -rf src/").targets], ["src/"]);
+  assert.deepEqual([...shell("printf 'x' >> src/parser.mjs").targets], ["src/parser.mjs"]);
+});
+
+test("a shell call that only reads still declares nothing", () => {
   const normalised = normalizeCodexHook({ hook_event_name: "PreToolUse",
     session_id: "s", cwd: "/tmp", tool_name: "shell",
-    tool_input: { command: "rm -rf src/" } });
+    tool_input: { command: "cat src/parser.mjs && npm test" } });
 
   assert.deepEqual([...normalised.targets], []);
+});
+
+test("a patch envelope is read as a patch whichever tool name carries it", () => {
+  // Which name a call arrives under is a property of the model's metadata, not
+  // of this config, so the shape decides. Reading this envelope as a shell
+  // command would find `***` and no paths at all.
+  const body = "*** Begin Patch\n*** Update File: real.txt\n+one\n*** End Patch";
+  const normalised = normalizeCodexHook({ hook_event_name: "PreToolUse",
+    session_id: "s", cwd: "/tmp", tool_name: "shell", tool_input: { command: body } });
+
+  assert.deepEqual([...normalised.targets], ["real.txt"]);
 });
 
 const realFixture = fixture;

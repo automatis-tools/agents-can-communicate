@@ -194,15 +194,19 @@ test("the guard sees the real tool name on both a write and a shell call", async
   assert.equal(normalizeKimiHook(await captured("PreToolUse-Bash")).tool, "Bash");
 });
 
-test("a write declares the path it would touch, a shell call declares none", async () => {
+test("a write declares the path it would touch, and so does a shell write", async () => {
   // Both editing tools take `path`, confirmed from their declared schemas.
   // Without this the guard has nothing to compare against a claim.
   assert.deepEqual(normalizeKimiHook(await captured("PreToolUse-Write")).targets,
     ["/workspace/project/notes.txt"]);
 
-  // A command can write anywhere; a path guessed from one would be wrong in
-  // both directions.
+  // The captured Bash payload carries no write, so it declares nothing - but a
+  // command that does write names the file it would touch.
   assert.deepEqual(normalizeKimiHook(await captured("PreToolUse-Bash")).targets, []);
+  assert.deepEqual(normalizeKimiHook({ hook_event_name: "PreToolUse", session_id: "s",
+    cwd: "/tmp", tool_name: "Bash",
+    tool_input: { command: "sed -i '' 's/a/b/' src/parser.mjs" } }).targets,
+  ["src/parser.mjs"]);
 
   assert.deepEqual(normalizeKimiHook(await captured("SessionStart")).targets, []);
 });

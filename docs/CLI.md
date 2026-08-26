@@ -60,7 +60,7 @@ graph LR
 | `acc sync` | New events since a cursor; silent when alone |
 | `acc work` | Publish what this session is doing. `--clear` when it has stopped |
 | `acc claim` | Reserve a resource. Exit `5` on conflict |
-| `acc release` | Give it back |
+| `acc release` | Give it back. `--resource` for what you claimed, `--claim` for its id |
 | `acc ack` | Answer a message that asked for one, so it stops asking |
 | `acc message` | Send a typed message to participants |
 | `acc request` | Ask another agent to do something. One call: the work plus why |
