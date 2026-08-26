@@ -1,5 +1,33 @@
 # Changelog
 
+## Unreleased
+
+| | |
+|---|---|
+| Built from | `PENDING` |
+| Tarball | `PENDING` |
+| sha256 | `PENDING` |
+| Tests | 877 passing, 0 failing |
+
+Not published. A published record says what the registry serves and is not
+rewritten, so shipped code that changes after a release is measured here instead.
+
+An agent in Codex can record what it is doing. That client sandboxes the shell
+commands a model runs to the workspace, and ACC keeps its state outside every
+workspace on purpose - so an agent there could read the roster and write
+nothing: `acc claim`, `acc work` and `acc message` each failed with
+`EPERM ... locks/writer.lock`. Half the product, silently, for one of four
+clients.
+
+The install declares that directory writable in the block it already owns. A
+config that sets `sandbox_workspace_write` itself is left alone - declaring the
+table twice is what makes this client refuse the whole config - and the
+diagnostic says what to add instead.
+
+Measured with `codex exec`, which is how an agent actually runs: the same
+command that failed with EPERM now returns `intent: reviewing the parser` and
+exit 0, with no flags passed by hand.
+
 ## 0.1.5
 
 One fix, and the most serious so far: every published version taught agents a

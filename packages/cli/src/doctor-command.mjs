@@ -1,5 +1,6 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
+import path from "node:path";
 
 import { detectInstallation, loadOwnership, verifyOwned }
   from "@agents-can-communicate/installer";
@@ -37,9 +38,9 @@ async function diagnoseAdapters({ options, runtime }) {
   // The same home `acc install --home` writes to, or the real one. Reading a
   // different home than install wrote to reports every adapter as missing.
   const home = options?.home ?? runtime?.env?.HOME ?? homedir();
-  const clients = clientContext(home);
   const { data: dataHome } = platformPaths({ platform: runtime?.platform,
     env: runtime?.env ?? {} });
+  const clients = clientContext(home, path.join(dataHome, "acc"));
   const adapters = ALL_ADAPTERS();
   const detected = await detectInstallation({ adapters, context: clients,
     probeTimeoutMs: probeTimeout(runtime?.env) });
