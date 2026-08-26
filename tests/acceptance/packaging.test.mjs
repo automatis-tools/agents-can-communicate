@@ -212,6 +212,34 @@ test("the installed package can find the binaries it names", async t => {
     `the installed package looks for its CLI at ${found.cli}`);
 });
 
+test("every binary the manifest declares is executable in the repository", async () => {
+  // npm sets the bit when it links a `bin`, so a missing one is invisible until
+  // somebody runs the file out of a checkout - or until `npm install -g .`
+  // sets it and leaves the working tree dirty, which is how this was noticed.
+  const manifest = JSON.parse(await readFile(path.join(repo, "package.json"), "utf8"));
+  // Without the inherited pair, which describe whoever's repository the runner
+  // or a hook was pointed at rather than this one.
+  const env = { ...process.env };
+  for (const name of ["GIT_DIR", "GIT_WORK_TREE"]) delete env[name];
+  // Its own message on failure: CI reported only `Command failed: git ls-files`,
+  // which says nothing about which repository it was standing in or why.
+  const { stdout } = await run("git", ["ls-files", "-s", "bin/"], { cwd: repo, env })
+    .catch(error => {
+      throw new Error(`git ls-files failed in ${repo}: ${error.stderr || error.message}`);
+    });
+  const modes = new Map(stdout.trim().split("\n")
+    .map(line => line.split(/\s+/))
+    .map(([mode, , , file]) => [file, mode]));
+
+  const notExecutable = Object.values(manifest.bin ?? {})
+    .map(entry => entry.replace(/^\.\//, ""))
+    .filter(file => modes.get(file) !== "100755")
+    .sort();
+
+  assert.deepEqual(notExecutable, [],
+    "these are declared as binaries and are not executable in the repository");
+});
+
 test("the manifest declares the binaries and the engine it was certified on", async t => {
   const manifest = JSON.parse(await readFile(path.join(repo, "package.json"), "utf8"));
 
