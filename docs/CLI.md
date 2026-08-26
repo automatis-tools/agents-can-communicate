@@ -168,7 +168,14 @@ appears as an attention item addressed to them, and the message explains why. A 
 no message is work nobody understands; a message with no task is a request nothing tracks.
 
 Work is addressed to a **participant**, not a session. The agent can close its terminal and
-the next session it opens is still told. Only that participant can take it:
+the next session it opens is still told — as long as that agent has a name of its own.
+Without one, each run is a new participant, so nothing addressed to the last one reaches it:
+
+```bash
+ACC_PARTICIPANT=backend-codex codex
+```
+
+Only that participant can take the work:
 
 ```bash
 acc task --task task_x --take     # exit 5 if it is not yours

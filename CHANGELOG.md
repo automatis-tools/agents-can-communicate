@@ -33,6 +33,20 @@ Measured with `codex exec`, which is how an agent actually runs: the same
 command that failed with EPERM now returns `intent: reviewing the parser` and
 exit 0, with no flags passed by hand.
 
+## Unreleased
+
+Not published. Documentation only; the packed tarball is unchanged, so the
+record below still describes it.
+
+`docs/CLI.md` names the condition on the promise it makes. It said an agent can
+close its terminal and the next session it opens is still told - true only when
+that agent has a name of its own. Without one, each run is a new participant and
+nothing addressed to the last one reaches it. `docs/PROTOCOL.md` had said so all
+along; the document a reader acts from had not.
+
+Seen while running two real clients against one workspace: consecutive runs
+appeared as `kimi-5P8POZ`, then `kimi-qUW4ei`.
+
 ## 0.1.5
 
 One fix, and the most serious so far: every published version taught agents a
