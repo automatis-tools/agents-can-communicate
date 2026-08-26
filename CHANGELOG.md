@@ -8,9 +8,9 @@ rather than with hand-written payloads.
 
 | | |
 |---|---|
-| Built from | `PENDING` |
-| Tarball | `PENDING` |
-| sha256 | `PENDING` |
+| Built from | `b047ec5` |
+| Tarball | `agents-can-communicate-0.1.6.tgz`, 136 KB, 109 entries |
+| sha256 | `66c50759dbfb5cec31f6fa128e454542eb4f89fdb5fcdcd2ca9c9421f14d04fa` |
 | Tests | 880 passing, 0 failing |
 | Node | 24 (current production LTS) |
 | Verified on | macOS 15 (darwin 25.5.0, arm64) and Linux in CI |
