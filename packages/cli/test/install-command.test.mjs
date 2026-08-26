@@ -166,3 +166,37 @@ test("`--yes` is gone from the commands that never asked", async () => {
   // `config init` does ask, so there it still means something.
   assert.equal(parseArgs(["config", "init", "--yes"]).options.yes, true);
 });
+
+test("the install tells an adapter where ACC keeps its state", async t => {
+  const { chmod, mkdir: makeDir } = await import("node:fs/promises");
+  const home = await realpath(await mkdtemp(path.join(tmpdir(), "acc-state-home-")));
+  const dataHome = await realpath(await mkdtemp(path.join(tmpdir(), "acc-state-data-")));
+  t.after(() => Promise.all([home, dataHome]
+    .map(dir => rm(dir, { recursive: true, force: true }))));
+
+  // A client of this test's own, so it asks the same question everywhere. On the
+  // real PATH, because detection spawns the client's binary and a spawn
+  // inherits the process environment - passing a PATH in `runtime.env` looked
+  // like it worked here and found nothing on a machine without Codex.
+  const bin = path.join(home, "bin");
+  await makeDir(bin, { recursive: true });
+  await writeFile(path.join(bin, "codex"), "#!/bin/sh\necho \"codex-cli 0.147.0\"\n");
+  await chmod(path.join(bin, "codex"), 0o755);
+  const previous = process.env.PATH;
+  process.env.PATH = `${bin}${path.delimiter}${previous}`;
+  t.after(() => { process.env.PATH = previous; });
+
+  await runInstallCommand({
+    options: { home, adapter: "codex" },
+    runtime: { platform: process.platform,
+      env: { ...process.env, HOME: home, ACC_DATA_HOME: dataHome,
+        ACC_PROBE_TIMEOUT_MS: "30000" } },
+    action: "install" });
+
+  // Codex sandboxes what a model runs to the workspace, and ACC's state is
+  // outside every workspace by design - so an adapter that is never told where
+  // that state is cannot declare it, and an agent there writes nothing.
+  const config = await readFile(path.join(home, ".codex", "config.toml"), "utf8");
+  assert.match(config, /\[sandbox_workspace_write\]/);
+  assert.match(config, new RegExp(`writable_roots = \\["${dataHome}/acc"\\]`));
+});
