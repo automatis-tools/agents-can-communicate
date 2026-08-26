@@ -229,6 +229,34 @@ async function removeEmptyDirs(directories) {
   }
 }
 
+/**
+ * Drop the client's trust record for hooks that are about to stop existing.
+ *
+ * Scoped to tables whose key begins with ACC's own `plugin@marketplace:` - a
+ * table belonging to any other plugin is the client's business and stays. The
+ * file is rewritten only when something was found, so an install that never ran
+ * here leaves the config byte for byte as it was.
+ */
+export async function removeHookTrust(file, prefix) {
+  const before = await readFile(file, "utf8").catch(() => null);
+  if (before === null || !before.includes(`hooks.state."${prefix}`)) return false;
+
+  const lines = before.split("\n");
+  const kept = [];
+  let dropping = false;
+  for (const line of lines) {
+    const header = /^\s*\[([^\]]*)\]\s*$/.exec(line);
+    if (header !== null) dropping = header[1].startsWith(`hooks.state."${prefix}`);
+    if (dropping) continue;
+    kept.push(line);
+  }
+  // A table's trailing blank line goes with it rather than piling up.
+  const text = kept.join("\n").replace(/\n{3,}/g, "\n\n");
+  if (text === before) return false;
+  await writeFile(file, text, "utf8");
+  return true;
+}
+
 export async function uninstallCodexPlugin({ home, agentsHome = home,
   codexHome = path.join(home, ".codex"), keep = [] }) {
   const file = marketplacePath(agentsHome);
@@ -240,6 +268,15 @@ export async function uninstallCodexPlugin({ home, agentsHome = home,
     await writeMarketplace(file, { ...existing, plugins: kept });
   }
   if (await removeTomlBlock(configPath(codexHome))) changes.push(configPath(codexHome));
+  // This client keeps its own record of which hook files it has trusted, one
+  // table per hook, keyed by the plugin that declared them. ACC never writes
+  // those - they are the client's bookkeeping about ACC - but once the plugin is
+  // gone they name a thing that does not exist, five of them per install, and
+  // nothing else will ever clear them. Verified inert first: a hook whose hash
+  // no longer matches still runs, so this is tidiness rather than repair.
+  if (await removeHookTrust(configPath(codexHome), `${PLUGIN_NAME}@${MARKETPLACE}:`)) {
+    if (!changes.includes(configPath(codexHome))) changes.push(configPath(codexHome));
+  }
   // The marketplace directory is ACC's too, so it goes rather than being left
   // behind empty.
   // A blank TOML config and an absent one are the same to this client, and a

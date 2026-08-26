@@ -62,10 +62,12 @@ export function createCodexAdapter() {
           // property of the model's metadata (apply_patch_tool_type), not a user
           // setting. With a model that does not have it, edits go through
           // exec_command, which reaches hooks as tool_name \"Bash\" carrying a
-          // command string - and a command names no resource, so a write guard
-          // has nothing to match. Verified on 0.147.0.
-          "write guards apply only to models that offer apply_patch; with the rest, "
-            + "edits run through the shell and cannot be matched to a claim",
+          // command string. Since 0.1.7 that command is read for its write
+          // positions, so those edits are matched too - as far as the reading
+          // goes. Verified on 0.147.0.
+          "write guards cover apply_patch and the shell writes ACC can read; a model "
+            + "without apply_patch edits through the shell, where a redirection or an "
+            + "mv is matched and a runtime opening the file is not",
           "Codex requires hooks to be trusted before they run; an untrusted plugin is "
             + "installed but inert",
         ],

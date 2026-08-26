@@ -85,11 +85,12 @@ function claimNote(claim) {
   if (claim.enforceable === false) {
     return " - not enforced for this session; do not edit it";
   }
-  // Guarded, and this session can be stopped - but only on a file edit. No
-  // harness intercepts a shell command, so an edit made through one goes
-  // through whatever the claim says, and a session told merely "this is
-  // claimed" would reasonably assume otherwise.
-  return " - file edits are blocked; edits made through a shell are not";
+  // Guarded, and this session can be stopped - on a file edit, and on the shell
+  // writes the guard can read: a redirection, an operand of a command whose job
+  // is to put bytes somewhere. A language runtime opening the file itself still
+  // gets past, and a session told merely "this is claimed" would reasonably
+  // assume either more or less than is true.
+  return " - file edits and recognised shell writes are blocked; a runtime can still get past";
 }
 
 function claimLines(claims) {

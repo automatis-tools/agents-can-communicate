@@ -149,14 +149,20 @@ test("injection uses the envelope, which is the opposite of the deny contract", 
   assert.deepEqual(injectResponse(""), {}, "solo injected an empty banner");
 });
 
-test("an edit declares the path it would write, a shell call declares none", async () => {
+test("an edit declares the path it would write, and so does a shell write", async () => {
   const edit = normalizeGeminiHook(await captured("BeforeTool"));
   assert.equal(edit.tool, "write_file");
   assert.deepEqual([...edit.targets], ["/tmp/example-workspace/notes.txt"]);
 
+  // The captured command is redacted content, and writes nothing.
   const shell = normalizeGeminiHook(await captured("BeforeTool-shell"));
   assert.equal(shell.tool, "run_shell_command");
   assert.deepEqual([...shell.targets], []);
+
+  const writing = normalizeGeminiHook({ hook_event_name: "BeforeTool", session_id: "s",
+    cwd: "/tmp", tool_name: "run_shell_command",
+    tool_input: { command: "printf x > notes.txt" } });
+  assert.deepEqual([...writing.targets], ["notes.txt"]);
 });
 
 test("captured payloads normalise and drop conversation content", async () => {

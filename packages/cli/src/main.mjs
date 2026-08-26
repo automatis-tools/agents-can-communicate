@@ -21,6 +21,39 @@ import { discoverWorkspace } from "./workspace-discovery.mjs";
 
 const DEFAULT_CADENCE_MS = 30_000;
 
+/**
+ * The claim a caller means when they name a resource instead of an id.
+ *
+ * `acc claim` takes `--resource`; `acc release` took `--claim`. The asymmetry
+ * cost every caller - a person and an agent alike - a round trip through
+ * `acc status --json` to find an id they never chose. The id is still accepted,
+ * and is still the precise answer when two sessions hold the same resource and
+ * an authority is releasing someone else's.
+ */
+async function claimOn(options, context) {
+  if (options.resource === undefined) {
+    throw new AccError(EXIT.USAGE,
+      "release needs the claim to give back: --resource is what you claimed, "
+      + "--claim is its id");
+  }
+  const resource = await canonicalClaim(options.resource, context.descriptor);
+  const { claims } = await context.service.collectStatus({});
+  // An authority releasing another session's claim is not looking for its own.
+  const mine = claims.filter(claim => claim.resource === resource
+    && (options.authority !== undefined || claim.ownerSessionId === options.session));
+
+  if (mine.length === 0) {
+    throw new AccError(EXIT.DATA, `no claim on ${resource} to release`,
+      { resource, held: claims.map(claim => claim.resource) });
+  }
+  if (mine.length > 1) {
+    throw new AccError(EXIT.DATA,
+      `${mine.length} claims on ${resource}; name the one you mean with --claim`,
+      { resource, claims: mine.map(claim => claim.claimId) });
+  }
+  return mine[0].claimId;
+}
+
 async function openContext(options, runtime) {
   const descriptor = await discoverWorkspace({
     cwd: options.cwd ?? runtime.cwd,
@@ -120,11 +153,12 @@ const HANDLERS = Object.freeze({
   },
 
   release: async ({ options, context }) => {
-    const request = { claimId: options.claim, sessionId: options.session,
+    const claimId = options.claim ?? await claimOn(options, context);
+    const request = { claimId, sessionId: options.session,
       generation: options.generation, authority: options.authority, reason: options.reason };
     if (options.authority === undefined) await context.service.releaseClaim(request);
     else await context.service.forceReleaseClaim(request);
-    return { data: { claimId: options.claim }, text: `released ${options.claim}` };
+    return { data: { claimId }, text: `released ${claimId}` };
   },
 
   message: async ({ options, context }) => {
