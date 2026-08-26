@@ -47,6 +47,29 @@ along; the document a reader acts from had not.
 Seen while running two real clients against one workspace: consecutive runs
 appeared as `kimi-5P8POZ`, then `kimi-qUW4ei`.
 
+## Unreleased
+
+| | |
+|---|---|
+| Built from | `PENDING` |
+| Tarball | `PENDING` |
+| sha256 | `PENDING` |
+| Tests | 880 passing, 0 failing |
+
+Not published. A published record says what the registry serves and is not
+rewritten, so shipped code that changes after a release is measured here instead.
+
+`acc status` says when the sessions it counts are not answering. `live` means
+present rather than online - a client that exits without closing its session
+leaves a record that goes stale rather than disappearing - so the line read
+`1 live` about a workspace whose only agent had left minutes before. The data
+was right the whole time: the same call reported `presence: stale` and
+`counts.stale: 1`. The sentence a person reads was the part that was not.
+
+Found by running a real client and watching what it left behind: a short run
+closes its session on the way out, and a longer one does not always get that
+far.
+
 ## 0.1.5
 
 One fix, and the most serious so far: every published version taught agents a
