@@ -200,3 +200,18 @@ test("the install tells an adapter where ACC keeps its state", async t => {
   assert.match(config, /\[sandbox_workspace_write\]/);
   assert.match(config, new RegExp(`writable_roots = \\["${dataHome}/acc"\\]`));
 });
+
+test("the status line says when the sessions it counts are not answering", async () => {
+  const { describePresence } = await import("../src/main.mjs");
+
+  // `live` counts everyone present, and a session goes stale rather than
+  // vanishing when its client exits without closing it. The number alone said
+  // "1 live" about a workspace whose last agent had left minutes before -
+  // measured, by running a real client and watching what it left behind.
+  assert.equal(describePresence({ live: 0, stale: 0 }), "0 live");
+  assert.equal(describePresence({ live: 2, stale: 0 }), "2 live");
+  assert.equal(describePresence({ live: 1, stale: 1 }), "1 present, none answering");
+  assert.equal(describePresence({ live: 3, stale: 3 }), "3 present, none answering");
+  assert.equal(describePresence({ live: 3, stale: 1 }), "3 live (1 not answering)");
+  assert.equal(describePresence(), "0 live");
+});

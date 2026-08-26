@@ -42,6 +42,14 @@ async function openContext(options, runtime) {
 
 const human = value => (typeof value === "string" ? value : JSON.stringify(value, null, 2));
 
+/** How many are here, and how many only look it. */
+export function describePresence({ live = 0, stale = 0 } = {}) {
+  if (live === 0) return "0 live";
+  if (stale === 0) return `${live} live`;
+  if (stale === live) return `${live} present, none answering`;
+  return `${live} live (${stale} not answering)`;
+}
+
 const HANDLERS = Object.freeze({
   attach: async ({ options, context }) => {
     const session = await context.service.openSession({
@@ -241,7 +249,12 @@ const HANDLERS = Object.freeze({
   status: async ({ options, context }) => {
     const status = await context.service.collectStatus({
       participantId: options.participant, all: options.all === true });
-    const text = `${status.counts.live} live; ${status.counts.claims} claim(s); `
+    // `live` counts everyone present, which includes sessions gone stale - a
+    // client that exited without its session being closed keeps a record that
+    // stops being answered but does not disappear. Printing the number alone
+    // said "1 live" about a workspace where the last agent had left minutes
+    // before, which is the one thing a person reads this line to find out.
+    const text = `${describePresence(status.counts)}; ${status.counts.claims} claim(s); `
       + `protection ${status.protection}`;
     return { data: status, text };
   },
