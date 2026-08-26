@@ -12,6 +12,11 @@
 Not published. A published record says what the registry serves and is not
 rewritten, so shipped code that changes after a release is measured here instead.
 
+Every binary the manifest declares is executable in the repository.
+`bin/acc-hook.mjs` was not, while its two siblings were. npm sets the bit when
+it links a `bin`, so the difference was invisible - until `npm install -g .`
+set it and left the working tree dirty, which is how it was noticed.
+
 An agent in Codex can record what it is doing. That client sandboxes the shell
 commands a model runs to the workspace, and ACC keeps its state outside every
 workspace on purpose - so an agent there could read the roster and write

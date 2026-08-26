@@ -212,6 +212,25 @@ test("the installed package can find the binaries it names", async t => {
     `the installed package looks for its CLI at ${found.cli}`);
 });
 
+test("every binary the manifest declares is executable in the repository", async () => {
+  // npm sets the bit when it links a `bin`, so a missing one is invisible until
+  // somebody runs the file out of a checkout - or until `npm install -g .`
+  // sets it and leaves the working tree dirty, which is how this was noticed.
+  const manifest = JSON.parse(await readFile(path.join(repo, "package.json"), "utf8"));
+  const { stdout } = await run("git", ["ls-files", "-s", "bin/"], { cwd: repo });
+  const modes = new Map(stdout.trim().split("\n")
+    .map(line => line.split(/\s+/))
+    .map(([mode, , , file]) => [file, mode]));
+
+  const notExecutable = Object.values(manifest.bin ?? {})
+    .map(entry => entry.replace(/^\.\//, ""))
+    .filter(file => modes.get(file) !== "100755")
+    .sort();
+
+  assert.deepEqual(notExecutable, [],
+    "these are declared as binaries and are not executable in the repository");
+});
+
 test("the manifest declares the binaries and the engine it was certified on", async t => {
   const manifest = JSON.parse(await readFile(path.join(repo, "package.json"), "utf8"));
 
