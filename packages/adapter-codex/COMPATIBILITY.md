@@ -228,7 +228,7 @@ write, so it says so before the turn instead:
 
 ```text
 2 session(s); cursor 0000000000000004
-- [claim] file:src/** held by models - file edits are blocked; edits made through a shell are not
+- [claim] file:src/** held by models - file edits and recognised shell writes are blocked; a runtime can still get past
 - session_9Xo… (cli, online)
 - session_BlU… (codex, online)
 ```
@@ -241,7 +241,7 @@ asked for, and whether ACC can stop this particular session:
 
 | Claim | This session | Note |
 |---|---|---|
-| guarded | can be guarded | `file edits are blocked; edits made through a shell are not` |
+| guarded | can be guarded | `file edits and recognised shell writes are blocked; a runtime can still get past` |
 | guarded | cannot be guarded | `not enforced for this session; do not edit it` |
 | advisory | either | `advisory; nothing will stop you, the owner is asking` |
 

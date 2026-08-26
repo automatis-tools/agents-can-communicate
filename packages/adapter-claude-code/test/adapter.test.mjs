@@ -157,7 +157,7 @@ test("the guard sees this client's real tool names", async () => {
   assert.doesNotMatch(matcher, /apply_patch/);
 });
 
-test("an edit declares the path it would write, a shell call declares none", async () => {
+test("an edit declares the path it would write, and so does a shell write", async () => {
   // Captured from 2.1.233: Write takes file_path/content, Edit takes file_path
   // with old_string/new_string. Without the path a guard has nothing to compare
   // against a claim.
@@ -165,8 +165,16 @@ test("an edit declares the path it would write, a shell call declares none", asy
   assert.equal(edit.tool, "Edit");
   assert.deepEqual([...edit.targets], ["/tmp/example-workspace/notes.txt"]);
 
-  // The surviving PreToolUse fixture is the Bash one.
+  // The surviving PreToolUse fixture is the Bash one, and `echo probe` writes
+  // nothing. A command that does write is a different matter: this session is
+  // itself told to prefer the shell for file changes, which is precisely why
+  // the command is read rather than waved through.
   assert.deepEqual([...normalizeClaudeHook(await captured("PreToolUse")).targets], []);
+
+  const shell = normalizeClaudeHook({ hook_event_name: "PreToolUse", session_id: "s",
+    cwd: "/tmp", tool_name: "Bash",
+    tool_input: { command: "printf '// x' >> /tmp/example-workspace/notes.txt" } });
+  assert.deepEqual([...shell.targets], ["/tmp/example-workspace/notes.txt"]);
 });
 
 test("reading a file is not a write", () => {

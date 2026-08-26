@@ -1,4 +1,4 @@
-import { normalizedEvent } from "@agents-can-communicate/adapter-sdk";
+import { normalizedEvent, shellWriteTargets } from "@agents-can-communicate/adapter-sdk";
 import { AccError, EXIT } from "@agents-can-communicate/protocol";
 
 // All eight observed in a live 0.37.0 configuration; the six that ACC uses were
@@ -59,10 +59,11 @@ export function normalizeGeminiHook(payload) {
  * Both editing tools take `file_path`, confirmed from a capture. The file's
  * contents are not read: they are conversation content.
  *
- * `run_shell_command` declares nothing. A command can write anywhere, and a path
- * guessed out of one gives a guard that is wrong in both directions.
+ * `run_shell_command` declares no path, so its command is read for the positions
+ * where a write is unambiguous, and for nothing else.
  */
 function writeTargets(tool, input) {
+  if (tool === "run_shell_command") return shellWriteTargets(input?.command);
   if (!GEMINI_EDIT_TOOLS.includes(tool)) return [];
   const target = input?.file_path;
   return typeof target === "string" && target !== "" ? [target] : [];

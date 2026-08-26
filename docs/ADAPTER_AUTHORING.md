@@ -75,7 +75,8 @@ tool output; none of it may survive.
 ```js
 return normalizedEvent({
   kind, sessionId, cwd, model, parentSessionId, tool,
-  targets,   // paths this call would WRITE. [] for shell — a command names no resource.
+  targets,   // paths this call would WRITE. For a shell call, pass the command to
+             // shellWriteTargets() — it reads write positions only, never reads.
 });
 ```
 

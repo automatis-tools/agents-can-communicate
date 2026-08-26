@@ -27,9 +27,9 @@ test("targets carry the paths a call would write, and nothing else", () => {
   assert.deepEqual(event.targets, ["src/a.mjs", "src/b.mjs"]);
 });
 
-test("a shell call declares no targets rather than a guessed one", () => {
-  // A command can write anywhere. Inventing a path from it would produce a
-  // guard that is wrong in both directions.
+test("an event carries the targets it was given and invents none", () => {
+  // Reading a command for its write positions is the adapter's job; this shape
+  // carries the result and adds nothing of its own.
   assert.deepEqual(normalizedEvent({ ...base, tool: "Bash" }).targets, []);
 });
 
