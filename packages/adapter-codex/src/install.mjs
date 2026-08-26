@@ -118,8 +118,37 @@ const entryFor = () => ({
  * an install that writes files alone leaves a plugin the client never sees and
  * a hook that never runs - while reporting success.
  */
+/**
+ * The table that lets an agent here record anything at all.
+ *
+ * This client sandboxes the shell commands a model runs to the workspace, and
+ * ACC keeps its state outside every workspace on purpose - so an agent could
+ * read the roster and write nothing: `acc claim`, `acc work`, `acc message` all
+ * failed with `EPERM ... locks/writer.lock`. Measured with `codex exec`, which
+ * is how an agent actually runs, and confirmed by watching the same commands
+ * succeed once this root was declared.
+ *
+ * Left out when the user declares the table themselves. Declaring it twice is
+ * what makes this client refuse the whole config, and their setting is theirs -
+ * the diagnostic says what to add rather than adding it for them.
+ */
+const sandboxTable = (stateRoot, theirs) => {
+  if (typeof stateRoot !== "string" || stateRoot === "") return [];
+  if (theirs) return [];
+  return ["", "[sandbox_workspace_write]",
+    `writable_roots = [${tomlString(stateRoot)}]`];
+};
+
+// Every spelling TOML allows for the same table: the header, a sub-table
+// header, a dotted key, and an inline table on one line. Missing one means ACC
+// appends a second declaration - which is the duplicate this exists to avoid,
+// and the client refuses the whole config over it.
+const declaresSandbox = config =>
+  /^\s*\[sandbox_workspace_write[\].]/m.test(config)
+  || /^\s*sandbox_workspace_write\s*[.=]/m.test(config);
+
 export async function installCodexPlugin({ home, agentsHome = home,
-  codexHome = path.join(home, ".codex"), runner, node }) {
+  codexHome = path.join(home, ".codex"), stateRoot, runner, node }) {
   // Read before writing, so a manifest that will not parse is found before a
   // plugin tree is laid down that nothing will then be able to remove.
   const existing = await readJson(marketplacePath(agentsHome), { name: MARKETPLACE,
@@ -157,6 +186,7 @@ export async function installCodexPlugin({ home, agentsHome = home,
       `marketplace ${MARKETPLACE} is already registered in this config; `
       + "remove it and install again", { config });
   }
+  const theirSandbox = declaresSandbox(stripBlock(before));
   await writeTomlBlock(config, [
     `[marketplaces.${MARKETPLACE}]`,
     `source_type = "local"`,
@@ -164,6 +194,7 @@ export async function installCodexPlugin({ home, agentsHome = home,
     "",
     `[plugins.${tomlString(QUALIFIED)}]`,
     "enabled = true",
+    ...sandboxTable(stateRoot, theirSandbox),
   ]);
 
   // The client runs the cached copy, so this has to happen after the shim and
@@ -184,7 +215,11 @@ export async function installCodexPlugin({ home, agentsHome = home,
   // while ACC invented its own marketplace name and so had a root to itself.
   // make the record stale the moment the plugin version changes.
   return { ok: true, changes: [target, file, config, cachePath(codexHome)],
-    diagnostics: ["hooks require explicit trust in Codex before they run"] };
+    diagnostics: ["hooks require explicit trust in Codex before they run",
+      ...(theirSandbox
+        ? [`this config sets its own sandbox_workspace_write; add ${stateRoot} to `
+          + "writable_roots, or an agent here can read the roster and record nothing"]
+        : [])] };
 }
 
 /** Remove each directory that is empty, in the order given. */

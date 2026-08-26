@@ -507,3 +507,91 @@ test("a marketplace ACC creates itself is still its own", async t => {
   assert.deepEqual(await readdir(path.join(context.codexHome, "plugins", "cache",
     "acc-local")), ["agents-can-communicate"]);
 });
+
+/**
+ * The table that lets an agent here record anything.
+ *
+ * This client sandboxes the shell commands a model runs to the workspace, and
+ * ACC keeps its state outside every workspace on purpose. So an agent could
+ * read the roster and write nothing: `acc claim`, `acc work` and `acc message`
+ * all failed with `EPERM ... locks/writer.lock`. Measured with `codex exec`,
+ * which is how an agent actually runs, and again after the fix - the same
+ * command, no flags, exit 0.
+ */
+const configOf = context =>
+  readFile(path.join(context.codexHome, "config.toml"), "utf8");
+
+test("the state directory is declared writable, or agents here cannot record", async t => {
+  const { context } = await fixture(t);
+  const stateRoot = path.join(context.home, "state", "acc");
+
+  await createCodexAdapter().install({ ...context, stateRoot });
+
+  const config = await configOf(context);
+  assert.match(config, /\[sandbox_workspace_write\]/);
+  assert.match(config, new RegExp(`writable_roots = \\[".*${
+    stateRoot.split(path.sep).at(-2)}.*"\\]`));
+});
+
+test("a config that sets its own sandbox is not written over", async t => {
+  const { context } = await fixture(t);
+  const config = path.join(context.codexHome, "config.toml");
+  await mkdir(context.codexHome, { recursive: true });
+  // Theirs, and declaring the table twice is what makes this client refuse the
+  // whole config - so the diagnostic says what to add rather than adding it.
+  await writeFile(config, "[sandbox_workspace_write]\nwritable_roots = [\"/tmp/theirs\"]\n");
+  const stateRoot = path.join(context.home, "state", "acc");
+
+  const result = await createCodexAdapter().install({ ...context, stateRoot });
+
+  const text = await readFile(config, "utf8");
+  assert.equal((text.match(/\[sandbox_workspace_write\]/g) ?? []).length, 1,
+    "the table is declared twice, which this client refuses to load at all");
+  assert.match(text, /writable_roots = \["\/tmp\/theirs"\]/);
+  assert.match(result.diagnostics.join(" "),
+    /sets its own sandbox_workspace_write.*read the roster and record nothing/s);
+});
+
+test("uninstall takes the sandbox declaration back out", async t => {
+  const { context } = await fixture(t);
+  const adapter = createCodexAdapter();
+  await adapter.install({ ...context, stateRoot: path.join(context.home, "state", "acc") });
+
+  await adapter.uninstall(context);
+
+  assert.doesNotMatch(await configOf(context).catch(() => ""), /sandbox_workspace_write/);
+});
+
+test("without a state directory nothing is declared", async t => {
+  const { context } = await fixture(t);
+  // An older caller, or one that has no state of its own to name. Writing an
+  // empty `writable_roots` would be worse than writing nothing.
+  await createCodexAdapter().install(context);
+
+  assert.doesNotMatch(await configOf(context), /sandbox_workspace_write/);
+});
+
+test("every spelling of that table counts as the user's", async t => {
+  // TOML says the same thing four ways. Missing one means ACC appends a second
+  // declaration, and this client refuses the whole config over a duplicate -
+  // which is the failure the check exists to prevent, arriving through the
+  // check itself.
+  for (const declaration of [
+    "[sandbox_workspace_write]\nwritable_roots = [\"/tmp/theirs\"]\n",
+    "[sandbox_workspace_write.nested]\nx = 1\n",
+    "sandbox_workspace_write.writable_roots = [\"/tmp/theirs\"]\n",
+    "sandbox_workspace_write = { writable_roots = [\"/tmp/theirs\"] }\n",
+  ]) {
+    const { context } = await fixture(t);
+    const config = path.join(context.codexHome, "config.toml");
+    await mkdir(context.codexHome, { recursive: true });
+    await writeFile(config, declaration);
+
+    await createCodexAdapter().install({ ...context,
+      stateRoot: path.join(context.home, "state", "acc") });
+
+    const text = await readFile(config, "utf8");
+    assert.equal((text.match(/sandbox_workspace_write/g) ?? []).length, 1,
+      `declared twice for:\n${declaration}`);
+  }
+});
