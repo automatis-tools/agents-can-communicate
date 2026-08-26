@@ -570,3 +570,28 @@ test("without a state directory nothing is declared", async t => {
 
   assert.doesNotMatch(await configOf(context), /sandbox_workspace_write/);
 });
+
+test("every spelling of that table counts as the user's", async t => {
+  // TOML says the same thing four ways. Missing one means ACC appends a second
+  // declaration, and this client refuses the whole config over a duplicate -
+  // which is the failure the check exists to prevent, arriving through the
+  // check itself.
+  for (const declaration of [
+    "[sandbox_workspace_write]\nwritable_roots = [\"/tmp/theirs\"]\n",
+    "[sandbox_workspace_write.nested]\nx = 1\n",
+    "sandbox_workspace_write.writable_roots = [\"/tmp/theirs\"]\n",
+    "sandbox_workspace_write = { writable_roots = [\"/tmp/theirs\"] }\n",
+  ]) {
+    const { context } = await fixture(t);
+    const config = path.join(context.codexHome, "config.toml");
+    await mkdir(context.codexHome, { recursive: true });
+    await writeFile(config, declaration);
+
+    await createCodexAdapter().install({ ...context,
+      stateRoot: path.join(context.home, "state", "acc") });
+
+    const text = await readFile(config, "utf8");
+    assert.equal((text.match(/sandbox_workspace_write/g) ?? []).length, 1,
+      `declared twice for:\n${declaration}`);
+  }
+});
