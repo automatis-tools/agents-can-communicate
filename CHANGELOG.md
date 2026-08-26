@@ -9,9 +9,9 @@ through it.
 
 | | |
 |---|---|
-| Built from | `PENDING` |
-| Tarball | `PENDING` |
-| sha256 | `PENDING` |
+| Built from | `22ee9c9` |
+| Tarball | `agents-can-communicate-0.1.7.tgz`, 142 KB, 110 entries |
+| sha256 | `16bbddfe242df6da5bf48aeec30a6f0c70cd7491cfbb71320fa4d60ef408c642` |
 | Tests | 906 passing, 0 failing |
 | Node | 24 (current production LTS) |
 | Verified on | macOS 15 (darwin 25.5.0, arm64) and Linux in CI |
