@@ -1,16 +1,21 @@
 # Changelog
 
-## Unreleased
+## 0.1.7
+
+One fix that matters and two that tidy after it. The one that matters: until
+now a `guarded` claim stopped a file edit and nothing else, so the shell - the
+way agents in these harnesses are told to change files - walked straight
+through it.
 
 | | |
 |---|---|
-| Built from | `8b049fe` |
-| Tarball | `agents-can-communicate-0.1.6.tgz`, 142 KB, 110 entries |
-| sha256 | `f2cc7c8e4b68e869c230cbe05c9b41d6c539986411b15e1413e60b7a5f697853` |
+| Built from | `22ee9c9` |
+| Tarball | `agents-can-communicate-0.1.7.tgz`, 142 KB, 110 entries |
+| sha256 | `16bbddfe242df6da5bf48aeec30a6f0c70cd7491cfbb71320fa4d60ef408c642` |
 | Tests | 906 passing, 0 failing |
-
-Not published. A published record says what the registry serves and is not
-rewritten, so shipped code that changes after a release is measured here instead.
+| Node | 24 (current production LTS) |
+| Verified on | macOS 15 (darwin 25.5.0, arm64) and Linux in CI |
+| Not supported | Windows — untested rather than known-broken |
 
 A claim now holds against the shell. Found by asking a live Codex session to
 append a line to a file another agent held guarded, and watching it succeed.
