@@ -7,6 +7,7 @@ import { detectInstallation, loadOwnership, verifyOwned }
 import { AccError, EXIT } from "@agents-can-communicate/protocol";
 
 import { ALL_ADAPTERS, clientContext, probeTimeout } from "./install-command.mjs";
+import { describePresence } from "./main.mjs";
 import { platformPaths } from "./platform-paths.mjs";
 import { noticeUpdate } from "./update-check.mjs";
 import { diagnoseFilesystemStore, repairFilesystemStore }
@@ -130,7 +131,7 @@ export async function runDoctor({ options, context, runtime }) {
   // command documented as saying "what to run next" said it only to `--json`.
   // A person running `acc doctor` on a client wired to an older plugin was told
   // the store was healthy and nothing else.
-  const text = [`store healthy; ${status.counts.live} live session(s); `
+  const text = [`store healthy; ${describePresence(status.counts)}; `
     + `protection ${status.protection}; ${installed} of ${adapters.length} adapter(s) installed`,
   ...data.remediation.map(line => `  ${line}`)].join("\n");
   return { data, text };
