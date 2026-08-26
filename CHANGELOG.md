@@ -4,7 +4,7 @@
 
 | | |
 |---|---|
-| Built from | `f86a5c5` |
+| Built from | `0465921` |
 | Tarball | `agents-can-communicate-0.1.5.tgz`, 135 KB, 109 entries |
 | sha256 | `5a5f6b8b73a21c90cd32841d8976be7ea92f232753308a9e1e4f419bc9376bf0` |
 | Tests | 877 passing, 0 failing |
