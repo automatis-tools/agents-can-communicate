@@ -1,16 +1,20 @@
 # Changelog
 
-## Unreleased
+## 0.1.6
+
+Five fixes, and the one that matters most is that an agent in Codex can act at
+all. Everything here came out of driving the real clients with live models
+rather than with hand-written payloads.
 
 | | |
 |---|---|
-| Built from | `f0100c9` |
-| Tarball | `agents-can-communicate-0.1.5.tgz`, 135 KB, 109 entries |
-| sha256 | `24ce109ae1928fde21ab22bf89f42bff35b2b20add7e089b7eab6a283534a1c1` |
+| Built from | `PENDING` |
+| Tarball | `PENDING` |
+| sha256 | `PENDING` |
 | Tests | 880 passing, 0 failing |
-
-Not published. A published record says what the registry serves and is not
-rewritten, so shipped code that changes after a release is measured here instead.
+| Node | 24 (current production LTS) |
+| Verified on | macOS 15 (darwin 25.5.0, arm64) and Linux in CI |
+| Not supported | Windows — untested rather than known-broken |
 
 Every binary the manifest declares is executable in the repository.
 `bin/acc-hook.mjs` was not, while its two siblings were. npm sets the bit when
