@@ -174,17 +174,23 @@ test("the install tells an adapter where ACC keeps its state", async t => {
   t.after(() => Promise.all([home, dataHome]
     .map(dir => rm(dir, { recursive: true, force: true }))));
 
-  // A client of this test's own, so it asks the same question everywhere.
+  // A client of this test's own, so it asks the same question everywhere. On the
+  // real PATH, because detection spawns the client's binary and a spawn
+  // inherits the process environment - passing a PATH in `runtime.env` looked
+  // like it worked here and found nothing on a machine without Codex.
   const bin = path.join(home, "bin");
   await makeDir(bin, { recursive: true });
   await writeFile(path.join(bin, "codex"), "#!/bin/sh\necho \"codex-cli 0.147.0\"\n");
   await chmod(path.join(bin, "codex"), 0o755);
+  const previous = process.env.PATH;
+  process.env.PATH = `${bin}${path.delimiter}${previous}`;
+  t.after(() => { process.env.PATH = previous; });
 
   await runInstallCommand({
     options: { home, adapter: "codex" },
     runtime: { platform: process.platform,
-      env: { ...process.env, PATH: `${bin}${path.delimiter}${process.env.PATH}`,
-        HOME: home, ACC_DATA_HOME: dataHome, ACC_PROBE_TIMEOUT_MS: "30000" } },
+      env: { ...process.env, HOME: home, ACC_DATA_HOME: dataHome,
+        ACC_PROBE_TIMEOUT_MS: "30000" } },
     action: "install" });
 
   // Codex sandboxes what a model runs to the workspace, and ACC's state is
