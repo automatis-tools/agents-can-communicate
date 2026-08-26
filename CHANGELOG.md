@@ -4,10 +4,10 @@
 
 | | |
 |---|---|
-| Built from | `3eb048d` |
+| Built from | `5fb3cfd` |
 | Tarball | `agents-can-communicate-0.1.5.tgz`, 135 KB, 109 entries |
-| sha256 | `23f6bb1cac9049c7a5f5b0dd453b7a1bac0e5f3b31bafc0f4566da9179952ec7` |
-| Tests | 878 passing, 0 failing |
+| sha256 | `98995091e8d17f8ec34f84246f4f993e663d036a6ebeb24e938db8946944d09d` |
+| Tests | 879 passing, 0 failing |
 
 Not published. A published record says what the registry serves and is not
 rewritten, so shipped code that changes after a release is measured here instead.
