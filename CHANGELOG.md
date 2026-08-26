@@ -4,10 +4,10 @@
 
 | | |
 |---|---|
-| Built from | `5fb3cfd` |
+| Built from | `f0100c9` |
 | Tarball | `agents-can-communicate-0.1.5.tgz`, 135 KB, 109 entries |
-| sha256 | `98995091e8d17f8ec34f84246f4f993e663d036a6ebeb24e938db8946944d09d` |
-| Tests | 879 passing, 0 failing |
+| sha256 | `24ce109ae1928fde21ab22bf89f42bff35b2b20add7e089b7eab6a283534a1c1` |
+| Tests | 880 passing, 0 failing |
 
 Not published. A published record says what the registry serves and is not
 rewritten, so shipped code that changes after a release is measured here instead.
@@ -33,11 +33,6 @@ Measured with `codex exec`, which is how an agent actually runs: the same
 command that failed with EPERM now returns `intent: reviewing the parser` and
 exit 0, with no flags passed by hand.
 
-## Unreleased
-
-Not published. Documentation only; the packed tarball is unchanged, so the
-record below still describes it.
-
 `docs/CLI.md` names the condition on the promise it makes. It said an agent can
 close its terminal and the next session it opens is still told - true only when
 that agent has a name of its own. Without one, each run is a new participant and
@@ -46,6 +41,17 @@ along; the document a reader acts from had not.
 
 Seen while running two real clients against one workspace: consecutive runs
 appeared as `kimi-5P8POZ`, then `kimi-qUW4ei`.
+
+`acc status` says when the sessions it counts are not answering. `live` means
+present rather than online - a client that exits without closing its session
+leaves a record that goes stale rather than disappearing - so the line read
+`1 live` about a workspace whose only agent had left minutes before. The data
+was right the whole time: the same call reported `presence: stale` and
+`counts.stale: 1`. The sentence a person reads was the part that was not.
+
+Found by running a real client and watching what it left behind: a short run
+closes its session on the way out, and a longer one does not always get that
+far.
 
 ## 0.1.5
 
