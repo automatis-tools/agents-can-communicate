@@ -51,9 +51,9 @@ appeared as `kimi-5P8POZ`, then `kimi-qUW4ei`.
 
 | | |
 |---|---|
-| Built from | `PENDING` |
-| Tarball | `PENDING` |
-| sha256 | `PENDING` |
+| Built from | `f0100c9` |
+| Tarball | `agents-can-communicate-0.1.5.tgz`, 135 KB, 109 entries |
+| sha256 | `24ce109ae1928fde21ab22bf89f42bff35b2b20add7e089b7eab6a283534a1c1` |
 | Tests | 880 passing, 0 failing |
 
 Not published. A published record says what the registry serves and is not
