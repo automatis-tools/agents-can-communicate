@@ -17,12 +17,18 @@ import { platformPaths } from "./platform-paths.mjs";
 // Each client keeps its own directory under the user's home, and an adapter
 // pointed at the home itself writes beside them rather than inside them. That
 // install reports success and the client never reads a byte of it.
-export const clientContext = home => ({
+export const clientContext = (home, stateRoot) => ({
   home,
   configDir: path.join(home, ".claude"),
   agentsHome: home,
   codexHome: path.join(home, ".codex"),
   kimiHome: path.join(home, ".kimi-code"),
+  // Where ACC keeps its own state, for the client that has to be told. Codex
+  // sandboxes the commands a model runs to the workspace, and ACC's state is
+  // outside every workspace on purpose - so an agent there could read the
+  // roster and record nothing, every write failing with EPERM on the writer
+  // lock. Measured with `codex exec`, which is how an agent actually runs.
+  stateRoot,
 });
 
 export const ALL_ADAPTERS = () => [createClaudeCodeAdapter(), createCodexAdapter(),
@@ -153,9 +159,9 @@ export function actedOn(result) {
 export async function runInstallCommand({ options, runtime, action = "install" }) {
   const adapters = selectAdapters(options.adapter);
   const home = options.home ?? runtime.env?.HOME ?? homedir();
-  const context = clientContext(home);
   const { data: dataHome } = platformPaths({ platform: runtime.platform,
     env: runtime.env ?? {} });
+  const context = clientContext(home, path.join(dataHome, "acc"));
 
   const detected = await detectInstallation({ adapters, context,
     probeTimeoutMs: probeTimeout(runtime.env) });
