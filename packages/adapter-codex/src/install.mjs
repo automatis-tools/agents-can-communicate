@@ -139,8 +139,13 @@ const sandboxTable = (stateRoot, theirs) => {
     `writable_roots = [${tomlString(stateRoot)}]`];
 };
 
-const declaresSandbox = config => /^\s*\[sandbox_workspace_write\]/m.test(config)
-  || /^\s*sandbox_workspace_write\./m.test(config);
+// Every spelling TOML allows for the same table: the header, a sub-table
+// header, a dotted key, and an inline table on one line. Missing one means ACC
+// appends a second declaration - which is the duplicate this exists to avoid,
+// and the client refuses the whole config over it.
+const declaresSandbox = config =>
+  /^\s*\[sandbox_workspace_write[\].]/m.test(config)
+  || /^\s*sandbox_workspace_write\s*[.=]/m.test(config);
 
 export async function installCodexPlugin({ home, agentsHome = home,
   codexHome = path.join(home, ".codex"), stateRoot, runner, node }) {
