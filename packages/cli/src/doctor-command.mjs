@@ -130,6 +130,9 @@ async function diagnoseAdapters({ options, runtime }) {
     if (owned.missing.length > 0) {
       remediation.push(`acc install --adapter ${entry.adapterId}  # files are missing`);
     }
+    // An adapter can name something only a person can do - the client's own
+    // trust prompt, most of all. It goes where a person reads, not into --json.
+    remediation.push(...(entry.needsAction ?? []));
     const installed = record.installs.find(one => one.adapterId === entry.adapterId);
     const stale = staleInstall({ recorded: installed?.accVersion ?? null, running });
     if (stale !== null) {

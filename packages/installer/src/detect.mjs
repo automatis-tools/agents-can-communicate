@@ -44,7 +44,8 @@ export async function detectInstallation({ adapters, context, probe = spawnProbe
     .map(async adapter => {
       const entry = { adapterId: adapter.id, displayName: adapter.displayName,
         present: false, version: null, versionOutput: null, installed: false,
-        diagnostics: [], capabilities: adapter.capabilities ?? {}, error: null };
+        diagnostics: [], needsAction: [], capabilities: adapter.capabilities ?? {},
+        error: null };
 
       try {
         const output = await withTimeout(
@@ -65,6 +66,9 @@ export async function detectInstallation({ adapters, context, probe = spawnProbe
       try {
         const detected = await adapter.detect(context);
         entry.diagnostics = detected.diagnostics ?? [];
+        // What a person has to do, as opposed to what is true. Adapters that
+        // have nothing to ask for say nothing.
+        entry.needsAction = detected.needsAction ?? [];
         // "Installed" is the adapter's own answer, phrased in its own terms.
         // The installer does not second-guess it by looking at files it does
         // not understand.

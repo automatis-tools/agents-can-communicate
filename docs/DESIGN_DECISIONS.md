@@ -35,6 +35,27 @@ Why ACC is shaped the way it is, and what is deliberately still open.
 | Reporting queued messages as delivered | A delivery state that overstates itself is worse than no state. |
 | Guessing file paths out of shell commands | It would block work at random and still miss real writes. See [CAPABILITIES.md](CAPABILITIES.md). |
 
+**Reversed in 0.1.11: removing the client's hook-trust record on uninstall.** 0.1.9
+took Codex's `[hooks.state."<plugin>:…"]` tables out on uninstall, reasoning that they
+named a plugin that was gone, five per install, cleared by nobody. The check behind that
+reasoning perturbed the record instead of removing it: a hook whose recorded hash no
+longer *matched* was observed still running, and the record was declared inert. Absence
+was never tested.
+
+Absence is the whole mechanism. With no record this client runs no hook at all, prints
+`hook: SessionStart Completed` while executing nothing, and ACC's write guard is silently
+off - with `acc doctor` reporting the adapter installed and `codex plugin list` reporting
+it enabled. Measured on a real machine: a shell write walked through a guarded claim, and
+writing the exact same hashes back - captured before the deletion, from an ACC three
+releases older - revived the guard immediately.
+
+That last detail is the reason it is never ACC's to remove: the record is granted once by
+a person, survives ACC upgrades, and nothing ACC writes can put it back. Tidiness is not
+worth a permission that only a human can re-grant.
+
+**The generalisation, since this cost a release:** to learn whether state is load-bearing,
+take it away. Changing it tests something else.
+
 **Reversed in 0.1.7: reading write positions out of shell commands.** The row above still
 holds against *guessing*, and it is kept rather than deleted because the reasoning behind
 it is what shaped the replacement. What changed is the evidence: a live Codex session was
