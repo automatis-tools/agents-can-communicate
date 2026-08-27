@@ -1,9 +1,9 @@
-import { cp, mkdir, readFile, rm, rmdir, stat, writeFile } from "node:fs/promises";
+import { cp, mkdir, readdir, readFile, rm, rmdir, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { bakeSkillCommand, blankJson, blankText, removeIfEmpty, removeInstalledTree,
-  ownVersion, stampPluginVersion,
+  keepOnlyVersion, ownVersion, stampPluginVersion,
   removeTomlBlock, stripBlock, tomlString,
   writeForeignJson, writeHookShim, writeTomlBlock }
   from "@agents-can-communicate/adapter-sdk";
@@ -210,6 +210,9 @@ export async function installCodexPlugin({ home, agentsHome = home,
   const cached = cachedVersionPath(codexHome, version);
   await rm(cached, { recursive: true, force: true });
   await cp(target, cached, { recursive: true });
+  // One copy, the one just written - and only inside this plugin's own
+  // directory. The marketplace cache root above it holds other people's plugins.
+  await keepOnlyVersion({ root: path.dirname(cached), version, io: { readdir, rm } });
 
   // The plugin's own directory in the cache. Not the versioned one inside it,
   // which goes stale the moment the version changes - and not the marketplace
