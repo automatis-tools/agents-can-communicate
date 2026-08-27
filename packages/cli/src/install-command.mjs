@@ -125,6 +125,16 @@ export function describeOutcome({ action, acted, failed = [], skipped = [],
   // Said once, where it is needed: the reader has just been shown a list of
   // their own files with ACC's name in them.
   ...(action === "install" && acted > 0 ? ["", "undo with: acc uninstall"] : []),
+  // And said once where it is needed differently: an install that wired nothing
+  // has just told this reader four times that their machine is not supported.
+  // It is not - the MCP server needs no adapter, and was measured answering on a
+  // machine with no client binaries at all. Only when nothing was wired: the
+  // skips already carry their own remedy, and a line printed every time is a
+  // line that stops being read.
+  ...(action === "install" && acted === 0
+    ? ["", "no client was wired, but any MCP client can still take part: "
+      + "point it at the acc-mcp command"]
+    : []),
   ].join("\n");
 }
 

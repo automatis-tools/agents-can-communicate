@@ -210,6 +210,13 @@ export async function runDoctor({ options, context, runtime }) {
   // the store was healthy and nothing else.
   const text = [`store healthy; ${describePresence(status.counts)}; `
     + `protection ${status.protection}; ${installed} of ${adapters.length} adapter(s) installed`,
-  ...data.remediation.map(line => `  ${line}`)].join("\n");
+  ...data.remediation.map(line => `  ${line}`),
+  // `0 of 4` is a true line that reads as a broken machine, and on an
+  // MCP-only one it would read that way on every run forever. The server needs
+  // no adapter: measured answering `tools/list` and writing an intent on a
+  // machine with no client binaries on PATH at all.
+  ...(installed === 0
+    ? ["  no client is wired; any MCP client can still take part through acc-mcp"]
+    : [])].join("\n");
   return { data, text };
 }
