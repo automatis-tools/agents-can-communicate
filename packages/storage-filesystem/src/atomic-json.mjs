@@ -32,9 +32,9 @@ export function encode(value) {
   return Buffer.from(`${serialised}\n`, "utf8");
 }
 
-async function bytesIfPresent(filePath, root) {
+async function bytesIfPresent(filePath, root, openFile) {
   try {
-    return await readRegularNoFollow(filePath, root);
+    return await readRegularNoFollow(filePath, root, openFile);
   } catch (error) {
     if (error.code === "ENOENT") return null;
     throw error;
@@ -87,8 +87,10 @@ export async function publishAtomic(destination, bytes, { root, tmpDir, replace 
   }
 }
 
-export async function readJsonIfPresent(filePath, root) {
-  const bytes = await bytesIfPresent(filePath, root);
+// The opener is the seam the race tests use, and stays last so callers that do
+// not care never see it.
+export async function readJsonIfPresent(filePath, root, openFile) {
+  const bytes = await bytesIfPresent(filePath, root, openFile);
   if (bytes === null) return null;
   try {
     return { value: JSON.parse(bytes.toString("utf8")), bytes };
