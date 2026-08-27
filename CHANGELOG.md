@@ -4,6 +4,39 @@
 
 | | |
 |---|---|
+| Built from | `PENDING` |
+| Tarball | `PENDING` |
+| sha256 | `PENDING` |
+| Tests | 943 passing, 0 failing |
+
+Not published. A published record says what the registry serves and is not
+rewritten, so shipped code that changes after a release is measured here instead.
+
+An upgrade leaves one copy of the plugin, not one per release. These clients
+cache a plugin under its version, and until the previous release that version
+never moved: every install landed in `0.1.6` and overwrote itself, so nothing
+accumulated and nobody looked. Once the version started tracking the package,
+the first upgrade left this behind:
+
+```
+~/.claude/plugins/cache/acc-local/agents-can-communicate/0.1.6
+~/.claude/plugins/cache/acc-local/agents-can-communicate/0.1.9
+~/.claude/plugins/cache/acc-local/agents-can-communicate/0.1.10
+```
+
+Three copies of ACC in a home that should hold one, and a fresh one every time
+you upgrade. `acc uninstall` still cleared all of them, so this was litter rather
+than breakage - but litter ACC put there and told nobody about, which is the
+thing this tool promises not to do to other people's machines.
+
+The tidy is scoped to the plugin's own directory. The marketplace cache root
+above it holds every plugin installed from that marketplace, and removing that
+root once took a plugin the user had installed themselves.
+
+## Unreleased
+
+| | |
+|---|---|
 | Built from | `3ace271` |
 | Tarball | `agents-can-communicate-0.1.9.tgz`, 146 KB, 111 entries |
 | sha256 | `49a0400e6c2db38b3e56ee6258f58a8b4dc9931be813bdb752e9e7b84d1aac57` |
