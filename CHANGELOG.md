@@ -9,9 +9,9 @@ that case had been disarmed by the same event.
 
 | | |
 |---|---|
-| Built from | `PENDING` |
-| Tarball | `PENDING` |
-| sha256 | `PENDING` |
+| Built from | `4697a72` |
+| Tarball | `agents-can-communicate-0.1.9.tgz`, 145 KB, 110 entries |
+| sha256 | `f83415d679f300ac0d58c92b53a18a4739133c45846f0c386d7607f59fed40fc` |
 | Tests | 935 passing, 0 failing |
 | Node | 24 (current production LTS) |
 | Verified on | macOS 15 (darwin 25.5.0, arm64) and Linux in CI |
