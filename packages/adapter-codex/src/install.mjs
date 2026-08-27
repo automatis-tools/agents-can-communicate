@@ -3,6 +3,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { bakeSkillCommand, blankJson, blankText, removeIfEmpty, removeInstalledTree,
+  ownVersion, stampPluginVersion,
   removeTomlBlock, stripBlock, tomlString,
   writeForeignJson, writeHookShim, writeTomlBlock }
   from "@agents-can-communicate/adapter-sdk";
@@ -199,8 +200,13 @@ export async function installCodexPlugin({ home, agentsHome = home,
 
   // The client runs the cached copy, so this has to happen after the shim and
   // the rewritten hooks.json are in place.
-  const { version } = await readJson(
-    path.join(target, ".codex-plugin", "plugin.json"), { version: "0.0.0" });
+  // One version on this machine: the package's own. The shipped manifest carries
+  // none, so nothing in the repository can fall out of step with it - which is
+  // how every client came to report 0.1.6 while running 0.1.9. The copy the
+  // client reads is stamped, so it says which ACC wrote it.
+  const version = await ownVersion(import.meta.url);
+  await stampPluginVersion({ file: path.join(target, ".codex-plugin", "plugin.json"),
+    version, io: { readFile, writeFile } });
   const cached = cachedVersionPath(codexHome, version);
   await rm(cached, { recursive: true, force: true });
   await cp(target, cached, { recursive: true });

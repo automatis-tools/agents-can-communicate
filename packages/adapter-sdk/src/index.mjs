@@ -9,6 +9,7 @@ export { BEGIN, END, removeTomlBlock, renderBlock, stripBlock, tomlString, write
   from "./toml-block.mjs";
 export { projectContext } from "./context-projector.mjs";
 export { shellWriteTargets } from "./shell-writes.mjs";
+export { ownVersion, stampPluginVersion } from "./own-version.mjs";
 export { editJson, readJson } from "./json-text.mjs";
 export { formatJsonAs, jsonStyleOf, mergeOwnedConfig, mergeOwnedEntries, ownedEntries, ownedKeys,
   acccreatedFile, removeIfEmpty, removeOwnedConfig, removeOwnedEntries, writeForeignJson,

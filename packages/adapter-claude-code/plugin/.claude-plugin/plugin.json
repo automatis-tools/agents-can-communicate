@@ -1,5 +1,4 @@
 {
   "name": "agents-can-communicate",
-  "version": "0.1.6",
   "description": "Coordinate this Claude Code session with other AI agent sessions working in the same workspace: shared presence, resource claims, typed messages, and handoffs."
 }
