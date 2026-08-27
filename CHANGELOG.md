@@ -1,16 +1,21 @@
 # Changelog
 
-## Unreleased
+## 0.1.12
+
+Two fixes for machines this project had never actually looked at. Every
+end-to-end run until now was done on one carrying all four clients and a healthy
+store, so a machine with fewer clients - or a store that cannot be read - was
+territory nobody had walked.
 
 | | |
 |---|---|
-| Built from | `491b41b` |
-| Tarball | `agents-can-communicate-0.1.11.tgz`, 148 KB, 111 entries |
-| sha256 | `178782d6553b7bb40d931a394c31f71581142ff7f443d1b19f1666c75a2d0cc6` |
+| Built from | `PENDING` |
+| Tarball | `PENDING` |
+| sha256 | `PENDING` |
 | Tests | 953 passing, 0 failing |
-
-Not published. A published record says what the registry serves and is not
-rewritten, so shipped code that changes after a release is measured here instead.
+| Node | 24 (current production LTS) |
+| Verified on | macOS 15 (darwin 25.5.0, arm64) and Linux in CI |
+| Not supported | Windows — untested rather than known-broken |
 
 `acc doctor` runs on the store it exists to diagnose. This was fixed once
 already, and the throw moved rather than went away. The first time, `collectStatus`
