@@ -1,5 +1,40 @@
 # Changelog
 
+## Unreleased
+
+| | |
+|---|---|
+| Built from | `PENDING` |
+| Tarball | `PENDING` |
+| sha256 | `PENDING` |
+| Tests | 949 passing, 0 failing |
+
+Not published. A published record says what the registry serves and is not
+rewritten, so shipped code that changes after a release is measured here instead.
+
+An install that wired nothing says what still works. Every end-to-end run until
+now was done on a machine carrying all four clients, so the machine that carries
+one - or none - had never been looked at. On that machine `acc install` said:
+
+```
+installed 0 adapter(s)
+  skip claude_code: Claude Code is not installed on this machine; …
+  skip codex: Codex CLI is not installed on this machine; …
+  skip gemini_cli: …
+  skip kimi: …
+```
+
+Every line true, and together they read as "ACC has nothing for you". They are
+wrong about that: the MCP server needs no adapter at all. Measured on exactly
+such a machine - no client binary on PATH, a fresh home - `acc-mcp` answered
+`tools/list` with ten tools and `acc_work` wrote an intent into the store.
+
+Both `acc install` and `acc doctor` now name that path, and only when nothing was
+wired. The skips already carry their own remedy, `0 of 4 adapter(s) installed`
+would otherwise read as a broken machine on every run an MCP-only user makes, and
+a line printed every time is a line that stops being read. An uninstall that
+removed nothing stays quiet: same zero, opposite meaning.
+
 ## 0.1.11
 
 A repair, and it is worth publishing on its own. Since 0.1.9, any `acc uninstall`
