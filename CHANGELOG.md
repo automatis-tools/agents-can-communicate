@@ -1,5 +1,60 @@
 # Changelog
 
+## Unreleased
+
+| | |
+|---|---|
+| Built from | `39f9862` |
+| Tarball | `agents-can-communicate-0.1.8.tgz`, 145 KB, 110 entries |
+| sha256 | `cd2ef8723516f5c8473506705e178d1e931e47132ad292b316235e930b227d54` |
+| Tests | 935 passing, 0 failing |
+
+Not published. A published record says what the registry serves and is not
+rewritten, so shipped code that changes after a release is measured here instead.
+
+`acc doctor` names the ACC each client will actually run. Found by breaking a
+machine: extending PATH to expose one client resolved `acc` to an 0.1.1 sitting
+under a different Node version. That install rewired all four clients to itself,
+and the only symptom was a guard behaving like the version it came from - a shell
+write walked through a claim that 0.1.7 had learned to stop.
+
+Nothing reported it. `staleInstall` compares the version recorded at install
+against the one running now, and the 0.1.1 had rewritten that record with
+`accVersion: null` - it predates the field. So the old ACC did not only replace
+the wiring, it erased the evidence, and the check that existed for exactly this
+went quiet at exactly the wrong moment.
+
+The record is written by whoever writes last. The shim is not: it carries the
+absolute path of the runner the client executes, and an old ACC writes it
+honestly, pointing at itself. `acc doctor` now reads that path, resolves its
+manifest, and says what it found:
+
+```
+acc install --adapter kimi  # wired to acc 0.1.1, this is 0.1.8
+```
+
+`acc install` refuses to wire an older ACC over a newer one, and `--downgrade`
+asks for it deliberately. This is the weaker half and worth saying plainly: an
+older release cannot enforce a check it does not contain, so it will not stop the
+0.1.1 case that prompted this. It stops the same mistake between this release and
+every one after it. The diagnosis above is what covers the rest.
+
+Versions are compared per segment as numbers. A string comparison puts 0.1.10
+before 0.1.9, which is the release where this would start refusing every
+legitimate install.
+
+`acc install --adapter <client>` installs that client even when the version probe
+cannot find it. Presence was decided by running the client's `--version`, which
+answers "can ACC run this client" - not the question that matters, since ACC
+never runs it: the client runs ACC's hook. A CLI installed under a different Node
+version sat there with its own configuration directory while every install said
+"not installed on this machine". Naming the client is an answer to what the probe
+was guessing at, and the skip now names that way past itself.
+
+Presence is not inferred from the configuration directory existing. That was
+tried first and is unsound: ACC creates those directories itself, and the attempt
+read a client's own test fixture as proof the client was there.
+
 ## 0.1.8
 
 Two fixes to what an agent reads and what it can answer with. Both came out of

@@ -63,7 +63,10 @@ export const COMMANDS = Object.freeze({
   // No `--yes`: neither of these ever asked, so the flag agreed to nothing. It
   // was accepted and read by nobody, which is a promise that a confirmation
   // exists to be skipped.
-  install: { required: [], optional: ["adapter", "home"], flags: ["dry-run"] },
+  // `--downgrade` because an older acc first on PATH will otherwise rewire every
+  // client to itself, and the only symptom is a guard behaving like the version
+  // it came from.
+  install: { required: [], optional: ["adapter", "home"], flags: ["dry-run", "downgrade"] },
   // `--dry-run` on both, because the preview was computed for either action and
   // only `install` could ask for it. Removal is the side that reaches into a
   // client's configuration - including a client that has left the machine.
