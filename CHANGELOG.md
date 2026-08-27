@@ -1,16 +1,21 @@
 # Changelog
 
-## Unreleased
+## 0.1.13
+
+One fix, and it is the reason to upgrade off 0.1.12 rather than wait. Two agents
+starting in the same fresh workspace at the same moment - the ordinary way people
+begin work - could leave one of them refused, and under a hook that refusal is
+silent: the session simply never appears.
 
 | | |
 |---|---|
-| Built from | `25d8f99` |
-| Tarball | `agents-can-communicate-0.1.12.tgz`, 148 KB, 111 entries |
-| sha256 | `6cfe06d14c6ec0b056669482778525e03480955f1c62c9f49284b51a48806c43` |
+| Built from | `8ef19b9` |
+| Tarball | `agents-can-communicate-0.1.13.tgz`, 148 KB, 111 entries |
+| sha256 | `13748bcbd3b0262b1c7ce6418ecb5e41290d0ceea39e243c5df16e6f159da86a` |
 | Tests | 956 passing, 0 failing |
-
-Not published. A published record says what the registry serves and is not
-rewritten, so shipped code that changes after a release is measured here instead.
+| Node | 24 (current production LTS) |
+| Verified on | macOS 15 (darwin 25.5.0, arm64) and Linux in CI |
+| Not supported | Windows — untested rather than known-broken |
 
 A lock changing hands is not an attack. Reads inside the store are guarded
 against a directory being swapped between the check and the open: stat the
