@@ -9,9 +9,9 @@ silent: the session simply never appears.
 
 | | |
 |---|---|
-| Built from | `PENDING` |
-| Tarball | `PENDING` |
-| sha256 | `PENDING` |
+| Built from | `8ef19b9` |
+| Tarball | `agents-can-communicate-0.1.13.tgz`, 148 KB, 111 entries |
+| sha256 | `13748bcbd3b0262b1c7ce6418ecb5e41290d0ceea39e243c5df16e6f159da86a` |
 | Tests | 956 passing, 0 failing |
 | Node | 24 (current production LTS) |
 | Verified on | macOS 15 (darwin 25.5.0, arm64) and Linux in CI |
