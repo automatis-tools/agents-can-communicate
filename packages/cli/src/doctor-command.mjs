@@ -1,4 +1,4 @@
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import path from "node:path";
 
@@ -30,9 +30,75 @@ import { diagnoseFilesystemStore, repairFilesystemStore }
  * Unknown when the install predates the record carrying it, and then nothing is
  * said: "your plugin might be old" on every run is not a diagnosis.
  */
+/**
+ * The ACC version a client will actually run, read out of its own shim.
+ *
+ * `staleInstall` compares the version recorded at install time against the one
+ * running now. That holds until the thing that rewrote the wiring is an ACC old
+ * enough not to know the field: an 0.1.1 first on PATH for one install rewired
+ * four clients to itself and rewrote the record with `accVersion: null`, erasing
+ * the evidence along with the wiring. The record is written by whoever writes
+ * last; the shim carries the absolute path of the runner the client executes,
+ * and an old ACC writes it honestly, pointing at itself.
+ *
+ * Null for anything unreadable. "Might be old" on every run is not a diagnosis.
+ */
+export async function wiredVersion(shimPath) {
+  if (typeof shimPath !== "string" || shimPath === "") return null;
+  const text = await readFile(shimPath, "utf8").catch(() => null);
+  if (text === null) return null;
+  const runner = /["']?(\/[^"'\s]*\/agents-can-communicate)\/bin\/acc-hook\.mjs["']?/.exec(text);
+  if (runner === null) return null;
+  const manifest = await readFile(path.join(runner[1], "package.json"), "utf8")
+    .catch(() => null);
+  if (manifest === null) return null;
+  try {
+    const version = JSON.parse(manifest).version;
+    return typeof version === "string" ? version : null;
+  } catch {
+    return null;
+  }
+}
+
 export function staleInstall({ recorded, running }) {
   if (typeof recorded !== "string" || typeof running !== "string") return null;
   return recorded === running ? null : { recorded, running };
+}
+
+/**
+ * The runner version behind whatever ACC wrote for one client.
+ *
+ * Two shapes, because the four clients differ: a config file ACC merged its hook
+ * commands into, and a tree ACC created with a shim inside it. The first
+ * readable answer wins, and every read is best-effort - a doctor that throws on
+ * a missing file diagnoses nothing.
+ */
+async function wiredVersionFor(artifacts) {
+  for (const artifact of artifacts ?? []) {
+    if (artifact.kind === "tree") {
+      for (const shim of await findShims(artifact.path, 4)) {
+        const version = await wiredVersion(shim);
+        if (version !== null) return version;
+      }
+      continue;
+    }
+    const version = await wiredVersion(artifact.path);
+    if (version !== null) return version;
+  }
+  return null;
+}
+
+/** Shim files under a tree ACC created, to a bounded depth. */
+async function findShims(root, depth) {
+  if (depth < 0) return [];
+  const entries = await readdir(root, { withFileTypes: true }).catch(() => []);
+  const found = [];
+  for (const entry of entries) {
+    const target = path.join(root, entry.name);
+    if (entry.isDirectory()) found.push(...await findShims(target, depth - 1));
+    else if (entry.name.endsWith(".sh")) found.push(target);
+  }
+  return found;
 }
 
 async function diagnoseAdapters({ options, runtime }) {
@@ -64,16 +130,24 @@ async function diagnoseAdapters({ options, runtime }) {
     if (owned.missing.length > 0) {
       remediation.push(`acc install --adapter ${entry.adapterId}  # files are missing`);
     }
-    const stale = staleInstall({
-      recorded: record.installs.find(install => install.adapterId === entry.adapterId)
-        ?.accVersion ?? null,
-      running });
+    const installed = record.installs.find(one => one.adapterId === entry.adapterId);
+    const stale = staleInstall({ recorded: installed?.accVersion ?? null, running });
     if (stale !== null) {
       remediation.push(`acc install --adapter ${entry.adapterId}`
         + `  # plugin is ${stale.recorded}, acc is ${stale.running}`);
     }
-    return { ...entry, stale, owned: { modified: owned.modified, missing: owned.missing,
-      intact: owned.intact.length }, remediation };
+    // Read from the wiring rather than from the record. An ACC old enough not to
+    // know the record's version field still rewrites that record - blank - while
+    // pointing every client at itself, so the record goes quiet exactly when it
+    // matters. The shim names the runner the client will execute.
+    const wired = await wiredVersionFor(installed?.artifacts);
+    if (stale === null && typeof wired === "string" && typeof running === "string"
+      && wired !== running) {
+      remediation.push(`acc install --adapter ${entry.adapterId}`
+        + `  # wired to acc ${wired}, this is ${running}`);
+    }
+    return { ...entry, stale, wired, owned: { modified: owned.modified,
+      missing: owned.missing, intact: owned.intact.length }, remediation };
   }));
 }
 
