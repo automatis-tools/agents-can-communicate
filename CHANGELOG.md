@@ -1,5 +1,37 @@
 # Changelog
 
+## Unreleased
+
+| | |
+|---|---|
+| Built from | `3ace271` |
+| Tarball | `agents-can-communicate-0.1.9.tgz`, 146 KB, 111 entries |
+| sha256 | `49a0400e6c2db38b3e56ee6258f58a8b4dc9931be813bdb752e9e7b84d1aac57` |
+| Tests | 939 passing, 0 failing |
+
+Not published. A published record says what the registry serves and is not
+rewritten, so shipped code that changes after a release is measured here instead.
+
+The version a client caches ACC's plugin under is the version of the ACC that
+installed it. It was a literal in each plugin manifest, updated by hand and by
+nobody. Three releases after 0.1.6 the package was 0.1.9 while every client had
+cached, listed and reported `0.1.6` - including `installed_plugins.json`, which
+is where a person looks to answer "which ACC am I running".
+
+Worse than cosmetic: the version string is how a client decides whether its
+cached copy is still current. A bundle whose version never changes is a bundle a
+client has no reason to replace, so an upgrade could leave the old plugin body in
+place while the CLI moved on.
+
+The fix is not "remember to bump three more files". The shipped manifests now
+carry no version at all, and the install stamps the running one into the copy the
+client reads. There is one version on the machine and nothing in the repository
+that can fall out of step with it.
+
+The tests that touched this were reading the version out of the same manifest, so
+they followed the literal wherever it went and could never see it drift. They
+read the package now.
+
 ## 0.1.9
 
 Three fixes to installation, all found by breaking a real machine rather than by
