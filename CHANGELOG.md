@@ -4,9 +4,9 @@
 
 | | |
 |---|---|
-| Built from | `PENDING` |
-| Tarball | `PENDING` |
-| sha256 | `PENDING` |
+| Built from | `491b41b` |
+| Tarball | `agents-can-communicate-0.1.11.tgz`, 148 KB, 111 entries |
+| sha256 | `178782d6553b7bb40d931a394c31f71581142ff7f443d1b19f1666c75a2d0cc6` |
 | Tests | 953 passing, 0 failing |
 
 Not published. A published record says what the registry serves and is not
