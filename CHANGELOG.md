@@ -8,9 +8,9 @@ session rather than by its author.
 
 | | |
 |---|---|
-| Built from | `PENDING` |
-| Tarball | `PENDING` |
-| sha256 | `PENDING` |
+| Built from | `9364e42` |
+| Tarball | `agents-can-communicate-0.1.8.tgz`, 142 KB, 110 entries |
+| sha256 | `13da399ce7d27dd650831458c708bee1e68dbaffba7294449cc92906f7617d1d` |
 | Tests | 914 passing, 0 failing |
 | Node | 24 (current production LTS) |
 | Verified on | macOS 15 (darwin 25.5.0, arm64) and Linux in CI |
