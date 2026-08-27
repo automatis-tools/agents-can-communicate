@@ -238,33 +238,6 @@ async function removeEmptyDirs(directories) {
   }
 }
 
-/**
- * Drop the client's trust record for hooks that are about to stop existing.
- *
- * Scoped to tables whose key begins with ACC's own `plugin@marketplace:` - a
- * table belonging to any other plugin is the client's business and stays. The
- * file is rewritten only when something was found, so an install that never ran
- * here leaves the config byte for byte as it was.
- */
-export async function removeHookTrust(file, prefix) {
-  const before = await readFile(file, "utf8").catch(() => null);
-  if (before === null || !before.includes(`hooks.state."${prefix}`)) return false;
-
-  const lines = before.split("\n");
-  const kept = [];
-  let dropping = false;
-  for (const line of lines) {
-    const header = /^\s*\[([^\]]*)\]\s*$/.exec(line);
-    if (header !== null) dropping = header[1].startsWith(`hooks.state."${prefix}`);
-    if (dropping) continue;
-    kept.push(line);
-  }
-  // A table's trailing blank line goes with it rather than piling up.
-  const text = kept.join("\n").replace(/\n{3,}/g, "\n\n");
-  if (text === before) return false;
-  await writeFile(file, text, "utf8");
-  return true;
-}
 
 export async function uninstallCodexPlugin({ home, agentsHome = home,
   codexHome = path.join(home, ".codex"), keep = [] }) {
@@ -277,15 +250,18 @@ export async function uninstallCodexPlugin({ home, agentsHome = home,
     await writeMarketplace(file, { ...existing, plugins: kept });
   }
   if (await removeTomlBlock(configPath(codexHome))) changes.push(configPath(codexHome));
-  // This client keeps its own record of which hook files it has trusted, one
-  // table per hook, keyed by the plugin that declared them. ACC never writes
-  // those - they are the client's bookkeeping about ACC - but once the plugin is
-  // gone they name a thing that does not exist, five of them per install, and
-  // nothing else will ever clear them. Verified inert first: a hook whose hash
-  // no longer matches still runs, so this is tidiness rather than repair.
-  if (await removeHookTrust(configPath(codexHome), `${PLUGIN_NAME}@${MARKETPLACE}:`)) {
-    if (!changes.includes(configPath(codexHome))) changes.push(configPath(codexHome));
-  }
+  // The client's `[hooks.state."<plugin>:…"]` tables stay. 0.1.9 removed them as
+  // litter naming a plugin that was gone; that was wrong, and wrong in a way
+  // worth writing down. The check behind it perturbed the record - a hook whose
+  // recorded hash no longer *matched* was seen still running - and concluded the
+  // record was inert. Absence was never tested, and absence is what matters:
+  // with the tables gone this client runs no hook at all, prints
+  // `hook: SessionStart Completed` while executing nothing, and ACC's write
+  // guard is silently off while `acc doctor` reports the adapter installed.
+  //
+  // The record is granted once, by a person, and survives ACC upgrades - hashes
+  // captured under 0.1.6 still admitted 0.1.10's hooks. Nothing ACC writes can
+  // put it back. So it is not ACC's to remove.
   // The marketplace directory is ACC's too, so it goes rather than being left
   // behind empty.
   // A blank TOML config and an absent one are the same to this client, and a
@@ -328,6 +304,13 @@ export async function detectCodex({ home, agentsHome = home,
   const enabled = config.includes(`[plugins."${QUALIFIED}"]`);
   const cached = await stat(cachePath(codexHome))
     .then(() => true).catch(() => false);
+  // The condition that decides whether ACC runs here at all, and the only one
+  // this client will not tell you about: with no trust record it runs no hook,
+  // prints `hook: SessionStart Completed`, and executes nothing. Everything else
+  // - published, registered, enabled, cached - can be true while the write guard
+  // is off. Only asked when something is wired: a warning about hooks that do
+  // not exist is how a real one gets ignored.
+  const untrusted = cached && !config.includes(`hooks.state."${QUALIFIED}:`);
   return { ok: true, changes: [], diagnostics: [
     published ? "acc plugin published in the marketplace" : "acc plugin not registered",
     registered && enabled
@@ -339,7 +322,25 @@ export async function detectCodex({ home, agentsHome = home,
     cached
       ? "plugin installed in the client's cache"
       : `plugin not installed yet; run: codex plugin add ${QUALIFIED}`,
-  ] };
+    // The condition that decides whether ACC runs here at all, and the only one
+    // this client will not tell you about: with no trust record it runs no hook,
+    // prints `hook: SessionStart Completed`, and executes nothing. Everything
+    // else - published, registered, enabled, cached - can be true while the
+    // write guard is off. Said only when there is something to trust, because a
+    // warning on a machine with nothing wired is how a real one gets ignored.
+    ...(untrusted
+      ? ["hooks are not trusted, so this client reports them completed and runs "
+        + "nothing"]
+      : []),
+  ],
+  // Said as an action rather than an observation, because a person has to do it
+  // and no acc command can: the client grants this once, from its own prompt.
+  // A diagnostic alone would have stayed in `--json`, which is where the first
+  // version of this fix put it and where nobody would have read it.
+  needsAction: untrusted
+    ? ["start codex once and accept the hook trust prompt  "
+      + "# its hooks run nothing until then"]
+    : [] };
 }
 
 /**

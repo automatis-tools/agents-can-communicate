@@ -4,94 +4,98 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
 
-import { removeHookTrust } from "../src/install.mjs";
+import { createCodexAdapter } from "../src/adapter.mjs";
 
 /**
- * The record this client keeps about ACC's hooks.
+ * The trust record this client keeps about ACC's hooks.
  *
  * Codex stores one `[hooks.state."plugin@marketplace:file:event:i:j"]` table per
- * hook, holding the hash it trusted. ACC writes none of them - a search of the
- * shipped package finds no occurrence of `hooks.state` - so after `acc
- * uninstall` five tables were left naming a plugin that no longer exists, and
- * five more arrived on the next install.
+ * hook, holding a hash it has trusted. It will not run a hook it has no record
+ * for - and it says nothing about that. It prints `hook: SessionStart Completed`
+ * and executes nothing.
  *
- * Checked before writing this: a hook whose recorded hash no longer matches
- * still runs. Both a control run and a run against a modified file returned
- * normally. So this is tidiness, and it must not reach past ACC's own keys.
+ * 0.1.9 removed these tables on uninstall, calling them litter that named a
+ * plugin no longer there. The reasoning was checked the wrong way: a hook whose
+ * recorded hash no longer *matched* was observed still running, and that was
+ * taken to mean the record was inert. Absence was never tested. Absence is what
+ * matters.
+ *
+ * Measured afterwards, on a real machine: with the tables gone, ACC's write
+ * guard was silently off in Codex while `acc doctor` reported `4 of 4
+ * adapter(s) installed` and `codex plugin list` reported the plugin enabled. A
+ * shell write walked through a guarded claim. Writing the exact same hashes back
+ * - captured before the deletion, from an ACC three versions older - revived the
+ * guard immediately, which is also how we know the record survives ACC upgrades
+ * and is granted once, interactively, for good.
+ *
+ * So it is never ACC's to delete: it is the client's permission for ACC to run
+ * at all, and nothing ACC can write puts it back.
  */
-const PREFIX = "agents-can-communicate@acc-local:";
-
-async function config(t, text) {
-  const home = await mkdtemp(path.join(tmpdir(), "acc-hook-trust-"));
-  t.after(() => rm(home, { recursive: true, force: true }));
-  const file = path.join(home, "config.toml");
-  await writeFile(file, text, "utf8");
-  return file;
-}
-
-const ACC_TABLES = `[hooks.state."agents-can-communicate@acc-local:hooks.json:pre_tool_use:0:0"]
-trusted_hash = "sha256:8d4a13"
+const TRUST = `[hooks.state."agents-can-communicate@acc-local:hooks.json:pre_tool_use:0:0"]
+trusted_hash = "sha256:8d4a13568a8748e93b91e512b415eaf97817fbc138997bd91017bec936e6be14"
 
 [hooks.state."agents-can-communicate@acc-local:hooks.json:session_start:0:0"]
-trusted_hash = "sha256:a17bdb"
+trusted_hash = "sha256:a17bdb450ab476b3f0f03fbf8c0f61ec5d2714fe419b12c9599e8a62dc763571"
 `;
 
-test("the trust record for ACC's own hooks is taken back out", async t => {
-  const file = await config(t, ACC_TABLES);
+async function home(t) {
+  const dir = await mkdtemp(path.join(tmpdir(), "acc-hook-trust-"));
+  const state = await mkdtemp(path.join(tmpdir(), "acc-hook-trust-state-"));
+  t.after(() => Promise.all([dir, state]
+    .map(one => rm(one, { recursive: true, force: true }))));
+  return { home: dir, stateRoot: state };
+}
 
-  assert.equal(await removeHookTrust(file, PREFIX), true);
+const config = context => path.join(context.home, ".codex", "config.toml");
 
-  const after = await readFile(file, "utf8");
-  assert.equal(after.includes("agents-can-communicate"), false);
-  assert.equal(after.trim(), "");
+test("uninstall leaves the client's trust in ACC's hooks alone", async t => {
+  const context = await home(t);
+  const adapter = createCodexAdapter();
+  await adapter.install(context);
+
+  // As the client writes it once a person has accepted the hooks.
+  await writeFile(config(context), `${await readFile(config(context), "utf8")}\n${TRUST}`);
+
+  await adapter.uninstall(context);
+
+  const after = await readFile(config(context), "utf8");
+  assert.match(after, /pre_tool_use/,
+    "the guard's trust was removed; nothing ACC can write puts it back");
+  assert.match(after, /session_start/);
+  assert.match(after, /8d4a13568a8748e93b91e512b415eaf97817fbc138997bd91017bec936e6be14/,
+    "the hash was rewritten rather than left as the client wrote it");
 });
 
-test("another plugin's trust record is not ACC's to remove", async t => {
-  const theirs = `[hooks.state."simplify@local-marketplace:hooks.json:stop:0:0"]
-trusted_hash = "sha256:deadbeef"
-`;
-  const file = await config(t, `${ACC_TABLES}\n${theirs}`);
+test("a reinstall over surviving trust is what makes the guard work again", async t => {
+  // The whole point of leaving it: install, uninstall, install again, and the
+  // hooks still run - no interactive step, because the record never left.
+  const context = await home(t);
+  const adapter = createCodexAdapter();
+  await adapter.install(context);
+  await writeFile(config(context), `${await readFile(config(context), "utf8")}\n${TRUST}`);
 
-  assert.equal(await removeHookTrust(file, PREFIX), true);
+  await adapter.uninstall(context);
+  await adapter.install(context);
 
-  const after = await readFile(file, "utf8");
-  assert.equal(after.includes("agents-can-communicate"), false);
-  assert.match(after, /simplify@local-marketplace/);
-  assert.match(after, /sha256:deadbeef/);
+  const after = await readFile(config(context), "utf8");
+  assert.match(after, /hooks\.state\."agents-can-communicate@acc-local:/);
+  assert.match(after, /\[plugins\."agents-can-communicate@acc-local"\]/,
+    "the plugin registration did not come back");
 });
 
-test("the user's own configuration around it is untouched", async t => {
-  const mine = `model = "gpt-5"
+test("uninstall still removes everything that is ACC's own", async t => {
+  // Leaving the trust record must not turn into leaving the wiring: what ACC
+  // wrote still goes.
+  const context = await home(t);
+  const adapter = createCodexAdapter();
+  await adapter.install(context);
+  await writeFile(config(context), `${await readFile(config(context), "utf8")}\n${TRUST}`);
 
-[sandbox_workspace_write]
-writable_roots = ["/tmp"]
+  await adapter.uninstall(context);
 
-`;
-  const file = await config(t, `${mine}${ACC_TABLES}`);
-
-  await removeHookTrust(file, PREFIX);
-
-  const after = await readFile(file, "utf8");
-  assert.match(after, /model = "gpt-5"/);
-  assert.match(after, /\[sandbox_workspace_write\]/);
-  assert.match(after, /writable_roots = \["\/tmp"\]/);
-});
-
-test("a config with nothing of ACC's in it is not rewritten at all", async t => {
-  const theirs = `model = "gpt-5"
-
-[hooks.state."simplify@local-marketplace:hooks.json:stop:0:0"]
-trusted_hash = "sha256:deadbeef"
-`;
-  const file = await config(t, theirs);
-
-  assert.equal(await removeHookTrust(file, PREFIX), false);
-  assert.equal(await readFile(file, "utf8"), theirs);
-});
-
-test("a config that is not there is not an error", async t => {
-  const file = await config(t, "");
-  await rm(file);
-
-  assert.equal(await removeHookTrust(file, PREFIX), false);
+  const after = await readFile(config(context), "utf8");
+  assert.equal(after.includes('[plugins."agents-can-communicate@acc-local"]'), false,
+    "ACC's own plugin registration survived the uninstall");
+  assert.equal(after.includes("sandbox_workspace_write"), false,
+    "ACC's own sandbox table survived the uninstall");
 });
