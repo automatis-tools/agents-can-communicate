@@ -9,9 +9,9 @@ health. Anyone who ran that pair is unprotected there until they upgrade.
 
 | | |
 |---|---|
-| Built from | `PENDING` |
-| Tarball | `PENDING` |
-| sha256 | `PENDING` |
+| Built from | `bdd78a2` |
+| Tarball | `agents-can-communicate-0.1.11.tgz`, 147 KB, 111 entries |
+| sha256 | `0eec8874230233671aad83313b5f4030bc67a6b915ea0140d1e912ef4ac7d0ac` |
 | Tests | 945 passing, 0 failing |
 | Node | 24 (current production LTS) |
 | Verified on | macOS 15 (darwin 25.5.0, arm64) and Linux in CI |
