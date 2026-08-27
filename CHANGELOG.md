@@ -1,16 +1,21 @@
 # Changelog
 
-## Unreleased
+## 0.1.9
+
+Three fixes to installation, all found by breaking a real machine rather than by
+reading the code. The one that matters: when a second ACC on the machine took
+over every client's wiring, nothing said so - and the check built for exactly
+that case had been disarmed by the same event.
 
 | | |
 |---|---|
-| Built from | `39f9862` |
-| Tarball | `agents-can-communicate-0.1.8.tgz`, 145 KB, 110 entries |
-| sha256 | `cd2ef8723516f5c8473506705e178d1e931e47132ad292b316235e930b227d54` |
+| Built from | `4697a72` |
+| Tarball | `agents-can-communicate-0.1.9.tgz`, 145 KB, 110 entries |
+| sha256 | `f83415d679f300ac0d58c92b53a18a4739133c45846f0c386d7607f59fed40fc` |
 | Tests | 935 passing, 0 failing |
-
-Not published. A published record says what the registry serves and is not
-rewritten, so shipped code that changes after a release is measured here instead.
+| Node | 24 (current production LTS) |
+| Verified on | macOS 15 (darwin 25.5.0, arm64) and Linux in CI |
+| Not supported | Windows — untested rather than known-broken |
 
 `acc doctor` names the ACC each client will actually run. Found by breaking a
 machine: extending PATH to expose one client resolved `acc` to an 0.1.1 sitting
