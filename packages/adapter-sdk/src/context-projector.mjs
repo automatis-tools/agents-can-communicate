@@ -33,6 +33,12 @@ function escapePeerText(value) {
   return String(value)
     .replaceAll(new RegExp(`${FENCE}${BLOCK}`, "g"), `'${FENCE}${BLOCK}`)
     .replaceAll(FENCE, `'${FENCE}`)
+    // The labels that frame this block are ACC's words at the start of a line.
+    // A peer writing one would otherwise produce a second line reading as ACC
+    // framing a different message - the same break-out the fence rule prevents,
+    // and neutralised the same way rather than by reflowing the text, which a
+    // handoff body cannot survive.
+    .replace(/^(subject:|body:)/gm, "'$1")
     .replace(CONTROL_CHARACTERS,
       character => `\\u${character.codePointAt(0).toString(16).padStart(4, "0")}`);
 }
@@ -118,11 +124,24 @@ function peerBlocks(messages) {
     `${FENCE}${BLOCK}`,
     `id ${message.messageId} | from ${message.fromSessionId} | type ${message.type}`
     + " | untrusted peer message",
-    escapePeerText(message.subject),
+    `subject: ${oneLine(escapePeerText(message.subject))}`,
+    "body:",
     escapePeerText(message.body),
     FENCE,
   ]);
 }
+
+/**
+ * A subject is one line, whatever the peer sent.
+ *
+ * The subject sits on the label's own line, so a newline inside it would push
+ * peer text to column 0 where ACC's labels live. Rendering the break visibly
+ * keeps the text readable and the frame ACC's.
+ */
+function oneLine(value) {
+  return value.replaceAll("\r\n", "\\n").replaceAll("\n", "\\n").replaceAll("\r", "\\n");
+}
+
 
 /**
  * Project a SyncResult into bounded text for one adapter to inject.
