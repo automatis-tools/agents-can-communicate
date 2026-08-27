@@ -1,16 +1,25 @@
 # Changelog
 
-## Unreleased
+## 0.1.10
+
+Two fixes about the same thing seen twice: the version a client caches ACC's
+plugin under. It had been frozen at `0.1.6` for three releases, and unfreezing it
+turned out to leave a copy behind on every upgrade. The second fix was found by
+the first one's acceptance run.
+
+This is also the first two-digit patch, which is the comparison the version guard
+added in 0.1.9 was written for - `0.1.10` sorts before `0.1.9` as a string, and
+did not here.
 
 | | |
 |---|---|
-| Built from | `4cd8921` |
-| Tarball | `agents-can-communicate-0.1.9.tgz`, 146 KB, 111 entries |
-| sha256 | `e536270e4150a6a7cdb312c9ecc3cbcd019a206ed9b60c254e085c764cd20b82` |
+| Built from | `1c994f7` |
+| Tarball | `agents-can-communicate-0.1.10.tgz`, 146 KB, 111 entries |
+| sha256 | `cbf695c209f9eaa109a1254e09d0095c41a7c51641be2f2fc3dbf6fe94c96b89` |
 | Tests | 943 passing, 0 failing |
-
-Not published. A published record says what the registry serves and is not
-rewritten, so shipped code that changes after a release is measured here instead.
+| Node | 24 (current production LTS) |
+| Verified on | macOS 15 (darwin 25.5.0, arm64) and Linux in CI |
+| Not supported | Windows — untested rather than known-broken |
 
 An upgrade leaves one copy of the plugin, not one per release. These clients
 cache a plugin under its version, and until the previous release that version
