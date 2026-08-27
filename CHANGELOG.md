@@ -1,5 +1,53 @@
 # Changelog
 
+## Unreleased
+
+| | |
+|---|---|
+| Built from | `d3b4cfe` |
+| Tarball | `agents-can-communicate-0.1.7.tgz`, 142 KB, 110 entries |
+| sha256 | `61b3fbfe2f294d181c7f5f8b620d52b027c03e6407eb2ef7976bca8bb08ecf7d` |
+| Tests | 914 passing, 0 failing |
+
+Not published. A published record says what the registry serves and is not
+rewritten, so shipped code that changes after a release is measured here instead.
+
+A peer message says which part is which. The block carried the subject and the
+body as two bare adjacent lines under a header that labels `id`, `from` and
+`type` and nothing else:
+
+```acc-peer-message
+id message_… | from session_… | type note | untrusted peer message
+SUBJECT-MARKER
+BODY-MARKER: this is the body, not the subject
+```
+
+A reader could not tell them apart, and a two-line body made its first line read
+as the subject. Found by a live session during an end-to-end run of 0.1.7: it
+compared the injected text against `acc sync --json` and reported that reading
+the injection alone would have made it repeat the subject as the body.
+
+Both are labelled now. The subject is folded onto its label's line, because a
+newline inside it would otherwise land peer text at column 0 - the one place a
+reader takes as ACC's own words. A peer writing `subject:` or `body:` at the
+start of a line gets the same treatment a forged fence already got: a `'` in
+front of it, so it cannot produce a second line that reads as ACC framing a
+different message.
+
+The body is not reflowed. Indenting it was tried first and broke the rendering
+of handoffs, whose bodies are structured text - which is the argument against
+touching peer content at all when neutralising a marker will do.
+
+A claim names its owner as a participant, not only as a session. `acc status
+--json` gave `ownerSessionId`, and every command that reaches a peer - `acc
+message --to`, `acc request --to` - takes a participant id, so "who holds this
+file and how do I ask them for it" needed a join through the roster that every
+caller wrote for itself. Observed costing a live agent that step. `ownerSessionId`
+stays: it is what `acc release --authority` acts on, and two sessions of one
+participant are still two holders. The lookup reads every session on record
+rather than only the live ones, because a claim outliving its session is exactly
+when the question gets asked.
+
 ## 0.1.7
 
 One fix that matters and two that tidy after it. The one that matters: until

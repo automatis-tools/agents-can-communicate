@@ -108,12 +108,22 @@ export function createStatusService(ports, sessions) {
         state: workstream.state,
         coordinatorSessionId: workstream.coordinatorSessionId,
       })),
+      // The owner is named twice on purpose. Every command that reaches a peer
+      // takes a participant id, so a claim that gave only a session id sent the
+      // reader back through the roster to answer "who is holding this, and how
+      // do I ask them for it". The session id stays because it is what
+      // `acc release --authority` acts on, and because two sessions of one
+      // participant are still two holders.
       claims: claims.map(claim => ({
         claimId: claim.claimId,
         resource: claim.resource,
         mode: claim.mode,
         enforcement: claim.enforcement,
         ownerSessionId: claim.ownerSessionId,
+        // Read from every session on record, not only the live ones: a claim
+        // outliving its session is exactly when this question gets asked.
+        ownerParticipantId: sessionRecords
+          .find(session => session.sessionId === claim.ownerSessionId)?.participantId ?? null,
         expiresAt: claim.expiresAt,
       })),
       attention: computeAttention(snapshot, { session: null,
