@@ -9,9 +9,9 @@ territory nobody had walked.
 
 | | |
 |---|---|
-| Built from | `PENDING` |
-| Tarball | `PENDING` |
-| sha256 | `PENDING` |
+| Built from | `93ea98b` |
+| Tarball | `agents-can-communicate-0.1.12.tgz`, 148 KB, 111 entries |
+| sha256 | `df1d0f07619eecffb17f7616a3713037a155778714d650ec411c84441079b947` |
 | Tests | 953 passing, 0 failing |
 | Node | 24 (current production LTS) |
 | Verified on | macOS 15 (darwin 25.5.0, arm64) and Linux in CI |
