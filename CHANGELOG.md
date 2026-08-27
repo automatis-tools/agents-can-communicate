@@ -4,6 +4,54 @@
 
 | | |
 |---|---|
+| Built from | `PENDING` |
+| Tarball | `PENDING` |
+| sha256 | `PENDING` |
+| Tests | 953 passing, 0 failing |
+
+Not published. A published record says what the registry serves and is not
+rewritten, so shipped code that changes after a release is measured here instead.
+
+`acc doctor` runs on the store it exists to diagnose. This was fixed once
+already, and the throw moved rather than went away. The first time, `collectStatus`
+read every record before the diagnosis and died on a truncated file, so the
+command answered `invalid JSON record` while the inspection had already found the
+file and put it in a list nobody saw. `runDoctor` was taught to check the report
+first.
+
+But every command outside a short list opens the store before its handler is
+called, and `doctor` was not on that list. So the diagnosis still died - one
+frame earlier, in the setup, before any of the code written to report it ran:
+
+```
+$ acc doctor --cwd <project>
+invalid JSON record: …/workspaces/workspace_662a…/protocol.json
+```
+
+One line, no framing, no list, no remedy. `--repair` did the same, instead of
+saying that repair is blocked - which is exactly what it is designed to say, and
+for a good reason it already carries: *completing a journal on top of state we
+cannot even read would turn an ambiguous store into a confidently wrong one.*
+
+Locating a workspace and opening it are separate now. `doctor` gets a context
+that knows where the store is and opens it on request, after the report has said
+that reading is safe:
+
+```
+store state is ambiguous; repair is blocked. 1 unreadable:
+  …/workspaces/workspace_02407733…/protocol.json
+```
+
+Splitting them exposed a case the old order had been hiding: opening the store
+created it, so the inspection never met a store that does not exist yet. Reading
+the report first, "no protocol.json" looked exactly like "unreadable
+protocol.json", and a person's first `acc doctor` in a new project would have
+been told their store was broken. Absent and unreadable are now different things.
+
+## Unreleased
+
+| | |
+|---|---|
 | Built from | `5b2e66f` |
 | Tarball | `agents-can-communicate-0.1.11.tgz`, 147 KB, 111 entries |
 | sha256 | `b3b35a86bfc62a48ba054b0fff780299454a94ff7d5a31ed8824630817c6b2e7` |
