@@ -1,4 +1,4 @@
-import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, stat, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import path from "node:path";
 
@@ -156,9 +156,21 @@ async function diagnoseAdapters({ options, runtime }) {
 
 export async function runDoctor({ options, context, runtime }) {
   const root = context.paths.root;
-  const report = options.repair === true
-    ? await repairFilesystemStore({ root, clock: context.service.clock })
-    : await diagnoseFilesystemStore({ root });
+  // The clock comes from the context rather than through the service, because
+  // the service is what may not open: this command runs before anything reads a
+  // record, which is the whole point of it.
+  const clock = context.clock ?? context.service?.clock;
+  // A store that is not there yet is not an ambiguous one. Opening the workspace
+  // used to happen first and created it, so the inspection never saw this case;
+  // now that the diagnosis runs first, "no protocol.json" would read as
+  // "unreadable protocol.json" and a person's first `acc doctor` in a new
+  // project would answer that their store is broken.
+  const started = await stat(path.join(root, "protocol.json")).then(() => true, () => false);
+  const report = !started
+    ? { healthy: true, blocked: [], corrupt: [], repaired: [] }
+    : options.repair === true
+      ? await repairFilesystemStore({ root, clock })
+      : await diagnoseFilesystemStore({ root });
   const adapters = await diagnoseAdapters({ options, runtime });
   const { data: dataHome } = platformPaths({ platform: runtime?.platform,
     env: runtime?.env ?? {} });
@@ -166,7 +178,7 @@ export async function runDoctor({ options, context, runtime }) {
     ? await runtime.version().catch(() => null)
     : null;
   const update = await noticeUpdate({ dataHome, running, env: runtime?.env ?? {},
-    now: Date.parse(context.service.clock.now()), get: runtime?.fetch,
+    now: Date.parse(clock.now()), get: runtime?.fetch,
     io: { readFile, writeFile, mkdir } });
 
   // Before the store is read for anything else. `collectStatus` reads every
@@ -185,7 +197,11 @@ export async function runDoctor({ options, context, runtime }) {
         remediation: ["inspect blocked and corrupt paths before repairing"] });
   }
 
-  const status = await context.service.collectStatus({});
+  // Only now, and only because the report said the records can be read. A
+  // context built for this command opens the store on request rather than up
+  // front.
+  const service = context.service ?? await context.openService();
+  const status = await service.collectStatus({});
 
   const data = {
     workspaceId: context.descriptor.id,

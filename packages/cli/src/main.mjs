@@ -54,7 +54,14 @@ async function claimOn(options, context) {
   return mine[0].claimId;
 }
 
-async function openContext(options, runtime) {
+/**
+ * Where this workspace's state lives, without reading a byte of it.
+ *
+ * Split out because `doctor` is the command a person runs when the store cannot
+ * be read, and it has to know which store to look at before deciding whether
+ * looking is safe.
+ */
+async function locateContext(options, runtime) {
   const descriptor = await discoverWorkspace({
     cwd: options.cwd ?? runtime.cwd,
     env: runtime.env,
@@ -67,10 +74,35 @@ async function openContext(options, runtime) {
     workspaceId: descriptor.id,
     workspaceRoots: descriptor.roots,
   });
+  return { descriptor, paths };
+}
+
+async function withService({ descriptor, paths }, runtime) {
   const store = await openFilesystemStore({ root: paths.root, clock: runtime.clock,
     ids: runtime.ids, workspaceId: descriptor.id });
   return { descriptor, paths,
     service: createCoordinationService({ store, clock: runtime.clock, ids: runtime.ids }) };
+}
+
+async function openContext(options, runtime) {
+  return withService(await locateContext(options, runtime), runtime);
+}
+
+/**
+ * A context for the one command that has to survive an unopenable store.
+ *
+ * `runDoctor` already refused to read records before diagnosing them - fixed
+ * after a truncated file made it answer "invalid JSON record" while the
+ * inspection had already found the file and put it in a list nobody saw. The
+ * throw then moved earlier: opening the store happens before any handler runs,
+ * so one unreadable `protocol.json` killed the diagnosis a frame before the code
+ * written to report it. Here the store is opened on request, after the report
+ * has said that reading is safe.
+ */
+async function openDiagnosticContext(options, runtime) {
+  const located = await locateContext(options, runtime);
+  return { ...located, clock: runtime.clock,
+    openService: async () => (await withService(located, runtime)).service };
 }
 
 const human = value => (typeof value === "string" ? value : JSON.stringify(value, null, 2));
@@ -368,7 +400,9 @@ export async function main(argv, runtime) {
     // and `help` has to answer in a directory that is no workspace at all.
     const context = NO_WORKSPACE.includes(parsed.command)
       ? null
-      : await openContext(parsed.options, runtime);
+      : parsed.command === "doctor"
+        ? await openDiagnosticContext(parsed.options, runtime)
+        : await openContext(parsed.options, runtime);
     // Which session is calling is answered once, here, rather than by each
     // handler: every one of them needs the same pair, and a handler that forgot
     // to ask would be an operation an agent cannot reach.
