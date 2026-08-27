@@ -168,10 +168,11 @@ export async function runInstallCommand({ options, runtime, action = "install" }
   // An uninstall is planned from what ACC recorded writing, not only from what
   // is on the machine now. A client can be removed after ACC installed into it,
   // and its configuration directory - with ACC's files in it - stays behind.
-  const recorded = action === "uninstall"
-    ? (await loadOwnership({ dataHome })).installs
-    : [];
-  const plan = planInstallation({ adapters, detected, context, action, recorded });
+  // Read on both actions now. An uninstall plans from it because a client can
+  // leave the machine after ACC wrote to it; an install reads it to see which
+  // ACC is already wired, so an older copy cannot replace a newer one in
+  // silence.
+  const recorded = (await loadOwnership({ dataHome })).installs;
 
   const dryRun = options.dryRun === true;
   // Recorded with the install, so a later run can tell that the bundle sitting
@@ -180,6 +181,14 @@ export async function runInstallCommand({ options, runtime, action = "install" }
   const accVersion = typeof runtime.version === "function"
     ? await runtime.version().catch(() => null)
     : null;
+  // Naming a client is an answer to the question the version probe was guessing
+  // at. `acc install --adapter gemini_cli` says the client is here, whatever
+  // PATH this process happens to carry.
+  const requested = options.adapter === undefined
+    ? []
+    : (Array.isArray(options.adapter) ? options.adapter : [options.adapter]);
+  const plan = planInstallation({ adapters, detected, context, action, recorded,
+    accVersion, allowDowngrade: options.downgrade === true, requested });
   const result = await applyPlan({ plan, adapters, context, dataHome, dryRun, accVersion });
 
   const acted = actedOn(result);
