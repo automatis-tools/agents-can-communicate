@@ -1,11 +1,11 @@
-import { cp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { cp, mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 import { AccError, EXIT } from "@agents-can-communicate/protocol";
 import { fileURLToPath } from "node:url";
 
 import { acccreatedFile, bakeSkillCommand, blankJson, mergeOwnedEntries, ownedEntries,
-  ownVersion, stampPluginVersion,
+  keepOnlyVersion, ownVersion, stampPluginVersion,
   removeIfEmpty,
   removeInstalledTree,
   removeOwnedEntries, writeForeignJson, writeHookShim }
@@ -180,6 +180,11 @@ export async function installClaudePlugin({ configDir, runner, node, now = new D
   // run `claude plugin install`, exactly as the Codex adapter does, because the
   // command's only effect is this copy plus the two registry entries below.
   await layOutPlugin(cached, { runner, node });
+  // One copy, the one just written. A client caches a plugin under its version,
+  // so every upgrade would otherwise leave the previous release's tree beside
+  // this one - invisible while the version never moved, three deep once it did.
+  await keepOnlyVersion({ root: path.dirname(cached), version,
+    io: { readdir, rm } });
 
   await writeClientJson(knownMarketplacesPath(configDir), {
     ...known,

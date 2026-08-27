@@ -55,3 +55,27 @@ export async function stampPluginVersion({ file, version, io }) {
   await io.writeFile(file, `${JSON.stringify({ ...manifest, version }, null, 2)}\n`);
   return true;
 }
+
+/**
+ * Leave one copy of a versioned plugin, the one just written.
+ *
+ * These clients cache a plugin under its version. Until the version tracked the
+ * package it never changed, every install landed in the same directory and
+ * overwrote itself, and nothing accumulated. Once it started moving, the first
+ * upgrade left three copies of ACC in a home that should hold one.
+ *
+ * Scoped to the plugin's own directory. The marketplace cache root above it
+ * holds every plugin installed from that marketplace, and removing that root
+ * once took a plugin the user had installed themselves - so a sibling here is
+ * an older ACC, and a sibling one level up is somebody else's.
+ */
+export async function keepOnlyVersion({ root, version, io }) {
+  const entries = await io.readdir(root, { withFileTypes: true }).catch(() => []);
+  const removed = [];
+  for (const entry of entries) {
+    if (!entry.isDirectory() || entry.name === version) continue;
+    await io.rm(path.join(root, entry.name), { recursive: true, force: true });
+    removed.push(entry.name);
+  }
+  return removed;
+}
