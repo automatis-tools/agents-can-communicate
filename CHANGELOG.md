@@ -1,5 +1,65 @@
 # Changelog
 
+## Unreleased
+
+| | |
+|---|---|
+| Built from | `PENDING` |
+| Tarball | `PENDING` |
+| sha256 | `PENDING` |
+| Tests | 945 passing, 0 failing |
+
+Not published. A published record says what the registry serves and is not
+rewritten, so shipped code that changes after a release is measured here instead.
+
+**0.1.9 silently switched off the write guard in Codex, and 0.1.9's own release
+notes state the opposite.** They say: *"Checked before touching them: a hook
+whose recorded hash no longer matches still runs, so this is tidiness rather than
+repair."* The check was real and the conclusion was wrong, because it perturbed
+the record instead of removing it. Absence was never tested, and absence is the
+whole mechanism.
+
+Codex keeps one `[hooks.state."<plugin>:…"]` table per hook, holding a hash it
+has trusted. With no table it runs no hook at all - and says nothing about it. It
+prints `hook: SessionStart Completed` and executes nothing. Proven by replacing
+ACC's hook with a two-line script that only appends its stdin to a file: an empty
+file, beside a `Completed` line.
+
+So after any `acc uninstall` followed by `acc install`, this was the state:
+
+```
+acc doctor         → 4 of 4 adapter(s) installed
+codex plugin list  → installed, enabled, 0.1.10
+the write guard    → off
+```
+
+A shell write walked straight through a `guarded` claim. Silently losing the
+write guard is the worst failure this tool has.
+
+Writing the same hashes back - captured before the deletion, from an ACC three
+releases older - revived the guard immediately. That is also how we know the
+record survives ACC upgrades and is granted once, by a person, for good. Nothing
+ACC writes can put it back, so it is never ACC's to remove. Uninstall leaves it
+alone now.
+
+`acc doctor` says when a client's hooks are not trusted, because every other
+indicator reads healthy while nothing runs:
+
+```
+store healthy; 0 live; protection none; 3 of 4 adapter(s) installed
+  start codex once and accept the hook trust prompt  # its hooks run nothing until then
+```
+
+That line is an *action*, not a diagnostic. The first version of this fix put it
+in `diagnostics`, which `acc doctor` renders only under `--json` - so on the very
+machine it was written for, the text output stayed silent and the guard stayed
+off. Adapters can now name something only a person can do, and it prints where a
+person reads.
+
+The reversal is recorded in [DESIGN_DECISIONS.md](docs/DESIGN_DECISIONS.md) with
+what it cost, along with the generalisation: to learn whether state is
+load-bearing, take it away - changing it tests something else.
+
 ## 0.1.10
 
 Two fixes about the same thing seen twice: the version a client caches ACC's
