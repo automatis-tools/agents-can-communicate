@@ -1,5 +1,50 @@
 # Changelog
 
+## Unreleased
+
+| | |
+|---|---|
+| Built from | `PENDING` |
+| Tarball | `PENDING` |
+| sha256 | `PENDING` |
+| Tests | 956 passing, 0 failing |
+
+Not published. A published record says what the registry serves and is not
+rewritten, so shipped code that changes after a release is measured here instead.
+
+A lock changing hands is not an attack. Reads inside the store are guarded
+against a directory being swapped between the check and the open: stat the
+parent, open with `O_NOFOLLOW`, stat the parent again, refuse if its identity
+changed. That is right for a record - a state file's parent has no business
+being replaced while it is read.
+
+The writer lock is the one directory in the store whose entire life is being
+created and removed. `mkdir` is the atomic primitive that grants it and `rm` is
+how it is released, so its inode changes every time the lock passes from one
+process to the next. The owner file lives inside it and was read through the
+same strict path, so a contended lock produced:
+
+```
+record parent directory changed while opening
+```
+
+and the command failed outright. Two agents attaching to a fresh workspace at
+the same moment - the ordinary way people start work - and one of them simply
+does not join.
+
+Reading the owner now treats that as what it is: the lock moved. Both callers
+already do the right thing with that answer. The acquiring loop waits and looks
+again; the releasing branch declines to remove a directory that is no longer the
+one it created. The guard itself is untouched and still refuses everywhere a
+parent has no business changing, which a test holds in place.
+
+Found by CI on Linux, on the merge commit of 0.1.12 - the same code having
+passed the same job on the pull request minutes earlier. Twelve rounds of six
+concurrent agents on macOS never reproduced it, which is how it reached a
+release. The test that holds it now does not depend on timing at all: it hands
+the lock to another holder in the window between the two checks, through the
+opener seam the other race tests already use.
+
 ## 0.1.12
 
 Two fixes for machines this project had never actually looked at. Every

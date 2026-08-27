@@ -22,9 +22,36 @@ function defaultPidIsAlive(pid) {
   }
 }
 
-async function readOwner(directory, root) {
-  const found = await readJsonIfPresent(path.join(directory, OWNER), root);
-  return found?.value ?? null;
+/**
+ * Who holds the lock, or nothing if it moved while we looked.
+ *
+ * Reads inside the store refuse a parent directory whose identity changed
+ * between the check and the open - the defence against a directory being
+ * swapped under a read. This lock is the one directory whose entire life is
+ * being created and removed: `mkdir` grants it, `rm` releases it, so its inode
+ * changes every time it passes from one process to the next. Reading its owner
+ * through the strict path meant a contended lock raised
+ * "record parent directory changed while opening" and the whole command failed -
+ * seen on Linux CI with four agents attaching to one fresh workspace, the
+ * ordinary way two people start work.
+ *
+ * Here that is not an anomaly, it is the answer: the lock moved. Null says so,
+ * and both callers already do the right thing with it - the acquiring loop waits
+ * and looks again, and the releasing branch declines to remove a directory that
+ * is no longer the one it created. The guard itself is untouched, and still
+ * refuses everywhere a parent has no business changing.
+ */
+async function readOwner(directory, root, openFile) {
+  try {
+    const found = await readJsonIfPresent(path.join(directory, OWNER), root, openFile);
+    return found?.value ?? null;
+  } catch (error) {
+    if (error instanceof AccError && error.code === EXIT.DATA
+      && /parent directory changed/.test(error.message)) {
+      return null;
+    }
+    throw error;
+  }
 }
 
 /**
@@ -58,7 +85,7 @@ async function takeStaleOwnership(directory, root, owner, now, pidIsAlive) {
 
 export async function withWriterMutex(paths, options, operation) {
   const { root, clock, pidIsAlive = defaultPidIsAlive, uuid = randomUUID,
-    attempts = 50, waitMs = 20 } = options;
+    attempts = 50, waitMs = 20, openFile } = options;
   const directory = path.join(paths.locks, "writer.lock");
   await ensureManagedDirectory(root, paths.locks);
   const token = uuid();
@@ -68,7 +95,7 @@ export async function withWriterMutex(paths, options, operation) {
       await mkdir(directory);
     } catch (error) {
       if (error.code !== "EEXIST") throw error;
-      const owner = await readOwner(directory, root);
+      const owner = await readOwner(directory, root, openFile);
       if (!await takeStaleOwnership(directory, root, owner, clock.now(), pidIsAlive)) {
         await new Promise(resolve => { setTimeout(resolve, waitMs); });
       }
@@ -79,7 +106,7 @@ export async function withWriterMutex(paths, options, operation) {
     try {
       return await operation();
     } finally {
-      const current = await readOwner(directory, root);
+      const current = await readOwner(directory, root, openFile);
       if (current?.token === token) await rm(directory, { recursive: true, force: true });
     }
   }
