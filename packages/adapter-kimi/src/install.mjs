@@ -5,6 +5,7 @@ import { AccError, EXIT } from "@agents-can-communicate/protocol";
 import { fileURLToPath } from "node:url";
 
 import { assertRunner, bakeSkillCommand, blankText, defaultRunner, removeIfEmpty,
+  ownVersion, stampPluginVersion,
   removeInstalledTree, runnerExists, writeForeignJson }
   from "@agents-can-communicate/adapter-sdk";
 
@@ -132,6 +133,10 @@ export async function installKimiPlugin({ home, runner = defaultRunner(), node }
   const target = pluginPath(home);
   await rm(target, { recursive: true, force: true });
   await cp(bundle, target, { recursive: true });
+  // The copy this client reads says which ACC wrote it. Nothing here reads it
+  // back, but a manifest that names a version it is not is a lie either way.
+  await stampPluginVersion({ file: path.join(target, ".kimi-plugin", "plugin.json"),
+    version: await ownVersion(import.meta.url), io: { readFile, writeFile } });
   // The skill ships with a placeholder where the command belongs: `acc` is
   // not on PATH everywhere, and an agent that cannot run it improvises.
   await bakeSkillCommand({ root: target, node });

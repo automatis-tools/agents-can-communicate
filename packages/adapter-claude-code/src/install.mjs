@@ -5,6 +5,7 @@ import { AccError, EXIT } from "@agents-can-communicate/protocol";
 import { fileURLToPath } from "node:url";
 
 import { acccreatedFile, bakeSkillCommand, blankJson, mergeOwnedEntries, ownedEntries,
+  ownVersion, stampPluginVersion,
   removeIfEmpty,
   removeInstalledTree,
   removeOwnedEntries, writeForeignJson, writeHookShim }
@@ -122,7 +123,9 @@ const writeRegistry = async (file, value, remaining) => {
   return rm(file, { force: true });
 };
 
-const pluginVersion = async () => (await readJson(manifest, {})).version ?? "0.0.0";
+// One version on this machine: the package's own. The shipped manifest carries
+// none, so there is nothing in the repository to fall out of step.
+const pluginVersion = async () => ownVersion(import.meta.url);
 
 /** The marketplace manifest, in the shape the client's own directory sources use. */
 const marketplaceManifest = () => ({
@@ -147,6 +150,11 @@ async function layOutPlugin(target, { runner, node }) {
   // The bundle's hooks.json names this script, and nothing else writes it.
   await writeHookShim({ dir: path.join(target, "hooks"), adapterId: "claude_code",
     runner, node });
+  // The copy the client reads says which ACC wrote it. The shipped manifest
+  // carries no version, so there is nothing in the repository to fall out of
+  // step - which is how every client came to report 0.1.6 while running 0.1.9.
+  await stampPluginVersion({ file: path.join(target, ".claude-plugin", "plugin.json"),
+    version: await pluginVersion(), io: { readFile, writeFile } });
 }
 
 export async function installClaudePlugin({ configDir, runner, node, now = new Date() }) {
