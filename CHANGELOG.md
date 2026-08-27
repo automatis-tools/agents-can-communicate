@@ -1,16 +1,20 @@
 # Changelog
 
-## Unreleased
+## 0.1.8
+
+Two fixes to what an agent reads and what it can answer with. Both came out of
+a full end-to-end run of the published 0.1.7, and the first was found by a live
+session rather than by its author.
 
 | | |
 |---|---|
-| Built from | `d3b4cfe` |
-| Tarball | `agents-can-communicate-0.1.7.tgz`, 142 KB, 110 entries |
-| sha256 | `61b3fbfe2f294d181c7f5f8b620d52b027c03e6407eb2ef7976bca8bb08ecf7d` |
+| Built from | `PENDING` |
+| Tarball | `PENDING` |
+| sha256 | `PENDING` |
 | Tests | 914 passing, 0 failing |
-
-Not published. A published record says what the registry serves and is not
-rewritten, so shipped code that changes after a release is measured here instead.
+| Node | 24 (current production LTS) |
+| Verified on | macOS 15 (darwin 25.5.0, arm64) and Linux in CI |
+| Not supported | Windows — untested rather than known-broken |
 
 A peer message says which part is which. The block carried the subject and the
 body as two bare adjacent lines under a header that labels `id`, `from` and
