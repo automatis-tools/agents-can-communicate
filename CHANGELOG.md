@@ -1,16 +1,21 @@
 # Changelog
 
-## Unreleased
+## 0.1.11
+
+A repair, and it is worth publishing on its own. Since 0.1.9, any `acc uninstall`
+followed by `acc install` left the write guard switched off in Codex while every
+indicator - `acc doctor`, `codex plugin list`, the client's own output - reported
+health. Anyone who ran that pair is unprotected there until they upgrade.
 
 | | |
 |---|---|
-| Built from | `d462603` |
-| Tarball | `agents-can-communicate-0.1.10.tgz`, 147 KB, 111 entries |
-| sha256 | `968e273d1eb32dcf16014761753d05312273401754e102d99cf8a7ecf67a8417` |
+| Built from | `PENDING` |
+| Tarball | `PENDING` |
+| sha256 | `PENDING` |
 | Tests | 945 passing, 0 failing |
-
-Not published. A published record says what the registry serves and is not
-rewritten, so shipped code that changes after a release is measured here instead.
+| Node | 24 (current production LTS) |
+| Verified on | macOS 15 (darwin 25.5.0, arm64) and Linux in CI |
+| Not supported | Windows — untested rather than known-broken |
 
 **0.1.9 silently switched off the write guard in Codex, and 0.1.9's own release
 notes state the opposite.** They say: *"Checked before touching them: a hook
