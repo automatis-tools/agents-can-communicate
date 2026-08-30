@@ -4,9 +4,9 @@
 
 | | |
 |---|---|
-| Built from | `40e1929` |
-| Tarball | `agents-can-communicate-0.1.13.tgz`, 152 KB, 114 entries |
-| sha256 | `bfd67a70ec885236242fef9f9c2d976990e3a98fd95c30ee1668313a3ad33829` |
+| Built from | `6db5937` |
+| Tarball | `agents-can-communicate-0.1.13.tgz`, 153 KB, 114 entries |
+| sha256 | `7fe1191e0c8d18bc01593ab2b43cac0138db215739d168f5e76569e818b10ee3` |
 | Tests | 979 passing, 0 failing |
 
 Not published. A published record says what the registry serves and is not
