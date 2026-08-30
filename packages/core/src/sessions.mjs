@@ -22,7 +22,16 @@ const ageBand = (session, age) =>
   age <= session.heartbeatCadenceMs * STALE_CADENCE_MULTIPLE ? "online" : "stale";
 
 /**
+ * @param {{ state: string, heartbeatAt: string, heartbeatCadenceMs: number,
+ *   pid?: number | null }} session The record to classify. `pid` absent or
+ *   `null` means nobody knows whether the process is alive - never that it is
+ *   dead - so age alone judges it.
+ * @param {string} now An ISO timestamp, compared against `session.heartbeatAt`.
+ * @param {(pid: number) => boolean} pidIsAlive Required, not defaulted: the one
+ *   thing that lets `offline` be reached before the age floors do. Called only
+ *   when `session.pid` is a real pid, never with `null`.
  * @returns {"online" | "stale" | "offline"}
+ * @throws {AccError} EXIT.USAGE when pidIsAlive is not a function.
  */
 export function classifySessionPresence(session, now, pidIsAlive) {
   // Required rather than defaulted. A probe that defaults to "everyone is
