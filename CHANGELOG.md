@@ -1,5 +1,28 @@
 # Changelog
 
+## Unreleased
+
+| | |
+|---|---|
+| Built from | `07de49e` |
+| Tarball | `agents-can-communicate-0.1.14.tgz`, 154 KB, 114 entries |
+| sha256 | `bf8b6a720d7ecca1630a8c09f220a12b8ee8adf2df178b7ade05378c1b8eb888` |
+| Tests | 980 passing, 0 failing |
+
+Not published. A published record says what the registry serves and is not
+rewritten, so shipped code that changes after a release is measured here instead.
+
+Intent gains a reader that faces the other way. `claim_conflict` has always warned
+the agent declaring intent that its target is already claimed; nothing warned the
+claim holder. A new attention rule, `claim_contended`, closes that: when a peer's
+declared resource hints overlap a claim you hold, you are told - early, because a
+claim is advice, not a lock. Only your own claims, and never your own intent
+against them.
+
+The skill now teaches `--hint`. It taught `--summary` and `--mode` and left out the
+one field a peer's tools act on, so agents filled what a person reads and left empty
+what a tool can match. A summary is not a hint.
+
 ## 0.1.14
 
 Sessions that ended without saying so no longer haunt the roster. A client killed
