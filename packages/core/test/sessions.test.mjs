@@ -114,13 +114,8 @@ test("a stale session cannot be replaced without a liveness probe", async () => 
 });
 
 test("a session whose recorded pid is dead is replaceable with no explicit probe", async () => {
-  const { service, store } = makeService({ pidIsAlive: () => false });
-  const session = await service.openSession(opening());
-  // Task 1 does not let openSession write a pid (Task 2 adds the field to the
-  // schema); patching the ephemeral record directly simulates what a later
-  // task's hook will actually record.
-  const raw = await store.ephemeral.get("session", session.sessionId);
-  await store.ephemeral.put("session", session.sessionId, { ...raw, pid: 42 });
+  const { service } = makeService({ pidIsAlive: () => false });
+  const session = await service.openSession(opening({ pid: 42 }));
 
   const replaced = await service.openSession(opening({ sessionId: session.sessionId }));
   assert.notEqual(replaced.generation, session.generation);
