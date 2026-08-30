@@ -11,7 +11,7 @@ skill teaches the field that feeds it.
 | Built from | `55bcb64` |
 | Tarball | `agents-can-communicate-0.1.15.tgz`, 154 KB, 114 entries |
 | sha256 | `8a7bb11d1e34681aa41613dcfedf5ca5e74850735c011161eda4b659a01bf742` |
-| Tests | 980 passing, 0 failing |
+| Tests | 981 passing, 0 failing |
 | Node | 24 (current production LTS) |
 | Verified on | macOS 26.6.2 (darwin 25.6.0, arm64) and Linux in CI |
 | Not supported | Windows - untested rather than known-broken |
