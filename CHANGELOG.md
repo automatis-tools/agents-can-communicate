@@ -1,16 +1,20 @@
 # Changelog
 
-## Unreleased
+## 0.1.15
+
+Intent finally points at the peer it names. Its one machine-read field now drives a
+rule that faces the claim holder rather than only the agent declaring intent, and the
+skill teaches the field that feeds it.
 
 | | |
 |---|---|
-| Built from | `07de49e` |
-| Tarball | `agents-can-communicate-0.1.14.tgz`, 154 KB, 114 entries |
-| sha256 | `bf8b6a720d7ecca1630a8c09f220a12b8ee8adf2df178b7ade05378c1b8eb888` |
+| Built from | `PENDING` |
+| Tarball | `PENDING` |
+| sha256 | `PENDING` |
 | Tests | 980 passing, 0 failing |
-
-Not published. A published record says what the registry serves and is not
-rewritten, so shipped code that changes after a release is measured here instead.
+| Node | 24 (current production LTS) |
+| Verified on | macOS 26.6.2 (darwin 25.6.0, arm64) and Linux in CI |
+| Not supported | Windows - untested rather than known-broken |
 
 Intent gains a reader that faces the other way. `claim_conflict` has always warned
 the agent declaring intent that its target is already claimed; nothing warned the
