@@ -10,9 +10,9 @@ and ACC now says so plainly instead of failing three different ways.
 
 | | |
 |---|---|
-| Built from | `PENDING` |
-| Tarball | `PENDING` |
-| sha256 | `PENDING` |
+| Built from | `0badbe8` |
+| Tarball | `agents-can-communicate-0.1.14.tgz`, 153 KB, 114 entries |
+| sha256 | `b5ee8e088a2ac6f734706e3da757ef9385cb2dbaee61641bcaa8e924af292e00` |
 | Tests | 979 passing, 0 failing |
 | Node | 24 (current production LTS) |
 | Verified on | macOS 26.6.2 (darwin 25.6.0, arm64) and Linux in CI |
