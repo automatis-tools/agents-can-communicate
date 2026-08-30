@@ -83,8 +83,11 @@ test("doctor says when a client is wired to an older acc than the one running", 
   // hook runtime, and the bundle written into the client stays where it was.
   await place.record4({ adapterId: "claude_code", accVersion: "0.0.9" });
 
+  // Names the skills and manifests, not "the plugin": the runtime the client's
+  // shim points at may already be current (npm replaced it), while the bundle
+  // copied into the client is what stayed behind.
   assert.match(await place.doctor(),
-    /acc install --adapter claude_code {2}# plugin is 0\.0\.9, acc is \d+\.\d+\.\d+/);
+    /acc install --adapter claude_code {2}# skills and manifests here are from 0\.0\.9, acc is \d+\.\d+\.\d+ - reinstall to refresh the bundle/);
 });
 
 test("an install records the acc that made it", async t => {
@@ -106,7 +109,10 @@ test("an install with no recorded acc version is not called stale", async t => {
   // every run is not a diagnosis.
   await place.record4({ adapterId: "claude_code", accVersion: undefined });
 
-  assert.doesNotMatch(await place.doctor(), /plugin is/);
+  // The new staleness phrase, not the old "plugin is", so this still probes
+  // whether the stale-bundle message fired rather than passing because a string
+  // that no longer exists anywhere is absent.
+  assert.doesNotMatch(await place.doctor(), /skills and manifests here are from/);
 });
 
 test("doctor mentions a newer release without asking the registry itself", async t => {

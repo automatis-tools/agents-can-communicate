@@ -22,7 +22,7 @@ const binary = path.join(repoRoot, "bin", "acc.mjs");
  * its `readdir` import: every test passed, and the real `acc doctor` died with
  * `readdir is not defined` on the first machine that had a tree recorded.
  */
-async function machine(t, wiredVersion) {
+async function machine(t, wiredVersion, accVersion = null) {
   const home = await realpath(await mkdtemp(path.join(tmpdir(), "acc-wired-home-")));
   const dataHome = await realpath(await mkdtemp(path.join(tmpdir(), "acc-wired-data-")));
   t.after(() => Promise.all([home, dataHome]
@@ -45,7 +45,7 @@ async function machine(t, wiredVersion) {
     `#!/bin/sh\nexec "/usr/bin/node" "${path.join(other, "bin", "acc-hook.mjs")}" claude_code "$@"\n`);
 
   await recordInstall({ dataHome, adapterId: "claude_code", version: "2.1.0",
-    accVersion: null, artifacts: [{ path: tree, kind: "tree" }] });
+    accVersion, artifacts: [{ path: tree, kind: "tree" }] });
   return { home, dataHome };
 }
 
@@ -94,3 +94,32 @@ test("wiring that matches the running acc says nothing", async t => {
   assert.equal(entry.remediation.some(line => /wired to acc/.test(line)), false,
     "a healthy machine was told to reinstall");
 });
+
+test("a stale bundle names the skills, not the runtime, and reports its version", async t => {
+  // The real npm-upgrade case: `npm i -g` refreshed the CLI and the hook
+  // runtime, so the runner the client points at is already the running version,
+  // but the skills and manifests copied into the client are from the acc that
+  // last ran `acc install`. Doctor used to call that "plugin is <old>", which
+  // reads as a stale runtime and sits beside a `wired` that says otherwise.
+  const running = JSON.parse(
+    await (await import("node:fs/promises")).readFile(
+      path.join(repoRoot, "package.json"), "utf8")).version;
+  const place = await machine(t, running, "0.0.1");
+
+  const body = await doctor(place);
+  const entry = body.data.adapters.find(one => one.adapterId === "claude_code");
+
+  // The runtime is current; the bundle is not - and the record now says both.
+  assert.equal(entry.wired, running, "the runner the client executes is current");
+  assert.equal(entry.bundleVersion, "0.0.1",
+    "the recorded install version is surfaced as the bundle's version");
+
+  const line = entry.remediation.find(one => /skills|manifests|bundle/.test(one));
+  assert.notEqual(line, undefined,
+    `no remediation names the stale bundle: ${JSON.stringify(entry.remediation)}`);
+  assert.match(line, /acc install --adapter claude_code/,
+    "the bundle line is not the reinstall command");
+  assert.match(line, /0\.0\.1/, "the bundle line does not name the stale version");
+  assert.equal(entry.remediation.some(one => /\bplugin is\b/.test(one)), false,
+    "a remediation still calls the whole plugin stale when only the bundle is");
+})

@@ -134,10 +134,18 @@ async function diagnoseAdapters({ options, runtime }) {
     // trust prompt, most of all. It goes where a person reads, not into --json.
     remediation.push(...(entry.needsAction ?? []));
     const installed = record.installs.find(one => one.adapterId === entry.adapterId);
-    const stale = staleInstall({ recorded: installed?.accVersion ?? null, running });
+    const bundleVersion = installed?.accVersion ?? null;
+    const stale = staleInstall({ recorded: bundleVersion, running });
     if (stale !== null) {
+      // Names the skills and manifests, not "the plugin". Updating the npm
+      // package replaces the CLI and the hook runtime the client's shim points
+      // at, so the runner can already be current - `wired` says whether it is -
+      // while the skills and manifests copied into the client stay at whatever
+      // acc last ran `acc install`. Calling the whole plugin stale reads as a
+      // stale runtime and contradicts a `wired` that says otherwise.
       remediation.push(`acc install --adapter ${entry.adapterId}`
-        + `  # plugin is ${stale.recorded}, acc is ${stale.running}`);
+        + `  # skills and manifests here are from ${stale.recorded}, acc is ${stale.running}`
+        + ` - reinstall to refresh the bundle`);
     }
     // Read from the wiring rather than from the record. An ACC old enough not to
     // know the record's version field still rewrites that record - blank - while
@@ -149,7 +157,11 @@ async function diagnoseAdapters({ options, runtime }) {
       remediation.push(`acc install --adapter ${entry.adapterId}`
         + `  # wired to acc ${wired}, this is ${running}`);
     }
-    return { ...entry, stale, wired, owned: { modified: owned.modified,
+    // `wired` is the version of the runner the client executes; `bundleVersion`
+    // is the acc that copied the skills and manifests into it. They diverge after
+    // an npm upgrade with no `acc install`, and reporting both is what makes the
+    // divergence legible rather than hidden behind a single reassuring number.
+    return { ...entry, stale, wired, bundleVersion, owned: { modified: owned.modified,
       missing: owned.missing, intact: owned.intact.length }, remediation };
   }));
 }
