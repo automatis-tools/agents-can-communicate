@@ -89,10 +89,15 @@ export function createSessionService(ports) {
   function assertReplaceable(existing, probe) {
     if (existing.record.state === "closed") return;
     // Presence staleness alone never replaces ownership: an idle-but-open
-    // session may resume at any moment. Only a session judged gone permits a
-    // replacement generation - which, before pids, nothing could ever be.
-    const live = probe ?? (record =>
-      classifySessionPresence(record, clock.now(), pidIsAlive) !== "offline");
+    // session may resume at any moment, and a wrong "gone" verdict there
+    // self-corrects the moment that session next takes a turn. A wrong
+    // replacement does not self-correct - it takes the generation, and the
+    // original session's own heartbeats fail with CONFLICT from then on. So
+    // only a pid confirmed dead is authority to replace; "we cannot tell" -
+    // a session with no recorded pid - is never enough, however long the
+    // silence.
+    const live = probe ?? (record => (record.pid ?? null) === null
+      || pidIsAlive(record.pid));
     if (live(existing.record)) {
       throw new AccError(EXIT.CONFLICT, "the session id is already live",
         { sessionId: existing.record.sessionId });

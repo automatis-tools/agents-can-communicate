@@ -192,6 +192,14 @@ function coordinatorGaps(snapshot) {
 }
 
 export function computeAttention(snapshot, { session, participantId, now, pidIsAlive }) {
+  // Required unconditionally, not only when there happen to be sessions to
+  // classify: `stalledRequests` reaches `classifySessionPresence` only inside a
+  // map/filter over `snapshot.sessions`, so an empty or absent roster let a
+  // missing probe through with nothing to trip over it - the same silent pass
+  // the classifier's own required parameter exists to close, one layer up.
+  if (typeof pidIsAlive !== "function") {
+    throw new AccError(EXIT.USAGE, "computeAttention requires a pidIsAlive probe", {});
+  }
   return [
     ...directRequests(snapshot, participantId),
     ...claimConflicts(snapshot, session, now),

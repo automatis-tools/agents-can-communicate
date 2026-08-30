@@ -12,11 +12,11 @@ const NOW = "2026-08-16T01:00:00.000Z";
 const WORKSPACE = "workspace_a";
 const CADENCE = 30_000;
 
-function makeService() {
+function makeService(overrides = {}) {
   const clock = createFakeClock(NOW);
   const store = createMemoryStore({ clock, ids: createFakeIds(), workspaceId: WORKSPACE });
   return { clock, store,
-    service: createCoordinationService({ store, clock, ids: createFakeIds() }) };
+    service: createCoordinationService({ store, clock, ids: createFakeIds(), ...overrides }) };
 }
 
 const opening = (overrides = {}) => ({ workspaceId: WORKSPACE, participantId: "participant_a",
@@ -111,6 +111,31 @@ test("a stale session cannot be replaced without a liveness probe", async () => 
   const replaced = await service.openSession(opening({ sessionId: session.sessionId,
     probe: () => false }));
   assert.notEqual(replaced.generation, session.generation);
+});
+
+test("a session whose recorded pid is dead is replaceable with no explicit probe", async () => {
+  const { service, store } = makeService({ pidIsAlive: () => false });
+  const session = await service.openSession(opening());
+  // Task 1 does not let openSession write a pid (Task 2 adds the field to the
+  // schema); patching the ephemeral record directly simulates what a later
+  // task's hook will actually record.
+  const raw = await store.ephemeral.get("session", session.sessionId);
+  await store.ephemeral.put("session", session.sessionId, { ...raw, pid: 42 });
+
+  const replaced = await service.openSession(opening({ sessionId: session.sessionId }));
+  assert.notEqual(replaced.generation, session.generation);
+});
+
+test("a session with no pid is never replaceable by age alone", async () => {
+  const { service, clock } = makeService();
+  const session = await service.openSession(opening());
+  // 100 minutes - well past the 30-minute unknown floor: if age alone still
+  // governed replacement here, this session would already read as offline and
+  // this would silently succeed instead of pinning the ruling.
+  clock.advance(CADENCE * 200);
+
+  await assert.rejects(service.openSession(opening({ sessionId: session.sessionId })),
+    error => error.code === EXIT.CONFLICT);
 });
 
 test("an old generation cannot close its successor", async () => {

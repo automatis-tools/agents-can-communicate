@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
+import { EXIT } from "@agents-can-communicate/protocol";
+
 import { createCoordinationService } from "../src/service.mjs";
 import { ATTENTION_PRIORITY, computeAttention } from "../src/sync.mjs";
 import { createFakeClock, createFakeIds, createMemoryStore }
@@ -176,4 +178,14 @@ test("every attention kind in the priority table is one a rule can produce", () 
   // Ordering is the table's, so a new kind cannot quietly outrank a conflict.
   assert.deepEqual(produced.map(item => item.priority),
     [...produced.map(item => item.priority)].sort((left, right) => left - right));
+});
+
+test("an empty roster does not let a missing probe through", () => {
+  // stalledRequests only reaches classifySessionPresence inside a map/filter
+  // over snapshot.sessions, so a snapshot with none to classify must not be
+  // the reason a forgotten pidIsAlive goes unnoticed.
+  const options = { session: null, participantId: "participant_a", now: NOW };
+  assert.throws(() => computeAttention({}, options), error => error.code === EXIT.USAGE);
+  assert.throws(() => computeAttention({ sessions: [] }, options),
+    error => error.code === EXIT.USAGE);
 });
