@@ -9,14 +9,37 @@ import { writeWorkResponse } from "./notify.mjs";
 // rather than one global constant (docs/ARCHITECTURE.md, presence freshness).
 const STALE_CADENCE_MULTIPLE = 3;
 
+// Two floors, because they answer different questions and neither subsumes the
+// other. UNKNOWN_EXPIRY_MS is the "cannot tell" branch: records written before
+// pids were recorded, platforms with no process table, an ancestry that did not
+// resolve. HARD_EXPIRY_MS exists because pids are recycled - the hazard
+// writer-mutex.mjs:72 documents - so a session whose number was reissued to
+// something unrelated would otherwise read as alive forever.
+const UNKNOWN_EXPIRY_MS = 30 * 60_000;
+const HARD_EXPIRY_MS = 24 * 60 * 60_000;
+
+const ageBand = (session, age) =>
+  age <= session.heartbeatCadenceMs * STALE_CADENCE_MULTIPLE ? "online" : "stale";
+
 /**
  * @returns {"online" | "stale" | "offline"}
  */
-export function classifySessionPresence(session, now, probe = () => true) {
+export function classifySessionPresence(session, now, pidIsAlive) {
+  // Required rather than defaulted. A probe that defaults to "everyone is
+  // alive" turns a forgotten call site into a check that silently passes, which
+  // is the failure this repository has already shipped twice.
+  if (typeof pidIsAlive !== "function") {
+    throw new AccError(EXIT.USAGE, "classifySessionPresence requires a pidIsAlive probe",
+      { sessionId: session?.sessionId ?? null });
+  }
   if (session.state === "closed") return "offline";
-  if (!probe(session)) return "offline";
   const age = Date.parse(now) - Date.parse(session.heartbeatAt);
-  return age <= session.heartbeatCadenceMs * STALE_CADENCE_MULTIPLE ? "online" : "stale";
+  if (age > HARD_EXPIRY_MS) return "offline";
+  const pid = session.pid ?? null;
+  // A pid that answers outranks the unknown floor: a live but idle session is
+  // exactly what kimi looks like between turns.
+  if (pid !== null) return pidIsAlive(pid) ? ageBand(session, age) : "offline";
+  return age > UNKNOWN_EXPIRY_MS ? "offline" : ageBand(session, age);
 }
 
 const sessionRecord = (input, now, generation) => validateRecord("session", {
@@ -50,7 +73,7 @@ const participantRecord = (input, now) => validateRecord("participant", {
 });
 
 export function createSessionService(ports) {
-  const { store, clock, ids } = ports;
+  const { store, clock, ids, pidIsAlive } = ports;
   const workspaceOf = input => input.workspaceId ?? store.workspaceId;
 
   async function locate(sessionId, workspaceId) {
@@ -66,9 +89,11 @@ export function createSessionService(ports) {
   function assertReplaceable(existing, probe) {
     if (existing.record.state === "closed") return;
     // Presence staleness alone never replaces ownership: an idle-but-open
-    // session may resume at any moment. Only a liveness probe reporting the
-    // owner gone permits a replacement generation.
-    if (probe === undefined || probe(existing.record)) {
+    // session may resume at any moment. Only a session judged gone permits a
+    // replacement generation - which, before pids, nothing could ever be.
+    const live = probe ?? (record =>
+      classifySessionPresence(record, clock.now(), pidIsAlive) !== "offline");
+    if (live(existing.record)) {
       throw new AccError(EXIT.CONFLICT, "the session id is already live",
         { sessionId: existing.record.sessionId });
     }

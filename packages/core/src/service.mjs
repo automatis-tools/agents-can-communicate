@@ -1,6 +1,7 @@
 import { createClaimService } from "./claims.mjs";
 import { createCommunicationService } from "./communication.mjs";
 import { createIntentService } from "./intents.mjs";
+import { defaultPidIsAlive } from "./pid.mjs";
 import { assertPorts } from "./ports.mjs";
 import { createSessionService } from "./sessions.mjs";
 import { createGuardStateService, createStatusService } from "./status.mjs";
@@ -13,10 +14,14 @@ import { createWorkstreamService } from "./workstreams.mjs";
  * randomness-dependent arrives through a port, so behaviour is reproducible and
  * no module reaches for a global.
  *
- * @param {{ store: object, clock: object, ids: object, policies?: object }} ports
+ * @param {{ store: object, clock: object, ids: object, pidIsAlive?: function,
+ *   policies?: object }} ports
  */
-export function createCoordinationService({ store, clock, ids, policies = {} }) {
-  const ports = assertPorts({ store, clock, ids });
+export function createCoordinationService({ store, clock, ids,
+  pidIsAlive = defaultPidIsAlive, policies = {} }) {
+  // Defaulted here, where the default is a real implementation, and required in
+  // the classifier, where a default could only be a lie.
+  const ports = { ...assertPorts({ store, clock, ids }), pidIsAlive };
   const sessions = createSessionService(ports);
   const intents = createIntentService(ports, sessions);
   const workstreams = createWorkstreamService(ports, sessions);

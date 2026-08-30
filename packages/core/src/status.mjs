@@ -58,7 +58,7 @@ export function createGuardStateService(ports) {
 }
 
 export function createStatusService(ports, sessions) {
-  const { store, clock } = ports;
+  const { store, clock, pidIsAlive } = ports;
 
   async function collectStatus(input = {}) {
     const workspaceId = input.workspaceId ?? store.workspaceId;
@@ -73,7 +73,7 @@ export function createStatusService(ports, sessions) {
       : await store.ephemeral.list("session");
     const intents = durable ? snapshot.intents : await store.ephemeral.list("intent");
     const live = sessionRecords
-      .map(session => ({ session, presence: classifySessionPresence(session, now) }))
+      .map(session => ({ session, presence: classifySessionPresence(session, now, pidIsAlive) }))
       .filter(item => item.presence !== "offline");
     const claims = snapshot.claims
       .filter(claim => Date.parse(claim.expiresAt) > Date.parse(now));
@@ -89,7 +89,7 @@ export function createStatusService(ports, sessions) {
       // `acc status --all` is how the worktree-cleanup question is asked.
       participants: sessionRecords
         .filter(session => input.all === true
-          || classifySessionPresence(session, now) !== "offline")
+          || classifySessionPresence(session, now, pidIsAlive) !== "offline")
         .map(session => ({
         sessionId: session.sessionId,
         participantId: session.participantId,
@@ -99,7 +99,7 @@ export function createStatusService(ports, sessions) {
         branch: session.branch ?? null,
         enforcement: session.enforcement ?? "advisory",
         lifecycle: session.lifecycle ?? "manual",
-        presence: classifySessionPresence(session, now),
+        presence: classifySessionPresence(session, now, pidIsAlive),
         intent: intents.find(intent => intent.sessionId === session.sessionId)?.summary ?? null,
       })),
       workstreams: snapshot.workstreams.map(workstream => ({
@@ -127,7 +127,7 @@ export function createStatusService(ports, sessions) {
         expiresAt: claim.expiresAt,
       })),
       attention: computeAttention(snapshot, { session: null,
-        participantId: input.participantId, now }),
+        participantId: input.participantId, now, pidIsAlive }),
       counts: {
         live: live.length,
         stale: live.filter(item => item.presence === "stale").length,

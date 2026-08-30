@@ -84,7 +84,7 @@ export function writeTask(tx, { input, session, workspaceId, now, ids }) {
 }
 
 export function createTaskService(ports, workstreams) {
-  const { store, clock, ids } = ports;
+  const { store, clock, ids, pidIsAlive } = ports;
 
   async function createTask(input) {
     const session = await workstreams.requireOpenSession(input, "create a task");
@@ -126,7 +126,7 @@ export function createTaskService(ports, workstreams) {
         const holder = tx.get("session", existing.assigneeSessionId);
         const presence = holder === null
           ? "offline"
-          : classifySessionPresence(holder, now);
+          : classifySessionPresence(holder, now, pidIsAlive);
         if (presence === "online") {
           throw new AccError(EXIT.CONFLICT, "the task already has an assignee",
             { taskId: input.taskId, assigneeSessionId: existing.assigneeSessionId });
