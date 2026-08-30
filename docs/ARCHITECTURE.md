@@ -122,8 +122,16 @@ exposes them — hook safe points, or tool calls for MCP. An idle-but-open sessi
 to `stale`, and that is truthful reporting rather than an error. Only Kimi Code fires on a
 timer; see [CAPABILITIES.md](CAPABILITIES.md).
 
-Lease expiry decides when ownership may be replaced. Presence staleness alone never does —
-an idle session may resume at any moment.
+A session reads `offline` when it is closed; when its recorded process is confirmed dead;
+when it has no recorded process and has been silent past thirty minutes — the point past
+which nobody can tell whether it is alive; or when it has been silent past twenty-four
+hours regardless of its process, because a process number can be reissued to something
+unrelated and a pid that still answers is not proof it is the same session. `online` and
+`stale` are unaffected: they still come from the session's own declared heartbeat cadence.
+
+A confirmed-dead process, or a lease running out, decides when ownership may be replaced.
+Presence staleness alone never does — an idle session may resume at any moment, and a
+session with no recorded pid stays owner of its id however long the silence.
 
 ## A hook never fails closed
 
