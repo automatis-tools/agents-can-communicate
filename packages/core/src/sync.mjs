@@ -154,11 +154,11 @@ function unansweredQuestions(snapshot, participantId, onlineParticipants) {
   return items;
 }
 
-function stalledRequests(snapshot, participantId, now) {
+function stalledRequests(snapshot, participantId, now, pidIsAlive) {
   const live = new Map((snapshot.sessions ?? [])
-    .map(session => [session.sessionId, classifySessionPresence(session, now)]));
+    .map(session => [session.sessionId, classifySessionPresence(session, now, pidIsAlive)]));
   const onlineParticipants = new Set((snapshot.sessions ?? [])
-    .filter(session => classifySessionPresence(session, now) === "online")
+    .filter(session => classifySessionPresence(session, now, pidIsAlive) === "online")
     .map(session => session.participantId));
   const goingNowhere = task => {
     // Taken by someone who has gone quiet.
@@ -191,20 +191,20 @@ function coordinatorGaps(snapshot) {
       sourceId: workstream.workstreamId, summary: workstream.title }));
 }
 
-export function computeAttention(snapshot, { session, participantId, now }) {
+export function computeAttention(snapshot, { session, participantId, now, pidIsAlive }) {
   return [
     ...directRequests(snapshot, participantId),
     ...claimConflicts(snapshot, session, now),
     ...expiredClaims(snapshot, session, now),
     ...unblockedTasks(snapshot, session, participantId),
     ...coordinatorGaps(snapshot),
-    ...stalledRequests(snapshot, participantId, now),
+    ...stalledRequests(snapshot, participantId, now, pidIsAlive),
   ].sort((left, right) => left.priority - right.priority
     || left.sourceId.localeCompare(right.sourceId));
 }
 
 export function createSyncService(ports, sessions) {
-  const { store, clock } = ports;
+  const { store, clock, pidIsAlive } = ports;
 
   /**
    * Any session may request the full Workspace scope. Peer equality is a
@@ -240,7 +240,7 @@ export function createSyncService(ports, sessions) {
     const page = await store.eventsSince(workspaceId, input.cursor ?? null,
       input.limit ?? DEFAULT_LIMIT);
     const attention = computeAttention(snapshot, { session,
-      participantId: session?.participantId ?? input.participantId, now });
+      participantId: session?.participantId ?? input.participantId, now, pidIsAlive });
 
     const roster = snapshot.sessions.map(item => ({
       sessionId: item.sessionId,
@@ -248,7 +248,7 @@ export function createSyncService(ports, sessions) {
       parentSessionId: item.parentSessionId,
       harness: item.harness,
       branch: item.branch ?? null,
-      presence: classifySessionPresence(item, now),
+      presence: classifySessionPresence(item, now, pidIsAlive),
     }));
 
     // Solo zero-overhead: one live session, no claims and

@@ -162,7 +162,8 @@ test("a closed session or a failed probe is offline, never merely stale", () => 
 
   assert.equal(classifySessionPresence({ ...session, state: "closed" }, NOW,
     () => true), "offline");
-  assert.equal(classifySessionPresence(session, at(CADENCE * 99), () => false), "offline");
+  assert.equal(classifySessionPresence({ ...session, pid: 42 }, at(CADENCE * 99), () => false),
+    "offline");
 });
 
 test("stale is a truthful state, not an error", () => {

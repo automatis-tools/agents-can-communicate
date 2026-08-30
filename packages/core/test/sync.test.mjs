@@ -169,7 +169,7 @@ test("every attention kind in the priority table is one a rule can produce", () 
   };
 
   const produced = computeAttention(snapshot, { session: { sessionId: "session_a" },
-    participantId: "participant_a", now: NOW });
+    participantId: "participant_a", now: NOW, pidIsAlive: () => true });
 
   assert.deepEqual([...new Set(produced.map(item => item.kind))].sort(),
     Object.keys(ATTENTION_PRIORITY).sort());

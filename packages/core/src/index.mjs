@@ -2,6 +2,7 @@
 export { createCoordinationService } from "./service.mjs";
 export { assertPorts } from "./ports.mjs";
 export { classifySessionPresence } from "./sessions.mjs";
+export { defaultPidIsAlive } from "./pid.mjs";
 export { ATTENTION_PRIORITY, computeAttention } from "./sync.mjs";
 export { overlaps } from "./claims.mjs";
 export { wouldCycle } from "./tasks.mjs";
