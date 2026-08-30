@@ -30,8 +30,13 @@ Default and `plan` modes expose no write tool at all. Use `--approval-mode auto_
 
 ## Kimi: sessions pile up in `acc status`
 
-Kimi fires no `SessionEnd`. Finished prompt-mode sessions age out on their 60s cadence.
-Not a leak.
+Kimi fires no `SessionEnd`, so a `kimi -p` run never closes its session - it just stops
+taking turns. Kimi resolves no pid, so presence is the only thing that retires it: the
+session reads `offline` and drops off the default view once it has been silent for thirty
+minutes, not on a fixed cadence.
+
+It isn't gone: `acc status --all` lists it, and every session before it, on purpose - for
+finding which worktree an agent was in after it has left.
 
 ## My write was blocked
 
