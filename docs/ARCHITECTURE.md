@@ -129,6 +129,11 @@ hours regardless of its process, because a process number can be reissued to som
 unrelated and a pid that still answers is not proof it is the same session. `online` and
 `stale` are unaffected: they still come from the session's own declared heartbeat cadence.
 
+A recorded process to confirm dead is not something every client gets, either - it comes
+from matching the adapter's own binary name against the operating system's name for the
+process, which fails for a client that is a script rather than an executable. Half of the
+shipped adapters resolve one and half do not; see [CAPABILITIES.md](CAPABILITIES.md).
+
 An open session's id is reused only once its recorded process is confirmed dead — a closed
 one is already free, since closing is the session's own choice, not a presence judgment
 made about it. Presence staleness alone never reuses an open session's id: an idle session
