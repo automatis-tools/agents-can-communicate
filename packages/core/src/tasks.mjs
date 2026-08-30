@@ -84,7 +84,7 @@ export function writeTask(tx, { input, session, workspaceId, now, ids }) {
 }
 
 export function createTaskService(ports, workstreams) {
-  const { store, clock, ids } = ports;
+  const { store, clock, ids, pidIsAlive } = ports;
 
   async function createTask(input) {
     const session = await workstreams.requireOpenSession(input, "create a task");
@@ -120,13 +120,19 @@ export function createTaskService(ports, workstreams) {
         && existing.assigneeSessionId !== session.sessionId) {
         // A holder that is gone is not a holder. Closing a session hands its
         // work back, so this is the crash case: no session end ever arrived and
-        // presence has decayed. Staleness alone does not release it - that is
-        // the same rule claims follow, because an idle agent may be thinking
-        // rather than dead - but it can be taken over deliberately.
+        // presence has decayed. `stale` alone does not release it - the same
+        // rule claims follow, because an idle agent may be thinking rather than
+        // dead - and taking it over needs `force`. `offline` needs no force at
+        // all, silence-derived cases included: a session with no recorded pid,
+        // quiet past the unknown floor, reads offline exactly like one whose
+        // pid is confirmed dead, and either way the task is simply taken. That
+        // is acceptable here where it would not be for a session id: the
+        // participant guard below still refuses a different participant, and
+        // taking a task back is reversible where replacing an id is not.
         const holder = tx.get("session", existing.assigneeSessionId);
         const presence = holder === null
           ? "offline"
-          : classifySessionPresence(holder, now);
+          : classifySessionPresence(holder, now, pidIsAlive);
         if (presence === "online") {
           throw new AccError(EXIT.CONFLICT, "the task already has an assignee",
             { taskId: input.taskId, assigneeSessionId: existing.assigneeSessionId });

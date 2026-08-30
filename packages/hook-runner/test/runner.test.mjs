@@ -11,6 +11,7 @@ import { canonicalTarget, covers, resourceFor, runHook } from "../src/runner.mjs
 // from the other one denies nothing at all.
 const kimi = {
   id: "kimi",
+  client: { command: "kimi", versionArgs: ["--version"] },
   normalizeHook: payload => payload,
   denyOutcome: reason => ({ stdout: JSON.stringify({ hookSpecificOutput: {
     hookEventName: "PreToolUse", permissionDecision: "deny",
@@ -43,9 +44,16 @@ async function workspace(t) {
 const event = (kind, extra = {}) => ({ kind, sessionId: "harness-session-1",
   cwd: extra.cwd, model: null, parentSessionId: null, tool: null, targets: [], ...extra });
 
+// A test that reads the machine's live process table is a test whose result
+// depends on what happens to be running, not on the hook behaviour this file
+// is about. Every call site below defaults to this, so `sessionStart` resolves
+// pid to null deterministically; the two tests that care about pid resolution
+// supply their own table and override it.
+const noProcessTable = async () => new Map();
+
 const run = (adapterId, payload, { root, dataHome }, options = {}) =>
   runHook({ adapterId, payload: { ...payload, cwd: payload.cwd ?? root },
-    adapters: ADAPTERS, dataHome, ...options });
+    adapters: ADAPTERS, dataHome, readProcessTable: noProcessTable, ...options });
 
 test("sessionStart attaches, and a later hook reuses that same session", async t => {
   const place = await workspace(t);
@@ -203,7 +211,8 @@ test("an internal failure never breaks the session it is hooked into", async t =
   const broken = { ...kimi, normalizeHook: () => { throw new Error("boom"); } };
 
   const result = await runHook({ adapterId: "kimi", payload: event("beforeTool"),
-    adapters: { kimi: broken }, dataHome: place.dataHome });
+    adapters: { kimi: broken }, dataHome: place.dataHome,
+    readProcessTable: noProcessTable });
 
   // A coordination tool must never be the reason someone's session stops
   // working. Failing open is the only acceptable direction here.
@@ -269,14 +278,17 @@ test("a client that denies by exit code is served that way, not with JSON", asyn
   const adapters = { ...ADAPTERS, codex };
 
   const peer = await runHook({ adapterId: "kimi", adapters, dataHome: place.dataHome,
+    readProcessTable: noProcessTable,
     payload: event("sessionStart", { sessionId: "peer", cwd: place.root }) });
   await peer.service.acquireClaim({ sessionId: peer.accSessionId,
     generation: peer.generation, resource: "file:src/**", mode: "exclusive",
     enforcement: "guarded", reason: "held" });
   await runHook({ adapterId: "codex", adapters, dataHome: place.dataHome,
+    readProcessTable: noProcessTable,
     payload: event("sessionStart", { cwd: place.root }) });
 
   const denied = await runHook({ adapterId: "codex", adapters, dataHome: place.dataHome,
+    readProcessTable: noProcessTable,
     payload: event("beforeTool", { tool: "apply_patch", cwd: place.root,
       targets: [path.join(place.root, "src/a.mjs")] }) });
 
@@ -295,8 +307,10 @@ test("attach declares what the adapter proved, not that it is an adapter", async
   const adapters = { kimi: guarding, blind };
 
   await runHook({ adapterId: "kimi", adapters, dataHome: place.dataHome,
+    readProcessTable: noProcessTable,
     payload: event("sessionStart", { sessionId: "a", cwd: place.root }) });
   const after = await runHook({ adapterId: "blind", adapters, dataHome: place.dataHome,
+    readProcessTable: noProcessTable,
     payload: event("sessionStart", { sessionId: "b", cwd: place.root }) });
 
   const byHarness = Object.fromEntries(after.sessions.map(s => [s.harness, s]));
@@ -326,8 +340,10 @@ test("the turn context names claims this session cannot be stopped from breaking
     const adapters = { ...ADAPTERS, unguarded };
 
     await runHook({ adapterId: "unguarded", adapters, dataHome: place.dataHome,
+      readProcessTable: noProcessTable,
       payload: event("sessionStart", { cwd: place.root }) });
     const turn = await runHook({ adapterId: "unguarded", adapters, dataHome: place.dataHome,
+      readProcessTable: noProcessTable,
       payload: event("beforeTurn", { cwd: place.root }) });
 
     assert.match(turn.stdout, /file:src\/\*\*/);
@@ -348,8 +364,10 @@ test("a guarded session is told about the claim, and that it is enforced", async
   const adapters = { ...ADAPTERS, guarding };
 
   await runHook({ adapterId: "guarding", adapters, dataHome: place.dataHome,
+    readProcessTable: noProcessTable,
     payload: event("sessionStart", { cwd: place.root }) });
   const turn = await runHook({ adapterId: "guarding", adapters, dataHome: place.dataHome,
+    readProcessTable: noProcessTable,
     payload: event("beforeTurn", { cwd: place.root }) });
 
   assert.match(turn.stdout, /\|true/);
@@ -365,15 +383,18 @@ test("a session is not warned about its own claim", async t => {
   const adapters = { ...ADAPTERS, rendering };
 
   const mine = await runHook({ adapterId: "rendering", adapters,
-    dataHome: place.dataHome, payload: event("sessionStart", { cwd: place.root }) });
+    dataHome: place.dataHome, readProcessTable: noProcessTable,
+    payload: event("sessionStart", { cwd: place.root }) });
   await mine.service.acquireClaim({ sessionId: mine.accSessionId,
     generation: mine.generation, resource: "file:src/**", mode: "exclusive",
     enforcement: "guarded", reason: "mine" });
   await runHook({ adapterId: "rendering", adapters, dataHome: place.dataHome,
+    readProcessTable: noProcessTable,
     payload: event("sessionStart", { sessionId: "peer", cwd: place.root }) });
 
   const turn = await runHook({ adapterId: "rendering", adapters,
-    dataHome: place.dataHome, payload: event("beforeTurn", { cwd: place.root }) });
+    dataHome: place.dataHome, readProcessTable: noProcessTable,
+    payload: event("beforeTurn", { cwd: place.root }) });
 
   // Telling a session to avoid the thing it deliberately reserved would be
   // exactly backwards.
@@ -397,8 +418,10 @@ test("an advisory claim is passed through as advisory, not as a block", async t 
   const adapters = { ...ADAPTERS, guarding };
 
   await runHook({ adapterId: "guarding", adapters, dataHome: place.dataHome,
+    readProcessTable: noProcessTable,
     payload: event("sessionStart", { cwd: place.root }) });
   const turn = await runHook({ adapterId: "guarding", adapters, dataHome: place.dataHome,
+    readProcessTable: noProcessTable,
     payload: event("beforeTurn", { cwd: place.root }) });
 
   assert.match(turn.stdout, /file:src\/\*\*\|advisory\|true/);
@@ -448,4 +471,36 @@ test("an error that is not absence stops the walk instead of climbing past it", 
   };
 
   assert.equal(await canonicalTarget(resolve, "/guarded/src/a.mjs"), "/guarded/src/a.mjs");
+});
+
+test("a session opened by a hook names the client process", async t => {
+  const place = await workspace(t);
+  // The walk starts at this test process, so the synthetic table has to be
+  // rooted there. Naming `kimi` two hops up proves the shell in between is
+  // stepped over, which is the case a real machine actually produces.
+  const table = new Map([
+    [process.pid, { ppid: 900, comm: "node" }],
+    [900, { ppid: 100, comm: "/bin/zsh" }],
+    [100, { ppid: 1, comm: "kimi" }],
+  ]);
+
+  const started = await run("kimi", event("sessionStart"), place,
+    { readProcessTable: async () => table });
+
+  const record = await started.service.store.ephemeral.get("session",
+    started.accSessionId);
+  assert.equal(record.pid, 100);
+});
+
+test("a session still opens when the client cannot be named", async t => {
+  const place = await workspace(t);
+
+  const started = await run("kimi", event("sessionStart"), place,
+    { readProcessTable: async () => new Map() });
+
+  const record = await started.service.store.ephemeral.get("session",
+    started.accSessionId);
+  // Null, not a failure: an unnameable client must never stop a session opening.
+  assert.equal(started.exitCode, 0);
+  assert.equal(record.pid, null);
 });

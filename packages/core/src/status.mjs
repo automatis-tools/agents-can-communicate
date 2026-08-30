@@ -58,7 +58,7 @@ export function createGuardStateService(ports) {
 }
 
 export function createStatusService(ports, sessions) {
-  const { store, clock } = ports;
+  const { store, clock, pidIsAlive } = ports;
 
   async function collectStatus(input = {}) {
     const workspaceId = input.workspaceId ?? store.workspaceId;
@@ -72,9 +72,17 @@ export function createStatusService(ports, sessions) {
       ? snapshot.sessions
       : await store.ephemeral.list("session");
     const intents = durable ? snapshot.intents : await store.ephemeral.list("intent");
-    const live = sessionRecords
-      .map(session => ({ session, presence: classifySessionPresence(session, now) }))
-      .filter(item => item.presence !== "offline");
+    // Classified once, and reused everywhere below. `classifySessionPresence` now
+    // asks `pidIsAlive`, a real `process.kill(pid, 0)` syscall for a session with
+    // a recorded pid, so it is no longer pure given `now` - a client can exit
+    // between two calls inside the same response, and re-reading the same
+    // session later in this function can then disagree with what an earlier
+    // reading already said. One reading, taken once, is what keeps `counts.live`,
+    // the roster filter, and each listed session's `presence` describing the
+    // same instant rather than three independent guesses at it.
+    const classified = sessionRecords
+      .map(session => ({ session, presence: classifySessionPresence(session, now, pidIsAlive) }));
+    const live = classified.filter(item => item.presence !== "offline");
     const claims = snapshot.claims
       .filter(claim => Date.parse(claim.expiresAt) > Date.parse(now));
 
@@ -87,10 +95,9 @@ export function createStatusService(ports, sessions) {
       // the roster is where "which worktree was that agent in" is answered - so
       // after a month of work this listed sixty entries for one live session.
       // `acc status --all` is how the worktree-cleanup question is asked.
-      participants: sessionRecords
-        .filter(session => input.all === true
-          || classifySessionPresence(session, now) !== "offline")
-        .map(session => ({
+      participants: classified
+        .filter(item => input.all === true || item.presence !== "offline")
+        .map(({ session, presence }) => ({
         sessionId: session.sessionId,
         participantId: session.participantId,
         harness: session.harness,
@@ -99,7 +106,7 @@ export function createStatusService(ports, sessions) {
         branch: session.branch ?? null,
         enforcement: session.enforcement ?? "advisory",
         lifecycle: session.lifecycle ?? "manual",
-        presence: classifySessionPresence(session, now),
+        presence,
         intent: intents.find(intent => intent.sessionId === session.sessionId)?.summary ?? null,
       })),
       workstreams: snapshot.workstreams.map(workstream => ({
@@ -127,7 +134,7 @@ export function createStatusService(ports, sessions) {
         expiresAt: claim.expiresAt,
       })),
       attention: computeAttention(snapshot, { session: null,
-        participantId: input.participantId, now }),
+        participantId: input.participantId, now, pidIsAlive }),
       counts: {
         live: live.length,
         stale: live.filter(item => item.presence === "stale").length,

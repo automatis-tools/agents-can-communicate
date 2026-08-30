@@ -10,6 +10,9 @@ import { openFilesystemStore } from "@agents-can-communicate/storage-filesystem"
 import { createGitProbe, discoverWorkspace, platformDataHome, runtimePaths }
   from "@agents-can-communicate/cli";
 
+import { resolveClientPid } from "./client-pid.mjs";
+import { readProcessTable as defaultReadProcessTable } from "./process-table.mjs";
+
 // A hook runs in front of the user's turn, so it gets a hard ceiling. Better to
 // let a call through than to make someone's session sit waiting on us.
 const DEFAULT_BUDGET_MS = 5_000;
@@ -154,8 +157,14 @@ async function openContext({ cwd, dataHome, runtime, env }) {
 }
 
 const HANDLERS = {
-  async sessionStart({ event, context, adapter, adapterId, paths }) {
+  async sessionStart({ event, context, adapter, adapterId, paths, readProcessTable }) {
     const capabilities = adapter.capabilities ?? {};
+    // Once per session, never per turn. A client that cannot be found yields
+    // null, and the session is then judged by age alone - which is exactly the
+    // behaviour every session had before this existed.
+    const command = adapter.client?.command ?? null;
+    const pid = command === null ? null
+      : resolveClientPid({ table: await readProcessTable(), from: process.pid, command });
     const session = await context.service.openSession({
       workspaceId: context.descriptor.id,
       participantId: participantFor(adapterId, event.sessionId, context.env),
@@ -171,6 +180,7 @@ const HANDLERS = {
       // Which checkout this agent is in. One workspace spans every worktree of
       // a repository, so this is the only thing that distinguishes them.
       checkoutRoot: context.descriptor.git?.worktreeRoot ?? context.descriptor.roots[0],
+      pid,
       branch: context.descriptor.git?.branch ?? null,
       descriptor: context.descriptor,
     });
@@ -339,7 +349,8 @@ const HANDLERS = {
  * only thing this function refuses to do is fail closed.
  */
 export async function runHook({ adapterId, payload, adapters, dataHome, env,
-  runtime = defaultRuntime(), budgetMs = DEFAULT_BUDGET_MS }) {
+  runtime = defaultRuntime(), budgetMs = DEFAULT_BUDGET_MS,
+  readProcessTable = defaultReadProcessTable }) {
   const result = { stdout: "", exitCode: 0, decision: "allow", sessions: [] };
   let timer = null;
   try {
@@ -354,7 +365,8 @@ export async function runHook({ adapterId, payload, adapters, dataHome, env,
     const handler = HANDLERS[event.kind];
     const work = handler === undefined
       ? Promise.resolve({})
-      : handler({ event, context, adapter, adapterId, binding, paths: context.paths });
+      : handler({ event, context, adapter, adapterId, binding, paths: context.paths,
+        readProcessTable });
 
     // The loser of a race is not cancelled, so the timer is cleared explicitly:
     // an outstanding one keeps the process alive long past its answer.

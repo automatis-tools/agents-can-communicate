@@ -32,6 +32,13 @@ export function createExampleAdapter() {
 }
 ```
 
+`client.command` has a second job beyond the version probe `detect.mjs` uses it for: presence
+liveness walks the hook's process ancestry looking for the first ancestor whose executable
+basename matches it, to learn the client's own pid. Declare the binary the client actually
+runs as — `command: "claude"` for a client that runs as `node` resolves nothing, and fails
+silently: the session gets `pid: null` and reads presence by age alone, with no error telling
+you why.
+
 ## Capabilities
 
 Seventeen booleans in five groups:

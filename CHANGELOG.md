@@ -1,5 +1,56 @@
 # Changelog
 
+## Unreleased
+
+| | |
+|---|---|
+| Built from | `6db5937` |
+| Tarball | `agents-can-communicate-0.1.13.tgz`, 153 KB, 114 entries |
+| sha256 | `7fe1191e0c8d18bc01593ab2b43cac0138db215739d168f5e76569e818b10ee3` |
+| Tests | 979 passing, 0 failing |
+
+Not published. A published record says what the registry serves and is not
+rewritten, so shipped code that changes after a release is measured here instead.
+
+A session whose process is gone now says so. A record is opened by a hook at
+session start and closed by one at session end, and when a client never fires the
+second - it has no such event, or it was killed with its terminal - the record
+stayed open forever. Presence decayed to `stale` and stopped there, because
+nothing could ask whether the process still existed. One real workspace had
+accumulated 227 of them, and `acc doctor` reported the pile as "not answering",
+which reads as a fault and is not one.
+
+Presence now pairs the process with two floors, the way the writer lock already
+reclaims a lock that is dead *and* old. A hook records the client's pid once, at
+session start, walking the process ancestry until it finds the binary its own
+adapter declares - the hook is not the client's child, and a shell usually sits
+between them. A pid confirmed dead makes the session `offline` at once. A pid
+nobody could name is judged by silence instead, at thirty minutes. Twenty-four
+hours retires a session whatever its pid says, because pids are recycled and a
+dead session's number can come back attached to something unrelated.
+
+`null` is a first-class answer here, not a missing value. No process table on this
+platform, or an ancestry that did not resolve, means nobody knows - and nobody
+knows is never read as dead.
+
+Nothing is written back to the record. `acc status --all` still lists everyone who
+was ever here, and presence stays a reading rather than an edit.
+
+Replacing a session id is held to the stricter test. A wrong presence verdict
+costs a roster row and corrects itself the moment that session next takes a turn;
+a wrong replacement takes a live session's generation, and from then on the
+original session's own heartbeats fail with exit 5. Nothing undoes that. So only a
+pid confirmed dead is authority to replace an id. Silence, however long, is not.
+
+`SCHEMA_VERSION` is 2, for the session record's new field, and `STORE_VERSION` moves
+with it: a store written by an older ACC is refused before a single record is read,
+with one plain `unknown store version` error, rather than opening the store, letting
+`acc status` appear to work, and only then breaking - `heartbeatSession` throwing deep
+inside on `unknown schemaVersion: 1`, `acc doctor` filing every record in the store
+under `corrupt`. Three confusing symptoms become one clear one. There is still no
+migration: the fix for an old store is the same as before - delete it and let ACC
+create a fresh one.
+
 ## 0.1.13
 
 One fix, and it is the reason to upgrade off 0.1.12 rather than wait. Two agents

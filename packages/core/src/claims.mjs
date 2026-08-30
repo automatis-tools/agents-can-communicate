@@ -31,7 +31,7 @@ export function overlaps(left, right) {
 const isLive = (claim, now) => Date.parse(claim.expiresAt) > Date.parse(now);
 
 export function createClaimService(ports, sessions) {
-  const { store, clock, ids } = ports;
+  const { store, clock, ids, pidIsAlive } = ports;
 
   async function requireOwner(input, action) {
     const existing = await sessions.locateSession(input.sessionId, input.workspaceId);
@@ -52,7 +52,7 @@ export function createClaimService(ports, sessions) {
     // releases the claim on its own.
     const ownerPresence = ownerSession === undefined
       ? "offline"
-      : classifySessionPresence(ownerSession, now);
+      : classifySessionPresence(ownerSession, now, pidIsAlive);
     return new AccError(EXIT.CONFLICT, "the resource is already claimed", {
       claimId: existing.claimId,
       resource: existing.resource,

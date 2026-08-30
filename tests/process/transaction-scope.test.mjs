@@ -108,7 +108,7 @@ test("reaching for an undeclared kind fails loudly", async () => {
 test("declaring nothing still reads everything", async () => {
   const { store } = spy();
   await store.transaction(async tx => {
-    tx.put("workspace", "workspace_a", { schemaVersion: 1, workspaceId: "workspace_a",
+    tx.put("workspace", "workspace_a", { schemaVersion: 2, workspaceId: "workspace_a",
       displayName: "x", source: "directory", roots: ["/tmp/x"],
       createdAt: "2026-08-23T00:00:00.000Z" });
   }, { kinds: ["workspace"] });
