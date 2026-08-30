@@ -129,9 +129,26 @@ hours regardless of its process, because a process number can be reissued to som
 unrelated and a pid that still answers is not proof it is the same session. `online` and
 `stale` are unaffected: they still come from the session's own declared heartbeat cadence.
 
-A confirmed-dead process, or a lease running out, decides when ownership may be replaced.
-Presence staleness alone never does — an idle session may resume at any moment, and a
-session with no recorded pid stays owner of its id however long the silence.
+An open session's id is reused only once its recorded process is confirmed dead — a closed
+one is already free, since closing is the session's own choice, not a presence judgment
+made about it. Presence staleness alone never reuses an open session's id: an idle session
+may resume at any moment, and a session with no recorded pid stays owner of its id however
+long the silence, regardless of age. Only the operating system's word that the process is
+gone is authority to hand it to someone else.
+
+A claim follows the same restraint for its own reason: presence never releases one, only
+an expired lease or an explicit force release does — see
+[PROTOCOL.md](PROTOCOL.md#claim-lifetime-and-stale-owners).
+
+A workstream coordinator is the one role presence staleness alone *does* replace: it is
+contestable by any peer the moment its holder reads `offline`, silence-based cases
+included, with no confirmed death and no human or policy authority required. That is
+deliberate, not an oversight — a coordinator whose process was killed used to leave its
+workstream stuck with an uncontestable coordinator forever, the same failure this branch
+exists to fix. The role can afford it where a session id cannot: taking a coordinator
+destroys nothing and the original holder can reacquire it the moment it is back, while
+reusing a session id cannot be undone — the displaced session's own heartbeats fail with
+CONFLICT from then on.
 
 ## A hook never fails closed
 
