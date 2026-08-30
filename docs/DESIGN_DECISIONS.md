@@ -17,6 +17,7 @@ Why ACC is shaped the way it is, and what is deliberately still open.
 | Project config optional and runtime-free | A committed file is editable by anyone with a PR, so it may carry policy — never sessions or tokens. |
 | Durable state is authoritative | Realtime delivery, if it ever exists, accelerates; it never becomes the source of truth. |
 | No heartbeat helper in v1 | An idle session is honestly reported `stale`. A sidecar process to fake liveness is worse than the truth. |
+| Presence reads the process, never writes the record | A pid answers "gone" at once and an age floor answers what a pid cannot, including its own reuse. Nothing is written back: in a system with no session in charge, a bystander editing another session's record is authority it does not have. What "No heartbeat helper in v1" rejected was a process beating on a session's behalf; this asks about a process that is already there. |
 | No process launching | ACC attaches to sessions you already own. Owning them is a different product. |
 | One publishable package | One version and one release rather than twelve coordinated ones. |
 | MIT | Widest reuse, least friction. |
