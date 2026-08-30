@@ -52,5 +52,14 @@ export function assertPorts(ports) {
         { port: "store.ephemeral", method });
     }
   }
+  // A bare function, not an object with methods, so it does not fit REQUIRED
+  // above. Checked here for the same reason as everything else in this file: a
+  // core that constructed cleanly and only discovered the gap at the first
+  // presence check would raise a bare TypeError from deep inside sessions.mjs,
+  // not an AccError - invisible to the CLI's exit-code mapping.
+  if (typeof ports.pidIsAlive !== "function") {
+    throw new AccError(EXIT.USAGE, "the pidIsAlive port must be a function",
+      { port: "pidIsAlive" });
+  }
   return ports;
 }

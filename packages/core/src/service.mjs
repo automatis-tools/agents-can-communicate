@@ -20,8 +20,12 @@ import { createWorkstreamService } from "./workstreams.mjs";
 export function createCoordinationService({ store, clock, ids,
   pidIsAlive = defaultPidIsAlive, policies = {} }) {
   // Defaulted here, where the default is a real implementation, and required in
-  // the classifier, where a default could only be a lie.
-  const ports = { ...assertPorts({ store, clock, ids }), pidIsAlive };
+  // the classifier, where a default could only be a lie. Passed into
+  // assertPorts rather than spread on afterward, so an explicit non-function -
+  // `null` included, since the default above only applies to `undefined` - is
+  // shape-checked at construction like every other port instead of surfacing
+  // as a raw TypeError the first time presence is classified.
+  const ports = assertPorts({ store, clock, ids, pidIsAlive });
   const sessions = createSessionService(ports);
   const intents = createIntentService(ports, sessions);
   const workstreams = createWorkstreamService(ports, sessions);
