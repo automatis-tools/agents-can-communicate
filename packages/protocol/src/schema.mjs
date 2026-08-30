@@ -2,7 +2,7 @@ import { AccError, EXIT } from "./errors.mjs";
 import { flag, id, invalid, listOf, nullable, oneOf, plainObject, positiveInteger,
   resourceUri, sequence, text, timestamp } from "./fields.mjs";
 
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 2;
 
 const line = text();
 const prose = text({ max: 4000, multiline: true });
@@ -78,6 +78,10 @@ const RECORDS = Object.freeze({
   session: { sessionId: id, participantId: id, workspaceId: id, generation: id,
     harness: line, state: oneOf("open", "closed"), parentSessionId: nullable(id),
     checkoutRoot: nullable(line), branch: nullable(line),
+    // The process behind this session, when it can be named. Null means nobody
+    // knows - no process table, or an ancestry that did not resolve - and is
+    // read as "judge this one by age alone", never as "dead".
+    pid: nullable(positiveInteger),
     enforcement: oneOf("guarded", "advisory"), lifecycle: oneOf("managed", "manual"),
     heartbeatCadenceMs: positiveInteger, startedAt: timestamp, heartbeatAt: timestamp },
 
