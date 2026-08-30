@@ -136,11 +136,20 @@ may resume at any moment, and a session with no recorded pid stays owner of its 
 long the silence, regardless of age. Only the operating system's word that the process is
 gone is authority to hand it to someone else.
 
+One gap in that rule is left open rather than fixed: a pid the OS has reissued to an
+unrelated long-lived process answers alive forever, past even the twenty-four-hour floor
+that retires everything else, because a pid that answers past that floor is either a live
+idle session or a recycled number and there is no way to tell which. "Cannot tell" is never
+authority for reusing a session's id, so this reads offline in presence but stays live for
+replacement — a wrong answer no more frequent than pid recycling itself, and reachable only
+through `acc attach --session <id>`, since the hook path always mints a fresh id rather than
+naming an existing one.
+
 A claim follows the same restraint for its own reason: presence never releases one, only
 an expired lease or an explicit force release does — see
 [PROTOCOL.md](PROTOCOL.md#claim-lifetime-and-stale-owners).
 
-A workstream coordinator is the one role presence staleness alone *does* replace: it is
+A workstream coordinator is one role presence staleness alone *does* replace: it is
 contestable by any peer the moment its holder reads `offline`, silence-based cases
 included, with no confirmed death and no human or policy authority required. That is
 deliberate, not an oversight — a coordinator whose process was killed used to leave its
@@ -149,6 +158,17 @@ exists to fix. The role can afford it where a session id cannot: taking a coordi
 destroys nothing and the original holder can reacquire it the moment it is back, while
 reusing a session id cannot be undone — the displaced session's own heartbeats fail with
 CONFLICT from then on.
+
+Task assignment is the other. `acc task --take` on a task already held by someone else's
+session refuses outright while the holder reads `online`, and requires `--force` while it
+reads `stale` — but once the holder reads `offline`, the task is simply taken, silence-based
+cases included, with no force and no confirmation that the holder's process is actually
+dead. A holder attached over MCP, which never records a pid, reads `offline` from silence
+alone after thirty minutes with no tool call to heartbeat it. This is acceptable for the
+same two reasons the coordinator case is: the participant guard still refuses a different
+participant's session regardless of presence, so the blast radius is one participant taking
+its own work back from itself, and a task taken back is reversible — nothing is destroyed,
+and the original holder can pick it back up the moment it resumes.
 
 ## A hook never fails closed
 
