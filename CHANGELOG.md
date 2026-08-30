@@ -1,16 +1,23 @@
 # Changelog
 
-## Unreleased
+## 0.1.14
+
+Sessions that ended without saying so no longer haunt the roster. A client killed
+with its terminal, or one that has no session-end event at all, left a record open
+forever - one real workspace had accumulated 227 of them, and `acc doctor` reported
+the pile as a fault. Upgrading requires deleting the store; there is no migration,
+and ACC now says so plainly instead of failing three different ways.
 
 | | |
 |---|---|
-| Built from | `6db5937` |
-| Tarball | `agents-can-communicate-0.1.13.tgz`, 153 KB, 114 entries |
-| sha256 | `7fe1191e0c8d18bc01593ab2b43cac0138db215739d168f5e76569e818b10ee3` |
+| Built from | `0badbe8` |
+| Tarball | `agents-can-communicate-0.1.14.tgz`, 153 KB, 114 entries |
+| sha256 | `b5ee8e088a2ac6f734706e3da757ef9385cb2dbaee61641bcaa8e924af292e00` |
 | Tests | 979 passing, 0 failing |
-
-Not published. A published record says what the registry serves and is not
-rewritten, so shipped code that changes after a release is measured here instead.
+| Node | 24 (current production LTS) |
+| Verified on | macOS 26.6.2 (darwin 25.6.0, arm64) and Linux in CI |
+| Not supported | Windows - untested rather than known-broken |
+| Pid resolution | `codex` and `claude_code` only; `gemini_cli` and `kimi` run through an interpreter, so they fall back to the age floor. See [CAPABILITIES.md](docs/CAPABILITIES.md) |
 
 A session whose process is gone now says so. A record is opened by a hook at
 session start and closed by one at session end, and when a client never fires the

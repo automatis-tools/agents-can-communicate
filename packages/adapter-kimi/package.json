@@ -1,6 +1,6 @@
 {
   "name": "@agents-can-communicate/adapter-kimi",
-  "version": "0.1.13",
+  "version": "0.1.14",
   "private": true,
   "type": "module",
   "exports": {
