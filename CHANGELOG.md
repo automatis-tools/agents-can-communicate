@@ -42,8 +42,14 @@ a wrong replacement takes a live session's generation, and from then on the
 original session's own heartbeats fail with exit 5. Nothing undoes that. So only a
 pid confirmed dead is authority to replace an id. Silence, however long, is not.
 
-`SCHEMA_VERSION` is 2. The session record carries the new field, so a store
-written by an older ACC is not read by this one.
+`SCHEMA_VERSION` is 2, for the session record's new field, and `STORE_VERSION` moves
+with it: a store written by an older ACC is refused before a single record is read,
+with one plain `unknown store version` error, rather than opening the store, letting
+`acc status` appear to work, and only then breaking - `heartbeatSession` throwing deep
+inside on `unknown schemaVersion: 1`, `acc doctor` filing every record in the store
+under `corrupt`. Three confusing symptoms become one clear one. There is still no
+migration: the fix for an old store is the same as before - delete it and let ACC
+create a fresh one.
 
 ## 0.1.13
 
