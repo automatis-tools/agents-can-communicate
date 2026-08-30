@@ -1,16 +1,19 @@
 # Changelog
 
-## Unreleased
+## 0.1.16
+
+`acc doctor` tells the truth about what an upgrade left stale: the skills copied
+into a client, not the hook runtime, which `npm install -g` already refreshed.
 
 | | |
 |---|---|
-| Built from | `4fcc56d` |
-| Tarball | `agents-can-communicate-0.1.15.tgz`, 154 KB, 114 entries |
-| sha256 | `c179f61249c15667f74177dcc2d06f1af976dc208311b05c5b843d69b9802137` |
+| Built from | `PENDING` |
+| Tarball | `PENDING` |
+| sha256 | `PENDING` |
 | Tests | 981 passing, 0 failing |
-
-Not published. A published record says what the registry serves and is not
-rewritten, so shipped code that changes after a release is measured here instead.
+| Node | 24 (current production LTS) |
+| Verified on | macOS 26.6.2 (darwin 25.6.0, arm64) and Linux in CI |
+| Not supported | Windows - untested rather than known-broken |
 
 `acc doctor` names the stale bundle, not the runtime. After `npm install -g` with
 no `acc install`, the client's shim points into the npm directory, so the hook
