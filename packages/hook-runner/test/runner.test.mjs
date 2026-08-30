@@ -11,6 +11,7 @@ import { canonicalTarget, covers, resourceFor, runHook } from "../src/runner.mjs
 // from the other one denies nothing at all.
 const kimi = {
   id: "kimi",
+  client: { command: "kimi", versionArgs: ["--version"] },
   normalizeHook: payload => payload,
   denyOutcome: reason => ({ stdout: JSON.stringify({ hookSpecificOutput: {
     hookEventName: "PreToolUse", permissionDecision: "deny",
@@ -448,4 +449,36 @@ test("an error that is not absence stops the walk instead of climbing past it", 
   };
 
   assert.equal(await canonicalTarget(resolve, "/guarded/src/a.mjs"), "/guarded/src/a.mjs");
+});
+
+test("a session opened by a hook names the client process", async t => {
+  const place = await workspace(t);
+  // The walk starts at this test process, so the synthetic table has to be
+  // rooted there. Naming `kimi` two hops up proves the shell in between is
+  // stepped over, which is the case a real machine actually produces.
+  const table = new Map([
+    [process.pid, { ppid: 900, comm: "node" }],
+    [900, { ppid: 100, comm: "/bin/zsh" }],
+    [100, { ppid: 1, comm: "kimi" }],
+  ]);
+
+  const started = await run("kimi", event("sessionStart"), place,
+    { readProcessTable: async () => table });
+
+  const record = await started.service.store.ephemeral.get("session",
+    started.accSessionId);
+  assert.equal(record.pid, 100);
+});
+
+test("a session still opens when the client cannot be named", async t => {
+  const place = await workspace(t);
+
+  const started = await run("kimi", event("sessionStart"), place,
+    { readProcessTable: async () => new Map() });
+
+  const record = await started.service.store.ephemeral.get("session",
+    started.accSessionId);
+  // Null, not a failure: an unnameable client must never stop a session opening.
+  assert.equal(started.exitCode, 0);
+  assert.equal(record.pid, null);
 });
