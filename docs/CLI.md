@@ -58,7 +58,7 @@ graph LR
 |---|---|
 | `acc status` | Who is here, claims, protection level. `--all` adds everyone who has been |
 | `acc sync` | New events since a cursor; silent when alone |
-| `acc work` | Publish what this session is doing. `--clear` when it has stopped |
+| `acc work` | Publish what this session is doing. `--hint` names a resource so a claim holder is warned; `--clear` when it has stopped |
 | `acc claim` | Reserve a resource. Exit `5` on conflict |
 | `acc release` | Give it back. `--resource` for what you claimed, `--claim` for its id |
 | `acc ack` | Answer a message that asked for one, so it stops asking |
