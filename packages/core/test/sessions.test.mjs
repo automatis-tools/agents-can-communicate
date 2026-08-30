@@ -199,3 +199,16 @@ test("stale is a truthful state, not an error", () => {
 
   assert.equal(classifySessionPresence(session, later, () => true), "stale");
 });
+
+test("a session records the process behind it, or null when nobody knows", async () => {
+  const { service } = makeService();
+
+  const known = await service.openSession(opening({ pid: 4321 }));
+  const unknown = await service.openSession(opening({ participantId: "participant_b",
+    pid: undefined }));
+
+  // null is a first-class answer here, not a missing value: it is what the
+  // ancestry walk returns when it cannot name the client.
+  assert.equal(known.pid, 4321);
+  assert.equal(unknown.pid, null);
+});

@@ -53,6 +53,7 @@ const sessionRecord = (input, now, generation) => validateRecord("session", {
   parentSessionId: input.parentSessionId ?? null,
   checkoutRoot: input.checkoutRoot ?? null,
   branch: input.branch ?? null,
+  pid: input.pid ?? null,
   // Both default to the weaker reading. A session that declares nothing is a
   // session nothing intercepts - an MCP client, or a CLI user - and claiming
   // otherwise would promise enforcement that is not there.
