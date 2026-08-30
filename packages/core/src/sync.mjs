@@ -45,6 +45,7 @@ export const ATTENTION_PRIORITY = Object.freeze({
   coordinator_missing: 4,
   request_stalled: 5,
   claim_expired: 6,
+  claim_contended: 7,
 });
 
 function directRequests(snapshot, participantId) {
@@ -93,6 +94,41 @@ function claimConflicts(snapshot, session, now) {
     .map(claim => ({ kind: "claim_conflict", priority: ATTENTION_PRIORITY.claim_conflict,
       sourceId: claim.claimId,
       summary: `${claim.resource} is claimed by ${claim.ownerSessionId}` }));
+}
+
+/**
+ * A resource I hold that a peer has said they intend to touch.
+ *
+ * The mirror of `claimConflicts`. That one reads my own intent and warns me when
+ * what I mean to touch is already claimed. This one reads a peer's intent and
+ * warns me, the holder, that someone is heading for what I claimed. Without it
+ * intent's only wired reader faced inward: it protected the one declaring intent
+ * and told the claim holder nothing, so a claim was a wall nobody was told they
+ * were walking into. A claim is advisory - it does not stop the write - so being
+ * told early is the whole of the protection it offers.
+ *
+ * Only my own claims, and never my own intent against them: declaring intent on
+ * what you already hold is not someone reaching for it. The peer is named by
+ * participant where the roster knows it, because a session id cannot be used
+ * with `--to` and an id a reader cannot act on is the trap the projector warns of.
+ */
+function claimContended(snapshot, session, now) {
+  if (session === null || session === undefined) return [];
+  const theirs = (snapshot.intents ?? [])
+    .filter(intent => intent.sessionId !== session.sessionId);
+  const nameOf = sessionId => (snapshot.sessions ?? [])
+    .find(item => item.sessionId === sessionId)?.participantId ?? "a peer";
+  return (snapshot.claims ?? [])
+    .filter(claim => claim.ownerSessionId === session.sessionId
+      && Date.parse(claim.expiresAt) > Date.parse(now))
+    .flatMap(claim => {
+      const eyeing = theirs.find(intent =>
+        (intent.resourceHints ?? []).some(hint => overlaps(hint, claim.resource)));
+      return eyeing === undefined ? [] : [{
+        kind: "claim_contended", priority: ATTENTION_PRIORITY.claim_contended,
+        sourceId: claim.claimId,
+        summary: `${claim.resource} - ${nameOf(eyeing.sessionId)} means to work on what you hold` }];
+    });
 }
 
 /**
@@ -210,6 +246,7 @@ export function computeAttention(snapshot, { session, participantId, now, pidIsA
   return [
     ...directRequests(snapshot, participantId),
     ...claimConflicts(snapshot, session, now),
+    ...claimContended(snapshot, session, now),
     ...expiredClaims(snapshot, session, now),
     ...unblockedTasks(snapshot, session, participantId),
     ...coordinatorGaps(snapshot),

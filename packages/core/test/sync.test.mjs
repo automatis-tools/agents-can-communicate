@@ -110,6 +110,39 @@ test("attention ranks a direct request above a nearby claim conflict", async () 
     ["direct_request", "claim_conflict"]);
 });
 
+test("a peer intending a resource I hold tells me my claim is contended", async () => {
+  const { service } = makeService();
+  const { first, second } = await pair(service);
+  // I hold the claim; a peer declares intent on the same resource. The mirror of
+  // the conflict above: there the intent is mine and the claim a peer's; here the
+  // claim is mine and the intent a peer's.
+  await service.acquireClaim({ sessionId: first.sessionId, generation: first.generation,
+    resource: "file:packages/core/src/claims.mjs", reason: "editing" });
+  await service.setIntent({ sessionId: second.sessionId, generation: second.generation,
+    summary: "reading the claim model", mode: "explore",
+    resourceHints: ["file:packages/core/src/claims.mjs"] });
+
+  const result = await service.sync({ sessionId: first.sessionId });
+
+  assert.deepEqual(result.attention.map(item => item.kind), ["claim_contended"]);
+  assert.equal(result.attention[0].sourceId.startsWith("claim_"), true,
+    "the line carries the claim id, so `acc release --claim` has its argument");
+});
+
+test("my own intent over my own claim is not a contention", async () => {
+  const { service } = makeService();
+  const { first } = await pair(service);
+  await service.acquireClaim({ sessionId: first.sessionId, generation: first.generation,
+    resource: "file:src/mine.mjs", reason: "editing" });
+  await service.setIntent({ sessionId: first.sessionId, generation: first.generation,
+    summary: "editing mine", mode: "edit", resourceHints: ["file:src/mine.mjs"] });
+
+  const result = await service.sync({ sessionId: first.sessionId });
+
+  // Declaring intent on what you already hold is not someone reaching for it.
+  assert.equal(result.attention.some(item => item.kind === "claim_contended"), false);
+});
+
 test("an acknowledged request stops demanding attention", async () => {
   const { service } = makeService();
   const { first, second } = await pair(service);
@@ -148,13 +181,20 @@ test("every attention kind in the priority table is one a rule can produce", () 
     messages: [{ messageId: "message_a", subject: "Need slots", requiresAck: true }],
     receipts: [{ messageId: "message_a", recipientParticipantId: "participant_a",
       state: "injected" }],
-    intents: [{ sessionId: "session_a", resourceHints: ["file:src/**"] }],
+    intents: [
+      { sessionId: "session_a", resourceHints: ["file:src/**"] },
+      // A peer heading for what this session holds - triggers claim_contended.
+      { sessionId: "session_b", resourceHints: ["file:src/held.mjs"] },
+    ],
     claims: [
       { claimId: "claim_a", ownerSessionId: "session_b", resource: "file:src/main.mjs",
         expiresAt: "2026-08-16T02:00:00.000Z" },
       // This session's own, and its lease has run out.
       { claimId: "claim_b", ownerSessionId: "session_a", resource: "file:src/lapsed.mjs",
         expiresAt: "2026-08-16T00:30:00.000Z" },
+      // This session's own and still held, and a peer above means to touch it.
+      { claimId: "claim_c", ownerSessionId: "session_a", resource: "file:src/held.mjs",
+        expiresAt: "2026-08-16T02:00:00.000Z" },
     ],
     tasks: [
       { taskId: "task_a", state: "pending", assigneeSessionId: "session_a",
