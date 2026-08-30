@@ -155,10 +155,17 @@ function unansweredQuestions(snapshot, participantId, onlineParticipants) {
 }
 
 function stalledRequests(snapshot, participantId, now, pidIsAlive) {
+  // Classified once per session and reused below, for the same reason
+  // collectStatus takes one reading: classifySessionPresence calls pidIsAlive,
+  // a real process.kill(pid, 0) syscall for a session with a recorded pid, so
+  // it is not pure given `now` any more. A second classifying pass here could
+  // disagree with the first - a client exiting between them would leave `live`
+  // saying "online" while a freshly-computed `onlineParticipants` had already
+  // dropped it, inside one attention computation.
   const live = new Map((snapshot.sessions ?? [])
     .map(session => [session.sessionId, classifySessionPresence(session, now, pidIsAlive)]));
   const onlineParticipants = new Set((snapshot.sessions ?? [])
-    .filter(session => classifySessionPresence(session, now, pidIsAlive) === "online")
+    .filter(session => live.get(session.sessionId) === "online")
     .map(session => session.participantId));
   const goingNowhere = task => {
     // Taken by someone who has gone quiet.
