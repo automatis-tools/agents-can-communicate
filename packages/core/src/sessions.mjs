@@ -9,14 +9,46 @@ import { writeWorkResponse } from "./notify.mjs";
 // rather than one global constant (docs/ARCHITECTURE.md, presence freshness).
 const STALE_CADENCE_MULTIPLE = 3;
 
+// Two floors, because they answer different questions and neither subsumes the
+// other. UNKNOWN_EXPIRY_MS is the "cannot tell" branch: records written before
+// pids were recorded, platforms with no process table, an ancestry that did not
+// resolve. HARD_EXPIRY_MS exists because pids are recycled - the hazard
+// writer-mutex.mjs:72 documents - so a session whose number was reissued to
+// something unrelated would otherwise read as alive forever.
+const UNKNOWN_EXPIRY_MS = 30 * 60_000;
+const HARD_EXPIRY_MS = 24 * 60 * 60_000;
+
+const ageBand = (session, age) =>
+  age <= session.heartbeatCadenceMs * STALE_CADENCE_MULTIPLE ? "online" : "stale";
+
 /**
+ * @param {{ state: string, heartbeatAt: string, heartbeatCadenceMs: number,
+ *   pid?: number | null }} session The record to classify. `pid` absent or
+ *   `null` means nobody knows whether the process is alive - never that it is
+ *   dead - so age alone judges it.
+ * @param {string} now An ISO timestamp, compared against `session.heartbeatAt`.
+ * @param {(pid: number) => boolean} pidIsAlive Required, not defaulted: the one
+ *   thing that lets `offline` be reached before the age floors do. Called only
+ *   when `session.pid` is a real pid, never with `null`.
  * @returns {"online" | "stale" | "offline"}
+ * @throws {AccError} EXIT.USAGE when pidIsAlive is not a function.
  */
-export function classifySessionPresence(session, now, probe = () => true) {
+export function classifySessionPresence(session, now, pidIsAlive) {
+  // Required rather than defaulted. A probe that defaults to "everyone is
+  // alive" turns a forgotten call site into a check that silently passes, which
+  // is the failure this repository has already shipped twice.
+  if (typeof pidIsAlive !== "function") {
+    throw new AccError(EXIT.USAGE, "classifySessionPresence requires a pidIsAlive probe",
+      { sessionId: session?.sessionId ?? null });
+  }
   if (session.state === "closed") return "offline";
-  if (!probe(session)) return "offline";
   const age = Date.parse(now) - Date.parse(session.heartbeatAt);
-  return age <= session.heartbeatCadenceMs * STALE_CADENCE_MULTIPLE ? "online" : "stale";
+  if (age > HARD_EXPIRY_MS) return "offline";
+  const pid = session.pid ?? null;
+  // A pid that answers outranks the unknown floor: a live but idle session is
+  // exactly what kimi looks like between turns.
+  if (pid !== null) return pidIsAlive(pid) ? ageBand(session, age) : "offline";
+  return age > UNKNOWN_EXPIRY_MS ? "offline" : ageBand(session, age);
 }
 
 const sessionRecord = (input, now, generation) => validateRecord("session", {
@@ -30,6 +62,7 @@ const sessionRecord = (input, now, generation) => validateRecord("session", {
   parentSessionId: input.parentSessionId ?? null,
   checkoutRoot: input.checkoutRoot ?? null,
   branch: input.branch ?? null,
+  pid: input.pid ?? null,
   // Both default to the weaker reading. A session that declares nothing is a
   // session nothing intercepts - an MCP client, or a CLI user - and claiming
   // otherwise would promise enforcement that is not there.
@@ -50,7 +83,7 @@ const participantRecord = (input, now) => validateRecord("participant", {
 });
 
 export function createSessionService(ports) {
-  const { store, clock, ids } = ports;
+  const { store, clock, ids, pidIsAlive } = ports;
   const workspaceOf = input => input.workspaceId ?? store.workspaceId;
 
   async function locate(sessionId, workspaceId) {
@@ -66,9 +99,16 @@ export function createSessionService(ports) {
   function assertReplaceable(existing, probe) {
     if (existing.record.state === "closed") return;
     // Presence staleness alone never replaces ownership: an idle-but-open
-    // session may resume at any moment. Only a liveness probe reporting the
-    // owner gone permits a replacement generation.
-    if (probe === undefined || probe(existing.record)) {
+    // session may resume at any moment, and a wrong "gone" verdict there
+    // self-corrects the moment that session next takes a turn. A wrong
+    // replacement does not self-correct - it takes the generation, and the
+    // original session's own heartbeats fail with CONFLICT from then on. So
+    // only a pid confirmed dead is authority to replace; "we cannot tell" -
+    // a session with no recorded pid - is never enough, however long the
+    // silence.
+    const live = probe ?? (record => (record.pid ?? null) === null
+      || pidIsAlive(record.pid));
+    if (live(existing.record)) {
       throw new AccError(EXIT.CONFLICT, "the session id is already live",
         { sessionId: existing.record.sessionId });
     }

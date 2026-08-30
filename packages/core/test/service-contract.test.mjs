@@ -169,6 +169,22 @@ test("the service factory rejects a port missing a required method", () => {
   }), error => error.code === EXIT.USAGE && error.message.includes("snapshot"));
 });
 
+test("a pidIsAlive that is not a function is refused at construction", () => {
+  const store = createMemoryStore({ clock: createFakeClock(NOW), ids: createFakeIds() });
+
+  // Not shape-checking this port let it construct cleanly and die later with a
+  // bare TypeError the first time presence was classified - invisible to the
+  // CLI's exit-code mapping. `null` is checked separately from a missing value:
+  // the default only applies to `undefined`, so an explicit `null` would
+  // otherwise slip through untouched.
+  assert.throws(() => createCoordinationService({ store, clock: createFakeClock(NOW),
+    ids: createFakeIds(), pidIsAlive: true }),
+  error => error.code === EXIT.USAGE && error.message.includes("pidIsAlive"));
+  assert.throws(() => createCoordinationService({ store, clock: createFakeClock(NOW),
+    ids: createFakeIds(), pidIsAlive: null }),
+  error => error.code === EXIT.USAGE && error.message.includes("pidIsAlive"));
+});
+
 test("the service exposes frozen ports and no global singleton", () => {
   const store = createMemoryStore({ clock: createFakeClock(NOW), ids: createFakeIds() });
   const service = createCoordinationService({ store, clock: createFakeClock(NOW),

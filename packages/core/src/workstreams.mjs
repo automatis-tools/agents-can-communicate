@@ -8,7 +8,7 @@ import { classifySessionPresence } from "./sessions.mjs";
 // coordinator lease, and the coordinator plans - it is never the transport,
 // the durable owner, or an information gatekeeper.
 export function createWorkstreamService(ports, sessions) {
-  const { store, clock, ids } = ports;
+  const { store, clock, ids, pidIsAlive } = ports;
 
   async function requireOpenSession(input, action) {
     const existing = await sessions.locateSession(input.sessionId, input.workspaceId);
@@ -63,7 +63,7 @@ export function createWorkstreamService(ports, sessions) {
       if (held !== null && held !== session.sessionId) {
         const holder = snapshot.sessions.find(item => item.sessionId === held);
         const presence = holder === undefined ? "offline"
-          : classifySessionPresence(holder, now);
+          : classifySessionPresence(holder, now, pidIsAlive);
         // A coordinator lease is replaced only when the holder is genuinely
         // gone or policy says so - not because a peer would like the role.
         if (presence !== "offline" && input.authority !== "human"

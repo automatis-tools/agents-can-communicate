@@ -44,6 +44,34 @@ should be re-run before claiming another platform.
 | `execution.resume` | no | no | no | no |
 | `execution.terminate` | no | no | no | no |
 
+## Resolving a client's pid is not universal either
+
+Not a capability above - no adapter method backs it, so it has no row in the matrix - but
+it is presence's other signal for telling a dead process from an idle one, and it does not
+reach every client.
+
+A session's recorded pid comes from walking its process ancestry until the adapter's own
+declared binary (`client.command`) turns up in `ps -o comm=`. That only works when the
+operating system's own name for the process actually is that binary: true for a native
+executable, false for a script run through an interpreter, where `comm` reports the
+interpreter's name rather than the script's.
+
+| Client | `client.command` | `ps -o comm=` reports | Pid resolves |
+|---|---|---|---|
+| `codex` | `codex` | `codex`, a native binary | yes |
+| `claude_code` | `claude` | `claude`, a native binary | yes |
+| `gemini_cli` | `gemini` | `node` - `gemini.js` starts `#!/usr/bin/env node` | **no** |
+| `kimi` | `kimi` | not installed on the machine this table was measured on; Kimi Code ships via npm as a Node.js CLI (`@moonshot-ai/kimi-code`), the same shape as Gemini CLI | **almost certainly no - not measured** |
+
+A Gemini session records `pid: null` for its whole life, and Kimi's is very likely the
+same, unconfirmed. `null` is the correct "nobody knows" answer and is handled identically
+wherever it is read - not a correctness bug. It does change what presence delivers, though:
+a confirmed-dead pid retires a session immediately and exactly, and today that is `codex`
+and `claude_code` only. `gemini_cli` and `kimi` fall back to the same age-based floor every
+session has for whenever a pid is unavailable - thirty minutes of silence - so their
+sessions still leave, just later and on a timer instead of on the fact. See
+[ARCHITECTURE.md](ARCHITECTURE.md#presence) for the full floor.
+
 ## What the yes values do not promise
 
 A capability says the client can do the thing. Several of them are conditional on how the
@@ -85,8 +113,10 @@ what the claim's owner asked for, and whether ACC can stop this session at all:
 Unenforceable is not the same as unknown - and neither is it the same as unclaimed.
 
 **`lifecycle.sessionEnd` on `kimi` is false and it matters.** Each `kimi -p` run leaves an
-attached session that only ages out on its declared 60s cadence, so a peer reading the
-roster inside that window sees sessions that have already exited. Interactive sessions
+attached session that never closes itself - it just stops taking turns. Presence retires it
+instead, most likely without ever resolving a pid (see above), which means the session
+reads `offline` - and disappears from the default `acc status` view - only after thirty
+minutes of silence, not on its declared 60s heartbeat cadence. Interactive sessions
 heartbeat and do not have this problem.
 
 **`lifecycle.heartbeat` is Kimi's alone.** It fires on a timer - observed at 60002, 120004

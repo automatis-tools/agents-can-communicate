@@ -154,11 +154,18 @@ function unansweredQuestions(snapshot, participantId, onlineParticipants) {
   return items;
 }
 
-function stalledRequests(snapshot, participantId, now) {
+function stalledRequests(snapshot, participantId, now, pidIsAlive) {
+  // Classified once per session and reused below, for the same reason
+  // collectStatus takes one reading: classifySessionPresence calls pidIsAlive,
+  // a real process.kill(pid, 0) syscall for a session with a recorded pid, so
+  // it is not pure given `now` any more. A second classifying pass here could
+  // disagree with the first - a client exiting between them would leave `live`
+  // saying "online" while a freshly-computed `onlineParticipants` had already
+  // dropped it, inside one attention computation.
   const live = new Map((snapshot.sessions ?? [])
-    .map(session => [session.sessionId, classifySessionPresence(session, now)]));
+    .map(session => [session.sessionId, classifySessionPresence(session, now, pidIsAlive)]));
   const onlineParticipants = new Set((snapshot.sessions ?? [])
-    .filter(session => classifySessionPresence(session, now) === "online")
+    .filter(session => live.get(session.sessionId) === "online")
     .map(session => session.participantId));
   const goingNowhere = task => {
     // Taken by someone who has gone quiet.
@@ -191,20 +198,28 @@ function coordinatorGaps(snapshot) {
       sourceId: workstream.workstreamId, summary: workstream.title }));
 }
 
-export function computeAttention(snapshot, { session, participantId, now }) {
+export function computeAttention(snapshot, { session, participantId, now, pidIsAlive }) {
+  // Required unconditionally, not only when there happen to be sessions to
+  // classify: `stalledRequests` reaches `classifySessionPresence` only inside a
+  // map/filter over `snapshot.sessions`, so an empty or absent roster let a
+  // missing probe through with nothing to trip over it - the same silent pass
+  // the classifier's own required parameter exists to close, one layer up.
+  if (typeof pidIsAlive !== "function") {
+    throw new AccError(EXIT.USAGE, "computeAttention requires a pidIsAlive probe", {});
+  }
   return [
     ...directRequests(snapshot, participantId),
     ...claimConflicts(snapshot, session, now),
     ...expiredClaims(snapshot, session, now),
     ...unblockedTasks(snapshot, session, participantId),
     ...coordinatorGaps(snapshot),
-    ...stalledRequests(snapshot, participantId, now),
+    ...stalledRequests(snapshot, participantId, now, pidIsAlive),
   ].sort((left, right) => left.priority - right.priority
     || left.sourceId.localeCompare(right.sourceId));
 }
 
 export function createSyncService(ports, sessions) {
-  const { store, clock } = ports;
+  const { store, clock, pidIsAlive } = ports;
 
   /**
    * Any session may request the full Workspace scope. Peer equality is a
@@ -240,7 +255,7 @@ export function createSyncService(ports, sessions) {
     const page = await store.eventsSince(workspaceId, input.cursor ?? null,
       input.limit ?? DEFAULT_LIMIT);
     const attention = computeAttention(snapshot, { session,
-      participantId: session?.participantId ?? input.participantId, now });
+      participantId: session?.participantId ?? input.participantId, now, pidIsAlive });
 
     const roster = snapshot.sessions.map(item => ({
       sessionId: item.sessionId,
@@ -248,7 +263,7 @@ export function createSyncService(ports, sessions) {
       parentSessionId: item.parentSessionId,
       harness: item.harness,
       branch: item.branch ?? null,
-      presence: classifySessionPresence(item, now),
+      presence: classifySessionPresence(item, now, pidIsAlive),
     }));
 
     // Solo zero-overhead: one live session, no claims and

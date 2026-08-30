@@ -9,11 +9,11 @@ const NOW = "2026-08-16T01:00:00.000Z";
 const WORKSPACE = "workspace_a";
 const CADENCE = 30_000;
 
-function makeService() {
+function makeService(overrides = {}) {
   const clock = createFakeClock(NOW);
   const store = createMemoryStore({ clock, ids: createFakeIds(), workspaceId: WORKSPACE });
   return { clock, store,
-    service: createCoordinationService({ store, clock, ids: createFakeIds() }) };
+    service: createCoordinationService({ store, clock, ids: createFakeIds(), ...overrides }) };
 }
 
 const opening = (overrides = {}) => ({ workspaceId: WORKSPACE,
@@ -98,4 +98,21 @@ test("an unknown enforcement value is refused rather than trusted", async () => 
   const { service } = makeService();
 
   await assert.rejects(service.openSession(opening({ enforcement: "probably" })));
+});
+
+test("a roster drops a session whose pid is dead, and --all still lists it", async () => {
+  const { service } = makeService({ pidIsAlive: () => false });
+  await service.openSession(opening({ pid: 4321 }));
+
+  // The record is still `state: "open"` - nobody rewrote it - but its process
+  // is confirmed gone, so presence reads `offline` and the ordinary roster
+  // drops it exactly as it would a closed session.
+  const status = await service.collectStatus({ workspaceId: WORKSPACE });
+  assert.equal(status.participants.length, 0);
+  assert.equal(status.counts.live, 0);
+
+  // `--all` is the worktree-cleanup question - it answers "who was ever here"
+  // regardless of presence - so the same ghost has to survive that filter.
+  const withAll = await service.collectStatus({ workspaceId: WORKSPACE, all: true });
+  assert.equal(withAll.participants.length, 1);
 });

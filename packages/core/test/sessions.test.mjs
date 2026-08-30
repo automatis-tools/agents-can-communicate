@@ -12,11 +12,11 @@ const NOW = "2026-08-16T01:00:00.000Z";
 const WORKSPACE = "workspace_a";
 const CADENCE = 30_000;
 
-function makeService() {
+function makeService(overrides = {}) {
   const clock = createFakeClock(NOW);
   const store = createMemoryStore({ clock, ids: createFakeIds(), workspaceId: WORKSPACE });
   return { clock, store,
-    service: createCoordinationService({ store, clock, ids: createFakeIds() }) };
+    service: createCoordinationService({ store, clock, ids: createFakeIds(), ...overrides }) };
 }
 
 const opening = (overrides = {}) => ({ workspaceId: WORKSPACE, participantId: "participant_a",
@@ -113,6 +113,26 @@ test("a stale session cannot be replaced without a liveness probe", async () => 
   assert.notEqual(replaced.generation, session.generation);
 });
 
+test("a session whose recorded pid is dead is replaceable with no explicit probe", async () => {
+  const { service } = makeService({ pidIsAlive: () => false });
+  const session = await service.openSession(opening({ pid: 42 }));
+
+  const replaced = await service.openSession(opening({ sessionId: session.sessionId }));
+  assert.notEqual(replaced.generation, session.generation);
+});
+
+test("a session with no pid is never replaceable by age alone", async () => {
+  const { service, clock } = makeService();
+  const session = await service.openSession(opening());
+  // 100 minutes - well past the 30-minute unknown floor: if age alone still
+  // governed replacement here, this session would already read as offline and
+  // this would silently succeed instead of pinning the ruling.
+  clock.advance(CADENCE * 200);
+
+  await assert.rejects(service.openSession(opening({ sessionId: session.sessionId })),
+    error => error.code === EXIT.CONFLICT);
+});
+
 test("an old generation cannot close its successor", async () => {
   const { service } = makeService();
   const original = await service.openSession(opening());
@@ -162,7 +182,8 @@ test("a closed session or a failed probe is offline, never merely stale", () => 
 
   assert.equal(classifySessionPresence({ ...session, state: "closed" }, NOW,
     () => true), "offline");
-  assert.equal(classifySessionPresence(session, at(CADENCE * 99), () => false), "offline");
+  assert.equal(classifySessionPresence({ ...session, pid: 42 }, at(CADENCE * 99), () => false),
+    "offline");
 });
 
 test("stale is a truthful state, not an error", () => {
@@ -172,4 +193,17 @@ test("stale is a truthful state, not an error", () => {
   const later = new Date(Date.parse(NOW) + CADENCE * 5).toISOString();
 
   assert.equal(classifySessionPresence(session, later, () => true), "stale");
+});
+
+test("a session records the process behind it, or null when nobody knows", async () => {
+  const { service } = makeService();
+
+  const known = await service.openSession(opening({ pid: 4321 }));
+  const unknown = await service.openSession(opening({ participantId: "participant_b",
+    pid: undefined }));
+
+  // null is a first-class answer here, not a missing value: it is what the
+  // ancestry walk returns when it cannot name the client.
+  assert.equal(known.pid, 4321);
+  assert.equal(unknown.pid, null);
 });

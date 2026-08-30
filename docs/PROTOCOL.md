@@ -20,6 +20,9 @@ Workspace
 - A session records the checkout it is working in — `checkoutRoot` and `branch`. One
   workspace spans every worktree of a repository, so the workspace id cannot say who is
   where, and nothing else can: the agents a clean-up asks about are the ones not running.
+- A session records the process behind it — `pid` — when the hook can name one, and `null`
+  when it cannot: no process table on the platform, or an ancestry that never resolved.
+  `null` means judge this session by age alone; it never means the session is dead.
 
 ## Intent
 
