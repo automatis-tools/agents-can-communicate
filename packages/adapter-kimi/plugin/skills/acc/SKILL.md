@@ -14,7 +14,7 @@ skill is how you stay legible to them and they to you.
 Once you understand the request, publish one line of Intent:
 
 ```bash
-{{ACC}} work --summary "porting the claim model" --mode edit
+{{ACC}} work --summary "porting the claim model" --mode edit --hint 'file:packages/core/**'
 ```
 
 When you stop working on something and are not starting anything else, say so with
@@ -24,6 +24,12 @@ progress.
 `--mode` is one of `observe`, `explore`, `edit`, `review`, `coordinate`, `wait`. Update it
 when the work changes character. Intent is awareness, not a reservation: it tells peers
 what you are up to, it does not stop anyone editing anything.
+
+`--hint` names a file or glob you are about to touch, and repeats for more than one. It is
+the part of Intent another agent's tools act on: a peer who holds a claim on that resource
+is told you are heading for it, and you are told if your hint lands on a claim someone else
+holds. A summary a person reads is not a hint a tool can match - leave it off and neither
+warning fires.
 
 ## Claim before you change shared work
 
@@ -62,6 +68,7 @@ to the command that answers it:
 - [direct_request] message_x    someone addressed this to you    -> ack
 - [task_unblocked] task_x       work is waiting for you          -> task --take
 - [claim_conflict] claim_x      someone holds what you want      -> ask, or release
+- [claim_contended] claim_x     a peer means to touch what you hold -> reach out, or hold
 - [request_stalled] task_x      you asked and nobody is on it    -> ask again, or take it back
 - [request_stalled] message_x   you asked and nobody is there    -> ask someone else
 ```
