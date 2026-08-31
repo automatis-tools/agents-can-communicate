@@ -13,8 +13,8 @@ import { COMMANDS } from "./args.mjs";
  */
 const GROUPS = Object.freeze([
   ["Set up", ["install", "uninstall", "doctor", "config"]],
-  ["In a session", ["status", "sync", "work", "claim", "release", "ack", "message",
-    "request", "task", "workstream", "decide", "finish"]],
+  ["In a session", ["status", "sync", "work", "claim", "release", "inbox", "reply",
+    "ack", "message", "request", "task", "workstream", "decide", "finish"]],
   ["Driven by adapters, not by people", ["attach", "heartbeat", "detach"]],
   ["About acc", ["help", "version", "update"]],
 ]);
@@ -31,6 +31,8 @@ const SUMMARY = Object.freeze({
   release: "give a claim back",
   ack: "answer a message that asked for one, so it stops asking",
   message: "send a typed message to named participants",
+  inbox: "read only unresolved messages addressed to this participant",
+  reply: "reply to one message and acknowledge it in the same operation",
   request: "ask another agent to do something: the work and the why, in one call",
   task: "create work, --take it, or move its --state along",
   workstream: "group related work, and steer it with --take / --release",

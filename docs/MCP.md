@@ -36,12 +36,17 @@ the command line: `acc-mcp` takes no arguments and says so rather than ignoring 
 | `acc_work` | Publish intent |
 | `acc_claim` | Reserve a resource |
 | `acc_message` | Send a message |
+| `acc_inbox` | Read unresolved messages addressed to this participant, optionally one id |
+| `acc_reply` | Reply to one message and acknowledge the original atomically |
+| `acc_ack` | Acknowledge without a written reply |
 | `acc_request` | Ask another agent to do something |
 | `acc_task` | Create work, take it, or move it along |
 | `acc_workstream` | Group related work. Optional |
+| `acc_decide` | Record a durable decision |
 | `acc_finish` | Handoff and release |
 
-Resources: `acc://snapshot`, `acc://roster`.
+Use `acc_inbox`, not `acc_sync --scope full`, to recover an addressed message. Resources:
+`acc://snapshot`, `acc://roster`, `acc://workstreams`, `acc://tasks`, `acc://inbox`.
 
 ## When this tier fits
 

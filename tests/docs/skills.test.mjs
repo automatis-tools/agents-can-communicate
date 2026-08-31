@@ -28,7 +28,7 @@ const TAUGHT = Object.freeze(["sync", "work", "claim", "request", "task", "messa
 // `finish`, and `workstream` and `decide` only matter once work is large enough,
 // or a disagreement real enough, that the model will have read the CLI reference
 // anyway. Four sections in every skill is four sections read on every turn.
-const OPTIONAL = Object.freeze(["release", "workstream", "decide"]);
+const OPTIONAL = Object.freeze(["release", "workstream", "decide", "inbox", "reply"]);
 
 /** Every SKILL.md an adapter ships. */
 async function skills() {

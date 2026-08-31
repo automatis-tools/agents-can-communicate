@@ -31,7 +31,7 @@ graph LR
     I[acc install] --- D[acc doctor] --- CF[acc config] --- UN[acc uninstall]
   end
   subgraph Your agent
-    W[acc work] --- CL[acc claim] --- RQ[acc request] --- MS[acc message] --- TK[acc task] --- WS[acc workstream] --- FN[acc finish] --- ST[acc status] --- SY[acc sync] --- RL[acc release]
+    W[acc work] --- CL[acc claim] --- RQ[acc request] --- MS[acc message] --- IN[acc inbox] --- RP[acc reply] --- TK[acc task] --- FN[acc finish] --- ST[acc status]
   end
   subgraph Adapters only
     AT[acc attach] --- HB[acc heartbeat] --- DT[acc detach]
@@ -61,6 +61,8 @@ graph LR
 | `acc work` | Publish what this session is doing. `--hint` names a resource so a claim holder is warned; `--clear` when it has stopped |
 | `acc claim` | Reserve a resource. Exit `5` on conflict |
 | `acc release` | Give it back. `--resource` for what you claimed, `--claim` for its id |
+| `acc inbox` | Unresolved messages addressed to you. `--message` selects exactly one |
+| `acc reply` | Reply to one addressed message and acknowledge it atomically |
 | `acc ack` | Answer a message that asked for one, so it stops asking |
 | `acc message` | Send a typed message to participants |
 | `acc request` | Ask another agent to do something. One call: the work plus why |
@@ -144,6 +146,30 @@ decision on its own; that is the one way this record could launder an agent's op
 a ruling.
 
 `--supersedes` points at the decision this replaces, and the one it names has to exist.
+
+## Reading and replying to messages
+
+The ordinary read is narrow:
+
+```bash
+acc inbox
+acc inbox --message message_x
+```
+
+Without an id it returns only unresolved messages addressed to this participant, paired
+with their own receipt. With `--message`, it can also recover an injected note named by an
+`unread_note` breadcrumb. Reading moves `queued` or `injected` to `seen`. A direct request
+remains in the inbox after `seen` until it is answered, so context compaction cannot erase
+an obligation.
+
+```bash
+acc reply --message message_x --body "Yes; the boundary is free after abc123."
+```
+
+Reply creates an attributed `answer` linked through `inReplyTo` and acknowledges the
+original in the same transaction. Use `acc ack --message message_x` when no written answer
+is useful. `acc sync --scope full --json` is for explicit whole-workspace forensics, not
+for recovering one message.
 
 ## Asking another agent
 

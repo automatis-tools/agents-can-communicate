@@ -26,6 +26,9 @@ export const COMMANDS = Object.freeze({
   message: { required: ["subject", "body"],
     optional: ["session", "generation", "type", "priority", "workstream"],
     repeated: ["to"], flags: ["requires-ack"] },
+  inbox: { required: [], optional: ["session", "generation", "message"] },
+  reply: { required: ["message", "body"],
+    optional: ["session", "generation", "subject", "type", "priority"] },
   // Asking another agent to do something: one call, because a task nobody was
   // told about and a message pointing at no task are each useless.
   request: { required: ["to", "title"],

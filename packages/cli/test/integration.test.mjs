@@ -184,3 +184,26 @@ test("a message reaches a peer and status counts it", async t => {
   assert.equal(status.body.data.counts.messages, 1);
   assert.equal(status.body.data.attention.some(item => item.kind === "direct_request"), true);
 });
+
+test("inbox reads one message and reply answers plus acknowledges it", async t => {
+  const { json } = await workspace(t);
+  const sender = await attach(json, "visual");
+  const recipient = await attach(json, "models");
+  const sent = await json(["message", "--session", sender.sessionId, "--generation",
+    sender.generation, "--to", "models", "--subject", "Material gate",
+    "--body", "Can visual proceed?", "--type", "question", "--requires-ack"]);
+  const messageId = sent.body.data.messageId;
+
+  const inbox = await json(["inbox", "--session", recipient.sessionId, "--generation",
+    recipient.generation, "--message", messageId]);
+  assert.equal(inbox.code, 0, inbox.stderr);
+  assert.deepEqual(inbox.body.data.map(item => item.message.messageId), [messageId]);
+  assert.equal(inbox.body.data[0].receipt.state, "seen");
+  assert.equal(Object.hasOwn(inbox.body.data[0], "snapshot"), false);
+
+  const replied = await json(["reply", "--session", recipient.sessionId, "--generation",
+    recipient.generation, "--message", messageId, "--body", "Yes, proceed."]);
+  assert.equal(replied.code, 0, replied.stderr);
+  assert.equal(replied.body.data.reply.inReplyTo, messageId);
+  assert.equal(replied.body.data.receipt.state, "acknowledged");
+});

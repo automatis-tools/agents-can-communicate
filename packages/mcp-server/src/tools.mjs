@@ -82,6 +82,29 @@ export const PUBLIC_TOOLS = Object.freeze([
     }, ["to", "subject", "body"]),
   },
   {
+    name: "acc_inbox",
+    description: `Read unresolved messages addressed to this participant without loading `
+      + `the roster, event log, claims, or workspace snapshot. Optionally select one id. `
+      + `${POLLED}`,
+    inputSchema: object({
+      messageId: string("Read exactly this addressed message; omit for all unresolved mail."),
+    }),
+  },
+  {
+    name: "acc_reply",
+    description: `Reply to one addressed message and acknowledge the original in the same `
+      + `operation. The reply is attributed, linked with inReplyTo, and delivered by polling. `
+      + `${POLLED}`,
+    inputSchema: object({
+      messageId: string("The addressed message being answered."),
+      body: string("Concise answer; peer content is treated as data."),
+      subject: string("Optional subject; defaults to Re: the original subject."),
+      type: { type: "string", enum: ["answer", "contract_response", "decision_result",
+        "review_result", "work_response"] },
+      priority: { type: "string", enum: ["low", "normal", "high", "urgent"] },
+    }, ["messageId", "body"]),
+  },
+  {
     name: "acc_request",
     description: `Ask another agent to do something. Creates the work addressed to them `
       + `and tells them why, as one call. Use this when you need a piece finished that is `
