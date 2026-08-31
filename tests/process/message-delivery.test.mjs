@@ -155,9 +155,9 @@ test("a message the budget could not fit stays queued rather than reported deliv
   assert.equal(context.includes("xxxxxxxx"), false, "an oversized body was injected anyway");
   assert.equal(Buffer.byteLength(context, "utf8") <= 200, true,
     `the configured ceiling was ignored: ${Buffer.byteLength(context, "utf8")} bytes`);
-  // Said out loud. A projection that hides its own omissions leaves the model
-  // confidently unaware that something is waiting.
-  assert.match(context, /not shown, over budget/);
+  // Said out loud, and a dropped message says so specifically - not the generic
+  // "+N not shown" that two agents read as noise and lost a decision behind.
+  assert.match(context, /message\(s\) addressed to you did not fit/);
   assert.deepEqual((await receipts(where)).map(receipt => receipt.state), ["queued"],
     "the receipt says injected for text the model never saw - the sender is misinformed");
 });
