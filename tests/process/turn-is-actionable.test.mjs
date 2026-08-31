@@ -82,7 +82,7 @@ test("what the budget withheld comes with the way to read it", async t => {
 
   const shown = await place.turn();
 
-  assert.match(shown, /not shown, over budget/);
+  assert.match(shown, /message\(s\) addressed to you did not fit/);
   assert.match(shown, /acc sync --scope full --json/,
     `something was withheld and nothing said how to see it:\n${shown}`);
 });

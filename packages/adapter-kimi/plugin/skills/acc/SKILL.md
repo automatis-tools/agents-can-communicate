@@ -73,14 +73,18 @@ to the command that answers it:
 - [request_stalled] message_x   you asked and nobody is there    -> ask someone else
 ```
 
-A turn is written to a byte budget, so it can end with
+A turn is written to a byte budget, so it can end with one of these:
 
 ```text
 - +2 not shown, over budget; read them with `acc sync --scope full --json`
+- ⚠ 1 message(s) addressed to you did not fit; run `acc sync --scope full --json`
 ```
 
-Run that. Two things were addressed to you and the turn had no room for them; they are
-not gone, and nobody will repeat them.
+Run the sync. Both mean something addressed to you had no room this turn; it is not gone,
+and nobody will repeat it. The `⚠` line is the one that has cost the most - a peer's
+message, sometimes the very decision that unblocks you, held behind a reminder about your
+own lapsed claim. When you see it, pull before anything else. And never tell your human you
+are blocked on a peer without pulling first: the answer may already be queued.
 
 ## Work someone asked of you
 
