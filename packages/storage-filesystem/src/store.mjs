@@ -12,6 +12,10 @@ import { assertEventBinding, assertStateBinding, eventPath, stateEnvelope, state
 import { ensureManagedDirectory } from "./safe-directory.mjs";
 import { withWriterMutex } from "./writer-mutex.mjs";
 
+// Kept cohesive above 300 lines because durable transactions and ephemeral
+// mutations must share this exact writer mutex. Splitting the two stores would
+// make it easy to reintroduce separate locks and resurrect replaced sessions.
+
 const SEQUENCE_WIDTH = 16;
 export const ZERO_CURSOR = "0".repeat(SEQUENCE_WIDTH);
 // No quarantine area. One was created in every workspace, named in the path
@@ -268,14 +272,16 @@ export async function openFilesystemStore({ root, clock, ids, workspaceId, failA
       return (await readJsonIfPresent(ephemeralPath(kind, id), root))?.value ?? null;
     },
     async put(kind, id, record) {
-      await publishAtomic(ephemeralPath(kind, id), encode(record),
-        { root, tmpDir: paths.tmp, replace: true });
-      return record;
+      return withWriterMutex(paths, publishOptions, async () => {
+        await publishAtomic(ephemeralPath(kind, id), encode(record),
+          { root, tmpDir: paths.tmp, replace: true });
+        return record;
+      });
     },
     async update(kind, id, updater) {
       return withWriterMutex(paths, publishOptions, async () => {
         const found = await readJsonIfPresent(ephemeralPath(kind, id), root);
-        const next = updater(found?.value ?? null);
+        const next = await updater(found?.value ?? null);
         if (next === null) return null;
         validateRecord(kind, next);
         await publishAtomic(ephemeralPath(kind, id), encode(next),
@@ -283,7 +289,10 @@ export async function openFilesystemStore({ root, clock, ids, workspaceId, failA
         return next;
       });
     },
-    async delete(kind, id) { await removeIfPresent(ephemeralPath(kind, id)); },
+    async delete(kind, id) {
+      return withWriterMutex(paths, publishOptions,
+        async () => removeIfPresent(ephemeralPath(kind, id)));
+    },
     async list(kind) {
       const records = [];
       for (const filePath of await listJsonFiles(path.join(paths.ephemeral, kind), { root })) {

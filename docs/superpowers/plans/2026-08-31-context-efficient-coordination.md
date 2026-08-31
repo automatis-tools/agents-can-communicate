@@ -87,6 +87,8 @@ and MCP. Rewrite the bundled skill around selective communication.
   clients to prefer `acc_inbox`.
 - Suppress incomplete recovery commands when an unusually small context budget
   cannot hold the exact message id and command.
+- Serialize ephemeral put, update, and delete under one store writer lock, and
+  visibly withhold bodies from legacy adapters that cannot report included ids.
 - Prove every corrected gate with a deliberate mutation, then repeat the full
   suite and installed-package verification before opening the PR.
 

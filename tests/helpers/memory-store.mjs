@@ -121,18 +121,39 @@ export function createMemoryStore({ clock, ids, workspaceId }) {
   // Ephemeral records live outside transactions and outside the event log:
   // they are presence and Intent for a workspace that has not materialised.
   const volatile = new Map();
+  let ephemeralTail = Promise.resolve();
+  const withEphemeralWriter = async callback => {
+    const previous = ephemeralTail;
+    let release;
+    ephemeralTail = new Promise(resolve => { release = resolve; });
+    await previous;
+    try {
+      return await callback();
+    } finally {
+      release();
+    }
+  };
   const ephemeral = Object.freeze({
     async get(kind, id) { return volatile.get(key(kind, id)) ?? null; },
-    async put(kind, id, record) { volatile.set(key(kind, id), record); return record; },
-    async update(kind, id, updater) {
-      const current = volatile.get(key(kind, id)) ?? null;
-      const next = updater(current);
-      if (next === null) return null;
-      validateRecord(kind, next);
-      volatile.set(key(kind, id), next);
-      return next;
+    async put(kind, id, record) {
+      return withEphemeralWriter(async () => {
+        volatile.set(key(kind, id), record);
+        return record;
+      });
     },
-    async delete(kind, id) { volatile.delete(key(kind, id)); },
+    async update(kind, id, updater) {
+      return withEphemeralWriter(async () => {
+        const current = volatile.get(key(kind, id)) ?? null;
+        const next = await updater(current);
+        if (next === null) return null;
+        validateRecord(kind, next);
+        volatile.set(key(kind, id), next);
+        return next;
+      });
+    },
+    async delete(kind, id) {
+      return withEphemeralWriter(async () => { volatile.delete(key(kind, id)); });
+    },
     async list(kind) {
       return [...volatile.entries()]
         .filter(([entryKey]) => entryKey.startsWith(`${kind}:`))
