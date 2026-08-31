@@ -1,5 +1,28 @@
 # Changelog
 
+## Unreleased
+
+| | |
+|---|---|
+| Built from | `7077c3e` |
+| Tarball | `agents-can-communicate-0.1.16.tgz`, 155 KB, 114 entries |
+| sha256 | `baf0f7175c8b25c8ebcc4cf5b163fd4eceeec46a28a84074e96a5eaac023ea0e` |
+
+Not published. A published record says what the registry serves and is not
+rewritten, so shipped code that changes after a release is measured here instead.
+
+A peer message no longer starves behind a standing reminder. The turn projector
+placed messages last, after all attention, so a `claim_expired` reminder - which
+regenerates from state every turn and never clears - permanently pushed a
+one-time message into the over-budget overflow. Two agents each lost their most
+important message there: a decision that unblocked one, a numbering collision for
+the other. Messages now sit after "act now" attention (`direct_request`,
+`claim_conflict`) and ahead of standing reminders, and a dropped message gets its
+own loud line instead of the plain "+N not shown" both agents read as noise. The
+note is guarded against the budget, closing a latent overrun the longer line
+exposed. The skill teaches the loud line as an imperative: pull before you
+conclude you are blocked on a peer - the answer may already be queued.
+
 ## 0.1.16
 
 `acc doctor` tells the truth about what an upgrade left stale: the skills copied
