@@ -77,7 +77,19 @@ coordination exists: a second live session attaches, or the session creates its 
 durable object. Workspaces that never got there vanish without a trace.
 
 A lone session also pays no attention cost: adapters inject nothing while the roster has no
-peers, and guards short-circuit against the empty claim set.
+peers, and guards short-circuit against the empty claim set. With peers, ambient projection
+is one compact instruction to load the ACC skill. It deduplicates legacy sessions by
+participant and does not enumerate the roster or unrelated claims. Addressed messages and
+intent-aware conflicts keep their ids and detail; an over-budget body points to
+`acc inbox --message <id>`.
+
+## Session continuation
+
+A harness binding carries the ACC session id and generation between hook processes. Some
+clients fire SessionStart again after compacting model context. The runner resumes the
+exact open generation named by that binding, refreshing heartbeat and process metadata
+without appending another `session.opened` event. A missing, closed, or invalid binding
+opens a genuinely new session. Compaction is not a second participant arriving.
 
 ## Events
 

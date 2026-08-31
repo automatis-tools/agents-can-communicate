@@ -82,8 +82,9 @@ test("what the budget withheld comes with the way to read it", async t => {
 
   const shown = await place.turn();
 
-  assert.match(shown, /message\(s\) addressed to you did not fit/);
-  assert.match(shown, /acc sync --scope full --json/,
+  const [, messageId] = /acc inbox --message (message_[A-Za-z0-9_-]+)/.exec(shown) ?? [];
+  assert.equal(typeof messageId, "string");
+  assert.match(shown, /acc inbox --message/,
     `something was withheld and nothing said how to see it:\n${shown}`);
 });
 
@@ -98,7 +99,7 @@ test("the note always fits, however tight the budget", async t => {
 
   // The reserve exists so the projection never runs out of room to say that it
   // ran out of room - including room for the command that recovers what it lost.
-  assert.match(shown, /acc sync --scope full --json/);
+  assert.match(shown, /acc inbox --message message_/);
 });
 
 test("what the turn withheld is still there to be read", async t => {
@@ -109,9 +110,9 @@ test("what the turn withheld is still there to be read", async t => {
 
   // Withheld, not delivered: a receipt that advanced here would tell the sender
   // it landed when the reader never saw a word of it.
-  const { stdout } = await place.cli(["sync", "--scope", "full", "--json"], "reader");
+  const { stdout } = await place.cli(["inbox", "--json"], "reader");
   const payload = JSON.parse(stdout).data;
-  const subjects = payload.snapshot.messages.map(item => item.subject);
+  const subjects = payload.map(item => item.message.subject);
   assert.deepEqual(subjects, ["The physics review"]);
 });
 
@@ -131,7 +132,11 @@ test("every skill teaches the two lines a turn can end with", async () => {
   assert.equal(skills.length, 4);
   for (const { file, text } of skills) {
     assert.match(text, /\[direct_request\] message_x/, `${file} does not say what to do`);
-    assert.match(text, /not shown, over budget/, `${file} never mentions the budget line`);
-    assert.match(text, /sync --scope full --json/, `${file} does not say how to read them`);
+    assert.match(text, /inbox --message/, `${file} does not say how to read overflow`);
+    assert.match(text, /full workspace sync to recover one message/,
+      `${file} does not forbid the expensive recovery path`);
+    const full = text.split("\n").find(line => line.includes("sync --scope full --json"));
+    assert.match(full ?? "", /forensic/,
+      `${file} does not reserve full sync for explicit forensics`);
   }
 });
