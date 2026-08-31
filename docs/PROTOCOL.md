@@ -1,32 +1,40 @@
 # Protocol
 
-The domain vocabulary shared by models, adapters, and the CLI. Field names below are the
-ones the records actually carry.
+The shared vocabulary behind the CLI, the MCP tools, and every adapter: the
+objects a workspace stores, the exact fields each record carries, and the
+states they move through.
 
 ## Identity hierarchy
 
 ```text
 Workspace
 └── Participant
-    └── Session
+    └── Session (bound to a generation)
         └── optional child Session
 ```
 
-- `Participant` is one running agent. Two Codex sessions are two participants, even in
-  the same directory. `ACC_PARTICIPANT` pins a durable name, which is what lets work
-  addressed to an agent survive it restarting.
-- `Session` is one live or resumable conversation in one harness.
-- A participant may have several sessions, but ownership and claims are attached to an exact session generation.
-- A session records the checkout it is working in — `checkoutRoot` and `branch`. One
-  workspace spans every worktree of a repository, so the workspace id cannot say who is
-  where, and nothing else can: the agents a clean-up asks about are the ones not running.
-- A session records the process behind it — `pid` — when the hook can name one, and `null`
-  when it cannot: no process table on the platform, or an ancestry that never resolved.
-  `null` means judge this session by age alone; it never means the session is dead.
+- `Participant` is one running agent. Two Codex sessions are two
+  participants, even in the same directory. `ACC_PARTICIPANT` pins a durable
+  name, which is what lets work addressed to an agent survive it restarting.
+- `Session` is one live or resumable conversation in one harness. A
+  participant may have several sessions, but ownership and claims attach to
+  an exact session **generation** — a counter that proves the session
+  survived (or didn't) across a resume. A generation gates claim renewal and
+  force release; it is never printed by `acc status` — proof, not public
+  information.
+- A session records the checkout it is working in — `checkoutRoot` and
+  `branch`. One workspace spans every worktree of a repository, so the
+  workspace id cannot say who is where, and nothing else can: the agents a
+  clean-up asks about are the ones not running.
+- A session records the process behind it — `pid` — when the hook can name
+  one, and `null` when it cannot: no process table on the platform, or an
+  ancestry that never resolved. `null` means judge this session by age
+  alone; it never means the session is dead.
 
 ## Intent
 
-Every active top-level session should publish one current Intent after it understands the user's request.
+Every active top-level session should publish one current Intent after it
+understands the user's request.
 
 ```ts
 export interface WorkIntent {
@@ -40,11 +48,13 @@ export interface WorkIntent {
 }
 ```
 
-Intent is awareness, not authorization. An edit intent does not replace a claim.
+Intent is awareness, not authorization. An edit intent does not replace a
+claim.
 
 ## Workstreams and tasks
 
-Workstreams group related collaboration. Tasks are optional and appear only when formal assignment, dependency, or acceptance tracking adds value.
+Workstreams group related collaboration. Tasks are optional and appear only
+when formal assignment, dependency, or acceptance tracking adds value.
 
 ```ts
 export interface Workstream {
@@ -68,12 +78,12 @@ export interface Task {
 }
 ```
 
-A task whose dependencies are unmet is created `blocked`. Finishing the last dependency flips
-its dependents to `pending` in the same transaction, so `pending` always means ready and no
-LLM has to remember to re-evaluate the graph. A dependency that would close a cycle is
-refused.
+A task whose dependencies are unmet is created `blocked`. Finishing the last
+dependency flips its dependents to `pending` in the same transaction, so
+`pending` always means ready and no LLM has to remember to re-evaluate the
+graph. A dependency that would close a cycle is refused.
 
-## Generic resource claims
+## Resource claims
 
 Claims use resource URIs so the core is not limited to files:
 
@@ -101,11 +111,20 @@ export interface ResourceClaim {
 }
 ```
 
-Adapters may provide path-aware overlap logic, but core mutation is atomic and project-agnostic.
+Adapters may provide path-aware overlap logic, but core mutation is atomic
+and project-agnostic. File-path canonicalization and the `file:dir/**`
+glob rule are covered in [Concepts](CONCEPTS.md#intent-is-cheap-a-claim-commits).
 
 ### Claim lifetime and stale owners
 
-Claims are leases. `expiresAt` bounds every claim — `leaseSeconds` defaults to 1800 — and renewal requires the owner's exact session generation. A conflicting claim whose owner session has stale presence still conflicts: the staleness is reported to the requester, but only lease expiry or an explicit force release removes the claim. Force release requires human or policy authority and records actor, reason, and the replaced generation. Presence staleness alone never auto-releases a claim, because an idle-but-open session may resume at any moment.
+Claims are leases. `expiresAt` bounds every claim — `leaseSeconds` defaults
+to 1800 — and renewal requires the owner's exact session generation. A
+conflicting claim whose owner session has stale presence still conflicts:
+the staleness is reported to the requester, but only lease expiry or an
+explicit force release removes the claim. Force release requires human or
+policy authority and records actor, reason, and the replaced generation.
+Presence staleness alone never auto-releases a claim, because an
+idle-but-open session may resume at any moment.
 
 ## Messages
 
@@ -126,22 +145,28 @@ handoff
 work_request
 ```
 
-Every message records sender, recipients, workstream, optional task, priority, reply thread, and evidence descriptors. Message bodies are untrusted peer content.
+Every message records sender, recipients, workstream, optional task,
+priority, reply thread, and evidence descriptors. Message bodies are
+untrusted peer content — a message is data the recipient weighs, never an
+order it obeys; see [Concepts](CONCEPTS.md#asking-not-commanding).
 
 ## Requesting work
 
-`requestWork` writes a task and a message in one transaction. Apart they are useless: a task
-nobody was told about is work nobody knows exists, and a message describing work that was
-never recorded is a request with nothing to point at.
+`requestWork` writes a task and a message in one transaction. Apart they are
+useless: a task nobody was told about is work nobody knows exists, and a
+message describing work that was never recorded is a request with nothing to
+point at.
 
-Two assignee fields, because they answer different questions. `assigneeParticipantId` is who
-the work is for and outlives that agent restarting — the next session of that participant is
-told about it. `assigneeSessionId` is who is actually doing it, and dies with the process.
-One field asked to be both would either lose the request when a terminal closes or claim a
-dead session is still working.
+The Task interface above carries two assignee fields because they answer
+different questions. `assigneeParticipantId` is who the work is for and
+outlives that agent restarting — the next session of that participant is
+told about it. `assigneeSessionId` is who is actually doing it, and dies
+with the process. One field asked to be both would either lose the request
+when a terminal closes or claim a dead session is still working.
 
-Only the named participant may take an addressed task. A task with no assignee is open to
-anyone, which is what makes a request without a recipient a request to the room.
+Only the named participant may take an addressed task. A task with no
+assignee is open to anyone, which is what makes a request without a
+recipient a request to the room.
 
 ## Delivery lifecycle
 
@@ -150,22 +175,30 @@ recorded -> queued -> injected -> seen -> acknowledged
                \-> failed
 ```
 
-States are monotonic. One recipient's receipt cannot alter another recipient's state. `seen` means exposed to the receiving session or explicitly marked, not that the model obeyed it.
+States are monotonic. One recipient's receipt cannot alter another
+recipient's state. `seen` means exposed to the receiving session or
+explicitly marked, not that the model obeyed it.
 
-`sendMessage` leaves a receipt at `queued`. It advances to `injected` when the message was
-actually handed to the recipient — and only then. For a hooked session that means the turn
-context carried it: one the budget could not fit stays `queued` and goes out on a later
-turn, because a receipt claiming delivery for text nobody was shown tells the sender
-something untrue, and whatever the budget left out is stated in the projection rather than
-dropped in silence. For a client with no hooks, `acc_inbox` is the explicit read and
-advances the receipt to `seen`. Its list returns only unresolved addressed messages, never
-the roster, event log, claims, or workspace snapshot. An exact id can also recover the
-injected note named by an `unread_note` breadcrumb. A non-ack note disappears from the
-list after it is read; a direct request remains recoverable while `seen` until acknowledged.
+`sendMessage` leaves a receipt at `queued`. It advances to `injected` when
+the message was actually handed to the recipient — and only then. For a
+hooked session that means the turn context carried it: one the budget could
+not fit stays `queued` and goes out on a later turn, because a receipt
+claiming delivery for text nobody was shown tells the sender something
+untrue, and whatever the budget left out is stated in the projection rather
+than dropped in silence.
 
-`replyToMessage` validates that the original was addressed to the caller, writes an
-attributed response with `inReplyTo`, and advances the caller's original receipt to
-`acknowledged` in one transaction. Another participant cannot read or answer that receipt.
+For a client with no hooks, `acc_inbox` is the targeted read: it returns
+only unresolved messages addressed to the calling participant, never the
+roster, event log, claims, or workspace snapshot, and advances the receipt
+to `seen`. An exact id can also recover the injected note named by an
+`unread_note` breadcrumb. A non-ack note disappears from the list after it
+is read; a direct request remains recoverable while `seen` until
+acknowledged.
+
+`replyToMessage` validates that the original was addressed to the caller,
+writes an attributed response with `inReplyTo`, and advances the caller's
+original receipt to `acknowledged` — answer, link, and acknowledge in one
+transaction. Another participant cannot read or answer that receipt.
 
 ## Decisions
 
@@ -185,11 +218,13 @@ export interface Decision {
 }
 ```
 
-Peer proposals never become human-authority decisions without an explicit human or policy transition.
+Peer proposals never become human-authority decisions without an explicit
+human or policy transition.
 
 ## Artifacts and handoffs
 
-Artifacts are references with provenance and optional integrity values. Large content stays outside message bodies.
+Artifacts are references with provenance and optional integrity values.
+Large content stays outside message bodies.
 
 ```ts
 export interface ArtifactRef {
@@ -213,15 +248,18 @@ A handoff contains:
 
 ## Sync and attention
 
-Adapters request deltas since a cursor. Core computes attention items from eight explicit
-rules — `direct_request`, `claim_conflict`, `task_unblocked`, `coordinator_missing`,
-`request_stalled`, `claim_expired`, `claim_contended`, `unread_note` — listed with their
-exact trigger in [ARCHITECTURE.md](ARCHITECTURE.md).
+Adapters request deltas since a cursor. Core computes attention items from
+eight explicit rules — `direct_request`, `claim_conflict`, `task_unblocked`,
+`coordinator_missing`, `request_stalled`, `claim_expired`, `claim_contended`,
+`unread_note` — listed with their exact trigger in
+[Architecture](ARCHITECTURE.md).
 
-Semantic relevance may be assessed by the receiving model, but correctness cannot depend on a hidden central LLM classifier.
+Semantic relevance may be assessed by the receiving model, but correctness
+cannot depend on a hidden central LLM classifier.
 
-Sync also supports an explicit full-Workspace scope: any session may request the complete
-snapshot — roster, intents, workstreams, tasks, claims, and other participants' collapsed
-child sessions — to answer whole-system forensic questions. Bounded deltas are the ambient
-default; one addressed message is always read through `inbox`, never by scanning this
-snapshot.
+Sync also supports an explicit full-Workspace scope: any session may
+request the complete snapshot — roster, intents, workstreams, tasks,
+claims, and other participants' collapsed child sessions — to answer
+whole-system forensic questions. Bounded deltas are the ambient default;
+one addressed message is always read through `inbox`, never by scanning
+this snapshot.
