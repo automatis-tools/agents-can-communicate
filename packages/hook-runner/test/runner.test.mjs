@@ -504,3 +504,49 @@ test("a session still opens when the client cannot be named", async t => {
   assert.equal(started.exitCode, 0);
   assert.equal(record.pid, null);
 });
+
+test("an unread note reminds exactly once: the runner advances it injected -> seen", async t => {
+  const place = await workspace(t);
+  // An adapter whose projection actually names the ids the runner records
+  // against. The real projectContext does; the two fakes above do not, and
+  // without the id in the output nothing is ever marked delivered.
+  const echo = { ...kimi, renderContext: sync => [
+    ...(sync.messages ?? []).map(message => message.messageId),
+    ...(sync.attention ?? []).map(item => item.sourceId),
+  ].join(" ") };
+  const runEcho = payload => runHook({ adapterId: "kimi",
+    payload: { ...payload, cwd: payload.cwd ?? place.root },
+    adapters: { kimi: echo }, dataHome: place.dataHome, readProcessTable: noProcessTable });
+
+  const recipient = await run("kimi", event("sessionStart"), place);
+  const peer = await run("kimi", event("sessionStart", { sessionId: "peer" }), place);
+  const rp = recipient.sessions
+    .find(session => session.sessionId === recipient.accSessionId).participantId;
+
+  const note = await peer.service.sendMessage({ sessionId: peer.accSessionId,
+    generation: peer.generation, toParticipantIds: [rp], type: "note",
+    subject: "Snow plan", body: "took the minimal record", requiresAck: false });
+
+  const hasBreadcrumb = async () => (await recipient.service.sync({
+    sessionId: recipient.accSessionId, scope: "delta" }))
+    .attention.some(item => item.kind === "unread_note");
+  const receiptState = async () => (await recipient.service.sync({
+    sessionId: recipient.accSessionId, scope: "full" }))
+    .snapshot.receipts.find(receipt => receipt.messageId === note.messageId)?.state;
+
+  // Queued: about to be shown in full this turn, so no breadcrumb yet.
+  assert.equal(await receiptState(), "queued");
+  assert.equal(await hasBreadcrumb(), false);
+
+  // Turn 1 shows the note in full and records it injected.
+  await runEcho(event("beforeTurn"));
+  assert.equal(await receiptState(), "injected");
+  assert.equal(await hasBreadcrumb(), true);
+
+  // Turn 2 shows the single breadcrumb and advances the receipt to seen.
+  await runEcho(event("beforeTurn"));
+  assert.equal(await receiptState(), "seen");
+
+  // Seen: the note is neither re-shown nor nagged again.
+  assert.equal(await hasBreadcrumb(), false);
+});

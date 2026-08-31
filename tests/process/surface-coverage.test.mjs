@@ -132,7 +132,8 @@ test("every attention rule is documented, and the documentation invents none", a
       `${kind} is not named in the protocol reference`);
   }
   // The count in the prose is the part that goes stale silently.
-  const counted = ["zero", "one", "two", "three", "four", "five", "six", "seven"][kinds.length];
+  const counted = ["zero", "one", "two", "three", "four", "five", "six", "seven",
+    "eight"][kinds.length];
   assert.match(protocol, new RegExp(`${counted} explicit\\s+rules`),
     `the protocol reference does not say there are ${counted} rules`);
 
