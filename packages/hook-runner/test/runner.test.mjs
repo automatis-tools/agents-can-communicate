@@ -322,7 +322,7 @@ test("attach declares what the adapter proved, not that it is an adapter", async
   assert.equal(byHarness.blind.lifecycle, "manual");
 });
 
-test("the turn context names claims this session cannot be stopped from breaking",
+test("the turn context names only a claim overlapping this session's published intent",
   async t => {
     const place = await workspace(t);
     const peer = await run("kimi", event("sessionStart", { sessionId: "peer" }), place);
@@ -330,56 +330,32 @@ test("the turn context names claims this session cannot be stopped from breaking
       generation: peer.generation, resource: "file:src/**", mode: "exclusive",
       enforcement: "guarded", reason: "porting" });
 
-    // A session whose harness cannot guard writes: a Codex model that edits
-    // through the shell, or an MCP client. Nothing will intercept it, so the
-    // only protection left is telling it before the turn.
     const unguarded = { ...kimi, id: "unguarded",
       capabilities: { guards: { beforeWrite: false }, lifecycle: { sessionEnd: false } },
-      renderContext: sync => (sync.claims ?? [])
-        .map(c => `${c.resource}|${c.enforceable}`).join(" ") };
+      renderContext: sync => (sync.attention ?? [])
+        .map(item => `${item.kind}|${item.summary}`).join(" ") };
     const adapters = { ...ADAPTERS, unguarded };
 
-    await runHook({ adapterId: "unguarded", adapters, dataHome: place.dataHome,
+    const mine = await runHook({ adapterId: "unguarded", adapters, dataHome: place.dataHome,
       readProcessTable: noProcessTable,
       payload: event("sessionStart", { cwd: place.root }) });
+    await mine.service.setIntent({ sessionId: mine.accSessionId,
+      generation: mine.generation, summary: "editing src", mode: "edit",
+      resourceHints: ["file:src/**"] });
     const turn = await runHook({ adapterId: "unguarded", adapters, dataHome: place.dataHome,
       readProcessTable: noProcessTable,
       payload: event("beforeTurn", { cwd: place.root }) });
 
     assert.match(turn.stdout, /file:src\/\*\*/);
-    assert.match(turn.stdout, /\|false/, "the session was not told it is unenforced");
+    assert.match(turn.stdout, /claim_conflict/);
   });
-
-test("a guarded session is told about the claim, and that it is enforced", async t => {
-  const place = await workspace(t);
-  const peer = await run("kimi", event("sessionStart", { sessionId: "peer" }), place);
-  await peer.service.acquireClaim({ sessionId: peer.accSessionId,
-    generation: peer.generation, resource: "file:src/**", mode: "exclusive",
-    enforcement: "guarded", reason: "porting" });
-
-  const guarding = { ...kimi, id: "guarding",
-    capabilities: { guards: { beforeWrite: true }, lifecycle: { sessionEnd: true } },
-    renderContext: sync => (sync.claims ?? [])
-      .map(c => `${c.resource}|${c.enforceable}`).join(" ") };
-  const adapters = { ...ADAPTERS, guarding };
-
-  await runHook({ adapterId: "guarding", adapters, dataHome: place.dataHome,
-    readProcessTable: noProcessTable,
-    payload: event("sessionStart", { cwd: place.root }) });
-  const turn = await runHook({ adapterId: "guarding", adapters, dataHome: place.dataHome,
-    readProcessTable: noProcessTable,
-    payload: event("beforeTurn", { cwd: place.root }) });
-
-  assert.match(turn.stdout, /\|true/);
-});
 
 test("a session is not warned about its own claim", async t => {
   const place = await workspace(t);
-  // An adapter that actually renders claims. The default mock renders only the
-  // roster, so asserting the absence of a claim through it would prove nothing
-  // whatever the runner did.
+  // An adapter that renders the intent-aware attention path. Raw claims are no
+  // longer supplied to the projector.
   const rendering = { ...kimi, id: "rendering",
-    renderContext: sync => (sync.claims ?? []).map(c => c.resource).join(" ") };
+    renderContext: sync => (sync.attention ?? []).map(item => item.summary).join(" ") };
   const adapters = { ...ADAPTERS, rendering };
 
   const mine = await runHook({ adapterId: "rendering", adapters,
@@ -399,32 +375,6 @@ test("a session is not warned about its own claim", async t => {
   // Telling a session to avoid the thing it deliberately reserved would be
   // exactly backwards.
   assert.doesNotMatch(turn.stdout, /file:src/);
-});
-
-test("an advisory claim is passed through as advisory, not as a block", async t => {
-  const place = await workspace(t);
-  const peer = await run("kimi", event("sessionStart", { sessionId: "peer" }), place);
-  await peer.service.acquireClaim({ sessionId: peer.accSessionId,
-    generation: peer.generation, resource: "file:src/**", mode: "exclusive",
-    enforcement: "advisory", reason: "just asking" });
-
-  // A session that genuinely can be guarded. The guard still will not block an
-  // advisory claim, so telling this session its edits are blocked would be an
-  // announcement of something that never happens.
-  const guarding = { ...kimi, id: "guarding",
-    capabilities: { guards: { beforeWrite: true }, lifecycle: { sessionEnd: true } },
-    renderContext: sync => (sync.claims ?? [])
-      .map(c => `${c.resource}|${c.enforcement}|${c.enforceable}`).join(" ") };
-  const adapters = { ...ADAPTERS, guarding };
-
-  await runHook({ adapterId: "guarding", adapters, dataHome: place.dataHome,
-    readProcessTable: noProcessTable,
-    payload: event("sessionStart", { cwd: place.root }) });
-  const turn = await runHook({ adapterId: "guarding", adapters, dataHome: place.dataHome,
-    readProcessTable: noProcessTable,
-    payload: event("beforeTurn", { cwd: place.root }) });
-
-  assert.match(turn.stdout, /file:src\/\*\*\|advisory\|true/);
 });
 
 /**
@@ -511,7 +461,7 @@ test("an unread note reminds exactly once: the runner advances it injected -> se
   // against. The real projectContext does; the two fakes above do not, and
   // without the id in the output nothing is ever marked delivered.
   const echo = { ...kimi, renderContext: sync => [
-    ...(sync.messages ?? []).map(message => message.messageId),
+    ...(sync.messages ?? []).map(message => `id ${message.messageId} | shown body`),
     ...(sync.attention ?? []).map(item => item.sourceId),
   ].join(" ") };
   const runEcho = payload => runHook({ adapterId: "kimi",

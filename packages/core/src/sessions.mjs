@@ -179,6 +179,41 @@ export function createSessionService(ports) {
     return beaten;
   }
 
+  /**
+   * Continue the exact session named by a harness binding.
+   *
+   * Some clients emit SessionStart again after compacting their model context.
+   * The binding is already the continuation token: it names both the session
+   * and its generation. Refreshing that record preserves one identity without
+   * pretending an unrelated or closed generation is still ours.
+   *
+   * Returns null when the binding can no longer be resumed, so the hook may
+   * open a genuinely new session. No semantic event is appended: compaction is
+   * not a second agent arriving.
+   */
+  async function resumeSession({ sessionId, workspaceId, generation, ...metadata }) {
+    const existing = await locate(sessionId, workspaceId);
+    if (existing === null || existing.record.state !== "open"
+      || existing.record.generation !== generation) return null;
+    const resumed = { ...existing.record,
+      pid: metadata.pid ?? null,
+      checkoutRoot: metadata.checkoutRoot ?? existing.record.checkoutRoot,
+      branch: metadata.branch ?? existing.record.branch,
+      enforcement: metadata.enforcement ?? existing.record.enforcement,
+      lifecycle: metadata.lifecycle ?? existing.record.lifecycle,
+      heartbeatCadenceMs: metadata.heartbeatCadenceMs ?? existing.record.heartbeatCadenceMs,
+      heartbeatAt: clock.now(),
+    };
+    if (!existing.durable) {
+      await store.ephemeral.put("session", sessionId, resumed);
+      return resumed;
+    }
+    await store.transaction(async tx =>
+      tx.put("session", sessionId, resumed, tx.generationOf("session", sessionId)),
+    { kinds: ["session"] });
+    return resumed;
+  }
+
   async function closeSession({ sessionId, workspaceId, generation }) {
     const existing = await locate(sessionId, workspaceId);
     if (existing === null) throw new AccError(EXIT.CONFLICT, "session is not open", { sessionId });
@@ -222,6 +257,7 @@ export function createSessionService(ports) {
 
   return {
     openSession,
+    resumeSession,
     heartbeatSession,
     closeSession,
     locateSession: locate,

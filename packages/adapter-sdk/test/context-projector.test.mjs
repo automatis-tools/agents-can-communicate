@@ -42,8 +42,9 @@ test("direct requests and conflicts survive a budget that drops routine detail",
   assert.equal(rendered.includes("file:src/main.mjs"), true);
   assert.equal(Buffer.byteLength(rendered, "utf8") <= 400, true,
     `projection was ${Buffer.byteLength(rendered, "utf8")} bytes`);
-  // What is dropped is named, not silently removed.
-  assert.match(rendered, /\+\d+ more/);
+  // Routine roster detail is omitted by design, not spent and then reported as
+  // overflow. Only the items that can change this turn remain.
+  assert.doesNotMatch(rendered, /participant_39/);
 });
 
 test("projection is deterministic for the same input", () => {
@@ -115,44 +116,17 @@ test("the budget is respected even when a single item is oversized", () => {
   assert.equal(rendered.includes("…"), true, "an oversized item was not marked as truncated");
 });
 
-test("claims held by other sessions are named in the turn context", () => {
-  const projected = projectContext({ solo: false, cursor: "c1", roster: [],
-    attention: [], messages: [],
-    claims: [{ resource: "file:src/**", ownerParticipantId: "models",
-      enforceable: true }] });
+test("unrelated raw claims are omitted; an intent-aware conflict is actionable", () => {
+  const projected = projectContext({ solo: false, cursor: "c1", roster: roster(2),
+    messages: [], claims: [{ resource: "file:unrelated/**", ownerParticipantId: "models" }],
+    attention: [{ kind: "claim_conflict", priority: 2, sourceId: "claim_relevant",
+      summary: "file:src/** is claimed by models" }] });
 
-  // A peer's claim is only useful if the other session knows about it before it
-  // starts editing. Rendering it after the fact is a conflict report, not
-  // coordination.
+  // Core computes claim_conflict only when this session's resource hints
+  // overlap. Injecting every raw claim made unrelated state consume every turn.
+  assert.match(projected, /claim_relevant/);
   assert.match(projected, /file:src\/\*\*/);
-  assert.match(projected, /models/);
-});
-
-test("a session that cannot be stopped is told so, not left to assume", () => {
-  const projected = projectContext({ solo: false, cursor: "c1", roster: [],
-    attention: [], messages: [],
-    claims: [{ resource: "file:src/**", ownerParticipantId: "models",
-      enforcement: "guarded", enforceable: false }] });
-
-  // The honest case: the owner asked for enforcement, and this session is one
-  // ACC cannot intercept - a Codex model that edits through the shell, or any
-  // MCP client. The only thing left is to say that respecting the claim is now
-  // this session's own responsibility.
-  assert.match(projected, /cannot be enforced|not enforced/i);
-  assert.match(projected, /file:src\/\*\*/);
-});
-
-test("claims are ranked above the roster when the budget is tight", () => {
-  const projected = projectContext({ solo: false, cursor: "c1",
-    attention: [], messages: [],
-    roster: Array.from({ length: 40 }, (_, index) =>
-      ({ sessionId: `session_${index}`, harness: "codex", presence: "online" })),
-    claims: [{ resource: "file:critical/**", ownerParticipantId: "models",
-      enforceable: false }] }, { budgetBytes: 300 });
-
-  // Roster detail is the first thing to drop. A claim this session can break
-  // without being stopped is the last.
-  assert.match(projected, /file:critical/);
+  assert.doesNotMatch(projected, /file:unrelated/);
 });
 
 test("no claims means no section at all", () => {
@@ -160,40 +134,6 @@ test("no claims means no section at all", () => {
     attention: [], messages: [], claims: [] });
 
   assert.doesNotMatch(projected, /claim/i);
-});
-
-test("a guarded session is told the limit of its own guard", () => {
-  const projected = projectContext(syncResult({ roster: [],
-    claims: [{ resource: "file:src/**", ownerParticipantId: "models",
-      enforcement: "guarded", enforceable: true }] }));
-
-  // Being guarded is not the same as being safe: no harness intercepts a shell
-  // command, so an edit made through one is never stopped. A session told only
-  // "this is claimed" would reasonably assume ACC has it covered.
-  assert.match(projected, /recognised shell writes are blocked/);
-});
-
-test("a claim its owner declared advisory is never described as blocking", () => {
-  const projected = projectContext(syncResult({ roster: [],
-    claims: [{ resource: "file:src/**", ownerParticipantId: "models",
-      enforcement: "advisory", enforceable: true }] }));
-
-  // Enforcement is declared per claim, and the guard only blocks guarded ones.
-  // Reading this session's own capability alone would announce a block that
-  // will never happen - and the owner explicitly did not ask for one.
-  assert.doesNotMatch(projected, /blocked/);
-  assert.match(projected, /advisory/);
-  assert.match(projected, /file:src\/\*\*/);
-});
-
-test("an advisory claim reads the same however capable the session is", () => {
-  const render = enforceable => projectContext(syncResult({ roster: [],
-    claims: [{ resource: "file:src/**", ownerParticipantId: "models",
-      enforcement: "advisory", enforceable }] }));
-
-  // Whether this session could have been stopped is irrelevant to a claim
-  // nobody asked to be enforced.
-  assert.equal(render(true), render(false));
 });
 
 const peerMessage = (overrides = {}) => ({ messageId: "message_a",
@@ -228,7 +168,7 @@ test("what the budget leaves out is stated, not silently dropped", () => {
   }), { budgetBytes: 300 });
 
   // A dropped message escalates past the plain "+N not shown" note.
-  assert.match(rendered, /message\(s\) addressed to you did not fit/);
+  assert.match(rendered, /acc inbox --message message_a/);
 });
 
 test("a large message does not hide the shorter ones queued behind it", () => {
@@ -243,8 +183,8 @@ test("a large message does not hide the shorter ones queued behind it", () => {
   }), { budgetBytes: 400 });
 
   assert.match(rendered, /id message_small/);
-  assert.equal(rendered.includes("message_big"), false);
-  assert.match(rendered, /message\(s\) addressed to you did not fit/);
+  assert.doesNotMatch(rendered, /xxxx/);
+  assert.match(rendered, /acc inbox --message message_big/);
 });
 
 test("every emitted block is closed, whatever the budget", () => {
@@ -280,8 +220,8 @@ test("a peer message is not starved by a standing low-value attention line", () 
   }), { budgetBytes: 360 });
 
   assert.match(rendered, /Snow decision/, "the peer message was dropped");
-  assert.doesNotMatch(rendered, /your claim has run out/,
-    "the expired-claim reminder crowded the message out again");
+  assert.ok(rendered.indexOf("Snow decision") < rendered.indexOf("your claim has run out"),
+    "the standing reminder led ahead of the one-time message again");
 });
 
 test("a dropped message is a loud imperative, not a footnote", () => {
@@ -295,10 +235,9 @@ test("a dropped message is a loud imperative, not a footnote", () => {
       body: "x".repeat(400) }],
   }), { budgetBytes: 160 });
 
-  assert.match(rendered, /message.*addressed to you.*did not fit/i,
-    "a dropped message did not get its own loud line");
-  assert.match(rendered, /acc sync --scope full/,
-    "the loud line does not say how to read it");
+  assert.match(rendered, /acc inbox --message message_big/,
+    "the loud line does not say how to read the exact message");
+  assert.doesNotMatch(rendered, /sync --scope full/);
 });
 
 test("urgent attention still leads, ahead of messages", () => {

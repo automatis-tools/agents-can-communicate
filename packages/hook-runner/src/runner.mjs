@@ -157,7 +157,8 @@ async function openContext({ cwd, dataHome, runtime, env }) {
 }
 
 const HANDLERS = {
-  async sessionStart({ event, context, adapter, adapterId, paths, readProcessTable }) {
+  async sessionStart({ event, context, adapter, adapterId, binding, paths,
+    readProcessTable }) {
     const capabilities = adapter.capabilities ?? {};
     // Once per session, never per turn. A client that cannot be found yields
     // null, and the session is then judged by age alone - which is exactly the
@@ -165,6 +166,24 @@ const HANDLERS = {
     const command = adapter.client?.command ?? null;
     const pid = command === null ? null
       : resolveClientPid({ table: await readProcessTable(), from: process.pid, command });
+    const metadata = {
+      pid,
+      enforcement: capabilities.guards?.beforeWrite === true ? "guarded" : "advisory",
+      lifecycle: capabilities.lifecycle?.sessionEnd === true ? "managed" : "manual",
+      heartbeatCadenceMs: CADENCE_MS,
+      checkoutRoot: context.descriptor.git?.worktreeRoot ?? context.descriptor.roots[0],
+      branch: context.descriptor.git?.branch ?? null,
+    };
+    if (binding !== null) {
+      const resumed = await context.service.resumeSession({
+        sessionId: binding.accSessionId,
+        generation: binding.generation,
+        ...metadata,
+      });
+      if (resumed !== null) {
+        return { accSessionId: resumed.sessionId, generation: resumed.generation };
+      }
+    }
     const session = await context.service.openSession({
       workspaceId: context.descriptor.id,
       participantId: participantFor(adapterId, event.sessionId, context.env),
@@ -174,14 +193,9 @@ const HANDLERS = {
       // Declared from what this adapter proved, not from the fact that it is an
       // adapter at all. A peer reading the roster can then tell a session whose
       // writes can be stopped from one whose cannot.
-      enforcement: capabilities.guards?.beforeWrite === true ? "guarded" : "advisory",
-      lifecycle: capabilities.lifecycle?.sessionEnd === true ? "managed" : "manual",
-      heartbeatCadenceMs: CADENCE_MS,
       // Which checkout this agent is in. One workspace spans every worktree of
       // a repository, so this is the only thing that distinguishes them.
-      checkoutRoot: context.descriptor.git?.worktreeRoot ?? context.descriptor.roots[0],
-      pid,
-      branch: context.descriptor.git?.branch ?? null,
+      ...metadata,
       descriptor: context.descriptor,
     });
     await storeSessionBinding({ runtimeDir: paths.root, harnessSessionId: event.sessionId,
@@ -213,27 +227,11 @@ const HANDLERS = {
     const sync = await context.service.sync({ sessionId: binding.accSessionId,
       cursor: null, scope: "delta" });
 
-    // Claims held by others, and whether this session can actually be stopped
-    // from breaking them. For a harness that guards writes this is useful
-    // warning; for one that cannot - a Codex model editing through the shell,
-    // an MCP client - it is the only protection there is, so it has to say
-    // plainly that the responsibility has moved to the session itself.
-    const status = await context.service.collectStatus({
-      workspaceId: context.descriptor.id });
-    const mine = status.participants
+    // Sync already carries the roster. Calling collectStatus here used to read
+    // the entire materialised store a second time on every prompt merely to
+    // rediscover this session's participant id.
+    const mine = sync.roster
       .find(participant => participant.sessionId === binding.accSessionId);
-    // Two independent facts, and both are needed. `enforceable` is whether ACC
-    // could stop *this* session at all; `enforcement` is what the claim's owner
-    // asked for. A guarded session facing an advisory claim is not blocked from
-    // anything, so reporting either one alone mislabels the other case.
-    const enforceable = mine?.enforcement === "guarded";
-    const claims = status.claims
-      .filter(claim => claim.ownerSessionId !== binding.accSessionId)
-      .map(claim => ({ resource: claim.resource, enforcement: claim.enforcement,
-        enforceable,
-        ownerParticipantId: status.participants
-          .find(p => p.sessionId === claim.ownerSessionId)?.participantId
-          ?? claim.ownerSessionId }));
 
     // What peers have said to this participant and no model has been shown yet.
     // Without this the projector's peer block never ran in production: an agent
@@ -254,7 +252,8 @@ const HANDLERS = {
     // The ceiling a team agreed on in `acc.workspace.json`, or the default when
     // there is no config. Validated by the protocol and, until now, never read:
     // the projector was always called with its own default.
-    const projected = await adapter.renderContext?.({ ...sync, claims, messages },
+    const projected = await adapter.renderContext?.({ ...sync, messages,
+      currentParticipantId: mine?.participantId },
       { budgetBytes: context.descriptor.policy?.contextBudgetBytes }) ?? "";
     if (projected === "") return { stdout: "" };
 
@@ -264,7 +263,10 @@ const HANDLERS = {
     // told it landed. A message left behind stays queued and goes out next turn.
     const failures = [];
     for (const message of messages) {
-      if (!projected.includes(message.messageId)) continue;
+      // Recovery notes now name the exact message id too. Only the attributed
+      // block header proves the body itself was shown; matching the bare id
+      // would call an overflow pointer a delivery.
+      if (!projected.includes(`id ${message.messageId} |`)) continue;
       await context.service.markDelivery({ sessionId: binding.accSessionId,
         generation: binding.generation, messageId: message.messageId,
         recipientParticipantId: mine.participantId, state: "injected" })
