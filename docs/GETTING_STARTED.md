@@ -16,10 +16,8 @@ Getting the `acc` binary itself: [README](../README.md#install). Then:
 
 <!-- test:command -->
 ```bash
-acc install --dry-run
+acc install
 ```
-
-Prints every path it would touch. Run without `--dry-run` to apply.
 
 It only installs for clients you actually have. Missing ones are listed with the reason.
 
