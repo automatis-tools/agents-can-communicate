@@ -1,15 +1,19 @@
 # Changelog
 
-## Unreleased
+## 0.1.17
+
+A peer message no longer starves behind a standing reminder. The turn a client
+injects put messages last, so a reminder about your own lapsed claim could hide
+a decision a peer sent you - which is exactly what happened to two agents.
 
 | | |
 |---|---|
-| Built from | `7077c3e` |
-| Tarball | `agents-can-communicate-0.1.16.tgz`, 155 KB, 114 entries |
-| sha256 | `baf0f7175c8b25c8ebcc4cf5b163fd4eceeec46a28a84074e96a5eaac023ea0e` |
-
-Not published. A published record says what the registry serves and is not
-rewritten, so shipped code that changes after a release is measured here instead.
+| Built from | `PENDING` |
+| Tarball | `PENDING` |
+| sha256 | `PENDING` |
+| Node | 24 (current production LTS) |
+| Verified on | macOS 26.6.2 (darwin 25.6.0, arm64) and Linux in CI |
+| Not supported | Windows - untested rather than known-broken |
 
 A peer message no longer starves behind a standing reminder. The turn projector
 placed messages last, after all attention, so a `claim_expired` reminder - which
