@@ -8,9 +8,9 @@ a decision a peer sent you - which is exactly what happened to two agents.
 
 | | |
 |---|---|
-| Built from | `PENDING` |
-| Tarball | `PENDING` |
-| sha256 | `PENDING` |
+| Built from | `e6518cc` |
+| Tarball | `agents-can-communicate-0.1.17.tgz`, 155 KB, 114 entries |
+| sha256 | `4ccc3fd64aa218af977e864ba69344ccc788a5e665120c739f2dfbe18b200c2a` |
 | Node | 24 (current production LTS) |
 | Verified on | macOS 26.6.2 (darwin 25.6.0, arm64) and Linux in CI |
 | Not supported | Windows - untested rather than known-broken |
