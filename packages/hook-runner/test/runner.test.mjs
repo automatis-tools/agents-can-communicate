@@ -542,3 +542,29 @@ test("peer text cannot forge delivery of a message omitted by the budget", async
   assert.equal(stateOf(omitted.messageId), "queued",
     "peer-controlled text forged delivery for a body the model never saw");
 });
+
+test("an adapter without delivery metadata withholds bodies and reports degradation", async t => {
+  const place = await workspace(t);
+  const legacy = { ...kimi,
+    renderContext: sync => (sync.messages ?? []).map(message => message.body).join(" ") };
+  const adapters = { kimi: legacy };
+  const invoke = payload => runHook({ adapterId: "kimi", adapters,
+    payload: { ...payload, cwd: payload.cwd ?? place.root }, dataHome: place.dataHome,
+    readProcessTable: noProcessTable });
+  const recipient = await invoke(event("sessionStart"));
+  const peer = await invoke(event("sessionStart", { sessionId: "legacy-peer" }));
+  const recipientId = recipient.sessions
+    .find(session => session.sessionId === recipient.accSessionId).participantId;
+  const message = await peer.service.sendMessage({ sessionId: peer.accSessionId,
+    generation: peer.generation, toParticipantIds: [recipientId], type: "note",
+    subject: "Legacy", body: "body must not repeat silently", requiresAck: false });
+
+  const turn = await invoke(event("beforeTurn"));
+  const receipt = (await recipient.service.sync({ sessionId: recipient.accSessionId,
+    scope: "full" })).snapshot.receipts
+    .find(item => item.messageId === message.messageId);
+
+  assert.doesNotMatch(turn.stdout, /body must not repeat silently/);
+  assert.match(turn.stderr, /delivery metadata|acc inbox/i);
+  assert.equal(receipt.state, "queued");
+});

@@ -257,7 +257,8 @@ const HANDLERS = {
     // The ceiling a team agreed on in `acc.workspace.json`, or the default when
     // there is no config. Validated by the protocol and, until now, never read:
     // the projector was always called with its own default.
-    const projectionInput = { ...sync, messages,
+    const tracksDelivery = typeof adapter.renderContextResult === "function";
+    const projectionInput = { ...sync, messages: tracksDelivery ? messages : [],
       currentParticipantId: mine?.participantId };
     const projectionOptions = {
       budgetBytes: context.descriptor.policy?.contextBudgetBytes };
@@ -265,12 +266,22 @@ const HANDLERS = {
     // another message's visible header, so only projector metadata proves
     // which complete groups survived the byte budget. A custom adapter without
     // metadata may still inject text, but cannot advance a receipt from it.
-    const projection = adapter.renderContextResult === undefined
+    const projection = !tracksDelivery
       ? { text: await adapter.renderContext?.(projectionInput, projectionOptions) ?? "",
         includedMessageIds: [], includedAttentionIds: [] }
       : await adapter.renderContextResult(projectionInput, projectionOptions);
-    const projected = projection.text;
-    if (projected === "") return { stdout: "" };
+    const degradation = !tracksDelivery && messages.length > 0
+      ? `acc: ${messages.length} pending message(s) withheld because this adapter lacks `
+        + `structured delivery metadata; read ${messages[0].messageId} with `
+        + `acc inbox --message ${messages[0].messageId}`
+      : null;
+    const visibleDegradation = degradation === null ? "" : `ACC: ${degradation.slice(5)}`;
+    const candidate = [projection.text, visibleDegradation].filter(Boolean).join("\n");
+    const projected = Buffer.byteLength(candidate, "utf8")
+      <= (projectionOptions.budgetBytes ?? 6_000) ? candidate : projection.text;
+    if (projected === "") {
+      return degradation === null ? { stdout: "" } : { stdout: "", stderr: degradation };
+    }
 
     // Only what the model was actually shown is recorded as delivered. The
     // budget can leave a message out, and a receipt reading `injected` for text
@@ -307,9 +318,11 @@ const HANDLERS = {
     // over bookkeeping would be the worse trade - but a receipt that failed to
     // advance has to be visible somewhere, and stdout belongs to the model.
     const outcome = { stdout: "", ...adapter.injectOutcome?.(projected) };
-    if (failures.length === 0) return outcome;
+    if (failures.length === 0 && degradation === null) return outcome;
     return { ...outcome,
-      stderr: [outcome.stderr, `acc: delivery not recorded for ${failures.join(", ")}`]
+      stderr: [outcome.stderr, degradation,
+        failures.length === 0 ? null
+          : `acc: delivery not recorded for ${failures.join(", ")}`]
         .filter(Boolean).join("\n") };
   },
 

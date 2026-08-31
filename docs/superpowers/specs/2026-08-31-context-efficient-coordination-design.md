@@ -73,6 +73,9 @@ groups that survived its byte budget. Delivery state advances from those ids,
 never by searching rendered peer-controlled text. Session continuation likewise
 validates state and semantic generation inside the atomic durable or ephemeral
 update rather than trusting a record read before the write lock.
+All ephemeral mutations share that writer lock; a legacy adapter without
+structured projection metadata receives no message bodies and emits a visible
+targeted-inbox warning instead of silently repeating untracked delivery.
 
 ### Make the skill selective
 

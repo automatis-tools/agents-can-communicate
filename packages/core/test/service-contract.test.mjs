@@ -168,6 +168,49 @@ export function runStoreContract(name, makeStore) {
     assert.deepEqual(results.map(record => record.heartbeatAt).sort(), [first, second]);
     assert.equal((await store.ephemeral.get("session", "session_a")).heartbeatAt, second);
   });
+
+  test(`${name}: ephemeral put and delete wait for an update holding the lock`, async () => {
+    const store = await makeStore();
+    const pauseUpdate = async next => {
+      let entered;
+      let release;
+      const inside = new Promise(resolve => { entered = resolve; });
+      const gate = new Promise(resolve => { release = resolve; });
+      const update = store.ephemeral.update("session", "session_a", async current => {
+        entered();
+        await gate;
+        return next(current);
+      });
+      await inside;
+      return { update, release };
+    };
+    const letItRun = () => new Promise(resolve => setImmediate(resolve));
+    await store.ephemeral.put("session", "session_a", sessionRecord());
+
+    const beforePut = await pauseUpdate(current => ({ ...current,
+      heartbeatAt: "2026-08-16T01:00:01.000Z" }));
+    let putSettled = false;
+    const replacement = sessionRecord({ generation: "generation_replacement" });
+    const put = store.ephemeral.put("session", "session_a", replacement)
+      .then(() => { putSettled = true; });
+    await letItRun();
+    assert.equal(putSettled, false, "put bypassed an update holding the writer lock");
+    beforePut.release();
+    await Promise.all([beforePut.update, put]);
+    assert.equal((await store.ephemeral.get("session", "session_a")).generation,
+      "generation_replacement");
+
+    const beforeDelete = await pauseUpdate(current => ({ ...current,
+      heartbeatAt: "2026-08-16T01:00:02.000Z" }));
+    let deleteSettled = false;
+    const deletion = store.ephemeral.delete("session", "session_a")
+      .then(() => { deleteSettled = true; });
+    await letItRun();
+    assert.equal(deleteSettled, false, "delete bypassed an update holding the writer lock");
+    beforeDelete.release();
+    await Promise.all([beforeDelete.update, deletion]);
+    assert.equal(await store.ephemeral.get("session", "session_a"), null);
+  });
 }
 
 runStoreContract("memory", async () =>
