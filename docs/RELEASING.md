@@ -38,9 +38,13 @@ installs it.
 
 ## Record the evidence
 
-Put the tarball name, sha256, **the commit it was built from**, test counts,
-capability matrix, and known limitations in `CHANGELOG.md`. A release without
-them is a release nobody can audit later.
+Put the tarball name, sha256, **the commit it was built from**, capability
+matrix, and known limitations in `CHANGELOG.md`. A release without them is a
+release nobody can audit later.
+
+The record holds what a reader can check: the digest against the registry, the
+commit against the tree. A test count is neither — nothing verifies it, so it
+only decorates or, when it drifts, misleads. It is deliberately not recorded.
 
 The commit is not optional detail. Every workspace travels inside the tarball,
 so any change to shipped code changes the digest — a digest recorded alone goes
