@@ -24,7 +24,8 @@ export const PUBLIC_TOOLS = Object.freeze([
     name: "acc_sync",
     description: `Read coordination state for this workspace: roster, attention items, and `
       + `events since a cursor. Use scope "full" to answer questions about the whole `
-      + `workspace, including other participants' collapsed child sessions. ${POLLED}`,
+      + `workspace, including other participants' collapsed child sessions. Pending mail is `
+      + `also returned for compatibility; prefer acc_inbox for targeted reads. ${POLLED}`,
     inputSchema: object({
       cursor: string("Resume from this cursor; omit to start from the beginning."),
       scope: { type: "string", enum: ["delta", "full"],

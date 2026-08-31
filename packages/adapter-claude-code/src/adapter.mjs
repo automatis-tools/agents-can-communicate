@@ -1,4 +1,5 @@
-import { defineAdapter, projectContext } from "@agents-can-communicate/adapter-sdk";
+import { defineAdapter, projectContext, projectContextResult }
+  from "@agents-can-communicate/adapter-sdk";
 
 import { denyOutcome, injectOutcome, normalizeClaudeHook } from "./hooks.mjs";
 import { planClaudeInstall, detectClaude, installClaudePlugin, uninstallClaudePlugin } from "./install.mjs";
@@ -60,5 +61,6 @@ export function createClaudeCodeAdapter() {
     injectOutcome,
     normalizeHook: payload => normalizeClaudeHook(payload),
     renderContext: (sync, options) => projectContext(sync, options),
+    renderContextResult: (sync, options) => projectContextResult(sync, options),
   });
 }

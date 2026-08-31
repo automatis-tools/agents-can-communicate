@@ -260,23 +260,30 @@ export async function openFilesystemStore({ root, clock, ids, workspaceId, failA
       handoffs: await of("handoff"),
     };
   }
-
   // Ephemeral records are published by replace and never journalled: they carry
   // no history, append no events, and are expected to disappear.
   const ephemeralPath = (kind, id) => path.join(paths.ephemeral, kind, `${id}.json`);
   const ephemeral = Object.freeze({
     async get(kind, id) {
-      const found = await readJsonIfPresent(ephemeralPath(kind, id), root);
-      return found?.value ?? null;
+      return (await readJsonIfPresent(ephemeralPath(kind, id), root))?.value ?? null;
     },
     async put(kind, id, record) {
       await publishAtomic(ephemeralPath(kind, id), encode(record),
         { root, tmpDir: paths.tmp, replace: true });
       return record;
     },
-    async delete(kind, id) {
-      await removeIfPresent(ephemeralPath(kind, id));
+    async update(kind, id, updater) {
+      return withWriterMutex(paths, publishOptions, async () => {
+        const found = await readJsonIfPresent(ephemeralPath(kind, id), root);
+        const next = updater(found?.value ?? null);
+        if (next === null) return null;
+        validateRecord(kind, next);
+        await publishAtomic(ephemeralPath(kind, id), encode(next),
+          { root, tmpDir: paths.tmp, replace: true });
+        return next;
+      });
     },
+    async delete(kind, id) { await removeIfPresent(ephemeralPath(kind, id)); },
     async list(kind) {
       const records = [];
       for (const filePath of await listJsonFiles(path.join(paths.ephemeral, kind), { root })) {

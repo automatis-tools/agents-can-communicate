@@ -165,6 +165,64 @@ test("a heartbeat requires the exact generation and moves only presence", async 
     generation: "generation_wrong" }), error => error.code === EXIT.CONFLICT);
 });
 
+test("a durable resume cannot resurrect a session closed before its transaction", async () => {
+  const { service, store, clock } = makeService();
+  const original = await service.openSession(opening());
+  await service.openSession(opening({ participantId: "participant_b" }));
+  let race = true;
+  const racingStore = { ...store,
+    transaction: async (callback, options) => {
+      if (race) {
+        race = false;
+        await service.closeSession({ sessionId: original.sessionId,
+          generation: original.generation });
+      }
+      return store.transaction(callback, options);
+    } };
+  const racing = createCoordinationService({ store: racingStore, clock,
+    ids: createFakeIds() });
+
+  const resumed = await racing.resumeSession({ sessionId: original.sessionId,
+    generation: original.generation, heartbeatCadenceMs: CADENCE });
+  const stored = (await store.snapshot(WORKSPACE, { kinds: ["session"] })).sessions
+    .find(session => session.sessionId === original.sessionId);
+
+  assert.equal(resumed, null);
+  assert.equal(stored.state, "closed");
+});
+
+test("an ephemeral resume cannot reclaim a concurrently replaced generation", async () => {
+  const { service, store, clock } = makeService();
+  const original = await service.openSession(opening());
+  let successor;
+  let race = true;
+  const replace = async () => {
+    if (!race) return;
+    race = false;
+    successor = await service.openSession(opening({ sessionId: original.sessionId,
+      probe: () => false }));
+  };
+  const ephemeral = { ...store.ephemeral,
+    get: async (kind, id) => {
+      const current = await store.ephemeral.get(kind, id);
+      if (kind === "session" && id === original.sessionId) await replace();
+      return current;
+    },
+    update: async (kind, id, updater) => {
+      if (kind === "session" && id === original.sessionId) await replace();
+      return store.ephemeral.update(kind, id, updater);
+    } };
+  const racing = createCoordinationService({ store: { ...store, ephemeral }, clock,
+    ids: createFakeIds() });
+
+  const resumed = await racing.resumeSession({ sessionId: original.sessionId,
+    generation: original.generation, heartbeatCadenceMs: CADENCE });
+  const stored = await store.ephemeral.get("session", original.sessionId);
+
+  assert.equal(resumed, null);
+  assert.equal(stored.generation, successor.generation);
+});
+
 test("presence is classified from the session's own declared cadence", () => {
   const session = { state: "open", heartbeatAt: NOW, heartbeatCadenceMs: CADENCE };
   const alive = () => true;

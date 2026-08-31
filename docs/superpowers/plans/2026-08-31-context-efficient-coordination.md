@@ -77,11 +77,24 @@ and MCP. Rewrite the bundled skill around selective communication.
 - Re-run it from a directory with no project `.claude` settings; verify exit 0,
   no stderr, and no unintended global-settings change.
 
-### 6. Final verification
+### 6. Pre-PR review hardening
+
+- Add an adversarial message whose peer-controlled body imitates another
+  message header; drive delivery from structured projector metadata only.
+- Race resume against both a durable close and an ephemeral replacement, and
+  validate state plus semantic generation inside the atomic update.
+- Preserve the released MCP `acc_sync.messages` behavior while teaching new
+  clients to prefer `acc_inbox`.
+- Suppress incomplete recovery commands when an unusually small context budget
+  cannot hold the exact message id and command.
+- Prove every corrected gate with a deliberate mutation, then repeat the full
+  suite and installed-package verification before opening the PR.
+
+### 7. Final verification
 
 - Run `npm run check`, `npm test`, and
   `npm pack && node scripts/verify-package.mjs`.
 - Install the tarball into an isolated temporary home and run the real CLI
   inbox/reply path plus adapter installation/package verification.
-- Review `git diff --check`, file sizes, and worktree status. Do not push or
-  merge.
+- Review `git diff --check`, file sizes, and worktree status. Push the reviewed
+  branch and create a pull request; do not merge it locally.

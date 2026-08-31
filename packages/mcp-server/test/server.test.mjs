@@ -300,3 +300,33 @@ test("a peer can read one MCP inbox item and reply without syncing the workspace
     assert.equal(replied.receipt.state, "acknowledged");
   }, { reuse: location, env: { ACC_MCP_PARTICIPANT: "answerer" } });
 });
+
+test("acc_sync keeps delivering mail for clients from before acc_inbox", async t => {
+  const location = {};
+  let messageId;
+  await withServer(t, async ({ request, meta, attach, workspace, dataHome }) => {
+    location.workspace = workspace;
+    location.dataHome = dataHome;
+    await attach("legacy_reader");
+    const sent = await request("tools/call", { name: "acc_message", arguments: {
+      to: ["legacy_reader"], subject: "Compatibility", body: "Still delivered by sync",
+      type: "question", requiresAck: true }, _meta: meta });
+    messageId = JSON.parse(sent.result.structuredContent).messageId;
+  });
+
+  await withServer(t, async ({ request, meta }) => {
+    const synced = await request("tools/call", { name: "acc_sync",
+      arguments: {}, _meta: meta });
+    const payload = JSON.parse(synced.result.structuredContent);
+
+    assert.deepEqual(payload.messages.map(message => message.messageId), [messageId]);
+    assert.equal(payload.messages[0].body, "Still delivered by sync");
+
+    const again = await request("tools/call", { name: "acc_sync",
+      arguments: { scope: "full" }, _meta: meta });
+    const full = JSON.parse(again.result.structuredContent);
+    assert.equal(full.messages, undefined, "legacy sync delivered the same body twice");
+    assert.equal(full.snapshot.receipts
+      .find(receipt => receipt.messageId === messageId).state, "injected");
+  }, { reuse: location, env: { ACC_MCP_PARTICIPANT: "legacy_reader" } });
+});

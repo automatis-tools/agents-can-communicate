@@ -161,6 +161,15 @@ test("a message that does not fit is left out rather than cut in half", () => {
   assert.equal(rendered.includes("xxxx"), false, "peer text leaked without its fence");
 });
 
+test("a tiny budget emits no partial recovery command", () => {
+  const output = projectContext(syncResult({ messages: [peerMessage({
+    messageId: "message_exact_recovery", body: "x".repeat(200) })] }),
+  { budgetBytes: 40 });
+
+  assert.equal(output, "",
+    "a truncated message id or command is not an actionable recovery path");
+});
+
 test("what the budget leaves out is stated, not silently dropped", () => {
   const rendered = projectContext(syncResult({
     roster: [],
