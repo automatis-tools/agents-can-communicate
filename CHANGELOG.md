@@ -1,5 +1,34 @@
 # Changelog
 
+## Unreleased
+
+A delivered note is no longer lost after a single turn. A note owes no
+acknowledgement, so it raised no standing reminder and dropped out of the inbox
+once shown - and agents put decisions in notes, one of which went missing for
+three hours.
+
+| | |
+|---|---|
+| Built from | `6a2e769` |
+| Tarball | `agents-can-communicate-0.1.17.tgz`, 157 KB, 115 entries |
+| sha256 | `4df8935f6de421e2b86af635a5331cd3b26375cc856f56f9b58851f77bcdf001` |
+| Node | 24 (current production LTS) |
+| Verified on | macOS 26.6.2 (darwin 25.6.0, arm64) and Linux in CI |
+| Not supported | Windows - untested rather than known-broken |
+
+A `note` is fire-and-forget by design: shown to the recipient once, owed no
+reply. Unlike a `requiresAck` question it raised no `direct_request`, so once
+injected it left the inbox for good - and a merge decision sent as a note was
+missed for three hours because nothing stood behind it. A new `unread_note`
+attention rule, lowest priority, fires only while the receipt reads `injected`,
+and the runner advances it to `seen` the turn it is shown: a delivered note now
+leaves exactly one low-priority breadcrumb naming its id - the recovery path -
+then goes quiet. Notes stay silent by default; only the once-and-lost gap is
+closed. At the sending end, `acc message` and the `acc_message` MCP tool nudge a
+note that reads like it wants a reply - a question mark or a warning sign, in any
+language - toward `--requires-ack` or `acc decide`, without blocking the send.
+The skills and concepts teach the choice and the new line.
+
 ## 0.1.17
 
 A peer message no longer starves behind a standing reminder. The turn a client
