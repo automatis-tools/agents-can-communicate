@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { mkdir, rm } from "node:fs/promises";
 import path from "node:path";
+import { performance } from "node:perf_hooks";
 
 import { AccError, EXIT } from "@agents-can-communicate/protocol";
 
@@ -8,7 +9,9 @@ import { encode, publishAtomic, readJsonIfPresent } from "./atomic-json.mjs";
 import { ensureManagedDirectory } from "./safe-directory.mjs";
 
 const STALE_MS = 60_000;
+const ACQUIRE_TIMEOUT_MS = 2_500;
 const OWNER = "owner.json";
+const sleepFor = duration => new Promise(resolve => { setTimeout(resolve, duration); });
 
 // Directory creation is the atomic primitive: mkdir either creates or fails
 // with EEXIST, with no window in between. Ported from the reconciled
@@ -85,21 +88,34 @@ async function takeStaleOwnership(directory, root, owner, now, pidIsAlive) {
 
 export async function withWriterMutex(paths, options, operation) {
   const { root, clock, pidIsAlive = defaultPidIsAlive, uuid = randomUUID,
-    attempts = 50, waitMs = 20, openFile } = options;
+    attempts = Number.POSITIVE_INFINITY, waitMs = 20, openFile,
+    acquireTimeoutMs = ACQUIRE_TIMEOUT_MS, monotonicNow = () => performance.now(),
+    sleep = sleepFor } = options;
   const directory = path.join(paths.locks, "writer.lock");
+  // Wall time can jump while a process waits. A monotonic absolute deadline
+  // bounds all owner reads and retries, leaving half the hook's five-second
+  // budget for publishing the owner, doing the write, and rendering a result.
+  const deadline = monotonicNow() + acquireTimeoutMs;
   await ensureManagedDirectory(root, paths.locks);
   const token = uuid();
 
   for (let attempt = 0; attempt < attempts; attempt += 1) {
+    if (monotonicNow() >= deadline) break;
     try {
       await mkdir(directory);
     } catch (error) {
       if (error.code !== "EEXIST") throw error;
       const owner = await readOwner(directory, root, openFile);
       if (!await takeStaleOwnership(directory, root, owner, clock.now(), pidIsAlive)) {
-        await new Promise(resolve => { setTimeout(resolve, waitMs); });
+        const remaining = deadline - monotonicNow();
+        if (remaining <= 0) break;
+        await sleep(Math.min(waitMs, remaining));
       }
       continue;
+    }
+    if (monotonicNow() >= deadline) {
+      await rm(directory, { recursive: true, force: true });
+      break;
     }
     const owner = { pid: process.pid, token, acquiredAt: clock.now() };
     await publishAtomic(path.join(directory, OWNER), encode(owner), { root, tmpDir: paths.tmp });
