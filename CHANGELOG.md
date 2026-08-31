@@ -9,9 +9,9 @@ targeted inbox/reply path recovers and closes the exact message that matters.
 
 | | |
 |---|---|
-| Built from | `05847b7` |
-| Tarball | `agents-can-communicate-0.1.17.tgz`, 155 KB, 116 entries |
-| sha256 | `0ec5a840262eb4a9b9723870bb0442125008bb47c350d112c76a7b482b447c05` |
+| Built from | `da9266a` |
+| Tarball | `agents-can-communicate-0.1.17.tgz`, 156 KB, 116 entries |
+| sha256 | `18138071de3c720c97543264928d3b26fd9e81f3f2690cb7fecaeab111f835ff` |
 | Node | 24 (current production LTS) |
 | Verified on | macOS 26.6.2 (darwin 25.6.0, arm64) and Linux in CI |
 | Not supported | Windows - untested rather than known-broken |
@@ -32,6 +32,14 @@ loads when ACC hook context appears, asks agents to publish one useful intent,
 and limits peer traffic to dependencies, conflicts, questions, decisions, and
 handoffs. Full sync remains an explicit forensic tool, not the routine recovery
 path.
+
+Delivery bookkeeping uses structured projector metadata rather than searching
+rendered peer-controlled text for message ids, so a smaller message cannot
+forge delivery of a larger body omitted by the budget. Resume validates the
+session state and semantic generation inside the atomic durable or ephemeral
+update, preventing a concurrent close or replacement from being reclaimed.
+MCP `acc_sync` retains its released pending-mail response for older clients;
+new clients use the narrower `acc_inbox` path.
 
 ## 0.1.17
 
