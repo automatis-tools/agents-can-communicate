@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { looksConsequential } from "../src/message-signals.mjs";
+import { looksConsequential, noteNudge } from "../src/message-signals.mjs";
 
 test("a note that asks a question reads as consequential", () => {
   assert.equal(looksConsequential({
@@ -31,4 +31,25 @@ test("a plain FYI does not read as consequential", () => {
 test("missing fields are treated as empty rather than thrown", () => {
   assert.equal(looksConsequential({}), false);
   assert.equal(looksConsequential(), false);
+});
+
+test("noteNudge speaks for a consequential note that carries no ack obligation", () => {
+  assert.match(noteNudge({ type: "note", requiresAck: false,
+    subject: "Snow", body: "It touches your file. Have you started?" }),
+  /--requires-ack|acc decide/);
+});
+
+test("noteNudge stays silent when the sender already set requiresAck", () => {
+  assert.equal(noteNudge({ type: "note", requiresAck: true, subject: "x",
+    body: "Have you started?" }), null);
+});
+
+test("noteNudge stays silent for a plain FYI note", () => {
+  assert.equal(noteNudge({ type: "note", requiresAck: false, subject: "FYI",
+    body: "Logged it. Nothing to do." }), null);
+});
+
+test("noteNudge only speaks for notes, not questions or other types", () => {
+  assert.equal(noteNudge({ type: "question", requiresAck: false, subject: "x",
+    body: "Have you started?" }), null);
 });

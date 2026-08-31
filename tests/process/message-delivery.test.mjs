@@ -200,3 +200,20 @@ test("a lone session is still shown what was already said to it", async t => {
   assert.match(shown, /Left the parser half-done\./,
     "being the only session left swallowed a message already addressed to it");
 });
+
+test("a note that reads like a question is nudged toward an answerable form", async t => {
+  const where = await place(t);
+  const message = (type, subject, body) => run(process.execPath,
+    [acc, "message", "--session", where.sender.accSessionId,
+      "--generation", where.sender.generation, "--cwd", where.project,
+      "--to", "codex", "--type", type, "--subject", subject, "--body", body, "--json"],
+    { env: where.env }).then(({ stdout }) => JSON.parse(stdout).data);
+
+  const consequential = await message("note", "Snow", "It touches your file. Have you started?");
+  assert.match(consequential.advice ?? "", /--requires-ack|acc decide/,
+    "a note asking a question was sent with no nudge to make it answerable");
+
+  const fyi = await message("note", "FYI", "Logged it. Nothing for you to do.");
+  assert.equal(fyi.advice, undefined,
+    "a plain FYI was nudged, which trains the reader to ignore the nudge");
+});
