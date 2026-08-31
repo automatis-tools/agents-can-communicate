@@ -22,7 +22,7 @@ const repo = path.resolve(import.meta.dirname, "..", "..");
 // `heartbeat`, `detach`) are deliberately absent — a skill that taught those
 // would have models running the installer.
 const TAUGHT = Object.freeze(["sync", "work", "claim", "request", "task", "message",
-  "finish", "status", "ack"]);
+  "inbox", "reply", "finish", "status", "ack"]);
 
 // Reachable by an agent but not worth a section: `release` is covered by
 // `finish`, and `workstream` and `decide` only matter once work is large enough,

@@ -1,6 +1,7 @@
 import { createClaimService } from "./claims.mjs";
 import { createCommunicationService } from "./communication.mjs";
 import { createIntentService } from "./intents.mjs";
+import { createInboxService } from "./inbox.mjs";
 import { defaultPidIsAlive } from "./pid.mjs";
 import { assertPorts } from "./ports.mjs";
 import { createSessionService } from "./sessions.mjs";
@@ -32,6 +33,7 @@ export function createCoordinationService({ store, clock, ids,
   const tasks = createTaskService(ports, workstreams);
   const claims = createClaimService(ports, sessions);
   const communication = createCommunicationService(ports, sessions, claims);
+  const inbox = createInboxService(ports, sessions);
   const sync = createSyncService(ports, sessions);
   const status = createStatusService(ports, sessions);
   const guardState = createGuardStateService(ports);
@@ -46,6 +48,7 @@ export function createCoordinationService({ store, clock, ids,
     ...tasks,
     ...claims,
     ...communication,
+    ...inbox,
     ...sync,
     ...status,
     guardState,

@@ -54,6 +54,12 @@ recorded decision (`acc decide`), not a note — and if a note reads like it wan
 message` says so when you send it. A note that does slip past is not lost either: delivered
 once, it leaves a single low-priority breadcrumb so it stays recoverable without nagging.
 
+`acc inbox` is the narrow recovery path. It returns only unresolved messages addressed to
+the current participant; `--message` selects one stable id. A direct request remains there
+after it is seen until it is acknowledged. `acc reply` writes the answer, links it to the
+original, and acknowledges that original as one operation. Context compaction therefore
+does not require scanning a whole workspace snapshot or remembering a separate ack.
+
 Work is addressed to a **participant** rather than a session, so it survives that agent
 restarting. Only the named participant can take it. Work addressed to nobody is open to
 anyone.
@@ -71,7 +77,7 @@ anyone.
 
 | Idea | What it means |
 |---|---|
-| **Ambient** | Attachment, presence, and guards happen inside your normal session. No new commands. |
+| **Ambient** | Attachment, presence, and guards happen inside your normal session. Peer presence is a short skill trigger; detailed state is pulled only when useful. |
 | **Peer equality** | No session is in charge. Any session can answer for the whole workspace. |
 | **Durable first** | State is recorded before delivery is attempted. Realtime would only accelerate it. |
 | **Truthful capability** | An adapter declares only what was observed. Degradation is visible, never silent. |

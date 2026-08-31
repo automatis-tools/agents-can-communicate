@@ -13,6 +13,11 @@ import { createGitProbe, discoverWorkspace, platformDataHome, runtimePaths }
 import { resolveClientPid } from "./client-pid.mjs";
 import { readProcessTable as defaultReadProcessTable } from "./process-table.mjs";
 
+// Kept cohesive above 300 lines because every handler shares one fail-open
+// hook boundary, binding lifecycle, and client-specific outcome contract.
+// Splitting handlers would duplicate that safety boundary and make delivery or
+// guard failures behave differently by event kind.
+
 // A hook runs in front of the user's turn, so it gets a hard ceiling. Better to
 // let a call through than to make someone's session sit waiting on us.
 const DEFAULT_BUDGET_MS = 5_000;
@@ -157,7 +162,8 @@ async function openContext({ cwd, dataHome, runtime, env }) {
 }
 
 const HANDLERS = {
-  async sessionStart({ event, context, adapter, adapterId, paths, readProcessTable }) {
+  async sessionStart({ event, context, adapter, adapterId, binding, paths,
+    readProcessTable }) {
     const capabilities = adapter.capabilities ?? {};
     // Once per session, never per turn. A client that cannot be found yields
     // null, and the session is then judged by age alone - which is exactly the
@@ -165,6 +171,24 @@ const HANDLERS = {
     const command = adapter.client?.command ?? null;
     const pid = command === null ? null
       : resolveClientPid({ table: await readProcessTable(), from: process.pid, command });
+    const metadata = {
+      pid,
+      enforcement: capabilities.guards?.beforeWrite === true ? "guarded" : "advisory",
+      lifecycle: capabilities.lifecycle?.sessionEnd === true ? "managed" : "manual",
+      heartbeatCadenceMs: CADENCE_MS,
+      checkoutRoot: context.descriptor.git?.worktreeRoot ?? context.descriptor.roots[0],
+      branch: context.descriptor.git?.branch ?? null,
+    };
+    if (binding !== null) {
+      const resumed = await context.service.resumeSession({
+        sessionId: binding.accSessionId,
+        generation: binding.generation,
+        ...metadata,
+      });
+      if (resumed !== null) {
+        return { accSessionId: resumed.sessionId, generation: resumed.generation };
+      }
+    }
     const session = await context.service.openSession({
       workspaceId: context.descriptor.id,
       participantId: participantFor(adapterId, event.sessionId, context.env),
@@ -174,14 +198,9 @@ const HANDLERS = {
       // Declared from what this adapter proved, not from the fact that it is an
       // adapter at all. A peer reading the roster can then tell a session whose
       // writes can be stopped from one whose cannot.
-      enforcement: capabilities.guards?.beforeWrite === true ? "guarded" : "advisory",
-      lifecycle: capabilities.lifecycle?.sessionEnd === true ? "managed" : "manual",
-      heartbeatCadenceMs: CADENCE_MS,
       // Which checkout this agent is in. One workspace spans every worktree of
       // a repository, so this is the only thing that distinguishes them.
-      checkoutRoot: context.descriptor.git?.worktreeRoot ?? context.descriptor.roots[0],
-      pid,
-      branch: context.descriptor.git?.branch ?? null,
+      ...metadata,
       descriptor: context.descriptor,
     });
     await storeSessionBinding({ runtimeDir: paths.root, harnessSessionId: event.sessionId,
@@ -213,27 +232,11 @@ const HANDLERS = {
     const sync = await context.service.sync({ sessionId: binding.accSessionId,
       cursor: null, scope: "delta" });
 
-    // Claims held by others, and whether this session can actually be stopped
-    // from breaking them. For a harness that guards writes this is useful
-    // warning; for one that cannot - a Codex model editing through the shell,
-    // an MCP client - it is the only protection there is, so it has to say
-    // plainly that the responsibility has moved to the session itself.
-    const status = await context.service.collectStatus({
-      workspaceId: context.descriptor.id });
-    const mine = status.participants
+    // Sync already carries the roster. Calling collectStatus here used to read
+    // the entire materialised store a second time on every prompt merely to
+    // rediscover this session's participant id.
+    const mine = sync.roster
       .find(participant => participant.sessionId === binding.accSessionId);
-    // Two independent facts, and both are needed. `enforceable` is whether ACC
-    // could stop *this* session at all; `enforcement` is what the claim's owner
-    // asked for. A guarded session facing an advisory claim is not blocked from
-    // anything, so reporting either one alone mislabels the other case.
-    const enforceable = mine?.enforcement === "guarded";
-    const claims = status.claims
-      .filter(claim => claim.ownerSessionId !== binding.accSessionId)
-      .map(claim => ({ resource: claim.resource, enforcement: claim.enforcement,
-        enforceable,
-        ownerParticipantId: status.participants
-          .find(p => p.sessionId === claim.ownerSessionId)?.participantId
-          ?? claim.ownerSessionId }));
 
     // What peers have said to this participant and no model has been shown yet.
     // Without this the projector's peer block never ran in production: an agent
@@ -254,17 +257,40 @@ const HANDLERS = {
     // The ceiling a team agreed on in `acc.workspace.json`, or the default when
     // there is no config. Validated by the protocol and, until now, never read:
     // the projector was always called with its own default.
-    const projected = await adapter.renderContext?.({ ...sync, claims, messages },
-      { budgetBytes: context.descriptor.policy?.contextBudgetBytes }) ?? "";
-    if (projected === "") return { stdout: "" };
+    const tracksDelivery = typeof adapter.renderContextResult === "function";
+    const projectionInput = { ...sync, messages: tracksDelivery ? messages : [],
+      currentParticipantId: mine?.participantId };
+    const projectionOptions = {
+      budgetBytes: context.descriptor.policy?.contextBudgetBytes };
+    // Delivery is state, not text parsing. Peer-controlled bodies can imitate
+    // another message's visible header, so only projector metadata proves
+    // which complete groups survived the byte budget. A custom adapter without
+    // metadata may still inject text, but cannot advance a receipt from it.
+    const projection = !tracksDelivery
+      ? { text: await adapter.renderContext?.(projectionInput, projectionOptions) ?? "",
+        includedMessageIds: [], includedAttentionIds: [] }
+      : await adapter.renderContextResult(projectionInput, projectionOptions);
+    const degradation = !tracksDelivery && messages.length > 0
+      ? `acc: ${messages.length} pending message(s) withheld because this adapter lacks `
+        + `structured delivery metadata; read ${messages[0].messageId} with `
+        + `acc inbox --message ${messages[0].messageId}`
+      : null;
+    const visibleDegradation = degradation === null ? "" : `ACC: ${degradation.slice(5)}`;
+    const candidate = [projection.text, visibleDegradation].filter(Boolean).join("\n");
+    const projected = Buffer.byteLength(candidate, "utf8")
+      <= (projectionOptions.budgetBytes ?? 6_000) ? candidate : projection.text;
+    if (projected === "") {
+      return degradation === null ? { stdout: "" } : { stdout: "", stderr: degradation };
+    }
 
     // Only what the model was actually shown is recorded as delivered. The
     // budget can leave a message out, and a receipt reading `injected` for text
     // nobody saw is worse than one still reading `queued` - the sender would be
     // told it landed. A message left behind stays queued and goes out next turn.
     const failures = [];
+    const includedMessages = new Set(projection.includedMessageIds ?? []);
     for (const message of messages) {
-      if (!projected.includes(message.messageId)) continue;
+      if (!includedMessages.has(message.messageId)) continue;
       await context.service.markDelivery({ sessionId: binding.accSessionId,
         generation: binding.generation, messageId: message.messageId,
         recipientParticipantId: mine.participantId, state: "injected" })
@@ -277,9 +303,10 @@ const HANDLERS = {
     // a delivered decision is recoverable without becoming a standing nag - the
     // noise a reader learns to skip. Only what was actually shown is advanced,
     // for the same reason the loop above only records what fit.
+    const includedAttention = new Set(projection.includedAttentionIds ?? []);
     for (const item of sync.attention ?? []) {
       if (item.kind !== "unread_note") continue;
-      if (!projected.includes(item.sourceId)) continue;
+      if (!includedAttention.has(item.sourceId)) continue;
       await context.service.markDelivery({ sessionId: binding.accSessionId,
         generation: binding.generation, messageId: item.sourceId,
         recipientParticipantId: mine.participantId, state: "seen" })
@@ -291,9 +318,11 @@ const HANDLERS = {
     // over bookkeeping would be the worse trade - but a receipt that failed to
     // advance has to be visible somewhere, and stdout belongs to the model.
     const outcome = { stdout: "", ...adapter.injectOutcome?.(projected) };
-    if (failures.length === 0) return outcome;
+    if (failures.length === 0 && degradation === null) return outcome;
     return { ...outcome,
-      stderr: [outcome.stderr, `acc: delivery not recorded for ${failures.join(", ")}`]
+      stderr: [outcome.stderr, degradation,
+        failures.length === 0 ? null
+          : `acc: delivery not recorded for ${failures.join(", ")}`]
         .filter(Boolean).join("\n") };
   },
 

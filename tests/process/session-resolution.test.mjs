@@ -152,6 +152,8 @@ const AGENT_FACING = Object.freeze([
   ["work", ["--summary", "a line of intent"]],
   ["claim", ["--resource", "file:src/**", "--reason", "editing"]],
   ["message", ["--to", "peer", "--subject", "s", "--body", "b"]],
+  ["inbox", []],
+  ["reply", ["--message", "message_absent", "--body", "answer"]],
   ["request", ["--to", "peer", "--title", "please take this"]],
   ["task", ["--title", "something to do"]],
   ["workstream", ["--title", "a stream", "--objective", "an objective"]],

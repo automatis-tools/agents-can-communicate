@@ -100,20 +100,22 @@ yours.
 
 ## What changes after installation
 
-**Agents know who is around.** Each session can see the other participants, their current
-focus, and the files they have claimed.
+**Agents know when coordination matters.** A short hook line tells a session peers are
+present; exact participants, focus, checkout, and claims remain available through status
+instead of being repeated in every prompt.
 
 **Parallel work becomes deliberate.** Agents claim shared files before editing. Supported
 client edits respect those claims and identify the participant already working there.
 
-**Questions and work find their way back.** Requests, decisions, and handoffs stay with
-the intended agent across session restarts, and results return to the agent that asked.
+**Questions and work find their way back.** A targeted inbox survives context compaction,
+and one reply operation both answers and acknowledges the original request.
 
 **Human authority stays clear.** Peer messages arrive with attribution and remain peer
 context. Your instructions and approved policy continue to set the boundaries.
 
 **Solo work stays quiet.** A single session receives the familiar client experience.
-Shared context appears when another participant or pending handoff makes it useful.
+Only actionable shared context appears when a message, conflict, or pending handoff makes
+it useful; ordinary peer presence stays one compact skill trigger.
 
 ## Fits the workflow you already have
 
@@ -146,6 +148,8 @@ and complete handoffs. These commands give you a direct view and control when yo
 | Command | What it is for |
 |---|---|
 | `acc status` | See active sessions, claimed work, and the room's protection level |
+| `acc inbox --message <id>` | Recover exactly one addressed message without a workspace dump |
+| `acc reply --message <id> --body ...` | Answer and acknowledge in one operation |
 | `acc doctor` | Confirm which client integrations are active |
 | `acc update --apply` | Install the latest release and refresh integrations |
 | `acc uninstall` | Remove ACC's client integrations safely |

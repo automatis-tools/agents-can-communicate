@@ -125,15 +125,12 @@ test("the MCP client sees the peer's claim, so it can choose to respect it", asy
 });
 
 /**
- * A poll is this client's turn.
+ * MCP has no turn hook, so it reads only its addressed inbox.
  *
  * The hook runtime hands a session its pending messages when it builds a turn.
- * An MCP client has no turn and no hook, and no tool handed it anything: it saw
- * a `direct_request` line carrying a subject and an id, and to read what a peer
- * had actually said it had to ask for the whole snapshot and search every
- * message in the workspace for its own name. The receipt stayed `queued` for as
- * long as the client ran, so the sender was told its message had not been
- * delivered by an agent that had answered it.
+ * Before `acc_inbox`, reading a peer's body required a full workspace sync and
+ * searching its nested snapshot. The narrow operation returns only unresolved
+ * addressed messages and moves their own receipts truthfully to `seen`.
  */
 async function mailed(t, { requiresAck = true } = {}) {
   const place = await workspace(t);
@@ -159,39 +156,38 @@ async function mailed(t, { requiresAck = true } = {}) {
 test("a message addressed to an MCP client reaches it, body and all", async t => {
   const { call } = await mailed(t);
 
-  const synced = await call("acc_sync");
+  const inbox = await call("acc_inbox");
 
-  const [message] = synced.messages ?? [];
-  assert.notEqual(message, undefined,
-    `nothing was handed over: ${JSON.stringify(Object.keys(synced))}`);
+  const [message] = inbox.map(item => item.message);
+  assert.notEqual(message, undefined, "nothing was handed over");
   assert.equal(message.subject, "which way should the hull clamp?");
   assert.equal(message.body, "Blocking me.");
 });
 
-test("what has been handed over is not handed over again", async t => {
-  const { call } = await mailed(t);
-  await call("acc_sync");
+test("a note that has been read is not handed over again", async t => {
+  const { call } = await mailed(t, { requiresAck: false });
+  await call("acc_inbox");
 
-  const second = await call("acc_sync");
+  const second = await call("acc_inbox");
 
   // A client that polls every few seconds would otherwise be told the same
   // thing until it acknowledged it, and most messages ask for no answer.
-  assert.deepEqual(second.messages ?? [], []);
+  assert.deepEqual(second, []);
 });
 
 test("the sender stops being told its message is undelivered", async t => {
   const { call, receipts } = await mailed(t);
   assert.deepEqual(await receipts(), ["queued"]);
 
-  await call("acc_sync");
+  await call("acc_inbox");
 
-  assert.deepEqual(await receipts(), ["injected"]);
+  assert.deepEqual(await receipts(), ["seen"]);
 });
 
 test("being shown something is still not agreeing to it", async t => {
   const { call, receipts } = await mailed(t);
-  const synced = await call("acc_sync");
-  const [message] = synced.messages;
+  const inbox = await call("acc_inbox");
+  const [message] = inbox.map(item => item.message);
 
   await call("acc_ack", { messageId: message.messageId });
 
@@ -220,7 +216,7 @@ test("an MCP client can ask a hooked peer for work and be told it is done", asyn
 
   // The whole loop, from the tier with no hooks at all: asked, taken, finished,
   // and the answer arrives where this client can see it.
-  const synced = await call("acc_sync");
-  const answers = (synced.messages ?? []).map(message => message.subject);
+  const inbox = await call("acc_inbox");
+  const answers = inbox.map(item => item.message.subject);
   assert.deepEqual(answers, ["accepted: Tank sinks through mud", "done: Tank sinks through mud"]);
 });

@@ -112,7 +112,7 @@ test("worktrees of one repository share a workspace, other projects do not",
     assert.deepEqual(there, ["stranger"]);
   });
 
-test("a peer is named in the turn context by something you can address",
+test("peer presence triggers the skill without repeating identity and branch every turn",
   async t => {
     const place = await repository(t);
     await attach(place, "alpha", place.worktrees["feature-a"]);
@@ -124,8 +124,7 @@ test("a peer is named in the turn context by something you can address",
       session_id: "cleaner", cwd: place.main, prompt: "go on" }));
     const { stdout } = await child;
 
-    // A session id cannot be used with `--to`. The roster line used to carry
-    // one, so an agent reading its own turn could see that someone was there
-    // and had no way to say anything to them.
-    assert.match(stdout, /alpha on feature-a/);
+    assert.match(stdout, /1 peer participant/);
+    assert.match(stdout, /acc skill/i);
+    assert.doesNotMatch(stdout, /alpha on feature-a/);
   });
