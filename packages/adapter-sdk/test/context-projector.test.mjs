@@ -227,7 +227,8 @@ test("what the budget leaves out is stated, not silently dropped", () => {
     messages: [peerMessage({ body: "x".repeat(4_000) })],
   }), { budgetBytes: 300 });
 
-  assert.match(rendered, /- \+1 not shown, over budget/);
+  // A dropped message escalates past the plain "+N not shown" note.
+  assert.match(rendered, /message\(s\) addressed to you did not fit/);
 });
 
 test("a large message does not hide the shorter ones queued behind it", () => {
@@ -243,7 +244,7 @@ test("a large message does not hide the shorter ones queued behind it", () => {
 
   assert.match(rendered, /id message_small/);
   assert.equal(rendered.includes("message_big"), false);
-  assert.match(rendered, /- \+1 not shown, over budget/);
+  assert.match(rendered, /message\(s\) addressed to you did not fit/);
 });
 
 test("every emitted block is closed, whatever the budget", () => {
@@ -262,4 +263,55 @@ test("every emitted block is closed, whatever the budget", () => {
     assert.equal(Buffer.byteLength(rendered, "utf8") <= budgetBytes, true,
       `projection overran ${budgetBytes} bytes`);
   }
+});
+
+test("a peer message is not starved by a standing low-value attention line", () => {
+  // The papercut failure: an expired-claim reminder (priority 6) is processed
+  // first and eats the budget, dropping the peer's message behind it - and the
+  // claim never un-expires, so the message is starved forever. The message must
+  // win: it is a one-time delivery, the reminder regenerates every turn.
+  const rendered = projectContext(syncResult({
+    roster: roster(1),
+    attention: [{ kind: "claim_expired", priority: 6, sourceId: "claim_old",
+      summary: "file:src/held.mjs - your claim has run out" }],
+    messages: [{ messageId: "message_snow", fromSessionId: "session_1", type: "note",
+      subject: "Snow decision: you take the minimal record",
+      body: "Add the record yourself in M9.11; polish stays with us." }],
+  }), { budgetBytes: 360 });
+
+  assert.match(rendered, /Snow decision/, "the peer message was dropped");
+  assert.doesNotMatch(rendered, /your claim has run out/,
+    "the expired-claim reminder crowded the message out again");
+});
+
+test("a dropped message is a loud imperative, not a footnote", () => {
+  // A message that truly does not fit must say so specifically - both agents
+  // read "+1 not shown, over budget" as noise and lost their most important
+  // message to it.
+  const rendered = projectContext(syncResult({
+    roster: roster(1),
+    messages: [{ messageId: "message_big", fromSessionId: "session_1", type: "note",
+      subject: "A subject long enough that the whole block cannot fit the budget below",
+      body: "x".repeat(400) }],
+  }), { budgetBytes: 160 });
+
+  assert.match(rendered, /message.*addressed to you.*did not fit/i,
+    "a dropped message did not get its own loud line");
+  assert.match(rendered, /acc sync --scope full/,
+    "the loud line does not say how to read it");
+});
+
+test("urgent attention still leads, ahead of messages", () => {
+  const rendered = projectContext(syncResult({
+    roster: roster(1),
+    attention: [{ kind: "direct_request", priority: 1, sourceId: "message_ack",
+      summary: "someone needs an ack" }],
+    messages: [{ messageId: "message_b", fromSessionId: "session_1", type: "note",
+      subject: "later", body: "body" }],
+  }), { budgetBytes: 2000 });
+
+  const reqIdx = rendered.indexOf("someone needs an ack");
+  const msgIdx = rendered.indexOf("later");
+  assert.ok(reqIdx !== -1 && msgIdx !== -1, "both should be present in a wide budget");
+  assert.ok(reqIdx < msgIdx, "a direct request must still lead the message");
 });
