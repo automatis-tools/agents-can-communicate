@@ -82,3 +82,12 @@ test("required options are still enforced", () => {
     error => error.code === EXIT.USAGE && error.message.includes("--participant"));
   assert.equal(parseArgs(["attach", "--participant", "visual"]).options.participant, "visual");
 });
+
+test("inbox targets an optional message and reply requires message plus body", () => {
+  assert.equal(parseArgs(["inbox", "--message", "message_a"]).options.message, "message_a");
+  assert.deepEqual(parseArgs(["inbox"]).options, {});
+  assert.deepEqual(parseArgs(["reply", "--message", "message_a", "--body", "Done"])
+    .options, { message: "message_a", body: "Done" });
+  assert.throws(() => parseArgs(["reply", "--message", "message_a"]),
+    error => error.code === EXIT.USAGE && error.message.includes("--body"));
+});

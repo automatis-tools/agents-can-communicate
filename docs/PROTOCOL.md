@@ -157,10 +157,15 @@ actually handed to the recipient — and only then. For a hooked session that me
 context carried it: one the budget could not fit stays `queued` and goes out on a later
 turn, because a receipt claiming delivery for text nobody was shown tells the sender
 something untrue, and whatever the budget left out is stated in the projection rather than
-dropped in silence. For a client with no hooks it means `acc_sync` returned it, which is
-that client's turn — until it did, such a receipt stayed `queued` for the life of the
-client and the sender was told its message had not arrived by an agent that had answered
-it.
+dropped in silence. For a client with no hooks, `acc_inbox` is the explicit read and
+advances the receipt to `seen`. Its list returns only unresolved addressed messages, never
+the roster, event log, claims, or workspace snapshot. An exact id can also recover the
+injected note named by an `unread_note` breadcrumb. A non-ack note disappears from the
+list after it is read; a direct request remains recoverable while `seen` until acknowledged.
+
+`replyToMessage` validates that the original was addressed to the caller, writes an
+attributed response with `inReplyTo`, and advances the caller's original receipt to
+`acknowledged` in one transaction. Another participant cannot read or answer that receipt.
 
 ## Decisions
 
@@ -215,4 +220,8 @@ exact trigger in [ARCHITECTURE.md](ARCHITECTURE.md).
 
 Semantic relevance may be assessed by the receiving model, but correctness cannot depend on a hidden central LLM classifier.
 
-Sync also supports an explicit full-Workspace scope: any session may request the complete snapshot — roster, intents, workstreams, tasks, claims, and other participants' collapsed child sessions — to answer whole-system questions. Bounded deltas are the ambient default; the full scope exists so no session ever has to say it cannot see the rest of the system.
+Sync also supports an explicit full-Workspace scope: any session may request the complete
+snapshot — roster, intents, workstreams, tasks, claims, and other participants' collapsed
+child sessions — to answer whole-system forensic questions. Bounded deltas are the ambient
+default; one addressed message is always read through `inbox`, never by scanning this
+snapshot.

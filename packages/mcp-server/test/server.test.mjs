@@ -11,6 +11,10 @@ import { fileURLToPath } from "node:url";
 
 import { PROTOCOL_VERSION } from "../src/server.mjs";
 
+// This end-to-end file intentionally keeps one real stdio JSON-RPC harness for
+// every server behavior. Splitting past 300 lines would duplicate that protocol
+// and lifecycle machinery, making the copies—not the server—the thing tested.
+
 const repoRoot = fileURLToPath(new URL("../../..", import.meta.url));
 const execFileAsync = promisify(execFile);
 const binary = path.join(repoRoot, "bin", "acc-mcp.mjs");
@@ -267,4 +271,32 @@ test("a consequential note comes back with a nudge; a plain FYI does not", async
     assert.equal(fyi.advice, undefined,
       "a plain FYI was nudged, which trains the reader to ignore the nudge");
   });
+});
+
+test("a peer can read one MCP inbox item and reply without syncing the workspace", async t => {
+  const location = {};
+  let messageId;
+  await withServer(t, async ({ request, meta, attach, workspace, dataHome }) => {
+    location.workspace = workspace;
+    location.dataHome = dataHome;
+    await attach("answerer");
+    const sent = await request("tools/call", { name: "acc_message", arguments: {
+      to: ["answerer"], subject: "Gate", body: "Can I proceed?", type: "question",
+      requiresAck: true }, _meta: meta });
+    messageId = JSON.parse(sent.result.structuredContent).messageId;
+  });
+
+  await withServer(t, async ({ request, meta }) => {
+    const inbox = await request("tools/call", { name: "acc_inbox",
+      arguments: { messageId }, _meta: meta });
+    const read = JSON.parse(inbox.result.structuredContent);
+    assert.deepEqual(read.map(item => item.message.messageId), [messageId]);
+    assert.equal(read[0].receipt.state, "seen");
+
+    const response = await request("tools/call", { name: "acc_reply",
+      arguments: { messageId, body: "Yes." }, _meta: meta });
+    const replied = JSON.parse(response.result.structuredContent);
+    assert.equal(replied.reply.inReplyTo, messageId);
+    assert.equal(replied.receipt.state, "acknowledged");
+  }, { reuse: location, env: { ACC_MCP_PARTICIPANT: "answerer" } });
 });
