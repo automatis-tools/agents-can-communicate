@@ -46,6 +46,7 @@ export const ATTENTION_PRIORITY = Object.freeze({
   request_stalled: 5,
   claim_expired: 6,
   claim_contended: 7,
+  unread_note: 8,
 });
 
 function directRequests(snapshot, participantId) {
@@ -57,6 +58,39 @@ function directRequests(snapshot, participantId) {
     if (message === undefined || !message.requiresAck) continue;
     items.push({ kind: "direct_request", priority: ATTENTION_PRIORITY.direct_request,
       sourceId: message.messageId, summary: message.subject });
+  }
+  return items;
+}
+
+/**
+ * A note that was delivered once and then left unanswered.
+ *
+ * A `note` carries no acknowledgement obligation, so unlike a `requiresAck`
+ * message it raises no direct_request and, once injected, drops out of the
+ * inbox for good. Agents put decisions in notes anyway, and one delivered that
+ * way was missed for three hours because nothing stood behind it. This is the
+ * single low-priority breadcrumb that keeps a delivered-but-unacknowledged note
+ * recoverable: it fires only while the receipt reads `injected`, so the runner
+ * advancing it to `seen` after one showing makes it one-shot rather than a
+ * standing nag - the very noise a reader learns to skip. A `queued` note is
+ * about to be shown in full this turn and needs no breadcrumb yet.
+ *
+ * Only the recipient's, and named by message id so `acc sync --scope full` or
+ * `acc ack --message` can act on it without a second lookup.
+ */
+function unreadNotes(snapshot, participantId) {
+  const items = [];
+  for (const receipt of snapshot.receipts ?? []) {
+    if (receipt.recipientParticipantId !== participantId) continue;
+    if (receipt.state !== "injected") continue;
+    const message = (snapshot.messages ?? [])
+      .find(item => item.messageId === receipt.messageId);
+    // A requiresAck message already carries a standing direct_request; a second
+    // line here would be two reminders for one obligation.
+    if (message === undefined || message.requiresAck) continue;
+    items.push({ kind: "unread_note", priority: ATTENTION_PRIORITY.unread_note,
+      sourceId: message.messageId,
+      summary: "a note you have not acknowledged - `acc sync --scope full --json` to read it" });
   }
   return items;
 }
@@ -245,6 +279,7 @@ export function computeAttention(snapshot, { session, participantId, now, pidIsA
   }
   return [
     ...directRequests(snapshot, participantId),
+    ...unreadNotes(snapshot, participantId),
     ...claimConflicts(snapshot, session, now),
     ...claimContended(snapshot, session, now),
     ...expiredClaims(snapshot, session, now),

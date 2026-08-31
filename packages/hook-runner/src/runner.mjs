@@ -270,6 +270,21 @@ const HANDLERS = {
         recipientParticipantId: mine.participantId, state: "injected" })
         .catch(error => failures.push(`${message.messageId}: ${error.message}`));
     }
+    // A note carries no ack obligation, so after its one full showing it leaves
+    // a single low-priority `unread_note` breadcrumb. Advancing that receipt
+    // injected -> seen the turn the breadcrumb is shown is what makes it
+    // one-shot: next turn the note reads `seen`, the breadcrumb stays quiet, and
+    // a delivered decision is recoverable without becoming a standing nag - the
+    // noise a reader learns to skip. Only what was actually shown is advanced,
+    // for the same reason the loop above only records what fit.
+    for (const item of sync.attention ?? []) {
+      if (item.kind !== "unread_note") continue;
+      if (!projected.includes(item.sourceId)) continue;
+      await context.service.markDelivery({ sessionId: binding.accSessionId,
+        generation: binding.generation, messageId: item.sourceId,
+        recipientParticipantId: mine.participantId, state: "seen" })
+        .catch(error => failures.push(`${item.sourceId}: ${error.message}`));
+    }
     // Same again: Kimi Code shows the model a hook's raw stdout, while Gemini
     // and Claude Code want an envelope and drop a bare string.
     // Reported rather than swallowed. The context still goes out - losing it

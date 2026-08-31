@@ -100,6 +100,7 @@ Computed from explicit rules, never from a hidden classifier. Lower sorts first:
 | 5 | `request_stalled` | You asked for something and nobody is on it: work you requested is held by a session that has gone quiet or addressed to a participant that is not here, or a question of yours needing an answer is addressed to a participant that is not here |
 | 6 | `claim_expired` | A claim you took has run out. Peers can write to it again, and until now nothing said so |
 | 7 | `claim_contended` | A peer's declared resource hints overlap a live claim you hold. The mirror of `claim_conflict`: a claim is advice, not a lock, so the holder is told early that someone means to touch it |
+| 8 | `unread_note` | A message shown to you once that you have not acknowledged, and which raised no `direct_request` because it asks for no ack. It surfaces as a single low-priority breadcrumb the turn after delivery, then goes quiet — so a delivered note (agents put decisions in them) stays recoverable without becoming a standing nag |
 
 A task with unmet dependencies is `blocked`, and finishing the last one flips its dependents
 to `pending`. So `pending` already means ready, and nothing has to re-evaluate the graph.
