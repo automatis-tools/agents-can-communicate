@@ -9,9 +9,9 @@ targeted inbox/reply path recovers and closes the exact message that matters.
 
 | | |
 |---|---|
-| Built from | `8594da3` |
-| Tarball | `agents-can-communicate-0.1.17.tgz`, 157 KB, 117 entries |
-| sha256 | `5179f6f81ec803b70ff661997bda60746e3b9e1a9071f499a04da622089d8cb3` |
+| Built from | `d4f35c5` |
+| Tarball | `agents-can-communicate-0.1.17.tgz`, 156 KB, 116 entries |
+| sha256 | `af169ce6f4b6ff66a94b90ff6155491b7dde01deb05529c80102e74adb2a3945` |
 | Node | 24 (current production LTS) |
 | Verified on | macOS 26.6.2 (darwin 25.6.0, arm64) and Linux in CI |
 | Not supported | Windows - untested rather than known-broken |
