@@ -179,6 +179,53 @@ export function createSessionService(ports) {
     return beaten;
   }
 
+  /**
+   * Continue the exact session named by a harness binding.
+   *
+   * Some clients emit SessionStart again after compacting their model context.
+   * The binding is already the continuation token: it names both the session
+   * and its generation. Refreshing that record preserves one identity without
+   * pretending an unrelated or closed generation is still ours.
+   *
+   * Returns null when the binding can no longer be resumed, so the hook may
+   * open a genuinely new session. No semantic event is appended: compaction is
+   * not a second agent arriving.
+   */
+  async function resumeSession({ sessionId, workspaceId, generation, ...metadata }) {
+    const resume = current => {
+      if (current === null || current.state !== "open"
+        || current.generation !== generation) return null;
+      return { ...current,
+      pid: metadata.pid ?? null,
+      checkoutRoot: metadata.checkoutRoot ?? current.checkoutRoot,
+      branch: metadata.branch ?? current.branch,
+      enforcement: metadata.enforcement ?? current.enforcement,
+      lifecycle: metadata.lifecycle ?? current.lifecycle,
+      heartbeatCadenceMs: metadata.heartbeatCadenceMs ?? current.heartbeatCadenceMs,
+      heartbeatAt: clock.now(),
+      };
+    };
+
+    // The compare and replacement happen under the ephemeral store's writer
+    // lock. A close or a replacement generation can win before this update or
+    // after it, but can never be overwritten from a record read beforehand.
+    const ephemeral = await store.ephemeral.update("session", sessionId, resume);
+    if (ephemeral !== null) return ephemeral;
+
+    // Re-read and validate inside the durable transaction for the same reason.
+    // Using generationOf only as the put token is insufficient: it protects
+    // the envelope write, not the semantic generation carried by the record.
+    const resolvedWorkspace = workspaceId ?? store.workspaceId;
+    if (resolvedWorkspace === undefined) return null;
+    return store.transaction(async tx => {
+      const current = tx.get("session", sessionId);
+      const resumed = resume(current);
+      if (resumed === null) return null;
+      tx.put("session", sessionId, resumed, tx.generationOf("session", sessionId));
+      return resumed;
+    }, { kinds: ["session"] });
+  }
+
   async function closeSession({ sessionId, workspaceId, generation }) {
     const existing = await locate(sessionId, workspaceId);
     if (existing === null) throw new AccError(EXIT.CONFLICT, "session is not open", { sessionId });
@@ -222,6 +269,7 @@ export function createSessionService(ports) {
 
   return {
     openSession,
+    resumeSession,
     heartbeatSession,
     closeSession,
     locateSession: locate,

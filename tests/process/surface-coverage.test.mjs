@@ -55,6 +55,7 @@ const BY_CLI = Object.freeze({
   openSession: "attach", heartbeatSession: "heartbeat", closeSession: "detach",
   sync: "sync", setIntent: "work", clearIntent: "work", acquireClaim: "claim", releaseClaim: "release",
   forceReleaseClaim: "release", sendMessage: "message", markDelivery: "ack",
+  readInbox: "inbox", replyToMessage: "reply",
   requestWork: "request", createTask: "task", claimTask: "task",
   transitionTask: "task", declineTask: "task", createWorkstream: "workstream",
   acquireCoordinator: "workstream", releaseCoordinator: "workstream",
@@ -71,6 +72,7 @@ const INTERNAL = Object.freeze({
   guardState: "the write guard's own read, kept narrow on purpose: `collectStatus` "
     + "answers the same question and reads the whole store, which put the cost of "
     + "guarding one write in proportion to every message the workspace had carried",
+  resumeSession: "the hook runtime resumes its generation-bearing binding after compaction",
 });
 
 test("every core operation is reachable, or named as internal on purpose", () => {
@@ -105,10 +107,12 @@ test("an operation an agent needs is offered over MCP as well", async () => {
   // of it, since a model should not be running the installer.
   const names = new Set(PUBLIC_TOOLS.map(tool => tool.name));
   for (const operation of ["sync", "setIntent", "acquireClaim", "sendMessage",
-    "markDelivery", "requestWork", "createTask", "createWorkstream", "acquireCoordinator",
+    "readInbox", "replyToMessage", "markDelivery", "requestWork", "createTask",
+    "createWorkstream", "acquireCoordinator",
     "releaseCoordinator", "finishSession"]) {
     const expected = { sync: "acc_sync", setIntent: "acc_work", acquireClaim: "acc_claim",
       sendMessage: "acc_message", markDelivery: "acc_ack", requestWork: "acc_request",
+      readInbox: "acc_inbox", replyToMessage: "acc_reply",
       createTask: "acc_task", createWorkstream: "acc_workstream",
       acquireCoordinator: "acc_workstream", releaseCoordinator: "acc_workstream",
       finishSession: "acc_finish" }[operation];

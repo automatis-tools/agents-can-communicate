@@ -4,6 +4,8 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
 
+import { EXIT } from "@agents-can-communicate/protocol";
+
 import { storePaths } from "../src/index.mjs";
 import { withWriterMutex } from "../src/writer-mutex.mjs";
 
@@ -42,6 +44,65 @@ async function store(t) {
 }
 
 const clock = { now: () => new Date().toISOString() };
+
+test("a contender lets a healthy writer finish before giving up", async t => {
+  const { root, paths } = await store(t);
+  let holderReady;
+  let releaseHolder;
+  const ready = new Promise(resolve => { holderReady = resolve; });
+  const release = new Promise(resolve => { releaseHolder = resolve; });
+  const holder = withWriterMutex(paths, { root, clock }, async () => {
+    holderReady();
+    await release;
+  });
+  await ready;
+
+  // One attach now performs several short writes under this shared mutex. A
+  // busy process can therefore hold the queue for longer than the old one
+  // second window while still remaining comfortably inside the hook budget.
+  const timer = setTimeout(releaseHolder, 1_200);
+  try {
+    const result = await withWriterMutex(paths, { root, clock }, async () => "written");
+    assert.equal(result, "written");
+  } finally {
+    clearTimeout(timer);
+    releaseHolder();
+    await holder;
+  }
+});
+
+test("a live holder cannot keep a contender past the hook-safe deadline", async t => {
+  const { root, paths } = await store(t);
+  let holderReady;
+  let releaseHolder;
+  const ready = new Promise(resolve => { holderReady = resolve; });
+  const release = new Promise(resolve => { releaseHolder = resolve; });
+  const holder = withWriterMutex(paths, { root, clock }, async () => {
+    holderReady();
+    await release;
+  });
+  await ready;
+
+  let elapsed = 0;
+  let operationRan = false;
+  try {
+    const failure = await withWriterMutex(paths, {
+      root,
+      clock,
+      monotonicNow: () => { elapsed += 7; return elapsed; },
+      sleep: async duration => { elapsed += duration; },
+    }, async () => { operationRan = true; }).then(() => null, error => error);
+
+    assert.equal(failure?.code, EXIT.CONFLICT);
+    assert.equal(operationRan, false);
+    assert.ok(elapsed > 1_200, `the contender gave up too early after ${elapsed}ms`);
+    assert.ok(elapsed <= 3_000,
+      `lock acquisition consumed ${elapsed}ms of the five-second hook budget`);
+  } finally {
+    releaseHolder();
+    await holder;
+  }
+});
 
 test("the lock passing to another holder mid-read is not fatal", async t => {
   // The interleaving Linux CI hit, made deterministic: the owner file is opened,

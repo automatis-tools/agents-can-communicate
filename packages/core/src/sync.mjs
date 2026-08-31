@@ -75,8 +75,8 @@ function directRequests(snapshot, participantId) {
  * standing nag - the very noise a reader learns to skip. A `queued` note is
  * about to be shown in full this turn and needs no breadcrumb yet.
  *
- * Only the recipient's, and named by message id so `acc sync --scope full` or
- * `acc ack --message` can act on it without a second lookup.
+ * Only the recipient's, and named by message id so `acc inbox --message` or
+ * `acc ack --message` can act on it without a workspace-wide lookup.
  */
 function unreadNotes(snapshot, participantId) {
   const items = [];
@@ -90,7 +90,8 @@ function unreadNotes(snapshot, participantId) {
     if (message === undefined || message.requiresAck) continue;
     items.push({ kind: "unread_note", priority: ATTENTION_PRIORITY.unread_note,
       sourceId: message.messageId,
-      summary: "a note you have not acknowledged - `acc sync --scope full --json` to read it" });
+      summary: `a note you have not acknowledged - \`acc inbox --message `
+        + `${message.messageId}\` to read it` });
   }
   return items;
 }

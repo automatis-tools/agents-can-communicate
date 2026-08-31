@@ -17,6 +17,13 @@ const eventRecord = (type, overrides = {}) => ({ schemaVersion: SCHEMA_VERSION,
   eventId: `event_${type.replace(".", "_")}`, workspaceId: WORKSPACE,
   actorSessionId: "session_a", type, occurredAt: NOW, payload: {}, ...overrides });
 
+const sessionRecord = (overrides = {}) => ({ schemaVersion: SCHEMA_VERSION,
+  sessionId: "session_a", participantId: "participant_a", workspaceId: WORKSPACE,
+  generation: "generation_semantic", harness: "codex", state: "open",
+  parentSessionId: null, checkoutRoot: null, branch: null, pid: null,
+  enforcement: "advisory", lifecycle: "manual", heartbeatCadenceMs: 30_000,
+  startedAt: NOW, heartbeatAt: NOW, ...overrides });
+
 // Exported so every CoordinationStore implementation is held to the same
 // contract. A contract only one implementation satisfies proves nothing.
 export function runStoreContract(name, makeStore) {
@@ -143,6 +150,66 @@ export function runStoreContract(name, makeStore) {
 
     const page = await store.eventsSince(WORKSPACE, null, 10);
     assert.deepEqual(page.events.map(event => event.eventId), ["event_session_opened"]);
+  });
+
+  test(`${name}: ephemeral updates serialize read-modify-write`, async () => {
+    const store = await makeStore();
+    await store.ephemeral.put("session", "session_a", sessionRecord());
+    const first = "2026-08-16T01:00:01.000Z";
+    const second = "2026-08-16T01:00:02.000Z";
+    const advance = current => ({ ...current,
+      heartbeatAt: current.heartbeatAt === NOW ? first : second });
+
+    const results = await Promise.all([
+      store.ephemeral.update("session", "session_a", advance),
+      store.ephemeral.update("session", "session_a", advance),
+    ]);
+
+    assert.deepEqual(results.map(record => record.heartbeatAt).sort(), [first, second]);
+    assert.equal((await store.ephemeral.get("session", "session_a")).heartbeatAt, second);
+  });
+
+  test(`${name}: ephemeral put and delete wait for an update holding the lock`, async () => {
+    const store = await makeStore();
+    const pauseUpdate = async next => {
+      let entered;
+      let release;
+      const inside = new Promise(resolve => { entered = resolve; });
+      const gate = new Promise(resolve => { release = resolve; });
+      const update = store.ephemeral.update("session", "session_a", async current => {
+        entered();
+        await gate;
+        return next(current);
+      });
+      await inside;
+      return { update, release };
+    };
+    const letItRun = () => new Promise(resolve => setImmediate(resolve));
+    await store.ephemeral.put("session", "session_a", sessionRecord());
+
+    const beforePut = await pauseUpdate(current => ({ ...current,
+      heartbeatAt: "2026-08-16T01:00:01.000Z" }));
+    let putSettled = false;
+    const replacement = sessionRecord({ generation: "generation_replacement" });
+    const put = store.ephemeral.put("session", "session_a", replacement)
+      .then(() => { putSettled = true; });
+    await letItRun();
+    assert.equal(putSettled, false, "put bypassed an update holding the writer lock");
+    beforePut.release();
+    await Promise.all([beforePut.update, put]);
+    assert.equal((await store.ephemeral.get("session", "session_a")).generation,
+      "generation_replacement");
+
+    const beforeDelete = await pauseUpdate(current => ({ ...current,
+      heartbeatAt: "2026-08-16T01:00:02.000Z" }));
+    let deleteSettled = false;
+    const deletion = store.ephemeral.delete("session", "session_a")
+      .then(() => { deleteSettled = true; });
+    await letItRun();
+    assert.equal(deleteSettled, false, "delete bypassed an update holding the writer lock");
+    beforeDelete.release();
+    await Promise.all([beforeDelete.update, deletion]);
+    assert.equal(await store.ephemeral.get("session", "session_a"), null);
   });
 }
 

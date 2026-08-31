@@ -208,6 +208,21 @@ const HANDLERS = Object.freeze({
       text: advice ? `sent ${message.messageId}\n${advice}` : `sent ${message.messageId}` };
   },
 
+  inbox: async ({ options, context }) => {
+    const messages = await context.service.readInbox({ sessionId: options.session,
+      generation: options.generation, messageId: options.message });
+    return { data: messages, text: messages.length === 0
+      ? "inbox empty" : JSON.stringify(messages, null, 2) };
+  },
+
+  reply: async ({ options, context }) => {
+    const result = await context.service.replyToMessage({ sessionId: options.session,
+      generation: options.generation, messageId: options.message, body: options.body,
+      subject: options.subject, type: options.type, priority: options.priority });
+    return { data: result,
+      text: `replied ${result.reply.messageId}; acknowledged ${options.message}` };
+  },
+
   /**
    * Ask another agent to do something. One call, one write.
    *

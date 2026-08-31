@@ -72,6 +72,22 @@ async function resolveSession(context) {
   return session;
 }
 
+// Kept for clients released before acc_inbox existed. New clients should use
+// the narrow inbox tool, but removing mail from acc_sync would strand deployed
+// clients that only know this response field. Returning a body is delivery, so
+// only those returned messages advance to injected.
+async function syncWithMail(service, owner, context, args) {
+  const sync = await service.sync({ ...owner, cursor: args.cursor ?? null,
+    scope: args.scope, limit: args.limit });
+  const messages = await service.pendingMessages({ workspaceId: context.workspaceId,
+    participantId: context.participantId, exceptSessionId: owner.sessionId });
+  for (const message of messages) {
+    await service.markDelivery({ ...owner, messageId: message.messageId,
+      state: "injected" }).catch(() => null);
+  }
+  return messages.length === 0 ? sync : { ...sync, messages };
+}
+
 /**
  * A poll is this client's turn.
  *
@@ -90,25 +106,6 @@ async function resolveSession(context) {
  * Acknowledgement stays a separate act, because being shown something is not
  * agreeing to it.
  */
-async function syncWithMail(service, owner, context, args) {
-  const sync = await service.sync({ ...owner, cursor: args.cursor ?? null,
-    scope: args.scope, limit: args.limit });
-  const messages = await service.pendingMessages({
-    workspaceId: context.workspaceId,
-    participantId: context.participantId,
-    exceptSessionId: owner.sessionId });
-  if (messages.length === 0) return sync;
-
-  for (const message of messages) {
-    // One failure must not swallow the rest: the client is holding the message
-    // either way, and a receipt that cannot be written is not a reason to hide
-    // what a peer said.
-    await service.markDelivery({ ...owner, messageId: message.messageId,
-      state: "injected" }).catch(() => null);
-  }
-  return { ...sync, messages };
-}
-
 async function callTool(name, args, context) {
   const session = await resolveSession(context);
   const owner = { sessionId: session.sessionId, generation: session.generation,
@@ -141,6 +138,11 @@ async function callTool(name, args, context) {
       const advice = noteNudge(message);
       return advice ? { ...message, advice } : message;
     }
+    case "acc_inbox":
+      return service.readInbox({ ...owner, messageId: args.messageId });
+    case "acc_reply":
+      return service.replyToMessage({ ...owner, messageId: args.messageId,
+        body: args.body, subject: args.subject, type: args.type, priority: args.priority });
     case "acc_task":
       if (args.action === "claim") return service.claimTask({ ...owner,
         taskId: args.taskId, force: args.force === true });
