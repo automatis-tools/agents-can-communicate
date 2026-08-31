@@ -1,40 +1,31 @@
 # CLI
 
-ACC keeps setup commands human-facing and coordination commands agent-facing. That split
-lets it disappear into sessions you already use instead of becoming a new console that
-owns the work.
+Full command reference. See the [docs index](README.md) for how this fits with the rest
+of the docs, and [GLOSSARY.md](GLOSSARY.md) for term definitions.
 
-Every command takes `--json` for machine output and `--cwd` to pick the workspace.
-
-`acc help` prints this list in short form, and `acc version` prints what is installed.
-Both work anywhere, including a directory that is no workspace at all.
-
-`acc update` is the only command that touches the network. `acc doctor` reads what it
-remembered, asking at most once a day, and `ACC_NO_UPDATE_CHECK=1` turns both off. Nothing
-on the hook path ever asks: a hook runs every turn inside a five-second budget.
-
-Updating matters in two places at once. `npm install -g` replaces this CLI and the hook
-runtime — the shim a client runs points into the npm directory rather than at a copy — and
-leaves the bundle written into the client alone, including the skills the agents read. That
-is why an upgrade is two commands, and why `acc doctor` says so when they disagree.
+Setup commands are human-facing; the rest are agent-facing. Every command accepts `--json`
+for machine output and `--cwd` to pick the workspace. `acc help` and `acc version` work
+anywhere, including a directory that is no workspace at all.
 
 <!-- test:command -->
 ```bash
 acc help
 acc version
-acc uninstall --dry-run
 ```
 
 ```mermaid
 graph LR
-  subgraph You
-    I[acc install] --- D[acc doctor] --- CF[acc config] --- UN[acc uninstall]
+  subgraph Setup
+    I[acc install] --- UN[acc uninstall] --- D[acc doctor] --- CF[acc config]
   end
-  subgraph Your agent
-    W[acc work] --- CL[acc claim] --- RQ[acc request] --- MS[acc message] --- IN[acc inbox] --- RP[acc reply] --- TK[acc task] --- FN[acc finish] --- ST[acc status]
+  subgraph In-session
+    ST[acc status] --- SY[acc sync] --- W[acc work] --- CL[acc claim] --- RL[acc release] --- MS[acc message] --- IN[acc inbox] --- RP[acc reply] --- RQ[acc request] --- TK[acc task] --- WS[acc workstream] --- AK[acc ack] --- DC[acc decide] --- FN[acc finish]
   end
-  subgraph Adapters only
+  subgraph Adapter-only
     AT[acc attach] --- HB[acc heartbeat] --- DT[acc detach]
+  end
+  subgraph About
+    HP[acc help] --- VR[acc version] --- UP[acc update]
   end
 ```
 
@@ -43,46 +34,84 @@ graph LR
 | Command | Does |
 |---|---|
 | `acc install` | Install adapters for the clients on this machine |
-| `acc install --dry-run` | Print the exact plan, change nothing |
-| `acc install --adapter kimi` | One client only |
-| `acc uninstall` | Remove what ACC wrote, keep what you edited — including for a client that has since left the machine |
-| `acc uninstall --dry-run` | Print exactly what would be removed, change nothing |
-| `acc doctor` | Clients, versions, install health, what to run next |
-| `acc doctor --repair` | Repair store state; refuses if it is ambiguous |
-| `acc config init` | Write `acc.workspace.json` after showing it |
+| `acc install --adapter <name>` | One client only |
+| `acc uninstall` | Remove what ACC wrote; keeps what you edited, even for a client no longer on the machine |
+| `acc doctor` | Clients, versions, install health, and what to run next |
+| `acc doctor --repair` | Repair store state; refuses if it's ambiguous |
+| `acc config` | Read or write `acc.workspace.json` |
+| `acc config init` | Write it, after showing what will be written |
 | `acc config validate` | Read-only check |
 
-## In a session
+## In-session
 
 | Command | Does |
 |---|---|
-| `acc status` | Who is here, claims, protection level. `--all` adds everyone who has been |
-| `acc sync` | New events since a cursor; silent when alone |
-| `acc work` | Publish what this session is doing. `--hint` names a resource so a claim holder is warned; `--clear` when it has stopped |
+| `acc status` | Who is here, claims, protection level. `--all` adds sessions that have closed |
+| `acc sync` | Events since a cursor; silent when alone |
+| `acc work` | Publish what this session is doing. `--hint` names a resource so a claim holder is warned; `--clear` when it's done |
 | `acc claim` | Reserve a resource. Exit `5` on conflict |
 | `acc release` | Give it back. `--resource` for what you claimed, `--claim` for its id |
-| `acc inbox` | Unresolved messages addressed to you. `--message` selects exactly one |
-| `acc reply` | Reply to one addressed message and acknowledge it atomically |
-| `acc ack` | Answer a message that asked for one, so it stops asking |
 | `acc message` | Send a typed message to participants |
-| `acc request` | Ask another agent to do something. One call: the work plus why |
-| `acc task` | Create work, `--take` it, or `--state` it along |
+| `acc inbox` | Unresolved messages addressed to you. `--message` selects one |
+| `acc reply` | Reply to one addressed message and acknowledge it in the same step |
+| `acc request` | Ask another agent to do something — the work plus why, in one call |
+| `acc task` | Create work, `--take` it, or move it along with `--state` |
 | `acc workstream` | Group related work. Optional. `--take` / `--release` steer one |
-| `acc decide` | Record what was settled, so the next session does not reopen it |
+| `acc ack` | Acknowledge a message that asked for one, without writing a reply |
+| `acc decide` | Record what was settled, so the next session doesn't reopen it |
 | `acc finish` | Write the handoff and release claims |
 
-## Adapters only
+## Messages
 
-`acc attach`, `acc heartbeat`, `acc detach` — driven by hooks, not by people.
+| Command | Required flags | Optional flags |
+|---|---|---|
+| `acc inbox` | — | `--session`, `--generation`, `--message` |
+| `acc reply` | `--message`, `--body` | `--session`, `--generation`, `--subject`, `--type`, `--priority` |
+
+Without `--message`, `acc inbox` returns only unresolved messages addressed to this
+participant, each paired with its own receipt. With `--message`, it can also recover an
+injected note named by an `unread_note` breadcrumb. Reading moves `queued` or `injected` to
+`seen` — a direct request stays in the inbox until it's answered, so context compaction
+can't erase an obligation.
+
+```bash
+acc inbox
+acc inbox --message message_x
+acc reply --message message_x --body "Yes; the boundary is free after abc123."
+```
+
+`acc reply` creates an attributed `answer` linked through `inReplyTo` and acknowledges the
+original in the same transaction. Use `acc ack --message message_x` when no written answer
+is needed. `acc sync --scope full --json` is for whole-workspace forensics, not for
+recovering one message.
+
+## Adapter-only
+
+| Command | Does |
+|---|---|
+| `acc attach` | Register a session at start, driven by the adapter's hook, not by a person |
+| `acc heartbeat` | Keep a session's presence alive, driven by the adapter's hook |
+| `acc detach` | Close a session cleanly, driven by the adapter's hook |
 
 ## About acc
 
 | Command | Does |
 |---|---|
-| `acc help` | Every command with one line each. `--help` and `-h` mean the same |
+| `acc help` | Every command, one line each. `--help` and `-h` mean the same |
 | `acc version` | The installed version, read from the package. `--version` and `-v` too |
 | `acc update` | Ask npm whether a newer acc exists |
 | `acc update --apply` | Install it, then re-run `acc install` so the clients get the new bundle |
+
+## Updating
+
+Only `acc update` touches the network. `acc doctor` reads what it last found, checking at
+most once a day; `ACC_NO_UPDATE_CHECK=1` turns both off. Nothing on the hook path ever
+asks — a hook runs every turn inside a five-second budget.
+
+An upgrade is two commands. `npm install -g` replaces the CLI and the hook runtime — the
+shim a client runs points into the npm directory rather than at a copy — but leaves the
+bundle written into each client alone, including the skills the agents read. `acc install`
+rewrites that bundle. `acc doctor` flags it when the two disagree.
 
 ## Exit codes
 
@@ -97,10 +126,9 @@ graph LR
 
 ## Ownership arguments
 
-Anything that mutates acts as a session, and proves it with that session's generation —
-which is what stops a restarted process from acting as the old one. You do not pass
-either. `acc` works out which session is running it, from the binding the adapter wrote
-when the session started:
+Anything that mutates acts as a session and proves it with that session's generation. You
+pass neither — `acc` resolves both from the binding the adapter wrote when the session
+started:
 
 | It uses | When |
 |---|---|
@@ -110,121 +138,85 @@ when the session started:
 | the checkout you are in | several sessions here, each in its own worktree |
 | the only live session | you are the only one attached |
 
-If two live sessions in one checkout both fit, it stops and names them rather than
-guessing — acting as the wrong session is exactly what the generation prevents.
-
-The generation is never printed by `acc status`, on purpose: it is proof of ownership, not
-public information.
+Two live sessions in one checkout that both fit stop the command rather than guess — that's
+exactly the mistake generation prevents, and why it's never printed by `acc status`. See
+[PROTOCOL.md](PROTOCOL.md#identity-hierarchy) for the full model.
 
 ## Who has been here
 
-`acc status` lists the sessions that are present. A closed session is kept — a message is
-attributed to whoever sent it, and the roster is the only place that answers which checkout
-an agent was working in, which is a question its session cannot answer once it has gone.
+`acc status --all` lists every session that has been present, closed ones included — a
+message stays attributed to whoever sent it, and the roster is the only place that answers
+which checkout an agent was working in.
 
 ```bash
 acc status --all
 ```
 
-That is how a cleanup asks: each entry carries `checkoutRoot`, `branch` and `presence`, so
-a worktree with no live session behind it can be told apart from someone's desk.
+Each entry carries `checkoutRoot`, `branch`, and `presence`, so a worktree with no live
+session behind it can be told apart from someone's desk.
 
 ## Recording what was settled
 
-A decision outlives the conversation that produced it, which is why it is a durable object
-rather than another message in the log.
+A decision is a durable object, not another message in the log — it outlives the
+conversation that produced it.
 
 ```bash
 acc decide --title "hull clamps at half height" \
   --outcome "settle() clamps to GROUND_Y + height/2; renderer draws what physics returns"
 ```
 
-`--authority` is who settled it: `workstream` (the default) for an agreement between
-agents, `policy` for a rule that already existed, and `human` only when a person actually
-said so — which needs `--human` as well. A peer proposal cannot become a human-authority
-decision on its own; that is the one way this record could launder an agent's opinion into
-a ruling.
+| Flag | Meaning |
+|---|---|
+| `--authority` | Who settled it: `workstream` (default), `policy`, or `human` (needs `--human` too) |
+| `--supersedes` | Id of the decision this replaces; it must already exist |
 
-`--supersedes` points at the decision this replaces, and the one it names has to exist.
-
-## Reading and replying to messages
-
-The ordinary read is narrow:
-
-```bash
-acc inbox
-acc inbox --message message_x
-```
-
-Without an id it returns only unresolved messages addressed to this participant, paired
-with their own receipt. With `--message`, it can also recover an injected note named by an
-`unread_note` breadcrumb. Reading moves `queued` or `injected` to `seen`. A direct request
-remains in the inbox after `seen` until it is answered, so context compaction cannot erase
-an obligation.
-
-```bash
-acc reply --message message_x --body "Yes; the boundary is free after abc123."
-```
-
-Reply creates an attributed `answer` linked through `inReplyTo` and acknowledges the
-original in the same transaction. Use `acc ack --message message_x` when no written answer
-is useful. `acc sync --scope full --json` is for explicit whole-workspace forensics, not
-for recovering one message.
+A peer proposal can't promote itself to human authority on its own. See
+[PROTOCOL.md](PROTOCOL.md#decisions) for the full authority model.
 
 ## Asking another agent
 
-`--to` and `--assignee` name a participant from the roster. One nobody here has is refused
-rather than accepted: a message to a name that does not exist used to report `sent` and go
-nowhere, and a request made a task assigned to nobody that its author then waited on. A
-participant who has closed their terminal is still a participant — that is the whole reason
-work is addressed to one.
+`--to` and `--assignee` name a participant from the roster. An unknown name is refused, not
+silently accepted — a participant who has closed their terminal is still a participant,
+which is the whole reason work is addressed to one rather than to a session.
 
 ```bash
 acc request --to claude_code --title "finish the store tests" \
   --detail "I ported src/store but ran out of time on the concurrency cases."
 ```
 
-Finishing the task answers the request it came from, so the message stops demanding an
-acknowledgement. `acc ack --message <id>` does the same for messages that are not tied to a
-task — and a session can only mark its own receipt, since reading something is a statement
-only the reader can make.
+One write produces two linked facts: the task shows up as an attention item for the
+recipient, and the message explains why. Finishing the task answers the request
+automatically; `acc ack --message <id>` closes a message with no task behind it — and only
+the session that read a message can acknowledge it.
 
-One write. The recipient learns about it twice, and the two facts are different: the work
-appears as an attention item addressed to them, and the message explains why. A task with
-no message is work nobody understands; a message with no task is a request nothing tracks.
-
-Work is addressed to a **participant**, not a session. The agent can close its terminal and
-the next session it opens is still told — as long as that agent has a name of its own.
-Without one, each run is a new participant, so nothing addressed to the last one reaches it:
+Addressing survives a closed terminal only if the agent has a stable name of its own:
 
 ```bash
 ACC_PARTICIPANT=backend-codex codex
 ```
 
-Only that participant can take the work:
+Without one, each run is a new participant, so nothing addressed to the last one reaches it.
+
+| Command | Does |
+|---|---|
+| `acc task --task task_x --take` | Claim assigned work; exit `5` if it isn't yours |
+| `acc task --task task_x --state review` | Move it along |
+| `acc task --assignee <name>` | Address work without sending a message |
+| `acc request` | Same as `--assignee`, with the explanation attached — almost always what you want |
+
+A workstream is optional — `acc request --to models --title "review the migration"` needs
+no project around it. Create one when several pieces belong together:
 
 ```bash
-acc task --task task_x --take     # exit 5 if it is not yours
-acc task --task task_x --state review
+acc workstream --title "Storage" --objective "port the store and its tests"
 ```
 
-`--assignee` on `acc task` addresses work without sending a message. `acc request` is the
-same thing with the explanation attached, which is almost always what you want.
-
-A workstream is optional. `acc request --to models --title "review the migration"` needs no
-project around it. Create one when several pieces belong together:
-
-```bash
-acc workstream \
-  --title "Storage" --objective "port the store and its tests"
-```
-
-An open workstream with nobody steering it raises `coordinator_missing` for everyone, every
-turn, until somebody takes it on. Taking it is saying so; releasing it asks again.
+An open workstream with nobody steering it raises `coordinator_missing` every turn until
+someone takes it on:
 
 ```bash
 acc workstream --workstream workstream_x --take
 acc workstream --workstream workstream_x --release
 ```
 
-Only the session holding the lease can hand it back.
+Only the session holding the lease can release it.

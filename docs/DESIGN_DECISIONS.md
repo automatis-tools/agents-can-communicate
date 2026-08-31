@@ -22,7 +22,7 @@ Why ACC is shaped the way it is, and what is deliberately still open.
 | One publishable package | One version and one release rather than twelve coordinated ones. |
 | MIT | Widest reuse, least friction. |
 | Node 24 (current production LTS) | Uses `node:test`, modern `fs` promises, and no transpiler. |
-| MCP session from launch config | Never from `initialize` or `clientInfo` — those are attacker-controllable. See [THREAT_MODEL.md](THREAT_MODEL.md) scenario 8. |
+| MCP session from launch config | Never from `initialize` or `clientInfo` — those are attacker-controllable. See the threat scenarios in [SECURITY_MODEL.md](SECURITY_MODEL.md) (scenario 8). |
 
 ## Rejected, and why
 
