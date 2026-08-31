@@ -11,6 +11,7 @@ import { promisify } from "node:util";
 import { createClaudeCodeAdapter } from "@agents-can-communicate/adapter-claude-code";
 import { createCodexAdapter } from "@agents-can-communicate/adapter-codex";
 import { createGeminiCliAdapter } from "@agents-can-communicate/adapter-gemini-cli";
+import { createGrokAdapter } from "@agents-can-communicate/adapter-grok";
 import { createKimiAdapter } from "@agents-can-communicate/adapter-kimi";
 
 const run = promisify(execFile);
@@ -67,6 +68,14 @@ const ADAPTERS = [
       return config.split("\n").filter(line => line.startsWith("command = "))
         .map(line => line.slice(line.indexOf('"') + 1, line.lastIndexOf('"'))
           .replace(/\\(["\\])/g, "$1"));
+    } },
+  { name: "grok", create: createGrokAdapter,
+    context: home => ({ home, grokHome: path.join(home, ".grok") }),
+    commands: async home => {
+      const wired = JSON.parse(await readFile(
+        path.join(home, ".grok", "hooks", "acc.json"), "utf8"));
+      return Object.values(wired.hooks)
+        .flatMap(entries => entries.flatMap(entry => entry.hooks.map(h => h.command)));
     } },
 ];
 

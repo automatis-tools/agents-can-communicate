@@ -18,7 +18,8 @@ const repo = path.resolve(import.meta.dirname, "..", "..");
  * not name a network module, call `fetch`, or import the one file that does.
  */
 const HOOK_PATH = ["hook-runner", "adapter-sdk", "adapter-claude-code", "adapter-codex",
-  "adapter-gemini-cli", "adapter-kimi", "core", "storage-filesystem", "protocol"];
+  "adapter-gemini-cli", "adapter-grok", "adapter-kimi", "core", "storage-filesystem",
+  "protocol"];
 
 const FORBIDDEN = [
   [/from\s+"node:(https?|net|tls|dgram)"/, "imports a network module"],

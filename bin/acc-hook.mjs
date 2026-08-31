@@ -13,12 +13,14 @@ import { runHook } from "@agents-can-communicate/hook-runner";
 import { createClaudeCodeAdapter } from "@agents-can-communicate/adapter-claude-code";
 import { createCodexAdapter } from "@agents-can-communicate/adapter-codex";
 import { createGeminiCliAdapter } from "@agents-can-communicate/adapter-gemini-cli";
+import { createGrokAdapter } from "@agents-can-communicate/adapter-grok";
 import { createKimiAdapter } from "@agents-can-communicate/adapter-kimi";
 
 const adapters = {
   claude_code: createClaudeCodeAdapter(),
   codex: createCodexAdapter(),
   gemini_cli: createGeminiCliAdapter(),
+  grok: createGrokAdapter(),
   kimi: createKimiAdapter(),
 };
 
