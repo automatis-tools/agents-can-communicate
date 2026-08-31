@@ -9,9 +9,9 @@ targeted inbox/reply path recovers and closes the exact message that matters.
 
 | | |
 |---|---|
-| Built from | `da9266a` |
+| Built from | `0a4bc3c` |
 | Tarball | `agents-can-communicate-0.1.17.tgz`, 156 KB, 116 entries |
-| sha256 | `18138071de3c720c97543264928d3b26fd9e81f3f2690cb7fecaeab111f835ff` |
+| sha256 | `99f904f26500db19b4a6d5865eb61a46a83f43f171b7a2209fc943c3310013c0` |
 | Node | 24 (current production LTS) |
 | Verified on | macOS 26.6.2 (darwin 25.6.0, arm64) and Linux in CI |
 | Not supported | Windows - untested rather than known-broken |
@@ -39,7 +39,10 @@ forge delivery of a larger body omitted by the budget. Resume validates the
 session state and semantic generation inside the atomic durable or ephemeral
 update, preventing a concurrent close or replacement from being reclaimed.
 MCP `acc_sync` retains its released pending-mail response for older clients;
-new clients use the narrower `acc_inbox` path.
+new clients use the narrower `acc_inbox` path. Ephemeral put, update, and
+delete share one writer lock, and adapters without structured delivery
+metadata visibly withhold bodies instead of repeating them without a truthful
+receipt.
 
 ## 0.1.17
 
