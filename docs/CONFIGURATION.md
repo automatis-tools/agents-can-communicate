@@ -3,7 +3,7 @@
 ACC works with no configuration at all. A workspace is identified by its Git common
 directory when there is one, and by the directory itself otherwise, and every policy has a
 default. `acc.workspace.json` is what a team writes when those answers are not good
-enough. Project map: [README](README.md). Terms used below: [Glossary](GLOSSARY.md).
+enough. Project map: [README](index.md). Terms used below: [Glossary](GLOSSARY.md).
 
 ## When you need a config
 

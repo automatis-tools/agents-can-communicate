@@ -140,5 +140,5 @@ time. A coordination tool must not be the reason a session stops working.
 
 ---
 
-See also: [README](README.md) for navigation, [Glossary](GLOSSARY.md) for terms, and
+See also: [README](index.md) for navigation, [Glossary](GLOSSARY.md) for terms, and
 [Protocol](PROTOCOL.md) for interfaces.

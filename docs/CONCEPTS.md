@@ -153,4 +153,4 @@ session can still be asked what the whole system is doing.
 
 ---
 
-Next: [Getting started](GETTING_STARTED.md) · [Capabilities](CAPABILITIES.md) · [the full docs map](README.md)
+Next: [Getting started](GETTING_STARTED.md) · [Capabilities](CAPABILITIES.md) · [the full docs map](index.md)

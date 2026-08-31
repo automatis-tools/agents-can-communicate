@@ -106,4 +106,4 @@ claim advisory while it's connected. That downgrade is deliberate and reported, 
 
 ---
 
-Next: [Why ACC](WHY_ACC.md) · [CLI reference](CLI.md) · [Configuration](CONFIGURATION.md) · [Troubleshooting](TROUBLESHOOTING.md) · [full docs map](README.md)
+Next: [Why ACC](WHY_ACC.md) · [CLI reference](CLI.md) · [Configuration](CONFIGURATION.md) · [Troubleshooting](TROUBLESHOOTING.md) · [full docs map](index.md)

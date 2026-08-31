@@ -3,7 +3,7 @@
 An adapter teaches ACC one client. Nothing else in ACC knows that client exists. This page
 assumes the vocabulary in [Protocol](PROTOCOL.md#identity-hierarchy) — session, participant,
 claim — and points to [Capabilities](CAPABILITIES.md) for what was actually measured per
-client; see the [documentation map](README.md) for where both fit among the rest.
+client; see the [documentation map](index.md) for where both fit among the rest.
 
 ```mermaid
 graph LR

@@ -88,7 +88,7 @@ own. These give you a direct view when you want one:
 
 ## Documentation
 
-Start at the **[documentation map](docs/README.md)** — it lays out a path for whatever
+Start at the **[documentation map](docs/index.md)** — it lays out a path for whatever
 brought you here: [why ACC](docs/WHY_ACC.md) and [concepts](docs/CONCEPTS.md) to evaluate
 it, [getting started](docs/GETTING_STARTED.md) to run it, the [CLI](docs/CLI.md) /
 [protocol](docs/PROTOCOL.md) / [capabilities](docs/CAPABILITIES.md) reference, and

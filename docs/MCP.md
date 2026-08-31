@@ -119,5 +119,5 @@ Protocol revision `2026-07-28`. Wire-level detail lives in
 
 ---
 
-See also: [README](README.md) for navigation, [Glossary](GLOSSARY.md) for terms, and
+See also: [README](index.md) for navigation, [Glossary](GLOSSARY.md) for terms, and
 [Capabilities](CAPABILITIES.md) for the full per-client matrix.
