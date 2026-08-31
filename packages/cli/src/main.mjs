@@ -1,6 +1,6 @@
 import { AccError, CONFIG_FILENAME, EXIT, failure, ok }
   from "@agents-can-communicate/protocol";
-import { createCoordinationService } from "@agents-can-communicate/core";
+import { createCoordinationService, noteNudge } from "@agents-can-communicate/core";
 import { openFilesystemStore } from "@agents-can-communicate/storage-filesystem";
 
 import { parseArgs, positiveNumber } from "./args.mjs";
@@ -199,7 +199,13 @@ const HANDLERS = Object.freeze({
       type: options.type ?? "note", subject: options.subject, body: options.body,
       priority: options.priority, workstreamId: options.workstream ?? null,
       requiresAck: options.requiresAck === true, descriptor: context.descriptor });
-    return { data: message, text: `sent ${message.messageId}` };
+    // A note that reads like it wants a reply was sent with no ack obligation
+    // and no standing reminder; say so once, without blocking the send. Carried
+    // in `data` so an adapter reading `--json` sees it, and appended to `text`
+    // for a person - the send already succeeded either way.
+    const advice = noteNudge(message);
+    return { data: advice ? { ...message, advice } : message,
+      text: advice ? `sent ${message.messageId}\n${advice}` : `sent ${message.messageId}` };
   },
 
   /**

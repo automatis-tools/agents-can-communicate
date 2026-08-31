@@ -46,6 +46,14 @@ Nobody is in charge. A request is a request: the recipient can take it, leave it
 the message instead. Authority differences apply to mutation only — never to knowledge, and
 never to who may ask whom.
 
+A message can be a fire-and-forget **note** or a **question** that asks for an answer. A note
+is shown to the recipient once and owes no reply; a question stands in front of them until it
+is acknowledged, and if it goes unanswered while its asker waits, that waiting is surfaced. So
+a decision or a warning the other agent must act on is a question (`--requires-ack`) or a
+recorded decision (`acc decide`), not a note — and if a note reads like it wants a reply, `acc
+message` says so when you send it. A note that does slip past is not lost either: delivered
+once, it leaves a single low-priority breadcrumb so it stays recoverable without nagging.
+
 Work is addressed to a **participant** rather than a session, so it survives that agent
 restarting. Only the named participant can take it. Work addressed to nobody is open to
 anyone.

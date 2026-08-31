@@ -178,9 +178,15 @@ test("every attention kind in the priority table is one a rule can produce", () 
   // the table without a rule fails this test; one added with a rule fails it
   // until the snapshot exercises it, which is the point.
   const snapshot = {
-    messages: [{ messageId: "message_a", subject: "Need slots", requiresAck: true }],
-    receipts: [{ messageId: "message_a", recipientParticipantId: "participant_a",
-      state: "injected" }],
+    messages: [
+      { messageId: "message_a", subject: "Need slots", requiresAck: true },
+      // A delivered note with no ack obligation - triggers unread_note.
+      { messageId: "message_note", subject: "FYI", body: "noted", requiresAck: false },
+    ],
+    receipts: [
+      { messageId: "message_a", recipientParticipantId: "participant_a", state: "injected" },
+      { messageId: "message_note", recipientParticipantId: "participant_a", state: "injected" },
+    ],
     intents: [
       { sessionId: "session_a", resourceHints: ["file:src/**"] },
       // A peer heading for what this session holds - triggers claim_contended.
@@ -228,4 +234,55 @@ test("an empty roster does not let a missing probe through", () => {
   assert.throws(() => computeAttention({}, options), error => error.code === EXIT.USAGE);
   assert.throws(() => computeAttention({ sessions: [] }, options),
     error => error.code === EXIT.USAGE);
+});
+
+test("a delivered note nobody acknowledged raises exactly one unread_note", () => {
+  const snapshot = {
+    messages: [{ messageId: "message_note", subject: "Snow",
+      body: "take the minimal record", requiresAck: false }],
+    receipts: [{ messageId: "message_note", recipientParticipantId: "participant_a",
+      state: "injected" }],
+    sessions: [],
+  };
+  const produced = computeAttention(snapshot, { session: { sessionId: "session_a" },
+    participantId: "participant_a", now: NOW, pidIsAlive: () => true });
+  assert.deepEqual(produced.map(item => item.kind), ["unread_note"]);
+  assert.equal(produced[0].sourceId, "message_note");
+  assert.equal(produced[0].priority, ATTENTION_PRIORITY.unread_note);
+});
+
+test("the unread-note reminder is one-shot: before injection nothing, after seen nothing", () => {
+  const kinds = state => computeAttention({
+    messages: [{ messageId: "m", subject: "s", body: "b", requiresAck: false }],
+    receipts: [{ messageId: "m", recipientParticipantId: "participant_a", state }],
+    sessions: [],
+  }, { session: { sessionId: "session_a" }, participantId: "participant_a",
+    now: NOW, pidIsAlive: () => true }).map(item => item.kind);
+  // queued: about to be shown in full this turn, so no breadcrumb yet.
+  assert.deepEqual(kinds("queued"), []);
+  // injected: shown once, not acted on - the one turn it is surfaced.
+  assert.deepEqual(kinds("injected"), ["unread_note"]);
+  // seen: the breadcrumb has been given; it goes quiet rather than nagging.
+  assert.deepEqual(kinds("seen"), []);
+  assert.deepEqual(kinds("acknowledged"), []);
+});
+
+test("a requiresAck message keeps its direct_request and never doubles as an unread_note", () => {
+  const produced = computeAttention({
+    messages: [{ messageId: "q", subject: "Need slots", body: "which?", requiresAck: true }],
+    receipts: [{ messageId: "q", recipientParticipantId: "participant_a", state: "injected" }],
+    sessions: [],
+  }, { session: { sessionId: "session_a" }, participantId: "participant_a",
+    now: NOW, pidIsAlive: () => true });
+  assert.deepEqual(produced.map(item => item.kind), ["direct_request"]);
+});
+
+test("an unread note addressed to someone else is not this participant's news", () => {
+  const produced = computeAttention({
+    messages: [{ messageId: "m", subject: "s", body: "b", requiresAck: false }],
+    receipts: [{ messageId: "m", recipientParticipantId: "participant_b", state: "injected" }],
+    sessions: [],
+  }, { session: { sessionId: "session_a" }, participantId: "participant_a",
+    now: NOW, pidIsAlive: () => true });
+  assert.deepEqual(produced, []);
 });

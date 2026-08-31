@@ -1,4 +1,5 @@
 import { AccError, EXIT } from "@agents-can-communicate/protocol";
+import { noteNudge } from "@agents-can-communicate/core";
 import { clearSessionBinding, loadSessionBinding, storeSessionBinding }
   from "@agents-can-communicate/adapter-sdk";
 
@@ -130,11 +131,16 @@ async function callTool(name, args, context) {
       return service.acquireClaim({ ...owner, resource: args.resource,
         mode: args.mode ?? "exclusive", enforcement: "advisory",
         reason: args.reason ?? "unspecified", leaseSeconds: args.leaseSeconds });
-    case "acc_message":
-      return service.sendMessage({ ...owner, toParticipantIds: args.to ?? [],
+    case "acc_message": {
+      const message = await service.sendMessage({ ...owner, toParticipantIds: args.to ?? [],
         subject: args.subject, body: args.body, type: args.type ?? "note",
         priority: args.priority, requiresAck: args.requiresAck === true,
         workstreamId: args.workstreamId ?? null });
+      // A note that reads like it wants a reply was sent fire-and-forget; hand
+      // the nudge back with the message so the model that sent it can reconsider.
+      const advice = noteNudge(message);
+      return advice ? { ...message, advice } : message;
+    }
     case "acc_task":
       if (args.action === "claim") return service.claimTask({ ...owner,
         taskId: args.taskId, force: args.force === true });

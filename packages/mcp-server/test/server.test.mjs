@@ -251,3 +251,20 @@ test("the server exits when its input stream closes", async t => {
   // The only portable graceful shutdown signal in the stdio binding.
   assert.equal(exit, 0);
 });
+
+test("a consequential note comes back with a nudge; a plain FYI does not", async t => {
+  await withServer(t, async ({ request, meta, attach }) => {
+    await attach("someone_else");
+    const send = (subject, body) => request("tools/call", { name: "acc_message",
+      arguments: { to: ["someone_else"], subject, body, type: "note" }, _meta: meta })
+      .then(res => JSON.parse(res.result.structuredContent ?? res.result.content[0].text));
+
+    const consequential = await send("Snow", "It touches your file. Have you started?");
+    assert.match(consequential.advice ?? "", /--requires-ack|acc decide/,
+      "a note asking a question came back with no nudge");
+
+    const fyi = await send("FYI", "Logged it. Nothing for you to do.");
+    assert.equal(fyi.advice, undefined,
+      "a plain FYI was nudged, which trains the reader to ignore the nudge");
+  });
+});
