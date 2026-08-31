@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+Grok is a first-class adapter. `acc install` writes `$GROK_HOME/hooks` and
+`$GROK_HOME/skills` (default `~/.grok`) and does not depend on a Claude Code
+plugin being present. Grok sessions attach as harness `grok`, not `claude_code`.
+Turn injection and write/shell guards stay false until captured on this client.
+
 Coordination now survives model-context compaction without flooding the next
 context. Repeated client starts resume the bound ACC generation, ambient hooks
 show one compact trigger instead of a roster and unrelated claims, and a

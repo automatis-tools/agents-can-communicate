@@ -114,6 +114,7 @@ Measure them. Every client differs, and a wrong shape fails **silently**:
 | Codex | exit 2 + stderr | plain stdout (`developer` message) |
 | Claude Code | `hookSpecificOutput.permissionDecision` | same envelope |
 | Gemini CLI | `{"decision":"block"}` | `hookSpecificOutput` envelope |
+| Grok | `{"decision":"deny","reason"}` (documented; deny not yet captured) | UserPromptSubmit stdout discarded on 1.0.13 |
 | Kimi Code | `hookSpecificOutput.permissionDecision` | plain stdout |
 
 `denyOutcome(reason)` returns `{ stdout, stderr, exitCode }`, so the runtime never has to

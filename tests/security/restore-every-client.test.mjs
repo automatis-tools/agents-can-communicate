@@ -68,10 +68,11 @@ async function livedIn(t) {
   await write(".claude/settings.json",
     clientJson({ enabledPlugins: { "their-plugin@their-market": true } }));
   await write(".kimi-code/config.toml", 'default_model = "k3"\n');
+  await write(".grok/hooks/other.json", clientJson({ hooks: { SessionStart: [] } }));
   return home;
 }
 
-for (const adapterId of ["codex", "claude_code", "gemini_cli", "kimi"]) {
+for (const adapterId of ["codex", "claude_code", "gemini_cli", "grok", "kimi"]) {
   test(`${adapterId}: install then uninstall leaves the home as it was found`, async t => {
     const home = await livedIn(t);
     const adapter = ALL_ADAPTERS().find(item => item.id === adapterId);

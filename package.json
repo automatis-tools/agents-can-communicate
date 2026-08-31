@@ -14,6 +14,7 @@
     "claude-code",
     "gemini-cli",
     "kimi",
+    "grok",
     "multi-agent",
     "cli"
   ],
@@ -52,6 +53,7 @@
     "@agents-can-communicate/adapter-claude-code": "*",
     "@agents-can-communicate/adapter-codex": "*",
     "@agents-can-communicate/adapter-gemini-cli": "*",
+    "@agents-can-communicate/adapter-grok": "*",
     "@agents-can-communicate/adapter-kimi": "*",
     "@agents-can-communicate/adapter-sdk": "*",
     "@agents-can-communicate/cli": "*",
@@ -66,6 +68,7 @@
     "@agents-can-communicate/adapter-claude-code",
     "@agents-can-communicate/adapter-codex",
     "@agents-can-communicate/adapter-gemini-cli",
+    "@agents-can-communicate/adapter-grok",
     "@agents-can-communicate/adapter-kimi",
     "@agents-can-communicate/adapter-sdk",
     "@agents-can-communicate/cli",

@@ -15,7 +15,7 @@ version. A reproduction against a throwaway `ACC_DATA_HOME` is ideal.
 |---|---|
 | Peer text escaping its quoted block | An attacker who already has write access to your data home |
 | Any path escaping the managed root | A model choosing to obey persuasive peer text |
-| Uninstall deleting files ACC did not write | Vulnerabilities in Codex, Claude Code, Gemini, or Kimi themselves |
+| Uninstall deleting files ACC did not write | Vulnerabilities in Codex, Claude Code, Gemini, Grok, or Kimi themselves |
 | ACC writing into a repository | Denial of service by a trusted peer |
 | Session impersonation across MCP | |
 

@@ -1,0 +1,13 @@
+{
+  "hookEventName": "pre_tool_use",
+  "sessionId": "01a05a0b-44e4-7601-acdc-fe81d7526981",
+  "cwd": "/tmp/example-workspace",
+  "workspaceRoot": "/tmp/example-workspace",
+  "permissionMode": "default",
+  "toolName": "run_terminal_command",
+  "toolInput": {
+    "command": "printf '// x' >> /tmp/example-workspace/notes.txt",
+    "description": "<redacted: command description>"
+  },
+  "timestamp": "2026-08-31T22:59:24.000Z"
+}

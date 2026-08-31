@@ -48,9 +48,9 @@ async function skills() {
 test("every adapter ships a skill", async () => {
   const found = await skills();
 
-  // Four adapters, four skills. A scan that found none would pass every
+  // Five adapters, five skills. A scan that found none would pass every
   // assertion below without reading anything.
-  assert.equal(found.length, 4, found.map(item => item.file).join("\n"));
+  assert.equal(found.length, 5, found.map(item => item.file).join("\n"));
 });
 
 test("each skill teaches the operations an agent is expected to use", async () => {
