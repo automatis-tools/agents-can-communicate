@@ -1,6 +1,9 @@
 # Writing an adapter
 
-An adapter teaches ACC one client. Nothing else in ACC knows that client exists.
+An adapter teaches ACC one client. Nothing else in ACC knows that client exists. This page
+assumes the vocabulary in [Protocol](PROTOCOL.md#identity-hierarchy) — session, participant,
+claim — and points to [Capabilities](CAPABILITIES.md) for what was actually measured per
+client; see the [documentation map](index.md) for where both fit among the rest.
 
 ```mermaid
 graph LR
@@ -33,25 +36,26 @@ export function createExampleAdapter() {
 }
 ```
 
-`renderContextResult` is required when an adapter renders peer messages. It returns
-`{ text, includedMessageIds, includedAttentionIds }`; the hook runner advances delivery
-only from those ids. It deliberately never searches `text` for an id, because peer text is
-untrusted and can imitate another message's header. `projectContextResult()` implements
-this contract, while `projectContext()` remains the text-only convenience API.
-For an older adapter that implements only `renderContext()`, the runner withholds
-pending bodies and emits a visible `acc inbox` degradation warning. Repeating an
-untracked body every turn would be quieter in code and dishonest in operation.
+`renderContextResult` is required wherever an adapter renders peer messages. It returns
+`{ text, includedMessageIds, includedAttentionIds }`, and the [delivery
+lifecycle](PROTOCOL.md#delivery-lifecycle) advances only from those ids — never by searching
+`text` for one, because peer text is untrusted and can imitate another message's header.
+`projectContextResult()` implements this contract; `projectContext()` remains the text-only
+convenience API for adapters that don't need it. An adapter with only the older
+`renderContext()` gets pending bodies withheld and a visible `acc inbox` degradation warning
+instead: repeating an untracked body every turn would be quieter in code and dishonest about
+what was actually delivered.
 
-`client.command` has a second job beyond the version probe `detect.mjs` uses it for: presence
-liveness walks the hook's process ancestry looking for the first ancestor whose executable
-basename matches it, to learn the client's own pid. Declare the binary the client actually
-runs as — `command: "claude"` for a client that runs as `node` resolves nothing, and fails
-silently: the session gets `pid: null` and reads presence by age alone, with no error telling
-you why.
+`client.command` does double duty. `detect.mjs` uses it as the version-probe binary, and
+presence liveness separately walks the hook's process ancestry for the first ancestor whose
+executable basename matches it, to learn the client's own pid. Declare the binary the client
+actually runs as — `command: "claude"` for a client that really runs as `node` resolves
+nothing, and the failure is silent: the session gets `pid: null` and falls back to reading
+presence by age alone, with nothing telling you why.
 
 ## Capabilities
 
-Seventeen booleans in five groups:
+Seventeen booleans in five groups, declared in the manifest's `capabilities` object:
 
 | Group | Entries |
 |---|---|
@@ -62,10 +66,11 @@ Seventeen booleans in five groups:
 | `execution` | `launch` `resume` `terminate` |
 
 **False by default. `true` requires a backing method *and* an observed capture.**
-
 `defineAdapter` enforces the method — declaring `guards.beforeWrite: true` without
 `guardWrite()` is a usage error at construction. Nothing enforces the capture except you, so
-declare only what you have watched happen, and say in the code why the rest is false.
+declare only what you have watched happen, and say in the code why the rest is false. What
+each shipped client was actually observed doing against this list is
+[Capabilities](CAPABILITIES.md#matrix) — measured, not repeated here.
 
 `lifecycle.heartbeat` is deliberately not a flavour of `delivery.polling`. Polling happens
 when the client reaches a hook, which for most harnesses means when the user takes a turn —
@@ -112,7 +117,10 @@ Measure them. Every client differs, and a wrong shape fails **silently**:
 | Kimi Code | `hookSpecificOutput.permissionDecision` | plain stdout |
 
 `denyOutcome(reason)` returns `{ stdout, stderr, exitCode }`, so the runtime never has to
-know which client it is talking to.
+know which client it is talking to. This table is only the shape each shipped adapter
+actually uses; the full experimental grid — every candidate shape tried against every
+client, including which ones are silently ignored — is measured in
+[Capabilities](CAPABILITIES.md#response-contracts-which-do-not-port).
 
 ## Install and ownership
 

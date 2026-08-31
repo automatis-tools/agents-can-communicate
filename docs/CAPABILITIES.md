@@ -1,17 +1,15 @@
 # Capabilities
 
-Capability honesty is part of the product, not an implementation footnote. ACC coordinates
-sessions it does not own, so the workspace can promise only what every session actually
-exposes. One weaker participant lowers the reported protection level instead of inheriting
-a stronger label from its peers.
+Capability honesty is part of the product: ACC coordinates sessions it does not own, so a
+workspace can promise only what every session in it actually exposes — one weaker
+participant lowers the reported protection level instead of inheriting a stronger label
+from its peers.
 
-What each harness was **observed** doing, on the versions named here. Nothing in this
-table is inferred from documentation: every `yes` has a fixture captured from a real
-session, and every `no` means it was not seen, not that it is impossible.
-
-Certified 2026-08-16 on macOS 15 (darwin 25.5.0, arm64). No other operating system has
-been tested, and at least one finding here is filesystem- and path-shaped, so the table
-should be re-run before claiming another platform.
+Every row below is **measured**, not asserted: a `yes` has a fixture captured from a real
+session of that client version; a `no` means the behavior was not observed, not that it is
+impossible. Certified 2026-08-16 on macOS 15 (darwin 25.5.0, arm64) only — at least one
+finding here is filesystem- and path-shaped, so re-run the table before trusting it on
+another platform.
 
 ## Clients
 
@@ -46,7 +44,7 @@ should be re-run before claiming another platform.
 
 ## Resolving a client's pid is not universal either
 
-Not a capability above - no adapter method backs it, so it has no row in the matrix - but
+Not a capability above — no adapter method backs it, so it has no row in the matrix — but
 it is presence's other signal for telling a dead process from an idle one, and it does not
 reach every client.
 
@@ -60,15 +58,15 @@ interpreter's name rather than the script's.
 |---|---|---|---|
 | `codex` | `codex` | `codex`, a native binary | yes |
 | `claude_code` | `claude` | `claude`, a native binary | yes |
-| `gemini_cli` | `gemini` | `node` - `gemini.js` starts `#!/usr/bin/env node` | **no** |
-| `kimi` | `kimi` | not installed on the machine this table was measured on; Kimi Code ships via npm as a Node.js CLI (`@moonshot-ai/kimi-code`), the same shape as Gemini CLI | **almost certainly no - not measured** |
+| `gemini_cli` | `gemini` | `node` — `gemini.js` starts `#!/usr/bin/env node` | **no** |
+| `kimi` | `kimi` | not installed on the machine this table was measured on; Kimi Code ships via npm as a Node.js CLI (`@moonshot-ai/kimi-code`), the same shape as Gemini CLI | **almost certainly no — not measured** |
 
 A Gemini session records `pid: null` for its whole life, and Kimi's is very likely the
 same, unconfirmed. `null` is the correct "nobody knows" answer and is handled identically
-wherever it is read - not a correctness bug. It does change what presence delivers, though:
+wherever it is read — not a correctness bug. It does change what presence delivers, though:
 a confirmed-dead pid retires a session immediately and exactly, and today that is `codex`
 and `claude_code` only. `gemini_cli` and `kimi` fall back to the same age-based floor every
-session has for whenever a pid is unavailable - thirty minutes of silence - so their
+session has for whenever a pid is unavailable — thirty minutes of silence — so their
 sessions still leave, just later and on a timer instead of on the fact. See
 [ARCHITECTURE.md](ARCHITECTURE.md#presence) for the full floor.
 
@@ -89,8 +87,8 @@ toolset contained no `apply_patch`.
 `replace` appear under `auto_edit`; `run_shell_command` under `yolo`.
 
 **`guards.beforeShell` is resource-aware where the write is unambiguous.** ACC reads the
-command for its write positions only - a redirection, an operand of a command whose whole
-job is to put bytes somewhere - and declares those paths as targets. Reading positions are
+command for its write positions only — a redirection, an operand of a command whose whole
+job is to put bytes somewhere — and declares those paths as targets. Reading positions are
 left alone: `cat file` and `grep file` name a path and write nothing, and treating them as
 writes would have sessions blocking each other for looking.
 
@@ -101,8 +99,9 @@ is: a session told to prefer the shell for file changes walked through every cla
 workspace.
 
 Where the guard cannot help, the turn context does: it names the claims other sessions
-hold and says which way this session stands with them. Two facts decide the wording -
-what the claim's owner asked for, and whether ACC can stop this session at all:
+hold and says which way this session stands with them. Two facts decide the wording — what
+the claim's owner asked for (`guarded` or `advisory`; see [Glossary](GLOSSARY.md)), and
+whether ACC can stop this session at all:
 
 | Claim | This session | Note |
 |---|---|---|
@@ -110,17 +109,17 @@ what the claim's owner asked for, and whether ACC can stop this session at all:
 | guarded | cannot be guarded | `not enforced for this session; do not edit it` |
 | advisory | either | `advisory; nothing will stop you, the owner is asking` |
 
-Unenforceable is not the same as unknown - and neither is it the same as unclaimed.
+Unenforceable is not the same as unknown — and neither is it the same as unclaimed.
 
 **`lifecycle.sessionEnd` on `kimi` is false and it matters.** Each `kimi -p` run leaves an
-attached session that never closes itself - it just stops taking turns. Presence retires it
+attached session that never closes itself — it just stops taking turns. Presence retires it
 instead, most likely without ever resolving a pid (see above), which means the session
-reads `offline` - and disappears from the default `acc status` view - only after thirty
+reads `offline` — and disappears from the default `acc status` view — only after thirty
 minutes of silence, not on its declared 60s heartbeat cadence. Interactive sessions
 heartbeat and do not have this problem.
 
-**`lifecycle.heartbeat` is Kimi's alone.** It fires on a timer - observed at 60002, 120004
-and 180006 ms of uptime - so an idle Kimi session keeps its presence honest. The other
+**`lifecycle.heartbeat` is Kimi's alone.** It fires on a timer — observed at 60002, 120004
+and 180006 ms of uptime — so an idle Kimi session keeps its presence honest. The other
 three reach a hook only when the user takes a turn, so their idle sessions go stale while
 alive. This is why it is a capability of its own rather than a flavour of
 `delivery.polling`.
@@ -129,10 +128,8 @@ alive. This is why it is a capability of its own rather than a flavour of
 
 The single most portable-looking mistake an adapter can make. Measured by running each
 candidate against a real session of each client and checking whether the tool actually
-ran.
-
-A dash means the candidate was never run against that client, not that it fails. Only the
-shape each adapter actually uses was measured on every client.
+ran. A dash means the candidate was never run against that client, not that it fails —
+only the shape each shipped adapter actually uses was measured on every client.
 
 | Reply to a guard hook | codex | claude_code | gemini_cli | kimi |
 |---|---|---|---|---|
@@ -144,7 +141,7 @@ shape each adapter actually uses was measured on every client.
 
 Codex has no structured reply at all: it denies by exiting 2 with the reason on stderr.
 Gemini ignores the shape that Claude Code and Kimi Code both honour, and Kimi ignores the
-shape Gemini needs. Each ignored case fails silently - the write goes through and the
+shape Gemini needs. Each ignored case fails silently — the write goes through and the
 client reports nothing.
 
 Context injection does not follow the deny contract even within one client:
@@ -154,7 +151,7 @@ Context injection does not follow the deny contract even within one client:
 | `hookSpecificOutput.additionalContext` | - | works | works | works, but **not unwrapped** |
 | plain text on stdout | works | - | dropped | works |
 
-Codex delivers a hook's stdout as a `developer` role message, verbatim - the most direct
+Codex delivers a hook's stdout as a `developer` role message, verbatim — the most direct
 of the four channels, and a reason for care rather than comfort: at that role a model
 reads text as instruction, so peer-authored text has to stay framed as data.
 
@@ -162,6 +159,11 @@ Kimi Code shows the model whatever a hook printed, wrapped in
 `<hook_result hook_event="…">`, so the JSON envelope itself would end up in the
 conversation. Gemini unwraps the envelope and appends `<hook_context>…</hook_context>` to
 the user turn, and drops a bare string entirely.
+
+These two tables are the measurement; they say nothing about how an adapter produces the
+right shape without knowing which client it is talking to. That contract —
+`denyOutcome()` / `injectOutcome()` — is documented in
+[ADAPTER_AUTHORING.md](ADAPTER_AUTHORING.md#response-contracts-do-not-port).
 
 ## Installation is not uniform either
 
@@ -174,26 +176,32 @@ the user turn, and drops a bare string entirely.
 | Extra step by the user | hook trust | - | - | - |
 
 Kimi Code is the only one with no project-level config, so ACC edits the user's global
-`config.toml` - as a delimited block it owns, because ACC ships without dependencies and a
+`config.toml` — as a delimited block it owns, because ACC ships without dependencies and a
 hand-written TOML round-tripper would take the user's comments and formatting with it.
 
 Codex needs four things before a hook runs, not one: the plugin directory, a parseable
 marketplace, both `[marketplaces.…]` and `[plugins."…"]` registered in its config, and the
-plugin copied into `plugins/cache/<marketplace>/<plugin>/<version>/`. ACC does all four -
+plugin copied into `plugins/cache/<marketplace>/<plugin>/<version>/`. ACC does all four —
 that last copy is exactly and only what `codex plugin add` does, measured by diffing the
 home around it. Hook trust remains a manual step, which is the client's security model.
 
 ## What a participant declares about itself
 
 Every session records `enforcement` (`guarded` | `advisory`) and `lifecycle`
-(`managed` | `manual`), taken from the adapter's proven capabilities rather than from the
-harness name. Both default to the weaker reading, so a generic MCP client or a human at
-the CLI reads as advisory and manual.
+(`managed` | `manual`), taken from the adapter's proven capabilities in this matrix rather
+than from the harness's name — both default to the weaker reading, so a generic MCP client
+or a human at the CLI reads as advisory and manual. What that downgrade means for a
+workspace, and why one MCP participant in the room is enough to drop everyone else's
+protection, is explained canonically in
+[MCP.md](MCP.md#native-adapter-vs-mcp-client).
 
-A workspace reports `protection: guarded` only when every live session can be stopped. One
-MCP client and a guarded claim is advice - so the workspace says `advisory`, whatever its
-claims were declared as.
+**"Stoppable" is not "unevadable".** Even in a guarded workspace, a session that writes
+through a language runtime rather than a recognised shell form gets past — see
+`guards.beforeShell` above. The claim still says who is working where; enforcement is the
+floor, not the ceiling.
 
-"Stoppable" is not "unevadable". Even in a guarded workspace, a session that writes through
-a language runtime rather than a recognised shell form gets past. The claim still says who
-is working where; enforcement is the floor, not the ceiling.
+---
+
+See also: [README](index.md) for navigation, [Glossary](GLOSSARY.md) for terms,
+[Adapter authoring](ADAPTER_AUTHORING.md) for the deny/inject implementation contract, and
+[MCP](MCP.md) for the participation tier and the native-vs-MCP explanation.

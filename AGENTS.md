@@ -5,11 +5,13 @@ Entry point for any agent — or person — working on this repository.
 ## What this is
 
 A local-first coordination layer for independent AI agent sessions: presence, intent,
-claims, and messages, with no session in charge. Node 24, ESM, `node:test`, **no runtime
-dependencies**.
+claims, and messages, with no session in charge. Node 24, ESM, `node:test`, no runtime
+dependencies.
 
-Start with [README.md](README.md), then [docs/CONCEPTS.md](docs/CONCEPTS.md) and
-[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+Start at [docs/index.md](docs/index.md), the map, then read
+[docs/CONCEPTS.md](docs/CONCEPTS.md) and [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+Unfamiliar terms are in [docs/GLOSSARY.md](docs/GLOSSARY.md). Planning specs live under
+`docs/internal/`.
 
 ## Commands
 
@@ -26,7 +28,7 @@ Enable the pre-push gate once per clone:
 git config core.hooksPath .githooks
 ```
 
-Never bypass it with `--no-verify`. Fix the failure instead.
+Never bypass it with `--no-verify` — fix the failure instead.
 
 ## Invariants
 
@@ -47,7 +49,7 @@ Never bypass it with `--no-verify`. Fix the failure instead.
 - `core` must not branch on a vendor name or import an adapter, Git, or
   `node:child_process`. `tests/package-boundaries.test.mjs` enforces this.
 - Vendor-specific behaviour lives in `packages/adapter-*`, nowhere else.
-- Prefer Node built-ins. Before adding a dependency, check the latest stable release from
+- Prefer Node built-ins; before adding a dependency, check the latest stable release from
   its primary source and pin it exactly.
 - Keep production modules and focused test files under 300 lines, or add a header
   explaining why splitting would damage cohesion.
@@ -72,6 +74,6 @@ installed artifact. Run the thing.
 ## Capability honesty
 
 Do not claim an adapter can wake, inject into, guard, or close a session unless that exact
-capability is implemented **and** captured from a real client. `false` is the default and
-needs no defence; `true` needs a fixture. Record what you observed in the adapter's
+capability is implemented and captured from a real client. `false` is the default and needs
+no defence; `true` needs a fixture. Record what you observed in the adapter's
 `COMPATIBILITY.md`, including what you could not observe.
