@@ -10,7 +10,7 @@ into a client, not the hook runtime, which `npm install -g` already refreshed.
 | Built from | `0b75f4e` |
 | Tarball | `agents-can-communicate-0.1.16.tgz`, 154 KB, 114 entries |
 | sha256 | `098a8f48c96718c64e348ebe6d71803f513bf5dc1413ab0fc9996ffe8a43a93e` |
-| Tests | 981 passing, 0 failing |
+| Tests | 982 passing, 0 failing |
 | Node | 24 (current production LTS) |
 | Verified on | macOS 26.6.2 (darwin 25.6.0, arm64) and Linux in CI |
 | Not supported | Windows - untested rather than known-broken |
