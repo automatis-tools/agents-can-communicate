@@ -117,16 +117,32 @@ test("delivery is recorded as injected once the model has been shown it", async 
     "the receipt never left queued, so the sender is told nothing landed");
 });
 
-test("the same message is not injected again on the next turn", async t => {
+test("the body is shown once, then a one-shot breadcrumb, then silence", async t => {
   const where = await place(t);
   const messageId = await send(where);
 
   const first = await turn(where, "codex", "reader-1");
   const second = await turn(where, "codex", "reader-1");
+  const third = await turn(where, "codex", "reader-1");
 
+  // Turn one: the full fenced body.
   assert.match(first, new RegExp(messageId));
-  assert.equal(second.includes(messageId), false,
-    "the message was replayed - delivery states move forward, so this is a false report");
+  assert.equal(first.includes("Need 20 minutes in src/store"), true);
+
+  // Turn two: the body is not replayed - a fenced block cut across turns is the
+  // failure the whole-or-nothing rule exists to prevent - but the message
+  // carries no ack obligation, so it leaves a single low-priority breadcrumb
+  // naming its id, the recovery path an agent can act on.
+  assert.equal(second.includes("Need 20 minutes in src/store"), false,
+    "the full body was replayed, not just the breadcrumb");
+  assert.match(second, /unread_note/);
+  assert.equal(second.includes(messageId), true,
+    "the breadcrumb does not name the message, so it cannot be recovered");
+
+  // Turn three and after: silent. The receipt is `seen`, so the breadcrumb does
+  // not nag past its single turn - a delivered note is recoverable, not a drip.
+  assert.equal(third.includes(messageId), false,
+    "the breadcrumb nagged past its one turn");
 });
 
 test("a sender is not shown its own message", async t => {
