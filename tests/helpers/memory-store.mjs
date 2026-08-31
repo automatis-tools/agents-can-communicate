@@ -124,6 +124,14 @@ export function createMemoryStore({ clock, ids, workspaceId }) {
   const ephemeral = Object.freeze({
     async get(kind, id) { return volatile.get(key(kind, id)) ?? null; },
     async put(kind, id, record) { volatile.set(key(kind, id), record); return record; },
+    async update(kind, id, updater) {
+      const current = volatile.get(key(kind, id)) ?? null;
+      const next = updater(current);
+      if (next === null) return null;
+      validateRecord(kind, next);
+      volatile.set(key(kind, id), next);
+      return next;
+    },
     async delete(kind, id) { volatile.delete(key(kind, id)); },
     async list(kind) {
       return [...volatile.entries()]

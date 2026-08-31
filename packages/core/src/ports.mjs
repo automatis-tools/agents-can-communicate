@@ -23,7 +23,7 @@ const REQUIRED = Object.freeze({
 // are storage too, so they hang off the store rather than becoming a fourth
 // port. They are deliberately outside transactions: they append no events and
 // vanish with their session.
-const EPHEMERAL = ["get", "put", "delete", "list"];
+const EPHEMERAL = ["get", "put", "update", "delete", "list"];
 
 // Ports are validated at construction rather than at first use. A core that
 // silently falls back to ambient time or randomness produces tests that pass

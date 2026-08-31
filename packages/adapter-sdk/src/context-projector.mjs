@@ -34,6 +34,7 @@ function attentionGroups(attention, { truncatable }) {
       ? `- [${item.kind}] ${item.sourceId} ${item.summary}`
       : `- [${item.kind}] ${item.summary}`],
     kind: "attention",
+    sourceId: item.sourceId ?? null,
     truncatable,
   }));
 }
@@ -83,7 +84,7 @@ function recoveryNote(ids) {
  * time, while intent-aware conflicts already arrive as attention. Repeating
  * the whole workspace on every prompt is neither safer nor cheaper.
  */
-export function projectContext(sync, { budgetBytes = DEFAULT_BUDGET_BYTES } = {}) {
+export function projectContextResult(sync, { budgetBytes = DEFAULT_BUDGET_BYTES } = {}) {
   const attention = [...(sync.attention ?? [])]
     .sort((left, right) => left.priority - right.priority
       || (left.sourceId ?? "").localeCompare(right.sourceId ?? ""));
@@ -95,7 +96,9 @@ export function projectContext(sync, { budgetBytes = DEFAULT_BUDGET_BYTES } = {}
     ...attentionGroups(informational, { truncatable: false }),
   ];
   const peers = peerCount(sync);
-  if (groups.length === 0 && (sync.solo === true || peers === 0)) return "";
+  if (groups.length === 0 && (sync.solo === true || peers === 0)) {
+    return { text: "", includedMessageIds: [], includedAttentionIds: [] };
+  }
 
   const fullHeader = groups.length === 0 ? ambientHeader(peers) : "ACC (load the acc skill):";
   const header = truncate(fullHeader, budgetBytes);
@@ -144,12 +147,27 @@ export function projectContext(sync, { budgetBytes = DEFAULT_BUDGET_BYTES } = {}
       lines.length = 0;
       used = 0;
     }
-    const fitted = truncate(recoveryNote([...new Set(droppedMessages)]), budgetBytes - used);
-    if (fitted !== "") lines.push(fitted);
+    const fitted = recoveryNote([...new Set(droppedMessages)]);
+    // An incomplete id or command is not a recovery path. When a deliberately
+    // tiny budget cannot hold the shortest truthful instruction, say nothing
+    // and leave every omitted receipt queued for a later turn.
+    if (used + bytes(fitted) + 1 <= budgetBytes) lines.push(fitted);
   } else if (droppedOther > 0) {
     const note = `- +${droppedOther} actionable item(s) omitted; run \`acc status --json\``;
     if (used + bytes(note) + 1 <= budgetBytes) lines.push(note);
   }
 
-  return lines.join("\n");
+  return {
+    text: lines.join("\n"),
+    includedMessageIds: included
+      .filter(item => item.group.kind === "message")
+      .map(item => item.group.messageId),
+    includedAttentionIds: included
+      .filter(item => item.group.kind === "attention" && item.group.sourceId !== null)
+      .map(item => item.group.sourceId),
+  };
+}
+
+export function projectContext(sync, options) {
+  return projectContextResult(sync, options).text;
 }

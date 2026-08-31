@@ -27,10 +27,17 @@ export function createExampleAdapter() {
     planInstall,                      // what install would write
     normalizeHook,                    // client payload -> normalised event
     renderContext,                    // SyncResult -> text
+    renderContextResult,              // text + ids of complete rendered groups
     denyOutcome, injectOutcome,       // how this client is answered
   });
 }
 ```
+
+`renderContextResult` is required when an adapter renders peer messages. It returns
+`{ text, includedMessageIds, includedAttentionIds }`; the hook runner advances delivery
+only from those ids. It deliberately never searches `text` for an id, because peer text is
+untrusted and can imitate another message's header. `projectContextResult()` implements
+this contract, while `projectContext()` remains the text-only convenience API.
 
 `client.command` has a second job beyond the version probe `detect.mjs` uses it for: presence
 liveness walks the hook's process ancestry looking for the first ancestor whose executable

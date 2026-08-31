@@ -64,7 +64,15 @@ with `inReplyTo` set and acknowledges the original request in the same service
 operation. It rejects messages not addressed to the current participant.
 
 `sync --scope full` remains available for explicit diagnostics and forensics,
-but normal coordination guidance no longer recommends it.
+but normal coordination guidance no longer recommends it. MCP `acc_sync`
+continues returning pending mail for clients released before `acc_inbox`; the
+new operation changes guidance, not the compatibility contract.
+
+The projector returns structured ids for the complete message and attention
+groups that survived its byte budget. Delivery state advances from those ids,
+never by searching rendered peer-controlled text. Session continuation likewise
+validates state and semantic generation inside the atomic durable or ephemeral
+update rather than trusting a record read before the write lock.
 
 ### Make the skill selective
 
@@ -84,11 +92,14 @@ diffs, transcripts, or repeated status narration.
 ## Success criteria
 
 - Repeating SessionStart for one harness id leaves exactly one open ACC session
-  and returns the same generation.
+  and returns the same generation, without resurrecting a concurrent close or
+  replacement.
 - A no-action peer-presence projection stays under 200 bytes and contains no
   session-by-session or claim-by-claim listing.
 - Overflow directs the agent to a targeted `inbox --message` command, never a
-  full sync.
+  full sync, and emits no partial recovery command at a deliberately tiny budget.
+- Peer text cannot forge delivery of a message omitted by the context budget,
+  and legacy MCP sync clients continue receiving pending mail.
 - Inbox and reply behavior is covered through core, CLI, MCP, and installed
   package surfaces.
 - The actual Claude cleanup hook exits zero when optional project settings do

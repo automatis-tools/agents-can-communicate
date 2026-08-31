@@ -7,7 +7,7 @@ export { assertRunner, bakeSkillCommand, defaultCli, defaultRunner, removeInstal
   from "./hook-shim.mjs";
 export { BEGIN, END, removeTomlBlock, renderBlock, stripBlock, tomlString, writeTomlBlock }
   from "./toml-block.mjs";
-export { projectContext } from "./context-projector.mjs";
+export { projectContext, projectContextResult } from "./context-projector.mjs";
 export { shellWriteTargets } from "./shell-writes.mjs";
 export { keepOnlyVersion, ownVersion, stampPluginVersion } from "./own-version.mjs";
 export { editJson, readJson } from "./json-text.mjs";

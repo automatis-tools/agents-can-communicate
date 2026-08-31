@@ -192,26 +192,38 @@ export function createSessionService(ports) {
    * not a second agent arriving.
    */
   async function resumeSession({ sessionId, workspaceId, generation, ...metadata }) {
-    const existing = await locate(sessionId, workspaceId);
-    if (existing === null || existing.record.state !== "open"
-      || existing.record.generation !== generation) return null;
-    const resumed = { ...existing.record,
+    const resume = current => {
+      if (current === null || current.state !== "open"
+        || current.generation !== generation) return null;
+      return { ...current,
       pid: metadata.pid ?? null,
-      checkoutRoot: metadata.checkoutRoot ?? existing.record.checkoutRoot,
-      branch: metadata.branch ?? existing.record.branch,
-      enforcement: metadata.enforcement ?? existing.record.enforcement,
-      lifecycle: metadata.lifecycle ?? existing.record.lifecycle,
-      heartbeatCadenceMs: metadata.heartbeatCadenceMs ?? existing.record.heartbeatCadenceMs,
+      checkoutRoot: metadata.checkoutRoot ?? current.checkoutRoot,
+      branch: metadata.branch ?? current.branch,
+      enforcement: metadata.enforcement ?? current.enforcement,
+      lifecycle: metadata.lifecycle ?? current.lifecycle,
+      heartbeatCadenceMs: metadata.heartbeatCadenceMs ?? current.heartbeatCadenceMs,
       heartbeatAt: clock.now(),
+      };
     };
-    if (!existing.durable) {
-      await store.ephemeral.put("session", sessionId, resumed);
+
+    // The compare and replacement happen under the ephemeral store's writer
+    // lock. A close or a replacement generation can win before this update or
+    // after it, but can never be overwritten from a record read beforehand.
+    const ephemeral = await store.ephemeral.update("session", sessionId, resume);
+    if (ephemeral !== null) return ephemeral;
+
+    // Re-read and validate inside the durable transaction for the same reason.
+    // Using generationOf only as the put token is insufficient: it protects
+    // the envelope write, not the semantic generation carried by the record.
+    const resolvedWorkspace = workspaceId ?? store.workspaceId;
+    if (resolvedWorkspace === undefined) return null;
+    return store.transaction(async tx => {
+      const current = tx.get("session", sessionId);
+      const resumed = resume(current);
+      if (resumed === null) return null;
+      tx.put("session", sessionId, resumed, tx.generationOf("session", sessionId));
       return resumed;
-    }
-    await store.transaction(async tx =>
-      tx.put("session", sessionId, resumed, tx.generationOf("session", sessionId)),
-    { kinds: ["session"] });
-    return resumed;
+    }, { kinds: ["session"] });
   }
 
   async function closeSession({ sessionId, workspaceId, generation }) {

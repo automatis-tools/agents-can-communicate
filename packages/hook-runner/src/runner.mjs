@@ -13,6 +13,11 @@ import { createGitProbe, discoverWorkspace, platformDataHome, runtimePaths }
 import { resolveClientPid } from "./client-pid.mjs";
 import { readProcessTable as defaultReadProcessTable } from "./process-table.mjs";
 
+// Kept cohesive above 300 lines because every handler shares one fail-open
+// hook boundary, binding lifecycle, and client-specific outcome contract.
+// Splitting handlers would duplicate that safety boundary and make delivery or
+// guard failures behave differently by event kind.
+
 // A hook runs in front of the user's turn, so it gets a hard ceiling. Better to
 // let a call through than to make someone's session sit waiting on us.
 const DEFAULT_BUDGET_MS = 5_000;
@@ -252,9 +257,19 @@ const HANDLERS = {
     // The ceiling a team agreed on in `acc.workspace.json`, or the default when
     // there is no config. Validated by the protocol and, until now, never read:
     // the projector was always called with its own default.
-    const projected = await adapter.renderContext?.({ ...sync, messages,
-      currentParticipantId: mine?.participantId },
-      { budgetBytes: context.descriptor.policy?.contextBudgetBytes }) ?? "";
+    const projectionInput = { ...sync, messages,
+      currentParticipantId: mine?.participantId };
+    const projectionOptions = {
+      budgetBytes: context.descriptor.policy?.contextBudgetBytes };
+    // Delivery is state, not text parsing. Peer-controlled bodies can imitate
+    // another message's visible header, so only projector metadata proves
+    // which complete groups survived the byte budget. A custom adapter without
+    // metadata may still inject text, but cannot advance a receipt from it.
+    const projection = adapter.renderContextResult === undefined
+      ? { text: await adapter.renderContext?.(projectionInput, projectionOptions) ?? "",
+        includedMessageIds: [], includedAttentionIds: [] }
+      : await adapter.renderContextResult(projectionInput, projectionOptions);
+    const projected = projection.text;
     if (projected === "") return { stdout: "" };
 
     // Only what the model was actually shown is recorded as delivered. The
@@ -262,11 +277,9 @@ const HANDLERS = {
     // nobody saw is worse than one still reading `queued` - the sender would be
     // told it landed. A message left behind stays queued and goes out next turn.
     const failures = [];
+    const includedMessages = new Set(projection.includedMessageIds ?? []);
     for (const message of messages) {
-      // Recovery notes now name the exact message id too. Only the attributed
-      // block header proves the body itself was shown; matching the bare id
-      // would call an overflow pointer a delivery.
-      if (!projected.includes(`id ${message.messageId} |`)) continue;
+      if (!includedMessages.has(message.messageId)) continue;
       await context.service.markDelivery({ sessionId: binding.accSessionId,
         generation: binding.generation, messageId: message.messageId,
         recipientParticipantId: mine.participantId, state: "injected" })
@@ -279,9 +292,10 @@ const HANDLERS = {
     // a delivered decision is recoverable without becoming a standing nag - the
     // noise a reader learns to skip. Only what was actually shown is advanced,
     // for the same reason the loop above only records what fit.
+    const includedAttention = new Set(projection.includedAttentionIds ?? []);
     for (const item of sync.attention ?? []) {
       if (item.kind !== "unread_note") continue;
-      if (!projected.includes(item.sourceId)) continue;
+      if (!includedAttention.has(item.sourceId)) continue;
       await context.service.markDelivery({ sessionId: binding.accSessionId,
         generation: binding.generation, messageId: item.sourceId,
         recipientParticipantId: mine.participantId, state: "seen" })

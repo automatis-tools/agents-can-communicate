@@ -72,6 +72,22 @@ async function resolveSession(context) {
   return session;
 }
 
+// Kept for clients released before acc_inbox existed. New clients should use
+// the narrow inbox tool, but removing mail from acc_sync would strand deployed
+// clients that only know this response field. Returning a body is delivery, so
+// only those returned messages advance to injected.
+async function syncWithMail(service, owner, context, args) {
+  const sync = await service.sync({ ...owner, cursor: args.cursor ?? null,
+    scope: args.scope, limit: args.limit });
+  const messages = await service.pendingMessages({ workspaceId: context.workspaceId,
+    participantId: context.participantId, exceptSessionId: owner.sessionId });
+  for (const message of messages) {
+    await service.markDelivery({ ...owner, messageId: message.messageId,
+      state: "injected" }).catch(() => null);
+  }
+  return messages.length === 0 ? sync : { ...sync, messages };
+}
+
 /**
  * A poll is this client's turn.
  *
@@ -98,8 +114,7 @@ async function callTool(name, args, context) {
 
   switch (name) {
     case "acc_sync":
-      return service.sync({ ...owner, cursor: args.cursor ?? null,
-        scope: args.scope, limit: args.limit });
+      return syncWithMail(service, owner, context, args);
     case "acc_work":
       if (args.clear === true) return service.clearIntent({ ...owner });
       return service.setIntent({ ...owner, summary: args.summary, mode: args.mode,

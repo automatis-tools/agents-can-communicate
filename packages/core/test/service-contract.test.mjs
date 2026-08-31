@@ -17,6 +17,13 @@ const eventRecord = (type, overrides = {}) => ({ schemaVersion: SCHEMA_VERSION,
   eventId: `event_${type.replace(".", "_")}`, workspaceId: WORKSPACE,
   actorSessionId: "session_a", type, occurredAt: NOW, payload: {}, ...overrides });
 
+const sessionRecord = (overrides = {}) => ({ schemaVersion: SCHEMA_VERSION,
+  sessionId: "session_a", participantId: "participant_a", workspaceId: WORKSPACE,
+  generation: "generation_semantic", harness: "codex", state: "open",
+  parentSessionId: null, checkoutRoot: null, branch: null, pid: null,
+  enforcement: "advisory", lifecycle: "manual", heartbeatCadenceMs: 30_000,
+  startedAt: NOW, heartbeatAt: NOW, ...overrides });
+
 // Exported so every CoordinationStore implementation is held to the same
 // contract. A contract only one implementation satisfies proves nothing.
 export function runStoreContract(name, makeStore) {
@@ -143,6 +150,23 @@ export function runStoreContract(name, makeStore) {
 
     const page = await store.eventsSince(WORKSPACE, null, 10);
     assert.deepEqual(page.events.map(event => event.eventId), ["event_session_opened"]);
+  });
+
+  test(`${name}: ephemeral updates serialize read-modify-write`, async () => {
+    const store = await makeStore();
+    await store.ephemeral.put("session", "session_a", sessionRecord());
+    const first = "2026-08-16T01:00:01.000Z";
+    const second = "2026-08-16T01:00:02.000Z";
+    const advance = current => ({ ...current,
+      heartbeatAt: current.heartbeatAt === NOW ? first : second });
+
+    const results = await Promise.all([
+      store.ephemeral.update("session", "session_a", advance),
+      store.ephemeral.update("session", "session_a", advance),
+    ]);
+
+    assert.deepEqual(results.map(record => record.heartbeatAt).sort(), [first, second]);
+    assert.equal((await store.ephemeral.get("session", "session_a")).heartbeatAt, second);
   });
 }
 
