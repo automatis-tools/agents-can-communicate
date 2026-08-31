@@ -1,6 +1,6 @@
 # Three workstreams, one repo
 
-Visual, models, and physics — different people, different clients, same checkout.
+Visual, models, and physics — three clients, one checkout.
 
 ```mermaid
 graph TB
@@ -11,10 +11,12 @@ graph TB
   end
 ```
 
-Claims are **workspace-global**. Independent workstreams still cannot write over each
-other.
+Claims are workspace-global, so even workstreams that never touch each other's
+files still can't step on one another.
 
 ## What each session does
+
+Publish intent, then claim the directory:
 
 ```bash
 acc work --summary "porting the material slots" --mode edit
@@ -37,7 +39,9 @@ sequenceDiagram
   ACC-->>P: ok
 ```
 
-Nobody is in charge. The conflict is surfaced; the humans and agents settle it.
+A conflict is a race, not an error: `claim` exits `5` and names the holder,
+physics messages models directly, models releases, physics claims again.
+Nobody arbitrates — the sessions settle it themselves.
 
 ## Asking across workstreams
 
@@ -47,8 +51,8 @@ Any session can answer for the whole workspace:
 acc sync --scope full --json
 ```
 
-"What is physics doing?" is answerable from visual's session. Authority differs;
-knowledge does not.
+"What is physics doing?" is answerable from visual's session — authority is
+scoped per claim, knowledge isn't.
 
 ## Ending
 
@@ -57,5 +61,8 @@ acc finish --goal "port the material slots" --status partial \
   --completed "slots ported" --remaining "physics review"
 ```
 
-Writes the handoff and releases the claims — while the session is still working, because a
-session-end hook cannot summarise a conversation that has already stopped.
+`finish` writes the handoff and releases the claims while the session can
+still speak for itself — a hook firing after the session has already stopped
+can't summarise a conversation it never saw.
+
+See [`../docs/index.md`](../docs/index.md) for the rest of the docs.

@@ -1,33 +1,32 @@
 # Getting started
 
-Three minutes, end to end.
-
-The short setup is part of the design: ACC coordinates sessions you already open, so
-there is no scheduler, daemon, dashboard, or replacement workflow to start first.
+A few minutes, end to end. The short setup is part of the design: ACC coordinates sessions
+you already open, so there is no scheduler, daemon, or dashboard to stand up first.
 
 ```mermaid
 graph LR
   I[acc install] --> S[open your client<br/>as usual] --> P[peers appear] --> C[claims guard writes] --> U[acc uninstall]
 ```
 
-## 1. Install
+## 1. Install — once per machine
 
-Getting the `acc` binary itself: [README](../README.md#install). Then:
+Get the `acc` binary first ([README](../README.md#install)), then wire it into the clients
+you have:
 
 <!-- test:command -->
 ```bash
-acc install --dry-run
+acc install
 ```
 
-Prints every path it would touch. Run without `--dry-run` to apply.
-
-It only installs for clients you actually have. Missing ones are listed with the reason.
+It only touches clients you actually have; missing ones are listed with the reason.
+**Restart the client afterwards** — hooks load at startup, and "nothing happens in my
+session" is almost always a client that was already running.
 
 ## 2. Open a session — normally
 
-No ACC command. Just start Codex, Claude Code, Gemini, or Kimi as you always do. A hook
+No ACC command. Start Codex, Claude Code, Gemini, or Kimi the way you always do; a hook
 attaches the session. It keeps its own client, permissions, checkout, and human
-instructions; ACC adds a shared coordination view around it.
+instructions — ACC just adds a shared view around it.
 
 ## 3. See who is here
 
@@ -42,13 +41,14 @@ acc status
 
 ## 4. Claim before touching shared files
 
-Inside a session your agent runs this for you:
+Inside a session, your agent runs this for you:
 
 ```bash
 acc claim --resource 'file:packages/core/**' --reason "porting the store"
 ```
 
-Another session that tries to write there is refused — with the owner's name.
+Another session that tries to write there is refused — by the owner's name. Exit code `5`
+means conflict.
 
 ```mermaid
 sequenceDiagram
@@ -63,23 +63,22 @@ sequenceDiagram
   ACC-->>V: ok
 ```
 
-Exit code `5` means conflict.
-
 ## 5. Say something
 
-`--to` takes a name from the roster — `acc status` above is where you get it. Using one
-nobody here has is refused, and the refusal lists the names there are.
+`--to` takes a name from the roster (`acc status` is where you get it); a name nobody here
+has is refused, and the refusal lists the ones that exist.
 
 ```bash
 acc message --to models --subject "Slots" --body "Which names are stable?" --type question
 ```
 
-Messages are **data, not orders**. A peer cannot change your instructions.
+Messages are **data, not orders** — a peer cannot change your instructions. See
+[Concepts](CONCEPTS.md#asking-not-commanding) for why, and for notes vs questions.
 
 ## 6. Optional: shared settings
 
-Nothing above needs a config file. A team adds one when identity has to survive a move, or
-when a claim policy should be agreed once rather than per machine:
+Nothing above needs a config file. A team adds one only when identity must survive a move,
+or when a claim policy should be agreed once instead of per machine:
 
 <!-- test:command -->
 ```bash
@@ -95,28 +94,16 @@ With no config present it reports the defaults — not having one is a valid sta
 acc uninstall
 ```
 
-Removes only what ACC wrote, and only if it still matches. Anything you edited stays.
+Removes only what ACC wrote, and only while it still matches. Anything you edited stays.
 
 ## Native vs MCP
 
-```mermaid
-graph TB
-  N[Native adapter<br/>Codex · Claude Code · Gemini · Kimi] --> NA[attaches by itself]
-  N --> NB[guards writes]
-  N --> NC[injects peer context]
-  M[Generic MCP client] --> MA[attaches on first tool call]
-  M --> MB[reads and posts]
-  M --> MC[nothing intercepts its writes]
-```
+Native adapters (Codex, Claude Code, Gemini, Kimi) attach by themselves, guard writes, and
+inject peer context. A generic **MCP** client can read and post durable coordination, but
+nothing intercepts its writes — so it shows as `advisory`, and one in the room makes every
+claim advisory while it's connected. That downgrade is deliberate and reported, not hidden;
+[MCP](MCP.md) covers it in full.
 
-An MCP participant shows as `advisory` on the roster, and a workspace with one in it
-reports `advisory` protection — a guarded claim is advice while it is connected.
+---
 
-That downgrade is deliberate. MCP is enough to participate in durable coordination, but
-it does not expose the lifecycle and write boundaries needed for ambient attachment and
-guards. ACC reports the difference instead of presenting both integrations as equivalent.
-
-## Next
-
-[Why ACC](WHY_ACC.md) · [CLI reference](CLI.md) · [Configuration](CONFIGURATION.md) ·
-[Troubleshooting](TROUBLESHOOTING.md)
+Next: [Why ACC](WHY_ACC.md) · [CLI reference](CLI.md) · [Configuration](CONFIGURATION.md) · [Troubleshooting](TROUBLESHOOTING.md) · [full docs map](index.md)

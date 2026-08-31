@@ -9,9 +9,9 @@ targeted inbox/reply path recovers and closes the exact message that matters.
 
 | | |
 |---|---|
-| Built from | `4e9e902` |
+| Built from | `d4f35c5` |
 | Tarball | `agents-can-communicate-0.1.17.tgz`, 156 KB, 116 entries |
-| sha256 | `3bd1e96aed4b1d7277b2ac91724280ce2c2705bb8244fcb1acee81ebf6861d6f` |
+| sha256 | `af169ce6f4b6ff66a94b90ff6155491b7dde01deb05529c80102e74adb2a3945` |
 | Node | 24 (current production LTS) |
 | Verified on | macOS 26.6.2 (darwin 25.6.0, arm64) and Linux in CI |
 | Not supported | Windows - untested rather than known-broken |
@@ -45,6 +45,14 @@ metadata visibly withhold bodies instead of repeating them without a truthful
 receipt. Contenders use a 2.5-second monotonic acquisition deadline: enough for
 a concurrent attach queue to drain while reserving half the hook budget for the
 write and response.
+
+The documentation was rebuilt around a new information architecture: a
+`docs/README.md` index and a `docs/GLOSSARY.md`, an example-driven on-ramp
+(why / concepts / getting-started), and a tightened reference set with the
+cross-cutting ideas deduplicated to single homes. `THREAT_MODEL` folds into
+`SECURITY_MODEL`, and the planning notes move under `docs/internal/`. The
+shipped `README.md` and `docs/CAPABILITIES.md` changed with it, so the package
+digest above is re-recorded.
 
 ## 0.1.17
 
