@@ -9,9 +9,9 @@ targeted inbox/reply path recovers and closes the exact message that matters.
 
 | | |
 |---|---|
-| Built from | `0a4bc3c` |
+| Built from | `4e9e902` |
 | Tarball | `agents-can-communicate-0.1.17.tgz`, 156 KB, 116 entries |
-| sha256 | `99f904f26500db19b4a6d5865eb61a46a83f43f171b7a2209fc943c3310013c0` |
+| sha256 | `3bd1e96aed4b1d7277b2ac91724280ce2c2705bb8244fcb1acee81ebf6861d6f` |
 | Node | 24 (current production LTS) |
 | Verified on | macOS 26.6.2 (darwin 25.6.0, arm64) and Linux in CI |
 | Not supported | Windows - untested rather than known-broken |
@@ -42,7 +42,9 @@ MCP `acc_sync` retains its released pending-mail response for older clients;
 new clients use the narrower `acc_inbox` path. Ephemeral put, update, and
 delete share one writer lock, and adapters without structured delivery
 metadata visibly withhold bodies instead of repeating them without a truthful
-receipt.
+receipt. Contenders use a 2.5-second monotonic acquisition deadline: enough for
+a concurrent attach queue to drain while reserving half the hook budget for the
+write and response.
 
 ## 0.1.17
 
