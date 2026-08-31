@@ -1,6 +1,6 @@
 # CLI
 
-Full command reference. See the [docs index](README.md) for how this fits with the rest
+Full command reference. See the [docs index](index.md) for how this fits with the rest
 of the docs, and [GLOSSARY.md](GLOSSARY.md) for term definitions.
 
 Setup commands are human-facing; the rest are agent-facing. Every command accepts `--json`

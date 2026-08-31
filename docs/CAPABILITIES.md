@@ -202,6 +202,6 @@ floor, not the ceiling.
 
 ---
 
-See also: [README](README.md) for navigation, [Glossary](GLOSSARY.md) for terms,
+See also: [README](index.md) for navigation, [Glossary](GLOSSARY.md) for terms,
 [Adapter authoring](ADAPTER_AUTHORING.md) for the deny/inject implementation contract, and
 [MCP](MCP.md) for the participation tier and the native-vs-MCP explanation.

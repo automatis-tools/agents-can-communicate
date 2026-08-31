@@ -85,4 +85,4 @@ where a guard stops behaves better than one that believes it absolute.
 
 ---
 
-See also: [README](README.md) for navigation and [Glossary](GLOSSARY.md) for terms.
+See also: [README](index.md) for navigation and [Glossary](GLOSSARY.md) for terms.

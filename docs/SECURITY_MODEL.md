@@ -178,5 +178,5 @@ Reporting a vulnerability: [SECURITY.md](../SECURITY.md) at the repository root.
 
 ---
 
-See also: [README](README.md) for navigation, [Glossary](GLOSSARY.md) for terms, and
+See also: [README](index.md) for navigation, [Glossary](GLOSSARY.md) for terms, and
 [Architecture](ARCHITECTURE.md) for the control-plane boundary this model assumes.

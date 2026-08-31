@@ -86,4 +86,4 @@ artifact; it does not publish.
 
 ---
 
-See also: [README](README.md) for navigation and [Glossary](GLOSSARY.md) for terms.
+See also: [README](index.md) for navigation and [Glossary](GLOSSARY.md) for terms.
