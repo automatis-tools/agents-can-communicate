@@ -6,7 +6,10 @@ const DEFAULT_BUDGET_BYTES = 6_000;
 // said only that something had been withheld, and nothing anywhere - not the
 // skills, not the docs - said how to see it. A turn that reports a thing the
 // reader cannot reach is how an agent ends up inventing its own way in.
-const NOTE_RESERVE = 80;
+// Enough for the longest over-budget note - the escalated "message did not fit"
+// line, which is longer than the plain "+N not shown" it replaces. Kept small
+// enough that the note still fits beside a header at the smallest budgets.
+const NOTE_RESERVE = 90;
 const FENCE = "```";
 // A peer cannot close a block it cannot name. The fence carries a marker that
 // is stripped from peer content, so forged delimiters stay inside the block.
@@ -167,11 +170,24 @@ export function projectContext(sync, { budgetBytes = DEFAULT_BUDGET_BYTES } = {}
   const claims = sync.claims ?? [];
 
   // Every entry is a group that appears whole or not at all. Single-line groups
-  // may still be truncated - there is no fence in them to leave open.
+  // may still be truncated - there is no fence in them to leave open. `message`
+  // is carried so a dropped message can be counted apart from a dropped
+  // reminder: the two are not the same news.
+  //
+  // A peer message sits after "act now" attention (a direct request, an imminent
+  // conflict: priority <= 2) and ahead of standing reminders. The order is the
+  // fix for a real starvation: an expired-claim line (priority 6) regenerates
+  // from state every turn, while a message is delivered once and its receipt
+  // then stops it appearing - so a reminder that never clears must not keep
+  // pushing a one-time message into the over-budget overflow, turn after turn,
+  // where two agents each lost their most important message to it.
+  const urgent = attention.filter(item => item.priority <= 2);
+  const info = attention.filter(item => item.priority > 2);
   const required = [
-    ...attentionLines(attention).map(line => [line]),
-    ...claimLines(claims).map(line => [line]),
-    ...peerBlocks(messages),
+    ...attentionLines(urgent).map(line => ({ lines: [line], message: false })),
+    ...peerBlocks(messages).map(block => ({ lines: block, message: true })),
+    ...attentionLines(info).map(line => ({ lines: [line], message: false })),
+    ...claimLines(claims).map(line => ({ lines: [line], message: false })),
   ];
   // Solo costs nothing: a lone session pays no visible price, and "no peers" is
   // still a cost when injected into every turn. But this is decided after the
@@ -198,27 +214,51 @@ export function projectContext(sync, { budgetBytes = DEFAULT_BUDGET_BYTES } = {}
   // Reserved so the note below always fits. Without it the projection could run
   // out of room to say that it ran out of room.
   const ceiling = budgetBytes - NOTE_RESERVE;
-  let dropped = 0;
+  let droppedOther = 0;
+  let droppedMessages = 0;
+  const drop = group => { if (group.message) droppedMessages += 1; else droppedOther += 1; };
   for (const group of required) {
-    if (group.length === 1) {
-      const candidate = truncate(group[0], Math.max(0, ceiling - used - 1));
-      if (candidate === "" || used + bytes(candidate) + 1 > ceiling) { dropped += 1; continue; }
+    const block = group.lines;
+    if (block.length === 1) {
+      const candidate = truncate(block[0], Math.max(0, ceiling - used - 1));
+      if (candidate === "" || used + bytes(candidate) + 1 > ceiling) { drop(group); continue; }
       lines.push(candidate);
       used += bytes(candidate) + 1;
       continue;
     }
-    const size = group.reduce((total, line) => total + bytes(line) + 1, 0);
+    const size = block.reduce((total, line) => total + bytes(line) + 1, 0);
     // Skipped rather than stopped at: the groups are ordered by priority, and a
     // large message must not hide the shorter ones behind it.
-    if (used + size > ceiling) { dropped += 1; continue; }
-    lines.push(...group);
+    if (used + size > ceiling) { drop(group); continue; }
+    lines.push(...block);
     used += size;
   }
-  if (dropped > 0) {
-    const note = `- +${dropped} not shown, over budget; read them with `
-      + "`acc sync --scope full --json`";
-    lines.push(note);
-    used += bytes(note) + 1;
+  // A dropped message is louder than a dropped reminder: "+N not shown" read as
+  // noise to two agents who each lost their most important message to it, so a
+  // message that did not fit says so specifically and names the command that
+  // recovers it. One note either way, escalated when a message is among the loss.
+  // The note is guarded against the budget, not merely reserved for: at a
+  // pathologically small budget the header alone can leave less room than the
+  // note needs, and a projection that overran the very budget it exists to
+  // respect is the bug this whole function is careful about. If the full note
+  // will not fit, the shortest imperative that does is still not silence.
+  const pushNote = note => {
+    const short = "- ⚠ over budget; `acc sync --scope full --json`";
+    for (const candidate of [note, short]) {
+      if (used + bytes(candidate) + 1 <= budgetBytes) {
+        lines.push(candidate);
+        used += bytes(candidate) + 1;
+        return;
+      }
+    }
+  };
+  if (droppedMessages > 0) {
+    // No count of the other drops: `--scope full` recovers everything.
+    pushNote(`- ⚠ ${droppedMessages} message(s) addressed to you did not fit; `
+      + "run `acc sync --scope full --json`");
+  } else if (droppedOther > 0) {
+    pushNote(`- +${droppedOther} not shown, over budget; read them with `
+      + "`acc sync --scope full --json`");
   }
 
   let shown = 0;
