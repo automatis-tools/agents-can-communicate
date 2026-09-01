@@ -6,8 +6,10 @@ import { AccError, EXIT, assertPortableId, validateRecord }
 
 import { encode, listDirectoryEntries, listJsonFiles, publishAtomic, readJsonIfPresent,
   retainFile } from "./atomic-json.mjs";
+import { initialiseActiveJournal } from "./active-journal.mjs";
 import { requireStoreIdentity } from "./identity.mjs";
-import { journalEntry, readOpenJournals, rollForward, writeJournalEntry } from "./journal.mjs";
+import { journalEntry, readJournalCeiling, readOpenJournals, rollForward, writeJournalEntry }
+  from "./journal.mjs";
 import { assertEventBinding, assertStateBinding, eventPath, stateEnvelope, statePath }
   from "./record-id.mjs";
 import { ephemeralIsDeleted, markEphemeral, stateDeletionPublication,
@@ -79,6 +81,7 @@ export async function openFilesystemStore({ root, clock, ids, workspaceId, failA
   await requireStoreIdentity(paths, { workspaceId, clock });
   for (const name of DIRECTORIES) await ensureManagedDirectory(root, paths[name]);
   const publishOptions = { root, tmpDir: paths.tmp, clock, failAt };
+  await initialiseActiveJournal(paths, publishOptions);
 
   // Any journal left behind by a crashed writer is completed before the store
   // serves a single read, so callers never observe a half-published
@@ -227,7 +230,7 @@ export async function openFilesystemStore({ root, clock, ids, workspaceId, failA
     // An open journal marks a transaction that is decided but not fully
     // published. Bounding the page below its first sequence is what keeps a
     // partially published transaction invisible to every reader.
-    const ceiling = (await readOpenJournals(paths, root)).at(0)?.firstSequence ?? null;
+    const ceiling = await readJournalCeiling(paths, root);
     const events = [];
     for (const filePath of await listJsonFiles(paths.events, { root })) {
       const sequence = path.basename(filePath, ".json");

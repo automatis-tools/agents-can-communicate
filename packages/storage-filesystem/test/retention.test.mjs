@@ -32,6 +32,14 @@ const binding = () => ({ schemaVersion: SCHEMA_VERSION, sessionId: "session_a",
   availableModes: ["nextTurn"], livePolicy: "actionable", opaqueEndpointRef: "socket_a",
   leaseUntil: NOW });
 
+async function writeEphemeralMarker(root, sequence, state) {
+  const directory = path.join(root, "retained", "ephemeral", "deliveryBinding", "session_a");
+  await mkdir(directory, { recursive: true });
+  const record = { retentionVersion: 1, area: "ephemeral", kind: "deliveryBinding",
+    id: "session_a", sequence, state };
+  await writeFile(path.join(directory, `${sequence}.json`), `${JSON.stringify(record)}\n`);
+}
+
 test("retention cannot unlink outside after its validated parent is replaced", async t => {
   assert.equal(typeof atomicJson.retainFile, "function");
   const root = await realpath(await mkdtemp(path.join(tmpdir(), "acc-retain-race-")));
@@ -60,7 +68,8 @@ test("journal retirement is logical and retains the decided transaction", async 
   await store.transaction(async tx => { tx.put("workspace", WORKSPACE, workspaceRecord()); });
 
   assert.deepEqual(await readOpenJournals(store.paths, root), []);
-  assert.deepEqual(await readdir(store.paths.journal), ["transaction_000001.json"]);
+  assert.deepEqual((await readdir(store.paths.journal)).filter(name => name.endsWith(".json")),
+    ["transaction_000001.json"]);
 });
 
 test("journalled state removal hides but retains the removed generation", async t => {
@@ -121,4 +130,33 @@ test("ephemeral deletion hides but retains the last published record", async t =
   assert.equal(await reopened.ephemeral.get("deliveryBinding", "session_a"), null);
   await reopened.ephemeral.put("deliveryBinding", "session_a", binding());
   assert.deepEqual(await reopened.ephemeral.get("deliveryBinding", "session_a"), binding());
+});
+
+test("an unknown ephemeral marker state fails closed instead of resurrecting a deletion",
+  async t => {
+    const { root, store } = await fixture(t);
+    await store.ephemeral.put("deliveryBinding", "session_a", binding());
+    await store.ephemeral.delete("deliveryBinding", "session_a");
+    await writeEphemeralMarker(root, "0000000000000003", "unknown");
+
+    await assert.rejects(store.ephemeral.get("deliveryBinding", "session_a"),
+      error => error.code === 4 && /ephemeral retention marker/.test(error.message));
+  });
+
+test("a non-numeric ephemeral marker sequence fails closed before selection", async t => {
+  const { root, store } = await fixture(t);
+  await store.ephemeral.put("deliveryBinding", "session_a", binding());
+  await writeEphemeralMarker(root, "banana", "deleted");
+
+  await assert.rejects(store.ephemeral.get("deliveryBinding", "session_a"),
+    error => error.code === 4 && /ephemeral retention marker/.test(error.message));
+});
+
+test("ephemeral markers are selected by numeric sequence rather than filename order", async t => {
+  const { root, store } = await fixture(t);
+  await store.ephemeral.put("deliveryBinding", "session_a", binding());
+  await writeEphemeralMarker(root, "9999999999999999", "deleted");
+  await writeEphemeralMarker(root, "10000000000000000", "present");
+
+  assert.deepEqual(await store.ephemeral.get("deliveryBinding", "session_a"), binding());
 });
