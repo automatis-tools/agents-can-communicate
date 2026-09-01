@@ -54,14 +54,17 @@ test("replace publication updates materialised state in place", async t => {
   assert.equal(await readFile(destination, "utf8"), "second\n");
 });
 
-test("publication leaves no temporary file behind on success or on conflict", async t => {
+test("immutable publication retains temporary links rather than unlinking by path", async t => {
   const { tmpDir, records, options } = await fixture(t);
   const destination = path.join(records, "evidence.json");
   await publishAtomic(destination, bytes("original"), options);
   await assert.rejects(publishAtomic(destination, bytes("other"), options),
     error => error.code === EXIT.CONFLICT);
 
-  assert.deepEqual(await readdir(tmpDir), []);
+  const retained = await readdir(tmpDir);
+  assert.equal(retained.length, 2);
+  assert.deepEqual((await Promise.all(retained.map(file => readFile(path.join(tmpDir, file),
+    "utf8")))).sort(), ["original\n", "other\n"]);
 });
 
 test("publication rejects a symlinked destination directory", async t => {

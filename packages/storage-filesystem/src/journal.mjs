@@ -2,10 +2,11 @@ import path from "node:path";
 
 import { AccError, EXIT, assertPortableId } from "@agents-can-communicate/protocol";
 
-import { encode, listJsonFiles, publishAtomic, readJsonIfPresent, removeIfPresent }
+import { encode, listJsonFiles, publishAtomic, readJsonIfPresent, retainFile }
   from "./atomic-json.mjs";
+import { completeJournal, journalIsCompleted } from "./retention.mjs";
 
-export const JOURNAL_VERSION = 1;
+export const JOURNAL_VERSION = 2;
 
 // A journal entry is written only after the transaction callback has succeeded
 // and every byte is known. Its existence therefore means "this transaction was
@@ -28,7 +29,7 @@ function publicationDestination(root, publicationPath) {
     throw new AccError(EXIT.DATA, "journal publication path is not managed",
       { publicationPath });
   }
-  if (!(["events", "state"].includes(segments[0]))) {
+  if (!(["events", "retained", "state"].includes(segments[0]))) {
     throw new AccError(EXIT.DATA, "journal publication path is not managed",
       { publicationPath });
   }
@@ -50,11 +51,9 @@ export function journalEntry(transactionId, firstSequence, publications, started
     startedAt,
     publications: publications.map(item => ({
       path: item.path,
-      // A removal is journalled like any other publication, so a crash between
-      // two deletions replays to the same end state rather than a partial one.
-      bytes: item.remove === true ? null : item.bytes.toString("base64"),
+      bytes: item.bytes.toString("base64"),
       replace: item.replace === true,
-      remove: item.remove === true,
+      retainedPath: item.retainedPath ?? null,
     })),
   };
 }
@@ -64,8 +63,9 @@ export async function writeJournalEntry(paths, options, entry) {
   return entry;
 }
 
-export async function retireJournalEntry(paths, transactionId) {
-  await removeIfPresent(journalPath(paths, transactionId), { root: paths.root });
+export async function retireJournalEntry(paths, options, transactionId) {
+  await retainFile(journalPath(paths, transactionId), { root: paths.root });
+  await completeJournal(paths, options, transactionId);
 }
 
 export async function readOpenJournals(paths, root) {
@@ -88,8 +88,11 @@ export async function readOpenJournals(paths, root) {
     }
     for (const publication of entry.publications) {
       publicationDestination(root, publication?.path);
+      if (publication?.retainedPath !== null) {
+        publicationDestination(root, publication?.retainedPath);
+      }
     }
-    entries.push(entry);
+    if (!await journalIsCompleted(paths, root, entry.transactionId)) entries.push(entry);
   }
   return entries.sort((left, right) => left.firstSequence.localeCompare(right.firstSequence));
 }
@@ -101,11 +104,9 @@ export async function rollForward(paths, options, entry) {
   const published = [];
   for (const publication of entry.publications) {
     const destination = publicationDestination(options.root, publication.path);
-    if (publication.remove === true) {
-      await removeIfPresent(destination, { root: options.root });
-      published.push(publication.path);
-      await options.failAt?.(`after:${publication.path}`);
-      continue;
+    if (publication.retainedPath !== null) {
+      await retainFile(publicationDestination(options.root, publication.retainedPath),
+        { root: options.root });
     }
     const bytes = Buffer.from(publication.bytes, "base64");
     const outcome = await publishAtomic(destination, bytes,
@@ -115,6 +116,6 @@ export async function rollForward(paths, options, entry) {
     // same decided transaction.
     await options.failAt?.(`after:${publication.path}`);
   }
-  await retireJournalEntry(paths, entry.transactionId);
+  await retireJournalEntry(paths, options, entry.transactionId);
   return published;
 }
