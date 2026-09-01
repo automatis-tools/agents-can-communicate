@@ -4,156 +4,184 @@ import path from "node:path";
 
 import { AccError, EXIT, assertPortableId } from "@agents-can-communicate/protocol";
 
-import { publishAtomic } from "./atomic-json.mjs";
+import { encode, publishAtomic } from "./atomic-json.mjs";
 import { withRegularNoFollow } from "./safe-file.mjs";
 
-const ACTIVE_JOURNAL_RECORD_BYTES = 512;
-const ACTIVE_JOURNAL_VERSION = 1;
-const POINTER_BYTES = 8;
+const ACTIVE_JOURNAL_VERSION = 2;
+const AUTHORITY_BYTES_LIMIT = 1024;
+const GENERATION_WIDTH = 16;
+const READ_ATTEMPTS = 4;
 
 const data = (message, details) => {
   throw new AccError(EXIT.DATA, message, details);
 };
 
-export function activeJournalPath(paths) {
-  return path.join(paths.journal, "active.log");
+export function activeJournalPath(paths, slot) {
+  if (slot !== 0 && slot !== 1) data("invalid active journal slot", { slot });
+  return path.join(paths.journal, `active.${slot}`);
 }
 
-function exactKeys(record, expected, filePath) {
-  if (record === null || typeof record !== "object" || Array.isArray(record)
-    || Object.keys(record).sort().join("\0") !== [...expected].sort().join("\0")) {
+function exactKeys(value, expected, filePath) {
+  if (value === null || typeof value !== "object" || Array.isArray(value)
+    || Object.keys(value).sort().join("\0") !== [...expected].sort().join("\0")) {
     data("active journal record is not closed", { filePath });
   }
 }
 
+function checksum(record) {
+  return createHash("sha256").update(JSON.stringify(record)).digest("hex");
+}
+
+function encodeAuthority(record) {
+  return encode({ activeJournalChecksum: checksum(record), record });
+}
+
 function validateActiveRecord(record, filePath) {
-  if (record?.activeJournalVersion !== ACTIVE_JOURNAL_VERSION) {
+  const base = ["activeJournalVersion", "generation", "previousChecksum", "state"];
+  if (record?.state === "idle") exactKeys(record, base, filePath);
+  else if (record?.state === "open") {
+    exactKeys(record, [...base, "transactionId", "firstSequence"], filePath);
+  } else data("invalid active journal state", { filePath, state: record?.state });
+
+  if (record.activeJournalVersion !== ACTIVE_JOURNAL_VERSION) {
     data("unknown active journal version", { filePath,
-      activeJournalVersion: record?.activeJournalVersion });
+      activeJournalVersion: record.activeJournalVersion });
   }
-  if (record.state === "idle") {
-    exactKeys(record, ["activeJournalVersion", "state"], filePath);
-    return record;
+  if (typeof record.generation !== "string"
+    || !/^\d{16}$/.test(record.generation)) {
+    data("invalid active journal generation", { filePath, generation: record.generation });
   }
-  if (record.state !== "open") data("invalid active journal state", { filePath });
-  exactKeys(record, ["activeJournalVersion", "state", "transactionId", "firstSequence"],
-    filePath);
-  assertPortableId(record.transactionId, "transaction id");
-  if (typeof record.firstSequence !== "string" || !/^\d{16}$/.test(record.firstSequence)) {
-    data("invalid active journal first sequence", { filePath,
-      firstSequence: record.firstSequence });
+  const generation = BigInt(record.generation);
+  if (generation === 0n) {
+    if (record.state !== "idle" || record.previousChecksum !== null) {
+      data("invalid active journal genesis", { filePath });
+    }
+  } else if (typeof record.previousChecksum !== "string"
+    || !/^[0-9a-f]{64}$/.test(record.previousChecksum)) {
+    data("invalid active journal previous checksum", { filePath });
   }
-  return record;
+  if (record.state === "open") {
+    assertPortableId(record.transactionId, "transaction id");
+    if (typeof record.firstSequence !== "string"
+      || !/^\d{16}$/.test(record.firstSequence)) {
+      data("invalid active journal first sequence", { filePath,
+        firstSequence: record.firstSequence });
+    }
+  }
+  return generation;
 }
 
-function checksum(record, previous) {
-  return createHash("sha256").update(JSON.stringify({ record, previous })).digest("hex");
-}
-
-function validateTransition(record, previous, filePath) {
-  if (previous === null) {
-    if (record.state !== "idle") data("active journal initial record is not idle", { filePath });
-    return;
-  }
-  const expectedPrevious = record.state === "open" ? "idle" : "open";
-  if (previous.state !== expectedPrevious) {
-    data("invalid active journal transition", { filePath,
-      previous: previous.state, next: record.state });
-  }
-}
-
-function encodeActiveJournalRecord(record, previous = null) {
-  validateActiveRecord(record, activeJournalPath({ journal: "<journal>" }));
-  if (previous !== null) {
-    validateActiveRecord(previous, activeJournalPath({ journal: "<journal>" }));
-  }
-  validateTransition(record, previous, activeJournalPath({ journal: "<journal>" }));
-  const envelope = JSON.stringify({ checksum: checksum(record, previous), previous, record });
-  const encoded = Buffer.from(envelope);
-  if (encoded.length > ACTIVE_JOURNAL_RECORD_BYTES - POINTER_BYTES) {
-    data("active journal record is too large", { bytes: encoded.length });
-  }
-  const bytes = Buffer.alloc(ACTIVE_JOURNAL_RECORD_BYTES, 0x20);
-  encoded.copy(bytes);
-  bytes[ACTIVE_JOURNAL_RECORD_BYTES - 1] = 0x0a;
-  return bytes;
-}
-
-function decodeEnvelope(bytes, filePath) {
+function decodeAuthority(bytes, filePath, slot) {
   let envelope;
   try {
-    envelope = JSON.parse(bytes.toString("utf8").trim());
+    envelope = JSON.parse(bytes.toString("utf8"));
   } catch (error) {
-    data("invalid active journal record", { filePath, cause: error.message });
+    data("invalid active journal authority", { filePath, cause: error.message });
   }
-  exactKeys(envelope, ["checksum", "previous", "record"], filePath);
-  if (typeof envelope.checksum !== "string"
-    || envelope.checksum !== checksum(envelope.record, envelope.previous)) {
+  exactKeys(envelope, ["activeJournalChecksum", "record"], filePath);
+  const generation = validateActiveRecord(envelope.record, filePath);
+  if (Number(generation % 2n) !== slot) {
+    data("active journal generation chain is invalid", { filePath,
+      generation: envelope.record.generation, slot });
+  }
+  if (typeof envelope.activeJournalChecksum !== "string"
+    || envelope.activeJournalChecksum !== checksum(envelope.record)) {
     data("active journal checksum mismatch", { filePath });
   }
-  const record = validateActiveRecord(envelope.record, filePath);
-  const previous = envelope.previous === null
+  if (!bytes.equals(encodeAuthority(envelope.record))) {
+    data("active journal authority is not canonical", { filePath });
+  }
+  return { checksum: envelope.activeJournalChecksum, generation,
+    record: envelope.record, slot };
+}
+
+async function readSlotBytes(paths, root, slot, openFile) {
+  const filePath = activeJournalPath(paths, slot);
+  try {
+    return await withRegularNoFollow(filePath, root, constants.O_RDONLY,
+      async (handle, stat) => {
+        if (stat.size < 1 || stat.size > AUTHORITY_BYTES_LIMIT) {
+          data("invalid active journal authority size", { filePath, size: stat.size });
+        }
+        return handle.readFile();
+      }, openFile);
+  } catch (error) {
+    if (error.code === "ENOENT") return null;
+    throw error;
+  }
+}
+
+function sameBytes(left, right) {
+  if (left === null || right === null) return left === right;
+  return left.equals(right);
+}
+
+// Slot zero is read twice. Because writers alternate slots and generations
+// never repeat, equal reads prove that the pair existed at one instant even if
+// another process published between descriptor opens.
+async function readStableSlots(paths, root, openFile) {
+  for (let attempt = 0; attempt < READ_ATTEMPTS; attempt += 1) {
+    const slot0 = await readSlotBytes(paths, root, 0, openFile);
+    const slot1 = await readSlotBytes(paths, root, 1, openFile);
+    const slot0Confirmation = await readSlotBytes(paths, root, 0, openFile);
+    if (sameBytes(slot0, slot0Confirmation)) return [slot0, slot1];
+  }
+  throw new AccError(EXIT.CONFLICT, "active journal changed while being read", {});
+}
+
+function validateTransition(current, previous, filePath) {
+  const expected = previous.state === "idle" ? "open" : "idle";
+  if (current.state !== expected) {
+    data("invalid active journal transition", { filePath,
+      previous: previous.state, current: current.state });
+  }
+}
+
+function compareGenerations(left, right) {
+  if (left.generation < right.generation) return -1;
+  if (left.generation > right.generation) return 1;
+  return 0;
+}
+
+function selectAuthority(paths, bytes) {
+  // Decode every present slot before selection. Falling back from a corrupt
+  // latest slot to an older valid peer would turn corruption into rollback.
+  const found = bytes.map((value, slot) => value === null
     ? null
-    : validateActiveRecord(envelope.previous, filePath);
-  validateTransition(record, previous, filePath);
-  return { previous, record };
+    : decodeAuthority(value, activeJournalPath(paths, slot), slot)).filter(Boolean);
+  if (found.length === 0) return null;
+  if (found.length === 1) {
+    const [only] = found;
+    if (only.slot === 0 && only.generation === 0n) return only;
+    data("active journal authority peer is missing", { slot: only.slot,
+      generation: only.record.generation });
+  }
+  found.sort(compareGenerations);
+  const [previous, current] = found;
+  if (current.generation !== previous.generation + 1n) {
+    data("active journal generation chain is invalid", {
+      previous: previous.record.generation, current: current.record.generation });
+  }
+  if (current.record.previousChecksum !== previous.checksum) {
+    data("active journal checksum chain is invalid", { slot: current.slot });
+  }
+  validateTransition(current.record, previous.record,
+    activeJournalPath(paths, current.slot));
+  return current;
 }
 
-async function readFrame(handle, offset, filePath) {
-  const bytes = Buffer.alloc(ACTIVE_JOURNAL_RECORD_BYTES);
-  const { bytesRead } = await handle.read(bytes, 0, bytes.length, offset);
-  if (bytesRead !== bytes.length) data("truncated active journal record", { filePath });
-  return bytes;
+async function readCurrent(paths, root, openFile) {
+  return selectAuthority(paths, await readStableSlots(paths, root, openFile));
 }
 
-async function readCurrent(handle, size, filePath) {
-  const completeSize = size - (size % ACTIVE_JOURNAL_RECORD_BYTES);
-  if (completeSize < ACTIVE_JOURNAL_RECORD_BYTES) {
-    data("active journal has no complete record", { filePath, size });
-  }
-  const offset = completeSize - ACTIVE_JOURNAL_RECORD_BYTES;
-  const bytes = await readFrame(handle, offset, filePath);
-  if (bytes[ACTIVE_JOURNAL_RECORD_BYTES - POINTER_BYTES] === 0) {
-    let distance = 0n;
-    for (let index = ACTIVE_JOURNAL_RECORD_BYTES - POINTER_BYTES + 1;
-      index < ACTIVE_JOURNAL_RECORD_BYTES; index += 1) {
-      distance = (distance << 8n) | BigInt(bytes[index]);
-    }
-    const available = BigInt(offset / ACTIVE_JOURNAL_RECORD_BYTES);
-    if (distance < 1n || distance > available) {
-      data("invalid active journal padding pointer", { filePath });
-    }
-    const targetOffset = offset - Number(distance) * ACTIVE_JOURNAL_RECORD_BYTES;
-    const target = await readFrame(handle, targetOffset, filePath);
-    return decodeFrame(target, targetOffset, filePath);
-  }
-  return decodeFrame(bytes, offset, filePath);
-}
-
-function decodeFrame(bytes, offset, filePath) {
-  // A short tail cannot hold a pointer. Its otherwise-complete transition
-  // envelope carries the checksummed prior state, so closing it with zero is
-  // sufficient to retain the prior authority without another filesystem read.
-  if (bytes.at(-1) === 0) {
-    const completed = Buffer.from(bytes);
-    completed[completed.length - 1] = 0x0a;
-    const { previous } = decodeEnvelope(completed, filePath);
-    if (previous === null) data("active journal padding has no prior record", { filePath });
-    return { offset, record: previous };
-  }
-  return { offset, record: decodeEnvelope(bytes, filePath).record };
-}
+const genesis = () => ({ activeJournalVersion: ACTIVE_JOURNAL_VERSION,
+  generation: "0".repeat(GENERATION_WIDTH), previousChecksum: null, state: "idle" });
 
 export async function initialiseActiveJournal(paths, options) {
-  const filePath = activeJournalPath(paths);
+  const current = await readCurrent(paths, options.root);
+  if (current !== null) return current.record;
   try {
-    return await readActiveJournal(paths, options.root);
-  } catch (error) {
-    if (error.code !== "ENOENT") throw error;
-  }
-  try {
-    await publishAtomic(filePath,
-      encodeActiveJournalRecord({ activeJournalVersion: 1, state: "idle" }), options);
+    await publishAtomic(activeJournalPath(paths, 0), encodeAuthority(genesis()), options);
   } catch (error) {
     if (error.code !== EXIT.CONFLICT) throw error;
   }
@@ -161,60 +189,42 @@ export async function initialiseActiveJournal(paths, options) {
 }
 
 export async function readActiveJournal(paths, root, openFile) {
-  const filePath = activeJournalPath(paths);
-  return withRegularNoFollow(filePath, root, constants.O_RDONLY,
-    async (handle, stat) => (await readCurrent(handle, stat.size, filePath)).record, openFile);
+  const current = await readCurrent(paths, root, openFile);
+  if (current === null) data("active journal has no authority", { journal: paths.journal });
+  return current.record;
 }
 
-async function appendAll(handle, bytes) {
-  let written = 0;
-  while (written < bytes.length) {
-    const result = await handle.write(bytes, written, bytes.length - written);
-    if (result.bytesWritten === 0) data("active journal append made no progress", {});
-    written += result.bytesWritten;
+function nextGeneration(current) {
+  const next = current.generation + 1n;
+  const generation = next.toString().padStart(GENERATION_WIDTH, "0");
+  if (generation.length !== GENERATION_WIDTH) {
+    data("active journal generation is exhausted", { current: current.record.generation });
   }
+  return generation;
 }
 
-async function appendTransition(paths, options, next, expected) {
-  const filePath = activeJournalPath(paths);
-  return withRegularNoFollow(filePath, options.root,
-    constants.O_RDWR | constants.O_APPEND, async (handle, stat) => {
-      const current = await readCurrent(handle, stat.size, filePath);
-      if (!expected(current.record)) {
-        throw new AccError(EXIT.CONFLICT, "active journal transition conflicts",
-          { current: current.record, next });
-      }
-      const remainder = stat.size % ACTIVE_JOURNAL_RECORD_BYTES;
-      if (remainder !== 0) {
-        const padding = Buffer.alloc(ACTIVE_JOURNAL_RECORD_BYTES - remainder, 0x20);
-        if (padding.length < POINTER_BYTES) {
-          padding[padding.length - 1] = 0;
-        } else {
-          padding[padding.length - POINTER_BYTES] = 0;
-          let distance = BigInt(Math.floor(stat.size / ACTIVE_JOURNAL_RECORD_BYTES)
-            - (current.offset / ACTIVE_JOURNAL_RECORD_BYTES));
-          for (let index = padding.length - 1; index > padding.length - POINTER_BYTES;
-            index -= 1) {
-            padding[index] = Number(distance & 0xffn);
-            distance >>= 8n;
-          }
-          if (distance !== 0n) data("active journal padding pointer is too large", { filePath });
-        }
-        await appendAll(handle, padding);
-      }
-      await appendAll(handle, encodeActiveJournalRecord(next, current.record));
-      await handle.sync();
-      return next;
-    }, options.openFile);
+async function appendTransition(paths, options, fields, expected) {
+  const current = await readCurrent(paths, options.root, options.openFile);
+  if (current === null || !expected(current.record)) {
+    throw new AccError(EXIT.CONFLICT, "active journal transition conflicts",
+      { current: current?.record ?? null, next: fields });
+  }
+  const record = { activeJournalVersion: ACTIVE_JOURNAL_VERSION,
+    generation: nextGeneration(current), previousChecksum: current.checksum, ...fields };
+  validateActiveRecord(record, activeJournalPath(paths, 1 - current.slot));
+  await publishAtomic(activeJournalPath(paths, 1 - current.slot), encodeAuthority(record),
+    { ...options, tmpDir: options.tmpDir ?? paths.tmp ?? path.join(options.root, "tmp"),
+      replace: true });
+  return record;
 }
 
 export function activateJournal(paths, options, entry) {
-  const next = { activeJournalVersion: 1, state: "open",
-    transactionId: entry.transactionId, firstSequence: entry.firstSequence };
-  return appendTransition(paths, options, next, current => current.state === "idle");
+  return appendTransition(paths, options, { state: "open",
+    transactionId: entry.transactionId, firstSequence: entry.firstSequence },
+    current => current.state === "idle");
 }
 
 export function idleJournal(paths, options, transactionId) {
-  return appendTransition(paths, options, { activeJournalVersion: 1, state: "idle" },
+  return appendTransition(paths, options, { state: "idle" },
     current => current.state === "open" && current.transactionId === transactionId);
 }
