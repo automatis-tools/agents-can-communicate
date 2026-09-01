@@ -10,25 +10,20 @@ const repo = path.resolve(import.meta.dirname, "..", "..");
 /**
  * A capability an agent is never told about does not exist.
  *
- * `acc task` shipped for the life of the project and no skill mentioned it, so
- * no agent ever created one and the only way to reach it was a human typing it
- * — in a product whose whole promise is that the human types nothing after
- * installing. The gap was invisible: the command worked, its tests passed, and
- * the surface it was missing from was a markdown file nobody diffed.
+ * A command can work and pass its tests while remaining absent from every
+ * installed skill. This gate keeps the taught and executable surfaces aligned.
  */
 
 // What an agent has to know how to do. Human-only commands (`install`,
 // `uninstall`, `doctor`, `config`) and adapter-only ones (`attach`,
 // `heartbeat`, `detach`) are deliberately absent — a skill that taught those
 // would have models running the installer.
-const TAUGHT = Object.freeze(["sync", "work", "claim", "request", "task", "message",
+const TAUGHT = Object.freeze(["sync", "work", "claim", "request", "message",
   "inbox", "reply", "finish", "status", "ack"]);
 
 // Reachable by an agent but not worth a section: `release` is covered by
-// `finish`, and `workstream` and `decide` only matter once work is large enough,
-// or a disagreement real enough, that the model will have read the CLI reference
-// anyway. Four sections in every skill is four sections read on every turn.
-const OPTIONAL = Object.freeze(["release", "workstream", "decide"]);
+// `finish`. Another section in every skill is another section read on every turn.
+const OPTIONAL = Object.freeze(["release"]);
 
 /** Every SKILL.md an adapter ships. */
 async function skills() {

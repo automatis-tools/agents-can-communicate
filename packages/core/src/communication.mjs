@@ -3,7 +3,6 @@ import { AccError, EXIT, SCHEMA_VERSION, advanceDelivery, createId, validateReco
 
 import { ensureMaterialised } from "./materialisation.mjs";
 import { assertKnownParticipants } from "./participants.mjs";
-import { writeTask } from "./tasks.mjs";
 
 const receiptId = (messageId, recipient) => `${messageId}--${recipient}`;
 
@@ -105,43 +104,6 @@ export function createCommunicationService(ports, sessions, claims) {
         payload: { messageId: input.messageId,
           recipientParticipantId: recipient } });
     }, { kinds: ["receipt"] });
-    return record;
-  }
-
-  async function recordDecision(input) {
-    const session = await requireOpenSession(input, "record a decision");
-    const workspaceId = session.workspaceId;
-    await ensureMaterialised(ports, { workspaceId, reason: "durable_object" });
-    // A peer proposal never becomes a human-authority decision on its own.
-    if (input.authority === "human" && input.humanConfirmed !== true) {
-      throw new AccError(EXIT.CONFLICT,
-        "human authority requires an explicit human confirmation", { authority: "human" });
-    }
-    const now = clock.now();
-    const decisionId = createId("decision");
-    const record = validateRecord("decision", {
-      schemaVersion: SCHEMA_VERSION,
-      decisionId,
-      workspaceId,
-      workstreamId: input.workstreamId ?? null,
-      title: input.title,
-      outcome: input.outcome,
-      authority: input.authority,
-      decidedBy: input.decidedBy ?? [session.participantId],
-      evidence: input.evidence ?? [],
-      supersedes: input.supersedes ?? null,
-      decidedAt: now,
-    });
-    await store.transaction(async tx => {
-      if (record.supersedes !== null && tx.get("decision", record.supersedes) === null) {
-        throw new AccError(EXIT.DATA, "the superseded decision does not exist",
-          { supersedes: record.supersedes });
-      }
-      tx.put("decision", decisionId, record);
-      tx.append({ schemaVersion: SCHEMA_VERSION, eventId: ids.next("event"), workspaceId,
-        actorSessionId: session.sessionId, type: "decision.recorded", occurredAt: now,
-        payload: { decisionId, authority: record.authority } });
-    }, { kinds: ["decision"] });
     return record;
   }
 
@@ -261,74 +223,18 @@ export function createCommunicationService(ports, sessions, claims) {
         || left.messageId.localeCompare(right.messageId));
   }
 
-  /**
-   * Ask another agent to do something.
-   *
-   * One write, because the two halves are useless apart. A task addressed to
-   * someone who was never told about it is work nobody knows exists, and a
-   * message describing work that was never recorded is a request with nothing
-   * to point at.
-   *
-   * The recipient learns about it twice over, and both paths already existed:
-   * the task raises a `task_unblocked` attention item for the participant it
-   * names, and the message reaches their turn as quoted peer text.
-   */
   async function requestWork(input) {
-    const session = await requireOpenSession(input, "request work");
-    const workspaceId = session.workspaceId;
-    const recipient = input.toParticipantId;
-    if (typeof recipient !== "string" || recipient === "") {
-      throw new AccError(EXIT.USAGE, "a request needs a recipient participant");
-    }
-    await ensureMaterialised(ports, { workspaceId, descriptor: input.descriptor,
-      reason: "durable_object" });
-    await assertKnownParticipants(store, workspaceId, [recipient]);
-    const now = clock.now();
-    const messageId = createId("message");
-    let task = null;
-    let message = null;
-
-    await store.transaction(async tx => {
-      task = writeTask(tx, { session, workspaceId, now, ids,
-        input: { ...input, assigneeParticipantId: recipient,
-          requestedByParticipantId: session.participantId } });
-      message = validateRecord("message", {
-        schemaVersion: SCHEMA_VERSION,
-        messageId,
-        workspaceId,
-        fromSessionId: session.sessionId,
-        fromParticipantId: session.participantId,
-        toParticipantIds: [recipient],
-        type: "work_request",
-        subject: input.title,
-        body: input.detail ?? input.title,
-        priority: input.priority ?? "normal",
-        workstreamId: task.workstreamId,
-        taskId: task.taskId,
-        inReplyTo: input.inReplyTo ?? null,
-        // A request is a question, so the sender is entitled to know whether it
-        // was taken up. Silence and refusal are different answers.
-        requiresAck: true,
-        artifacts: input.artifacts ?? [],
-        sentAt: now,
-      });
-      tx.put("message", messageId, message);
-      tx.put("receipt", receiptId(messageId, recipient), validateRecord("receipt", {
-        schemaVersion: SCHEMA_VERSION,
-        messageId,
-        workspaceId,
-        recipientParticipantId: recipient,
-        state: "queued",
-        updatedAt: now,
-      }));
-      tx.append({ schemaVersion: SCHEMA_VERSION, eventId: ids.next("event"), workspaceId,
-        actorSessionId: session.sessionId, type: "work.requested", occurredAt: now,
-        payload: { taskId: task.taskId, messageId, recipient } });
-    // `writeTask` runs on this handle, so what it reads is read here.
-    }, { kinds: ["message", "receipt", "session", "task", "workstream"] });
-    return { task, message };
+    return sendMessage({
+      sessionId: input.sessionId,
+      generation: input.generation,
+      toParticipantIds: [input.toParticipantId],
+      type: "work_request",
+      subject: input.title,
+      body: input.detail ?? input.title,
+      requiresAck: true,
+      descriptor: input.descriptor,
+    });
   }
 
-  return { sendMessage, markDelivery, pendingMessages, requestWork, recordDecision,
-    finishSession };
+  return { sendMessage, markDelivery, pendingMessages, requestWork, finishSession };
 }

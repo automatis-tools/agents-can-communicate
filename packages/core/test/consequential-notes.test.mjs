@@ -34,9 +34,10 @@ test("missing fields are treated as empty rather than thrown", () => {
 });
 
 test("noteNudge speaks for a consequential note that carries no ack obligation", () => {
-  assert.match(noteNudge({ type: "note", requiresAck: false,
-    subject: "Snow", body: "It touches your file. Have you started?" }),
-  /--requires-ack|acc decide/);
+  const advice = noteNudge({ type: "note", requiresAck: false,
+    subject: "Snow", body: "It touches your file. Have you started?" });
+  assert.match(advice, /--requires-ack/);
+  assert.doesNotMatch(advice, /acc decide/);
 });
 
 test("noteNudge stays silent when the sender already set requiresAck", () => {

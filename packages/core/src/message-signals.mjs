@@ -24,7 +24,7 @@ export function looksConsequential({ subject = "", body = "" } = {}) {
 
 const NUDGE = "this note reads like it needs a reply, but a note is fire-and-forget: "
   + "the recipient sees it once and owes no response. Re-send with --requires-ack "
-  + "for an answer, or record it with `acc decide`.";
+  + "for an answer.";
 
 /**
  * The send-time advisory for a note that looks like it is waiting on a reply,

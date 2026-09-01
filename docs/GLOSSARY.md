@@ -10,12 +10,9 @@ One definition per term. Where a term has a fuller treatment, the link points to
 - **Intent** — what a session says it is doing right now, published with `acc work`. Awareness, not a reservation.
 - **Claim** — a reservation on a resource (a file or glob such as `file:src/**`), taken with `acc claim`. See guarded vs advisory below. See [Concepts](CONCEPTS.md).
 - **Guarded vs advisory** — the room's protection level. Under **guarded**, a clashing write from another session is refused and the owner is named; under **advisory**, the claim only warns. One MCP participant in the room makes it advisory for everyone. See [MCP](MCP.md).
-- **Workstream** — a named grouping of related work, optionally steered by one participant (the coordinator role).
-- **Task** — a unit of work with a state — `pending`, `in_progress`, `review`, `done`, or `blocked` — optionally assigned to a participant.
 - **Message** — a typed note to other participants (`note`, `question`, `answer`, `decision_proposal`, `blocker`, `handoff`, and more), delivered on the recipient's next turn. A message is data the recipient weighs, never a command it obeys.
 - **Note vs question** — a `note` is delivered once and leaves one recoverable breadcrumb; a `question` (or any `--requires-ack` message) keeps a standing reminder until it is acknowledged with `acc ack`.
 - **Inbox** — a participant's targeted mail, read with `acc inbox`; replies go back with `acc reply`.
-- **Decision** — a settled outcome recorded with `acc decide`, so a later session does not reopen it.
 - **Handoff** — an end-of-turn record written with `acc finish`: what is done, what remains, what is blocked — and it releases the session's claims.
-- **Attention** — the room's prioritized signals a session should act on (eight kinds, e.g. `direct_request`, `claim_conflict`, `unread_note`). See [Architecture](ARCHITECTURE.md).
+- **Attention** — the room's prioritized signals a session should act on (six kinds, e.g. `direct_request`, `claim_conflict`, `unread_note`). See [Architecture](ARCHITECTURE.md).
 - **Managed vs manual** — whether ACC controls a client's session lifecycle. A native adapter is **managed** (ambient attach, guarded writes, injected context); an MCP client is **manual** — the participation tier, advisory only. See [MCP](MCP.md) and [Capabilities](CAPABILITIES.md).

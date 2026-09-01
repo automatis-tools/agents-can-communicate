@@ -95,8 +95,8 @@ it, [getting started](docs/GETTING_STARTED.md) to run it, the [CLI](docs/CLI.md)
 [adapter authoring](docs/ADAPTER_AUTHORING.md) to extend it. New to the vocabulary? The
 [glossary](docs/GLOSSARY.md) defines every term in one line.
 
-See it run: [three workstreams](examples/three-workstreams.md) · [research in a plain
-folder](examples/non-git-research.md). Contributing starts with [AGENTS.md](AGENTS.md).
+See it run: [research in a plain folder](examples/non-git-research.md). Contributing starts
+with [AGENTS.md](AGENTS.md).
 
 ## Requirements & license
 

@@ -24,7 +24,7 @@ const hook = path.join(repo, "bin", "acc-hook.mjs");
  * ownership rather than public information.
  *
  * So the whole documented workflow was unreachable: on all four native clients,
- * `work`, `claim`, `message`, `request`, `task`, `ack` and `finish` could not be
+ * `work`, `claim`, `message`, `request`, `ack` and `finish` could not be
  * run by the agent they were written for. Only the MCP path worked, because that
  * server resolves its own session and never asks the model for one.
  *
@@ -73,19 +73,14 @@ test("the whole request loop runs with no identifiers on either side", async t =
     "--detail", "settle() adds mudDepth with nothing stopping it."],
   { CLAUDE_CODE_SESSION_ID: "gfx" });
 
-  const { stdout: waiting } = await cli(["status", "--json"],
+  const { stdout: waiting } = await cli(["inbox", "--json"],
     { CLAUDE_CODE_SESSION_ID: "phy" });
-  const attention = JSON.parse(waiting).data.attention;
-  const taskId = attention.find(item => item.kind === "task_unblocked")?.sourceId;
-  assert.equal(typeof taskId, "string",
-    `physics was not told work is waiting: ${JSON.stringify(attention)}`);
-
-  const { stdout: taken } = await cli(["task", "--task", taskId, "--take"],
+  const [request] = JSON.parse(waiting).data;
+  assert.equal(request.message.subject, "Tank sinks through mud");
+  const { stdout: replied } = await cli(["reply", "--message", request.message.messageId,
+    "--body", "I will review the settling path."],
     { CLAUDE_CODE_SESSION_ID: "phy" });
-  assert.match(taken, /in_progress/);
-  const { stdout: done } = await cli(["task", "--task", taskId, "--state", "done"],
-    { CLAUDE_CODE_SESSION_ID: "phy" });
-  assert.match(done, /done/);
+  assert.match(replied, /replied message_/);
 });
 
 test("a session id from status is enough; the generation is looked up", async t => {
@@ -155,11 +150,8 @@ const AGENT_FACING = Object.freeze([
   ["inbox", []],
   ["reply", ["--message", "message_absent", "--body", "answer"]],
   ["request", ["--to", "peer", "--title", "please take this"]],
-  ["task", ["--title", "something to do"]],
-  ["workstream", ["--title", "a stream", "--objective", "an objective"]],
   ["ack", ["--message", "message_absent"]],
   ["finish", ["--goal", "what this session was for"]],
-  ["decide", ["--title", "settled", "--outcome", "what was settled"]],
   ["release", ["--claim", "claim_absent"]],
 ]);
 
@@ -172,9 +164,8 @@ const NOT_AGENT_FACING = Object.freeze(["install", "uninstall", "doctor", "confi
   "help", "version", "update"]);
 
 test("the list above is every command an agent can run", async () => {
-  // Remembered lists rot. `acc decide` was added, needed an identity like the
-  // rest, and was not in this list - so the gate for exactly that defect passed
-  // while the command refused every agent that tried it.
+  // Remembered lists rot. Derive the gap from the command table so a newly
+  // added operation cannot evade the identity gate.
   const covered = new Set([...AGENT_FACING.map(([command]) => command),
     ...NOT_AGENT_FACING]);
   const forgotten = Object.keys(COMMANDS).filter(command => !covered.has(command));

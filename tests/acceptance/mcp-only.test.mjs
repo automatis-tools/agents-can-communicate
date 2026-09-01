@@ -196,7 +196,7 @@ test("being shown something is still not agreeing to it", async t => {
   assert.deepEqual(await receipts(), ["acknowledged"]);
 });
 
-test("an MCP client can ask a hooked peer for work and be told it is done", async t => {
+test("an MCP client can ask a peer for work and receive its reply", async t => {
   const place = await workspace(t);
   const client = connectMcp({ ...place, participant: "graphics" });
   t.after(() => client.close());
@@ -209,14 +209,15 @@ test("an MCP client can ask a hooked peer for work and be told it is done", asyn
 
   const asked = await call("acc_request", { toParticipantId: "physics",
     title: "Tank sinks through mud", detail: "Not mine to fix. Can you take it?" });
-  await cli(place, ["task", "--session", peer.sessionId, "--generation", peer.generation,
-    "--task", asked.task.taskId, "--take"]);
-  await cli(place, ["task", "--session", peer.sessionId, "--generation", peer.generation,
-    "--task", asked.task.taskId, "--state", "done"]);
+  const [received] = await cli(place, ["inbox", "--session", peer.sessionId,
+    "--generation", peer.generation]);
+  assert.equal(received.message.messageId, asked.messageId);
+  await cli(place, ["reply", "--session", peer.sessionId, "--generation", peer.generation,
+    "--message", asked.messageId, "--body", "Done; the mud clamp now holds."]);
 
-  // The whole loop, from the tier with no hooks at all: asked, taken, finished,
-  // and the answer arrives where this client can see it.
+  // The whole loop, from the tier with no hooks at all: asked, answered, and the
+  // answer arrives where this client can see it.
   const inbox = await call("acc_inbox");
-  const answers = inbox.map(item => item.message.subject);
-  assert.deepEqual(answers, ["accepted: Tank sinks through mud", "done: Tank sinks through mud"]);
+  assert.deepEqual(inbox.map(item => item.message.body),
+    ["Done; the mud clamp now holds."]);
 });

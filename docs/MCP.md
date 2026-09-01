@@ -13,7 +13,7 @@ and tells the workspace cleanly when the session ends.
 
 A generic **MCP client** gets none of that integration — it only gets `acc-mcp`, a stdio
 server exposing ACC's coordination tools. This is the **participation tier**: full access
-to the durable, shared state (roster, claims, messages, workstreams, tasks, decisions) but
+to the durable, shared state (roster, claims, messages, and handoffs) but
 no hook into the client's own lifecycle or file writes. Nothing intercepts what the client
 writes, there is no session-end signal when it disconnects, and there is no push delivery —
 an MCP client only sees new mail, claims, or roster changes when it next calls a tool.
@@ -65,30 +65,26 @@ and it says so rather than silently ignoring extra flags.
 
 | Tool | Does |
 |---|---|
+| `acc_status` | Current participants, intents, claims, and protection |
 | `acc_sync` | New events, roster, attention, and (for compatibility) pending mail |
 | `acc_work` | Publish intent |
-| `acc_claim` | Reserve a resource, or release one |
+| `acc_claim` | Reserve or renew a resource |
+| `acc_release` | Release a claim |
 | `acc_message` | Send a message |
 | `acc_inbox` | Read unresolved messages addressed to this participant, optionally one by id |
 | `acc_reply` | Reply to one message and acknowledge the original, atomically |
 | `acc_ack` | Acknowledge without a written reply |
 | `acc_request` | Ask another agent to do something |
-| `acc_task` | Create work, take it, or move it along |
-| `acc_workstream` | Group related work. Optional |
-| `acc_decide` | Record a durable decision |
 | `acc_finish` | Handoff and release |
 
-That is all twelve — there is no `acc_status` and no `acc_release` tool. Roster and status
-come from `acc_sync`; releasing a claim is `acc_claim` with a release action, not a
-separate tool.
+That is all eleven.
 
 `acc_inbox` and `acc_reply` are the recent, preferred path for addressed mail. `acc_sync`
 still returns pending mail too, purely for compatibility with clients built before
 `acc_inbox` existed — use `acc_inbox` going forward, not `acc_sync --scope full`, to recover
 an addressed message.
 
-Resources: `acc://snapshot`, `acc://roster`, `acc://workstreams`, `acc://tasks`,
-`acc://inbox`.
+Resources: `acc://snapshot`, `acc://roster`, `acc://inbox`.
 
 ## What you don't get
 

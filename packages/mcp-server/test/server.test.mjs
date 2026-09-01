@@ -202,7 +202,7 @@ test("resources/list and resources/read expose read-only views", async t => {
     const listed = await request("resources/list", { _meta: meta });
     const read = await request("resources/read", { uri: "acc://roster", _meta: meta });
 
-    assert.equal(listed.result.resources.length, 5);
+    assert.equal(listed.result.resources.length, 3);
     assert.equal(read.result.contents[0].mimeType, "application/json");
     assert.equal(Array.isArray(JSON.parse(read.result.contents[0].text)), true);
   });
@@ -264,8 +264,9 @@ test("a consequential note comes back with a nudge; a plain FYI does not", async
       .then(res => JSON.parse(res.result.structuredContent ?? res.result.content[0].text));
 
     const consequential = await send("Snow", "It touches your file. Have you started?");
-    assert.match(consequential.advice ?? "", /--requires-ack|acc decide/,
+    assert.match(consequential.advice ?? "", /--requires-ack/,
       "a note asking a question came back with no nudge");
+    assert.doesNotMatch(consequential.advice ?? "", /acc decide/);
 
     const fyi = await send("FYI", "Logged it. Nothing for you to do.");
     assert.equal(fyi.advice, undefined,
