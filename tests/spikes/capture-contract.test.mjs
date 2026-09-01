@@ -66,6 +66,45 @@ test("a capture result is closed to pass or fail", () => {
   );
 });
 
+test("capture identity fields are non-empty strings", () => {
+  for (const key of ["client", "version", "platform", "observedAt", "capability", "fixture"]) {
+    assert.throws(
+      () => validateCapture({ ...BASE_CAPTURE, [key]: "" }),
+      new RegExp(`capture ${key} is a non-empty string`),
+    );
+  }
+});
+
+test("capture branches are observed states or explicitly unobserved", () => {
+  const observed = {
+    idle: "offered",
+    busy: "not_interrupted",
+    reply: "routed",
+    duplicate: "same_message_id",
+    fallback: "queued",
+  };
+  for (const [key, expected] of Object.entries(observed)) {
+    assert.doesNotThrow(() => validateCapture({ ...BASE_CAPTURE, [key]: expected }));
+    assert.throws(
+      () => validateCapture({ ...BASE_CAPTURE, [key]: null }),
+      new RegExp(`capture ${key} is ${expected} or unobserved`),
+    );
+    assert.throws(
+      () => validateCapture({ ...BASE_CAPTURE, [key]: "unknown" }),
+      new RegExp(`capture ${key} is ${expected} or unobserved`),
+    );
+  }
+});
+
+test("capture limitations contain at least one stable non-empty reason", () => {
+  for (const limitations of [null, [], [""], ["   "], "fixture only"]) {
+    assert.throws(
+      () => validateCapture({ ...BASE_CAPTURE, limitations }),
+      /capture limitations is a non-empty array of non-empty strings/,
+    );
+  }
+});
+
 test("stored real-client captures satisfy the closed contract", () => {
   const fixtureUrls = [
     new URL("../../packages/adapter-codex/fixtures/delivery/codex-cli-0.152.0.json",
