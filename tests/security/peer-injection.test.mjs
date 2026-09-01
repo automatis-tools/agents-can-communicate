@@ -15,8 +15,10 @@ import { projectContext } from "@agents-can-communicate/adapter-sdk";
 const sync = (overrides = {}) => ({ solo: false, cursor: "c1", roster: [],
   attention: [], messages: [], claims: [], ...overrides });
 
-const message = (body, extra = {}) => ({ fromSessionId: "session_peer",
-  type: "note", subject: "subject", body, ...extra });
+const message = (body, extra = {}) => ({ messageId: "message_peer",
+  threadId: "message_peer", fromParticipantId: "participant_peer",
+  fromSessionId: "session_peer", toParticipantIds: ["participant_reader"],
+  kind: "note", obligation: "none", subject: "subject", body, ...extra });
 
 // Lines ACC speaks in its own voice. Everything a peer wrote belongs between the
 // fences; anything of theirs out here is text that stopped being quoted.
@@ -55,7 +57,7 @@ test("peer text is attributed and labelled untrusted, every time", () => {
 
   // Attribution is the whole defence at this layer: the model can only weigh a
   // claim if it knows who is making it.
-  assert.match(projected, /from session_peer/);
+  assert.match(projected, /sender: participant_peer \(session session_peer\)/);
   assert.match(projected, /untrusted peer message/);
 });
 

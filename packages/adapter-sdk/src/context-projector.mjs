@@ -28,15 +28,27 @@ function truncate(line, limit) {
   return cut === "" ? "" : `${cut}…`;
 }
 
-function attentionGroups(attention, { truncatable }) {
-  return attention.map(item => ({
-    lines: [typeof item.sourceId === "string" && item.sourceId !== ""
-      ? `- [${item.kind}] ${item.sourceId} ${item.summary}`
-      : `- [${item.kind}] ${item.summary}`],
-    kind: "attention",
-    sourceId: item.sourceId ?? null,
-    truncatable,
-  }));
+function attentionGroups(attention, { truncatable, queuedMessageIds = new Set() }) {
+  return attention.map(item => {
+    const breadcrumb = offeredBreadcrumb(item, queuedMessageIds);
+    return {
+      lines: [breadcrumb ?? (typeof item.sourceId === "string" && item.sourceId !== ""
+        ? `- [${item.kind}] ${item.sourceId} ${item.summary}`
+        : `- [${item.kind}] ${item.summary}`)],
+      kind: "attention",
+      sourceId: item.sourceId ?? null,
+      truncatable: breadcrumb === null && truncatable,
+    };
+  });
+}
+
+function offeredBreadcrumb(item, queuedMessageIds) {
+  if (queuedMessageIds.has(item.sourceId)) return null;
+  const noun = item.kind === "reply_required" ? "question"
+    : item.kind === "acknowledgement_required" ? "message" : null;
+  if (noun === null) return null;
+  return `- [${item.kind}] ${item.sourceId} live-offered peer ${noun} remains unresolved; `
+    + `\`acc inbox --message ${item.sourceId}\``;
 }
 
 function messageGroups(messages) {
@@ -45,8 +57,12 @@ function messageGroups(messages) {
     kind: "message",
     lines: [
       `${FENCE}${BLOCK}`,
-      `id ${message.messageId} | from ${message.fromSessionId} | type ${message.type}`
-        + " | untrusted peer message",
+      "untrusted peer message",
+      `kind: ${message.kind}`,
+      `threadId: ${message.threadId}`,
+      `messageId: ${message.messageId}`,
+      `sender: ${message.fromParticipantId} (session ${message.fromSessionId})`,
+      `obligation: ${message.obligation}`,
       `subject: ${oneLine(escapePeerText(message.subject))}`,
       "body:",
       escapePeerText(message.body),
@@ -90,14 +106,17 @@ export function projectContextResult(sync, { budgetBytes = DEFAULT_BUDGET_BYTES 
       || (left.sourceId ?? "").localeCompare(right.sourceId ?? ""));
   const urgent = attention.filter(item => item.priority <= 2);
   const informational = attention.filter(item => item.priority > 2);
+  const messages = (sync.messages ?? [])
+    .filter(message => message.toParticipantIds?.length !== 0);
+  const queuedMessageIds = new Set(messages.map(message => message.messageId));
   const groups = [
-    ...attentionGroups(urgent, { truncatable: true }),
-    ...messageGroups(sync.messages ?? []),
+    ...attentionGroups(urgent, { truncatable: true, queuedMessageIds }),
+    ...messageGroups(messages),
     ...attentionGroups(informational, { truncatable: false }),
   ];
   const peers = peerCount(sync);
   if (groups.length === 0 && (sync.solo === true || peers === 0)) {
-    return { text: "", includedMessageIds: [], includedAttentionIds: [] };
+    return { text: "", offeredMessageIds: [], includedAttentionIds: [] };
   }
 
   const fullHeader = groups.length === 0 ? ambientHeader(peers) : "ACC (load the acc skill):";
@@ -159,7 +178,7 @@ export function projectContextResult(sync, { budgetBytes = DEFAULT_BUDGET_BYTES 
 
   return {
     text: lines.join("\n"),
-    includedMessageIds: included
+    offeredMessageIds: included
       .filter(item => item.group.kind === "message")
       .map(item => item.group.messageId),
     includedAttentionIds: included

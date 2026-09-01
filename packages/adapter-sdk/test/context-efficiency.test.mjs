@@ -5,6 +5,9 @@ import { projectContext } from "../src/context-projector.mjs";
 
 const session = (sessionId, participantId, presence) => ({ sessionId, participantId,
   harness: "codex", presence, branch: "main" });
+const message = (messageId, subject, body) => ({ messageId, threadId: messageId,
+  fromParticipantId: "peer", fromSessionId: "session_peer",
+  toParticipantIds: ["reader"], kind: "question", obligation: "reply", subject, body });
 
 test("ambient peer presence is a compact skill trigger, not a workspace dump", () => {
   const projected = projectContext({ cursor: "0000000000000042", solo: false,
@@ -29,8 +32,8 @@ test("ambient peer presence is a compact skill trigger, not a workspace dump", (
 
 test("an addressed message remains actionable and carries its stable id", () => {
   const projected = projectContext({ cursor: "7", solo: true, roster: [], claims: [],
-    attention: [], messages: [{ messageId: "message_target", fromSessionId: "session_peer",
-      type: "question", subject: "API shape", body: "Should inbox mark this seen?" }] });
+    attention: [], messages: [message("message_target", "API shape",
+      "Should inbox mark this seen?")] });
 
   assert.match(projected, /message_target/);
   assert.match(projected, /Should inbox mark this seen\?/);
@@ -39,8 +42,7 @@ test("an addressed message remains actionable and carries its stable id", () => 
 test("overflow points to the exact inbox item instead of a full workspace sync", () => {
   const projected = projectContext({ cursor: "8", solo: false,
     roster: [session("session_peer", "peer", "online")], claims: [], attention: [],
-    messages: [{ messageId: "message_oversized", fromSessionId: "session_peer",
-      type: "question", subject: "Large", body: "x".repeat(2_000) }] },
+    messages: [message("message_oversized", "Large", "x".repeat(2_000))] },
   { budgetBytes: 220 });
 
   assert.match(projected, /acc inbox --message message_oversized/);

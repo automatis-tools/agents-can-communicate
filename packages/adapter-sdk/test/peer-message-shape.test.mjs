@@ -29,8 +29,9 @@ const sync = message => ({
 });
 
 const message = (subject, body) => ({
-  messageId: "message_abc", fromSessionId: "session_peer", type: "note",
-  subject, body,
+  messageId: "message_abc", threadId: "message_thread",
+  fromParticipantId: "mcp_peer", fromSessionId: "session_peer",
+  toParticipantIds: ["reader"], kind: "note", obligation: "none", subject, body,
 });
 
 const blockOf = text => {
@@ -103,11 +104,14 @@ test("a newline in the subject does not push peer text to the frame's column", (
   assert.match(subject, /forged/, "the rest of the subject was dropped rather than folded");
 });
 
-test("the header still names the id, the sender and the type", () => {
+test("the frame names every stable field needed to act on the message", () => {
   const projected = projectContext(sync(message("s", "b")), { budgetBytes: 4000 });
-  const header = blockOf(projected)[0];
+  const block = blockOf(projected);
 
-  assert.match(header, /message_abc/);
-  assert.match(header, /session_peer/);
-  assert.match(header, /untrusted peer message/);
+  assert.match(block.join("\n"), /kind: note/);
+  assert.match(block.join("\n"), /threadId: message_thread/);
+  assert.match(block.join("\n"), /messageId: message_abc/);
+  assert.match(block.join("\n"), /sender: mcp_peer \(session session_peer\)/);
+  assert.match(block.join("\n"), /obligation: none/);
+  assert.match(block[0], /untrusted peer message/);
 });

@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { randomBytes } from "node:crypto";
 import { execFile } from "node:child_process";
 import { mkdtemp, readFile, readdir, realpath, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -6,17 +7,23 @@ import path from "node:path";
 import test from "node:test";
 import { promisify } from "node:util";
 
+import { loadSessionBinding } from "@agents-can-communicate/adapter-sdk";
+import { runtimePaths } from "@agents-can-communicate/cli";
+import { createCoordinationService } from "@agents-can-communicate/core";
+import { createId } from "@agents-can-communicate/protocol";
+import { openFilesystemStore } from "@agents-can-communicate/storage-filesystem";
+
 const run = promisify(execFile);
 const repo = path.resolve(import.meta.dirname, "..", "..");
-const acc = path.join(repo, "bin", "acc.mjs");
 const hook = path.join(repo, "bin", "acc-hook.mjs");
+const WORKSPACE = "workspace_turn_budget";
 
 /**
  * A turn that reports something the reader cannot reach.
  *
  * The whole point of the injected turn is that an agent acts on it without being
- * asked twice. Two things in it could not be acted on. `[direct_request] The
- * physics review` named no message, and `acc ack` takes one - so an agent told
+ * asked twice. Two things in it could not be acted on. `[reply_required] The
+ * physics review` named no message, and acknowledgement takes one - so an agent told
  * that something was addressed to it could not answer. And `+1 not shown, over
  * budget` said something had been withheld while nothing anywhere, skills and
  * documentation included, said how to see it.
@@ -32,13 +39,11 @@ async function workspace(t, { budgetBytes }) {
   await run("mkdir", ["-p", root]);
   const env = { ...process.env, ACC_DATA_HOME: path.join(base, "data"),
     GIT_DIR: "", GIT_WORK_TREE: "" };
-  if (budgetBytes !== undefined) {
-    await writeFile(path.join(root, "acc.workspace.json"), `${JSON.stringify({
-      schemaVersion: 1, workspaceId: "workspace_turn_budget", displayName: "turn",
-      roots: ["."], policy: { claimMode: "advisory", contextBudgetBytes: budgetBytes },
-      requiredAdapters: [],
-    }, null, 2)}\n`);
-  }
+  await writeFile(path.join(root, "acc.workspace.json"), `${JSON.stringify({
+    schemaVersion: 1, workspaceId: WORKSPACE, displayName: "turn",
+    roots: ["."], policy: { claimMode: "advisory",
+      contextBudgetBytes: budgetBytes ?? 6_000 }, requiredAdapters: [],
+  }, null, 2)}\n`);
   for (const [participant, harness] of [["sender", "codex"], ["reader", "claude_code"]]) {
     const child = run(process.execPath, [hook, harness],
       { env: { ...env, ACC_PARTICIPANT: participant } });
@@ -46,8 +51,24 @@ async function workspace(t, { budgetBytes }) {
       session_id: participant, cwd: root, source: "startup" }));
     await child;
   }
-  const cli = (args, who) => run(process.execPath, [acc, ...args, "--cwd", root],
-    { env: { ...env, CLAUDE_CODE_SESSION_ID: who } });
+  const paths = runtimePaths({ dataHome: env.ACC_DATA_HOME, workspaceId: WORKSPACE,
+    workspaceRoots: [root] });
+  const clock = { now: () => new Date().toISOString() };
+  const ids = { next: kind => createId(kind, randomBytes) };
+  const store = await openFilesystemStore({ root: paths.root, clock, ids,
+    workspaceId: WORKSPACE });
+  const service = createCoordinationService({ store, clock, ids });
+  const sender = await loadSessionBinding({ runtimeDir: paths.root,
+    harnessSessionId: "sender" });
+  const reader = await loadSessionBinding({ runtimeDir: paths.root,
+    harnessSessionId: "reader" });
+  let sequence = 0;
+  const send = ({ subject, body, requiresAck = false }) => service.sendMessage({
+    sessionId: sender.accSessionId, generation: sender.generation,
+    clientMessageId: `client_turn_${sequence += 1}`, toParticipantIds: ["reader"],
+    kind: requiresAck ? "question" : "note",
+    obligation: requiresAck ? "reply" : "none", subject, body,
+  });
   const turn = async () => {
     const child = run(process.execPath, [hook, "claude_code"],
       { env: { ...env, ACC_PARTICIPANT: "reader" } });
@@ -57,28 +78,32 @@ async function workspace(t, { budgetBytes }) {
     if (stdout.trim() === "") return "";
     return JSON.parse(stdout).hookSpecificOutput.additionalContext;
   };
-  return { root, env, cli, turn };
+  const inbox = messageId => service.readInbox({ sessionId: reader.accSessionId,
+    generation: reader.generation, ...(messageId === undefined ? {} : { messageId }) });
+  const acknowledge = messageId => service.acknowledgeMessage({
+    sessionId: reader.accSessionId, generation: reader.generation, messageId });
+  return { root, env, send, turn, inbox, acknowledge };
 }
 
 test("a message addressed to you arrives with the id that answers it", async t => {
   const place = await workspace(t, {});
-  await place.cli(["message", "--to", "reader", "--subject", "The physics review",
-    "--body", "Which way should the hull clamp?", "--requires-ack"], "sender");
+  await place.send({ subject: "The physics review",
+    body: "Which way should the hull clamp?", requiresAck: true });
 
   const shown = await place.turn();
 
-  const [, messageId] = /\[direct_request\] (message_\S+)/.exec(shown) ?? [];
+  const [, messageId] = /\[reply_required\] (message_\S+)/.exec(shown) ?? [];
   assert.equal(typeof messageId, "string",
     `the reader cannot name what was addressed to it:\n${shown}`);
   // The id is worth showing only if it is the one the command takes.
-  const { stdout } = await place.cli(["ack", "--message", messageId], "reader");
-  assert.match(stdout, /acknowledged/);
+  const receipt = await place.acknowledge(messageId);
+  assert.equal(receipt.state, "acknowledged");
 });
 
 test("what the budget withheld comes with the way to read it", async t => {
   const place = await workspace(t, { budgetBytes: 200 });
-  await place.cli(["message", "--to", "reader", "--subject", "The physics review",
-    "--body", "Here is a long explanation of the sinking tank. ".repeat(8)], "sender");
+  await place.send({ subject: "The physics review",
+    body: "Here is a long explanation of the sinking tank. ".repeat(8) });
 
   const shown = await place.turn();
 
@@ -91,8 +116,7 @@ test("what the budget withheld comes with the way to read it", async t => {
 test("the note always fits, however tight the budget", async t => {
   const place = await workspace(t, { budgetBytes: 200 });
   for (let index = 0; index < 6; index += 1) {
-    await place.cli(["message", "--to", "reader", "--subject", `Note ${index}`,
-      "--body", "x".repeat(400)], "sender");
+    await place.send({ subject: `Note ${index}`, body: "x".repeat(400) });
   }
 
   const shown = await place.turn();
@@ -104,14 +128,13 @@ test("the note always fits, however tight the budget", async t => {
 
 test("what the turn withheld is still there to be read", async t => {
   const place = await workspace(t, { budgetBytes: 200 });
-  await place.cli(["message", "--to", "reader", "--subject", "The physics review",
-    "--body", "Here is a long explanation of the sinking tank. ".repeat(8)], "sender");
+  await place.send({ subject: "The physics review",
+    body: "Here is a long explanation of the sinking tank. ".repeat(8) });
   await place.turn();
 
   // Withheld, not delivered: a receipt that advanced here would tell the sender
   // it landed when the reader never saw a word of it.
-  const { stdout } = await place.cli(["inbox", "--json"], "reader");
-  const payload = JSON.parse(stdout).data;
+  const payload = await place.inbox();
   const subjects = payload.map(item => item.message.subject);
   assert.deepEqual(subjects, ["The physics review"]);
 });
