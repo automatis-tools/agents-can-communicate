@@ -141,6 +141,20 @@ test("opening a v0.1 store refuses it before recovery and preserves every byte",
   assert.deepEqual(await snapshotTree(root), before);
 });
 
+test("opening the previous active-log format refuses it before mutation", async t => {
+  const root = await tempRoot(t);
+  await mkdir(path.join(root, "journal"));
+  await writeFile(path.join(root, "protocol.json"), `${JSON.stringify({ storeVersion: 5,
+    workspaceId: WORKSPACE, initialisedAt: NOW }, null, 2)}\n`);
+  await writeFile(path.join(root, "journal", "active.log"), "retained format-5 authority\n");
+  const before = await snapshotTree(root);
+
+  await assert.rejects(open(root),
+    error => error.code === EXIT.DATA && /store version/.test(error.message));
+
+  assert.deepEqual(await snapshotTree(root), before);
+});
+
 for (const [name, publicationPath] of [
   ["absolute", sentinel => sentinel],
   ["traversal", (sentinel, root) => path.relative(root, sentinel)],

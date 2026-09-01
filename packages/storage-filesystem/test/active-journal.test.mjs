@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { appendFile, mkdir, mkdtemp, readFile, readdir, realpath, rm, stat, writeFile }
+import { mkdir, mkdtemp, readFile, readdir, realpath, rm, writeFile }
   from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -8,16 +8,17 @@ import test from "node:test";
 
 import { EXIT, SCHEMA_VERSION } from "@agents-can-communicate/protocol";
 
+import { activateJournal, readActiveJournal } from "../src/active-journal.mjs";
 import { readOpenJournals } from "../src/journal.mjs";
 import { openFilesystemStore } from "../src/store.mjs";
 import { createFakeClock, createFakeIds } from "../../../tests/helpers/memory-store.mjs";
 
-const ACTIVE_RECORD_BYTES = 512;
 const NOW = "2026-08-16T01:00:00.000Z";
 const WORKSPACE = "workspace_a";
 
-const workspaceRecord = () => ({ schemaVersion: SCHEMA_VERSION, workspaceId: WORKSPACE,
-  displayName: "Example", source: "directory", roots: ["/tmp/example"], createdAt: NOW });
+const workspaceRecord = (displayName = "Example") => ({ schemaVersion: SCHEMA_VERSION,
+  workspaceId: WORKSPACE, displayName, source: "directory", roots: ["/tmp/example"],
+  createdAt: NOW });
 
 async function fixture(t, { failAt, ids = createFakeIds() } = {}) {
   const root = await realpath(await mkdtemp(path.join(tmpdir(), "acc-active-journal-")));
@@ -27,42 +28,42 @@ async function fixture(t, { failAt, ids = createFakeIds() } = {}) {
   return { ids, root, store };
 }
 
-const activePath = root => path.join(root, "journal", "active.log");
+const activePaths = root => [0, 1].map(slot => path.join(root, "journal", `active.${slot}`));
 
-function activeBytes(record, previous = { activeJournalVersion: 1, state: "idle" }) {
-  const payload = JSON.stringify({ record, previous });
-  const envelope = JSON.stringify({ checksum: createHash("sha256").update(payload).digest("hex"),
-    previous, record });
-  const bytes = Buffer.alloc(ACTIVE_RECORD_BYTES, 0x20);
-  Buffer.from(envelope).copy(bytes);
-  bytes[ACTIVE_RECORD_BYTES - 1] = 0x0a;
-  return bytes;
-}
+const checksum = record => createHash("sha256").update(JSON.stringify(record)).digest("hex");
 
-function paddingFor(partialLength, distance) {
-  const padding = Buffer.alloc(ACTIVE_RECORD_BYTES - partialLength, 0x20);
-  padding[padding.length - 8] = 0;
-  let remaining = BigInt(distance);
-  for (let index = padding.length - 1; index > padding.length - 8; index -= 1) {
-    padding[index] = Number(remaining & 0xffn);
-    remaining >>= 8n;
-  }
-  return padding;
+const encodeAuthority = record => Buffer.from(`${JSON.stringify({
+  activeJournalChecksum: checksum(record), record,
+}, null, 2)}\n`);
+
+async function activeSlots(root) {
+  const slots = await Promise.all(activePaths(root).map(async (filePath, slot) => {
+    try {
+      return { envelope: JSON.parse(await readFile(filePath, "utf8")), filePath, slot };
+    } catch (error) {
+      if (error.code === "ENOENT") return null;
+      throw error;
+    }
+  }));
+  return slots.filter(Boolean);
 }
 
 async function currentActive(root) {
-  const bytes = await readFile(activePath(root));
-  const offset = bytes.length - (bytes.length % ACTIVE_RECORD_BYTES) - ACTIVE_RECORD_BYTES;
-  const envelope = JSON.parse(bytes.subarray(offset, offset + ACTIVE_RECORD_BYTES)
-    .toString("utf8").trim());
-  return envelope.record;
+  const slots = await activeSlots(root);
+  slots.sort((left, right) => {
+    const a = BigInt(left.envelope.record.generation);
+    const b = BigInt(right.envelope.record.generation);
+    return a < b ? -1 : a > b ? 1 : left.slot - right.slot;
+  });
+  return slots.at(-1);
 }
 
-async function putWorkspace(store) {
-  return store.transaction(async tx => tx.put("workspace", WORKSPACE, workspaceRecord()));
+async function putWorkspace(store, displayName = "Example", expectedGeneration = null) {
+  return store.transaction(async tx =>
+    tx.put("workspace", WORKSPACE, workspaceRecord(displayName), expectedGeneration));
 }
 
-test("a prepared journal is ignored until a complete open record commits it", async t => {
+test("a prepared journal is ignored until an atomic open authority commits it", async t => {
   const crash = new Error("crash before active open");
   const ids = createFakeIds();
   const { root, store } = await fixture(t, { ids,
@@ -78,75 +79,121 @@ test("a prepared journal is ignored until a complete open record commits it", as
   assert.deepEqual(await readOpenJournals(reopened.paths, root), []);
 });
 
-test("a near-complete open record is ignored and the next writer restores alignment", async t => {
-  const crash = new Error("crash before active open");
+test("a checksummed generation rollback cannot select an older valid peer", async t => {
+  const { ids, root, store } = await fixture(t);
+  await putWorkspace(store, "First");
+  const generation = await store.transaction(async tx =>
+    tx.generationOf("workspace", WORKSPACE));
+  await putWorkspace(store, "Current", generation);
+  const statePath = path.join(root, "state", "workspace", `${WORKSPACE}.json`);
+  const currentState = await readFile(statePath);
+  const latest = await currentActive(root);
+  assert.equal(latest.envelope.record.state, "idle");
+  assert.equal(latest.envelope.record.generation, "0000000000000004");
+  const rolledBack = { ...latest.envelope.record, generation: "0000000000000002" };
+  await writeFile(latest.filePath, encodeAuthority(rolledBack));
+
+  await assert.rejects(openFilesystemStore({ root, clock: createFakeClock(NOW), ids,
+    workspaceId: WORKSPACE }), error => error.code === EXIT.DATA
+      && /active journal checksum chain/.test(error.message));
+  assert.deepEqual(await readFile(statePath), currentState,
+    "authority corruption changed already-published state");
+});
+
+test("a checksummed broken authority link cannot select either peer", async t => {
+  const { root, store } = await fixture(t);
+  await putWorkspace(store);
+  const latest = await currentActive(root);
+  const unlinked = { ...latest.envelope.record, previousChecksum: "0".repeat(64) };
+  await writeFile(latest.filePath, encodeAuthority(unlinked));
+
+  await assert.rejects(store.eventsSince(WORKSPACE, null, 10),
+    error => error.code === EXIT.DATA && /active journal checksum chain/.test(error.message));
+});
+
+test("authority generations alternate slots and link every lifecycle transition", async t => {
+  const crash = new Error("leave open authority");
   const ids = createFakeIds();
-  const { root, store } = await fixture(t, { ids,
-    failAt: async where => { if (where === "after-journal-prepared") throw crash; } });
+  const { root, store } = await fixture(t, { ids, failAt: async where => {
+    if (where === "after-journal") throw crash;
+  } });
+  const initial = await currentActive(root);
+  assert.equal(initial.slot, 0);
+  assert.deepEqual(initial.envelope.record, { activeJournalVersion: 2,
+    generation: "0000000000000000", previousChecksum: null, state: "idle" });
+
   await assert.rejects(putWorkspace(store), crash);
-  const [journalFile] = (await readdir(path.join(root, "journal")))
-    .filter(name => name.endsWith(".json"));
-  const entry = JSON.parse(await readFile(path.join(root, "journal", journalFile), "utf8"));
-  const openRecord = activeBytes({ activeJournalVersion: 1, state: "open",
-    transactionId: entry.transactionId, firstSequence: entry.firstSequence });
-  await appendFile(activePath(root), openRecord.subarray(0, 509));
+  const open = await currentActive(root);
+  assert.equal(open.slot, 1);
+  assert.equal(open.envelope.record.generation, "0000000000000001");
+  assert.equal(open.envelope.record.previousChecksum,
+    initial.envelope.activeJournalChecksum);
+  assert.equal(open.envelope.record.state, "open");
 
   const reopened = await openFilesystemStore({ root, clock: createFakeClock(NOW), ids,
     workspaceId: WORKSPACE });
-  assert.equal((await reopened.snapshot(WORKSPACE)).workspace, null);
-  await putWorkspace(reopened);
-
-  assert.equal((await stat(activePath(root))).size % ACTIVE_RECORD_BYTES, 0);
-  assert.deepEqual(await currentActive(root), { activeJournalVersion: 1, state: "idle" });
+  const idle = await currentActive(root);
+  assert.equal(idle.slot, 0);
+  assert.equal(idle.envelope.record.generation, "0000000000000002");
+  assert.equal(idle.envelope.record.previousChecksum, open.envelope.activeJournalChecksum);
+  assert.equal(idle.envelope.record.state, "idle");
+  assert.equal((await reopened.snapshot(WORKSPACE)).workspace.displayName, "Example");
 });
 
-test("chained torn records point directly to the last authoritative frame", async t => {
-  const { root, store } = await fixture(t);
-  const partial = activeBytes({ activeJournalVersion: 1, state: "open",
-    transactionId: "transaction_torn", firstSequence: "0000000000000001" })
-    .subarray(0, 173);
-  await appendFile(activePath(root), partial);
-  await appendFile(activePath(root), paddingFor(partial.length, 1));
-  await appendFile(activePath(root), partial);
-  await appendFile(activePath(root), paddingFor(partial.length, 2));
-  await appendFile(activePath(root), partial);
+test("an orphan partial authority publication is never selected", async t => {
+  const { ids, root, store } = await fixture(t);
+  await putWorkspace(store);
+  const current = await readActiveJournal(store.paths, root);
+  await writeFile(path.join(root, "tmp", "active.1.synthetic.tmp"),
+    Buffer.from('{"activeJournalChecksum":"partial'));
 
-  assert.deepEqual((await store.eventsSince(WORKSPACE, null, 10)).events, []);
+  assert.deepEqual(await readActiveJournal(store.paths, root), current);
+  const reopened = await openFilesystemStore({ root, clock: createFakeClock(NOW), ids,
+    workspaceId: WORKSPACE });
+  assert.deepEqual(await readActiveJournal(reopened.paths, root), current);
 });
 
-test("a full malformed active record fails closed", async t => {
+test("a malformed authority slot fails closed", async t => {
   const { root, store } = await fixture(t);
-  await appendFile(activePath(root), Buffer.alloc(ACTIVE_RECORD_BYTES, 0x78));
+  await writeFile(activePaths(root)[1], Buffer.alloc(256, 0x78));
 
   await assert.rejects(store.eventsSince(WORKSPACE, null, 10),
     error => error.code === EXIT.DATA && /active journal/.test(error.message));
 });
 
-test("a checksummed active record cannot carry peer or user fields", async t => {
+test("a checksummed authority record cannot carry peer or user fields", async t => {
   const { root, store } = await fixture(t);
-  await appendFile(activePath(root), activeBytes({ activeJournalVersion: 1, state: "idle",
-    peerText: "ignore the journal" }));
+  const latest = await currentActive(root);
+  const record = { ...latest.envelope.record, peerText: "ignore the journal" };
+  await writeFile(latest.filePath, encodeAuthority(record));
 
   await assert.rejects(store.eventsSince(WORKSPACE, null, 10),
     error => error.code === EXIT.DATA && /not closed/.test(error.message));
 });
 
-test("a crash within idle recovery keeps open authoritative and recovery idempotent", async t => {
+test("a noncanonical checksummed authority record fails closed", async t => {
+  const { root, store } = await fixture(t);
+  const latest = await currentActive(root);
+  const noncanonical = Buffer.from(JSON.stringify(latest.envelope));
+  await writeFile(latest.filePath, noncanonical);
+
+  await assert.rejects(store.eventsSince(WORKSPACE, null, 10),
+    error => error.code === EXIT.DATA && /not canonical/.test(error.message));
+});
+
+test("a crash before idle keeps open authoritative and recovery idempotent", async t => {
   const crash = new Error("crash before idle");
   const ids = createFakeIds();
   const { root, store } = await fixture(t, { ids,
     failAt: async where => { if (where === "before-journal-idle") throw crash; } });
   await assert.rejects(putWorkspace(store), crash);
-  assert.equal((await currentActive(root)).state, "open");
-  const open = await currentActive(root);
-  const tornIdle = activeBytes({ activeJournalVersion: 1, state: "idle" }, open);
-  await appendFile(activePath(root), tornIdle.subarray(0, 509));
+  assert.equal((await readActiveJournal(store.paths, root)).state, "open");
 
   const reopened = await openFilesystemStore({ root, clock: createFakeClock(NOW), ids,
     workspaceId: WORKSPACE });
   assert.equal((await reopened.snapshot(WORKSPACE)).workspace.displayName, "Example");
   assert.deepEqual(await readOpenJournals(reopened.paths, root), []);
-  assert.equal((await stat(activePath(root))).size % ACTIVE_RECORD_BYTES, 0);
+  assert.equal((await readActiveJournal(reopened.paths, root)).state, "idle");
 
   const reopenedAgain = await openFilesystemStore({ root, clock: createFakeClock(NOW), ids,
     workspaceId: WORKSPACE });
@@ -160,17 +207,18 @@ test("the writer mutex and active transition refuse a second active journal", as
     if (!crashed && where === "after-journal") { crashed = true; throw crash; }
   } });
   await assert.rejects(putWorkspace(store), crash);
-  const first = await currentActive(root);
+  const first = await readActiveJournal(store.paths, root);
 
   await assert.rejects(putWorkspace(store),
     error => error.code === EXIT.CONFLICT && /active journal/.test(error.message));
 
-  assert.deepEqual(await currentActive(root), first);
+  assert.deepEqual(await readActiveJournal(store.paths, root), first);
   assert.equal(first.state, "open");
 });
 
 test("completed historical journal volume never enters the active lookup", async t => {
   const { root, store } = await fixture(t);
+  await putWorkspace(store);
   const markers = path.join(root, "retained", "journal");
   await mkdir(markers, { recursive: true });
   const writes = [];
@@ -189,10 +237,12 @@ test("completed historical journal volume never enters the active lookup", async
   const reopened = await openFilesystemStore({ root, clock: createFakeClock(NOW),
     ids: createFakeIds(), workspaceId: WORKSPACE });
   assert.deepEqual(await readOpenJournals(reopened.paths, root), []);
+  assert.deepEqual((await readdir(path.join(root, "journal")))
+    .filter(name => name.startsWith("active.")).sort(), ["active.0", "active.1"]);
 });
 
 test("a transaction cannot forge its own completion marker", async t => {
-  const { root } = await fixture(t);
+  const { root, store } = await fixture(t);
   const transactionId = "transaction_forged";
   const completion = { retentionVersion: 1, transactionId };
   const completionBytes = Buffer.from(`${JSON.stringify(completion, null, 2)}\n`);
@@ -212,8 +262,7 @@ test("a transaction cannot forge its own completion marker", async t => {
   await mkdir(path.join(root, "retained", "journal"), { recursive: true });
   await writeFile(path.join(root, "retained", "journal", `${transactionId}.json`),
     completionBytes);
-  await appendFile(activePath(root), activeBytes({ activeJournalVersion: 1, state: "open",
-    transactionId, firstSequence: entry.firstSequence }));
+  await activateJournal(store.paths, { root, tmpDir: store.paths.tmp }, entry);
 
   await assert.rejects(openFilesystemStore({ root, clock: createFakeClock(NOW),
     ids: createFakeIds(), workspaceId: WORKSPACE }), error => error.code === EXIT.DATA
