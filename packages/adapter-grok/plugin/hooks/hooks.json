@@ -1,0 +1,61 @@
+{
+  "description": "Attach this session to the local coordination plane.",
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "acc-hook sessionStart",
+            "timeout": 15
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "acc-hook beforeTurn",
+            "timeout": 30
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "write|search_replace|run_terminal_command",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "acc-hook guard",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "acc-hook finish",
+            "timeout": 60
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "acc-hook sessionEnd",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}

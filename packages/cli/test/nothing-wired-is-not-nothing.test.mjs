@@ -4,9 +4,9 @@ import test from "node:test";
 import { describeOutcome } from "../src/install-command.mjs";
 
 /**
- * A machine none of the four adapters fit.
+ * A machine none of the adapters fit.
  *
- * Every end-to-end run so far was done on a machine carrying all four clients,
+ * Every end-to-end run so far was done on a machine carrying every client,
  * so this case was never seen. On a machine with only one - or none - `acc
  * install` says:
  *
@@ -14,6 +14,7 @@ import { describeOutcome } from "../src/install-command.mjs";
  *     skip claude_code: Claude Code is not installed on this machine; …
  *     skip codex: Codex CLI is not installed on this machine; …
  *     skip gemini_cli: …
+ *     skip grok: …
  *     skip kimi: …
  *
  * and exits 0. Every line of that is true, and together they read as "ACC has
@@ -29,7 +30,7 @@ const skip = id => ({ adapterId: id, reason: `${id} is not installed on this mac
 
 test("when nothing was wired, the reader is told what still works", () => {
   const text = describeOutcome({ action: "install", acted: 0,
-    skipped: ["claude_code", "codex", "gemini_cli", "kimi"].map(skip) });
+    skipped: ["claude_code", "codex", "gemini_cli", "grok", "kimi"].map(skip) });
 
   assert.match(text, /installed 0 adapter\(s\)/);
   assert.match(text, /acc-mcp/,
@@ -42,7 +43,7 @@ test("wiring even one client makes that advice noise", () => {
   // stops being read.
   const text = describeOutcome({ action: "install", acted: 1,
     operations: [{ adapterId: "codex", applied: true, changes: [], removed: [] }],
-    skipped: ["claude_code", "gemini_cli", "kimi"].map(skip) });
+    skipped: ["claude_code", "gemini_cli", "grok", "kimi"].map(skip) });
 
   assert.doesNotMatch(text, /acc-mcp/);
 });
@@ -57,9 +58,9 @@ test("an uninstall that removed nothing is not an invitation", () => {
 
 test("the skips are still all there, and still say their own remedy", () => {
   const text = describeOutcome({ action: "install", acted: 0,
-    skipped: ["claude_code", "codex", "gemini_cli", "kimi"].map(skip) });
+    skipped: ["claude_code", "codex", "gemini_cli", "grok", "kimi"].map(skip) });
 
-  for (const id of ["claude_code", "codex", "gemini_cli", "kimi"]) {
+  for (const id of ["claude_code", "codex", "gemini_cli", "grok", "kimi"]) {
     assert.match(text, new RegExp(`skip ${id}:`));
   }
 });

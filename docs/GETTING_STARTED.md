@@ -24,7 +24,7 @@ session" is almost always a client that was already running.
 
 ## 2. Open a session — normally
 
-No ACC command. Start Codex, Claude Code, Gemini, or Kimi the way you always do; a hook
+No ACC command. Start Codex, Claude Code, Gemini, Grok, or Kimi the way you always do; a hook
 attaches the session. It keeps its own client, permissions, checkout, and human
 instructions — ACC just adds a shared view around it.
 
@@ -98,8 +98,9 @@ Removes only what ACC wrote, and only while it still matches. Anything you edite
 
 ## Native vs MCP
 
-Native adapters (Codex, Claude Code, Gemini, Kimi) attach by themselves, guard writes, and
-inject peer context. A generic **MCP** client can read and post durable coordination, but
+Native adapters (Codex, Claude Code, Gemini, Grok, Kimi) attach by themselves. Guarded
+writes and injected peer context depend on the client — see [Capabilities](CAPABILITIES.md).
+A generic **MCP** client can read and post durable coordination, but
 nothing intercepts its writes — so it shows as `advisory`, and one in the room makes every
 claim advisory while it's connected. That downgrade is deliberate and reported, not hidden;
 [MCP](MCP.md) covers it in full.

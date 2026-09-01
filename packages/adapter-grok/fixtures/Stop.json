@@ -1,0 +1,12 @@
+{
+  "hookEventName": "stop",
+  "sessionId": "01a05a0b-44e4-7601-acdc-fe81d7526981",
+  "cwd": "/tmp/example-workspace",
+  "workspaceRoot": "/tmp/example-workspace",
+  "permissionMode": "default",
+  "promptId": "1acbd891-0326-41c8-bb02-596f5b7c204d",
+  "stopHookActive": false,
+  "reason": "end_turn",
+  "lastAssistantMessage": "<redacted: last assistant message>",
+  "timestamp": "2026-08-31T22:59:38.000Z"
+}

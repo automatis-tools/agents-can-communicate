@@ -1,0 +1,14 @@
+{
+  "hookEventName": "pre_tool_use",
+  "sessionId": "01a05a0b-44e4-7601-acdc-fe81d7526981",
+  "cwd": "/tmp/example-workspace",
+  "workspaceRoot": "/tmp/example-workspace",
+  "permissionMode": "default",
+  "toolName": "search_replace",
+  "toolInput": {
+    "file_path": "/tmp/example-workspace/notes.txt",
+    "old_string": "<redacted: old_string>",
+    "new_string": "<redacted: new_string>"
+  },
+  "timestamp": "2026-08-31T22:59:23.000Z"
+}
