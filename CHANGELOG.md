@@ -14,9 +14,9 @@ targeted inbox/reply path recovers and closes the exact message that matters.
 
 | | |
 |---|---|
-| Built from | `PENDING` |
-| Tarball | `PENDING` |
-| sha256 | `PENDING` |
+| Built from | `3ab46be` |
+| Tarball | `agents-can-communicate-0.1.18.tgz`, 159 KB, 122 entries |
+| sha256 | `5ede54cd894f41adc24089638356896e8284b95e4170ad6beede4753b88f386b` |
 | Node | 24 (current production LTS) |
 | Verified on | macOS 26.6.2 (darwin 25.6.0, arm64) and Linux in CI |
 | Not supported | Windows - untested rather than known-broken |
