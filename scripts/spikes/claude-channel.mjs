@@ -1,36 +1,51 @@
 #!/usr/bin/env node
 
-import { chmodSync, existsSync, unlinkSync } from "node:fs";
+import {
+  chmodSync,
+  existsSync,
+  realpathSync,
+  statSync,
+  unlinkSync,
+} from "node:fs";
 import net from "node:net";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const MAX_ENVELOPE_BYTES = 64 * 1024;
-const repoRoot = fileURLToPath(new URL("../..", import.meta.url));
+const repoRoot = realpathSync(fileURLToPath(new URL("../..", import.meta.url)));
 const socketPath = process.env.ACC_CHANNEL_SPIKE_SOCKET;
 
 if (!socketPath || !path.isAbsolute(socketPath)) fail("ACC_CHANNEL_SPIKE_SOCKET is absolute");
-const resolvedSocket = path.resolve(socketPath);
-if (resolvedSocket === repoRoot || resolvedSocket.startsWith(`${repoRoot}${path.sep}`)) {
+const lexicalSocket = path.resolve(socketPath);
+const socketParent = canonicalParent(path.dirname(lexicalSocket));
+if (socketParent === repoRoot || socketParent.startsWith(`${repoRoot}${path.sep}`)) {
   fail("ACC_CHANNEL_SPIKE_SOCKET must be outside the repository");
 }
+const parentStat = statSync(socketParent);
+if (!parentStat.isDirectory() || parentStat.uid !== process.getuid()
+  || (parentStat.mode & 0o077) !== 0) {
+  fail("ACC_CHANNEL_SPIKE_SOCKET parent must be a private user-owned directory");
+}
+const resolvedSocket = path.join(socketParent, path.basename(lexicalSocket));
 if (existsSync(resolvedSocket)) fail("ACC_CHANNEL_SPIKE_SOCKET already exists");
 
 const connections = new Map();
 let initialized = false;
 let pendingEnvelope = null;
+let acceptedSocket = null;
+let consumed = false;
 
 const socketServer = net.createServer((socket) => {
-  if (connections.size > 0 || pendingEnvelope !== null) {
+  if (acceptedSocket !== null || consumed) {
     socket.end(`${JSON.stringify({ error: "capture accepts one envelope" })}\n`);
     return;
   }
+  acceptedSocket = socket;
 
   let bytes = 0;
   let buffer = "";
-  let received = false;
   socket.on("data", (chunk) => {
-    if (received) {
+    if (consumed) {
       socket.end(`${JSON.stringify({ error: "capture accepts one envelope" })}\n`);
       return;
     }
@@ -42,8 +57,13 @@ const socketServer = net.createServer((socket) => {
     buffer += chunk.toString("utf8");
     const newline = buffer.indexOf("\n");
     if (newline === -1) return;
+    consumed = true;
     const line = buffer.slice(0, newline);
     buffer = buffer.slice(newline + 1);
+    if (buffer.trim() !== "") {
+      socket.end(`${JSON.stringify({ error: "capture accepts one envelope" })}\n`);
+      return;
+    }
     let envelope;
     try {
       envelope = JSON.parse(line);
@@ -53,11 +73,11 @@ const socketServer = net.createServer((socket) => {
       return;
     }
     connections.set(envelope.messageId, socket);
-    received = true;
     pendingEnvelope = envelope;
     offerEnvelope();
   });
   socket.on("close", () => {
+    if (acceptedSocket === socket) acceptedSocket = null;
     for (const [messageId, connection] of connections) {
       if (connection === socket) connections.delete(messageId);
     }
@@ -212,4 +232,12 @@ function cleanup() {
 function fail(message) {
   process.stderr.write(`${message}\n`);
   process.exit(2);
+}
+
+function canonicalParent(parent) {
+  try {
+    return realpathSync(parent);
+  } catch {
+    fail("ACC_CHANNEL_SPIKE_SOCKET parent must exist");
+  }
 }

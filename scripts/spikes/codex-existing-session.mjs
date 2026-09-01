@@ -41,7 +41,7 @@ async function captureExistingSession() {
       clientInfo: { name: "acc-native-boundary-spike", version: "0.0.0" },
       capabilities: { experimentalApi: true },
     });
-    if (!String(initialized.userAgent ?? "").includes(CERTIFIED_VERSION)) {
+    if (appServerVersion(initialized.userAgent) !== CERTIFIED_VERSION) {
       captureFail(version, "running app-server version did not match codex-cli 0.152.0");
       return;
     }
@@ -130,6 +130,10 @@ function captureFail(version, reason, branches = {}) {
 function readVersion(command) {
   const run = spawnSync(command, ["--version"], { encoding: "utf8" });
   return /codex-cli\s+(\S+)/.exec(run.stdout)?.[1] ?? "unavailable";
+}
+
+function appServerVersion(userAgent) {
+  return /^codex_app_server\/([^\s()]+)(?:\s|$)/.exec(String(userAgent ?? ""))?.[1] ?? null;
 }
 
 function parseArgs(args) {
