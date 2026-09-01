@@ -14,12 +14,16 @@ function makeService() {
   const clock = createFakeClock(NOW);
   const ids = createFakeIds();
   const store = createMemoryStore({ clock, ids, workspaceId: WORKSPACE });
-  return { store, clock, service: createCoordinationService({ store, clock, ids }) };
+  return { store, clock, ids,
+    service: createCoordinationService({ store, clock, ids }) };
 }
 
-const opening = participantId => ({ workspaceId: WORKSPACE, participantId,
-  displayName: participantId, harness: "test", heartbeatCadenceMs: 60_000 });
+const opening = (participantId, overrides = {}) => ({ workspaceId: WORKSPACE, participantId,
+  displayName: participantId, harness: "test", heartbeatCadenceMs: 60_000, ...overrides });
 const owner = session => ({ sessionId: session.sessionId, generation: session.generation });
+const MESSAGE_FIELDS = ["artifacts", "body", "clientMessageId", "fromParticipantId",
+  "fromSessionId", "handoff", "inReplyTo", "kind", "messageId", "obligation",
+  "schemaVersion", "sentAt", "subject", "threadId", "toParticipantIds", "workspaceId"];
 const direct = (session, overrides = {}) => ({ ...owner(session),
   clientMessageId: "client_direct", toParticipantIds: ["recipient"], kind: "decision",
   obligation: "acknowledge", subject: "Choose the seam", body: "Use the durable seam.",
@@ -120,7 +124,7 @@ test("finish atomically records an addressed handoff, releases claims, and close
   async () => {
     const { service, store } = makeService();
     const { sender } = await trio(service);
-    await service.acquireClaim({ ...owner(sender), resource: "file:src/**",
+    const claim = await service.acquireClaim({ ...owner(sender), resource: "file:src/**",
       reason: "editing" });
 
     const result = await service.finishSession({ ...owner(sender),
@@ -133,7 +137,9 @@ test("finish atomically records an addressed handoff, releases claims, and close
     assert.deepEqual(result.message.toParticipantIds, ["recipient"]);
     assert.deepEqual(result.message.handoff, { status: "partial", completed: ["threading"],
       remaining: ["router"], blockers: ["capture"], verification: [] });
-    assert.deepEqual(result.releasedClaims.map(claim => claim.resource), ["file:src/**"]);
+    assert.deepEqual(Object.keys(result.message).sort(), MESSAGE_FIELDS);
+    assert.deepEqual(result.releasedClaims, [{ claimId: claim.claimId,
+      resource: "file:src/**", mode: "exclusive" }]);
     assert.equal(result.session.state, "closed");
     const snapshot = await store.snapshot(WORKSPACE);
     assert.deepEqual(snapshot.claims, []);
@@ -156,9 +162,36 @@ test("finish without a successor creates a room handoff with no obligation", asy
     .map(receipt => receipt.recipientParticipantId).sort(), ["other", "recipient"]);
 });
 
+test("finish retry data is absent from every public read surface", async () => {
+  const { service } = makeService();
+  const { sender, recipient } = await trio(service);
+  const secretReason = "PRIVATE-RETRY-REASON";
+  await service.acquireClaim({ ...owner(sender), resource: "file:private-retry.mjs",
+    reason: secretReason });
+
+  const result = await service.finishSession({ ...owner(sender),
+    clientMessageId: "client_public_finish", toParticipantId: "recipient",
+    goal: "public handoff", completed: [], remaining: [], blockers: [],
+    verification: [], artifacts: [] });
+  const pending = await service.pendingMessages({ participantId: "recipient" });
+  const delta = await service.sync({ ...owner(recipient), scope: "delta" });
+  const full = await service.sync({ ...owner(recipient), scope: "full" });
+  const inbox = await service.readInbox({ ...owner(recipient),
+    messageId: result.message.messageId });
+  const status = await service.collectStatus({ participantId: "recipient", all: true });
+
+  for (const message of [result.message, pending[0], inbox[0].message,
+    full.snapshot.messages[0]]) {
+    assert.deepEqual(Object.keys(message).sort(), MESSAGE_FIELDS);
+  }
+  const exposed = JSON.stringify({ result, pending, delta, full, inbox, status });
+  assert.equal(exposed.includes('"extensions"'), false);
+  assert.equal(exposed.includes(secretReason), false);
+});
+
 test("addressed finish response-loss retry returns the prior outcome without new writes",
   async () => {
-    const { service, store, clock } = makeService();
+    const { service, store, clock, ids } = makeService();
     const { sender } = await trio(service);
     await service.acquireClaim({ ...owner(sender), resource: "file:src/**",
       reason: "editing" });
@@ -171,19 +204,20 @@ test("addressed finish response-loss retry returns the prior outcome without new
     const beforeEvents = await store.eventsSince(WORKSPACE, null, 100);
     clock.advance(5_000);
 
-    const retried = await service.finishSession(input);
+    const restarted = createCoordinationService({ store, clock, ids });
+    const retried = await restarted.finishSession(input);
     const afterSnapshot = await store.snapshot(WORKSPACE);
     const afterEvents = await store.eventsSince(WORKSPACE, null, 100);
 
     assert.deepEqual(retried, first);
     assert.deepEqual(afterSnapshot, beforeSnapshot);
     assert.equal(afterEvents.events.length, beforeEvents.events.length);
-    await assert.rejects(service.finishSession({ ...input, remaining: ["different"] }),
+    await assert.rejects(restarted.finishSession({ ...input, remaining: ["different"] }),
       error => error.code === EXIT.CONFLICT && /clientMessageId/.test(error.message));
   });
 
 test("room finish retry preserves its original audience snapshot", async () => {
-  const { service, store, clock } = makeService();
+  const { service, store, clock, ids } = makeService();
   const { sender } = await trio(service);
   const input = { ...owner(sender), clientMessageId: "client_room_finish_retry",
     goal: "leave durable context", completed: [], remaining: [], blockers: [],
@@ -193,7 +227,8 @@ test("room finish retry preserves its original audience snapshot", async () => {
   const before = await store.eventsSince(WORKSPACE, null, 100);
   clock.advance(5_000);
 
-  const retried = await service.finishSession(input);
+  const restarted = createCoordinationService({ store, clock, ids });
+  const retried = await restarted.finishSession(input);
   const after = await store.eventsSince(WORKSPACE, null, 100);
 
   assert.deepEqual(retried, first);
@@ -202,4 +237,18 @@ test("room finish retry preserves its original audience snapshot", async () => {
   assert.equal(snapshot.messages.length, 1);
   assert.deepEqual(snapshot.receipts.map(item => item.recipientParticipantId).sort(),
     ["other", "recipient"]);
+});
+
+test("a finish retry key cannot cross a replacement session generation", async () => {
+  const { service } = makeService();
+  const { sender } = await trio(service);
+  const input = { ...owner(sender), clientMessageId: "client_finish_generation",
+    toParticipantId: "recipient", goal: "generation bound", completed: [], remaining: [],
+    blockers: [], verification: [], artifacts: [] };
+  await service.finishSession(input);
+  const replacement = await service.openSession(opening("sender",
+    { sessionId: sender.sessionId }));
+
+  await assert.rejects(service.finishSession({ ...input, ...owner(replacement) }),
+    error => error.code === EXIT.CONFLICT && /generation/.test(error.message));
 });

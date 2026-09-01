@@ -3,6 +3,7 @@ import { isDeepStrictEqual } from "node:util";
 import { AccError, EXIT, SCHEMA_VERSION, validateRecord }
   from "@agents-can-communicate/protocol";
 
+import { projectReleasedClaim, reconstructFinishRetry } from "./finish-retries.mjs";
 import { ensureMaterialised } from "./materialisation.mjs";
 
 export const receiptId = (messageId, participantId) => `${messageId}--${participantId}`;
@@ -85,7 +86,7 @@ function threadFor(tx, messageId, inReplyTo) {
 }
 
 export function recordMessageInTransaction({ tx, session, input, now, messageId, ids,
-  action = "send a message", extensions }) {
+  action = "send a message" }) {
   assertCurrentSession(tx, session, action);
   const existing = existingMessage(tx, session, input);
   if (existing !== undefined) {
@@ -110,7 +111,6 @@ export function recordMessageInTransaction({ tx, session, input, now, messageId,
     artifacts: input.artifacts ?? [],
     handoff: input.handoff ?? null,
     sentAt: now,
-    ...(extensions === undefined ? {} : { extensions }),
   });
   const recipientParticipantIds = addressedRecipients(tx, message, session);
   tx.put("message", messageId, message);
@@ -190,7 +190,7 @@ export function createConversationService(ports, sessions) {
       handoff,
     };
     const now = clock.now();
-    return store.transaction(tx => {
+    const outcome = await store.transaction(tx => {
       const current = tx.get("session", session.sessionId);
       if (current === null || current.generation !== session.generation) {
         throw new AccError(EXIT.CONFLICT, "cannot finish from this session generation",
@@ -198,14 +198,12 @@ export function createConversationService(ports, sessions) {
       }
       const existing = existingMessage(tx, session, messageInput);
       if (existing !== undefined) {
-        const outcome = existing.extensions?.acc?.finish;
-        if (existing.fromSessionId !== session.sessionId
-          || outcome?.sessionGeneration !== session.generation) {
+        if (existing.fromSessionId !== session.sessionId) {
           throw new AccError(EXIT.CONFLICT,
             "clientMessageId belongs to a different finish generation",
             { clientMessageId: input.clientMessageId, messageId: existing.messageId });
         }
-        return { message: existing, releasedClaims: outcome.releasedClaims, session: current };
+        return { retry: true, message: existing, session: current };
       }
       if (current.state !== "open") {
         throw new AccError(EXIT.CONFLICT, "cannot finish from this session generation",
@@ -215,8 +213,7 @@ export function createConversationService(ports, sessions) {
         claim => claim.ownerSessionId === session.sessionId);
       const recorded = recordMessageInTransaction({ tx, session, now,
         messageId: ids.next("message"), ids, action: "finish",
-        input: messageInput, extensions: { acc: { finish: {
-          sessionGeneration: session.generation, releasedClaims } } } });
+        input: messageInput });
       for (const claim of releasedClaims) {
         tx.remove("claim", claim.claimId, tx.generationOf("claim", claim.claimId));
         tx.append({ schemaVersion: SCHEMA_VERSION, eventId: ids.next("event"),
@@ -231,8 +228,16 @@ export function createConversationService(ports, sessions) {
       tx.append({ schemaVersion: SCHEMA_VERSION, eventId: ids.next("event"),
         workspaceId: session.workspaceId, actorSessionId: session.sessionId,
         type: "session.closed", occurredAt: now, payload: {} });
-      return { message: recorded.message, releasedClaims, session: closed };
+      return { retry: false, message: recorded.message,
+        releasedClaims: releasedClaims.map(projectReleasedClaim), session: closed };
     }, { kinds: ["participant", "session", "claim", "message", "receipt"] });
+    if (!outcome.retry) {
+      return { message: outcome.message, releasedClaims: outcome.releasedClaims,
+        session: outcome.session };
+    }
+    const releasedClaims = await reconstructFinishRetry({ store,
+      workspaceId: session.workspaceId, session: outcome.session, message: outcome.message });
+    return { message: outcome.message, releasedClaims, session: outcome.session };
   }
 
   async function pendingMessages(input = {}) {

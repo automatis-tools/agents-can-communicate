@@ -31,7 +31,7 @@ const owner = session => ({ sessionId: session.sessionId, generation: session.ge
 test("finish commits one structured handoff with release and close", async t => {
   const { store, service, leaving } = await place(t);
   await service.acquireClaim({ ...owner(leaving), resource: "file:src/**",
-    reason: "porting" });
+    reason: "PRIVATE-PROCESS-RETRY-REASON" });
 
   const result = await service.finishSession({ ...owner(leaving),
     clientMessageId: "client_process_finish", toParticipantId: "successor",
@@ -47,6 +47,8 @@ test("finish commits one structured handoff with release and close", async t => 
   const snapshot = await store.snapshot(WORKSPACE);
   assert.deepEqual(snapshot.claims, []);
   assert.equal(snapshot.messages.length, 1);
+  assert.equal("extensions" in snapshot.messages[0], false);
+  assert.equal(JSON.stringify(snapshot).includes("PRIVATE-PROCESS-RETRY-REASON"), false);
   assert.equal(snapshot.receipts[0].recipientParticipantId, "successor");
 });
 
