@@ -223,7 +223,7 @@ const HANDLERS = {
     return {};
   },
 
-  async beforeTurn({ binding, context, adapter }) {
+  async beforeTurn({ binding, context, adapter, adapterId }) {
     if (binding === null) return {};
     // A turn is the clearest sign a session is alive. Never a reason to fail:
     // this runs in front of somebody's prompt.
@@ -239,13 +239,14 @@ const HANDLERS = {
       .find(participant => participant.sessionId === binding.accSessionId);
 
     // What peers have said to this participant and no model has been shown yet.
-    // Without this the projector's peer block never ran in production: an agent
-    // saw only the subject of a message through its attention line, and the
-    // `injected` delivery state was unreachable.
-    const messages = await context.service.pendingMessages({
+    // Without this the projector's peer block never runs in production: an
+    // agent sees only the obligation attention line, not the durable body that
+    // may be offered after the stdout transport succeeds.
+    const messages = (await context.service.pendingMessages({
       workspaceId: context.descriptor.id,
       participantId: mine?.participantId,
-      exceptSessionId: binding.accSessionId });
+      exceptSessionId: binding.accSessionId }))
+      .filter(message => message.toParticipantIds.length > 0);
 
     // Solo costs nothing: nothing to say means nothing printed, not a banner
     // announcing that nobody else is here. But something already said to you is
@@ -268,7 +269,7 @@ const HANDLERS = {
     // metadata may still inject text, but cannot advance a receipt from it.
     const projection = !tracksDelivery
       ? { text: await adapter.renderContext?.(projectionInput, projectionOptions) ?? "",
-        includedMessageIds: [], includedAttentionIds: [] }
+        offeredMessageIds: [], includedAttentionIds: [] }
       : await adapter.renderContextResult(projectionInput, projectionOptions);
     const degradation = !tracksDelivery && messages.length > 0
       ? `acc: ${messages.length} pending message(s) withheld because this adapter lacks `
@@ -283,47 +284,27 @@ const HANDLERS = {
       return degradation === null ? { stdout: "" } : { stdout: "", stderr: degradation };
     }
 
-    // Only what the model was actually shown is recorded as delivered. The
-    // budget can leave a message out, and a receipt reading `injected` for text
-    // nobody saw is worse than one still reading `queued` - the sender would be
-    // told it landed. A message left behind stays queued and goes out next turn.
-    const failures = [];
-    const includedMessages = new Set(projection.includedMessageIds ?? []);
-    for (const message of messages) {
-      if (!includedMessages.has(message.messageId)) continue;
-      await context.service.markDelivery({ sessionId: binding.accSessionId,
-        generation: binding.generation, messageId: message.messageId,
-        recipientParticipantId: mine.participantId, state: "injected" })
-        .catch(error => failures.push(`${message.messageId}: ${error.message}`));
-    }
-    // A note carries no ack obligation, so after its one full showing it leaves
-    // a single low-priority `unread_note` breadcrumb. Advancing that receipt
-    // injected -> seen the turn the breadcrumb is shown is what makes it
-    // one-shot: next turn the note reads `seen`, the breadcrumb stays quiet, and
-    // a delivered decision is recoverable without becoming a standing nag - the
-    // noise a reader learns to skip. Only what was actually shown is advanced,
-    // for the same reason the loop above only records what fit.
-    const includedAttention = new Set(projection.includedAttentionIds ?? []);
-    for (const item of sync.attention ?? []) {
-      if (item.kind !== "unread_note") continue;
-      if (!includedAttention.has(item.sourceId)) continue;
-      await context.service.markDelivery({ sessionId: binding.accSessionId,
-        generation: binding.generation, messageId: item.sourceId,
-        recipientParticipantId: mine.participantId, state: "seen" })
-        .catch(error => failures.push(`${item.sourceId}: ${error.message}`));
-    }
+    // The renderer returns ids as metadata, never as text to parse. A peer body
+    // can imitate every visible label, so only a complete group selected by the
+    // projector is eligible for the post-write offer commit.
+    const offered = new Set(projection.offeredMessageIds ?? []);
+    const offerInputs = messages.filter(message => offered.has(message.messageId))
+      .map(message => ({ messageId: message.messageId,
+        recipientParticipantId: mine.participantId,
+        targetSessionId: binding.accSessionId, targetGeneration: binding.generation,
+        transport: "next-turn", adapterId,
+        clientVersion: adapter.clientVersion ?? "unknown" }));
     // Same again: Kimi Code shows the model a hook's raw stdout, while Gemini
     // and Claude Code want an envelope and drop a bare string.
-    // Reported rather than swallowed. The context still goes out - losing it
-    // over bookkeeping would be the worse trade - but a receipt that failed to
-    // advance has to be visible somewhere, and stdout belongs to the model.
+    // The entry point owns the transport boundary. This handler only prepares
+    // offer inputs; recording them here would claim delivery before stdout's
+    // callback proves that the bytes crossed.
     const outcome = { stdout: "", ...adapter.injectOutcome?.(projected) };
-    if (failures.length === 0 && degradation === null) return outcome;
+    const writableOffers = outcome.stdout === "" ? [] : offerInputs;
+    if (degradation === null) return { ...outcome, offerInputs: writableOffers };
     return { ...outcome,
-      stderr: [outcome.stderr, degradation,
-        failures.length === 0 ? null
-          : `acc: delivery not recorded for ${failures.join(", ")}`]
-        .filter(Boolean).join("\n") };
+      stderr: [outcome.stderr, degradation].filter(Boolean).join("\n"),
+      offerInputs: writableOffers };
   },
 
   async beforeTool({ binding, context, event, adapter }) {
@@ -395,7 +376,9 @@ const HANDLERS = {
 export async function runHook({ adapterId, payload, adapters, dataHome, env,
   runtime = defaultRuntime(), budgetMs = DEFAULT_BUDGET_MS,
   readProcessTable = defaultReadProcessTable }) {
-  const result = { stdout: "", exitCode: 0, decision: "allow", sessions: [] };
+  const deadline = Date.now() + budgetMs;
+  const result = { stdout: "", exitCode: 0, decision: "allow", sessions: [],
+    commitOffers: async () => {} };
   let timer = null;
   try {
     const adapter = adapters?.[adapterId];
@@ -419,6 +402,32 @@ export async function runHook({ adapterId, payload, adapters, dataHome, env,
     });
     Object.assign(result, await Promise.race([work, budget]));
 
+    const offerInputs = result.offerInputs ?? [];
+    let commitPromise = null;
+    result.commitOffers = () => {
+      if (commitPromise !== null) return commitPromise;
+      commitPromise = (async () => {
+        for (const input of offerInputs) {
+          const remaining = deadline - Date.now();
+          if (remaining <= 0) throw new Error("hook budget exhausted before offer commit");
+          let commitTimer;
+          try {
+            await Promise.race([
+              context.service.recordOfferSucceeded(input),
+              new Promise((_, reject) => {
+                commitTimer = setTimeout(() => reject(
+                  new Error("hook budget exhausted during offer commit")), remaining);
+              }),
+            ]);
+          } finally {
+            if (commitTimer !== undefined) clearTimeout(commitTimer);
+          }
+        }
+      })();
+      return commitPromise;
+    };
+    delete result.offerInputs;
+
     const status = await context.service.collectStatus({
       workspaceId: context.descriptor.id });
     result.sessions = status.participants.filter(p => p.presence !== "offline");
@@ -428,6 +437,9 @@ export async function runHook({ adapterId, payload, adapters, dataHome, env,
     result.reason = error.message;
     result.decision = "allow";
     result.stdout = "";
+    // A later failure may happen after a turn prepared offer inputs. Once the
+    // fail-open path withdraws stdout, no transport boundary remains to commit.
+    result.commitOffers = async () => {};
   } finally {
     if (timer !== null) clearTimeout(timer);
   }
