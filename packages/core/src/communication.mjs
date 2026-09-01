@@ -1,4 +1,4 @@
-import { AccError, EXIT, SCHEMA_VERSION, advanceDelivery, createId, validateRecord }
+import { AccError, EXIT, SCHEMA_VERSION, advanceReceipt, createId, validateRecord }
   from "@agents-can-communicate/protocol";
 
 import { ensureMaterialised } from "./materialisation.mjs";
@@ -95,7 +95,7 @@ export function createCommunicationService(ports, sessions, claims) {
       }
       // Monotonic by construction: the protocol state machine refuses to move
       // backwards, so an acknowledgement can never be downgraded to seen.
-      record = { ...existing, state: advanceDelivery(existing.state, input.state),
+      record = { ...existing, state: advanceReceipt(existing.state, input.state),
         updatedAt: now };
       tx.put("receipt", id, record, tx.generationOf("receipt", id));
       tx.append({ schemaVersion: SCHEMA_VERSION, eventId: ids.next("event"),

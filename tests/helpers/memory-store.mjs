@@ -99,22 +99,18 @@ export function createMemoryStore({ clock, ids, workspaceId }) {
     const wanted = kinds === undefined ? null : new Set(kinds);
     const of = kind => (wanted !== null && !wanted.has(kind) ? [] : [...committed.values()]
       .filter(entry => entry.kind === kind && entry.record.workspaceId === workspaceId)
-      .map(entry => entry.record));
+      .map(entry => validateRecord(kind, entry.record)));
+    const workspace = wanted !== null && !wanted.has("workspace") ? null
+      : [...committed.values()].find(entry => entry.kind === "workspace"
+        && entry.record.workspaceId === workspaceId)?.record ?? null;
     return {
-      workspace: (wanted !== null && !wanted.has("workspace") ? null
-        : [...committed.values()]
-          .find(entry => entry.kind === "workspace"
-            && entry.record.workspaceId === workspaceId)?.record ?? null),
+      workspace: workspace === null ? null : validateRecord("workspace", workspace),
       participants: of("participant"),
       sessions: of("session"),
       intents: of("intent"),
-      workstreams: of("workstream"),
-      tasks: of("task"),
       claims: of("claim"),
       messages: of("message"),
       receipts: of("receipt"),
-      decisions: of("decision"),
-      handoffs: of("handoff"),
     };
   }
 
@@ -136,6 +132,7 @@ export function createMemoryStore({ clock, ids, workspaceId }) {
   const ephemeral = Object.freeze({
     async get(kind, id) { return volatile.get(key(kind, id)) ?? null; },
     async put(kind, id, record) {
+      validateRecord(kind, record);
       return withEphemeralWriter(async () => {
         volatile.set(key(kind, id), record);
         return record;
@@ -157,7 +154,7 @@ export function createMemoryStore({ clock, ids, workspaceId }) {
     async list(kind) {
       return [...volatile.entries()]
         .filter(([entryKey]) => entryKey.startsWith(`${kind}:`))
-        .map(([, record]) => record);
+        .map(([, record]) => validateRecord(kind, record));
     },
   });
 

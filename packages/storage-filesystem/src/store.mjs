@@ -37,8 +37,10 @@ async function listState(paths, root, kind) {
   for (const filePath of await listJsonFiles(path.join(paths.state, kind), { root })) {
     const found = await readJsonIfPresent(filePath, root);
     if (found === null) continue;
-    envelopes.push(assertStateBinding(found.value, kind,
-      path.basename(filePath, ".json"), filePath));
+    const envelope = assertStateBinding(found.value, kind,
+      path.basename(filePath, ".json"), filePath);
+    validateRecord(kind, envelope.record);
+    envelopes.push(envelope);
   }
   return envelopes;
 }
@@ -255,13 +257,9 @@ export async function openFilesystemStore({ root, clock, ids, workspaceId, failA
       participants: await of("participant"),
       sessions: await of("session"),
       intents: await of("intent"),
-      workstreams: await of("workstream"),
-      tasks: await of("task"),
       claims: await of("claim"),
       messages: await of("message"),
       receipts: await of("receipt"),
-      decisions: await of("decision"),
-      handoffs: await of("handoff"),
     };
   }
   // Ephemeral records are published by replace and never journalled: they carry
@@ -272,6 +270,7 @@ export async function openFilesystemStore({ root, clock, ids, workspaceId, failA
       return (await readJsonIfPresent(ephemeralPath(kind, id), root))?.value ?? null;
     },
     async put(kind, id, record) {
+      validateRecord(kind, record);
       return withWriterMutex(paths, publishOptions, async () => {
         await publishAtomic(ephemeralPath(kind, id), encode(record),
           { root, tmpDir: paths.tmp, replace: true });
@@ -297,7 +296,7 @@ export async function openFilesystemStore({ root, clock, ids, workspaceId, failA
       const records = [];
       for (const filePath of await listJsonFiles(path.join(paths.ephemeral, kind), { root })) {
         const found = await readJsonIfPresent(filePath, root);
-        if (found !== null) records.push(found.value);
+        if (found !== null) records.push(validateRecord(kind, found.value));
       }
       return records;
     },
