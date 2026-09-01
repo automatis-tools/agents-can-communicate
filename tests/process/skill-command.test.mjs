@@ -44,6 +44,7 @@ const ADAPTERS = [
     ".claude/plugins/marketplaces/acc-local/agents-can-communicate/skills/acc/SKILL.md"],
   ["codex", ".agents/acc-local/plugins/agents-can-communicate/skills/acc/SKILL.md"],
   ["gemini_cli", ".gemini/extensions/agents-can-communicate/skills/acc/SKILL.md"],
+  ["grok", ".grok/skills/acc/SKILL.md"],
 ];
 
 for (const [adapter, relative] of ADAPTERS) {
@@ -85,7 +86,7 @@ test("the skill tells the agent not to write to the store by hand", async t => {
 });
 
 test("every shipped skill is templated, none forgotten", async () => {
-  // Four adapters, four bundles. A new one that forgets to bake would ship a
+  // Five adapters, five bundles. A new one that forgets to bake would ship a
   // skill telling agents to run a placeholder.
   const roots = [];
   for (const entry of await readdir(path.join(repo, "packages"), { withFileTypes: true })) {
@@ -98,7 +99,7 @@ test("every shipped skill is templated, none forgotten", async () => {
     }
   }
 
-  assert.equal(roots.length, 4, roots.map(item => item.file).join("\n"));
+  assert.equal(roots.length, 5, roots.map(item => item.file).join("\n"));
   for (const { file, text } of roots) {
     assert.match(text, /\{\{ACC\}\}/, `${file} ships without the placeholder to replace`);
   }

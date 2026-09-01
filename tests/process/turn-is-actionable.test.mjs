@@ -129,7 +129,7 @@ test("every skill teaches the two lines a turn can end with", async () => {
       if (text !== null) skills.push({ file, text });
     }
   }
-  assert.equal(skills.length, 4);
+  assert.equal(skills.length, 5);
   for (const { file, text } of skills) {
     assert.match(text, /\[direct_request\] message_x/, `${file} does not say what to do`);
     assert.match(text, /inbox --message/, `${file} does not say how to read overflow`);

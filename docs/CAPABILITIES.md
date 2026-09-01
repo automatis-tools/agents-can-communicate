@@ -18,29 +18,30 @@ another platform.
 | `codex` | `codex-cli` | 0.147.0 |
 | `claude_code` | Claude Code | 2.1.233 |
 | `gemini_cli` | Gemini CLI | 0.37.0 and 0.55.1 |
+| `grok` | Grok | 1.0.13 |
 | `kimi` | Kimi Code | 0.36.1 |
 
 ## Matrix
 
-| Capability | codex | claude_code | gemini_cli | kimi |
-|---|---|---|---|---|
-| `lifecycle.sessionStart` | yes | yes | yes | yes |
-| `lifecycle.sessionResume` | no | no | no | no |
-| `lifecycle.sessionEnd` | yes | yes | yes | no |
-| `lifecycle.heartbeat` | no | no | no | yes |
-| `lifecycle.childSessions` | no | no | no | no |
-| `context.startupInjection` | no | no | no | no |
-| `context.beforeTurnInjection` | yes | yes | yes | yes |
-| `context.safePointInjection` | no | no | no | no |
-| `guards.beforeRead` | no | no | no | no |
-| `guards.beforeWrite` | yes | yes | yes | yes |
-| `guards.beforeShell` | yes | yes | yes | yes |
-| `delivery.polling` | yes | yes | yes | yes |
-| `delivery.activeNotification` | no | no | no | no |
-| `delivery.wakeDormantSession` | no | no | no | no |
-| `execution.launch` | no | no | no | no |
-| `execution.resume` | no | no | no | no |
-| `execution.terminate` | no | no | no | no |
+| Capability | codex | claude_code | gemini_cli | grok | kimi |
+|---|---|---|---|---|---|
+| `lifecycle.sessionStart` | yes | yes | yes | yes | yes |
+| `lifecycle.sessionResume` | no | no | no | no | no |
+| `lifecycle.sessionEnd` | yes | yes | yes | yes | no |
+| `lifecycle.heartbeat` | no | no | no | no | yes |
+| `lifecycle.childSessions` | no | no | no | no | no |
+| `context.startupInjection` | no | no | no | no | no |
+| `context.beforeTurnInjection` | yes | yes | yes | no | yes |
+| `context.safePointInjection` | no | no | no | no | no |
+| `guards.beforeRead` | no | no | no | no | no |
+| `guards.beforeWrite` | yes | yes | yes | no | yes |
+| `guards.beforeShell` | yes | yes | yes | no | yes |
+| `delivery.polling` | yes | yes | yes | yes | yes |
+| `delivery.activeNotification` | no | no | no | no | no |
+| `delivery.wakeDormantSession` | no | no | no | no | no |
+| `execution.launch` | no | no | no | no | no |
+| `execution.resume` | no | no | no | no | no |
+| `execution.terminate` | no | no | no | no | no |
 
 ## Resolving a client's pid is not universal either
 
@@ -59,13 +60,14 @@ interpreter's name rather than the script's.
 | `codex` | `codex` | `codex`, a native binary | yes |
 | `claude_code` | `claude` | `claude`, a native binary | yes |
 | `gemini_cli` | `gemini` | `node` — `gemini.js` starts `#!/usr/bin/env node` | **no** |
+| `grok` | `grok` | `grok`, a native Mach-O at `~/.grok/bin/grok` | yes |
 | `kimi` | `kimi` | not installed on the machine this table was measured on; Kimi Code ships via npm as a Node.js CLI (`@moonshot-ai/kimi-code`), the same shape as Gemini CLI | **almost certainly no — not measured** |
 
 A Gemini session records `pid: null` for its whole life, and Kimi's is very likely the
 same, unconfirmed. `null` is the correct "nobody knows" answer and is handled identically
 wherever it is read — not a correctness bug. It does change what presence delivers, though:
-a confirmed-dead pid retires a session immediately and exactly, and today that is `codex`
-and `claude_code` only. `gemini_cli` and `kimi` fall back to the same age-based floor every
+a confirmed-dead pid retires a session immediately and exactly, and today that is `codex`,
+`claude_code`, and `grok`. `gemini_cli` and `kimi` fall back to the same age-based floor every
 session has for whenever a pid is unavailable — thirty minutes of silence — so their
 sessions still leave, just later and on a timer instead of on the fact. See
 [ARCHITECTURE.md](ARCHITECTURE.md#presence) for the full floor.
@@ -120,9 +122,18 @@ heartbeat and do not have this problem.
 
 **`lifecycle.heartbeat` is Kimi's alone.** It fires on a timer — observed at 60002, 120004
 and 180006 ms of uptime — so an idle Kimi session keeps its presence honest. The other
-three reach a hook only when the user takes a turn, so their idle sessions go stale while
+clients reach a hook only when the user takes a turn, so their idle sessions go stale while
 alive. This is why it is a capability of its own rather than a flavour of
 `delivery.polling`.
+
+**`context.beforeTurnInjection` on `grok` is false.** Grok 1.0.13 discards
+UserPromptSubmit stdout and `additionalContext`. The hook still runs (presence
+and polling), but the model is not shown that text. Agents on this client read
+`acc status` / `acc inbox` from the skill.
+
+**`guards.beforeWrite` / `beforeShell` on `grok` are false.** PreToolUse fires, and
+the matcher names `write`, `search_replace`, and `run_terminal_command`. A deny
+has not yet been captured blocking a real call, so the capability stays false.
 
 ## Response contracts, which do not port
 
@@ -131,13 +142,14 @@ candidate against a real session of each client and checking whether the tool ac
 ran. A dash means the candidate was never run against that client, not that it fails —
 only the shape each shipped adapter actually uses was measured on every client.
 
-| Reply to a guard hook | codex | claude_code | gemini_cli | kimi |
-|---|---|---|---|---|
-| exit code 2 | denies | - | denies | denies |
-| `{"hookSpecificOutput":{…,"permissionDecision":"deny"}}` | - | denies | **ignored** | denies |
-| `{"decision":"block","reason":…}` | - | - | denies | **ignored** |
-| `{"permission":"deny"}` | - | - | ignored | ignored |
-| exit code 1 | - | - | ignored | ignored |
+| Reply to a guard hook | codex | claude_code | gemini_cli | grok | kimi |
+|---|---|---|---|---|---|
+| exit code 2 | denies | - | denies | - | denies |
+| `{"hookSpecificOutput":{…,"permissionDecision":"deny"}}` | - | denies | **ignored** | documented | denies |
+| `{"decision":"deny","reason":…}` | - | - | - | documented | - |
+| `{"decision":"block","reason":…}` | - | - | denies | - | **ignored** |
+| `{"permission":"deny"}` | - | - | ignored | - | ignored |
+| exit code 1 | - | - | ignored | - | ignored |
 
 Codex has no structured reply at all: it denies by exiting 2 with the reason on stderr.
 Gemini ignores the shape that Claude Code and Kimi Code both honour, and Kimi ignores the
@@ -146,10 +158,10 @@ client reports nothing.
 
 Context injection does not follow the deny contract even within one client:
 
-| Injection | codex | claude_code | gemini_cli | kimi |
-|---|---|---|---|---|
-| `hookSpecificOutput.additionalContext` | - | works | works | works, but **not unwrapped** |
-| plain text on stdout | works | - | dropped | works |
+| Injection | codex | claude_code | gemini_cli | grok | kimi |
+|---|---|---|---|---|---|
+| `hookSpecificOutput.additionalContext` | - | works | works | **discarded** on UserPromptSubmit | works, but **not unwrapped** |
+| plain text on stdout | works | - | dropped | **discarded** on UserPromptSubmit | works |
 
 Codex delivers a hook's stdout as a `developer` role message, verbatim — the most direct
 of the four channels, and a reason for care rather than comfort: at that role a model
@@ -167,13 +179,13 @@ right shape without knowing which client it is talking to. That contract —
 
 ## Installation is not uniform either
 
-| | codex | claude_code | gemini_cli | kimi |
-|---|---|---|---|---|
-| Where hooks live | marketplace plugin | plugin | `settings.json` | `config.toml` |
-| Project-level config | no | no | yes | **no** |
-| Hook `timeout` unit | - | - | milliseconds | **seconds** (max 600) |
-| Command path | absolute required | `${CLAUDE_PLUGIN_ROOT}` | absolute required | absolute required |
-| Extra step by the user | hook trust | - | - | - |
+| | codex | claude_code | gemini_cli | grok | kimi |
+|---|---|---|---|---|---|
+| Where hooks live | marketplace plugin | plugin | `settings.json` | `~/.grok/hooks/acc.json` | `config.toml` |
+| Project-level config | no | no | yes | yes (`<project>/.grok/hooks`, unused) | **no** |
+| Hook `timeout` unit | - | - | milliseconds | **seconds** | **seconds** (max 600) |
+| Command path | absolute required | `${CLAUDE_PLUGIN_ROOT}` | absolute required | absolute required | absolute required |
+| Extra step by the user | hook trust | - | - | - | - |
 
 Kimi Code is the only one with no project-level config, so ACC edits the user's global
 `config.toml` — as a delimited block it owns, because ACC ships without dependencies and a

@@ -6,7 +6,7 @@ canonical explanation of native vs. MCP — every other doc that draws that line
 
 ## Native adapter vs. MCP client
 
-A **native adapter** (Codex, Claude Code, Gemini CLI, Kimi) is wired into the client's own
+A **native adapter** (Codex, Claude Code, Gemini CLI, Grok, Kimi) is wired into the client's own
 hook or plugin system. It attaches to the workspace by itself when the client starts,
 guards the writes its session makes, injects peer context straight into the conversation,
 and tells the workspace cleanly when the session ends.

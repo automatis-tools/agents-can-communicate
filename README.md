@@ -48,12 +48,12 @@ npm install -g agents-can-communicate
 acc install
 ```
 
-`acc install` wires ACC into the clients you have — Codex, Claude Code, Gemini CLI, Kimi
-Code — and names everything it changed. **Restart the client afterwards** (hooks load at
-startup); Codex also needs you to trust the plugin. Then just open a session in a project
-and it joins that project's room by itself; open a second and they coordinate. `acc doctor`
-shows what's active, `acc update --apply` keeps it current, `acc uninstall` removes only
-what ACC wrote.
+`acc install` wires ACC into the clients you have — Codex, Claude Code, Gemini CLI, Grok,
+Kimi Code — and names everything it changed. **Restart the client afterwards** (hooks load
+at startup); Codex also needs you to trust the plugin. Then just open a session in a
+project and it joins that project's room by itself; open a second and they coordinate.
+`acc doctor` shows what's active, `acc update --apply` keeps it current, `acc uninstall`
+removes only what ACC wrote.
 
 Coordination data lives in the platform app-data directory (`~/Library/Application
 Support/acc`, `~/.local/share/acc`; override with `ACC_DATA_HOME`), never in your repo.

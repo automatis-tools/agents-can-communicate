@@ -4,6 +4,7 @@ import path from "node:path";
 import { createClaudeCodeAdapter } from "@agents-can-communicate/adapter-claude-code";
 import { createCodexAdapter } from "@agents-can-communicate/adapter-codex";
 import { createGeminiCliAdapter } from "@agents-can-communicate/adapter-gemini-cli";
+import { createGrokAdapter } from "@agents-can-communicate/adapter-grok";
 import { createKimiAdapter } from "@agents-can-communicate/adapter-kimi";
 import { applyPlan, detectInstallation, loadOwnership, planInstallation }
   from "@agents-can-communicate/installer";
@@ -23,6 +24,7 @@ export const clientContext = (home, stateRoot) => ({
   agentsHome: home,
   codexHome: path.join(home, ".codex"),
   kimiHome: path.join(home, ".kimi-code"),
+  grokHome: path.join(home, ".grok"),
   // Where ACC keeps its own state, for the client that has to be told. Codex
   // sandboxes the commands a model runs to the workspace, and ACC's state is
   // outside every workspace on purpose - so an agent there could read the
@@ -32,7 +34,7 @@ export const clientContext = (home, stateRoot) => ({
 });
 
 export const ALL_ADAPTERS = () => [createClaudeCodeAdapter(), createCodexAdapter(),
-  createGeminiCliAdapter(), createKimiAdapter()];
+  createGeminiCliAdapter(), createGrokAdapter(), createKimiAdapter()];
 
 /**
  * How long to wait for a client to say its version.
