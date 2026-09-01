@@ -99,12 +99,12 @@ Computed from explicit rules, never from a hidden classifier. Lower sorts first:
 
 | Priority | Kind | Fires when |
 |---|---|---|
-| 1 | `direct_request` | A message addressed to you requires an ack and has not had one |
-| 2 | `claim_conflict` | Your declared resource hints overlap a live claim you do not own |
-| 3 | `request_stalled` | A question of yours needs an answer from a participant that is not here |
-| 4 | `claim_expired` | A claim you took has run out — peers can write to it again, and until now nothing said so |
-| 5 | `claim_contended` | A peer's declared resource hints overlap a live claim you hold. The mirror of `claim_conflict`: a claim is advice, not a lock, so the holder is told early that someone means to touch it |
-| 6 | `unread_note` | A message shown to you once that raised no `direct_request` (it asked for no ack) and that you have not acknowledged. It surfaces once, the turn after delivery, then goes quiet — recoverable without becoming a standing nag |
+| 1 | `reply_required` | Your receipt carries an unresolved `reply` obligation |
+| 2 | `acknowledgement_required` | Your receipt carries an unresolved `acknowledge` obligation |
+| 3 | `recipient_unavailable` | Your addressed message has an unresolved obligation and its recipient has no online session |
+| 4 | `claim_conflict` | Your declared resource hints overlap a live claim you do not own |
+| 5 | `claim_contended` | A peer's declared resource hints overlap a live claim you hold |
+| 6 | `claim_expired` | A claim you took has run out, so peers can write to it again |
 
 Semantic relevance is the receiving model's job; correctness is not allowed to depend on it.
 

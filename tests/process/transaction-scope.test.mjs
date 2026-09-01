@@ -57,9 +57,11 @@ test("every transaction says what it reads", async () => {
   await service.acquireClaim({ sessionId: session.sessionId, generation: session.generation,
     resource: "file:src/a.mjs", reason: "editing", descriptor });
   await service.sendMessage({ sessionId: session.sessionId, generation: session.generation,
-    toParticipantIds: ["peer"], type: "note", subject: "s", body: "b", descriptor });
-  await service.requestWork({ sessionId: session.sessionId, generation: session.generation,
-    toParticipantId: "peer", title: "please take this", descriptor });
+    clientMessageId: "client_scope_note", toParticipantIds: ["peer"], kind: "note",
+    obligation: "none", subject: "s", body: "b", descriptor });
+  await service.sendMessage({ sessionId: session.sessionId, generation: session.generation,
+    clientMessageId: "client_scope_request", toParticipantIds: ["peer"], kind: "request",
+    obligation: "reply", subject: "please take this", body: "please take this", descriptor });
   await service.closeSession({ sessionId: other.sessionId, generation: other.generation });
 
   assert.equal(declarations.length > 0, true);
