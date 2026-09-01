@@ -109,12 +109,6 @@ export function createStatusService(ports, sessions) {
         presence,
         intent: intents.find(intent => intent.sessionId === session.sessionId)?.summary ?? null,
       })),
-      workstreams: snapshot.workstreams.map(workstream => ({
-        workstreamId: workstream.workstreamId,
-        title: workstream.title,
-        state: workstream.state,
-        coordinatorSessionId: workstream.coordinatorSessionId,
-      })),
       // The owner is named twice on purpose. Every command that reaches a peer
       // takes a participant id, so a claim that gave only a session id sent the
       // reader back through the roster to answer "who is holding this, and how
@@ -139,7 +133,6 @@ export function createStatusService(ports, sessions) {
         live: live.length,
         stale: live.filter(item => item.presence === "stale").length,
         claims: claims.length,
-        tasks: snapshot.tasks.length,
         messages: snapshot.messages.length,
       },
     };

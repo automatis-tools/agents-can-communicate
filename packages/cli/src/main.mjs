@@ -1,3 +1,7 @@
+// Kept cohesive above 300 lines because this is the single CLI composition boundary: every
+// handler shares one owner-resolution, result, and error contract with `main`. Splitting the
+// dispatch table would either duplicate that contract or expose storage/runtime context solely
+// to pass it across a module boundary, making command behavior harder to audit as one surface.
 import { AccError, CONFIG_FILENAME, EXIT, failure, ok }
   from "@agents-can-communicate/protocol";
 import { createCoordinationService, noteNudge } from "@agents-can-communicate/core";

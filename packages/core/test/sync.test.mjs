@@ -79,6 +79,9 @@ test("full scope returns the whole workspace to any session", async () => {
   // participant's collapsed child, not a reduced view of it.
   assert.equal(full.scope, "full");
   assert.equal(full.snapshot.sessions.length, 3);
+  assert.equal(Object.hasOwn(full.snapshot, "workstreams"), false);
+  assert.equal(Object.hasOwn(full.snapshot, "tasks"), false);
+  assert.equal(Object.hasOwn(full.snapshot, "decisions"), false);
   assert.equal(full.roster.some(item => item.parentSessionId === second.sessionId), true);
 });
 

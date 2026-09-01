@@ -59,6 +59,8 @@ async function loadPackedSurface() {
   const help = await import(pathToFileURL(path.join(modules, "cli", "src", "help.mjs")));
   const core = await import(pathToFileURL(path.join(modules, "core", "src", "index.mjs")));
   const mcp = await import(pathToFileURL(path.join(modules, "mcp-server", "src", "server.mjs")));
+  const resources = await import(pathToFileURL(
+    path.join(modules, "mcp-server", "src", "resources.mjs")));
   const clock = createFakeClock("2026-09-01T00:00:00.000Z");
   const service = core.createCoordinationService({
     store: createMemoryStore({ clock, ids: createFakeIds(), workspaceId: "workspace_a" }),
@@ -66,9 +68,13 @@ async function loadPackedSurface() {
     ids: createFakeIds(),
   });
   const mcpSurface = await listMcpSurface(mcp.serve, mcp.PROTOCOL_VERSION);
+  const status = await service.collectStatus({ workspaceId: "workspace_a" });
+  const sync = await service.sync({ workspaceId: "workspace_a", scope: "full" });
+  const resourceSnapshot = await resources.readResource("acc://snapshot", {
+    service, participantId: "participant_a", workspaceId: "workspace_a" });
   const text = [help.helpText(), mcpSurface.text,
     ...await packedTextFiles(packageRoot)].join("\n");
-  return { commands: cli.COMMANDS, mcpSurface, service, text };
+  return { commands: cli.COMMANDS, mcpSurface, resourceSnapshot, service, status, sync, text };
 }
 
 const packed = await loadPackedSurface();
@@ -105,3 +111,23 @@ for (const operation of ["createTask", "createWorkstream", "recordDecision"]) {
       `packed service exposes ${operation}`);
   });
 }
+
+function assertNoOrchestration(value) {
+  for (const field of ["workstreams", "tasks", "decisions"]) {
+    assert.equal(Object.hasOwn(value, field), false, `public output exposes ${field}`);
+  }
+}
+
+test("packed status omits legacy orchestration", () => {
+  assertNoOrchestration(packed.status);
+  assert.equal(Object.hasOwn(packed.status.counts, "tasks"), false,
+    "public status exposes a task count");
+});
+
+test("packed full sync omits legacy orchestration", () => {
+  assertNoOrchestration(packed.sync.snapshot);
+});
+
+test("packed snapshot resource omits legacy orchestration", () => {
+  assertNoOrchestration(packed.resourceSnapshot);
+});

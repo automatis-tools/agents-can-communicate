@@ -28,14 +28,15 @@ const attributedMessage = message => ({
 });
 
 export async function readResource(uri, { service, participantId, workspaceId }) {
-  const snapshot = await service.store.snapshot(workspaceId);
   switch (uri) {
-    case "acc://snapshot":
-      return { ...snapshot,
-        messages: snapshot.messages.map(attributedMessage) };
+    case "acc://snapshot": {
+      const { snapshot } = await service.sync({ workspaceId, scope: "full" });
+      return { ...snapshot, messages: snapshot.messages.map(attributedMessage) };
+    }
     case "acc://roster":
       return (await service.sync({ workspaceId })).roster;
     case "acc://inbox": {
+      const snapshot = await service.store.snapshot(workspaceId);
       const mine = new Set(snapshot.receipts
         .filter(receipt => receipt.recipientParticipantId === participantId)
         .map(receipt => receipt.messageId));
