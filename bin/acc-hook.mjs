@@ -38,14 +38,31 @@ const readStdin = () => new Promise(resolve => {
   return undefined;
 });
 
-export const writeOutput = (stream, output) => {
+export const writeOutput = (stream, output, { deadlineAt } = {}) => {
   if (output === "") return Promise.resolve();
   return new Promise((resolve, reject) => {
+    let settled = false;
+    let timer;
+    const finish = error => {
+      if (settled) return;
+      settled = true;
+      if (timer !== undefined) clearTimeout(timer);
+      if (error === undefined || error === null) resolve();
+      else reject(error);
+    };
+    if (deadlineAt !== undefined) {
+      const remaining = deadlineAt - Date.now();
+      if (remaining <= 0) {
+        finish(new Error("hook budget exhausted before stdout write"));
+        return;
+      }
+      timer = setTimeout(() => finish(
+        new Error("hook budget exhausted waiting for stdout callback")), remaining);
+    }
     try {
-      stream.write(output, error => error === undefined || error === null
-        ? resolve() : reject(error));
+      stream.write(output, finish);
     } catch (error) {
-      reject(error);
+      finish(error);
     }
   });
 };
@@ -73,7 +90,7 @@ function tryWrite(stream, output) {
 export async function completeHookOutput(result,
   { stdout = process.stdout, stderr = process.stderr } = {}) {
   try {
-    await writeOutput(stdout, result.stdout ?? "");
+    await writeOutput(stdout, result.stdout ?? "", { deadlineAt: result.deadlineAt });
   } catch (error) {
     tryWrite(stderr, boundedDiagnostic("stdout write failed", error));
     return { exitCode: 0, wroteStdout: false, committedOffers: false };

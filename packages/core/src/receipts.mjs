@@ -60,7 +60,7 @@ export function createReceiptService(ports) {
           transport: input.transport, adapterId: input.adapterId,
           clientVersion: input.clientVersion } });
       return offered;
-    }, { kinds: ["session", "message", "receipt"] });
+    }, { kinds: ["session", "message", "receipt"], deadlineAt: input.deadlineAt });
   }
 
   async function recordOfferFailed(input) {

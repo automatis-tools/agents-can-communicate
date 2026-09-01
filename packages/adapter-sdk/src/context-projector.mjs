@@ -28,9 +28,9 @@ function truncate(line, limit) {
   return cut === "" ? "" : `${cut}…`;
 }
 
-function attentionGroups(attention, { truncatable, queuedMessageIds = new Set() }) {
+function attentionGroups(attention, { truncatable, liveOfferedMessageIds = new Set() }) {
   return attention.map(item => {
-    const breadcrumb = offeredBreadcrumb(item, queuedMessageIds);
+    const breadcrumb = offeredBreadcrumb(item, liveOfferedMessageIds);
     return {
       lines: [breadcrumb ?? (typeof item.sourceId === "string" && item.sourceId !== ""
         ? `- [${item.kind}] ${item.sourceId} ${item.summary}`
@@ -42,8 +42,8 @@ function attentionGroups(attention, { truncatable, queuedMessageIds = new Set() 
   });
 }
 
-function offeredBreadcrumb(item, queuedMessageIds) {
-  if (queuedMessageIds.has(item.sourceId)) return null;
+function offeredBreadcrumb(item, liveOfferedMessageIds) {
+  if (!liveOfferedMessageIds.has(item.sourceId)) return null;
   const noun = item.kind === "reply_required" ? "question"
     : item.kind === "acknowledgement_required" ? "message" : null;
   if (noun === null) return null;
@@ -101,16 +101,18 @@ function recoveryNote(ids) {
  * the whole workspace on every prompt is neither safer nor cheaper.
  */
 export function projectContextResult(sync, { budgetBytes = DEFAULT_BUDGET_BYTES } = {}) {
+  const roomMessageIds = new Set(sync.roomMessageIds ?? []);
   const attention = [...(sync.attention ?? [])]
+    .filter(item => !roomMessageIds.has(item.sourceId))
     .sort((left, right) => left.priority - right.priority
       || (left.sourceId ?? "").localeCompare(right.sourceId ?? ""));
   const urgent = attention.filter(item => item.priority <= 2);
   const informational = attention.filter(item => item.priority > 2);
   const messages = (sync.messages ?? [])
     .filter(message => message.toParticipantIds?.length !== 0);
-  const queuedMessageIds = new Set(messages.map(message => message.messageId));
+  const liveOfferedMessageIds = new Set(sync.liveOfferedMessageIds ?? []);
   const groups = [
-    ...attentionGroups(urgent, { truncatable: true, queuedMessageIds }),
+    ...attentionGroups(urgent, { truncatable: true, liveOfferedMessageIds }),
     ...messageGroups(messages),
     ...attentionGroups(informational, { truncatable: false }),
   ];

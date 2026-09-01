@@ -32,6 +32,13 @@ const DIRECTORIES = ["state", "events", "journal", "locks", "ephemeral", "retain
 
 const pad = value => String(value).padStart(SEQUENCE_WIDTH, "0");
 
+function assertBeforePublication(deadlineAt) {
+  if (deadlineAt !== undefined && Date.now() >= deadlineAt) {
+    throw new AccError(EXIT.CONFLICT,
+      "transaction deadline expired before durable publication", {});
+  }
+}
+
 export function storePaths(root) {
   return Object.freeze(Object.fromEntries([["root", root],
     ...DIRECTORIES.map(name => [name, path.join(root, name)])]));
@@ -117,7 +124,7 @@ export async function openFilesystemStore({ root, clock, ids, workspaceId, failA
    * these transactions make reads as "nothing conflicts" when it finds nothing.
    * Declaring nothing reads everything, which is what this always did.
    */
-  async function transaction(callback, { kinds } = {}) {
+  async function transaction(callback, { kinds, deadlineAt } = {}) {
     const wanted = kinds === undefined ? null : new Set(kinds);
     const declared = kind => {
       if (wanted !== null && !wanted.has(kind)) {
@@ -127,7 +134,8 @@ export async function openFilesystemStore({ root, clock, ids, workspaceId, failA
       }
       return kind;
     };
-    return withWriterMutex(paths, publishOptions, async () => {
+    return withWriterMutex(paths, { ...publishOptions, deadlineAt }, async () => {
+      assertBeforePublication(deadlineAt);
       // Reads are loaded once per transaction so get, list, and the generation
       // that put() compares against all describe the same instant.
       const loaded = await loadAllState(paths, root, wanted);
@@ -216,6 +224,11 @@ export async function openFilesystemStore({ root, clock, ids, workspaceId, failA
       ];
       if (publications.length === 0) return result;
 
+      // Cancellation is safe up to this point: nothing durable has decided the
+      // transaction. Once the journal write starts, recovery must finish it and
+      // the caller waits for that atomic outcome instead of reporting a false
+      // timeout while publication continues in the background.
+      assertBeforePublication(deadlineAt);
       const entry = journalEntry(ids.next("transaction"), firstSequence, publications,
         clock.now());
       await writeJournalEntry(paths, publishOptions, entry);

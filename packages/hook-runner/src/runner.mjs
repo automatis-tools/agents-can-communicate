@@ -242,11 +242,11 @@ const HANDLERS = {
     // Without this the projector's peer block never runs in production: an
     // agent sees only the obligation attention line, not the durable body that
     // may be offered after the stdout transport succeeds.
-    const messages = (await context.service.pendingMessages({
+    const delivery = await context.service.nextTurnDelivery({
       workspaceId: context.descriptor.id,
       participantId: mine?.participantId,
-      exceptSessionId: binding.accSessionId }))
-      .filter(message => message.toParticipantIds.length > 0);
+      exceptSessionId: binding.accSessionId });
+    const messages = delivery.queuedMessages;
 
     // Solo costs nothing: nothing to say means nothing printed, not a banner
     // announcing that nobody else is here. But something already said to you is
@@ -260,6 +260,8 @@ const HANDLERS = {
     // the projector was always called with its own default.
     const tracksDelivery = typeof adapter.renderContextResult === "function";
     const projectionInput = { ...sync, messages: tracksDelivery ? messages : [],
+      liveOfferedMessageIds: delivery.liveOfferedMessageIds,
+      roomMessageIds: delivery.roomMessageIds,
       currentParticipantId: mine?.participantId };
     const projectionOptions = {
       budgetBytes: context.descriptor.policy?.contextBudgetBytes };
@@ -377,7 +379,7 @@ export async function runHook({ adapterId, payload, adapters, dataHome, env,
   runtime = defaultRuntime(), budgetMs = DEFAULT_BUDGET_MS,
   readProcessTable = defaultReadProcessTable }) {
   const deadline = Date.now() + budgetMs;
-  const result = { stdout: "", exitCode: 0, decision: "allow", sessions: [],
+  const result = { stdout: "", exitCode: 0, decision: "allow", sessions: [], deadlineAt: deadline,
     commitOffers: async () => {} };
   let timer = null;
   try {
@@ -410,18 +412,10 @@ export async function runHook({ adapterId, payload, adapters, dataHome, env,
         for (const input of offerInputs) {
           const remaining = deadline - Date.now();
           if (remaining <= 0) throw new Error("hook budget exhausted before offer commit");
-          let commitTimer;
-          try {
-            await Promise.race([
-              context.service.recordOfferSucceeded(input),
-              new Promise((_, reject) => {
-                commitTimer = setTimeout(() => reject(
-                  new Error("hook budget exhausted during offer commit")), remaining);
-              }),
-            ]);
-          } finally {
-            if (commitTimer !== undefined) clearTimeout(commitTimer);
-          }
+          // The durable transaction owns deadline cancellation. Racing it here
+          // would only reject the public promise while the losing writer kept
+          // waiting and could publish later.
+          await context.service.recordOfferSucceeded({ ...input, deadlineAt: deadline });
         }
       })();
       return commitPromise;
