@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.1.18
 
 Grok is a first-class adapter. `acc install` writes `$GROK_HOME/hooks` and
 `$GROK_HOME/skills` (default `~/.grok`) and does not depend on a Claude Code
@@ -14,9 +14,9 @@ targeted inbox/reply path recovers and closes the exact message that matters.
 
 | | |
 |---|---|
-| Built from | `52a9500` |
-| Tarball | `agents-can-communicate-0.1.17.tgz`, 159 KB, 122 entries |
-| sha256 | `f482917525d4012c55c9fffcf13004286735d2953aa1f23a5abd2b4eee0ddacd` |
+| Built from | `PENDING` |
+| Tarball | `PENDING` |
+| sha256 | `PENDING` |
 | Node | 24 (current production LTS) |
 | Verified on | macOS 26.6.2 (darwin 25.6.0, arm64) and Linux in CI |
 | Not supported | Windows - untested rather than known-broken |

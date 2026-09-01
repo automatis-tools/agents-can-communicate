@@ -1,6 +1,6 @@
 {
   "name": "agents-can-communicate",
-  "version": "0.1.17",
+  "version": "0.1.18",
   "type": "module",
   "description": "Local-first coordination for independently opened AI agent sessions.",
   "keywords": [
