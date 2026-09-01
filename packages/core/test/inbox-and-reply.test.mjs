@@ -86,6 +86,38 @@ test("inbox keeps unresolved obligations recoverable but does not replay a retri
     assert.equal(recovered[0].receipt.state, "retrieved");
   });
 
+test("exact inbox recovery at retrieved does not refresh time or append an event", async () => {
+  const { service, base, clock } = makeService();
+  const { sender, recipient } = await pair(service);
+  const request = await question(service, sender);
+  const input = { ...owner(recipient), messageId: request.messageId };
+  const [first] = await service.readInbox(input);
+  const before = await base.eventsSince(WORKSPACE, null, 100);
+  clock.advance(5_000);
+
+  const [retried] = await service.readInbox(input);
+  const after = await base.eventsSince(WORKSPACE, null, 100);
+
+  assert.deepEqual(retried, first);
+  assert.equal(after.events.length, before.events.length);
+});
+
+test("repeated acknowledgement does not refresh time or append an event", async () => {
+  const { service, base, clock } = makeService();
+  const { sender, recipient } = await pair(service);
+  const request = await question(service, sender);
+  const input = { ...owner(recipient), messageId: request.messageId };
+  const first = await service.acknowledgeMessage(input);
+  const before = await base.eventsSince(WORKSPACE, null, 100);
+  clock.advance(5_000);
+
+  const retried = await service.acknowledgeMessage(input);
+  const after = await base.eventsSince(WORKSPACE, null, 100);
+
+  assert.deepEqual(retried, first);
+  assert.equal(after.events.length, before.events.length);
+});
+
 test("reply preserves the root thread and acknowledges only the replying participant",
   async () => {
     const { service, base } = makeService();
@@ -125,6 +157,26 @@ test("replying to a reply retains the original thread root", async () => {
 
   assert.equal(secondReply.reply.threadId, original.messageId);
   assert.equal(secondReply.reply.inReplyTo, firstReply.reply.messageId);
+});
+
+test("exact reply retry returns the original outcome without new transition events", async () => {
+  const { service, base, clock } = makeService();
+  const { sender, recipient } = await pair(service);
+  const original = await question(service, sender);
+  const input = { ...owner(recipient), messageId: original.messageId,
+    clientMessageId: "client_reply_retry", body: "The durable one." };
+  const first = await service.replyToMessage(input);
+  const before = await base.eventsSince(WORKSPACE, null, 100);
+  clock.advance(5_000);
+
+  const retried = await service.replyToMessage(input);
+  const after = await base.eventsSince(WORKSPACE, null, 100);
+
+  assert.deepEqual(retried, first);
+  assert.equal(after.events.length, before.events.length);
+  const snapshot = await base.snapshot(WORKSPACE);
+  assert.equal(snapshot.messages.length, 2);
+  assert.equal(snapshot.receipts.length, 2);
 });
 
 test("a participant without the receipt cannot read, reply, or acknowledge", async () => {

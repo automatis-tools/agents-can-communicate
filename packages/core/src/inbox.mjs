@@ -33,8 +33,11 @@ export function createInboxService(ports, sessions) {
 
   function advanceOwned(tx, session, messageId, state, now) {
     const owned = requireOwnedReceipt(tx, session, messageId);
-    const receipt = { ...owned.receipt,
-      state: advanceReceipt(owned.receipt.state, state), updatedAt: now };
+    const nextState = advanceReceipt(owned.receipt.state, state);
+    if (nextState === owned.receipt.state) {
+      return { message: owned.message, receipt: owned.receipt };
+    }
+    const receipt = { ...owned.receipt, state: nextState, updatedAt: now };
     tx.put("receipt", owned.id, receipt, tx.generationOf("receipt", owned.id));
     tx.append({ schemaVersion: SCHEMA_VERSION, eventId: ids.next("event"),
       workspaceId: session.workspaceId, actorSessionId: session.sessionId,
