@@ -227,7 +227,10 @@ export function createConversationService(ports, sessions) {
         tx.generationOf("session", session.sessionId));
       tx.append({ schemaVersion: SCHEMA_VERSION, eventId: ids.next("event"),
         workspaceId: session.workspaceId, actorSessionId: session.sessionId,
-        type: "session.closed", occurredAt: now, payload: {} });
+        type: "session.closed", occurredAt: now,
+        payload: { cause: "finish", messageId: recorded.message.messageId,
+          sessionGeneration: session.generation,
+          releasedClaimIds: releasedClaims.map(claim => claim.claimId) } });
       return { retry: false, message: recorded.message,
         releasedClaims: releasedClaims.map(projectReleasedClaim), session: closed };
     }, { kinds: ["participant", "session", "claim", "message", "receipt"] });
