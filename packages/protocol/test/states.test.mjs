@@ -2,82 +2,37 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { AccError, EXIT } from "../src/errors.mjs";
-import { DELIVERY_STATES, TASK_STATES, advanceDelivery, transitionTask } from "../src/states.mjs";
+import { RECEIPT_STATES, advanceReceipt } from "../src/states.mjs";
 
-test("delivery advances along the documented lifecycle", () => {
-  assert.equal(advanceDelivery("recorded", "queued"), "queued");
-  assert.equal(advanceDelivery("queued", "injected"), "injected");
-  assert.equal(advanceDelivery("queued", "seen"), "seen");
-  assert.equal(advanceDelivery("injected", "seen"), "seen");
-  assert.equal(advanceDelivery("seen", "acknowledged"), "acknowledged");
+test("receipt advances along the truthful delivery lifecycle", () => {
+  assert.equal(advanceReceipt("queued", "offered"), "offered");
+  assert.equal(advanceReceipt("offered", "retrieved"), "retrieved");
+  assert.equal(advanceReceipt("retrieved", "acknowledged"), "acknowledged");
 });
 
-test("delivery is monotonic and never moves backwards", () => {
-  assert.throws(() => advanceDelivery("acknowledged", "injected"), AccError);
-  assert.throws(() => advanceDelivery("seen", "queued"), AccError);
-  assert.throws(() => advanceDelivery("injected", "recorded"), AccError);
-  assert.throws(() => advanceDelivery("queued", "recorded"),
-    error => error.code === EXIT.CONFLICT);
+test("stronger evidence may skip weaker receipt states", () => {
+  assert.equal(advanceReceipt("queued", "retrieved"), "retrieved");
+  assert.equal(advanceReceipt("queued", "acknowledged"), "acknowledged");
+  assert.equal(advanceReceipt("offered", "acknowledged"), "acknowledged");
 });
 
-test("re-declaring the current delivery state is accepted as idempotent", () => {
-  // Adapters retry at safe points; a repeated "seen" must not be an error.
-  for (const state of DELIVERY_STATES) {
-    assert.equal(advanceDelivery(state, state), state);
+test("receipt transitions are monotonic and never move backwards", () => {
+  assert.throws(() => advanceReceipt("acknowledged", "retrieved"), AccError);
+  assert.throws(() => advanceReceipt("retrieved", "offered"), AccError);
+  assert.throws(() => advanceReceipt("offered", "queued"),
+    error => error.code === EXIT.CONFLICT
+      && error.message.includes("offered") && error.message.includes("queued"));
+});
+
+test("re-declaring a receipt state is idempotent", () => {
+  assert.deepEqual(RECEIPT_STATES, ["queued", "offered", "retrieved", "acknowledged"]);
+  for (const state of RECEIPT_STATES) assert.equal(advanceReceipt(state, state), state);
+});
+
+test("removed and unknown receipt states are data errors", () => {
+  for (const [current, next] of [["recorded", "queued"], ["queued", "injected"],
+    ["seen", "acknowledged"], ["queued", "failed"], ["imagined", "retrieved"]]) {
+    assert.throws(() => advanceReceipt(current, next), error => error.code === EXIT.DATA,
+      `accepted ${current} -> ${next}`);
   }
-});
-
-test("failed is reachable only before the message was exposed", () => {
-  assert.equal(advanceDelivery("recorded", "failed"), "failed");
-  assert.equal(advanceDelivery("queued", "failed"), "failed");
-  assert.throws(() => advanceDelivery("seen", "failed"), AccError);
-  assert.throws(() => advanceDelivery("acknowledged", "failed"), AccError);
-});
-
-test("failed and acknowledged are terminal", () => {
-  assert.throws(() => advanceDelivery("failed", "queued"), AccError);
-  assert.throws(() => advanceDelivery("acknowledged", "seen"), AccError);
-});
-
-test("unknown delivery states are rejected as data errors", () => {
-  assert.throws(() => advanceDelivery("queued", "delivered"),
-    error => error.code === EXIT.DATA);
-  assert.throws(() => advanceDelivery("imagined", "seen"),
-    error => error.code === EXIT.DATA);
-});
-
-test("tasks follow the documented state machine", () => {
-  assert.equal(transitionTask("pending", "in_progress"), "in_progress");
-  assert.equal(transitionTask("in_progress", "review"), "review");
-  assert.equal(transitionTask("review", "done"), "done");
-  assert.equal(transitionTask("review", "in_progress"), "in_progress");
-  assert.equal(transitionTask("in_progress", "blocked"), "blocked");
-  assert.equal(transitionTask("blocked", "in_progress"), "in_progress");
-});
-
-test("done is terminal and pending cannot skip straight to done", () => {
-  assert.throws(() => transitionTask("done", "in_progress"),
-    error => error.code === EXIT.CONFLICT);
-  assert.throws(() => transitionTask("pending", "done"),
-    error => error.code === EXIT.CONFLICT);
-});
-
-test("re-declaring the current task state is idempotent", () => {
-  for (const state of TASK_STATES) {
-    assert.equal(transitionTask(state, state), state);
-  }
-});
-
-test("unknown task states are rejected as data errors", () => {
-  assert.throws(() => transitionTask("pending", "abandoned"),
-    error => error.code === EXIT.DATA);
-  assert.throws(() => transitionTask("napping", "done"),
-    error => error.code === EXIT.DATA);
-});
-
-test("an illegal transition names both states so the failure is diagnosable", () => {
-  assert.throws(() => advanceDelivery("acknowledged", "injected"),
-    error => error.message.includes("acknowledged") && error.message.includes("injected"));
-  assert.throws(() => transitionTask("done", "pending"),
-    error => error.message.includes("done") && error.message.includes("pending"));
 });

@@ -1,4 +1,4 @@
-import { AccError, EXIT, SCHEMA_VERSION, advanceDelivery, createId, validateRecord }
+import { AccError, EXIT, SCHEMA_VERSION, advanceReceipt, createId, validateRecord }
   from "@agents-can-communicate/protocol";
 
 const receiptId = (messageId, recipient) => `${messageId}--${recipient}`;
@@ -50,7 +50,7 @@ export function createInboxService(ports, sessions) {
       for (const item of addressed) {
         const id = receiptId(item.message.messageId, session.participantId);
         const current = tx.get("receipt", id);
-        const receipt = { ...current, state: advanceDelivery(current.state, "seen"),
+        const receipt = { ...current, state: advanceReceipt(current.state, "seen"),
           updatedAt: now };
         tx.put("receipt", id, receipt, tx.generationOf("receipt", id));
         tx.append({ schemaVersion: SCHEMA_VERSION, eventId: ids.next("event"),
@@ -102,7 +102,7 @@ export function createInboxService(ports, sessions) {
         sentAt: now,
       });
       const acknowledged = { ...originalReceipt,
-        state: advanceDelivery(originalReceipt.state, "acknowledged"), updatedAt: now };
+        state: advanceReceipt(originalReceipt.state, "acknowledged"), updatedAt: now };
       const replyReceipt = validateRecord("receipt", {
         schemaVersion: SCHEMA_VERSION,
         messageId: replyId,

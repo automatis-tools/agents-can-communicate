@@ -12,7 +12,7 @@ export const CONFIG_FILENAME = "acc.workspace.json";
 // the wrong place for them, and a config carrying them is either a mistake or
 // an attempt to hand a peer state it would otherwise have to earn.
 export const RUNTIME_KEYS = Object.freeze(["sessions", "participants", "messages",
-  "claims", "receipts", "intents", "events", "tokens", "credentials"]);
+  "claims", "receipts", "intents", "events", "deliveryBindings", "tokens", "credentials"]);
 
 const KNOWN_KEYS = Object.freeze(["schemaVersion", "workspaceId", "displayName",
   "roots", "policy", "requiredAdapters", "extensions"]);

@@ -2,7 +2,6 @@ import { AccError, EXIT, SCHEMA_VERSION, assertPortableId, createId, validateRec
   from "@agents-can-communicate/protocol";
 
 import { ensureMaterialised, isMaterialised, materialise } from "./materialisation.mjs";
-import { writeWorkResponse } from "./notify.mjs";
 
 // A hook-only adapter heartbeats only when its harness gives it a turn, so the
 // staleness window is a multiple of the cadence the session itself declared
@@ -243,27 +242,10 @@ export function createSessionService(ports) {
 
     await store.transaction(async tx => {
       tx.put("session", sessionId, closed, tx.generationOf("session", sessionId));
-      // Work in progress goes back on the table. A task held by a session that
-      // has gone stayed `in_progress` forever, nobody else could take it, and
-      // whoever asked for it was never told - a request handed to an agent that
-      // closed its terminal simply vanished.
-      for (const task of tx.list("task")) {
-        if (task.assigneeSessionId !== sessionId) continue;
-        if (task.state === "done") continue;
-        const released = { ...task, assigneeSessionId: null, state: "pending" };
-        tx.put("task", task.taskId, released, tx.generationOf("task", task.taskId));
-        writeWorkResponse(tx, { task, actor: closed, workspaceId: closed.workspaceId,
-          now, ids, outcome: "released",
-          reason: "the session working on this closed before finishing it" });
-        tx.append({ schemaVersion: SCHEMA_VERSION, eventId: ids.next("event"),
-          workspaceId: closed.workspaceId, actorSessionId: sessionId,
-          type: "task.released", occurredAt: now, payload: { taskId: task.taskId } });
-      }
       tx.append({ schemaVersion: SCHEMA_VERSION, eventId: ids.next("event"),
         workspaceId: closed.workspaceId, actorSessionId: sessionId, type: "session.closed",
         occurredAt: now, payload: {} });
-    // `writeWorkResponse` tells whoever asked, on this same handle.
-    }, { kinds: ["message", "receipt", "session", "task"] });
+    }, { kinds: ["session"] });
     return closed;
   }
 
