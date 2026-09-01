@@ -21,10 +21,10 @@ export function createExampleAdapter() {
   return defineAdapter({
     id: "example",                    // portable id
     displayName: "Example CLI",
-    client: { command: "example", versionArgs: ["--version"] },
-    capabilities: { lifecycle: { sessionStart: true } },
-
-    startSession: async () => ({ ok: true, changes: [], diagnostics: [] }),
+    client: { command: "example", certificationName: "example-cli",
+      versionArgs: ["--version"] },
+    certification,                    // imported package-local certification.json
+    capabilities: { delivery: { nextTurn: true } },
 
     detect, install, uninstall, doctor,
     planInstall,                      // what install would write
@@ -55,27 +55,40 @@ presence by age alone, with nothing telling you why.
 
 ## Capabilities
 
-Seventeen booleans in five groups, declared in the manifest's `capabilities` object:
+Fourteen booleans in four groups, declared in the manifest's `capabilities` object:
 
 | Group | Entries |
 |---|---|
 | `lifecycle` | `sessionStart` `sessionResume` `sessionEnd` `heartbeat` `childSessions` |
 | `context` | `startupInjection` `beforeTurnInjection` `safePointInjection` |
 | `guards` | `beforeRead` `beforeWrite` `beforeShell` |
-| `delivery` | `polling` `activeNotification` `wakeDormantSession` |
-| `execution` | `launch` `resume` `terminate` |
+| `delivery` | `nextTurn` `livePush` `replyRoute` |
 
 **False by default. `true` requires a backing method *and* an observed capture.**
 `defineAdapter` enforces the method — declaring `guards.beforeWrite: true` without
-`guardWrite()` is a usage error at construction. Nothing enforces the capture except you, so
-declare only what you have watched happen, and say in the code why the rest is false. What
-each shipped client was actually observed doing against this list is
-[Capabilities](CAPABILITIES.md#matrix) — measured, not repeated here.
+`guardWrite()` is a usage error at construction. It also requires a passing entry in the
+validated `certification.json`; method existence is never evidence. What each shipped
+client was actually observed doing against this list is [Capabilities](CAPABILITIES.md#matrix).
 
-`lifecycle.heartbeat` is deliberately not a flavour of `delivery.polling`. Polling happens
-when the client reaches a hook, which for most harnesses means when the user takes a turn —
-an idle session stops refreshing and goes stale while its process is alive. Heartbeat fires
-on a timer instead.
+`lifecycle.heartbeat` is deliberately not a flavour of `delivery.nextTurn`. Next-turn
+delivery happens only when the client reaches a normal turn boundary; heartbeat fires on a
+timer even while the session is idle.
+
+### Certification evidence
+
+Every adapter ships `certification.json` and every referenced capture under `fixtures/`.
+Each evidence entry contains `client`, exact `version`, exact `platform`, `observedAt`,
+`capability`, package-relative `fixture`, `idleBehavior`, `busyBehavior`,
+`authorityLevel`, `limitations`, and `result` (`pass` or `fail`). A copied documentation
+example is not a capture. Failed experiments stay in the manifest as `fail`; they explain
+the false value and can never enable it.
+
+`effectiveCapabilities(adapter, { clientVersion, platform })` returns the full boolean
+shape for the installed client. Only an exact passing version/platform match remains true.
+Unreadable, unknown, or mismatched clients degrade every uncertified row to false.
+
+The backing methods for delivery are `renderContextResult()` for `nextTurn`,
+`offerMessage()` for `livePush`, and `routeReply()` for `replyRoute`.
 
 ## How far you can get
 
@@ -86,8 +99,9 @@ on a timer instead.
 | 2 | hooks + skill | automatic attach, turn context, write guards, cleanup | realtime |
 | 3 | + realtime surface | delivery receipts, safe-point injection, child sessions | — |
 
-Every shipped adapter is tier 2. Tier 3 is claimed only where a public harness contract
-genuinely supports it — no client observed so far does.
+Installed hook wiring may reach tier 2, but the effective capability is still limited to
+an exact certified client/version/platform. No client currently certifies native live push
+or native reply routing.
 
 ## normalizeHook
 

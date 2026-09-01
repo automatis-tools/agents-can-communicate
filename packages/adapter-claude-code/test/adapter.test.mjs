@@ -116,8 +116,9 @@ test("only capabilities observed in a real session are declared true", () => {
   // Documented and real, but no subagent ran during the capture.
   assert.equal(capabilities.lifecycle.childSessions, false);
   assert.equal(capabilities.context.startupInjection, false);
-  assert.equal(capabilities.delivery.wakeDormantSession, false);
-  for (const value of Object.values(capabilities.execution)) assert.equal(value, false);
+  assert.equal(capabilities.delivery.nextTurn, true);
+  assert.equal(capabilities.delivery.livePush, false);
+  assert.equal(capabilities.delivery.replyRoute, false);
 });
 
 test("captured payloads normalise and drop conversation content", async () => {

@@ -1,5 +1,6 @@
 import { defineAdapter, projectContext, projectContextResult }
   from "@agents-can-communicate/adapter-sdk";
+import certification from "../certification.json" with { type: "json" };
 
 import { denyOutcome, injectOutcome, normalizeClaudeHook } from "./hooks.mjs";
 import { planClaudeInstall, detectClaude, installClaudePlugin, uninstallClaudePlugin } from "./install.mjs";
@@ -15,7 +16,7 @@ export const CLAUDE_CODE_VERSION = "2.1.233";
  * and a parent/child mapping claimed without observation is the kind of thing
  * that quietly maps every child onto its parent. `startupInjection` and
  * `safePointInjection` were not exercised - only the before-turn path was.
- * `execution.*` and wake are not offered by this harness.
+ * Native live delivery and reply routing are not certified for this harness.
  */
 export function createClaudeCodeAdapter() {
   return defineAdapter({
@@ -24,7 +25,8 @@ export function createClaudeCodeAdapter() {
     // The binary this client actually installs. Probed for a version to
     // decide whether the client is on this machine, so it has to be the
     // real command rather than the adapter id: `2.1.233 (Claude Code)`.
-    client: { command: "claude", versionArgs: ["--version"] },
+    client: { command: "claude", certificationName: "claude-code", versionArgs: ["--version"] },
+    certification,
     capabilities: {
       lifecycle: { sessionStart: true, sessionEnd: true },
       // A UserPromptSubmit hook's additionalContext was observed arriving in
@@ -32,14 +34,13 @@ export function createClaudeCodeAdapter() {
       context: { beforeTurnInjection: true },
       // PreToolUse denied both a Write and a Bash call; neither ran.
       guards: { beforeWrite: true, beforeShell: true },
-      delivery: { polling: true },
+      delivery: { nextTurn: true },
     },
 
     startSession: async () => ({ ok: true, changes: [], diagnostics: [] }),
     endSession: async () => ({ ok: true, changes: [], diagnostics: [] }),
     guardWrite: async () => ({ ok: true, changes: [], diagnostics: [] }),
     guardShell: async () => ({ ok: true, changes: [], diagnostics: [] }),
-    poll: async () => ({ ok: true, changes: [], diagnostics: [] }),
 
     planInstall: context => planClaudeInstall(context),
     detect: context => detectClaude(context),

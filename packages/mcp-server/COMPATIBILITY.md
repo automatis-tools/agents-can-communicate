@@ -75,5 +75,6 @@ This does not violate statelessness: the server infers nothing from earlier requ
 identity comes from its own configuration, which is available on every request
 independently.
 
-Capabilities remain truthful: `delivery.polling` is true; lifecycle, guards, active
-notification, and wake stay false, because MCP guarantees none of them.
+Capabilities remain truthful: manual MCP tool polling is not `delivery.nextTurn`,
+`delivery.livePush`, or `delivery.replyRoute`; lifecycle, guards, and all three delivery
+modes stay false because MCP guarantees none of them.

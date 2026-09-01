@@ -129,12 +129,13 @@ test("only capabilities observed in a real session are declared true", () => {
   assert.equal(capabilities.lifecycle.sessionStart, true);
   assert.equal(capabilities.lifecycle.sessionEnd, true);
   assert.equal(capabilities.guards.beforeWrite, true);
-  assert.equal(capabilities.guards.beforeShell, true);
+  assert.equal(capabilities.guards.beforeShell, false);
 
   // Not observed, so not claimed: no subagent ran during the capture.
   assert.equal(capabilities.lifecycle.childSessions, false);
-  assert.equal(capabilities.delivery.wakeDormantSession, false);
-  for (const value of Object.values(capabilities.execution)) assert.equal(value, false);
+  assert.equal(capabilities.delivery.nextTurn, true);
+  assert.equal(capabilities.delivery.livePush, false);
+  assert.equal(capabilities.delivery.replyRoute, false);
 });
 
 test("doctor reports the capture and the trust requirement", async t => {

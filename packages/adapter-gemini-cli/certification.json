@@ -1,0 +1,46 @@
+{
+  "evidence": [
+    {
+      "client": "gemini-cli", "version": "0.37.0", "platform": "darwin-arm64",
+      "observedAt": "2026-08-16", "capability": "lifecycle.sessionStart",
+      "fixture": "fixtures/SessionStart.json", "idleBehavior": "fires when a session starts",
+      "busyBehavior": "fires before the first model turn", "authorityLevel": "advisory",
+      "limitations": ["capture used temporary project settings"], "result": "pass"
+    },
+    {
+      "client": "gemini-cli", "version": "0.37.0", "platform": "darwin-arm64",
+      "observedAt": "2026-08-16", "capability": "lifecycle.sessionEnd",
+      "fixture": "fixtures/SessionEnd.json", "idleBehavior": "fires when a session exits",
+      "busyBehavior": "does not run until the session exits", "authorityLevel": "advisory",
+      "limitations": ["handoff must be written before session end"], "result": "pass"
+    },
+    {
+      "client": "gemini-cli", "version": "0.37.0", "platform": "darwin-arm64",
+      "observedAt": "2026-08-16", "capability": "context.beforeTurnInjection",
+      "fixture": "fixtures/BeforeAgent.json", "idleBehavior": "waits for the next user prompt",
+      "busyBehavior": "does not interrupt an in-progress turn", "authorityLevel": "context",
+      "limitations": ["requires the hookSpecificOutput additionalContext envelope"], "result": "pass"
+    },
+    {
+      "client": "gemini-cli", "version": "0.37.0", "platform": "darwin-arm64",
+      "observedAt": "2026-08-16", "capability": "guards.beforeWrite",
+      "fixture": "fixtures/BeforeTool.json", "idleBehavior": "no write exists to guard",
+      "busyBehavior": "blocks write_file before mutation", "authorityLevel": "blocking",
+      "limitations": ["write tools are unavailable in plan mode"], "result": "pass"
+    },
+    {
+      "client": "gemini-cli", "version": "0.37.0", "platform": "darwin-arm64",
+      "observedAt": "2026-08-16", "capability": "guards.beforeShell",
+      "fixture": "fixtures/BeforeTool-shell.json", "idleBehavior": "no shell call exists to guard",
+      "busyBehavior": "blocks run_shell_command before execution", "authorityLevel": "blocking",
+      "limitations": ["shell tools depend on approval mode"], "result": "pass"
+    },
+    {
+      "client": "gemini-cli", "version": "0.37.0", "platform": "darwin-arm64",
+      "observedAt": "2026-08-16", "capability": "delivery.nextTurn",
+      "fixture": "fixtures/BeforeAgent.json", "idleBehavior": "offers complete peer messages at the next prompt",
+      "busyBehavior": "does not interrupt an in-progress turn", "authorityLevel": "context",
+      "limitations": ["delivery requires the next normal user turn"], "result": "pass"
+    }
+  ]
+}

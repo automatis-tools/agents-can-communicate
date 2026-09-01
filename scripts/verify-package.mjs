@@ -29,15 +29,14 @@ const runNpm = (args, options = {}) => (isWindows
   ? run("npm.cmd", args.map(argument => `"${argument}"`), { ...options, shell: true })
   : run("npm", args, options));
 
-// Never published: the test suite, local configuration, capture material
-// carrying paths from the machine that made it, and anything that looks like a
-// live session.
+// Never published: the test suite, local configuration, and anything that
+// looks like a live session. Redacted adapter certification captures are the
+// one fixture exception: effective capability claims must remain inspectable.
 const FORBIDDEN = [
   { pattern: /^tests\//, why: "test suite" },
   { pattern: /^\.github\//, why: "CI configuration" },
   { pattern: /^\.githooks\//, why: "local git hooks" },
   { pattern: /^\.agents\//, why: "local agent state" },
-  { pattern: /(^|\/)fixtures\//, why: "capture material from a real machine" },
   { pattern: /(^|\/)test\//, why: "test suite" },
   { pattern: /\.jsonl$/, why: "looks like a transcript" },
 ];
@@ -59,6 +58,11 @@ async function packTarball(into) {
 async function entries(tarball) {
   const { stdout } = await run("tar", ["-tzf", tarball]);
   return stdout.split("\n").filter(Boolean).map(entry => entry.replace(/^package\//, ""));
+}
+
+async function readTarJson(tarball, entry) {
+  const { stdout } = await run("tar", ["-xzOf", tarball, `package/${entry}`]);
+  return JSON.parse(stdout);
 }
 
 async function main() {
@@ -104,7 +108,27 @@ async function main() {
       const hits = listed.filter(entry => pattern.test(entry));
       if (hits.length > 0) fail(`${why} is published`, hits.slice(0, 5).join("\n"));
     }
+    const fixtureEntries = listed.filter(entry => entry.includes("/fixtures/"));
+    const invalidFixtures = fixtureEntries.filter(entry =>
+      !/^node_modules\/@agents-can-communicate\/adapter-[^/]+\/fixtures\//.test(entry));
+    if (invalidFixtures.length > 0) {
+      fail("non-certification fixture material is published", invalidFixtures.slice(0, 5).join("\n"));
+    }
+    const certifications = listed.filter(entry =>
+      /^node_modules\/@agents-can-communicate\/adapter-[^/]+\/certification\.json$/.test(entry));
+    if (certifications.length !== 5) {
+      fail("every shipped adapter must carry certification.json", certifications.join("\n"));
+    }
+    for (const certification of certifications) {
+      const manifest = await readTarJson(tarball, certification);
+      const packageRoot = path.dirname(certification);
+      for (const evidence of manifest.evidence ?? []) {
+        const fixture = `${packageRoot}/${evidence.fixture}`;
+        if (!listed.includes(fixture)) fail(`certification fixture is missing: ${fixture}`);
+      }
+    }
     ok(`${listed.length} entries, none forbidden`);
+    ok(`${certifications.length} certification manifest(s), every fixture shipped`);
 
     // The workspaces have to travel inside the tarball, or every internal
     // import fails on install. This is the whole reason the package bundles.

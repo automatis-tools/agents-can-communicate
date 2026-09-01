@@ -128,6 +128,9 @@ test("only capabilities observed firing are declared true", () => {
   assert.equal(capabilities.lifecycle.childSessions, false);
   assert.equal(capabilities.lifecycle.heartbeat, false);
   assert.equal(capabilities.guards.beforeRead, false);
+  assert.equal(capabilities.delivery.nextTurn, true);
+  assert.equal(capabilities.delivery.livePush, false);
+  assert.equal(capabilities.delivery.replyRoute, false);
 });
 
 test("a deny uses the shape this client acts on, not the one two others accept", () => {

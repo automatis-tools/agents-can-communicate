@@ -1,24 +1,21 @@
 import { AccError, EXIT, assertPortableId } from "@agents-can-communicate/protocol";
 
+import { CAPABILITY_SHAPE, freezeCapabilities, validateCertification }
+  from "./certification.mjs";
+
 // The capability surface, documented in docs/ADAPTER_AUTHORING.md and measured
 // per client in docs/CAPABILITIES.md. False is the default for every
 // entry: an adapter earns a true value by implementing the method that backs it
 // and by proving it in the conformance suite. Optimistic defaults are how a
 // tool ends up claiming protection it cannot deliver.
-export const CAPABILITY_SHAPE = Object.freeze({
-  lifecycle: ["sessionStart", "sessionResume", "sessionEnd", "heartbeat", "childSessions"],
-  context: ["startupInjection", "beforeTurnInjection", "safePointInjection"],
-  guards: ["beforeRead", "beforeWrite", "beforeShell"],
-  delivery: ["polling", "activeNotification", "wakeDormantSession"],
-  execution: ["launch", "resume", "terminate"],
-});
+export { CAPABILITY_SHAPE } from "./certification.mjs";
 
 // Each true capability names the method that has to exist for it to be true.
 const BACKING_METHOD = Object.freeze({
   "lifecycle.sessionStart": "startSession",
   "lifecycle.sessionResume": "resumeSession",
   "lifecycle.sessionEnd": "endSession",
-  // A timer-driven event from the client, distinct from delivery.polling: it
+  // A timer-driven event from the client, distinct from delivery.nextTurn: it
   // keeps presence fresh while the session is idle, which turn-driven hooks
   // cannot do.
   "lifecycle.heartbeat": "heartbeat",
@@ -29,12 +26,9 @@ const BACKING_METHOD = Object.freeze({
   "guards.beforeRead": "guardRead",
   "guards.beforeWrite": "guardWrite",
   "guards.beforeShell": "guardShell",
-  "delivery.polling": "poll",
-  "delivery.activeNotification": "notify",
-  "delivery.wakeDormantSession": "wake",
-  "execution.launch": "launch",
-  "execution.resume": "resumeProcess",
-  "execution.terminate": "terminate",
+  "delivery.nextTurn": "renderContextResult",
+  "delivery.livePush": "offerMessage",
+  "delivery.replyRoute": "routeReply",
 });
 
 const BASE_METHODS = Object.freeze(["detect", "install", "uninstall", "doctor",
@@ -44,7 +38,7 @@ function usage(message, details = {}) {
   throw new AccError(EXIT.USAGE, message, details);
 }
 
-export function assertCapabilities(declared = {}, implementation = {}) {
+export function assertCapabilities(declared = {}, implementation = {}, certification) {
   const resolved = {};
   for (const [group, names] of Object.entries(CAPABILITY_SHAPE)) {
     resolved[group] = Object.fromEntries(names.map(name => [name, false]));
@@ -65,13 +59,20 @@ export function assertCapabilities(declared = {}, implementation = {}) {
         if (typeof implementation[method] !== "function") {
           usage(`capability ${group}.${name} requires ${method}()`, { group, name, method });
         }
+        const client = implementation.client?.certificationName
+          ?? implementation.client?.command;
+        const proven = certification?.evidence.some(item => item.result === "pass"
+          && item.capability === `${group}.${name}` && item.client === client);
+        if (!proven) {
+          usage(`capability ${group}.${name} requires passing evidence in certification`,
+            { group, name, client });
+        }
       }
       resolved[group][name] = value;
     }
     Object.freeze(resolved[group]);
   }
-  for (const group of Object.keys(CAPABILITY_SHAPE)) Object.freeze(resolved[group]);
-  return Object.freeze(resolved);
+  return freezeCapabilities(resolved);
 }
 
 export function defineAdapter(manifest) {
@@ -94,8 +95,23 @@ export function defineAdapter(manifest) {
       usage(`an adapter must implement ${method}()`, { id: manifest.id, method });
     }
   }
+  const certification = validateCertification(manifest.certification);
+  const known = new Set(Object.entries(CAPABILITY_SHAPE)
+    .flatMap(([group, names]) => names.map(name => `${group}.${name}`)));
+  for (const item of certification.evidence) {
+    if (!known.has(item.capability)) {
+      usage(`unknown certified capability: ${item.capability}`,
+        { capability: item.capability });
+    }
+    const client = manifest.client.certificationName ?? manifest.client.command;
+    if (item.client !== client) {
+      usage(`certification evidence client ${item.client} does not match ${client}`,
+        { evidenceClient: item.client, client });
+    }
+  }
   return Object.freeze({
     ...manifest,
-    capabilities: assertCapabilities(manifest.capabilities, manifest),
+    certification,
+    capabilities: assertCapabilities(manifest.capabilities, manifest, certification),
   });
 }

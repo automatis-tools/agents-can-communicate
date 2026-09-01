@@ -120,10 +120,13 @@ possible without touching the operator's install.
 ## What this adapter declares
 
 Session-start and session-end hooks exist, so lifecycle holds; the payload gap is closed by
-capture. Declared true: `lifecycle.sessionStart`,
-`lifecycle.sessionEnd`, `guards.beforeWrite`, `guards.beforeShell`, `delivery.polling`.
-Still false and why: context injection unobserved, child sessions unobserved (no subagent
-ran during the capture), wake and execution not offered by this harness.
+capture. Certified true on 0.147.0 darwin-arm64: `lifecycle.sessionStart`,
+`lifecycle.sessionEnd`, `context.beforeTurnInjection`, `guards.beforeWrite`, and
+`delivery.nextTurn`. The shell denial was observed, but its `PreToolUse` payload was not
+retained — the shipped Bash JSON is an allowed `PostToolUse` event — so it cannot satisfy
+the package-local evidence gate and `guards.beforeShell` is now false. Child sessions remain
+unobserved. Native `delivery.livePush` and `delivery.replyRoute` remain false after the
+0.152.0 boundary capture.
 
 ## Certification findings (2026-08-16)
 

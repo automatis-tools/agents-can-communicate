@@ -162,15 +162,13 @@ export const RESOURCES = Object.freeze([
     description: "Messages addressed to this participant, rendered as attributed data." },
 ]);
 
-// Declared, not assumed. MCP is a polling transport with no lifecycle contract,
-// so everything except polling stays false.
+// Declared, not assumed. Manual MCP tool polling is not next-turn injection,
+// live push, or a native reply route, so every adapter delivery mode is false.
 export const MCP_CAPABILITIES = Object.freeze({
   lifecycle: Object.freeze({ sessionStart: false, sessionResume: false, sessionEnd: false,
     childSessions: false }),
   context: Object.freeze({ startupInjection: false, beforeTurnInjection: false,
     safePointInjection: false }),
   guards: Object.freeze({ beforeRead: false, beforeWrite: false, beforeShell: false }),
-  delivery: Object.freeze({ polling: true, activeNotification: false,
-    wakeDormantSession: false }),
-  execution: Object.freeze({ launch: false, resume: false, terminate: false }),
+  delivery: Object.freeze({ nextTurn: false, livePush: false, replyRoute: false }),
 });
