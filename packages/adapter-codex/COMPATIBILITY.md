@@ -247,3 +247,18 @@ asked for, and whether ACC can stop this particular session:
 
 Reading only the session's capability would announce a block on an advisory claim that
 will never happen - and its owner explicitly did not ask for one.
+
+## Native delivery boundary (2026-09-01)
+
+The installed `codex-cli 0.152.0` experimental app-server schema includes the proposed
+`turn/start` shape: empty `input`, `clientUserMessageId`, `turnTrigger`, and a standalone
+`toolOutput` with `name`, optional `namespace`, and string `output` are accepted by the
+generated schema.
+
+The real-client capture is nevertheless `fail`. `codex app-server daemon version`
+reported that `~/.codex/app-server-control/app-server-control.sock` did not exist. The
+spike did not start, bootstrap, or restart the daemon, did not start a target client, and
+did not run the proxy without that socket. Native idle delivery, busy non-interruption,
+reply routing, duplicate retry, and durable fallback are all unobserved. No native
+delivery capability is certified by this evidence. The redacted capture is under
+`fixtures/delivery/`.
