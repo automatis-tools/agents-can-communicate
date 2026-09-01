@@ -153,12 +153,22 @@ test("a tool call attaches, works, and reports through core", async t => {
     const worked = await request("tools/call", { name: "acc_work",
       arguments: { summary: "reviewing the claim model", mode: "review" }, _meta: meta });
     const synced = await request("tools/call", { name: "acc_sync", arguments: {}, _meta: meta });
+    const full = await request("tools/call", { name: "acc_sync",
+      arguments: { scope: "full" }, _meta: meta });
+    const status = await request("tools/call", { name: "acc_status", arguments: {}, _meta: meta });
 
     assert.equal(worked.error, undefined, JSON.stringify(worked.error));
     assert.equal(worked.result.isError, undefined);
     const payload = JSON.parse(synced.result.structuredContent
       ?? synced.result.content[0].text);
+    const fullPayload = JSON.parse(full.result.structuredContent);
+    const statusPayload = JSON.parse(status.result.structuredContent);
     assert.equal(payload.roster.length >= 1, true);
+    for (const field of ["workstreams", "tasks", "decisions"]) {
+      assert.equal(Object.hasOwn(fullPayload.snapshot, field), false);
+      assert.equal(Object.hasOwn(statusPayload, field), false);
+    }
+    assert.equal(Object.hasOwn(statusPayload.counts, "tasks"), false);
   });
 });
 
@@ -201,10 +211,15 @@ test("resources/list and resources/read expose read-only views", async t => {
   await withServer(t, async ({ request, meta }) => {
     const listed = await request("resources/list", { _meta: meta });
     const read = await request("resources/read", { uri: "acc://roster", _meta: meta });
+    const snapshotRead = await request("resources/read", { uri: "acc://snapshot", _meta: meta });
+    const snapshot = JSON.parse(snapshotRead.result.contents[0].text);
 
     assert.equal(listed.result.resources.length, 3);
     assert.equal(read.result.contents[0].mimeType, "application/json");
     assert.equal(Array.isArray(JSON.parse(read.result.contents[0].text)), true);
+    assert.equal(Object.hasOwn(snapshot, "workstreams"), false);
+    assert.equal(Object.hasOwn(snapshot, "tasks"), false);
+    assert.equal(Object.hasOwn(snapshot, "decisions"), false);
   });
 });
 

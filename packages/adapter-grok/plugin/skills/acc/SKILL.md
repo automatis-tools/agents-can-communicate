@@ -100,7 +100,7 @@ Every attention line includes the id its command needs:
 - `[direct_request] message_x`: use `inbox`, then `reply` or `ack`.
 - `claim_conflict claim_x`: respect it; contact the owner or change scope.
 - `claim_contended claim_x`: a peer intends to touch what you hold; coordinate.
-- `request_stalled`: contact the recipient, wait, or withdraw the request.
+- `request_stalled`: contact the recipient or wait for their reply.
 - `claim_expired`: stop assuming the resource is reserved; reclaim if needed.
 - `unread_note message_x`: read that exact inbox item once.
 

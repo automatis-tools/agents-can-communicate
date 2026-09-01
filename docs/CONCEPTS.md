@@ -72,9 +72,9 @@ participant, `--message` to select one by id. `acc reply` writes the answer, lin
 the original, and acknowledges it — one operation, so a compacted session need not scan a
 whole snapshot or remember a separate ack.
 
-Work is addressed to a **participant**, not a session, so it survives that agent
-restarting. Only the named participant can take it; work addressed to nobody is open to
-anyone.
+A request is addressed to a **participant**, not a session, so it survives that agent
+restarting. The named participant reads it from their inbox, then replies or acknowledges it;
+there is no separate operation for taking unaddressed work.
 
 ## Intent is cheap; a claim commits
 

@@ -32,6 +32,9 @@ function assertCursor(cursor) {
   }
 }
 
+function projectPublicSnapshot({ workstreams, tasks, decisions, ...publicSnapshot }) {
+  return publicSnapshot;
+}
 // Attention is computed from explicit rules, never from a hidden classifier.
 // Lower priority sorts first.
 //
@@ -288,7 +291,7 @@ export function createSyncService(ports, sessions) {
       attention,
       roster,
       events: page.events,
-      ...(input.scope === "full" ? { snapshot } : {}),
+      ...(input.scope === "full" ? { snapshot: projectPublicSnapshot(snapshot) } : {}),
     };
   }
 
