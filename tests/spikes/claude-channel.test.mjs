@@ -118,6 +118,24 @@ test("the channel rejects a second client connected before the envelope", async 
   }
 });
 
+test("the channel rejects a later client after an empty disconnect", async () => {
+  const channel = await startChannel();
+  const first = await connectSocket(channel.socketPath);
+  first.end();
+  await new Promise((resolve) => first.once("close", resolve));
+  await new Promise((resolve) => setTimeout(resolve, 20));
+
+  const second = await connectSocket(channel.socketPath);
+  try {
+    assert.deepEqual(await nextSocketMessage(second), {
+      error: "capture accepts one envelope",
+    });
+  } finally {
+    second.end();
+    await channel.close();
+  }
+});
+
 test("the channel rejects two envelopes written in one chunk", async () => {
   const channel = await startChannel();
   const socket = await connectSocket(channel.socketPath);

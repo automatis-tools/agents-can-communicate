@@ -77,7 +77,6 @@ const socketServer = net.createServer((socket) => {
     offerEnvelope();
   });
   socket.on("close", () => {
-    if (acceptedSocket === socket) acceptedSocket = null;
     for (const [messageId, connection] of connections) {
       if (connection === socket) connections.delete(messageId);
     }
