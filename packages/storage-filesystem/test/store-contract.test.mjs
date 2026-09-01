@@ -46,6 +46,14 @@ const binding = (overrides = {}) => ({
   ...overrides,
 });
 
+const workspaceRecord = (overrides = {}) => ({ schemaVersion: SCHEMA_VERSION,
+  workspaceId: "workspace_a", displayName: "Example", source: "directory",
+  roots: ["/tmp/example"], createdAt: NOW, ...overrides });
+
+const eventRecord = (overrides = {}) => ({ schemaVersion: SCHEMA_VERSION,
+  eventId: "event_a", workspaceId: "workspace_a", actorSessionId: "session_a",
+  type: "session.opened", occurredAt: NOW, payload: {}, ...overrides });
+
 for (const [name, makeStore] of [["memory", memoryStore], ["filesystem", filesystemStore]]) {
   test(`${name}: snapshots expose only v0.2 durable collections`, async () => {
     const store = await makeStore();
@@ -74,6 +82,38 @@ test("memory: ephemeral list refuses a binding corrupted after put", async () =>
     error => error.code === EXIT.DATA && /schemaVersion/.test(error.message));
 });
 
+test("memory: snapshot refuses a committed durable record corrupted after put", async () => {
+  const store = await memoryStore();
+  const record = workspaceRecord();
+  await store.transaction(async tx => tx.put("workspace", "workspace_a", record));
+  record.schemaVersion = 2;
+
+  await assert.rejects(() => store.snapshot("workspace_a"),
+    error => error.code === EXIT.DATA && /schemaVersion/.test(error.message));
+});
+
+test("memory: eventsSince refuses an old event before workspace filtering", async () => {
+  const store = await memoryStore();
+  let committed;
+  await store.transaction(async tx => {
+    committed = tx.append(eventRecord({ workspaceId: "workspace_b" }));
+  });
+  committed.schemaVersion = 2;
+
+  await assert.rejects(() => store.eventsSince("workspace_a", null, 10),
+    error => error.code === EXIT.DATA && /schemaVersion/.test(error.message));
+});
+
+test("memory: eventsSince refuses a removed event type", async () => {
+  const store = await memoryStore();
+  let committed;
+  await store.transaction(async tx => { committed = tx.append(eventRecord()); });
+  committed.type = "task.created";
+
+  await assert.rejects(() => store.eventsSince("workspace_a", null, 10),
+    error => error.code === EXIT.DATA && /type/.test(error.message));
+});
+
 test("filesystem: old durable state is refused without being rewritten or removed", async () => {
   const store = await filesystemStore();
   const directory = join(store.paths.state, "workspace");
@@ -100,3 +140,18 @@ test("filesystem: ephemeral list validates hand-written delivery bindings", asyn
   await assert.rejects(() => store.ephemeral.list("deliveryBinding"),
     error => error.code === EXIT.DATA && /schemaVersion/.test(error.message));
 });
+
+for (const [name, overrides, message] of [
+  ["old schema", { schemaVersion: 2, workspaceId: "workspace_b" }, /schemaVersion/],
+  ["removed type", { type: "task.created" }, /type/],
+]) {
+  test(`filesystem: eventsSince refuses ${name} events`, async () => {
+    const store = await filesystemStore();
+    const sequence = "0000000000000001";
+    await writeFile(join(store.paths.events, `${sequence}.json`),
+      JSON.stringify({ ...eventRecord(overrides), sequence }));
+
+    await assert.rejects(() => store.eventsSince("workspace_a", null, 10),
+      error => error.code === EXIT.DATA && message.test(error.message));
+  });
+}

@@ -1,7 +1,8 @@
 import { mkdir } from "node:fs/promises";
 import path from "node:path";
 
-import { AccError, EXIT, validateRecord } from "@agents-can-communicate/protocol";
+import { AccError, EXIT, assertPortableId, validateRecord }
+  from "@agents-can-communicate/protocol";
 
 import { encode, listDirectoryEntries, listJsonFiles, publishAtomic, readJsonIfPresent,
   removeIfPresent } from "./atomic-json.mjs";
@@ -227,7 +228,7 @@ export async function openFilesystemStore({ root, clock, ids, workspaceId, failA
       if (ceiling !== null && sequence >= ceiling) break;
       const found = await readJsonIfPresent(filePath, root);
       if (found === null) continue;
-      const event = assertEventBinding(found.value, filePath);
+      const event = validateRecord("event", assertEventBinding(found.value, filePath));
       if (event.workspaceId !== workspace) continue;
       events.push(event);
       if (events.length === limit) break;
@@ -264,7 +265,14 @@ export async function openFilesystemStore({ root, clock, ids, workspaceId, failA
   }
   // Ephemeral records are published by replace and never journalled: they carry
   // no history, append no events, and are expected to disappear.
-  const ephemeralPath = (kind, id) => path.join(paths.ephemeral, kind, `${id}.json`);
+  const ephemeralDirectory = kind => {
+    assertPortableId(kind, "ephemeral record kind");
+    return path.join(paths.ephemeral, kind);
+  };
+  const ephemeralPath = (kind, id) => {
+    assertPortableId(id, "ephemeral record id");
+    return path.join(ephemeralDirectory(kind), `${id}.json`);
+  };
   const ephemeral = Object.freeze({
     async get(kind, id) {
       return (await readJsonIfPresent(ephemeralPath(kind, id), root))?.value ?? null;
@@ -290,11 +298,11 @@ export async function openFilesystemStore({ root, clock, ids, workspaceId, failA
     },
     async delete(kind, id) {
       return withWriterMutex(paths, publishOptions,
-        async () => removeIfPresent(ephemeralPath(kind, id)));
+        async () => removeIfPresent(ephemeralPath(kind, id), { root }));
     },
     async list(kind) {
       const records = [];
-      for (const filePath of await listJsonFiles(path.join(paths.ephemeral, kind), { root })) {
+      for (const filePath of await listJsonFiles(ephemeralDirectory(kind), { root })) {
         const found = await readJsonIfPresent(filePath, root);
         if (found !== null) records.push(validateRecord(kind, found.value));
       }
