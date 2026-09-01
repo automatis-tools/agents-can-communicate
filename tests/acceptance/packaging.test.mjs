@@ -87,11 +87,32 @@ test("nothing private, local, or irrelevant is published", async t => {
   for (const excluded of [".agents", ".github", ".githooks", "tests", ".gitworktrees"]) {
     assert.equal(top.has(excluded), false, `${excluded}/ is in the tarball`);
   }
-  // A capture or a fixture would carry a real path from the machine that made
-  // it, and the runtime bus files carry live session state.
+  // Only redacted adapter certification fixtures may ship; runtime bus files
+  // and unrelated development fixtures remain private.
   for (const entry of entries) {
-    assert.doesNotMatch(entry, /fixtures\//, `${entry} is capture material`);
+    if (entry.includes("/fixtures/")) {
+      assert.match(entry,
+        /^node_modules\/@agents-can-communicate\/adapter-[^/]+\/fixtures\//,
+        `${entry} is not adapter certification evidence`);
+    }
     assert.doesNotMatch(entry, /\.jsonl$/, `${entry} looks like a transcript`);
+  }
+});
+
+test("every packaged certification reference resolves inside its adapter", async t => {
+  const { tarball } = await packed(t);
+  const entries = await entriesOf(tarball);
+  const certifications = entries.filter(entry =>
+    /^node_modules\/@agents-can-communicate\/adapter-[^/]+\/certification\.json$/.test(entry));
+
+  assert.equal(certifications.length, 5);
+  for (const certification of certifications) {
+    const manifest = JSON.parse((await run("tar",
+      ["-xzOf", tarball, `package/${certification}`])).stdout);
+    for (const item of manifest.evidence) {
+      assert.equal(entries.includes(`${path.dirname(certification)}/${item.fixture}`), true,
+        `${certification} references missing ${item.fixture}`);
+    }
   }
 });
 

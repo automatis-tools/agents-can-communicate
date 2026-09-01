@@ -7,6 +7,8 @@
     ".": "./src/adapter.mjs"
   },
   "files": [
+    "certification.json",
+    "fixtures/",
     "src/",
     "extension/"
   ]

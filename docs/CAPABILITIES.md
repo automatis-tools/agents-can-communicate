@@ -5,11 +5,9 @@ workspace can promise only what every session in it actually exposes — one wea
 participant lowers the reported protection level instead of inheriting a stronger label
 from its peers.
 
-Every row below is **measured**, not asserted: a `yes` has a fixture captured from a real
-session of that client version; a `no` means the behavior was not observed, not that it is
-impossible. Certified 2026-08-16 on macOS 15 (darwin 25.5.0, arm64) only — at least one
-finding here is filesystem- and path-shaped, so re-run the table before trusting it on
-another platform.
+Every row below is **measured**, not asserted: a `yes` has package-shipped passing evidence
+for that exact client version and `darwin-arm64`; a `no` means the behavior lacks qualifying
+evidence, not that it is impossible. Unknown versions and other platforms degrade to false.
 
 ## Clients
 
@@ -17,17 +15,17 @@ another platform.
 |---|---|---|
 | `codex` | `codex-cli` | 0.147.0 |
 | `claude_code` | Claude Code | 2.1.233 |
-| `gemini_cli` | Gemini CLI | 0.37.0 and 0.55.1 |
-| `grok` | Grok | 1.0.13 |
+| `gemini_cli` | Gemini CLI | 0.37.0 (0.55.1 has no exact package-shipped capture) |
+| `grok` | Grok | 1.0.13 (documentation-shaped fixtures do not certify capabilities) |
 | `kimi` | Kimi Code | 0.36.1 |
 
 ## Matrix
 
 | Capability | codex | claude_code | gemini_cli | grok | kimi |
 |---|---|---|---|---|---|
-| `lifecycle.sessionStart` | yes | yes | yes | yes | yes |
+| `lifecycle.sessionStart` | yes | yes | yes | no | yes |
 | `lifecycle.sessionResume` | no | no | no | no | no |
-| `lifecycle.sessionEnd` | yes | yes | yes | yes | no |
+| `lifecycle.sessionEnd` | yes | yes | yes | no | no |
 | `lifecycle.heartbeat` | no | no | no | no | yes |
 | `lifecycle.childSessions` | no | no | no | no | no |
 | `context.startupInjection` | no | no | no | no | no |
@@ -35,13 +33,16 @@ another platform.
 | `context.safePointInjection` | no | no | no | no | no |
 | `guards.beforeRead` | no | no | no | no | no |
 | `guards.beforeWrite` | yes | yes | yes | no | yes |
-| `guards.beforeShell` | yes | yes | yes | no | yes |
-| `delivery.polling` | yes | yes | yes | yes | yes |
-| `delivery.activeNotification` | no | no | no | no | no |
-| `delivery.wakeDormantSession` | no | no | no | no | no |
-| `execution.launch` | no | no | no | no | no |
-| `execution.resume` | no | no | no | no | no |
-| `execution.terminate` | no | no | no | no | no |
+| `guards.beforeShell` | no | yes | yes | no | yes |
+| `delivery.nextTurn` | yes | yes | yes | no | yes |
+| `delivery.livePush` | no | no | no | no | no |
+| `delivery.replyRoute` | no | no | no | no | no |
+
+The manifest is a maximum claim, not a promise for every installation.
+`effectiveCapabilities(adapter, { clientVersion, platform })` keeps a `yes` only when a
+passing evidence entry matches both values exactly. The Codex 0.152.0 native-delivery
+capture and Claude Code 2.1.252 development-channel capture are retained as `fail`
+evidence: neither certifies `livePush` or `replyRoute`.
 
 ## Resolving a client's pid is not universal either
 
@@ -124,12 +125,17 @@ heartbeat and do not have this problem.
 and 180006 ms of uptime — so an idle Kimi session keeps its presence honest. The other
 clients reach a hook only when the user takes a turn, so their idle sessions go stale while
 alive. This is why it is a capability of its own rather than a flavour of
-`delivery.polling`.
+`delivery.nextTurn`.
 
-**`context.beforeTurnInjection` on `grok` is false.** Grok 1.0.13 discards
-UserPromptSubmit stdout and `additionalContext`. The hook still runs (presence
-and polling), but the model is not shown that text. Agents on this client read
+**`context.beforeTurnInjection` and `delivery.nextTurn` on `grok` are false.** Grok 1.0.13
+discards UserPromptSubmit stdout and `additionalContext`. The hook still runs, but the
+model is not shown that text. Agents on this client read
 `acc status` / `acc inbox` from the skill.
+
+Grok's shipped JSON payloads are reconstructed from its documentation, while the actual
+TUI capture retained only event names and timings. Those observations remain useful in
+`COMPATIBILITY.md`, but copied shapes cannot satisfy package-local capture provenance, so
+the lifecycle rows also remain false until a raw capture is shipped.
 
 **`guards.beforeWrite` / `beforeShell` on `grok` are false.** PreToolUse fires, and
 the matcher names `write`, `search_replace`, and `run_terminal_command`. A deny

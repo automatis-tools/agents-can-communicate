@@ -1,0 +1,46 @@
+{
+  "evidence": [
+    {
+      "client": "kimi", "version": "0.36.1", "platform": "darwin-arm64",
+      "observedAt": "2026-08-16", "capability": "lifecycle.sessionStart",
+      "fixture": "fixtures/SessionStart.json", "idleBehavior": "fires when a session starts",
+      "busyBehavior": "fires before the first model turn", "authorityLevel": "advisory",
+      "limitations": ["prompt-mode session end is not emitted"], "result": "pass"
+    },
+    {
+      "client": "kimi", "version": "0.36.1", "platform": "darwin-arm64",
+      "observedAt": "2026-08-16", "capability": "lifecycle.heartbeat",
+      "fixture": "fixtures/SessionHeartbeat.json", "idleBehavior": "fires every 60 seconds while idle",
+      "busyBehavior": "continues on the same fixed cadence", "authorityLevel": "advisory",
+      "limitations": ["a process that exits before one minute emits no heartbeat"], "result": "pass"
+    },
+    {
+      "client": "kimi", "version": "0.36.1", "platform": "darwin-arm64",
+      "observedAt": "2026-08-16", "capability": "context.beforeTurnInjection",
+      "fixture": "fixtures/UserPromptSubmit.json", "idleBehavior": "waits for the next user prompt",
+      "busyBehavior": "does not interrupt an in-progress turn", "authorityLevel": "context",
+      "limitations": ["the client wraps raw stdout as hook_result"], "result": "pass"
+    },
+    {
+      "client": "kimi", "version": "0.36.1", "platform": "darwin-arm64",
+      "observedAt": "2026-08-16", "capability": "guards.beforeWrite",
+      "fixture": "fixtures/PreToolUse-Write.json", "idleBehavior": "no write exists to guard",
+      "busyBehavior": "denies Write before mutation", "authorityLevel": "blocking",
+      "limitations": ["runtime writes are outside the hook boundary"], "result": "pass"
+    },
+    {
+      "client": "kimi", "version": "0.36.1", "platform": "darwin-arm64",
+      "observedAt": "2026-08-16", "capability": "guards.beforeShell",
+      "fixture": "fixtures/PreToolUse-Bash.json", "idleBehavior": "no shell call exists to guard",
+      "busyBehavior": "denies Bash before execution", "authorityLevel": "blocking",
+      "limitations": ["only tool calls reaching PreToolUse are guarded"], "result": "pass"
+    },
+    {
+      "client": "kimi", "version": "0.36.1", "platform": "darwin-arm64",
+      "observedAt": "2026-08-16", "capability": "delivery.nextTurn",
+      "fixture": "fixtures/UserPromptSubmit.json", "idleBehavior": "offers complete peer messages at the next prompt",
+      "busyBehavior": "does not interrupt an in-progress turn", "authorityLevel": "context",
+      "limitations": ["delivery requires the next normal user turn"], "result": "pass"
+    }
+  ]
+}

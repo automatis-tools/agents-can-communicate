@@ -52,13 +52,12 @@ test("capabilities MCP lacks are only ever mentioned in the negative", () => {
   }
 });
 
-test("declared capabilities are truthful for a polling transport", () => {
-  assert.equal(MCP_CAPABILITIES.delivery.polling, true);
-  assert.equal(MCP_CAPABILITIES.delivery.activeNotification, false);
-  assert.equal(MCP_CAPABILITIES.delivery.wakeDormantSession, false);
+test("manual MCP polling does not claim an adapter delivery capability", () => {
+  assert.deepEqual(MCP_CAPABILITIES.delivery,
+    { nextTurn: false, livePush: false, replyRoute: false });
   for (const value of Object.values(MCP_CAPABILITIES.lifecycle)) assert.equal(value, false);
   for (const value of Object.values(MCP_CAPABILITIES.guards)) assert.equal(value, false);
-  for (const value of Object.values(MCP_CAPABILITIES.execution)) assert.equal(value, false);
+  assert.equal(Object.hasOwn(MCP_CAPABILITIES, "execution"), false);
 });
 
 test("read-only resources are declared with stable uris", () => {

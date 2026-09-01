@@ -1,5 +1,6 @@
 import { defineAdapter, projectContext, projectContextResult }
   from "@agents-can-communicate/adapter-sdk";
+import certification from "../certification.json" with { type: "json" };
 
 import { denyOutcome, injectOutcome, normalizeGrokHook } from "./hooks.mjs";
 import { planGrokInstall, detectGrok, installGrokHooks, uninstallGrokHooks, grokHomeOf }
@@ -23,18 +24,15 @@ export function createGrokAdapter() {
     id: "grok",
     displayName: "Grok",
     // Native Mach-O at ~/.grok/bin/grok. `ps -o comm=` on 1.0.13 reports `grok`.
-    client: { command: "grok", versionArgs: ["--version"] },
-    capabilities: {
-      lifecycle: { sessionStart: true, sessionEnd: true },
-      // UserPromptSubmit fires (observed) but stdout / additionalContext is
-      // discarded on 1.0.13. Polling still happens: the hook runs, the session
-      // heartbeats. The model is not shown the turn text.
-      delivery: { polling: true },
-    },
+    client: { command: "grok", certificationName: "grok", versionArgs: ["--version"] },
+    certification,
+    // The shipped JSON shapes were copied from documentation. Session logs
+    // prove some event names fired, but those captures are not package-shipped,
+    // so no effective capability is certified from them.
+    capabilities: {},
 
     startSession: async () => ({ ok: true, changes: [], diagnostics: [] }),
     endSession: async () => ({ ok: true, changes: [], diagnostics: [] }),
-    poll: async () => ({ ok: true, changes: [], diagnostics: [] }),
 
     planInstall: context => planGrokInstall(forClient(context)),
     detect: context => detectGrok(forClient(context)),

@@ -1,5 +1,6 @@
 import { defineAdapter, projectContext, projectContextResult }
   from "@agents-can-communicate/adapter-sdk";
+import certification from "../certification.json" with { type: "json" };
 
 import { allowOutcome, denyOutcome, injectOutcome, normalizeCodexHook }
   from "./hooks.mjs";
@@ -17,8 +18,7 @@ export const CODEX_VERSION = "0.147.0";
  * observed, and injecting nothing while claiming injection would be worse than
  * claiming nothing. `lifecycle.childSessions` is unverified: SubagentStart and
  * SubagentStop are in the binary's enum but no subagent ran during the capture.
- * `delivery.*` beyond polling and `execution.*` are not offered by this harness
- * at all.
+ * Native live delivery and reply routing remain false after the 0.152.0 capture.
  */
 export function createCodexAdapter() {
   return defineAdapter({
@@ -27,22 +27,24 @@ export function createCodexAdapter() {
     // The binary this client actually installs. Probed for a version to
     // decide whether the client is on this machine, so it has to be the
     // real command rather than the adapter id: `codex-cli 0.147.0`.
-    client: { command: "codex", versionArgs: ["--version"] },
+    client: { command: "codex", certificationName: "codex-cli", versionArgs: ["--version"] },
+    certification,
     capabilities: {
       lifecycle: { sessionStart: true, sessionEnd: true },
       // Observed reaching the model as a `developer` role message, unwrapped.
       context: { beforeTurnInjection: true },
       // PreToolUse was observed blocking both a shell command and an
       // apply_patch edit, with the reason reaching the model verbatim.
-      guards: { beforeWrite: true, beforeShell: true },
-      delivery: { polling: true },
+      // The captured Bash payload is an allowed PostToolUse event, not the
+      // denied PreToolUse capture required to certify a shell guard.
+      guards: { beforeWrite: true },
+      delivery: { nextTurn: true },
     },
 
     startSession: async () => ({ ok: true, changes: [], diagnostics: [] }),
     endSession: async () => ({ ok: true, changes: [], diagnostics: [] }),
     guardWrite: async () => ({ ok: true, changes: [], diagnostics: [] }),
     guardShell: async () => ({ ok: true, changes: [], diagnostics: [] }),
-    poll: async () => ({ ok: true, changes: [], diagnostics: [] }),
 
     planInstall: context => planCodexInstall(context),
     detect: context => detectCodex(context),

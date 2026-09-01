@@ -11,6 +11,7 @@ const base = (overrides = {}) => ({
   id: "example",
   displayName: "Example",
   capabilities: {},
+  certification: { evidence: [] },
   detect: noop,
   install: noop,
   uninstall: noop,
@@ -20,6 +21,13 @@ const base = (overrides = {}) => ({
   client: { command: "example", versionArgs: ["--version"] },
   ...overrides,
 });
+
+const evidence = capability => ({ evidence: [{
+  client: "example", version: "1.0.0", platform: "darwin-arm64",
+  observedAt: "2026-08-16", capability, fixture: "fixtures/example.json",
+  idleBehavior: "observed while idle", busyBehavior: "observed while busy",
+  authorityLevel: "advisory", limitations: [], result: "pass",
+}] });
 
 test("false is the default for every capability", () => {
   const adapter = defineAdapter(base());
@@ -39,15 +47,16 @@ test("a true capability requires an implementation method", () => {
     /endSession/);
 });
 
-test("a true capability is accepted once its method exists", () => {
+test("a true capability is accepted once its method and evidence exist", () => {
   const adapter = defineAdapter(base({ capabilities: { guards: { beforeWrite: true } },
+    certification: evidence("guards.beforeWrite"),
     guardWrite: async () => ({ ok: true, changes: [], diagnostics: [] }) }));
 
   assert.equal(adapter.capabilities.guards.beforeWrite, true);
   assert.equal(adapter.capabilities.guards.beforeRead, false);
 });
 
-test("a client-driven heartbeat is a capability of its own, not polling", () => {
+test("a client-driven heartbeat is a capability of its own, not next-turn delivery", () => {
   // Kimi Code fires SessionHeartbeat on a timer, so an idle session keeps its
   // presence fresh. The other three only reach a hook when the user takes a
   // turn, so an idle session there goes stale however alive it is. Presence in
@@ -59,10 +68,11 @@ test("a client-driven heartbeat is a capability of its own, not polling", () => 
     /heartbeat\(\)/);
 
   const adapter = defineAdapter(base({ capabilities: { lifecycle: { heartbeat: true } },
+    certification: evidence("lifecycle.heartbeat"),
     heartbeat: async () => ({ ok: true, changes: [], diagnostics: [] }) }));
   assert.equal(adapter.capabilities.lifecycle.heartbeat, true);
-  assert.equal(adapter.capabilities.delivery.polling, false,
-    "heartbeat must not imply polling; they are separately earned");
+  assert.equal(adapter.capabilities.delivery.nextTurn, false,
+    "heartbeat must not imply delivery; they are separately earned");
 });
 
 test("an unknown capability key or group fails validation", () => {
