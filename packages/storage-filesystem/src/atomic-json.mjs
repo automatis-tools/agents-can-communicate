@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { link, open, readdir, rename, unlink } from "node:fs/promises";
+import { link, open, readdir, rename } from "node:fs/promises";
 import path from "node:path";
 
 import { AccError, EXIT } from "@agents-can-communicate/protocol";
@@ -13,14 +13,6 @@ async function syncDirectory(directory) {
     await handle.sync();
   } finally {
     await handle.close();
-  }
-}
-
-async function unlinkIfPresent(filePath) {
-  try {
-    await unlink(filePath);
-  } catch (error) {
-    if (error.code !== "ENOENT") throw error;
   }
 }
 
@@ -83,7 +75,7 @@ export async function publishAtomic(destination, bytes, { root, tmpDir, replace 
     throw new AccError(EXIT.CONFLICT, "record already published with different bytes",
       { destination });
   } finally {
-    await removeIfPresent(temporary, { root });
+    await retainFile(temporary, { root });
   }
 }
 
@@ -132,7 +124,13 @@ export async function listJsonFiles(dirPath, options) {
     .sort((left, right) => left.localeCompare(right));
 }
 
-export async function removeIfPresent(filePath, { root }) {
+// Node exposes unlink only by pathname: directory handles cannot be passed to
+// unlinkat, so checking a parent and then unlinking still lets an adversary
+// replace that parent in between. Retention is the safe primitive. Callers
+// publish an append-only logical marker after this validation and never unlink
+// the retained path. The callback is the deterministic race seam.
+export async function retainFile(filePath, { root, afterValidation } = {}) {
   await assertManagedDirectory(root, path.dirname(filePath));
-  await unlinkIfPresent(filePath);
+  await afterValidation?.();
+  return "retained";
 }

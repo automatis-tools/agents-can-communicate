@@ -10,6 +10,7 @@ import { promisify } from "node:util";
 import { EXIT, SCHEMA_VERSION } from "@agents-can-communicate/protocol";
 
 import { openFilesystemStore } from "../../packages/storage-filesystem/src/store.mjs";
+import { readOpenJournals } from "../../packages/storage-filesystem/src/journal.mjs";
 import { createFakeClock, createFakeIds } from "../helpers/memory-store.mjs";
 
 const execFileAsync = promisify(execFile);
@@ -122,8 +123,8 @@ test("the event log has no gaps and no duplicate sequences after contention", as
 
   assert.deepEqual(sequences, [1, 2], "the event log gained a gap or a duplicate");
   assert.equal(new Set(sequences).size, sequences.length);
-  assert.deepEqual(await readdir(path.join(root, "journal")), [],
-    "a journal entry outlived the transaction that wrote it");
+  assert.deepEqual(await readOpenJournals(store.paths, root), [],
+    "a completed journal entry was still treated as open");
 
   // A losing process must leave nothing behind at all, not even an event.
   const events = await Promise.all(files.map(async file =>

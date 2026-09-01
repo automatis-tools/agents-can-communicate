@@ -4,7 +4,7 @@ import { AccError, EXIT, assertPortableId } from "@agents-can-communicate/protoc
 
 import { encode, publishAtomic, readJsonIfPresent } from "./atomic-json.mjs";
 
-export const STORE_VERSION = 3;
+export const STORE_VERSION = 4;
 
 export function identityPath(paths) {
   return path.join(paths.root, "protocol.json");

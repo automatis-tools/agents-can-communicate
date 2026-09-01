@@ -8,6 +8,7 @@ import test from "node:test";
 import { EXIT, SCHEMA_VERSION } from "@agents-can-communicate/protocol";
 
 import { diagnoseFilesystemStore, repairFilesystemStore } from "../src/recovery.mjs";
+import { JOURNAL_VERSION, readOpenJournals } from "../src/journal.mjs";
 import { openFilesystemStore } from "../src/store.mjs";
 import { createFakeClock, createFakeIds } from "../../../tests/helpers/memory-store.mjs";
 
@@ -49,8 +50,9 @@ async function snapshotTree(root, relative = "") {
   return entries;
 }
 
-async function writeJournal(root, publications, transactionId = "transaction_old") {
-  const entry = { journalVersion: 1, transactionId,
+async function writeJournal(root, publications, transactionId = "transaction_old",
+  journalVersion = JOURNAL_VERSION) {
+  const entry = { journalVersion, transactionId,
     firstSequence: "0000000000000001", startedAt: NOW, publications };
   await writeFile(path.join(root, "journal", `${transactionId}.json`),
     `${JSON.stringify(entry, null, 2)}\n`);
@@ -105,7 +107,9 @@ test("reopening the store completes a journalled transaction exactly", async t =
   const page = await reopened.eventsSince(WORKSPACE, null, 10);
   assert.deepEqual(page.events.map(event => event.eventId), ["event_created"]);
   assert.equal((await reopened.snapshot(WORKSPACE)).workspace.displayName, "Example");
-  assert.deepEqual(await readdir(path.join(root, "journal")), []);
+  assert.deepEqual(await readOpenJournals(reopened.paths, root), []);
+  assert.equal((await readdir(path.join(root, "journal"))).length, 1,
+    "recovery deleted its durable decision record");
 });
 
 test("opening a v0.1 store refuses it before recovery and preserves every byte", async t => {
@@ -120,7 +124,7 @@ test("opening a v0.1 store refuses it before recovery and preserves every byte",
       source: "directory", roots: ["/tmp/old"], createdAt: NOW } };
   await writeJournal(root, [{ path: `state/workspace/${WORKSPACE}.json`,
     bytes: Buffer.from(`${JSON.stringify(oldRecord)}\n`).toString("base64"),
-    replace: true, remove: false }]);
+    replace: true, remove: false }], "transaction_old", 1);
   const before = await snapshotTree(root);
 
   await assert.rejects(open(root),

@@ -5,11 +5,13 @@ import { AccError, EXIT, assertPortableId, validateRecord }
   from "@agents-can-communicate/protocol";
 
 import { encode, listDirectoryEntries, listJsonFiles, publishAtomic, readJsonIfPresent,
-  removeIfPresent } from "./atomic-json.mjs";
+  retainFile } from "./atomic-json.mjs";
 import { requireStoreIdentity } from "./identity.mjs";
 import { journalEntry, readOpenJournals, rollForward, writeJournalEntry } from "./journal.mjs";
 import { assertEventBinding, assertStateBinding, eventPath, stateEnvelope, statePath }
   from "./record-id.mjs";
+import { ephemeralIsDeleted, markEphemeral, stateDeletionPublication,
+  stateGenerationIsDeleted } from "./retention.mjs";
 import { ensureManagedDirectory } from "./safe-directory.mjs";
 import { withWriterMutex } from "./writer-mutex.mjs";
 
@@ -24,7 +26,7 @@ export const ZERO_CURSOR = "0".repeat(SEQUENCE_WIDTH);
 // corrupt record, so nothing ever had a reason to put one aside. An empty
 // directory that reads as a feature is the same mistake as an attention kind
 // with no rule behind it. If quarantining is ever built, it comes back with it.
-const DIRECTORIES = ["state", "events", "journal", "locks", "ephemeral", "tmp"];
+const DIRECTORIES = ["state", "events", "journal", "locks", "ephemeral", "retained", "tmp"];
 
 const pad = value => String(value).padStart(SEQUENCE_WIDTH, "0");
 
@@ -40,6 +42,8 @@ async function listState(paths, root, kind) {
     if (found === null) continue;
     const envelope = assertStateBinding(found.value, kind,
       path.basename(filePath, ".json"), filePath);
+    if (await stateGenerationIsDeleted(paths, root, kind, envelope.id,
+      envelope.generation)) continue;
     validateRecord(kind, envelope.record);
     envelopes.push(envelope);
   }
@@ -70,10 +74,10 @@ export async function openFilesystemStore({ root, clock, ids, workspaceId, failA
   // root, containment rules apply and each level is created individually so a
   // symlinked ancestor cannot be created past.
   await mkdir(root, { recursive: true });
-  for (const name of DIRECTORIES) await ensureManagedDirectory(root, paths[name]);
   // Identity is settled before any read or write. Adopting a directory that
   // already belongs to another workspace is the failure this fails closed on.
   await requireStoreIdentity(paths, { workspaceId, clock });
+  for (const name of DIRECTORIES) await ensureManagedDirectory(root, paths[name]);
   const publishOptions = { root, tmpDir: paths.tmp, clock, failAt };
 
   // Any journal left behind by a crashed writer is completed before the store
@@ -174,7 +178,9 @@ export async function openFilesystemStore({ root, clock, ids, workspaceId, failA
             throw new AccError(EXIT.CONFLICT, `${kind} ${id} changed under this transaction`,
               { kind, id, expectedGeneration, actualGeneration: actual });
           }
-          staged.set(key, { kind, id, removed: true });
+          const persisted = loaded.get(key);
+          if (persisted === undefined) staged.delete(key);
+          else staged.set(key, { kind, id, generation: persisted.generation, removed: true });
         },
         append(event) {
           const stamped = { ...event, sequence: pad(sequence) };
@@ -197,7 +203,8 @@ export async function openFilesystemStore({ root, clock, ids, workspaceId, failA
           replace: false,
         })),
         ...[...staged.values()].map(entry => (entry.removed === true
-          ? { path: path.relative(root, statePath(paths, entry.kind, entry.id)), remove: true }
+          ? stateDeletionPublication(paths, root, entry.kind, entry.id, entry.generation,
+            statePath(paths, entry.kind, entry.id))
           : {
             path: path.relative(root, statePath(paths, entry.kind, entry.id)),
             bytes: encode(stateEnvelope(entry.kind, entry.id, entry.generation, entry.record)),
@@ -264,7 +271,8 @@ export async function openFilesystemStore({ root, clock, ids, workspaceId, failA
     };
   }
   // Ephemeral records are published by replace and never journalled: they carry
-  // no history, append no events, and are expected to disappear.
+  // no durable history and append no events. Deletion is represented by a
+  // retained marker because Node cannot unlink safely through a directory fd.
   const ephemeralDirectory = kind => {
     assertPortableId(kind, "ephemeral record kind");
     return path.join(paths.ephemeral, kind);
@@ -273,38 +281,49 @@ export async function openFilesystemStore({ root, clock, ids, workspaceId, failA
     assertPortableId(id, "ephemeral record id");
     return path.join(ephemeralDirectory(kind), `${id}.json`);
   };
+  const readEphemeral = async (kind, id) => {
+    const found = await readJsonIfPresent(ephemeralPath(kind, id), root);
+    if (found === null || await ephemeralIsDeleted(paths, root, kind, id)) return null;
+    return validateRecord(kind, found.value);
+  };
   const ephemeral = Object.freeze({
     async get(kind, id) {
-      return (await readJsonIfPresent(ephemeralPath(kind, id), root))?.value ?? null;
+      return readEphemeral(kind, id);
     },
     async put(kind, id, record) {
       validateRecord(kind, record);
       return withWriterMutex(paths, publishOptions, async () => {
         await publishAtomic(ephemeralPath(kind, id), encode(record),
           { root, tmpDir: paths.tmp, replace: true });
+        await markEphemeral(paths, publishOptions, kind, id, "present");
         return record;
       });
     },
     async update(kind, id, updater) {
       return withWriterMutex(paths, publishOptions, async () => {
-        const found = await readJsonIfPresent(ephemeralPath(kind, id), root);
-        const next = await updater(found?.value ?? null);
+        const next = await updater(await readEphemeral(kind, id));
         if (next === null) return null;
         validateRecord(kind, next);
         await publishAtomic(ephemeralPath(kind, id), encode(next),
           { root, tmpDir: paths.tmp, replace: true });
+        await markEphemeral(paths, publishOptions, kind, id, "present");
         return next;
       });
     },
     async delete(kind, id) {
-      return withWriterMutex(paths, publishOptions,
-        async () => removeIfPresent(ephemeralPath(kind, id), { root }));
+      return withWriterMutex(paths, publishOptions, async () => {
+        if (await readEphemeral(kind, id) === null) return null;
+        await retainFile(ephemeralPath(kind, id), { root });
+        await markEphemeral(paths, publishOptions, kind, id, "deleted");
+        return null;
+      });
     },
     async list(kind) {
       const records = [];
       for (const filePath of await listJsonFiles(ephemeralDirectory(kind), { root })) {
         const found = await readJsonIfPresent(filePath, root);
-        if (found !== null) records.push(validateRecord(kind, found.value));
+        if (found !== null && !await ephemeralIsDeleted(paths, root, kind,
+          path.basename(filePath, ".json"))) records.push(validateRecord(kind, found.value));
       }
       return records;
     },
