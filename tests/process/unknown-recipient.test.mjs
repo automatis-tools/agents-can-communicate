@@ -64,7 +64,7 @@ test("a message to a name nobody has is refused, and says who is here", async t 
   assert.match(error.message, /graphics, physics/);
 });
 
-test("a request to a name nobody has makes no task", async t => {
+test("a request to a name nobody has makes no message", async t => {
   const place = await workspace(t);
   const sender = await place.attach("graphics");
   await place.attach("physics");
@@ -75,8 +75,8 @@ test("a request to a name nobody has makes no task", async t => {
   assert.notEqual(refused, null, "work was addressed to nobody");
   const { snapshot } = JSON.parse((await place.cli("sync", "--session", sender.sessionId,
     "--scope", "full")).stdout).data;
-  assert.deepEqual(snapshot.tasks, [],
-    "a task was left addressed to an agent that will never come");
+  assert.deepEqual(snapshot.messages, [],
+    "a message was left addressed to an agent that will never come");
 });
 
 test("a peer who has gone is still a peer", async t => {
@@ -123,38 +123,4 @@ test("a body that cannot be stored is refused for that, not for its recipient", 
   // control character is wrong whoever it was addressed to.
   assert.notEqual(refused, null);
   assert.match(JSON.parse(refused.stdout).error.message, /control characters/i);
-});
-
-test("work cannot be assigned to a name nobody has", async t => {
-  const place = await workspace(t);
-  const sender = await place.attach("graphics");
-  await place.attach("physics");
-
-  const refused = await failed(place.cli("task", "--session", sender.sessionId,
-    "--generation", sender.generation, "--title", "fix the tank",
-    "--assignee", "physcis"));
-
-  // `acc task --assignee` is how work is handed over without a message, and it
-  // was the one path this rule had not reached. A task left `pending` for a
-  // participant nobody has ever been is invisible to every roster, raises
-  // `task_unblocked` for nobody, and is not even stalled - nothing was waiting
-  // on it that could be told.
-  assert.notEqual(refused, null, "work was assigned to nobody");
-  assert.match(JSON.parse(refused.stdout).error.message, /no participant here is called physcis/);
-  const { snapshot } = JSON.parse((await place.cli("sync", "--session", sender.sessionId,
-    "--scope", "full")).stdout).data;
-  assert.deepEqual(snapshot.tasks, []);
-});
-
-test("work with no assignee at all is still allowed", async t => {
-  const place = await workspace(t);
-  const sender = await place.attach("graphics");
-
-  // Unassigned work is ordinary: a task noted now and picked up by whoever
-  // takes it. The rule is about naming somebody who is not there, not about
-  // naming nobody.
-  const { stdout } = await place.cli("task", "--session", sender.sessionId,
-    "--generation", sender.generation, "--title", "something to do");
-
-  assert.equal(JSON.parse(stdout).ok, true);
 });

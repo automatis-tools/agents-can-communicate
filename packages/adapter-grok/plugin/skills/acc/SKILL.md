@@ -61,8 +61,7 @@ For a question or action, require an answer:
   --subject "claim boundary" --body "Can I take file:src/parser/** after your commit?"
 ```
 
-When the peer should own a concrete piece of work, use one request instead of a
-message plus a separate task:
+When the peer should own a concrete piece of work, send one acknowledged request:
 
 ```bash
 {{ACC}} request --to claude_code --title "review inbox transitions" \
@@ -99,21 +98,9 @@ Do not use a full workspace sync to recover one message.
 Every attention line includes the id its command needs:
 
 - `[direct_request] message_x`: use `inbox`, then `reply` or `ack`.
-- `task_unblocked task_x`: take it before working:
-
-  ```bash
-  {{ACC}} task --task task_x --take
-  ```
-
-  Finish or decline it so the requester is not left waiting:
-
-  ```bash
-  {{ACC}} task --task task_x --state done
-  ```
-
 - `claim_conflict claim_x`: respect it; contact the owner or change scope.
 - `claim_contended claim_x`: a peer intends to touch what you hold; coordinate.
-- `request_stalled`: reassign, force-take intentionally, or drop the request.
+- `request_stalled`: contact the recipient, wait, or withdraw the request.
 - `claim_expired`: stop assuming the resource is reserved; reclaim if needed.
 - `unread_note message_x`: read that exact inbox item once.
 

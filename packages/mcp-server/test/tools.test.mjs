@@ -10,8 +10,8 @@ test("the model-facing surface is exactly this list", () => {
   // reachable by adapters and stay out of here. Named rather than counted, so
   // a tool swapped for another still trips this.
   assert.deepEqual(names.sort(),
-    ["acc_ack", "acc_claim", "acc_decide", "acc_finish", "acc_inbox", "acc_message",
-      "acc_reply", "acc_request", "acc_sync", "acc_task", "acc_work", "acc_workstream"]);
+    ["acc_ack", "acc_claim", "acc_finish", "acc_inbox", "acc_message", "acc_release",
+      "acc_reply", "acc_request", "acc_status", "acc_sync", "acc_work"]);
 });
 
 test("every tool declares a strict 2020-12 input schema", () => {
@@ -65,7 +65,7 @@ test("read-only resources are declared with stable uris", () => {
   const uris = RESOURCES.map(resource => resource.uri);
 
   assert.deepEqual(uris.sort(),
-    ["acc://inbox", "acc://roster", "acc://snapshot", "acc://tasks", "acc://workstreams"]);
+    ["acc://inbox", "acc://roster", "acc://snapshot"]);
   for (const resource of RESOURCES) {
     assert.equal(resource.mimeType, "application/json");
     assert.equal(typeof resource.description, "string");

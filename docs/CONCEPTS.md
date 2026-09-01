@@ -40,8 +40,8 @@ The sessions ACC joins may run different models, clients, trust settings, or peo
 Making one of them the standing authority would misrepresent that, and would make
 coordination die the moment that one process did.
 
-So ACC keeps the durable state *below* every session. Peers ask, answer, reserve, hand
-off, and steer a workstream; none can quietly become the owner of another. That is the
+So ACC keeps the durable state *below* every session. Peers ask, answer, reserve, and hand
+off; none can quietly become the owner of another. That is the
 useful middle ground between isolated terminals and a managed runtime that replaces them.
 
 | Idea | What it means |
@@ -62,8 +62,8 @@ only*, never to knowledge and never to who may ask whom.
 A message is either a fire-and-forget **note** or a **question** that wants an answer. A
 note is shown once and owes no reply; a question stands in front of the recipient until it
 is acknowledged, and if it goes unanswered while its asker waits, that waiting is surfaced.
-So a decision or warning the other agent must act on is a question (`--requires-ack`) or a
-recorded `acc decide` — not a note. A note that still reads like it wants a reply gets
+So a decision or warning the other agent must act on is a question (`--requires-ack`) —
+not a note. A note that still reads like it wants a reply gets
 flagged when you send it, and a delivered note leaves one low-priority breadcrumb so it
 stays recoverable without nagging.
 
@@ -85,8 +85,6 @@ graph TB
   S --> I["Intent — what I am doing now"]
   S --> C["Claim — a resource I reserved"]
   S --> M["Message — typed, attributed, untrusted"]
-  W --> WS["Workstream — optional grouping"]
-  WS --> T["Task — optional, with dependencies"]
 ```
 
 **Intent** is awareness — published with `acc work`, it authorises nothing. **Claim** is the
@@ -107,7 +105,7 @@ reading like protection. `acc claim` echoes back the name it stored — the name
 
 ## Where state lives, and when it appears
 
-Everything ACC records — presence, claims, messages, tasks, decisions — lives in the
+Everything ACC records — presence, claims, messages, and handoffs — lives in the
 platform's app-data directory (`~/Library/Application Support/acc` on macOS,
 `~/.local/share/acc` on Linux), **never inside your repository**, and every worktree of one
 repo shares it. Your transcripts stay on the client; ACC does not copy them.
@@ -124,7 +122,7 @@ sequenceDiagram
 ```
 
 Durable state appears at the first moment coordination actually exists — a second live
-session, or the first claim, message, task, or handoff. A room that never got a second
+session, or the first claim, message, or handoff. A room that never got a second
 session leaves nothing behind.
 
 ## Protection is a property of the room
@@ -140,16 +138,14 @@ client was measured doing.
 
 | Situation | What a session does |
 |---|---|
-| Explicit invitation, or the same workstream id | join |
+| Explicit invitation | join |
 | Exact conflicting resource | stop before writing; ask or negotiate |
 | Merely similar topic | mention it; do not merge work |
 | Unrelated | continue, silently |
 | Human said "work independently" | stay independent — claims still apply |
 
-A workstream may have one **coordinator**: it plans and synthesises, but it is not the
-transport and not the owner of durable state. If it disappears, claims and tasks stay
-valid and another participant can take the lease. Authority is about mutation only — any
-session can still be asked what the whole system is doing.
+Authority is about mutation only — any session can still be asked what the whole system
+is doing.
 
 ---
 

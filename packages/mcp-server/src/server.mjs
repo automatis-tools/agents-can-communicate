@@ -113,6 +113,8 @@ async function callTool(name, args, context) {
   const service = context.service;
 
   switch (name) {
+    case "acc_status":
+      return service.collectStatus({});
     case "acc_sync":
       return syncWithMail(service, owner, context, args);
     case "acc_work":
@@ -121,13 +123,14 @@ async function callTool(name, args, context) {
         state: args.state, workstreamId: args.workstreamId ?? null,
         resourceHints: args.resourceHints ?? [] });
     case "acc_claim":
-      if (args.action === "release") return service.releaseClaim({ ...owner,
-        claimId: args.claimId }) ?? { released: args.claimId };
       if (args.action === "renew") return service.renewClaim({ ...owner,
         claimId: args.claimId, leaseSeconds: args.leaseSeconds });
       return service.acquireClaim({ ...owner, resource: args.resource,
         mode: args.mode ?? "exclusive", enforcement: "advisory",
         reason: args.reason ?? "unspecified", leaseSeconds: args.leaseSeconds });
+    case "acc_release":
+      await service.releaseClaim({ ...owner, claimId: args.claimId });
+      return { released: args.claimId };
     case "acc_message": {
       const message = await service.sendMessage({ ...owner, toParticipantIds: args.to ?? [],
         subject: args.subject, body: args.body, type: args.type ?? "note",
@@ -143,38 +146,12 @@ async function callTool(name, args, context) {
     case "acc_reply":
       return service.replyToMessage({ ...owner, messageId: args.messageId,
         body: args.body, subject: args.subject, type: args.type, priority: args.priority });
-    case "acc_task":
-      if (args.action === "claim") return service.claimTask({ ...owner,
-        taskId: args.taskId, force: args.force === true });
-      if (args.action === "decline") return service.declineTask({ ...owner,
-        taskId: args.taskId, reason: args.reason });
-      if (args.action === "transition") return service.transitionTask({ ...owner,
-        taskId: args.taskId, state: args.state });
-      return service.createTask({ ...owner, workstreamId: args.workstreamId,
-        title: args.title, detail: args.detail, taskId: args.taskId,
-        assigneeParticipantId: args.assigneeParticipantId,
-        dependsOn: args.dependsOn ?? [] });
     case "acc_request":
       return service.requestWork({ ...owner, toParticipantId: args.toParticipantId,
-        title: args.title, detail: args.detail, workstreamId: args.workstreamId,
-        priority: args.priority, dependsOn: args.dependsOn ?? [] });
+        title: args.title, detail: args.detail });
     case "acc_ack":
       return service.markDelivery({ ...owner, messageId: args.messageId,
         state: args.state ?? "acknowledged" });
-    case "acc_decide":
-      return service.recordDecision({ ...owner, title: args.title, outcome: args.outcome,
-        authority: args.authority ?? "workstream", workstreamId: args.workstreamId ?? null,
-        decidedBy: args.decidedBy, supersedes: args.supersedes ?? null,
-        humanConfirmed: args.humanConfirmed === true });
-    case "acc_workstream":
-      if (args.action === "coordinate") {
-        return service.acquireCoordinator({ ...owner, workstreamId: args.workstreamId });
-      }
-      if (args.action === "release") {
-        return service.releaseCoordinator({ ...owner, workstreamId: args.workstreamId });
-      }
-      return service.createWorkstream({ ...owner, title: args.title,
-        objective: args.objective });
     case "acc_finish":
       return service.finishSession({ ...owner, goal: args.goal, status: args.status,
         completed: args.completed ?? [], remaining: args.remaining ?? [],

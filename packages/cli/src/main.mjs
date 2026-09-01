@@ -223,21 +223,18 @@ const HANDLERS = Object.freeze({
       text: `replied ${result.reply.messageId}; acknowledged ${options.message}` };
   },
 
-  /**
-   * Ask another agent to do something. One call, one write.
-   *
-   * The recipient hears about it twice by design: the task raises an attention
-   * item for the participant it names, and the message reaches their turn as
-   * quoted peer text explaining why.
-   */
   request: async ({ options, context }) => {
-    const { task, message } = await context.service.requestWork({
-      sessionId: options.session, generation: options.generation,
-      toParticipantId: options.to, title: options.title, detail: options.detail,
-      workstreamId: options.workstream, priority: options.priority,
-      dependsOn: options.dependsOn ?? [], descriptor: context.descriptor });
-    return { data: { task, message },
-      text: `requested ${task.taskId} of ${options.to}` };
+    const message = await context.service.sendMessage({
+      sessionId: options.session,
+      generation: options.generation,
+      toParticipantIds: [options.to],
+      type: "work_request",
+      subject: options.title,
+      body: options.detail ?? options.title,
+      requiresAck: true,
+      descriptor: context.descriptor,
+    });
+    return { data: message, text: `requested ${message.messageId} of ${options.to}` };
   },
 
   ack: async ({ options, context }) => {
@@ -245,84 +242,6 @@ const HANDLERS = Object.freeze({
       generation: options.generation, messageId: options.message,
       state: options.state ?? "acknowledged" });
     return { data: receipt, text: `${receipt.messageId} ${receipt.state}` };
-  },
-
-  /**
-   * What was settled, and on whose authority.
-   *
-   * `--human` is the caller stating that a person actually decided this. The
-   * core refuses `--authority human` without it, because a peer proposal
-   * becoming a human decision on its own is the one way this record could
-   * launder an agent's opinion into a ruling.
-   */
-  decide: async ({ options, context }) => {
-    const decision = await context.service.recordDecision({
-      sessionId: options.session, generation: options.generation,
-      title: options.title, outcome: options.outcome,
-      authority: options.authority ?? "workstream",
-      workstreamId: options.workstream ?? null,
-      decidedBy: options.decidedBy,
-      supersedes: options.supersedes ?? null,
-      humanConfirmed: options.human === true,
-      descriptor: context.descriptor });
-    return { data: decision,
-      text: `${decision.decisionId} ${decision.authority}: ${decision.title}` };
-  },
-
-  workstream: async ({ options, context }) => {
-    const owner = { sessionId: options.session, generation: options.generation };
-    // Taking the coordination of one and creating one are the same noun, so
-    // they stay one command rather than two the model has to choose between -
-    // the same shape `acc task` already has.
-    if (options.take === true || options.release === true) {
-      if (options.workstream === undefined) {
-        throw usage(`workstream --${options.take === true ? "take" : "release"} `
-          + "requires --workstream");
-      }
-      const acted = options.take === true
-        ? await context.service.acquireCoordinator({ ...owner,
-          workstreamId: options.workstream })
-        : await context.service.releaseCoordinator({ ...owner,
-          workstreamId: options.workstream });
-      return { data: acted,
-        text: `${acted.workstreamId} ${options.take === true ? "coordinated" : "released"}` };
-    }
-    if (options.title === undefined) throw usage("workstream requires --title");
-    if (options.objective === undefined) throw usage("workstream requires --objective");
-    const workstream = await context.service.createWorkstream({ ...owner,
-      title: options.title, objective: options.objective,
-      descriptor: context.descriptor });
-    return { data: workstream, text: `${workstream.workstreamId} ${workstream.state}` };
-  },
-
-  task: async ({ options, context }) => {
-    const owner = { sessionId: options.session, generation: options.generation };
-    // Taking work and moving it along are the same noun as creating it, so they
-    // stay one command rather than three the model has to choose between.
-    if (options.take === true) {
-      if (options.task === undefined) throw usage("task --take requires --task");
-      const taken = await context.service.claimTask({ ...owner, taskId: options.task,
-        force: options.force === true });
-      return { data: taken, text: `${taken.taskId} ${taken.state}` };
-    }
-    if (options.decline === true) {
-      if (options.task === undefined) throw usage("task --decline requires --task");
-      const refused = await context.service.declineTask({ ...owner,
-        taskId: options.task, reason: options.reason });
-      return { data: refused, text: `${refused.taskId} declined` };
-    }
-    if (options.state !== undefined) {
-      if (options.task === undefined) throw usage("task --state requires --task");
-      const moved = await context.service.transitionTask({ ...owner,
-        taskId: options.task, state: options.state });
-      return { data: moved, text: `${moved.taskId} ${moved.state}` };
-    }
-    if (options.title === undefined) throw usage("task requires --title");
-    const task = await context.service.createTask({ ...owner,
-      workstreamId: options.workstream, title: options.title, detail: options.detail,
-      assigneeParticipantId: options.assignee, taskId: options.task,
-      dependsOn: options.dependsOn ?? [], descriptor: context.descriptor });
-    return { data: task, text: `${task.taskId} ${task.state}` };
   },
 
   finish: async ({ options, context }) => {

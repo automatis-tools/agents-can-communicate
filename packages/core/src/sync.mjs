@@ -41,12 +41,10 @@ function assertCursor(cursor) {
 export const ATTENTION_PRIORITY = Object.freeze({
   direct_request: 1,
   claim_conflict: 2,
-  task_unblocked: 3,
-  coordinator_missing: 4,
-  request_stalled: 5,
-  claim_expired: 6,
-  claim_contended: 7,
-  unread_note: 8,
+  request_stalled: 3,
+  claim_expired: 4,
+  claim_contended: 5,
+  unread_note: 6,
 });
 
 function directRequests(snapshot, participantId) {
@@ -167,45 +165,12 @@ function claimContended(snapshot, session, now) {
 }
 
 /**
- * Work waiting on me.
- *
- * Addressed by participant, so a request survives the recipient restarting -
- * the next session of that agent is told about it. A task already taken by one
- * of my sessions matches too, since that session may have been replaced.
- *
- * Unaddressed tasks are deliberately absent. Anyone may take one, but pushing
- * every open task into every turn is how a coordination layer becomes noise.
- */
-function unblockedTasks(snapshot, session, participantId) {
-  const mine = task => (task.assigneeParticipantId !== null
-    && task.assigneeParticipantId === participantId)
-    || (task.assigneeSessionId !== null && task.assigneeSessionId === session?.sessionId);
-  return (snapshot.tasks ?? [])
-    .filter(task => task.state === "pending" && mine(task))
-    .map(task => ({ kind: "task_unblocked", priority: ATTENTION_PRIORITY.task_unblocked,
-      sourceId: task.taskId, summary: task.title }));
-}
-
-/**
- * Work you asked for that nobody is doing any more.
- *
- * A task taken by a session that then crashed stayed `in_progress` for good:
- * the requester was told nothing and nobody else could take it. Unlike the
- * one-shot answers a request produces, this repeats until it is resolved,
- * because it stays true until someone picks the work back up.
- */
-/**
  * A question nobody is left to answer.
  *
- * The task rule below tells a requester when work they asked for is going
- * nowhere. A `requiresAck` message had no such rule, and a message is the other
- * half of the same act: an agent asked a peer a direct question, the peer's
- * session ended without answering, and the asker's next turn was empty. Not
- * "still waiting" - empty. Measured, with the only other agent gone and an
- * unanswered question standing between them.
- *
- * The same kind as the task case, because it is the same fact about the world:
- * you asked, and there is nobody there.
+ * An agent asked a peer a direct question, the peer's session ended without
+ * answering, and the asker's next turn was empty. Not "still waiting" - empty.
+ * Measured, with the only other agent gone and an unanswered question standing
+ * between them.
  */
 function unansweredQuestions(snapshot, participantId, onlineParticipants) {
   const items = [];
@@ -238,35 +203,7 @@ function stalledRequests(snapshot, participantId, now, pidIsAlive) {
   const onlineParticipants = new Set((snapshot.sessions ?? [])
     .filter(session => live.get(session.sessionId) === "online")
     .map(session => session.participantId));
-  const goingNowhere = task => {
-    // Taken by someone who has gone quiet.
-    if (task.state === "in_progress") {
-      return task.assigneeSessionId !== null
-        && live.get(task.assigneeSessionId) !== "online";
-    }
-    // Or waiting on an agent that is not here - including one that closed and
-    // never came back, which leaves the work addressed to nobody at all.
-    return task.state === "pending" && task.assigneeParticipantId !== null
-      && !onlineParticipants.has(task.assigneeParticipantId);
-  };
-  return [
-    ...(snapshot.tasks ?? [])
-      .filter(task => task.requestedByParticipantId === participantId
-        && goingNowhere(task))
-      .map(task => ({ kind: "request_stalled", priority: ATTENTION_PRIORITY.request_stalled,
-        sourceId: task.taskId,
-        summary: `${task.title} - nobody is working on it` })),
-    ...unansweredQuestions(snapshot, participantId, onlineParticipants),
-  ];
-}
-
-function coordinatorGaps(snapshot) {
-  return (snapshot.workstreams ?? [])
-    .filter(workstream => workstream.state === "open"
-      && workstream.coordinatorSessionId === null)
-    .map(workstream => ({ kind: "coordinator_missing",
-      priority: ATTENTION_PRIORITY.coordinator_missing,
-      sourceId: workstream.workstreamId, summary: workstream.title }));
+  return unansweredQuestions(snapshot, participantId, onlineParticipants);
 }
 
 export function computeAttention(snapshot, { session, participantId, now, pidIsAlive }) {
@@ -284,8 +221,6 @@ export function computeAttention(snapshot, { session, participantId, now, pidIsA
     ...claimConflicts(snapshot, session, now),
     ...claimContended(snapshot, session, now),
     ...expiredClaims(snapshot, session, now),
-    ...unblockedTasks(snapshot, session, participantId),
-    ...coordinatorGaps(snapshot),
     ...stalledRequests(snapshot, participantId, now, pidIsAlive),
   ].sort((left, right) => left.priority - right.priority
     || left.sourceId.localeCompare(right.sourceId));

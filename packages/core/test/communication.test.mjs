@@ -85,30 +85,20 @@ test("a message needs at least one recipient", async () => {
     error => error.code === EXIT.USAGE);
 });
 
-test("a peer proposal cannot become a human-authority decision by itself", async () => {
-  const { service } = makeService();
-  const { first } = await pair(service);
-  const proposing = { sessionId: first.sessionId, generation: first.generation,
-    title: "Adopt base64url", outcome: "Adopted" };
-
-  await assert.rejects(service.recordDecision({ ...proposing, authority: "human" }),
-    error => error.code === EXIT.CONFLICT);
-
-  const workstream = await service.recordDecision({ ...proposing, authority: "workstream" });
-  assert.equal(workstream.authority, "workstream");
-  const confirmed = await service.recordDecision({ ...proposing, authority: "human",
-    humanConfirmed: true });
-  assert.equal(confirmed.authority, "human");
-});
-
-test("superseding an unknown decision is refused", async () => {
+test("requestWork returns one acknowledged message and no work identifier", async () => {
   const { service } = makeService();
   const { first } = await pair(service);
 
-  await assert.rejects(service.recordDecision({ sessionId: first.sessionId,
-    generation: first.generation, title: "Replace", outcome: "New",
-    authority: "workstream", supersedes: "decision_missing" }),
-  error => error.code === EXIT.DATA);
+  const message = await service.requestWork({ sessionId: first.sessionId,
+    generation: first.generation, toParticipantId: "participant_b",
+    title: "Review the boundary" });
+
+  assert.equal(message.type, "work_request");
+  assert.equal(message.body, "Review the boundary");
+  assert.equal(message.requiresAck, true);
+  assert.equal(Object.hasOwn(message, "taskId"), true);
+  assert.equal(message.taskId, null);
+  assert.equal(Object.hasOwn(message, "task"), false);
 });
 
 test("finish produces a handoff and releases what the session owned", async () => {

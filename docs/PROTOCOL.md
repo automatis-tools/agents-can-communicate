@@ -42,7 +42,6 @@ export interface WorkIntent {
   summary: string;
   mode: "observe" | "explore" | "edit" | "review" | "coordinate" | "wait";
   resourceHints: string[];
-  workstreamId: string | null;
   state: "active" | "blocked" | "waiting" | "done";
   updatedAt: string;
 }
@@ -51,38 +50,6 @@ export interface WorkIntent {
 Intent is awareness, not authorization. An edit intent does not replace a
 claim.
 
-## Workstreams and tasks
-
-Workstreams group related collaboration. Tasks are optional and appear only
-when formal assignment, dependency, or acceptance tracking adds value.
-
-```ts
-export interface Workstream {
-  workstreamId: string;
-  title: string;
-  objective: string;
-  coordinatorSessionId: string | null;
-  state: "open" | "paused" | "complete" | "cancelled";
-}
-
-export interface Task {
-  taskId: string;
-  workstreamId: string | null;        // optional: a request needs no project
-  title: string;
-  detail: string | null;
-  state: "pending" | "in_progress" | "review" | "done" | "blocked";
-  assigneeParticipantId: string | null;  // who it is for, survives their restart
-  assigneeSessionId: string | null;      // who is doing it now, dies with the process
-  dependsOn: string[];
-  acceptance: string[];
-}
-```
-
-A task whose dependencies are unmet is created `blocked`. Finishing the last
-dependency flips its dependents to `pending` in the same transaction, so
-`pending` always means ready and no LLM has to remember to re-evaluate the
-graph. A dependency that would close a cycle is refused.
-
 ## Resource claims
 
 Claims use resource URIs so the core is not limited to files:
@@ -90,7 +57,6 @@ Claims use resource URIs so the core is not limited to files:
 ```text
 file:game/presentation/**
 git:branch/feature-camera
-task:M2.1a
 asset:tank-model/v3
 doc:architecture#camera-contract
 url:https://example.test/spec
@@ -145,28 +111,16 @@ handoff
 work_request
 ```
 
-Every message records sender, recipients, workstream, optional task,
-priority, reply thread, and evidence descriptors. Message bodies are
+Every message records sender, recipients, type, priority, reply thread, and evidence
+descriptors. Message bodies are
 untrusted peer content — a message is data the recipient weighs, never an
 order it obeys; see [Concepts](CONCEPTS.md#asking-not-commanding).
 
 ## Requesting work
 
-`requestWork` writes a task and a message in one transaction. Apart they are
-useless: a task nobody was told about is work nobody knows exists, and a
-message describing work that was never recorded is a request with nothing to
-point at.
-
-The Task interface above carries two assignee fields because they answer
-different questions. `assigneeParticipantId` is who the work is for and
-outlives that agent restarting — the next session of that participant is
-told about it. `assigneeSessionId` is who is actually doing it, and dies
-with the process. One field asked to be both would either lose the request
-when a terminal closes or claim a dead session is still working.
-
-Only the named participant may take an addressed task. A task with no
-assignee is open to anyone, which is what makes a request without a
-recipient a request to the room.
+`requestWork` is a message-only convenience. It writes one `work_request` to the named
+participant, requires acknowledgement, uses the title as the body when no detail is given,
+and returns the message. No separate work record or identifier is created.
 
 ## Delivery lifecycle
 
@@ -200,27 +154,6 @@ writes an attributed response with `inReplyTo`, and advances the caller's
 original receipt to `acknowledged` — answer, link, and acknowledge in one
 transaction. Another participant cannot read or answer that receipt.
 
-## Decisions
-
-Decisions are separate durable objects rather than ordinary chat messages:
-
-```ts
-export interface Decision {
-  decisionId: string;
-  workstreamId: string | null;
-  title: string;
-  outcome: string;
-  authority: "human" | "workstream" | "policy";
-  decidedBy: string[];
-  evidence: ArtifactRef[];
-  supersedes: string | null;
-  decidedAt: string;
-}
-```
-
-Peer proposals never become human-authority decisions without an explicit
-human or policy transition.
-
 ## Artifacts and handoffs
 
 Artifacts are references with provenance and optional integrity values.
@@ -249,17 +182,16 @@ A handoff contains:
 ## Sync and attention
 
 Adapters request deltas since a cursor. Core computes attention items from
-eight explicit rules — `direct_request`, `claim_conflict`, `task_unblocked`,
-`coordinator_missing`, `request_stalled`, `claim_expired`, `claim_contended`,
-`unread_note` — listed with their exact trigger in
+six explicit rules — `direct_request`, `claim_conflict`, `request_stalled`,
+`claim_expired`, `claim_contended`, `unread_note` — listed with their exact trigger in
 [Architecture](ARCHITECTURE.md).
 
 Semantic relevance may be assessed by the receiving model, but correctness
 cannot depend on a hidden central LLM classifier.
 
 Sync also supports an explicit full-Workspace scope: any session may
-request the complete snapshot — roster, intents, workstreams, tasks,
-claims, and other participants' collapsed child sessions — to answer
+request the complete snapshot — roster, intents, claims, messages, and other
+participants' collapsed child sessions — to answer
 whole-system forensic questions. Bounded deltas are the ambient default;
 one addressed message is always read through `inbox`, never by scanning
 this snapshot.

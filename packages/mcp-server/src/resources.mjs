@@ -35,10 +35,6 @@ export async function readResource(uri, { service, participantId, workspaceId })
         messages: snapshot.messages.map(attributedMessage) };
     case "acc://roster":
       return (await service.sync({ workspaceId })).roster;
-    case "acc://workstreams":
-      return snapshot.workstreams;
-    case "acc://tasks":
-      return snapshot.tasks;
     case "acc://inbox": {
       const mine = new Set(snapshot.receipts
         .filter(receipt => receipt.recipientParticipantId === participantId)

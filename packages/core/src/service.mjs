@@ -7,8 +7,6 @@ import { assertPorts } from "./ports.mjs";
 import { createSessionService } from "./sessions.mjs";
 import { createGuardStateService, createStatusService } from "./status.mjs";
 import { createSyncService } from "./sync.mjs";
-import { createTaskService } from "./tasks.mjs";
-import { createWorkstreamService } from "./workstreams.mjs";
 
 /**
  * Composition root for the domain services. Everything time- or
@@ -29,8 +27,6 @@ export function createCoordinationService({ store, clock, ids,
   const ports = assertPorts({ store, clock, ids, pidIsAlive });
   const sessions = createSessionService(ports);
   const intents = createIntentService(ports, sessions);
-  const workstreams = createWorkstreamService(ports, sessions);
-  const tasks = createTaskService(ports, workstreams);
   const claims = createClaimService(ports, sessions);
   const communication = createCommunicationService(ports, sessions, claims);
   const inbox = createInboxService(ports, sessions);
@@ -44,8 +40,6 @@ export function createCoordinationService({ store, clock, ids,
     policies: Object.freeze({ ...policies }),
     ...sessions,
     ...intents,
-    ...workstreams,
-    ...tasks,
     ...claims,
     ...communication,
     ...inbox,

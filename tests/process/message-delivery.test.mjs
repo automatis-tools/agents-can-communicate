@@ -209,8 +209,9 @@ test("a note that reads like a question is nudged toward an answerable form", as
     { env: where.env }).then(({ stdout }) => JSON.parse(stdout).data);
 
   const consequential = await message("note", "Snow", "It touches your file. Have you started?");
-  assert.match(consequential.advice ?? "", /--requires-ack|acc decide/,
+  assert.match(consequential.advice ?? "", /--requires-ack/,
     "a note asking a question was sent with no nudge to make it answerable");
+  assert.doesNotMatch(consequential.advice ?? "", /acc decide/);
 
   const fyi = await message("note", "FYI", "Logged it. Nothing for you to do.");
   assert.equal(fyi.advice, undefined,

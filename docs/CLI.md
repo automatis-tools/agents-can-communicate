@@ -19,7 +19,7 @@ graph LR
     I[acc install] --- UN[acc uninstall] --- D[acc doctor] --- CF[acc config]
   end
   subgraph In-session
-    ST[acc status] --- SY[acc sync] --- W[acc work] --- CL[acc claim] --- RL[acc release] --- MS[acc message] --- IN[acc inbox] --- RP[acc reply] --- RQ[acc request] --- TK[acc task] --- WS[acc workstream] --- AK[acc ack] --- DC[acc decide] --- FN[acc finish]
+    ST[acc status] --- SY[acc sync] --- W[acc work] --- CL[acc claim] --- RL[acc release] --- MS[acc message] --- IN[acc inbox] --- RP[acc reply] --- RQ[acc request] --- AK[acc ack] --- FN[acc finish]
   end
   subgraph Adapter-only
     AT[acc attach] --- HB[acc heartbeat] --- DT[acc detach]
@@ -54,11 +54,8 @@ graph LR
 | `acc message` | Send a typed message to participants |
 | `acc inbox` | Unresolved messages addressed to you. `--message` selects one |
 | `acc reply` | Reply to one addressed message and acknowledge it in the same step |
-| `acc request` | Ask another agent to do something — the work plus why, in one call |
-| `acc task` | Create work, `--take` it, or move it along with `--state` |
-| `acc workstream` | Group related work. Optional. `--take` / `--release` steer one |
+| `acc request` | Ask another agent to do something in an acknowledged message |
 | `acc ack` | Acknowledge a message that asked for one, without writing a reply |
-| `acc decide` | Record what was settled, so the next session doesn't reopen it |
 | `acc finish` | Write the handoff and release claims |
 
 ## Messages
@@ -155,39 +152,20 @@ acc status --all
 Each entry carries `checkoutRoot`, `branch`, and `presence`, so a worktree with no live
 session behind it can be told apart from someone's desk.
 
-## Recording what was settled
-
-A decision is a durable object, not another message in the log — it outlives the
-conversation that produced it.
-
-```bash
-acc decide --title "hull clamps at half height" \
-  --outcome "settle() clamps to GROUND_Y + height/2; renderer draws what physics returns"
-```
-
-| Flag | Meaning |
-|---|---|
-| `--authority` | Who settled it: `workstream` (default), `policy`, or `human` (needs `--human` too) |
-| `--supersedes` | Id of the decision this replaces; it must already exist |
-
-A peer proposal can't promote itself to human authority on its own. See
-[PROTOCOL.md](PROTOCOL.md#decisions) for the full authority model.
-
 ## Asking another agent
 
-`--to` and `--assignee` name a participant from the roster. An unknown name is refused, not
+`--to` names a participant from the roster. An unknown name is refused, not
 silently accepted — a participant who has closed their terminal is still a participant,
-which is the whole reason work is addressed to one rather than to a session.
+which is why the message is addressed to one rather than to a session.
 
 ```bash
 acc request --to claude_code --title "finish the store tests" \
   --detail "I ported src/store but ran out of time on the concurrency cases."
 ```
 
-One write produces two linked facts: the task shows up as an attention item for the
-recipient, and the message explains why. Finishing the task answers the request
-automatically; `acc ack --message <id>` closes a message with no task behind it — and only
-the session that read a message can acknowledge it.
+One write produces a `work_request` message that requires acknowledgement. The recipient
+can reply in writing with `acc reply`, or close it without a written answer using
+`acc ack --message <id>` — and only the session that read a message can acknowledge it.
 
 Addressing survives a closed terminal only if the agent has a stable name of its own:
 
@@ -196,27 +174,3 @@ ACC_PARTICIPANT=backend-codex codex
 ```
 
 Without one, each run is a new participant, so nothing addressed to the last one reaches it.
-
-| Command | Does |
-|---|---|
-| `acc task --task task_x --take` | Claim assigned work; exit `5` if it isn't yours |
-| `acc task --task task_x --state review` | Move it along |
-| `acc task --assignee <name>` | Address work without sending a message |
-| `acc request` | Same as `--assignee`, with the explanation attached — almost always what you want |
-
-A workstream is optional — `acc request --to models --title "review the migration"` needs
-no project around it. Create one when several pieces belong together:
-
-```bash
-acc workstream --title "Storage" --objective "port the store and its tests"
-```
-
-An open workstream with nobody steering it raises `coordinator_missing` every turn until
-someone takes it on:
-
-```bash
-acc workstream --workstream workstream_x --take
-acc workstream --workstream workstream_x --release
-```
-
-Only the session holding the lease can release it.

@@ -13,7 +13,7 @@ graph TB
   end
   X1 & X2 & X3 & X4 --> HR[acc-hook runtime]
   X5 --> MS[acc-mcp]
-  HR & MS --> CO["core — sessions · intents · claims<br/>messages · tasks · sync"]
+  HR & MS --> CO["core — sessions · intents · claims<br/>messages · sync"]
   CO --> ST[(filesystem store<br/>outside every repo)]
 ```
 
@@ -101,17 +101,12 @@ Computed from explicit rules, never from a hidden classifier. Lower sorts first:
 |---|---|---|
 | 1 | `direct_request` | A message addressed to you requires an ack and has not had one |
 | 2 | `claim_conflict` | Your declared resource hints overlap a live claim you do not own |
-| 3 | `task_unblocked` | Work addressed to your participant is `pending` — every dependency is `done` |
-| 4 | `coordinator_missing` | An open workstream has no coordinator |
-| 5 | `request_stalled` | Work you requested is held by a session gone quiet, or addressed to a participant that is not here; or a question of yours needs an answer from a participant that is not here |
-| 6 | `claim_expired` | A claim you took has run out — peers can write to it again, and until now nothing said so |
-| 7 | `claim_contended` | A peer's declared resource hints overlap a live claim you hold. The mirror of `claim_conflict`: a claim is advice, not a lock, so the holder is told early that someone means to touch it |
-| 8 | `unread_note` | A message shown to you once that raised no `direct_request` (it asked for no ack) and that you have not acknowledged. It surfaces once, the turn after delivery, then goes quiet — recoverable without becoming a standing nag |
+| 3 | `request_stalled` | A question of yours needs an answer from a participant that is not here |
+| 4 | `claim_expired` | A claim you took has run out — peers can write to it again, and until now nothing said so |
+| 5 | `claim_contended` | A peer's declared resource hints overlap a live claim you hold. The mirror of `claim_conflict`: a claim is advice, not a lock, so the holder is told early that someone means to touch it |
+| 6 | `unread_note` | A message shown to you once that raised no `direct_request` (it asked for no ack) and that you have not acknowledged. It surfaces once, the turn after delivery, then goes quiet — recoverable without becoming a standing nag |
 
-A task with unmet dependencies is `blocked`, and finishing the last one flips its
-dependents to `pending` — so `pending` already means ready, and nothing has to re-evaluate
-the graph. Semantic relevance is the receiving model's job; correctness is not allowed to
-depend on it.
+Semantic relevance is the receiving model's job; correctness is not allowed to depend on it.
 
 ## Consistency
 
@@ -129,8 +124,7 @@ Three observable states: online, stale, offline. Heartbeats arrive only where a 
 exposes them — hook safe points, or tool calls for MCP — so an idle-but-open session
 degrading to `stale` is truthful reporting, not an error. Pid liveness and how long a
 session has been silent decide the transition to `offline`; a claim is never released by
-presence alone, and a coordinator or a self-owned task can be reclaimed once its holder
-reads `offline`. The full presence and pid-reuse rationale is archived in
+presence alone. The full presence and pid-reuse rationale is archived in
 [internal notes](internal/presence-model.md).
 
 ## A hook never fails closed

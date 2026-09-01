@@ -182,10 +182,15 @@ test("every attention kind in the priority table is one a rule can produce", () 
       { messageId: "message_a", subject: "Need slots", requiresAck: true },
       // A delivered note with no ack obligation - triggers unread_note.
       { messageId: "message_note", subject: "FYI", body: "noted", requiresAck: false },
+      // An unanswered question whose recipient has left - triggers request_stalled.
+      { messageId: "message_stalled", subject: "Review the port", requiresAck: true,
+        fromParticipantId: "participant_a" },
     ],
     receipts: [
       { messageId: "message_a", recipientParticipantId: "participant_a", state: "injected" },
       { messageId: "message_note", recipientParticipantId: "participant_a", state: "injected" },
+      { messageId: "message_stalled", recipientParticipantId: "participant_gone",
+        state: "queued" },
     ],
     intents: [
       { sessionId: "session_a", resourceHints: ["file:src/**"] },
@@ -202,18 +207,8 @@ test("every attention kind in the priority table is one a rule can produce", () 
       { claimId: "claim_c", ownerSessionId: "session_a", resource: "file:src/held.mjs",
         expiresAt: "2026-08-16T02:00:00.000Z" },
     ],
-    tasks: [
-      { taskId: "task_a", state: "pending", assigneeSessionId: "session_a",
-        title: "port the store" },
-      // Taken by a session that then went quiet. The requester is still waiting.
-      { taskId: "task_b", state: "in_progress", assigneeSessionId: "session_gone",
-        assigneeParticipantId: "physics", requestedByParticipantId: "participant_a",
-        title: "tank sinks into mud" },
-    ],
     sessions: [{ sessionId: "session_gone", state: "closed",
-      heartbeatAt: NOW, heartbeatCadenceMs: 30_000 }],
-    workstreams: [{ workstreamId: "workstream_a", state: "open",
-      coordinatorSessionId: null, title: "directed-visuals" }],
+      participantId: "participant_gone", heartbeatAt: NOW, heartbeatCadenceMs: 30_000 }],
   };
 
   const produced = computeAttention(snapshot, { session: { sessionId: "session_a" },
