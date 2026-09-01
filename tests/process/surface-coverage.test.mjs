@@ -49,9 +49,9 @@ function coreOperations() {
 const BY_CLI = Object.freeze({
   openSession: "attach", heartbeatSession: "heartbeat", closeSession: "detach",
   sync: "sync", setIntent: "work", clearIntent: "work", acquireClaim: "claim", releaseClaim: "release",
-  forceReleaseClaim: "release", sendMessage: "message", markDelivery: "ack",
+  forceReleaseClaim: "release", sendMessage: "message", acknowledgeMessage: "ack",
   readInbox: "inbox", replyToMessage: "reply",
-  requestWork: "request", finishSession: "finish", collectStatus: "status",
+  finishSession: "finish", collectStatus: "status",
 });
 
 // Deliberately internal, each for a stated reason rather than by omission.
@@ -64,6 +64,8 @@ const INTERNAL = Object.freeze({
     + "answers the same question and reads the whole store, which put the cost of "
     + "guarding one write in proportion to every message the workspace had carried",
   resumeSession: "the hook runtime resumes its generation-bearing binding after compaction",
+  recordOfferSucceeded: "called only after a transport proves it crossed its boundary",
+  recordOfferFailed: "called by the delivery router to append a safe failed-attempt event",
 });
 
 test("every core operation is reachable, or named as internal on purpose", () => {
@@ -98,11 +100,11 @@ test("an operation an agent needs is offered over MCP as well", async () => {
   // of it, since a model should not be running the installer.
   const names = new Set(PUBLIC_TOOLS.map(tool => tool.name));
   for (const operation of ["collectStatus", "sync", "setIntent", "acquireClaim",
-    "releaseClaim", "sendMessage", "readInbox", "replyToMessage", "markDelivery",
-    "requestWork", "finishSession"]) {
+    "releaseClaim", "sendMessage", "readInbox", "replyToMessage", "acknowledgeMessage",
+    "finishSession"]) {
     const expected = { collectStatus: "acc_status", sync: "acc_sync", setIntent: "acc_work",
       acquireClaim: "acc_claim", releaseClaim: "acc_release", sendMessage: "acc_message",
-      markDelivery: "acc_ack", requestWork: "acc_request", readInbox: "acc_inbox",
+      acknowledgeMessage: "acc_ack", readInbox: "acc_inbox",
       replyToMessage: "acc_reply", finishSession: "acc_finish" }[operation];
     assert.equal(names.has(expected), true, `${operation} has no MCP tool`);
   }

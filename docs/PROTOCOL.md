@@ -182,8 +182,8 @@ A handoff contains:
 ## Sync and attention
 
 Adapters request deltas since a cursor. Core computes attention items from
-six explicit rules — `direct_request`, `claim_conflict`, `request_stalled`,
-`claim_expired`, `claim_contended`, `unread_note` — listed with their exact trigger in
+six explicit rules — `reply_required`, `acknowledgement_required`,
+`recipient_unavailable`, `claim_conflict`, `claim_contended`, `claim_expired` — listed with their exact trigger in
 [Architecture](ARCHITECTURE.md).
 
 Semantic relevance may be assessed by the receiving model, but correctness

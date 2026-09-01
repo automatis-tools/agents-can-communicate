@@ -1,5 +1,5 @@
 import { classifySessionPresence } from "./sessions.mjs";
-import { computeAttention } from "./sync.mjs";
+import { computeAttention } from "./attention.mjs";
 
 /**
  * Protection level, reported from what is actually enforceable.

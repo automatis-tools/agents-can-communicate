@@ -1,9 +1,10 @@
 import { createClaimService } from "./claims.mjs";
-import { createCommunicationService } from "./communication.mjs";
+import { createConversationService } from "./conversations.mjs";
 import { createIntentService } from "./intents.mjs";
 import { createInboxService } from "./inbox.mjs";
 import { defaultPidIsAlive } from "./pid.mjs";
 import { assertPorts } from "./ports.mjs";
+import { createReceiptService } from "./receipts.mjs";
 import { createSessionService } from "./sessions.mjs";
 import { createGuardStateService, createStatusService } from "./status.mjs";
 import { createSyncService } from "./sync.mjs";
@@ -28,8 +29,9 @@ export function createCoordinationService({ store, clock, ids,
   const sessions = createSessionService(ports);
   const intents = createIntentService(ports, sessions);
   const claims = createClaimService(ports, sessions);
-  const communication = createCommunicationService(ports, sessions, claims);
+  const conversations = createConversationService(ports, sessions);
   const inbox = createInboxService(ports, sessions);
+  const receipts = createReceiptService(ports);
   const sync = createSyncService(ports, sessions);
   const status = createStatusService(ports, sessions);
   const guardState = createGuardStateService(ports);
@@ -41,8 +43,9 @@ export function createCoordinationService({ store, clock, ids,
     ...sessions,
     ...intents,
     ...claims,
-    ...communication,
+    ...conversations,
     ...inbox,
+    ...receipts,
     ...sync,
     ...status,
     guardState,
