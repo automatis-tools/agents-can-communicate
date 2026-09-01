@@ -8,7 +8,8 @@ import { AccError, EXIT } from "@agents-can-communicate/protocol";
  *   list(kind: string, predicate?: (record: object) => boolean): object[],
  *   put(kind: string, id: string, record: object, expectedGeneration?: string | null): string,
  *   append(event: object): object }} CoordinationTransaction
- * @typedef {{ transaction(callback: (tx: CoordinationTransaction) => unknown): Promise<unknown>,
+ * @typedef {{ transaction(callback: (tx: CoordinationTransaction) => unknown,
+ *   options?: { kinds?: string[], deadlineAt?: number }): Promise<unknown>,
  *   eventsSince(workspaceId: string, cursor: string | null, limit: number): Promise<object>,
  *   snapshot(workspaceId: string): Promise<object> }} CoordinationStore
  */

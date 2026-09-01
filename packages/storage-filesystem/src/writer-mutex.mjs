@@ -90,12 +90,15 @@ export async function withWriterMutex(paths, options, operation) {
   const { root, clock, pidIsAlive = defaultPidIsAlive, uuid = randomUUID,
     attempts = Number.POSITIVE_INFINITY, waitMs = 20, openFile,
     acquireTimeoutMs = ACQUIRE_TIMEOUT_MS, monotonicNow = () => performance.now(),
-    sleep = sleepFor } = options;
+    wallNow = Date.now, deadlineAt, sleep = sleepFor } = options;
   const directory = path.join(paths.locks, "writer.lock");
   // Wall time can jump while a process waits. A monotonic absolute deadline
   // bounds all owner reads and retries, leaving half the hook's five-second
   // budget for publishing the owner, doing the write, and rendering a result.
-  const deadline = monotonicNow() + acquireTimeoutMs;
+  const started = monotonicNow();
+  const callerBudget = deadlineAt === undefined
+    ? Number.POSITIVE_INFINITY : Math.max(0, deadlineAt - wallNow());
+  const deadline = started + Math.min(acquireTimeoutMs, callerBudget);
   await ensureManagedDirectory(root, paths.locks);
   const token = uuid();
 
@@ -126,5 +129,8 @@ export async function withWriterMutex(paths, options, operation) {
       if (current?.token === token) await rm(directory, { recursive: true, force: true });
     }
   }
-  throw new AccError(EXIT.CONFLICT, "another writer holds the store lock", { directory });
+  const reason = deadlineAt !== undefined && wallNow() >= deadlineAt
+    ? "transaction deadline expired while waiting for the store lock"
+    : "another writer holds the store lock";
+  throw new AccError(EXIT.CONFLICT, reason, { directory });
 }

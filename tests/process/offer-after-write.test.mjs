@@ -8,6 +8,10 @@ import { projectContextResult } from "@agents-can-communicate/adapter-sdk";
 import { runHook } from "@agents-can-communicate/hook-runner";
 import { completeHookOutput, writeOutput } from "../../bin/acc-hook.mjs";
 
+// Kept cohesive above 300 lines because every case shares one durable
+// two-session hook fixture and jointly proves the stdout/deadline/receipt
+// boundary; splitting would duplicate the real process composition under test.
+
 const adapter = {
   id: "test",
   client: { command: "test-client", versionArgs: ["--version"] },
@@ -99,8 +103,35 @@ test("an expired hook budget refuses to start an offer commit", async t => {
   assert.equal((await receipt()).state, "queued");
 });
 
+test("a retrieved obligation is never described as live-offered", async t => {
+  const { invoke, message, receipt, recipient } = await fixture(t);
+  await recipient.service.readInbox({ sessionId: recipient.accSessionId,
+    generation: recipient.generation, messageId: message.messageId });
+  assert.equal((await receipt()).state, "retrieved");
+
+  const result = await invoke("beforeTurn", "recipient-session");
+
+  assert.match(result.stdout, new RegExp(message.messageId));
+  assert.doesNotMatch(result.stdout, /live-offered/);
+  await result.commitOffers();
+  assert.equal((await receipt()).state, "retrieved");
+});
+
+test("an actually offered obligation becomes the compact recovery breadcrumb", async t => {
+  const { invoke, message, receipt } = await fixture(t);
+  const first = await invoke("beforeTurn", "recipient-session");
+  await first.commitOffers();
+  assert.equal((await receipt()).state, "offered");
+
+  const second = await invoke("beforeTurn", "recipient-session");
+
+  assert.match(second.stdout, new RegExp(`live-offered peer question remains unresolved; `
+    + `\`acc inbox --message ${message.messageId}\``));
+  assert.doesNotMatch(second.stdout, /Commit only after these bytes cross/);
+});
+
 test("one turn offers every fitting addressed receipt and never a room receipt", async t => {
-  const { invoke, recipientId, sender } = await fixture(t);
+  const { invoke, recipient, recipientId, sender } = await fixture(t);
   const other = await invoke("sessionStart", "other-recipient-session");
   const otherId = other.sessions.find(item => item.sessionId === other.accSessionId).participantId;
   const send = (clientMessageId, toParticipantIds, subject) => sender.service.sendMessage({
@@ -115,6 +146,10 @@ test("one turn offers every fitting addressed receipt and never a room receipt",
   assert.match(result.stdout, new RegExp(direct.messageId));
   assert.match(result.stdout, new RegExp(shared.messageId));
   assert.doesNotMatch(result.stdout, new RegExp(room.messageId));
+  const attention = await recipient.service.sync({ sessionId: recipient.accSessionId,
+    scope: "delta" });
+  assert.equal(attention.attention.some(item => item.sourceId === room.messageId), false,
+    "a valid room note created live obligation attention");
   await result.commitOffers();
 
   const receipts = (await sender.service.store.snapshot(sender.service.store.workspaceId))
@@ -201,6 +236,45 @@ test("a synchronous stdout throw leaves offers uncommitted and fails open", asyn
   assert.equal(commits, 0);
   assert.equal(outcome.exitCode, 0);
   assert.match(diagnostics.join(""), /stdout write failed/);
+});
+
+test("a stdout writer that never calls back times out without committing", async () => {
+  let commits = 0;
+  const diagnostics = [];
+  const stdout = { write() { return true; } };
+  const stderr = { write(output, callback) { diagnostics.push(output); callback?.(); } };
+  const completion = completeHookOutput({ stdout: "payload", deadlineAt: Date.now() + 25,
+    commitOffers: async () => { commits += 1; } }, { stdout, stderr });
+
+  const outcome = await Promise.race([completion,
+    new Promise(resolve => setTimeout(() => resolve("still waiting"), 150))]);
+
+  assert.notEqual(outcome, "still waiting", "stdout completion exceeded its hook deadline");
+  assert.equal(outcome.exitCode, 0);
+  assert.equal(commits, 0);
+  assert.match(diagnostics.join(""), /stdout write failed/);
+});
+
+test("a contended offer deadline cannot publish after commit rejects", async t => {
+  const { invoke, receipt, recipient } = await fixture(t);
+  const result = await invoke("beforeTurn", "recipient-session", { budgetMs: 1_500 });
+  let releaseWriter;
+  let announceWriter;
+  const writerHeld = new Promise(resolve => { announceWriter = resolve; });
+  const blocker = recipient.service.store.transaction(async () => {
+    announceWriter();
+    await new Promise(resolve => { releaseWriter = resolve; });
+  }, { kinds: [] });
+  await writerHeld;
+
+  await assert.rejects(result.commitOffers(), /budget|deadline|store lock/);
+  assert.equal((await receipt()).state, "queued");
+  releaseWriter();
+  await blocker;
+  await new Promise(resolve => setTimeout(resolve, 500));
+
+  assert.equal((await receipt()).state, "queued",
+    "the rejected offer transaction published after its deadline");
 });
 
 test("a commit failure is bounded on stderr and the hook still succeeds", async () => {

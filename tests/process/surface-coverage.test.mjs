@@ -59,6 +59,7 @@ const INTERNAL = Object.freeze({
   ensureMaterialised: "called by every write that needs durable state",
   locateSession: "a lookup the other operations share",
   pendingMessages: "read by the hook runtime when it builds a turn",
+  nextTurnDelivery: "the hook runtime's receipt-backed message and offer evidence",
   renewClaim: "reached through `acc claim` on a claim this session already holds",
   guardState: "the write guard's own read, kept narrow on purpose: `collectStatus` "
     + "answers the same question and reads the whole store, which put the cost of "

@@ -175,7 +175,8 @@ test("projection metadata offers only complete addressed peer payloads", () => {
 });
 
 test("a prior live offer becomes one compact recoverable breadcrumb", () => {
-  const result = projectContextResult(syncResult({ messages: [], attention: [{
+  const result = projectContextResult(syncResult({ messages: [],
+    liveOfferedMessageIds: ["message_live"], attention: [{
     kind: "reply_required", priority: 1, sourceId: "message_live",
     summary: "message message_live from peer is a question requiring a reply",
   }] }));
@@ -187,8 +188,20 @@ test("a prior live offer becomes one compact recoverable breadcrumb", () => {
   assert.deepEqual(result.includedAttentionIds, ["message_live"]);
 });
 
+test("a retrieved obligation without a live offer keeps its ordinary attention", () => {
+  const result = projectContextResult(syncResult({ messages: [],
+    liveOfferedMessageIds: [], attention: [{
+      kind: "reply_required", priority: 1, sourceId: "message_retrieved",
+      summary: "message message_retrieved from peer is a question requiring a reply",
+    }] }));
+
+  assert.match(result.text, /message_retrieved from peer is a question requiring a reply/);
+  assert.doesNotMatch(result.text, /live-offered/);
+});
+
 test("a live-offer breadcrumb never truncates its recovery command", () => {
-  const result = projectContextResult(syncResult({ messages: [], attention: [{
+  const result = projectContextResult(syncResult({ messages: [],
+    liveOfferedMessageIds: ["message_live"], attention: [{
     kind: "reply_required", priority: 1, sourceId: "message_live",
     summary: "message message_live from peer is a question requiring a reply",
   }] }), { budgetBytes: 80 });
