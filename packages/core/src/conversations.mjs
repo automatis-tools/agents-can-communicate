@@ -32,6 +32,18 @@ const normalizedContent = input => logicalContent({
   handoff: input.handoff ?? null,
 });
 
+function existingMessage(tx, session, input) {
+  const identity = `${session.workspaceId}--${session.participantId}--${input.clientMessageId}`;
+  const existing = tx.list("message", message => identityOf(message) === identity).at(0);
+  if (existing !== undefined
+    && !isDeepStrictEqual(logicalContent(existing), normalizedContent(input))) {
+    throw new AccError(EXIT.CONFLICT,
+      "clientMessageId was already used with different message content",
+      { clientMessageId: input.clientMessageId, messageId: existing.messageId });
+  }
+  return existing;
+}
+
 function assertCurrentSession(tx, session, action) {
   const current = tx.get("session", session.sessionId);
   if (current === null || current.state !== "open"
@@ -73,16 +85,10 @@ function threadFor(tx, messageId, inReplyTo) {
 }
 
 export function recordMessageInTransaction({ tx, session, input, now, messageId, ids,
-  action = "send a message" }) {
+  action = "send a message", extensions }) {
   assertCurrentSession(tx, session, action);
-  const identity = `${session.workspaceId}--${session.participantId}--${input.clientMessageId}`;
-  const existing = tx.list("message", message => identityOf(message) === identity).at(0);
+  const existing = existingMessage(tx, session, input);
   if (existing !== undefined) {
-    if (!isDeepStrictEqual(logicalContent(existing), normalizedContent(input))) {
-      throw new AccError(EXIT.CONFLICT,
-        "clientMessageId was already used with different message content",
-        { clientMessageId: input.clientMessageId, messageId: existing.messageId });
-    }
     return { message: existing, recipientParticipantIds: [], created: false };
   }
 
@@ -104,6 +110,7 @@ export function recordMessageInTransaction({ tx, session, input, now, messageId,
     artifacts: input.artifacts ?? [],
     handoff: input.handoff ?? null,
     sentAt: now,
+    ...(extensions === undefined ? {} : { extensions }),
   });
   const recipientParticipantIds = addressedRecipients(tx, message, session);
   tx.put("message", messageId, message);
@@ -156,7 +163,12 @@ export function createConversationService(ports, sessions) {
   }
 
   async function finishSession(input) {
-    const session = await requireSession(input, "finish");
+    const located = await sessions.locateSession(input.sessionId, input.workspaceId);
+    if (located === null || located.record.generation !== input.generation) {
+      throw new AccError(EXIT.CONFLICT, "cannot finish from this session generation",
+        { sessionId: input.sessionId });
+    }
+    const session = located.record;
     await ensureMaterialised(ports, { workspaceId: session.workspaceId,
       descriptor: input.descriptor, reason: "durable_object" });
     const handoff = {
@@ -179,10 +191,32 @@ export function createConversationService(ports, sessions) {
     };
     const now = clock.now();
     return store.transaction(tx => {
-      const recorded = recordMessageInTransaction({ tx, session, input: messageInput, now,
-        messageId: ids.next("message"), ids, action: "finish" });
+      const current = tx.get("session", session.sessionId);
+      if (current === null || current.generation !== session.generation) {
+        throw new AccError(EXIT.CONFLICT, "cannot finish from this session generation",
+          { sessionId: session.sessionId });
+      }
+      const existing = existingMessage(tx, session, messageInput);
+      if (existing !== undefined) {
+        const outcome = existing.extensions?.acc?.finish;
+        if (existing.fromSessionId !== session.sessionId
+          || outcome?.sessionGeneration !== session.generation) {
+          throw new AccError(EXIT.CONFLICT,
+            "clientMessageId belongs to a different finish generation",
+            { clientMessageId: input.clientMessageId, messageId: existing.messageId });
+        }
+        return { message: existing, releasedClaims: outcome.releasedClaims, session: current };
+      }
+      if (current.state !== "open") {
+        throw new AccError(EXIT.CONFLICT, "cannot finish from this session generation",
+          { sessionId: session.sessionId });
+      }
       const releasedClaims = tx.list("claim",
         claim => claim.ownerSessionId === session.sessionId);
+      const recorded = recordMessageInTransaction({ tx, session, now,
+        messageId: ids.next("message"), ids, action: "finish",
+        input: messageInput, extensions: { acc: { finish: {
+          sessionGeneration: session.generation, releasedClaims } } } });
       for (const claim of releasedClaims) {
         tx.remove("claim", claim.claimId, tx.generationOf("claim", claim.claimId));
         tx.append({ schemaVersion: SCHEMA_VERSION, eventId: ids.next("event"),
@@ -191,7 +225,6 @@ export function createConversationService(ports, sessions) {
           payload: { claimId: claim.claimId, authority: null, reason: null,
             replacedGeneration: claim.generation } });
       }
-      const current = tx.get("session", session.sessionId);
       const closed = { ...current, state: "closed", heartbeatAt: now };
       tx.put("session", session.sessionId, closed,
         tx.generationOf("session", session.sessionId));

@@ -20,8 +20,11 @@ function obligationItems(snapshot, participantId) {
     const message = messages.get(receipt.messageId);
     const kind = message?.obligation === "reply" ? "reply_required"
       : message?.obligation === "acknowledge" ? "acknowledgement_required" : null;
+    const action = kind === "reply_required" ? "a reply" : "acknowledgement";
     return kind === null ? [] : [{ kind, priority: ATTENTION_PRIORITY[kind],
-      sourceId: message.messageId, summary: message.subject }];
+      sourceId: message.messageId,
+      summary: `message ${message.messageId} from ${message.fromParticipantId} is a `
+        + `${message.kind} requiring ${action}` }];
   });
 }
 

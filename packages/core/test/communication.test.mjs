@@ -14,7 +14,7 @@ function makeService() {
   const clock = createFakeClock(NOW);
   const ids = createFakeIds();
   const store = createMemoryStore({ clock, ids, workspaceId: WORKSPACE });
-  return { store, service: createCoordinationService({ store, clock, ids }) };
+  return { store, clock, service: createCoordinationService({ store, clock, ids }) };
 }
 
 const opening = participantId => ({ workspaceId: WORKSPACE, participantId,
@@ -154,4 +154,52 @@ test("finish without a successor creates a room handoff with no obligation", asy
   assert.equal(result.message.handoff.status, "partial");
   assert.deepEqual((await store.snapshot(WORKSPACE)).receipts
     .map(receipt => receipt.recipientParticipantId).sort(), ["other", "recipient"]);
+});
+
+test("addressed finish response-loss retry returns the prior outcome without new writes",
+  async () => {
+    const { service, store, clock } = makeService();
+    const { sender } = await trio(service);
+    await service.acquireClaim({ ...owner(sender), resource: "file:src/**",
+      reason: "editing" });
+    const input = { ...owner(sender), clientMessageId: "client_finish_retry",
+      toParticipantId: "recipient", goal: "complete the durable seam", status: "partial",
+      completed: ["threading"], remaining: ["router"], blockers: [], verification: [],
+      artifacts: [] };
+    const first = await service.finishSession(input);
+    const beforeSnapshot = await store.snapshot(WORKSPACE);
+    const beforeEvents = await store.eventsSince(WORKSPACE, null, 100);
+    clock.advance(5_000);
+
+    const retried = await service.finishSession(input);
+    const afterSnapshot = await store.snapshot(WORKSPACE);
+    const afterEvents = await store.eventsSince(WORKSPACE, null, 100);
+
+    assert.deepEqual(retried, first);
+    assert.deepEqual(afterSnapshot, beforeSnapshot);
+    assert.equal(afterEvents.events.length, beforeEvents.events.length);
+    await assert.rejects(service.finishSession({ ...input, remaining: ["different"] }),
+      error => error.code === EXIT.CONFLICT && /clientMessageId/.test(error.message));
+  });
+
+test("room finish retry preserves its original audience snapshot", async () => {
+  const { service, store, clock } = makeService();
+  const { sender } = await trio(service);
+  const input = { ...owner(sender), clientMessageId: "client_room_finish_retry",
+    goal: "leave durable context", completed: [], remaining: [], blockers: [],
+    verification: [], artifacts: [] };
+  const first = await service.finishSession(input);
+  await service.openSession(opening("later"));
+  const before = await store.eventsSince(WORKSPACE, null, 100);
+  clock.advance(5_000);
+
+  const retried = await service.finishSession(input);
+  const after = await store.eventsSince(WORKSPACE, null, 100);
+
+  assert.deepEqual(retried, first);
+  assert.equal(after.events.length, before.events.length);
+  const snapshot = await store.snapshot(WORKSPACE);
+  assert.equal(snapshot.messages.length, 1);
+  assert.deepEqual(snapshot.receipts.map(item => item.recipientParticipantId).sort(),
+    ["other", "recipient"]);
 });
