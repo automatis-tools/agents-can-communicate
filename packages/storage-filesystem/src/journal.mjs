@@ -1,6 +1,6 @@
 import path from "node:path";
 
-import { AccError, EXIT } from "@agents-can-communicate/protocol";
+import { AccError, EXIT, assertPortableId } from "@agents-can-communicate/protocol";
 
 import { encode, listJsonFiles, publishAtomic, readJsonIfPresent, removeIfPresent }
   from "./atomic-json.mjs";
@@ -13,7 +13,33 @@ export const JOURNAL_VERSION = 1;
 // correct recovery. Roll-forward is idempotent because publication is
 // no-replace and identical bytes are accepted as already published.
 export function journalPath(paths, transactionId) {
+  assertPortableId(transactionId, "transaction id");
   return path.join(paths.journal, `${transactionId}.json`);
+}
+
+function publicationDestination(root, publicationPath) {
+  if (typeof publicationPath !== "string" || publicationPath === ""
+    || path.isAbsolute(publicationPath) || path.win32.isAbsolute(publicationPath)) {
+    throw new AccError(EXIT.DATA, "journal publication path must be relative",
+      { publicationPath });
+  }
+  const segments = publicationPath.split(/[\\/]/);
+  if (segments.some(segment => segment === "" || segment === "." || segment === "..")) {
+    throw new AccError(EXIT.DATA, "journal publication path is not managed",
+      { publicationPath });
+  }
+  if (!(["events", "state"].includes(segments[0]))) {
+    throw new AccError(EXIT.DATA, "journal publication path is not managed",
+      { publicationPath });
+  }
+  const destination = path.resolve(root, ...segments);
+  const relative = path.relative(root, destination);
+  if (relative === "" || path.isAbsolute(relative) || relative === ".."
+    || relative.startsWith(`..${path.sep}`)) {
+    throw new AccError(EXIT.DATA, "journal publication path escapes the store root",
+      { publicationPath, root });
+  }
+  return destination;
 }
 
 export function journalEntry(transactionId, firstSequence, publications, startedAt) {
@@ -39,7 +65,7 @@ export async function writeJournalEntry(paths, options, entry) {
 }
 
 export async function retireJournalEntry(paths, transactionId) {
-  await removeIfPresent(journalPath(paths, transactionId));
+  await removeIfPresent(journalPath(paths, transactionId), { root: paths.root });
 }
 
 export async function readOpenJournals(paths, root) {
@@ -56,6 +82,13 @@ export async function readOpenJournals(paths, root) {
     if (path.basename(file, ".json") !== entry.transactionId) {
       throw new AccError(EXIT.DATA, "journal entry does not match its filename", { file });
     }
+    assertPortableId(entry.transactionId, "transaction id");
+    if (!Array.isArray(entry.publications)) {
+      throw new AccError(EXIT.DATA, "journal publications must be an array", { file });
+    }
+    for (const publication of entry.publications) {
+      publicationDestination(root, publication?.path);
+    }
     entries.push(entry);
   }
   return entries.sort((left, right) => left.firstSequence.localeCompare(right.firstSequence));
@@ -67,9 +100,9 @@ export async function readOpenJournals(paths, root) {
 export async function rollForward(paths, options, entry) {
   const published = [];
   for (const publication of entry.publications) {
-    const destination = path.resolve(options.root, publication.path);
+    const destination = publicationDestination(options.root, publication.path);
     if (publication.remove === true) {
-      await removeIfPresent(destination);
+      await removeIfPresent(destination, { root: options.root });
       published.push(publication.path);
       await options.failAt?.(`after:${publication.path}`);
       continue;

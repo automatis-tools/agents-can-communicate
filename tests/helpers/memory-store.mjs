@@ -86,8 +86,8 @@ export function createMemoryStore({ clock, ids, workspaceId }) {
 
   async function eventsSince(workspaceId, cursor, limit) {
     const after = cursor ?? ZERO_CURSOR;
-    const matching = events.filter(event => event.workspaceId === workspaceId
-      && event.sequence > after);
+    const matching = events.map(event => validateRecord("event", event))
+      .filter(event => event.workspaceId === workspaceId && event.sequence > after);
     const page = matching.slice(0, limit);
     return { cursor: page.at(-1)?.sequence ?? after, events: page };
   }

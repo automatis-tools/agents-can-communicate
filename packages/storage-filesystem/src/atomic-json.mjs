@@ -83,7 +83,7 @@ export async function publishAtomic(destination, bytes, { root, tmpDir, replace 
     throw new AccError(EXIT.CONFLICT, "record already published with different bytes",
       { destination });
   } finally {
-    await unlinkIfPresent(temporary);
+    await removeIfPresent(temporary, { root });
   }
 }
 
@@ -132,6 +132,7 @@ export async function listJsonFiles(dirPath, options) {
     .sort((left, right) => left.localeCompare(right));
 }
 
-export async function removeIfPresent(filePath) {
+export async function removeIfPresent(filePath, { root }) {
+  await assertManagedDirectory(root, path.dirname(filePath));
   await unlinkIfPresent(filePath);
 }
