@@ -1,3 +1,5 @@
+// Kept over 300 lines because recovery, diagnosis, identity refusal, and the
+// adversarial journal fixtures exercise one shared fail-closed store boundary.
 import assert from "node:assert/strict";
 import { lstat, mkdir, mkdtemp, readdir, readFile, readlink, realpath, rm, symlink,
   writeFile } from "node:fs/promises";
@@ -8,6 +10,7 @@ import test from "node:test";
 import { EXIT, SCHEMA_VERSION } from "@agents-can-communicate/protocol";
 
 import { diagnoseFilesystemStore, repairFilesystemStore } from "../src/recovery.mjs";
+import { activateJournal } from "../src/active-journal.mjs";
 import { JOURNAL_VERSION, readOpenJournals } from "../src/journal.mjs";
 import { openFilesystemStore } from "../src/store.mjs";
 import { createFakeClock, createFakeIds } from "../../../tests/helpers/memory-store.mjs";
@@ -56,6 +59,9 @@ async function writeJournal(root, publications, transactionId = "transaction_old
     firstSequence: "0000000000000001", startedAt: NOW, publications };
   await writeFile(path.join(root, "journal", `${transactionId}.json`),
     `${JSON.stringify(entry, null, 2)}\n`);
+  if (journalVersion === JOURNAL_VERSION) {
+    await activateJournal({ root, journal: path.join(root, "journal") }, { root }, entry);
+  }
 }
 
 function crashAt(marker) {
@@ -80,7 +86,8 @@ test("a crash after the journal but before publication publishes nothing", async
   assert.deepEqual((await readdir(path.join(root, "events"))), []);
   assert.deepEqual((await store.eventsSince(WORKSPACE, null, 10)).events, []);
   assert.equal((await store.snapshot(WORKSPACE)).workspace, null);
-  assert.equal((await readdir(path.join(root, "journal"))).length, 1);
+  assert.equal((await readdir(path.join(root, "journal")))
+    .filter(name => name.endsWith(".json")).length, 1);
 });
 
 test("a crash between the event and the state record stays invisible to readers", async t => {
@@ -108,7 +115,8 @@ test("reopening the store completes a journalled transaction exactly", async t =
   assert.deepEqual(page.events.map(event => event.eventId), ["event_created"]);
   assert.equal((await reopened.snapshot(WORKSPACE)).workspace.displayName, "Example");
   assert.deepEqual(await readOpenJournals(reopened.paths, root), []);
-  assert.equal((await readdir(path.join(root, "journal"))).length, 1,
+  assert.equal((await readdir(path.join(root, "journal")))
+    .filter(name => name.endsWith(".json")).length, 1,
     "recovery deleted its durable decision record");
 });
 

@@ -2,17 +2,18 @@ import path from "node:path";
 
 import { AccError, EXIT, assertPortableId } from "@agents-can-communicate/protocol";
 
-import { encode, listJsonFiles, publishAtomic, readJsonIfPresent, retainFile }
+import { activateJournal, idleJournal, readActiveJournal } from "./active-journal.mjs";
+import { encode, publishAtomic, readJsonIfPresent, retainFile }
   from "./atomic-json.mjs";
-import { completeJournal, journalIsCompleted } from "./retention.mjs";
+import { completeJournal } from "./retention.mjs";
 
 export const JOURNAL_VERSION = 2;
 
-// A journal entry is written only after the transaction callback has succeeded
-// and every byte is known. Its existence therefore means "this transaction was
-// decided", which is what makes roll-forward - rather than rollback - the
-// correct recovery. Roll-forward is idempotent because publication is
-// no-replace and identical bytes are accepted as already published.
+// A journal entry is prepared only after the transaction callback has
+// succeeded and every byte is known. The subsequent synced active-log record
+// is the commit point: an orphan prepared journal is not a decided
+// transaction. Roll-forward is idempotent because identical immutable bytes
+// are accepted and materialised state carries generations.
 export function journalPath(paths, transactionId) {
   assertPortableId(transactionId, "transaction id");
   return path.join(paths.journal, `${transactionId}.json`);
@@ -29,7 +30,9 @@ function publicationDestination(root, publicationPath) {
     throw new AccError(EXIT.DATA, "journal publication path is not managed",
       { publicationPath });
   }
-  if (!(["events", "retained", "state"].includes(segments[0]))) {
+  const durablePublication = segments[0] === "events" || segments[0] === "state";
+  const stateRetention = segments[0] === "retained" && segments[1] === "state";
+  if (!(durablePublication || stateRetention)) {
     throw new AccError(EXIT.DATA, "journal publication path is not managed",
       { publicationPath });
   }
@@ -60,41 +63,52 @@ export function journalEntry(transactionId, firstSequence, publications, started
 
 export async function writeJournalEntry(paths, options, entry) {
   await publishAtomic(journalPath(paths, entry.transactionId), encode(entry), options);
+  await options.failAt?.("after-journal-prepared");
+  await activateJournal(paths, options, entry);
   return entry;
 }
 
 export async function retireJournalEntry(paths, options, transactionId) {
   await retainFile(journalPath(paths, transactionId), { root: paths.root });
   await completeJournal(paths, options, transactionId);
+  await options.failAt?.("before-journal-idle");
+  await idleJournal(paths, options, transactionId);
 }
 
 export async function readOpenJournals(paths, root) {
-  const files = await listJsonFiles(paths.journal, { root });
-  const entries = [];
-  for (const file of files) {
-    const found = await readJsonIfPresent(file, root);
-    if (found === null) continue;
-    const entry = found.value;
-    if (entry?.journalVersion !== JOURNAL_VERSION) {
-      throw new AccError(EXIT.DATA, "unknown journal version", { file,
-        journalVersion: entry?.journalVersion });
-    }
-    if (path.basename(file, ".json") !== entry.transactionId) {
-      throw new AccError(EXIT.DATA, "journal entry does not match its filename", { file });
-    }
-    assertPortableId(entry.transactionId, "transaction id");
-    if (!Array.isArray(entry.publications)) {
-      throw new AccError(EXIT.DATA, "journal publications must be an array", { file });
-    }
-    for (const publication of entry.publications) {
-      publicationDestination(root, publication?.path);
-      if (publication?.retainedPath !== null) {
-        publicationDestination(root, publication?.retainedPath);
-      }
-    }
-    if (!await journalIsCompleted(paths, root, entry.transactionId)) entries.push(entry);
+  const active = await readActiveJournal(paths, root);
+  if (active.state === "idle") return [];
+  const file = journalPath(paths, active.transactionId);
+  const found = await readJsonIfPresent(file, root);
+  if (found === null) {
+    throw new AccError(EXIT.DATA, "active journal entry is missing", { file });
   }
-  return entries.sort((left, right) => left.firstSequence.localeCompare(right.firstSequence));
+  const entry = found.value;
+  if (entry?.journalVersion !== JOURNAL_VERSION) {
+    throw new AccError(EXIT.DATA, "unknown journal version", { file,
+      journalVersion: entry?.journalVersion });
+  }
+  if (path.basename(file, ".json") !== entry.transactionId
+    || entry.transactionId !== active.transactionId
+    || entry.firstSequence !== active.firstSequence) {
+    throw new AccError(EXIT.DATA, "journal entry does not match its active record", { file });
+  }
+  assertPortableId(entry.transactionId, "transaction id");
+  if (!Array.isArray(entry.publications)) {
+    throw new AccError(EXIT.DATA, "journal publications must be an array", { file });
+  }
+  for (const publication of entry.publications) {
+    publicationDestination(root, publication?.path);
+    if (publication?.retainedPath !== null) {
+      publicationDestination(root, publication?.retainedPath);
+    }
+  }
+  return [entry];
+}
+
+export async function readJournalCeiling(paths, root) {
+  const active = await readActiveJournal(paths, root);
+  return active.state === "open" ? active.firstSequence : null;
 }
 
 // Publishing every listed file and then retiring the entry. Already-published
