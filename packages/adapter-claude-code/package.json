@@ -4,7 +4,8 @@
   "private": true,
   "type": "module",
   "exports": {
-    ".": "./src/adapter.mjs"
+    ".": "./src/adapter.mjs",
+    "./channel": "./src/channel.mjs"
   },
   "files": [
     "certification.json",

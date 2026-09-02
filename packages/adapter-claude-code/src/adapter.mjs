@@ -2,10 +2,14 @@ import { defineAdapter, projectContext, projectContextResult }
   from "@agents-can-communicate/adapter-sdk";
 import certification from "../certification.json" with { type: "json" };
 
+import { PROTOCOL_CONTRACT } from "./channel.mjs";
 import { denyOutcome, injectOutcome, normalizeClaudeHook } from "./hooks.mjs";
 import { planClaudeInstall, detectClaude, installClaudePlugin, uninstallClaudePlugin } from "./install.mjs";
+import { bindNativeSession, offerMessage, planNativeActivation, probeNativeDelivery, routeReply }
+  from "./native-delivery.mjs";
 
 export const CLAUDE_CODE_VERSION = "2.1.233";
+export const CLAUDE_CHANNEL_MINIMUM = "2.1.258";
 export const CLAUDE_DELIVERY_FALLBACK = Object.freeze({
   diagnostic: "Claude Code native delivery is off: the 2.1.252 capture stopped at the "
     + "development-channel security warning before the ACC MCP child started; messages "
@@ -40,7 +44,20 @@ export function createClaudeCodeAdapter() {
       context: { beforeTurnInjection: true },
       // PreToolUse denied both a Write and a Bash call; neither ran.
       guards: { beforeWrite: true, beforeShell: true },
-      delivery: { nextTurn: true },
+      // nextTurn is the certified 2.1.233 hook projection; livePush and
+      // replyRoute rest on the 2.1.258 Channel capture and the native contract
+      // below. effectiveCapabilities() still gates every row on an exact
+      // certified version; the native contract is the separate live rule.
+      delivery: { nextTurn: true, livePush: true, replyRoute: true },
+    },
+    // The first passing capture is the shipped minimum; the research lower
+    // bound (2.1.80) is documented but not admitted without its own capture.
+    nativeDelivery: {
+      minimumByPlatform: { "darwin-arm64": CLAUDE_CHANNEL_MINIMUM },
+      anchors: [{ platform: "darwin-arm64", version: CLAUDE_CHANNEL_MINIMUM,
+        protocolContract: PROTOCOL_CONTRACT }],
+      knownBad: [],
+      activationKinds: ["shell-bootstrap", "native-config"],
     },
 
     startSession: async () => ({ ok: true, changes: [], diagnostics: [] }),
@@ -50,7 +67,8 @@ export function createClaudeCodeAdapter() {
 
     planInstall: context => planClaudeInstall(context),
     detect: context => detectClaude(context),
-    install: context => installClaudePlugin(context),
+    install: context => installClaudePlugin({ ...context,
+      livePolicy: context.livePolicy ?? "off" }),
     uninstall: context => uninstallClaudePlugin(context),
 
     doctor: async context => {
@@ -64,6 +82,12 @@ export function createClaudeCodeAdapter() {
         "handoff is written while the model is active, not at SessionEnd",
       ] };
     },
+
+    probeNativeDelivery,
+    planNativeActivation,
+    bindNativeSession,
+    offerMessage,
+    routeReply,
 
     denyOutcome,
     injectOutcome,
