@@ -72,7 +72,9 @@ inside the message so an uncertain caller can retry explicitly.
 An empty `toParticipantIds` creates a room record. At commit time, core resolves every
 known peer participant with an open session and creates a receipt for each. Participants
 that arrive later can inspect room history through a full sync but do not receive
-retroactive receipts. Room records are never eligible for live push.
+retroactive receipts. Those already-present recipients get the normal inbox and certified
+next-turn path; a successful next-turn write advances their room receipt to `offered`.
+Room records are never eligible for native live push.
 
 ## Kinds and obligations
 
@@ -139,8 +141,12 @@ message.offer_succeeded
 message.offer_failed
 ```
 
-An attempt records ids, target generation, transport name, adapter, client version,
-timestamp, and a safe closed error code. It never copies the peer body into diagnostics.
+Every attempt identifies `messageId`, `recipientParticipantId`, `targetSessionId`, and
+`targetGeneration`, followed by the transport name, adapter, client version, and timestamp.
+A failed attempt additionally carries a safe closed error code. Core validates the target
+as that recipient's recorded session generation and derives event attribution from it; the
+router cannot substitute the sender or omit the selected binding. Attempts never copy the
+peer body into diagnostics.
 Receipt `offered` is committed only after the transport accepts bytes. A failed attempt
 leaves the receipt queued.
 

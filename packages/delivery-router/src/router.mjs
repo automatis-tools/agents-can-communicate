@@ -32,7 +32,8 @@ export function createDeliveryRouter({ service, adapters, clock }) {
 
   async function recordFailure(binding, message, participantId, transport, safeErrorCode) {
     await service.recordOfferFailed({ messageId: message.messageId,
-      recipientParticipantId: participantId, actorSessionId: binding.sessionId,
+      recipientParticipantId: participantId, targetSessionId: binding.sessionId,
+      targetGeneration: binding.generation,
       transport: safeTransport(transport, binding.opaqueEndpointRef), adapterId: binding.adapterId,
       clientVersion: binding.clientVersion, safeErrorCode }).catch(() => null);
   }

@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { isDeepStrictEqual } from "node:util";
 
 import { AccError, EXIT, SCHEMA_VERSION, validateRecord }
@@ -6,10 +7,8 @@ import { AccError, EXIT, SCHEMA_VERSION, validateRecord }
 import { projectReleasedClaim, reconstructFinishRetry } from "./finish-retries.mjs";
 import { ensureMaterialised } from "./materialisation.mjs";
 
-export const receiptId = (messageId, participantId) => `${messageId}--${participantId}`;
-
-const identityOf = message =>
-  `${message.workspaceId}--${message.fromParticipantId}--${message.clientMessageId}`;
+export const receiptId = (messageId, participantId) => `receipt_${createHash("sha256")
+  .update(JSON.stringify([messageId, participantId])).digest("base64url")}`;
 
 const logicalContent = message => ({
   toParticipantIds: message.toParticipantIds,
@@ -34,8 +33,10 @@ const normalizedContent = input => logicalContent({
 });
 
 function existingMessage(tx, session, input) {
-  const identity = `${session.workspaceId}--${session.participantId}--${input.clientMessageId}`;
-  const existing = tx.list("message", message => identityOf(message) === identity).at(0);
+  const existing = tx.list("message", message =>
+    message.workspaceId === session.workspaceId
+    && message.fromParticipantId === session.participantId
+    && message.clientMessageId === input.clientMessageId).at(0);
   if (existing !== undefined
     && !isDeepStrictEqual(logicalContent(existing), normalizedContent(input))) {
     throw new AccError(EXIT.CONFLICT,
@@ -261,8 +262,8 @@ export function createConversationService(ports, sessions) {
       .sort((left, right) => left.sentAt.localeCompare(right.sentAt)
         || left.messageId.localeCompare(right.messageId));
     return {
-      queuedMessages: eligible.filter(message => message.toParticipantIds.length > 0
-        && receiptByMessage.get(message.messageId).state === "queued"),
+      queuedMessages: eligible.filter(message =>
+        receiptByMessage.get(message.messageId).state === "queued"),
       liveOfferedMessageIds: eligible.filter(message => message.toParticipantIds.length > 0
         && receiptByMessage.get(message.messageId).state === "offered")
         .map(message => message.messageId),

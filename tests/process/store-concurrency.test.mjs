@@ -149,6 +149,7 @@ async function freshWorkspace(t) {
 
 test("agents starting together in a fresh workspace all get in", async t => {
   const place = await freshWorkspace(t);
+  const participants = ["alpha", "beta", "gamma", "delta"];
 
   // The first thing every process does is establish the store's identity, and
   // that document carries the moment it was written. Two of them racing wrote
@@ -156,13 +157,19 @@ test("agents starting together in a fresh workspace all get in", async t => {
   // "record already published with different bytes" and could not attach at all
   // - in a workspace neither had opened before, which is the ordinary way two
   // agents start.
-  const outcomes = await Promise.all(["alpha", "beta", "gamma", "delta"]
+  const outcomes = await Promise.all(participants
     .map(participant => place.attach(participant)
       .then(({ stdout }) => JSON.parse(stdout).ok, error => error.stdout ?? error.message)));
 
   assert.deepEqual(outcomes, [true, true, true, true],
     `an agent could not open a workspace because another was opening it: ${
       JSON.stringify(outcomes.filter(outcome => outcome !== true))}`);
+  const status = await execFileAsync(process.execPath,
+    [path.join(repoRoot, "bin", "acc.mjs"), "status", "--cwd", place.cwd, "--json"],
+    { env: place.env });
+  const roster = JSON.parse(status.stdout).data.participants;
+  assert.deepEqual(roster.map(item => item.participantId).sort(), participants.toSorted(),
+    "an attach returned success but its late ephemeral session never reached the durable roster");
 });
 
 test("a directory belonging to another workspace is still refused", async t => {

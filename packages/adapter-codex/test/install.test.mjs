@@ -11,6 +11,11 @@ import { EXIT } from "@agents-can-communicate/protocol";
 import { createCodexAdapter } from "../src/adapter.mjs";
 import { CODEX_HOOK_EVENTS, injectOutcome, normalizeCodexHook } from "../src/hooks.mjs";
 
+// Kept cohesive above 300 lines because every case shares the same real Codex
+// home/marketplace topology and jointly proves install, upgrade, and uninstall
+// ownership. Splitting would duplicate that foreign-state fixture and weaken
+// the round-trip assertions that compare the complete tree.
+
 // A marketplace the user already owns, in the shape this client actually
 // parses. `plugins` is a sequence; a map is rejected and takes the whole file
 // with it, so the earlier map-shaped fixture was testing a format that could

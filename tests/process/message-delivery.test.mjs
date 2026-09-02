@@ -49,14 +49,15 @@ test("durable delivery evidence advances queued to offered to retrieved", async 
 });
 
 test("transport rejection remains an event and never becomes failed delivery state", async t => {
-  const { store, service, sender } = await place(t);
+  const { store, service, sender, recipient } = await place(t);
   const message = await service.sendMessage({ ...owner(sender),
     clientMessageId: "client_process_failure", toParticipantIds: ["recipient"],
     kind: "decision", obligation: "acknowledge", subject: "Store seam",
     body: "Use the durable record." });
 
   const event = await service.recordOfferFailed({ messageId: message.messageId,
-    recipientParticipantId: "recipient", actorSessionId: sender.sessionId,
+    recipientParticipantId: "recipient", targetSessionId: recipient.sessionId,
+    targetGeneration: recipient.generation,
     transport: "process-fixture", adapterId: "test", clientVersion: "1.0.0",
     safeErrorCode: "transport_rejected" });
 

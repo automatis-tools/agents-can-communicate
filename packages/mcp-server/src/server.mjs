@@ -1,3 +1,5 @@
+import { createRequire } from "node:module";
+
 import { AccError, EXIT, GENERIC_MESSAGE_KINDS, VALID_OBLIGATIONS }
   from "@agents-can-communicate/protocol";
 import { clearSessionBinding, loadSessionBinding, storeSessionBinding }
@@ -9,7 +11,8 @@ import { MCP_CAPABILITIES, PUBLIC_TOOLS, RESOURCES } from "./tools.mjs";
 
 export const PROTOCOL_VERSION = "2026-07-28";
 export const SUPPORTED_VERSIONS = Object.freeze([PROTOCOL_VERSION]);
-const SERVER_INFO = Object.freeze({ name: "agents-can-communicate", version: "0.0.0" });
+const PACKAGE_VERSION = createRequire(import.meta.url)("../package.json").version;
+const SERVER_INFO = Object.freeze({ name: "agents-can-communicate", version: PACKAGE_VERSION });
 
 const META = "io.modelcontextprotocol";
 const HEARTBEAT_CADENCE_MS = 60_000;
@@ -213,7 +216,13 @@ async function handle(message, context) {
     case "resources/list":
       return complete({ resources: [...RESOURCES] });
     case "resources/read": {
-      const value = await readResource(params.uri, context);
+      // Snapshot and roster are observation-only. Inbox is a delivery boundary:
+      // resolve this configured participant's durable session and let the core
+      // inbox service record that the returned bodies were retrieved.
+      const resourceContext = params.uri === "acc://inbox"
+        ? { ...context, session: await resolveSession(context) }
+        : context;
+      const value = await readResource(params.uri, resourceContext);
       return complete({ contents: [{ uri: params.uri, mimeType: "application/json",
         text: JSON.stringify(value, null, 2) }] });
     }

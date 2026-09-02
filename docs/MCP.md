@@ -58,8 +58,10 @@ pairs and advances only this participant's receipts to `retrieved`. `acc_reply` 
 `answer` and acknowledges the original atomically. `acc_ack` exposes no receipt-state
 parameter.
 
-Resources are `acc://snapshot`, `acc://roster`, and `acc://inbox`. Prefer the inbox tool
-for addressed messages; a full snapshot is for explicit workspace forensics.
+Resources are `acc://snapshot`, `acc://roster`, and `acc://inbox`. Reading `acc://inbox`
+resolves the configured MCP participant and advances only the returned receipts to
+`retrieved`, just like the inbox tool. Snapshot and roster reads do not advance receipts.
+A full snapshot is for explicit workspace forensics.
 
 ## Capability floor
 

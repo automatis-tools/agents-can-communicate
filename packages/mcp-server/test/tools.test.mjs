@@ -60,7 +60,7 @@ test("manual MCP polling does not claim an adapter delivery capability", () => {
   assert.equal(Object.hasOwn(MCP_CAPABILITIES, "execution"), false);
 });
 
-test("read-only resources are declared with stable uris", () => {
+test("resources are declared with stable uris", () => {
   const uris = RESOURCES.map(resource => resource.uri);
 
   assert.deepEqual(uris.sort(),

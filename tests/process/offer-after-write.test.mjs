@@ -188,7 +188,7 @@ test("an actually offered obligation becomes the compact recovery breadcrumb", a
   assert.doesNotMatch(second.stdout, /Commit only after these bytes cross/);
 });
 
-test("one turn offers every fitting addressed receipt and never a room receipt", async t => {
+test("one turn offers every fitting addressed and already-present room receipt once", async t => {
   const { invoke, recipient, recipientId, sender } = await fixture(t);
   const other = await invoke("sessionStart", "other-recipient-session");
   const otherId = other.sessions.find(item => item.sessionId === other.accSessionId).participantId;
@@ -203,7 +203,8 @@ test("one turn offers every fitting addressed receipt and never a room receipt",
   const result = await invoke("beforeTurn", "recipient-session");
   assert.match(result.stdout, new RegExp(direct.messageId));
   assert.match(result.stdout, new RegExp(shared.messageId));
-  assert.doesNotMatch(result.stdout, new RegExp(room.messageId));
+  assert.match(result.stdout, new RegExp(room.messageId));
+  assert.match(result.stdout, /room-only body/);
   const attention = await recipient.service.sync({ sessionId: recipient.accSessionId,
     scope: "delta" });
   assert.equal(attention.attention.some(item => item.sourceId === room.messageId), false,
@@ -217,7 +218,11 @@ test("one turn offers every fitting addressed receipt and never a room receipt",
   assert.equal(state(direct.messageId, recipientId), "offered");
   assert.equal(state(shared.messageId, recipientId), "offered");
   assert.equal(state(shared.messageId, otherId), "queued");
-  assert.equal(state(room.messageId, recipientId), "queued");
+  assert.equal(state(room.messageId, recipientId), "offered");
+
+  const next = await invoke("beforeTurn", "recipient-session");
+  assert.doesNotMatch(next.stdout, new RegExp(room.messageId));
+  assert.doesNotMatch(next.stdout, /room-only body/);
 });
 
 test("an adapter that emits no stdout cannot commit an offer", async t => {

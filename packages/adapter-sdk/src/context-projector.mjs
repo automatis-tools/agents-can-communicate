@@ -101,16 +101,13 @@ function recoveryNote(ids) {
  * the whole workspace on every prompt is neither safer nor cheaper.
  */
 export function projectContextResult(sync, { budgetBytes = DEFAULT_BUDGET_BYTES } = {}) {
-  const roomMessageIds = new Set(sync.roomMessageIds ?? []);
   const attention = [...(sync.attention ?? [])]
-    .filter(item => !roomMessageIds.has(item.sourceId))
     .sort((left, right) => left.priority - right.priority
       || (left.sourceId ?? "").localeCompare(right.sourceId ?? ""));
   const leadsPeerBodies = item => item.priority <= 2 || item.kind === "claim_conflict";
   const urgent = attention.filter(leadsPeerBodies);
   const informational = attention.filter(item => !leadsPeerBodies(item));
-  const messages = (sync.messages ?? [])
-    .filter(message => message.toParticipantIds?.length !== 0);
+  const messages = sync.messages ?? [];
   const liveOfferedMessageIds = new Set(sync.liveOfferedMessageIds ?? []);
   const groups = [
     ...attentionGroups(urgent, { truncatable: true, liveOfferedMessageIds }),
