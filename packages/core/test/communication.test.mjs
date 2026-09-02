@@ -82,8 +82,8 @@ test("successful offers are generation-bound and receipt states move only forwar
   assert.equal((await service.readInbox({ ...owner(recipient),
     messageId: message.messageId }))[0].receipt.state, "retrieved");
   assert.equal((await offer()).state, "retrieved");
-  assert.equal((await offer({ targetSessionId: other.sessionId,
-    targetGeneration: other.generation })).state, "retrieved");
+  await assert.rejects(offer({ targetSessionId: other.sessionId,
+    targetGeneration: other.generation }), error => error.code === EXIT.CONFLICT);
 });
 
 test("a failed offer records only a safe event and leaves the receipt queued", async () => {

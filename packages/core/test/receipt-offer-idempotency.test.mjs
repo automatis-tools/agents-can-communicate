@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
+import { EXIT } from "@agents-can-communicate/protocol";
+
 import { createCoordinationService } from "../src/service.mjs";
 import { createFakeClock, createFakeIds, createMemoryStore }
   from "../../../tests/helpers/memory-store.mjs";
@@ -72,3 +74,44 @@ test("offer success is atomic and idempotent after every stronger receipt state"
       `${state} appended another offer success`);
   }
 });
+
+test("settled receipts still reject every invalid generation-bound target without writes",
+  async () => {
+    for (const state of ["offered", "retrieved", "acknowledged"]) {
+      for (const invalidTarget of ["wrong participant", "closed target", "wrong generation"]) {
+        const f = await fixture();
+        const message = await send(f, `${state}_${invalidTarget.replaceAll(" ", "_")}`);
+        if (state === "offered") await offer(f, message);
+        if (state === "retrieved") await f.service.readInbox({ ...owner(f.recipient),
+          messageId: message.messageId });
+        if (state === "acknowledged") await f.service.acknowledgeMessage({
+          ...owner(f.recipient), messageId: message.messageId });
+
+        let targetSessionId = f.recipient.sessionId;
+        let targetGeneration = f.recipient.generation;
+        if (invalidTarget === "wrong participant") {
+          targetSessionId = f.sender.sessionId;
+          targetGeneration = f.sender.generation;
+        }
+        if (invalidTarget === "closed target") {
+          await f.service.closeSession(owner(f.recipient));
+        }
+        if (invalidTarget === "wrong generation") targetGeneration = "generation_stale";
+
+        const beforeReceipt = await f.service.readReceipt({ messageId: message.messageId,
+          recipientParticipantId: "recipient" });
+        const beforeEvents = await f.store.eventsSince(WORKSPACE, null, 100);
+        await assert.rejects(f.service.recordOfferSucceeded({ messageId: message.messageId,
+          recipientParticipantId: "recipient", targetSessionId, targetGeneration,
+          transport: "next-turn", adapterId: "fixture", clientVersion: "1.0.0",
+        }), error => error.code === EXIT.CONFLICT && /offer target/.test(error.message),
+        `${state}: ${invalidTarget}`);
+
+        assert.deepEqual(await f.service.readReceipt({ messageId: message.messageId,
+          recipientParticipantId: "recipient" }), beforeReceipt,
+        `${state}: ${invalidTarget} changed the receipt`);
+        assert.deepEqual(await f.store.eventsSince(WORKSPACE, null, 100), beforeEvents,
+        `${state}: ${invalidTarget} appended an event`);
+      }
+    }
+  });
