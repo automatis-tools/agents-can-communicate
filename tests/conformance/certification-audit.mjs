@@ -12,6 +12,15 @@ const nextTurn = (fixture, event, limitation) => row("delivery.nextTurn", fixtur
 const withFacts = (client, version, entries) => entries.map(entry => ({ client, version,
   platform: "darwin-arm64", observedAt: "2026-08-16", ...entry }));
 
+// A native delivery capture has no hook event or tool: it proves an ordinary
+// launch, a protocol contract, and the five delivery branches instead. Both
+// livePush and replyRoute rest on the same redacted capture.
+const nativeDelivery = (client, version, observedAt, fixture, protocolContract, idle, busy,
+  limitations) => ["delivery.livePush", "delivery.replyRoute"].map(capability => ({
+  client, version, platform: "darwin-arm64", observedAt, capability, fixture, event: null,
+  tool: null, protocolContract, outcome: "native-delivery-observed", idleBehavior: idle,
+  busyBehavior: busy, authorityLevel: "experimental", limitations }));
+
 export const PASS_EXPECTATIONS = Object.freeze({
   "adapter-claude-code": withFacts("claude-code", "2.1.233", [
     row("lifecycle.sessionStart", "fixtures/SessionStart.json", "SessionStart", null,
@@ -34,6 +43,15 @@ export const PASS_EXPECTATIONS = Object.freeze({
       ["only tool calls reaching PreToolUse are guarded"]),
     nextTurn("fixtures/UserPromptSubmit.json", "UserPromptSubmit",
       "delivery requires the next normal user turn"),
+    ...nativeDelivery("claude-code", "2.1.258", "2026-09-02T21:20:11.676Z",
+      "fixtures/delivery/claude-code-2.1.258.json", "claude-code-channel-mcp-v1",
+      "offered", "queued_after_turn", [
+          "captured on darwin-arm64 only; Linux and Windows remain uncaptured",
+          "the vendor development-channel warning stayed visible and was accepted by the operator by hand",
+          "the plugin .mcp.json must live in the marketplace source copy; the plugin cache copy alone is not read",
+          "acc_reply routed through the spike's explicit tool call; the spike created no durable ACC answer record",
+          "presentation after the busy turn was observed by the operator; the channel log records the write at 21:18:45Z and the explicit reply at 21:19:21Z"
+    ]),
   ]),
   "adapter-codex": withFacts("codex-cli", "0.147.0", [
     row("lifecycle.sessionStart", "fixtures/SessionStart.json", "SessionStart", null,

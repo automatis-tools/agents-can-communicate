@@ -1,0 +1,23 @@
+{
+  "client": "claude-code",
+  "version": "2.1.258",
+  "platform": "darwin-arm64",
+  "observedAt": "2026-09-02T21:20:11.676Z",
+  "capability": "native_delivery",
+  "result": "pass",
+  "fixture": "claude-code-2.1.258-channel",
+  "launchMode": "ordinary-command-with-install-time-bootstrap",
+  "protocolContract": "claude-code-channel-mcp-v1",
+  "idle": "offered",
+  "busy": "queued_after_turn",
+  "reply": "routed",
+  "duplicate": "same_message_id",
+  "fallback": "queued",
+  "limitations": [
+    "captured on darwin-arm64 only; Linux and Windows remain uncaptured",
+    "the vendor development-channel warning stayed visible and was accepted by the operator by hand",
+    "the plugin .mcp.json must live in the marketplace source copy; the plugin cache copy alone is not read",
+    "acc_reply routed through the spike's explicit tool call; the spike created no durable ACC answer record",
+    "presentation after the busy turn was observed by the operator; the channel log records the write at 21:18:45Z and the explicit reply at 21:19:21Z"
+  ]
+}

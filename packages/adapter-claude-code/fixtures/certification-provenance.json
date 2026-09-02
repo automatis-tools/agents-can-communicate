@@ -72,6 +72,23 @@
         { "capability": "delivery.livePush", "result": "fail", "outcome": { "kind": "native-capture-failed" } },
         { "capability": "delivery.replyRoute", "result": "fail", "outcome": { "kind": "native-capture-failed" } }
       ]
+    },
+    {
+      "id": "native-delivery-2-1-258", "client": "claude-code", "version": "2.1.258",
+      "platform": "darwin-arm64", "observedAt": "2026-09-02T21:20:11.676Z",
+      "fixture": "fixtures/delivery/claude-code-2.1.258.json",
+      "sha256": "c68e84989c02fa0657d0a8669a774ab1e301088d8c7856346cc9739d0fbad228",
+      "event": null, "tool": null,
+      "claims": [
+        { "capability": "delivery.livePush", "result": "pass",
+          "outcome": { "kind": "native-delivery-observed", "idle": "offered",
+            "busy": "queued_after_turn", "authority": "experimental",
+            "limitations": ["captured on darwin-arm64 only; Linux and Windows remain uncaptured", "the vendor development-channel warning stayed visible and was accepted by the operator by hand", "the plugin .mcp.json must live in the marketplace source copy; the plugin cache copy alone is not read", "acc_reply routed through the spike's explicit tool call; the spike created no durable ACC answer record", "presentation after the busy turn was observed by the operator; the channel log records the write at 21:18:45Z and the explicit reply at 21:19:21Z"] } },
+        { "capability": "delivery.replyRoute", "result": "pass",
+          "outcome": { "kind": "native-delivery-observed", "idle": "offered",
+            "busy": "queued_after_turn", "authority": "experimental",
+            "limitations": ["captured on darwin-arm64 only; Linux and Windows remain uncaptured", "the vendor development-channel warning stayed visible and was accepted by the operator by hand", "the plugin .mcp.json must live in the marketplace source copy; the plugin cache copy alone is not read", "acc_reply routed through the spike's explicit tool call; the spike created no durable ACC answer record", "presentation after the busy turn was observed by the operator; the channel log records the write at 21:18:45Z and the explicit reply at 21:19:21Z"] } }
+      ]
     }
   ]
 }
