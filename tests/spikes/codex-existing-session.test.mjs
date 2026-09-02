@@ -6,8 +6,8 @@ import { fileURLToPath } from "node:url";
 import test from "node:test";
 
 import { MINIMUM_VERSION, PROTOCOL_CONTRACT, addCodexQueueMessage, compareStableVersions,
-  evaluateClientVersion, locateCodexThread, probeCodexQueue, runCodexQueueCapture }
-  from "../../scripts/spikes/codex-existing-session.mjs";
+  discoverCodexThreads, evaluateClientVersion, locateCodexThread, probeCodexQueue,
+  runCodexQueueCapture } from "../../scripts/spikes/codex-existing-session.mjs";
 import { runProcess } from "../helpers/claude-channel.mjs";
 
 // Kept cohesive above 300 lines because every case drives the same disposable
@@ -139,6 +139,18 @@ test("the exact thread is discovered from loaded state rather than guessed", asy
     { found: true, threadId: THREAD, status: "active" });
 });
 
+test("discovery lists loaded threads with id, cwd, and status only", async () => {
+  const peer = fakePeer({ loaded: [THREAD, "thread-other"],
+    threads: [thread(THREAD, CWD), thread("thread-other", "/work/other",
+      { type: "active", activeFlags: [] }), thread("thread-stored", "/work/old")] });
+  const discovered = await discoverCodexThreads(peer);
+  assert.deepEqual(discovered, [
+    { threadId: THREAD, cwd: CWD, status: "idle" },
+    { threadId: "thread-other", cwd: "/work/other", status: "active" },
+  ]);
+  assert.equal(JSON.stringify(discovered).includes(SECRET_PREVIEW), false);
+});
+
 test("a queue addition carries the captured shape and the stable message id", async () => {
   const peer = fakePeer();
   const result = await addCodexQueueMessage(peer, { threadId: THREAD, messageId: "message_1",
@@ -252,6 +264,13 @@ process.exit(9);
     const usage = await runProcess([captureScript, "--thread", THREAD]);
     assert.equal(usage.code, 2);
     assert.match(usage.stderr, /usage:/);
+    const discover = await runProcess([captureScript, "--discover"],
+      { env: { ACC_CODEX_SPIKE_COMMAND: command,
+        ACC_CODEX_APP_SERVER_SOCKET: path.join(tempDir, "missing.sock") } });
+    assert.equal(discover.code, 0, discover.stderr);
+    assert.deepEqual(discover.result.loaded, []);
+    assert.equal(discover.result.reasonCode, "transport_unavailable");
+    assert.equal(discover.result.clientVersion, "0.152.0");
   } finally {
     rmSync(tempDir, { recursive: true, force: true });
   }
