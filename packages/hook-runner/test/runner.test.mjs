@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtemp, realpath, rm } from "node:fs/promises";
+import { mkdtemp, realpath, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -593,3 +593,44 @@ test("an adapter without delivery metadata withholds bodies and reports degradat
   assert.match(turn.stderr, /delivery metadata|acc inbox/i);
   assert.equal(receipt.state, "queued");
 });
+
+test("an uncertified platform keeps the exact inbox recovery path inside a tight budget",
+  async t => {
+    const place = await workspace(t);
+    await writeFile(path.join(place.root, "acc.workspace.json"), `${JSON.stringify({
+      schemaVersion: 1,
+      workspaceId: "workspace_uncertified_budget",
+      displayName: "uncertified budget",
+      roots: ["."],
+      policy: { claimMode: "advisory", contextBudgetBytes: 200 },
+      requiredAdapters: [],
+    }, null, 2)}\n`);
+    const truthful = { ...kimi,
+      renderContext: (sync, options) => projectContext(sync, options),
+      renderContextResult: (sync, options) => projectContextResult(sync, options) };
+    const adapters = { kimi: truthful };
+    const unsupportedPlatform = platform === "linux-x64" ? "darwin-arm64" : "linux-x64";
+    const invoke = payload => runHook({ adapterId: "kimi", adapters,
+      payload: { ...payload, cwd: payload.cwd ?? place.root }, dataHome: place.dataHome,
+      readProcessTable: noProcessTable, probeClientVersion: testProbe,
+      platform: unsupportedPlatform });
+    const recipient = await invoke(event("sessionStart"));
+    const peer = await invoke(event("sessionStart", { sessionId: "uncertified-peer" }));
+    const recipientId = recipient.sessions
+      .find(session => session.sessionId === recipient.accSessionId).participantId;
+    const message = await peer.service.sendMessage({ sessionId: peer.accSessionId,
+      generation: peer.generation, clientMessageId: "client_uncertified_budget",
+      toParticipantIds: [recipientId], kind: "note", obligation: "none",
+      subject: "Private body", body: "this body must stay out of uncertified delivery" });
+
+    const turn = await invoke(event("beforeTurn"));
+    await turn.commitOffers();
+    const receipt = (await recipient.service.sync({ sessionId: recipient.accSessionId,
+      scope: "full" })).snapshot.receipts.find(item => item.messageId === message.messageId);
+
+    assert.doesNotMatch(turn.stdout, /this body must stay out/);
+    assert.match(turn.stdout, new RegExp(`acc inbox --message ${message.messageId}`));
+    assert.equal(Buffer.byteLength(turn.stdout, "utf8") <= 200, true);
+    assert.match(turn.stderr, /not certified for nextTurn/);
+    assert.equal(receipt.state, "queued");
+  });
