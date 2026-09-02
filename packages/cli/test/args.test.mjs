@@ -91,3 +91,11 @@ test("inbox targets an optional message and reply requires message plus body", (
   assert.throws(() => parseArgs(["reply", "--message", "message_a"]),
     error => error.code === EXIT.USAGE && error.message.includes("--body"));
 });
+
+test("install delivery policy is explicit and closed", () => {
+  assert.equal(parseArgs(["install"]).options.delivery, undefined);
+  assert.equal(parseArgs(["install", "--delivery", "actionable"]).options.delivery,
+    "actionable");
+  assert.throws(() => parseArgs(["uninstall", "--delivery", "all"]),
+    error => error.code === EXIT.USAGE && /unknown option/.test(error.message));
+});

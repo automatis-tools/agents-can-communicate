@@ -67,6 +67,8 @@ const INTERNAL = Object.freeze({
   resumeSession: "the hook runtime resumes its generation-bearing binding after compaction",
   recordOfferSucceeded: "called only after a transport proves it crossed its boundary",
   recordOfferFailed: "called by the delivery router to append a safe failed-attempt event",
+  publishDeliveryBinding: "called by an adapter for the exact session generation it owns",
+  listDeliveryBindings: "called by the delivery router while selecting one eligible target",
 });
 
 test("every core operation is reachable, or named as internal on purpose", () => {

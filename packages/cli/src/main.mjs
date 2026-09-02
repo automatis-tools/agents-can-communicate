@@ -84,8 +84,11 @@ async function locateContext(options, runtime) {
 async function withService({ descriptor, paths }, runtime) {
   const store = await openFilesystemStore({ root: paths.root, clock: runtime.clock,
     ids: runtime.ids, workspaceId: descriptor.id });
+  const service = createCoordinationService({ store, clock: runtime.clock, ids: runtime.ids });
   return { descriptor, paths,
-    service: createCoordinationService({ store, clock: runtime.clock, ids: runtime.ids }) };
+    service,
+    deliveryRouter: typeof runtime.createDeliveryRouter === "function"
+      ? runtime.createDeliveryRouter({ service, clock: runtime.clock }) : null };
 }
 
 async function openContext(options, runtime) {
@@ -110,6 +113,23 @@ async function openDiagnosticContext(options, runtime) {
 }
 
 const human = value => (typeof value === "string" ? value : JSON.stringify(value, null, 2));
+
+export async function recordAndOffer({ record, router, selectMessage = value => value }) {
+  const recorded = await record();
+  const message = selectMessage(recorded);
+  if (router === null || router === undefined
+    || !Array.isArray(message?.toParticipantIds) || message.toParticipantIds.length === 0) {
+    return { recorded, delivery: [] };
+  }
+  try {
+    return { recorded, delivery: await router.offer(message) };
+  } catch {
+    return { recorded, delivery: message.toParticipantIds.map(recipientParticipantId => ({
+      recipientParticipantId, outcome: "queued", transport: "durable",
+      errorCode: "transport_error",
+    })) };
+  }
+}
 
 /** How many are here, and how many only look it. */
 export function describePresence({ live = 0, stale = 0 } = {}) {
@@ -198,17 +218,20 @@ const HANDLERS = Object.freeze({
   },
 
   message: async ({ options, context }) => {
-    const message = await context.service.sendMessage({ sessionId: options.session,
+    const routed = await recordAndOffer({ router: context.deliveryRouter, record: () =>
+      context.service.sendMessage({ sessionId: options.session,
       generation: options.generation, toParticipantIds: options.to ?? [],
       type: options.type ?? "note", subject: options.subject, body: options.body,
       priority: options.priority, workstreamId: options.workstream ?? null,
-      requiresAck: options.requiresAck === true, descriptor: context.descriptor });
+      requiresAck: options.requiresAck === true, descriptor: context.descriptor }) });
+    const message = routed.recorded;
     // A note that reads like it wants a reply was sent with no ack obligation
     // and no standing reminder; say so once, without blocking the send. Carried
     // in `data` so an adapter reading `--json` sees it, and appended to `text`
     // for a person - the send already succeeded either way.
     const advice = noteNudge(message);
-    return { data: advice ? { ...message, advice } : message,
+    return { data: advice ? { ...message, advice, delivery: routed.delivery }
+      : { ...message, delivery: routed.delivery },
       text: advice ? `sent ${message.messageId}\n${advice}` : `sent ${message.messageId}` };
   },
 
@@ -220,15 +243,19 @@ const HANDLERS = Object.freeze({
   },
 
   reply: async ({ options, context }) => {
-    const result = await context.service.replyToMessage({ sessionId: options.session,
+    const routed = await recordAndOffer({ router: context.deliveryRouter,
+      selectMessage: value => value.reply, record: () => context.service.replyToMessage({
+      sessionId: options.session,
       generation: options.generation, messageId: options.message, body: options.body,
-      subject: options.subject, type: options.type, priority: options.priority });
-    return { data: result,
+      subject: options.subject, type: options.type, priority: options.priority }) });
+    const result = routed.recorded;
+    return { data: { ...result, delivery: routed.delivery },
       text: `replied ${result.reply.messageId}; acknowledged ${options.message}` };
   },
 
   request: async ({ options, context }) => {
-    const message = await context.service.sendMessage({
+    const routed = await recordAndOffer({ router: context.deliveryRouter, record: () =>
+      context.service.sendMessage({
       sessionId: options.session,
       generation: options.generation,
       toParticipantIds: [options.to],
@@ -237,8 +264,10 @@ const HANDLERS = Object.freeze({
       body: options.detail ?? options.title,
       requiresAck: true,
       descriptor: context.descriptor,
-    });
-    return { data: message, text: `requested ${message.messageId} of ${options.to}` };
+    }) });
+    const message = routed.recorded;
+    return { data: { ...message, delivery: routed.delivery },
+      text: `requested ${message.messageId} of ${options.to}` };
   },
 
   ack: async ({ options, context }) => {
@@ -249,11 +278,15 @@ const HANDLERS = Object.freeze({
   },
 
   finish: async ({ options, context }) => {
-    const handoff = await context.service.finishSession({ sessionId: options.session,
+    const routed = await recordAndOffer({ router: context.deliveryRouter,
+      selectMessage: value => value.message, record: () => context.service.finishSession({
+      sessionId: options.session,
       generation: options.generation, goal: options.goal, status: options.status,
       toParticipantId: options.to ?? null, completed: options.completed ?? [],
-      remaining: options.remaining ?? [], blockers: options.blocker ?? [] });
-    return { data: handoff, text: `handoff ${handoff.handoffId}` };
+      remaining: options.remaining ?? [], blockers: options.blocker ?? [] }) });
+    const handoff = routed.recorded;
+    return { data: { ...handoff, delivery: routed.delivery },
+      text: `handoff ${handoff.handoffId}` };
   },
 
   status: async ({ options, context }) => {

@@ -30,7 +30,10 @@ export async function applyPlan({ plan, adapters, context, dataHome, dryRun = fa
 
     try {
       if (plan.action === "install") {
-        const outcome = await adapter.install(context);
+        const installContext = { ...context,
+          requestedLivePolicy: operation.livePolicy ?? "off",
+          livePolicy: operation.effectiveLivePolicy ?? "off" };
+        const outcome = await adapter.install(installContext);
         // Recorded after the write, so a record never claims an install that
         // did not happen. The reverse order would leave uninstall trying to
         // remove files nothing created.
@@ -38,7 +41,11 @@ export async function applyPlan({ plan, adapters, context, dataHome, dryRun = fa
           version: operation.clientVersion ?? null, accVersion,
           artifacts: operation.artifacts });
         results.operations.push({ ...operation, applied: true,
-          changes: outcome.changes ?? [], diagnostics: outcome.diagnostics ?? [] });
+          changes: outcome.changes ?? [], diagnostics: [
+            ...(operation.deliveryDiagnostic === undefined
+              ? [] : [operation.deliveryDiagnostic]),
+            ...(outcome.diagnostics ?? []),
+          ] });
       } else {
         // Ownership first: it decides what may be deleted, and the adapter's own
         // uninstall then unpicks the entries it added to files the user owns.

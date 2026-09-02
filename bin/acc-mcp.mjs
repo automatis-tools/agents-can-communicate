@@ -3,8 +3,9 @@ import { randomBytes } from "node:crypto";
 
 import { EXIT, createId } from "@agents-can-communicate/protocol";
 import { createCoordinationService } from "@agents-can-communicate/core";
+import { createDeliveryRouter } from "@agents-can-communicate/delivery-router";
 import { openFilesystemStore } from "@agents-can-communicate/storage-filesystem";
-import { createGitProbe, discoverWorkspace, platformDataHome, runtimePaths }
+import { ALL_ADAPTERS, createGitProbe, discoverWorkspace, platformDataHome, runtimePaths }
   from "@agents-can-communicate/cli";
 import { serve } from "@agents-can-communicate/mcp-server";
 
@@ -40,13 +41,16 @@ const paths = runtimePaths({
 });
 const store = await openFilesystemStore({ root: paths.root, clock, ids,
   workspaceId: descriptor.id });
+const service = createCoordinationService({ store, clock, ids });
+const adapters = Object.fromEntries(ALL_ADAPTERS().map(adapter => [adapter.id, adapter]));
 
 await serve({
   input: process.stdin,
   output: process.stdout,
   log: message => process.stderr.write(`acc-mcp: ${message}\n`),
   context: {
-    service: createCoordinationService({ store, clock, ids }),
+    service,
+    deliveryRouter: createDeliveryRouter({ service, adapters, clock }),
     workspaceId: descriptor.id,
     participantId,
     descriptor,

@@ -88,6 +88,23 @@ async function syncWithMail(service, owner, context, args) {
   return messages.length === 0 ? sync : { ...sync, messages };
 }
 
+export async function recordAndOffer({ record, router, selectMessage = value => value }) {
+  const recorded = await record();
+  const message = selectMessage(recorded);
+  if (router === null || router === undefined
+    || !Array.isArray(message?.toParticipantIds) || message.toParticipantIds.length === 0) {
+    return { recorded, delivery: [] };
+  }
+  try {
+    return { recorded, delivery: await router.offer(message) };
+  } catch {
+    return { recorded, delivery: message.toParticipantIds.map(recipientParticipantId => ({
+      recipientParticipantId, outcome: "queued", transport: "durable",
+      errorCode: "transport_error",
+    })) };
+  }
+}
+
 /**
  * A poll is this client's turn.
  *
@@ -132,30 +149,44 @@ async function callTool(name, args, context) {
       await service.releaseClaim({ ...owner, claimId: args.claimId });
       return { released: args.claimId };
     case "acc_message": {
-      const message = await service.sendMessage({ ...owner, toParticipantIds: args.to ?? [],
+      const routed = await recordAndOffer({ router: context.deliveryRouter, record: () =>
+        service.sendMessage({ ...owner, toParticipantIds: args.to ?? [],
         subject: args.subject, body: args.body, type: args.type ?? "note",
         priority: args.priority, requiresAck: args.requiresAck === true,
-        workstreamId: args.workstreamId ?? null });
+        workstreamId: args.workstreamId ?? null }) });
+      const message = routed.recorded;
       // A note that reads like it wants a reply was sent fire-and-forget; hand
       // the nudge back with the message so the model that sent it can reconsider.
       const advice = noteNudge(message);
-      return advice ? { ...message, advice } : message;
+      return advice ? { ...message, advice, delivery: routed.delivery }
+        : { ...message, delivery: routed.delivery };
     }
     case "acc_inbox":
       return service.readInbox({ ...owner, messageId: args.messageId });
-    case "acc_reply":
-      return service.replyToMessage({ ...owner, messageId: args.messageId,
-        body: args.body, subject: args.subject, type: args.type, priority: args.priority });
-    case "acc_request":
-      return service.requestWork({ ...owner, toParticipantId: args.toParticipantId,
-        title: args.title, detail: args.detail });
+    case "acc_reply": {
+      const routed = await recordAndOffer({ router: context.deliveryRouter,
+        selectMessage: value => value.reply,
+        record: () => service.replyToMessage({ ...owner, messageId: args.messageId,
+          body: args.body, subject: args.subject, type: args.type, priority: args.priority }) });
+      return { ...routed.recorded, delivery: routed.delivery };
+    }
+    case "acc_request": {
+      const routed = await recordAndOffer({ router: context.deliveryRouter,
+        record: () => service.requestWork({ ...owner, toParticipantId: args.toParticipantId,
+          title: args.title, detail: args.detail }) });
+      return { ...routed.recorded, delivery: routed.delivery };
+    }
     case "acc_ack":
       return service.markDelivery({ ...owner, messageId: args.messageId,
         state: args.state ?? "acknowledged" });
-    case "acc_finish":
-      return service.finishSession({ ...owner, goal: args.goal, status: args.status,
+    case "acc_finish": {
+      const routed = await recordAndOffer({ router: context.deliveryRouter,
+        selectMessage: value => value.message,
+        record: () => service.finishSession({ ...owner, goal: args.goal, status: args.status,
         completed: args.completed ?? [], remaining: args.remaining ?? [],
-        blockers: args.blockers ?? [], toParticipantId: args.toParticipantId ?? null });
+        blockers: args.blockers ?? [], toParticipantId: args.toParticipantId ?? null }) });
+      return { ...routed.recorded, delivery: routed.delivery };
+    }
     default:
       throw new AccError(EXIT.USAGE, `unknown tool: ${name}`, { name });
   }
