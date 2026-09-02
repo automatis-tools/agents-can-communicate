@@ -15,17 +15,19 @@ function escapeText(value) {
   return result;
 }
 
+function escapePeerValue(value) {
+  if (typeof value === "string") return escapeText(value);
+  if (Array.isArray(value)) return value.map(escapePeerValue);
+  if (value !== null && typeof value === "object") {
+    return Object.fromEntries(Object.entries(value)
+      .map(([key, child]) => [key, escapePeerValue(child)]));
+  }
+  return value;
+}
+
 const attributedMessage = message => ({
-  messageId: message.messageId,
-  threadId: message.threadId,
-  clientMessageId: message.clientMessageId,
-  from: message.fromParticipantId,
-  kind: message.kind,
-  obligation: message.obligation,
-  sentAt: message.sentAt,
+  ...escapePeerValue(message),
   trust: "untrusted peer content",
-  subject: escapeText(message.subject),
-  body: escapeText(message.body),
 });
 
 export async function readResource(uri, { service, participantId, workspaceId }) {

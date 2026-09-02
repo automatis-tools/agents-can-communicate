@@ -1,9 +1,10 @@
-import { AccError, EXIT, MESSAGE_KINDS, VALID_OBLIGATIONS }
+import { AccError, EXIT, GENERIC_MESSAGE_KINDS, VALID_OBLIGATIONS }
   from "@agents-can-communicate/protocol";
 import { clearSessionBinding, loadSessionBinding, storeSessionBinding }
   from "@agents-can-communicate/adapter-sdk";
 
 import { readResource } from "./resources.mjs";
+import { validateToolInput } from "./input-validator.mjs";
 import { MCP_CAPABILITIES, PUBLIC_TOOLS, RESOURCES } from "./tools.mjs";
 
 export const PROTOCOL_VERSION = "2026-07-28";
@@ -93,12 +94,13 @@ const clientMessageId = (args, service) =>
   args.clientMessageId ?? service.ids.next("client");
 
 function obligationFor(kind, explicit, addressed) {
-  if (!MESSAGE_KINDS.includes(kind)) {
-    throw new AccError(EXIT.USAGE, `unknown message kind: ${kind}`);
+  if (!GENERIC_MESSAGE_KINDS.includes(kind)) {
+    const command = kind === "answer"
+      ? "acc_reply" : kind === "handoff" ? "acc_finish" : null;
+    throw new AccError(EXIT.USAGE, command === null
+      ? `unknown message kind: ${kind}` : `${kind} messages require ${command}`);
   }
-  const obligation = explicit ?? (kind === "handoff"
-    ? (addressed ? "acknowledge" : "none")
-    : VALID_OBLIGATIONS[kind][0]);
+  const obligation = explicit ?? VALID_OBLIGATIONS[kind][0];
   if (!VALID_OBLIGATIONS[kind].includes(obligation)
     || (!addressed && obligation !== "none")) {
     throw new AccError(EXIT.USAGE,
@@ -138,7 +140,10 @@ async function callTool(name, args, context) {
       return service.sync({ ...owner, cursor: args.cursor ?? null,
         scope: args.scope, limit: args.limit });
     case "acc_work":
-      if (args.clear === true) return service.clearIntent({ ...owner });
+      if (args.clear === true) {
+        await service.clearIntent({ ...owner });
+        return { cleared: true };
+      }
       return service.setIntent({ ...owner, summary: args.summary, mode: args.mode,
         state: args.state, resourceHints: args.resourceHints ?? [] });
     case "acc_claim":
@@ -214,9 +219,15 @@ async function handle(message, context) {
     }
     case "tools/call": {
       try {
-        const value = await callTool(params.name, params.arguments ?? {}, context);
+        const args = params.arguments === undefined ? {} : params.arguments;
+        const tool = PUBLIC_TOOLS.find(candidate => candidate.name === params.name);
+        if (tool === undefined) {
+          throw new AccError(EXIT.USAGE, `unknown tool: ${params.name}`, { name: params.name });
+        }
+        validateToolInput(tool.inputSchema, args);
+        const value = await callTool(params.name, args, context);
         return complete({ content: [{ type: "text", text: JSON.stringify(value, null, 2) }],
-          structuredContent: JSON.stringify(value) });
+          structuredContent: value });
       } catch (error) {
         // A failing operation is a tool result, not a transport failure: the
         // model must see it and be able to react.
