@@ -227,14 +227,8 @@ export async function verifyOwned({ dataHome, adapterId }) {
   return result;
 }
 
-/**
- * Remove the files this adapter's install wrote, and only those.
- *
- * A modified file is kept and reported. A merge artifact is never deleted at
- * all: the user owns that file and ACC owns some entries inside it, which is the
- * adapter's own uninstall to unpick because it knows the format.
- */
-export async function removeOwned({ dataHome, adapterId }) {
+/** Remove owned artifacts while retaining the record as retry authority. */
+export async function removeOwnedArtifacts({ dataHome, adapterId }) {
   const record = await loadOwnership({ dataHome });
   const install = installFor(record, adapterId);
   const result = { adapterId, removed: [], kept: [], missing: [], delegated: [],
@@ -250,7 +244,22 @@ export async function removeOwned({ dataHome, adapterId }) {
     result.removed.push(artifact.path);
   }
 
+  return result;
+}
+
+/** Forget one install only after every adapter-owned cleanup step succeeded. */
+export async function finalizeRemoval({ dataHome, adapterId }) {
+  const record = await loadOwnership({ dataHome });
+  if (installFor(record, adapterId) === null) return false;
+
   await saveOwnership({ dataHome, record: { schemaVersion: SCHEMA_VERSION,
     installs: record.installs.filter(entry => entry.adapterId !== adapterId) } });
+  return true;
+}
+
+/** Remove and finalize for callers that perform no delegated adapter cleanup. */
+export async function removeOwned(options) {
+  const result = await removeOwnedArtifacts(options);
+  await finalizeRemoval(options);
   return result;
 }

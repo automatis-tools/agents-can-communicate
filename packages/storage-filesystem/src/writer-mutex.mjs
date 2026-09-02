@@ -1,5 +1,5 @@
-import { randomUUID } from "node:crypto";
-import { mkdir, rm } from "node:fs/promises";
+import { createHash, randomUUID } from "node:crypto";
+import { mkdir, rename, rm } from "node:fs/promises";
 import path from "node:path";
 import { performance } from "node:perf_hooks";
 
@@ -82,8 +82,22 @@ async function takeStaleOwnership(directory, root, owner, now, pidIsAlive) {
   if (owner === null) return false;
   const age = Date.parse(now) - Date.parse(owner.acquiredAt);
   if (pidIsAlive(owner.pid) && !(age > STALE_MS)) return false;
-  await rm(directory, { recursive: true, force: true });
-  return true;
+  // Every contender that observed this owner names the same retained target.
+  // rename() moves the whole lock atomically; exactly one contender can put it
+  // there. The target is deliberately left non-empty. A late contender cannot
+  // rename a successor over it, so a stale pathname observation never becomes
+  // permission to remove the writer that acquired the lock afterwards.
+  const identity = createHash("sha256")
+    .update(JSON.stringify([owner.pid, owner.token, owner.acquiredAt]))
+    .digest("hex");
+  const reclaimed = path.join(path.dirname(directory), `writer.reclaimed-${identity}.lock`);
+  try {
+    await rename(directory, reclaimed);
+    return true;
+  } catch (error) {
+    if (["ENOENT", "EEXIST", "ENOTEMPTY"].includes(error.code)) return false;
+    throw error;
+  }
 }
 
 export async function withWriterMutex(paths, options, operation) {

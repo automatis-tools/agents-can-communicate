@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { link, open, readdir, rename } from "node:fs/promises";
 import path from "node:path";
 
@@ -33,6 +33,23 @@ async function bytesIfPresent(filePath, root, openFile) {
   }
 }
 
+function retainedStage(destination, root, tmpDir) {
+  const identity = createHash("sha256")
+    .update(path.relative(root, destination))
+    .digest("hex");
+  return path.join(tmpDir, `${identity}.published`);
+}
+
+async function replaceHandleBytes(handle, bytes) {
+  await handle.truncate(0);
+  let offset = 0;
+  while (offset < bytes.length) {
+    const { bytesWritten } = await handle.write(bytes, offset, bytes.length - offset, offset);
+    offset += bytesWritten;
+  }
+  await handle.sync();
+}
+
 /**
  * Publish bytes atomically.
  *
@@ -51,31 +68,64 @@ export async function publishAtomic(destination, bytes, { root, tmpDir, replace 
     ensureManagedDirectory(root, tmpDir),
     ensureManagedDirectory(root, destinationDir),
   ]);
-  const temporary = path.join(tmpDir, `${path.basename(destination)}.${process.pid}.${randomUUID()}.tmp`);
-  const handle = await open(temporary, "wx");
+  if (!replace) {
+    const existing = await bytesIfPresent(destination, root);
+    if (existing !== null) {
+      if (existing.equals(bytes)) return "already_published";
+      throw new AccError(EXIT.CONFLICT, "record already published with different bytes",
+        { destination });
+    }
+  }
+
+  const stage = retainedStage(destination, root, tmpDir);
+  const temporary = `${stage}.${process.pid}.${randomUUID()}.tmp`;
+  let handle = await open(temporary, "wx");
+  let stageAcceptedBytes = false;
   try {
     await handle.writeFile(bytes);
     await handle.sync();
-  } finally {
-    await handle.close();
-  }
-  try {
     if (replace) {
+      await handle.close();
+      handle = null;
       await rename(temporary, destination);
       await syncDirectory(destinationDir);
       return "published";
     }
-    await link(temporary, destination);
-    await syncDirectory(destinationDir);
-    return "published";
-  } catch (error) {
-    if (error.code !== "EEXIST") throw error;
-    const existing = await bytesIfPresent(destination, root);
-    if (existing !== null && existing.equals(bytes)) return "already_published";
-    throw new AccError(EXIT.CONFLICT, "record already published with different bytes",
-      { destination });
+
+    try {
+      await link(temporary, destination);
+      stageAcceptedBytes = true;
+      await syncDirectory(destinationDir);
+      return "published";
+    } catch (error) {
+      if (error.code !== "EEXIST") throw error;
+      const existing = await bytesIfPresent(destination, root);
+      if (existing !== null && existing.equals(bytes)) {
+        stageAcceptedBytes = true;
+        return "already_published";
+      }
+      if (existing !== null) {
+        // This caller lost a different-payload race. Keep no rejected bytes:
+        // rewrite its still-open private inode with the accepted destination
+        // before consolidating every contender onto one retained stage name.
+        await replaceHandleBytes(handle, existing);
+        stageAcceptedBytes = true;
+      }
+      throw new AccError(EXIT.CONFLICT, "record already published with different bytes",
+        { destination });
+    }
   } finally {
-    await retainFile(temporary, { root });
+    await handle?.close();
+    if (stageAcceptedBytes) {
+      await assertManagedDirectory(root, tmpDir);
+      await rename(temporary, stage);
+      await syncDirectory(tmpDir);
+    } else {
+      // A crash/error before immutable acceptance keeps its unique partial.
+      // Retention avoids the unsafe parent-check/unlink pathname window, while
+      // the deterministic accepted stage bounds all ordinary retries.
+      await retainFile(temporary, { root });
+    }
   }
 }
 
