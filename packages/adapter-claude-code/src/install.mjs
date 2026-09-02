@@ -4,7 +4,8 @@ import path from "node:path";
 import { AccError, EXIT } from "@agents-can-communicate/protocol";
 import { fileURLToPath } from "node:url";
 
-import { acccreatedFile, bakeSkillCommand, blankJson, mergeOwnedEntries, ownedEntries,
+import { acccreatedFile, bakeSkillCommand, blankJson, defaultBootstrap, defaultChannel,
+  mergeOwnedEntries, ownedEntries,
   keepOnlyVersion, ownVersion, stampPluginVersion,
   removeIfEmpty,
   removeInstalledTree,
@@ -140,10 +141,24 @@ const marketplaceManifest = () => ({
   }],
 });
 
+// The channel MCP entry Claude Code loads only when the session is started with
+// the captured development-channel flag. Written with the pinned Node and the
+// installed Channel binary, so the generated file carries no repository path;
+// removed entirely for a non-live install so a plain launch spawns nothing.
+const mcpPath = target => path.join(target, ".mcp.json");
+async function writeChannelMcp(target, { node, channel }) {
+  await writeJson(mcpPath(target), { mcpServers: { "acc-channel": {
+    command: node, args: [channel] } } });
+}
+
 /** A plugin tree with the shim written and the skill's command baked in. */
-async function layOutPlugin(target, { runner, node }) {
+async function layOutPlugin(target, { runner, node, channel, live }) {
   await rm(target, { recursive: true, force: true });
   await cp(bundle, target, { recursive: true });
+  // The bundle ships a placeholder .mcp.json; the real one is written only for a
+  // live install, and a non-live tree carries none.
+  await rm(mcpPath(target), { force: true });
+  if (live) await writeChannelMcp(target, { node, channel });
   // The skill ships with a placeholder where the command belongs: `acc` is not
   // on PATH everywhere, and an agent that cannot run it improvises.
   await bakeSkillCommand({ root: target, node });
@@ -157,7 +172,9 @@ async function layOutPlugin(target, { runner, node }) {
     version: await pluginVersion(), io: { readFile, writeFile } });
 }
 
-export async function installClaudePlugin({ configDir, runner, node, now = new Date() }) {
+export async function installClaudePlugin({ configDir, runner, node = process.execPath,
+  channel = defaultChannel(), livePolicy = "off", now = new Date() }) {
+  const live = livePolicy === "actionable" || livePolicy === "all";
   // Everything this will merge into, read before a byte is written. A settings
   // file that will not parse used to be discovered after the plugin tree was
   // already on disk, and the install then failed with nineteen files left
@@ -174,12 +191,12 @@ export async function installClaudePlugin({ configDir, runner, node, now = new D
   const source = sourceDir(configDir);
   const cached = cachePath(configDir, version);
 
-  await layOutPlugin(source, { runner, node });
+  await layOutPlugin(source, { runner, node, channel, live });
   await writeJson(marketplaceFile(configDir), marketplaceManifest());
   // The copy the client runs from. Written here rather than asking the user to
   // run `claude plugin install`, exactly as the Codex adapter does, because the
   // command's only effect is this copy plus the two registry entries below.
-  await layOutPlugin(cached, { runner, node });
+  await layOutPlugin(cached, { runner, node, channel, live });
   // One copy, the one just written. A client caches a plugin under its version,
   // so every upgrade would otherwise leave the previous release's tree beside
   // this one - invisible while the version never moved, three deep once it did.
@@ -225,8 +242,11 @@ export async function installClaudePlugin({ configDir, runner, node, now = new D
 
   return { ok: true,
     changes: [source, cached, marketplaceFile(configDir),
-      knownMarketplacesPath(configDir), installedPluginsPath(configDir), file],
-    diagnostics: [] };
+      knownMarketplacesPath(configDir), installedPluginsPath(configDir), file,
+      ...(live ? [mcpPath(source), mcpPath(cached)] : [])],
+    diagnostics: live
+      ? ["native channel wired; Claude's experimental development-channel warning still applies"]
+      : [] };
 }
 
 export async function uninstallClaudePlugin({ configDir, keep = [] }) {

@@ -82,7 +82,11 @@ export function createDeliveryRouter({ service, adapters, clock }) {
     const { binding, adapter } = capable[0];
     let response;
     try {
-      response = await adapter.offerMessage({ binding, message });
+      // The store root is this workspace's runtime dir; the adapter resolves its
+      // opaque endpoint id under it. Passed as data, never as a leak into core:
+      // the router does not read what the adapter does with it.
+      response = await adapter.offerMessage({ binding, message,
+        runtimeDir: service.store?.root });
     } catch {
       await recordFailure(binding, message, participantId, "live-adapter", "transport_error");
       return durable(participantId, "transport_error");
