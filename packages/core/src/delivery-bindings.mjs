@@ -49,7 +49,17 @@ export function createDeliveryBindingService(ports, sessions) {
       }
       throw error;
     }
-    await store.ephemeral.put("deliveryBinding", binding.sessionId, binding);
+    await store.ephemeral.update("deliveryBinding", binding.sessionId, async () => {
+      // This check runs while the ephemeral key's writer lock is held. A stale
+      // publisher that passed the earlier check cannot replace a successor's
+      // endpoint after that successor becomes current.
+      const current = await sessions.locateSession(input.sessionId);
+      if (current?.record.state !== "open"
+        || current.record.generation !== input.generation) {
+        throw conflict(input.sessionId);
+      }
+      return binding;
+    });
     const stillCurrent = await sessions.locateSession(input.sessionId);
     if (stillCurrent?.record.state !== "open"
       || stillCurrent.record.generation !== input.generation) {

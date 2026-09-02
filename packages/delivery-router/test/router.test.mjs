@@ -12,7 +12,7 @@ const WORKSPACE = "workspace_router";
 const PLATFORM = `${process.platform}-${process.arch}`;
 
 function certifiedAdapter(offerMessage = async ({ binding }) => ({
-  accepted: true, transport: "fixture-live", clientVersion: binding.clientVersion,
+  accepted: true, transport: "codex-app-server", clientVersion: binding.clientVersion,
 })) {
   return {
     id: "fixture_adapter",
@@ -82,7 +82,7 @@ test("one eligible certified binding is offered and only then committed", async 
   const message = await send(f.service, f.sender);
 
   assert.deepEqual(await f.router.offer(message), [{ recipientParticipantId: "models",
-    outcome: "offered", transport: "fixture-live" }]);
+    outcome: "offered", transport: "codex-app-server" }]);
   assert.equal((await receipt(f.store, message.messageId)).state, "offered");
 });
 
@@ -108,7 +108,7 @@ test("an adapter throw observes queued and cannot advance the receipt", async ()
 
 test("an adapter rejection records safe evidence without advancing the receipt", async () => {
   const adapter = certifiedAdapter(async () => ({ accepted: false,
-    transport: "fixture-live", clientVersion: "1.2.3",
+    transport: "codex-app-server", clientVersion: "1.2.3",
     safeErrorCode: "recipient_busy", detail: "secret endpoint detail" }));
   const f = await fixture({ adapter });
   await publish(f.service, f.sessions[0]);
@@ -120,6 +120,58 @@ test("an adapter rejection records safe evidence without advancing the receipt",
   const failed = events.find(event => event.type === "message.offer_failed");
   assert.equal(failed.payload.safeErrorCode, "recipient_busy");
   assert.equal(JSON.stringify(failed).includes("secret endpoint detail"), false);
+});
+
+test("an unapproved portable transport cannot expose the endpoint on success", async () => {
+  const secretEndpoint = "secretEndpoint42";
+  const adapter = certifiedAdapter(async ({ binding }) => ({ accepted: true,
+    transport: binding.opaqueEndpointRef, clientVersion: binding.clientVersion }));
+  const f = await fixture({ adapter });
+  await publish(f.service, f.sessions[0], { opaqueEndpointRef: secretEndpoint });
+  const message = await send(f.service, f.sender, "question", "secret_success");
+
+  assert.deepEqual(await f.router.offer(message), [{ recipientParticipantId: "models",
+    outcome: "offered", transport: "live-adapter" }]);
+  const events = (await f.store.eventsSince(WORKSPACE, null, 100)).events;
+  const succeeded = events.find(event => event.type === "message.offer_succeeded");
+  assert.equal(succeeded.payload.transport, "live-adapter");
+  assert.equal(JSON.stringify(succeeded).includes(secretEndpoint), false);
+});
+
+test("an approved transport name cannot alias the endpoint on rejection", async () => {
+  const secretEndpoint = "codex-app-server";
+  const adapter = certifiedAdapter(async ({ binding }) => ({ accepted: false,
+    transport: binding.opaqueEndpointRef, clientVersion: binding.clientVersion,
+    safeErrorCode: "recipient_busy" }));
+  const f = await fixture({ adapter });
+  await publish(f.service, f.sessions[0], { opaqueEndpointRef: secretEndpoint });
+  const message = await send(f.service, f.sender, "request", "secret_rejection");
+
+  assert.deepEqual(await f.router.offer(message), durable("recipient_busy"));
+  const events = (await f.store.eventsSince(WORKSPACE, null, 100)).events;
+  const failed = events.find(event => event.type === "message.offer_failed");
+  assert.equal(failed.payload.transport, "live-adapter");
+  assert.equal(JSON.stringify(failed).includes(secretEndpoint), false);
+});
+
+test("record-success failure cannot persist an endpoint-shaped transport", async () => {
+  const secretEndpoint = "claude-channel";
+  let f;
+  const adapter = certifiedAdapter(async ({ binding }) => {
+    await f.service.closeSession({ sessionId: f.sessions[0].sessionId,
+      generation: f.sessions[0].generation });
+    return { accepted: true, transport: binding.opaqueEndpointRef,
+      clientVersion: binding.clientVersion };
+  });
+  f = await fixture({ adapter });
+  await publish(f.service, f.sessions[0], { opaqueEndpointRef: secretEndpoint });
+  const message = await send(f.service, f.sender, "question", "secret_record_failure");
+
+  assert.deepEqual(await f.router.offer(message), durable("transport_error"));
+  const events = (await f.store.eventsSince(WORKSPACE, null, 100)).events;
+  const failed = events.find(event => event.type === "message.offer_failed");
+  assert.equal(failed.payload.transport, "live-adapter");
+  assert.equal(JSON.stringify(failed).includes(secretEndpoint), false);
 });
 
 test("multiple eligible current sessions are ambiguous and durable-only", async () => {
