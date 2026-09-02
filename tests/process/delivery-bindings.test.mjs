@@ -89,11 +89,15 @@ test("filesystem composition records before an offer failure and keeps command s
     opaqueEndpointRef: "never-print-this-process-endpoint",
     leaseUntil: "2026-09-01T20:01:00.000Z" });
   let stateAtOffer;
+  const platform = `${process.platform}-${process.arch}`;
   const adapter = { id: "fixture_adapter", client: { command: "fixture-client" },
     capabilities: { delivery: { livePush: true } }, certification: { evidence: [{
       result: "pass", client: "fixture-client", version: "1.2.3",
-      platform: `${process.platform}-${process.arch}`, capability: "delivery.livePush",
-    }] }, offerMessage: async ({ message }) => {
+      platform, capability: "delivery.livePush",
+    }] }, nativeDelivery: { minimumByPlatform: { [platform]: "1.2.3" },
+      anchors: [{ platform, version: "1.2.3", protocolContract: "fixture-native-v1" }],
+      knownBad: [], activationKinds: ["shell-bootstrap"] },
+    offerMessage: async ({ message }) => {
       stateAtOffer = (await store.snapshot(status.workspaceId, { kinds: ["receipt"] }))
         .receipts.find(item => item.messageId === message.messageId).state;
       throw new Error("secret process transport detail");

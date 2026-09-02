@@ -70,7 +70,7 @@ policy:
 | Policy | Meaning |
 |---|---|
 | `off` | normal next-turn and inbox only |
-| `actionable` | questions, requests, and addressed handoffs may use live push |
+| `actionable` | questions, requests, answers, decisions, and addressed handoffs may use live push; notes wait for the next turn |
 | `all` | every addressed message kind may use live push |
 
 The default is `off`. `acc install --delivery actionable|all` is an explicit request, not
