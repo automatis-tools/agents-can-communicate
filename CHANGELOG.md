@@ -9,21 +9,21 @@ advisory protection around that communication layer, not the product's centre.
 
 | | |
 |---|---|
-| Built from | `31567567b1824a2b504eb532e84b9803270bcd2a` |
-| Tarball | `agents-can-communicate-0.2.0.tgz`, 199,472 bytes, 178 entries |
-| sha256 | `06b11edf959eaa960b379a0cb967b53af42614b029e81ab19939309c6b28c82c` |
+| Built from | `dab200f4e5d968716ea296412703a9be222fc7a4` |
+| Tarball | `agents-can-communicate-0.2.0.tgz`, 199,128 bytes, 177 entries |
+| sha256 | `8987e99f223ba90e9c0ae695670c1a733c788e24ef0d66a36dfc5ca5546f62c0` |
 | Node | 26.5.1 for this release proof; package requires Node >=24 |
 | Verified on | macOS 26.6.2 (darwin 25.6.0, arm64) |
 | Native live delivery | Not certified: Codex 0.152.0 had no daemon control socket; Claude Code 2.1.252 stopped at the development-channel warning |
 | Durable fallback | Packed Claude↔Codex question/answer flows passed through addressed inbox recovery with explicit downgrade |
 | Not supported | Windows — measured as broken in the retained platform baseline |
 
-The release gate packs and installs into a clean temporary consumer, then invokes only the
-installed CLI, hook, MCP, and bundled packages. It proves both Claude-to-Codex and
-Codex-to-Claude question/answer threads, `retrieved` then `acknowledged` receipts,
-idempotent retries, generation restarts, stale-binding rejection, unknown-version
-downgrade, double uninstall, byte-identical foreign client configuration, and no ACC state
-inside the project.
+The package verifier installs into a clean temporary consumer and drives only its installed
+`acc` boundary; the separate packed acceptance invokes the installed hook and MCP binaries
+and bundled packages. Together they prove both Claude-to-Codex and Codex-to-Claude
+question/answer threads, `retrieved` then `acknowledged` receipts, idempotent retries,
+generation restarts, stale-binding rejection, unknown-version downgrade, double uninstall,
+exact foreign client-home topology restoration, and no ACC state inside the project.
 
 Native client claims remain deliberately narrower. The retained Codex and Claude captures
 are failures, not passing evidence, so v0.2.0 installs no native live channel for them.
