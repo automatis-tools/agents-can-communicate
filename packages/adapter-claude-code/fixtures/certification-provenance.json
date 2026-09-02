@@ -66,7 +66,7 @@
       "id": "native-delivery-2-1-252", "client": "claude-code", "version": "2.1.252",
       "platform": "darwin-arm64", "observedAt": "2026-09-01T16:17:06Z",
       "fixture": "fixtures/delivery/claude-code-2.1.252.json",
-      "sha256": "a9b6bbad11ebf15bb01ace7b489f1b2d73f1a8226e9832e4cac5f1492c7ad7f7",
+      "sha256": "04ca2d59abc4d397167ba05a7dc6f9ec28f71158f340da27aa847109ef601617",
       "event": null, "tool": null,
       "claims": [
         { "capability": "delivery.livePush", "result": "fail", "outcome": { "kind": "native-capture-failed" } },

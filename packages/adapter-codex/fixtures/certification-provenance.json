@@ -55,7 +55,7 @@
       "id": "native-delivery-0-152-0", "client": "codex-cli", "version": "0.152.0",
       "platform": "darwin-arm64", "observedAt": "2026-09-01T16:20:40.386Z",
       "fixture": "fixtures/delivery/codex-cli-0.152.0.json",
-      "sha256": "e7879ed95374a4e0450a3c8c0e291357a8c9cf41f6bee90978d920a14f9dc954",
+      "sha256": "1f3a57d5ab6fecf827fd54a1fd452c3c7a8d0ac199dd2af025f1954aa83b3cf8",
       "event": null, "tool": null,
       "claims": [
         { "capability": "delivery.livePush", "result": "fail", "outcome": { "kind": "native-capture-failed" } },
