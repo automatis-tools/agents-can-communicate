@@ -1,96 +1,14 @@
 import assert from "node:assert/strict";
 
 import { PUBLIC_TOOLS } from "../src/tools.mjs";
-import { execFile, spawn } from "node:child_process";
-import { mkdtemp, realpath, rm } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import path from "node:path";
 import test from "node:test";
-import { promisify } from "node:util";
-import { fileURLToPath } from "node:url";
 
 import { PROTOCOL_VERSION } from "../src/server.mjs";
+import { withServer } from "./stdio-harness.mjs";
 
 // This end-to-end file intentionally keeps one real stdio JSON-RPC harness for
 // every server behavior. Splitting past 300 lines would duplicate that protocol
 // and lifecycle machinery, making the copies—not the server—the thing tested.
-
-const repoRoot = fileURLToPath(new URL("../../..", import.meta.url));
-const execFileAsync = promisify(execFile);
-const binary = path.join(repoRoot, "bin", "acc-mcp.mjs");
-
-// A minimal client: writes newline-delimited JSON-RPC to stdin, reads
-// newline-delimited JSON-RPC from stdout, keeps stderr separate.
-async function withServer(t, run, { env = {}, reuse } = {}) {
-  const workspace = reuse?.workspace
-    ?? await realpath(await mkdtemp(path.join(tmpdir(), "acc-mcp-ws-")));
-  const dataHome = reuse?.dataHome
-    ?? await realpath(await mkdtemp(path.join(tmpdir(), "acc-mcp-home-")));
-  if (reuse === undefined) {
-    t.after(() => Promise.all([rm(workspace, { recursive: true, force: true }),
-      rm(dataHome, { recursive: true, force: true })]));
-  }
-
-  const child = spawn(process.execPath, [binary], {
-    cwd: workspace,
-    env: { ...process.env, ACC_DATA_HOME: dataHome, HOME: dataHome,
-      ACC_MCP_PARTICIPANT: "mcp_client", ...env },
-    stdio: ["pipe", "pipe", "pipe"],
-  });
-  let stdout = "";
-  let stderr = "";
-  const lines = [];
-  const waiters = [];
-  // Recorded rather than awaited twice: once "close" has fired, a listener
-  // added afterwards never runs, which is a hang rather than a failure.
-  let exited = null;
-  const closed = new Promise(resolve => child.once("close", code => {
-    exited = code ?? 0;
-    resolve(exited);
-  }));
-  child.stdout.setEncoding("utf8");
-  child.stderr.setEncoding("utf8");
-  child.stdout.on("data", chunk => {
-    stdout += chunk;
-    let index = stdout.indexOf("\n");
-    while (index !== -1) {
-      lines.push(stdout.slice(0, index));
-      stdout = stdout.slice(index + 1);
-      index = stdout.indexOf("\n");
-      waiters.shift()?.();
-    }
-  });
-  child.stderr.on("data", chunk => { stderr += chunk; });
-
-  const request = async (method, params, id = Math.floor(Math.random() * 1e6)) => {
-    child.stdin.write(`${JSON.stringify({ jsonrpc: "2.0", id, method, params })}\n`);
-    while (lines.length === 0) {
-      const answered = new Promise(resolve => waiters.push(resolve));
-      const gaveUp = Promise.race([answered, closed.then(() => "closed")]);
-      if (await gaveUp === "closed" && lines.length === 0) {
-        throw new Error(`server exited before answering ${method}; stderr: ${stderr}`);
-      }
-    }
-    return JSON.parse(lines.shift());
-  };
-
-  const meta = { "io.modelcontextprotocol/protocolVersion": PROTOCOL_VERSION,
-    "io.modelcontextprotocol/clientCapabilities": {} };
-
-  try {
-    // A participant this workspace has seen, for the tests that need a real
-    // recipient rather than a placeholder.
-    const attach = participantId => execFileAsync(process.execPath,
-      [path.join(repoRoot, "bin", "acc.mjs"), "attach", "--participant", participantId,
-        "--harness", "cli", "--cwd", workspace, "--json"],
-      { env: { ...process.env, ACC_DATA_HOME: dataHome, GIT_DIR: "", GIT_WORK_TREE: "" } });
-    return await run({ request, meta, child, closed, stderr: () => stderr, workspace, attach,
-      dataHome });
-  } finally {
-    child.stdin.end();
-    await closed;
-  }
-}
 
 test("server/discover reports the supported revision", async t => {
   await withServer(t, async ({ request, meta }) => {
@@ -159,10 +77,9 @@ test("a tool call attaches, works, and reports through core", async t => {
 
     assert.equal(worked.error, undefined, JSON.stringify(worked.error));
     assert.equal(worked.result.isError, undefined);
-    const payload = JSON.parse(synced.result.structuredContent
-      ?? synced.result.content[0].text);
-    const fullPayload = JSON.parse(full.result.structuredContent);
-    const statusPayload = JSON.parse(status.result.structuredContent);
+    const payload = synced.result.structuredContent;
+    const fullPayload = full.result.structuredContent;
+    const statusPayload = status.result.structuredContent;
     assert.equal(payload.roster.length >= 1, true);
     for (const field of ["workstreams", "tasks", "decisions"]) {
       assert.equal(Object.hasOwn(fullPayload.snapshot, field), false);
@@ -180,7 +97,7 @@ test("a restarted server resolves to the same session, not a second one", async 
     await request("tools/call", { name: "acc_work",
       arguments: { summary: "still here", mode: "observe" }, _meta: meta });
     const synced = await request("tools/call", { name: "acc_sync", arguments: {}, _meta: meta });
-    return JSON.parse(synced.result.structuredContent ?? synced.result.content[0].text).roster;
+    return synced.result.structuredContent.roster;
   }, { reuse });
 
   const first = await rosterOf(undefined);
@@ -258,7 +175,8 @@ test("peer content that reads as an instruction is stored and attributed as data
     assert.equal(inbox[0].trust, "untrusted peer content");
     assert.equal(inbox[0].kind, "note");
     assert.equal(inbox[0].obligation, "none");
-    assert.equal(typeof inbox[0].from, "string");
+    assert.equal(typeof inbox[0].fromParticipantId, "string");
+    assert.equal(typeof inbox[0].fromSessionId, "string");
   });
 });
 
@@ -277,7 +195,7 @@ test("every note returns the same closed v0.2 send result", async t => {
     await attach("someone_else");
     const send = (subject, body) => request("tools/call", { name: "acc_message",
       arguments: { to: ["someone_else"], subject, body, kind: "note" }, _meta: meta })
-      .then(res => JSON.parse(res.result.structuredContent ?? res.result.content[0].text));
+      .then(res => res.result.structuredContent);
 
     const consequential = await send("Snow", "It touches your file. Have you started?");
     assert.deepEqual(Object.keys(consequential).sort(), ["delivery", "message"]);
@@ -299,7 +217,7 @@ test("a peer can read one MCP inbox item and reply without syncing the workspace
     const sent = await request("tools/call", { name: "acc_message", arguments: {
       to: ["answerer"], subject: "Gate", body: "Can I proceed?", kind: "question" },
     _meta: meta });
-    const result = JSON.parse(sent.result.structuredContent);
+    const result = sent.result.structuredContent;
     assert.deepEqual(Object.keys(result).sort(), ["delivery", "message"]);
     messageId = result.message.messageId;
   });
@@ -307,16 +225,22 @@ test("a peer can read one MCP inbox item and reply without syncing the workspace
   await withServer(t, async ({ request, meta }) => {
     const inbox = await request("tools/call", { name: "acc_inbox",
       arguments: { messageId }, _meta: meta });
-    const read = JSON.parse(inbox.result.structuredContent);
+    const read = inbox.result.structuredContent;
     assert.deepEqual(read.map(item => item.message.messageId), [messageId]);
     assert.equal(read[0].receipt.state, "retrieved");
 
+    const replyArgs = { messageId, body: "Yes.",
+      clientMessageId: "client_mcp_reply_retry" };
     const response = await request("tools/call", { name: "acc_reply",
-      arguments: { messageId, body: "Yes." }, _meta: meta });
-    const replied = JSON.parse(response.result.structuredContent);
+      arguments: replyArgs, _meta: meta });
+    const responseRetry = await request("tools/call", { name: "acc_reply",
+      arguments: replyArgs, _meta: meta });
+    const replied = response.result.structuredContent;
+    const replyRetry = responseRetry.result.structuredContent;
     assert.deepEqual(Object.keys(replied).sort(), ["delivery", "message"]);
     assert.equal(replied.message.inReplyTo, messageId);
-    assert.equal(typeof replied.message.clientMessageId, "string");
+    assert.equal(replied.message.clientMessageId, "client_mcp_reply_retry");
+    assert.equal(replyRetry.message.messageId, replied.message.messageId);
   }, { reuse: location, env: { ACC_MCP_PARTICIPANT: "answerer" } });
 });
 
@@ -329,8 +253,8 @@ test("request and finish expose one retryable send result", async t => {
       _meta: meta });
     const retried = await request("tools/call", { name: "acc_request", arguments: args,
       _meta: meta });
-    const sent = JSON.parse(first.result.structuredContent);
-    const retry = JSON.parse(retried.result.structuredContent);
+    const sent = first.result.structuredContent;
+    const retry = retried.result.structuredContent;
 
     assert.deepEqual(Object.keys(sent).sort(), ["delivery", "message"]);
     assert.equal(sent.message.kind, "request");
@@ -338,12 +262,19 @@ test("request and finish expose one retryable send result", async t => {
     assert.equal(sent.message.clientMessageId, "client_mcp_request");
     assert.equal(retry.message.messageId, sent.message.messageId);
 
-    const finished = await request("tools/call", { name: "acc_finish", arguments: {
-      goal: "Hand off cleanly" }, _meta: meta });
-    const handoff = JSON.parse(finished.result.structuredContent);
+    const finishArgs = { goal: "Hand off cleanly",
+      clientMessageId: "client_mcp_finish_retry" };
+    const finished = await request("tools/call", { name: "acc_finish", arguments: finishArgs,
+      _meta: meta });
+    const finishRetry = await request("tools/call", { name: "acc_finish",
+      arguments: finishArgs, _meta: meta });
+    const handoff = finished.result.structuredContent;
+    const retriedHandoff = finishRetry.result.structuredContent;
     assert.deepEqual(Object.keys(handoff).sort(), ["delivery", "message"]);
     assert.equal(handoff.message.kind, "handoff");
-    assert.equal(typeof handoff.message.clientMessageId, "string");
+    assert.equal(handoff.message.clientMessageId, "client_mcp_finish_retry");
+    assert.equal(finishRetry.result.isError, undefined, finishRetry.result.content?.[0]?.text);
+    assert.equal(retriedHandoff.message.messageId, handoff.message.messageId);
   });
 });
 
@@ -357,19 +288,19 @@ test("acc_sync never doubles as a compatibility mail transport", async t => {
     const sent = await request("tools/call", { name: "acc_message", arguments: {
       to: ["legacy_reader"], subject: "Compatibility", body: "Still delivered by sync",
       kind: "question" }, _meta: meta });
-    messageId = JSON.parse(sent.result.structuredContent).message.messageId;
+    messageId = sent.result.structuredContent.message.messageId;
   });
 
   await withServer(t, async ({ request, meta }) => {
     const synced = await request("tools/call", { name: "acc_sync",
       arguments: {}, _meta: meta });
-    const payload = JSON.parse(synced.result.structuredContent);
+    const payload = synced.result.structuredContent;
 
     assert.equal(payload.messages, undefined);
 
     const inbox = await request("tools/call", { name: "acc_inbox",
       arguments: { messageId }, _meta: meta });
-    const read = JSON.parse(inbox.result.structuredContent);
+    const read = inbox.result.structuredContent;
     assert.equal(read[0].message.messageId, messageId);
     assert.equal(read[0].receipt.state, "retrieved");
   }, { reuse: location, env: { ACC_MCP_PARTICIPANT: "legacy_reader" } });

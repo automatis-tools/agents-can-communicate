@@ -97,7 +97,7 @@ test("send tools expose idempotency and only the v0.2 message semantics", () => 
   }
 
   assert.deepEqual(byName("acc_message").kind.enum,
-    ["note", "question", "request", "answer", "decision", "handoff"]);
+    ["note", "question", "request", "decision"]);
   assert.deepEqual(byName("acc_message").obligation.enum, ["none", "acknowledge", "reply"]);
   for (const removed of ["type", "priority", "requiresAck", "workstreamId"]) {
     assert.equal(Object.hasOwn(byName("acc_message"), removed), false,

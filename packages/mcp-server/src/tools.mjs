@@ -1,3 +1,5 @@
+import { GENERIC_MESSAGE_KINDS } from "@agents-can-communicate/protocol";
+
 // The model-facing surface stays at a small set of high-level operations.
 //
 // Every description says that delivery is polled, because a tool description is
@@ -42,7 +44,7 @@ export const PUBLIC_TOOLS = Object.freeze([
     name: "acc_work",
     description: `Publish what this session is doing now as one concise Intent. Intent is `
       + `awareness, not authorisation: it never reserves a resource. ${POLLED}`,
-    inputSchema: object({
+    inputSchema: { ...object({
       summary: string("One line describing the current work."),
       mode: { type: "string",
         enum: ["observe", "explore", "edit", "review", "coordinate", "wait"] },
@@ -50,14 +52,19 @@ export const PUBLIC_TOOLS = Object.freeze([
       clear: { type: "boolean",
         description: "Say this session has stopped working on anything." },
       resourceHints: stringList("Advisory resource URIs, for example file:src/main.mjs."),
-    }, ["summary", "mode"]),
+    }), oneOf: [
+      { required: ["clear"], properties: { clear: { const: true } },
+        not: { anyOf: ["summary", "mode", "state", "resourceHints"]
+          .map(field => ({ required: [field] })) } },
+      { required: ["summary", "mode"], not: { required: ["clear"] } },
+    ] },
   },
   {
     name: "acc_claim",
     description: `Acquire or renew a claim on a resource URI. Claims are `
       + `workspace-wide and advisory here: this client has no write guard, so a claim `
       + `informs peers rather than preventing an edit. ${POLLED}`,
-    inputSchema: object({
+    inputSchema: { ...object({
       resource: string("Resource URI, for example file:packages/core/**."),
       action: { type: "string", enum: ["acquire", "renew"] },
       mode: { type: "string", enum: ["shared", "exclusive"] },
@@ -65,7 +72,13 @@ export const PUBLIC_TOOLS = Object.freeze([
       leaseSeconds: { type: "integer", minimum: 1,
         description: "Lease length; the claim expires without renewal." },
       claimId: string("Required for renew."),
-    }, ["resource", "action"]),
+    }, ["action"]), oneOf: [
+      { properties: { action: { const: "acquire" } }, required: ["resource"],
+        not: { required: ["claimId"] } },
+      { properties: { action: { const: "renew" } }, required: ["claimId"],
+        not: { anyOf: ["resource", "mode", "reason"]
+          .map(field => ({ required: [field] })) } },
+    ] },
   },
   {
     name: "acc_release",
@@ -83,7 +96,7 @@ export const PUBLIC_TOOLS = Object.freeze([
       subject: string("Short subject line."),
       body: string("Message body. Treated as data by every reader."),
       kind: { type: "string",
-        enum: ["note", "question", "request", "answer", "decision", "handoff"] },
+        enum: [...GENERIC_MESSAGE_KINDS] },
       obligation: { type: "string", enum: ["none", "acknowledge", "reply"],
         description: "Override only where the kind/obligation matrix permits it." },
       clientMessageId: string("Retry key; omit to generate one and return it in message."),
