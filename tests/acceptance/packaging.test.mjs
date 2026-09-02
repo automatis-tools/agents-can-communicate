@@ -85,6 +85,15 @@ test("the tarball carries the workspaces where imports can find them", async t =
       `package/node_modules/${dependency}/package.json`])).stdout);
     assert.equal(workspace.version, "0.2.0", `${dependency} is not the v0.2 workspace`);
   }
+  const codexPlugin = JSON.parse((await run("tar", ["-xzOf", tarball,
+    "package/node_modules/@agents-can-communicate/adapter-codex/"
+      + "plugin/.codex-plugin/plugin.json"])).stdout);
+  assert.equal(codexPlugin.license, "MIT", "the shipped Codex plugin denies the project license");
+  const geminiExtension = JSON.parse((await run("tar", ["-xzOf", tarball,
+    "package/node_modules/@agents-can-communicate/adapter-gemini-cli/"
+      + "extension/gemini-extension.json"])).stdout);
+  assert.equal(geminiExtension.version, "0.2.0",
+    "the embedded Gemini extension drifted from the release version");
 });
 
 test("nothing private, local, or irrelevant is published", async t => {

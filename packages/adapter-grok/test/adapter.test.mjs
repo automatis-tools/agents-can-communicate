@@ -62,8 +62,11 @@ test("install is idempotent and uninstall restores the user's files", async t =>
   await adapter.install(context);
   assert.equal(await readFile(hooksFile(grokHome), "utf8"), firstHooks);
 
-  await adapter.uninstall(context);
-  await adapter.uninstall(context);
+  const firstRemoval = await adapter.uninstall(context);
+  const secondRemoval = await adapter.uninstall(context);
+  assert.equal(firstRemoval.changes.length, 3);
+  assert.deepEqual(secondRemoval.changes, [],
+    "an idempotent uninstall reported absent files as removals");
 
   await stat(path.join(grokHome, "hooks", "other.json"));
   await assert.rejects(stat(hooksFile(grokHome)), { code: "ENOENT" });

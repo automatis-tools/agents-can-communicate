@@ -1,4 +1,5 @@
-import { recordInstall, removeOwned } from "./ownership.mjs";
+import { missingArtifactParents, recordInstall, removeEmptyOwnedDirectories, removeOwned }
+  from "./ownership.mjs";
 
 /**
  * Carry out a plan, one adapter at a time.
@@ -30,6 +31,8 @@ export async function applyPlan({ plan, adapters, context, dataHome, dryRun = fa
 
     try {
       if (plan.action === "install") {
+        const createdDirectories = await missingArtifactParents({ home: context.home,
+          artifacts: operation.artifacts });
         const installContext = { ...context,
           requestedLivePolicy: operation.livePolicy ?? "off",
           livePolicy: operation.effectiveLivePolicy ?? "off" };
@@ -39,7 +42,7 @@ export async function applyPlan({ plan, adapters, context, dataHome, dryRun = fa
         // remove files nothing created.
         await recordInstall({ dataHome, adapterId: adapter.id,
           version: operation.clientVersion ?? null, accVersion,
-          artifacts: operation.artifacts });
+          artifacts: operation.artifacts, createdDirectories });
         results.operations.push({ ...operation, applied: true,
           changes: outcome.changes ?? [], diagnostics: [
             ...(operation.deliveryDiagnostic === undefined
@@ -55,8 +58,12 @@ export async function applyPlan({ plan, adapters, context, dataHome, dryRun = fa
         // The case that matters: someone put their own work inside a directory
         // ACC created, and a recognised path is not a reason to delete it.
         const outcome = await adapter.uninstall({ ...context, keep: owned.kept });
+        const directories = await removeEmptyOwnedDirectories({ home: context.home,
+          directories: owned.createdDirectories });
         results.operations.push({ ...operation, applied: true,
           changes: outcome.changes ?? [], removed: owned.removed, kept: owned.kept,
+          removedDirectories: directories.removed, keptDirectories: directories.kept,
+          missingDirectories: directories.missing,
           diagnostics: outcome.diagnostics ?? [] });
       }
     } catch (error) {

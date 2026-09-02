@@ -110,6 +110,8 @@ export function describeChanges(operation, home) {
   }
   return [
     ...(operation.removed ?? []).map(file => `  removed ${shorten(file, home)}`),
+    ...(operation.removedDirectories ?? [])
+      .map(file => `  removed ${shorten(file, home)}`),
     ...edited,
     ...(operation.kept ?? [])
       .map(file => `  kept    ${shorten(file, home)} - changed since ACC wrote it`),
@@ -168,7 +170,8 @@ export function failureOf({ action, acted, failed = [] }) {
 export function actedOn(result) {
   return result.operations.filter(operation => operation.applied
     && (result.action === "install"
-      || (operation.removed?.length ?? 0) + (operation.changes?.length ?? 0) > 0)).length;
+      || (operation.removed?.length ?? 0) + (operation.removedDirectories?.length ?? 0)
+        + (operation.changes?.length ?? 0) > 0)).length;
 }
 
 export async function runInstallCommand({ options, runtime, action = "install" }) {

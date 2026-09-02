@@ -1,7 +1,7 @@
 {
   "name": "agents-can-communicate",
   "description": "Coordinate this Codex session with other AI agent sessions working in the same workspace.",
-  "license": "UNLICENSED",
+  "license": "MIT",
   "keywords": [
     "coordination",
     "multi-agent",

@@ -17,7 +17,8 @@ git status --short
 git commit -m "release: prepare ACC v0.2.0"
 candidate_dir="$(mktemp -d /private/tmp/acc-v0.2.XXXXXX)"
 env npm_config_cache=/private/tmp/acc-npm-cache-v02 npm pack --pack-destination "$candidate_dir"
-node scripts/verify-package.mjs "$candidate_dir/agents-can-communicate-0.2.0.tgz"
+env npm_config_cache=/private/tmp/acc-npm-cache-v02 node scripts/verify-package.mjs \
+  "$candidate_dir/agents-can-communicate-0.2.0.tgz"
 git diff --check
 ```
 

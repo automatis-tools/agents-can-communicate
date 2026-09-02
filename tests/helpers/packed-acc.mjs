@@ -1,5 +1,6 @@
 import { execFile } from "node:child_process";
-import { chmod, mkdir, mkdtemp, readFile, readdir, realpath, rm, writeFile }
+import { chmod, lstat, mkdir, mkdtemp, readFile, readdir, readlink, realpath, rm,
+  writeFile }
   from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -27,8 +28,14 @@ async function treeSnapshot(root) {
   for (const entry of entries) {
     const absolute = path.join(entry.parentPath ?? entry.path, entry.name);
     const relative = path.relative(root, absolute).split(path.sep).join("/");
-    if (entry.isFile()) snapshot.push({ path: relative, type: "file",
+    const stat = await lstat(absolute);
+    const mode = stat.mode & 0o7777;
+    if (stat.isDirectory()) snapshot.push({ path: relative, type: "directory", mode });
+    else if (stat.isFile()) snapshot.push({ path: relative, type: "file", mode,
       bytes: (await readFile(absolute)).toString("base64") });
+    else if (stat.isSymbolicLink()) snapshot.push({ path: relative, type: "symlink", mode,
+      target: await readlink(absolute) });
+    else throw new Error(`unsupported client-home entry type at ${absolute}`);
   }
   return snapshot.sort((left, right) => left.path.localeCompare(right.path));
 }
@@ -79,9 +86,13 @@ export async function createPackedAcc(t) {
     PATH: clientBin,
     GIT_DIR: "", GIT_WORK_TREE: "" };
 
-  const acc = async (args, extraEnv = {}) => parsed((await run(process.execPath,
+  const commandTrace = [];
+  const acc = async (args, extraEnv = {}) => {
+    commandTrace.push([...args]);
+    return parsed((await run(process.execPath,
     [accBin, ...args, "--cwd", project, "--json"], { cwd: project,
       env: { ...env, ...extraEnv } })).stdout);
+  };
   const accError = async (args, extraEnv = {}) => run(process.execPath,
     [accBin, ...args, "--cwd", project, "--json"], { cwd: project,
       env: { ...env, ...extraEnv } }).then(() => null, error => error);
@@ -153,7 +164,8 @@ export async function createPackedAcc(t) {
   };
 
   return { root, repo, pack, consumer, project, dataHome, clientHome, clientBin,
-    tarball, installed, accBin, hookBin, mcpBin, env, acc, accError, hook, start,
+    tarball, installed, accBin, hookBin, mcpBin, env, acc, accError, commandTrace,
+    hook, start,
     beforeTurn, receipt, setClientVersions, publishBinding,
     manifest: JSON.parse(await readFile(path.join(installed, "package.json"), "utf8")),
     snapshotClientFiles: () => treeSnapshot(clientHome),

@@ -17,6 +17,7 @@ import { promisify } from "node:util";
 
 import { gitProvenance } from "./git-provenance.mjs";
 import { verifyCertificationFixtureAllowlist } from "./package-certification.mjs";
+import { treeSnapshot } from "./tree-snapshot.mjs";
 
 const run = promisify(execFile);
 const repo = path.resolve(import.meta.dirname, "..");
@@ -174,6 +175,16 @@ async function main() {
         fail(`${dependency} is ${workspaceManifest.version}, not 0.2.0`);
       }
     }
+    const geminiManifest = await readTarJson(tarball,
+      "node_modules/@agents-can-communicate/adapter-gemini-cli/"
+      + "extension/gemini-extension.json");
+    if (geminiManifest.version !== "0.2.0") {
+      fail(`embedded Gemini extension is ${geminiManifest.version}, not 0.2.0`);
+    }
+    const codexPlugin = await readTarJson(tarball,
+      "node_modules/@agents-can-communicate/adapter-codex/"
+      + "plugin/.codex-plugin/plugin.json");
+    if (codexPlugin.license !== "MIT") fail("shipped Codex plugin license is not MIT");
     ok(`root and ${manifest.bundleDependencies.length} bundled workspaces are 0.2.0`);
 
     step("install into a clean directory");
@@ -210,18 +221,52 @@ async function main() {
     ok("nothing written into the project");
 
     step("install and uninstall");
-    await writeFile(path.join(clientHome, "config.toml"), 'default_model = "k3"\n');
-    const before = await readFile(path.join(clientHome, "config.toml"), "utf8");
+    const kimiHome = path.join(clientHome, ".kimi-code");
+    await mkdir(kimiHome, { recursive: true });
+    await writeFile(path.join(kimiHome, "config.toml"), 'default_model = "k3"\n');
+    const before = await treeSnapshot(clientHome);
     // `acc install` fails the command when an adapter fails, so its output is
     // the diagnosis rather than something to discard.
-    const installed = await acc("install", "--home", clientHome)
-      .catch(error => { fail("install failed", error.stdout || error.message); });
-    const removed = await acc("uninstall", "--home", clientHome)
-      .catch(error => { fail("uninstall failed", error.stdout || error.message); });
-    void installed; void removed;
-    const after = await readFile(path.join(clientHome, "config.toml"), "utf8");
-    if (after !== before) fail("uninstall did not restore the client config");
-    ok("client config restored byte for byte");
+    const installed = JSON.parse((await acc("install", "--adapter", "kimi",
+      "--home", clientHome)
+      .catch(error => fail("install failed", error.stdout || error.message))).stdout).data;
+    if (installed.failed.length > 0 || installed.operations.length !== 1
+      || installed.operations[0].adapterId !== "kimi"
+      || installed.operations[0].applied !== true) {
+      fail("install result did not apply the requested Kimi adapter", JSON.stringify(installed));
+    }
+    if (JSON.stringify(await treeSnapshot(clientHome)) === JSON.stringify(before)) {
+      fail("install did not change the client-home topology");
+    }
+    const installedKimi = JSON.parse(await readFile(path.join(kimiHome, "plugins", "managed",
+      "agents-can-communicate", ".kimi-plugin", "plugin.json"), "utf8"));
+    if (installedKimi.version !== "0.2.0") fail("installed Kimi manifest is not 0.2.0");
+
+    const removed = JSON.parse((await acc("uninstall", "--adapter", "kimi",
+      "--home", clientHome)
+      .catch(error => fail("uninstall failed", error.stdout || error.message))).stdout).data;
+    if (removed.failed.length > 0 || removed.operations.length !== 1
+      || removed.operations[0].applied !== true
+      || (removed.operations[0].removed.length + removed.operations[0].changes.length) === 0) {
+      fail("first uninstall did not report its removals", JSON.stringify(removed));
+    }
+    if (JSON.stringify(await treeSnapshot(clientHome)) !== JSON.stringify(before)) {
+      fail("uninstall did not restore client-home topology and bytes");
+    }
+
+    const repeated = JSON.parse((await acc("uninstall", "--adapter", "kimi",
+      "--home", clientHome)).stdout).data;
+    const repeatedOperation = repeated.operations[0];
+    if (repeated.failed.length > 0 || repeatedOperation?.applied !== true
+      || (repeatedOperation.removed?.length ?? 0) > 0
+      || (repeatedOperation.removedDirectories?.length ?? 0) > 0
+      || (repeatedOperation.changes?.length ?? 0) > 0) {
+      fail("second uninstall was not an idempotent no-op", JSON.stringify(repeated));
+    }
+    if (JSON.stringify(await treeSnapshot(clientHome)) !== JSON.stringify(before)) {
+      fail("second uninstall changed client-home topology or bytes");
+    }
+    ok("client-home topology, modes, links, and bytes restored; repeated uninstall was a no-op");
 
     // One line to copy into the changelog, complete enough to be checkable
     // later: which file, which bytes, and which revision produced them.
