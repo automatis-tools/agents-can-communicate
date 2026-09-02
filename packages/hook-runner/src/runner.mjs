@@ -23,6 +23,24 @@ import { readProcessTable as defaultReadProcessTable } from "./process-table.mjs
 // let a call through than to make someone's session sit waiting on us.
 const DEFAULT_BUDGET_MS = 5_000;
 
+const byteLength = value => Buffer.byteLength(value, "utf8");
+
+function compactInboxRecovery(messages) {
+  const first = messages[0].messageId;
+  const rest = messages.length > 1 ? ` (+${messages.length - 1} more in \`acc inbox\`)` : "";
+  return `ACC: read pending peer message: \`acc inbox --message ${first}\`${rest}`;
+}
+
+function fitDegradation(projection, visibleDegradation, messages, budgetBytes) {
+  const full = [projection, visibleDegradation].filter(Boolean).join("\n");
+  if (byteLength(full) <= budgetBytes) return full;
+  const recovery = compactInboxRecovery(messages);
+  const withRecovery = [projection, recovery].filter(Boolean).join("\n");
+  if (byteLength(withRecovery) <= budgetBytes) return withRecovery;
+  if (byteLength(recovery) <= budgetBytes) return recovery;
+  return projection;
+}
+
 // Declared by this process on the session it opens, so peers can tell an idle
 // session from a dead one. Only one of the four clients fires a heartbeat event,
 // so the rest refresh here: on every turn, and during a long one whenever the
@@ -301,9 +319,9 @@ const HANDLERS = {
       ? `acc: ${messages.length} pending message(s) withheld because ${reason}; read `
         + `${messages[0].messageId} with acc inbox --message ${messages[0].messageId}` : null;
     const visibleDegradation = degradation === null ? "" : `ACC: ${degradation.slice(5)}`;
-    const candidate = [projection.text, visibleDegradation].filter(Boolean).join("\n");
-    const projected = Buffer.byteLength(candidate, "utf8")
-      <= (projectionOptions.budgetBytes ?? 6_000) ? candidate : projection.text;
+    const budgetBytes = projectionOptions.budgetBytes ?? 6_000;
+    const projected = degradation === null ? projection.text
+      : fitDegradation(projection.text, visibleDegradation, messages, budgetBytes);
     if (projected === "") {
       return degradation === null ? { stdout: "" } : { stdout: "", stderr: degradation };
     }
