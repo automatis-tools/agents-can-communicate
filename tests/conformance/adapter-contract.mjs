@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { CAPABILITY_SHAPE, effectiveCapabilities, projectContext }
+import { CAPABILITY_SHAPE, effectiveCapabilities, evaluateNativeEligibility, projectContext }
   from "@agents-can-communicate/adapter-sdk";
 
 /**
@@ -147,6 +147,30 @@ export function runAdapterConformance(name, kit) {
     assert.equal(later.sessionId, start.sessionId,
       "the harness session id did not survive between two hook events");
     assert.equal(typeof fixture.context, "object");
+  });
+
+  test(`${name}: a native contract, when declared, admits only its captured platforms`, () => {
+    const instance = adapter();
+    const probeFor = (clientVersion, protocolContract) => ({ supported: true, clientVersion,
+      protocolContract, executableFingerprint: null, modes: ["livePush"], reasonCode: null });
+    if (instance.nativeDelivery === undefined) {
+      assert.deepEqual(evaluateNativeEligibility(instance, { clientVersion: "1.0.0",
+        platform: "darwin-arm64", probe: probeFor("1.0.0", "any-v1") }),
+      { eligible: false, reasonCode: "native_delivery_unsupported", minimumVersion: null,
+        protocolContract: null, modes: [] });
+      return;
+    }
+    assert.equal(Object.isFrozen(instance.nativeDelivery), true);
+    for (const anchor of instance.nativeDelivery.anchors) {
+      const result = evaluateNativeEligibility(instance, { clientVersion: anchor.version,
+        platform: anchor.platform, probe: probeFor(anchor.version, anchor.protocolContract) });
+      assert.equal(result.eligible, true, `${anchor.platform} ${anchor.version} is not eligible`);
+      assert.equal(result.protocolContract, anchor.protocolContract);
+    }
+    const uncaptured = evaluateNativeEligibility(instance, { clientVersion: "999.0.0",
+      platform: "win32-x64", probe: probeFor("999.0.0", "any-v1") });
+    assert.equal(uncaptured.eligible === false && ["platform_not_captured", "protocol_mismatch"]
+      .includes(uncaptured.reasonCode), true);
   });
 
   test(`${name}: no hook payload field is copied verbatim into coordination state`, async () => {

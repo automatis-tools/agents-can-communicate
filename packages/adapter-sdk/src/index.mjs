@@ -2,6 +2,10 @@
 // that survives between two ephemeral hook processes.
 export { CAPABILITY_SHAPE, assertCapabilities, defineAdapter } from "./capabilities.mjs";
 export { effectiveCapabilities, validateCertification } from "./certification.mjs";
+export { NATIVE_ACTIVATION_KINDS, NATIVE_BINDING_MODES, NATIVE_PLATFORMS, NATIVE_REASON_CODES,
+  compareStableVersions, evaluateNativeEligibility, parseStableVersion,
+  validateNativeActivationPlan, validateNativeDeliveryContract, validateNativeHandshake }
+  from "./native-delivery.mjs";
 export { EVENT_KINDS, NORMALIZED_EVENT_KEYS, normalizedEvent } from "./events.mjs";
 export { assertRunner, bakeSkillCommand, defaultCli, defaultRunner, removeInstalledTree,
   runnerExists, writeHookShim }
