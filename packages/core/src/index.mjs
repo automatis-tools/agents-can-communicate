@@ -5,5 +5,6 @@ export { classifySessionPresence } from "./sessions.mjs";
 export { defaultPidIsAlive } from "./pid.mjs";
 export { ATTENTION_PRIORITY, computeAttention } from "./attention.mjs";
 export { SAFE_OFFER_ERROR_CODES } from "./receipts.mjs";
+export { createDeliveryBindingService } from "./delivery-bindings.mjs";
 export { looksConsequential, noteNudge } from "./message-signals.mjs";
 export { overlaps } from "./claims.mjs";

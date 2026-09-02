@@ -57,7 +57,7 @@ export function createGuardStateService(ports) {
   };
 }
 
-export function createStatusService(ports, sessions) {
+export function createStatusService(ports, sessions, deliveryBindings) {
   const { store, clock, pidIsAlive } = ports;
 
   async function collectStatus(input = {}) {
@@ -85,6 +85,7 @@ export function createStatusService(ports, sessions) {
     const live = classified.filter(item => item.presence !== "offline");
     const claims = snapshot.claims
       .filter(claim => Date.parse(claim.expiresAt) > Date.parse(now));
+    const currentBindings = await deliveryBindings.currentBindings(now);
 
     return {
       workspaceId,
@@ -126,6 +127,14 @@ export function createStatusService(ports, sessions) {
         ownerParticipantId: sessionRecords
           .find(session => session.sessionId === claim.ownerSessionId)?.participantId ?? null,
         expiresAt: claim.expiresAt,
+      })),
+      deliveryBindings: currentBindings.map(({ binding, reachable }) => ({
+        adapterId: binding.adapterId,
+        clientVersion: binding.clientVersion,
+        availableModes: [...binding.availableModes],
+        livePolicy: binding.livePolicy,
+        reachable,
+        leaseUntil: binding.leaseUntil,
       })),
       attention: computeAttention(snapshot, { session: null,
         participantId: input.participantId, now, pidIsAlive }),

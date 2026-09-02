@@ -8,9 +8,13 @@ import { AccError, EXIT } from "@agents-can-communicate/protocol";
  * it previews is a decoration, and the operator would find out only afterwards.
  */
 export function planInstallation({ adapters, detected, context, action = "install",
-  recorded = [], accVersion = null, allowDowngrade = false, requested = [] }) {
+  recorded = [], accVersion = null, allowDowngrade = false, requested = [],
+  delivery = "off" }) {
   if (!["install", "uninstall"].includes(action)) {
     throw new AccError(EXIT.USAGE, `unknown installation action: ${action}`, { action });
+  }
+  if (!["off", "actionable", "all"].includes(delivery)) {
+    throw new AccError(EXIT.USAGE, `unknown delivery policy: ${delivery}`, { delivery });
   }
   const byId = new Map(adapters.map(adapter => [adapter.id, adapter]));
   // What ACC recorded writing, by client. For an uninstall this is the
@@ -82,7 +86,15 @@ export function planInstallation({ adapters, detected, context, action = "instal
     // From the record when the client is gone, because that is what was written
     // and so what will be removed. Asking the adapter instead would describe an
     // install for a machine this one no longer is.
-    const artifacts = (record?.artifacts ?? adapter.planInstall(context))
+    const liveDeliverySupported = entry.capabilities?.delivery?.livePush === true;
+    const effectiveLivePolicy = liveDeliverySupported ? delivery : "off";
+    const deliveryDiagnostic = action === "install" && delivery !== "off"
+      && !liveDeliverySupported
+      ? `${adapter.displayName ?? adapter.id} has no certified live delivery for this client; durable fallback remains active`
+      : null;
+    const installContext = { ...context, requestedLivePolicy: delivery,
+      livePolicy: effectiveLivePolicy };
+    const artifacts = (record?.artifacts ?? adapter.planInstall(installContext))
       .map(artifact => ({ path: artifact.path, kind: artifact.kind ?? "file" }))
       .sort((a, b) => a.path.localeCompare(b.path));
 
@@ -96,12 +108,16 @@ export function planInstallation({ adapters, detected, context, action = "instal
       // to be inferred from a client version that is null.
       clientPresent: entry.present === true,
       alreadyInstalled: entry.installed === true,
+      livePolicy: delivery,
+      effectiveLivePolicy,
+      ...(deliveryDiagnostic === null ? {} : { deliveryDiagnostic }),
       artifacts,
       // Said in the operator's terms, not in paths: which files ACC creates
       // outright and which belong to the user and are only edited.
       summary: [
         ...(entry.present ? [] : [`${adapter.displayName ?? adapter.id} is no longer on `
           + "this machine; removing what ACC recorded writing"]),
+        ...(deliveryDiagnostic === null ? [] : [deliveryDiagnostic]),
         ...artifacts.filter(a => a.kind === "tree")
           .map(a => `${action === "install" ? "create" : "remove"} ${a.path}`),
         ...artifacts.filter(a => a.kind === "merge")

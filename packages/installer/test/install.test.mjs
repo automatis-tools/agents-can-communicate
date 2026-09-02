@@ -174,3 +174,71 @@ test("uninstall removes ACC and leaves the rest of the file alone", async t => {
   assert.equal(await readFile(path.join(home, "config.toml"), "utf8"), original);
   assert.deepEqual((await loadOwnership({ dataHome })).installs, []);
 });
+
+test("delivery policy is deterministic and carried into adapter-owned install work",
+  async t => {
+    const { context, dataHome } = await machine(t);
+    const seen = [];
+    const adapter = {
+      id: "live_fixture", displayName: "Live Fixture",
+      capabilities: { delivery: { livePush: true } },
+      planInstall: installContext => {
+        seen.push(["plan", installContext.requestedLivePolicy,
+          installContext.livePolicy]);
+        return [];
+      },
+      install: async installContext => {
+        seen.push(["apply", installContext.requestedLivePolicy,
+          installContext.livePolicy]);
+        return { changes: [], diagnostics: [] };
+      },
+    };
+    const detectedFixture = [{ adapterId: adapter.id, displayName: adapter.displayName,
+      present: true, version: "1.0.0", installed: false,
+      capabilities: { delivery: { livePush: true } } }];
+    const plan = planInstallation({ adapters: [adapter], detected: detectedFixture,
+      context, delivery: "actionable" });
+
+    assert.equal(JSON.stringify(plan), JSON.stringify(planInstallation({ adapters: [adapter],
+      detected: detectedFixture, context, delivery: "actionable" })));
+    assert.deepEqual(plan.operations[0].livePolicy, "actionable");
+    assert.deepEqual(plan.operations[0].effectiveLivePolicy, "actionable");
+    await applyPlan({ plan, adapters: [adapter], context, dataHome });
+    assert.deepEqual(seen, [
+      ["plan", "actionable", "actionable"],
+      ["plan", "actionable", "actionable"],
+      ["apply", "actionable", "actionable"],
+    ]);
+  });
+
+test("unsupported adapters receive off and report durable fallback", async t => {
+  const { context, dataHome } = await machine(t);
+  let appliedContext;
+  const adapter = {
+    id: "durable_fixture", displayName: "Durable Fixture",
+    capabilities: { delivery: { livePush: false } },
+    planInstall: () => [],
+    install: async installContext => {
+      appliedContext = installContext;
+      return { changes: [], diagnostics: [] };
+    },
+  };
+  const plan = planInstallation({ adapters: [adapter], detected: [{
+    adapterId: adapter.id, displayName: adapter.displayName, present: true,
+    version: "1.0.0", installed: false }], context, delivery: "all" });
+
+  assert.equal(plan.operations[0].livePolicy, "all");
+  assert.equal(plan.operations[0].effectiveLivePolicy, "off");
+  assert.match(plan.operations[0].deliveryDiagnostic, /durable fallback/);
+  const result = await applyPlan({ plan, adapters: [adapter], context, dataHome });
+  assert.equal(appliedContext.requestedLivePolicy, "all");
+  assert.equal(appliedContext.livePolicy, "off");
+  assert.match(result.operations[0].diagnostics.join("\n"), /durable fallback/);
+});
+
+test("an unknown delivery policy is refused rather than treated as opt-in", async t => {
+  const { context } = await machine(t);
+  const adapters = ALL();
+  assert.throws(() => planInstallation({ adapters, detected: detected(adapters, ["kimi"]),
+    context, delivery: "sometimes" }), /unknown delivery policy/);
+});

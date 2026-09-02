@@ -1,5 +1,6 @@
 import { createClaimService } from "./claims.mjs";
 import { createConversationService } from "./conversations.mjs";
+import { createDeliveryBindingService } from "./delivery-bindings.mjs";
 import { createIntentService } from "./intents.mjs";
 import { createInboxService } from "./inbox.mjs";
 import { defaultPidIsAlive } from "./pid.mjs";
@@ -30,10 +31,11 @@ export function createCoordinationService({ store, clock, ids,
   const intents = createIntentService(ports, sessions);
   const claims = createClaimService(ports, sessions);
   const conversations = createConversationService(ports, sessions);
+  const deliveryBindings = createDeliveryBindingService(ports, sessions);
   const inbox = createInboxService(ports, sessions);
   const receipts = createReceiptService(ports);
   const sync = createSyncService(ports, sessions);
-  const status = createStatusService(ports, sessions);
+  const status = createStatusService(ports, sessions, deliveryBindings);
   const guardState = createGuardStateService(ports);
   return Object.freeze({
     store,
@@ -44,6 +46,8 @@ export function createCoordinationService({ store, clock, ids,
     ...intents,
     ...claims,
     ...conversations,
+    publishDeliveryBinding: deliveryBindings.publishDeliveryBinding,
+    listDeliveryBindings: deliveryBindings.listDeliveryBindings,
     ...inbox,
     ...receipts,
     ...sync,

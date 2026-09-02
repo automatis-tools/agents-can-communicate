@@ -200,7 +200,8 @@ export async function runInstallCommand({ options, runtime, action = "install" }
     ? []
     : (Array.isArray(options.adapter) ? options.adapter : [options.adapter]);
   const plan = planInstallation({ adapters, detected, context, action, recorded,
-    accVersion, allowDowngrade: options.downgrade === true, requested });
+    accVersion, allowDowngrade: options.downgrade === true, requested,
+    delivery: options.delivery ?? "off" });
   const result = await applyPlan({ plan, adapters, context, dataHome, dryRun, accVersion });
 
   const acted = actedOn(result);
