@@ -1,6 +1,8 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 
+import { effectiveCapabilities } from "@agents-can-communicate/adapter-sdk";
+
 const run = promisify(execFile);
 
 const DEFAULT_PROBE_TIMEOUT_MS = 3_000;
@@ -9,7 +11,7 @@ const DEFAULT_PROBE_TIMEOUT_MS = 3_000;
 // "0.36.1", a banner with the number somewhere inside. The number is extracted
 // where it can be, and the raw line is kept either way - "present, version
 // unreadable" is a real state and hiding it would make the client look absent.
-const VERSION = /\b(\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?)\b/;
+const VERSION = /(?:^|[^0-9A-Za-z])v?(\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?)(?:\b|$)/;
 
 /**
  * Ask the operating system what a client reports as its version.
@@ -36,7 +38,8 @@ const withTimeout = (work, ms, label) => new Promise((resolve, reject) => {
  * letting it throw would hide the other three behind it.
  */
 export async function detectInstallation({ adapters, context, probe = spawnProbe,
-  probeTimeoutMs = DEFAULT_PROBE_TIMEOUT_MS }) {
+  probeTimeoutMs = DEFAULT_PROBE_TIMEOUT_MS,
+  platform = `${process.platform}-${process.arch}` }) {
   const entries = await Promise.all([...adapters]
     // Ordered by id so two runs can be diffed, and so a plan built from this is
     // deterministic rather than dependent on registry order.
@@ -44,7 +47,7 @@ export async function detectInstallation({ adapters, context, probe = spawnProbe
     .map(async adapter => {
       const entry = { adapterId: adapter.id, displayName: adapter.displayName,
         present: false, version: null, versionOutput: null, installed: false,
-        diagnostics: [], needsAction: [], capabilities: adapter.capabilities ?? {},
+        diagnostics: [], needsAction: [], capabilities: effectiveCapabilities(adapter),
         error: null };
 
       try {
@@ -62,6 +65,8 @@ export async function detectInstallation({ adapters, context, probe = spawnProbe
       } catch (error) {
         entry.error = error.message;
       }
+      entry.capabilities = effectiveCapabilities(adapter,
+        { clientVersion: entry.version, platform });
 
       try {
         const detected = await adapter.detect(context);

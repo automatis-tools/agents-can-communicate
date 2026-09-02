@@ -14,8 +14,12 @@ import { completeHookOutput, writeOutput } from "../../bin/acc-hook.mjs";
 
 const adapter = {
   id: "test",
-  client: { command: "test-client", versionArgs: ["--version"] },
-  clientVersion: "1.0.0",
+  client: { command: "test-client", certificationName: "test-client",
+    versionArgs: ["--version"] },
+  capabilities: { delivery: { nextTurn: true } },
+  certification: { evidence: [{ client: "test-client", version: "1.0.0",
+    platform: `${process.platform}-${process.arch}`, capability: "delivery.nextTurn",
+    result: "pass" }] },
   normalizeHook: payload => payload,
   injectOutcome: context => ({ stdout: context, exitCode: 0 }),
   renderContext: sync => projectContextResult(sync).text,
@@ -26,14 +30,15 @@ const noProcessTable = async () => new Map();
 const event = (kind, cwd, sessionId) => ({ kind, cwd, sessionId,
   model: null, parentSessionId: null, tool: null, targets: [] });
 
-async function fixture(t) {
+async function fixture(t, { clientVersion = "1.0.0", selectedAdapter = adapter } = {}) {
   const root = await realpath(await mkdtemp(path.join(tmpdir(), "acc-offer-write-")));
   const dataHome = await realpath(await mkdtemp(path.join(tmpdir(), "acc-offer-data-")));
   t.after(() => Promise.all([rm(root, { recursive: true, force: true }),
     rm(dataHome, { recursive: true, force: true })]));
   const invoke = (kind, sessionId, options = {}) => runHook({ adapterId: "test",
-    payload: event(kind, root, sessionId), adapters: { test: adapter }, dataHome,
-    readProcessTable: noProcessTable, ...options });
+    payload: event(kind, root, sessionId), adapters: { test: selectedAdapter }, dataHome,
+    readProcessTable: noProcessTable, probeClientVersion: async () => clientVersion,
+    ...options });
   const recipient = await invoke("sessionStart", "recipient-session");
   const sender = await invoke("sessionStart", "sender-session");
   const recipientId = recipient.sessions
@@ -47,6 +52,17 @@ async function fixture(t) {
     .find(item => item.messageId === message.messageId);
   return { invoke, message, receipt, recipient, recipientId, sender };
 }
+
+test("renderer existence cannot deliver for an adapter with no certified capabilities", async t => {
+  const unsupported = { ...adapter, capabilities: {}, certification: { evidence: [] } };
+  const { invoke, receipt } = await fixture(t, { selectedAdapter: unsupported });
+  const result = await invoke("beforeTurn", "recipient-session");
+
+  assert.doesNotMatch(result.stdout, /Commit only after these bytes cross/);
+  assert.match(result.stderr, /pending message.*withheld/);
+  await result.commitOffers();
+  assert.equal((await receipt()).state, "queued");
+});
 
 test("next-turn offer stays queued until the stdout writer completes", async t => {
   const { invoke, message, receipt } = await fixture(t);
@@ -67,6 +83,31 @@ test("next-turn offer stays queued until the stdout writer completes", async t =
   assert.equal(written.length, 1);
   assert.match(written[0], new RegExp(message.messageId));
 });
+
+test("the offer records the exact client version observed for the recipient session", async t => {
+  const { invoke, message, sender } = await fixture(t);
+  const result = await invoke("beforeTurn", "recipient-session");
+  await result.commitOffers();
+
+  const events = (await sender.service.store.eventsSince(
+    sender.service.store.workspaceId, null, 100)).events;
+  const offered = events.find(item => item.type === "message.offer_succeeded"
+    && item.payload.messageId === message.messageId);
+  assert.equal(offered.payload.clientVersion, "1.0.0");
+});
+
+for (const [label, clientVersion] of [["unknown", null], ["uncertified", "9.9.9"]]) {
+  test(`${label} client versions withhold next-turn bodies and offers`, async t => {
+    const { invoke, message, receipt } = await fixture(t, { clientVersion });
+    const result = await invoke("beforeTurn", "recipient-session");
+
+    assert.doesNotMatch(result.stdout, /Commit only after these bytes cross/);
+    assert.match(result.stderr, /pending message.*withheld/);
+    assert.match(`${result.stdout}\n${result.stderr}`, new RegExp(message.messageId));
+    await result.commitOffers();
+    assert.equal((await receipt()).state, "queued");
+  });
+}
 
 test("committing the same prepared offers twice is idempotent", async t => {
   const { invoke, message, receipt, sender } = await fixture(t);

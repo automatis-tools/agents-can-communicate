@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import { randomBytes } from "node:crypto";
 import { execFile } from "node:child_process";
-import { mkdtemp, readFile, readdir, realpath, rm, writeFile } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, readFile, readdir, realpath, rm, writeFile }
+  from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -36,9 +37,17 @@ async function workspace(t, { budgetBytes }) {
   const base = await realpath(await mkdtemp(path.join(tmpdir(), "acc-turn-")));
   t.after(() => rm(base, { recursive: true, force: true }));
   const root = path.join(base, "repo");
-  await run("mkdir", ["-p", root]);
+  const clientBin = path.join(base, "bin");
+  await Promise.all([mkdir(root, { recursive: true }), mkdir(clientBin, { recursive: true })]);
+  for (const [command, version] of [["codex", "codex-cli 0.147.0"],
+    ["claude", "2.1.233 (Claude Code)"]]) {
+    const executable = path.join(clientBin, command);
+    await writeFile(executable,
+      `#!/usr/bin/env node\nprocess.stdout.write(${JSON.stringify(version)});\n`);
+    await chmod(executable, 0o755);
+  }
   const env = { ...process.env, ACC_DATA_HOME: path.join(base, "data"),
-    GIT_DIR: "", GIT_WORK_TREE: "" };
+    GIT_DIR: "", GIT_WORK_TREE: "", PATH: `${clientBin}${path.delimiter}${process.env.PATH}` };
   await writeFile(path.join(root, "acc.workspace.json"), `${JSON.stringify({
     schemaVersion: 1, workspaceId: WORKSPACE, displayName: "turn",
     roots: ["."], policy: { claimMode: "advisory",
