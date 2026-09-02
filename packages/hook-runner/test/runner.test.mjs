@@ -594,7 +594,7 @@ test("an adapter without delivery metadata withholds bodies and reports degradat
   assert.equal(receipt.state, "queued");
 });
 
-test("an uncertified platform keeps the exact inbox recovery path inside a tight budget",
+test("an uncertified platform drops an optional count before an exact inbox recovery path",
   async t => {
     const place = await workspace(t);
     await writeFile(path.join(place.root, "acc.workspace.json"), `${JSON.stringify({
@@ -602,7 +602,7 @@ test("an uncertified platform keeps the exact inbox recovery path inside a tight
       workspaceId: "workspace_uncertified_budget",
       displayName: "uncertified budget",
       roots: ["."],
-      policy: { claimMode: "advisory", contextBudgetBytes: 200 },
+      policy: { claimMode: "advisory", contextBudgetBytes: 84 },
       requiredAdapters: [],
     }, null, 2)}\n`);
     const truthful = { ...kimi,
@@ -622,6 +622,10 @@ test("an uncertified platform keeps the exact inbox recovery path inside a tight
       generation: peer.generation, clientMessageId: "client_uncertified_budget",
       toParticipantIds: [recipientId], kind: "note", obligation: "none",
       subject: "Private body", body: "this body must stay out of uncertified delivery" });
+    await peer.service.sendMessage({ sessionId: peer.accSessionId,
+      generation: peer.generation, clientMessageId: "client_uncertified_budget_second",
+      toParticipantIds: [recipientId], kind: "note", obligation: "none",
+      subject: "Second private body", body: "this second body must stay out too" });
 
     const turn = await invoke(event("beforeTurn"));
     await turn.commitOffers();
@@ -630,7 +634,8 @@ test("an uncertified platform keeps the exact inbox recovery path inside a tight
 
     assert.doesNotMatch(turn.stdout, /this body must stay out/);
     assert.match(turn.stdout, new RegExp(`acc inbox --message ${message.messageId}`));
-    assert.equal(Buffer.byteLength(turn.stdout, "utf8") <= 200, true);
+    assert.equal(Buffer.byteLength(turn.stdout, "utf8") <= 84, true);
+    assert.doesNotMatch(turn.stdout, /more in/);
     assert.match(turn.stderr, /not certified for nextTurn/);
     assert.equal(receipt.state, "queued");
   });
