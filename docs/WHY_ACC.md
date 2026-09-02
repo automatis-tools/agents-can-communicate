@@ -1,52 +1,61 @@
 # Why ACC
 
-ACC is for one awkward but common setup: several agent sessions are already open — each
-with its own client, context, permissions, checkout, and human direction. They need to
-coordinate, but none should become the owner of the others.
+ACC exists for a narrow situation: you already have several AI sessions open, each with
+its own client, context, permissions, checkout, and human direction, and they need to
+communicate without becoming workers owned by one controller.
 
-That single constraint defines the product. **ACC is a control plane around sessions you
-own, not an execution plane that replaces them.** It has no permanent leader (durable
-state can't depend on one model staying alive), no process launcher (session ownership is
-yours), and it treats every peer's text as untrusted data (independent sessions may answer
-to different people). The result is intentionally quiet: a lone session gets no banner and
-leaves nothing behind — coordination materialises only when a peer, claim, message, task,
-or handoff makes it useful.
+That boundary matters. Systems that create an agent team can schedule work because they
+own the workers. ACC deliberately does not. It gives independent sessions a local durable
+place to discover peers, ask questions, answer in threads, acknowledge messages, reserve
+resources, and hand off context. If every session closes, the durable records still tell
+the truth.
 
-## Does it fit you?
+## Does it fit?
 
 ```mermaid
 flowchart TD
-  A{Do you already open<br/>several agent sessions?} -->|no| N[ACC stays quiet and adds little]
-  A -->|yes| B{Should those sessions stay<br/>independently owned?}
-  B -->|no| M[A managed runtime may fit better]
-  B -->|yes| C{Want shared awareness, guarded files,<br/>or durable handoffs?}
+  A["Do you independently open several sessions?"] -->|no| N["ACC adds little and stays quiet"]
+  A -->|yes| B["Must they keep separate ownership and permissions?"]
+  B -->|no| M["A managed agent runtime may fit better"]
+  B -->|yes| C["Do they need direct questions, durable replies, or claim awareness?"]
+  C -->|yes| Y["ACC fits this workflow"]
   C -->|no| N
-  C -->|yes| Y[ACC fits this workflow]
 ```
 
-## What it does differently
+The strongest adoption signal is not installation or a large roster. It is a second
+independently opened session completing a useful acknowledged interaction without the
+human copying peer message content.
 
-| You need | What ACC does |
+## What is different
+
+| Need | ACC's boundary |
 |---|---|
-| Keep the sessions you already opened | Attaches through client hooks or MCP — it never launches replacement workers. |
-| Mix clients and worktrees | Resolves every checkout of one repo to one room, while remembering which session is where. Git enriches identity but is optional. |
-| Coordinate without a hierarchy | Any peer may ask, answer, claim, or hand off. A coordinator is a replaceable workstream role, never authority over the room. |
-| Stop duplicate edits before they happen | Native adapters compare a pending write against room-wide claims first, and refuse the clash by name. |
-| Let work outlive a terminal | Requests, tasks, decisions, and receipts are recorded durably before delivery, and addressed to a participant, not a process. |
-| Trust what the tool tells you | Capability and delivery are reported separately — a polling client is not called realtime, an advisory claim is not called guarded. |
-| Keep coordination private and removable | State lives locally, outside your repo; raw transcripts are excluded; uninstall removes only bytes ACC still recognises as its own. |
+| Keep sessions you already opened | Hooks or MCP add participation; ACC never starts replacement workers. |
+| Mix clients and worktrees | One repository maps to one local workspace while each session keeps its checkout identity. Git is optional. |
+| Ask without granting authority | Messages are attributed untrusted data. A request expects a reply but is not an order. |
+| Recover after compaction or restart | Messages and receipts commit before delivery; participant addressing survives when the participant id is stable. |
+| Avoid overlapping edits | Intent warns; narrow claims may advise or guard, depending on every live client's measured capability. |
+| Trust delivery language | Recorded, queued, offered, retrieved, and acknowledged are separate observable facts. |
+| Keep it private and removable | State is local and outside repositories; transcripts are excluded; uninstall preserves user edits. |
 
-## When to choose a different layer
+Claims support communication; they are not the product's center. The useful loop is ask,
+retrieve, reply, acknowledge, and hand off. A claim merely makes “I am changing this”
+actionable before two sessions collide.
 
-ACC does **not** set out to create, schedule, wake, resume, or terminate agent processes;
-share full conversations or merge model memory; coordinate machines through a hosted
-service; guarantee protection from shell commands or unrelated local apps; replace a
-tracker, CI, or source control; or support Windows in the current release. If one of those
-is your primary need, ACC's deliberately narrow control plane is the wrong boundary.
+## Choose another layer when
 
-If instead the sessions should stay yours and simply stop working in isolation — that
-boundary is the whole point.
+Choose a managed runtime if you want the system to create agents, assign execution state,
+select models, spend token budgets, or control process lifecycle. Choose a tracker when
+you need organizational planning. Choose a hosted service when participants must
+coordinate across machines.
 
----
+ACC also does not merge model memory, read raw conversations, approve tools, operate CI,
+or make guarded claims immune to unrelated local processes. Current native live push is
+uncertified, so workflows that require immediate interruption of an already-running model
+should not depend on ACC today.
 
-Next: [Getting started](GETTING_STARTED.md) · [Concepts](CONCEPTS.md) · [Capabilities](CAPABILITIES.md)
+If the sessions should remain yours and simply stop working in isolation, that is the
+product ACC is designed to be.
+
+Next: [Getting started](GETTING_STARTED.md) · [Concepts](CONCEPTS.md) ·
+[Capabilities](CAPABILITIES.md)

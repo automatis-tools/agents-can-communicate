@@ -1,18 +1,26 @@
 # Glossary
 
-One definition per term. Where a term has a fuller treatment, the link points to its home.
+- **Workspace** — one local coordination room; all worktrees of a Git repository share it.
+- **Participant** — the stable address that sends and receives messages.
+- **Session** — one independently opened client conversation participating in a workspace.
+- **Generation** — the token proving a mutation belongs to the current opening of a session.
+- **Presence** — `online`, `stale`, or `offline`, based only on observed heartbeat and pid facts.
+- **Intent** — a session's current summary and resource hints; awareness, not permission.
+- **Claim** — a leased reservation for a canonical resource such as `file:src/**`.
+- **Advisory / guarded** — a claim peers must respect versus one ACC can stop on measured client write paths; neither stops unrelated local processes.
+- **Message** — an attributed untrusted `note`, `question`, `request`, `answer`, `decision`, or `handoff`.
+- **Thread** — a root message plus linked answers sharing one immutable `threadId`.
+- **Obligation** — `none`, `reply`, or `acknowledge`; what communication the recipient owes.
+- **Receipt** — one recipient's monotonic `queued`, `offered`, `retrieved`, or `acknowledged` evidence.
+- **Offered** — bytes crossed ACC's transport boundary; not proof the recipient read them.
+- **Retrieved** — the participant received the body; not proof of model attention.
+- **Acknowledged** — that participant explicitly acknowledged or replied; a reply is not proof requested work finished.
+- **Next-turn delivery** — certified projection at the client's next normal turn; it never interrupts an active turn.
+- **Live push** — optional delivery to an already-running session through an official certified client API. No shipped adapter currently qualifies.
+- **Recipient policy** — `off`, `actionable`, or `all`; opt-in permission to spend a turn, not a capability.
+- **Delivery binding** — ephemeral, generation-bound reachability data owned by an adapter.
+- **Fallback** — durable inbox or exact-certified next-turn recovery when live delivery is unavailable.
+- **Managed / manual lifecycle** — whether hooks report ACC presence automatically; never ownership of the external client process.
+- **MCP participation** — polling access to durable communication without native lifecycle, context, guards, or push.
 
-- **Room** (workspace) — the shared coordination space for one project. Every worktree of a repo shares one room; a plain folder works the same. See [Concepts](CONCEPTS.md).
-- **Participant** — a stable identity in a room (e.g. `claude_code`, `codex`, or a name you set with `ACC_PARTICIPANT`). Work addressed to a participant survives a restart. See [Protocol](PROTOCOL.md).
-- **Session** — one live run of a client. A session dies with its process; it is identified by a session id plus a generation. Work addressed to a *session*, not a participant, dies with it.
-- **Generation** — a counter that proves ownership of a session across resumes. It is never printed by `acc status` — it is proof, not public information.
-- **Presence** — a session reads as **online**, **stale**, or **offline**, derived from the client's process and recent activity. See [Architecture](ARCHITECTURE.md).
-- **Intent** — what a session says it is doing right now, published with `acc work`. Awareness, not a reservation.
-- **Claim** — a reservation on a resource (a file or glob such as `file:src/**`), taken with `acc claim`. See guarded vs advisory below. See [Concepts](CONCEPTS.md).
-- **Guarded vs advisory** — the room's protection level. Under **guarded**, a clashing write from another session is refused and the owner is named; under **advisory**, the claim only warns. One MCP participant in the room makes it advisory for everyone. See [MCP](MCP.md).
-- **Message** — a typed message to other participants (`note`, `question`, `request`, `answer`, `decision`, or `handoff`), delivered on the recipient's next turn. A message is data the recipient weighs, never a command it obeys.
-- **Note vs question** — a `note` is delivered once and leaves one recoverable breadcrumb; a `question` keeps a standing reminder until it is answered with `acc reply`.
-- **Inbox** — a participant's targeted mail, read with `acc inbox`; replies go back with `acc reply`.
-- **Handoff** — an end-of-turn record written with `acc finish`: what is done, what remains, what is blocked — and it releases the session's claims.
-- **Attention** — the room's prioritized signals a session should act on (six kinds, e.g. `direct_request`, `claim_conflict`, `unread_note`). See [Architecture](ARCHITECTURE.md).
-- **Managed vs manual** — whether ACC controls a client's session lifecycle. A native adapter is **managed** (ambient attach, guarded writes, injected context); an MCP client is **manual** — the participation tier, advisory only. See [MCP](MCP.md) and [Capabilities](CAPABILITIES.md).
+See [Concepts](CONCEPTS.md) for relationships and [Protocol](PROTOCOL.md) for exact rules.

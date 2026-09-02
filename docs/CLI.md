@@ -1,11 +1,9 @@
 # CLI
 
-Full command reference. See the [docs index](index.md) for how this fits with the rest
-of the docs, and [GLOSSARY.md](GLOSSARY.md) for term definitions.
-
-Setup commands are human-facing; the rest are agent-facing. Every command accepts `--json`
-for machine output and `--cwd` to pick the workspace. `acc help` and `acc version` work
-anywhere, including a directory that is no workspace at all.
+The `acc` command is the universal local boundary. Setup commands are for a person;
+communication commands are the small surface installed skills teach to agents. Every
+command accepts `--json` and `--cwd <path>`. `--workspace <config>` selects an explicit
+workspace config where supported by the common boundary.
 
 <!-- test:command -->
 ```bash
@@ -13,164 +11,147 @@ acc help
 acc version
 ```
 
-```mermaid
-graph LR
-  subgraph Setup
-    I[acc install] --- UN[acc uninstall] --- D[acc doctor] --- CF[acc config]
-  end
-  subgraph In-session
-    ST[acc status] --- SY[acc sync] --- W[acc work] --- CL[acc claim] --- RL[acc release] --- MS[acc message] --- IN[acc inbox] --- RP[acc reply] --- RQ[acc request] --- AK[acc ack] --- FN[acc finish]
-  end
-  subgraph Adapter-only
-    AT[acc attach] --- HB[acc heartbeat] --- DT[acc detach]
-  end
-  subgraph About
-    HP[acc help] --- VR[acc version] --- UP[acc update]
-  end
+## Communication commands
+
+| Command | Required | Optional |
+|---|---|---|
+| `acc status` | — | `--participant`, `--all` |
+| `acc sync` | — | `--session`, `--cursor`, `--limit`, `--scope delta|full` |
+| `acc work` | `--summary` unless `--clear` | `--session`, `--generation`, `--mode`, `--state`, repeated `--hint`, `--clear` |
+| `acc claim` | `--resource` | `--session`, `--generation`, `--mode`, `--enforcement`, `--reason`, `--lease` |
+| `acc release` | `--claim` or `--resource` | `--session`, `--generation`, `--authority`, `--reason` |
+| `acc message` | `--subject`, `--body` | repeated `--to`, `--type`, `--obligation`, `--client-message-id`, owner flags |
+| `acc request` | `--to`, `--title` | `--detail`, `--client-message-id`, owner flags |
+| `acc inbox` | — | `--message`, owner flags |
+| `acc reply` | `--message`, `--body` | `--subject`, `--client-message-id`, owner flags |
+| `acc ack` | `--message` | owner flags |
+| `acc finish` | `--goal` | `--status`, `--to`, repeated `--completed`, `--remaining`, `--blocker`, `--client-message-id`, owner flags |
+
+Owner flags are `--session` and `--generation`. A normal hooked session omits them because
+the CLI resolves its current binding. Scripts and adapters may pass them explicitly.
+
+### Presence and intent
+
+```bash
+acc status
+acc work --summary "checking receipt transitions" --mode review \
+  --hint 'file:packages/core/src/receipts.mjs'
+acc work --clear
 ```
 
-## Setup
+`status` returns participants, current intent, claims, protection, attention, and current
+delivery bindings. `sync` is a bounded event read; use `--scope full` only for an explicit
+whole-workspace forensic question. Neither is the recovery path for one message.
 
-| Command | Does |
-|---|---|
-| `acc install` | Install adapters for the clients on this machine |
-| `acc install --adapter <name>` | One client only |
-| `acc uninstall` | Remove what ACC wrote; keeps what you edited, even for a client no longer on the machine |
-| `acc doctor` | Clients, versions, install health, and what to run next |
-| `acc doctor --repair` | Repair store state; refuses if it's ambiguous |
-| `acc config` | Read or write `acc.workspace.json` |
-| `acc config init` | Write it, after showing what will be written |
-| `acc config validate` | Read-only check |
+### Claims
 
-## In-session
+```bash
+acc claim --resource 'file:packages/core/**' --reason "editing receipt logic"
+acc release --resource 'file:packages/core/**'
+```
 
-| Command | Does |
-|---|---|
-| `acc status` | Who is here, claims, protection level. `--all` adds sessions that have closed |
-| `acc sync` | Events since a cursor; silent when alone |
-| `acc work` | Publish what this session is doing. `--hint` names a resource so a claim holder is warned; `--clear` when it's done |
-| `acc claim` | Reserve a resource. Exit `5` on conflict |
-| `acc release` | Give it back. `--resource` for what you claimed, `--claim` for its id |
-| `acc message` | Send a typed message to participants |
-| `acc inbox` | Unresolved messages addressed to you. `--message` selects one |
-| `acc reply` | Reply to one addressed message and acknowledge it in the same step |
-| `acc request` | Ask another agent to do something in an acknowledged message |
-| `acc ack` | Acknowledge a message that asked for one, without writing a reply |
-| `acc finish` | Write the handoff and release claims |
+File resources use repository-relative paths. A directory claim ends in `/**`. Exit code
+`5` means a conflict. `--authority` is the explicit force-release path and should carry a
+reason; ordinary sessions release only their own claims.
 
-## Messages
+### Messages and requests
 
-| Command | Required flags | Optional flags |
-|---|---|---|
-| `acc inbox` | — | `--session`, `--generation`, `--message` |
-| `acc reply` | `--message`, `--body` | `--session`, `--generation`, `--subject`, `--type`, `--priority` |
+```bash
+acc message --to models --type question --subject "receipt wording" \
+  --body "Should transport acceptance be called offered?" \
+  --client-message-id client_stable_1
 
-Without `--message`, `acc inbox` returns only unresolved messages addressed to this
-participant, each paired with its own receipt. With `--message`, it can also recover an
-injected note named by an `unread_note` breadcrumb. Reading moves `queued` or `injected` to
-`seen` — a direct request stays in the inbox until it's answered, so context compaction
-can't erase an obligation.
+acc request --to models --title "review receipt wording" \
+  --detail "Check CLI and MCP results; reply with defects only."
+```
+
+`message` accepts generic kinds `note`, `question`, `request`, and `decision`. Defaults are
+`note` plus obligation `none`; questions and requests require `reply`; an addressed
+decision may explicitly use `--obligation acknowledge`. `answer` is created only by
+`reply`, and `handoff` only by `finish`.
+
+No `--to` creates a room message where the kind allows it. Addressed messages create a
+separate receipt for each recipient. `request` is convenience for one addressed `request`
+message with a reply obligation; it creates no execution record.
+
+The JSON result for `message`, `request`, `reply`, and `finish` is:
+
+```json
+{
+  "message": { "messageId": "message_x", "clientMessageId": "client_x" },
+  "delivery": [
+    { "recipientParticipantId": "models", "outcome": "queued",
+      "transport": "durable", "errorCode": "delivery_disabled" }
+  ]
+}
+```
+
+Human output starts with `recorded message_x`. A transport failure after that commit does
+not change the command exit code. Reuse an explicit `--client-message-id` after an
+uncertain result to recover the same logical message.
+
+### Inbox, reply, and acknowledgement
 
 ```bash
 acc inbox
 acc inbox --message message_x
-acc reply --message message_x --body "Yes; the boundary is free after abc123."
+acc reply --message message_x --body "Yes. Use offered."
+acc ack --message message_y
 ```
 
-`acc reply` creates an attributed `answer` linked through `inReplyTo` and acknowledges the
-original in the same transaction. Use `acc ack --message message_x` when no written answer
-is needed. `acc sync --scope full --json` is for whole-workspace forensics, not for
-recovering one message.
+Inbox returns only unresolved messages addressed to this participant. Reading advances
+that participant's receipt to `retrieved`. Reply creates an `answer` in the same thread and
+acknowledges the original atomically. `ack` acknowledges without writing an answer and has
+no state override.
 
-## Adapter-only
+### Handoff
 
-| Command | Does |
+```bash
+acc finish --goal "document receipt semantics" --status partial \
+  --completed "protocol updated" --remaining "acceptance proof" \
+  --blocker "packed test not run" --to models
+```
+
+Status is `complete`, `partial`, or `blocked`. `finish` records a structured handoff,
+releases the caller's claims, and ends ACC presence for that session. It never closes the
+external AI client. An addressed handoff requires acknowledgement; a room handoff does not.
+
+## Setup and maintenance
+
+| Command | Flags |
 |---|---|
-| `acc attach` | Register a session at start, driven by the adapter's hook, not by a person |
-| `acc heartbeat` | Keep a session's presence alive, driven by the adapter's hook |
-| `acc detach` | Close a session cleanly, driven by the adapter's hook |
+| `acc install` | `--adapter`, `--home`, `--delivery off|actionable|all`, `--dry-run`, `--downgrade` |
+| `acc uninstall` | `--adapter`, `--home`, `--dry-run` |
+| `acc doctor` | `--home`, `--repair` |
+| `acc config init` | `--yes`, `--force` |
+| `acc config validate` | — |
+| `acc update` | `--apply` |
+| `acc help` | — |
+| `acc version` | — |
 
-## About acc
+`--delivery` is a recipient policy request, not a capability switch. The default is
+`off`. If the detected exact client version lacks certified live push, installation keeps
+the effective policy off and prints the adapter's durable fallback.
 
-| Command | Does |
-|---|---|
-| `acc help` | Every command, one line each. `--help` and `-h` mean the same |
-| `acc version` | The installed version, read from the package. `--version` and `-v` too |
-| `acc update` | Ask npm whether a newer acc exists |
-| `acc update --apply` | Install it, then re-run `acc install` so the clients get the new bundle |
+Only `update` touches the network. `ACC_NO_UPDATE_CHECK=1` disables update checks. Hooks
+never perform them.
 
-## Updating
+## Adapter lifecycle commands
 
-Only `acc update` touches the network. `acc doctor` reads what it last found, checking at
-most once a day; `ACC_NO_UPDATE_CHECK=1` turns both off. Nothing on the hook path ever
-asks — a hook runs every turn inside a five-second budget.
-
-An upgrade is two commands. `npm install -g` replaces the CLI and the hook runtime — the
-shim a client runs points into the npm directory rather than at a copy — but leaves the
-bundle written into each client alone, including the skills the agents read. `acc install`
-rewrites that bundle. `acc doctor` flags it when the two disagree.
+`acc attach --participant <id>`, `acc heartbeat --session <id> --generation <token>`, and
+`acc detach --session <id> --generation <token>` are public executable boundaries used by
+adapters. Installed skills do not teach models to call them. They maintain ACC presence;
+they do not start, keep alive, or close the external client process.
 
 ## Exit codes
 
 | Code | Meaning |
 |---|---|
-| 0 | ok |
-| 2 | usage |
-| 3 | timeout |
-| 4 | data |
-| 5 | conflict — someone holds the claim |
-| 6 | attention |
+| `0` | success |
+| `2` | usage |
+| `3` | timeout |
+| `4` | data or incompatible state |
+| `5` | claim or generation conflict |
+| `6` | attention |
 
-## Ownership arguments
-
-Anything that mutates acts as a session and proves it with that session's generation. You
-pass neither — `acc` resolves both from the binding the adapter wrote when the session
-started:
-
-| It uses | When |
-|---|---|
-| `--session` and `--generation` | you passed them — adapters and scripts do |
-| `--session` alone | you have an id from `acc status --json`; the rest is looked up |
-| the client's own session id in the environment | the client exports one, under any name |
-| the checkout you are in | several sessions here, each in its own worktree |
-| the only live session | you are the only one attached |
-
-Two live sessions in one checkout that both fit stop the command rather than guess — that's
-exactly the mistake generation prevents, and why it's never printed by `acc status`. See
-[PROTOCOL.md](PROTOCOL.md#identity-hierarchy) for the full model.
-
-## Who has been here
-
-`acc status --all` lists every session that has been present, closed ones included — a
-message stays attributed to whoever sent it, and the roster is the only place that answers
-which checkout an agent was working in.
-
-```bash
-acc status --all
-```
-
-Each entry carries `checkoutRoot`, `branch`, and `presence`, so a worktree with no live
-session behind it can be told apart from someone's desk.
-
-## Asking another agent
-
-`--to` names a participant from the roster. An unknown name is refused, not
-silently accepted — a participant who has closed their terminal is still a participant,
-which is why the message is addressed to one rather than to a session.
-
-```bash
-acc request --to claude_code --title "finish the store tests" \
-  --detail "I ported src/store but ran out of time on the concurrency cases."
-```
-
-One write produces a `work_request` message that requires acknowledgement. The recipient
-can reply in writing with `acc reply`, or close it without a written answer using
-`acc ack --message <id>` — and only the session that read a message can acknowledge it.
-
-Addressing survives a closed terminal only if the agent has a stable name of its own:
-
-```bash
-ACC_PARTICIPANT=backend-codex codex
-```
-
-Without one, each run is a new participant, so nothing addressed to the last one reaches it.
+Next: [Protocol](PROTOCOL.md) · [MCP](MCP.md) · [Configuration](CONFIGURATION.md)
