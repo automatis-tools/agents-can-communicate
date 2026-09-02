@@ -242,11 +242,18 @@ async function waitForSocket(socketPath, child, stderr) {
   throw new Error(`channel socket was not created: ${stderr()}`);
 }
 
-function connectSocket(socketPath) {
-  return new Promise((resolve, reject) => {
-    const socket = net.createConnection(socketPath, () => resolve(socket));
-    socket.once("error", reject);
-  });
+async function connectSocket(socketPath) {
+  for (let attempt = 0; attempt < 100; attempt += 1) {
+    try {
+      return await new Promise((resolve, reject) => {
+        const socket = net.createConnection(socketPath, () => resolve(socket));
+        socket.once("error", reject);
+      });
+    } catch (error) {
+      if (!new Set(["ECONNREFUSED", "ENOENT"]).has(error.code) || attempt === 99) throw error;
+      await new Promise((resolve) => setTimeout(resolve, 5));
+    }
+  }
 }
 
 function nextSocketMessage(socket) {
