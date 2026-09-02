@@ -35,9 +35,13 @@ function fitDegradation(projection, visibleDegradation, messages, budgetBytes) {
   const full = [projection, visibleDegradation].filter(Boolean).join("\n");
   if (byteLength(full) <= budgetBytes) return full;
   const recovery = compactInboxRecovery(messages);
+  const exactRecovery = compactInboxRecovery(messages.slice(0, 1));
   const withRecovery = [projection, recovery].filter(Boolean).join("\n");
   if (byteLength(withRecovery) <= budgetBytes) return withRecovery;
+  const withExactRecovery = [projection, exactRecovery].filter(Boolean).join("\n");
+  if (byteLength(withExactRecovery) <= budgetBytes) return withExactRecovery;
   if (byteLength(recovery) <= budgetBytes) return recovery;
+  if (byteLength(exactRecovery) <= budgetBytes) return exactRecovery;
   return projection;
 }
 
