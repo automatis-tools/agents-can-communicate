@@ -21,13 +21,26 @@ const fileFor = (runtimeDir, harnessSessionId) => path.join(runtimeDir, "binding
  * plus the exact client facts observed at attach time - no prompt, transcript,
  * or harness state.
  */
+const isPid = value => Number.isInteger(value) && value > 0;
+
 export async function storeSessionBinding({ runtimeDir, harnessSessionId, accSessionId,
-  generation, clientVersion, platform }) {
+  generation, clientVersion, platform, clientPid }) {
   const file = fileFor(runtimeDir, harnessSessionId);
   await mkdir(path.dirname(file), { recursive: true });
   const record = { schemaVersion: SCHEMA_VERSION, harnessSessionId, accSessionId, generation };
   if (typeof clientVersion === "string" && clientVersion !== "") record.clientVersion = clientVersion;
   if (typeof platform === "string" && platform !== "") record.platform = platform;
+  // The vendor process this session runs in, resolved once at SessionStart.
+  // A native endpoint is matched against it, so a binding without one can
+  // still heartbeat and deliver at the next turn but cannot go live until a
+  // fresh start resolves the process again.
+  if (clientPid !== undefined && clientPid !== null) {
+    if (!isPid(clientPid)) {
+      throw new AccError(EXIT.USAGE, "session binding clientPid must be a positive integer",
+        { clientPid });
+    }
+    record.clientPid = clientPid;
+  }
   const temporary = `${file}.${process.pid}.tmp`;
   await writeFile(temporary, `${JSON.stringify(record, null, 2)}\n`, "utf8");
   // Replace rather than append: re-attaching supersedes the old generation, and
@@ -60,6 +73,7 @@ export async function loadSessionBinding({ runtimeDir, harnessSessionId }) {
   const binding = { accSessionId: record.accSessionId, generation: record.generation };
   if (typeof record.clientVersion === "string") binding.clientVersion = record.clientVersion;
   if (typeof record.platform === "string") binding.platform = record.platform;
+  if (isPid(record.clientPid)) binding.clientPid = record.clientPid;
   return binding;
 }
 
@@ -98,7 +112,8 @@ export async function listSessionBindings({ runtimeDir }) {
       accSessionId: record.accSessionId, generation: record.generation,
       ...(typeof record.clientVersion === "string"
         ? { clientVersion: record.clientVersion } : {}),
-      ...(typeof record.platform === "string" ? { platform: record.platform } : {}) });
+      ...(typeof record.platform === "string" ? { platform: record.platform } : {}),
+      ...(isPid(record.clientPid) ? { clientPid: record.clientPid } : {}) });
   }
   return bindings;
 }

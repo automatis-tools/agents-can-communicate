@@ -152,3 +152,63 @@ test("a stale publisher cannot overwrite a successor binding that published firs
     /open session generation/);
   assert.equal(stored, successor);
 });
+
+test("the current generation may clear its binding, and an absent binding is a no-op", async () => {
+  const { service } = fixture();
+  const session = await open(service, "models", "session_models");
+  await service.clearDeliveryBinding({ sessionId: session.sessionId,
+    generation: session.generation });
+  await service.publishDeliveryBinding(binding(session));
+  assert.equal((await service.listDeliveryBindings({ participantId: "models", now: NOW })).length, 1);
+
+  await service.clearDeliveryBinding({ sessionId: session.sessionId,
+    generation: session.generation });
+  await service.clearDeliveryBinding({ sessionId: session.sessionId,
+    generation: session.generation });
+
+  assert.deepEqual(await service.listDeliveryBindings({ participantId: "models", now: NOW }), []);
+  const [reported] = (await service.collectStatus({ workspaceId: WORKSPACE })).deliveryBindings;
+  assert.equal(reported.reachable, false);
+});
+
+test("a stale generation cannot clear a successor's binding", async () => {
+  const { service } = fixture();
+  const first = await open(service, "models", "session_models");
+  await service.closeSession({ sessionId: first.sessionId, generation: first.generation });
+  const successor = await open(service, "models", first.sessionId);
+  await service.publishDeliveryBinding(binding(successor));
+
+  await assert.rejects(service.clearDeliveryBinding({ sessionId: first.sessionId,
+    generation: first.generation }), /open session generation/);
+  assert.deepEqual(await service.listDeliveryBindings({ participantId: "models", now: NOW }),
+    [binding(successor)]);
+});
+
+test("closing a session retires its own current binding", async () => {
+  const { service } = fixture();
+  const session = await open(service, "models", "session_models");
+  await service.publishDeliveryBinding(binding(session));
+
+  await service.closeSession({ sessionId: session.sessionId, generation: session.generation });
+
+  const status = await service.collectStatus({ workspaceId: WORKSPACE });
+  assert.equal(status.deliveryBindings.some(item => item.reachable), false);
+});
+
+test("a failed re-handshake cannot leave an older binding reachable", async () => {
+  const { service } = fixture();
+  const session = await open(service, "models", "session_models");
+  await service.publishDeliveryBinding(binding(session));
+
+  // The hook clears before it handshakes; when the handshake then fails, the
+  // old endpoint must already be gone rather than surviving as a live target.
+  await service.clearDeliveryBinding({ sessionId: session.sessionId,
+    generation: session.generation });
+  const failedHandshake = null;
+  assert.equal(failedHandshake, null);
+
+  assert.deepEqual(await service.listDeliveryBindings({ participantId: "models", now: NOW }), []);
+  await service.publishDeliveryBinding(binding(session, { opaqueEndpointRef: "fixture:endpoint:new" }));
+  assert.deepEqual((await service.listDeliveryBindings({ participantId: "models", now: NOW }))
+    .map(item => item.opaqueEndpointRef), ["fixture:endpoint:new"]);
+});

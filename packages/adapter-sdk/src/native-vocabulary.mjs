@@ -24,7 +24,7 @@ export const NATIVE_REASON_CODES = Object.freeze([
   "prerelease_not_captured", "below_minimum_version", "known_bad_version",
   "feature_probe_failed", "probe_timeout", "probe_version_mismatch", "protocol_mismatch",
   "handshake_failed", "handshake_timeout", "handshake_version_mismatch",
-  "session_generation_stale", "unsupported_shell",
+  "session_generation_stale", "client_process_unknown", "unsupported_shell",
 ]);
 
 export const STABLE_VERSION = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:\+[0-9A-Za-z.-]+)?$/;
