@@ -182,3 +182,14 @@ turn.
 
 Headless runs also need workspace trust: `GEMINI_CLI_TRUST_WORKSPACE=true`, or
 `--skip-trust`.
+
+## Native delivery boundary (2026-09-02)
+
+Gemini CLI stays fallback-only for native delivery. Its interactive TUI exposes no captured
+external wake or queue interface: an addressed message cannot be pushed into an
+independently opened ordinary `gemini` session through any supported surface. `gemini --acp`
+does exist, but it changes the client's mode and makes another process its controller, which
+violates the transparent-native-launch boundary this feature is built on. The adapter
+therefore declares no `nativeDelivery` contract and keeps `delivery.livePush` and
+`delivery.replyRoute` false; messages remain durable for the certified next-turn hook or for
+`acc inbox`.

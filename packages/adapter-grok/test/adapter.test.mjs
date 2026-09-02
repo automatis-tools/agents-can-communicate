@@ -110,6 +110,21 @@ test("documentation-shaped fixtures do not certify Grok capabilities", () => {
   assert.doesNotMatch(createGrokAdapter().deliveryFallback.diagnostic, /live push available/i);
 });
 
+test("Grok declares no native delivery and no live capability", () => {
+  const adapter = createGrokAdapter();
+  assert.equal(adapter.nativeDelivery, undefined);
+  for (const capability of ["livePush", "replyRoute", "nextTurn"]) {
+    assert.equal(adapter.capabilities.delivery?.[capability] ?? false, false,
+      `Grok declared delivery.${capability} without a real capture`);
+  }
+  for (const method of ["probeNativeDelivery", "planNativeActivation", "bindNativeSession",
+    "offerMessage", "routeReply"]) {
+    assert.equal(Object.hasOwn(adapter, method), false, `Grok exposes native method ${method}`);
+  }
+  assert.match(adapter.deliveryFallback.diagnostic, /awaiting_compatibility_capture/);
+  assert.match(adapter.deliveryFallback.diagnostic, /acc inbox/);
+});
+
 test("captured payloads normalise and drop conversation content", async () => {
   const kinds = { SessionStart: "sessionStart", UserPromptSubmit: "beforeTurn",
     "PreToolUse-write": "beforeTool", Stop: "turnEnd", SessionEnd: "sessionEnd" };
