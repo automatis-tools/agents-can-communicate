@@ -101,7 +101,8 @@ be guaranteed.
 
 ## Documentation
 
-Start with [Getting started](docs/GETTING_STARTED.md), then use the
+Start with [Getting started](docs/GETTING_STARTED.md), then read
+[How ACC works](docs/HOW_IT_WORKS.md) for the end-to-end engineering tour or use the
 [documentation map](docs/index.md). The exact surfaces are in the [CLI](docs/CLI.md),
 [MCP](docs/MCP.md), [Protocol](docs/PROTOCOL.md), and
 [Capabilities](docs/CAPABILITIES.md) references. Adapter evidence lives beside each
