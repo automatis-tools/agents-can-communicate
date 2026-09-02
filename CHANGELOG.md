@@ -1,5 +1,47 @@
 # Changelog
 
+## 0.2.0
+
+ACC is communication-first: independently opened agent sessions discover peers, publish
+intent, exchange addressed questions and answers, and retain the exact thread and receipt
+state without appointing a coordinator or copying peer text through a human. Claims remain
+advisory protection around that communication layer, not the product's centre.
+
+| | |
+|---|---|
+| Built from | `98469d195924169c9576f305c57a24a92fecdc75` |
+| Tarball | `agents-can-communicate-0.2.0.tgz`, 201,295 bytes, 177 entries |
+| sha256 | `4ef3d36208421b6659382b9253c5bdcebcaf679b352dd2945f0e3247e527b6f3` |
+| Node | 26.5.1 for this release proof; package requires Node >=24 |
+| Verified on | macOS 26.6.2 (darwin 25.6.0, arm64) |
+| Native live delivery | Not certified: Codex 0.152.0 had no daemon control socket; Claude Code 2.1.252 stopped at the development-channel warning |
+| Durable fallback | Packed Claude↔Codex question/answer flows passed through addressed inbox recovery with explicit downgrade |
+| Not supported | Windows — measured as broken in the retained platform baseline |
+
+The package verifier installs into a clean temporary consumer and drives only its installed
+`acc` boundary; the separate packed acceptance invokes the installed hook and MCP binaries
+and bundled packages. Together they prove both Claude-to-Codex and Codex-to-Claude
+question/answer threads, `retrieved` then `acknowledged` receipts, idempotent retries,
+generation restarts, stale-binding rejection, unknown-version downgrade, double uninstall,
+exact foreign client-home topology restoration, and no ACC state inside the project.
+
+The final candidate also closes the storage and delivery races found during release review.
+A writer prepares its owner record before atomically publishing the whole lock, can recover
+an ownerless directory left by the former publication sequence, and cannot remove or be
+overwritten by its successor. Concurrent immutable publishes retain only accepted bytes,
+and uninstall keeps its ownership recipe until all cleanup succeeds. Room-message
+retrieval, hashed receipt keys, offer-failure attribution, MCP inbox receipt transitions,
+and the attach/materialisation boundary now share the same durable semantics under
+concurrency. On an uncertified client/platform combination, a tight context budget now
+keeps the exact `acc inbox --message …` recovery command visible without exposing the peer
+body or advancing its queued receipt.
+
+Native client claims remain deliberately narrower. The retained Codex and Claude captures
+are failures, not passing evidence, so v0.2.0 installs no native live channel for them.
+Exact older certified tiers may use next-turn hooks; uncaptured versions keep the durable
+`acc inbox` path. Full commands, mutations, environment, and limitations are in
+[the v0.2.0 release evidence](docs/release-evidence/v0.2.0.md).
+
 ## 0.1.18
 
 Grok is a first-class adapter. `acc install` writes `$GROK_HOME/hooks` and

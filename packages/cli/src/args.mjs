@@ -14,7 +14,7 @@ export const COMMANDS = Object.freeze({
   detach: { required: ["session", "generation"], optional: [] },
   sync: { required: [], optional: ["session", "cursor", "limit", "scope"] },
   work: { required: [], optional: ["session", "generation", "summary", "mode",
-    "state", "workstream"], repeated: ["hint"], flags: ["clear"] },
+    "state"], repeated: ["hint"], flags: ["clear"] },
   claim: { required: ["resource"],
     optional: ["session", "generation", "mode", "enforcement", "reason", "lease"] },
   // Neither is required on its own, because either one names the claim: an id
@@ -24,37 +24,17 @@ export const COMMANDS = Object.freeze({
   release: { required: [],
     optional: ["claim", "resource", "session", "generation", "authority", "reason"] },
   message: { required: ["subject", "body"],
-    optional: ["session", "generation", "type", "priority", "workstream"],
-    repeated: ["to"], flags: ["requires-ack"] },
+    optional: ["session", "generation", "type", "obligation", "client-message-id"],
+    repeated: ["to"] },
   inbox: { required: [], optional: ["session", "generation", "message"] },
   reply: { required: ["message", "body"],
-    optional: ["session", "generation", "subject", "type", "priority"] },
-  // Asking another agent to do something: one call, because a task nobody was
-  // told about and a message pointing at no task are each useless.
+    optional: ["session", "generation", "subject", "client-message-id"] },
+  // Asking another agent to do something as a message with a reply obligation.
   request: { required: ["to", "title"],
-    optional: ["session", "generation", "detail", "workstream", "priority"],
-    repeated: ["depends-on"] },
-  // Create a task, or act on one with --task. A workstream is optional: small
-  // requests should not have to invent a project first.
-  task: { required: [], optional: ["session", "generation", "workstream", "title",
-    "detail", "assignee", "state", "task", "reason"],
-    repeated: ["depends-on"], flags: ["take", "decline", "force"] },
-  // Create one, or take and hand back the coordination of one that exists.
-  // Creating a workstream raised `coordinator_missing` on every turn from then
-  // on, and nothing could answer it: the two core operations that do had no
-  // surface at all.
-  workstream: { required: [], optional: ["session", "generation", "title", "objective",
-    "workstream"], flags: ["take", "release"] },
-  // Messages not tied to a task need a way to be answered too. Without one a
-  // `requiresAck` message raised an attention item nothing could ever clear.
-  ack: { required: ["message"], optional: ["session", "generation", "state"] },
-  // Recording what was settled, so the next session does not reopen it. The
-  // protocol has described this object from the start and nothing could make
-  // one: no command, no tool.
-  decide: { required: ["title", "outcome"],
-    optional: ["session", "generation", "authority", "workstream", "supersedes"],
-    repeated: ["decided-by"], flags: ["human"] },
-  finish: { required: ["goal"], optional: ["session", "generation", "status", "to"],
+    optional: ["session", "generation", "detail", "client-message-id"] },
+  ack: { required: ["message"], optional: ["session", "generation"] },
+  finish: { required: ["goal"], optional: ["session", "generation", "status", "to",
+    "client-message-id"],
     repeated: ["completed", "remaining", "blocker"] },
   status: { required: [], optional: ["participant"], flags: ["all"] },
   doctor: { required: [], optional: ["home"], flags: ["repair"] },
@@ -69,7 +49,8 @@ export const COMMANDS = Object.freeze({
   // `--downgrade` because an older acc first on PATH will otherwise rewire every
   // client to itself, and the only symptom is a guard behaving like the version
   // it came from.
-  install: { required: [], optional: ["adapter", "home"], flags: ["dry-run", "downgrade"] },
+  install: { required: [], optional: ["adapter", "home", "delivery"],
+    flags: ["dry-run", "downgrade"] },
   // `--dry-run` on both, because the preview was computed for either action and
   // only `install` could ask for it. Removal is the side that reaches into a
   // client's configuration - including a client that has left the machine.

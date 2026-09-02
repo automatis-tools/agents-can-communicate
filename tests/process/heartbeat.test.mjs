@@ -23,16 +23,8 @@ const hook = path.join(repo, "bin", "acc-hook.mjs");
  * minutes later - a cadence of 60 seconds, stale at three of them - it went
  * stale and stayed stale however hard it was working.
  *
- * Measured, with a peer that had accepted work and was doing it:
- *
- *   asker  stale
- *   doer   stale
- *   - [request_stalled] port the store - nobody is working on it
- *   - [request_stalled] port the store - doer is not here to answer
- *
  * Every roster showed every peer as stale, so the word stopped meaning
- * anything, and the one rule that depends on it told a requester the opposite of
- * the truth.
+ * anything and presence-derived attention became unreliable.
  */
 async function workspace(t) {
   const base = await realpath(await mkdtemp(path.join(tmpdir(), "acc-beat-")));
@@ -123,28 +115,6 @@ test("guarding a write is still a read when the session was heard from lately", 
   const after = await readFile(path.join(root, "ephemeral", "session",
     (await readdir(path.join(root, "ephemeral", "session")))[0]), "utf8");
   assert.equal(after, before, "a heartbeat was written for a session heard from seconds ago");
-});
-
-test("work in progress is not reported as going nowhere", async t => {
-  const place = await workspace(t);
-  await place.attach("asker");
-  await place.attach("doer");
-  const asker = JSON.parse((await place.cli("status")).stdout).data.participants
-    .find(item => item.participantId === "asker").sessionId;
-  await place.cli("request", "--session", asker, "--to", "doer", "--title", "port the store");
-  const doer = JSON.parse((await place.cli("status")).stdout).data.participants
-    .find(item => item.participantId === "doer").sessionId;
-  const { snapshot } = JSON.parse((await place.cli("sync", "--session", asker,
-    "--scope", "full")).stdout).data;
-  await place.cli("task", "--session", doer, "--task", snapshot.tasks[0].taskId, "--take");
-  await place.goQuiet(4);
-
-  await place.turn("doer");
-
-  // The rule reads presence, so a session that looks dead makes it say the
-  // opposite of the truth about work somebody is doing right now.
-  const shown = await place.turn("asker");
-  assert.equal(shown.includes("nobody is working on it"), false, shown);
 });
 
 test("a session with no recorded sign of life gets one", async () => {

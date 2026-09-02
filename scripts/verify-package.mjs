@@ -16,6 +16,8 @@ import path from "node:path";
 import { promisify } from "node:util";
 
 import { gitProvenance } from "./git-provenance.mjs";
+import { verifyCertificationFixtureAllowlist } from "./package-certification.mjs";
+import { treeSnapshot } from "./tree-snapshot.mjs";
 
 const run = promisify(execFile);
 const repo = path.resolve(import.meta.dirname, "..");
@@ -29,16 +31,18 @@ const runNpm = (args, options = {}) => (isWindows
   ? run("npm.cmd", args.map(argument => `"${argument}"`), { ...options, shell: true })
   : run("npm", args, options));
 
-// Never published: the test suite, local configuration, capture material
-// carrying paths from the machine that made it, and anything that looks like a
-// live session.
+// Never published: the test suite, local configuration, and anything that
+// looks like a live session. Redacted adapter certification captures are the
+// one fixture exception: effective capability claims must remain inspectable.
 const FORBIDDEN = [
   { pattern: /^tests\//, why: "test suite" },
   { pattern: /^\.github\//, why: "CI configuration" },
   { pattern: /^\.githooks\//, why: "local git hooks" },
   { pattern: /^\.agents\//, why: "local agent state" },
-  { pattern: /(^|\/)fixtures\//, why: "capture material from a real machine" },
   { pattern: /(^|\/)test\//, why: "test suite" },
+  { pattern: /(^|\/)scripts\/spikes\//, why: "native feasibility spike" },
+  { pattern: /(^|\/)(?:runtime|transcript|secret)s?\//, why: "runtime or private state" },
+  { pattern: /\.sock$/, why: "local socket" },
   { pattern: /\.jsonl$/, why: "looks like a transcript" },
 ];
 
@@ -59,6 +63,26 @@ async function packTarball(into) {
 async function entries(tarball) {
   const { stdout } = await run("tar", ["-tzf", tarball]);
   return stdout.split("\n").filter(Boolean).map(entry => entry.replace(/^package\//, ""));
+}
+
+async function readTarJson(tarball, entry) {
+  const { stdout } = await run("tar", ["-xzOf", tarball, `package/${entry}`]);
+  return JSON.parse(stdout);
+}
+
+async function readTarText(tarball, entry) {
+  return (await run("tar", ["-xzOf", tarball, `package/${entry}`])).stdout;
+}
+
+function localMarkdownTargets(markdown, from) {
+  const targets = [];
+  for (const match of markdown.matchAll(/!?\[[^\]]*\]\(([^)\s]+)(?:\s+"[^"]*")?\)/g)) {
+    const raw = match[1].replace(/^<|>$/g, "");
+    if (/^(?:[a-z]+:|#)/i.test(raw)) continue;
+    const local = decodeURIComponent(raw.split("#", 1)[0].split("?", 1)[0]);
+    targets.push(path.posix.normalize(path.posix.join(path.posix.dirname(from), local)));
+  }
+  return targets;
 }
 
 async function main() {
@@ -104,7 +128,34 @@ async function main() {
       const hits = listed.filter(entry => pattern.test(entry));
       if (hits.length > 0) fail(`${why} is published`, hits.slice(0, 5).join("\n"));
     }
+    const fixtureEntries = listed.filter(entry => entry.includes("/fixtures/"));
+    const invalidFixtures = fixtureEntries.filter(entry =>
+      !/^node_modules\/@agents-can-communicate\/adapter-[^/]+\/fixtures\//.test(entry));
+    if (invalidFixtures.length > 0) {
+      fail("non-certification fixture material is published", invalidFixtures.slice(0, 5).join("\n"));
+    }
+    const certifications = listed.filter(entry =>
+      /^node_modules\/@agents-can-communicate\/adapter-[^/]+\/certification\.json$/.test(entry));
+    if (certifications.length !== 5) {
+      fail("every shipped adapter must carry certification.json", certifications.join("\n"));
+    }
+    await verifyCertificationFixtureAllowlist(listed,
+      certification => readTarJson(tarball, certification))
+      .catch(error => fail(error.message));
     ok(`${listed.length} entries, none forbidden`);
+    ok(`${certifications.length} certification manifest(s), exact evidence allowlist shipped`);
+
+    const packedEntries = new Set(listed);
+    const missingLinks = [];
+    for (const markdown of listed.filter(entry => entry.endsWith(".md"))) {
+      for (const target of localMarkdownTargets(await readTarText(tarball, markdown), markdown)) {
+        if (!packedEntries.has(target)) missingLinks.push(`${markdown} -> ${target}`);
+      }
+    }
+    if (missingLinks.length > 0) {
+      fail("packed documentation has missing local links", missingLinks.join("\n"));
+    }
+    ok("every packed Markdown link resolves inside the tarball");
 
     // The workspaces have to travel inside the tarball, or every internal
     // import fails on install. This is the whole reason the package bundles.
@@ -112,11 +163,34 @@ async function main() {
       fail("the workspaces are not bundled; internal imports would fail on install");
     }
     ok("workspaces bundled");
+    const manifest = await readTarJson(tarball, "package.json");
+    if (manifest.version !== "0.2.0") fail(`root version is ${manifest.version}, not 0.2.0`);
+    if (!manifest.bundleDependencies?.includes("@agents-can-communicate/delivery-router")) {
+      fail("delivery-router is not bundled; installed message commands cannot start");
+    }
+    for (const dependency of manifest.bundleDependencies) {
+      const workspaceManifest = await readTarJson(tarball,
+        `node_modules/${dependency}/package.json`);
+      if (workspaceManifest.version !== "0.2.0") {
+        fail(`${dependency} is ${workspaceManifest.version}, not 0.2.0`);
+      }
+    }
+    const geminiManifest = await readTarJson(tarball,
+      "node_modules/@agents-can-communicate/adapter-gemini-cli/"
+      + "extension/gemini-extension.json");
+    if (geminiManifest.version !== "0.2.0") {
+      fail(`embedded Gemini extension is ${geminiManifest.version}, not 0.2.0`);
+    }
+    const codexPlugin = await readTarJson(tarball,
+      "node_modules/@agents-can-communicate/adapter-codex/"
+      + "plugin/.codex-plugin/plugin.json");
+    if (codexPlugin.license !== "MIT") fail("shipped Codex plugin license is not MIT");
+    ok(`root and ${manifest.bundleDependencies.length} bundled workspaces are 0.2.0`);
 
     step("install into a clean directory");
     await writeFile(path.join(consumer, "package.json"),
       '{"name":"acc-verify","version":"1.0.0","private":true}\n');
-    await runNpm(["install", "--silent", tarball], { cwd: consumer });
+    await runNpm(["install", "--offline", "--silent", tarball], { cwd: consumer });
     const bin = path.join(consumer, "node_modules", ".bin");
     ok((await readdir(bin)).join(", "));
 
@@ -147,18 +221,52 @@ async function main() {
     ok("nothing written into the project");
 
     step("install and uninstall");
-    await writeFile(path.join(clientHome, "config.toml"), 'default_model = "k3"\n');
-    const before = await readFile(path.join(clientHome, "config.toml"), "utf8");
+    const kimiHome = path.join(clientHome, ".kimi-code");
+    await mkdir(kimiHome, { recursive: true });
+    await writeFile(path.join(kimiHome, "config.toml"), 'default_model = "k3"\n');
+    const before = await treeSnapshot(clientHome);
     // `acc install` fails the command when an adapter fails, so its output is
     // the diagnosis rather than something to discard.
-    const installed = await acc("install", "--home", clientHome)
-      .catch(error => { fail("install failed", error.stdout || error.message); });
-    const removed = await acc("uninstall", "--home", clientHome)
-      .catch(error => { fail("uninstall failed", error.stdout || error.message); });
-    void installed; void removed;
-    const after = await readFile(path.join(clientHome, "config.toml"), "utf8");
-    if (after !== before) fail("uninstall did not restore the client config");
-    ok("client config restored byte for byte");
+    const installed = JSON.parse((await acc("install", "--adapter", "kimi",
+      "--home", clientHome)
+      .catch(error => fail("install failed", error.stdout || error.message))).stdout).data;
+    if (installed.failed.length > 0 || installed.operations.length !== 1
+      || installed.operations[0].adapterId !== "kimi"
+      || installed.operations[0].applied !== true) {
+      fail("install result did not apply the requested Kimi adapter", JSON.stringify(installed));
+    }
+    if (JSON.stringify(await treeSnapshot(clientHome)) === JSON.stringify(before)) {
+      fail("install did not change the client-home topology");
+    }
+    const installedKimi = JSON.parse(await readFile(path.join(kimiHome, "plugins", "managed",
+      "agents-can-communicate", ".kimi-plugin", "plugin.json"), "utf8"));
+    if (installedKimi.version !== "0.2.0") fail("installed Kimi manifest is not 0.2.0");
+
+    const removed = JSON.parse((await acc("uninstall", "--adapter", "kimi",
+      "--home", clientHome)
+      .catch(error => fail("uninstall failed", error.stdout || error.message))).stdout).data;
+    if (removed.failed.length > 0 || removed.operations.length !== 1
+      || removed.operations[0].applied !== true
+      || (removed.operations[0].removed.length + removed.operations[0].changes.length) === 0) {
+      fail("first uninstall did not report its removals", JSON.stringify(removed));
+    }
+    if (JSON.stringify(await treeSnapshot(clientHome)) !== JSON.stringify(before)) {
+      fail("uninstall did not restore client-home topology and bytes");
+    }
+
+    const repeated = JSON.parse((await acc("uninstall", "--adapter", "kimi",
+      "--home", clientHome)).stdout).data;
+    const repeatedOperation = repeated.operations[0];
+    if (repeated.failed.length > 0 || repeatedOperation?.applied !== true
+      || (repeatedOperation.removed?.length ?? 0) > 0
+      || (repeatedOperation.removedDirectories?.length ?? 0) > 0
+      || (repeatedOperation.changes?.length ?? 0) > 0) {
+      fail("second uninstall was not an idempotent no-op", JSON.stringify(repeated));
+    }
+    if (JSON.stringify(await treeSnapshot(clientHome)) !== JSON.stringify(before)) {
+      fail("second uninstall changed client-home topology or bytes");
+    }
+    ok("client-home topology, modes, links, and bytes restored; repeated uninstall was a no-op");
 
     // One line to copy into the changelog, complete enough to be checkable
     // later: which file, which bytes, and which revision produced them.

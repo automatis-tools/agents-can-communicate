@@ -1,0 +1,66 @@
+{
+  "schemaVersion": 1,
+  "captures": [
+    {
+      "id": "session-start", "client": "kimi", "version": "0.36.1",
+      "platform": "darwin-arm64", "observedAt": "2026-08-16",
+      "fixture": "fixtures/SessionStart.json",
+      "sha256": "d8b3fd270d51911cde47048a83d1019aafdf061f88a339e657a0cc973fd3b0e8",
+      "event": "SessionStart", "tool": null,
+      "claims": [{ "capability": "lifecycle.sessionStart", "result": "pass",
+        "outcome": { "kind": "event-observed", "idle": "fires when a session starts",
+          "busy": "fires before the first model turn", "authority": "advisory",
+          "limitations": ["prompt-mode session end is not emitted"] } }]
+    },
+    {
+      "id": "session-heartbeat", "client": "kimi", "version": "0.36.1",
+      "platform": "darwin-arm64", "observedAt": "2026-08-16",
+      "fixture": "fixtures/SessionHeartbeat.json",
+      "sha256": "91a96a72410c98f47a596b1eb4168636c71045db4b7fe51a4688a4bf996b293f",
+      "event": "SessionHeartbeat", "tool": null,
+      "claims": [{ "capability": "lifecycle.heartbeat", "result": "pass",
+        "outcome": { "kind": "fixed-cadence-observed", "idle": "fires every 60 seconds while idle",
+          "busy": "continues on the same fixed cadence", "authority": "advisory",
+          "limitations": ["a process that exits before one minute emits no heartbeat"] } }]
+    },
+    {
+      "id": "user-prompt-submit", "client": "kimi", "version": "0.36.1",
+      "platform": "darwin-arm64", "observedAt": "2026-08-16",
+      "fixture": "fixtures/UserPromptSubmit.json",
+      "sha256": "783fdf9d2daeb7829c748d7bc17793971990b9da46d9aaf78ab5f522acd56cea",
+      "event": "UserPromptSubmit", "tool": null,
+      "claims": [
+        { "capability": "context.beforeTurnInjection", "result": "pass",
+          "outcome": { "kind": "model-context-observed", "idle": "waits for the next user prompt",
+            "busy": "does not interrupt an in-progress turn", "authority": "context",
+            "limitations": ["the client wraps raw stdout as hook_result"] } },
+        { "capability": "delivery.nextTurn", "result": "pass",
+          "outcome": { "kind": "model-context-observed", "idle": "offers complete peer messages at the next prompt",
+            "busy": "does not interrupt an in-progress turn", "authority": "context",
+            "limitations": ["delivery requires the next normal user turn"] } }
+      ]
+    },
+    {
+      "id": "pre-tool-use-write", "client": "kimi", "version": "0.36.1",
+      "platform": "darwin-arm64", "observedAt": "2026-08-16",
+      "fixture": "fixtures/PreToolUse-Write.json",
+      "sha256": "348a22b9e7f2de80b06a77f87b29baf91e72eb5c57e0b0d7dced2f4451147234",
+      "event": "PreToolUse", "tool": "Write",
+      "claims": [{ "capability": "guards.beforeWrite", "result": "pass",
+        "outcome": { "kind": "tool-denied-before-mutation", "idle": "no write exists to guard",
+          "busy": "denies Write before mutation", "authority": "blocking",
+          "limitations": ["runtime writes are outside the hook boundary"] } }]
+    },
+    {
+      "id": "pre-tool-use-bash", "client": "kimi", "version": "0.36.1",
+      "platform": "darwin-arm64", "observedAt": "2026-08-16",
+      "fixture": "fixtures/PreToolUse-Bash.json",
+      "sha256": "895a611c780c6fe00012cca84b43301d1f2cb2a3f9d6f29448ba28e46520a6db",
+      "event": "PreToolUse", "tool": "Bash",
+      "claims": [{ "capability": "guards.beforeShell", "result": "pass",
+        "outcome": { "kind": "tool-denied-before-execution", "idle": "no shell call exists to guard",
+          "busy": "denies Bash before execution", "authority": "blocking",
+          "limitations": ["only tool calls reaching PreToolUse are guarded"] } }]
+    }
+  ]
+}

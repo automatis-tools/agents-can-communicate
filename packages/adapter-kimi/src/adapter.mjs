@@ -1,5 +1,6 @@
 import { defineAdapter, projectContext, projectContextResult }
   from "@agents-can-communicate/adapter-sdk";
+import certification from "../certification.json" with { type: "json" };
 
 import { denyOutcome, injectOutcome, normalizeKimiHook } from "./hooks.mjs";
 import { planKimiInstall, detectKimi, installKimiPlugin, uninstallKimiPlugin } from "./install.mjs";
@@ -31,19 +32,22 @@ export function createKimiAdapter() {
     // The binary this client actually installs. Probed for a version to
     // decide whether the client is on this machine, so it has to be the
     // real command rather than the adapter id: `0.36.1`.
-    client: { command: "kimi", versionArgs: ["--version"] },
+    client: { command: "kimi", certificationName: "kimi", versionArgs: ["--version"] },
+    certification,
     capabilities: {
       lifecycle: { sessionStart: true, heartbeat: true },
       context: { beforeTurnInjection: true },
       guards: { beforeWrite: true, beforeShell: true },
-      delivery: { polling: true },
+      delivery: { nextTurn: true },
     },
+    deliveryFallback: { diagnostic:
+      "Kimi Code next-turn delivery is certified only for 0.36.1 on darwin-arm64; "
+      + "other or unknown versions keep durable acc inbox access, and live push is unavailable" },
 
     startSession: async () => ({ ok: true, changes: [], diagnostics: [] }),
     heartbeat: async () => ({ ok: true, changes: [], diagnostics: [] }),
     guardWrite: async () => ({ ok: true, changes: [], diagnostics: [] }),
     guardShell: async () => ({ ok: true, changes: [], diagnostics: [] }),
-    poll: async () => ({ ok: true, changes: [], diagnostics: [] }),
 
     // This client keeps everything under its own directory, so the installer is
     // handed that rather than the user's home. Pointed at the home itself it

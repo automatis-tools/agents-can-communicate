@@ -3,7 +3,10 @@ import { randomBytes } from "node:crypto";
 import { readFile } from "node:fs/promises";
 
 import { createId } from "@agents-can-communicate/protocol";
-import { askConfirmation, main } from "@agents-can-communicate/cli";
+import { createDeliveryRouter } from "@agents-can-communicate/delivery-router";
+import { ALL_ADAPTERS, askConfirmation, main } from "@agents-can-communicate/cli";
+
+const adapters = Object.fromEntries(ALL_ADAPTERS().map(adapter => [adapter.id, adapter]));
 
 // The composition root is the only place allowed to reach for ambient time and
 // randomness; everything below it receives them as ports.
@@ -15,6 +18,8 @@ const runtime = {
   stderr: process.stderr,
   clock: { now: () => new Date().toISOString() },
   ids: { next: kind => createId(kind, randomBytes) },
+  createDeliveryRouter: ({ service, clock }) =>
+    createDeliveryRouter({ service, adapters, clock }),
   // Asked only by `acc config init`, and only when stdout is a terminal. There
   // was no port here at all, so the question went to the fallback that always
   // answers no: in a real terminal the command printed "not written" and never

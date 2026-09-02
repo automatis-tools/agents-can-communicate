@@ -1,0 +1,77 @@
+{
+  "schemaVersion": 1,
+  "captures": [
+    {
+      "id": "session-start", "client": "claude-code", "version": "2.1.233",
+      "platform": "darwin-arm64", "observedAt": "2026-08-16",
+      "fixture": "fixtures/SessionStart.json",
+      "sha256": "f63baff4ba14b1490c1d66ccae1b5e355ca8185128e82639a22313c3c3a06fdc",
+      "event": "SessionStart", "tool": null,
+      "claims": [{ "capability": "lifecycle.sessionStart", "result": "pass",
+        "outcome": { "kind": "event-observed", "idle": "fires when a session starts",
+          "busy": "fires before the first model turn", "authority": "advisory",
+          "limitations": ["capture used a one-session --plugin-dir"] } }]
+    },
+    {
+      "id": "session-end", "client": "claude-code", "version": "2.1.233",
+      "platform": "darwin-arm64", "observedAt": "2026-08-16",
+      "fixture": "fixtures/SessionEnd.json",
+      "sha256": "165b89ab0c8398580c59c8a95febfeae6c833954767993f559b1d13867fc5ec9",
+      "event": "SessionEnd", "tool": null,
+      "claims": [{ "capability": "lifecycle.sessionEnd", "result": "pass",
+        "outcome": { "kind": "event-observed", "idle": "fires when a session exits",
+          "busy": "does not run until the session exits", "authority": "advisory",
+          "limitations": ["cannot write a handoff after the model has stopped"] } }]
+    },
+    {
+      "id": "user-prompt-submit", "client": "claude-code", "version": "2.1.233",
+      "platform": "darwin-arm64", "observedAt": "2026-08-16",
+      "fixture": "fixtures/UserPromptSubmit.json",
+      "sha256": "8d9edbc92de1b3c1601cfb36ddc341e45d1299df1803f0d5756890ecfbfd4a04",
+      "event": "UserPromptSubmit", "tool": null,
+      "claims": [
+        { "capability": "context.beforeTurnInjection", "result": "pass",
+          "outcome": { "kind": "model-context-observed", "idle": "waits for the next user prompt",
+            "busy": "does not interrupt an in-progress turn", "authority": "context",
+            "limitations": ["requires the hookSpecificOutput additionalContext envelope"] } },
+        { "capability": "delivery.nextTurn", "result": "pass",
+          "outcome": { "kind": "model-context-observed", "idle": "offers complete peer messages at the next prompt",
+            "busy": "does not interrupt an in-progress turn", "authority": "context",
+            "limitations": ["delivery requires the next normal user turn"] } }
+      ]
+    },
+    {
+      "id": "pre-tool-use-edit", "client": "claude-code", "version": "2.1.233",
+      "platform": "darwin-arm64", "observedAt": "2026-08-16",
+      "fixture": "fixtures/PreToolUse-Edit.json",
+      "sha256": "8768062d89190644cffb137572dfd0517473b83717a1e1b5c23aaa98e1501b36",
+      "event": "PreToolUse", "tool": "Edit",
+      "claims": [{ "capability": "guards.beforeWrite", "result": "pass",
+        "outcome": { "kind": "tool-denied-before-mutation", "idle": "no write exists to guard",
+          "busy": "denies a file edit before disk mutation", "authority": "blocking",
+          "limitations": ["runtime writes are outside the hook boundary"] } }]
+    },
+    {
+      "id": "pre-tool-use-bash", "client": "claude-code", "version": "2.1.233",
+      "platform": "darwin-arm64", "observedAt": "2026-08-16",
+      "fixture": "fixtures/PreToolUse.json",
+      "sha256": "fecdf3b8183e3c95da1535ca09bac4f571986c0e8c54b442b6423d5382d4a574",
+      "event": "PreToolUse", "tool": "Bash",
+      "claims": [{ "capability": "guards.beforeShell", "result": "pass",
+        "outcome": { "kind": "tool-denied-before-execution", "idle": "no shell call exists to guard",
+          "busy": "denies a Bash call before execution", "authority": "blocking",
+          "limitations": ["only tool calls reaching PreToolUse are guarded"] } }]
+    },
+    {
+      "id": "native-delivery-2-1-252", "client": "claude-code", "version": "2.1.252",
+      "platform": "darwin-arm64", "observedAt": "2026-09-01T16:17:06Z",
+      "fixture": "fixtures/delivery/claude-code-2.1.252.json",
+      "sha256": "a9b6bbad11ebf15bb01ace7b489f1b2d73f1a8226e9832e4cac5f1492c7ad7f7",
+      "event": null, "tool": null,
+      "claims": [
+        { "capability": "delivery.livePush", "result": "fail", "outcome": { "kind": "native-capture-failed" } },
+        { "capability": "delivery.replyRoute", "result": "fail", "outcome": { "kind": "native-capture-failed" } }
+      ]
+    }
+  ]
+}

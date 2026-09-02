@@ -9,13 +9,13 @@ Why ACC is shaped the way it is, and what is deliberately still open.
 | Local-first, same machine | Coordination that needs a server is coordination nobody sets up. |
 | Git optional | The problem is concurrent sessions, not version control; a plain directory works. |
 | Attach everywhere, materialise lazily | Universal attachment is what makes it ambient; lazy state is what makes a lone session free. |
-| No permanent orchestrator | A lead session is a single point of failure and a lie about who owns the work. |
-| Coordinators are scoped and replaceable | A workstream can benefit from one. A workspace never needs one. |
-| `Intent` first-class, `Task` optional | Most real work is not a ticket. Forcing one is why coordination tools go unused. |
-| Claims are workspace-global | Independent workstreams still share a filesystem. |
+| No coordinator, workstream, or task subsystem | ACC connects peers; it does not assign, supervise, schedule, or own their work. |
+| Explicit peer conversations are first-class product data | Addressed questions, answers, decisions, and handoffs need durable threads and per-recipient receipts. |
+| Intent is awareness, not assignment | A session says what it is doing without creating a queue or granting another session authority. |
+| Claims are workspace-global | Independently opened sessions still share a filesystem. |
 | Runtime state outside the repository | A checkout can be deleted, cloned, or synced; presence and locks must not travel with it. |
 | Project config optional and runtime-free | A committed file is editable by anyone with a PR, so it may carry policy — never sessions or tokens. |
-| Durable state is authoritative | Realtime delivery, if it ever exists, accelerates; it never becomes the source of truth. |
+| Durable state is authoritative | Next-turn or live delivery may accelerate an interaction; neither becomes the source of truth. |
 | No heartbeat helper in v1 | An idle session is honestly reported `stale`. A sidecar process to fake liveness is worse than the truth. |
 | Presence reads the process, never writes the record | A pid answers "gone" at once; an age floor covers what a pid cannot, including its own reuse. Nothing is written back — no session has authority to edit another's record. This checks a process already there, not one beating on a session's behalf like the heartbeat helper above. |
 | No process launching | ACC attaches to sessions you already own. Owning them is a different product. |
@@ -32,7 +32,7 @@ Why ACC is shaped the way it is, and what is deliberately still open.
 | A permanent global lead session | Turns peers into workers and makes one crash fatal. |
 | Treating MCP as a lifecycle guarantee | MCP is a tool surface. It cannot attach, guard, or wake anything. |
 | Requiring Git, tmux, PostgreSQL, or a service | Every requirement is a reason the tool is not installed. |
-| Sharing full transcripts by default | Coordination needs intent and claims, not conversations. |
+| Collecting or sharing raw transcripts | Raw transcripts are never collected or shared. Explicit peer messages are bounded records the sender chose to address. |
 | Reporting queued messages as delivered | A delivery state that overstates itself is worse than no state. |
 | Guessing file paths out of shell commands | It would block work at random and still miss real writes. See [CAPABILITIES.md](CAPABILITIES.md). |
 
@@ -81,7 +81,8 @@ where a guard stops behaves better than one that believes it absolute.
 4. **Multi-root discovery rules** beyond the current `roots` list.
 5. **Default claim lease length** for hook-only adapters. A hook-only session cannot sustain
    a short renewal cadence, so lease policy must not assume one.
-6. **Windows.** Measured as not working, not merely untested — see [CHANGELOG.md](../CHANGELOG.md).
+6. **Windows.** Measured as not working, not merely untested — see the
+   [repository changelog](https://github.com/automatis-tools/agents-can-communicate/blob/main/CHANGELOG.md).
 
 ---
 

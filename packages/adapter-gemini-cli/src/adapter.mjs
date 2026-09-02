@@ -1,5 +1,6 @@
 import { defineAdapter, projectContext, projectContextResult }
   from "@agents-can-communicate/adapter-sdk";
+import certification from "../certification.json" with { type: "json" };
 
 import { denyOutcome, injectOutcome, normalizeGeminiHook } from "./hooks.mjs";
 import { planGeminiInstall, detectGemini, installGeminiExtension, uninstallGeminiExtension } from "./install.mjs";
@@ -32,19 +33,22 @@ export function createGeminiCliAdapter() {
     // The binary this client actually installs. Probed for a version to
     // decide whether the client is on this machine, so it has to be the
     // real command rather than the adapter id: `0.55.1`.
-    client: { command: "gemini", versionArgs: ["--version"] },
+    client: { command: "gemini", certificationName: "gemini-cli", versionArgs: ["--version"] },
+    certification,
     capabilities: {
       lifecycle: { sessionStart: true, sessionEnd: true },
       context: { beforeTurnInjection: true },
       guards: { beforeWrite: true, beforeShell: true },
-      delivery: { polling: true },
+      delivery: { nextTurn: true },
     },
+    deliveryFallback: { diagnostic:
+      "Gemini CLI next-turn delivery is certified only for 0.37.0 on darwin-arm64; "
+      + "other or unknown versions keep durable acc inbox access, and live push is unavailable" },
 
     startSession: async () => ({ ok: true, changes: [], diagnostics: [] }),
     endSession: async () => ({ ok: true, changes: [], diagnostics: [] }),
     guardWrite: async () => ({ ok: true, changes: [], diagnostics: [] }),
     guardShell: async () => ({ ok: true, changes: [], diagnostics: [] }),
-    poll: async () => ({ ok: true, changes: [], diagnostics: [] }),
 
     planInstall: context => planGeminiInstall(context),
     detect: context => detectGemini(context),

@@ -1,14 +1,19 @@
 import { mkdir } from "node:fs/promises";
 import path from "node:path";
 
-import { AccError, EXIT, validateRecord } from "@agents-can-communicate/protocol";
+import { AccError, EXIT, assertPortableId, validateRecord }
+  from "@agents-can-communicate/protocol";
 
 import { encode, listDirectoryEntries, listJsonFiles, publishAtomic, readJsonIfPresent,
-  removeIfPresent } from "./atomic-json.mjs";
+  retainFile } from "./atomic-json.mjs";
+import { initialiseActiveJournal } from "./active-journal.mjs";
 import { requireStoreIdentity } from "./identity.mjs";
-import { journalEntry, readOpenJournals, rollForward, writeJournalEntry } from "./journal.mjs";
+import { journalEntry, readJournalCeiling, readOpenJournals, rollForward, writeJournalEntry }
+  from "./journal.mjs";
 import { assertEventBinding, assertStateBinding, eventPath, stateEnvelope, statePath }
   from "./record-id.mjs";
+import { ephemeralIsDeleted, markEphemeral, stateDeletionPublication,
+  stateGenerationIsDeleted } from "./retention.mjs";
 import { ensureManagedDirectory } from "./safe-directory.mjs";
 import { withWriterMutex } from "./writer-mutex.mjs";
 
@@ -23,9 +28,16 @@ export const ZERO_CURSOR = "0".repeat(SEQUENCE_WIDTH);
 // corrupt record, so nothing ever had a reason to put one aside. An empty
 // directory that reads as a feature is the same mistake as an attention kind
 // with no rule behind it. If quarantining is ever built, it comes back with it.
-const DIRECTORIES = ["state", "events", "journal", "locks", "ephemeral", "tmp"];
+const DIRECTORIES = ["state", "events", "journal", "locks", "ephemeral", "retained", "tmp"];
 
 const pad = value => String(value).padStart(SEQUENCE_WIDTH, "0");
+
+function assertBeforePublication(deadlineAt) {
+  if (deadlineAt !== undefined && Date.now() >= deadlineAt) {
+    throw new AccError(EXIT.CONFLICT,
+      "transaction deadline expired before durable publication", {});
+  }
+}
 
 export function storePaths(root) {
   return Object.freeze(Object.fromEntries([["root", root],
@@ -37,8 +49,12 @@ async function listState(paths, root, kind) {
   for (const filePath of await listJsonFiles(path.join(paths.state, kind), { root })) {
     const found = await readJsonIfPresent(filePath, root);
     if (found === null) continue;
-    envelopes.push(assertStateBinding(found.value, kind,
-      path.basename(filePath, ".json"), filePath));
+    const envelope = assertStateBinding(found.value, kind,
+      path.basename(filePath, ".json"), filePath);
+    if (await stateGenerationIsDeleted(paths, root, kind, envelope.id,
+      envelope.generation)) continue;
+    validateRecord(kind, envelope.record);
+    envelopes.push(envelope);
   }
   return envelopes;
 }
@@ -67,11 +83,12 @@ export async function openFilesystemStore({ root, clock, ids, workspaceId, failA
   // root, containment rules apply and each level is created individually so a
   // symlinked ancestor cannot be created past.
   await mkdir(root, { recursive: true });
-  for (const name of DIRECTORIES) await ensureManagedDirectory(root, paths[name]);
   // Identity is settled before any read or write. Adopting a directory that
   // already belongs to another workspace is the failure this fails closed on.
   await requireStoreIdentity(paths, { workspaceId, clock });
+  for (const name of DIRECTORIES) await ensureManagedDirectory(root, paths[name]);
   const publishOptions = { root, tmpDir: paths.tmp, clock, failAt };
+  await initialiseActiveJournal(paths, publishOptions);
 
   // Any journal left behind by a crashed writer is completed before the store
   // serves a single read, so callers never observe a half-published
@@ -107,7 +124,7 @@ export async function openFilesystemStore({ root, clock, ids, workspaceId, failA
    * these transactions make reads as "nothing conflicts" when it finds nothing.
    * Declaring nothing reads everything, which is what this always did.
    */
-  async function transaction(callback, { kinds } = {}) {
+  async function transaction(callback, { kinds, deadlineAt } = {}) {
     const wanted = kinds === undefined ? null : new Set(kinds);
     const declared = kind => {
       if (wanted !== null && !wanted.has(kind)) {
@@ -117,7 +134,8 @@ export async function openFilesystemStore({ root, clock, ids, workspaceId, failA
       }
       return kind;
     };
-    return withWriterMutex(paths, publishOptions, async () => {
+    return withWriterMutex(paths, { ...publishOptions, deadlineAt }, async () => {
+      assertBeforePublication(deadlineAt);
       // Reads are loaded once per transaction so get, list, and the generation
       // that put() compares against all describe the same instant.
       const loaded = await loadAllState(paths, root, wanted);
@@ -171,7 +189,9 @@ export async function openFilesystemStore({ root, clock, ids, workspaceId, failA
             throw new AccError(EXIT.CONFLICT, `${kind} ${id} changed under this transaction`,
               { kind, id, expectedGeneration, actualGeneration: actual });
           }
-          staged.set(key, { kind, id, removed: true });
+          const persisted = loaded.get(key);
+          if (persisted === undefined) staged.delete(key);
+          else staged.set(key, { kind, id, generation: persisted.generation, removed: true });
         },
         append(event) {
           const stamped = { ...event, sequence: pad(sequence) };
@@ -194,7 +214,8 @@ export async function openFilesystemStore({ root, clock, ids, workspaceId, failA
           replace: false,
         })),
         ...[...staged.values()].map(entry => (entry.removed === true
-          ? { path: path.relative(root, statePath(paths, entry.kind, entry.id)), remove: true }
+          ? stateDeletionPublication(paths, root, entry.kind, entry.id, entry.generation,
+            statePath(paths, entry.kind, entry.id))
           : {
             path: path.relative(root, statePath(paths, entry.kind, entry.id)),
             bytes: encode(stateEnvelope(entry.kind, entry.id, entry.generation, entry.record)),
@@ -203,6 +224,11 @@ export async function openFilesystemStore({ root, clock, ids, workspaceId, failA
       ];
       if (publications.length === 0) return result;
 
+      // Cancellation is safe up to this point: nothing durable has decided the
+      // transaction. Once the journal write starts, recovery must finish it and
+      // the caller waits for that atomic outcome instead of reporting a false
+      // timeout while publication continues in the background.
+      assertBeforePublication(deadlineAt);
       const entry = journalEntry(ids.next("transaction"), firstSequence, publications,
         clock.now());
       await writeJournalEntry(paths, publishOptions, entry);
@@ -217,7 +243,7 @@ export async function openFilesystemStore({ root, clock, ids, workspaceId, failA
     // An open journal marks a transaction that is decided but not fully
     // published. Bounding the page below its first sequence is what keeps a
     // partially published transaction invisible to every reader.
-    const ceiling = (await readOpenJournals(paths, root)).at(0)?.firstSequence ?? null;
+    const ceiling = await readJournalCeiling(paths, root);
     const events = [];
     for (const filePath of await listJsonFiles(paths.events, { root })) {
       const sequence = path.basename(filePath, ".json");
@@ -225,7 +251,7 @@ export async function openFilesystemStore({ root, clock, ids, workspaceId, failA
       if (ceiling !== null && sequence >= ceiling) break;
       const found = await readJsonIfPresent(filePath, root);
       if (found === null) continue;
-      const event = assertEventBinding(found.value, filePath);
+      const event = validateRecord("event", assertEventBinding(found.value, filePath));
       if (event.workspaceId !== workspace) continue;
       events.push(event);
       if (events.length === limit) break;
@@ -255,49 +281,65 @@ export async function openFilesystemStore({ root, clock, ids, workspaceId, failA
       participants: await of("participant"),
       sessions: await of("session"),
       intents: await of("intent"),
-      workstreams: await of("workstream"),
-      tasks: await of("task"),
       claims: await of("claim"),
       messages: await of("message"),
       receipts: await of("receipt"),
-      decisions: await of("decision"),
-      handoffs: await of("handoff"),
     };
   }
   // Ephemeral records are published by replace and never journalled: they carry
-  // no history, append no events, and are expected to disappear.
-  const ephemeralPath = (kind, id) => path.join(paths.ephemeral, kind, `${id}.json`);
+  // no durable history and append no events. Deletion is represented by a
+  // retained marker because Node cannot unlink safely through a directory fd.
+  const ephemeralDirectory = kind => {
+    assertPortableId(kind, "ephemeral record kind");
+    return path.join(paths.ephemeral, kind);
+  };
+  const ephemeralPath = (kind, id) => {
+    assertPortableId(id, "ephemeral record id");
+    return path.join(ephemeralDirectory(kind), `${id}.json`);
+  };
+  const readEphemeral = async (kind, id) => {
+    const found = await readJsonIfPresent(ephemeralPath(kind, id), root);
+    if (found === null || await ephemeralIsDeleted(paths, root, kind, id)) return null;
+    return validateRecord(kind, found.value);
+  };
   const ephemeral = Object.freeze({
     async get(kind, id) {
-      return (await readJsonIfPresent(ephemeralPath(kind, id), root))?.value ?? null;
+      return readEphemeral(kind, id);
     },
     async put(kind, id, record) {
+      validateRecord(kind, record);
       return withWriterMutex(paths, publishOptions, async () => {
         await publishAtomic(ephemeralPath(kind, id), encode(record),
           { root, tmpDir: paths.tmp, replace: true });
+        await markEphemeral(paths, publishOptions, kind, id, "present");
         return record;
       });
     },
     async update(kind, id, updater) {
       return withWriterMutex(paths, publishOptions, async () => {
-        const found = await readJsonIfPresent(ephemeralPath(kind, id), root);
-        const next = await updater(found?.value ?? null);
+        const next = await updater(await readEphemeral(kind, id));
         if (next === null) return null;
         validateRecord(kind, next);
         await publishAtomic(ephemeralPath(kind, id), encode(next),
           { root, tmpDir: paths.tmp, replace: true });
+        await markEphemeral(paths, publishOptions, kind, id, "present");
         return next;
       });
     },
     async delete(kind, id) {
-      return withWriterMutex(paths, publishOptions,
-        async () => removeIfPresent(ephemeralPath(kind, id)));
+      return withWriterMutex(paths, publishOptions, async () => {
+        if (await readEphemeral(kind, id) === null) return null;
+        await retainFile(ephemeralPath(kind, id), { root });
+        await markEphemeral(paths, publishOptions, kind, id, "deleted");
+        return null;
+      });
     },
     async list(kind) {
       const records = [];
-      for (const filePath of await listJsonFiles(path.join(paths.ephemeral, kind), { root })) {
+      for (const filePath of await listJsonFiles(ephemeralDirectory(kind), { root })) {
         const found = await readJsonIfPresent(filePath, root);
-        if (found !== null) records.push(found.value);
+        if (found !== null && !await ephemeralIsDeleted(paths, root, kind,
+          path.basename(filePath, ".json"))) records.push(validateRecord(kind, found.value));
       }
       return records;
     },

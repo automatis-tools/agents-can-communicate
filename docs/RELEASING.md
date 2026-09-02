@@ -2,25 +2,31 @@
 
 ```mermaid
 graph LR
-  A[npm ci] --> B[npm test] --> C[npm run check] --> D[npm pack] --> E[verify-package] --> F{approved?}
-  F -->|yes| G[tag · publish · release]
-  F -->|no| H[stop]
+  A[npm ci] --> B[npm run check] --> C[npm test] --> D[clean candidate commit] --> E[npm pack] --> F[verify-package] --> G{approved?}
+  G -->|yes| H[tag · publish · release]
+  G -->|no| I[stop]
 ```
 
 ## Build the candidate
 
 ```bash
 npm ci
-npm test
 npm run check
-npm pack
-node scripts/verify-package.mjs agents-can-communicate-*.tgz
+env npm_config_cache=/private/tmp/acc-npm-cache-v02 npm test
+git status --short
+git commit -m "release: prepare ACC v0.2.0"
+candidate_dir="$(mktemp -d /private/tmp/acc-v0.2.XXXXXX)"
+env npm_config_cache=/private/tmp/acc-npm-cache-v02 npm pack --pack-destination "$candidate_dir"
+env npm_config_cache=/private/tmp/acc-npm-cache-v02 node scripts/verify-package.mjs \
+  "$candidate_dir/agents-can-communicate-0.2.0.tgz"
 git diff --check
 ```
 
 `verify-package.mjs` is the gate that matters. It installs the tarball into a
-clean directory with **no workspace anywhere** and then drives the product:
-doctor, a non-Git workspace, an install and its removal.
+clean directory with **no workspace anywhere** and then drives the product. The
+acceptance suite additionally opens independent Claude/Codex hook sessions from
+the installed artifact, completes both message directions, proves downgrade and
+restart behavior, exercises the installed MCP binary, and removes client wiring twice.
 
 Development cannot catch what this catches. Workspace symlinks are always
 present there, so an unbundled package imports fine right up until somebody
@@ -31,17 +37,20 @@ else installs it.
 | Refused | Why |
 |---|---|
 | `tests/`, `test/` | test suite |
-| `fixtures/` | capture material carrying paths from one machine |
+| unreferenced `fixtures/` | material that is not exact redacted certification evidence |
+| `scripts/spikes/`, `*.sock` | development probes and local endpoints |
+| runtime, transcript, or secret directories | machine state and private material |
 | `.github/`, `.githooks/`, `.agents/` | local configuration |
 | `*.jsonl` | looks like a transcript |
 | Workspaces missing from `node_modules/` | every internal import would fail |
 
 ## Record the evidence
 
-Put the tarball name, sha256, **the commit it was built from**, capability
-matrix, and known limitations in `CHANGELOG.md`. A release without them is a
-release nobody can audit later. Test count is deliberately left out: nothing
-verifies it, so it only decorates or, when it drifts, misleads.
+Put the tarball name, sha256, **the commit it was built from**, exact platform/client
+facts, fallback result, and known limitations in `docs/release-evidence/v0.2.0.md` and
+the current `CHANGELOG.md` release table. A release without them is a release nobody can
+audit later. Test count is deliberately left out: nothing verifies it, so it only
+decorates or, when it drifts, misleads.
 
 The commit matters because every workspace travels inside the tarball, so any
 change to shipped code changes the digest. A digest recorded alone goes stale
@@ -60,6 +69,17 @@ because someone happened to run the script. So `npm test` now checks it:
 changed since the recorded commit, and names the files. A shallow clone that
 does not have the commit reports that instead of failing — the check is of
 the record, not of the checkout depth.
+
+The candidate therefore uses two commits. Commit A contains every packed file and every
+release gate. Pack and verify clean commit A, then commit B records its digest and evidence
+only in files that are not packed. Never record a dirty-tree digest: changing a packed file
+after commit A means making a new candidate commit and packing again.
+
+Native real-client tests run only where the retained capture proved that native boundary.
+For v0.2.0 neither Codex 0.152.0 nor Claude Code 2.1.252 did: the Codex control socket was
+absent and Claude stopped at the development-channel warning. Record those exact failed
+captures and run the packed inbox/next-turn fallback instead of promoting an unobserved
+native path. Windows is an explicit unsupported-platform skip, not a passing capture.
 
 A published version's record is history and is not rewritten; later changes
 get a new `## Unreleased` entry at the top, checked the same way against the

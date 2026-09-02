@@ -6,6 +6,7 @@ import test from "node:test";
 import { COMMANDS } from "@agents-can-communicate/cli";
 import { ATTENTION_PRIORITY, createCoordinationService }
   from "@agents-can-communicate/core";
+import * as coreApi from "@agents-can-communicate/core";
 import { PUBLIC_TOOLS } from "../../packages/mcp-server/src/tools.mjs";
 
 import { createFakeClock, createFakeIds, createMemoryStore } from "../helpers/memory-store.mjs";
@@ -15,15 +16,10 @@ const repo = path.resolve(import.meta.dirname, "..", "..");
 /**
  * An operation nothing can call does not exist.
  *
- * This has been the recurring defect of the project, six times over. Each one
+ * This has been a recurring defect of the project. Each one
  * was implemented in the core, tested at the core, and reachable from nothing:
  *
- *   createWorkstream   no command, no tool - and `acc task` required a workstream,
- *                      so from a clean install tasks could not be made at all
- *   claimTask          taking a task
- *   transitionTask     moving one along
- *   assignment         `createTask` hard-coded `assigneeSessionId: null`
- *   markDelivery       so a `requiresAck` message raised an attention item that
+ *   markDelivery       so a reply-required message raised an attention item that
  *                      could never be cleared
  *   nearby_intent      an attention kind with no rule behind it
  *
@@ -54,25 +50,29 @@ function coreOperations() {
 const BY_CLI = Object.freeze({
   openSession: "attach", heartbeatSession: "heartbeat", closeSession: "detach",
   sync: "sync", setIntent: "work", clearIntent: "work", acquireClaim: "claim", releaseClaim: "release",
-  forceReleaseClaim: "release", sendMessage: "message", markDelivery: "ack",
+  forceReleaseClaim: "release", sendMessage: "message", acknowledgeMessage: "ack",
   readInbox: "inbox", replyToMessage: "reply",
-  requestWork: "request", createTask: "task", claimTask: "task",
-  transitionTask: "task", declineTask: "task", createWorkstream: "workstream",
-  acquireCoordinator: "workstream", releaseCoordinator: "workstream",
-  finishSession: "finish", collectStatus: "status", recordDecision: "decide",
+  finishSession: "finish", collectStatus: "status",
 });
 
 // Deliberately internal, each for a stated reason rather than by omission.
 const INTERNAL = Object.freeze({
   ensureMaterialised: "called by every write that needs durable state",
-  requireOpenSession: "the ownership check every mutation runs first",
   locateSession: "a lookup the other operations share",
   pendingMessages: "read by the hook runtime when it builds a turn",
+  nextTurnDelivery: "the hook runtime's receipt-backed message and offer evidence",
   renewClaim: "reached through `acc claim` on a claim this session already holds",
   guardState: "the write guard's own read, kept narrow on purpose: `collectStatus` "
     + "answers the same question and reads the whole store, which put the cost of "
     + "guarding one write in proportion to every message the workspace had carried",
   resumeSession: "the hook runtime resumes its generation-bearing binding after compaction",
+  recordOfferSucceeded: "called only after a transport proves it crossed its boundary",
+  recordOfferFailed: "called by the delivery router to append a safe failed-attempt event",
+  readReceipt: "called by delivery transports before attempting a queued recipient receipt",
+  publishDeliveryBinding: "called by an adapter for the exact session generation it owns",
+  listDeliveryBindings: "called by the delivery router while selecting one eligible target",
+  listLiveSessions: "called by the delivery router before binding eligibility, so one "
+    + "certified endpoint cannot hide an ambiguous recipient participant",
 });
 
 test("every core operation is reachable, or named as internal on purpose", () => {
@@ -101,21 +101,23 @@ test("the internal list stays a list of decisions, not of leftovers", () => {
   assert.deepEqual(stale, []);
 });
 
+test("the core package exposes no v0.1 acknowledgement heuristic", () => {
+  assert.equal(Object.hasOwn(coreApi, "noteNudge"), false);
+  assert.equal(Object.hasOwn(coreApi, "looksConsequential"), false);
+});
+
 test("an operation an agent needs is offered over MCP as well", async () => {
   // A client with no adapter reaches ACC only through tools. The agent-facing
   // set is what an agent has to be able to do; setup and lifecycle are not part
   // of it, since a model should not be running the installer.
   const names = new Set(PUBLIC_TOOLS.map(tool => tool.name));
-  for (const operation of ["sync", "setIntent", "acquireClaim", "sendMessage",
-    "readInbox", "replyToMessage", "markDelivery", "requestWork", "createTask",
-    "createWorkstream", "acquireCoordinator",
-    "releaseCoordinator", "finishSession"]) {
-    const expected = { sync: "acc_sync", setIntent: "acc_work", acquireClaim: "acc_claim",
-      sendMessage: "acc_message", markDelivery: "acc_ack", requestWork: "acc_request",
-      readInbox: "acc_inbox", replyToMessage: "acc_reply",
-      createTask: "acc_task", createWorkstream: "acc_workstream",
-      acquireCoordinator: "acc_workstream", releaseCoordinator: "acc_workstream",
-      finishSession: "acc_finish" }[operation];
+  for (const operation of ["collectStatus", "sync", "setIntent", "acquireClaim",
+    "releaseClaim", "sendMessage", "readInbox", "replyToMessage", "acknowledgeMessage",
+    "finishSession"]) {
+    const expected = { collectStatus: "acc_status", sync: "acc_sync", setIntent: "acc_work",
+      acquireClaim: "acc_claim", releaseClaim: "acc_release", sendMessage: "acc_message",
+      acknowledgeMessage: "acc_ack", readInbox: "acc_inbox",
+      replyToMessage: "acc_reply", finishSession: "acc_finish" }[operation];
     assert.equal(names.has(expected), true, `${operation} has no MCP tool`);
   }
 });

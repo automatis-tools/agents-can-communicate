@@ -30,6 +30,18 @@ test("a binding survives between two separate hook processes", async t => {
   assert.deepEqual(loaded, { accSessionId: "session_a", generation: "generation_a" });
 });
 
+test("a binding carries the client facts observed for this exact session", async t => {
+  const dir = await runtimeDir(t);
+  await storeSessionBinding({ runtimeDir: dir, ...binding,
+    clientVersion: "1.2.3", platform: "darwin-arm64" });
+
+  assert.deepEqual(await loadSessionBinding({ runtimeDir: dir,
+    harnessSessionId: binding.harnessSessionId }), {
+    accSessionId: "session_a", generation: "generation_a",
+    clientVersion: "1.2.3", platform: "darwin-arm64",
+  });
+});
+
 test("an unknown harness session loads as null rather than throwing", async t => {
   const dir = await runtimeDir(t);
 

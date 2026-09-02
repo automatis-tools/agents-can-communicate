@@ -1,14 +1,18 @@
-import { AccError, EXIT } from "@agents-can-communicate/protocol";
-import { noteNudge } from "@agents-can-communicate/core";
+import { createRequire } from "node:module";
+
+import { AccError, EXIT, GENERIC_MESSAGE_KINDS, VALID_OBLIGATIONS }
+  from "@agents-can-communicate/protocol";
 import { clearSessionBinding, loadSessionBinding, storeSessionBinding }
   from "@agents-can-communicate/adapter-sdk";
 
 import { readResource } from "./resources.mjs";
+import { validateToolInput } from "./input-validator.mjs";
 import { MCP_CAPABILITIES, PUBLIC_TOOLS, RESOURCES } from "./tools.mjs";
 
 export const PROTOCOL_VERSION = "2026-07-28";
 export const SUPPORTED_VERSIONS = Object.freeze([PROTOCOL_VERSION]);
-const SERVER_INFO = Object.freeze({ name: "agents-can-communicate", version: "0.0.0" });
+const PACKAGE_VERSION = createRequire(import.meta.url)("../package.json").version;
+const SERVER_INFO = Object.freeze({ name: "agents-can-communicate", version: PACKAGE_VERSION });
 
 const META = "io.modelcontextprotocol";
 const HEARTBEAT_CADENCE_MS = 60_000;
@@ -72,20 +76,40 @@ async function resolveSession(context) {
   return session;
 }
 
-// Kept for clients released before acc_inbox existed. New clients should use
-// the narrow inbox tool, but removing mail from acc_sync would strand deployed
-// clients that only know this response field. Returning a body is delivery, so
-// only those returned messages advance to injected.
-async function syncWithMail(service, owner, context, args) {
-  const sync = await service.sync({ ...owner, cursor: args.cursor ?? null,
-    scope: args.scope, limit: args.limit });
-  const messages = await service.pendingMessages({ workspaceId: context.workspaceId,
-    participantId: context.participantId, exceptSessionId: owner.sessionId });
-  for (const message of messages) {
-    await service.markDelivery({ ...owner, messageId: message.messageId,
-      state: "injected" }).catch(() => null);
+export async function recordAndOffer({ record, router, selectMessage = value => value }) {
+  const recorded = await record();
+  const message = selectMessage(recorded);
+  if (router === null || router === undefined
+    || !Array.isArray(message?.toParticipantIds) || message.toParticipantIds.length === 0) {
+    return { recorded, delivery: [] };
   }
-  return messages.length === 0 ? sync : { ...sync, messages };
+  try {
+    return { recorded, delivery: await router.offer(message) };
+  } catch {
+    return { recorded, delivery: message.toParticipantIds.map(recipientParticipantId => ({
+      recipientParticipantId, outcome: "queued", transport: "durable",
+      errorCode: "transport_error",
+    })) };
+  }
+}
+
+const clientMessageId = (args, service) =>
+  args.clientMessageId ?? service.ids.next("client");
+
+function obligationFor(kind, explicit, addressed) {
+  if (!GENERIC_MESSAGE_KINDS.includes(kind)) {
+    const command = kind === "answer"
+      ? "acc_reply" : kind === "handoff" ? "acc_finish" : null;
+    throw new AccError(EXIT.USAGE, command === null
+      ? `unknown message kind: ${kind}` : `${kind} messages require ${command}`);
+  }
+  const obligation = explicit ?? VALID_OBLIGATIONS[kind][0];
+  if (!VALID_OBLIGATIONS[kind].includes(obligation)
+    || (!addressed && obligation !== "none")) {
+    throw new AccError(EXIT.USAGE,
+      `message obligation ${obligation} is invalid for ${kind}`);
+  }
+  return obligation;
 }
 
 /**
@@ -93,7 +117,7 @@ async function syncWithMail(service, owner, context, args) {
  *
  * The hook runtime hands a session its pending messages when it builds a turn,
  * and marks them delivered. An MCP client has no turn and no hook, and no tool
- * ever handed it anything: it saw a `direct_request` line carrying a subject and
+ * ever handed it anything: it saw a `reply_required` line carrying a subject and
  * an id, and to read what a peer had actually said it had to ask for the whole
  * snapshot and search every message in the workspace for its own name.
  *
@@ -102,7 +126,7 @@ async function syncWithMail(service, owner, context, args) {
  * that had answered it.
  *
  * Returning them here is delivery, in the same sense and with the same honesty
- * as the turn: what is handed over is marked `injected`, and nothing else is.
+ * as the turn: what is handed over is marked `retrieved`, and nothing else is.
  * Acknowledgement stays a separate act, because being shown something is not
  * agreeing to it.
  */
@@ -113,72 +137,66 @@ async function callTool(name, args, context) {
   const service = context.service;
 
   switch (name) {
+    case "acc_status":
+      return service.collectStatus({});
     case "acc_sync":
-      return syncWithMail(service, owner, context, args);
+      return service.sync({ ...owner, cursor: args.cursor ?? null,
+        scope: args.scope, limit: args.limit });
     case "acc_work":
-      if (args.clear === true) return service.clearIntent({ ...owner });
+      if (args.clear === true) {
+        await service.clearIntent({ ...owner });
+        return { cleared: true };
+      }
       return service.setIntent({ ...owner, summary: args.summary, mode: args.mode,
-        state: args.state, workstreamId: args.workstreamId ?? null,
-        resourceHints: args.resourceHints ?? [] });
+        state: args.state, resourceHints: args.resourceHints ?? [] });
     case "acc_claim":
-      if (args.action === "release") return service.releaseClaim({ ...owner,
-        claimId: args.claimId }) ?? { released: args.claimId };
       if (args.action === "renew") return service.renewClaim({ ...owner,
         claimId: args.claimId, leaseSeconds: args.leaseSeconds });
       return service.acquireClaim({ ...owner, resource: args.resource,
         mode: args.mode ?? "exclusive", enforcement: "advisory",
         reason: args.reason ?? "unspecified", leaseSeconds: args.leaseSeconds });
+    case "acc_release":
+      await service.releaseClaim({ ...owner, claimId: args.claimId });
+      return { released: args.claimId };
     case "acc_message": {
-      const message = await service.sendMessage({ ...owner, toParticipantIds: args.to ?? [],
-        subject: args.subject, body: args.body, type: args.type ?? "note",
-        priority: args.priority, requiresAck: args.requiresAck === true,
-        workstreamId: args.workstreamId ?? null });
-      // A note that reads like it wants a reply was sent fire-and-forget; hand
-      // the nudge back with the message so the model that sent it can reconsider.
-      const advice = noteNudge(message);
-      return advice ? { ...message, advice } : message;
+      const kind = args.kind ?? "note";
+      const toParticipantIds = args.to ?? [];
+      const routed = await recordAndOffer({ router: context.deliveryRouter, record: () =>
+        service.sendMessage({ ...owner, clientMessageId: clientMessageId(args, service),
+        toParticipantIds, subject: args.subject, body: args.body, kind,
+        obligation: obligationFor(kind, args.obligation, toParticipantIds.length > 0) }) });
+      const message = routed.recorded;
+      return { message, delivery: routed.delivery };
     }
     case "acc_inbox":
       return service.readInbox({ ...owner, messageId: args.messageId });
-    case "acc_reply":
-      return service.replyToMessage({ ...owner, messageId: args.messageId,
-        body: args.body, subject: args.subject, type: args.type, priority: args.priority });
-    case "acc_task":
-      if (args.action === "claim") return service.claimTask({ ...owner,
-        taskId: args.taskId, force: args.force === true });
-      if (args.action === "decline") return service.declineTask({ ...owner,
-        taskId: args.taskId, reason: args.reason });
-      if (args.action === "transition") return service.transitionTask({ ...owner,
-        taskId: args.taskId, state: args.state });
-      return service.createTask({ ...owner, workstreamId: args.workstreamId,
-        title: args.title, detail: args.detail, taskId: args.taskId,
-        assigneeParticipantId: args.assigneeParticipantId,
-        dependsOn: args.dependsOn ?? [] });
-    case "acc_request":
-      return service.requestWork({ ...owner, toParticipantId: args.toParticipantId,
-        title: args.title, detail: args.detail, workstreamId: args.workstreamId,
-        priority: args.priority, dependsOn: args.dependsOn ?? [] });
+    case "acc_reply": {
+      const routed = await recordAndOffer({ router: context.deliveryRouter,
+        selectMessage: value => value.reply,
+        record: () => service.replyToMessage({ ...owner, messageId: args.messageId,
+          body: args.body, subject: args.subject,
+          clientMessageId: clientMessageId(args, service) }) });
+      return { message: routed.recorded.reply, delivery: routed.delivery };
+    }
+    case "acc_request": {
+      const routed = await recordAndOffer({ router: context.deliveryRouter,
+        record: () => service.sendMessage({ ...owner,
+          clientMessageId: clientMessageId(args, service),
+          toParticipantIds: [args.toParticipantId], kind: "request", obligation: "reply",
+          subject: args.title, body: args.detail ?? args.title }) });
+      return { message: routed.recorded, delivery: routed.delivery };
+    }
     case "acc_ack":
-      return service.markDelivery({ ...owner, messageId: args.messageId,
-        state: args.state ?? "acknowledged" });
-    case "acc_decide":
-      return service.recordDecision({ ...owner, title: args.title, outcome: args.outcome,
-        authority: args.authority ?? "workstream", workstreamId: args.workstreamId ?? null,
-        decidedBy: args.decidedBy, supersedes: args.supersedes ?? null,
-        humanConfirmed: args.humanConfirmed === true });
-    case "acc_workstream":
-      if (args.action === "coordinate") {
-        return service.acquireCoordinator({ ...owner, workstreamId: args.workstreamId });
-      }
-      if (args.action === "release") {
-        return service.releaseCoordinator({ ...owner, workstreamId: args.workstreamId });
-      }
-      return service.createWorkstream({ ...owner, title: args.title,
-        objective: args.objective });
-    case "acc_finish":
-      return service.finishSession({ ...owner, goal: args.goal, status: args.status,
+      return service.acknowledgeMessage({ ...owner, messageId: args.messageId });
+    case "acc_finish": {
+      const routed = await recordAndOffer({ router: context.deliveryRouter,
+        selectMessage: value => value.message,
+        record: () => service.finishSession({ ...owner,
+        clientMessageId: clientMessageId(args, service), goal: args.goal, status: args.status,
         completed: args.completed ?? [], remaining: args.remaining ?? [],
-        blockers: args.blockers ?? [], toParticipantId: args.toParticipantId ?? null });
+        blockers: args.blockers ?? [], toParticipantId: args.toParticipantId }) });
+      return { message: routed.recorded.message, delivery: routed.delivery };
+    }
     default:
       throw new AccError(EXIT.USAGE, `unknown tool: ${name}`, { name });
   }
@@ -198,15 +216,27 @@ async function handle(message, context) {
     case "resources/list":
       return complete({ resources: [...RESOURCES] });
     case "resources/read": {
-      const value = await readResource(params.uri, context);
+      // Snapshot and roster are observation-only. Inbox is a delivery boundary:
+      // resolve this configured participant's durable session and let the core
+      // inbox service record that the returned bodies were retrieved.
+      const resourceContext = params.uri === "acc://inbox"
+        ? { ...context, session: await resolveSession(context) }
+        : context;
+      const value = await readResource(params.uri, resourceContext);
       return complete({ contents: [{ uri: params.uri, mimeType: "application/json",
         text: JSON.stringify(value, null, 2) }] });
     }
     case "tools/call": {
       try {
-        const value = await callTool(params.name, params.arguments ?? {}, context);
+        const args = params.arguments === undefined ? {} : params.arguments;
+        const tool = PUBLIC_TOOLS.find(candidate => candidate.name === params.name);
+        if (tool === undefined) {
+          throw new AccError(EXIT.USAGE, `unknown tool: ${params.name}`, { name: params.name });
+        }
+        validateToolInput(tool.inputSchema, args);
+        const value = await callTool(params.name, args, context);
         return complete({ content: [{ type: "text", text: JSON.stringify(value, null, 2) }],
-          structuredContent: JSON.stringify(value) });
+          structuredContent: value });
       } catch (error) {
         // A failing operation is a tool result, not a transport failure: the
         // model must see it and be able to react.

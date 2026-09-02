@@ -33,6 +33,10 @@ test("a session records what its harness can actually enforce", async () => {
   const [participant] = status.participants;
   assert.equal(participant.enforcement, "guarded");
   assert.equal(participant.lifecycle, "managed");
+  assert.equal(Object.hasOwn(status, "workstreams"), false);
+  assert.equal(Object.hasOwn(status, "tasks"), false);
+  assert.equal(Object.hasOwn(status, "decisions"), false);
+  assert.equal(Object.hasOwn(status.counts, "tasks"), false);
 });
 
 test("a participant that cannot be guarded says so, rather than staying silent", async () => {

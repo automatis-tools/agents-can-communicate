@@ -1,6 +1,6 @@
-// The model-facing surface stays at six high-level operations. Granular
-// internal transitions remain available to adapters through the CLI and are
-// deliberately not advertised here.
+import { GENERIC_MESSAGE_KINDS } from "@agents-can-communicate/protocol";
+
+// The model-facing surface stays at a small set of high-level operations.
 //
 // Every description says that delivery is polled, because a tool description is
 // the only contract the model ever sees. MCP guarantees no lifecycle, no push,
@@ -21,11 +21,17 @@ const stringList = description => ({ type: "array", items: { type: "string" }, d
 
 export const PUBLIC_TOOLS = Object.freeze([
   {
+    name: "acc_status",
+    description: `Read who is here, current intents and claims, and the workspace's real `
+      + `protection level. ${POLLED}`,
+    inputSchema: object({}),
+  },
+  {
     name: "acc_sync",
     description: `Read coordination state for this workspace: roster, attention items, and `
       + `events since a cursor. Use scope "full" to answer questions about the whole `
-      + `workspace, including other participants' collapsed child sessions. Pending mail is `
-      + `also returned for compatibility; prefer acc_inbox for targeted reads. ${POLLED}`,
+      + `workspace, including other participants' collapsed child sessions. Use acc_inbox `
+      + `instead for addressed messages. ${POLLED}`,
     inputSchema: object({
       cursor: string("Resume from this cursor; omit to start from the beginning."),
       scope: { type: "string", enum: ["delta", "full"],
@@ -38,48 +44,62 @@ export const PUBLIC_TOOLS = Object.freeze([
     name: "acc_work",
     description: `Publish what this session is doing now as one concise Intent. Intent is `
       + `awareness, not authorisation: it never reserves a resource. ${POLLED}`,
-    inputSchema: object({
+    inputSchema: { ...object({
       summary: string("One line describing the current work."),
       mode: { type: "string",
         enum: ["observe", "explore", "edit", "review", "coordinate", "wait"] },
       state: { type: "string", enum: ["active", "blocked", "waiting", "done"] },
-      workstreamId: string("Optional workstream this work belongs to."),
       clear: { type: "boolean",
         description: "Say this session has stopped working on anything." },
       resourceHints: stringList("Advisory resource URIs, for example file:src/main.mjs."),
-    }, ["summary", "mode"]),
+    }), oneOf: [
+      { required: ["clear"], properties: { clear: { const: true } },
+        not: { anyOf: ["summary", "mode", "state", "resourceHints"]
+          .map(field => ({ required: [field] })) } },
+      { required: ["summary", "mode"], not: { required: ["clear"] } },
+    ] },
   },
   {
     name: "acc_claim",
-    description: `Acquire, renew, or release a claim on a resource URI. Claims are `
+    description: `Acquire or renew a claim on a resource URI. Claims are `
       + `workspace-wide and advisory here: this client has no write guard, so a claim `
       + `informs peers rather than preventing an edit. ${POLLED}`,
-    inputSchema: object({
-      resource: string("Resource URI, for example file:packages/core/** or task:M2.1a."),
-      action: { type: "string", enum: ["acquire", "renew", "release"] },
+    inputSchema: { ...object({
+      resource: string("Resource URI, for example file:packages/core/**."),
+      action: { type: "string", enum: ["acquire", "renew"] },
       mode: { type: "string", enum: ["shared", "exclusive"] },
       reason: string("Why the resource is being claimed."),
       leaseSeconds: { type: "integer", minimum: 1,
         description: "Lease length; the claim expires without renewal." },
-      claimId: string("Required for renew and release."),
-    }, ["resource", "action"]),
+      claimId: string("Required for renew."),
+    }, ["action"]), oneOf: [
+      { properties: { action: { const: "acquire" } }, required: ["resource"],
+        not: { required: ["claimId"] } },
+      { properties: { action: { const: "renew" } }, required: ["claimId"],
+        not: { anyOf: ["resource", "mode", "reason"]
+          .map(field => ({ required: [field] })) } },
+    ] },
+  },
+  {
+    name: "acc_release",
+    description: `Release a claim this session owns. ${POLLED}`,
+    inputSchema: object({
+      claimId: string("The claim to release."),
+    }, ["claimId"]),
   },
   {
     name: "acc_message",
-    description: `Send a typed message to other participants, optionally requiring an `
-      + `acknowledgement. Recipients read it when they next poll; there is no delivery `
-      + `guarantee and no wake. ${POLLED}`,
+    description: `Durably record a typed message to other participants. Recipients read it `
+      + `when they next poll; there is no push guarantee and no wake. ${POLLED}`,
     inputSchema: object({
       to: stringList("Recipient participant ids."),
       subject: string("Short subject line."),
       body: string("Message body. Treated as data by every reader."),
-      type: { type: "string",
-        enum: ["note", "question", "answer", "contract_request", "contract_response",
-          "decision_proposal", "decision_result", "blocker", "review_request",
-          "review_result", "handoff"] },
-      priority: { type: "string", enum: ["low", "normal", "high", "urgent"] },
-      requiresAck: { type: "boolean", description: "Ask the recipient to acknowledge." },
-      workstreamId: string("Optional workstream context."),
+      kind: { type: "string",
+        enum: [...GENERIC_MESSAGE_KINDS] },
+      obligation: { type: "string", enum: ["none", "acknowledge", "reply"],
+        description: "Override only where the kind/obligation matrix permits it." },
+      clientMessageId: string("Retry key; omit to generate one and return it in message."),
     }, ["to", "subject", "body"]),
   },
   {
@@ -100,87 +120,29 @@ export const PUBLIC_TOOLS = Object.freeze([
       messageId: string("The addressed message being answered."),
       body: string("Concise answer; peer content is treated as data."),
       subject: string("Optional subject; defaults to Re: the original subject."),
-      type: { type: "string", enum: ["answer", "contract_response", "decision_result",
-        "review_result", "work_response"] },
-      priority: { type: "string", enum: ["low", "normal", "high", "urgent"] },
+      clientMessageId: string("Retry key; omit to generate one and return it in message."),
     }, ["messageId", "body"]),
   },
   {
     name: "acc_request",
-    description: `Ask another agent to do something. Creates the work addressed to them `
-      + `and tells them why, as one call. Use this when you need a piece finished that is `
+    description: `Ask another agent to do something in a reply-required message. Use this `
+      + `when you need a piece finished that is `
       + `not yours to do - a review, a port, tests for something you just wrote. `
       + `${POLLED}`,
     inputSchema: object({
       toParticipantId: string("The agent being asked."),
       title: string("What needs doing, in one line."),
       detail: string("Context the other agent needs to start."),
-      workstreamId: string("Optional workstream context."),
-      priority: { type: "string", enum: ["low", "normal", "high", "urgent"] },
-      dependsOn: stringList("Task ids this waits for."),
+      clientMessageId: string("Retry key; omit to generate one and return it in message."),
     }, ["toParticipantId", "title"]),
   },
   {
     name: "acc_ack",
     description: `Answer a message that asked for an acknowledgement, so it stops `
-      + `demanding one. Finishing a task answers the request it came from `
-      + `automatically. ${POLLED}`,
+      + `demanding one. ${POLLED}`,
     inputSchema: object({
       messageId: string("The message being answered."),
-      state: { type: "string", enum: ["seen", "acknowledged"] },
     }, ["messageId"]),
-  },
-  {
-    name: "acc_decide",
-    description: `Record what was settled, so the next session does not reopen it. `
-      + `Separate from a message because a decision outlives the conversation that `
-      + `produced it. \`authority\` is who settled it: \`workstream\` for an agreement `
-      + `between agents, \`policy\` for a rule that already existed, \`human\` only when a `
-      + `person actually said so - which needs \`humanConfirmed\`. ${POLLED}`,
-    inputSchema: object({
-      title: string("What was decided, in one line."),
-      outcome: string("What was settled, and enough of why to act on it."),
-      authority: { type: "string", enum: ["workstream", "policy", "human"],
-        description: "Default: workstream." },
-      humanConfirmed: { type: "boolean",
-        description: "A person said so. Required for human authority." },
-      workstreamId: string("Optional workstream context."),
-      supersedes: string("A decision this replaces."),
-      decidedBy: stringList("Participants who settled it. Defaults to you."),
-    }, ["title", "outcome"]),
-  },
-  {
-    name: "acc_workstream",
-    description: `Group related work so several agents can see it as one thing, or take `
-      + `on steering one that exists. Optional: a single request needs no workstream. `
-      + `An open workstream with no coordinator is reported to everyone until somebody `
-      + `takes it. ${POLLED}`,
-    inputSchema: object({
-      action: { type: "string", enum: ["create", "coordinate", "release"],
-        description: "Default: create." },
-      title: string("Short name. Creating one."),
-      objective: string("What finishing it would mean. Creating one."),
-      workstreamId: string("The workstream to coordinate or hand back."),
-    }, []),
-  },
-  {
-    name: "acc_task",
-    description: `Create or transition an optional task within a workstream. Tasks are for `
-      + `work that needs assignment, dependencies, or acceptance tracking; ordinary work `
-      + `needs only Intent. ${POLLED}`,
-    inputSchema: object({
-      action: { type: "string", enum: ["create", "claim", "transition", "decline"] },
-      workstreamId: string("Workstream the task belongs to."),
-      title: string("Task title, required when creating."),
-      detail: string("Context for whoever picks it up."),
-      assigneeParticipantId: string("Agent this is for. Only they can take it."),
-      taskId: string("Required for claim and transition."),
-      state: { type: "string", enum: ["pending", "in_progress", "review", "done", "blocked"] },
-      dependsOn: stringList("Task ids this task waits for."),
-      reason: string("Why, when declining."),
-      force: { type: "boolean",
-        description: "Take work held by a session that has gone quiet." },
-    }, ["action"]),
   },
   {
     name: "acc_finish",
@@ -194,32 +156,27 @@ export const PUBLIC_TOOLS = Object.freeze([
       remaining: stringList("What is left."),
       blockers: stringList("What is in the way."),
       toParticipantId: string("Participant taking over, if any."),
+      clientMessageId: string("Retry key; omit to generate one and return it in message."),
     }, ["goal"]),
   },
 ]);
 
 export const RESOURCES = Object.freeze([
   { uri: "acc://snapshot", name: "Workspace snapshot", mimeType: "application/json",
-    description: "The whole coordination state: participants, intents, claims, tasks." },
+    description: "The whole coordination state: participants, intents, claims, and messages." },
   { uri: "acc://roster", name: "Participant roster", mimeType: "application/json",
     description: "Sessions with their harness and presence, including collapsed children." },
-  { uri: "acc://workstreams", name: "Workstreams", mimeType: "application/json",
-    description: "Open workstreams and their coordinator lease, if any." },
-  { uri: "acc://tasks", name: "Tasks", mimeType: "application/json",
-    description: "Tasks with state, assignee, and dependencies." },
   { uri: "acc://inbox", name: "Inbox", mimeType: "application/json",
     description: "Messages addressed to this participant, rendered as attributed data." },
 ]);
 
-// Declared, not assumed. MCP is a polling transport with no lifecycle contract,
-// so everything except polling stays false.
+// Declared, not assumed. Manual MCP tool polling is not next-turn injection,
+// live push, or a native reply route, so every adapter delivery mode is false.
 export const MCP_CAPABILITIES = Object.freeze({
   lifecycle: Object.freeze({ sessionStart: false, sessionResume: false, sessionEnd: false,
     childSessions: false }),
   context: Object.freeze({ startupInjection: false, beforeTurnInjection: false,
     safePointInjection: false }),
   guards: Object.freeze({ beforeRead: false, beforeWrite: false, beforeShell: false }),
-  delivery: Object.freeze({ polling: true, activeNotification: false,
-    wakeDormantSession: false }),
-  execution: Object.freeze({ launch: false, resume: false, terminate: false }),
+  delivery: Object.freeze({ nextTurn: false, livePush: false, replyRoute: false }),
 });

@@ -18,13 +18,16 @@ const fileFor = (runtimeDir, harnessSessionId) => path.join(runtimeDir, "binding
  * detach the exact generation instead of opening a second session.
  *
  * It lives in the runtime directory, never the project, and carries identity
- * only - no prompt, no transcript, no harness state.
+ * plus the exact client facts observed at attach time - no prompt, transcript,
+ * or harness state.
  */
 export async function storeSessionBinding({ runtimeDir, harnessSessionId, accSessionId,
-  generation }) {
+  generation, clientVersion, platform }) {
   const file = fileFor(runtimeDir, harnessSessionId);
   await mkdir(path.dirname(file), { recursive: true });
   const record = { schemaVersion: SCHEMA_VERSION, harnessSessionId, accSessionId, generation };
+  if (typeof clientVersion === "string" && clientVersion !== "") record.clientVersion = clientVersion;
+  if (typeof platform === "string" && platform !== "") record.platform = platform;
   const temporary = `${file}.${process.pid}.tmp`;
   await writeFile(temporary, `${JSON.stringify(record, null, 2)}\n`, "utf8");
   // Replace rather than append: re-attaching supersedes the old generation, and
@@ -54,7 +57,10 @@ export async function loadSessionBinding({ runtimeDir, harnessSessionId }) {
     throw new AccError(EXIT.DATA, "unknown session binding schemaVersion",
       { file, schemaVersion: record?.schemaVersion });
   }
-  return { accSessionId: record.accSessionId, generation: record.generation };
+  const binding = { accSessionId: record.accSessionId, generation: record.generation };
+  if (typeof record.clientVersion === "string") binding.clientVersion = record.clientVersion;
+  if (typeof record.platform === "string") binding.platform = record.platform;
+  return binding;
 }
 
 export async function clearSessionBinding({ runtimeDir, harnessSessionId }) {
@@ -89,7 +95,10 @@ export async function listSessionBindings({ runtimeDir }) {
       .then(JSON.parse).catch(() => null);
     if (record?.schemaVersion !== SCHEMA_VERSION) continue;
     bindings.push({ harnessSessionId: record.harnessSessionId,
-      accSessionId: record.accSessionId, generation: record.generation });
+      accSessionId: record.accSessionId, generation: record.generation,
+      ...(typeof record.clientVersion === "string"
+        ? { clientVersion: record.clientVersion } : {}),
+      ...(typeof record.platform === "string" ? { platform: record.platform } : {}) });
   }
   return bindings;
 }

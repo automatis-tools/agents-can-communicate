@@ -10,6 +10,8 @@ import { spawn } from "node:child_process";
 import { readdir } from "node:fs/promises";
 import path from "node:path";
 
+import { TEST_FILE_CONCURRENCY, nodeTestArguments } from "./test-runner-plan.mjs";
+
 const repo = path.resolve(import.meta.dirname, "..");
 
 // Everything that ships or guards. node_modules is not ours.
@@ -37,7 +39,7 @@ if (files.length === 0) {
   process.exit(1);
 }
 
-console.log(`running ${files.length} test file(s)`);
+console.log(`running ${files.length} test file(s) at concurrency ${TEST_FILE_CONCURRENCY}`);
 
 // `--list` prints what would run and stops. The suite uses it to assert the
 // discovery is not empty without running itself recursively.
@@ -46,6 +48,6 @@ if (process.argv.includes("--list")) {
   process.exit(0);
 }
 
-const child = spawn(process.execPath, ["--test", ...files],
+const child = spawn(process.execPath, nodeTestArguments(files),
   { stdio: "inherit", cwd: repo });
 child.on("exit", code => { process.exitCode = code ?? 1; });

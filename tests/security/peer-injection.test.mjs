@@ -15,8 +15,10 @@ import { projectContext } from "@agents-can-communicate/adapter-sdk";
 const sync = (overrides = {}) => ({ solo: false, cursor: "c1", roster: [],
   attention: [], messages: [], claims: [], ...overrides });
 
-const message = (body, extra = {}) => ({ fromSessionId: "session_peer",
-  type: "note", subject: "subject", body, ...extra });
+const message = (body, extra = {}) => ({ messageId: "message_peer",
+  threadId: "message_peer", fromParticipantId: "participant_peer",
+  fromSessionId: "session_peer", toParticipantIds: ["participant_reader"],
+  kind: "note", obligation: "none", subject: "subject", body, ...extra });
 
 // Lines ACC speaks in its own voice. Everything a peer wrote belongs between the
 // fences; anything of theirs out here is text that stopped being quoted.
@@ -55,7 +57,7 @@ test("peer text is attributed and labelled untrusted, every time", () => {
 
   // Attribution is the whole defence at this layer: the model can only weigh a
   // claim if it knows who is making it.
-  assert.match(projected, /from session_peer/);
+  assert.match(projected, /sender: participant_peer \(session session_peer\)/);
   assert.match(projected, /untrusted peer message/);
 });
 
@@ -83,12 +85,12 @@ test("a peer's own words never become an ACC instruction line", () => {
 
 test("a huge peer message cannot crowd out the conflict that matters", () => {
   const projected = projectContext(sync({
-    attention: [{ kind: "conflict", priority: 0, sourceId: "a",
+    attention: [{ kind: "claim_conflict", priority: 4, sourceId: "claim_a",
       summary: "file:src/** is claimed by models" }],
-    messages: [message("x".repeat(50_000))] }), { budgetBytes: 800 });
+    messages: [message("x".repeat(575))] }), { budgetBytes: 800 });
 
-  // Priority is fixed and the budget is spent from the top. Otherwise flooding
-  // is enough to push a conflict warning out of the turn entirely.
+  // This is the real priority emitted by core. A valid peer body that nearly
+  // fills the budget must not displace the safety fact that stops a shared edit.
   assert.match(projected, /file:src/);
   assert.equal(Buffer.byteLength(projected, "utf8") <= 800, true);
 });

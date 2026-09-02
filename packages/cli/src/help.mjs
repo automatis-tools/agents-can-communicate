@@ -14,7 +14,7 @@ import { COMMANDS } from "./args.mjs";
 const GROUPS = Object.freeze([
   ["Set up", ["install", "uninstall", "doctor", "config"]],
   ["In a session", ["status", "sync", "work", "claim", "release", "inbox", "reply",
-    "ack", "message", "request", "task", "workstream", "decide", "finish"]],
+    "ack", "message", "request", "finish"]],
   ["Driven by adapters, not by people", ["attach", "heartbeat", "detach"]],
   ["About acc", ["help", "version", "update"]],
 ]);
@@ -33,10 +33,7 @@ const SUMMARY = Object.freeze({
   message: "send a typed message to named participants",
   inbox: "read only unresolved messages addressed to this participant",
   reply: "reply to one message and acknowledge it in the same operation",
-  request: "ask another agent to do something: the work and the why, in one call",
-  task: "create work, --take it, or move its --state along",
-  workstream: "group related work, and steer it with --take / --release",
-  decide: "record what was settled, so the next session does not reopen it",
+  request: "ask another agent to do something in a reply-required message",
   finish: "write the handoff and release what this session held",
   attach: "open a session; an adapter calls this, not a person",
   heartbeat: "say the session is still alive",

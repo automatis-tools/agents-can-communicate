@@ -2,7 +2,7 @@ import { createHash, randomBytes } from "node:crypto";
 import { realpath } from "node:fs/promises";
 import path from "node:path";
 
-import { clearSessionBinding, loadSessionBinding, storeSessionBinding }
+import { clearSessionBinding, effectiveCapabilities, loadSessionBinding, storeSessionBinding }
   from "@agents-can-communicate/adapter-sdk";
 import { createCoordinationService } from "@agents-can-communicate/core";
 import { createId } from "@agents-can-communicate/protocol";
@@ -11,6 +11,7 @@ import { createGitProbe, discoverWorkspace, platformDataHome, runtimePaths }
   from "@agents-can-communicate/cli";
 
 import { resolveClientPid } from "./client-pid.mjs";
+import { probeClientVersion as defaultProbeClientVersion } from "./client-version.mjs";
 import { readProcessTable as defaultReadProcessTable } from "./process-table.mjs";
 
 // Kept cohesive above 300 lines because every handler shares one fail-open
@@ -21,6 +22,28 @@ import { readProcessTable as defaultReadProcessTable } from "./process-table.mjs
 // A hook runs in front of the user's turn, so it gets a hard ceiling. Better to
 // let a call through than to make someone's session sit waiting on us.
 const DEFAULT_BUDGET_MS = 5_000;
+
+const byteLength = value => Buffer.byteLength(value, "utf8");
+
+function compactInboxRecovery(messages) {
+  const first = messages[0].messageId;
+  const rest = messages.length > 1 ? ` (+${messages.length - 1} more in \`acc inbox\`)` : "";
+  return `ACC: read pending peer message: \`acc inbox --message ${first}\`${rest}`;
+}
+
+function fitDegradation(projection, visibleDegradation, messages, budgetBytes) {
+  const full = [projection, visibleDegradation].filter(Boolean).join("\n");
+  if (byteLength(full) <= budgetBytes) return full;
+  const recovery = compactInboxRecovery(messages);
+  const exactRecovery = compactInboxRecovery(messages.slice(0, 1));
+  const withRecovery = [projection, recovery].filter(Boolean).join("\n");
+  if (byteLength(withRecovery) <= budgetBytes) return withRecovery;
+  const withExactRecovery = [projection, exactRecovery].filter(Boolean).join("\n");
+  if (byteLength(withExactRecovery) <= budgetBytes) return withExactRecovery;
+  if (byteLength(recovery) <= budgetBytes) return recovery;
+  if (byteLength(exactRecovery) <= budgetBytes) return exactRecovery;
+  return projection;
+}
 
 // Declared by this process on the session it opens, so peers can tell an idle
 // session from a dead one. Only one of the four clients fires a heartbeat event,
@@ -163,8 +186,18 @@ async function openContext({ cwd, dataHome, runtime, env }) {
 
 const HANDLERS = {
   async sessionStart({ event, context, adapter, adapterId, binding, paths,
-    readProcessTable }) {
-    const capabilities = adapter.capabilities ?? {};
+    readProcessTable, probeClientVersion, platform, deadline }) {
+    // A repeated start refreshes the client's version/platform. Remove the old
+    // certified facts before any probe, PID lookup, resume, or open can fail;
+    // keep only the generation identity needed for a successful resume.
+    if (binding !== null) {
+      await storeSessionBinding({ runtimeDir: paths.root, harnessSessionId: event.sessionId,
+        accSessionId: binding.accSessionId, generation: binding.generation });
+    }
+    const clientVersion = await probeClientVersion(adapter,
+      { timeoutMs: Math.max(1, Math.min(1_000, deadline - Date.now())) });
+    const clientFacts = { clientVersion, platform };
+    const capabilities = effectiveCapabilities(adapter, clientFacts);
     // Once per session, never per turn. A client that cannot be found yields
     // null, and the session is then judged by age alone - which is exactly the
     // behaviour every session had before this existed.
@@ -186,7 +219,10 @@ const HANDLERS = {
         ...metadata,
       });
       if (resumed !== null) {
-        return { accSessionId: resumed.sessionId, generation: resumed.generation };
+        await storeSessionBinding({ runtimeDir: paths.root, harnessSessionId: event.sessionId,
+          accSessionId: resumed.sessionId, generation: resumed.generation, ...clientFacts });
+        return { accSessionId: resumed.sessionId, generation: resumed.generation,
+          ...clientFacts, capabilities };
       }
     }
     const session = await context.service.openSession({
@@ -204,8 +240,9 @@ const HANDLERS = {
       descriptor: context.descriptor,
     });
     await storeSessionBinding({ runtimeDir: paths.root, harnessSessionId: event.sessionId,
-      accSessionId: session.sessionId, generation: session.generation });
-    return { accSessionId: session.sessionId, generation: session.generation };
+      accSessionId: session.sessionId, generation: session.generation, ...clientFacts });
+    return { accSessionId: session.sessionId, generation: session.generation,
+      ...clientFacts, capabilities };
   },
 
   async heartbeat({ binding, context }) {
@@ -223,7 +260,7 @@ const HANDLERS = {
     return {};
   },
 
-  async beforeTurn({ binding, context, adapter }) {
+  async beforeTurn({ binding, context, adapter, adapterId }) {
     if (binding === null) return {};
     // A turn is the clearest sign a session is alive. Never a reason to fail:
     // this runs in front of somebody's prompt.
@@ -239,13 +276,14 @@ const HANDLERS = {
       .find(participant => participant.sessionId === binding.accSessionId);
 
     // What peers have said to this participant and no model has been shown yet.
-    // Without this the projector's peer block never ran in production: an agent
-    // saw only the subject of a message through its attention line, and the
-    // `injected` delivery state was unreachable.
-    const messages = await context.service.pendingMessages({
+    // Without this the projector's peer block never runs in production: an
+    // agent sees only the obligation attention line, not the durable body that
+    // may be offered after the stdout transport succeeds.
+    const delivery = await context.service.nextTurnDelivery({
       workspaceId: context.descriptor.id,
       participantId: mine?.participantId,
       exceptSessionId: binding.accSessionId });
+    const messages = delivery.queuedMessages;
 
     // Solo costs nothing: nothing to say means nothing printed, not a banner
     // announcing that nobody else is here. But something already said to you is
@@ -257,8 +295,12 @@ const HANDLERS = {
     // The ceiling a team agreed on in `acc.workspace.json`, or the default when
     // there is no config. Validated by the protocol and, until now, never read:
     // the projector was always called with its own default.
-    const tracksDelivery = typeof adapter.renderContextResult === "function";
-    const projectionInput = { ...sync, messages: tracksDelivery ? messages : [],
+    const effective = effectiveCapabilities(adapter, binding);
+    const hasStructuredRenderer = typeof adapter.renderContextResult === "function";
+    const canOfferNextTurn = effective.delivery.nextTurn === true && hasStructuredRenderer;
+    const projectionInput = { ...sync, messages: canOfferNextTurn ? messages : [],
+      liveOfferedMessageIds: delivery.liveOfferedMessageIds,
+      roomMessageIds: delivery.roomMessageIds,
       currentParticipantId: mine?.participantId };
     const projectionOptions = {
       budgetBytes: context.descriptor.policy?.contextBudgetBytes };
@@ -266,64 +308,49 @@ const HANDLERS = {
     // another message's visible header, so only projector metadata proves
     // which complete groups survived the byte budget. A custom adapter without
     // metadata may still inject text, but cannot advance a receipt from it.
-    const projection = !tracksDelivery
+    const projection = !hasStructuredRenderer
       ? { text: await adapter.renderContext?.(projectionInput, projectionOptions) ?? "",
-        includedMessageIds: [], includedAttentionIds: [] }
+        offeredMessageIds: [], includedAttentionIds: [] }
       : await adapter.renderContextResult(projectionInput, projectionOptions);
-    const degradation = !tracksDelivery && messages.length > 0
-      ? `acc: ${messages.length} pending message(s) withheld because this adapter lacks `
-        + `structured delivery metadata; read ${messages[0].messageId} with `
-        + `acc inbox --message ${messages[0].messageId}`
-      : null;
+    const clientFactsKnown = typeof binding.clientVersion === "string"
+      && typeof binding.platform === "string";
+    const reason = !effective.delivery.nextTurn
+      ? clientFactsKnown
+        ? `client ${binding.clientVersion} on ${binding.platform} is not certified for nextTurn`
+        : "the client version or platform is unknown"
+      : !hasStructuredRenderer ? "this adapter lacks structured delivery metadata" : null;
+    const degradation = reason !== null && messages.length > 0
+      ? `acc: ${messages.length} pending message(s) withheld because ${reason}; read `
+        + `${messages[0].messageId} with acc inbox --message ${messages[0].messageId}` : null;
     const visibleDegradation = degradation === null ? "" : `ACC: ${degradation.slice(5)}`;
-    const candidate = [projection.text, visibleDegradation].filter(Boolean).join("\n");
-    const projected = Buffer.byteLength(candidate, "utf8")
-      <= (projectionOptions.budgetBytes ?? 6_000) ? candidate : projection.text;
+    const budgetBytes = projectionOptions.budgetBytes ?? 6_000;
+    const projected = degradation === null ? projection.text
+      : fitDegradation(projection.text, visibleDegradation, messages, budgetBytes);
     if (projected === "") {
       return degradation === null ? { stdout: "" } : { stdout: "", stderr: degradation };
     }
 
-    // Only what the model was actually shown is recorded as delivered. The
-    // budget can leave a message out, and a receipt reading `injected` for text
-    // nobody saw is worse than one still reading `queued` - the sender would be
-    // told it landed. A message left behind stays queued and goes out next turn.
-    const failures = [];
-    const includedMessages = new Set(projection.includedMessageIds ?? []);
-    for (const message of messages) {
-      if (!includedMessages.has(message.messageId)) continue;
-      await context.service.markDelivery({ sessionId: binding.accSessionId,
-        generation: binding.generation, messageId: message.messageId,
-        recipientParticipantId: mine.participantId, state: "injected" })
-        .catch(error => failures.push(`${message.messageId}: ${error.message}`));
-    }
-    // A note carries no ack obligation, so after its one full showing it leaves
-    // a single low-priority `unread_note` breadcrumb. Advancing that receipt
-    // injected -> seen the turn the breadcrumb is shown is what makes it
-    // one-shot: next turn the note reads `seen`, the breadcrumb stays quiet, and
-    // a delivered decision is recoverable without becoming a standing nag - the
-    // noise a reader learns to skip. Only what was actually shown is advanced,
-    // for the same reason the loop above only records what fit.
-    const includedAttention = new Set(projection.includedAttentionIds ?? []);
-    for (const item of sync.attention ?? []) {
-      if (item.kind !== "unread_note") continue;
-      if (!includedAttention.has(item.sourceId)) continue;
-      await context.service.markDelivery({ sessionId: binding.accSessionId,
-        generation: binding.generation, messageId: item.sourceId,
-        recipientParticipantId: mine.participantId, state: "seen" })
-        .catch(error => failures.push(`${item.sourceId}: ${error.message}`));
-    }
+    // The renderer returns ids as metadata, never as text to parse. A peer body
+    // can imitate every visible label, so only a complete group selected by the
+    // projector is eligible for the post-write offer commit.
+    const offered = new Set(canOfferNextTurn ? projection.offeredMessageIds ?? [] : []);
+    const offerInputs = messages.filter(message => offered.has(message.messageId))
+      .map(message => ({ messageId: message.messageId,
+        recipientParticipantId: mine.participantId,
+        targetSessionId: binding.accSessionId, targetGeneration: binding.generation,
+        transport: "next-turn", adapterId,
+        clientVersion: binding.clientVersion }));
     // Same again: Kimi Code shows the model a hook's raw stdout, while Gemini
     // and Claude Code want an envelope and drop a bare string.
-    // Reported rather than swallowed. The context still goes out - losing it
-    // over bookkeeping would be the worse trade - but a receipt that failed to
-    // advance has to be visible somewhere, and stdout belongs to the model.
+    // The entry point owns the transport boundary. This handler only prepares
+    // offer inputs; recording them here would claim delivery before stdout's
+    // callback proves that the bytes crossed.
     const outcome = { stdout: "", ...adapter.injectOutcome?.(projected) };
-    if (failures.length === 0 && degradation === null) return outcome;
+    const writableOffers = outcome.stdout === "" ? [] : offerInputs;
+    if (degradation === null) return { ...outcome, offerInputs: writableOffers };
     return { ...outcome,
-      stderr: [outcome.stderr, degradation,
-        failures.length === 0 ? null
-          : `acc: delivery not recorded for ${failures.join(", ")}`]
-        .filter(Boolean).join("\n") };
+      stderr: [outcome.stderr, degradation].filter(Boolean).join("\n"),
+      offerInputs: writableOffers };
   },
 
   async beforeTool({ binding, context, event, adapter }) {
@@ -394,8 +421,12 @@ const HANDLERS = {
  */
 export async function runHook({ adapterId, payload, adapters, dataHome, env,
   runtime = defaultRuntime(), budgetMs = DEFAULT_BUDGET_MS,
-  readProcessTable = defaultReadProcessTable }) {
-  const result = { stdout: "", exitCode: 0, decision: "allow", sessions: [] };
+  readProcessTable = defaultReadProcessTable,
+  probeClientVersion = defaultProbeClientVersion,
+  platform = `${process.platform}-${process.arch}` }) {
+  const deadline = Date.now() + budgetMs;
+  const result = { stdout: "", exitCode: 0, decision: "allow", sessions: [], deadlineAt: deadline,
+    commitOffers: async () => {} };
   let timer = null;
   try {
     const adapter = adapters?.[adapterId];
@@ -410,7 +441,7 @@ export async function runHook({ adapterId, payload, adapters, dataHome, env,
     const work = handler === undefined
       ? Promise.resolve({})
       : handler({ event, context, adapter, adapterId, binding, paths: context.paths,
-        readProcessTable });
+        readProcessTable, probeClientVersion, platform, deadline });
 
     // The loser of a race is not cancelled, so the timer is cleared explicitly:
     // an outstanding one keeps the process alive long past its answer.
@@ -418,6 +449,24 @@ export async function runHook({ adapterId, payload, adapters, dataHome, env,
       timer = setTimeout(() => resolve({ timedOut: true }), budgetMs);
     });
     Object.assign(result, await Promise.race([work, budget]));
+
+    const offerInputs = result.offerInputs ?? [];
+    let commitPromise = null;
+    result.commitOffers = () => {
+      if (commitPromise !== null) return commitPromise;
+      commitPromise = (async () => {
+        for (const input of offerInputs) {
+          const remaining = deadline - Date.now();
+          if (remaining <= 0) throw new Error("hook budget exhausted before offer commit");
+          // The durable transaction owns deadline cancellation. Racing it here
+          // would only reject the public promise while the losing writer kept
+          // waiting and could publish later.
+          await context.service.recordOfferSucceeded({ ...input, deadlineAt: deadline });
+        }
+      })();
+      return commitPromise;
+    };
+    delete result.offerInputs;
 
     const status = await context.service.collectStatus({
       workspaceId: context.descriptor.id });
@@ -428,6 +477,9 @@ export async function runHook({ adapterId, payload, adapters, dataHome, env,
     result.reason = error.message;
     result.decision = "allow";
     result.stdout = "";
+    // A later failure may happen after a turn prepared offer inputs. Once the
+    // fail-open path withdraws stdout, no transport boundary remains to commit.
+    result.commitOffers = async () => {};
   } finally {
     if (timer !== null) clearTimeout(timer);
   }

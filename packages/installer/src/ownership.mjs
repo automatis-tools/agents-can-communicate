@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
-import { mkdir, readdir, readFile, rename, rm, writeFile } from "node:fs/promises";
+import { lstat, mkdir, readdir, readFile, rename, rm, rmdir, writeFile }
+  from "node:fs/promises";
 import path from "node:path";
 
 import { AccError, EXIT } from "@agents-can-communicate/protocol";
@@ -109,7 +110,7 @@ async function saveOwnership({ dataHome, record }) {
  * runtime, and leaves the bundle inside the client exactly where it was.
  */
 export async function recordInstall({ dataHome, adapterId, version, accVersion = null,
-  artifacts }) {
+  artifacts, createdDirectories = [] }) {
   const stamped = await Promise.all(artifacts.map(async artifact => ({
     path: artifact.path,
     kind: artifact.kind ?? "file",
@@ -118,13 +119,98 @@ export async function recordInstall({ dataHome, adapterId, version, accVersion =
     sha256: artifact.kind === "merge" ? null : await fingerprintFor(artifact),
   })));
   const record = await loadOwnership({ dataHome });
+  const previous = record.installs.find(install => install.adapterId === adapterId);
+  const directories = [...new Set([
+    ...(previous?.createdDirectories ?? []), ...createdDirectories,
+  ])].sort((left, right) => left.split(path.sep).length - right.split(path.sep).length
+    || left.localeCompare(right));
   await saveOwnership({ dataHome, record: { schemaVersion: SCHEMA_VERSION,
     installs: [...record.installs.filter(install => install.adapterId !== adapterId),
-      { adapterId, version, accVersion, artifacts: stamped }] } });
+      { adapterId, version, accVersion, artifacts: stamped,
+        ...(directories.length === 0 ? {} : { createdDirectories: directories }) }] } });
 }
 
 const installFor = (record, adapterId) =>
   record.installs.find(install => install.adapterId === adapterId) ?? null;
+
+const inside = (home, candidate) => {
+  const relative = path.relative(home, candidate);
+  return relative !== "" && relative !== ".." && !relative.startsWith(`..${path.sep}`)
+    && !path.isAbsolute(relative);
+};
+
+async function hasSymlinkAncestor(home, candidate) {
+  let current = candidate;
+  while (inside(home, current)) {
+    const stat = await lstat(current).catch(error => {
+      if (error.code === "ENOENT") return null;
+      throw error;
+    });
+    if (stat?.isSymbolicLink()) return true;
+    current = path.dirname(current);
+  }
+  return false;
+}
+
+/** Return planned artifact parents that do not yet exist under the client home. */
+export async function missingArtifactParents({ home, artifacts }) {
+  if (typeof home !== "string") return [];
+  const root = path.resolve(home);
+  const missing = new Set();
+  for (const artifact of artifacts) {
+    let directory = path.dirname(path.resolve(artifact.path));
+    while (inside(root, directory)) {
+      try {
+        await lstat(directory);
+        break;
+      } catch (error) {
+        if (error.code !== "ENOENT") throw error;
+        missing.add(directory);
+        directory = path.dirname(directory);
+      }
+    }
+  }
+  return [...missing].sort((left, right) =>
+    left.split(path.sep).length - right.split(path.sep).length || left.localeCompare(right));
+}
+
+/** Remove recorded parents deepest-first, but only while each remains an empty directory. */
+export async function removeEmptyOwnedDirectories({ home, directories = [] }) {
+  const result = { removed: [], kept: [], missing: [] };
+  const root = typeof home === "string" ? path.resolve(home) : null;
+  const ordered = [...new Set(directories)].sort((left, right) =>
+    right.split(path.sep).length - left.split(path.sep).length || left.localeCompare(right));
+  for (const directory of ordered) {
+    if (root === null || !inside(root, path.resolve(directory))) {
+      result.kept.push(directory);
+      continue;
+    }
+    let stat;
+    try {
+      stat = await lstat(directory);
+    } catch (error) {
+      if (error.code === "ENOENT") { result.missing.push(directory); continue; }
+      throw error;
+    }
+    if (!stat.isDirectory() || stat.isSymbolicLink()
+      || await hasSymlinkAncestor(root, path.dirname(directory))) {
+      result.kept.push(directory);
+      continue;
+    }
+    try {
+      await rmdir(directory);
+      result.removed.push(directory);
+    } catch (error) {
+      if (["ENOTEMPTY", "EEXIST"].includes(error.code)) {
+        result.kept.push(directory);
+        continue;
+      }
+      if (error.code === "ENOENT") { result.missing.push(directory); continue; }
+      throw error;
+    }
+  }
+  return result;
+}
 
 /** Compare what was written against what is there now. Read-only. */
 export async function verifyOwned({ dataHome, adapterId }) {
@@ -141,17 +227,12 @@ export async function verifyOwned({ dataHome, adapterId }) {
   return result;
 }
 
-/**
- * Remove the files this adapter's install wrote, and only those.
- *
- * A modified file is kept and reported. A merge artifact is never deleted at
- * all: the user owns that file and ACC owns some entries inside it, which is the
- * adapter's own uninstall to unpick because it knows the format.
- */
-export async function removeOwned({ dataHome, adapterId }) {
+/** Remove owned artifacts while retaining the record as retry authority. */
+export async function removeOwnedArtifacts({ dataHome, adapterId }) {
   const record = await loadOwnership({ dataHome });
   const install = installFor(record, adapterId);
-  const result = { adapterId, removed: [], kept: [], missing: [], delegated: [] };
+  const result = { adapterId, removed: [], kept: [], missing: [], delegated: [],
+    createdDirectories: install?.createdDirectories ?? [] };
   if (install === null) return result;
 
   for (const artifact of install.artifacts) {
@@ -163,7 +244,22 @@ export async function removeOwned({ dataHome, adapterId }) {
     result.removed.push(artifact.path);
   }
 
+  return result;
+}
+
+/** Forget one install only after every adapter-owned cleanup step succeeded. */
+export async function finalizeRemoval({ dataHome, adapterId }) {
+  const record = await loadOwnership({ dataHome });
+  if (installFor(record, adapterId) === null) return false;
+
   await saveOwnership({ dataHome, record: { schemaVersion: SCHEMA_VERSION,
     installs: record.installs.filter(entry => entry.adapterId !== adapterId) } });
+  return true;
+}
+
+/** Remove and finalize for callers that perform no delegated adapter cleanup. */
+export async function removeOwned(options) {
+  const result = await removeOwnedArtifacts(options);
+  await finalizeRemoval(options);
   return result;
 }

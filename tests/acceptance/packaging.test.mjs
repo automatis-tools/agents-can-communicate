@@ -68,14 +68,32 @@ test("the tarball carries the workspaces where imports can find them", async t =
   const manifest = await manifestOf(tarball);
   const entries = await entriesOf(tarball);
 
+  assert.equal(manifest.version, "0.2.0");
   assert.equal((manifest.bundleDependencies ?? []).length > 0,
     true, "nothing is bundled, so every internal import would fail on install");
+  assert.equal(manifest.bundleDependencies.includes(
+    "@agents-can-communicate/delivery-router"), true,
+  "the installed acc command cannot compose delivery without the router");
   // Each package appears once, under node_modules. Shipping it twice - once
   // there and once under packages/ - is the tempting version of this.
   assert.equal(entries.some(entry =>
     entry.startsWith("node_modules/@agents-can-communicate/protocol/")), true);
   assert.equal(entries.some(entry => entry.startsWith("packages/")), false,
     "the workspace sources are shipped twice");
+  for (const dependency of manifest.bundleDependencies) {
+    const workspace = JSON.parse((await run("tar", ["-xzOf", tarball,
+      `package/node_modules/${dependency}/package.json`])).stdout);
+    assert.equal(workspace.version, "0.2.0", `${dependency} is not the v0.2 workspace`);
+  }
+  const codexPlugin = JSON.parse((await run("tar", ["-xzOf", tarball,
+    "package/node_modules/@agents-can-communicate/adapter-codex/"
+      + "plugin/.codex-plugin/plugin.json"])).stdout);
+  assert.equal(codexPlugin.license, "MIT", "the shipped Codex plugin denies the project license");
+  const geminiExtension = JSON.parse((await run("tar", ["-xzOf", tarball,
+    "package/node_modules/@agents-can-communicate/adapter-gemini-cli/"
+      + "extension/gemini-extension.json"])).stdout);
+  assert.equal(geminiExtension.version, "0.2.0",
+    "the embedded Gemini extension drifted from the release version");
 });
 
 test("nothing private, local, or irrelevant is published", async t => {
@@ -87,11 +105,36 @@ test("nothing private, local, or irrelevant is published", async t => {
   for (const excluded of [".agents", ".github", ".githooks", "tests", ".gitworktrees"]) {
     assert.equal(top.has(excluded), false, `${excluded}/ is in the tarball`);
   }
-  // A capture or a fixture would carry a real path from the machine that made
-  // it, and the runtime bus files carry live session state.
+  // Only redacted adapter certification fixtures may ship; runtime bus files
+  // and unrelated development fixtures remain private.
   for (const entry of entries) {
-    assert.doesNotMatch(entry, /fixtures\//, `${entry} is capture material`);
+    if (entry.includes("/fixtures/")) {
+      assert.match(entry,
+        /^node_modules\/@agents-can-communicate\/adapter-[^/]+\/fixtures\//,
+        `${entry} is not adapter certification evidence`);
+    }
     assert.doesNotMatch(entry, /\.jsonl$/, `${entry} looks like a transcript`);
+    assert.doesNotMatch(entry, /(^|\/)scripts\/spikes\//, `${entry} is a spike script`);
+    assert.doesNotMatch(entry, /(^|\/)(?:runtime|transcript|secret)s?\//,
+      `${entry} looks like runtime or private state`);
+    assert.doesNotMatch(entry, /\.sock$/, `${entry} is a local socket`);
+  }
+});
+
+test("every packaged certification reference resolves inside its adapter", async t => {
+  const { tarball } = await packed(t);
+  const entries = await entriesOf(tarball);
+  const certifications = entries.filter(entry =>
+    /^node_modules\/@agents-can-communicate\/adapter-[^/]+\/certification\.json$/.test(entry));
+
+  assert.equal(certifications.length, 5);
+  for (const certification of certifications) {
+    const manifest = JSON.parse((await run("tar",
+      ["-xzOf", tarball, `package/${certification}`])).stdout);
+    for (const item of manifest.evidence) {
+      assert.equal(entries.includes(`${path.dirname(certification)}/${item.fixture}`), true,
+        `${certification} references missing ${item.fixture}`);
+    }
   }
 });
 
@@ -122,7 +165,7 @@ test("a clean install runs the CLI and attaches a session", async t => {
   await writeFile(path.join(consumer, "package.json"),
     '{"name":"consumer","version":"1.0.0","private":true}\n');
 
-  await runNpm(["install", "--silent", tarball], { cwd: consumer });
+  await runNpm(["install", "--offline", "--silent", tarball], { cwd: consumer });
 
   // The whole point: installed from a tarball, with no workspace anywhere.
   const env = { ...process.env, ACC_DATA_HOME: dataHome,
@@ -180,7 +223,7 @@ test("the installed package can find the binaries it names", async t => {
   t.after(() => rm(consumer, { recursive: true, force: true }));
   await writeFile(path.join(consumer, "package.json"),
     '{"name":"consumer","version":"1.0.0","private":true}\n');
-  await runNpm(["install", "--silent", tarball], { cwd: consumer });
+  await runNpm(["install", "--offline", "--silent", tarball], { cwd: consumer });
 
   // Every adapter writes a shim that runs this file, and refuses to install
   // when it is missing. The path was counted out in `../` from the SDK's own
