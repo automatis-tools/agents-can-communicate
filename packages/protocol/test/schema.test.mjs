@@ -81,6 +81,13 @@ for (const [kind, fixture] of Object.entries(VALID)) {
 
 test("delivery bindings are validated without joining the durable record kinds", () => {
   assert.deepEqual(validateRecord("deliveryBinding", DELIVERY_BINDING), DELIVERY_BINDING);
+  const native = { ...DELIVERY_BINDING,
+    availableModes: ["nextTurn", "livePush", "idleWake", "busyQueue", "replyRoute"] };
+  assert.deepEqual(validateRecord("deliveryBinding", native), native);
+  assert.throws(() => validateRecord("deliveryBinding",
+    { ...DELIVERY_BINDING, availableModes: ["livePush", "livePush"] }),
+  error => error.code === EXIT.DATA && error.message.includes("availableModes")
+    && /repeat/.test(error.message));
   assert.throws(() => validateRecord("deliveryBinding",
     { ...DELIVERY_BINDING, availableModes: ["telepathy"] }),
   error => error.code === EXIT.DATA && error.message.includes("availableModes"));

@@ -64,6 +64,16 @@ const EVENT_TYPES = Object.freeze([
 ]);
 
 const eventType = oneOf(...EVENT_TYPES);
+
+// nextTurn is the durable hook projection; the other four are what a native
+// transport proved for one session generation. A mode listed twice would let a
+// reader count capabilities it does not have.
+export const DELIVERY_MODES = Object.freeze(["nextTurn", "livePush", "idleWake", "busyQueue",
+  "replyRoute"]);
+const uniqueListOf = check => (value, field) => {
+  listOf(check)(value, field);
+  if (new Set(value).size !== value.length) invalid(field, "must not repeat entries", value);
+};
 const receiptState = oneOf("queued", "offered", "retrieved", "acknowledged");
 
 const DURABLE_RECORDS = Object.freeze({
@@ -104,7 +114,7 @@ const DURABLE_RECORDS = Object.freeze({
 const RECORDS = Object.freeze({
   ...DURABLE_RECORDS,
   deliveryBinding: { sessionId: id, generation: id, adapterId: id, clientVersion: line,
-    availableModes: listOf(oneOf("nextTurn", "livePush", "replyRoute")),
+    availableModes: uniqueListOf(oneOf(...DELIVERY_MODES)),
     livePolicy: oneOf("off", "actionable", "all"), opaqueEndpointRef: prose,
     leaseUntil: timestamp },
 });

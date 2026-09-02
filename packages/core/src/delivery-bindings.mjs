@@ -8,7 +8,7 @@ function conflict(sessionId) {
 }
 
 export function createDeliveryBindingService(ports, sessions) {
-  const { store } = ports;
+  const { store, clock } = ports;
 
   async function currentBindings(now) {
     const bindings = await store.ephemeral.list("deliveryBinding");
@@ -71,11 +71,26 @@ export function createDeliveryBindingService(ports, sessions) {
     return binding;
   }
 
+  // Clearing is an in-place expiry under the same writer lock as publication.
+  // The store's update contract has no deletion sentinel and its delete() takes
+  // the same mutex, so this is the one atomic form: a stale generation cannot
+  // retire a successor's endpoint, an absent or already-expired binding stays
+  // as it is, and every reader already filters by lease.
+  async function clearDeliveryBinding({ sessionId, generation }) {
+    await store.ephemeral.update("deliveryBinding", sessionId, async current => {
+      if (current === null || current === undefined) return null;
+      if (current.generation !== generation) throw conflict(sessionId);
+      const now = clock.now();
+      if (Date.parse(current.leaseUntil) <= Date.parse(now)) return null;
+      return { ...current, leaseUntil: now };
+    });
+  }
+
   async function listDeliveryBindings({ participantId, now }) {
     return (await currentBindings(now))
       .filter(item => item.participantId === participantId && item.reachable)
       .map(item => item.binding);
   }
 
-  return { publishDeliveryBinding, listDeliveryBindings, currentBindings };
+  return { publishDeliveryBinding, clearDeliveryBinding, listDeliveryBindings, currentBindings };
 }

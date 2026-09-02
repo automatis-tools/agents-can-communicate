@@ -51,6 +51,37 @@ const gemini = {
 
 const ADAPTERS = { kimi, gemini_cli: gemini };
 
+// A native adapter whose handshake succeeds, used to prove the runner attaches
+// and retries a native binding without reaching a real vendor process.
+function nativeHookAdapter(onBind = () => {}) {
+  return {
+    id: "native",
+    client: { command: "native-client", certificationName: "native-client",
+      versionArgs: ["--version"] },
+    capabilities: { delivery: { livePush: true } },
+    certification: { evidence: [pass("native-client", "2.1.258", "delivery.livePush")] },
+    nativeDelivery: { minimumByPlatform: { "darwin-arm64": "2.1.258" },
+      anchors: [{ platform: "darwin-arm64", version: "2.1.258",
+        protocolContract: "native-v1" }], knownBad: [], activationKinds: ["shell-bootstrap"] },
+    normalizeHook: payload => payload,
+    denyOutcome: reason => ({ stdout: "", stderr: reason, exitCode: 2 }),
+    injectOutcome: context => ({ stdout: context, stderr: "", exitCode: 0 }),
+    renderContext: sync => `${sync.roster?.length ?? 0} peers`,
+    offerMessage: async () => ({ accepted: true, transport: "native", clientVersion: "2.1.258" }),
+    probeNativeDelivery: async () => ({ supported: true, clientVersion: "2.1.258",
+      protocolContract: "native-v1", executableFingerprint: null, modes: ["livePush"],
+      reasonCode: null }),
+    planNativeActivation: async () => ({ eligible: false, reasonCode: "unsupported_shell",
+      mechanisms: [] }),
+    bindNativeSession: async input => {
+      onBind(input);
+      return { supported: true, clientVersion: "2.1.258", protocolContract: "native-v1",
+        modes: ["livePush"], opaqueEndpointRef: "native-endpoint-secret",
+        leaseUntil: new Date(Date.now() + 60_000).toISOString(), reasonCode: null };
+    },
+  };
+}
+
 async function workspace(t) {
   const root = await realpath(await mkdtemp(path.join(tmpdir(), "acc-hook-")));
   const dataHome = await realpath(await mkdtemp(path.join(tmpdir(), "acc-data-")));
@@ -481,6 +512,38 @@ test("a session still opens when the client cannot be named", async t => {
   // Null, not a failure: an unnameable client must never stop a session opening.
   assert.equal(started.exitCode, 0);
   assert.equal(record.pid, null);
+});
+
+test("a native adapter binds at start and retries on a later turn under a live policy", async t => {
+  const place = await workspace(t);
+  const handshakes = [];
+  const native = nativeHookAdapter(input => { handshakes.push(input.event.kind); });
+  const table = new Map([[process.pid, { ppid: 900, comm: "node" }],
+    [900, { ppid: 1, comm: "native-client" }]]);
+  const env = { ACC_NATIVE_DELIVERY_POLICY: "actionable" };
+  const runNative = (kind, options = {}) => runHook({ adapterId: "native", adapters: { native },
+    dataHome: place.dataHome, env, readProcessTable: async () => table,
+    probeClientVersion: async () => "2.1.258", platform: "darwin-arm64",
+    payload: event(kind, { cwd: place.root }), ...options });
+
+  const started = await runNative("sessionStart");
+  assert.equal(started.exitCode, 0);
+  assert.deepEqual(started.nativeBinding, { state: "active", reasonCode: null,
+    modes: ["livePush"] });
+
+  // The Channel that was not ready at start is picked up on the next turn.
+  const turn = await runNative("beforeTurn");
+  assert.equal(turn.nativeBinding.state, "active");
+  assert.deepEqual(handshakes, ["sessionStart", "beforeTurn"]);
+
+  // With no exported policy an ordinary launch never handshakes.
+  handshakes.length = 0;
+  const plain = await runHook({ adapterId: "native", adapters: { native },
+    dataHome: place.dataHome, env: {}, readProcessTable: async () => table,
+    probeClientVersion: async () => "2.1.258", platform: "darwin-arm64",
+    payload: event("beforeTurn", { cwd: place.root }) });
+  assert.equal(plain.nativeBinding, undefined);
+  assert.deepEqual(handshakes, []);
 });
 
 test("an offered note is not replayed on the next turn", async t => {
