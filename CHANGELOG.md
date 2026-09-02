@@ -1,5 +1,27 @@
 # Changelog
 
+## Unreleased
+
+ACC now has one end-to-end engineering tour for readers who want to understand the system
+before trusting or extending it. It follows a real interaction from client startup and
+workspace identity through record-first storage, inbox and next-turn delivery, reply,
+receipt transitions, crash recovery, and the peer-content trust boundary.
+
+| | |
+|---|---|
+| Built from | `062277db231e21243b9533dba9971e4884b8ebac` |
+| Tarball | `agents-can-communicate-0.2.0.tgz`, 205,285 bytes, 178 entries |
+| sha256 | `36843bb0355a0af792abff31ef5ec8156f17f65b419b50393df125f8f21ffe2b` |
+| Node | 26.5.1; package requires Node >=24 |
+| Verified on | macOS 26.6.2 (darwin 25.6.0, arm64) |
+
+Not published. The packed artifact contains `docs/HOW_IT_WORKS.md`; its README and
+documentation map link to it, and the clean-consumer verifier proves every packaged
+Markdown link resolves. The page separates the universal durable inbox, exact-version
+next-turn projection, and the currently uncertified native live-push seam instead of
+collapsing all three into “delivery.” It also names the shortest source-code path for
+auditing each claim.
+
 ## 0.2.0
 
 ACC is communication-first: independently opened agent sessions discover peers, publish

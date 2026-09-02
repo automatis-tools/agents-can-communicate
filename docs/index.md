@@ -8,7 +8,9 @@ separates protocol truth from adapter reach.
 
 1. [Why ACC](WHY_ACC.md) — the product boundary and when a managed runtime fits better.
 2. [Concepts](CONCEPTS.md) — peers, durable threads, receipts, intent, and claims.
-3. [Capabilities](CAPABILITIES.md) — certified support, current reachability, recipient
+3. [How ACC works](HOW_IT_WORKS.md) — the end-to-end path from client hook and workspace
+   identity through durable storage, delivery fallback, reply, and acknowledgement.
+4. [Capabilities](CAPABILITIES.md) — certified support, current reachability, recipient
    policy, fallback, and limitations beside each adapter.
 
 ## Use it
