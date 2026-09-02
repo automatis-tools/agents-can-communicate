@@ -309,3 +309,27 @@ Facts that shape the adapter:
 
 `certification.json` now carries passing `delivery.livePush` evidence for 0.152.1; the
 adapter's declared capabilities stay `false` until the production App Server client ships.
+
+## Native queue adapter (2026-09-02)
+
+The shipped adapter declares `delivery.livePush` true behind the native contract
+`codex-app-server-thread-queue-v1`, minimum `0.152.1` on `darwin-arm64`.
+`delivery.replyRoute` stays false: Codex answers ACC through the existing `acc reply`
+CLI, not a native callback, and the adapter exposes no `routeReply`.
+
+The transport is JSON-RPC over WebSocket on the daemon's control Unix socket
+(`~/.codex/app-server-control/app-server-control.sock`); a newline-framed line gets no
+answer. `probeNativeDelivery` initializes and confirms `thread/queue/list` exists;
+`bindNativeSession` uses the hook's Codex `session_id` as the thread id and verifies the
+id and cwd; `offerMessage` re-verifies the thread and calls `thread/queue/add` with
+`{ threadId, input: [{ type: "text", text }], clientUserMessageId }`, the ACC message id as
+the stable `clientUserMessageId`, so a retry while the submission is still queued is the
+same offer.
+
+ACC never starts, restarts, supervises, or stops the daemon. Detection only reaches an
+eligible verdict when a daemon already answered the probe, so the recorded
+`native-service` mechanism is always `preExisting: true` with no apply or teardown command,
+and uninstall leaves the vendor daemon in place. To use native Codex delivery, start the
+daemon yourself (`codex app-server daemon start`) before `acc install`; the install detects
+it and adds only the `--remote unix://` attachment to the ordinary `codex` command. With no
+daemon the client stays durable/next-turn only.

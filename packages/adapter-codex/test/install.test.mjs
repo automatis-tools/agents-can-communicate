@@ -139,8 +139,23 @@ test("only capabilities observed in a real session are declared true", () => {
   // Not observed, so not claimed: no subagent ran during the capture.
   assert.equal(capabilities.lifecycle.childSessions, false);
   assert.equal(capabilities.delivery.nextTurn, true);
-  assert.equal(capabilities.delivery.livePush, false);
+  // Declared from the 0.152.1 App Server queue capture and gated by the native
+  // contract; replyRoute stays false because Codex answers through acc reply.
+  assert.equal(capabilities.delivery.livePush, true);
   assert.equal(capabilities.delivery.replyRoute, false);
+});
+
+test("native delivery is declared with the captured queue contract, livePush only", () => {
+  const adapter = createCodexAdapter();
+  assert.deepEqual(adapter.nativeDelivery.minimumByPlatform, { "darwin-arm64": "0.152.1" });
+  assert.equal(adapter.nativeDelivery.anchors[0].protocolContract,
+    "codex-app-server-thread-queue-v1");
+  assert.deepEqual(adapter.nativeDelivery.activationKinds, ["native-service", "shell-bootstrap"]);
+  assert.equal(Object.hasOwn(adapter, "routeReply"), false);
+  for (const method of ["probeNativeDelivery", "planNativeActivation", "bindNativeSession",
+    "offerMessage"]) {
+    assert.equal(typeof adapter[method], "function", method);
+  }
 });
 
 test("doctor reports the capture and the trust requirement", async t => {
