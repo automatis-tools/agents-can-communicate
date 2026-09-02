@@ -2,7 +2,7 @@ import { mkdir, readdir, readFile, stat, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import path from "node:path";
 
-import { detectInstallation, loadOwnership, verifyOwned }
+import { detectInstallation, livePolicyOf, loadOwnership, verifyOwned }
   from "@agents-can-communicate/installer";
 import { AccError, EXIT } from "@agents-can-communicate/protocol";
 
@@ -65,6 +65,21 @@ export function staleInstall({ recorded, running }) {
   return recorded === running ? null : { recorded, running };
 }
 
+const RUNTIME_LABEL = Object.freeze({ active: "active", waiting: "waiting for a live session",
+  inactive: "not enabled", degraded: "degraded", unsupported: "unsupported" });
+
+/** One human clause for a native-delivery state, next-action implied, never overclaiming. */
+export function describeNative(native) {
+  if (native.eligibility === "unsupported") {
+    return `unsupported${native.reasonCode ? ` (${native.reasonCode})` : ""}`;
+  }
+  const enabled = native.configured ? `enabled (${native.policy})` : "eligible, not enabled";
+  const runtime = RUNTIME_LABEL[native.runtime] ?? native.runtime;
+  const degraded = native.eligibility === "degraded" && native.reasonCode
+    ? ` - ${native.reasonCode}` : "";
+  return `${native.eligibility} - ${enabled} - ${runtime}${degraded}`;
+}
+
 /**
  * The runner version behind whatever ACC wrote for one client.
  *
@@ -99,6 +114,25 @@ async function findShims(root, depth) {
     else if (entry.name.endsWith(".sh")) found.push(target);
   }
   return found;
+}
+
+// One closed native-delivery report per adapter, built only from detection,
+// ownership, and later the live binding facts - never inferred from a
+// configured shim alone. eligibility is what the client could do; configured is
+// whether a policy was recorded; policy is that recorded policy; runtime is
+// filled in from current bindings; modes and reasonCode carry the closed
+// detail. runtime "active" never means the model read anything.
+function nativeState(detected, recordedPolicy) {
+  const native = detected ?? { state: "unsupported", reasonCode: "native_delivery_unsupported" };
+  const eligibility = native.state === "eligible" ? "eligible"
+    : native.state === "degraded" ? "degraded" : "unsupported";
+  const policy = recordedPolicy ?? "off";
+  const configured = policy !== "off";
+  const modes = native.state === "eligible" && Array.isArray(native.probe?.modes)
+    ? [...native.probe.modes] : [];
+  const runtime = eligibility === "unsupported" ? "unsupported"
+    : !configured ? "inactive" : "waiting";
+  return { eligibility, configured, policy, runtime, modes, reasonCode: native.reasonCode ?? null };
 }
 
 async function diagnoseAdapters({ options, runtime }) {
@@ -162,7 +196,8 @@ async function diagnoseAdapters({ options, runtime }) {
     // an npm upgrade with no `acc install`, and reporting both is what makes the
     // divergence legible rather than hidden behind a single reassuring number.
     return { ...entry, stale, wired, bundleVersion, owned: { modified: owned.modified,
-      missing: owned.missing, intact: owned.intact.length }, remediation };
+      missing: owned.missing, intact: owned.intact.length },
+      nativeDelivery: nativeState(entry.nativeDelivery, livePolicyOf(installed)), remediation };
   }));
 }
 
@@ -214,6 +249,23 @@ export async function runDoctor({ options, context, runtime }) {
   // front.
   const service = context.service ?? await context.openService();
   const status = await service.collectStatus({});
+  // The runtime column is the only part that needs a live read: a current
+  // reachable binding for this adapter is "active", an expired one "degraded".
+  const bindingsByAdapter = new Map();
+  for (const binding of status.deliveryBindings ?? []) {
+    const existing = bindingsByAdapter.get(binding.adapterId);
+    if (existing === undefined || binding.reachable) bindingsByAdapter.set(binding.adapterId, binding);
+  }
+  for (const adapter of adapters) {
+    const native = adapter.nativeDelivery;
+    if (native.eligibility === "unsupported") continue;
+    const binding = bindingsByAdapter.get(adapter.adapterId);
+    native.runtime = binding === undefined ? (native.configured ? "waiting" : "inactive")
+      : binding.reachable ? "active" : "degraded";
+    if (binding !== undefined && Array.isArray(binding.availableModes)) {
+      native.modes = binding.availableModes.filter(mode => mode !== "nextTurn");
+    }
+  }
 
   const data = {
     workspaceId: context.descriptor.id,
@@ -241,6 +293,11 @@ export async function runDoctor({ options, context, runtime }) {
   ...adapters.filter(adapter => (adapter.present || adapter.installed)
     && typeof adapter.deliveryDiagnostic === "string")
     .map(adapter => `  ${adapter.deliveryDiagnostic}`),
+  // One concise native-delivery line per detected client, distinguishing
+  // eligibility, the recorded policy, and the live runtime state. It never
+  // claims that "active" means a model read anything.
+  ...adapters.filter(adapter => adapter.present)
+    .map(adapter => `  ${adapter.displayName} native delivery: ${describeNative(adapter.nativeDelivery)}`),
   ...data.remediation.map(line => `  ${line}`),
   // `0 of 4` is a true line that reads as a broken machine, and on an
   // MCP-only one it would read that way on every run forever. The server needs
