@@ -104,6 +104,22 @@ test("detection asks the adapter whether ACC is already installed", async t => {
   assert.deepEqual(detected[0].diagnostics.length > 0, true);
 });
 
+test("a fallback diagnostic does not mutate adapter-owned detection results", async t => {
+  const context = { home: await home(t), dataHome: await home(t) };
+  const adapterDiagnostics = Object.freeze(["acc plugin not registered"]);
+  const durable = adapter("claude_code", {
+    deliveryFallback: { diagnostic: "native capture failed; use inbox" },
+    detect: async () => ({ ok: true, changes: [], diagnostics: adapterDiagnostics }),
+  });
+
+  const [detected] = await detectInstallation({ adapters: [durable],
+    probe: probeFor({ claude_code: "0.147.0" }), context });
+
+  assert.deepEqual(detected.diagnostics,
+    ["acc plugin not registered", "native capture failed; use inbox"]);
+  assert.deepEqual(adapterDiagnostics, ["acc plugin not registered"]);
+});
+
 test("detection writes nothing at all", async t => {
   const dir = await home(t);
   const context = { home: dir, dataHome: dir };

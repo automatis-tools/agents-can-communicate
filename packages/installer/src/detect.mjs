@@ -48,7 +48,7 @@ export async function detectInstallation({ adapters, context, probe = spawnProbe
       const entry = { adapterId: adapter.id, displayName: adapter.displayName,
         present: false, version: null, versionOutput: null, installed: false,
         diagnostics: [], needsAction: [], capabilities: effectiveCapabilities(adapter),
-        error: null };
+        deliveryDiagnostic: null, error: null };
 
       try {
         const output = await withTimeout(
@@ -70,7 +70,7 @@ export async function detectInstallation({ adapters, context, probe = spawnProbe
 
       try {
         const detected = await adapter.detect(context);
-        entry.diagnostics = detected.diagnostics ?? [];
+        entry.diagnostics = [...(detected.diagnostics ?? [])];
         // What a person has to do, as opposed to what is true. Adapters that
         // have nothing to ask for say nothing.
         entry.needsAction = detected.needsAction ?? [];
@@ -81,6 +81,11 @@ export async function detectInstallation({ adapters, context, probe = spawnProbe
           /registered|installed/.test(line) && !/not registered|not installed/.test(line));
       } catch (error) {
         entry.error = entry.error ?? error.message;
+      }
+      if (entry.capabilities?.delivery?.livePush !== true
+        && typeof adapter.deliveryFallback?.diagnostic === "string") {
+        entry.deliveryDiagnostic = adapter.deliveryFallback.diagnostic;
+        entry.diagnostics.push(entry.deliveryDiagnostic);
       }
       return entry;
     }));

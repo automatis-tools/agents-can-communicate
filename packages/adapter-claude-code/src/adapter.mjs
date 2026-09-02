@@ -6,6 +6,11 @@ import { denyOutcome, injectOutcome, normalizeClaudeHook } from "./hooks.mjs";
 import { planClaudeInstall, detectClaude, installClaudePlugin, uninstallClaudePlugin } from "./install.mjs";
 
 export const CLAUDE_CODE_VERSION = "2.1.233";
+export const CLAUDE_DELIVERY_FALLBACK = Object.freeze({
+  diagnostic: "Claude Code native delivery is off: the 2.1.252 capture stopped at the "
+    + "development-channel security warning before the ACC MCP child started; messages "
+    + "stay durable for certified next-turn delivery or acc inbox",
+});
 
 /**
  * Every true capability below was observed in a real `claude -p` session on
@@ -27,6 +32,7 @@ export function createClaudeCodeAdapter() {
     // real command rather than the adapter id: `2.1.233 (Claude Code)`.
     client: { command: "claude", certificationName: "claude-code", versionArgs: ["--version"] },
     certification,
+    deliveryFallback: CLAUDE_DELIVERY_FALLBACK,
     capabilities: {
       lifecycle: { sessionStart: true, sessionEnd: true },
       // A UserPromptSubmit hook's additionalContext was observed arriving in
@@ -52,6 +58,7 @@ export function createClaudeCodeAdapter() {
       return { ok: true, changes: [], diagnostics: [
         ...detected.diagnostics,
         "hook payloads captured from Claude Code 2.1.233",
+        CLAUDE_DELIVERY_FALLBACK.diagnostic,
         // SessionEnd is advisory and cannot summarise a conversation that has
         // already stopped, so the handoff is written from Stop or the skill.
         "handoff is written while the model is active, not at SessionEnd",

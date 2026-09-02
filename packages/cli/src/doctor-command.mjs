@@ -238,6 +238,9 @@ export async function runDoctor({ options, context, runtime }) {
   // the store was healthy and nothing else.
   const text = [`store healthy; ${describePresence(status.counts)}; `
     + `protection ${status.protection}; ${installed} of ${adapters.length} adapter(s) installed`,
+  ...adapters.filter(adapter => (adapter.present || adapter.installed)
+    && typeof adapter.deliveryDiagnostic === "string")
+    .map(adapter => `  ${adapter.deliveryDiagnostic}`),
   ...data.remediation.map(line => `  ${line}`),
   // `0 of 4` is a true line that reads as a broken machine, and on an
   // MCP-only one it would read that way on every run forever. The server needs
