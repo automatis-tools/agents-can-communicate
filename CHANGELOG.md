@@ -9,9 +9,9 @@ advisory protection around that communication layer, not the product's centre.
 
 | | |
 |---|---|
-| Built from | `1d898e81b3226992be8ec1eac591650d5c45d901` |
-| Tarball | `agents-can-communicate-0.2.0.tgz`, 201,021 bytes, 177 entries |
-| sha256 | `cbd0fac296513a3b6e55562dbd7569e88e079ebbd30a017136f67f75862bff9d` |
+| Built from | `2f5803189583407561782745cb15f7eeb269a4b8` |
+| Tarball | `agents-can-communicate-0.2.0.tgz`, 201,247 bytes, 177 entries |
+| sha256 | `4754e23ae167411dd2dc7523de75b2aa61b0aa5f112aae953e91f2aef2d32869` |
 | Node | 26.5.1 for this release proof; package requires Node >=24 |
 | Verified on | macOS 26.6.2 (darwin 25.6.0, arm64) |
 | Native live delivery | Not certified: Codex 0.152.0 had no daemon control socket; Claude Code 2.1.252 stopped at the development-channel warning |
@@ -32,7 +32,9 @@ overwritten by its successor. Concurrent immutable publishes retain only accepte
 and uninstall keeps its ownership recipe until all cleanup succeeds. Room-message
 retrieval, hashed receipt keys, offer-failure attribution, MCP inbox receipt transitions,
 and the attach/materialisation boundary now share the same durable semantics under
-concurrency.
+concurrency. On an uncertified client/platform combination, a tight context budget now
+keeps the exact `acc inbox --message …` recovery command visible without exposing the peer
+body or advancing its queued receipt.
 
 Native client claims remain deliberately narrower. The retained Codex and Claude captures
 are failures, not passing evidence, so v0.2.0 installs no native live channel for them.
