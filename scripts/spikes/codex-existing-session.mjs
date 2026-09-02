@@ -99,6 +99,15 @@ export async function locateCodexThread(peer, { threadId, cwd }) {
   return { found: true, threadId, status: found.status?.type ?? "unknown" };
 }
 
+// Loaded threads only, with id, cwd, and status - never a preview or a turn.
+export async function discoverCodexThreads(peer) {
+  const loaded = new Set(await pageAll(peer, "thread/loaded/list", {}));
+  const threads = await pageAll(peer, "thread/list", { limit: 100 });
+  return threads.filter((item) => loaded.has(item?.id)).map((item) => ({
+    threadId: item.id, cwd: item.cwd ?? null, status: item.status?.type ?? "unknown",
+  }));
+}
+
 export async function addCodexQueueMessage(peer, { threadId, messageId, text }) {
   const listed = await peer.request("thread/queue/list", { threadId });
   const existing = (listed?.data ?? []).find((item) => item?.clientUserMessageId === messageId);
@@ -167,6 +176,7 @@ function readVersion(command) {
 }
 
 function parseArgs(args) {
+  if (args.length === 1 && args[0] === "--discover") return { discover: true };
   const parsed = {};
   const known = new Set(["--thread", "--message", "--cwd", "--text"]);
   for (let index = 0; index < args.length; index += 2) {
@@ -181,7 +191,7 @@ function parseArgs(args) {
 
 function usage() {
   process.stderr.write("usage: codex-existing-session.mjs --thread <exact-id> --message <stable-id> "
-    + "--cwd <absolute-path> [--text <body>]\n");
+    + "--cwd <absolute-path> [--text <body>] | --discover\n");
   process.exit(2);
 }
 
@@ -198,7 +208,9 @@ async function main() {
     minimum };
   const version = evaluateClientVersion(clientVersion, minimum);
   let result;
-  if (!version.ok) {
+  if (options.discover) {
+    result = await discoverFromDaemon({ command, socketPath, clientVersion, minimum });
+  } else if (!version.ok) {
     result = closedResult(clientVersion, { reasonCode: version.reasonCode, stage: "version" });
   } else if (!existsSync(socketPath) || !statSync(socketPath).isSocket()) {
     result = closedResult(clientVersion, { reasonCode: "transport_unavailable", stage: "initialize" });
@@ -212,6 +224,27 @@ async function main() {
     }
   }
   process.stdout.write(`${JSON.stringify(result)}\n`);
+}
+
+async function discoverFromDaemon({ command, socketPath, clientVersion, minimum }) {
+  const base = { at: new Date().toISOString(), clientVersion, serverVersion: null, loaded: [],
+    reasonCode: null };
+  if (!existsSync(socketPath) || !statSync(socketPath).isSocket()) {
+    return { ...base, reasonCode: "transport_unavailable" };
+  }
+  const peer = openJsonRpcPeer({ command, args: ["app-server", "proxy", "--sock", socketPath],
+    timeoutMs: 5_000 });
+  try {
+    const probe = await probeCodexQueue(peer, { clientVersion, threadId: "thread_discover", minimum });
+    if (!probe.supported) {
+      return { ...base, serverVersion: probe.serverVersion, reasonCode: probe.reasonCode };
+    }
+    return { ...base, serverVersion: probe.serverVersion, loaded: await discoverCodexThreads(peer) };
+  } catch (error) {
+    return { ...base, reasonCode: safeReason(error) };
+  } finally {
+    await peer.close();
+  }
 }
 
 const invokedDirectly = typeof process.argv[1] === "string"
