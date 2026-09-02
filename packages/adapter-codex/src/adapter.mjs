@@ -7,18 +7,21 @@ import { allowOutcome, denyOutcome, injectOutcome, normalizeCodexHook }
 import { planCodexInstall, detectCodex, installCodexPlugin, uninstallCodexPlugin } from "./install.mjs";
 
 export const CODEX_VERSION = "0.147.0";
+export const CODEX_DELIVERY_FALLBACK = Object.freeze({
+  diagnostic: "Codex native delivery is off: the codex-cli 0.152.0 capture found the "
+    + "app-server control socket absent; ACC did not start a daemon or target session; "
+    + "durable fallback remains exact-certified next-turn delivery or acc inbox",
+});
 
 /**
  * Each true capability was observed firing in a real codex exec session on
  * 0.147.0; the payloads are in fixtures/ and the evidence is in
  * COMPATIBILITY.md.
  *
- * What stays false and why. `context.*` injection is unverified: the hooks fire
- * before a turn, but whether their stdout reaches the model has not been
- * observed, and injecting nothing while claiming injection would be worse than
- * claiming nothing. `lifecycle.childSessions` is unverified: SubagentStart and
- * SubagentStop are in the binary's enum but no subagent ran during the capture.
- * Native live delivery and reply routing remain false after the 0.152.0 capture.
+ * What stays false and why. `lifecycle.childSessions` is unverified:
+ * SubagentStart and SubagentStop are in the binary's enum but no subagent ran
+ * during the capture. Native live delivery and reply routing remain false after
+ * the 0.152.0 capture found no existing app-server control socket.
  */
 export function createCodexAdapter() {
   return defineAdapter({
@@ -29,6 +32,7 @@ export function createCodexAdapter() {
     // real command rather than the adapter id: `codex-cli 0.147.0`.
     client: { command: "codex", certificationName: "codex-cli", versionArgs: ["--version"] },
     certification,
+    deliveryFallback: CODEX_DELIVERY_FALLBACK,
     capabilities: {
       lifecycle: { sessionStart: true, sessionEnd: true },
       // Observed reaching the model as a `developer` role message, unwrapped.
@@ -60,6 +64,7 @@ export function createCodexAdapter() {
         diagnostics: [
           ...detected.diagnostics,
           "hook payloads captured from codex-cli 0.147.0",
+          CODEX_DELIVERY_FALLBACK.diagnostic,
           "guards cover apply_patch and shell; Codex names its edit tool apply_patch",
           // Certification found this: whether apply_patch is offered at all is a
           // property of the model's metadata (apply_patch_tool_type), not a user
