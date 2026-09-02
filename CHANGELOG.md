@@ -9,9 +9,9 @@ advisory protection around that communication layer, not the product's centre.
 
 | | |
 |---|---|
-| Built from | `dab200f4e5d968716ea296412703a9be222fc7a4` |
-| Tarball | `agents-can-communicate-0.2.0.tgz`, 199,128 bytes, 177 entries |
-| sha256 | `8987e99f223ba90e9c0ae695670c1a733c788e24ef0d66a36dfc5ca5546f62c0` |
+| Built from | `1ecbd72996758cf15cf8ecde4497f041e7bc7980` |
+| Tarball | `agents-can-communicate-0.2.0.tgz`, 200,590 bytes, 177 entries |
+| sha256 | `f6771edc0afcb39f33e512117a7be646ef193bf1e66de016fc3bbeb71bdeb472` |
 | Node | 26.5.1 for this release proof; package requires Node >=24 |
 | Verified on | macOS 26.6.2 (darwin 25.6.0, arm64) |
 | Native live delivery | Not certified: Codex 0.152.0 had no daemon control socket; Claude Code 2.1.252 stopped at the development-channel warning |
@@ -24,6 +24,13 @@ and bundled packages. Together they prove both Claude-to-Codex and Codex-to-Clau
 question/answer threads, `retrieved` then `acknowledged` receipts, idempotent retries,
 generation restarts, stale-binding rejection, unknown-version downgrade, double uninstall,
 exact foreign client-home topology restoration, and no ACC state inside the project.
+
+The final candidate also closes the storage and delivery races found during release review:
+stale writer reclamation cannot remove a successor's lock, concurrent immutable publishes
+retain only accepted bytes, and uninstall keeps its ownership recipe until all cleanup
+succeeds. Room-message retrieval, hashed receipt keys, offer-failure attribution, MCP inbox
+receipt transitions, and the attach/materialisation boundary now share the same durable
+semantics under concurrency.
 
 Native client claims remain deliberately narrower. The retained Codex and Claude captures
 are failures, not passing evidence, so v0.2.0 installs no native live channel for them.
