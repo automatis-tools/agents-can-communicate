@@ -70,12 +70,13 @@ From the first session, address a participant listed by `acc status`:
 
 ```bash
 acc message --to models --type question --subject "receipt wording" \
-  --body "Should the UI say offered or delivered after the transport accepts bytes?"
+  --body "Should the UI say offered or delivered after the transport accepts bytes?" \
+  --client-message-id client_receipt_wording_1
 ```
 
 The output starts with `recorded message_x`. That is the durable guarantee. Any following
-delivery diagnostic is acceleration, not the source of truth. Keep the returned
-`clientMessageId` when retrying after an uncertain result; reusing it returns the same
+delivery diagnostic is acceleration, not the source of truth. Reuse the explicit
+`client_receipt_wording_1` key when retrying after an uncertain result; it returns the same
 logical message instead of creating a duplicate.
 
 ## 5. Read and reply from the second session
