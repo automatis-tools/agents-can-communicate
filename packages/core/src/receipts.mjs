@@ -32,12 +32,22 @@ function requireAddressedReceipt(tx, messageId, recipientParticipantId) {
 export function createReceiptService(ports) {
   const { store, clock, ids } = ports;
 
+  async function readReceipt(input) {
+    return store.transaction(tx => requireAddressedReceipt(tx, input.messageId,
+      input.recipientParticipantId), { kinds: ["message", "receipt"] });
+  }
+
   async function recordOfferSucceeded(input) {
     const now = clock.now();
     return store.transaction(tx => {
       const id = receiptId(input.messageId, input.recipientParticipantId);
       const receipt = requireAddressedReceipt(tx, input.messageId,
         input.recipientParticipantId);
+      // A retrieval or acknowledgement may win after a transport accepted but
+      // before this transaction acquired the writer. That stronger truth must
+      // remain in place. The same rule makes a repeated successful commit a
+      // read-only operation rather than another success event.
+      if (receipt.state !== "queued") return receipt;
       const target = tx.get("session", input.targetSessionId);
       if (target === null || target.state !== "open"
         || target.participantId !== input.recipientParticipantId
@@ -82,5 +92,5 @@ export function createReceiptService(ports) {
     }, { kinds: ["message", "receipt"] });
   }
 
-  return { recordOfferSucceeded, recordOfferFailed };
+  return { readReceipt, recordOfferSucceeded, recordOfferFailed };
 }

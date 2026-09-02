@@ -110,12 +110,37 @@ test("a stale publisher cannot delete a successor binding that won the race", as
   let reads = 0;
   const store = { ephemeral: {
     list: async () => stored === null ? [] : [stored],
-    put: async (_kind, _id, record) => {
-      stored = record;
-      // The successor publishes after this stale put but before its recheck.
+    update: async (_kind, _id, updater) => {
+      stored = await updater(stored);
+      // The successor publishes after this stale update but before its recheck.
       stored = successor;
+      return stored;
     },
-    delete: async () => { stored = null; },
+  } };
+  const sessions = { locateSession: async () => ({ record: reads++ < 2
+    ? { ...first, participantId: "models", state: "open" }
+    : { sessionId: first.sessionId, generation: successor.generation,
+      participantId: "models", state: "open" } }) };
+  const service = createDeliveryBindingService({ store }, sessions);
+
+  await assert.rejects(service.publishDeliveryBinding(binding(first)),
+    /open session generation/);
+  assert.equal(stored, successor);
+});
+
+test("a stale publisher cannot overwrite a successor binding that published first", async () => {
+  const first = { sessionId: "session_models", generation: "generation_first" };
+  const successor = binding({ sessionId: first.sessionId, generation: "generation_next" });
+  let stored = successor;
+  let reads = 0;
+  const store = { ephemeral: {
+    list: async () => [stored],
+    put: async (_kind, _id, record) => { stored = record; return record; },
+    update: async (_kind, _id, updater) => {
+      const next = await updater(stored);
+      if (next !== null) stored = next;
+      return next;
+    },
   } };
   const sessions = { locateSession: async () => ({ record: reads++ === 0
     ? { ...first, participantId: "models", state: "open" }

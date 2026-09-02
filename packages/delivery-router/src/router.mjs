@@ -4,6 +4,7 @@ const PLATFORM = `${process.platform}-${process.arch}`;
 const SAFE_ERRORS = new Set(["ambiguous_recipient_sessions", "delivery_disabled",
   "recipient_busy", "recipient_unavailable", "transport_error", "transport_rejected",
   "unsupported_client_version"]);
+const NAMED_LIVE_TRANSPORTS = new Set(["claude-channel", "codex-app-server"]);
 
 const adaptersById = adapters => adapters instanceof Map
   ? adapters
@@ -16,9 +17,14 @@ const permits = (policy, kind) => policy === "all"
 const durable = (recipientParticipantId, errorCode) => ({ recipientParticipantId,
   outcome: "queued", transport: "durable", errorCode });
 
-function safeTransport(value) {
-  return typeof value === "string" && value.length > 0 && value.length <= 100
-    && !/[\u0000-\u001f\u007f]/.test(value) ? value : "adapter";
+const settled = receipt => ({ recipientParticipantId: receipt.recipientParticipantId,
+  outcome: receipt.state, transport: "durable" });
+
+function safeTransport(value, opaqueEndpointRef) {
+  if (NAMED_LIVE_TRANSPORTS.has(value) && value !== opaqueEndpointRef) return value;
+  // Both markers are fixed router vocabulary. The alternate prevents even a
+  // coincidental endpoint value equal to the primary redaction from escaping.
+  return opaqueEndpointRef === "live-adapter" ? "native-live" : "live-adapter";
 }
 
 export function createDeliveryRouter({ service, adapters, clock }) {
@@ -27,11 +33,14 @@ export function createDeliveryRouter({ service, adapters, clock }) {
   async function recordFailure(binding, message, participantId, transport, safeErrorCode) {
     await service.recordOfferFailed({ messageId: message.messageId,
       recipientParticipantId: participantId, actorSessionId: binding.sessionId,
-      transport: safeTransport(transport), adapterId: binding.adapterId,
+      transport: safeTransport(transport, binding.opaqueEndpointRef), adapterId: binding.adapterId,
       clientVersion: binding.clientVersion, safeErrorCode }).catch(() => null);
   }
 
   async function offerTo(message, participantId, now) {
+    const receipt = await service.readReceipt({ messageId: message.messageId,
+      recipientParticipantId: participantId });
+    if (receipt.state !== "queued") return settled(receipt);
     const bindings = await service.listDeliveryBindings({ participantId, now });
     if (bindings.length === 0) return durable(participantId, "recipient_unavailable");
     const permitted = bindings.filter(binding => binding.livePolicy !== "off"
@@ -56,10 +65,10 @@ export function createDeliveryRouter({ service, adapters, clock }) {
     try {
       response = await adapter.offerMessage({ binding, message });
     } catch {
-      await recordFailure(binding, message, participantId, "adapter", "transport_error");
+      await recordFailure(binding, message, participantId, "live-adapter", "transport_error");
       return durable(participantId, "transport_error");
     }
-    const transport = safeTransport(response?.transport);
+    const transport = safeTransport(response?.transport, binding.opaqueEndpointRef);
     if (response?.accepted !== true) {
       const code = SAFE_ERRORS.has(response?.safeErrorCode)
         ? response.safeErrorCode : "transport_rejected";
