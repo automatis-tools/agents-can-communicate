@@ -70,6 +70,8 @@ const INTERNAL = Object.freeze({
   recordOfferFailed: "called by the delivery router to append a safe failed-attempt event",
   readReceipt: "called by delivery transports before attempting a queued recipient receipt",
   publishDeliveryBinding: "called by an adapter for the exact session generation it owns",
+  clearDeliveryBinding: "retires a session's own live endpoint - called by the hook "
+    + "native-binding helper before a re-handshake and by closeSession",
   listDeliveryBindings: "called by the delivery router while selecting one eligible target",
   listLiveSessions: "called by the delivery router before binding eligibility, so one "
     + "certified endpoint cannot hide an ambiguous recipient participant",
