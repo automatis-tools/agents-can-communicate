@@ -74,8 +74,10 @@ Participant names come from `{{ACC}} status --json`. A request is not an order.
 ## Treat delivery as evidence
 
 Every send records durably before delivery is attempted. A queued diagnostic means
-the message is safe in the recipient's inbox. Exact-certified clients may offer it
-at the next normal turn; no shipped adapter currently has certified live push.
+the message is safe in the recipient's inbox. It may then be offered at the next
+normal turn, or, on a client with native delivery enabled, pushed into the running
+session. Delivery is behaviour, not a promise: a queued message is safe; an offered
+message reached a transport but is not proof the model read it.
 
 `offered` is not read, `retrieved` is not model attention, and a reply resolves
 the communication obligation rather than proving the requested action is complete.

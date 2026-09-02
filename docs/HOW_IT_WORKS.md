@@ -113,21 +113,39 @@ The hook entry point records `offered` only after its stdout transport reports t
 bytes crossed the boundary. The state is not `retrieved`: ACC still has no observation
 that the model attended to those bytes.
 
-### Optional native live push
+### Native live push
 
-The delivery router contains a deliberately narrow seam for offering a message to an
-already-running session. It requires all of the following at once:
+The delivery router offers an actionable message to an already-running session when all of
+these hold at once:
 
 - exactly one live generation for the recipient;
-- an unexpired generation-bound delivery binding;
-- recipient policy permitting this message kind;
-- passing `livePush` certification for the exact client version and platform; and
+- an unexpired generation-bound delivery binding published by that session's own start;
+- a recorded policy permitting this message kind (`actionable` covers question, request,
+  answer, decision, and handoff; `all` adds note; room messages are never live);
+- an adapter that declares `delivery.livePush` and a native contract; and
 - adapter acceptance of the bytes.
 
-Any missing condition leaves the receipt queued and returns a safe fallback reason. No
-shipped adapter currently passes native live-push certification, so ACC v0.2 does not
-interrupt an active model turn. Today the real product is durable inbox plus exact-version
-next-turn delivery where certified, not realtime session control.
+Any missing condition leaves the receipt `queued` and returns a safe fallback reason. Two
+adapters ship a native transport, both experimental and off until a per-client opt-in:
+
+```text
+sender -> durable ACC record -> exact live binding -> vendor transport -> receiver
+                             \-> queued inbox on every failure
+```
+
+- **Claude Code 2.1.258** uses a vendor Channel: an ACC-owned MCP child, started only when
+  the user's ordinary `claude` launch carries the captured development-channel flag, offers
+  the message as a native notification and routes the model's explicit `acc_reply` back as a
+  real ACC answer. Claude's development-channel warning is vendor-owned and stays visible.
+- **Codex 0.152.1** adds the message to the App Server thread queue over the vendor daemon's
+  control socket; it is presented on the idle thread or after the current turn. Codex answers
+  through the ordinary `acc reply` command, so its reply route is not native.
+
+Compatibility is decided at the launch-time bootstrap and again by a per-session handshake
+bound to the exact client process; there is no maximum client version, but a newer stable
+release must pass a current probe and handshake for the captured protocol, and an older,
+prerelease, known-bad, or uncaptured client stays durable-only. ACC is never the parent of
+a model session after the shell `exec`, and `ACC_BYPASS=1` starts the unmodified client.
 
 ## 5. Reply closes the communication obligation
 
