@@ -109,6 +109,23 @@ for (const [label, clientVersion] of [["unknown", null], ["uncertified", "9.9.9"
   });
 }
 
+test("a failed reattach cannot leave certified client facts for a later turn", async t => {
+  const { invoke, message, receipt } = await fixture(t);
+  const reattach = await invoke("sessionStart", "recipient-session", {
+    probeClientVersion: async () => null,
+    readProcessTable: async () => { throw new Error("process table unavailable"); },
+  });
+  assert.equal(reattach.failed, true);
+
+  const laterTurn = await invoke("beforeTurn", "recipient-session");
+
+  assert.doesNotMatch(laterTurn.stdout, /Commit only after these bytes cross/);
+  assert.match(laterTurn.stderr, /pending message.*withheld/);
+  assert.match(`${laterTurn.stdout}\n${laterTurn.stderr}`, new RegExp(message.messageId));
+  await laterTurn.commitOffers();
+  assert.equal((await receipt()).state, "queued");
+});
+
 test("committing the same prepared offers twice is idempotent", async t => {
   const { invoke, message, receipt, sender } = await fixture(t);
   const result = await invoke("beforeTurn", "recipient-session");

@@ -165,6 +165,13 @@ async function openContext({ cwd, dataHome, runtime, env }) {
 const HANDLERS = {
   async sessionStart({ event, context, adapter, adapterId, binding, paths,
     readProcessTable, probeClientVersion, platform, deadline }) {
+    // A repeated start refreshes the client's version/platform. Remove the old
+    // certified facts before any probe, PID lookup, resume, or open can fail;
+    // keep only the generation identity needed for a successful resume.
+    if (binding !== null) {
+      await storeSessionBinding({ runtimeDir: paths.root, harnessSessionId: event.sessionId,
+        accSessionId: binding.accSessionId, generation: binding.generation });
+    }
     const clientVersion = await probeClientVersion(adapter,
       { timeoutMs: Math.max(1, Math.min(1_000, deadline - Date.now())) });
     const clientFacts = { clientVersion, platform };
