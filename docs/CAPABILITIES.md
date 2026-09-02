@@ -32,15 +32,21 @@ Passing evidence currently ships for these exact versions on `darwin-arm64`:
 Every other capability in the closed shape defaults to false, including session resume,
 child sessions, startup or safe-point injection, and before-read guards.
 
+The `delivery.livePush` and `delivery.replyRoute` row is `no` for the exact hook versions
+this matrix is keyed to. Native live delivery was captured on newer clients - Claude Code
+2.1.258 (livePush and replyRoute) and Codex 0.152.1 (livePush) - and is admitted through the
+native delivery contract rather than exact-version certification: it is off until a per-client
+opt-in, experimental, and never turns on for a client below the captured minimum.
+
 The limitations belong next to the adapters they affect:
 
 | Adapter | Exact limitation and evidence |
 |---|---|
-| Codex | 0.147.0 next-turn stdout arrives as unwrapped developer-role context and requires plugin trust. The separate 0.152.0 native capture found no daemon control socket; ACC did not start one, so live push and reply routing remain false. |
-| Claude Code | 2.1.233 next-turn delivery waits for the next user prompt. The 2.1.252 channel capture stopped at the development-channel warning before the ACC MCP child started; native delivery branches are unobserved and false. |
-| Gemini CLI | Only 0.37.0 has package-shipped next-turn certification. Write and shell tools depend on approval mode; other versions and platforms retain inbox access but no effective delivery capability. |
-| Grok | Documentation-shaped payloads do not count as real captures. UserPromptSubmit context was observed discarded, and no deny was captured stopping a real write; all capabilities remain false. |
-| Kimi Code | 0.36.1 has next-turn and guard evidence, plus a 60-second heartbeat. Prompt-mode `SessionEnd` never fired, and its next-turn path does not interrupt an active turn. |
+| Codex | 0.147.0 next-turn stdout arrives as unwrapped developer-role context and requires plugin trust. A separate 0.152.1 capture proved the App Server queue transport, so `delivery.livePush` is a live capability behind the native contract (experimental, off until opted in); Codex answers through `acc reply`, so `replyRoute` stays false. |
+| Claude Code | 2.1.233 next-turn delivery waits for the next user prompt. A 2.1.258 Channel capture proved idle offer, busy queue-after-turn, explicit reply, duplicate suppression, and durable fallback, so `delivery.livePush` and `delivery.replyRoute` are live capabilities behind the native contract (experimental, off until opted in; Claude's development-channel warning is vendor-owned and visible). |
+| Gemini CLI | Only 0.37.0 has package-shipped next-turn certification. Its TUI has no captured external wake or queue interface and `--acp` changes launch ownership, so native delivery is fallback-only; live push and reply routing remain false. |
+| Grok | Documentation-shaped payloads do not count as real captures. The public leader surface exposed no proven addressed injection into an ordinary TUI session, so native delivery is `awaiting_compatibility_capture`; all capabilities remain false. |
+| Kimi Code | 0.36.1 has next-turn and guard evidence, plus a 60-second heartbeat. Its server/queue APIs do not prove a transparent binding to an independently opened session, so native delivery is fallback-only. |
 | Generic MCP | Tool polling is not next-turn injection, live push, or a native reply route. It has no write guard or client-lifecycle evidence. |
 
 `certification.json` beside each adapter is machine-readable. `COMPATIBILITY.md` records the
@@ -57,8 +63,9 @@ The router requires exactly one current eligible generation. No binding, an expi
 several live sessions for one participant, a busy target, or a version that does not match
 passing evidence all stay on durable fallback.
 
-Current shipped reality: no adapter publishes a native live binding, and no adapter has
-passing `livePush` certification. Codex and Claude Code are next-turn or inbox only;
+Current shipped reality: Claude Code 2.1.258 and Codex 0.152.1 on darwin-arm64 have passing
+experimental `livePush` captures behind the native delivery contract, off until a per-client
+opt-in; every other client is next-turn or inbox only;
 Gemini CLI and Kimi Code are next-turn only at their exact captured versions; Grok and MCP
 poll inbox.
 

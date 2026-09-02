@@ -187,3 +187,12 @@ a shell command. Only the model was stubbed; every payload above came from the c
 The client speaks OpenAI chat completions with `stream: true` to a provider of
 `type = "openai"`, imported through `kimi provider add <registry-url>`. Accepted provider
 types are `openai`, `anthropic` and `kimi`.
+
+## Native delivery boundary (2026-09-02)
+
+Kimi Code stays fallback-only for native delivery. It exposes server and queue APIs, but no
+capture proves a transparent binding to an independently opened ordinary TUI session: the
+supported surfaces reach a server ACC would own or launch, not the session a user started
+themselves. The adapter declares no `nativeDelivery` contract and keeps `delivery.livePush`
+and `delivery.replyRoute` false; messages remain durable for the certified next-turn hook
+and heartbeat or for `acc inbox`.
