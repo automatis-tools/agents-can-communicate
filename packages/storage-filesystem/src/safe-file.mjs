@@ -10,16 +10,15 @@ function sameDirectory(left, right) {
   return left.dev === right.dev && left.ino === right.ino;
 }
 
-// O_NOFOLLOW plus a before/after identity check on the parent: the bytes
-// returned come from the handle that was opened, not from whatever the path
-// resolves to afterwards. The injected opener is the seam the crash-window and
-// race tests use, and stays the final argument.
-export async function readRegularNoFollow(filePath, root, openFile = open) {
+// The operation runs through the opened handle only after O_NOFOLLOW and the
+// before/after parent identity check agree. Replacing the pathname after that
+// point cannot redirect a read or append through the already-open descriptor.
+export async function withRegularNoFollow(filePath, root, flags, operation, openFile = open) {
   const parent = path.dirname(filePath);
   const before = await assertManagedDirectory(root, parent);
   let handle;
   try {
-    handle = await openFile(filePath, constants.O_RDONLY | constants.O_NOFOLLOW);
+    handle = await openFile(filePath, flags | constants.O_NOFOLLOW);
   } catch (error) {
     if (error.code === "ENOENT") throw error;
     throw new AccError(EXIT.DATA, "cannot safely open regular file",
@@ -35,13 +34,24 @@ export async function readRegularNoFollow(filePath, root, openFile = open) {
       throw new AccError(EXIT.DATA, "record parent directory changed while opening",
         { filePath, root });
     }
-    return await handle.readFile();
+    return await operation(handle, stat);
+  } catch (error) {
+    if (error instanceof AccError || error.code === "ENOENT") throw error;
+    throw new AccError(EXIT.DATA, "cannot safely access regular file",
+      { filePath, cause: error.message });
+  } finally {
+    await handle.close();
+  }
+}
+
+export async function readRegularNoFollow(filePath, root, openFile = open) {
+  try {
+    return await withRegularNoFollow(filePath, root, constants.O_RDONLY,
+      handle => handle.readFile(), openFile);
   } catch (error) {
     if (error instanceof AccError || error.code === "ENOENT") throw error;
     throw new AccError(EXIT.DATA, "cannot safely read regular file",
       { filePath, cause: error.message });
-  } finally {
-    await handle.close();
   }
 }
 

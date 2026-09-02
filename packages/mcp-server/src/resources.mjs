@@ -15,42 +15,37 @@ function escapeText(value) {
   return result;
 }
 
+function escapePeerValue(value) {
+  if (typeof value === "string") return escapeText(value);
+  if (Array.isArray(value)) return value.map(escapePeerValue);
+  if (value !== null && typeof value === "object") {
+    return Object.fromEntries(Object.entries(value)
+      .map(([key, child]) => [key, escapePeerValue(child)]));
+  }
+  return value;
+}
+
 const attributedMessage = message => ({
-  messageId: message.messageId,
-  from: message.fromSessionId,
-  type: message.type,
-  priority: message.priority,
-  requiresAck: message.requiresAck,
-  sentAt: message.sentAt,
+  ...escapePeerValue(message),
   trust: "untrusted peer content",
-  subject: escapeText(message.subject),
-  body: escapeText(message.body),
 });
 
-export async function readResource(uri, { service, participantId, workspaceId }) {
-  const snapshot = await service.store.snapshot(workspaceId);
+export async function readResource(uri, { service, participantId, workspaceId, session }) {
   switch (uri) {
-    case "acc://snapshot":
-      return { ...snapshot,
-        messages: snapshot.messages.map(attributedMessage) };
+    case "acc://snapshot": {
+      const { snapshot } = await service.sync({ workspaceId, scope: "full" });
+      return { ...snapshot, messages: snapshot.messages.map(attributedMessage) };
+    }
     case "acc://roster":
       return (await service.sync({ workspaceId })).roster;
-    case "acc://workstreams":
-      return snapshot.workstreams;
-    case "acc://tasks":
-      return snapshot.tasks;
     case "acc://inbox": {
-      const mine = new Set(snapshot.receipts
-        .filter(receipt => receipt.recipientParticipantId === participantId)
-        .map(receipt => receipt.messageId));
-      // A participant sees what was addressed to it, plus what it sent, so a
-      // fresh reader can follow its own thread.
-      return snapshot.messages
-        .filter(message => mine.has(message.messageId)
-          || message.toParticipantIds.includes(participantId)
-          || snapshot.sessions.some(session => session.sessionId === message.fromSessionId
-            && session.participantId === participantId))
-        .map(attributedMessage);
+      if (session === undefined) {
+        throw new AccError(EXIT.DATA, "the inbox resource requires a resolved session",
+          { participantId });
+      }
+      const inbox = await service.readInbox({ workspaceId, sessionId: session.sessionId,
+        generation: session.generation });
+      return inbox.map(item => attributedMessage(item.message));
     }
     default:
       throw new AccError(EXIT.DATA, `unknown resource: ${uri}`, { uri });

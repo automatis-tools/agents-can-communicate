@@ -2,7 +2,6 @@ import { AccError, EXIT, SCHEMA_VERSION, assertPortableId, createId, validateRec
   from "@agents-can-communicate/protocol";
 
 import { ensureMaterialised, isMaterialised, materialise } from "./materialisation.mjs";
-import { writeWorkResponse } from "./notify.mjs";
 
 // A hook-only adapter heartbeats only when its harness gives it a turn, so the
 // staleness window is a multiple of the cadence the session itself declared
@@ -154,7 +153,12 @@ export function createSessionService(ports) {
     // The approved trigger is the SECOND live session, not the first: a lone
     // session must be able to open and close without leaving a trace.
     const live = (await store.ephemeral.list("session")).filter(item => item.state === "open");
-    if (live.length > 1) {
+    // Recheck durable state only after our ephemeral writes. Another process
+    // may have staged the old ephemeral set after our first precheck, committed
+    // materialisation, and retired that set before these puts completed. In
+    // that case this attach is the only ephemeral session left, but it still
+    // has to run the idempotent promotion pass into the now-durable workspace.
+    if (live.length > 1 || await isMaterialised(store, workspaceId)) {
       await materialise(ports, { workspaceId, descriptor: input.descriptor,
         reason: "second_live_session" });
     }
@@ -243,28 +247,25 @@ export function createSessionService(ports) {
 
     await store.transaction(async tx => {
       tx.put("session", sessionId, closed, tx.generationOf("session", sessionId));
-      // Work in progress goes back on the table. A task held by a session that
-      // has gone stayed `in_progress` forever, nobody else could take it, and
-      // whoever asked for it was never told - a request handed to an agent that
-      // closed its terminal simply vanished.
-      for (const task of tx.list("task")) {
-        if (task.assigneeSessionId !== sessionId) continue;
-        if (task.state === "done") continue;
-        const released = { ...task, assigneeSessionId: null, state: "pending" };
-        tx.put("task", task.taskId, released, tx.generationOf("task", task.taskId));
-        writeWorkResponse(tx, { task, actor: closed, workspaceId: closed.workspaceId,
-          now, ids, outcome: "released",
-          reason: "the session working on this closed before finishing it" });
-        tx.append({ schemaVersion: SCHEMA_VERSION, eventId: ids.next("event"),
-          workspaceId: closed.workspaceId, actorSessionId: sessionId,
-          type: "task.released", occurredAt: now, payload: { taskId: task.taskId } });
-      }
       tx.append({ schemaVersion: SCHEMA_VERSION, eventId: ids.next("event"),
         workspaceId: closed.workspaceId, actorSessionId: sessionId, type: "session.closed",
         occurredAt: now, payload: {} });
-    // `writeWorkResponse` tells whoever asked, on this same handle.
-    }, { kinds: ["message", "receipt", "session", "task"] });
+    }, { kinds: ["session"] });
     return closed;
+  }
+
+  async function listLiveSessions({ participantId, workspaceId, now = clock.now() }) {
+    const resolved = workspaceId ?? store.workspaceId;
+    const snapshot = resolved === undefined ? null
+      : await store.snapshot(resolved, { kinds: ["workspace", "session"] });
+    const records = snapshot?.workspace === null
+      ? await store.ephemeral.list("session")
+      : snapshot?.sessions ?? await store.ephemeral.list("session");
+    return records
+      .filter(session => session.participantId === participantId
+        && classifySessionPresence(session, now, pidIsAlive) !== "offline")
+      .sort((left, right) => left.sessionId.localeCompare(right.sessionId))
+      .map(session => ({ sessionId: session.sessionId, generation: session.generation }));
   }
 
   return {
@@ -272,6 +273,7 @@ export function createSessionService(ports) {
     resumeSession,
     heartbeatSession,
     closeSession,
+    listLiveSessions,
     locateSession: locate,
     ensureMaterialised: options => ensureMaterialised(ports, options),
   };

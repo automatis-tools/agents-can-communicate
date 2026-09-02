@@ -1,12 +1,19 @@
 {
   "name": "@agents-can-communicate/adapter-kimi",
-  "version": "0.1.18",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
   "exports": {
     ".": "./src/adapter.mjs"
   },
   "files": [
+    "certification.json",
+    "fixtures/certification-provenance.json",
+    "fixtures/SessionStart.json",
+    "fixtures/SessionHeartbeat.json",
+    "fixtures/UserPromptSubmit.json",
+    "fixtures/PreToolUse-Write.json",
+    "fixtures/PreToolUse-Bash.json",
     "src/",
     "plugin/"
   ]

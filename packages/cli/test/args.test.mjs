@@ -30,9 +30,9 @@ test("a trailing option with no value at all is a usage error", () => {
 });
 
 test("the inline form is unambiguous even when the value names an option", () => {
-  const parsed = parseArgs(message("--priority=--json"));
+  const parsed = parseArgs(message("--obligation=--json"));
 
-  assert.equal(parsed.options.priority, "--json");
+  assert.equal(parsed.options.obligation, "--json");
   assert.equal(parsed.options.json, undefined);
 });
 
@@ -50,10 +50,29 @@ test("an empty value is rejected in both forms", () => {
     error => error.code === EXIT.USAGE);
 });
 
-test("a flag takes no value in either form", () => {
-  assert.throws(() => parseArgs(message("--requires-ack=true")),
-    error => error.code === EXIT.USAGE && error.message.includes("does not take a value"));
-  assert.equal(parseArgs(message("--requires-ack")).options.requiresAck, true);
+test("send boundaries accept caller idempotency keys and the v0.2 obligation", () => {
+  assert.deepEqual(parseArgs(message("--client-message-id", "client_a",
+    "--obligation", "acknowledge")).options,
+  { session: "session_a", generation: "generation_a", to: ["models"], subject: "s",
+    body: "b", clientMessageId: "client_a", obligation: "acknowledge" });
+  assert.equal(parseArgs(["request", "--to", "models", "--title", "Review",
+    "--client-message-id", "client_request"]).options.clientMessageId, "client_request");
+  assert.equal(parseArgs(["reply", "--message", "message_a", "--body", "Done",
+    "--client-message-id", "client_reply"]).options.clientMessageId, "client_reply");
+  assert.equal(parseArgs(["finish", "--goal", "Ship",
+    "--client-message-id", "client_finish"]).options.clientMessageId, "client_finish");
+});
+
+test("legacy acknowledgement and transport-state controls are absent", () => {
+  assert.throws(() => parseArgs(message("--requires-ack")),
+    error => error.code === EXIT.USAGE && /unknown option/.test(error.message));
+  assert.throws(() => parseArgs(["ack", "--message", "message_a", "--state", "offered"]),
+    error => error.code === EXIT.USAGE && /unknown option/.test(error.message));
+});
+
+test("intent publishing has no legacy orchestration handle", () => {
+  assert.throws(() => parseArgs(["work", "--summary", "Review", "--workstream", "ws_a"]),
+    error => error.code === EXIT.USAGE && /unknown option/.test(error.message));
 });
 
 test("repeated options accumulate and single options refuse repetition", () => {
@@ -61,7 +80,7 @@ test("repeated options accumulate and single options refuse repetition", () => {
     "generation_a", "--to", "models", "--to", "ops", "--subject", "s", "--body", "b"]);
 
   assert.deepEqual(parsed.options.to, ["models", "ops"]);
-  assert.throws(() => parseArgs(message("--priority", "high", "--priority", "low")),
+  assert.throws(() => parseArgs(message("--obligation", "none", "--obligation", "reply")),
     error => error.code === EXIT.USAGE && error.message.includes("only once"));
 });
 
@@ -90,4 +109,12 @@ test("inbox targets an optional message and reply requires message plus body", (
     .options, { message: "message_a", body: "Done" });
   assert.throws(() => parseArgs(["reply", "--message", "message_a"]),
     error => error.code === EXIT.USAGE && error.message.includes("--body"));
+});
+
+test("install delivery policy is explicit and closed", () => {
+  assert.equal(parseArgs(["install"]).options.delivery, undefined);
+  assert.equal(parseArgs(["install", "--delivery", "actionable"]).options.delivery,
+    "actionable");
+  assert.throws(() => parseArgs(["uninstall", "--delivery", "all"]),
+    error => error.code === EXIT.USAGE && /unknown option/.test(error.message));
 });

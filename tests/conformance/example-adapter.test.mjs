@@ -43,14 +43,10 @@ function createAdapter() {
     id: "example_harness",
     displayName: "Example Harness",
     client: { command: "example", versionArgs: ["--version"] },
-    capabilities: {
-      lifecycle: { sessionStart: true, sessionEnd: true },
-      context: { startupInjection: true },
-      delivery: { polling: true },
-    },
+    capabilities: {},
+    certification: { evidence: [] },
     startSession: async () => ({ ok: true, changes: [], diagnostics: [] }),
     endSession: async () => ({ ok: true, changes: [], diagnostics: [] }),
-    poll: async () => ({ ok: true, changes: [], diagnostics: [] }),
 
     detect: async context => ({ ok: true, changes: [],
       diagnostics: [`config at ${context.configPath}`] }),

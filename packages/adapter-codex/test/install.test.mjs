@@ -11,6 +11,11 @@ import { EXIT } from "@agents-can-communicate/protocol";
 import { createCodexAdapter } from "../src/adapter.mjs";
 import { CODEX_HOOK_EVENTS, injectOutcome, normalizeCodexHook } from "../src/hooks.mjs";
 
+// Kept cohesive above 300 lines because every case shares the same real Codex
+// home/marketplace topology and jointly proves install, upgrade, and uninstall
+// ownership. Splitting would duplicate that foreign-state fixture and weaken
+// the round-trip assertions that compare the complete tree.
+
 // A marketplace the user already owns, in the shape this client actually
 // parses. `plugins` is a sequence; a map is rejected and takes the whole file
 // with it, so the earlier map-shaped fixture was testing a format that could
@@ -129,12 +134,13 @@ test("only capabilities observed in a real session are declared true", () => {
   assert.equal(capabilities.lifecycle.sessionStart, true);
   assert.equal(capabilities.lifecycle.sessionEnd, true);
   assert.equal(capabilities.guards.beforeWrite, true);
-  assert.equal(capabilities.guards.beforeShell, true);
+  assert.equal(capabilities.guards.beforeShell, false);
 
   // Not observed, so not claimed: no subagent ran during the capture.
   assert.equal(capabilities.lifecycle.childSessions, false);
-  assert.equal(capabilities.delivery.wakeDormantSession, false);
-  for (const value of Object.values(capabilities.execution)) assert.equal(value, false);
+  assert.equal(capabilities.delivery.nextTurn, true);
+  assert.equal(capabilities.delivery.livePush, false);
+  assert.equal(capabilities.delivery.replyRoute, false);
 });
 
 test("doctor reports the capture and the trust requirement", async t => {

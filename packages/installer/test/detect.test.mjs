@@ -11,8 +11,10 @@ import { detectInstallation } from "../src/detect.mjs";
 const adapter = (id, overrides = {}) => ({
   id,
   displayName: id,
-  client: { command: id, versionArgs: ["--version"] },
+  client: { command: id, certificationName: id, versionArgs: ["--version"] },
   capabilities: { guards: { beforeWrite: true }, lifecycle: { sessionEnd: true } },
+  certification: { evidence: [{ client: id, version: "0.147.0",
+    platform: "darwin-arm64", capability: "guards.beforeWrite", result: "pass" }] },
   detect: async () => ({ ok: true, changes: [],
     diagnostics: ["acc plugin not registered"] }),
   ...overrides,
@@ -50,6 +52,24 @@ test("a present client reports the version it printed", async t => {
   assert.equal(detected.find(entry => entry.adapterId === "kimi").present, false);
 });
 
+test("detection advertises only capabilities effective for the observed version and platform",
+  async t => {
+    const context = { home: await home(t), dataHome: await home(t) };
+    const exact = await detectInstallation({ adapters: [adapter("codex")],
+      probe: probeFor({ codex: "codex-cli 0.147.0" }), context,
+      platform: "darwin-arm64" });
+    const mismatch = await detectInstallation({ adapters: [adapter("codex")],
+      probe: probeFor({ codex: "codex-cli 0.148.0" }), context,
+      platform: "darwin-arm64" });
+    const unknown = await detectInstallation({ adapters: [adapter("codex")],
+      probe: probeFor({ codex: "build from source" }), context,
+      platform: "darwin-arm64" });
+
+    assert.equal(exact[0].capabilities.guards.beforeWrite, true);
+    assert.equal(mismatch[0].capabilities.guards.beforeWrite, false);
+    assert.equal(unknown[0].capabilities.guards.beforeWrite, false);
+  });
+
 test("a version that cannot be parsed is reported raw, not dropped", async t => {
   const context = { home: await home(t), dataHome: await home(t) };
 
@@ -63,6 +83,14 @@ test("a version that cannot be parsed is reported raw, not dropped", async t => 
   assert.equal(detected[0].versionOutput, "a build from source");
 });
 
+test("a conventional v-prefixed version is still an exact observed version", async t => {
+  const context = { home: await home(t), dataHome: await home(t) };
+  const detected = await detectInstallation({ adapters: [adapter("codex")],
+    probe: probeFor({ codex: "v0.147.0" }), context });
+
+  assert.equal(detected[0].version, "0.147.0");
+});
+
 test("detection asks the adapter whether ACC is already installed", async t => {
   const context = { home: await home(t), dataHome: await home(t) };
   const installed = adapter("codex", { detect: async () => ({ ok: true, changes: [],
@@ -74,6 +102,40 @@ test("detection asks the adapter whether ACC is already installed", async t => {
 
   assert.equal(detected[0].installed, true);
   assert.deepEqual(detected[0].diagnostics.length > 0, true);
+});
+
+test("a fallback diagnostic does not mutate adapter-owned detection results", async t => {
+  const context = { home: await home(t), dataHome: await home(t) };
+  const adapterDiagnostics = Object.freeze(["acc plugin not registered"]);
+  const durable = adapter("claude_code", {
+    deliveryFallback: { diagnostic: "native capture failed; use inbox" },
+    detect: async () => ({ ok: true, changes: [], diagnostics: adapterDiagnostics }),
+  });
+
+  const [detected] = await detectInstallation({ adapters: [durable],
+    probe: probeFor({ claude_code: "0.147.0" }), context });
+
+  assert.deepEqual(detected.diagnostics,
+    ["acc plugin not registered", "native capture failed; use inbox"]);
+  assert.deepEqual(adapterDiagnostics, ["acc plugin not registered"]);
+});
+
+test("an uncertified next-turn version is named as an inbox downgrade", async t => {
+  const context = { home: await home(t), dataHome: await home(t) };
+  const nextTurn = adapter("gemini_cli", {
+    capabilities: { delivery: { nextTurn: true } },
+    certification: { evidence: [{ client: "gemini_cli", version: "0.37.0",
+      platform: "darwin-arm64", capability: "delivery.nextTurn", result: "pass" }] },
+    deliveryFallback: { diagnostic: "live delivery unavailable; acc inbox remains active" },
+  });
+
+  const [detected] = await detectInstallation({ adapters: [nextTurn],
+    probe: probeFor({ gemini_cli: "0.55.1" }), context, platform: "darwin-arm64" });
+
+  assert.equal(detected.capabilities.delivery.nextTurn, false);
+  assert.match(detected.deliveryDiagnostic, /0\.55\.1/);
+  assert.match(detected.deliveryDiagnostic, /next-turn/);
+  assert.match(detected.deliveryDiagnostic, /acc inbox/);
 });
 
 test("detection writes nothing at all", async t => {

@@ -4,7 +4,7 @@ import path from "node:path";
 import test from "node:test";
 
 import { createCoordinationService } from "@agents-can-communicate/core";
-import { EXIT } from "@agents-can-communicate/protocol";
+import { EXIT, SCHEMA_VERSION } from "@agents-can-communicate/protocol";
 
 import { createFakeClock, createFakeIds, createMemoryStore } from "../helpers/memory-store.mjs";
 
@@ -46,7 +46,7 @@ const open = (service, participantId) => service.openSession({ workspaceId: "wor
   heartbeatCadenceMs: 30_000, descriptor });
 
 // The unbounded kinds: nothing limits how many of these a workspace collects.
-const UNBOUNDED = Object.freeze(["message", "receipt", "task", "event", "decision", "handoff"]);
+const UNBOUNDED = Object.freeze(["message", "receipt", "event"]);
 
 test("every transaction says what it reads", async () => {
   const { declarations, service } = spy();
@@ -57,9 +57,11 @@ test("every transaction says what it reads", async () => {
   await service.acquireClaim({ sessionId: session.sessionId, generation: session.generation,
     resource: "file:src/a.mjs", reason: "editing", descriptor });
   await service.sendMessage({ sessionId: session.sessionId, generation: session.generation,
-    toParticipantIds: ["peer"], type: "note", subject: "s", body: "b", descriptor });
-  await service.requestWork({ sessionId: session.sessionId, generation: session.generation,
-    toParticipantId: "peer", title: "please take this", descriptor });
+    clientMessageId: "client_scope_note", toParticipantIds: ["peer"], kind: "note",
+    obligation: "none", subject: "s", body: "b", descriptor });
+  await service.sendMessage({ sessionId: session.sessionId, generation: session.generation,
+    clientMessageId: "client_scope_request", toParticipantIds: ["peer"], kind: "request",
+    obligation: "reply", subject: "please take this", body: "please take this", descriptor });
   await service.closeSession({ sessionId: other.sessionId, generation: other.generation });
 
   assert.equal(declarations.length > 0, true);
@@ -108,7 +110,8 @@ test("reaching for an undeclared kind fails loudly", async () => {
 test("declaring nothing still reads everything", async () => {
   const { store } = spy();
   await store.transaction(async tx => {
-    tx.put("workspace", "workspace_a", { schemaVersion: 2, workspaceId: "workspace_a",
+    tx.put("workspace", "workspace_a", { schemaVersion: SCHEMA_VERSION,
+      workspaceId: "workspace_a",
       displayName: "x", source: "directory", roots: ["/tmp/x"],
       createdAt: "2026-08-23T00:00:00.000Z" });
   }, { kinds: ["workspace"] });

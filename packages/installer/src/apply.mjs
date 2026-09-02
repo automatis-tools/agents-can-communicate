@@ -1,4 +1,5 @@
-import { recordInstall, removeOwned } from "./ownership.mjs";
+import { finalizeRemoval, missingArtifactParents, recordInstall,
+  removeEmptyOwnedDirectories, removeOwnedArtifacts } from "./ownership.mjs";
 
 /**
  * Carry out a plan, one adapter at a time.
@@ -30,26 +31,41 @@ export async function applyPlan({ plan, adapters, context, dataHome, dryRun = fa
 
     try {
       if (plan.action === "install") {
-        const outcome = await adapter.install(context);
+        const createdDirectories = await missingArtifactParents({ home: context.home,
+          artifacts: operation.artifacts });
+        const installContext = { ...context,
+          requestedLivePolicy: operation.livePolicy ?? "off",
+          livePolicy: operation.effectiveLivePolicy ?? "off" };
+        const outcome = await adapter.install(installContext);
         // Recorded after the write, so a record never claims an install that
         // did not happen. The reverse order would leave uninstall trying to
         // remove files nothing created.
         await recordInstall({ dataHome, adapterId: adapter.id,
           version: operation.clientVersion ?? null, accVersion,
-          artifacts: operation.artifacts });
+          artifacts: operation.artifacts, createdDirectories });
         results.operations.push({ ...operation, applied: true,
-          changes: outcome.changes ?? [], diagnostics: outcome.diagnostics ?? [] });
+          changes: outcome.changes ?? [], diagnostics: [
+            ...(operation.deliveryDiagnostic === undefined
+              ? [] : [operation.deliveryDiagnostic]),
+            ...(outcome.diagnostics ?? []),
+          ] });
       } else {
-        // Ownership first: it decides what may be deleted, and the adapter's own
-        // uninstall then unpicks the entries it added to files the user owns.
-        const owned = await removeOwned({ dataHome, adapterId: adapter.id });
+        // Keep the record until every cleanup step succeeds. It is both the
+        // authority for deletion and the only durable recipe a retry has when
+        // the client or one of ACC's own artifacts is already gone.
+        const owned = await removeOwnedArtifacts({ dataHome, adapterId: adapter.id });
         // What ownership held back is passed on, because the adapter would
         // otherwise remove its own layout unconditionally and undo the decision.
         // The case that matters: someone put their own work inside a directory
         // ACC created, and a recognised path is not a reason to delete it.
         const outcome = await adapter.uninstall({ ...context, keep: owned.kept });
+        const directories = await removeEmptyOwnedDirectories({ home: context.home,
+          directories: owned.createdDirectories });
+        await finalizeRemoval({ dataHome, adapterId: adapter.id });
         results.operations.push({ ...operation, applied: true,
           changes: outcome.changes ?? [], removed: owned.removed, kept: owned.kept,
+          removedDirectories: directories.removed, keptDirectories: directories.kept,
+          missingDirectories: directories.missing,
           diagnostics: outcome.diagnostics ?? [] });
       }
     } catch (error) {

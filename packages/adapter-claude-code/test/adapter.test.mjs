@@ -116,8 +116,9 @@ test("only capabilities observed in a real session are declared true", () => {
   // Documented and real, but no subagent ran during the capture.
   assert.equal(capabilities.lifecycle.childSessions, false);
   assert.equal(capabilities.context.startupInjection, false);
-  assert.equal(capabilities.delivery.wakeDormantSession, false);
-  for (const value of Object.values(capabilities.execution)) assert.equal(value, false);
+  assert.equal(capabilities.delivery.nextTurn, true);
+  assert.equal(capabilities.delivery.livePush, false);
+  assert.equal(capabilities.delivery.replyRoute, false);
 });
 
 test("captured payloads normalise and drop conversation content", async () => {
@@ -228,6 +229,12 @@ test("doctor states that the handoff is not written at SessionEnd", async t => {
   // summarise anything. Saying so in doctor keeps the limitation visible.
   assert.match(report.diagnostics.join(" "), /while the model is active/);
   assert.match(report.diagnostics.join(" "), /captured/);
+  assert.match(report.diagnostics.join(" "), /2\.1\.252/,
+    "doctor hid which native-delivery capture failed");
+  assert.match(report.diagnostics.join(" "), /development-channel security warning/,
+    "doctor hid the client boundary that prevented native delivery");
+  assert.match(report.diagnostics.join(" "), /next-turn.*acc inbox/,
+    "doctor did not name the durable fallback");
 });
 
 test("the client's own registries come back byte for byte", async t => {

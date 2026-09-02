@@ -35,7 +35,6 @@ export function createIntentService(ports, sessions) {
       summary: input.summary,
       mode: input.mode,
       resourceHints: input.resourceHints ?? [],
-      workstreamId: input.workstreamId ?? null,
       state: input.state ?? "active",
       updatedAt: now,
     });

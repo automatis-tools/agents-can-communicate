@@ -67,6 +67,14 @@ test("every listed command says what it does", () => {
   assert.deepEqual(missing, [], "a command is listed with nothing said about it");
 });
 
+test("request help names the reply obligation it actually creates", () => {
+  const request = describeCommands().flatMap(group => group.commands)
+    .find(command => command.name === "request");
+
+  assert.match(request.summary, /reply-required/);
+  assert.doesNotMatch(request.summary, /acknowledged message/);
+});
+
 test("help and version answer even when the store cannot be opened", async t => {
   // They describe the program, not a workspace. Pointing the data home at a
   // file makes every command that opens the store fail, which is what proves

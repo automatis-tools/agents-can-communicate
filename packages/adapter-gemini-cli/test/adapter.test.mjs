@@ -5,6 +5,7 @@ import path from "node:path";
 import test from "node:test";
 
 import { EXIT } from "@agents-can-communicate/protocol";
+import { effectiveCapabilities } from "@agents-can-communicate/adapter-sdk";
 
 import { createGeminiCliAdapter } from "../src/adapter.mjs";
 import { allowResponse, denyResponse, injectResponse, normalizeGeminiHook }
@@ -30,6 +31,8 @@ async function fixture(t) {
 
 const captured = async name => JSON.parse(await readFile(
   new URL(`../fixtures/${name}.json`, import.meta.url), "utf8"));
+const adapterVersion = async () => JSON.parse(await readFile(
+  new URL("../package.json", import.meta.url), "utf8")).version;
 
 test("install adds ACC hooks beside the user's own on the same event", async t => {
   const { context, read } = await fixture(t);
@@ -71,7 +74,14 @@ test("install and uninstall are both idempotent", async t => {
   assert.deepEqual(await read(), restored);
 });
 
-test("the extension bundle carries a manifest and the coordination skill", async t => {
+test("the embedded extension manifest matches the release version", async () => {
+  const bundled = JSON.parse(await readFile(
+    new URL("../extension/gemini-extension.json", import.meta.url), "utf8"));
+  assert.equal(bundled.version, await adapterVersion(),
+    "embedded extension manifest drifted from the release version");
+});
+
+test("the installed extension carries a stamped manifest and coordination skill", async t => {
   const { context } = await fixture(t);
   await createGeminiCliAdapter().install(context);
   const target = path.join(context.home, ".gemini", "extensions", "agents-can-communicate");
@@ -81,6 +91,8 @@ test("the extension bundle carries a manifest and the coordination skill", async
   const manifest = JSON.parse(await readFile(
     path.join(target, "gemini-extension.json"), "utf8"));
   assert.equal(manifest.name, "agents-can-communicate");
+  assert.equal(manifest.version, await adapterVersion(),
+    "installed extension manifest drifted from the adapter package version");
   assert.equal(manifest.contextFileName, "skills/acc/SKILL.md");
 });
 
@@ -128,6 +140,22 @@ test("only capabilities observed firing are declared true", () => {
   assert.equal(capabilities.lifecycle.childSessions, false);
   assert.equal(capabilities.lifecycle.heartbeat, false);
   assert.equal(capabilities.guards.beforeRead, false);
+  assert.equal(capabilities.delivery.nextTurn, true);
+  assert.equal(capabilities.delivery.livePush, false);
+  assert.equal(capabilities.delivery.replyRoute, false);
+});
+
+test("next-turn delivery exists only at the exact certified client tier", () => {
+  const adapter = createGeminiCliAdapter();
+
+  assert.equal(effectiveCapabilities(adapter,
+    { clientVersion: "0.37.0", platform: "darwin-arm64" }).delivery.nextTurn, true);
+  assert.equal(effectiveCapabilities(adapter,
+    { clientVersion: "0.55.1", platform: "darwin-arm64" }).delivery.nextTurn, false);
+  assert.equal(effectiveCapabilities(adapter,
+    { clientVersion: undefined, platform: "darwin-arm64" }).delivery.nextTurn, false);
+  assert.match(adapter.deliveryFallback.diagnostic, /0\.37\.0/);
+  assert.match(adapter.deliveryFallback.diagnostic, /acc inbox/);
 });
 
 test("a deny uses the shape this client acts on, not the one two others accept", () => {

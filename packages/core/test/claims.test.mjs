@@ -64,21 +64,6 @@ test("shared claims coexist while an exclusive claim excludes everything", async
     error => error.code === EXIT.CONFLICT);
 });
 
-test("claims are workspace-global even across independent workstreams", async () => {
-  const { service } = makeService();
-  const { first, second } = await twoSessions(service);
-  const left = await service.createWorkstream({ sessionId: first.sessionId,
-    generation: first.generation, title: "Camera", objective: "Ship the camera" });
-  const right = await service.createWorkstream({ sessionId: second.sessionId,
-    generation: second.generation, title: "Models", objective: "Ship the models" });
-  await service.acquireClaim(claiming(first, { workstreamId: left.workstreamId }));
-
-  // Approved 2026-08-15: independent work stays independent, but a claim is a
-  // workspace-wide fact. Two workstreams cannot both own one resource.
-  await assert.rejects(service.acquireClaim(claiming(second,
-    { workstreamId: right.workstreamId })), error => error.code === EXIT.CONFLICT);
-});
-
 test("an expired lease stops conflicting", async () => {
   const { service, clock } = makeService();
   const { first, second } = await twoSessions(service);

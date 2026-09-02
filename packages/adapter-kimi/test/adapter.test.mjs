@@ -1,3 +1,6 @@
+// Kept cohesive above 300 lines because every case exercises one adapter contract through the
+// same byte-exact user-owned TOML fixture; splitting would duplicate the installation harness
+// and weaken the paired install/uninstall assertions that protect the user's configuration.
 import assert from "node:assert/strict";
 import { mkdtemp, readFile, readdir, realpath, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -5,6 +8,7 @@ import path from "node:path";
 import test from "node:test";
 
 import { EXIT } from "@agents-can-communicate/protocol";
+import { effectiveCapabilities } from "@agents-can-communicate/adapter-sdk";
 
 import { createKimiAdapter } from "../src/adapter.mjs";
 import { allowResponse, denyResponse, injectResponse, normalizeKimiHook }
@@ -165,7 +169,22 @@ test("only capabilities observed firing are declared true", () => {
   assert.equal(capabilities.lifecycle.sessionEnd, false);
   assert.equal(capabilities.lifecycle.childSessions, false);
   assert.equal(capabilities.guards.beforeRead, false);
-  for (const value of Object.values(capabilities.execution)) assert.equal(value, false);
+  assert.equal(capabilities.delivery.nextTurn, true);
+  assert.equal(capabilities.delivery.livePush, false);
+  assert.equal(capabilities.delivery.replyRoute, false);
+});
+
+test("next-turn delivery downgrades visibly outside the exact certified tier", () => {
+  const adapter = createKimiAdapter();
+
+  assert.equal(effectiveCapabilities(adapter,
+    { clientVersion: "0.36.1", platform: "darwin-arm64" }).delivery.nextTurn, true);
+  assert.equal(effectiveCapabilities(adapter,
+    { clientVersion: "0.36.2", platform: "darwin-arm64" }).delivery.nextTurn, false);
+  assert.equal(effectiveCapabilities(adapter,
+    { clientVersion: null, platform: "darwin-arm64" }).delivery.nextTurn, false);
+  assert.match(adapter.deliveryFallback.diagnostic, /0\.36\.1/);
+  assert.match(adapter.deliveryFallback.diagnostic, /acc inbox/);
 });
 
 test("captured payloads normalise and drop conversation content", async () => {

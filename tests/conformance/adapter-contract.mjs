@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { CAPABILITY_SHAPE, projectContext } from "@agents-can-communicate/adapter-sdk";
+import { CAPABILITY_SHAPE, effectiveCapabilities, projectContext }
+  from "@agents-can-communicate/adapter-sdk";
 
 /**
  * The shared matrix behind docs/ADAPTER_AUTHORING.md. Every adapter is held to it, so a
@@ -22,6 +23,14 @@ export function runAdapterConformance(name, kit) {
       for (const value of Object.values(declared[group])) {
         assert.equal(typeof value, "boolean");
       }
+    }
+  });
+
+  test(`${name}: unknown client versions degrade every capability to false`, () => {
+    const effective = effectiveCapabilities(adapter(), {
+      clientVersion: "unknown", platform: `${process.platform}-${process.arch}` });
+    for (const group of Object.values(effective)) {
+      for (const value of Object.values(group)) assert.equal(value, false);
     }
   });
 

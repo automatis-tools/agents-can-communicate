@@ -110,6 +110,8 @@ export function describeChanges(operation, home) {
   }
   return [
     ...(operation.removed ?? []).map(file => `  removed ${shorten(file, home)}`),
+    ...(operation.removedDirectories ?? [])
+      .map(file => `  removed ${shorten(file, home)}`),
     ...edited,
     ...(operation.kept ?? [])
       .map(file => `  kept    ${shorten(file, home)} - changed since ACC wrote it`),
@@ -122,6 +124,9 @@ export function describeOutcome({ action, acted, failed = [], skipped = [],
     + (failed.length > 0 ? `; ${failed.length} failed` : ""),
   ...operations.filter(operation => operation.applied)
     .flatMap(operation => describeChanges(operation, home)),
+  ...operations.filter(operation => operation.applied
+    && typeof operation.deliveryDiagnostic === "string")
+    .map(operation => `  ${operation.deliveryDiagnostic}`),
   ...skipped.map(entry => `  skip ${entry.adapterId}: ${entry.reason}`),
   ...failed.map(entry => `  ${entry.adapterId}: ${entry.error}`),
   // Said once, where it is needed: the reader has just been shown a list of
@@ -165,7 +170,8 @@ export function failureOf({ action, acted, failed = [] }) {
 export function actedOn(result) {
   return result.operations.filter(operation => operation.applied
     && (result.action === "install"
-      || (operation.removed?.length ?? 0) + (operation.changes?.length ?? 0) > 0)).length;
+      || (operation.removed?.length ?? 0) + (operation.removedDirectories?.length ?? 0)
+        + (operation.changes?.length ?? 0) > 0)).length;
 }
 
 export async function runInstallCommand({ options, runtime, action = "install" }) {
@@ -200,7 +206,8 @@ export async function runInstallCommand({ options, runtime, action = "install" }
     ? []
     : (Array.isArray(options.adapter) ? options.adapter : [options.adapter]);
   const plan = planInstallation({ adapters, detected, context, action, recorded,
-    accVersion, allowDowngrade: options.downgrade === true, requested });
+    accVersion, allowDowngrade: options.downgrade === true, requested,
+    delivery: options.delivery ?? "off" });
   const result = await applyPlan({ plan, adapters, context, dataHome, dryRun, accVersion });
 
   const acted = actedOn(result);

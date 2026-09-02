@@ -78,7 +78,8 @@ test("a kinds-scoped snapshot returns those kinds and leaves the rest empty", as
     heartbeatCadenceMs: 30_000,
     descriptor: { id: "workspace_a", roots: ["/tmp/x"], source: "directory" } });
   await service.sendMessage({ sessionId: session.sessionId, generation: session.generation,
-    toParticipantIds: ["solo"], type: "note", subject: "s", body: "b",
+    clientMessageId: "client_scope", toParticipantIds: ["solo"], kind: "note",
+    obligation: "none", subject: "s", body: "b",
     descriptor: { id: "workspace_a", roots: ["/tmp/x"], source: "directory" } });
 
   const narrow = await service.store.snapshot("workspace_a",

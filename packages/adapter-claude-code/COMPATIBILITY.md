@@ -119,3 +119,26 @@ Two details that only a diff shows:
 Verified on a real machine: after `acc install --adapter claude_code`, a
 `claude -p` run with nothing about ACC in the prompt attached a session by
 itself, and `acc uninstall` restored all three files byte for byte.
+
+## Native Channel boundary (2026-09-01)
+
+The installed Claude Code `2.1.252` recognizes the documented
+`--dangerously-load-development-channels server:acc-spike` entry and displays the
+full-screen development-channel security warning before starting the configured MCP
+child. The operator cancelled at that warning rather than bypassing it. The `acc-spike`
+child was not spawned and its Unix-domain socket was never created.
+
+The real-client capture is therefore `fail`: channel registration, idle delivery, busy
+queueing, reply routing, duplicate retry, and durable fallback are all unobserved. The
+zero-network spike advertises `claude/channel` plus tools only, omits permission relay,
+uses stdio for MCP, and accepts one bounded envelope on a mode-`0600` Unix-domain socket
+outside the repository, but those properties are implementation boundaries rather than
+real-client certification. No native delivery capability is certified by this evidence.
+The redacted capture is under `fixtures/delivery/`.
+
+The shipped adapter therefore keeps `delivery.livePush` and `delivery.replyRoute` false.
+`acc install --adapter claude_code --delivery actionable` (or `all`) reports the failed
+capture, keeps the effective policy `off`, and installs no Channel MCP entry. The default
+is also `off`. Messages remain durable for the certified 2.1.233 next-turn hook or for
+explicit recovery through `acc inbox`; an unknown or uncertified version retains the inbox
+path without being promoted to next-turn support. `acc doctor` reports the same boundary.

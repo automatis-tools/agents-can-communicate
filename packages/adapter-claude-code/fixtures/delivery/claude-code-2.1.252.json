@@ -1,0 +1,19 @@
+{
+  "client": "claude-code",
+  "version": "2.1.252",
+  "platform": "darwin-arm64",
+  "observedAt": "2026-09-01T16:17:06Z",
+  "capability": "claude_channel_native_delivery",
+  "result": "fail",
+  "fixture": "claude-code-2.1.252-channel",
+  "idle": "unobserved",
+  "busy": "unobserved",
+  "reply": "unobserved",
+  "duplicate": "unobserved",
+  "fallback": "unobserved",
+  "limitations": [
+    "Claude Code displayed the development-channel security warning and the operator did not accept it",
+    "Claude Code did not spawn the acc-spike MCP child and the Unix-domain socket was never created",
+    "idle, busy, reply, duplicate, and fallback branches were not observed"
+  ]
+}

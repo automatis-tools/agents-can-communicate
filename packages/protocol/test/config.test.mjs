@@ -110,9 +110,14 @@ test("runtime state is refused in a file that lives in the repository", () => {
   // A repository is the wrong place for them, and a config carrying them is
   // either a mistake or an attempt to inject state a peer would trust.
   for (const key of ["sessions", "participants", "messages", "claims", "receipts",
-    "intents", "events", "tokens", "credentials"]) {
-    assert.throws(() => validateProjectConfig(valid({ [key]: [] })),
-      error => error.code === EXIT.DATA && new RegExp(key).test(error.message),
+    "intents", "events", "deliveryBindings", "tokens", "credentials"]) {
+    assert.throws(() => validateProjectConfig(valid({ [key]: [] })), candidate => {
+      assert.equal(candidate.code, EXIT.DATA);
+      assert.match(candidate.message, /runtime state/,
+        `${key} was not classified as runtime state`);
+      assert.deepEqual(candidate.details.keys, [key]);
+      return true;
+    },
       `${key} was accepted in a project config`);
   }
 });

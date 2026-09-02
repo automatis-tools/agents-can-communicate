@@ -24,8 +24,30 @@ const repo = path.resolve(import.meta.dirname, "..", "..");
  * be the stronger check and is not portable: a gzip stream carries mtimes, and
  * the CI matrix builds on two platforms.
  */
-const PACKED = Object.freeze(["bin/", "packages/", "README.md", "LICENSE",
-  "docs/CAPABILITIES.md", "package.json"]);
+const PACKED = Object.freeze([
+  "bin/",
+  "packages/",
+  "docs/ADAPTER_AUTHORING.md",
+  "docs/ARCHITECTURE.md",
+  "docs/CAPABILITIES.md",
+  "docs/CLI.md",
+  "docs/CONCEPTS.md",
+  "docs/CONFIGURATION.md",
+  "docs/DESIGN_DECISIONS.md",
+  "docs/GETTING_STARTED.md",
+  "docs/GLOSSARY.md",
+  "docs/MCP.md",
+  "docs/PROTOCOL.md",
+  "docs/RELEASING.md",
+  "docs/SECURITY_MODEL.md",
+  "docs/TROUBLESHOOTING.md",
+  "docs/WHY_ACC.md",
+  "docs/index.md",
+  "SECURITY.md",
+  "README.md",
+  "LICENSE",
+  "package.json",
+]);
 
 // npm packs these whatever `files` says, which is why `files` cannot be the
 // whole answer: the manifest always travels, and the bundled workspaces come
@@ -39,7 +61,7 @@ const git = async (...argv) => {
   // Inherited from a hook or a test runner, these describe someone else's
   // repository. The provenance script strips them for the same reason.
   for (const name of ["GIT_DIR", "GIT_WORK_TREE"]) delete env[name];
-  return (await run("git", argv, { cwd: repo, env })).stdout.trim();
+  return (await run("git", argv, { cwd: repo, env })).stdout;
 };
 
 test("the changelog's digest describes the code that is here now", async () => {

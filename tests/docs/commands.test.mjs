@@ -18,6 +18,18 @@ const repo = path.resolve(import.meta.dirname, "..", "..");
  */
 const MARKER = "<!-- test:command -->";
 
+const LEAD = "ACC connects independently opened AI sessions so they can discover, ask, "
+  + "answer, acknowledge, and hand off without becoming one managed agent team.";
+
+async function shippedMarkdown() {
+  const manifest = JSON.parse(await readFile(path.join(repo, "package.json"), "utf8"));
+  const markdown = manifest.files.filter(entry => entry.endsWith(".md"));
+  for (const required of ["README.md", "SECURITY.md"]) {
+    assert.equal(markdown.includes(required), true, `${required} is no longer declared public`);
+  }
+  return markdown;
+}
+
 async function markedCommands(file) {
   const text = await readFile(file, "utf8");
   const blocks = [];
@@ -69,6 +81,60 @@ test("every documented command is one the CLI still accepts", async t => {
       .catch(error => { throw new Error(`${command}\n${error.stdout || error.message}`); });
     assert.equal(JSON.parse(stdout).ok, true, command);
   }
+});
+
+test("public docs describe the communication product that actually ships", async () => {
+  const entries = await Promise.all((await shippedMarkdown()).map(async file => ({ file,
+    source: await readFile(path.join(repo, file), "utf8") })));
+
+  for (const { file, source } of entries) {
+    assert.doesNotMatch(source, /\bacc (?:task|workstream|decide)\b/,
+      `${file} teaches a removed orchestration command`);
+    for (const line of source.split("\n")) {
+      const staleReceipt = /(?:\b(?:receipt|delivery)\b.*\b(?:injected|seen)\b|\b(?:injected|seen)\b.*\b(?:receipt|delivery)\b|->.*\b(?:injected|seen)\b)/i;
+      const clearlyNegative = /\b(?:no|not|never|without|cannot|removed|rejected)\b/i;
+      if (staleReceipt.test(line) && !clearlyNegative.test(line)) {
+        assert.fail(`${file} teaches stale receipt vocabulary: ${line.trim()}`);
+      }
+    }
+  }
+
+  const readme = entries.find(entry => entry.file === "README.md").source;
+  assert.match(readme, new RegExp(LEAD.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")),
+    "README lost the communication-first lead");
+  assert.match(readme, /second independently opened session[\s\S]*useful acknowledged interaction[\s\S]*without the human copying peer message content/i,
+    "README lost the one activation event");
+
+  const protocol = entries.find(entry => entry.file === "docs/PROTOCOL.md").source;
+  assert.match(protocol, /queued\s*->\s*offered\s*->\s*retrieved\s*->\s*acknowledged/,
+    "protocol lost the truthful receipt lifecycle");
+  for (const distinction of [/offered[^\n]*not[^\n]*read/i,
+    /retrieved[^\n]*not[^\n]*model attention/i,
+    /reply[^\n]*not[^\n]*task completion/i]) {
+    assert.match(protocol, distinction, `protocol lost distinction ${distinction}`);
+  }
+
+  const decisions = entries.find(entry => entry.file === "docs/DESIGN_DECISIONS.md").source;
+  assert.match(decisions, /no coordinator, workstream, or task subsystem/i,
+    "design decisions still describe the removed orchestration hierarchy");
+  assert.match(decisions, /explicit peer conversations?[^\n]*(?:product|first-class)/i,
+    "design decisions do not name peer conversations as product data");
+  assert.match(decisions, /raw transcripts?[^\n]*(?:never|not)[^\n]*(?:collect|share)/i,
+    "design decisions do not exclude raw transcript collection");
+
+  const capabilities = entries.find(entry => entry.file === "docs/CAPABILITIES.md").source;
+  for (const dimension of ["Certified support", "Current reachability", "Recipient policy",
+    "Fallback"]) {
+    assert.match(capabilities, new RegExp(`^## ${dimension}$`, "m"),
+      `capabilities do not separate ${dimension.toLowerCase()}`);
+  }
+});
+
+test("the release check uses the same isolated npm cache as pack and tests", async () => {
+  const releasing = await readFile(path.join(repo, "docs", "RELEASING.md"), "utf8");
+  assert.match(releasing,
+    /env npm_config_cache=\/private\/tmp\/acc-npm-cache-v02 node scripts\/verify-package\.mjs/,
+  "verify-package can fall back to the machine's root-owned npm cache");
 });
 
 test("the getting-started guide covers the flow it promises", async () => {

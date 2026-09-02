@@ -1,12 +1,19 @@
 {
   "name": "@agents-can-communicate/adapter-codex",
-  "version": "0.1.18",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
   "exports": {
     ".": "./src/adapter.mjs"
   },
   "files": [
+    "certification.json",
+    "fixtures/certification-provenance.json",
+    "fixtures/SessionStart.json",
+    "fixtures/SessionEnd.json",
+    "fixtures/UserPromptSubmit.json",
+    "fixtures/PreToolUse.json",
+    "fixtures/delivery/codex-cli-0.152.0.json",
     "src/",
     "plugin/"
   ]

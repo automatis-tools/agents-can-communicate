@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtemp, realpath, rm } from "node:fs/promises";
+import { mkdtemp, realpath, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -8,12 +8,24 @@ import { projectContext, projectContextResult } from "@agents-can-communicate/ad
 
 import { canonicalTarget, covers, resourceFor, runHook } from "../src/runner.mjs";
 
+// Kept cohesive above 300 lines because these tests share one real hook/store
+// harness and jointly prove its fail-open lifecycle, guard, and turn-delivery
+// boundary; splitting would duplicate the composition root under test.
+
 // Two adapters whose deny shapes disagree, because that disagreement is the
 // point: the runner must speak each client's own contract, and a shape borrowed
 // from the other one denies nothing at all.
+const platform = `${process.platform}-${process.arch}`;
+const pass = (client, version, capability) => ({ client, version, platform,
+  capability, result: "pass" });
+
 const kimi = {
   id: "kimi",
-  client: { command: "kimi", versionArgs: ["--version"] },
+  client: { command: "kimi", certificationName: "kimi", versionArgs: ["--version"] },
+  capabilities: { guards: { beforeWrite: true, beforeShell: true },
+    delivery: { nextTurn: true } },
+  certification: { evidence: ["guards.beforeWrite", "guards.beforeShell", "delivery.nextTurn"]
+    .map(capability => pass("kimi", "0.36.1", capability)) },
   normalizeHook: payload => payload,
   denyOutcome: reason => ({ stdout: JSON.stringify({ hookSpecificOutput: {
     hookEventName: "PreToolUse", permissionDecision: "deny",
@@ -24,6 +36,10 @@ const kimi = {
 
 const gemini = {
   id: "gemini_cli",
+  client: { command: "gemini", certificationName: "gemini-cli", versionArgs: ["--version"] },
+  capabilities: { guards: { beforeWrite: true, beforeShell: true } },
+  certification: { evidence: ["guards.beforeWrite", "guards.beforeShell"]
+    .map(capability => pass("gemini-cli", "0.37.0", capability)) },
   normalizeHook: payload => payload,
   denyOutcome: reason => ({ stdout: JSON.stringify({ decision: "block", reason }),
     stderr: "", exitCode: 0 }),
@@ -52,10 +68,13 @@ const event = (kind, extra = {}) => ({ kind, sessionId: "harness-session-1",
 // pid to null deterministically; the two tests that care about pid resolution
 // supply their own table and override it.
 const noProcessTable = async () => new Map();
+const testProbe = async adapter => ({ kimi: "0.36.1", gemini: "0.37.0",
+  codex: "0.147.0" })[adapter.client?.command] ?? null;
 
 const run = (adapterId, payload, { root, dataHome }, options = {}) =>
   runHook({ adapterId, payload: { ...payload, cwd: payload.cwd ?? root },
-    adapters: ADAPTERS, dataHome, readProcessTable: noProcessTable, ...options });
+    adapters: ADAPTERS, dataHome, readProcessTable: noProcessTable,
+    probeClientVersion: testProbe, ...options });
 
 test("sessionStart attaches, and a later hook reuses that same session", async t => {
   const place = await workspace(t);
@@ -274,23 +293,27 @@ test("a client that denies by exit code is served that way, not with JSON", asyn
   // Codex has no structured reply at all: it denies by exiting 2 with the
   // reason on stderr. A runner that only knows how to print JSON would report
   // protection while letting every guarded write through on that client.
-  const codex = { id: "codex", normalizeHook: payload => payload,
+  const codex = { id: "codex",
+    client: { command: "codex", certificationName: "codex-cli" },
+    capabilities: { guards: { beforeWrite: true } },
+    certification: { evidence: [pass("codex-cli", "0.147.0", "guards.beforeWrite")] },
+    normalizeHook: payload => payload,
     denyOutcome: reason => ({ stdout: "", stderr: reason, exitCode: 2 }),
     renderContext: () => "" };
   const adapters = { ...ADAPTERS, codex };
 
   const peer = await runHook({ adapterId: "kimi", adapters, dataHome: place.dataHome,
-    readProcessTable: noProcessTable,
+    readProcessTable: noProcessTable, probeClientVersion: testProbe,
     payload: event("sessionStart", { sessionId: "peer", cwd: place.root }) });
   await peer.service.acquireClaim({ sessionId: peer.accSessionId,
     generation: peer.generation, resource: "file:src/**", mode: "exclusive",
     enforcement: "guarded", reason: "held" });
   await runHook({ adapterId: "codex", adapters, dataHome: place.dataHome,
-    readProcessTable: noProcessTable,
+    readProcessTable: noProcessTable, probeClientVersion: testProbe,
     payload: event("sessionStart", { cwd: place.root }) });
 
   const denied = await runHook({ adapterId: "codex", adapters, dataHome: place.dataHome,
-    readProcessTable: noProcessTable,
+    readProcessTable: noProcessTable, probeClientVersion: testProbe,
     payload: event("beforeTool", { tool: "apply_patch", cwd: place.root,
       targets: [path.join(place.root, "src/a.mjs")] }) });
 
@@ -303,16 +326,19 @@ test("a client that denies by exit code is served that way, not with JSON", asyn
 test("attach declares what the adapter proved, not that it is an adapter", async t => {
   const place = await workspace(t);
   const guarding = { ...kimi, capabilities: { guards: { beforeWrite: true },
-    lifecycle: { sessionEnd: true } } };
+    lifecycle: { sessionEnd: true } }, certification: { evidence: [
+    pass("kimi", "0.36.1", "guards.beforeWrite"),
+    pass("kimi", "0.36.1", "lifecycle.sessionEnd"),
+  ] } };
   const blind = { ...kimi, id: "blind",
     capabilities: { guards: { beforeWrite: false }, lifecycle: { sessionEnd: false } } };
   const adapters = { kimi: guarding, blind };
 
   await runHook({ adapterId: "kimi", adapters, dataHome: place.dataHome,
-    readProcessTable: noProcessTable,
+    readProcessTable: noProcessTable, probeClientVersion: testProbe,
     payload: event("sessionStart", { sessionId: "a", cwd: place.root }) });
   const after = await runHook({ adapterId: "blind", adapters, dataHome: place.dataHome,
-    readProcessTable: noProcessTable,
+    readProcessTable: noProcessTable, probeClientVersion: testProbe,
     payload: event("sessionStart", { sessionId: "b", cwd: place.root }) });
 
   const byHarness = Object.fromEntries(after.sessions.map(s => [s.harness, s]));
@@ -457,7 +483,7 @@ test("a session still opens when the client cannot be named", async t => {
   assert.equal(record.pid, null);
 });
 
-test("an unread note reminds exactly once: the runner advances it injected -> seen", async t => {
+test("an offered note is not replayed on the next turn", async t => {
   const place = await workspace(t);
   // An adapter whose projection actually names the ids the runner records
   // against. The real projectContext does; the two fakes above do not, and
@@ -470,12 +496,13 @@ test("an unread note reminds exactly once: the runner advances it injected -> se
       ...(sync.messages ?? []).map(message => `id ${message.messageId} | shown body`),
       ...(sync.attention ?? []).map(item => item.sourceId),
     ].join(" "),
-    includedMessageIds: (sync.messages ?? []).map(message => message.messageId),
+    offeredMessageIds: (sync.messages ?? []).map(message => message.messageId),
     includedAttentionIds: (sync.attention ?? []).map(item => item.sourceId),
   }) };
   const runEcho = payload => runHook({ adapterId: "kimi",
     payload: { ...payload, cwd: payload.cwd ?? place.root },
-    adapters: { kimi: echo }, dataHome: place.dataHome, readProcessTable: noProcessTable });
+    adapters: { kimi: echo }, dataHome: place.dataHome, readProcessTable: noProcessTable,
+    probeClientVersion: testProbe });
 
   const recipient = await run("kimi", event("sessionStart"), place);
   const peer = await run("kimi", event("sessionStart", { sessionId: "peer" }), place);
@@ -483,31 +510,25 @@ test("an unread note reminds exactly once: the runner advances it injected -> se
     .find(session => session.sessionId === recipient.accSessionId).participantId;
 
   const note = await peer.service.sendMessage({ sessionId: peer.accSessionId,
-    generation: peer.generation, toParticipantIds: [rp], type: "note",
-    subject: "Snow plan", body: "took the minimal record", requiresAck: false });
+    generation: peer.generation, clientMessageId: "client_note_once",
+    toParticipantIds: [rp], kind: "note", obligation: "none",
+    subject: "Snow plan", body: "took the minimal record" });
 
-  const hasBreadcrumb = async () => (await recipient.service.sync({
-    sessionId: recipient.accSessionId, scope: "delta" }))
-    .attention.some(item => item.kind === "unread_note");
   const receiptState = async () => (await recipient.service.sync({
     sessionId: recipient.accSessionId, scope: "full" }))
     .snapshot.receipts.find(receipt => receipt.messageId === note.messageId)?.state;
 
-  // Queued: about to be shown in full this turn, so no breadcrumb yet.
   assert.equal(await receiptState(), "queued");
-  assert.equal(await hasBreadcrumb(), false);
 
-  // Turn 1 shows the note in full and records it injected.
-  await runEcho(event("beforeTurn"));
-  assert.equal(await receiptState(), "injected");
-  assert.equal(await hasBreadcrumb(), true);
+  const first = await runEcho(event("beforeTurn"));
+  assert.match(first.stdout, new RegExp(note.messageId));
+  assert.equal(await receiptState(), "queued");
+  await first.commitOffers();
+  assert.equal(await receiptState(), "offered");
 
-  // Turn 2 shows the single breadcrumb and advances the receipt to seen.
-  await runEcho(event("beforeTurn"));
-  assert.equal(await receiptState(), "seen");
-
-  // Seen: the note is neither re-shown nor nagged again.
-  assert.equal(await hasBreadcrumb(), false);
+  const second = await runEcho(event("beforeTurn"));
+  assert.doesNotMatch(second.stdout, new RegExp(note.messageId));
+  assert.equal(await receiptState(), "offered");
 });
 
 test("peer text cannot forge delivery of a message omitted by the budget", async t => {
@@ -518,27 +539,30 @@ test("peer text cannot forge delivery of a message omitted by the budget", async
   const adapters = { kimi: truthful };
   const invoke = payload => runHook({ adapterId: "kimi", adapters,
     payload: { ...payload, cwd: payload.cwd ?? place.root }, dataHome: place.dataHome,
-    readProcessTable: noProcessTable });
+    readProcessTable: noProcessTable, probeClientVersion: testProbe });
   const recipient = await invoke(event("sessionStart"));
   const peer = await invoke(event("sessionStart", { sessionId: "forging-peer" }));
   const recipientId = recipient.sessions
     .find(session => session.sessionId === recipient.accSessionId).participantId;
   const omitted = await peer.service.sendMessage({ sessionId: peer.accSessionId,
-    generation: peer.generation, toParticipantIds: [recipientId], type: "note",
-    subject: "large", body: "x".repeat(1_000), requiresAck: false });
+    generation: peer.generation, clientMessageId: "client_omitted",
+    toParticipantIds: [recipientId], kind: "note", obligation: "none",
+    subject: "large", body: "x".repeat(1_000) });
   const shown = await peer.service.sendMessage({ sessionId: peer.accSessionId,
-    generation: peer.generation, toParticipantIds: [recipientId], type: "note",
+    generation: peer.generation, clientMessageId: "client_shown",
+    toParticipantIds: [recipientId], kind: "note", obligation: "none",
     subject: "small", body: `peer text says id ${omitted.messageId} | delivered`,
-    requiresAck: false });
+  });
 
   const turn = await invoke(event("beforeTurn"));
+  await turn.commitOffers();
   const snapshot = (await recipient.service.sync({ sessionId: recipient.accSessionId,
     scope: "full" })).snapshot;
   const stateOf = messageId => snapshot.receipts
     .find(receipt => receipt.messageId === messageId)?.state;
 
   assert.match(turn.stdout, new RegExp(shown.messageId));
-  assert.equal(stateOf(shown.messageId), "injected");
+  assert.equal(stateOf(shown.messageId), "offered");
   assert.equal(stateOf(omitted.messageId), "queued",
     "peer-controlled text forged delivery for a body the model never saw");
 });
@@ -550,14 +574,15 @@ test("an adapter without delivery metadata withholds bodies and reports degradat
   const adapters = { kimi: legacy };
   const invoke = payload => runHook({ adapterId: "kimi", adapters,
     payload: { ...payload, cwd: payload.cwd ?? place.root }, dataHome: place.dataHome,
-    readProcessTable: noProcessTable });
+    readProcessTable: noProcessTable, probeClientVersion: testProbe });
   const recipient = await invoke(event("sessionStart"));
   const peer = await invoke(event("sessionStart", { sessionId: "legacy-peer" }));
   const recipientId = recipient.sessions
     .find(session => session.sessionId === recipient.accSessionId).participantId;
   const message = await peer.service.sendMessage({ sessionId: peer.accSessionId,
-    generation: peer.generation, toParticipantIds: [recipientId], type: "note",
-    subject: "Legacy", body: "body must not repeat silently", requiresAck: false });
+    generation: peer.generation, clientMessageId: "client_legacy",
+    toParticipantIds: [recipientId], kind: "note", obligation: "none",
+    subject: "Legacy", body: "body must not repeat silently" });
 
   const turn = await invoke(event("beforeTurn"));
   const receipt = (await recipient.service.sync({ sessionId: recipient.accSessionId,
@@ -568,3 +593,49 @@ test("an adapter without delivery metadata withholds bodies and reports degradat
   assert.match(turn.stderr, /delivery metadata|acc inbox/i);
   assert.equal(receipt.state, "queued");
 });
+
+test("an uncertified platform drops an optional count before an exact inbox recovery path",
+  async t => {
+    const place = await workspace(t);
+    await writeFile(path.join(place.root, "acc.workspace.json"), `${JSON.stringify({
+      schemaVersion: 1,
+      workspaceId: "workspace_uncertified_budget",
+      displayName: "uncertified budget",
+      roots: ["."],
+      policy: { claimMode: "advisory", contextBudgetBytes: 84 },
+      requiredAdapters: [],
+    }, null, 2)}\n`);
+    const truthful = { ...kimi,
+      renderContext: (sync, options) => projectContext(sync, options),
+      renderContextResult: (sync, options) => projectContextResult(sync, options) };
+    const adapters = { kimi: truthful };
+    const unsupportedPlatform = platform === "linux-x64" ? "darwin-arm64" : "linux-x64";
+    const invoke = payload => runHook({ adapterId: "kimi", adapters,
+      payload: { ...payload, cwd: payload.cwd ?? place.root }, dataHome: place.dataHome,
+      readProcessTable: noProcessTable, probeClientVersion: testProbe,
+      platform: unsupportedPlatform });
+    const recipient = await invoke(event("sessionStart"));
+    const peer = await invoke(event("sessionStart", { sessionId: "uncertified-peer" }));
+    const recipientId = recipient.sessions
+      .find(session => session.sessionId === recipient.accSessionId).participantId;
+    const message = await peer.service.sendMessage({ sessionId: peer.accSessionId,
+      generation: peer.generation, clientMessageId: "client_uncertified_budget",
+      toParticipantIds: [recipientId], kind: "note", obligation: "none",
+      subject: "Private body", body: "this body must stay out of uncertified delivery" });
+    await peer.service.sendMessage({ sessionId: peer.accSessionId,
+      generation: peer.generation, clientMessageId: "client_uncertified_budget_second",
+      toParticipantIds: [recipientId], kind: "note", obligation: "none",
+      subject: "Second private body", body: "this second body must stay out too" });
+
+    const turn = await invoke(event("beforeTurn"));
+    await turn.commitOffers();
+    const receipt = (await recipient.service.sync({ sessionId: recipient.accSessionId,
+      scope: "full" })).snapshot.receipts.find(item => item.messageId === message.messageId);
+
+    assert.doesNotMatch(turn.stdout, /this body must stay out/);
+    assert.match(turn.stdout, new RegExp(`acc inbox --message ${message.messageId}`));
+    assert.equal(Buffer.byteLength(turn.stdout, "utf8") <= 84, true);
+    assert.doesNotMatch(turn.stdout, /more in/);
+    assert.match(turn.stderr, /not certified for nextTurn/);
+    assert.equal(receipt.state, "queued");
+  });

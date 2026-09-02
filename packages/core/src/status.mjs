@@ -1,5 +1,5 @@
 import { classifySessionPresence } from "./sessions.mjs";
-import { computeAttention } from "./sync.mjs";
+import { computeAttention } from "./attention.mjs";
 
 /**
  * Protection level, reported from what is actually enforceable.
@@ -57,7 +57,7 @@ export function createGuardStateService(ports) {
   };
 }
 
-export function createStatusService(ports, sessions) {
+export function createStatusService(ports, sessions, deliveryBindings) {
   const { store, clock, pidIsAlive } = ports;
 
   async function collectStatus(input = {}) {
@@ -85,6 +85,7 @@ export function createStatusService(ports, sessions) {
     const live = classified.filter(item => item.presence !== "offline");
     const claims = snapshot.claims
       .filter(claim => Date.parse(claim.expiresAt) > Date.parse(now));
+    const currentBindings = await deliveryBindings.currentBindings(now);
 
     return {
       workspaceId,
@@ -109,12 +110,6 @@ export function createStatusService(ports, sessions) {
         presence,
         intent: intents.find(intent => intent.sessionId === session.sessionId)?.summary ?? null,
       })),
-      workstreams: snapshot.workstreams.map(workstream => ({
-        workstreamId: workstream.workstreamId,
-        title: workstream.title,
-        state: workstream.state,
-        coordinatorSessionId: workstream.coordinatorSessionId,
-      })),
       // The owner is named twice on purpose. Every command that reaches a peer
       // takes a participant id, so a claim that gave only a session id sent the
       // reader back through the roster to answer "who is holding this, and how
@@ -133,13 +128,20 @@ export function createStatusService(ports, sessions) {
           .find(session => session.sessionId === claim.ownerSessionId)?.participantId ?? null,
         expiresAt: claim.expiresAt,
       })),
+      deliveryBindings: currentBindings.map(({ binding, reachable }) => ({
+        adapterId: binding.adapterId,
+        clientVersion: binding.clientVersion,
+        availableModes: [...binding.availableModes],
+        livePolicy: binding.livePolicy,
+        reachable,
+        leaseUntil: binding.leaseUntil,
+      })),
       attention: computeAttention(snapshot, { session: null,
         participantId: input.participantId, now, pidIsAlive }),
       counts: {
         live: live.length,
         stale: live.filter(item => item.presence === "stale").length,
         claims: claims.length,
-        tasks: snapshot.tasks.length,
         messages: snapshot.messages.length,
       },
     };

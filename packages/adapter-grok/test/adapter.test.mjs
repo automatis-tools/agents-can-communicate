@@ -62,8 +62,11 @@ test("install is idempotent and uninstall restores the user's files", async t =>
   await adapter.install(context);
   assert.equal(await readFile(hooksFile(grokHome), "utf8"), firstHooks);
 
-  await adapter.uninstall(context);
-  await adapter.uninstall(context);
+  const firstRemoval = await adapter.uninstall(context);
+  const secondRemoval = await adapter.uninstall(context);
+  assert.equal(firstRemoval.changes.length, 3);
+  assert.deepEqual(secondRemoval.changes, [],
+    "an idempotent uninstall reported absent files as removals");
 
   await stat(path.join(grokHome, "hooks", "other.json"));
   await assert.rejects(stat(hooksFile(grokHome)), { code: "ENOENT" });
@@ -97,19 +100,14 @@ test("the hook file points at the shim with this adapter id", async t => {
   }
 });
 
-test("only capabilities observed on a real Grok session are declared true", () => {
+test("documentation-shaped fixtures do not certify Grok capabilities", () => {
   const { capabilities } = createGrokAdapter();
 
-  assert.equal(capabilities.lifecycle.sessionStart, true);
-  assert.equal(capabilities.lifecycle.sessionEnd, true);
-  assert.equal(capabilities.delivery.polling, true);
-
-  assert.equal(capabilities.context.beforeTurnInjection, false);
-  assert.equal(capabilities.guards.beforeWrite, false);
-  assert.equal(capabilities.guards.beforeShell, false);
-  assert.equal(capabilities.lifecycle.heartbeat, false);
-  assert.equal(capabilities.lifecycle.childSessions, false);
-  for (const value of Object.values(capabilities.execution)) assert.equal(value, false);
+  for (const group of Object.values(capabilities)) {
+    for (const value of Object.values(group)) assert.equal(value, false);
+  }
+  assert.match(createGrokAdapter().deliveryFallback.diagnostic, /polling|acc inbox/i);
+  assert.doesNotMatch(createGrokAdapter().deliveryFallback.diagnostic, /live push available/i);
 });
 
 test("captured payloads normalise and drop conversation content", async () => {

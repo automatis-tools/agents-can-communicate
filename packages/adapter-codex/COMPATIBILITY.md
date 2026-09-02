@@ -100,19 +100,12 @@ possible without touching the operator's install.
 
 ## Open risks
 
-1. **Context injection is unverified.** The event names are settled (above), but
-   nothing published or bundled describes what a Codex hook receives on stdin. Claude
-   Code documents `session_id`, `cwd`, `transcript_path`, and `hook_event_name`; Codex
-   documents nothing equivalent, and the binary's `HookRunSummary` fields describe the
-   *result* of a hook run rather than its input. Until a real session is observed, the
-   adapter cannot normalise a payload it has never seen, and therefore declares no
-   capability as true. Enum membership proves an event exists, not that ACC can handle it.
-2. **Hooks require persisted user trust.** The client exposes
+1. **Hooks require persisted user trust.** The client exposes
    `--dangerously-bypass-hook-trust`, and the docs say "Review and trust plugin hooks
    before you enable them". Installation therefore cannot be silent: `acc install` can
    place the plugin, but the user must trust its hooks before any of them run, and
    `acc doctor` has to report the untrusted state rather than implying protection.
-3. **Distribution is marketplace-based.** `codex plugin add` installs from a configured
+2. **Distribution is marketplace-based.** `codex plugin add` installs from a configured
    marketplace snapshot; the personal marketplace lives at
    `~/.agents/plugins/marketplace.json`. A file drop into a plugins directory is not the
    supported installation path.
@@ -120,10 +113,13 @@ possible without touching the operator's install.
 ## What this adapter declares
 
 Session-start and session-end hooks exist, so lifecycle holds; the payload gap is closed by
-capture. Declared true: `lifecycle.sessionStart`,
-`lifecycle.sessionEnd`, `guards.beforeWrite`, `guards.beforeShell`, `delivery.polling`.
-Still false and why: context injection unobserved, child sessions unobserved (no subagent
-ran during the capture), wake and execution not offered by this harness.
+capture. Certified true on 0.147.0 darwin-arm64: `lifecycle.sessionStart`,
+`lifecycle.sessionEnd`, `context.beforeTurnInjection`, `guards.beforeWrite`, and
+`delivery.nextTurn`. The shell denial was observed, but its `PreToolUse` payload was not
+retained — the shipped Bash JSON is an allowed `PostToolUse` event — so it cannot satisfy
+the package-local evidence gate and `guards.beforeShell` is now false. Child sessions remain
+unobserved. Native `delivery.livePush` and `delivery.replyRoute` remain false after the
+0.152.0 boundary capture.
 
 ## Certification findings (2026-08-16)
 
@@ -247,3 +243,24 @@ asked for, and whether ACC can stop this particular session:
 
 Reading only the session's capability would announce a block on an advisory claim that
 will never happen - and its owner explicitly did not ask for one.
+
+## Native delivery boundary (2026-09-01)
+
+The installed `codex-cli 0.152.0` experimental app-server schema includes the proposed
+`turn/start` shape: empty `input`, `clientUserMessageId`, `turnTrigger`, and a standalone
+`toolOutput` with `name`, optional `namespace`, and string `output` are accepted by the
+generated schema.
+
+The real-client capture is nevertheless `fail`. `codex app-server daemon version`
+reported that `~/.codex/app-server-control/app-server-control.sock` did not exist. The
+spike did not start, bootstrap, or restart the daemon, did not start a target client, and
+did not run the proxy without that socket. Native idle delivery, busy non-interruption,
+reply routing, duplicate retry, and durable fallback are all unobserved. No native
+delivery capability is certified by this evidence. The redacted capture is under
+`fixtures/delivery/`.
+
+Consequently `acc install --adapter codex --delivery actionable|all` keeps the effective
+policy `off` and names this exact limitation. Only `codex-cli 0.147.0` on
+`darwin-arm64` retains its separately captured next-turn hook capability. `0.152.0` and
+unknown or uncertified versions retain the durable `acc inbox` recovery path; ACC does
+not start a daemon or target client to make native delivery appear available.
