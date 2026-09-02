@@ -233,6 +233,7 @@ test("stored real-client captures satisfy the closed contract", () => {
       import.meta.url),
     new URL("../../packages/adapter-claude-code/fixtures/delivery/claude-code-2.1.252.json",
       import.meta.url),
+    new URL("../../packages/adapter-grok/fixtures/delivery/grok-1.0.13.json", import.meta.url),
   ];
 
   for (const fixtureUrl of fixtureUrls) {
