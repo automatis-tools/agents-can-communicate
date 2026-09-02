@@ -9,9 +9,9 @@ advisory protection around that communication layer, not the product's centre.
 
 | | |
 |---|---|
-| Built from | `1ecbd72996758cf15cf8ecde4497f041e7bc7980` |
-| Tarball | `agents-can-communicate-0.2.0.tgz`, 200,590 bytes, 177 entries |
-| sha256 | `f6771edc0afcb39f33e512117a7be646ef193bf1e66de016fc3bbeb71bdeb472` |
+| Built from | `1d898e81b3226992be8ec1eac591650d5c45d901` |
+| Tarball | `agents-can-communicate-0.2.0.tgz`, 201,021 bytes, 177 entries |
+| sha256 | `cbd0fac296513a3b6e55562dbd7569e88e079ebbd30a017136f67f75862bff9d` |
 | Node | 26.5.1 for this release proof; package requires Node >=24 |
 | Verified on | macOS 26.6.2 (darwin 25.6.0, arm64) |
 | Native live delivery | Not certified: Codex 0.152.0 had no daemon control socket; Claude Code 2.1.252 stopped at the development-channel warning |
@@ -25,12 +25,14 @@ question/answer threads, `retrieved` then `acknowledged` receipts, idempotent re
 generation restarts, stale-binding rejection, unknown-version downgrade, double uninstall,
 exact foreign client-home topology restoration, and no ACC state inside the project.
 
-The final candidate also closes the storage and delivery races found during release review:
-stale writer reclamation cannot remove a successor's lock, concurrent immutable publishes
-retain only accepted bytes, and uninstall keeps its ownership recipe until all cleanup
-succeeds. Room-message retrieval, hashed receipt keys, offer-failure attribution, MCP inbox
-receipt transitions, and the attach/materialisation boundary now share the same durable
-semantics under concurrency.
+The final candidate also closes the storage and delivery races found during release review.
+A writer prepares its owner record before atomically publishing the whole lock, can recover
+an ownerless directory left by the former publication sequence, and cannot remove or be
+overwritten by its successor. Concurrent immutable publishes retain only accepted bytes,
+and uninstall keeps its ownership recipe until all cleanup succeeds. Room-message
+retrieval, hashed receipt keys, offer-failure attribution, MCP inbox receipt transitions,
+and the attach/materialisation boundary now share the same durable semantics under
+concurrency.
 
 Native client claims remain deliberately narrower. The retained Codex and Claude captures
 are failures, not passing evidence, so v0.2.0 installs no native live channel for them.
