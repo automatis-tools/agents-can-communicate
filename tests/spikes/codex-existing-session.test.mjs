@@ -6,8 +6,9 @@ import { fileURLToPath } from "node:url";
 import test from "node:test";
 
 import { MINIMUM_VERSION, PROTOCOL_CONTRACT, addCodexQueueMessage, compareStableVersions,
-  discoverCodexThreads, evaluateClientVersion, locateCodexThread, probeCodexQueue,
-  runCodexQueueCapture } from "../../scripts/spikes/codex-existing-session.mjs";
+  discoverCodexThreads, evaluateClientVersion, isMethodMissing, locateCodexThread,
+  probeCodexQueue, runCodexQueueCapture, serverVersionOf }
+  from "../../scripts/spikes/codex-existing-session.mjs";
 import { runProcess } from "../helpers/claude-channel.mjs";
 
 // Kept cohesive above 300 lines because every case drives the same disposable
@@ -23,9 +24,15 @@ function rpcError(code, message) {
   return Object.assign(new Error(message), { code });
 }
 
-function fakePeer({ userAgent = "codex_app_server/0.152.1 (Mac OS 26.6.2; arm64)",
+const OBSERVED_USER_AGENT = "acc-native-delivery-capture/0.152.1 (Mac OS 26.6.2; arm64) "
+  + "Apple_Terminal (acc-native-delivery-capture; 0.0.0)";
+
+function fakePeer({ userAgent = OBSERVED_USER_AGENT,
   loaded = [THREAD], threads = [thread(THREAD, CWD)], queueSupported = true,
-  queue = [], transportError = null } = {}) {
+  queue = [], transportError = null, missingMethodCode = -32601 } = {}) {
+  const methodMissing = (method) => missingMethodCode === -32601
+    ? rpcError(-32601, "Method not found")
+    : rpcError(-32600, `Invalid request: unknown variant \`${method}\`, expected one of ...`);
   const calls = [];
   const state = { queue: queue.map(item => ({ ...item })) };
   return {
@@ -39,23 +46,26 @@ function fakePeer({ userAgent = "codex_app_server/0.152.1 (Mac OS 26.6.2; arm64)
           return { userAgent, codexHome: "/home/x/.codex", platformFamily: "unix",
             platformOs: "macos" };
         case "thread/loaded/list": return { data: loaded, nextCursor: null };
-        case "thread/list": return { data: threads, nextCursor: null };
+        case "thread/list":
+          if (params.useStateDbOnly !== true) throw new Error("test: the slow rollout listing was used");
+          return { data: threads.filter(item => params.cwd === undefined || item.cwd === params.cwd),
+            nextCursor: null };
         case "thread/queue/list":
-          if (!queueSupported) throw rpcError(-32601, "Method not found");
+          if (!queueSupported) throw methodMissing(method);
           if (!threads.some(item => item.id === params.threadId)) {
             throw rpcError(-32602, "thread not found");
           }
           return { data: state.queue.filter(item => item.threadId === params.threadId)
             .map(({ threadId, ...item }) => item), nextCursor: null };
         case "thread/queue/add": {
-          if (!queueSupported) throw rpcError(-32601, "Method not found");
+          if (!queueSupported) throw methodMissing(method);
           const item = { threadId: params.threadId, id: `qs_${state.queue.length + 1}`,
             clientUserMessageId: params.clientUserMessageId, input: params.input };
           state.queue.push(item);
           const { threadId, ...queuedSubmission } = item;
           return { queuedSubmission };
         }
-        default: throw rpcError(-32601, `Method not found: ${method}`);
+        default: throw methodMissing(method);
       }
     },
     async close() {},
@@ -88,19 +98,33 @@ test("the minimum admits equal or newer stable versions and nothing else", () =>
   assert.equal(compareStableVersions("0.152.1", "0.152.1"), 0);
 });
 
+test("the server version is read from the observed user-agent shape", () => {
+  assert.equal(serverVersionOf(OBSERVED_USER_AGENT), "0.152.1");
+  assert.equal(serverVersionOf("acc/0.153.0-alpha.1 (Mac OS)"), "0.153.0-alpha.1");
+  assert.equal(serverVersionOf("codex_app_server/0.152.0"), "0.152.0");
+  assert.equal(serverVersionOf("no version here"), null);
+  assert.equal(serverVersionOf(undefined), null);
+});
+
 test("the probe rejects an app server that does not speak the captured queue protocol",
   async () => {
     const stale = fakePeer({ queueSupported: false });
     assert.deepEqual(await probeCodexQueue(stale, { clientVersion: "0.152.1", threadId: THREAD }),
       { supported: false, clientVersion: "0.152.1", serverVersion: "0.152.1",
         protocolContract: PROTOCOL_CONTRACT, modes: [], reasonCode: "protocol_mismatch" });
-    const older = fakePeer({ userAgent: "codex_app_server/0.152.0 (Mac OS)" });
+    const observed = fakePeer({ queueSupported: false, missingMethodCode: -32600 });
+    assert.equal((await probeCodexQueue(observed, { clientVersion: "0.152.1", threadId: THREAD }))
+      .reasonCode, "protocol_mismatch");
+    assert.equal(isMethodMissing(rpcError(-32600, "Invalid request: unknown variant `x`")), true);
+    assert.equal(isMethodMissing(rpcError(-32600, "invalid thread id: invalid character")), false);
+    assert.equal(isMethodMissing(rpcError(-32603, "no rollout found for thread")), false);
+    const older = fakePeer({ userAgent: "acc-native-delivery-capture/0.152.0 (Mac OS)" });
     assert.equal((await probeCodexQueue(older, { clientVersion: "0.152.1", threadId: THREAD }))
       .reasonCode, "below_minimum_version");
-    const mismatch = fakePeer({ userAgent: "codex_app_server/0.153.0 (Mac OS)" });
+    const mismatch = fakePeer({ userAgent: "acc-native-delivery-capture/0.153.0 (Mac OS)" });
     assert.equal((await probeCodexQueue(mismatch, { clientVersion: "0.152.1", threadId: THREAD }))
       .reasonCode, "server_version_mismatch");
-    const pre = fakePeer({ userAgent: "codex_app_server/0.153.0-alpha.1 (Mac OS)" });
+    const pre = fakePeer({ userAgent: "acc-native-delivery-capture/0.153.0-alpha.1 (Mac OS)" });
     assert.equal((await probeCodexQueue(pre, { clientVersion: "0.153.0-alpha.1", threadId: THREAD }))
       .reasonCode, "prerelease_not_captured");
   });
@@ -130,7 +154,9 @@ test("the exact thread is discovered from loaded state rather than guessed", asy
   assert.deepEqual(await locateCodexThread(peer, { threadId: "thread-missing", cwd: CWD }),
     { found: false, reasonCode: "thread_not_loaded" });
   assert.deepEqual(await locateCodexThread(peer, { threadId: THREAD, cwd: "/work/elsewhere" }),
-    { found: false, reasonCode: "cwd_mismatch" });
+    { found: false, reasonCode: "thread_not_found" });
+  const list = peer.calls.filter(call => call.method === "thread/list").at(-1);
+  assert.deepEqual(list.params, { limit: 100, useStateDbOnly: true, cwd: "/work/elsewhere" });
   const unlisted = fakePeer({ loaded: [THREAD], threads: [] });
   assert.deepEqual(await locateCodexThread(unlisted, { threadId: THREAD, cwd: CWD }),
     { found: false, reasonCode: "thread_not_found" });
