@@ -195,12 +195,15 @@ test("delivery policy is deterministic and carried into adapter-owned install wo
     };
     const detectedFixture = [{ adapterId: adapter.id, displayName: adapter.displayName,
       present: true, version: "1.0.0", installed: false,
-      capabilities: { delivery: { livePush: true } } }];
+      capabilities: { delivery: { livePush: true } },
+      nativeDelivery: { state: "eligible", reasonCode: null, realExecutable: "/vendor/live",
+        probe: null, eligibility: { eligible: true, protocolContract: "live-v1" },
+        activationPlan: { eligible: true, reasonCode: null, mechanisms: [] } } }];
     const plan = planInstallation({ adapters: [adapter], detected: detectedFixture,
-      context, delivery: "actionable" });
+      context, deliveryByAdapter: { live_fixture: "actionable" } });
 
     assert.equal(JSON.stringify(plan), JSON.stringify(planInstallation({ adapters: [adapter],
-      detected: detectedFixture, context, delivery: "actionable" })));
+      detected: detectedFixture, context, deliveryByAdapter: { live_fixture: "actionable" } })));
     assert.deepEqual(plan.operations[0].livePolicy, "actionable");
     assert.deepEqual(plan.operations[0].effectiveLivePolicy, "actionable");
     await applyPlan({ plan, adapters: [adapter], context, dataHome });
@@ -227,7 +230,8 @@ test("unsupported adapters receive off and report durable fallback", async t => 
   };
   const plan = planInstallation({ adapters: [adapter], detected: [{
     adapterId: adapter.id, displayName: adapter.displayName, present: true,
-    version: "1.0.0", installed: false }], context, delivery: "all" });
+    version: "1.0.0", installed: false }], context,
+  deliveryByAdapter: { durable_fixture: "all" } });
 
   assert.equal(plan.operations[0].livePolicy, "all");
   assert.equal(plan.operations[0].effectiveLivePolicy, "off");
@@ -243,5 +247,7 @@ test("an unknown delivery policy is refused rather than treated as opt-in", asyn
   const { context } = await machine(t);
   const adapters = ALL();
   assert.throws(() => planInstallation({ adapters, detected: detected(adapters, ["kimi"]),
-    context, delivery: "sometimes" }), /unknown delivery policy/);
+    context, deliveryByAdapter: { kimi: "sometimes" } }), /unknown delivery policy/);
+  assert.throws(() => planInstallation({ adapters, detected: detected(adapters, ["kimi"]),
+    context, deliveryByAdapter: { nobody: "off" } }), /not part of this install/);
 });

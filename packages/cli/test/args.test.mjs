@@ -111,6 +111,13 @@ test("inbox targets an optional message and reply requires message plus body", (
     error => error.code === EXIT.USAGE && error.message.includes("--body"));
 });
 
+test("install and uninstall accept --adapter more than once", () => {
+  assert.deepEqual(parseArgs(["install", "--adapter", "claude_code", "--adapter", "codex"])
+    .options.adapter, ["claude_code", "codex"]);
+  assert.deepEqual(parseArgs(["uninstall", "--adapter", "codex"]).options.adapter, ["codex"]);
+  assert.equal(parseArgs(["install"]).options.adapter, undefined);
+});
+
 test("install delivery policy is explicit and closed", () => {
   assert.equal(parseArgs(["install"]).options.delivery, undefined);
   assert.equal(parseArgs(["install", "--delivery", "actionable"]).options.delivery,
