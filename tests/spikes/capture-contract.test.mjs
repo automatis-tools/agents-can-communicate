@@ -230,6 +230,7 @@ test("the JSON-RPC helper re-exports the same validator for older spike callers"
 test("stored real-client captures satisfy the closed contract", () => {
   const stored = [
     ["../../packages/adapter-codex/fixtures/delivery/codex-cli-0.152.0.json", "fail"],
+    ["../../packages/adapter-codex/fixtures/delivery/codex-cli-0.152.1.json", "pass"],
     ["../../packages/adapter-claude-code/fixtures/delivery/claude-code-2.1.252.json", "fail"],
     ["../../packages/adapter-claude-code/fixtures/delivery/claude-code-2.1.258.json", "pass"],
     ["../../packages/adapter-grok/fixtures/delivery/grok-1.0.13.json", "fail"],
