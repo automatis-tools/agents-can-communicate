@@ -20,7 +20,100 @@ const delay = duration => new Promise(resolve => { setTimeout(resolve, duration)
 const sleeper = new Int32Array(new SharedArrayBuffer(4));
 
 if (workerMode) await runWorker();
-else test("concurrent stale-lock reclaimers never overlap writer operations", async t => {
+else test("an ownerless writer lock left during publication is claimed", async t => {
+  const { root, paths } = await ownerlessLock(t);
+  let ran = false;
+  const outcome = await withWriterMutex(paths, {
+    root,
+    clock: { now: () => new Date().toISOString() },
+    attempts: 3,
+    waitMs: 1,
+  }, async () => {
+    ran = true;
+    return "written";
+  }).then(value => ({ value, error: null }), error => ({ value: null, error }));
+
+  assert.equal(ran, true, JSON.stringify({ ran, code: outcome.error?.code,
+    message: outcome.error?.message, locks: await readdir(paths.locks) }));
+  assert.equal(outcome.value, "written");
+  assert.deepEqual(await readdir(paths.locks), []);
+});
+
+if (!workerMode) test("concurrent owner publication elects one live writer", async t => {
+  const { root, paths } = await ownerlessLock(t);
+  let active = 0;
+  let maximum = 0;
+
+  await Promise.all(Array.from({ length: 8 }, () => withWriterMutex(paths, {
+    root,
+    clock: { now: () => new Date().toISOString() },
+    pidIsAlive: () => true,
+    attempts: 10_000,
+    waitMs: 1,
+  }, async () => {
+    active += 1;
+    maximum = Math.max(maximum, active);
+    await delay(10);
+    active -= 1;
+  })));
+
+  assert.equal(maximum, 1);
+});
+
+if (!workerMode) test("a delayed legacy owner publication cannot overwrite its successor",
+  async t => {
+    const { root, paths, directory } = await ownerlessLock(t);
+    let entered;
+    let release;
+    const inside = new Promise(resolve => { entered = resolve; });
+    const held = new Promise(resolve => { release = resolve; });
+    const successor = withWriterMutex(paths, {
+      root,
+      clock: { now: () => new Date().toISOString() },
+      uuid: () => "successor-token",
+      attempts: 10_000,
+      waitMs: 1,
+    }, async () => {
+      entered();
+      await held;
+    });
+
+    await inside;
+    try {
+      await assert.rejects(writeFile(path.join(directory, "owner.json"), JSON.stringify({
+        pid: process.pid,
+        token: "delayed-legacy-token",
+        acquiredAt: new Date().toISOString(),
+      }), { flag: "wx" }), error => error.code === "EEXIST");
+    } finally {
+      release();
+    }
+    await successor;
+    assert.deepEqual(await readdir(paths.locks), []);
+  });
+
+if (!workerMode) test("candidate cleanup survives timeout and operation errors", async t => {
+  const root = await mkdtemp(path.join(tmpdir(), "acc-candidate-cleanup-"));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const paths = storePaths(root);
+  await mkdir(paths.locks, { recursive: true });
+
+  await assert.rejects(withWriterMutex(paths, {
+    root,
+    clock: { now: () => new Date().toISOString() },
+    acquireTimeoutMs: 0,
+  }, async () => {}), error => error.code === EXIT.CONFLICT);
+  assert.deepEqual(await readdir(paths.locks), []);
+
+  const failure = new Error("operation failed");
+  await assert.rejects(withWriterMutex(paths, {
+    root,
+    clock: { now: () => new Date().toISOString() },
+  }, async () => { throw failure; }), error => error === failure);
+  assert.deepEqual(await readdir(paths.locks), []);
+});
+
+if (!workerMode) test("concurrent stale-lock reclaimers never overlap writer operations", async t => {
   const root = await mkdtemp(path.join(tmpdir(), "acc-reclaim-"));
   t.after(() => rm(root, { recursive: true, force: true }));
   const paths = storePaths(root);
@@ -46,6 +139,17 @@ else test("concurrent stale-lock reclaimers never overlap writer operations", as
   assert.equal(observedMax, 1,
     `stale-lock reclaimers overlapped ${observedMax} writer operations`);
 });
+
+async function ownerlessLock(t) {
+  const root = await mkdtemp(path.join(tmpdir(), "acc-ownerless-"));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const paths = storePaths(root);
+  await mkdir(paths.locks, { recursive: true });
+  await mkdir(paths.tmp, { recursive: true });
+  const directory = path.join(paths.locks, "writer.lock");
+  await mkdir(directory);
+  return { root, paths, directory };
+}
 
 async function contend(root, round, t) {
   let maximum = 0;
