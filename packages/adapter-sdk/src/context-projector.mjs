@@ -106,8 +106,9 @@ export function projectContextResult(sync, { budgetBytes = DEFAULT_BUDGET_BYTES 
     .filter(item => !roomMessageIds.has(item.sourceId))
     .sort((left, right) => left.priority - right.priority
       || (left.sourceId ?? "").localeCompare(right.sourceId ?? ""));
-  const urgent = attention.filter(item => item.priority <= 2);
-  const informational = attention.filter(item => item.priority > 2);
+  const leadsPeerBodies = item => item.priority <= 2 || item.kind === "claim_conflict";
+  const urgent = attention.filter(leadsPeerBodies);
+  const informational = attention.filter(item => !leadsPeerBodies(item));
   const messages = (sync.messages ?? [])
     .filter(message => message.toParticipantIds?.length !== 0);
   const liveOfferedMessageIds = new Set(sync.liveOfferedMessageIds ?? []);

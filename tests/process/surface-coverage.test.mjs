@@ -71,6 +71,8 @@ const INTERNAL = Object.freeze({
   readReceipt: "called by delivery transports before attempting a queued recipient receipt",
   publishDeliveryBinding: "called by an adapter for the exact session generation it owns",
   listDeliveryBindings: "called by the delivery router while selecting one eligible target",
+  listLiveSessions: "called by the delivery router before binding eligibility, so one "
+    + "certified endpoint cannot hide an ambiguous recipient participant",
 });
 
 test("every core operation is reachable, or named as internal on purpose", () => {

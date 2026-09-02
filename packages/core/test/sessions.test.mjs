@@ -253,6 +253,31 @@ test("stale is a truthful state, not an error", () => {
   assert.equal(classifySessionPresence(session, later, () => true), "stale");
 });
 
+test("live-session lookup includes stale but excludes offline, closed, and replaced", async () => {
+  const { service, clock } = makeService();
+  const first = await service.openSession(opening({ sessionId: "session_first" }));
+  const second = await service.openSession(opening({ sessionId: "session_second" }));
+
+  assert.deepEqual((await service.listLiveSessions({ participantId: "participant_a" }))
+    .map(session => session.sessionId).sort(), [first.sessionId, second.sessionId]);
+
+  clock.advance(CADENCE * 3 + 1);
+  await service.heartbeatSession({ sessionId: first.sessionId, generation: first.generation });
+  assert.deepEqual((await service.listLiveSessions({ participantId: "participant_a" }))
+    .map(session => session.sessionId).sort(), [first.sessionId, second.sessionId]);
+
+  clock.advance(30 * 60_000 + 1);
+  await service.heartbeatSession({ sessionId: first.sessionId, generation: first.generation });
+  assert.deepEqual(await service.listLiveSessions({ participantId: "participant_a" }),
+    [{ sessionId: first.sessionId, generation: first.generation }]);
+
+  await service.closeSession({ sessionId: first.sessionId, generation: first.generation });
+  const replacement = await service.openSession(opening({ sessionId: second.sessionId,
+    probe: () => false }));
+  assert.deepEqual(await service.listLiveSessions({ participantId: "participant_a" }),
+    [{ sessionId: replacement.sessionId, generation: replacement.generation }]);
+});
+
 test("a session records the process behind it, or null when nobody knows", async () => {
   const { service } = makeService();
 

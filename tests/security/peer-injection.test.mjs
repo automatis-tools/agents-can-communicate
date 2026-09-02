@@ -85,12 +85,12 @@ test("a peer's own words never become an ACC instruction line", () => {
 
 test("a huge peer message cannot crowd out the conflict that matters", () => {
   const projected = projectContext(sync({
-    attention: [{ kind: "conflict", priority: 0, sourceId: "a",
+    attention: [{ kind: "claim_conflict", priority: 4, sourceId: "claim_a",
       summary: "file:src/** is claimed by models" }],
-    messages: [message("x".repeat(50_000))] }), { budgetBytes: 800 });
+    messages: [message("x".repeat(575))] }), { budgetBytes: 800 });
 
-  // Priority is fixed and the budget is spent from the top. Otherwise flooding
-  // is enough to push a conflict warning out of the turn entirely.
+  // This is the real priority emitted by core. A valid peer body that nearly
+  // fills the budget must not displace the safety fact that stops a shared edit.
   assert.match(projected, /file:src/);
   assert.equal(Buffer.byteLength(projected, "utf8") <= 800, true);
 });
