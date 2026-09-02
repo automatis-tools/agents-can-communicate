@@ -58,6 +58,7 @@ const ownBinary = name => {
 };
 
 export const defaultRunner = () => ownBinary("acc-hook.mjs");
+export const defaultBootstrap = () => ownBinary("acc-bootstrap.mjs");
 
 export const runnerExists = async runner => {
   try {
