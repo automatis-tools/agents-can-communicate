@@ -7,9 +7,23 @@ import path from "node:path";
 import test from "node:test";
 import { promisify } from "node:util";
 
+import * as codexModule from "@agents-can-communicate/adapter-codex";
+
 const run = promisify(execFile);
 const repo = path.resolve(import.meta.dirname, "..", "..");
 const acc = path.join(repo, "bin", "acc.mjs");
+
+const NATIVE_PACKAGE_SURFACE =
+  /app-server-client|acc-codex-app-server|offerCodexMessage|connectExistingAppServer|codex[-_]?(?:live|app[-_]?server)|(?:live|app[-_]?server)[-_]?codex/i;
+
+const publicManifestSurface = manifest => JSON.stringify({
+  bin: manifest.bin,
+  exports: manifest.exports,
+  dependencies: manifest.dependencies,
+  bundleDependencies: manifest.bundleDependencies,
+  scripts: manifest.scripts,
+  files: (manifest.files ?? []).filter(file => !file.startsWith("fixtures/")),
+});
 
 async function machine(t, version = "codex-cli 0.152.0") {
   const home = await realpath(await mkdtemp(path.join(tmpdir(), "acc-codex-home-")));
@@ -41,6 +55,44 @@ async function machine(t, version = "codex-cli 0.152.0") {
   };
   return { command, home, pluginTrees };
 }
+
+test("Codex fallback-only source and public package surface omit the planned native bridge",
+  async () => {
+    for (const planned of [
+      path.join(repo, "packages", "adapter-codex", "src", "app-server-client.mjs"),
+      path.join(repo, "tests", "acceptance", "codex-live-real.test.mjs"),
+    ]) {
+      await assert.rejects(stat(planned), { code: "ENOENT" },
+        `unproven native-delivery artifact is present: ${planned}`);
+    }
+
+    const adapter = codexModule.createCodexAdapter();
+    for (const method of ["offerMessage", "routeReply"]) {
+      assert.equal(Object.hasOwn(adapter, method), false,
+        `Codex adapter exports unproven native method ${method}`);
+    }
+    for (const exported of ["connectExistingAppServer", "offerCodexMessage"]) {
+      assert.equal(Object.hasOwn(codexModule, exported), false,
+        `Codex package exports unproven native API ${exported}`);
+    }
+
+    for (const manifestPath of [
+      path.join(repo, "package.json"),
+      path.join(repo, "packages", "adapter-codex", "package.json"),
+    ]) {
+      const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
+      assert.doesNotMatch(publicManifestSurface(manifest), NATIVE_PACKAGE_SURFACE,
+        `native Codex bridge entered package surface: ${manifestPath}`);
+    }
+
+    const hooks = JSON.parse(await readFile(path.join(repo, "packages", "adapter-codex",
+      "plugin", "hooks.json"), "utf8"));
+    const commands = Object.values(hooks.hooks)
+      .flatMap(entries => entries.flatMap(entry => entry.hooks.map(hook => hook.command)));
+    assert.doesNotMatch(commands.join("\n"),
+      /app-server|proxy|livePush|replyRoute|opaqueEndpointRef/i,
+      "shipped Codex hooks contain unproven native-delivery wiring");
+  });
 
 for (const policy of ["actionable", "all"]) {
   test(`Codex ${policy} delivery stays off and installs no native bridge`, async t => {
