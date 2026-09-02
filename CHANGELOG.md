@@ -9,9 +9,9 @@ receipt transitions, crash recovery, and the peer-content trust boundary.
 
 | | |
 |---|---|
-| Built from | `0b1675af8adfeae668e4af43a91831453777a762` |
-| Tarball | `agents-can-communicate-0.2.0.tgz`, 235,926 bytes, 192 entries |
-| sha256 | `78b3bcba552f618a3131bf30878a218d65372a884a090679ec6dd43ea7b5c13e` |
+| Built from | `aee6173a2672c11c6835b44da0f99182eb8c0de5` |
+| Tarball | `agents-can-communicate-0.2.0.tgz`, 241,624 bytes, 195 entries |
+| sha256 | `8ebb6458e8cd2f1711f5d90ff4134666352519577074ee235aaee87bec687287` |
 | Node | 26.5.1; package requires Node >=24 |
 | Verified on | macOS 26.6.2 (darwin 25.6.0, arm64) |
 
