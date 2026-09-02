@@ -44,7 +44,8 @@ export function openJsonRpcPeer({ command, args = [], env, timeoutMs }) {
     pending.delete(message.id);
     clearTimeout(request.timer);
     if (message.error) {
-      request.reject(new Error(message.error.message ?? "JSON-RPC request failed"));
+      request.reject(Object.assign(new Error(message.error.message ?? "JSON-RPC request failed"),
+        { code: message.error.code ?? null }));
     } else {
       request.resolve(message.result);
     }
