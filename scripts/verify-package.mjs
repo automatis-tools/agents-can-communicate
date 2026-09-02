@@ -16,6 +16,7 @@ import path from "node:path";
 import { promisify } from "node:util";
 
 import { gitProvenance } from "./git-provenance.mjs";
+import { verifyCertificationFixtureAllowlist } from "./package-certification.mjs";
 
 const run = promisify(execFile);
 const repo = path.resolve(import.meta.dirname, "..");
@@ -119,16 +120,11 @@ async function main() {
     if (certifications.length !== 5) {
       fail("every shipped adapter must carry certification.json", certifications.join("\n"));
     }
-    for (const certification of certifications) {
-      const manifest = await readTarJson(tarball, certification);
-      const packageRoot = path.dirname(certification);
-      for (const evidence of manifest.evidence ?? []) {
-        const fixture = `${packageRoot}/${evidence.fixture}`;
-        if (!listed.includes(fixture)) fail(`certification fixture is missing: ${fixture}`);
-      }
-    }
+    await verifyCertificationFixtureAllowlist(listed,
+      certification => readTarJson(tarball, certification))
+      .catch(error => fail(error.message));
     ok(`${listed.length} entries, none forbidden`);
-    ok(`${certifications.length} certification manifest(s), every fixture shipped`);
+    ok(`${certifications.length} certification manifest(s), exact evidence allowlist shipped`);
 
     // The workspaces have to travel inside the tarball, or every internal
     // import fails on install. This is the whole reason the package bundles.

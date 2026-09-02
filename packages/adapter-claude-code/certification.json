@@ -4,6 +4,7 @@
       "client": "claude-code", "version": "2.1.233", "platform": "darwin-arm64",
       "observedAt": "2026-08-16", "capability": "lifecycle.sessionStart",
       "fixture": "fixtures/SessionStart.json", "idleBehavior": "fires when a session starts",
+      "provenance": "fixtures/certification-provenance.json", "provenanceId": "session-start",
       "busyBehavior": "fires before the first model turn", "authorityLevel": "advisory",
       "limitations": ["capture used a one-session --plugin-dir"], "result": "pass"
     },
@@ -11,6 +12,7 @@
       "client": "claude-code", "version": "2.1.233", "platform": "darwin-arm64",
       "observedAt": "2026-08-16", "capability": "lifecycle.sessionEnd",
       "fixture": "fixtures/SessionEnd.json", "idleBehavior": "fires when a session exits",
+      "provenance": "fixtures/certification-provenance.json", "provenanceId": "session-end",
       "busyBehavior": "does not run until the session exits", "authorityLevel": "advisory",
       "limitations": ["cannot write a handoff after the model has stopped"], "result": "pass"
     },
@@ -18,6 +20,7 @@
       "client": "claude-code", "version": "2.1.233", "platform": "darwin-arm64",
       "observedAt": "2026-08-16", "capability": "context.beforeTurnInjection",
       "fixture": "fixtures/UserPromptSubmit.json", "idleBehavior": "waits for the next user prompt",
+      "provenance": "fixtures/certification-provenance.json", "provenanceId": "user-prompt-submit",
       "busyBehavior": "does not interrupt an in-progress turn", "authorityLevel": "context",
       "limitations": ["requires the hookSpecificOutput additionalContext envelope"], "result": "pass"
     },
@@ -25,6 +28,7 @@
       "client": "claude-code", "version": "2.1.233", "platform": "darwin-arm64",
       "observedAt": "2026-08-16", "capability": "guards.beforeWrite",
       "fixture": "fixtures/PreToolUse-Edit.json", "idleBehavior": "no write exists to guard",
+      "provenance": "fixtures/certification-provenance.json", "provenanceId": "pre-tool-use-edit",
       "busyBehavior": "denies a file edit before disk mutation", "authorityLevel": "blocking",
       "limitations": ["runtime writes are outside the hook boundary"], "result": "pass"
     },
@@ -32,6 +36,7 @@
       "client": "claude-code", "version": "2.1.233", "platform": "darwin-arm64",
       "observedAt": "2026-08-16", "capability": "guards.beforeShell",
       "fixture": "fixtures/PreToolUse.json", "idleBehavior": "no shell call exists to guard",
+      "provenance": "fixtures/certification-provenance.json", "provenanceId": "pre-tool-use-bash",
       "busyBehavior": "denies a Bash call before execution", "authorityLevel": "blocking",
       "limitations": ["only tool calls reaching PreToolUse are guarded"], "result": "pass"
     },
@@ -39,6 +44,7 @@
       "client": "claude-code", "version": "2.1.233", "platform": "darwin-arm64",
       "observedAt": "2026-08-16", "capability": "delivery.nextTurn",
       "fixture": "fixtures/UserPromptSubmit.json", "idleBehavior": "offers complete peer messages at the next prompt",
+      "provenance": "fixtures/certification-provenance.json", "provenanceId": "user-prompt-submit",
       "busyBehavior": "does not interrupt an in-progress turn", "authorityLevel": "context",
       "limitations": ["delivery requires the next normal user turn"], "result": "pass"
     },
@@ -46,6 +52,7 @@
       "client": "claude-code", "version": "2.1.252", "platform": "darwin-arm64",
       "observedAt": "2026-09-01T16:17:06Z", "capability": "delivery.livePush",
       "fixture": "fixtures/delivery/claude-code-2.1.252.json", "idleBehavior": "unobserved",
+      "provenance": "fixtures/certification-provenance.json", "provenanceId": "native-delivery-2-1-252",
       "busyBehavior": "unobserved", "authorityLevel": "none",
       "limitations": [
         "Claude Code displayed the development-channel security warning and the operator did not accept it",
@@ -58,6 +65,7 @@
       "client": "claude-code", "version": "2.1.252", "platform": "darwin-arm64",
       "observedAt": "2026-09-01T16:17:06Z", "capability": "delivery.replyRoute",
       "fixture": "fixtures/delivery/claude-code-2.1.252.json", "idleBehavior": "unobserved",
+      "provenance": "fixtures/certification-provenance.json", "provenanceId": "native-delivery-2-1-252",
       "busyBehavior": "unobserved", "authorityLevel": "none",
       "limitations": [
         "Claude Code displayed the development-channel security warning and the operator did not accept it",

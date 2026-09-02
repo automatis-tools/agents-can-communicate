@@ -27,6 +27,8 @@ const evidence = (overrides = {}) => ({
   observedAt: "2026-08-16",
   capability: "delivery.livePush",
   fixture: "fixtures/live-push.json",
+  provenance: "fixtures/certification-provenance.json",
+  provenanceId: "live-push",
   idleBehavior: "accepted without interrupting a turn",
   busyBehavior: "queued until the current turn completed",
   authorityLevel: "advisory",
@@ -95,6 +97,42 @@ test("certification validates every required evidence fact", () => {
     /limitations/);
   assert.throws(() => sdk.validateCertification({ evidence: [evidence({ result: "maybe" })] }),
     /result/);
+});
+
+test("certification is a closed schema and cannot retain mutable nested extras", () => {
+  assert.throws(() => sdk.validateCertification({ evidence: [evidence()], extra: true }),
+    /unknown certification field extra/);
+  assert.throws(() => sdk.validateCertification({ evidence: [evidence({
+    audit: { mutable: true },
+  })] }), /unknown certification evidence field audit/);
+});
+
+test("reserved unknown and malformed client facts cannot certify a capability", () => {
+  for (const [key, value] of [
+    ["version", "unknown"], ["platform", "unknown"], ["version", "latest"],
+    ["platform", "darwin"], ["observedAt", "2026-02-30"],
+    ["observedAt", "yesterday"],
+  ]) {
+    assert.throws(() => sdk.validateCertification({ evidence: [evidence({ [key]: value })] }),
+      new RegExp(key), `${key}=${value} was accepted`);
+  }
+});
+
+test("contradictory duplicate certification tuples are rejected", () => {
+  assert.throws(() => sdk.validateCertification({ evidence: [
+    evidence(), evidence({ result: "fail", idleBehavior: "unobserved" }),
+  ] }), /duplicate certification tuple/);
+});
+
+test("both unknown effective client facts degrade to all false", () => {
+  const adapter = sdk.defineAdapter(base({
+    capabilities: { delivery: { livePush: true } },
+    certification: { evidence: [evidence()] },
+    offerMessage: noop,
+  }));
+
+  assert.equal(sdk.effectiveCapabilities(adapter,
+    { clientVersion: "unknown", platform: "unknown" }).delivery.livePush, false);
 });
 
 test("delivery uses only the communication-first vocabulary", () => {

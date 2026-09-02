@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import test from "node:test";
@@ -22,45 +23,45 @@ const ADAPTERS = [
 
 const PASS_EXPECTATIONS = Object.freeze({
   "adapter-claude-code": [
-    ["lifecycle.sessionStart", "fixtures/SessionStart.json", "SessionStart", null],
-    ["lifecycle.sessionEnd", "fixtures/SessionEnd.json", "SessionEnd", null],
-    ["context.beforeTurnInjection", "fixtures/UserPromptSubmit.json", "UserPromptSubmit", null],
-    ["guards.beforeWrite", "fixtures/PreToolUse-Edit.json", "PreToolUse", "Edit"],
-    ["guards.beforeShell", "fixtures/PreToolUse.json", "PreToolUse", "Bash"],
-    ["delivery.nextTurn", "fixtures/UserPromptSubmit.json", "UserPromptSubmit", null],
-  ].map(([capability, fixture, event, tool]) =>
+    ["lifecycle.sessionStart", "fixtures/SessionStart.json", "SessionStart", null, "event-observed"],
+    ["lifecycle.sessionEnd", "fixtures/SessionEnd.json", "SessionEnd", null, "event-observed"],
+    ["context.beforeTurnInjection", "fixtures/UserPromptSubmit.json", "UserPromptSubmit", null, "model-context-observed"],
+    ["guards.beforeWrite", "fixtures/PreToolUse-Edit.json", "PreToolUse", "Edit", "tool-denied-before-mutation"],
+    ["guards.beforeShell", "fixtures/PreToolUse.json", "PreToolUse", "Bash", "tool-denied-before-execution"],
+    ["delivery.nextTurn", "fixtures/UserPromptSubmit.json", "UserPromptSubmit", null, "model-context-observed"],
+  ].map(([capability, fixture, event, tool, outcome]) =>
     ({ client: "claude-code", version: "2.1.233", platform: "darwin-arm64",
-      capability, fixture, event, tool })),
+      capability, fixture, event, tool, outcome })),
   "adapter-codex": [
-    ["lifecycle.sessionStart", "fixtures/SessionStart.json", "SessionStart", null],
-    ["lifecycle.sessionEnd", "fixtures/SessionEnd.json", "SessionEnd", null],
-    ["context.beforeTurnInjection", "fixtures/UserPromptSubmit.json", "UserPromptSubmit", null],
-    ["guards.beforeWrite", "fixtures/PreToolUse.json", "PreToolUse", "apply_patch"],
-    ["delivery.nextTurn", "fixtures/UserPromptSubmit.json", "UserPromptSubmit", null],
-  ].map(([capability, fixture, event, tool]) =>
+    ["lifecycle.sessionStart", "fixtures/SessionStart.json", "SessionStart", null, "event-observed"],
+    ["lifecycle.sessionEnd", "fixtures/SessionEnd.json", "SessionEnd", null, "event-observed"],
+    ["context.beforeTurnInjection", "fixtures/UserPromptSubmit.json", "UserPromptSubmit", null, "model-context-observed"],
+    ["guards.beforeWrite", "fixtures/PreToolUse.json", "PreToolUse", "apply_patch", "tool-denied-before-mutation"],
+    ["delivery.nextTurn", "fixtures/UserPromptSubmit.json", "UserPromptSubmit", null, "model-context-observed"],
+  ].map(([capability, fixture, event, tool, outcome]) =>
     ({ client: "codex-cli", version: "0.147.0", platform: "darwin-arm64",
-      capability, fixture, event, tool })),
+      capability, fixture, event, tool, outcome })),
   "adapter-gemini-cli": [
-    ["lifecycle.sessionStart", "fixtures/SessionStart.json", "SessionStart", null],
-    ["lifecycle.sessionEnd", "fixtures/SessionEnd.json", "SessionEnd", null],
-    ["context.beforeTurnInjection", "fixtures/BeforeAgent.json", "BeforeAgent", null],
-    ["guards.beforeWrite", "fixtures/BeforeTool.json", "BeforeTool", "write_file"],
-    ["guards.beforeShell", "fixtures/BeforeTool-shell.json", "BeforeTool", "run_shell_command"],
-    ["delivery.nextTurn", "fixtures/BeforeAgent.json", "BeforeAgent", null],
-  ].map(([capability, fixture, event, tool]) =>
+    ["lifecycle.sessionStart", "fixtures/SessionStart.json", "SessionStart", null, "event-observed"],
+    ["lifecycle.sessionEnd", "fixtures/SessionEnd.json", "SessionEnd", null, "event-observed"],
+    ["context.beforeTurnInjection", "fixtures/BeforeAgent.json", "BeforeAgent", null, "model-context-observed"],
+    ["guards.beforeWrite", "fixtures/BeforeTool.json", "BeforeTool", "write_file", "tool-denied-before-mutation"],
+    ["guards.beforeShell", "fixtures/BeforeTool-shell.json", "BeforeTool", "run_shell_command", "tool-denied-before-execution"],
+    ["delivery.nextTurn", "fixtures/BeforeAgent.json", "BeforeAgent", null, "model-context-observed"],
+  ].map(([capability, fixture, event, tool, outcome]) =>
     ({ client: "gemini-cli", version: "0.37.0", platform: "darwin-arm64",
-      capability, fixture, event, tool })),
+      capability, fixture, event, tool, outcome })),
   "adapter-grok": [],
   "adapter-kimi": [
-    ["lifecycle.sessionStart", "fixtures/SessionStart.json", "SessionStart", null],
-    ["lifecycle.heartbeat", "fixtures/SessionHeartbeat.json", "SessionHeartbeat", null],
-    ["context.beforeTurnInjection", "fixtures/UserPromptSubmit.json", "UserPromptSubmit", null],
-    ["guards.beforeWrite", "fixtures/PreToolUse-Write.json", "PreToolUse", "Write"],
-    ["guards.beforeShell", "fixtures/PreToolUse-Bash.json", "PreToolUse", "Bash"],
-    ["delivery.nextTurn", "fixtures/UserPromptSubmit.json", "UserPromptSubmit", null],
-  ].map(([capability, fixture, event, tool]) =>
+    ["lifecycle.sessionStart", "fixtures/SessionStart.json", "SessionStart", null, "event-observed"],
+    ["lifecycle.heartbeat", "fixtures/SessionHeartbeat.json", "SessionHeartbeat", null, "fixed-cadence-observed"],
+    ["context.beforeTurnInjection", "fixtures/UserPromptSubmit.json", "UserPromptSubmit", null, "model-context-observed"],
+    ["guards.beforeWrite", "fixtures/PreToolUse-Write.json", "PreToolUse", "Write", "tool-denied-before-mutation"],
+    ["guards.beforeShell", "fixtures/PreToolUse-Bash.json", "PreToolUse", "Bash", "tool-denied-before-execution"],
+    ["delivery.nextTurn", "fixtures/UserPromptSubmit.json", "UserPromptSubmit", null, "model-context-observed"],
+  ].map(([capability, fixture, event, tool, outcome]) =>
     ({ client: "kimi", version: "0.36.1", platform: "darwin-arm64",
-      capability, fixture, event, tool })),
+      capability, fixture, event, tool, outcome })),
 });
 
 const comparable = item => ({ client: item.client, version: item.version,
@@ -79,8 +80,8 @@ for (const [packageName, createAdapter] of ADAPTERS) {
       const packageJson = JSON.parse(await readFile(path.join(packageRoot, "package.json")));
       assert.equal(packageJson.files.includes("certification.json"), true,
         "certification.json is absent from package files");
-      assert.equal(packageJson.files.includes("fixtures/"), true,
-        "captured fixtures are absent from package files");
+      assert.equal(packageJson.files.includes("fixtures/"), false,
+        "a wildcard fixture directory can publish documentation-derived material");
 
       const adapter = createAdapter();
       assert.equal(Array.isArray(adapter.certification?.evidence), true);
@@ -89,6 +90,14 @@ for (const [packageName, createAdapter] of ADAPTERS) {
         .map(comparable).sort(byCapability), expected.map(comparable).sort(byCapability),
       "passing certification facts differ from the audited client/version/platform captures");
       for (const item of adapter.certification.evidence) {
+        assert.equal(packageJson.files.includes(item.fixture), true,
+          `${item.fixture} is absent from the exact package allowlist`);
+        assert.equal(packageJson.files.includes(item.provenance), true,
+          `${item.provenance} is absent from the exact package allowlist`);
+        assert.match(item.provenance ?? "", /^fixtures\/.+\.json$/,
+          "certification must reference package-shipped structured provenance");
+        assert.match(item.provenanceId ?? "", /^[a-z0-9][a-z0-9-]+$/,
+          "certification must select one structured provenance record");
         assert.match(item.fixture, /^fixtures\/(?!.*(?:^|\/)\.\.\/).+\.json$/,
           "certification must reference package-local captured JSON, not documentation");
         const fixturePath = path.join(packageRoot, item.fixture);
@@ -100,6 +109,37 @@ for (const [packageName, createAdapter] of ADAPTERS) {
         }
         const expectedCapture = expected.find(candidate => candidate.capability === item.capability
           && candidate.fixture === item.fixture);
+        const fixtureDigest = createHash("sha256")
+          .update(await readFile(fixturePath)).digest("hex");
+        const provenance = JSON.parse(await readFile(path.join(packageRoot, item.provenance),
+          "utf8"));
+        const provenanceRecord = provenance.captures?.find(record =>
+          record.id === item.provenanceId);
+        assert.ok(provenanceRecord, `${item.provenanceId} is absent from provenance`);
+        for (const key of ["client", "version", "platform", "observedAt", "fixture"]) {
+          assert.equal(provenanceRecord[key], item[key],
+            `${item.provenanceId} ${key} differs from certification evidence`);
+        }
+        assert.equal(provenanceRecord.sha256, fixtureDigest,
+          `${item.fixture} differs from the audited capture digest`);
+        const claim = provenanceRecord.claims?.find(candidate =>
+          candidate.capability === item.capability);
+        assert.ok(claim, `${item.provenanceId} has no outcome for ${item.capability}`);
+        assert.equal(claim.result, item.result, `${item.capability} result was rewritten`);
+        if (item.result === "pass") {
+          assert.equal(provenanceRecord.event, expectedCapture.event,
+            `${item.provenanceId} event differs from the independent audit`);
+          assert.equal(provenanceRecord.tool, expectedCapture.tool,
+            `${item.provenanceId} tool differs from the independent audit`);
+          assert.equal(claim.outcome?.kind, expectedCapture.outcome,
+            `${item.provenanceId} outcome differs from the independent audit`);
+          assert.equal(claim.outcome.idle, item.idleBehavior);
+          assert.equal(claim.outcome.busy, item.busyBehavior);
+          assert.equal(claim.outcome.authority, item.authorityLevel);
+          assert.deepEqual(claim.outcome.limitations, item.limitations);
+        } else {
+          assert.equal(claim.outcome?.kind, "native-capture-failed");
+        }
         if (item.result === "pass") {
           assert.equal(capture.hook_event_name ?? capture.hookEventName, expectedCapture.event,
             `${item.fixture} does not contain the certified hook event`);

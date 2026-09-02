@@ -25,6 +25,7 @@ const base = (overrides = {}) => ({
 const evidence = capability => ({ evidence: [{
   client: "example", version: "1.0.0", platform: "darwin-arm64",
   observedAt: "2026-08-16", capability, fixture: "fixtures/example.json",
+  provenance: "fixtures/certification-provenance.json", provenanceId: "example",
   idleBehavior: "observed while idle", busyBehavior: "observed while busy",
   authorityLevel: "advisory", limitations: [], result: "pass",
 }] });

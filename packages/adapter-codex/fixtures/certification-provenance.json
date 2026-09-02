@@ -1,0 +1,66 @@
+{
+  "schemaVersion": 1,
+  "captures": [
+    {
+      "id": "session-start", "client": "codex-cli", "version": "0.147.0",
+      "platform": "darwin-arm64", "observedAt": "2026-08-16",
+      "fixture": "fixtures/SessionStart.json",
+      "sha256": "1580157d6b48c10f6de5f155aa1d7c68d1695409a5a178eb36c85ce5e01de956",
+      "event": "SessionStart", "tool": null,
+      "claims": [{ "capability": "lifecycle.sessionStart", "result": "pass",
+        "outcome": { "kind": "event-observed", "idle": "fires when a client session starts",
+          "busy": "fires before the first model turn", "authority": "advisory",
+          "limitations": ["plugin hooks must be explicitly trusted by the user"] } }]
+    },
+    {
+      "id": "session-end", "client": "codex-cli", "version": "0.147.0",
+      "platform": "darwin-arm64", "observedAt": "2026-08-16",
+      "fixture": "fixtures/SessionEnd.json",
+      "sha256": "e1468c9d5cd2ff5408184158004e9877684f1ae2815239691bbaa386327fe58e",
+      "event": "SessionEnd", "tool": null,
+      "claims": [{ "capability": "lifecycle.sessionEnd", "result": "pass",
+        "outcome": { "kind": "event-observed", "idle": "fires when a client session exits",
+          "busy": "does not run until the session exits", "authority": "advisory",
+          "limitations": ["plugin hooks must be explicitly trusted by the user"] } }]
+    },
+    {
+      "id": "user-prompt-submit", "client": "codex-cli", "version": "0.147.0",
+      "platform": "darwin-arm64", "observedAt": "2026-08-16",
+      "fixture": "fixtures/UserPromptSubmit.json",
+      "sha256": "1774062b17ea917cf67d8adca3408525a928c5b9b88adda1ff6b92f3e89a459f",
+      "event": "UserPromptSubmit", "tool": null,
+      "claims": [
+        { "capability": "context.beforeTurnInjection", "result": "pass",
+          "outcome": { "kind": "model-context-observed", "idle": "waits for the next user prompt",
+            "busy": "does not interrupt an in-progress turn", "authority": "context",
+            "limitations": ["stdout arrives as an unwrapped developer-role message"] } },
+        { "capability": "delivery.nextTurn", "result": "pass",
+          "outcome": { "kind": "model-context-observed", "idle": "offers complete peer messages at the next prompt",
+            "busy": "does not interrupt an in-progress turn", "authority": "context",
+            "limitations": ["delivery requires the next normal user turn"] } }
+      ]
+    },
+    {
+      "id": "pre-tool-use", "client": "codex-cli", "version": "0.147.0",
+      "platform": "darwin-arm64", "observedAt": "2026-08-16",
+      "fixture": "fixtures/PreToolUse.json",
+      "sha256": "8d3785cfcffbe9affef6c10c1dbbeaf5a0b7062eaed4414e4a66c073f0397a77",
+      "event": "PreToolUse", "tool": "apply_patch",
+      "claims": [{ "capability": "guards.beforeWrite", "result": "pass",
+        "outcome": { "kind": "tool-denied-before-mutation", "idle": "no write exists to guard",
+          "busy": "blocks an apply_patch call before disk mutation", "authority": "blocking",
+          "limitations": ["runtime and unrecognised shell writes can bypass the guard"] } }]
+    },
+    {
+      "id": "native-delivery-0-152-0", "client": "codex-cli", "version": "0.152.0",
+      "platform": "darwin-arm64", "observedAt": "2026-09-01T16:20:40.386Z",
+      "fixture": "fixtures/delivery/codex-cli-0.152.0.json",
+      "sha256": "e7879ed95374a4e0450a3c8c0e291357a8c9cf41f6bee90978d920a14f9dc954",
+      "event": null, "tool": null,
+      "claims": [
+        { "capability": "delivery.livePush", "result": "fail", "outcome": { "kind": "native-capture-failed" } },
+        { "capability": "delivery.replyRoute", "result": "fail", "outcome": { "kind": "native-capture-failed" } }
+      ]
+    }
+  ]
+}

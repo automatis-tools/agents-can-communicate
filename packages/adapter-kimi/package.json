@@ -8,7 +8,12 @@
   },
   "files": [
     "certification.json",
-    "fixtures/",
+    "fixtures/certification-provenance.json",
+    "fixtures/SessionStart.json",
+    "fixtures/SessionHeartbeat.json",
+    "fixtures/UserPromptSubmit.json",
+    "fixtures/PreToolUse-Write.json",
+    "fixtures/PreToolUse-Bash.json",
     "src/",
     "plugin/"
   ]

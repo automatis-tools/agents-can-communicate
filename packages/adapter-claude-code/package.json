@@ -8,7 +8,13 @@
   },
   "files": [
     "certification.json",
-    "fixtures/",
+    "fixtures/certification-provenance.json",
+    "fixtures/SessionStart.json",
+    "fixtures/SessionEnd.json",
+    "fixtures/UserPromptSubmit.json",
+    "fixtures/PreToolUse-Edit.json",
+    "fixtures/PreToolUse.json",
+    "fixtures/delivery/claude-code-2.1.252.json",
     "src/",
     "plugin/"
   ]
