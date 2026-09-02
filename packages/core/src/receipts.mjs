@@ -43,11 +43,6 @@ export function createReceiptService(ports) {
       const id = receiptId(input.messageId, input.recipientParticipantId);
       const receipt = requireAddressedReceipt(tx, input.messageId,
         input.recipientParticipantId);
-      // A retrieval or acknowledgement may win after a transport accepted but
-      // before this transaction acquired the writer. That stronger truth must
-      // remain in place. The same rule makes a repeated successful commit a
-      // read-only operation rather than another success event.
-      if (receipt.state !== "queued") return receipt;
       const target = tx.get("session", input.targetSessionId);
       if (target === null || target.state !== "open"
         || target.participantId !== input.recipientParticipantId
@@ -57,6 +52,11 @@ export function createReceiptService(ports) {
           { targetSessionId: input.targetSessionId,
             recipientParticipantId: input.recipientParticipantId });
       }
+      // A retrieval or acknowledgement may win after a transport accepted but
+      // before this transaction acquired the writer. That stronger truth must
+      // remain in place. The same rule makes a repeated successful commit a
+      // read-only operation rather than another success event.
+      if (receipt.state !== "queued") return receipt;
       const offered = { ...receipt, state: advanceReceipt(receipt.state, "offered"),
         updatedAt: now };
       tx.put("receipt", id, offered, tx.generationOf("receipt", id));
