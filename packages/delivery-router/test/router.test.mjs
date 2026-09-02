@@ -183,6 +183,59 @@ test("multiple eligible current sessions are ambiguous and durable-only", async 
   assert.equal((await receipt(f.store, message.messageId)).state, "queued");
 });
 
+test("multiple current recipient sessions are ambiguous before binding eligibility",
+  async () => {
+    let offers = 0;
+    const adapter = certifiedAdapter(async ({ binding }) => {
+      offers += 1;
+      return { accepted: true, transport: "codex-app-server",
+        clientVersion: binding.clientVersion };
+    });
+    const f = await fixture({ adapter, secondRecipientSession: true });
+    await publish(f.service, f.sessions[0]);
+    const message = await send(f.service, f.sender, "question", "one_of_two_bound");
+
+    assert.deepEqual(await f.router.offer(message), durable("ambiguous_recipient_sessions"));
+    assert.equal(offers, 0, "the router offered before resolving session ambiguity");
+    assert.equal((await receipt(f.store, message.messageId)).state, "queued");
+  });
+
+test("closed extra sessions do not create false ambiguity", async () => {
+  const f = await fixture({ secondRecipientSession: true });
+  await f.service.closeSession({ sessionId: f.sessions[1].sessionId,
+    generation: f.sessions[1].generation });
+  await publish(f.service, f.sessions[0]);
+  const message = await send(f.service, f.sender, "question", "closed_extra");
+
+  assert.equal((await f.router.offer(message))[0].outcome, "offered");
+});
+
+test("a stale extra session still makes live delivery ambiguous", async () => {
+  const f = await fixture({ secondRecipientSession: true });
+  await publish(f.service, f.sessions[0], { leaseUntil: "2026-09-01T20:03:00.000Z" });
+  f.clock.advance(90_001);
+  await f.service.heartbeatSession({ sessionId: f.sender.sessionId,
+    generation: f.sender.generation });
+  await f.service.heartbeatSession({ sessionId: f.sessions[0].sessionId,
+    generation: f.sessions[0].generation });
+  const message = await send(f.service, f.sender, "question", "stale_extra");
+
+  assert.deepEqual(await f.router.offer(message), durable("ambiguous_recipient_sessions"));
+});
+
+test("an offline extra session does not create false ambiguity", async () => {
+  const f = await fixture({ secondRecipientSession: true });
+  await publish(f.service, f.sessions[0], { leaseUntil: "2026-09-01T21:00:00.000Z" });
+  f.clock.advance(30 * 60_000 + 1);
+  await f.service.heartbeatSession({ sessionId: f.sender.sessionId,
+    generation: f.sender.generation });
+  await f.service.heartbeatSession({ sessionId: f.sessions[0].sessionId,
+    generation: f.sessions[0].generation });
+  const message = await send(f.service, f.sender, "question", "offline_extra");
+
+  assert.equal((await f.router.offer(message))[0].outcome, "offered");
+});
+
 test("lease expiry and generation replacement remove a binding from eligibility", async () => {
   const f = await fixture();
   await publish(f.service, f.sessions[0]);

@@ -249,11 +249,26 @@ export function createSessionService(ports) {
     return closed;
   }
 
+  async function listLiveSessions({ participantId, workspaceId, now = clock.now() }) {
+    const resolved = workspaceId ?? store.workspaceId;
+    const snapshot = resolved === undefined ? null
+      : await store.snapshot(resolved, { kinds: ["workspace", "session"] });
+    const records = snapshot?.workspace === null
+      ? await store.ephemeral.list("session")
+      : snapshot?.sessions ?? await store.ephemeral.list("session");
+    return records
+      .filter(session => session.participantId === participantId
+        && classifySessionPresence(session, now, pidIsAlive) !== "offline")
+      .sort((left, right) => left.sessionId.localeCompare(right.sessionId))
+      .map(session => ({ sessionId: session.sessionId, generation: session.generation }));
+  }
+
   return {
     openSession,
     resumeSession,
     heartbeatSession,
     closeSession,
+    listLiveSessions,
     locateSession: locate,
     ensureMaterialised: options => ensureMaterialised(ports, options),
   };

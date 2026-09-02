@@ -41,7 +41,15 @@ export function createDeliveryRouter({ service, adapters, clock }) {
     const receipt = await service.readReceipt({ messageId: message.messageId,
       recipientParticipantId: participantId });
     if (receipt.state !== "queued") return settled(receipt);
-    const bindings = await service.listDeliveryBindings({ participantId, now });
+    const liveSessions = await service.listLiveSessions({ participantId, now });
+    if (liveSessions.length === 0) return durable(participantId, "recipient_unavailable");
+    if (liveSessions.length > 1) {
+      return durable(participantId, "ambiguous_recipient_sessions");
+    }
+    const [target] = liveSessions;
+    const bindings = (await service.listDeliveryBindings({ participantId, now }))
+      .filter(binding => binding.sessionId === target.sessionId
+        && binding.generation === target.generation);
     if (bindings.length === 0) return durable(participantId, "recipient_unavailable");
     const permitted = bindings.filter(binding => binding.livePolicy !== "off"
       && permits(binding.livePolicy, message.kind));
