@@ -9,9 +9,9 @@ advisory protection around that communication layer, not the product's centre.
 
 | | |
 |---|---|
-| Built from | `2f5803189583407561782745cb15f7eeb269a4b8` |
-| Tarball | `agents-can-communicate-0.2.0.tgz`, 201,247 bytes, 177 entries |
-| sha256 | `4754e23ae167411dd2dc7523de75b2aa61b0aa5f112aae953e91f2aef2d32869` |
+| Built from | `98469d195924169c9576f305c57a24a92fecdc75` |
+| Tarball | `agents-can-communicate-0.2.0.tgz`, 201,295 bytes, 177 entries |
+| sha256 | `4ef3d36208421b6659382b9253c5bdcebcaf679b352dd2945f0e3247e527b6f3` |
 | Node | 26.5.1 for this release proof; package requires Node >=24 |
 | Verified on | macOS 26.6.2 (darwin 25.6.0, arm64) |
 | Native live delivery | Not certified: Codex 0.152.0 had no daemon control socket; Claude Code 2.1.252 stopped at the development-channel warning |
