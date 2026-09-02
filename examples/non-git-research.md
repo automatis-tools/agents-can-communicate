@@ -35,10 +35,10 @@ files, no collision.
 
 ```bash
 acc message --to review --subject "Two sources disagree" \
-  --body "Fig. 3 vs Table 2 — which do we trust?" --type question --requires-ack
+  --body "Fig. 3 vs Table 2 — which do we trust?" --type question
 ```
 
-`--requires-ack` means the question stays open until review answers it.
+The `question` kind stays open until review answers it.
 
 ## Check the room
 

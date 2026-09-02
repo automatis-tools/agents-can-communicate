@@ -84,7 +84,12 @@ export async function detectInstallation({ adapters, context, probe = spawnProbe
       }
       if (entry.capabilities?.delivery?.livePush !== true
         && typeof adapter.deliveryFallback?.diagnostic === "string") {
-        entry.deliveryDiagnostic = adapter.deliveryFallback.diagnostic;
+        const nextTurnDowngraded = adapter.capabilities?.delivery?.nextTurn === true
+          && entry.capabilities?.delivery?.nextTurn !== true;
+        entry.deliveryDiagnostic = nextTurnDowngraded
+          ? `${adapter.displayName} ${entry.version ?? "unknown version"} has no certified `
+            + `next-turn delivery on ${platform}; ${adapter.deliveryFallback.diagnostic}`
+          : adapter.deliveryFallback.diagnostic;
         entry.diagnostics.push(entry.deliveryDiagnostic);
       }
       return entry;

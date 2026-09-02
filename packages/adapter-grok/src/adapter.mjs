@@ -30,6 +30,8 @@ export function createGrokAdapter() {
     // prove some event names fired, but those captures are not package-shipped,
     // so no effective capability is certified from them.
     capabilities: {},
+    deliveryFallback: { diagnostic:
+      "Grok has no certified next-turn or live delivery; polling through acc inbox remains active" },
 
     startSession: async () => ({ ok: true, changes: [], diagnostics: [] }),
     endSession: async () => ({ ok: true, changes: [], diagnostics: [] }),

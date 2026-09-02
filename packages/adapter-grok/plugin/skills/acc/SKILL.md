@@ -54,18 +54,18 @@ For information that needs no response:
   --body "Record v2 accepts nullable pid; no migration is planned."
 ```
 
-For a question or action, require an answer:
+For a question, use the kind whose default obligation is a reply:
 
 ```bash
-{{ACC}} message --to models --type question --requires-ack \
+{{ACC}} message --to models --type question \
   --subject "claim boundary" --body "Can I take file:src/parser/** after your commit?"
 ```
 
-When the peer should own a concrete piece of work, send one acknowledged request:
+When the peer should own a concrete piece of work, send one reply-required request:
 
 ```bash
 {{ACC}} request --to claude_code --title "review inbox transitions" \
-  --detail "Check queued -> seen and reply -> acknowledged; return only defects."
+  --detail "Check queued -> retrieved and reply -> acknowledged; return only defects."
 ```
 
 Participant names come from `{{ACC}} status --json`. A request is not an order.
@@ -85,7 +85,7 @@ To answer a direct message, reply and acknowledge it in one operation:
 {{ACC}} reply --message message_x --body "Yes. The boundary is free after commit abc123."
 ```
 
-If no written reply is needed, acknowledge it directly:
+If the sender chose the `acknowledge` obligation, acknowledge it directly:
 
 ```bash
 {{ACC}} ack --message message_x
@@ -97,12 +97,12 @@ Do not use a full workspace sync to recover one message.
 
 Every attention line includes the id its command needs:
 
-- `[direct_request] message_x`: use `inbox`, then `reply` or `ack`.
+- `[reply_required] message_x`: use `inbox`, then `reply`.
+- `[acknowledgement_required] message_x`: use `inbox`, then `ack`.
 - `claim_conflict claim_x`: respect it; contact the owner or change scope.
 - `claim_contended claim_x`: a peer intends to touch what you hold; coordinate.
-- `request_stalled`: contact the recipient or wait for their reply.
+- `recipient_unavailable message_x`: contact the recipient or wait for their reply.
 - `claim_expired`: stop assuming the resource is reserved; reclaim if needed.
-- `unread_note message_x`: read that exact inbox item once.
 
 ## Choose the narrow read
 

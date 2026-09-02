@@ -4,7 +4,7 @@ Verified 2026-08-16 against the installed client and its live configuration.
 
 | Item | Value |
 |---|---|
-| Client | **0.37.0** and **0.55.1** (re-certified; see the last section) |
+| Client | **0.37.0** and **0.55.1** hook contracts; next-turn delivery only **0.37.0 darwin-arm64** |
 | Primary docs | <https://geminicli.com/docs/extensions/>, <https://geminicli.com/docs/hooks/> |
 | Local evidence | `~/.gemini/settings.json`, `gemini hooks --help`, `gemini extensions` |
 
@@ -102,6 +102,15 @@ prefer these surfaces over hand-editing settings where they cover the operation.
 Task 5 of the adapters plan is accurate. Add `name` and `timeout` to every installed hook
 entry: `name` is what lets uninstall remove exactly ACC's entries, which is otherwise a
 guess by command string.
+
+## Delivery tier
+
+ACC's machine-readable `delivery.nextTurn` capability is certified only for the exact
+`0.37.0` / `darwin-arm64` tier recorded in `certification.json`. The 0.55.1 observations
+below re-certify hook and response contracts; they do not certify ACC next-turn delivery
+for that version. Any other or unparseable version therefore downgrades explicitly while
+durable `acc inbox` access remains available. Gemini CLI has no certified live-push
+binding.
 
 
 ## Re-certified on 0.55.1 (2026-08-16)

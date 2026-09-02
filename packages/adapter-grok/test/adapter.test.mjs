@@ -103,6 +103,8 @@ test("documentation-shaped fixtures do not certify Grok capabilities", () => {
   for (const group of Object.values(capabilities)) {
     for (const value of Object.values(group)) assert.equal(value, false);
   }
+  assert.match(createGrokAdapter().deliveryFallback.diagnostic, /polling|acc inbox/i);
+  assert.doesNotMatch(createGrokAdapter().deliveryFallback.diagnostic, /live push available/i);
 });
 
 test("captured payloads normalise and drop conversation content", async () => {

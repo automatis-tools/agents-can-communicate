@@ -5,6 +5,7 @@ import path from "node:path";
 import test from "node:test";
 
 import { EXIT } from "@agents-can-communicate/protocol";
+import { effectiveCapabilities } from "@agents-can-communicate/adapter-sdk";
 
 import { createGeminiCliAdapter } from "../src/adapter.mjs";
 import { allowResponse, denyResponse, injectResponse, normalizeGeminiHook }
@@ -131,6 +132,19 @@ test("only capabilities observed firing are declared true", () => {
   assert.equal(capabilities.delivery.nextTurn, true);
   assert.equal(capabilities.delivery.livePush, false);
   assert.equal(capabilities.delivery.replyRoute, false);
+});
+
+test("next-turn delivery exists only at the exact certified client tier", () => {
+  const adapter = createGeminiCliAdapter();
+
+  assert.equal(effectiveCapabilities(adapter,
+    { clientVersion: "0.37.0", platform: "darwin-arm64" }).delivery.nextTurn, true);
+  assert.equal(effectiveCapabilities(adapter,
+    { clientVersion: "0.55.1", platform: "darwin-arm64" }).delivery.nextTurn, false);
+  assert.equal(effectiveCapabilities(adapter,
+    { clientVersion: undefined, platform: "darwin-arm64" }).delivery.nextTurn, false);
+  assert.match(adapter.deliveryFallback.diagnostic, /0\.37\.0/);
+  assert.match(adapter.deliveryFallback.diagnostic, /acc inbox/);
 });
 
 test("a deny uses the shape this client acts on, not the one two others accept", () => {

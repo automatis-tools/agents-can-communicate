@@ -163,7 +163,9 @@ test("every skill teaches the two lines a turn can end with", async () => {
   }
   assert.equal(skills.length, 5);
   for (const { file, text } of skills) {
-    assert.match(text, /\[direct_request\] message_x/, `${file} does not say what to do`);
+    assert.match(text, /\[reply_required\] message_x/, `${file} does not explain replies`);
+    assert.match(text, /\[acknowledgement_required\] message_x/,
+      `${file} does not explain acknowledgements`);
     assert.match(text, /inbox --message/, `${file} does not say how to read overflow`);
     assert.match(text, /full workspace sync to recover one message/,
       `${file} does not forbid the expensive recovery path`);

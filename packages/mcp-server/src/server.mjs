@@ -1,5 +1,5 @@
-import { AccError, EXIT } from "@agents-can-communicate/protocol";
-import { noteNudge } from "@agents-can-communicate/core";
+import { AccError, EXIT, MESSAGE_KINDS, VALID_OBLIGATIONS }
+  from "@agents-can-communicate/protocol";
 import { clearSessionBinding, loadSessionBinding, storeSessionBinding }
   from "@agents-can-communicate/adapter-sdk";
 
@@ -72,22 +72,6 @@ async function resolveSession(context) {
   return session;
 }
 
-// Kept for clients released before acc_inbox existed. New clients should use
-// the narrow inbox tool, but removing mail from acc_sync would strand deployed
-// clients that only know this response field. Returning a body is delivery, so
-// only those returned messages advance to injected.
-async function syncWithMail(service, owner, context, args) {
-  const sync = await service.sync({ ...owner, cursor: args.cursor ?? null,
-    scope: args.scope, limit: args.limit });
-  const messages = await service.pendingMessages({ workspaceId: context.workspaceId,
-    participantId: context.participantId, exceptSessionId: owner.sessionId });
-  for (const message of messages) {
-    await service.markDelivery({ ...owner, messageId: message.messageId,
-      state: "injected" }).catch(() => null);
-  }
-  return messages.length === 0 ? sync : { ...sync, messages };
-}
-
 export async function recordAndOffer({ record, router, selectMessage = value => value }) {
   const recorded = await record();
   const message = selectMessage(recorded);
@@ -105,12 +89,30 @@ export async function recordAndOffer({ record, router, selectMessage = value => 
   }
 }
 
+const clientMessageId = (args, service) =>
+  args.clientMessageId ?? service.ids.next("client");
+
+function obligationFor(kind, explicit, addressed) {
+  if (!MESSAGE_KINDS.includes(kind)) {
+    throw new AccError(EXIT.USAGE, `unknown message kind: ${kind}`);
+  }
+  const obligation = explicit ?? (kind === "handoff"
+    ? (addressed ? "acknowledge" : "none")
+    : VALID_OBLIGATIONS[kind][0]);
+  if (!VALID_OBLIGATIONS[kind].includes(obligation)
+    || (!addressed && obligation !== "none")) {
+    throw new AccError(EXIT.USAGE,
+      `message obligation ${obligation} is invalid for ${kind}`);
+  }
+  return obligation;
+}
+
 /**
  * A poll is this client's turn.
  *
  * The hook runtime hands a session its pending messages when it builds a turn,
  * and marks them delivered. An MCP client has no turn and no hook, and no tool
- * ever handed it anything: it saw a `direct_request` line carrying a subject and
+ * ever handed it anything: it saw a `reply_required` line carrying a subject and
  * an id, and to read what a peer had actually said it had to ask for the whole
  * snapshot and search every message in the workspace for its own name.
  *
@@ -119,7 +121,7 @@ export async function recordAndOffer({ record, router, selectMessage = value => 
  * that had answered it.
  *
  * Returning them here is delivery, in the same sense and with the same honesty
- * as the turn: what is handed over is marked `injected`, and nothing else is.
+ * as the turn: what is handed over is marked `retrieved`, and nothing else is.
  * Acknowledgement stays a separate act, because being shown something is not
  * agreeing to it.
  */
@@ -133,12 +135,12 @@ async function callTool(name, args, context) {
     case "acc_status":
       return service.collectStatus({});
     case "acc_sync":
-      return syncWithMail(service, owner, context, args);
+      return service.sync({ ...owner, cursor: args.cursor ?? null,
+        scope: args.scope, limit: args.limit });
     case "acc_work":
       if (args.clear === true) return service.clearIntent({ ...owner });
       return service.setIntent({ ...owner, summary: args.summary, mode: args.mode,
-        state: args.state, workstreamId: args.workstreamId ?? null,
-        resourceHints: args.resourceHints ?? [] });
+        state: args.state, resourceHints: args.resourceHints ?? [] });
     case "acc_claim":
       if (args.action === "renew") return service.renewClaim({ ...owner,
         claimId: args.claimId, leaseSeconds: args.leaseSeconds });
@@ -149,17 +151,14 @@ async function callTool(name, args, context) {
       await service.releaseClaim({ ...owner, claimId: args.claimId });
       return { released: args.claimId };
     case "acc_message": {
+      const kind = args.kind ?? "note";
+      const toParticipantIds = args.to ?? [];
       const routed = await recordAndOffer({ router: context.deliveryRouter, record: () =>
-        service.sendMessage({ ...owner, toParticipantIds: args.to ?? [],
-        subject: args.subject, body: args.body, type: args.type ?? "note",
-        priority: args.priority, requiresAck: args.requiresAck === true,
-        workstreamId: args.workstreamId ?? null }) });
+        service.sendMessage({ ...owner, clientMessageId: clientMessageId(args, service),
+        toParticipantIds, subject: args.subject, body: args.body, kind,
+        obligation: obligationFor(kind, args.obligation, toParticipantIds.length > 0) }) });
       const message = routed.recorded;
-      // A note that reads like it wants a reply was sent fire-and-forget; hand
-      // the nudge back with the message so the model that sent it can reconsider.
-      const advice = noteNudge(message);
-      return advice ? { ...message, advice, delivery: routed.delivery }
-        : { ...message, delivery: routed.delivery };
+      return { message, delivery: routed.delivery };
     }
     case "acc_inbox":
       return service.readInbox({ ...owner, messageId: args.messageId });
@@ -167,25 +166,28 @@ async function callTool(name, args, context) {
       const routed = await recordAndOffer({ router: context.deliveryRouter,
         selectMessage: value => value.reply,
         record: () => service.replyToMessage({ ...owner, messageId: args.messageId,
-          body: args.body, subject: args.subject, type: args.type, priority: args.priority }) });
-      return { ...routed.recorded, delivery: routed.delivery };
+          body: args.body, subject: args.subject,
+          clientMessageId: clientMessageId(args, service) }) });
+      return { message: routed.recorded.reply, delivery: routed.delivery };
     }
     case "acc_request": {
       const routed = await recordAndOffer({ router: context.deliveryRouter,
-        record: () => service.requestWork({ ...owner, toParticipantId: args.toParticipantId,
-          title: args.title, detail: args.detail }) });
-      return { ...routed.recorded, delivery: routed.delivery };
+        record: () => service.sendMessage({ ...owner,
+          clientMessageId: clientMessageId(args, service),
+          toParticipantIds: [args.toParticipantId], kind: "request", obligation: "reply",
+          subject: args.title, body: args.detail ?? args.title }) });
+      return { message: routed.recorded, delivery: routed.delivery };
     }
     case "acc_ack":
-      return service.markDelivery({ ...owner, messageId: args.messageId,
-        state: args.state ?? "acknowledged" });
+      return service.acknowledgeMessage({ ...owner, messageId: args.messageId });
     case "acc_finish": {
       const routed = await recordAndOffer({ router: context.deliveryRouter,
         selectMessage: value => value.message,
-        record: () => service.finishSession({ ...owner, goal: args.goal, status: args.status,
+        record: () => service.finishSession({ ...owner,
+        clientMessageId: clientMessageId(args, service), goal: args.goal, status: args.status,
         completed: args.completed ?? [], remaining: args.remaining ?? [],
-        blockers: args.blockers ?? [], toParticipantId: args.toParticipantId ?? null }) });
-      return { ...routed.recorded, delivery: routed.delivery };
+        blockers: args.blockers ?? [], toParticipantId: args.toParticipantId }) });
+      return { message: routed.recorded.message, delivery: routed.delivery };
     }
     default:
       throw new AccError(EXIT.USAGE, `unknown tool: ${name}`, { name });

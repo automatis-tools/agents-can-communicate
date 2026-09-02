@@ -14,7 +14,7 @@ export const COMMANDS = Object.freeze({
   detach: { required: ["session", "generation"], optional: [] },
   sync: { required: [], optional: ["session", "cursor", "limit", "scope"] },
   work: { required: [], optional: ["session", "generation", "summary", "mode",
-    "state", "workstream"], repeated: ["hint"], flags: ["clear"] },
+    "state"], repeated: ["hint"], flags: ["clear"] },
   claim: { required: ["resource"],
     optional: ["session", "generation", "mode", "enforcement", "reason", "lease"] },
   // Neither is required on its own, because either one names the claim: an id
@@ -24,18 +24,17 @@ export const COMMANDS = Object.freeze({
   release: { required: [],
     optional: ["claim", "resource", "session", "generation", "authority", "reason"] },
   message: { required: ["subject", "body"],
-    optional: ["session", "generation", "type", "priority", "workstream"],
-    repeated: ["to"], flags: ["requires-ack"] },
+    optional: ["session", "generation", "type", "obligation", "client-message-id"],
+    repeated: ["to"] },
   inbox: { required: [], optional: ["session", "generation", "message"] },
   reply: { required: ["message", "body"],
-    optional: ["session", "generation", "subject", "type", "priority"] },
-  // Asking another agent to do something as an acknowledged message.
+    optional: ["session", "generation", "subject", "client-message-id"] },
+  // Asking another agent to do something as a message with a reply obligation.
   request: { required: ["to", "title"],
-    optional: ["session", "generation", "detail"] },
-  // Messages not tied to a task need a way to be answered too. Without one a
-  // `requiresAck` message raised an attention item nothing could ever clear.
-  ack: { required: ["message"], optional: ["session", "generation", "state"] },
-  finish: { required: ["goal"], optional: ["session", "generation", "status", "to"],
+    optional: ["session", "generation", "detail", "client-message-id"] },
+  ack: { required: ["message"], optional: ["session", "generation"] },
+  finish: { required: ["goal"], optional: ["session", "generation", "status", "to",
+    "client-message-id"],
     repeated: ["completed", "remaining", "blocker"] },
   status: { required: [], optional: ["participant"], flags: ["all"] },
   doctor: { required: [], optional: ["home"], flags: ["repair"] },

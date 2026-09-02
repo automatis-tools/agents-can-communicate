@@ -17,10 +17,11 @@ function escapeText(value) {
 
 const attributedMessage = message => ({
   messageId: message.messageId,
-  from: message.fromSessionId,
-  type: message.type,
-  priority: message.priority,
-  requiresAck: message.requiresAck,
+  threadId: message.threadId,
+  clientMessageId: message.clientMessageId,
+  from: message.fromParticipantId,
+  kind: message.kind,
+  obligation: message.obligation,
   sentAt: message.sentAt,
   trust: "untrusted peer content",
   subject: escapeText(message.subject),
