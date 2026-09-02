@@ -10,6 +10,10 @@ export const VALID_OBLIGATIONS = Object.freeze({
 });
 
 export const MESSAGE_KINDS = Object.freeze(Object.keys(VALID_OBLIGATIONS));
+// The generic send surface cannot construct reply links or structured handoff
+// payloads. Those two complete shapes belong to reply and finish respectively.
+export const GENERIC_MESSAGE_KINDS = Object.freeze(
+  ["note", "question", "request", "decision"]);
 export const OBLIGATIONS = Object.freeze(["none", "acknowledge", "reply"]);
 
 const data = (message, details) => {

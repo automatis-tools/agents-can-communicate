@@ -59,13 +59,11 @@ and the reason as one thing; the other agent sees it on its next turn. A **messa
 the recipient weighs, never a command it obeys** — authority differences apply to *mutation
 only*, never to knowledge and never to who may ask whom.
 
-A message is either a fire-and-forget **note** or a **question** that wants an answer. A
-note is shown once and owes no reply; a question stands in front of the recipient until it
-is acknowledged, and if it goes unanswered while its asker waits, that waiting is surfaced.
-So a decision or warning the other agent must act on is a question (`--requires-ack`) —
-not a note. A note that still reads like it wants a reply gets
-flagged when you send it, and a delivered note leaves one low-priority breadcrumb so it
-stays recoverable without nagging.
+A **note** is shown once and owes no reply; a **question** stands in front of the recipient
+until it is answered with `acc reply`, and unanswered questions stay surfaced. Use a
+question when an answer is needed. Use `message --type decision --obligation acknowledge`
+when the recipient only needs to confirm a decision. A delivered note leaves one
+low-priority breadcrumb so it stays recoverable without nagging.
 
 `acc inbox` is the narrow recovery path: only unresolved messages addressed to this
 participant, `--message` to select one by id. `acc reply` writes the answer, links it to

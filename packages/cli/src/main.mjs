@@ -2,7 +2,8 @@
 // handler shares one owner-resolution, result, and error contract with `main`. Splitting the
 // dispatch table would either duplicate that contract or expose storage/runtime context solely
 // to pass it across a module boundary, making command behavior harder to audit as one surface.
-import { AccError, CONFIG_FILENAME, EXIT, MESSAGE_KINDS, VALID_OBLIGATIONS, failure, ok }
+import { AccError, CONFIG_FILENAME, EXIT, GENERIC_MESSAGE_KINDS, VALID_OBLIGATIONS,
+  failure, ok }
   from "@agents-can-communicate/protocol";
 import { createCoordinationService } from "@agents-can-communicate/core";
 import { openFilesystemStore } from "@agents-can-communicate/storage-filesystem";
@@ -118,10 +119,12 @@ const clientMessageId = (options, context) =>
   options.clientMessageId ?? context.service.ids.next("client");
 
 function obligationFor(kind, explicit, addressed) {
-  if (!MESSAGE_KINDS.includes(kind)) throw usage(`unknown message type: ${kind}`);
-  const obligation = explicit ?? (kind === "handoff"
-    ? (addressed ? "acknowledge" : "none")
-    : VALID_OBLIGATIONS[kind][0]);
+  if (!GENERIC_MESSAGE_KINDS.includes(kind)) {
+    const command = kind === "answer" ? "reply" : kind === "handoff" ? "finish" : "message";
+    throw usage(kind === "answer" || kind === "handoff"
+      ? `${kind} messages require acc ${command}` : `unknown message type: ${kind}`);
+  }
+  const obligation = explicit ?? VALID_OBLIGATIONS[kind][0];
   if (!VALID_OBLIGATIONS[kind].includes(obligation)
     || (!addressed && obligation !== "none")) {
     throw usage(`message obligation ${obligation} is invalid for ${kind}`);
