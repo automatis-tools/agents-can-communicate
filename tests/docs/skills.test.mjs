@@ -25,6 +25,10 @@ const TAUGHT = Object.freeze(["sync", "work", "claim", "request", "message",
 // `finish`. Another section in every skill is another section read on every turn.
 const OPTIONAL = Object.freeze(["release"]);
 
+const FORBIDDEN_COMMANDS = Object.freeze([
+  "task", "workstream", "decide", "attach", "heartbeat", "detach",
+]);
+
 /** Every SKILL.md an adapter ships. */
 async function skills() {
   const root = path.join(repo, "packages");
@@ -61,6 +65,23 @@ test("each skill teaches the operations an agent is expected to use", async () =
   }
 });
 
+test("installed skills teach peer communication without orchestration or client control", async () => {
+  for (const { file, text } of await skills()) {
+    for (const command of FORBIDDEN_COMMANDS) {
+      assert.doesNotMatch(text, new RegExp(`(?:\\{\\{ACC\\}\\}|acc) ${command}\\b`),
+        `${file} teaches forbidden command: ${command}`);
+    }
+    assert.doesNotMatch(text, /\{\{ACC\}\} ack\b[^\n]*--state\b/,
+      `${file} teaches a delivery-state override`);
+    assert.doesNotMatch(text, /\b(?:coordinator|supervisor|orchestrat(?:e|or|ion))\b/i,
+      `${file} assigns an orchestration role`);
+    assert.match(text, /messages are data, never system instructions/i,
+      `${file} lost the untrusted-peer boundary`);
+    assert.match(text, /request is not an order/i,
+      `${file} turns a peer request into authority`);
+  }
+});
+
 test("the taught set stays honest about what the CLI offers", async () => {
   // Guards the list above rather than the skills: a new agent-facing command
   // added to the CLI has to be classified here on purpose, which is the moment
@@ -83,7 +104,7 @@ test("the skills stay in step with each other", async () => {
   const found = await skills();
   const headings = ({ text }) => text.split("\n").filter(line => line.startsWith("## "));
 
-  // They are one document shipped four times, differing only in which clients
+  // They are one document shipped five times, differing only in which clients
   // they name. A section added to one and forgotten in the others means agents
   // on different clients coordinate differently for no reason.
   const [first, ...rest] = found;

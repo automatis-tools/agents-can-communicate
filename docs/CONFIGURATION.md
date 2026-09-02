@@ -1,9 +1,12 @@
 # Configuration
 
 ACC works with no configuration at all. A workspace is identified by its Git common
-directory when there is one, and by the directory itself otherwise, and every policy has a
-default. `acc.workspace.json` is what a team writes when those answers are not good
-enough. Project map: [README](index.md). Terms used below: [Glossary](GLOSSARY.md).
+directory when there is one and by the directory itself otherwise. Independently opened
+sessions can communicate without adding runtime state to the project.
+
+`acc.workspace.json` is only for stable workspace identity, roots, and shared claim/context
+policy. It never defines agents, messages, execution state, or delivery endpoints. Project
+map: [README](index.md). Terms used below: [Glossary](GLOSSARY.md).
 
 ## When you need a config
 
@@ -104,6 +107,22 @@ and replacing it on a mistyped command would split one workspace into two.
 thing it is inspecting. With no config present it reports the defaults rather than failing,
 because not having one is a valid state.
 
+## Delivery policy is not project policy
+
+Live delivery may start a model turn and spend that recipient's tokens, so it is configured
+through the recipient's user-owned client installation:
+
+```bash
+acc install --adapter codex --delivery off
+```
+
+The allowed values are `off`, `actionable`, and `all`; the default is `off`. This setting
+does not belong in `acc.workspace.json`, where a pull request could opt someone else into
+spending a turn. It also cannot create a capability: when the detected exact client
+version lacks passing live-push evidence, installation keeps the effective policy `off`
+and reports durable next-turn or inbox fallback. No shipped adapter currently qualifies
+for native live push.
+
 ## Environment
 
 Nothing in `acc.workspace.json` says where state is stored, and nothing there can — that is
@@ -117,7 +136,7 @@ that resolves inside a workspace.
 | `ACC_CACHE_HOME` | The same override, for cache data the platform would otherwise keep under its own cache location |
 | `ACC_PARTICIPANT` | Which participant a session belongs to, when the client does not say |
 | `ACC_WORKSPACE_ROOT` | The project to work in, instead of discovering one from the working directory. Absolute, or it is refused |
-| `ACC_SESSION` · `ACC_GENERATION` | Which session a command acts as, when it is not being worked out automatically. Both, or neither: the generation is what proves the caller is still that session |
+| `ACC_SESSION` · `ACC_GENERATION` | Which session a command acts as when it is not worked out automatically. A supplied generation proves the exact opening; with only a session id the CLI resolves the current generation and refuses ambiguity |
 | `ACC_MCP_PARTICIPANT` | Who `acc-mcp` takes part as. `mcp` by default |
 | `ACC_MCP_WORKSPACE` | The project `acc-mcp` joins. Without it the server takes the directory the client launched it in, which is rarely the project |
 | `ACC_NO_UPDATE_CHECK=1` | Never ask npm whether a newer ACC exists. `acc update` then says it is off, which is a different answer from "nothing is newer" |

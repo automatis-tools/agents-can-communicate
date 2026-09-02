@@ -1,225 +1,107 @@
 # Capabilities
 
-Capability honesty is part of the product: ACC coordinates sessions it does not own, so a
-workspace can promise only what every session in it actually exposes — one weaker
-participant lowers the reported protection level instead of inheriting a stronger label
-from its peers.
+Capability honesty separates four questions that are easy to collapse:
 
-Every row below is **measured**, not asserted: a `yes` has package-shipped passing evidence
-for that exact client version and `darwin-arm64`; a `no` means the behavior lacks qualifying
-evidence, not that it is impossible. Unknown versions and other platforms degrade to false.
+1. **Certified support** — did this exact client version and platform pass a shipped
+   real-client fixture?
+2. **Current reachability** — does one current session generation expose a live binding
+   whose lease is valid now?
+3. **Recipient policy** — did that recipient opt into spending a turn for this message
+   kind?
+4. **Fallback** — what durable path remains when any earlier answer is no?
 
-## Clients
+A source method or vendor documentation is not certification. Unknown versions and
+platforms degrade to false. No weaker session inherits a stronger peer's capability.
 
-| Adapter | Client | Version |
-|---|---|---|
-| `codex` | `codex-cli` | 0.147.0 |
-| `claude_code` | Claude Code | 2.1.233 |
-| `gemini_cli` | Gemini CLI | 0.37.0 (0.55.1 has no exact package-shipped capture) |
-| `grok` | Grok | 1.0.13 (documentation-shaped fixtures do not certify capabilities) |
-| `kimi` | Kimi Code | 0.36.1 |
+## Certified support
 
-## Matrix
+Passing evidence currently ships for these exact versions on `darwin-arm64`:
 
-| Capability | codex | claude_code | gemini_cli | grok | kimi |
-|---|---|---|---|---|---|
+| Capability | Codex 0.147.0 | Claude Code 2.1.233 | Gemini CLI 0.37.0 | Grok 1.0.13 | Kimi 0.36.1 |
+|---|---:|---:|---:|---:|---:|
 | `lifecycle.sessionStart` | yes | yes | yes | no | yes |
-| `lifecycle.sessionResume` | no | no | no | no | no |
 | `lifecycle.sessionEnd` | yes | yes | yes | no | no |
 | `lifecycle.heartbeat` | no | no | no | no | yes |
-| `lifecycle.childSessions` | no | no | no | no | no |
-| `context.startupInjection` | no | no | no | no | no |
 | `context.beforeTurnInjection` | yes | yes | yes | no | yes |
-| `context.safePointInjection` | no | no | no | no | no |
-| `guards.beforeRead` | no | no | no | no | no |
 | `guards.beforeWrite` | yes | yes | yes | no | yes |
 | `guards.beforeShell` | no | yes | yes | no | yes |
 | `delivery.nextTurn` | yes | yes | yes | no | yes |
 | `delivery.livePush` | no | no | no | no | no |
 | `delivery.replyRoute` | no | no | no | no | no |
 
-The manifest is a maximum claim, not a promise for every installation.
-`effectiveCapabilities(adapter, { clientVersion, platform })` keeps a `yes` only when a
-passing evidence entry matches both values exactly. The Codex 0.152.0 native-delivery
-capture and Claude Code 2.1.252 development-channel capture are retained as `fail`
-evidence: neither certifies `livePush` or `replyRoute`.
+Every other capability in the closed shape defaults to false, including session resume,
+child sessions, startup or safe-point injection, and before-read guards.
 
-## Resolving a client's pid is not universal either
+The limitations belong next to the adapters they affect:
 
-Not a capability above — no adapter method backs it, so it has no row in the matrix — but
-it is presence's other signal for telling a dead process from an idle one, and it does not
-reach every client.
+| Adapter | Exact limitation and evidence |
+|---|---|
+| Codex | 0.147.0 next-turn stdout arrives as unwrapped developer-role context and requires plugin trust. The separate 0.152.0 native capture found no daemon control socket; ACC did not start one, so live push and reply routing remain false. |
+| Claude Code | 2.1.233 next-turn delivery waits for the next user prompt. The 2.1.252 channel capture stopped at the development-channel warning before the ACC MCP child started; native delivery branches are unobserved and false. |
+| Gemini CLI | Only 0.37.0 has package-shipped next-turn certification. Write and shell tools depend on approval mode; other versions and platforms retain inbox access but no effective delivery capability. |
+| Grok | Documentation-shaped payloads do not count as real captures. UserPromptSubmit context was observed discarded, and no deny was captured stopping a real write; all capabilities remain false. |
+| Kimi Code | 0.36.1 has next-turn and guard evidence, plus a 60-second heartbeat. Prompt-mode `SessionEnd` never fired, and its next-turn path does not interrupt an active turn. |
+| Generic MCP | Tool polling is not next-turn injection, live push, or a native reply route. It has no write guard or client-lifecycle evidence. |
 
-A session's recorded pid comes from walking its process ancestry until the adapter's own
-declared binary (`client.command`) turns up in `ps -o comm=`. That only works when the
-operating system's own name for the process actually is that binary: true for a native
-executable, false for a script run through an interpreter, where `comm` reports the
-interpreter's name rather than the script's.
+`certification.json` beside each adapter is machine-readable. `COMPATIBILITY.md` records the
+captured client behavior, including what could not be observed.
 
-| Client | `client.command` | `ps -o comm=` reports | Pid resolves |
-|---|---|---|---|
-| `codex` | `codex` | `codex`, a native binary | yes |
-| `claude_code` | `claude` | `claude`, a native binary | yes |
-| `gemini_cli` | `gemini` | `node` — `gemini.js` starts `#!/usr/bin/env node` | **no** |
-| `grok` | `grok` | `grok`, a native Mach-O at `~/.grok/bin/grok` | yes |
-| `kimi` | `kimi` | not installed on the machine this table was measured on; Kimi Code ships via npm as a Node.js CLI (`@moonshot-ai/kimi-code`), the same shape as Gemini CLI | **almost certainly no — not measured** |
+## Current reachability
 
-A Gemini session records `pid: null` for its whole life, and Kimi's is very likely the
-same, unconfirmed. `null` is the correct "nobody knows" answer and is handled identically
-wherever it is read — not a correctness bug. It does change what presence delivers, though:
-a confirmed-dead pid retires a session immediately and exactly, and today that is `codex`,
-`claude_code`, and `grok`. `gemini_cli` and `kimi` fall back to the same age-based floor every
-session has for whenever a pid is unavailable — thirty minutes of silence — so their
-sessions still leave, just later and on a timer instead of on the fact. See
-[ARCHITECTURE.md](ARCHITECTURE.md#presence) for the full floor.
+Certification is static evidence; reachability is runtime state. A live-capable adapter
+would publish a generation-bound binding with `availableModes`, `clientVersion`,
+`livePolicy`, and `leaseUntil`. `acc status --json` reports these as `deliveryBindings`
+with a computed `reachable` boolean while keeping the opaque endpoint private.
 
-## What the yes values do not promise
+The router requires exactly one current eligible generation. No binding, an expired lease,
+several live sessions for one participant, a busy target, or a version that does not match
+passing evidence all stay on durable fallback.
 
-A capability says the client can do the thing. Several of them are conditional on how the
-client is being run, and the conditions differ per harness. These are the ones that bite.
+Current shipped reality: no adapter publishes a native live binding, and no adapter has
+passing `livePush` certification. Codex and Claude Code are next-turn or inbox only;
+Gemini CLI and Kimi Code are next-turn only at their exact captured versions; Grok and MCP
+poll inbox.
 
-**`guards.beforeWrite` on `codex` depends on the model.** Whether the client offers
-`apply_patch` at all is a property of the model's metadata (`apply_patch_tool_type`), not
-a user setting. With a model that does not have it, edits run through `exec_command`,
-which reaches hooks as `tool_name: "Bash"` carrying a command string. A command names no
-resource, so there is nothing to compare against a claim. Observed on 0.147.0: the default
-toolset contained no `apply_patch`.
+## Recipient policy
 
-**`guards.beforeWrite` on `gemini_cli` depends on the approval mode.** In the default and
-`plan` modes the client declares no write tool to the model at all. `write_file` and
-`replace` appear under `auto_edit`; `run_shell_command` under `yolo`.
+Native live delivery may start a model turn and spend tokens, so the recipient owns the
+policy:
 
-**`guards.beforeShell` is resource-aware where the write is unambiguous.** ACC reads the
-command for its write positions only — a redirection, an operand of a command whose whole
-job is to put bytes somewhere — and declares those paths as targets. Reading positions are
-left alone: `cat file` and `grep file` name a path and write nothing, and treating them as
-writes would have sessions blocking each other for looking.
+| Policy | Meaning |
+|---|---|
+| `off` | normal next-turn and inbox only |
+| `actionable` | questions, requests, and addressed handoffs may use live push |
+| `all` | every addressed message kind may use live push |
 
-What it does not see is a language runtime opening the file itself (`python3 -c
-"open(...)"`), a command assembled at runtime, or an `eval`. A shell can still evade the
-guard. Until 0.1.7 every shell write did, which is why partial sight is the improvement it
-is: a session told to prefer the shell for file changes walked through every claim in the
-workspace.
+The default is `off`. `acc install --delivery actionable|all` is an explicit request, not
+a force switch. The installer applies it only when the detected exact client has certified
+live push; otherwise effective policy remains off and the fallback diagnostic is printed.
+Room messages are never live-push candidates.
 
-Where the guard cannot help, the turn context does: it names the claims other sessions
-hold and says which way this session stands with them. Two facts decide the wording — what
-the claim's owner asked for (`guarded` or `advisory`; see [Glossary](GLOSSARY.md)), and
-whether ACC can stop this session at all:
+## Fallback
 
-| Claim | This session | Note |
-|---|---|---|
-| guarded | can be guarded | `file edits and recognised shell writes are blocked; a runtime can still get past` |
-| guarded | cannot be guarded | `not enforced for this session; do not edit it` |
-| advisory | either | `advisory; nothing will stop you, the owner is asking` |
+| Participant | Durable behavior when acceleration is unavailable |
+|---|---|
+| exact-certified Codex 0.147.0 | complete peer body at the next normal turn; `acc inbox` remains recoverable |
+| exact-certified Claude Code 2.1.233 | complete peer body at the next normal prompt; `acc inbox` remains recoverable |
+| exact-certified Gemini CLI 0.37.0 | complete peer body at the next normal turn; `acc inbox` remains recoverable |
+| exact-certified Kimi Code 0.36.1 | complete peer body at the next normal turn; `acc inbox` remains recoverable |
+| Grok, generic MCP, unknown version, other platform | explicit `acc inbox` polling |
 
-Unenforceable is not the same as unknown — and neither is it the same as unclaimed.
+A send that committed durably succeeds even if a transport later fails. The delivery array
+names the queued fallback and safe error code. There is no terminal failed receipt.
 
-**`lifecycle.sessionEnd` on `kimi` is false and it matters.** Each `kimi -p` run leaves an
-attached session that never closes itself — it just stops taking turns. Presence retires it
-instead, most likely without ever resolving a pid (see above), which means the session
-reads `offline` — and disappears from the default `acc status` view — only after thirty
-minutes of silence, not on its declared 60s heartbeat cadence. Interactive sessions
-heartbeat and do not have this problem.
+## Guard limitations
 
-**`lifecycle.heartbeat` is Kimi's alone.** It fires on a timer — observed at 60002, 120004
-and 180006 ms of uptime — so an idle Kimi session keeps its presence honest. The other
-clients reach a hook only when the user takes a turn, so their idle sessions go stale while
-alive. This is why it is a capability of its own rather than a flavour of
-`delivery.nextTurn`.
+A guarded claim stops only paths the client exposes to a captured pre-tool hook. Codex's
+write guard depends on the model offering `apply_patch`; recognised shell writes can be
+matched, but a language runtime opening a file cannot. Gemini's edit tools depend on
+approval mode. Grok has no certified guard. One live advisory session lowers workspace
+protection to advisory because that is the strongest honest room-wide statement.
 
-**`context.beforeTurnInjection` and `delivery.nextTurn` on `grok` are false.** Grok 1.0.13
-discards UserPromptSubmit stdout and `additionalContext`. The hook still runs, but the
-model is not shown that text. Agents on this client read
-`acc status` / `acc inbox` from the skill.
+Hook response shapes are vendor-specific and not portable. An ignored deny response often
+fails silently, which is why each true cell above needs its own fixture rather than a
+shared documentation example.
 
-Grok's shipped JSON payloads are reconstructed from its documentation, while the actual
-TUI capture retained only event names and timings. Those observations remain useful in
-`COMPATIBILITY.md`, but copied shapes cannot satisfy package-local capture provenance, so
-the lifecycle rows also remain false until a raw capture is shipped.
-
-**`guards.beforeWrite` / `beforeShell` on `grok` are false.** PreToolUse fires, and
-the matcher names `write`, `search_replace`, and `run_terminal_command`. A deny
-has not yet been captured blocking a real call, so the capability stays false.
-
-## Response contracts, which do not port
-
-The single most portable-looking mistake an adapter can make. Measured by running each
-candidate against a real session of each client and checking whether the tool actually
-ran. A dash means the candidate was never run against that client, not that it fails —
-only the shape each shipped adapter actually uses was measured on every client.
-
-| Reply to a guard hook | codex | claude_code | gemini_cli | grok | kimi |
-|---|---|---|---|---|---|
-| exit code 2 | denies | - | denies | - | denies |
-| `{"hookSpecificOutput":{…,"permissionDecision":"deny"}}` | - | denies | **ignored** | documented | denies |
-| `{"decision":"deny","reason":…}` | - | - | - | documented | - |
-| `{"decision":"block","reason":…}` | - | - | denies | - | **ignored** |
-| `{"permission":"deny"}` | - | - | ignored | - | ignored |
-| exit code 1 | - | - | ignored | - | ignored |
-
-Codex has no structured reply at all: it denies by exiting 2 with the reason on stderr.
-Gemini ignores the shape that Claude Code and Kimi Code both honour, and Kimi ignores the
-shape Gemini needs. Each ignored case fails silently — the write goes through and the
-client reports nothing.
-
-Context injection does not follow the deny contract even within one client:
-
-| Injection | codex | claude_code | gemini_cli | grok | kimi |
-|---|---|---|---|---|---|
-| `hookSpecificOutput.additionalContext` | - | works | works | **discarded** on UserPromptSubmit | works, but **not unwrapped** |
-| plain text on stdout | works | - | dropped | **discarded** on UserPromptSubmit | works |
-
-Codex delivers a hook's stdout as a `developer` role message, verbatim — the most direct
-of the four channels, and a reason for care rather than comfort: at that role a model
-reads text as instruction, so peer-authored text has to stay framed as data.
-
-Kimi Code shows the model whatever a hook printed, wrapped in
-`<hook_result hook_event="…">`, so the JSON envelope itself would end up in the
-conversation. Gemini unwraps the envelope and appends `<hook_context>…</hook_context>` to
-the user turn, and drops a bare string entirely.
-
-These two tables are the measurement; they say nothing about how an adapter produces the
-right shape without knowing which client it is talking to. That contract —
-`denyOutcome()` / `injectOutcome()` — is documented in
-[ADAPTER_AUTHORING.md](ADAPTER_AUTHORING.md#response-contracts-do-not-port).
-
-## Installation is not uniform either
-
-| | codex | claude_code | gemini_cli | grok | kimi |
-|---|---|---|---|---|---|
-| Where hooks live | marketplace plugin | plugin | `settings.json` | `~/.grok/hooks/acc.json` | `config.toml` |
-| Project-level config | no | no | yes | yes (`<project>/.grok/hooks`, unused) | **no** |
-| Hook `timeout` unit | - | - | milliseconds | **seconds** | **seconds** (max 600) |
-| Command path | absolute required | `${CLAUDE_PLUGIN_ROOT}` | absolute required | absolute required | absolute required |
-| Extra step by the user | hook trust | - | - | - | - |
-
-Kimi Code is the only one with no project-level config, so ACC edits the user's global
-`config.toml` — as a delimited block it owns, because ACC ships without dependencies and a
-hand-written TOML round-tripper would take the user's comments and formatting with it.
-
-Codex needs four things before a hook runs, not one: the plugin directory, a parseable
-marketplace, both `[marketplaces.…]` and `[plugins."…"]` registered in its config, and the
-plugin copied into `plugins/cache/<marketplace>/<plugin>/<version>/`. ACC does all four —
-that last copy is exactly and only what `codex plugin add` does, measured by diffing the
-home around it. Hook trust remains a manual step, which is the client's security model.
-
-## What a participant declares about itself
-
-Every session records `enforcement` (`guarded` | `advisory`) and `lifecycle`
-(`managed` | `manual`), taken from the adapter's proven capabilities in this matrix rather
-than from the harness's name — both default to the weaker reading, so a generic MCP client
-or a human at the CLI reads as advisory and manual. What that downgrade means for a
-workspace, and why one MCP participant in the room is enough to drop everyone else's
-protection, is explained canonically in
-[MCP.md](MCP.md#native-adapter-vs-mcp-client).
-
-**"Stoppable" is not "unevadable".** Even in a guarded workspace, a session that writes
-through a language runtime rather than a recognised shell form gets past — see
-`guards.beforeShell` above. The claim still says who is working where; enforcement is the
-floor, not the ceiling.
-
----
-
-See also: [README](index.md) for navigation, [Glossary](GLOSSARY.md) for terms,
-[Adapter authoring](ADAPTER_AUTHORING.md) for the deny/inject implementation contract, and
-[MCP](MCP.md) for the participation tier and the native-vs-MCP explanation.
+Next: [Protocol](PROTOCOL.md) · [MCP](MCP.md) ·
+[Adapter authoring](ADAPTER_AUTHORING.md)

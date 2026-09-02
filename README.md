@@ -4,101 +4,107 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Node](https://img.shields.io/badge/node-%E2%89%A524-brightgreen.svg)](https://nodejs.org)
 
-**Give the agent sessions you already opened a shared room — and stop being the wire
-between them.**
+ACC connects independently opened AI sessions so they can discover, ask, answer, acknowledge, and hand off without becoming one managed agent team.
 
-ACC is a local-first coordination layer for independent AI coding sessions on one repo.
-They see who else is here, claim the files they touch, message each other directly, and
-hand work across — while each keeps its own client, checkout, permissions, and human. It
-runs entirely on your machine, on Node's standard library with **zero runtime
-dependencies**, and your transcripts never leave the client.
+It is a local-first communication layer for sessions you already run. Each session keeps
+its own client, model, checkout, permissions, context, and human direction. ACC supplies a
+shared room with presence, intent, narrow file claims, durable conversation threads, and
+truthful per-recipient receipts. It does not launch, steer, supervise, or terminate agents.
 
-## The wall is you
+The project uses Node's standard library with **zero runtime dependencies**. Coordination
+state stays in platform app data outside the repository, and ACC never collects raw
+transcripts.
 
-One session refactors and is about to remove a field called `item.drive`. Another, in a
-file you're not looking at, still reads it. Neither terminal knows the other exists — so
-either you carry the warning across by hand, or it ships broken.
+## Stop relaying between windows
 
-**Without ACC**, every warning, question, and handoff between sessions stops at you and
-starts again from you. **With ACC**, the sessions carry them to each other: the second
-agent sees the claim, gets the measured impact as a message, and the change lands in one
-piece. You go back to directing.
+One session finds that removing `item.drive` will break another area. A second session is
+working there, but neither client knows the other exists. Without ACC, the warning stops at
+you: copy it to the other window, copy the answer back, and repeat for every question.
+
+With ACC, the first session sends an attributed question. The second retrieves it, replies
+in the same thread, and thereby acknowledges the original. The first retrieves the answer.
+The message is durable throughout; neither model gains authority over the other.
 
 ```mermaid
-flowchart TB
-  Y["You — set direction"]
-  A["session A"]
-  B["session B"]
-  C["session C"]
-  R["ACC shared room<br/>presence · claims · messages · handoffs"]
-  Y --> A
-  Y --> B
-  Y --> C
-  A <--> R
-  B <--> R
-  C <--> R
+flowchart LR
+  A["session A — independently opened"] <--> R["ACC room<br/>presence · messages · receipts · claims"]
+  B["session B — independently opened"] <--> R
+  U["You — direction and authority"] --> A
+  U --> B
 ```
+
+The product's canonical activation event is simple: a second independently opened session
+completes a useful acknowledged interaction without the human copying peer message content.
 
 ## Install
 
-Two commands, once per macOS or Linux machine where your clients run:
+On macOS or Linux with Node 24 or newer:
 
 ```bash
 npm install -g agents-can-communicate
 acc install
 ```
 
-`acc install` wires ACC into the clients you have — Codex, Claude Code, Gemini CLI, Grok,
-Kimi Code — and names everything it changed. **Restart the client afterwards** (hooks load
-at startup); Codex also needs you to trust the plugin. Then just open a session in a
-project and it joins that project's room by itself; open a second and they coordinate.
-`acc doctor` shows what's active, `acc update --apply` keeps it current, `acc uninstall`
-removes only what ACC wrote.
+Restart the clients whose hooks were installed; Codex also requires trusting the plugin.
+Then open two sessions in the same repository or plain directory as usual. They remain
+independent and join the same ACC workspace. Use `acc doctor` to see exact versions,
+installation health, and delivery downgrades.
 
-Coordination data lives in the platform app-data directory (`~/Library/Application
-Support/acc`, `~/.local/share/acc`; override with `ACC_DATA_HOME`), never in your repo.
-Every worktree of a repo shares one room; a plain folder works the same.
+Runtime state lives in `~/Library/Application Support/acc` on macOS or the XDG data
+directory on Linux. `ACC_DATA_HOME` can override it, but ACC refuses a location inside a
+workspace. Git is optional; worktrees of one repository share awareness.
 
-## What the room holds
+## The communication loop
 
-| | |
+```bash
+# Session A publishes awareness and reserves only what it will edit.
+acc work --summary "changing the item schema" --mode edit --hint 'file:src/item.mjs'
+acc claim --resource 'file:src/item.mjs' --reason "changing the item schema"
+
+# Session A asks a participant named by `acc status`.
+acc message --to models --type question --subject "item.drive" \
+  --body "Can your code stop reading item.drive before I remove it?"
+
+# Session B reads and answers the exact message.
+acc inbox --message message_x
+acc reply --message message_x --body "Yes. Commit abc123 removes the final read."
+
+# Either session records a handoff while context is still available.
+acc finish --goal "remove item.drive" --status complete \
+  --completed "schema and reader updated" --remaining "none"
+```
+
+Messages commit before any delivery attempt. `queued`, `offered`, `retrieved`, and
+`acknowledged` describe different observable facts: an offer is not a read, retrieval is
+not proof of model attention, and a reply resolves communication rather than proving a
+requested task finished.
+
+Durable inbox recovery is the baseline for every client. Certified next-turn injection can
+reduce the polling, but only for the exact client version and platform captured by the
+adapter. Native live push is opt-in and would also require a current reachable binding;
+**no shipped adapter currently has passing live-push certification**. The failed Codex
+0.152.0 and Claude Code 2.1.252 captures are shipped as evidence, so ACC reports fallback
+instead of claiming realtime delivery.
+
+## What ACC owns
+
+| ACC owns | ACC does not own |
 |---|---|
-| **presence** | who's live, their client and branch, and what each intends — one `acc status`. |
-| **claims** | the files each session is touching; on guardable clients a clashing edit is refused and the owner named. |
-| **messages** | questions, decisions, notes — attributed, delivered on the recipient's next turn, and data they weigh rather than orders. |
-| **requests & handoffs** | work addressed to a participant, so it waits across restarts and carries the answer back. |
+| participant and session presence | process or model lifecycle |
+| current intent and resource claims | prompts, permissions, or token budgets |
+| messages, threads, replies, acknowledgements | work queues or execution state |
+| delivery evidence and visible fallback | raw transcripts or shared model memory |
 
-A targeted `acc inbox` survives context compaction, and `acc reply` answers and
-acknowledges in one operation. A session alone in a repo pays nothing — no banner, no
-protocol, nothing left behind.
-
-## Everyday controls
-
-The installed guidance teaches your agents to claim, ask, request, and hand off on their
-own. These give you a direct view when you want one:
-
-| Command | For |
-|---|---|
-| `acc status` | who's here, what they claim, and the room's protection level |
-| `acc inbox` | recover an addressed message without a workspace dump |
-| `acc reply` | answer and acknowledge in one operation |
-| `acc doctor` | confirm which client integrations are active and current |
-| `acc update --apply` | install the latest release and refresh integrations |
-| `acc uninstall` | remove ACC's integrations — settings you changed stay yours |
+A peer message is untrusted input, never system authority. A guarded claim can stop only
+the write paths a client actually exposes; `acc status` reports `advisory` when that cannot
+be guaranteed.
 
 ## Documentation
 
-Start at the **[documentation map](docs/index.md)** — it lays out a path for whatever
-brought you here: [why ACC](docs/WHY_ACC.md) and [concepts](docs/CONCEPTS.md) to evaluate
-it, [getting started](docs/GETTING_STARTED.md) to run it, the [CLI](docs/CLI.md) /
-[protocol](docs/PROTOCOL.md) / [capabilities](docs/CAPABILITIES.md) reference, and
-[adapter authoring](docs/ADAPTER_AUTHORING.md) to extend it. New to the vocabulary? The
-[glossary](docs/GLOSSARY.md) defines every term in one line.
+Start with [Getting started](docs/GETTING_STARTED.md), then use the
+[documentation map](docs/index.md). The exact surfaces are in the [CLI](docs/CLI.md),
+[MCP](docs/MCP.md), [Protocol](docs/PROTOCOL.md), and
+[Capabilities](docs/CAPABILITIES.md) references. Adapter evidence lives beside each
+adapter in its `COMPATIBILITY.md` and `certification.json`.
 
-See it run: [research in a plain folder](examples/non-git-research.md). Contributing starts
-with [AGENTS.md](AGENTS.md).
-
-## Requirements & license
-
-Node 24+, macOS or Linux, Git optional. MIT — use it, fork it, keep it
-([LICENSE](LICENSE)).
+Contributing starts with [AGENTS.md](AGENTS.md). Node 24+, Git optional, MIT licensed.

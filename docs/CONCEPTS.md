@@ -1,150 +1,134 @@
 # Concepts
 
-## You are the transport
-
-You keep several agent sessions open at once — often different clients, on different
-branches, in different git worktrees. Each has its own model, memory, permissions, and
-human. None of them can see what the others are doing, and none can ask another for
-anything.
-
-So the coordination runs through you. One session is about to delete a field called
-`item.drive`; another, in a file you're not looking at, still reads it. Nothing in either
-terminal knows about the other — so you carry the warning across by hand, or it ships
-broken. You copy context between windows, repeat decisions, and relay questions. You are
-the wire.
-
-ACC gives the sessions a shared room instead, so they carry those things to each other.
+ACC connects AI sessions that were independently opened by a user. It adds communication
+around those sessions; it does not turn them into one managed runtime. Each client keeps
+its own context, permissions, lifecycle, checkout, and human authority.
 
 ```mermaid
 graph LR
-  subgraph "Without ACC"
-    A1[Codex] --> H1((you))
-    B1[Claude Code] --> H1
-    H1 --> C1[Kimi]
-  end
-  subgraph "With ACC"
-    A2[Codex] --- ACC{{ACC}}
-    B2[Claude Code] --- ACC
-    ACC --- C2[Kimi]
-  end
+  A["independent session A"] --- ACC["ACC local room"]
+  B["independent session B"] --- ACC
+  C["independent session C"] --- ACC
 ```
-
-Subagents spawned *inside* one session solve a different problem — delegated work under a
-single owner. ACC connects sessions **you** opened, and leaves each one's lifecycle,
-permissions, context, and human direction independent. (New to a term below? The
-[Glossary](GLOSSARY.md) defines each in one line.)
 
 ## Peers, not workers
 
-The sessions ACC joins may run different models, clients, trust settings, or people.
-Making one of them the standing authority would misrepresent that, and would make
-coordination die the moment that one process did.
+Sessions in one workspace may use different models, clients, trust settings, or people.
+No participant is automatically in charge of another. A peer may ask, answer, reserve,
+acknowledge, or hand off; the receiver evaluates the message under its own instructions.
 
-So ACC keeps the durable state *below* every session. Peers ask, answer, reserve, and hand
-off; none can quietly become the owner of another. That is the
-useful middle ground between isolated terminals and a managed runtime that replaces them.
+This is the middle layer between isolated terminals and a system that owns the agents.
+ACC owns durable coordination facts even when every model process is gone, but it never
+owns the process itself.
 
-| Idea | What it means |
-|---|---|
-| **Ambient** | Attach, presence, and guards happen inside your normal session — no extra process to run. |
-| **Peer equality** | No session is in charge. Any session can answer for the whole room. |
-| **Durable first** | State is recorded before delivery is attempted. Realtime would only make it faster. |
-| **Truthful capability** | An adapter declares only what was measured. Degradation is visible, never silent. |
-| **Silent when alone** | One session pays nothing — no injected context, no protocol, no banners. |
+## Participant and session
 
-## Asking, not commanding
+A **participant** is the address used for communication. A stable participant id lets a
+new session recover messages addressed before restart. A **session** is one current client
+conversation with a generation token proving ownership of its mutations. Several sessions
+may belong to one participant; a live offer is ambiguous unless exactly one current
+generation is eligible.
 
-The move at the center is one agent asking another for something. It writes the request
-and the reason as one thing; the other agent sees it on its next turn. A **message is data
-the recipient weighs, never a command it obeys** — authority differences apply to *mutation
-only*, never to knowledge and never to who may ask whom.
+A **workspace** is the local room. Git worktrees of one repository resolve to the same
+workspace while retaining their checkout and branch in presence. In a non-Git directory,
+the directory itself supplies identity. Git enriches the record but is never required.
 
-A **note** is shown once and owes no reply; a **question** stands in front of the recipient
-until it is answered with `acc reply`, and unanswered questions stay surfaced. Use a
-question when an answer is needed. Use `message --type decision --obligation acknowledge`
-when the recipient only needs to confirm a decision. A delivered note leaves one
-low-priority breadcrumb so it stays recoverable without nagging.
+## Intent is awareness; a claim commits
 
-`acc inbox` is the narrow recovery path: only unresolved messages addressed to this
-participant, `--message` to select one by id. `acc reply` writes the answer, links it to
-the original, and acknowledges it — one operation, so a compacted session need not scan a
-whole snapshot or remember a separate ack.
+An **intent** says what a session is doing and which resources may be affected. It
+authorises nothing. Publish it early because it is cheap:
 
-A request is addressed to a **participant**, not a session, so it survives that agent
-restarting. The named participant reads it from their inbox, then replies or acknowledges it;
-there is no separate operation for taking unaddressed work.
-
-## Intent is cheap; a claim commits
-
-```mermaid
-graph TB
-  W[Workspace] --> P[Participant]
-  P --> S[Session]
-  S --> I["Intent — what I am doing now"]
-  S --> C["Claim — a resource I reserved"]
-  S --> M["Message — typed, attributed, untrusted"]
+```bash
+acc work --summary "changing message rendering" --mode edit \
+  --hint 'file:packages/cli/**'
 ```
 
-**Intent** is awareness — published with `acc work`, it authorises nothing. **Claim** is the
-thing that can stop a write. Keeping them separate is deliberate: saying "I'm editing here"
-should be cheap and constant, while reserving a resource is a commitment other sessions are
-held to.
+A **claim** reserves a resource for a lease. It is narrow, explicit, and either
+`advisory` or `guarded`:
 
-A file is named relative to the **repository**, not to where a session started:
-`file:src/physics.mjs` is one file in the project whether the agent opened at the root, in
-`src/`, or in another worktree. One name for one file is what makes a claim mean anything —
-two agents calling it two things is the same as no claim.
-
-The spelling is settled for you: `./src/a.mjs`, `src//a.mjs`, and `src/x/../a.mjs` all
-store as `file:src/a.mjs`, and case is resolved by asking the filesystem. A directory is
-`file:src/**` — only that trailing glob is understood, so `file:src`, `file:src/`,
-`file:src/*`, and `file:src/*.mjs` are refused rather than stored: each covers nothing while
-reading like protection. `acc claim` echoes back the name it stored — the name peers see.
-
-## Where state lives, and when it appears
-
-Everything ACC records — presence, claims, messages, and handoffs — lives in the
-platform's app-data directory (`~/Library/Application Support/acc` on macOS,
-`~/.local/share/acc` on Linux), **never inside your repository**, and every worktree of one
-repo shares it. Your transcripts stay on the client; ACC does not copy them.
-
-```mermaid
-sequenceDiagram
-  participant S1 as First session
-  participant ACC
-  participant S2 as Second session
-  S1->>ACC: attach
-  Note over ACC: ephemeral only — nothing durable, nothing injected
-  S2->>ACC: attach
-  Note over ACC: room materialises — both sessions see each other
+```bash
+acc claim --resource 'file:packages/cli/**' --reason "changing message rendering"
 ```
 
-Durable state appears at the first moment coordination actually exists — a second live
-session, or the first claim, message, or handoff. A room that never got a second
-session leaves nothing behind.
+`guarded` means every live session exposes a measured pre-write guard for the path ACC can
+recognise. It never means an unrelated process or a runtime-generated write is impossible.
+If any live participant cannot be stopped, workspace protection is reported as
+`advisory`.
 
-## Protection is a property of the room
+File claims are repository-relative and canonical. `file:src/a.mjs` names a file;
+`file:src/**` names a directory tree. Ambiguous spellings such as `file:src/*` are refused
+instead of creating protection that covers nothing.
 
-A claim is `guarded` only while every live session can actually be stopped. Put one MCP
-client in the room and it reports `advisory` — because that is the truth. And being
-stoppable is not the same as being unevadable: a guarded claim stops file edits and the
-shell writes ACC can read, but a language runtime opening the file gets past either way.
-[MCP](MCP.md) explains the downgrade; [Capabilities](CAPABILITIES.md) records what each
-client was measured doing.
+## Messages are durable untrusted data
 
-## Joining someone else's work
+The message kinds are `note`, `question`, `request`, `answer`, `decision`, and `handoff`.
+The generic send command creates the first four except `answer`, which requires `reply`,
+and `handoff`, which requires `finish` so their thread and structured payloads cannot be
+omitted.
 
-| Situation | What a session does |
+An independent **obligation** says what the recipient owes:
+
+| Kind | Obligation |
 |---|---|
-| Explicit invitation | join |
-| Exact conflicting resource | stop before writing; ask or negotiate |
-| Merely similar topic | mention it; do not merge work |
-| Unrelated | continue, silently |
-| Human said "work independently" | stay independent — claims still apply |
+| `note` | `none` |
+| `question` | `reply` |
+| `request` | `reply` |
+| `answer` | `none` |
+| `decision` | `none`, or `acknowledge` when addressed |
+| `handoff` | `acknowledge` when addressed, `none` as a room record |
 
-Authority is about mutation only — any session can still be asked what the whole system
-is doing.
+A request is not an order. It asks for action and a result in the thread, but ACC does not
+track execution state. Every body is attributed, escaped, and framed as peer input rather
+than system authority.
 
----
+## Threads have no hidden status
 
-Next: [Getting started](GETTING_STARTED.md) · [Capabilities](CAPABILITIES.md) · [the full docs map](index.md)
+The first message is the thread root and uses its own `messageId` as `threadId`. A reply
+keeps that thread id and names the original with `inReplyTo`. There is no mutable thread
+record. What still needs attention is derived from message obligations and per-recipient
+receipts.
+
+`clientMessageId` is the caller's retry key. Repeating equivalent content with the same
+key returns the same logical message; reusing it for different content is rejected.
+
+## Delivery words are evidence
+
+Each recipient has an independent monotonic receipt:
+
+```text
+queued -> offered -> retrieved -> acknowledged
+```
+
+- `queued`: message and receipt committed durably;
+- `offered`: bytes crossed ACC's transport boundary or a certified native client accepted
+  the call;
+- `retrieved`: the participant explicitly read the message through inbox or equivalent
+  certified evidence;
+- `acknowledged`: the participant acknowledged it or replied.
+
+There is no `seen`: ACC cannot observe model attention. There is no terminal delivery
+failure: a failed acceleration leaves the durable message recoverable. Forward skips are
+legal when a stronger fact implies the weaker ones; backward transitions are rejected.
+
+## Durable first, acceleration second
+
+Every send records the message before attempting a transport. Inbox is the universal
+recovery path. Exact-version certified adapters may offer complete peer messages at the
+next normal turn. Native live push would additionally require passing certification, the
+recipient's opt-in policy, exactly one current reachable binding, and a safe recipient
+state.
+
+No shipped adapter currently passes live-push certification. Codex 0.152.0 had no daemon
+control socket; Claude Code 2.1.252 stopped at the development-channel warning before its
+ACC child started. Those failures are shipped as evidence and result in visible fallback,
+not a stronger promise.
+
+## Where state lives
+
+Presence, intents, claims, messages, receipts, events, and handoffs live in platform app
+data outside every repository. Raw transcripts remain in the client. A single session is
+silent; durable workspace state materialises when a second session or the first durable
+coordination object makes it necessary.
+
+Next: [Getting started](GETTING_STARTED.md) · [Protocol](PROTOCOL.md) ·
+[Capabilities](CAPABILITIES.md)

@@ -18,6 +18,27 @@ const repo = path.resolve(import.meta.dirname, "..", "..");
  */
 const MARKER = "<!-- test:command -->";
 
+const PUBLIC_DOCS = Object.freeze([
+  "README.md",
+  "docs/GETTING_STARTED.md",
+  "docs/WHY_ACC.md",
+  "docs/CONCEPTS.md",
+  "docs/ARCHITECTURE.md",
+  "docs/PROTOCOL.md",
+  "docs/CLI.md",
+  "docs/MCP.md",
+  "docs/CONFIGURATION.md",
+  "docs/CAPABILITIES.md",
+  "docs/SECURITY_MODEL.md",
+  "docs/TROUBLESHOOTING.md",
+  "docs/GLOSSARY.md",
+  "docs/index.md",
+  "tests/acceptance/cross-vendor.md",
+]);
+
+const LEAD = "ACC connects independently opened AI sessions so they can discover, ask, "
+  + "answer, acknowledge, and hand off without becoming one managed agent team.";
+
 async function markedCommands(file) {
   const text = await readFile(file, "utf8");
   const blocks = [];
@@ -68,6 +89,38 @@ test("every documented command is one the CLI still accepts", async t => {
         GIT_DIR: "", GIT_WORK_TREE: "" } })
       .catch(error => { throw new Error(`${command}\n${error.stdout || error.message}`); });
     assert.equal(JSON.parse(stdout).ok, true, command);
+  }
+});
+
+test("public docs describe the communication product that actually ships", async () => {
+  const entries = await Promise.all(PUBLIC_DOCS.map(async file => ({ file,
+    source: await readFile(path.join(repo, file), "utf8") })));
+
+  for (const { file, source } of entries) {
+    assert.doesNotMatch(source, /\bacc (?:task|workstream|decide)\b/,
+      `${file} teaches a removed orchestration command`);
+  }
+
+  const readme = entries.find(entry => entry.file === "README.md").source;
+  assert.match(readme, new RegExp(LEAD.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")),
+    "README lost the communication-first lead");
+  assert.match(readme, /second independently opened session[\s\S]*useful acknowledged interaction[\s\S]*without the human copying peer message content/i,
+    "README lost the one activation event");
+
+  const protocol = entries.find(entry => entry.file === "docs/PROTOCOL.md").source;
+  assert.match(protocol, /queued\s*->\s*offered\s*->\s*retrieved\s*->\s*acknowledged/,
+    "protocol lost the truthful receipt lifecycle");
+  for (const distinction of [/offered[^\n]*not[^\n]*read/i,
+    /retrieved[^\n]*not[^\n]*model attention/i,
+    /reply[^\n]*not[^\n]*task completion/i]) {
+    assert.match(protocol, distinction, `protocol lost distinction ${distinction}`);
+  }
+
+  const capabilities = entries.find(entry => entry.file === "docs/CAPABILITIES.md").source;
+  for (const dimension of ["Certified support", "Current reachability", "Recipient policy",
+    "Fallback"]) {
+    assert.match(capabilities, new RegExp(`^## ${dimension}$`, "m"),
+      `capabilities do not separate ${dimension.toLowerCase()}`);
   }
 });
 

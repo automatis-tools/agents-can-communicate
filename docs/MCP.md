@@ -1,119 +1,92 @@
 # MCP
 
-MCP is how a client with no native ACC adapter joins a workspace: a generic Model Context
-Protocol client talking to a bundled server, `acc-mcp`, over stdio. This page is the
-canonical explanation of native vs. MCP — every other doc that draws that line links here.
-
-## Native adapter vs. MCP client
-
-A **native adapter** (Codex, Claude Code, Gemini CLI, Grok, Kimi) is wired into the client's own
-hook or plugin system. It attaches to the workspace by itself when the client starts,
-guards the writes its session makes, injects peer context straight into the conversation,
-and tells the workspace cleanly when the session ends.
-
-A generic **MCP client** gets none of that integration — it only gets `acc-mcp`, a stdio
-server exposing ACC's coordination tools. This is the **participation tier**: full access
-to the durable, shared state (roster, claims, messages, and handoffs) but
-no hook into the client's own lifecycle or file writes. Nothing intercepts what the client
-writes, there is no session-end signal when it disconnects, and there is no push delivery —
-an MCP client only sees new mail, claims, or roster changes when it next calls a tool.
-
-Each session records two independent readings, taken from what the adapter can actually
-prove rather than from the client's name:
-
-- **enforcement**: `guarded` (a clashing write from another session is refused and the
-  owner named) or `advisory` (the claim only warns).
-- **lifecycle**: `managed` (ACC controls attach and session-end) or `manual` (it does not).
-
-A native adapter earns `guarded` / `managed`. An MCP client defaults to the weaker reading
-on both axes: `advisory` / `manual`. Both default weak because neither can be proven any
-other way for a generic tool surface.
-
-That downgrade is not scoped to the MCP session alone: a workspace reports
-`protection: guarded` only when *every* live session in it can be stopped. One MCP
-participant in the room is enough to drop the whole workspace to `advisory`, even for
-sessions whose own claims were declared `guarded`. This is deliberate, not a bug — ACC
-would rather report a true weaker guarantee than a false stronger one — and it is reported:
-the roster shows the downgrade and why, it is never silent.
+`acc-mcp` lets a client with no native ACC adapter participate over stdio. It exposes the
+same durable messages, threads, receipts, intent, claims, and handoffs, but it cannot infer
+the client's lifecycle, intercept writes, inject a normal turn, or push a message. The
+client polls tools under its own control.
 
 ```mermaid
 graph LR
-  C["MCP client"] -->|"stdio JSON-RPC"| S["acc-mcp"]
-  S --> W[("workspace state")]
+  C["independently opened MCP client"] -->|"stdio JSON-RPC"| M["acc-mcp"]
+  M --> S[("ACC durable store")]
 ```
 
 ## Register
 
 ```json
-{ "command": "acc-mcp", "env": {
-  "ACC_MCP_PARTICIPANT": "research",
-  "ACC_MCP_WORKSPACE": "/path/to/the/project"
-} }
+{
+  "command": "acc-mcp",
+  "env": {
+    "ACC_MCP_PARTICIPANT": "research",
+    "ACC_MCP_WORKSPACE": "/absolute/path/to/project"
+  }
+}
 ```
 
-`acc-mcp` takes no command-line arguments — there is nothing to pass on the command line,
-and it says so rather than silently ignoring extra flags.
+`acc-mcp` accepts no command-line arguments. `ACC_MCP_PARTICIPANT` is the stable recipient
+identity for this server. It comes from user-owned launch configuration, never from MCP
+`initialize` or `clientInfo`. `ACC_MCP_WORKSPACE` should be absolute; without it, the
+server uses its launch directory, which may be a different workspace from the other
+sessions.
 
-- `ACC_MCP_PARTICIPANT` names the session. It comes from this configuration, never from
-  the client's `initialize` or `clientInfo` — restarting the process with the same env
-  resolves to the same session.
-- `ACC_MCP_WORKSPACE` is the project this server joins. Without it, the server falls back
-  to the directory the client happened to launch it in — rarely the project — and does so
-  silently: `acc_sync` then answers `solo` from a workspace nobody else is actually in.
+The server implements MCP protocol revision `2026-07-28` over newline-delimited JSON-RPC
+stdio. Tool input schemas are closed: unknown fields and invalid conditional shapes are
+rejected before a session is resolved.
 
 ## Tools
 
-| Tool | Does |
+| Tool | Required input | Optional input |
+|---|---|---|
+| `acc_status` | — | — |
+| `acc_sync` | — | `cursor`, `scope: delta|full`, `limit: 1..500` |
+| `acc_work` | `summary` and `mode`, or `clear: true` | `state`, `resourceHints` |
+| `acc_claim` | `action`; `resource` for acquire, `claimId` for renew | `mode`, `reason`, `leaseSeconds` where valid |
+| `acc_release` | `claimId` | — |
+| `acc_message` | `to`, `subject`, `body` | `kind`, `obligation`, `clientMessageId` |
+| `acc_request` | `toParticipantId`, `title` | `detail`, `clientMessageId` |
+| `acc_inbox` | — | `messageId` |
+| `acc_reply` | `messageId`, `body` | `subject`, `clientMessageId` |
+| `acc_ack` | `messageId` | — |
+| `acc_finish` | `goal` | `status`, `completed`, `remaining`, `blockers`, `toParticipantId`, `clientMessageId` |
+
+All tool names above are the complete model-facing surface. There are no execution or
+client-control tools.
+
+Send-like tools return a raw structured object with `{ message, delivery }`; their text
+content is the JSON serialization of the same value. `acc_inbox` returns message/receipt
+pairs and advances only this participant's receipts to `retrieved`. `acc_reply` writes an
+`answer` and acknowledges the original atomically. `acc_ack` exposes no receipt-state
+parameter.
+
+Resources are `acc://snapshot`, `acc://roster`, and `acc://inbox`. Prefer the inbox tool
+for addressed messages; a full snapshot is for explicit workspace forensics.
+
+## Capability floor
+
+The generic MCP capability declaration is all false:
+
+| Group | Effective behavior |
 |---|---|
-| `acc_status` | Current participants, intents, claims, and protection |
-| `acc_sync` | New events, roster, attention, and (for compatibility) pending mail |
-| `acc_work` | Publish intent |
-| `acc_claim` | Reserve or renew a resource |
-| `acc_release` | Release a claim |
-| `acc_message` | Send a message |
-| `acc_inbox` | Read unresolved messages addressed to this participant, optionally one by id |
-| `acc_reply` | Reply to one message and acknowledge the original, atomically |
-| `acc_ack` | Acknowledge without a written reply |
-| `acc_request` | Ask another agent to do something |
-| `acc_finish` | Handoff and release |
+| lifecycle | no automatic session-start, resume, or end signal |
+| context | no startup, before-turn, or safe-point injection |
+| guards | no before-read, before-write, or before-shell interception |
+| delivery | no `nextTurn`, `livePush`, or native `replyRoute` |
 
-That is all eleven.
+An MCP participant therefore reports `advisory` enforcement and `manual` lifecycle.
+`manual` describes ACC presence reporting, not ownership of the external client. Because
+workspace protection is the weakest live participant's real guarantee, one MCP session
+makes guarded claims advisory for the room.
 
-`acc_inbox` and `acc_reply` are the recent, preferred path for addressed mail. `acc_sync`
-still returns pending mail too, purely for compatibility with clients built before
-`acc_inbox` existed — use `acc_inbox` going forward, not `acc_sync --scope full`, to recover
-an addressed message.
+## Durable polling semantics
 
-Resources: `acc://snapshot`, `acc://roster`, `acc://inbox`.
+Every outgoing message commits first. `acc_message`, `acc_request`, `acc_reply`, and
+`acc_finish` cannot promise push; delivery results remain queued with a durable diagnostic.
+The recipient calls `acc_inbox` to retrieve the body. Being returned by a tool is
+`retrieved`, not proof that a model attended to or obeyed it. A reply or explicit ack is
+`acknowledged`.
 
-## What you don't get
+MCP is therefore a complete communication participant with higher latency, not a fake
+native adapter. Use it when a client can call tools but exposes no measured hook boundary.
 
-```mermaid
-graph TB
-  Y["Yes"] --> Y1["attach on first call"]
-  Y --> Y2["read everything"]
-  Y --> Y3["claim, message, hand off"]
-  N["No"] --> N1["writes are not guarded"]
-  N --> N2["no session end"]
-  N --> N3["no push delivery"]
-```
-
-The roster is explicit about it: an MCP participant always reads `advisory` / `manual`,
-and — per the downgrade rule above — a workspace with one connected reports `advisory`
-protection even for a claim that was declared `guarded`.
-
-## When this tier fits
-
-Reach for MCP when shared presence, requests, claims, and handoffs matter more than
-guarded writes or automatic delivery — a research tool, a script, a client with no adapter
-yet. Move to a native adapter once the client exposes hooks strong enough to prove
-`guarded` / `managed`. The underlying coordination model is identical either way; only the
-integration's reach changes.
-
-Protocol revision `2026-07-28`. Wire-level detail lives in
-`packages/mcp-server/COMPATIBILITY.md`.
-
----
-
-See also: [README](index.md) for navigation, [Glossary](GLOSSARY.md) for terms, and
-[Capabilities](CAPABILITIES.md) for the full per-client matrix.
+Next: [Protocol](PROTOCOL.md) · [Capabilities](CAPABILITIES.md) ·
+[Security model](SECURITY_MODEL.md)
