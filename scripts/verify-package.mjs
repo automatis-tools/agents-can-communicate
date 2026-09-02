@@ -39,6 +39,9 @@ const FORBIDDEN = [
   { pattern: /^\.githooks\//, why: "local git hooks" },
   { pattern: /^\.agents\//, why: "local agent state" },
   { pattern: /(^|\/)test\//, why: "test suite" },
+  { pattern: /(^|\/)scripts\/spikes\//, why: "native feasibility spike" },
+  { pattern: /(^|\/)(?:runtime|transcript|secret)s?\//, why: "runtime or private state" },
+  { pattern: /\.sock$/, why: "local socket" },
   { pattern: /\.jsonl$/, why: "looks like a transcript" },
 ];
 
@@ -64,6 +67,21 @@ async function entries(tarball) {
 async function readTarJson(tarball, entry) {
   const { stdout } = await run("tar", ["-xzOf", tarball, `package/${entry}`]);
   return JSON.parse(stdout);
+}
+
+async function readTarText(tarball, entry) {
+  return (await run("tar", ["-xzOf", tarball, `package/${entry}`])).stdout;
+}
+
+function localMarkdownTargets(markdown, from) {
+  const targets = [];
+  for (const match of markdown.matchAll(/!?\[[^\]]*\]\(([^)\s]+)(?:\s+"[^"]*")?\)/g)) {
+    const raw = match[1].replace(/^<|>$/g, "");
+    if (/^(?:[a-z]+:|#)/i.test(raw)) continue;
+    const local = decodeURIComponent(raw.split("#", 1)[0].split("?", 1)[0]);
+    targets.push(path.posix.normalize(path.posix.join(path.posix.dirname(from), local)));
+  }
+  return targets;
 }
 
 async function main() {
@@ -126,17 +144,42 @@ async function main() {
     ok(`${listed.length} entries, none forbidden`);
     ok(`${certifications.length} certification manifest(s), exact evidence allowlist shipped`);
 
+    const packedEntries = new Set(listed);
+    const missingLinks = [];
+    for (const markdown of listed.filter(entry => entry.endsWith(".md"))) {
+      for (const target of localMarkdownTargets(await readTarText(tarball, markdown), markdown)) {
+        if (!packedEntries.has(target)) missingLinks.push(`${markdown} -> ${target}`);
+      }
+    }
+    if (missingLinks.length > 0) {
+      fail("packed documentation has missing local links", missingLinks.join("\n"));
+    }
+    ok("every packed Markdown link resolves inside the tarball");
+
     // The workspaces have to travel inside the tarball, or every internal
     // import fails on install. This is the whole reason the package bundles.
     if (!listed.some(entry => entry.startsWith("node_modules/@agents-can-communicate/"))) {
       fail("the workspaces are not bundled; internal imports would fail on install");
     }
     ok("workspaces bundled");
+    const manifest = await readTarJson(tarball, "package.json");
+    if (manifest.version !== "0.2.0") fail(`root version is ${manifest.version}, not 0.2.0`);
+    if (!manifest.bundleDependencies?.includes("@agents-can-communicate/delivery-router")) {
+      fail("delivery-router is not bundled; installed message commands cannot start");
+    }
+    for (const dependency of manifest.bundleDependencies) {
+      const workspaceManifest = await readTarJson(tarball,
+        `node_modules/${dependency}/package.json`);
+      if (workspaceManifest.version !== "0.2.0") {
+        fail(`${dependency} is ${workspaceManifest.version}, not 0.2.0`);
+      }
+    }
+    ok(`root and ${manifest.bundleDependencies.length} bundled workspaces are 0.2.0`);
 
     step("install into a clean directory");
     await writeFile(path.join(consumer, "package.json"),
       '{"name":"acc-verify","version":"1.0.0","private":true}\n');
-    await runNpm(["install", "--silent", tarball], { cwd: consumer });
+    await runNpm(["install", "--offline", "--silent", tarball], { cwd: consumer });
     const bin = path.join(consumer, "node_modules", ".bin");
     ok((await readdir(bin)).join(", "));
 

@@ -1,6 +1,6 @@
 {
   "name": "agents-can-communicate",
-  "version": "0.1.18",
+  "version": "0.2.0",
   "type": "module",
   "description": "Local-first coordination for independently opened AI agent sessions.",
   "keywords": [
@@ -45,7 +45,24 @@
   },
   "files": [
     "bin/",
+    "docs/ADAPTER_AUTHORING.md",
+    "docs/ARCHITECTURE.md",
     "docs/CAPABILITIES.md",
+    "docs/CLI.md",
+    "docs/CONCEPTS.md",
+    "docs/CONFIGURATION.md",
+    "docs/DESIGN_DECISIONS.md",
+    "docs/GETTING_STARTED.md",
+    "docs/GLOSSARY.md",
+    "docs/MCP.md",
+    "docs/PROTOCOL.md",
+    "docs/RELEASING.md",
+    "docs/SECURITY_MODEL.md",
+    "docs/TROUBLESHOOTING.md",
+    "docs/WHY_ACC.md",
+    "docs/index.md",
+    "AGENTS.md",
+    "SECURITY.md",
     "README.md",
     "LICENSE"
   ],

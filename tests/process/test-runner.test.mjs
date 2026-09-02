@@ -4,6 +4,9 @@ import path from "node:path";
 import test from "node:test";
 import { promisify } from "node:util";
 
+import { TEST_FILE_CONCURRENCY, nodeTestArguments }
+  from "../../scripts/test-runner-plan.mjs";
+
 const run = promisify(execFile);
 const repo = path.resolve(import.meta.dirname, "..", "..");
 const runner = path.join(repo, "scripts", "run-tests.mjs");
@@ -36,4 +39,14 @@ test("file discovery does not depend on the shell", async () => {
   assert.equal(listed.some(file => file.includes("prototype")), false,
     "the preserved prototype is not part of this suite");
   assert.equal(listed.some(file => file.includes("node_modules")), false);
+});
+
+test("the runner bounds file concurrency without weakening process races", () => {
+  assert.equal(TEST_FILE_CONCURRENCY, 4);
+  assert.deepEqual(nodeTestArguments(["first.test.mjs", "second.test.mjs"]), [
+    "--test",
+    "--test-concurrency=4",
+    "first.test.mjs",
+    "second.test.mjs",
+  ]);
 });

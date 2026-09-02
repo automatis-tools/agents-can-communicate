@@ -16,8 +16,9 @@ export const PROTOCOL_META = protocolVersion => ({
  * Deliberately not the SDK: the point of an MCP-only run is to show what a
  * generic client gets, so the harness has to be as generic as the claim.
  */
-export function connectMcp({ cwd, dataHome, participant = "mcp_client", env = {} }) {
-  const child = spawn(process.execPath, [binary], {
+export function connectMcp({ cwd, dataHome, participant = "mcp_client", env = {},
+  binary: selectedBinary = binary }) {
+  const child = spawn(process.execPath, [selectedBinary], {
     cwd,
     env: { ...process.env, ACC_DATA_HOME: dataHome, HOME: dataHome,
       ACC_MCP_PARTICIPANT: participant, ...env },
