@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "captures": [
+    {
+      "id": "native-delivery-1-0-13", "client": "grok", "version": "1.0.13",
+      "platform": "darwin-arm64", "observedAt": "2026-09-02T20:29:24.226Z",
+      "fixture": "fixtures/delivery/grok-1.0.13.json",
+      "sha256": "d2f80de5016950efc03b6709d5aa6b2d9501220571dd94e2f247a5c2080f9f58",
+      "event": null, "tool": null,
+      "claims": [
+        { "capability": "delivery.livePush", "result": "fail", "outcome": { "kind": "native-capture-failed" } },
+        { "capability": "delivery.replyRoute", "result": "fail", "outcome": { "kind": "native-capture-failed" } }
+      ]
+    }
+  ]
+}

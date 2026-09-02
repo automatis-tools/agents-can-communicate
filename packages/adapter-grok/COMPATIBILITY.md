@@ -107,3 +107,25 @@ not inherit Claude Code's capability row.
 For message delivery this means polling and durable `acc inbox` only. Grok has
 no certified next-turn or live-push transport, including on the observed 1.0.13
 client, and installation must never report either one as active.
+
+## Native delivery boundary (2026-09-02)
+
+The installed `grok 1.0.13` exposes a shared leader mode on its public surface:
+`--leader` / `--no-leader` on `grok agent`, `--leader-socket <PATH>` (default
+`~/.grok/leader.sock`), `grok agent leader` ("Run as the shared leader process for
+other clients"), and `[cli] use_leader` in `config.toml`, which the vendor's configuration
+reference documents as "Use the leader process for config reload and MCP watches".
+
+That surface shares one backend between clients. It does not name a public method that
+injects an addressed message into an independently opened ordinary TUI session, and the
+leader help only speaks of remote prompts arriving through the vendor relay for headless
+leaders. The leader socket protocol is private; ACC does not reverse-engineer it.
+`grok agent serve` and `grok agent stdio` are real public entry points, but both make
+another process the client's controller, which is outside the transparent-delivery
+boundary.
+
+The read-only capture is therefore `fail`, with idle, busy, reply, duplicate, and fallback
+all `unobserved`; no client, leader, or ACP server was started by it. The redacted capture
+is under `fixtures/delivery/` and `certification.json` stays without native evidence:
+`delivery.livePush` and `delivery.replyRoute` remain absent, installation wires hooks and
+the skill only, and messages stay durable for `acc inbox`.
