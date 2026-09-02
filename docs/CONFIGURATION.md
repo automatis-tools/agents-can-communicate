@@ -141,3 +141,7 @@ that resolves inside a workspace.
 | `ACC_MCP_WORKSPACE` | The project `acc-mcp` joins. Without it the server takes the directory the client launched it in, which is rarely the project |
 | `ACC_NO_UPDATE_CHECK=1` | Never ask npm whether a newer ACC exists. `acc update` then says it is off, which is a different answer from "nothing is newer" |
 | `ACC_PROBE_TIMEOUT_MS` | How long to wait for a client to print its version. Three seconds by default: generous on an idle machine, and not always enough on a busy one, where a client that overruns it is reported as not installed |
+| `ACC_NATIVE_DELIVERY_POLICY` | Set only by an ACC-owned shell shim to the consented live policy (`off`, `actionable`, or `all`) before it `exec`s the real client, so the session's hook knows a native transport was activated. Not for a person to set: an ordinary or `ACC_BYPASS=1` launch leaves it unset, and the hook treats missing or invalid values as `off` |
+| `ACC_BYPASS=1` | Runs the unmodified client through an ACC shim: no launch-time check, no native flags, and the reserved policy variable is unset. The escape hatch when you want the vendor command exactly as it was |
+| `ACC_BOOTSTRAP_DEBUG=1` | Lets the internal `acc-bootstrap` check write one safe diagnostic line to stderr. Off, it is silent, and it never writes to stdout |
+| `CODEX_HOME` | Codex's own home, honoured when locating the Codex App Server daemon's control socket for native delivery. Codex sets it; ACC only reads it |
