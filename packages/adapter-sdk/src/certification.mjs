@@ -114,7 +114,8 @@ export function validateCertification(manifest) {
   });
   const tuples = new Set();
   for (const [index, entry] of evidence.entries()) {
-    const tuple = [entry.client, entry.version, entry.platform, entry.capability].join("\0");
+    const tuple = JSON.stringify([entry.client, entry.version, entry.platform,
+      entry.capability]);
     if (tuples.has(tuple)) {
       usage(`duplicate certification tuple at evidence ${index}`,
         { index, client: entry.client, version: entry.version,

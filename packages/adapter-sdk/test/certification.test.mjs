@@ -124,6 +124,25 @@ test("contradictory duplicate certification tuples are rejected", () => {
   ] }), /duplicate certification tuple/);
 });
 
+test("embedded delimiter bytes cannot make distinct certification tuples collide", () => {
+  const delimiter = "\u0000";
+  const tail = ["delivery.livePush", "x", "1.2.3", "darwin-arm64",
+    "delivery.replyRoute"].join(delimiter);
+  const prefix = ["example-client", "1.2.3", "darwin-arm64",
+    "delivery.livePush", "x"].join(delimiter);
+  const manifest = sdk.validateCertification({ evidence: [
+    evidence({ client: "example-client", capability: tail }),
+    evidence({ client: prefix, capability: "delivery.replyRoute" }),
+  ] });
+
+  assert.equal(manifest.evidence.length, 2);
+  assert.notEqual(manifest.evidence[0].client, manifest.evidence[1].client);
+  assert.notEqual(manifest.evidence[0].capability, manifest.evidence[1].capability);
+  assert.throws(() => sdk.defineAdapter(base({ certification: manifest })),
+    /unknown certified capability/,
+    "collision-safe tuple identity must not loosen the known capability gate");
+});
+
 test("both unknown effective client facts degrade to all false", () => {
   const adapter = sdk.defineAdapter(base({
     capabilities: { delivery: { livePush: true } },
