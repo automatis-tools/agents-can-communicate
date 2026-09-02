@@ -11,6 +11,7 @@ import { createGeminiCliAdapter } from "@agents-can-communicate/adapter-gemini-c
 import { createGrokAdapter } from "@agents-can-communicate/adapter-grok";
 import { createKimiAdapter } from "@agents-can-communicate/adapter-kimi";
 import { CAPABILITY_SHAPE } from "@agents-can-communicate/adapter-sdk";
+import { PASS_EXPECTATIONS } from "./certification-audit.mjs";
 
 const repoRoot = fileURLToPath(new URL("../..", import.meta.url));
 const ADAPTERS = [
@@ -21,51 +22,10 @@ const ADAPTERS = [
   ["adapter-kimi", createKimiAdapter],
 ];
 
-const PASS_EXPECTATIONS = Object.freeze({
-  "adapter-claude-code": [
-    ["lifecycle.sessionStart", "fixtures/SessionStart.json", "SessionStart", null, "event-observed"],
-    ["lifecycle.sessionEnd", "fixtures/SessionEnd.json", "SessionEnd", null, "event-observed"],
-    ["context.beforeTurnInjection", "fixtures/UserPromptSubmit.json", "UserPromptSubmit", null, "model-context-observed"],
-    ["guards.beforeWrite", "fixtures/PreToolUse-Edit.json", "PreToolUse", "Edit", "tool-denied-before-mutation"],
-    ["guards.beforeShell", "fixtures/PreToolUse.json", "PreToolUse", "Bash", "tool-denied-before-execution"],
-    ["delivery.nextTurn", "fixtures/UserPromptSubmit.json", "UserPromptSubmit", null, "model-context-observed"],
-  ].map(([capability, fixture, event, tool, outcome]) =>
-    ({ client: "claude-code", version: "2.1.233", platform: "darwin-arm64",
-      capability, fixture, event, tool, outcome })),
-  "adapter-codex": [
-    ["lifecycle.sessionStart", "fixtures/SessionStart.json", "SessionStart", null, "event-observed"],
-    ["lifecycle.sessionEnd", "fixtures/SessionEnd.json", "SessionEnd", null, "event-observed"],
-    ["context.beforeTurnInjection", "fixtures/UserPromptSubmit.json", "UserPromptSubmit", null, "model-context-observed"],
-    ["guards.beforeWrite", "fixtures/PreToolUse.json", "PreToolUse", "apply_patch", "tool-denied-before-mutation"],
-    ["delivery.nextTurn", "fixtures/UserPromptSubmit.json", "UserPromptSubmit", null, "model-context-observed"],
-  ].map(([capability, fixture, event, tool, outcome]) =>
-    ({ client: "codex-cli", version: "0.147.0", platform: "darwin-arm64",
-      capability, fixture, event, tool, outcome })),
-  "adapter-gemini-cli": [
-    ["lifecycle.sessionStart", "fixtures/SessionStart.json", "SessionStart", null, "event-observed"],
-    ["lifecycle.sessionEnd", "fixtures/SessionEnd.json", "SessionEnd", null, "event-observed"],
-    ["context.beforeTurnInjection", "fixtures/BeforeAgent.json", "BeforeAgent", null, "model-context-observed"],
-    ["guards.beforeWrite", "fixtures/BeforeTool.json", "BeforeTool", "write_file", "tool-denied-before-mutation"],
-    ["guards.beforeShell", "fixtures/BeforeTool-shell.json", "BeforeTool", "run_shell_command", "tool-denied-before-execution"],
-    ["delivery.nextTurn", "fixtures/BeforeAgent.json", "BeforeAgent", null, "model-context-observed"],
-  ].map(([capability, fixture, event, tool, outcome]) =>
-    ({ client: "gemini-cli", version: "0.37.0", platform: "darwin-arm64",
-      capability, fixture, event, tool, outcome })),
-  "adapter-grok": [],
-  "adapter-kimi": [
-    ["lifecycle.sessionStart", "fixtures/SessionStart.json", "SessionStart", null, "event-observed"],
-    ["lifecycle.heartbeat", "fixtures/SessionHeartbeat.json", "SessionHeartbeat", null, "fixed-cadence-observed"],
-    ["context.beforeTurnInjection", "fixtures/UserPromptSubmit.json", "UserPromptSubmit", null, "model-context-observed"],
-    ["guards.beforeWrite", "fixtures/PreToolUse-Write.json", "PreToolUse", "Write", "tool-denied-before-mutation"],
-    ["guards.beforeShell", "fixtures/PreToolUse-Bash.json", "PreToolUse", "Bash", "tool-denied-before-execution"],
-    ["delivery.nextTurn", "fixtures/UserPromptSubmit.json", "UserPromptSubmit", null, "model-context-observed"],
-  ].map(([capability, fixture, event, tool, outcome]) =>
-    ({ client: "kimi", version: "0.36.1", platform: "darwin-arm64",
-      capability, fixture, event, tool, outcome })),
-});
-
 const comparable = item => ({ client: item.client, version: item.version,
-  platform: item.platform, capability: item.capability, fixture: item.fixture });
+  platform: item.platform, observedAt: item.observedAt, capability: item.capability,
+  fixture: item.fixture, idleBehavior: item.idleBehavior, busyBehavior: item.busyBehavior,
+  authorityLevel: item.authorityLevel, limitations: item.limitations });
 const byCapability = (left, right) => left.capability.localeCompare(right.capability);
 
 const trueCapabilities = adapter => Object.entries(CAPABILITY_SHAPE)
