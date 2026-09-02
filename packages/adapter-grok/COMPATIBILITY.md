@@ -103,3 +103,7 @@ defaults to 600s.
 Grok is tier 2 for attach, presence, and skill-driven polling. It is not tier 2
 for turn injection or proven write/shell guards. Advertise that honestly; do
 not inherit Claude Code's capability row.
+
+For message delivery this means polling and durable `acc inbox` only. Grok has
+no certified next-turn or live-push transport, including on the observed 1.0.13
+client, and installation must never report either one as active.

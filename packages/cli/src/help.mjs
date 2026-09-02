@@ -33,7 +33,7 @@ const SUMMARY = Object.freeze({
   message: "send a typed message to named participants",
   inbox: "read only unresolved messages addressed to this participant",
   reply: "reply to one message and acknowledge it in the same operation",
-  request: "ask another agent to do something in an acknowledged message",
+  request: "ask another agent to do something in a reply-required message",
   finish: "write the handoff and release what this session held",
   attach: "open a session; an adapter calls this, not a person",
   heartbeat: "say the session is still alive",

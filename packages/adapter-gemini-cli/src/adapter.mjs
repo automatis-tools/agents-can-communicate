@@ -41,6 +41,9 @@ export function createGeminiCliAdapter() {
       guards: { beforeWrite: true, beforeShell: true },
       delivery: { nextTurn: true },
     },
+    deliveryFallback: { diagnostic:
+      "Gemini CLI next-turn delivery is certified only for 0.37.0 on darwin-arm64; "
+      + "other or unknown versions keep durable acc inbox access, and live push is unavailable" },
 
     startSession: async () => ({ ok: true, changes: [], diagnostics: [] }),
     endSession: async () => ({ ok: true, changes: [], diagnostics: [] }),

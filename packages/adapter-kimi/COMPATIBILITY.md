@@ -9,6 +9,13 @@ running that client, not by reading about it.
 | Config root | `~/.kimi-code`, redirectable with `KIMI_CODE_HOME` |
 | Local evidence | isolated `KIMI_CODE_HOME`, hook captures, config-schema probes |
 
+## Delivery tier
+
+ACC's machine-readable `delivery.nextTurn` capability is certified only for the exact
+`0.36.1` / `darwin-arm64` tier in `certification.json`. A different or unparseable client
+version is reported as a downgrade, while durable `acc inbox` polling remains available.
+Kimi Code has no certified live-push binding.
+
 ## The integration surface is not the plugin
 
 This is the first of the four clients where hooks do **not** live in the plugin. Its

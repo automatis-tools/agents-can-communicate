@@ -134,9 +134,9 @@ test("the MCP client sees the peer's claim, so it can choose to respect it", asy
  * The hook runtime hands a session its pending messages when it builds a turn.
  * Before `acc_inbox`, reading a peer's body required a full workspace sync and
  * searching its nested snapshot. The narrow operation returns only unresolved
- * addressed messages and moves their own receipts truthfully to `seen`.
+ * addressed messages and moves their own receipts truthfully to `retrieved`.
  */
-async function mailed(t, { requiresAck = true } = {}) {
+async function mailed(t, { kind = "question" } = {}) {
   const place = await workspace(t);
   const client = connectMcp({ ...place, participant: "mcp_reader" });
   t.after(() => client.close());
@@ -151,7 +151,7 @@ async function mailed(t, { requiresAck = true } = {}) {
   await cli(place, ["message", "--session", sender.sessionId,
     "--generation", sender.generation, "--to", "mcp_reader",
     "--subject", "which way should the hull clamp?", "--body", "Blocking me.",
-    ...(requiresAck ? ["--requires-ack"] : [])]);
+    "--type", kind]);
   const receipts = async () => (await cli(place, ["sync", "--session", sender.sessionId,
     "--scope", "full"])).snapshot.receipts.map(receipt => receipt.state);
   return { place, call, sender, receipts };
@@ -169,7 +169,7 @@ test("a message addressed to an MCP client reaches it, body and all", async t =>
 });
 
 test("a note that has been read is not handed over again", async t => {
-  const { call } = await mailed(t, { requiresAck: false });
+  const { call } = await mailed(t, { kind: "note" });
   await call("acc_inbox");
 
   const second = await call("acc_inbox");
@@ -185,7 +185,7 @@ test("the sender stops being told its message is undelivered", async t => {
 
   await call("acc_inbox");
 
-  assert.deepEqual(await receipts(), ["seen"]);
+  assert.deepEqual(await receipts(), ["retrieved"]);
 });
 
 test("being shown something is still not agreeing to it", async t => {
@@ -215,9 +215,9 @@ test("an MCP client can ask a peer for work and receive its reply", async t => {
     title: "Tank sinks through mud", detail: "Not mine to fix. Can you take it?" });
   const [received] = await cli(place, ["inbox", "--session", peer.sessionId,
     "--generation", peer.generation]);
-  assert.equal(received.message.messageId, asked.messageId);
+  assert.equal(received.message.messageId, asked.message.messageId);
   await cli(place, ["reply", "--session", peer.sessionId, "--generation", peer.generation,
-    "--message", asked.messageId, "--body", "Done; the mud clamp now holds."]);
+    "--message", asked.message.messageId, "--body", "Done; the mud clamp now holds."]);
 
   // The whole loop, from the tier with no hooks at all: asked, answered, and the
   // answer arrives where this client can see it.

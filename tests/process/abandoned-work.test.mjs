@@ -56,22 +56,23 @@ async function turn(place, adapter, clientSessionId, participant) {
 const cli = ({ env, project }, ...argv) =>
   run(process.execPath, [acc, ...argv, "--cwd", project], { env });
 
-test("a direct message can be answered without a written reply", async t => {
+test("a direct message can be acknowledged without a written reply", async t => {
   const place = await workspace(t);
   const asker = await attach(place, "codex", "gfx", "graphics");
   const doer = await attach(place, "kimi", "phys", "physics");
   const { stdout } = await cli(place, "message", "--session", asker.accSessionId,
-    "--generation", asker.generation, "--to", "physics", "--type", "question",
-    "--subject", "scale", "--body", "Is the tank scale settled?", "--requires-ack");
-  const messageId = stdout.trim().replace(/^sent /, "");
+    "--generation", asker.generation, "--to", "physics", "--type", "decision",
+    "--obligation", "acknowledge", "--subject", "scale",
+    "--body", "The tank scale is settled.");
+  const [, messageId] = /^recorded (message_[^;\s]+)/.exec(stdout.trim()) ?? [];
 
   assert.match(await turn(place, "kimi", "phys", "physics"),
-    /\[direct_request\] message_\S+ scale/);
+    /\[acknowledgement_required\] message_\S+/);
   await cli(place, "ack", "--session", doer.accSessionId, "--generation", doer.generation,
     "--message", messageId);
 
   const after = await turn(place, "kimi", "phys", "physics");
-  assert.equal(after.includes("[direct_request]"), false, after);
+  assert.equal(after.includes("[acknowledgement_required]"), false, after);
 });
 
 test("a direct question outlives the agent it was put to", async t => {
@@ -81,18 +82,18 @@ test("a direct question outlives the agent it was put to", async t => {
   await cli(place, "message", "--session", asker.accSessionId,
     "--generation", asker.generation, "--to", "physics",
     "--subject", "which way should the hull clamp?",
-    "--body", "It is blocking my rendering work.", "--requires-ack");
+    "--body", "It is blocking my rendering work.", "--type", "question");
 
   const waiting = await turn(place, "codex", "gfx", "graphics");
-  assert.equal(waiting.includes("request_stalled"), false, waiting);
+  assert.equal(waiting.includes("recipient_unavailable"), false, waiting);
 
   await hookEvent(place, "kimi", "phys", "physics", "sessionEnd",
     { hook_event_name: "SessionEnd", reason: "exit" });
 
   const alone = await turn(place, "codex", "gfx", "graphics");
-  assert.match(alone, /\[request_stalled\] message_\S+ which way should the hull clamp\?/,
+  assert.match(alone, /\[recipient_unavailable\] message_\S+ which way should the hull clamp\?/,
     `the asker was left waiting on a question nobody can answer:\n${alone}`);
-  assert.match(alone, /physics is not here to answer/);
+  assert.match(alone, /physics is unavailable/);
 });
 
 test("an answered question stops being reported, even once its author leaves", async t => {
@@ -102,17 +103,18 @@ test("an answered question stops being reported, even once its author leaves", a
   await cli(place, "message", "--session", asker.accSessionId,
     "--generation", asker.generation, "--to", "physics",
     "--subject", "which way should the hull clamp?", "--body", "Blocking me.",
-    "--requires-ack");
+    "--type", "question");
   const [pending] = JSON.parse((await cli(place, "sync", "--session", doer.accSessionId,
     "--scope", "full", "--json")).stdout).data.snapshot.messages;
 
-  await cli(place, "ack", "--session", doer.accSessionId,
-    "--generation", doer.generation, "--message", pending.messageId);
+  await cli(place, "reply", "--session", doer.accSessionId,
+    "--generation", doer.generation, "--message", pending.messageId,
+    "--body", "Use the settled clamp orientation.");
   await hookEvent(place, "kimi", "phys", "physics", "sessionEnd",
     { hook_event_name: "SessionEnd", reason: "exit" });
 
   const after = await turn(place, "codex", "gfx", "graphics");
-  assert.equal(after.includes("request_stalled"), false, after);
+  assert.equal(after.includes("recipient_unavailable"), false, after);
 });
 
 test("only the agent who asked is told", async t => {
@@ -123,11 +125,11 @@ test("only the agent who asked is told", async t => {
   await cli(place, "message", "--session", asker.accSessionId,
     "--generation", asker.generation, "--to", "physics",
     "--subject", "which way should the hull clamp?", "--body", "Blocking me.",
-    "--requires-ack");
+    "--type", "question");
   await hookEvent(place, "kimi", "phys", "physics", "sessionEnd",
     { hook_event_name: "SessionEnd", reason: "exit" });
 
   const seen = await turn(place, "claude_code", "snd", "sound");
-  assert.equal(seen.includes("request_stalled"), false, seen);
+  assert.equal(seen.includes("recipient_unavailable"), false, seen);
   assert.equal(typeof bystander.accSessionId, "string");
 });

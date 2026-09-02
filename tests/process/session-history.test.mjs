@@ -104,7 +104,7 @@ test("a message says who sent it, not only which session did", async t => {
   const asker = roster.find(item => item.participantId === "asker");
   await place.cli("message", "--session", asker.sessionId, "--to", "helper",
     "--subject", "which way should the hull clamp?", "--body", "Blocking me.",
-    "--requires-ack");
+    "--type", "question");
 
   const { stdout } = await place.cli("sync", "--session", asker.sessionId,
     "--scope", "full", "--json");
@@ -121,7 +121,7 @@ test("a stalled question survives the session that asked it", async t => {
   const asker = roster.find(item => item.participantId === "asker");
   await place.cli("message", "--session", asker.sessionId, "--to", "helper",
     "--subject", "which way should the hull clamp?", "--body", "Blocking me.",
-    "--requires-ack");
+    "--type", "question");
   await place.close("helper", "helper-1");
   await place.close("asker", "asker-1");
 
@@ -131,6 +131,6 @@ test("a stalled question survives the session that asked it", async t => {
   await place.attach("asker", "asker-2");
   const shown = await place.turn("asker", "asker-2");
 
-  assert.match(shown, /\[request_stalled\] message_\S+ which way should the hull clamp\?/,
+  assert.match(shown, /\[recipient_unavailable\] message_\S+ which way should the hull clamp\?/,
     `a restarted asker lost track of its own question:\n${shown}`);
 });

@@ -2,9 +2,9 @@
 // handler shares one owner-resolution, result, and error contract with `main`. Splitting the
 // dispatch table would either duplicate that contract or expose storage/runtime context solely
 // to pass it across a module boundary, making command behavior harder to audit as one surface.
-import { AccError, CONFIG_FILENAME, EXIT, failure, ok }
+import { AccError, CONFIG_FILENAME, EXIT, MESSAGE_KINDS, VALID_OBLIGATIONS, failure, ok }
   from "@agents-can-communicate/protocol";
-import { createCoordinationService, noteNudge } from "@agents-can-communicate/core";
+import { createCoordinationService } from "@agents-can-communicate/core";
 import { openFilesystemStore } from "@agents-can-communicate/storage-filesystem";
 
 import { parseArgs, positiveNumber } from "./args.mjs";
@@ -114,6 +114,30 @@ async function openDiagnosticContext(options, runtime) {
 
 const human = value => (typeof value === "string" ? value : JSON.stringify(value, null, 2));
 
+const clientMessageId = (options, context) =>
+  options.clientMessageId ?? context.service.ids.next("client");
+
+function obligationFor(kind, explicit, addressed) {
+  if (!MESSAGE_KINDS.includes(kind)) throw usage(`unknown message type: ${kind}`);
+  const obligation = explicit ?? (kind === "handoff"
+    ? (addressed ? "acknowledge" : "none")
+    : VALID_OBLIGATIONS[kind][0]);
+  if (!VALID_OBLIGATIONS[kind].includes(obligation)
+    || (!addressed && obligation !== "none")) {
+    throw usage(`message obligation ${obligation} is invalid for ${kind}`);
+  }
+  return obligation;
+}
+
+function recordedText(message, delivery) {
+  const diagnostics = delivery.map(item => item.outcome === "offered"
+    ? `live offered to ${item.recipientParticipantId} via ${item.transport}`
+    : item.outcome === "queued"
+      ? `live offer unavailable (${item.errorCode ?? "durable_fallback"})`
+      : `delivery already ${item.outcome}`);
+  return [`recorded ${message.messageId}`, ...diagnostics].join("; ");
+}
+
 export async function recordAndOffer({ record, router, selectMessage = value => value }) {
   const recorded = await record();
   const message = selectMessage(recorded);
@@ -192,8 +216,7 @@ const HANDLERS = Object.freeze({
     if (options.summary === undefined) throw usage("work requires --summary");
     const intent = await context.service.setIntent({ sessionId: options.session,
       generation: options.generation, summary: options.summary, mode: options.mode ?? "edit",
-      state: options.state, workstreamId: options.workstream ?? null,
-      resourceHints: options.hint ?? [] });
+      state: options.state, resourceHints: options.hint ?? [] });
     return { data: intent, text: `intent: ${intent.summary}` };
   },
 
@@ -218,21 +241,17 @@ const HANDLERS = Object.freeze({
   },
 
   message: async ({ options, context }) => {
+    const kind = options.type ?? "note";
+    const toParticipantIds = options.to ?? [];
     const routed = await recordAndOffer({ router: context.deliveryRouter, record: () =>
       context.service.sendMessage({ sessionId: options.session,
-      generation: options.generation, toParticipantIds: options.to ?? [],
-      type: options.type ?? "note", subject: options.subject, body: options.body,
-      priority: options.priority, workstreamId: options.workstream ?? null,
-      requiresAck: options.requiresAck === true, descriptor: context.descriptor }) });
+      generation: options.generation, clientMessageId: clientMessageId(options, context),
+      toParticipantIds, kind,
+      obligation: obligationFor(kind, options.obligation, toParticipantIds.length > 0),
+      subject: options.subject, body: options.body, descriptor: context.descriptor }) });
     const message = routed.recorded;
-    // A note that reads like it wants a reply was sent with no ack obligation
-    // and no standing reminder; say so once, without blocking the send. Carried
-    // in `data` so an adapter reading `--json` sees it, and appended to `text`
-    // for a person - the send already succeeded either way.
-    const advice = noteNudge(message);
-    return { data: advice ? { ...message, advice, delivery: routed.delivery }
-      : { ...message, delivery: routed.delivery },
-      text: advice ? `sent ${message.messageId}\n${advice}` : `sent ${message.messageId}` };
+    return { data: { message, delivery: routed.delivery },
+      text: recordedText(message, routed.delivery) };
   },
 
   inbox: async ({ options, context }) => {
@@ -247,10 +266,10 @@ const HANDLERS = Object.freeze({
       selectMessage: value => value.reply, record: () => context.service.replyToMessage({
       sessionId: options.session,
       generation: options.generation, messageId: options.message, body: options.body,
-      subject: options.subject, type: options.type, priority: options.priority }) });
+      subject: options.subject, clientMessageId: clientMessageId(options, context) }) });
     const result = routed.recorded;
-    return { data: { ...result, delivery: routed.delivery },
-      text: `replied ${result.reply.messageId}; acknowledged ${options.message}` };
+    return { data: { message: result.reply, delivery: routed.delivery },
+      text: recordedText(result.reply, routed.delivery) };
   },
 
   request: async ({ options, context }) => {
@@ -258,22 +277,22 @@ const HANDLERS = Object.freeze({
       context.service.sendMessage({
       sessionId: options.session,
       generation: options.generation,
+      clientMessageId: clientMessageId(options, context),
       toParticipantIds: [options.to],
-      type: "work_request",
+      kind: "request",
+      obligation: "reply",
       subject: options.title,
       body: options.detail ?? options.title,
-      requiresAck: true,
       descriptor: context.descriptor,
     }) });
     const message = routed.recorded;
-    return { data: { ...message, delivery: routed.delivery },
-      text: `requested ${message.messageId} of ${options.to}` };
+    return { data: { message, delivery: routed.delivery },
+      text: recordedText(message, routed.delivery) };
   },
 
   ack: async ({ options, context }) => {
-    const receipt = await context.service.markDelivery({ sessionId: options.session,
-      generation: options.generation, messageId: options.message,
-      state: options.state ?? "acknowledged" });
+    const receipt = await context.service.acknowledgeMessage({ sessionId: options.session,
+      generation: options.generation, messageId: options.message });
     return { data: receipt, text: `${receipt.messageId} ${receipt.state}` };
   },
 
@@ -281,12 +300,13 @@ const HANDLERS = Object.freeze({
     const routed = await recordAndOffer({ router: context.deliveryRouter,
       selectMessage: value => value.message, record: () => context.service.finishSession({
       sessionId: options.session,
-      generation: options.generation, goal: options.goal, status: options.status,
-      toParticipantId: options.to ?? null, completed: options.completed ?? [],
+      generation: options.generation, clientMessageId: clientMessageId(options, context),
+      goal: options.goal, status: options.status,
+      toParticipantId: options.to, completed: options.completed ?? [],
       remaining: options.remaining ?? [], blockers: options.blocker ?? [] }) });
     const handoff = routed.recorded;
-    return { data: { ...handoff, delivery: routed.delivery },
-      text: `handoff ${handoff.handoffId}` };
+    return { data: { message: handoff.message, delivery: routed.delivery },
+      text: recordedText(handoff.message, routed.delivery) };
   },
 
   status: async ({ options, context }) => {

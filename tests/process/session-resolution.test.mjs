@@ -80,7 +80,7 @@ test("the whole request loop runs with no identifiers on either side", async t =
   const { stdout: replied } = await cli(["reply", "--message", request.message.messageId,
     "--body", "I will review the settling path."],
     { CLAUDE_CODE_SESSION_ID: "phy" });
-  assert.match(replied, /replied message_/);
+  assert.match(replied, /^recorded message_/);
 });
 
 test("a session id from status is enough; the generation is looked up", async t => {
@@ -151,8 +151,9 @@ const AGENT_FACING = Object.freeze([
   ["reply", ["--message", "message_absent", "--body", "answer"]],
   ["request", ["--to", "peer", "--title", "please take this"]],
   ["ack", ["--message", "message_absent"]],
-  ["finish", ["--goal", "what this session was for"]],
   ["release", ["--claim", "claim_absent"]],
+  // Finish closes the resolved session, so it must be the last identity check.
+  ["finish", ["--goal", "what this session was for"]],
 ]);
 
 // Setup and lifecycle: a model should not be running the installer, and these

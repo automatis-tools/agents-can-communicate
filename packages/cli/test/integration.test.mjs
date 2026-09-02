@@ -69,8 +69,9 @@ test("a session attaches, works, claims, and finishes through the executable", a
   const finished = await json(["finish", "--session", first.sessionId, "--generation",
     first.generation, "--goal", "hand over the claim model", "--status", "partial"]);
   assert.equal(finished.code, 0, finished.stderr);
-  assert.deepEqual(finished.body.data.claimsToRelease,
-    ["file:packages/core/src/claims.mjs"]);
+  assert.deepEqual(Object.keys(finished.body.data).sort(), ["delivery", "message"]);
+  assert.equal(finished.body.data.message.kind, "handoff");
+  assert.equal(typeof finished.body.data.message.clientMessageId, "string");
 
   const after = await json(["status"]);
   assert.deepEqual(after.body.data.claims, [], "finish did not release the owned claim");
@@ -176,14 +177,57 @@ test("a message reaches a peer and status counts it", async t => {
 
   const sent = await json(["message", "--session", first.sessionId, "--generation",
     first.generation, "--to", "models", "--subject", "Material slots",
-    "--body", "Which names are stable?", "--type", "question", "--requires-ack"]);
+    "--body", "Which names are stable?", "--type", "question"]);
 
   assert.equal(sent.code, 0, sent.stderr);
-  assert.equal(sent.body.data.requiresAck, true);
+  assert.deepEqual(Object.keys(sent.body.data).sort(), ["delivery", "message"]);
+  assert.equal(sent.body.data.message.kind, "question");
+  assert.equal(sent.body.data.message.obligation, "reply");
+  assert.equal(typeof sent.body.data.message.clientMessageId, "string");
   const status = await json(["status", "--participant", "models"]);
   assert.equal(status.body.data.counts.messages, 1);
-  assert.equal(status.body.data.attention.some(item => item.kind === "direct_request"), true);
+  assert.equal(status.body.data.attention.some(item => item.kind === "reply_required"), true);
 });
+
+test("an explicit client message id makes a CLI retry one logical message", async t => {
+  const { json } = await workspace(t);
+  const sender = await attach(json, "visual");
+  await attach(json, "models");
+  const argv = ["message", "--session", sender.sessionId, "--generation",
+    sender.generation, "--to", "models", "--subject", "Stable retry",
+    "--body", "Retry the same logical send.", "--client-message-id", "client_cli_retry"];
+
+  const first = await json(argv);
+  const second = await json(argv);
+
+  assert.equal(first.code, 0, first.stderr);
+  assert.equal(second.code, 0, second.stderr);
+  assert.deepEqual(Object.keys(first.body.data).sort(), ["delivery", "message"]);
+  assert.equal(first.body.data.message.clientMessageId, "client_cli_retry");
+  assert.equal(second.body.data.message.messageId, first.body.data.message.messageId);
+  const status = await json(["status"]);
+  assert.equal(status.body.data.counts.messages, 1);
+});
+
+test("request returns the same send result and human output leads with durable recording",
+  async t => {
+    const { json, run } = await workspace(t);
+    const sender = await attach(json, "visual");
+    await attach(json, "models");
+
+    const machine = await json(["request", "--session", sender.sessionId, "--generation",
+      sender.generation, "--to", "models", "--title", "Review the seam"]);
+    assert.equal(machine.code, 0, machine.stderr);
+    assert.deepEqual(Object.keys(machine.body.data).sort(), ["delivery", "message"]);
+    assert.equal(machine.body.data.message.kind, "request");
+    assert.equal(machine.body.data.message.obligation, "reply");
+
+    const human = await run(["message", "--session", sender.sessionId, "--generation",
+      sender.generation, "--to", "models", "--subject", "FYI", "--body", "Recorded."]);
+    assert.equal(human.code, 0, human.stderr);
+    assert.match(human.stdout, /^recorded message_[A-Za-z0-9_-]+/);
+    assert.match(human.stdout, /live offer unavailable \(recipient_unavailable\)/);
+  });
 
 test("inbox reads one message and reply answers plus acknowledges it", async t => {
   const { json } = await workspace(t);
@@ -191,19 +235,21 @@ test("inbox reads one message and reply answers plus acknowledges it", async t =
   const recipient = await attach(json, "models");
   const sent = await json(["message", "--session", sender.sessionId, "--generation",
     sender.generation, "--to", "models", "--subject", "Material gate",
-    "--body", "Can visual proceed?", "--type", "question", "--requires-ack"]);
-  const messageId = sent.body.data.messageId;
+    "--body", "Can visual proceed?", "--type", "question"]);
+  const messageId = sent.body.data.message.messageId;
 
   const inbox = await json(["inbox", "--session", recipient.sessionId, "--generation",
     recipient.generation, "--message", messageId]);
   assert.equal(inbox.code, 0, inbox.stderr);
   assert.deepEqual(inbox.body.data.map(item => item.message.messageId), [messageId]);
-  assert.equal(inbox.body.data[0].receipt.state, "seen");
+  assert.equal(inbox.body.data[0].receipt.state, "retrieved");
   assert.equal(Object.hasOwn(inbox.body.data[0], "snapshot"), false);
 
   const replied = await json(["reply", "--session", recipient.sessionId, "--generation",
     recipient.generation, "--message", messageId, "--body", "Yes, proceed."]);
   assert.equal(replied.code, 0, replied.stderr);
-  assert.equal(replied.body.data.reply.inReplyTo, messageId);
-  assert.equal(replied.body.data.receipt.state, "acknowledged");
+  assert.deepEqual(Object.keys(replied.body.data).sort(), ["delivery", "message"]);
+  assert.equal(replied.body.data.message.inReplyTo, messageId);
+  assert.equal(replied.body.data.message.kind, "answer");
+  assert.equal(typeof replied.body.data.message.clientMessageId, "string");
 });

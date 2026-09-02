@@ -89,3 +89,33 @@ test("no tool takes a session handle: identity comes from configuration", () => 
     }
   }
 });
+
+test("send tools expose idempotency and only the v0.2 message semantics", () => {
+  const byName = name => PUBLIC_TOOLS.find(tool => tool.name === name).inputSchema.properties;
+  for (const name of ["acc_message", "acc_request", "acc_reply", "acc_finish"]) {
+    assert.equal(byName(name).clientMessageId.type, "string", `${name} has no retry key`);
+  }
+
+  assert.deepEqual(byName("acc_message").kind.enum,
+    ["note", "question", "request", "answer", "decision", "handoff"]);
+  assert.deepEqual(byName("acc_message").obligation.enum, ["none", "acknowledge", "reply"]);
+  for (const removed of ["type", "priority", "requiresAck", "workstreamId"]) {
+    assert.equal(Object.hasOwn(byName("acc_message"), removed), false,
+      `acc_message still exposes ${removed}`);
+  }
+  assert.equal(Object.hasOwn(byName("acc_ack"), "state"), false,
+    "the model can still forge a transport-owned receipt state");
+});
+
+test("intent publishing has no legacy orchestration handle", () => {
+  const work = PUBLIC_TOOLS.find(tool => tool.name === "acc_work");
+
+  assert.equal(Object.hasOwn(work.inputSchema.properties, "workstreamId"), false);
+});
+
+test("request describes the reply obligation it actually creates", () => {
+  const request = PUBLIC_TOOLS.find(tool => tool.name === "acc_request");
+
+  assert.match(request.description, /reply-required/);
+  assert.doesNotMatch(request.description, /acknowledged message/);
+});

@@ -120,6 +120,24 @@ test("a fallback diagnostic does not mutate adapter-owned detection results", as
   assert.deepEqual(adapterDiagnostics, ["acc plugin not registered"]);
 });
 
+test("an uncertified next-turn version is named as an inbox downgrade", async t => {
+  const context = { home: await home(t), dataHome: await home(t) };
+  const nextTurn = adapter("gemini_cli", {
+    capabilities: { delivery: { nextTurn: true } },
+    certification: { evidence: [{ client: "gemini_cli", version: "0.37.0",
+      platform: "darwin-arm64", capability: "delivery.nextTurn", result: "pass" }] },
+    deliveryFallback: { diagnostic: "live delivery unavailable; acc inbox remains active" },
+  });
+
+  const [detected] = await detectInstallation({ adapters: [nextTurn],
+    probe: probeFor({ gemini_cli: "0.55.1" }), context, platform: "darwin-arm64" });
+
+  assert.equal(detected.capabilities.delivery.nextTurn, false);
+  assert.match(detected.deliveryDiagnostic, /0\.55\.1/);
+  assert.match(detected.deliveryDiagnostic, /next-turn/);
+  assert.match(detected.deliveryDiagnostic, /acc inbox/);
+});
+
 test("detection writes nothing at all", async t => {
   const dir = await home(t);
   const context = { home: dir, dataHome: dir };
