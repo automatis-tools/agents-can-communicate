@@ -73,6 +73,38 @@
         "idle, busy, reply, duplicate, and fallback branches were not observed"
       ],
       "result": "fail"
+    },
+    {
+      "client": "claude-code", "version": "2.1.258", "platform": "darwin-arm64",
+      "observedAt": "2026-09-02T21:20:11.676Z", "capability": "delivery.livePush",
+      "fixture": "fixtures/delivery/claude-code-2.1.258.json", "idleBehavior": "offered",
+      "provenance": "fixtures/certification-provenance.json",
+      "provenanceId": "native-delivery-2-1-258", "busyBehavior": "queued_after_turn",
+      "authorityLevel": "experimental",
+      "limitations": [
+        "captured on darwin-arm64 only; Linux and Windows remain uncaptured",
+        "the vendor development-channel warning stayed visible and was accepted by the operator by hand",
+        "the plugin .mcp.json must live in the marketplace source copy; the plugin cache copy alone is not read",
+        "acc_reply routed through the spike's explicit tool call; the spike created no durable ACC answer record",
+        "presentation after the busy turn was observed by the operator; the channel log records the write at 21:18:45Z and the explicit reply at 21:19:21Z"
+      ],
+      "result": "pass"
+    },
+    {
+      "client": "claude-code", "version": "2.1.258", "platform": "darwin-arm64",
+      "observedAt": "2026-09-02T21:20:11.676Z", "capability": "delivery.replyRoute",
+      "fixture": "fixtures/delivery/claude-code-2.1.258.json", "idleBehavior": "offered",
+      "provenance": "fixtures/certification-provenance.json",
+      "provenanceId": "native-delivery-2-1-258", "busyBehavior": "queued_after_turn",
+      "authorityLevel": "experimental",
+      "limitations": [
+        "captured on darwin-arm64 only; Linux and Windows remain uncaptured",
+        "the vendor development-channel warning stayed visible and was accepted by the operator by hand",
+        "the plugin .mcp.json must live in the marketplace source copy; the plugin cache copy alone is not read",
+        "acc_reply routed through the spike's explicit tool call; the spike created no durable ACC answer record",
+        "presentation after the busy turn was observed by the operator; the channel log records the write at 21:18:45Z and the explicit reply at 21:19:21Z"
+      ],
+      "result": "pass"
     }
   ]
 }

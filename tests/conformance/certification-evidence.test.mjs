@@ -100,7 +100,16 @@ for (const [packageName, createAdapter] of ADAPTERS) {
         } else {
           assert.equal(claim.outcome?.kind, "native-capture-failed");
         }
-        if (item.result === "pass") {
+        if (item.result === "pass" && expectedCapture.event === null) {
+          // A native delivery capture: no hook event, but the ordinary launch and
+          // the exact protocol contract must be the ones the audit names.
+          assert.equal(capture.hook_event_name ?? capture.hookEventName, undefined,
+            `${item.fixture} is a delivery capture and carries no hook event`);
+          assert.equal(capture.launchMode, "ordinary-command-with-install-time-bootstrap",
+            `${item.fixture} was not captured through the ordinary command`);
+          assert.equal(capture.protocolContract, expectedCapture.protocolContract,
+            `${item.fixture} protocol contract differs from the independent audit`);
+        } else if (item.result === "pass") {
           assert.equal(capture.hook_event_name ?? capture.hookEventName, expectedCapture.event,
             `${item.fixture} does not contain the certified hook event`);
           assert.equal(capture.tool_name ?? capture.toolName ?? null, expectedCapture.tool,
