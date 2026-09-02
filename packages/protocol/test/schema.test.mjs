@@ -27,7 +27,7 @@ const VALID = {
     startedAt: NOW, heartbeatAt: NOW }),
   intent: base({ sessionId: "session_a", workspaceId: "workspace_a",
     summary: "reviewing the claim model", mode: "review", resourceHints: [],
-    workstreamId: null, state: "active", updatedAt: NOW }),
+    state: "active", updatedAt: NOW }),
   claim: base({ claimId: "claim_a", workspaceId: "workspace_a",
     ownerSessionId: "session_a", resource: "file:src/main.mjs", mode: "exclusive",
     enforcement: "advisory", reason: "editing", acquiredAt: NOW,
@@ -87,6 +87,12 @@ test("delivery bindings are validated without joining the durable record kinds",
   assert.throws(() => validateRecord("deliveryBinding",
     { ...DELIVERY_BINDING, livePolicy: "implicit" }),
   error => error.code === EXIT.DATA && error.message.includes("livePolicy"));
+});
+
+test("intent rejects the removed orchestration handle", () => {
+  assert.throws(() => validateRecord("intent",
+    { ...VALID.intent, workstreamId: "workstream_a" }),
+  error => error.code === EXIT.DATA && error.message.includes("workstreamId"));
 });
 
 test("message artifacts and structured handoffs reject unknown nested fields", () => {

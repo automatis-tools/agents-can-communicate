@@ -6,6 +6,7 @@ import test from "node:test";
 import { COMMANDS } from "@agents-can-communicate/cli";
 import { ATTENTION_PRIORITY, createCoordinationService }
   from "@agents-can-communicate/core";
+import * as coreApi from "@agents-can-communicate/core";
 import { PUBLIC_TOOLS } from "../../packages/mcp-server/src/tools.mjs";
 
 import { createFakeClock, createFakeIds, createMemoryStore } from "../helpers/memory-store.mjs";
@@ -18,7 +19,7 @@ const repo = path.resolve(import.meta.dirname, "..", "..");
  * This has been a recurring defect of the project. Each one
  * was implemented in the core, tested at the core, and reachable from nothing:
  *
- *   markDelivery       so a `requiresAck` message raised an attention item that
+ *   markDelivery       so a reply-required message raised an attention item that
  *                      could never be cleared
  *   nearby_intent      an attention kind with no rule behind it
  *
@@ -96,6 +97,11 @@ test("the internal list stays a list of decisions, not of leftovers", () => {
   // An entry for an operation that no longer exists is a note about nothing, and
   // hides the next one that does need a decision.
   assert.deepEqual(stale, []);
+});
+
+test("the core package exposes no v0.1 acknowledgement heuristic", () => {
+  assert.equal(Object.hasOwn(coreApi, "noteNudge"), false);
+  assert.equal(Object.hasOwn(coreApi, "looksConsequential"), false);
 });
 
 test("an operation an agent needs is offered over MCP as well", async () => {

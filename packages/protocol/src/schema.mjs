@@ -81,7 +81,7 @@ const DURABLE_RECORDS = Object.freeze({
 
   intent: { sessionId: id, workspaceId: id, summary,
     mode: oneOf("observe", "explore", "edit", "review", "coordinate", "wait"),
-    resourceHints: listOf(resourceUri), workstreamId: nullable(id),
+    resourceHints: listOf(resourceUri),
     state: oneOf("active", "blocked", "waiting", "done"), updatedAt: timestamp },
 
   claim: { claimId: id, workspaceId: id, ownerSessionId: id, resource: resourceUri,

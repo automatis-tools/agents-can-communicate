@@ -72,11 +72,11 @@ async function workspace(t, { budgetBytes }) {
   const reader = await loadSessionBinding({ runtimeDir: paths.root,
     harnessSessionId: "reader" });
   let sequence = 0;
-  const send = ({ subject, body, requiresAck = false }) => service.sendMessage({
+  const send = ({ subject, body, replyRequired = false }) => service.sendMessage({
     sessionId: sender.accSessionId, generation: sender.generation,
     clientMessageId: `client_turn_${sequence += 1}`, toParticipantIds: ["reader"],
-    kind: requiresAck ? "question" : "note",
-    obligation: requiresAck ? "reply" : "none", subject, body,
+    kind: replyRequired ? "question" : "note",
+    obligation: replyRequired ? "reply" : "none", subject, body,
   });
   const turn = async () => {
     const child = run(process.execPath, [hook, "claude_code"],
@@ -97,7 +97,7 @@ async function workspace(t, { budgetBytes }) {
 test("a message addressed to you arrives with the id that answers it", async t => {
   const place = await workspace(t, {});
   await place.send({ subject: "The physics review",
-    body: "Which way should the hull clamp?", requiresAck: true });
+    body: "Which way should the hull clamp?", replyRequired: true });
 
   const shown = await place.turn();
 

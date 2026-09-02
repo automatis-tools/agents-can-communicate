@@ -63,7 +63,7 @@ test("intent carries no raw prompt or transcript field", async () => {
   assert.equal("prompt" in intent, false);
   assert.equal("transcript" in intent, false);
   assert.deepEqual(Object.keys(intent).sort(), ["mode", "resourceHints", "schemaVersion",
-    "sessionId", "state", "summary", "updatedAt", "workspaceId", "workstreamId"]);
+    "sessionId", "state", "summary", "updatedAt", "workspaceId"]);
 });
 
 test("an unknown mode or state is rejected", async () => {
