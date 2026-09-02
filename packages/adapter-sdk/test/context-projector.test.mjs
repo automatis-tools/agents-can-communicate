@@ -159,18 +159,18 @@ test("a peer message reaches the projection whole, with the id needed to answer 
   assert.match(rendered, /Need 20 minutes\./);
 });
 
-test("projection metadata offers only complete addressed peer payloads", () => {
+test("projection metadata offers complete addressed and room peer payloads", () => {
   const result = projectContextResult(syncResult({ messages: [
     peerMessage({ messageId: "message_addressed", threadId: "message_addressed",
       body: "small" }),
     peerMessage({ messageId: "message_room", threadId: "message_room",
-      toParticipantIds: [], body: "room history is inbox-only" }),
+      toParticipantIds: [], body: "room history reaches the next turn" }),
     peerMessage({ messageId: "message_overflow", threadId: "message_overflow",
       body: "x".repeat(4_000) }),
-  ] }), { budgetBytes: 650 });
+  ] }), { budgetBytes: 1_000 });
 
-  assert.deepEqual(result.offeredMessageIds, ["message_addressed"]);
-  assert.doesNotMatch(result.text, /room history is inbox-only/);
+  assert.deepEqual(result.offeredMessageIds, ["message_addressed", "message_room"]);
+  assert.match(result.text, /room history reaches the next turn/);
   assert.match(result.text, /acc inbox --message message_overflow/);
 });
 

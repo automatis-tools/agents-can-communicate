@@ -103,6 +103,8 @@ test("an adapter throw observes queued and cannot advance the receipt", async ()
   const events = (await f.store.eventsSince(WORKSPACE, null, 100)).events;
   const failed = events.find(event => event.type === "message.offer_failed");
   assert.equal(failed.payload.safeErrorCode, "transport_error");
+  assert.equal(failed.payload.targetSessionId, f.sessions[0].sessionId);
+  assert.equal(failed.payload.targetGeneration, f.sessions[0].generation);
   assert.equal(JSON.stringify(failed).includes("secret detail"), false);
 });
 
@@ -119,6 +121,8 @@ test("an adapter rejection records safe evidence without advancing the receipt",
   const events = (await f.store.eventsSince(WORKSPACE, null, 100)).events;
   const failed = events.find(event => event.type === "message.offer_failed");
   assert.equal(failed.payload.safeErrorCode, "recipient_busy");
+  assert.equal(failed.payload.targetSessionId, f.sessions[0].sessionId);
+  assert.equal(failed.payload.targetGeneration, f.sessions[0].generation);
   assert.equal(JSON.stringify(failed).includes("secret endpoint detail"), false);
 });
 

@@ -41,6 +41,14 @@ test("false is the default for every capability", () => {
   }
 });
 
+test("the exported capability vocabulary is deeply immutable", () => {
+  assert.equal(Object.isFrozen(CAPABILITY_SHAPE), true);
+  for (const [group, names] of Object.entries(CAPABILITY_SHAPE)) {
+    assert.equal(Object.isFrozen(names), true, `${group} capability names are mutable`);
+    assert.throws(() => names.push("inventedCapability"), TypeError);
+  }
+});
+
 test("a true capability requires an implementation method", () => {
   assert.throws(() => defineAdapter(base({ capabilities: { guards: { beforeWrite: true } } })),
     /guardWrite/);

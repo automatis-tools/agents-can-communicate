@@ -153,7 +153,12 @@ export function createSessionService(ports) {
     // The approved trigger is the SECOND live session, not the first: a lone
     // session must be able to open and close without leaving a trace.
     const live = (await store.ephemeral.list("session")).filter(item => item.state === "open");
-    if (live.length > 1) {
+    // Recheck durable state only after our ephemeral writes. Another process
+    // may have staged the old ephemeral set after our first precheck, committed
+    // materialisation, and retired that set before these puts completed. In
+    // that case this attach is the only ephemeral session left, but it still
+    // has to run the idempotent promotion pass into the now-durable workspace.
+    if (live.length > 1 || await isMaterialised(store, workspaceId)) {
       await materialise(ports, { workspaceId, descriptor: input.descriptor,
         reason: "second_live_session" });
     }

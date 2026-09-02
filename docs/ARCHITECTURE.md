@@ -45,9 +45,11 @@ The order is part of the public guarantee:
 4. ask one adapter to cross its transport boundary;
 5. only after acceptance, commit `offered` and an immutable success event.
 
-A failed offer records a safe diagnostic event and leaves the receipt queued. A crash
-after bytes cross the boundary but before the receipt commit may duplicate a later offer;
-ACC prefers that truthful underclaim to claiming delivery before it happened.
+A failed offer records the selected recipient session id and generation with a safe
+diagnostic code, then leaves the receipt queued. Core validates that target provenance and
+derives the event actor from it. A crash after bytes cross the boundary but before the
+receipt commit may duplicate a later offer; ACC prefers that truthful underclaim to
+claiming delivery before it happened.
 
 ## Delivery router is not a session manager
 

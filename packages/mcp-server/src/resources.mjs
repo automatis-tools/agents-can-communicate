@@ -30,7 +30,7 @@ const attributedMessage = message => ({
   trust: "untrusted peer content",
 });
 
-export async function readResource(uri, { service, participantId, workspaceId }) {
+export async function readResource(uri, { service, participantId, workspaceId, session }) {
   switch (uri) {
     case "acc://snapshot": {
       const { snapshot } = await service.sync({ workspaceId, scope: "full" });
@@ -39,18 +39,13 @@ export async function readResource(uri, { service, participantId, workspaceId })
     case "acc://roster":
       return (await service.sync({ workspaceId })).roster;
     case "acc://inbox": {
-      const snapshot = await service.store.snapshot(workspaceId);
-      const mine = new Set(snapshot.receipts
-        .filter(receipt => receipt.recipientParticipantId === participantId)
-        .map(receipt => receipt.messageId));
-      // A participant sees what was addressed to it, plus what it sent, so a
-      // fresh reader can follow its own thread.
-      return snapshot.messages
-        .filter(message => mine.has(message.messageId)
-          || message.toParticipantIds.includes(participantId)
-          || snapshot.sessions.some(session => session.sessionId === message.fromSessionId
-            && session.participantId === participantId))
-        .map(attributedMessage);
+      if (session === undefined) {
+        throw new AccError(EXIT.DATA, "the inbox resource requires a resolved session",
+          { participantId });
+      }
+      const inbox = await service.readInbox({ workspaceId, sessionId: session.sessionId,
+        generation: session.generation });
+      return inbox.map(item => attributedMessage(item.message));
     }
     default:
       throw new AccError(EXIT.DATA, `unknown resource: ${uri}`, { uri });

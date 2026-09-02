@@ -88,35 +88,60 @@ test("successful offers are generation-bound and receipt states move only forwar
 
 test("a failed offer records only a safe event and leaves the receipt queued", async () => {
   const { service, store } = makeService();
-  const { sender } = await trio(service);
+  const { sender, recipient, other } = await trio(service);
   const message = await service.sendMessage(direct(sender));
 
+  await assert.rejects(service.recordOfferFailed({ messageId: message.messageId,
+    recipientParticipantId: "recipient", targetSessionId: other.sessionId,
+    targetGeneration: other.generation, transport: "test-transport", adapterId: "test",
+    clientVersion: "1.0.0", safeErrorCode: "transport_error" }),
+  error => error.code === EXIT.CONFLICT);
+  await assert.rejects(service.recordOfferFailed({ messageId: message.messageId,
+    recipientParticipantId: "recipient", targetSessionId: recipient.sessionId,
+    targetGeneration: "generation_stale", transport: "test-transport", adapterId: "test",
+    clientVersion: "1.0.0", safeErrorCode: "transport_error" }),
+  error => error.code === EXIT.CONFLICT);
   const event = await service.recordOfferFailed({ messageId: message.messageId,
-    recipientParticipantId: "recipient", actorSessionId: sender.sessionId,
+    recipientParticipantId: "recipient", targetSessionId: recipient.sessionId,
+    targetGeneration: recipient.generation,
     transport: "test-transport", adapterId: "test", clientVersion: "1.0.0",
     safeErrorCode: "transport_error" });
 
   assert.equal(event.type, "message.offer_failed");
+  assert.equal(event.actorSessionId, recipient.sessionId);
+  assert.equal(event.payload.targetSessionId, recipient.sessionId);
+  assert.equal(event.payload.targetGeneration, recipient.generation);
   assert.equal((await store.snapshot(WORKSPACE)).receipts[0].state, "queued");
   await assert.rejects(service.recordOfferFailed({ messageId: message.messageId,
-    recipientParticipantId: "recipient", actorSessionId: sender.sessionId,
+    recipientParticipantId: "recipient", targetSessionId: recipient.sessionId,
+    targetGeneration: recipient.generation,
     transport: "test-transport", adapterId: "test", clientVersion: "1.0.0",
     safeErrorCode: "peer said: secret token" }), error => error.code === EXIT.DATA);
 });
 
-test("a room receipt is inbox-only and cannot become a live offer", async () => {
-  const { service } = makeService();
+test("a room receipt accepts only a certified next-turn offer", async () => {
+  const { service, store } = makeService();
   const { sender, recipient } = await trio(service);
   const room = await service.sendMessage({ ...owner(sender),
     clientMessageId: "client_room_note", toParticipantIds: [], kind: "note",
-    obligation: "none", subject: "Room", body: "Inbox history for current peers." });
+    obligation: "none", subject: "Room", body: "Next-turn note for current peers." });
 
   await assert.rejects(service.recordOfferSucceeded({ messageId: room.messageId,
     recipientParticipantId: "recipient", targetSessionId: recipient.sessionId,
     targetGeneration: recipient.generation, transport: "test-transport", adapterId: "test",
     clientVersion: "1.0.0" }), error => error.code === EXIT.CONFLICT && /room/.test(error.message));
+  const offered = await service.recordOfferSucceeded({ messageId: room.messageId,
+    recipientParticipantId: "recipient", targetSessionId: recipient.sessionId,
+    targetGeneration: recipient.generation, transport: "next-turn", adapterId: "test",
+    clientVersion: "1.0.0" });
+  assert.equal(offered.state, "offered");
+  const event = (await store.eventsSince(WORKSPACE, null, 100)).events
+    .find(item => item.type === "message.offer_succeeded"
+      && item.payload.messageId === room.messageId);
+  assert.equal(event.payload.transport, "next-turn");
   await assert.rejects(service.recordOfferFailed({ messageId: room.messageId,
-    recipientParticipantId: "recipient", actorSessionId: sender.sessionId,
+    recipientParticipantId: "recipient", targetSessionId: recipient.sessionId,
+    targetGeneration: recipient.generation,
     transport: "test-transport", adapterId: "test", clientVersion: "1.0.0",
     safeErrorCode: "transport_error" }),
   error => error.code === EXIT.CONFLICT && /room/.test(error.message));

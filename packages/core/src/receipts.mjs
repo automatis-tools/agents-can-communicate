@@ -18,40 +18,51 @@ function missingReceipt(messageId, recipientParticipantId) {
     { messageId, recipientParticipantId });
 }
 
-function requireAddressedReceipt(tx, messageId, recipientParticipantId) {
+function requireReceipt(tx, messageId, recipientParticipantId) {
   const receipt = tx.get("receipt", receiptId(messageId, recipientParticipantId));
   if (receipt === null) throw missingReceipt(messageId, recipientParticipantId);
   const message = tx.get("message", messageId);
-  if (message === null || message.toParticipantIds.length === 0) {
+  if (message === null) throw missingReceipt(messageId, recipientParticipantId);
+  return { message, receipt };
+}
+
+function requireOfferableReceipt(tx, input, { allowRoomNextTurn }) {
+  const found = requireReceipt(tx, input.messageId, input.recipientParticipantId);
+  if (found.message.toParticipantIds.length === 0
+    && (!allowRoomNextTurn || input.transport !== "next-turn")) {
     throw new AccError(EXIT.CONFLICT, "room messages are not eligible for live offers",
-      { messageId, recipientParticipantId });
+      { messageId: input.messageId, recipientParticipantId: input.recipientParticipantId });
   }
-  return receipt;
+  return found.receipt;
+}
+
+function requireTarget(tx, input, { mustBeOpen }) {
+  const target = tx.get("session", input.targetSessionId);
+  if (target === null || (mustBeOpen && target.state !== "open")
+    || target.participantId !== input.recipientParticipantId
+    || target.generation !== input.targetGeneration) {
+    throw new AccError(EXIT.CONFLICT,
+      "the offer target is not this recipient's session generation",
+      { targetSessionId: input.targetSessionId,
+        recipientParticipantId: input.recipientParticipantId });
+  }
+  return target;
 }
 
 export function createReceiptService(ports) {
   const { store, clock, ids } = ports;
 
   async function readReceipt(input) {
-    return store.transaction(tx => requireAddressedReceipt(tx, input.messageId,
-      input.recipientParticipantId), { kinds: ["message", "receipt"] });
+    return store.transaction(tx => requireReceipt(tx, input.messageId,
+      input.recipientParticipantId).receipt, { kinds: ["message", "receipt"] });
   }
 
   async function recordOfferSucceeded(input) {
     const now = clock.now();
     return store.transaction(tx => {
       const id = receiptId(input.messageId, input.recipientParticipantId);
-      const receipt = requireAddressedReceipt(tx, input.messageId,
-        input.recipientParticipantId);
-      const target = tx.get("session", input.targetSessionId);
-      if (target === null || target.state !== "open"
-        || target.participantId !== input.recipientParticipantId
-        || target.generation !== input.targetGeneration) {
-        throw new AccError(EXIT.CONFLICT,
-          "the offer target is not this recipient's open session generation",
-          { targetSessionId: input.targetSessionId,
-            recipientParticipantId: input.recipientParticipantId });
-      }
+      const receipt = requireOfferableReceipt(tx, input, { allowRoomNextTurn: true });
+      const target = requireTarget(tx, input, { mustBeOpen: true });
       // A retrieval or acknowledgement may win after a transport accepted but
       // before this transaction acquired the writer. That stronger truth must
       // remain in place. The same rule makes a repeated successful commit a
@@ -80,16 +91,18 @@ export function createReceiptService(ports) {
     }
     const now = clock.now();
     return store.transaction(tx => {
-      const receipt = requireAddressedReceipt(tx, input.messageId,
-        input.recipientParticipantId);
+      const receipt = requireOfferableReceipt(tx, input, { allowRoomNextTurn: false });
+      const target = requireTarget(tx, input, { mustBeOpen: false });
       return tx.append({ schemaVersion: SCHEMA_VERSION, eventId: ids.next("event"),
-        workspaceId: receipt.workspaceId, actorSessionId: input.actorSessionId,
+        workspaceId: receipt.workspaceId, actorSessionId: target.sessionId,
         type: "message.offer_failed", occurredAt: now,
         payload: { messageId: input.messageId,
           recipientParticipantId: input.recipientParticipantId,
+          targetSessionId: target.sessionId,
+          targetGeneration: target.generation,
           transport: input.transport, adapterId: input.adapterId,
           clientVersion: input.clientVersion, safeErrorCode: input.safeErrorCode } });
-    }, { kinds: ["message", "receipt"] });
+    }, { kinds: ["session", "message", "receipt"] });
   }
 
   return { readReceipt, recordOfferSucceeded, recordOfferFailed };

@@ -3,10 +3,11 @@ import path from "node:path";
 import { AccError, EXIT } from "@agents-can-communicate/protocol";
 
 export const CAPABILITY_SHAPE = Object.freeze({
-  lifecycle: ["sessionStart", "sessionResume", "sessionEnd", "heartbeat", "childSessions"],
-  context: ["startupInjection", "beforeTurnInjection", "safePointInjection"],
-  guards: ["beforeRead", "beforeWrite", "beforeShell"],
-  delivery: ["nextTurn", "livePush", "replyRoute"],
+  lifecycle: Object.freeze(["sessionStart", "sessionResume", "sessionEnd", "heartbeat",
+    "childSessions"]),
+  context: Object.freeze(["startupInjection", "beforeTurnInjection", "safePointInjection"]),
+  guards: Object.freeze(["beforeRead", "beforeWrite", "beforeShell"]),
+  delivery: Object.freeze(["nextTurn", "livePush", "replyRoute"]),
 });
 
 const REQUIRED_TEXT = Object.freeze(["client", "version", "platform", "observedAt",
