@@ -1,38 +1,11 @@
 import { spawn } from "node:child_process";
 import readline from "node:readline";
 
-const STDERR_LIMIT = 16 * 1024;
-const REQUIRED_CAPTURE_FIELDS = [
-  "client",
-  "version",
-  "platform",
-  "observedAt",
-  "capability",
-  "result",
-  "fixture",
-  "idle",
-  "busy",
-  "reply",
-  "duplicate",
-  "fallback",
-  "limitations",
-];
+// The capture contract moved to its own module; older spike callers still
+// import the validator from here until Task 3 rewrites them.
+export { validateCapture } from "./delivery-capture.mjs";
 
-const PASS_BRANCHES = {
-  idle: ["offered", "a passing capture requires idle behavior"],
-  busy: ["not_interrupted", "a passing capture requires busy behavior"],
-  reply: ["routed", "a passing capture requires reply behavior"],
-  duplicate: ["same_message_id", "a passing capture requires duplicate behavior"],
-  fallback: ["queued", "a passing capture requires fallback behavior"],
-};
-const STRING_CAPTURE_FIELDS = [
-  "client",
-  "version",
-  "platform",
-  "observedAt",
-  "capability",
-  "fixture",
-];
+const STDERR_LIMIT = 16 * 1024;
 
 export function openJsonRpcPeer({ command, args = [], env, timeoutMs }) {
   const child = spawn(command, args, {
@@ -128,36 +101,4 @@ export function openJsonRpcPeer({ command, args = [], env, timeoutMs }) {
   }
 
   return { request, notify, notifications, close };
-}
-
-export function validateCapture(value) {
-  if (!value || typeof value !== "object" || Array.isArray(value)) {
-    throw new Error("capture is an object");
-  }
-  for (const key of REQUIRED_CAPTURE_FIELDS) {
-    if (!Object.hasOwn(value, key)) throw new Error(`capture requires ${key}`);
-  }
-  for (const key of STRING_CAPTURE_FIELDS) {
-    if (typeof value[key] !== "string" || value[key].trim() === "") {
-      throw new Error(`capture ${key} is a non-empty string`);
-    }
-  }
-  if (!new Set(["pass", "fail"]).has(value.result)) {
-    throw new Error("capture result is pass or fail");
-  }
-  if (!Array.isArray(value.limitations) || value.limitations.length === 0
-    || value.limitations.some((item) => typeof item !== "string" || item.trim() === "")) {
-    throw new Error("capture limitations is a non-empty array of non-empty strings");
-  }
-  if (value.result === "pass") {
-    for (const [key, [expected, error]] of Object.entries(PASS_BRANCHES)) {
-      if (value[key] !== expected) throw new Error(error);
-    }
-  }
-  for (const [key, [observed]] of Object.entries(PASS_BRANCHES)) {
-    if (!new Set([observed, "unobserved"]).has(value[key])) {
-      throw new Error(`capture ${key} is ${observed} or unobserved`);
-    }
-  }
-  return Object.freeze({ ...value });
 }
