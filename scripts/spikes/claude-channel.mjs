@@ -44,7 +44,14 @@ const pendingOffers = [];
 let initialized = false;
 let closing = false;
 
+// macOS limits a Unix socket path to 104 bytes (sun_path); a longer path fails
+// at listen with EINVAL before the endpoint is ever registered.
+if (Buffer.byteLength(socketPath) >= 104) {
+  fail("ACC_CHANNEL_CAPTURE_DIR is too long for a Unix socket path (keep it under 90 bytes)");
+}
+
 const socketServer = net.createServer(handleConnection);
+socketServer.on("error", (error) => fail(`endpoint could not listen: ${error.code ?? "error"}`));
 process.umask(0o177);
 socketServer.listen(socketPath, () => {
   chmodSync(socketPath, 0o600);

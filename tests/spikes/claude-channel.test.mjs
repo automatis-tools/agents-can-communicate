@@ -234,11 +234,13 @@ test("the channel refuses a capture directory it cannot trust", async () => {
   const loose = mkdtempSync(path.join(os.tmpdir(), "acc-channel-loose-"));
   chmodSync(loose, 0o755);
   try {
+    const long = mkdtempSync(path.join(os.tmpdir(), `acc-channel-${"long-".repeat(20)}`));
     for (const [dir, pattern] of [
       [inRepo, /must be outside the repository/],
       [loose, /private user-owned directory/],
       ["relative/dir", /is absolute/],
       [path.join(os.tmpdir(), "acc-channel-missing-dir"), /must exist/],
+      [long, /too long for a Unix socket path/],
     ]) {
       const result = await runRejectedChannel({ ACC_CHANNEL_CAPTURE_DIR: dir });
       assert.equal(result.code, 2, dir);
@@ -248,6 +250,7 @@ test("the channel refuses a capture directory it cannot trust", async () => {
   } finally {
     rmSync(inRepo, { recursive: true, force: true });
     rmSync(loose, { recursive: true, force: true });
+    rmSync(path.join(os.tmpdir(), `acc-channel-${"long-".repeat(20)}`), { recursive: true, force: true });
   }
 });
 
