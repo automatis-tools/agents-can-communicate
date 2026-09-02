@@ -54,17 +54,37 @@ test("replace publication updates materialised state in place", async t => {
   assert.equal(await readFile(destination, "utf8"), "second\n");
 });
 
-test("immutable publication retains temporary links rather than unlinking by path", async t => {
+test("immutable retries and conflicts retain one accepted staging file", async t => {
   const { tmpDir, records, options } = await fixture(t);
   const destination = path.join(records, "evidence.json");
   await publishAtomic(destination, bytes("original"), options);
-  await assert.rejects(publishAtomic(destination, bytes("other"), options),
-    error => error.code === EXIT.CONFLICT);
+  for (let attempt = 0; attempt < 32; attempt += 1) {
+    assert.equal(await publishAtomic(destination, bytes("original"), options),
+      "already_published");
+    await assert.rejects(publishAtomic(destination, bytes(`rejected-${attempt}`), options),
+      error => error.code === EXIT.CONFLICT);
+  }
 
   const retained = await readdir(tmpDir);
-  assert.equal(retained.length, 2);
-  assert.deepEqual((await Promise.all(retained.map(file => readFile(path.join(tmpDir, file),
-    "utf8")))).sort(), ["original\n", "other\n"]);
+  assert.equal(retained.length, 1);
+  assert.deepEqual(await Promise.all(retained.map(file => readFile(path.join(tmpDir, file),
+    "utf8"))), ["original\n"]);
+});
+
+test("concurrent immutable conflicts retain only the published bytes", async t => {
+  const { tmpDir, records, options } = await fixture(t);
+  const destination = path.join(records, "evidence.json");
+  const outcomes = await Promise.allSettled(Array.from({ length: 16 }, (_, index) =>
+    publishAtomic(destination, bytes(`candidate-${index}`), options)));
+
+  assert.equal(outcomes.filter(outcome => outcome.status === "fulfilled").length, 1);
+  assert.equal(outcomes.filter(outcome => outcome.status === "rejected"
+    && outcome.reason.code === EXIT.CONFLICT).length, 15);
+  const published = await readFile(destination);
+  const retained = await readdir(tmpDir);
+  assert.equal(retained.length, 1);
+  assert.equal((await readFile(path.join(tmpDir, retained[0]))).equals(published), true,
+    "staging retained bytes rejected by the destination");
 });
 
 test("publication rejects a symlinked destination directory", async t => {
