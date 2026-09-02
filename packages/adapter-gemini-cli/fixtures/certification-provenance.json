@@ -1,0 +1,66 @@
+{
+  "schemaVersion": 1,
+  "captures": [
+    {
+      "id": "session-start", "client": "gemini-cli", "version": "0.37.0",
+      "platform": "darwin-arm64", "observedAt": "2026-08-16",
+      "fixture": "fixtures/SessionStart.json",
+      "sha256": "30ee33373127ebedea181f743dc606a193911f6a259d58ef4cdedffc09512ad3",
+      "event": "SessionStart", "tool": null,
+      "claims": [{ "capability": "lifecycle.sessionStart", "result": "pass",
+        "outcome": { "kind": "event-observed", "idle": "fires when a session starts",
+          "busy": "fires before the first model turn", "authority": "advisory",
+          "limitations": ["capture used temporary project settings"] } }]
+    },
+    {
+      "id": "session-end", "client": "gemini-cli", "version": "0.37.0",
+      "platform": "darwin-arm64", "observedAt": "2026-08-16",
+      "fixture": "fixtures/SessionEnd.json",
+      "sha256": "e4a61680c96b4d1a921a142e29b34b667cd843cfb27f361c05efb07dfea75796",
+      "event": "SessionEnd", "tool": null,
+      "claims": [{ "capability": "lifecycle.sessionEnd", "result": "pass",
+        "outcome": { "kind": "event-observed", "idle": "fires when a session exits",
+          "busy": "does not run until the session exits", "authority": "advisory",
+          "limitations": ["handoff must be written before session end"] } }]
+    },
+    {
+      "id": "before-agent", "client": "gemini-cli", "version": "0.37.0",
+      "platform": "darwin-arm64", "observedAt": "2026-08-16",
+      "fixture": "fixtures/BeforeAgent.json",
+      "sha256": "87e1baebbf94ecd7d6a56d92a594a095f20d893bcde7e46ad053f164855528d5",
+      "event": "BeforeAgent", "tool": null,
+      "claims": [
+        { "capability": "context.beforeTurnInjection", "result": "pass",
+          "outcome": { "kind": "model-context-observed", "idle": "waits for the next user prompt",
+            "busy": "does not interrupt an in-progress turn", "authority": "context",
+            "limitations": ["requires the hookSpecificOutput additionalContext envelope"] } },
+        { "capability": "delivery.nextTurn", "result": "pass",
+          "outcome": { "kind": "model-context-observed", "idle": "offers complete peer messages at the next prompt",
+            "busy": "does not interrupt an in-progress turn", "authority": "context",
+            "limitations": ["delivery requires the next normal user turn"] } }
+      ]
+    },
+    {
+      "id": "before-tool-write", "client": "gemini-cli", "version": "0.37.0",
+      "platform": "darwin-arm64", "observedAt": "2026-08-16",
+      "fixture": "fixtures/BeforeTool.json",
+      "sha256": "23c08aaf65f4b3bc060e99fdb7fab0c2db7242a0fc0e86b6dea02e85e8b1383c",
+      "event": "BeforeTool", "tool": "write_file",
+      "claims": [{ "capability": "guards.beforeWrite", "result": "pass",
+        "outcome": { "kind": "tool-denied-before-mutation", "idle": "no write exists to guard",
+          "busy": "blocks write_file before mutation", "authority": "blocking",
+          "limitations": ["write tools are unavailable in plan mode"] } }]
+    },
+    {
+      "id": "before-tool-shell", "client": "gemini-cli", "version": "0.37.0",
+      "platform": "darwin-arm64", "observedAt": "2026-08-16",
+      "fixture": "fixtures/BeforeTool-shell.json",
+      "sha256": "05dc4f6fb0aa6fa59a195fbbb4faf0c05db8cb12ce6098c6a1bba3b62065a285",
+      "event": "BeforeTool", "tool": "run_shell_command",
+      "claims": [{ "capability": "guards.beforeShell", "result": "pass",
+        "outcome": { "kind": "tool-denied-before-execution", "idle": "no shell call exists to guard",
+          "busy": "blocks run_shell_command before execution", "authority": "blocking",
+          "limitations": ["shell tools depend on approval mode"] } }]
+    }
+  ]
+}

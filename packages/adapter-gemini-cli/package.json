@@ -8,7 +8,12 @@
   },
   "files": [
     "certification.json",
-    "fixtures/",
+    "fixtures/certification-provenance.json",
+    "fixtures/SessionStart.json",
+    "fixtures/SessionEnd.json",
+    "fixtures/BeforeAgent.json",
+    "fixtures/BeforeTool.json",
+    "fixtures/BeforeTool-shell.json",
     "src/",
     "extension/"
   ]
