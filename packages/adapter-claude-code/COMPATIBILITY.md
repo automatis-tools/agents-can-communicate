@@ -135,3 +135,10 @@ uses stdio for MCP, and accepts one bounded envelope on a mode-`0600` Unix-domai
 outside the repository, but those properties are implementation boundaries rather than
 real-client certification. No native delivery capability is certified by this evidence.
 The redacted capture is under `fixtures/delivery/`.
+
+The shipped adapter therefore keeps `delivery.livePush` and `delivery.replyRoute` false.
+`acc install --adapter claude_code --delivery actionable` (or `all`) reports the failed
+capture, keeps the effective policy `off`, and installs no Channel MCP entry. The default
+is also `off`. Messages remain durable for the certified 2.1.233 next-turn hook or for
+explicit recovery through `acc inbox`; an unknown or uncertified version retains the inbox
+path without being promoted to next-turn support. `acc doctor` reports the same boundary.

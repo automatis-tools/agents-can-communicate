@@ -122,6 +122,9 @@ export function describeOutcome({ action, acted, failed = [], skipped = [],
     + (failed.length > 0 ? `; ${failed.length} failed` : ""),
   ...operations.filter(operation => operation.applied)
     .flatMap(operation => describeChanges(operation, home)),
+  ...operations.filter(operation => operation.applied
+    && typeof operation.deliveryDiagnostic === "string")
+    .map(operation => `  ${operation.deliveryDiagnostic}`),
   ...skipped.map(entry => `  skip ${entry.adapterId}: ${entry.reason}`),
   ...failed.map(entry => `  ${entry.adapterId}: ${entry.error}`),
   // Said once, where it is needed: the reader has just been shown a list of

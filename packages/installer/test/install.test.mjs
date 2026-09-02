@@ -217,6 +217,8 @@ test("unsupported adapters receive off and report durable fallback", async t => 
   const adapter = {
     id: "durable_fixture", displayName: "Durable Fixture",
     capabilities: { delivery: { livePush: false } },
+    deliveryFallback: { diagnostic:
+      "Durable Fixture capture stopped at its trust warning; use next-turn or inbox" },
     planInstall: () => [],
     install: async installContext => {
       appliedContext = installContext;
@@ -229,11 +231,12 @@ test("unsupported adapters receive off and report durable fallback", async t => 
 
   assert.equal(plan.operations[0].livePolicy, "all");
   assert.equal(plan.operations[0].effectiveLivePolicy, "off");
-  assert.match(plan.operations[0].deliveryDiagnostic, /durable fallback/);
+  assert.equal(plan.operations[0].deliveryDiagnostic,
+    "Durable Fixture capture stopped at its trust warning; use next-turn or inbox");
   const result = await applyPlan({ plan, adapters: [adapter], context, dataHome });
   assert.equal(appliedContext.requestedLivePolicy, "all");
   assert.equal(appliedContext.livePolicy, "off");
-  assert.match(result.operations[0].diagnostics.join("\n"), /durable fallback/);
+  assert.match(result.operations[0].diagnostics.join("\n"), /capture stopped/);
 });
 
 test("an unknown delivery policy is refused rather than treated as opt-in", async t => {

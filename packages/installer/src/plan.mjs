@@ -90,7 +90,8 @@ export function planInstallation({ adapters, detected, context, action = "instal
     const effectiveLivePolicy = liveDeliverySupported ? delivery : "off";
     const deliveryDiagnostic = action === "install" && delivery !== "off"
       && !liveDeliverySupported
-      ? `${adapter.displayName ?? adapter.id} has no certified live delivery for this client; durable fallback remains active`
+      ? entry.deliveryDiagnostic ?? adapter.deliveryFallback?.diagnostic
+        ?? `${adapter.displayName ?? adapter.id} has no certified live delivery for this client; durable fallback remains active`
       : null;
     const installContext = { ...context, requestedLivePolicy: delivery,
       livePolicy: effectiveLivePolicy };
