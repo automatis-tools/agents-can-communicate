@@ -1,95 +1,258 @@
 import assert from "node:assert/strict";
-import { spawn } from "node:child_process";
 import { chmodSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
-import net from "node:net";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
 
+import { MINIMUM_VERSION, PROTOCOL_CONTRACT, addCodexQueueMessage, compareStableVersions,
+  evaluateClientVersion, locateCodexThread, probeCodexQueue, runCodexQueueCapture }
+  from "../../scripts/spikes/codex-existing-session.mjs";
+import { runProcess } from "../helpers/claude-channel.mjs";
+
+// Kept cohesive above 300 lines because every case drives the same disposable
+// queue probe against one fake App Server; splitting would duplicate the peer.
+
 const repoRoot = fileURLToPath(new URL("../..", import.meta.url));
 const captureScript = path.join(repoRoot, "scripts", "spikes", "codex-existing-session.mjs");
+const THREAD = "thread-native-capture";
+const CWD = "/work/capture";
+const SECRET_PREVIEW = "SECRET-PREVIEW-4d2c must never surface";
 
-for (const userAgent of [
-  "codex_app_server/0.152.0-beta.1",
-  "codex_app_server/0.152.0.1",
-]) {
-  test(`the Codex capture rejects non-exact app-server version ${userAgent}`, async () => {
-    const fixture = await startFixture(userAgent);
-    try {
-      const result = await runCapture(fixture);
-      assert.equal(result.code, 0, result.stderr);
-      const capture = JSON.parse(result.stdout);
-      assert.equal(capture.result, "fail");
-      assert.equal(
-        capture.limitations[0],
-        "running app-server version did not match codex-cli 0.152.0",
-      );
-    } finally {
-      await fixture.close();
-    }
-  });
+function rpcError(code, message) {
+  return Object.assign(new Error(message), { code });
 }
 
-async function startFixture(userAgent) {
-  const tempDir = mkdtempSync(path.join(os.tmpdir(), "acc-codex-spike-"));
-  const socketPath = path.join(tempDir, "control.sock");
-  const command = path.join(tempDir, "fake-codex.mjs");
-  writeFileSync(command, `#!/usr/bin/env node
-import readline from "node:readline";
-if (process.argv[2] === "--version") {
-  process.stdout.write("codex-cli 0.152.0\\n");
-  process.exit(0);
-}
-const input = readline.createInterface({ input: process.stdin });
-input.on("line", (line) => {
-  const message = JSON.parse(line);
-  const result = message.method === "initialize"
-    ? { userAgent: process.env.FAKE_CODEX_USER_AGENT }
-    : { data: [] };
-  process.stdout.write(JSON.stringify({ jsonrpc: "2.0", id: message.id, result }) + "\\n");
-});
-`, { mode: 0o700 });
-  chmodSync(command, 0o700);
-  const server = net.createServer();
-  await new Promise((resolve, reject) => {
-    server.once("error", reject);
-    server.listen(socketPath, resolve);
-  });
+function fakePeer({ userAgent = "codex_app_server/0.152.1 (Mac OS 26.6.2; arm64)",
+  loaded = [THREAD], threads = [thread(THREAD, CWD)], queueSupported = true,
+  queue = [], transportError = null } = {}) {
+  const calls = [];
+  const state = { queue: queue.map(item => ({ ...item })) };
   return {
-    command,
-    socketPath,
-    userAgent,
-    async close() {
-      await new Promise((resolve) => server.close(resolve));
-      rmSync(tempDir, { recursive: true, force: true });
+    calls, state, notifications: [],
+    notify(method, params) { calls.push({ method, params, notification: true }); },
+    async request(method, params) {
+      calls.push({ method, params });
+      if (transportError) throw transportError;
+      switch (method) {
+        case "initialize":
+          return { userAgent, codexHome: "/home/x/.codex", platformFamily: "unix",
+            platformOs: "macos" };
+        case "thread/loaded/list": return { data: loaded, nextCursor: null };
+        case "thread/list": return { data: threads, nextCursor: null };
+        case "thread/queue/list":
+          if (!queueSupported) throw rpcError(-32601, "Method not found");
+          if (!threads.some(item => item.id === params.threadId)) {
+            throw rpcError(-32602, "thread not found");
+          }
+          return { data: state.queue.filter(item => item.threadId === params.threadId)
+            .map(({ threadId, ...item }) => item), nextCursor: null };
+        case "thread/queue/add": {
+          if (!queueSupported) throw rpcError(-32601, "Method not found");
+          const item = { threadId: params.threadId, id: `qs_${state.queue.length + 1}`,
+            clientUserMessageId: params.clientUserMessageId, input: params.input };
+          state.queue.push(item);
+          const { threadId, ...queuedSubmission } = item;
+          return { queuedSubmission };
+        }
+        default: throw rpcError(-32601, `Method not found: ${method}`);
+      }
     },
+    async close() {},
   };
 }
 
-function runCapture(fixture) {
-  return new Promise((resolve) => {
-    const child = spawn(
-      process.execPath,
-      [captureScript, "--thread", "thread_existing", "--message", "message_1",
-        "--cwd", repoRoot],
-      {
-        cwd: repoRoot,
-        env: {
-          ...process.env,
-          ACC_CODEX_SPIKE_COMMAND: fixture.command,
-          ACC_CODEX_APP_SERVER_SOCKET: fixture.socketPath,
-          FAKE_CODEX_USER_AGENT: fixture.userAgent,
-        },
-        stdio: ["ignore", "pipe", "pipe"],
-      },
-    );
-    let stdout = "";
-    let stderr = "";
-    child.stdout.setEncoding("utf8");
-    child.stderr.setEncoding("utf8");
-    child.stdout.on("data", (chunk) => { stdout += chunk; });
-    child.stderr.on("data", (chunk) => { stderr += chunk; });
-    child.once("exit", (code) => resolve({ code, stdout, stderr }));
-  });
+function thread(id, cwd, status = { type: "idle" }) {
+  return { id, cwd, status, preview: SECRET_PREVIEW, canAcceptDirectInput: true,
+    sessionId: id, cliVersion: "0.152.1" };
 }
+
+const capture = (peer, overrides = {}) => runCodexQueueCapture({ peer, clientVersion: "0.152.1",
+  threadId: THREAD, cwd: CWD, messageId: "message_1", text: "untrusted body", ...overrides });
+
+test("the minimum admits equal or newer stable versions and nothing else", () => {
+  assert.equal(MINIMUM_VERSION, "0.152.1");
+  assert.deepEqual(evaluateClientVersion("0.152.1", "0.152.1"), { ok: true, reasonCode: null });
+  assert.deepEqual(evaluateClientVersion("0.160.0", "0.152.1"), { ok: true, reasonCode: null });
+  assert.deepEqual(evaluateClientVersion("1.0.0", "0.152.1"), { ok: true, reasonCode: null });
+  assert.deepEqual(evaluateClientVersion("0.152.0", "0.152.1"),
+    { ok: false, reasonCode: "below_minimum_version" });
+  assert.deepEqual(evaluateClientVersion("0.153.0-beta.1", "0.152.1"),
+    { ok: false, reasonCode: "prerelease_not_captured" });
+  assert.deepEqual(evaluateClientVersion("0.152.0.1", "0.152.1"),
+    { ok: false, reasonCode: "prerelease_not_captured" });
+  assert.deepEqual(evaluateClientVersion("unavailable", "0.152.1"),
+    { ok: false, reasonCode: "version_unavailable" });
+  assert.equal(compareStableVersions("0.10.0", "0.9.99"), 1);
+  assert.equal(compareStableVersions("2.0.0", "10.0.0"), -1);
+  assert.equal(compareStableVersions("0.152.1", "0.152.1"), 0);
+});
+
+test("the probe rejects an app server that does not speak the captured queue protocol",
+  async () => {
+    const stale = fakePeer({ queueSupported: false });
+    assert.deepEqual(await probeCodexQueue(stale, { clientVersion: "0.152.1", threadId: THREAD }),
+      { supported: false, clientVersion: "0.152.1", serverVersion: "0.152.1",
+        protocolContract: PROTOCOL_CONTRACT, modes: [], reasonCode: "protocol_mismatch" });
+    const older = fakePeer({ userAgent: "codex_app_server/0.152.0 (Mac OS)" });
+    assert.equal((await probeCodexQueue(older, { clientVersion: "0.152.1", threadId: THREAD }))
+      .reasonCode, "below_minimum_version");
+    const mismatch = fakePeer({ userAgent: "codex_app_server/0.153.0 (Mac OS)" });
+    assert.equal((await probeCodexQueue(mismatch, { clientVersion: "0.152.1", threadId: THREAD }))
+      .reasonCode, "server_version_mismatch");
+    const pre = fakePeer({ userAgent: "codex_app_server/0.153.0-alpha.1 (Mac OS)" });
+    assert.equal((await probeCodexQueue(pre, { clientVersion: "0.153.0-alpha.1", threadId: THREAD }))
+      .reasonCode, "prerelease_not_captured");
+  });
+
+test("a supported probe reports the driver-facing closed result", async () => {
+  const peer = fakePeer();
+  assert.deepEqual(await probeCodexQueue(peer, { clientVersion: "0.152.1", threadId: THREAD }), {
+    supported: true,
+    clientVersion: "0.152.1",
+    serverVersion: "0.152.1",
+    protocolContract: PROTOCOL_CONTRACT,
+    modes: ["livePush", "idleWake", "busyQueue"],
+    reasonCode: null,
+  });
+  assert.deepEqual(peer.calls[0], { method: "initialize", params: {
+    clientInfo: { name: "acc-native-delivery-capture", version: "0.0.0" },
+    capabilities: { experimentalApi: true } } });
+  assert.deepEqual(peer.calls[1], { method: "initialized", params: {}, notification: true });
+  assert.deepEqual(peer.calls[2], { method: "thread/queue/list", params: { threadId: THREAD } });
+});
+
+test("the exact thread is discovered from loaded state rather than guessed", async () => {
+  const peer = fakePeer({ loaded: ["thread-other", THREAD],
+    threads: [thread("thread-other", "/work/other"), thread(THREAD, CWD)] });
+  assert.deepEqual(await locateCodexThread(peer, { threadId: THREAD, cwd: CWD }),
+    { found: true, threadId: THREAD, status: "idle" });
+  assert.deepEqual(await locateCodexThread(peer, { threadId: "thread-missing", cwd: CWD }),
+    { found: false, reasonCode: "thread_not_loaded" });
+  assert.deepEqual(await locateCodexThread(peer, { threadId: THREAD, cwd: "/work/elsewhere" }),
+    { found: false, reasonCode: "cwd_mismatch" });
+  const unlisted = fakePeer({ loaded: [THREAD], threads: [] });
+  assert.deepEqual(await locateCodexThread(unlisted, { threadId: THREAD, cwd: CWD }),
+    { found: false, reasonCode: "thread_not_found" });
+  const busy = fakePeer({ threads: [thread(THREAD, CWD, { type: "active", activeFlags: [] })] });
+  assert.deepEqual(await locateCodexThread(busy, { threadId: THREAD, cwd: CWD }),
+    { found: true, threadId: THREAD, status: "active" });
+});
+
+test("a queue addition carries the captured shape and the stable message id", async () => {
+  const peer = fakePeer();
+  const result = await addCodexQueueMessage(peer, { threadId: THREAD, messageId: "message_1",
+    text: "untrusted body" });
+  assert.deepEqual(result, { accepted: true, duplicate: false, queuedSubmissionId: "qs_1",
+    clientUserMessageId: "message_1" });
+  const add = peer.calls.find(call => call.method === "thread/queue/add");
+  assert.deepEqual(add.params, { threadId: THREAD,
+    input: [{ type: "text", text: "untrusted body" }], clientUserMessageId: "message_1" });
+});
+
+test("a retry preserves the client message id and is the same offer", async () => {
+  const peer = fakePeer();
+  const first = await addCodexQueueMessage(peer, { threadId: THREAD, messageId: "message_1",
+    text: "untrusted body" });
+  const second = await addCodexQueueMessage(peer, { threadId: THREAD, messageId: "message_1",
+    text: "untrusted body" });
+  assert.equal(first.duplicate, false);
+  assert.deepEqual(second, { accepted: true, duplicate: true, queuedSubmissionId: "qs_1",
+    clientUserMessageId: "message_1" });
+  assert.equal(peer.state.queue.length, 1);
+  const adds = peer.calls.filter(call => call.method === "thread/queue/add");
+  assert.deepEqual(adds.map(call => call.params.clientUserMessageId), ["message_1"]);
+});
+
+test("a duplicate acknowledgement from the server is the same offer", async () => {
+  const peer = fakePeer({ queue: [{ threadId: THREAD, id: "qs_existing",
+    clientUserMessageId: "message_1", input: [{ type: "text", text: "earlier" }] }] });
+  const result = await addCodexQueueMessage(peer, { threadId: THREAD, messageId: "message_1",
+    text: "untrusted body" });
+  assert.deepEqual(result, { accepted: true, duplicate: true, queuedSubmissionId: "qs_existing",
+    clientUserMessageId: "message_1" });
+  assert.equal(peer.calls.some(call => call.method === "thread/queue/add"), false);
+});
+
+test("the capture returns closed safe results for every unavailable dependency", async () => {
+  const refused = Object.assign(new Error("connect ECONNREFUSED"), { code: "ECONNREFUSED" });
+  expectClosed(await capture(fakePeer({ transportError: refused })),
+    { reasonCode: "transport_unavailable", stage: "initialize" });
+  expectClosed(await capture(fakePeer({ loaded: [] })),
+    { reasonCode: "thread_not_loaded", stage: "locate", serverVersion: "0.152.1" });
+  expectClosed(await capture(fakePeer({ queueSupported: false })),
+    { reasonCode: "protocol_mismatch", stage: "probe", serverVersion: "0.152.1" });
+  const timeout = Object.assign(new Error("thread/queue/add timed out after 5ms"),
+    { code: "ETIMEDOUT" });
+  expectClosed(await capture(failingAt(fakePeer(), "thread/queue/add", timeout)),
+    { reasonCode: "request_timeout", stage: "queue", serverVersion: "0.152.1",
+      threadId: THREAD, threadStatus: "idle" });
+  const vendor = rpcError(-32000, "internal: SECRET path /Users/x");
+  const vendorResult = await capture(failingAt(fakePeer(), "thread/queue/add", vendor));
+  assert.equal(vendorResult.reasonCode, "vendor_error");
+  assert.equal(vendorResult.stage, "queue");
+  assert.equal(JSON.stringify(vendorResult).includes("SECRET"), false);
+});
+
+function failingAt(peer, failingMethod, error) {
+  const original = peer.request;
+  peer.request = async (method, params) => {
+    if (method === failingMethod) {
+      peer.calls.push({ method, params });
+      throw error;
+    }
+    return original(method, params);
+  };
+  return peer;
+}
+
+function expectClosed(actual, overrides) {
+  const { at, ...rest } = actual;
+  assert.match(at, /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/);
+  assert.deepEqual(rest, { supported: false, clientVersion: "0.152.1", serverVersion: null,
+    protocolContract: PROTOCOL_CONTRACT, modes: [], threadId: null, threadStatus: null,
+    queue: null, reasonCode: null, stage: null, ...overrides });
+}
+
+test("a complete capture never reads transcript content", async () => {
+  const peer = fakePeer();
+  const result = await capture(peer);
+  assert.match(result.at, /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/);
+  assert.deepEqual(result, {
+    at: result.at, supported: true, clientVersion: "0.152.1", serverVersion: "0.152.1",
+    protocolContract: PROTOCOL_CONTRACT, modes: ["livePush", "idleWake", "busyQueue"],
+    threadId: THREAD, threadStatus: "idle",
+    queue: { accepted: true, duplicate: false, queuedSubmissionId: "qs_1",
+      clientUserMessageId: "message_1" },
+    reasonCode: null, stage: "complete",
+  });
+  const forbidden = new Set(["thread/read", "thread/items/list", "thread/turns/list",
+    "thread/resume", "thread/start", "turn/start", "thread/queue/start"]);
+  for (const call of peer.calls) assert.equal(forbidden.has(call.method), false, call.method);
+  assert.equal(JSON.stringify(result).includes(SECRET_PREVIEW), false);
+});
+
+test("the command-line capture prints one closed JSON result from a fake client", async () => {
+  const tempDir = mkdtempSync(path.join(os.tmpdir(), "acc-codex-spike-"));
+  const command = path.join(tempDir, "fake-codex.mjs");
+  writeFileSync(command, `#!/usr/bin/env node
+if (process.argv[2] === "--version") { process.stdout.write("codex-cli 0.152.0\\n"); process.exit(0); }
+process.exit(9);
+`, { mode: 0o700 });
+  chmodSync(command, 0o700);
+  try {
+    const run = await runProcess([captureScript, "--thread", THREAD, "--message", "message_1",
+      "--cwd", repoRoot], { env: { ACC_CODEX_SPIKE_COMMAND: command,
+      ACC_CODEX_APP_SERVER_SOCKET: path.join(tempDir, "missing.sock") } });
+    assert.equal(run.code, 0, run.stderr);
+    assert.equal(run.result.supported, false);
+    assert.equal(run.result.clientVersion, "0.152.0");
+    assert.equal(run.result.reasonCode, "below_minimum_version");
+    assert.equal(run.result.stage, "version");
+    const usage = await runProcess([captureScript, "--thread", THREAD]);
+    assert.equal(usage.code, 2);
+    assert.match(usage.stderr, /usage:/);
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true });
+  }
+});

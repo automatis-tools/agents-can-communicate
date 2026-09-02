@@ -125,9 +125,10 @@ export async function runCaptureClient({ socketPath, nonce, messageId, kind = "q
   return runProcess(args);
 }
 
-export function runProcess(args, { timeoutMs = 4_000 } = {}) {
+export function runProcess(args, { timeoutMs = 4_000, env = {} } = {}) {
   return new Promise(resolve => {
-    const child = spawn(process.execPath, args, { stdio: ["ignore", "pipe", "pipe"] });
+    const child = spawn(process.execPath, args, { stdio: ["ignore", "pipe", "pipe"],
+      env: { ...process.env, ...env } });
     let stdout = "";
     let stderr = "";
     child.stdout.setEncoding("utf8");
