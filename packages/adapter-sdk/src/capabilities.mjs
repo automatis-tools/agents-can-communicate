@@ -2,6 +2,7 @@ import { AccError, EXIT, assertPortableId } from "@agents-can-communicate/protoc
 
 import { CAPABILITY_SHAPE, freezeCapabilities, validateCertification }
   from "./certification.mjs";
+import { validateNativeDeliveryContract } from "./native-delivery.mjs";
 
 // The capability surface, documented in docs/ADAPTER_AUTHORING.md and measured
 // per client in docs/CAPABILITIES.md. False is the default for every
@@ -33,6 +34,11 @@ const BACKING_METHOD = Object.freeze({
 
 const BASE_METHODS = Object.freeze(["detect", "install", "uninstall", "doctor",
   "normalizeHook", "renderContext"]);
+
+// A static native-delivery contract is only honest with the three methods
+// that read the client, plan its activation, and bind a live session.
+const NATIVE_METHODS = Object.freeze(["probeNativeDelivery", "planNativeActivation",
+  "bindNativeSession"]);
 
 function usage(message, details = {}) {
   throw new AccError(EXIT.USAGE, message, details);
@@ -109,9 +115,21 @@ export function defineAdapter(manifest) {
         { evidenceClient: item.client, client });
     }
   }
+  const native = {};
+  if (manifest.nativeDelivery !== undefined) {
+    const client = manifest.client.certificationName ?? manifest.client.command;
+    native.nativeDelivery = validateNativeDeliveryContract(manifest.nativeDelivery,
+      { certification, client });
+    for (const method of NATIVE_METHODS) {
+      if (typeof manifest[method] !== "function") {
+        usage(`a native delivery contract requires ${method}()`, { id: manifest.id, method });
+      }
+    }
+  }
   return Object.freeze({
     ...manifest,
     certification,
+    ...native,
     capabilities: assertCapabilities(manifest.capabilities, manifest, certification),
   });
 }

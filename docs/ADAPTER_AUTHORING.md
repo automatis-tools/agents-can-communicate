@@ -90,6 +90,37 @@ Unreadable, unknown, or mismatched clients degrade every uncertified row to fals
 The backing methods for delivery are `renderContextResult()` for `nextTurn`,
 `offerMessage()` for `livePush`, and `routeReply()` for `replyRoute`.
 
+### Native delivery contract
+
+An adapter that can push a message into a running session declares `nativeDelivery` next
+to its capabilities:
+
+```js
+nativeDelivery: {
+  minimumByPlatform: { "darwin-arm64": "2.1.258" },
+  anchors: [{ platform: "darwin-arm64", version: "2.1.258",
+    protocolContract: "claude-code-channel-mcp-v1" }],
+  knownBad: [],
+  activationKinds: ["shell-bootstrap"],
+}
+```
+
+The rules `defineAdapter` enforces, and the ones the runtime applies:
+
+- A minimum is the **first passing capture** on that platform, never a guessed first vendor
+  release. Every anchor must have passing `delivery.livePush` evidence for the same client,
+  version, and platform, and each minimum must itself be an anchor.
+- There is intentionally **no maximum version**. A newer stable release is admitted only
+  when a current read-only feature probe (`probeNativeDelivery()`) and a per-session
+  handshake (`bindNativeSession()`) both report the anchored `protocolContract`;
+  `evaluateNativeEligibility()` and `validateNativeHandshake()` are those two checks.
+- Prereleases require their own passing capture; they are `prerelease_not_captured` even
+  when numerically newer. `knownBad` names exact versions or inclusive intervals.
+- Exact-version certification still governs every non-native capability;
+  `effectiveCapabilities()` is unchanged. The native rule is used for live delivery alone.
+- The three native methods return closed facts (`validateNativeActivationPlan()` closes the
+  activation plan) and never put vendor data - endpoints, sockets, raw errors - into core.
+
 ## How far you can get
 
 | Tier | You register | You get | You do not get |
@@ -100,8 +131,9 @@ The backing methods for delivery are `renderContextResult()` for `nextTurn`,
 | 3 | + realtime surface | delivery receipts, safe-point injection, child sessions | — |
 
 Installed hook wiring may reach tier 2, but the effective capability is still limited to
-an exact certified client/version/platform. No client currently certifies native live push
-or native reply routing.
+an exact certified client/version/platform. Passing native captures exist for Claude Code
+2.1.258 and Codex 0.152.1 on macOS arm64; they become live capabilities only when the
+production transports ship behind the native delivery contract above.
 
 ## normalizeHook
 

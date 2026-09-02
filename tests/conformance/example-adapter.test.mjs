@@ -93,7 +93,54 @@ const hookFixtures = {
   sessionEnd: { hook_event_name: "SessionEnd", session_id: "abc-123", cwd: "/tmp/project" },
 };
 
+// The same reference adapter with a native-delivery contract: a passing
+// livePush capture anchors the minimum, and the three native methods return
+// closed facts. It proves the runner accepts a native adapter and that a
+// regular adapter without the contract keeps live delivery off.
+function createNativeAdapter() {
+  const regular = createAdapter();
+  return defineAdapter({
+    ...regular,
+    client: { command: "example", certificationName: "example-client", versionArgs: ["--version"] },
+    capabilities: { delivery: { livePush: true } },
+    certification: { evidence: [{
+      client: "example-client", version: "1.2.3", platform: "darwin-arm64",
+      observedAt: "2026-09-02T12:00:00.000Z", capability: "delivery.livePush",
+      fixture: "fixtures/delivery/example-client-1.2.3.json",
+      provenance: "fixtures/certification-provenance.json", provenanceId: "native-1-2-3",
+      idleBehavior: "offered", busyBehavior: "queued_after_turn", authorityLevel: "experimental",
+      limitations: ["reference adapter only"], result: "pass",
+    }] },
+    nativeDelivery: {
+      minimumByPlatform: { "darwin-arm64": "1.2.3" },
+      anchors: [{ platform: "darwin-arm64", version: "1.2.3", protocolContract: "example-native-v1" }],
+      knownBad: [],
+      activationKinds: ["native-config"],
+    },
+    offerMessage: async () => ({ accepted: false, transport: "example", clientVersion: "1.2.3" }),
+    probeNativeDelivery: async () => ({ supported: true, clientVersion: "1.2.3",
+      protocolContract: "example-native-v1", executableFingerprint: null, modes: ["livePush"],
+      reasonCode: null }),
+    planNativeActivation: async () => ({ eligible: true, reasonCode: null,
+      mechanisms: [{ kind: "native-config", artifactIds: ["example-owned-block"] }] }),
+    bindNativeSession: async () => ({ supported: false, clientVersion: "1.2.3",
+      protocolContract: "example-native-v1", modes: [], opaqueEndpointRef: null, leaseUntil: null,
+      reasonCode: "handshake_failed" }),
+  });
+}
+
 runAdapterConformance("example", { createAdapter, createFixture, hookFixtures });
+runAdapterConformance("example native", { createAdapter: createNativeAdapter, createFixture,
+  hookFixtures });
+
+test("the native reference adapter exposes its contract while the regular one does not", () => {
+  assert.equal(createAdapter().nativeDelivery, undefined);
+  assert.equal(createAdapter().capabilities.delivery.livePush, false);
+  const native = createNativeAdapter();
+  assert.equal(native.capabilities.delivery.livePush, true);
+  assert.deepEqual(native.nativeDelivery.minimumByPlatform, { "darwin-arm64": "1.2.3" });
+  assert.equal(Object.isFrozen(native.nativeDelivery.anchors), true);
+});
 
 test("the reference adapter really does preserve unrelated configuration", async () => {
   const fixture = await createFixture();
