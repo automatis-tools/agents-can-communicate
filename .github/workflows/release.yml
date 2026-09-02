@@ -22,6 +22,9 @@ jobs:
           GIT_DIR: ''
           GIT_WORK_TREE: ''
 
+      - name: Prepare output directory
+        run: mkdir -p dist
+
       - name: Pack
         run: npm pack --pack-destination dist
 
