@@ -71,6 +71,9 @@ test("uninstall counts the adapters it changed, not the ones it visited", async 
     { adapterId: "gemini_cli", applied: true, removed: ["/a/tree"], changes: [] },
     { adapterId: "kimi", applied: true, removed: [], changes: ["unpicked an entry"] },
     { adapterId: "codex", applied: true, removed: [], changes: [] }] }), 2);
+  assert.equal(actedOn({ action: "uninstall", operations: [
+    { adapterId: "kimi", applied: true, removed: [], removedDirectories: ["/empty"],
+      changes: [] }] }), 1, "removing an ACC-created parent was reported as no change");
 
   // An install that ran wrote something by definition, so it is counted as it was.
   assert.equal(actedOn({ action: "install", operations: [

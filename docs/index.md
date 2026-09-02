@@ -34,7 +34,7 @@ separates protocol truth from adapter reach.
 
 ## Project work
 
-- [Contributing](../AGENTS.md) — invariants and the mutation-proof gate.
+- [Contributing](https://github.com/automatis-tools/agents-can-communicate/blob/main/AGENTS.md) — invariants and the mutation-proof gate.
 - [Design decisions](DESIGN_DECISIONS.md) — architectural decisions and reversals.
 - [Releasing](RELEASING.md) — packed-artifact verification.
 

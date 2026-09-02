@@ -107,4 +107,6 @@ Start with [Getting started](docs/GETTING_STARTED.md), then use the
 [Capabilities](docs/CAPABILITIES.md) references. Adapter evidence lives beside each
 adapter in its `COMPATIBILITY.md` and `certification.json`.
 
-Contributing starts with [AGENTS.md](AGENTS.md). Node 24+, Git optional, MIT licensed.
+Contributing starts with the repository's
+[AGENTS.md](https://github.com/automatis-tools/agents-can-communicate/blob/main/AGENTS.md).
+Node 24+, Git optional, MIT licensed.

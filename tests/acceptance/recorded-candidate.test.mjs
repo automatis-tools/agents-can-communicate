@@ -43,7 +43,6 @@ const PACKED = Object.freeze([
   "docs/TROUBLESHOOTING.md",
   "docs/WHY_ACC.md",
   "docs/index.md",
-  "AGENTS.md",
   "SECURITY.md",
   "README.md",
   "LICENSE",

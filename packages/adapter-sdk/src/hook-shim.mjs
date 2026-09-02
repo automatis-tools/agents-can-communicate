@@ -1,4 +1,4 @@
-import { access, chmod, mkdir, readFile, readdir, rm, writeFile }
+import { access, chmod, lstat, mkdir, readFile, readdir, rm, writeFile }
   from "node:fs/promises";
 import { existsSync } from "node:fs";
 import path from "node:path";
@@ -147,6 +147,12 @@ export async function writeHookShim({ dir, adapterId, runner = defaultRunner(),
  */
 export async function removeInstalledTree(target, keep = []) {
   if (keep.includes(target)) return false;
+  try {
+    await lstat(target);
+  } catch (error) {
+    if (error.code === "ENOENT") return false;
+    throw error;
+  }
   await rm(target, { recursive: true, force: true });
   return true;
 }

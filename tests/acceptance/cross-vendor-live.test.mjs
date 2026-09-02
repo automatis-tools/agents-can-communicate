@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdir, readdir, writeFile } from "node:fs/promises";
+import { mkdir, readFile, readdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import test from "node:test";
 
@@ -8,9 +8,13 @@ import { createPackedAcc } from "../helpers/packed-acc.mjs";
 
 const META = PROTOCOL_META("2026-07-28");
 const CAPTURE_VERSIONS = Object.freeze({ claude: "2.1.252", codex: "0.152.0" });
+const ADAPTER_IDS = Object.freeze(["claude_code", "codex", "gemini_cli", "grok", "kimi"]);
+
+const operationIds = result => result.operations.map(operation => operation.adapterId);
+const readJson = file => readFile(file, "utf8").then(JSON.parse);
 
 async function exchange(packed, { from, to, subject, body, answer, key }) {
-  const humanCopiedPeerBody = false;
+  const traceStart = packed.commandTrace.length;
   const sent = await packed.acc(["message", "--session", from.session.sessionId,
     "--to", to.participantId, "--type", "question", "--subject", subject,
     "--body", body, "--client-message-id", `${key}-question`]);
@@ -61,7 +65,18 @@ async function exchange(packed, { from, to, subject, body, answer, key }) {
     "--client-message-id", `${key}-answer`]);
   assert.equal(sentAgain.message.messageId, question.messageId);
   assert.equal(replyAgain.message.messageId, response.messageId);
-  assert.equal(humanCopiedPeerBody, false);
+  const trace = packed.commandTrace.slice(traceStart);
+  const carries = value => trace.filter(args => args.includes(value));
+  assert.deepEqual(carries(body).map(args => args[0]), ["message", "message"],
+    "the responder command copied the peer's question body");
+  assert.deepEqual(carries(answer).map(args => args[0]), ["reply", "reply"],
+    "the original sender copied the peer's answer body");
+  for (const args of carries(body)) {
+    assert.equal(args[args.indexOf("--session") + 1], from.session.sessionId);
+  }
+  for (const args of carries(answer)) {
+    assert.equal(args[args.indexOf("--session") + 1], to.session.sessionId);
+  }
   return { question, answer: response };
 }
 
@@ -152,10 +167,47 @@ test("packed v0.2 completes cross-vendor fallback without human relay", {
     '{"foreign":true}\n');
   await writeFile(path.join(packed.clientHome, ".codex", "config.toml"),
     'foreign = "keep"\n');
+  await mkdir(path.join(packed.clientHome, ".kimi-code"), { recursive: true });
+  await writeFile(path.join(packed.clientHome, ".kimi-code", "config.toml"),
+    'default_model = "k3"\n');
   const beforeInstall = await packed.snapshotClientFiles();
-  await packed.acc(["install", "--home", packed.clientHome]);
-  await packed.acc(["uninstall", "--home", packed.clientHome]);
-  await packed.acc(["uninstall", "--home", packed.clientHome]);
+  const installed = await packed.acc(["install", "--home", packed.clientHome]);
+  assert.deepEqual(installed.failed, []);
+  assert.deepEqual(operationIds(installed), ADAPTER_IDS);
+  assert.equal(installed.operations.every(operation => operation.applied), true);
+  assert.notDeepEqual(await packed.snapshotClientFiles(), beforeInstall,
+    "install did not change the client-home topology");
+
+  const manifests = [
+    ".claude/plugins/marketplaces/acc-local/agents-can-communicate/.claude-plugin/plugin.json",
+    ".agents/acc-local/plugins/agents-can-communicate/.codex-plugin/plugin.json",
+    ".gemini/extensions/agents-can-communicate/gemini-extension.json",
+    ".kimi-code/plugins/managed/agents-can-communicate/.kimi-plugin/plugin.json",
+  ];
+  for (const manifest of manifests) {
+    assert.equal((await readJson(path.join(packed.clientHome, manifest))).version, "0.2.0",
+      `${manifest} was not stamped from the installed package`);
+  }
+
+  const uninstalled = await packed.acc(["uninstall", "--home", packed.clientHome]);
+  assert.deepEqual(uninstalled.failed, []);
+  assert.deepEqual(operationIds(uninstalled), ADAPTER_IDS);
+  assert.equal(uninstalled.operations.every(operation => operation.applied), true);
+  assert.equal(uninstalled.operations.some(operation =>
+    (operation.removed?.length ?? 0) + (operation.changes?.length ?? 0) > 0), true,
+  "first uninstall reported no removals");
+  assert.deepEqual(await packed.snapshotClientFiles(), beforeInstall,
+    "first uninstall did not restore the exact pre-install topology");
+
+  const repeated = await packed.acc(["uninstall", "--home", packed.clientHome]);
+  assert.deepEqual(repeated.failed, []);
+  assert.deepEqual(operationIds(repeated), ADAPTER_IDS);
+  assert.equal(repeated.operations.every(operation => operation.applied), true);
+  assert.equal(repeated.operations.every(operation =>
+    (operation.removed?.length ?? 0) === 0
+      && (operation.removedDirectories?.length ?? 0) === 0
+      && (operation.changes?.length ?? 0) === 0), true,
+  `second uninstall was not an idempotent no-op: ${JSON.stringify(repeated.operations)}`);
   assert.deepEqual(await packed.snapshotClientFiles(), beforeInstall);
   assert.deepEqual(await readdir(packed.project), [],
     "packed ACC wrote runtime state into the user's project");

@@ -4,9 +4,9 @@ import path from "node:path";
 import { AccError, EXIT } from "@agents-can-communicate/protocol";
 import { fileURLToPath } from "node:url";
 
-import { acccreatedFile, bakeSkillCommand, blankJson, removeIfEmpty,
+import { acccreatedFile, bakeSkillCommand, blankJson, ownVersion, removeIfEmpty,
   removeInstalledTree,
-  writeForeignJson, writeHookShim }
+  stampPluginVersion, writeForeignJson, writeHookShim }
   from "@agents-can-communicate/adapter-sdk";
 
 const bundle = fileURLToPath(new URL("../extension", import.meta.url));
@@ -71,6 +71,8 @@ export async function installGeminiExtension({ home, runner, node }) {
   const target = extensionPath(home);
   await rm(target, { recursive: true, force: true });
   await cp(bundle, target, { recursive: true });
+  await stampPluginVersion({ file: path.join(target, "gemini-extension.json"),
+    version: await ownVersion(import.meta.url), io: { readFile, writeFile } });
   // The bundle's hooks.json is the template the settings entries are built
   // from, not something to ship. This client loads an extension's own
   // hooks.json *in addition to* settings, so shipping it registered ACC

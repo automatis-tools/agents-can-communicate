@@ -1,23 +1,11 @@
 import assert from "node:assert/strict";
-import { spawn } from "node:child_process";
-import {
-  chmodSync,
-  existsSync,
-  mkdtempSync,
-  rmSync,
-  statSync,
-  symlinkSync,
-} from "node:fs";
-import net from "node:net";
-import os from "node:os";
+import { existsSync, rmSync, statSync, symlinkSync } from "node:fs";
 import path from "node:path";
-import readline from "node:readline";
-import { fileURLToPath } from "node:url";
 import test from "node:test";
 
-const channelScript = fileURLToPath(
-  new URL("../../scripts/spikes/claude-channel.mjs", import.meta.url),
-);
+import { channelScript, connectSocket, nextSocketMessage, runRejectedChannel,
+  startChannel, startConnectedChannel, trustedTempDir }
+  from "../helpers/claude-channel.mjs";
 
 test("the channel advertises tools without permission relay", async () => {
   const channel = await startChannel();
@@ -42,8 +30,8 @@ test("the channel advertises tools without permission relay", async () => {
 });
 
 test("the channel routes a reply to the originating Unix socket", async () => {
-  const channel = await startChannel();
-  const socket = await connectSocket(channel.socketPath);
+  const channel = await startConnectedChannel();
+  const { socket } = channel;
   try {
     await channel.request("initialize", { protocolVersion: "2025-11-25" });
     channel.notify("notifications/initialized", {});
@@ -63,14 +51,13 @@ test("the channel routes a reply to the originating Unix socket", async () => {
       body: "reply body",
     });
   } finally {
-    socket.end();
     await channel.close();
   }
 });
 
 test("the channel rejects a second envelope on the same socket", async () => {
-  const channel = await startChannel();
-  const socket = await connectSocket(channel.socketPath);
+  const channel = await startConnectedChannel();
+  const { socket } = channel;
   try {
     await channel.request("initialize", { protocolVersion: "2025-11-25" });
     channel.notify("notifications/initialized", {});
@@ -82,7 +69,6 @@ test("the channel rejects a second envelope on the same socket", async () => {
       error: "capture accepts one envelope",
     });
   } finally {
-    socket.end();
     await channel.close();
   }
 });
@@ -105,40 +91,44 @@ test("the channel rejects a socket parent symlinked into the repository", async 
 
 test("the channel rejects a second client connected before the envelope", async () => {
   const channel = await startChannel();
-  const first = await connectSocket(channel.socketPath);
-  const second = await connectSocket(channel.socketPath);
+  let first;
+  let second;
   try {
+    first = await connectSocket(channel.socketPath);
+    second = await connectSocket(channel.socketPath);
     assert.deepEqual(await nextSocketMessage(second), {
       error: "capture accepts one envelope",
     });
   } finally {
-    first.end();
-    second.end();
+    first?.end();
+    second?.end();
     await channel.close();
   }
 });
 
 test("the channel rejects a later client after an empty disconnect", async () => {
   const channel = await startChannel();
-  const first = await connectSocket(channel.socketPath);
-  first.end();
-  await new Promise((resolve) => first.once("close", resolve));
-  await new Promise((resolve) => setTimeout(resolve, 20));
-
-  const second = await connectSocket(channel.socketPath);
+  let first;
+  let second;
   try {
+    first = await connectSocket(channel.socketPath);
+    first.end();
+    await new Promise(resolve => first.once("close", resolve));
+    await new Promise(resolve => setTimeout(resolve, 20));
+    second = await connectSocket(channel.socketPath);
     assert.deepEqual(await nextSocketMessage(second), {
       error: "capture accepts one envelope",
     });
   } finally {
-    second.end();
+    first?.end();
+    second?.end();
     await channel.close();
   }
 });
 
 test("the channel rejects two envelopes written in one chunk", async () => {
-  const channel = await startChannel();
-  const socket = await connectSocket(channel.socketPath);
+  const channel = await startConnectedChannel();
+  const { socket } = channel;
   try {
     const first = JSON.stringify({ messageId: "message_1", body: "first" });
     const second = JSON.stringify({ messageId: "message_2", body: "second" });
@@ -147,127 +137,30 @@ test("the channel rejects two envelopes written in one chunk", async () => {
       error: "capture accepts one envelope",
     });
   } finally {
-    socket.end();
     await channel.close();
   }
 });
 
-async function startChannel() {
-  const tempDir = trustedTempDir();
-  const socketPath = path.join(tempDir, "channel.sock");
-  const child = spawn(process.execPath, [channelScript], {
-    env: { ...process.env, ACC_CHANNEL_SPIKE_SOCKET: socketPath },
-    stdio: ["pipe", "pipe", "pipe"],
-  });
-  const lines = readline.createInterface({ input: child.stdout });
-  const messages = [];
-  const waiters = [];
-  let nextId = 1;
-  let stderr = "";
-  child.stderr.setEncoding("utf8");
-  child.stderr.on("data", (chunk) => { stderr += chunk; });
-  lines.on("line", (line) => {
-    const message = JSON.parse(line);
-    const waiter = waiters.shift();
-    if (waiter) waiter(message);
-    else messages.push(message);
-  });
+test("an exhausted connect cleans the spawned channel and its temporary directory", async () => {
+  let spawned;
+  await assert.rejects(startConnectedChannel({
+    connectPath: channel => `${channel.socketPath}.missing`,
+    connectOptions: { attempts: 1 },
+    onChannel: channel => { spawned = channel; },
+  }), error => error.code === "ENOENT");
 
-  const nextMessage = () => messages.length > 0
-    ? Promise.resolve(messages.shift())
-    : new Promise((resolve) => waiters.push(resolve));
-  const request = async (method, params) => {
-    const id = nextId++;
-    child.stdin.write(`${JSON.stringify({ jsonrpc: "2.0", id, method, params })}\n`);
-    while (true) {
-      const message = await nextMessage();
-      if (message.id === id) {
-        if (message.error) throw new Error(message.error.message);
-        return message.result;
-      }
-      messages.push(message);
-    }
-  };
-  await waitForSocket(socketPath, child, () => stderr);
-  return {
-    socketPath,
-    request,
-    nextMessage,
-    notify(method, params) {
-      child.stdin.write(`${JSON.stringify({ jsonrpc: "2.0", method, params })}\n`);
-    },
-    async close() {
-      child.stdin.end();
-      const code = await new Promise((resolve) => child.once("exit", resolve));
-      assert.equal(code, 0, stderr);
-      rmSync(tempDir, { recursive: true, force: true });
-    },
-  };
-}
+  const exited = await spawned.exited;
+  assert.equal(exited.code, 0);
+  assert.equal(existsSync(spawned.tempDir), false);
+});
 
-async function runRejectedChannel(socketPath) {
-  const child = spawn(process.execPath, [channelScript], {
-    env: { ...process.env, ACC_CHANNEL_SPIKE_SOCKET: socketPath },
-    stdio: ["pipe", "pipe", "pipe"],
-  });
-  let stderr = "";
-  child.stderr.setEncoding("utf8");
-  child.stderr.on("data", (chunk) => { stderr += chunk; });
-  const exit = new Promise((resolve) => child.once("exit", (code) => resolve({ code, stderr })));
-  const timedOut = await Promise.race([
-    exit,
-    new Promise((resolve) => setTimeout(() => resolve(null), 200)),
-  ]);
-  if (timedOut) return timedOut;
-  child.kill("SIGTERM");
-  return exit;
-}
+test("a readiness failure kills the child and removes its temporary directory", async () => {
+  let spawned;
+  await assert.rejects(startChannel({
+    waitForReady: async () => { throw new Error("forced readiness failure"); },
+    onSpawn: channel => { spawned = channel; },
+  }), /forced readiness failure/);
 
-function trustedTempDir() {
-  const tempDir = mkdtempSync(path.join(os.tmpdir(), "acc-channel-test-"));
-  chmodSync(tempDir, 0o700);
-  return tempDir;
-}
-
-async function waitForSocket(socketPath, child, stderr) {
-  for (let attempt = 0; attempt < 100; attempt += 1) {
-    try {
-      statSync(socketPath);
-      return;
-    } catch {
-      if (child.exitCode !== null) throw new Error(`channel exited: ${stderr()}`);
-      await new Promise((resolve) => setTimeout(resolve, 5));
-    }
-  }
-  throw new Error(`channel socket was not created: ${stderr()}`);
-}
-
-async function connectSocket(socketPath) {
-  for (let attempt = 0; attempt < 100; attempt += 1) {
-    try {
-      return await new Promise((resolve, reject) => {
-        const socket = net.createConnection(socketPath, () => resolve(socket));
-        socket.once("error", reject);
-      });
-    } catch (error) {
-      if (!new Set(["ECONNREFUSED", "ENOENT"]).has(error.code) || attempt === 99) throw error;
-      await new Promise((resolve) => setTimeout(resolve, 5));
-    }
-  }
-}
-
-function nextSocketMessage(socket) {
-  return new Promise((resolve, reject) => {
-    const lines = readline.createInterface({ input: socket });
-    const timer = setTimeout(() => {
-      lines.close();
-      reject(new Error("socket reply timed out"));
-    }, 200);
-    lines.once("line", (line) => {
-      clearTimeout(timer);
-      lines.close();
-      resolve(JSON.parse(line));
-    });
-    socket.once("error", reject);
-  });
-}
+  await spawned.exited;
+  assert.equal(existsSync(spawned.tempDir), false);
+});
