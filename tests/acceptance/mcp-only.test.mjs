@@ -79,10 +79,14 @@ test("a guarded workspace degrades to advisory when an MCP client joins", async 
   // nature, so the workspace would never have been guarded and the change this
   // test is about could not be observed.
   const guarding = { id: "guarding", normalizeHook: payload => payload,
+    client: { command: "guarding", certificationName: "guarding" },
     capabilities: { guards: { beforeWrite: true }, lifecycle: { sessionEnd: true } },
+    certification: { evidence: ["guards.beforeWrite", "lifecycle.sessionEnd"]
+      .map(capability => ({ client: "guarding", version: "1.0.0",
+        platform: `${process.platform}-${process.arch}`, capability, result: "pass" })) },
     renderContext: () => "", denyOutcome: reason => ({ stdout: reason }) };
   const attached = await runHook({ adapterId: "guarding", adapters: { guarding },
-    dataHome: place.dataHome,
+    dataHome: place.dataHome, probeClientVersion: async () => "1.0.0",
     payload: { kind: "sessionStart", sessionId: "harness-1", cwd: place.cwd,
       model: null, parentSessionId: null, tool: null, targets: [] } });
   await attached.service.acquireClaim({ sessionId: attached.accSessionId,

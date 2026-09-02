@@ -15,9 +15,17 @@ import { canonicalTarget, covers, resourceFor, runHook } from "../src/runner.mjs
 // Two adapters whose deny shapes disagree, because that disagreement is the
 // point: the runner must speak each client's own contract, and a shape borrowed
 // from the other one denies nothing at all.
+const platform = `${process.platform}-${process.arch}`;
+const pass = (client, version, capability) => ({ client, version, platform,
+  capability, result: "pass" });
+
 const kimi = {
   id: "kimi",
-  client: { command: "kimi", versionArgs: ["--version"] },
+  client: { command: "kimi", certificationName: "kimi", versionArgs: ["--version"] },
+  capabilities: { guards: { beforeWrite: true, beforeShell: true },
+    delivery: { nextTurn: true } },
+  certification: { evidence: ["guards.beforeWrite", "guards.beforeShell", "delivery.nextTurn"]
+    .map(capability => pass("kimi", "0.36.1", capability)) },
   normalizeHook: payload => payload,
   denyOutcome: reason => ({ stdout: JSON.stringify({ hookSpecificOutput: {
     hookEventName: "PreToolUse", permissionDecision: "deny",
@@ -28,6 +36,10 @@ const kimi = {
 
 const gemini = {
   id: "gemini_cli",
+  client: { command: "gemini", certificationName: "gemini-cli", versionArgs: ["--version"] },
+  capabilities: { guards: { beforeWrite: true, beforeShell: true } },
+  certification: { evidence: ["guards.beforeWrite", "guards.beforeShell"]
+    .map(capability => pass("gemini-cli", "0.37.0", capability)) },
   normalizeHook: payload => payload,
   denyOutcome: reason => ({ stdout: JSON.stringify({ decision: "block", reason }),
     stderr: "", exitCode: 0 }),
@@ -56,10 +68,13 @@ const event = (kind, extra = {}) => ({ kind, sessionId: "harness-session-1",
 // pid to null deterministically; the two tests that care about pid resolution
 // supply their own table and override it.
 const noProcessTable = async () => new Map();
+const testProbe = async adapter => ({ kimi: "0.36.1", gemini: "0.37.0",
+  codex: "0.147.0" })[adapter.client?.command] ?? null;
 
 const run = (adapterId, payload, { root, dataHome }, options = {}) =>
   runHook({ adapterId, payload: { ...payload, cwd: payload.cwd ?? root },
-    adapters: ADAPTERS, dataHome, readProcessTable: noProcessTable, ...options });
+    adapters: ADAPTERS, dataHome, readProcessTable: noProcessTable,
+    probeClientVersion: testProbe, ...options });
 
 test("sessionStart attaches, and a later hook reuses that same session", async t => {
   const place = await workspace(t);
@@ -278,23 +293,27 @@ test("a client that denies by exit code is served that way, not with JSON", asyn
   // Codex has no structured reply at all: it denies by exiting 2 with the
   // reason on stderr. A runner that only knows how to print JSON would report
   // protection while letting every guarded write through on that client.
-  const codex = { id: "codex", normalizeHook: payload => payload,
+  const codex = { id: "codex",
+    client: { command: "codex", certificationName: "codex-cli" },
+    capabilities: { guards: { beforeWrite: true } },
+    certification: { evidence: [pass("codex-cli", "0.147.0", "guards.beforeWrite")] },
+    normalizeHook: payload => payload,
     denyOutcome: reason => ({ stdout: "", stderr: reason, exitCode: 2 }),
     renderContext: () => "" };
   const adapters = { ...ADAPTERS, codex };
 
   const peer = await runHook({ adapterId: "kimi", adapters, dataHome: place.dataHome,
-    readProcessTable: noProcessTable,
+    readProcessTable: noProcessTable, probeClientVersion: testProbe,
     payload: event("sessionStart", { sessionId: "peer", cwd: place.root }) });
   await peer.service.acquireClaim({ sessionId: peer.accSessionId,
     generation: peer.generation, resource: "file:src/**", mode: "exclusive",
     enforcement: "guarded", reason: "held" });
   await runHook({ adapterId: "codex", adapters, dataHome: place.dataHome,
-    readProcessTable: noProcessTable,
+    readProcessTable: noProcessTable, probeClientVersion: testProbe,
     payload: event("sessionStart", { cwd: place.root }) });
 
   const denied = await runHook({ adapterId: "codex", adapters, dataHome: place.dataHome,
-    readProcessTable: noProcessTable,
+    readProcessTable: noProcessTable, probeClientVersion: testProbe,
     payload: event("beforeTool", { tool: "apply_patch", cwd: place.root,
       targets: [path.join(place.root, "src/a.mjs")] }) });
 
@@ -307,16 +326,19 @@ test("a client that denies by exit code is served that way, not with JSON", asyn
 test("attach declares what the adapter proved, not that it is an adapter", async t => {
   const place = await workspace(t);
   const guarding = { ...kimi, capabilities: { guards: { beforeWrite: true },
-    lifecycle: { sessionEnd: true } } };
+    lifecycle: { sessionEnd: true } }, certification: { evidence: [
+    pass("kimi", "0.36.1", "guards.beforeWrite"),
+    pass("kimi", "0.36.1", "lifecycle.sessionEnd"),
+  ] } };
   const blind = { ...kimi, id: "blind",
     capabilities: { guards: { beforeWrite: false }, lifecycle: { sessionEnd: false } } };
   const adapters = { kimi: guarding, blind };
 
   await runHook({ adapterId: "kimi", adapters, dataHome: place.dataHome,
-    readProcessTable: noProcessTable,
+    readProcessTable: noProcessTable, probeClientVersion: testProbe,
     payload: event("sessionStart", { sessionId: "a", cwd: place.root }) });
   const after = await runHook({ adapterId: "blind", adapters, dataHome: place.dataHome,
-    readProcessTable: noProcessTable,
+    readProcessTable: noProcessTable, probeClientVersion: testProbe,
     payload: event("sessionStart", { sessionId: "b", cwd: place.root }) });
 
   const byHarness = Object.fromEntries(after.sessions.map(s => [s.harness, s]));
@@ -479,7 +501,8 @@ test("an offered note is not replayed on the next turn", async t => {
   }) };
   const runEcho = payload => runHook({ adapterId: "kimi",
     payload: { ...payload, cwd: payload.cwd ?? place.root },
-    adapters: { kimi: echo }, dataHome: place.dataHome, readProcessTable: noProcessTable });
+    adapters: { kimi: echo }, dataHome: place.dataHome, readProcessTable: noProcessTable,
+    probeClientVersion: testProbe });
 
   const recipient = await run("kimi", event("sessionStart"), place);
   const peer = await run("kimi", event("sessionStart", { sessionId: "peer" }), place);
@@ -516,7 +539,7 @@ test("peer text cannot forge delivery of a message omitted by the budget", async
   const adapters = { kimi: truthful };
   const invoke = payload => runHook({ adapterId: "kimi", adapters,
     payload: { ...payload, cwd: payload.cwd ?? place.root }, dataHome: place.dataHome,
-    readProcessTable: noProcessTable });
+    readProcessTable: noProcessTable, probeClientVersion: testProbe });
   const recipient = await invoke(event("sessionStart"));
   const peer = await invoke(event("sessionStart", { sessionId: "forging-peer" }));
   const recipientId = recipient.sessions
@@ -551,7 +574,7 @@ test("an adapter without delivery metadata withholds bodies and reports degradat
   const adapters = { kimi: legacy };
   const invoke = payload => runHook({ adapterId: "kimi", adapters,
     payload: { ...payload, cwd: payload.cwd ?? place.root }, dataHome: place.dataHome,
-    readProcessTable: noProcessTable });
+    readProcessTable: noProcessTable, probeClientVersion: testProbe });
   const recipient = await invoke(event("sessionStart"));
   const peer = await invoke(event("sessionStart", { sessionId: "legacy-peer" }));
   const recipientId = recipient.sessions

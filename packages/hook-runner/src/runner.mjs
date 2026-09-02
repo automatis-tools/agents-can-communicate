@@ -2,7 +2,7 @@ import { createHash, randomBytes } from "node:crypto";
 import { realpath } from "node:fs/promises";
 import path from "node:path";
 
-import { clearSessionBinding, loadSessionBinding, storeSessionBinding }
+import { clearSessionBinding, effectiveCapabilities, loadSessionBinding, storeSessionBinding }
   from "@agents-can-communicate/adapter-sdk";
 import { createCoordinationService } from "@agents-can-communicate/core";
 import { createId } from "@agents-can-communicate/protocol";
@@ -11,6 +11,7 @@ import { createGitProbe, discoverWorkspace, platformDataHome, runtimePaths }
   from "@agents-can-communicate/cli";
 
 import { resolveClientPid } from "./client-pid.mjs";
+import { probeClientVersion as defaultProbeClientVersion } from "./client-version.mjs";
 import { readProcessTable as defaultReadProcessTable } from "./process-table.mjs";
 
 // Kept cohesive above 300 lines because every handler shares one fail-open
@@ -163,8 +164,11 @@ async function openContext({ cwd, dataHome, runtime, env }) {
 
 const HANDLERS = {
   async sessionStart({ event, context, adapter, adapterId, binding, paths,
-    readProcessTable }) {
-    const capabilities = adapter.capabilities ?? {};
+    readProcessTable, probeClientVersion, platform, deadline }) {
+    const clientVersion = await probeClientVersion(adapter,
+      { timeoutMs: Math.max(1, Math.min(1_000, deadline - Date.now())) });
+    const clientFacts = { clientVersion, platform };
+    const capabilities = effectiveCapabilities(adapter, clientFacts);
     // Once per session, never per turn. A client that cannot be found yields
     // null, and the session is then judged by age alone - which is exactly the
     // behaviour every session had before this existed.
@@ -186,7 +190,10 @@ const HANDLERS = {
         ...metadata,
       });
       if (resumed !== null) {
-        return { accSessionId: resumed.sessionId, generation: resumed.generation };
+        await storeSessionBinding({ runtimeDir: paths.root, harnessSessionId: event.sessionId,
+          accSessionId: resumed.sessionId, generation: resumed.generation, ...clientFacts });
+        return { accSessionId: resumed.sessionId, generation: resumed.generation,
+          ...clientFacts, capabilities };
       }
     }
     const session = await context.service.openSession({
@@ -204,8 +211,9 @@ const HANDLERS = {
       descriptor: context.descriptor,
     });
     await storeSessionBinding({ runtimeDir: paths.root, harnessSessionId: event.sessionId,
-      accSessionId: session.sessionId, generation: session.generation });
-    return { accSessionId: session.sessionId, generation: session.generation };
+      accSessionId: session.sessionId, generation: session.generation, ...clientFacts });
+    return { accSessionId: session.sessionId, generation: session.generation,
+      ...clientFacts, capabilities };
   },
 
   async heartbeat({ binding, context }) {
@@ -258,8 +266,10 @@ const HANDLERS = {
     // The ceiling a team agreed on in `acc.workspace.json`, or the default when
     // there is no config. Validated by the protocol and, until now, never read:
     // the projector was always called with its own default.
-    const tracksDelivery = typeof adapter.renderContextResult === "function";
-    const projectionInput = { ...sync, messages: tracksDelivery ? messages : [],
+    const effective = effectiveCapabilities(adapter, binding);
+    const hasStructuredRenderer = typeof adapter.renderContextResult === "function";
+    const canOfferNextTurn = effective.delivery.nextTurn === true && hasStructuredRenderer;
+    const projectionInput = { ...sync, messages: canOfferNextTurn ? messages : [],
       liveOfferedMessageIds: delivery.liveOfferedMessageIds,
       roomMessageIds: delivery.roomMessageIds,
       currentParticipantId: mine?.participantId };
@@ -269,15 +279,20 @@ const HANDLERS = {
     // another message's visible header, so only projector metadata proves
     // which complete groups survived the byte budget. A custom adapter without
     // metadata may still inject text, but cannot advance a receipt from it.
-    const projection = !tracksDelivery
+    const projection = !hasStructuredRenderer
       ? { text: await adapter.renderContext?.(projectionInput, projectionOptions) ?? "",
         offeredMessageIds: [], includedAttentionIds: [] }
       : await adapter.renderContextResult(projectionInput, projectionOptions);
-    const degradation = !tracksDelivery && messages.length > 0
-      ? `acc: ${messages.length} pending message(s) withheld because this adapter lacks `
-        + `structured delivery metadata; read ${messages[0].messageId} with `
-        + `acc inbox --message ${messages[0].messageId}`
-      : null;
+    const clientFactsKnown = typeof binding.clientVersion === "string"
+      && typeof binding.platform === "string";
+    const reason = !effective.delivery.nextTurn
+      ? clientFactsKnown
+        ? `client ${binding.clientVersion} on ${binding.platform} is not certified for nextTurn`
+        : "the client version or platform is unknown"
+      : !hasStructuredRenderer ? "this adapter lacks structured delivery metadata" : null;
+    const degradation = reason !== null && messages.length > 0
+      ? `acc: ${messages.length} pending message(s) withheld because ${reason}; read `
+        + `${messages[0].messageId} with acc inbox --message ${messages[0].messageId}` : null;
     const visibleDegradation = degradation === null ? "" : `ACC: ${degradation.slice(5)}`;
     const candidate = [projection.text, visibleDegradation].filter(Boolean).join("\n");
     const projected = Buffer.byteLength(candidate, "utf8")
@@ -289,13 +304,13 @@ const HANDLERS = {
     // The renderer returns ids as metadata, never as text to parse. A peer body
     // can imitate every visible label, so only a complete group selected by the
     // projector is eligible for the post-write offer commit.
-    const offered = new Set(projection.offeredMessageIds ?? []);
+    const offered = new Set(canOfferNextTurn ? projection.offeredMessageIds ?? [] : []);
     const offerInputs = messages.filter(message => offered.has(message.messageId))
       .map(message => ({ messageId: message.messageId,
         recipientParticipantId: mine.participantId,
         targetSessionId: binding.accSessionId, targetGeneration: binding.generation,
         transport: "next-turn", adapterId,
-        clientVersion: adapter.clientVersion ?? "unknown" }));
+        clientVersion: binding.clientVersion }));
     // Same again: Kimi Code shows the model a hook's raw stdout, while Gemini
     // and Claude Code want an envelope and drop a bare string.
     // The entry point owns the transport boundary. This handler only prepares
@@ -377,7 +392,9 @@ const HANDLERS = {
  */
 export async function runHook({ adapterId, payload, adapters, dataHome, env,
   runtime = defaultRuntime(), budgetMs = DEFAULT_BUDGET_MS,
-  readProcessTable = defaultReadProcessTable }) {
+  readProcessTable = defaultReadProcessTable,
+  probeClientVersion = defaultProbeClientVersion,
+  platform = `${process.platform}-${process.arch}` }) {
   const deadline = Date.now() + budgetMs;
   const result = { stdout: "", exitCode: 0, decision: "allow", sessions: [], deadlineAt: deadline,
     commitOffers: async () => {} };
@@ -395,7 +412,7 @@ export async function runHook({ adapterId, payload, adapters, dataHome, env,
     const work = handler === undefined
       ? Promise.resolve({})
       : handler({ event, context, adapter, adapterId, binding, paths: context.paths,
-        readProcessTable });
+        readProcessTable, probeClientVersion, platform, deadline });
 
     // The loser of a race is not cancelled, so the timer is cleared explicitly:
     // an outstanding one keeps the process alive long past its answer.
