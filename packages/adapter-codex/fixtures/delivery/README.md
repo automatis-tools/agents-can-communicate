@@ -21,3 +21,7 @@ thread), busy (presented after the turn), reply (real ACC answers through `acc r
 duplicate (the same queued submission on retry), and fallback (queued after `daemon stop`)
 were all observed. Limitations name what the capture did not cover, including the missing
 native idempotency after a submission is consumed. `COMPATIBILITY.md` has the timeline.
+
+The shipped adapter now builds on `codex-cli-0.152.1.json`: `delivery.livePush` is declared
+true behind the `codex-app-server-thread-queue-v1` contract, and the transport is the
+daemon's WebSocket control socket. See `COMPATIBILITY.md` for the daemon-ownership boundary.

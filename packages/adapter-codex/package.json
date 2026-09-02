@@ -4,7 +4,8 @@
   "private": true,
   "type": "module",
   "exports": {
-    ".": "./src/adapter.mjs"
+    ".": "./src/adapter.mjs",
+    "./app-server": "./src/app-server-client.mjs"
   },
   "files": [
     "certification.json",

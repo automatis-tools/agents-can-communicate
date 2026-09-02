@@ -56,43 +56,29 @@ async function machine(t, version = "codex-cli 0.152.0") {
   return { command, home, pluginTrees };
 }
 
-test("Codex fallback-only source and public package surface omit the planned native bridge",
-  async () => {
-    for (const planned of [
-      path.join(repo, "packages", "adapter-codex", "src", "app-server-client.mjs"),
-      path.join(repo, "tests", "acceptance", "codex-live-real.test.mjs"),
-    ]) {
-      await assert.rejects(stat(planned), { code: "ENOENT" },
-        `unproven native-delivery artifact is present: ${planned}`);
-    }
-
-    const adapter = codexModule.createCodexAdapter();
-    for (const method of ["offerMessage", "routeReply"]) {
-      assert.equal(Object.hasOwn(adapter, method), false,
-        `Codex adapter exports unproven native method ${method}`);
-    }
-    for (const exported of ["connectExistingAppServer", "offerCodexMessage"]) {
-      assert.equal(Object.hasOwn(codexModule, exported), false,
-        `Codex package exports unproven native API ${exported}`);
-    }
-
-    for (const manifestPath of [
-      path.join(repo, "package.json"),
-      path.join(repo, "packages", "adapter-codex", "package.json"),
-    ]) {
-      const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
-      assert.doesNotMatch(publicManifestSurface(manifest), NATIVE_PACKAGE_SURFACE,
-        `native Codex bridge entered package surface: ${manifestPath}`);
-    }
-
-    const hooks = JSON.parse(await readFile(path.join(repo, "packages", "adapter-codex",
-      "plugin", "hooks.json"), "utf8"));
-    const commands = Object.values(hooks.hooks)
-      .flatMap(entries => entries.flatMap(entry => entry.hooks.map(hook => hook.command)));
-    assert.doesNotMatch(commands.join("\n"),
-      /app-server|proxy|livePush|replyRoute|opaqueEndpointRef/i,
-      "shipped Codex hooks contain unproven native-delivery wiring");
-  });
+test("the Codex native queue surface is present and proven, not speculative", async () => {
+  const adapter = codexModule.createCodexAdapter();
+  // The capture passed for livePush only; Codex answers through the acc reply
+  // CLI, so replyRoute stays false and routeReply is not an adapter method.
+  assert.equal(adapter.capabilities.delivery.livePush, true);
+  assert.equal(adapter.capabilities.delivery.replyRoute, false);
+  assert.equal(Object.hasOwn(adapter, "routeReply"), false);
+  assert.equal(adapter.nativeDelivery.anchors[0].protocolContract,
+    "codex-app-server-thread-queue-v1");
+  for (const method of ["probeNativeDelivery", "planNativeActivation", "bindNativeSession",
+    "offerMessage"]) {
+    assert.equal(typeof adapter[method], "function", method);
+  }
+  // The daemon start/stop lives in the activation plan (run only during apply),
+  // never in a shipped hook command.
+  const hooks = JSON.parse(await readFile(path.join(repo, "packages", "adapter-codex",
+    "plugin", "hooks.json"), "utf8"));
+  const commands = Object.values(hooks.hooks)
+    .flatMap(entries => entries.flatMap(entry => entry.hooks.map(hook => hook.command)));
+  assert.doesNotMatch(commands.join("\n"),
+    /app-server|proxy|daemon|livePush|opaqueEndpointRef/i,
+    "shipped Codex hooks contain native-delivery wiring");
+});
 
 for (const policy of ["actionable", "all"]) {
   test(`Codex ${policy} delivery stays off and installs no native bridge`, async t => {

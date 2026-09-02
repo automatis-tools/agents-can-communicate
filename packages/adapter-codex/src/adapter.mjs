@@ -2,11 +2,15 @@ import { defineAdapter, projectContext, projectContextResult }
   from "@agents-can-communicate/adapter-sdk";
 import certification from "../certification.json" with { type: "json" };
 
+import { PROTOCOL_CONTRACT } from "./app-server-client.mjs";
 import { allowOutcome, denyOutcome, injectOutcome, normalizeCodexHook }
   from "./hooks.mjs";
 import { planCodexInstall, detectCodex, installCodexPlugin, uninstallCodexPlugin } from "./install.mjs";
+import { bindNativeSession, offerMessage, planNativeActivation, probeNativeDelivery }
+  from "./native-delivery.mjs";
 
 export const CODEX_VERSION = "0.147.0";
+export const CODEX_QUEUE_MINIMUM = "0.152.1";
 export const CODEX_DELIVERY_FALLBACK = Object.freeze({
   diagnostic: "Codex native delivery is off: the codex-cli 0.152.0 capture found the "
     + "app-server control socket absent; ACC did not start a daemon or target session; "
@@ -42,7 +46,17 @@ export function createCodexAdapter() {
       // The captured Bash payload is an allowed PostToolUse event, not the
       // denied PreToolUse capture required to certify a shell guard.
       guards: { beforeWrite: true },
-      delivery: { nextTurn: true },
+      // nextTurn is the certified 0.147.0 hook projection; livePush rests on the
+      // 0.152.1 App Server queue capture and the native contract below. Codex
+      // answers through the acc reply CLI, so replyRoute stays false.
+      delivery: { nextTurn: true, livePush: true },
+    },
+    nativeDelivery: {
+      minimumByPlatform: { "darwin-arm64": CODEX_QUEUE_MINIMUM },
+      anchors: [{ platform: "darwin-arm64", version: CODEX_QUEUE_MINIMUM,
+        protocolContract: PROTOCOL_CONTRACT }],
+      knownBad: [],
+      activationKinds: ["native-service", "shell-bootstrap"],
     },
 
     startSession: async () => ({ ok: true, changes: [], diagnostics: [] }),
@@ -50,9 +64,15 @@ export function createCodexAdapter() {
     guardWrite: async () => ({ ok: true, changes: [], diagnostics: [] }),
     guardShell: async () => ({ ok: true, changes: [], diagnostics: [] }),
 
+    probeNativeDelivery,
+    planNativeActivation,
+    bindNativeSession,
+    offerMessage,
+
     planInstall: context => planCodexInstall(context),
     detect: context => detectCodex(context),
-    install: context => installCodexPlugin(context),
+    install: context => installCodexPlugin({ ...context,
+      livePolicy: context.livePolicy ?? "off" }),
     uninstall: context => uninstallCodexPlugin(context),
 
     doctor: async context => {
