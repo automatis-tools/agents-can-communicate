@@ -1,8 +1,10 @@
 #!/usr/bin/env node
 // Disposable Codex App Server queue probe for the native-delivery capture.
 //
-// Talks to the vendor-owned daemon through `codex app-server proxy` and only
-// through official methods present in the 0.152.1 generated schema:
+// Talks to the vendor-owned daemon over its control Unix socket, which answers
+// an HTTP upgrade and then speaks JSON-RPC one message per WebSocket text frame
+// (observed on 0.152.1), and only through official methods present in the
+// 0.152.1 generated schema:
 // initialize, thread/loaded/list, thread/list, thread/queue/list, and
 // thread/queue/add. It never resumes, starts, steers, or reads a thread, and it
 // prints one closed JSON result with ids, versions, states, and a timestamp -
@@ -17,7 +19,7 @@ import { existsSync, realpathSync, statSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
-import { openJsonRpcPeer } from "./json-rpc-peer.mjs";
+import { openWebSocketPeer } from "./ws-unix-peer.mjs";
 
 export const PROTOCOL_CONTRACT = "codex-app-server-thread-queue-v1";
 export const MINIMUM_VERSION = "0.152.1";
@@ -26,7 +28,16 @@ const CLIENT_INFO = Object.freeze({ name: "acc-native-delivery-capture", version
 const STABLE_VERSION = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/;
 const MAX_PAGES = 20;
 const METHOD_NOT_FOUND = -32601;
+const INVALID_REQUEST = -32600;
 const INVALID_PARAMS = -32602;
+const INTERNAL_ERROR = -32603;
+
+// Observed on 0.152.1: an unknown method is answered as -32600 "Invalid
+// request: unknown variant `x`", not as -32601.
+export function isMethodMissing(error) {
+  return error?.code === METHOD_NOT_FOUND
+    || (error?.code === INVALID_REQUEST && /unknown variant/.test(String(error?.message ?? "")));
+}
 
 export function compareStableVersions(left, right) {
   const a = left.split(".").map(Number);
@@ -48,8 +59,10 @@ export function evaluateClientVersion(observed, minimum = MINIMUM_VERSION) {
   return { ok: true, reasonCode: null };
 }
 
+// Observed shape: "<clientName>/<appServerVersion> (<os>) <terminal> (<clientName>; <clientVersion>)".
 export function serverVersionOf(userAgent) {
-  return /^codex_app_server\/([^\s()]+)(?:\s|$)/.exec(String(userAgent ?? ""))?.[1] ?? null;
+  return /^[^\s/]+\/(\d+\.\d+\.\d+(?:-[0-9A-Za-z.]+)?)(?=[\s(]|$)/
+    .exec(String(userAgent ?? ""))?.[1] ?? null;
 }
 
 export async function probeCodexQueue(peer, { clientVersion, threadId, minimum = MINIMUM_VERSION }) {
@@ -69,10 +82,9 @@ export async function probeCodexQueue(peer, { clientVersion, threadId, minimum =
   try {
     await peer.request("thread/queue/list", { threadId });
   } catch (error) {
-    if (error?.code === METHOD_NOT_FOUND) {
-      return { ...base, serverVersion, reasonCode: "protocol_mismatch" };
-    }
-    // Any other answer proves the method exists; the thread itself is checked later.
+    if (isMethodMissing(error)) return { ...base, serverVersion, reasonCode: "protocol_mismatch" };
+    // Any other answer (invalid or unknown thread id) proves the method exists;
+    // the thread itself is checked later.
   }
   return { ...base, supported: true, serverVersion, modes: [...QUEUE_MODES] };
 }
@@ -89,10 +101,14 @@ async function pageAll(peer, method, params) {
   return items;
 }
 
+// The state-db listing answers in milliseconds and filters by cwd; the default
+// listing reads every rollout from disk (measured: 2.7 s for 20 threads).
+const listParams = (cwd) => ({ limit: 100, useStateDbOnly: true, ...(cwd ? { cwd } : {}) });
+
 export async function locateCodexThread(peer, { threadId, cwd }) {
   const loaded = await pageAll(peer, "thread/loaded/list", {});
   if (!loaded.includes(threadId)) return { found: false, reasonCode: "thread_not_loaded" };
-  const threads = await pageAll(peer, "thread/list", { limit: 100 });
+  const threads = await pageAll(peer, "thread/list", listParams(cwd));
   const found = threads.find((item) => item?.id === threadId);
   if (!found) return { found: false, reasonCode: "thread_not_found" };
   if (found.cwd !== cwd) return { found: false, reasonCode: "cwd_mismatch" };
@@ -102,7 +118,8 @@ export async function locateCodexThread(peer, { threadId, cwd }) {
 // Loaded threads only, with id, cwd, and status - never a preview or a turn.
 export async function discoverCodexThreads(peer) {
   const loaded = new Set(await pageAll(peer, "thread/loaded/list", {}));
-  const threads = await pageAll(peer, "thread/list", { limit: 100 });
+  if (loaded.size === 0) return [];
+  const threads = await pageAll(peer, "thread/list", listParams());
   return threads.filter((item) => loaded.has(item?.id)).map((item) => ({
     threadId: item.id, cwd: item.cwd ?? null, status: item.status?.type ?? "unknown",
   }));
@@ -131,13 +148,14 @@ export async function addCodexQueueMessage(peer, { threadId, messageId, text }) 
 
 export function safeReason(error) {
   const message = String(error?.message ?? "");
-  if (error?.code === METHOD_NOT_FOUND || error?.code === "EPROTOCOL") return "protocol_mismatch";
+  if (isMethodMissing(error) || error?.code === "EPROTOCOL") return "protocol_mismatch";
   if (error?.code === "ETIMEDOUT" || /timed out/.test(message)) return "request_timeout";
   if (["ECONNREFUSED", "ENOENT", "EPIPE"].includes(error?.code)
     || /JSON-RPC peer (?:exited|is closed|wrote invalid JSON)|ECONNREFUSED|ENOENT/.test(message)) {
     return "transport_unavailable";
   }
-  if (error?.code === INVALID_PARAMS && /thread/i.test(message)) return "thread_not_found";
+  if ((error?.code === INVALID_PARAMS || error?.code === INVALID_REQUEST
+    || error?.code === INTERNAL_ERROR) && /thread/i.test(message)) return "thread_not_found";
   return "vendor_error";
 }
 
@@ -209,14 +227,13 @@ async function main() {
   const version = evaluateClientVersion(clientVersion, minimum);
   let result;
   if (options.discover) {
-    result = await discoverFromDaemon({ command, socketPath, clientVersion, minimum });
+    result = await discoverFromDaemon({ socketPath, clientVersion, minimum });
   } else if (!version.ok) {
     result = closedResult(clientVersion, { reasonCode: version.reasonCode, stage: "version" });
   } else if (!existsSync(socketPath) || !statSync(socketPath).isSocket()) {
     result = closedResult(clientVersion, { reasonCode: "transport_unavailable", stage: "initialize" });
   } else {
-    const peer = openJsonRpcPeer({ command, args: ["app-server", "proxy", "--sock", socketPath],
-      timeoutMs: 5_000 });
+    const peer = openWebSocketPeer({ socketPath, timeoutMs: 5_000 });
     try {
       result = await runCodexQueueCapture({ ...input, peer });
     } finally {
@@ -226,20 +243,18 @@ async function main() {
   process.stdout.write(`${JSON.stringify(result)}\n`);
 }
 
-async function discoverFromDaemon({ command, socketPath, clientVersion, minimum }) {
+async function discoverFromDaemon({ socketPath, clientVersion, minimum }) {
   const base = { at: new Date().toISOString(), clientVersion, serverVersion: null, loaded: [],
     reasonCode: null };
   if (!existsSync(socketPath) || !statSync(socketPath).isSocket()) {
     return { ...base, reasonCode: "transport_unavailable" };
   }
-  const peer = openJsonRpcPeer({ command, args: ["app-server", "proxy", "--sock", socketPath],
-    timeoutMs: 5_000 });
+  const peer = openWebSocketPeer({ socketPath, timeoutMs: 5_000 });
   try {
     const probe = await probeCodexQueue(peer, { clientVersion, threadId: "thread_discover", minimum });
-    if (!probe.supported) {
-      return { ...base, serverVersion: probe.serverVersion, reasonCode: probe.reasonCode };
-    }
-    return { ...base, serverVersion: probe.serverVersion, loaded: await discoverCodexThreads(peer) };
+    base.serverVersion = probe.serverVersion;
+    if (!probe.supported) return { ...base, reasonCode: probe.reasonCode };
+    return { ...base, loaded: await discoverCodexThreads(peer) };
   } catch (error) {
     return { ...base, reasonCode: safeReason(error) };
   } finally {
