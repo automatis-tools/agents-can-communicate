@@ -19,7 +19,7 @@ version. A reproduction against a throwaway `ACC_DATA_HOME` is ideal.
 | ACC writing into a repository | Denial of service by a trusted peer |
 | Session impersonation across MCP | |
 
-Reasoning behind each: [docs/THREAT_MODEL.md](docs/THREAT_MODEL.md).
+Reasoning behind each: [docs/SECURITY_MODEL.md](docs/SECURITY_MODEL.md).
 
 ## Supported versions
 
