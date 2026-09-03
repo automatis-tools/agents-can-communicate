@@ -2,7 +2,7 @@ import { mkdir, readdir, readFile, stat, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import path from "node:path";
 
-import { detectInstallation, livePolicyOf, loadOwnership, verifyOwned }
+import { detectInstallation, livePolicyOf, loadOwnership, shellOf, verifyOwned }
   from "@agents-can-communicate/installer";
 import { AccError, EXIT } from "@agents-can-communicate/protocol";
 
@@ -135,15 +135,20 @@ function nativeState(detected, recordedPolicy) {
   return { eligibility, configured, policy, runtime, modes, reasonCode: native.reasonCode ?? null };
 }
 
-async function diagnoseAdapters({ options, runtime }) {
+export async function diagnoseAdapters({ options, runtime, detect = detectInstallation }) {
   // The same home `acc install --home` writes to, or the real one. Reading a
   // different home than install wrote to reports every adapter as missing.
   const home = options?.home ?? runtime?.env?.HOME ?? homedir();
   const { data: dataHome } = platformPaths({ platform: runtime?.platform,
     env: runtime?.env ?? {} });
-  const clients = clientContext(home, path.join(dataHome, "acc"));
+  // The same shell and environment install reads, so detection plans the same
+  // shell bootstrap it would apply. Omitting them left detection with a null
+  // shell, which degrades every shell-bootstrap client to `unsupported_shell` -
+  // so a zsh machine with a working shim read as degraded on every run.
+  const clients = clientContext(home, path.join(dataHome, "acc"),
+    { shell: shellOf(runtime?.env ?? {}), env: runtime?.env ?? {} });
   const adapters = ALL_ADAPTERS();
-  const detected = await detectInstallation({ adapters, context: clients,
+  const detected = await detect({ adapters, context: clients,
     probeTimeoutMs: probeTimeout(runtime?.env) });
   const record = await loadOwnership({ dataHome });
   const running = typeof runtime?.version === "function"
