@@ -26,6 +26,13 @@ export const shellOf = env => {
   return typeof shell === "string" && shell !== "" ? path.basename(shell) : null;
 };
 export const shimDirFor = stateRoot => path.join(stateRoot, "bin");
+// `.zshrc`, deliberately, and that makes the shim interactive-only: zsh reads
+// this file for interactive shells and not for `zsh -lc` or a script. An
+// interactive launch is where a client session comes from, and putting the PATH
+// entry somewhere every shell reads would put ACC in front of a vendor command
+// in scripts and CI that never asked for it. Worth knowing when checking an
+// install: a non-interactive shell resolving the vendor binary directly is this
+// choice working, not a broken bootstrap.
 export const rcFileFor = (home, shell) => (shell === "zsh" && typeof home === "string"
   ? path.join(home, ".zshrc") : null);
 
