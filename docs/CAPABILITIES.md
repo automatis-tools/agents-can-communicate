@@ -42,7 +42,7 @@ The limitations belong next to the adapters they affect:
 
 | Adapter | Exact limitation and evidence |
 |---|---|
-| Codex | 0.147.0 next-turn stdout arrives as unwrapped developer-role context and requires plugin trust. A separate 0.152.1 capture proved the App Server queue transport, so `delivery.livePush` is a live capability behind the native contract (experimental, off until opted in); Codex answers through `acc reply`, so `replyRoute` stays false. |
+| Codex | 0.147.0 next-turn stdout arrives as unwrapped developer-role context and requires plugin trust. A 0.152.1 capture proved the App Server queue transport, but the release capture then measured that native delivery there requires `codex --remote unix://`, and in that mode the session runs inside the daemon: both the hook payload and the App Server's own thread record report the daemon's directory instead of the session's, so ACC cannot tell which workspace the session is in. Nothing ACC can reach carries the real one, and placing a session in the wrong workspace is worse than not placing it, so `delivery.livePush` is **not** claimed - the probe and the handshake both refuse with `workspace_identity_unavailable`. `replyRoute` stays false. |
 | Claude Code | 2.1.233 next-turn delivery waits for the next user prompt. A 2.1.258 Channel capture proved idle offer, busy queue-after-turn, explicit reply, duplicate suppression, and durable fallback, so `delivery.livePush` and `delivery.replyRoute` are live capabilities behind the native contract (experimental, off until opted in; Claude's development-channel warning is vendor-owned and visible). |
 | Gemini CLI | Only 0.37.0 has package-shipped next-turn certification. Its TUI has no captured external wake or queue interface and `--acp` changes launch ownership, so native delivery is fallback-only; live push and reply routing remain false. |
 | Grok | Documentation-shaped payloads do not count as real captures. The public leader surface exposed no proven addressed injection into an ordinary TUI session, so native delivery is `awaiting_compatibility_capture`; all capabilities remain false. |
@@ -69,9 +69,11 @@ let the lease run out under an idle session, which is exactly when live delivery
 having. Giving a binding up is a separate, final fact rather than an expired lease, so a
 channel that has not yet noticed cannot extend something the session already retired.
 
-Current shipped reality: Claude Code 2.1.258 and Codex 0.152.1 on darwin-arm64 have passing
-experimental `livePush` captures behind the native delivery contract, off until a per-client
-opt-in; every other client is next-turn or inbox only;
+Current shipped reality: Claude Code on darwin-arm64 has a passing experimental `livePush`
+capture behind the native delivery contract, off until a per-client opt-in. Codex is
+next-turn and inbox only: its queue transport works, but the mode that makes a session
+reachable is the mode that hides which workspace it is in. Every other client is next-turn or
+inbox only;
 Gemini CLI and Kimi Code are next-turn only at their exact captured versions; Grok and MCP
 poll inbox.
 

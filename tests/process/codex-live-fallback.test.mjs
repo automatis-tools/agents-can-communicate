@@ -56,21 +56,26 @@ async function machine(t, version = "codex-cli 0.152.0") {
   return { command, home, pluginTrees };
 }
 
-test("the Codex native queue surface is present and proven, not speculative", async () => {
+// Codex ships no native-delivery surface. The 0.152.1 queue capture observed a
+// working transport, and the release capture then measured that the mode it
+// requires - codex --remote unix:// - runs the session inside the daemon, where
+// both the hook payload's cwd and the App Server's own thread record name the
+// daemon's directory instead of the session's. ACC placed such a session in an
+// unrelated workspace and fed it that workspace's peers. Nothing ACC can reach
+// carries the real one, so the capability is withdrawn rather than defaulted.
+test("the Codex native queue surface is absent, and no hook smuggles it back", async () => {
   const adapter = codexModule.createCodexAdapter();
-  // The capture passed for livePush only; Codex answers through the acc reply
-  // CLI, so replyRoute stays false and routeReply is not an adapter method.
-  assert.equal(adapter.capabilities.delivery.livePush, true);
+  assert.equal(adapter.capabilities.delivery.livePush, false);
   assert.equal(adapter.capabilities.delivery.replyRoute, false);
-  assert.equal(Object.hasOwn(adapter, "routeReply"), false);
-  assert.equal(adapter.nativeDelivery.anchors[0].protocolContract,
-    "codex-app-server-thread-queue-v1");
+  assert.equal(adapter.nativeDelivery, undefined);
   for (const method of ["probeNativeDelivery", "planNativeActivation", "bindNativeSession",
-    "offerMessage"]) {
-    assert.equal(typeof adapter[method], "function", method);
+    "offerMessage", "routeReply"]) {
+    assert.equal(Object.hasOwn(adapter, method), false, method);
   }
-  // The daemon start/stop lives in the activation plan (run only during apply),
-  // never in a shipped hook command.
+  // Codex keeps next-turn delivery and the durable inbox: neither depends on
+  // knowing which directory the session is in.
+  assert.equal(adapter.capabilities.delivery.nextTurn, true);
+  // And no shipped hook may reintroduce the wiring by the back door.
   const hooks = JSON.parse(await readFile(path.join(repo, "packages", "adapter-codex",
     "plugin", "hooks.json"), "utf8"));
   const commands = Object.values(hooks.hooks)

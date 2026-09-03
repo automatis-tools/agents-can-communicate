@@ -12,7 +12,9 @@
       "idleBehavior": "fires when a client session starts",
       "busyBehavior": "fires before the first model turn",
       "authorityLevel": "advisory",
-      "limitations": ["plugin hooks must be explicitly trusted by the user"],
+      "limitations": [
+        "plugin hooks must be explicitly trusted by the user"
+      ],
       "result": "pass"
     },
     {
@@ -27,7 +29,9 @@
       "idleBehavior": "fires when a client session exits",
       "busyBehavior": "does not run until the session exits",
       "authorityLevel": "advisory",
-      "limitations": ["plugin hooks must be explicitly trusted by the user"],
+      "limitations": [
+        "plugin hooks must be explicitly trusted by the user"
+      ],
       "result": "pass"
     },
     {
@@ -42,7 +46,9 @@
       "idleBehavior": "waits for the next user prompt",
       "busyBehavior": "does not interrupt an in-progress turn",
       "authorityLevel": "context",
-      "limitations": ["stdout arrives as an unwrapped developer-role message"],
+      "limitations": [
+        "stdout arrives as an unwrapped developer-role message"
+      ],
       "result": "pass"
     },
     {
@@ -57,7 +63,9 @@
       "idleBehavior": "no write exists to guard",
       "busyBehavior": "blocks an apply_patch call before disk mutation",
       "authorityLevel": "blocking",
-      "limitations": ["runtime and unrecognised shell writes can bypass the guard"],
+      "limitations": [
+        "runtime and unrecognised shell writes can bypass the guard"
+      ],
       "result": "pass"
     },
     {
@@ -72,7 +80,9 @@
       "idleBehavior": "offers complete peer messages at the next prompt",
       "busyBehavior": "does not interrupt an in-progress turn",
       "authorityLevel": "context",
-      "limitations": ["delivery requires the next normal user turn"],
+      "limitations": [
+        "delivery requires the next normal user turn"
+      ],
       "result": "pass"
     },
     {
@@ -114,20 +124,27 @@
       "result": "fail"
     },
     {
-      "client": "codex-cli", "version": "0.152.1", "platform": "darwin-arm64",
-      "observedAt": "2026-09-02T21:32:19.320Z", "capability": "delivery.livePush",
-      "fixture": "fixtures/delivery/codex-cli-0.152.1.json", "idleBehavior": "offered",
+      "client": "codex-cli",
+      "version": "0.152.1",
+      "platform": "darwin-arm64",
+      "observedAt": "2026-09-03T04:45:00.000Z",
+      "capability": "delivery.livePush",
+      "fixture": "fixtures/delivery/codex-cli-0.152.1-remote-workspace.json",
       "provenance": "fixtures/certification-provenance.json",
-      "provenanceId": "native-delivery-0-152-1", "busyBehavior": "queued_after_turn",
+      "provenanceId": "native-delivery-0-152-1-remote-workspace",
+      "idleBehavior": "unobserved",
+      "busyBehavior": "unobserved",
       "authorityLevel": "experimental",
       "limitations": [
-        "captured on darwin-arm64 only; Linux and Windows remain uncaptured",
-        "no daemon pre-existed; codex app-server daemon start created it for this capture and daemon stop removed it",
-        "the daemon speaks JSON-RPC over WebSocket on its control Unix socket; a submission queued on the idle thread started a turn by itself, and one queued during a turn was presented after that turn as a user prompt",
-        "the model answered through the ACC CLI (acc reply), which proves the product loop but not a native reply route; delivery.replyRoute stays uncertified",
-        "thread/queue/add has no native idempotency once a submission has been consumed: a retried clientUserMessageId created a second submission and a short turn but no second ACC answer; idempotency holds while the submission is still queued, where thread/queue/list exposes it"
+        "release capture on the installed tarball, with the vendor daemon already running from a directory other than the session's",
+        "native delivery requires codex --remote unix://, and in that mode the session runs inside the daemon",
+        "the SessionStart hook payload reported cwd as the daemon's directory rather than the client's: the client was working in a temporary capture project while the payload named the daemon's own checkout",
+        "the App Server's own thread/list recorded that same daemon directory for the live thread, so the session's workspace is not available from anything ACC can reach",
+        "ACC placed the session in an unrelated workspace and injected that workspace's peers into it",
+        "no delivery branch could be observed because the session was never addressable from the workspace it was actually in",
+        "the earlier 0.152.1 pass started the daemon itself in the session's own directory, so the two directories coincided and the substitution was invisible"
       ],
-      "result": "pass"
+      "result": "fail"
     }
   ]
 }

@@ -73,17 +73,12 @@ export const PASS_EXPECTATIONS = Object.freeze({
       ["runtime and unrecognised shell writes can bypass the guard"]),
     nextTurn("fixtures/UserPromptSubmit.json", "UserPromptSubmit",
       "delivery requires the next normal user turn"),
-    // The model replied through the ACC CLI, not a native reply tool, so only
-    // livePush is proven for Codex.
-    ...nativeDelivery("codex-cli", "0.152.1", "2026-09-02T21:32:19.320Z",
-      "fixtures/delivery/codex-cli-0.152.1.json", "codex-app-server-thread-queue-v1",
-      "offered", "queued_after_turn", [
-          "captured on darwin-arm64 only; Linux and Windows remain uncaptured",
-          "no daemon pre-existed; codex app-server daemon start created it for this capture and daemon stop removed it",
-          "the daemon speaks JSON-RPC over WebSocket on its control Unix socket; a submission queued on the idle thread started a turn by itself, and one queued during a turn was presented after that turn as a user prompt",
-          "the model answered through the ACC CLI (acc reply), which proves the product loop but not a native reply route; delivery.replyRoute stays uncertified",
-          "thread/queue/add has no native idempotency once a submission has been consumed: a retried clientUserMessageId created a second submission and a short turn but no second ACC answer; idempotency holds while the submission is still queued, where thread/queue/list exposes it"
-    ], ["delivery.livePush"]),
+    // Codex has no native-delivery pass. The 0.152.1 queue capture observed a
+    // working transport; the release capture then measured that the mode it
+    // requires - codex --remote unix:// - reports the daemon's directory as the
+    // session's, from both the hook payload and the App Server's thread record.
+    // A session ACC cannot place must not be addressed, so the verdict for that
+    // tuple is the failure capture and the capability is withdrawn.
   ]),
   "adapter-gemini-cli": withFacts("gemini-cli", "0.37.0", [
     row("lifecycle.sessionStart", "fixtures/SessionStart.json", "SessionStart", null,
