@@ -26,11 +26,18 @@ sub-second race, and losing it was permanent: the session kept the unbound serve
 delivery never activated, with nothing in the record saying why. The lookup now retries
 until the binding appears, bounded so an unbound session is still answered.
 
+The Channel now also extends its endpoint lease while it is serving. The registration was
+written once and never renewed, so on a measured capture a session that had just live-pushed
+and been answered read as `reachable: false` about two minutes later - same process, same
+socket, still listening - and every later message fell back to the durable inbox. Renewal
+runs well inside the lease, stops when the channel closes, and keeps the endpoint identity
+so a peer that already resolved it is not locked out.
+
 | | |
 |---|---|
-| Built from | `e668aa84fcfa773fc945b23c786fb548296d2bef` |
-| Tarball | `agents-can-communicate-0.2.0.tgz`, 245,584 bytes, 195 entries |
-| sha256 | `f160994734ca4f9a81fe955164d2c1f36b8949c24a082dac7859b9f49e591202` |
+| Built from | `cfae16598ff3268cd1f2bc7b539d0f1d9f60673a` |
+| Tarball | `agents-can-communicate-0.2.0.tgz`, 246,052 bytes, 195 entries |
+| sha256 | `e6c33159093fc9c34adde2a4c6baa36e8fd2759f76fbf39d42636cf3762a714a` |
 | Node | 26.5.1; package requires Node >=24 |
 | Verified on | macOS 26.6.2 (darwin 25.6.0, arm64) |
 
