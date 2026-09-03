@@ -25,7 +25,10 @@ const publicManifestSurface = manifest => JSON.stringify({
   files: (manifest.files ?? []).filter(file => !file.startsWith("fixtures/")),
 });
 
-async function machine(t, version = "codex-cli 0.152.0") {
+// 0.152.1 is the version the withdrawal was measured on: the one where the
+// queue transport works and delivery is off anyway. 0.152.0 only ever proved
+// that an absent socket stops it, which is the weaker of the two facts.
+async function machine(t, version = "codex-cli 0.152.1") {
   const home = await realpath(await mkdtemp(path.join(tmpdir(), "acc-codex-home-")));
   const dataHome = await realpath(await mkdtemp(path.join(tmpdir(), "acc-codex-data-")));
   const project = path.join(home, "project");
@@ -94,14 +97,15 @@ for (const policy of ["actionable", "all"]) {
 
     assert.equal(operation.livePolicy, policy);
     assert.equal(operation.effectiveLivePolicy, "off");
-    assert.match(operation.deliveryDiagnostic, /0\.152\.0/);
-    assert.match(operation.deliveryDiagnostic, /control socket.*absent/i);
+    assert.match(operation.deliveryDiagnostic, /0\.152\.1/);
+    assert.match(operation.deliveryDiagnostic, /workspace/i);
+    assert.match(operation.deliveryDiagnostic, /not a misconfiguration/i);
     assert.match(operation.deliveryDiagnostic, /did not start.*daemon/i);
     assert.match(operation.deliveryDiagnostic, /next-turn.*acc inbox/);
 
     const installed = await place.command("install", "--adapter", "codex",
       "--delivery", policy, "--home", place.home);
-    assert.match(installed.stdout, /control socket.*absent/i,
+    assert.match(installed.stdout, /workspace/i,
       "the human install report hid the native-delivery downgrade");
     await assert.rejects(stat(path.join(place.home, ".codex", "app-server-control")),
       { code: "ENOENT" });
@@ -120,8 +124,9 @@ test("doctor names the failed Codex capture and withholds uncertified delivery",
   await place.command("install", "--adapter", "codex", "--home", place.home);
 
   const human = (await place.command("doctor", "--home", place.home)).stdout;
-  assert.match(human, /0\.152\.0/);
-  assert.match(human, /control socket.*absent/i);
+  assert.match(human, /0\.152\.1/);
+  assert.match(human, /workspace/i);
+  assert.match(human, /not a misconfiguration/i);
   assert.match(human, /did not start.*daemon/i);
   assert.match(human, /next-turn.*acc inbox/);
 
@@ -131,7 +136,7 @@ test("doctor names the failed Codex capture and withholds uncertified delivery",
   assert.equal(codex.capabilities.delivery.nextTurn, false);
   assert.equal(codex.capabilities.delivery.livePush, false);
   assert.equal(codex.capabilities.delivery.replyRoute, false);
-  assert.match(codex.deliveryDiagnostic, /control socket.*absent/i);
+  assert.match(codex.deliveryDiagnostic, /workspace/i);
   assert.match(codex.diagnostics.join(" "), /next-turn.*acc inbox/);
 });
 
