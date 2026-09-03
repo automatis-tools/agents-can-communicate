@@ -51,11 +51,21 @@ reported unreachable. A record written before that field existed stays readable:
 required made `acc status` fail outright against a store that had been working, and a
 coordination tool must not refuse to read what it wrote yesterday.
 
+Codex native delivery is withdrawn. Its App Server queue capture was real and the transport
+still works, but the mode that capability needs - `codex --remote unix://` - runs the session
+inside the daemon, and both the hook payload's `cwd` and the App Server's own thread record
+then name the daemon's directory instead of the session's. ACC placed such a session in an
+unrelated workspace and injected that workspace's peers into it, and nothing ACC can reach
+carries the real one. `delivery.livePush` is false, no native descriptor is declared, and the
+probe and handshake answer `workspace_identity_unavailable`. The failure is recorded as its
+own capture rather than by rewriting the passing one. Codex keeps next-turn delivery and the
+durable inbox.
+
 | | |
 |---|---|
-| Built from | `2e6d11e8aacfbec294feb3fb718d1ea31165bb86` |
-| Tarball | `agents-can-communicate-0.2.0.tgz`, 247,935 bytes, 195 entries |
-| sha256 | `96f0ddb5d884148046de137b3d19d71c2fe3e6d5da018d734e8044fa31121e3a` |
+| Built from | `7af86cdc6c0a8b07fb19f837b68b9e99e8b92755` |
+| Tarball | `agents-can-communicate-0.2.0.tgz`, 249,655 bytes, 195 entries |
+| sha256 | `f961e2e3f8a578be2d30ab8ec61c838262801fd2f8acd6e3b8d5c2a46caf4362` |
 | Node | 26.5.1; package requires Node >=24 |
 | Verified on | macOS 26.6.2 (darwin 25.6.0, arm64) |
 
