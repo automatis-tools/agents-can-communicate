@@ -97,6 +97,11 @@ test("delivery bindings are validated without joining the durable record kinds",
   error => error.code === EXIT.DATA && error.message.includes("livePolicy"));
   // Retirement is a fact of its own, not an expired lease: a channel that is
   // still renewing must not be able to express "given up" by moving a date.
+  // A record written before retirement was a field must still be readable: an
+  // upgrade that makes ACC refuse its own store breaks the coordination it
+  // exists to provide, and "never retired" is exactly what an absent fact means.
+  const { retiredAt: _absent, ...legacy } = DELIVERY_BINDING;
+  assert.deepEqual(validateRecord("deliveryBinding", legacy), legacy);
   const retired = { ...DELIVERY_BINDING, retiredAt: NOW };
   assert.deepEqual(validateRecord("deliveryBinding", retired), retired);
   assert.throws(() => validateRecord("deliveryBinding",

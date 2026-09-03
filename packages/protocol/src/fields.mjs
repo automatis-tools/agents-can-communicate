@@ -74,6 +74,23 @@ export const listOf = inner => (value, field) => {
 export const nullable = inner => (value, field) =>
   (value === null ? null : inner(value, field));
 
+/**
+ * A field that may be absent entirely.
+ *
+ * For a fact that either happened or did not, absence is the honest encoding of
+ * "not yet" - and it is what a record written before the field existed already
+ * says. Every record carries a schemaVersion, but adding a required field to a
+ * kind that outlives an upgrade turns a stored record into an unreadable one:
+ * measured, one binding written by the previous build made `acc status` fail
+ * outright with "deliveryBinding requires retiredAt". A coordination tool must
+ * not refuse to read its own store because it was upgraded.
+ */
+export const optional = inner => {
+  const check = (value, field) => (value === undefined ? undefined : inner(value, field));
+  check.optional = true;
+  return check;
+};
+
 export const positiveInteger = (value, field) => {
   if (!Number.isSafeInteger(value) || value <= 0) {
     invalid(field, "must be a positive integer", value);
