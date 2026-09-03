@@ -41,6 +41,32 @@ async function resolveSession({ runtimeDir, service, env }) {
     : { sessionId: chosen.accSessionId, generation: chosen.generation, clientPid: chosen.clientPid };
 }
 
+// How long the Channel will wait for the hook to publish this session's
+// binding. Claude spawns this child while SessionStart is still running - both
+// landed in the same second on a real 2.1.259 launch - and a single lookup
+// loses that race often enough to make native delivery activate or not per
+// launch. Bounded, because a session with no ACC binding must still be answered.
+const BINDING_WAIT_MS = 5_000;
+const BINDING_POLL_MS = 100;
+
+/**
+ * The session binding, once it exists - or null when the wait runs out.
+ *
+ * A binding with no `clientPid` names no process, and the Channel binds an
+ * exact one, so it does not count as resolved: the hook writes the identity
+ * first and the certified facts after, and reading in between must keep waiting
+ * rather than settle for the half-written answer.
+ */
+export async function resolveWithin({ resolve, deadline, intervalMs = BINDING_POLL_MS,
+  now = () => Date.now(), sleep = ms => new Promise(resolve_ => setTimeout(resolve_, ms)) }) {
+  for (;;) {
+    const session = await resolve();
+    if (session !== null && Number.isInteger(session?.clientPid)) return session;
+    if (now() >= deadline) return null;
+    await sleep(intervalMs);
+  }
+}
+
 async function main() {
   const descriptor = await discoverWorkspace({ cwd: process.cwd(), env: process.env,
     gitProbe: createGitProbe() });
@@ -50,7 +76,9 @@ async function main() {
     workspaceId: descriptor.id });
   const service = createCoordinationService({ store, clock, ids });
   const write = payload => process.stdout.write(`${JSON.stringify(payload)}\n`);
-  const session = await resolveSession({ runtimeDir: paths.root, service, env: process.env });
+  const session = await resolveWithin({
+    resolve: () => resolveSession({ runtimeDir: paths.root, service, env: process.env }),
+    deadline: Date.now() + BINDING_WAIT_MS });
   // No binding to serve - but Claude is already speaking MCP to this child, and
   // returning here left the event loop empty: the process exited in 75ms
   // without answering `initialize`, and Claude reported the server as failed to
