@@ -145,16 +145,22 @@ test("only capabilities observed firing are declared true", () => {
   assert.equal(capabilities.delivery.replyRoute, false);
 });
 
+// The tier moved to 0.57.0, and 0.37.0 losing its claim is the cost of that,
+// stated rather than hidden: this matrix admits one exact version, so certifying
+// the version people run necessarily un-certifies the one they no longer have.
+// A capture that is no longer the certified tier stays in provenance as history.
 test("next-turn delivery exists only at the exact certified client tier", () => {
   const adapter = createGeminiCliAdapter();
 
   assert.equal(effectiveCapabilities(adapter,
-    { clientVersion: "0.37.0", platform: "darwin-arm64" }).delivery.nextTurn, true);
+    { clientVersion: "0.57.0", platform: "darwin-arm64" }).delivery.nextTurn, true);
+  assert.equal(effectiveCapabilities(adapter,
+    { clientVersion: "0.37.0", platform: "darwin-arm64" }).delivery.nextTurn, false);
   assert.equal(effectiveCapabilities(adapter,
     { clientVersion: "0.55.1", platform: "darwin-arm64" }).delivery.nextTurn, false);
   assert.equal(effectiveCapabilities(adapter,
     { clientVersion: undefined, platform: "darwin-arm64" }).delivery.nextTurn, false);
-  assert.match(adapter.deliveryFallback.diagnostic, /0\.37\.0/);
+  assert.match(adapter.deliveryFallback.diagnostic, /0\.57\.0/);
   assert.match(adapter.deliveryFallback.diagnostic, /acc inbox/);
 });
 

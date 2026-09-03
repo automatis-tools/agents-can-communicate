@@ -9,8 +9,8 @@ const nextTurn = (fixture, event, limitation) => row("delivery.nextTurn", fixtur
   event, null, "model-context-observed", "offers complete peer messages at the next prompt",
   "does not interrupt an in-progress turn", "context", [limitation]);
 
-const withFacts = (client, version, entries) => entries.map(entry => ({ client, version,
-  platform: "darwin-arm64", observedAt: "2026-08-16", ...entry }));
+const withFacts = (client, version, entries, observedAt = "2026-08-16") => entries
+  .map(entry => ({ client, version, platform: "darwin-arm64", observedAt, ...entry }));
 
 // A native delivery capture has no hook event or tool: it proves an ordinary
 // launch, a protocol contract, and the five delivery branches instead. Both
@@ -80,28 +80,36 @@ export const PASS_EXPECTATIONS = Object.freeze({
     // A session ACC cannot place must not be addressed, so the verdict for that
     // tuple is the failure capture and the capability is withdrawn.
   ]),
-  "adapter-gemini-cli": withFacts("gemini-cli", "0.37.0", [
-    row("lifecycle.sessionStart", "fixtures/SessionStart.json", "SessionStart", null,
+  // Re-captured on the version this machine actually runs. 0.57.0 added folder
+  // trust, which silently downgrades the approval mode and with it the toolset,
+  // so the guard paths are reachable only from an explicitly trusted folder.
+  "adapter-gemini-cli": withFacts("gemini-cli", "0.57.0", [
+    row("lifecycle.sessionStart", "fixtures/SessionStart-0.57.0.json", "SessionStart", null,
       "event-observed", "fires when a session starts", "fires before the first model turn",
-      "advisory", ["capture used temporary project settings"]),
-    row("lifecycle.sessionEnd", "fixtures/SessionEnd.json", "SessionEnd", null,
+      "advisory", ["capture used an isolated HOME and a locally stubbed model endpoint"]),
+    row("lifecycle.sessionEnd", "fixtures/SessionEnd-0.57.0.json", "SessionEnd", null,
       "event-observed", "fires when a session exits", "does not run until the session exits",
       "advisory", ["handoff must be written before session end"]),
-    row("context.beforeTurnInjection", "fixtures/BeforeAgent.json", "BeforeAgent", null,
+    row("context.beforeTurnInjection", "fixtures/BeforeAgent-0.57.0.json", "BeforeAgent", null,
       "model-context-observed", "waits for the next user prompt",
       "does not interrupt an in-progress turn", "context",
-      ["requires the hookSpecificOutput additionalContext envelope"]),
-    row("guards.beforeWrite", "fixtures/BeforeTool.json", "BeforeTool", "write_file",
+      ["requires the hookSpecificOutput additionalContext envelope; the client forwards it"
+        + " to the model as a <hook_context> part"]),
+    row("guards.beforeWrite", "fixtures/BeforeTool-0.57.0.json", "BeforeTool", "write_file",
       "tool-denied-before-mutation", "no write exists to guard",
       "blocks write_file before mutation", "blocking",
-      ["write tools are unavailable in plan mode"]),
-    row("guards.beforeShell", "fixtures/BeforeTool-shell.json", "BeforeTool",
+      ["write tools are absent in the default and plan approval modes; the capture used yolo",
+        "an untrusted folder silently downgrades the approval mode, so the capture disabled"
+        + " security.folderTrust"]),
+    row("guards.beforeShell", "fixtures/BeforeTool-shell-0.57.0.json", "BeforeTool",
       "run_shell_command", "tool-denied-before-execution", "no shell call exists to guard",
       "blocks run_shell_command before execution", "blocking",
-      ["shell tools depend on approval mode"]),
-    nextTurn("fixtures/BeforeAgent.json", "BeforeAgent",
+      ["run_shell_command is absent below the yolo approval mode",
+        "a deny must be {\"decision\":\"block\"}; the hookSpecificOutput permissionDecision"
+        + " shape still does not deny on this client"]),
+    nextTurn("fixtures/BeforeAgent-0.57.0.json", "BeforeAgent",
       "delivery requires the next normal user turn"),
-  ]),
+  ], "2026-09-03"),
   "adapter-grok": [],
   "adapter-kimi": withFacts("kimi", "0.36.1", [
     row("lifecycle.sessionStart", "fixtures/SessionStart.json", "SessionStart", null,

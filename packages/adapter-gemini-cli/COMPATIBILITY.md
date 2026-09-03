@@ -4,7 +4,7 @@ Verified 2026-08-16 against the installed client and its live configuration.
 
 | Item | Value |
 |---|---|
-| Client | **0.37.0** and **0.55.1** hook contracts; next-turn delivery only **0.37.0 darwin-arm64** |
+| Client | **0.37.0**, **0.55.1** and **0.57.0** hook contracts; next-turn delivery only **0.57.0 darwin-arm64** |
 | Primary docs | <https://geminicli.com/docs/extensions/>, <https://geminicli.com/docs/hooks/> |
 | Local evidence | `~/.gemini/settings.json`, `gemini hooks --help`, `gemini extensions` |
 
@@ -106,11 +106,13 @@ guess by command string.
 ## Delivery tier
 
 ACC's machine-readable `delivery.nextTurn` capability is certified only for the exact
-`0.37.0` / `darwin-arm64` tier recorded in `certification.json`. The 0.55.1 observations
-below re-certify hook and response contracts; they do not certify ACC next-turn delivery
-for that version. Any other or unparseable version therefore downgrades explicitly while
-durable `acc inbox` access remains available. Gemini CLI has no certified live-push
-binding.
+`0.57.0` / `darwin-arm64` tier recorded in `certification.json`. This matrix admits one
+exact version, so moving the tier to the version the client now ships as necessarily takes
+the claim away from `0.37.0`: both captures are real, only one can be the certified tier,
+and the earlier one stays in `fixtures/certification-provenance.json` as history. The
+0.55.1 observations re-certify hook and response contracts only; they were never a
+next-turn tier. Any other or unparseable version downgrades explicitly while durable
+`acc inbox` access remains available. Gemini CLI has no certified live-push binding.
 
 
 ## Re-certified on 0.55.1 (2026-08-16)
@@ -142,6 +144,44 @@ The account still receives HTTP 403 from the real model API in headless mode - v
 with a plain `gemini -p` outside ACC entirely, so it is neither ACC's doing nor the
 client's. ACC's own hooks were observed firing against the real API on 0.55.1 regardless:
 a real session attached and closed through ACC's runtime before the model call failed.
+
+## Re-certified on 0.57.0 (2026-09-03), and this is now the certified tier
+
+The installed client had moved to 0.57.0 while the certified tier still named 0.37.0 - so
+the mechanism worked on this machine and ACC refused to claim it, which is the safe
+direction to be wrong in but still wrong. Everything was measured again on 0.57.0 rather
+than carried over, and the whole set came from **one** session
+(`d3effafd-204b-4b94-8b01-ad3efed7bf18`) so the payloads and the behaviour cannot be an
+assembly of separate runs.
+
+**Unchanged.** Event names and payload fields are identical. `{"decision":"block"}` still
+denies. The `hookSpecificOutput.permissionDecision` shape still does **not** deny - the
+trap holds, re-measured directly: with that reply the write went through and the file
+appeared.
+
+**Injection was checked at the far end, not at the hook.** A hook that prints an envelope
+proves only that it printed. So `additionalContext` carried a marker unlike anything the
+client or the prompt would produce, and the marker was looked for in the request the client
+sent to the model: it arrived in 4 of 4 requests, as its own part next to the user prompt,
+wrapped `<hook_context>…</hook_context>`. That is consumption, not emission.
+
+**Guards were checked by absence.** With the deny wired in, `BeforeTool` fired for
+`write_file` and for `run_shell_command`, no `AfterTool` followed either, and the workspace
+stayed empty - no written file, no marker from the shell command. With the deny removed,
+both `AfterTool` events appeared and both artefacts existed.
+
+**New in 0.57.0, and the quietest obstacle so far: folder trust.** An untrusted folder does
+not fail the run. It prints `Approval mode overridden to "default" because the current
+folder is not trusted` and continues - and in the default mode this client declares no
+write or shell tool at all. A guard then never fires, and nothing anywhere says the reason
+was trust. Setting `security.folderTrust.enabled` to `false` (or trusting the folder)
+restores the toolset. `security.auth.selectedType` is still required, as on 0.55.1.
+
+**Also changed, and relevant only to capture:** the router's complexity call now goes to a
+different model than the turn, so a stand-in endpoint must answer both
+`:generateContent` (strict JSON: `complexity_reasoning`, `complexity_score`) and
+`:streamGenerateContent?alt=sse` (the turn itself, as SSE). Answering only the second makes
+the client retry the first and give up before offering any tool.
 
 ## The extension's hooks.json is a template, measured 2026-08-17 on 0.55.1
 
@@ -176,9 +216,13 @@ from ACC's side: the hook it ran exited 0 and did its work.
 Hook wiring is verified against the real client. The model call is not: this
 account returns `Permission 'cloudaicompanion.companions.generateChat' denied`
 in headless mode, which is the same account limitation already recorded in
-`CHANGELOG.md`. So no Gemini session has been driven by a live model, and the
-matrix rows for this client rest on hook captures rather than on a completed
-turn.
+`CHANGELOG.md`. So no Gemini session has been driven by a live model.
+
+What the 0.57.0 capture does add is a **completed** turn: the client ran to a
+final answer, chose and called two tools of its own accord, and exited 0 - only
+the model behind it was a local stand-in. The matrix rows therefore rest on a
+whole turn's worth of the client's own behaviour, and on nobody's account being
+able to reach the real model.
 
 Headless runs also need workspace trust: `GEMINI_CLI_TRUST_WORKSPACE=true`, or
 `--skip-trust`.

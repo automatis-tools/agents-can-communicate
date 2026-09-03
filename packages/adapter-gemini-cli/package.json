@@ -9,11 +9,11 @@
   "files": [
     "certification.json",
     "fixtures/certification-provenance.json",
-    "fixtures/SessionStart.json",
-    "fixtures/SessionEnd.json",
-    "fixtures/BeforeAgent.json",
-    "fixtures/BeforeTool.json",
-    "fixtures/BeforeTool-shell.json",
+    "fixtures/SessionStart-0.57.0.json",
+    "fixtures/SessionEnd-0.57.0.json",
+    "fixtures/BeforeAgent-0.57.0.json",
+    "fixtures/BeforeTool-0.57.0.json",
+    "fixtures/BeforeTool-shell-0.57.0.json",
     "src/",
     "extension/"
   ]
