@@ -7,11 +7,16 @@ before trusting or extending it. It follows a real interaction from client start
 workspace identity through record-first storage, inbox and next-turn delivery, reply,
 receipt transitions, crash recovery, and the peer-content trust boundary.
 
+`acc doctor` now reports native-delivery state from the shell it actually runs in. It had
+built its detection context without a shell, so every shell-bootstrap client degraded to
+`unsupported_shell` - a zsh install with a working shim read as degraded on every run, the
+same shape install already resolves.
+
 | | |
 |---|---|
-| Built from | `6de0d3af887e13125235349ccc64cbdfe967bb18` |
-| Tarball | `agents-can-communicate-0.2.0.tgz`, 244,269 bytes, 195 entries |
-| sha256 | `b6f19c921ebe278eb97ecfec8786527040e431dc68fb8ee27edfc55fd0461e40` |
+| Built from | `b577ce585297035edd83094def7bbd499a8b9fb6` |
+| Tarball | `agents-can-communicate-0.2.0.tgz`, 244,382 bytes, 195 entries |
+| sha256 | `a6029cc30b9afe17f011c6d0ed78b7b1068510438bdde44aa2cd2eda43bf51c6` |
 | Node | 26.5.1; package requires Node >=24 |
 | Verified on | macOS 26.6.2 (darwin 25.6.0, arm64) |
 
