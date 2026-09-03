@@ -63,6 +63,12 @@ The router requires exactly one current eligible generation. No binding, an expi
 several live sessions for one participant, a busy target, or a version that does not match
 passing evidence all stay on durable fallback.
 
+The lease is extended by whoever serves the endpoint, because only that process knows it is
+still alive. A client that publishes no heartbeat - Claude Code among them - would otherwise
+let the lease run out under an idle session, which is exactly when live delivery is worth
+having. Giving a binding up is a separate, final fact rather than an expired lease, so a
+channel that has not yet noticed cannot extend something the session already retired.
+
 Current shipped reality: Claude Code 2.1.258 and Codex 0.152.1 on darwin-arm64 have passing
 experimental `livePush` captures behind the native delivery contract, off until a per-client
 opt-in; every other client is next-turn or inbox only;

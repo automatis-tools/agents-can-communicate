@@ -116,7 +116,11 @@ const RECORDS = Object.freeze({
   deliveryBinding: { sessionId: id, generation: id, adapterId: id, clientVersion: line,
     availableModes: uniqueListOf(oneOf(...DELIVERY_MODES)),
     livePolicy: oneOf("off", "actionable", "all"), opaqueEndpointRef: prose,
-    leaseUntil: timestamp },
+    // The lease says how long the endpoint's owner has vouched for it; the
+    // retirement says the session gave it up. They were once the same field -
+    // clearing expired the lease - which made a renewal by a channel that had
+    // not yet noticed indistinguishable from a legitimate extension.
+    leaseUntil: timestamp, retiredAt: nullable(timestamp) },
 });
 
 export const RECORD_KINDS = Object.freeze(Object.keys(DURABLE_RECORDS));

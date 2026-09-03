@@ -43,7 +43,8 @@ const defaultSocketDir = () => path.join(os.tmpdir(),
  */
 export function createAccChannel({ endpointDir, socketDir = defaultSocketDir(), clientPid,
   protocolContract = PROTOCOL_CONTRACT, modes = CHANNEL_MODES, leaseMs = 60_000, routeReply,
-  routeAck, observe = () => {}, clock = () => new Date().toISOString(), write, now = Date.now }) {
+  routeAck, refreshBinding = null, observe = () => {},
+  clock = () => new Date().toISOString(), write, now = Date.now }) {
   const endpointId = shortId();
   const nonce = randomBytes(32).toString("hex");
   const socketPath = path.join(socketDir, `s${randomBytes(6).toString("hex")}.sock`);
@@ -63,10 +64,12 @@ export function createAccChannel({ endpointDir, socketDir = defaultSocketDir(), 
   function record() {
     mkdirSync(endpointDir, { recursive: true, mode: 0o700 });
     chmodSync(endpointDir, 0o700);
+    const leaseUntil = new Date(now() + leaseMs).toISOString();
     writeFileSync(registrationPath, `${JSON.stringify({
       schemaVersion: 1, endpointId, clientPid, socketPath, nonce, protocolContract,
-      modes: [...modes], leaseUntil: new Date(now() + leaseMs).toISOString(),
+      modes: [...modes], leaseUntil,
     }, null, 2)}\n`, { mode: 0o600 });
+    return leaseUntil;
   }
 
   /**
@@ -85,7 +88,19 @@ export function createAccChannel({ endpointDir, socketDir = defaultSocketDir(), 
    */
   function renew() {
     if (closed) return;
-    record();
+    const leaseUntil = record();
+    // ACC keeps its own record of this binding with its own lease, and for a
+    // client with no heartbeat nothing else moves it: the two drifted apart
+    // until the router stopped offering to a session this endpoint was still
+    // serving. The owner tells ACC exactly the lease it just advertised.
+    //
+    // Fail-open, and never awaited: coordination that cannot be reached must
+    // not take down the endpoint that is working.
+    if (refreshBinding === null) return;
+    try {
+      const settled = refreshBinding(leaseUntil);
+      if (settled && typeof settled.catch === "function") settled.catch(() => {});
+    } catch { /* the endpoint stays advertised regardless */ }
   }
 
   function reject(socket, reasonCode) {

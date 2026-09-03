@@ -95,6 +95,12 @@ async function main() {
     write,
     routeReply: ({ messageId, body }) => routeReply({ service, session, messageId, body }),
     routeAck: ({ messageId }) => routeAck({ service, session, messageId }),
+    // This process is the only party that knows the endpoint is still being
+    // served, and Claude publishes no heartbeat, so nothing else would move
+    // ACC's lease while the session sits idle - which is when live delivery is
+    // worth having.
+    refreshBinding: leaseUntil => service.refreshDeliveryBinding({
+      sessionId: session.sessionId, generation: session.generation, leaseUntil }),
   });
   await channel.listen();
   pump(channel.handleLine, () => { channel.close(); process.exit(0); });
