@@ -18,7 +18,7 @@ import { openFilesystemStore } from "@agents-can-communicate/storage-filesystem"
 import { createGitProbe, discoverWorkspace, platformDataHome, runtimePaths }
   from "@agents-can-communicate/cli";
 
-import { createAccChannel, endpointDir, routeAck, routeReply }
+import { createAccChannel, createInertChannel, endpointDir, routeAck, routeReply }
   from "@agents-can-communicate/adapter-claude-code/channel";
 
 const clock = { now: () => new Date().toISOString() };
@@ -49,18 +49,32 @@ async function main() {
   const store = await openFilesystemStore({ root: paths.root, clock, ids,
     workspaceId: descriptor.id });
   const service = createCoordinationService({ store, clock, ids });
+  const write = payload => process.stdout.write(`${JSON.stringify(payload)}\n`);
   const session = await resolveSession({ runtimeDir: paths.root, service, env: process.env });
-  if (session === null || !Number.isInteger(session.clientPid)) return null;
+  // No binding to serve - but Claude is already speaking MCP to this child, and
+  // returning here left the event loop empty: the process exited in 75ms
+  // without answering `initialize`, and Claude reported the server as failed to
+  // connect on every session that enables the plugin without ACC's shim.
+  if (session === null || !Number.isInteger(session.clientPid)) {
+    const inert = createInertChannel({ write });
+    pump(inert.handleLine, () => process.exit(0));
+    return inert;
+  }
 
   const channel = createAccChannel({
     endpointDir: endpointDir(paths.root),
     clientPid: session.clientPid,
-    write: payload => process.stdout.write(`${JSON.stringify(payload)}\n`),
+    write,
     routeReply: ({ messageId, body }) => routeReply({ service, session, messageId, body }),
     routeAck: ({ messageId }) => routeAck({ service, session, messageId }),
   });
   await channel.listen();
+  pump(channel.handleLine, () => { channel.close(); process.exit(0); });
+  return channel;
+}
 
+/** One line-delimited JSON pump, for the bound server and the unbound one alike. */
+function pump(handleLine, shutdown) {
   let buffer = "";
   process.stdin.setEncoding("utf8");
   process.stdin.on("data", async chunk => {
@@ -70,14 +84,14 @@ async function main() {
       const line = buffer.slice(0, newline).trim();
       buffer = buffer.slice(newline + 1);
       newline = buffer.indexOf("\n");
-      if (line !== "") await channel.handleLine(line);
+      if (line !== "") await handleLine(line);
     }
   });
-  const shutdown = () => { channel.close(); process.exit(0); };
   process.stdin.on("end", shutdown);
   process.once("SIGTERM", shutdown);
   process.once("SIGINT", shutdown);
-  return channel;
+  // Keeps the child answerable for as long as Claude holds the transport open.
+  process.stdin.resume();
 }
 
 const invokedDirectly = typeof process.argv[1] === "string"
