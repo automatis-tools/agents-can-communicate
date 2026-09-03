@@ -5,11 +5,13 @@ import certification from "../certification.json" with { type: "json" };
 import { denyOutcome, injectOutcome, normalizeGeminiHook } from "./hooks.mjs";
 import { planGeminiInstall, detectGemini, installGeminiExtension, uninstallGeminiExtension } from "./install.mjs";
 
-// Verified on both. The version jump changed how a session is authenticated and
-// how a turn is routed, and changed neither the hook events nor either of the
-// two response contracts.
-export const GEMINI_CLI_VERSIONS = Object.freeze(["0.37.0", "0.55.1"]);
-export const GEMINI_CLI_VERSION = "0.55.1";
+// Verified on all three. Two version jumps changed how a session is
+// authenticated, how a turn is routed, and whether a folder is trusted at all,
+// and changed neither the hook events nor either of the two response contracts.
+// The certified tier is the last of them, because that is the one this client
+// is shipped as; the earlier captures stay in provenance as history.
+export const GEMINI_CLI_VERSIONS = Object.freeze(["0.37.0", "0.55.1", "0.57.0"]);
+export const GEMINI_CLI_VERSION = "0.57.0";
 
 /**
  * The gap this adapter used to carry is closed.
@@ -25,6 +27,14 @@ export const GEMINI_CLI_VERSION = "0.55.1";
  * measured rather than assumed: a deny must be `{"decision":"block"}`, while an
  * injection must be the `hookSpecificOutput` envelope. Swapping them silently
  * does nothing at all.
+ *
+ * Re-measured the same way on 0.57.0, the version this client now ships as, and
+ * both contracts still hold: a `{"decision":"block"}` deny left the workspace
+ * empty with no AfterTool event, while the `permissionDecision` shape other
+ * clients accept let the write through. Injection was checked at the far end
+ * rather than at the hook: a marker returned as `additionalContext` arrived in
+ * the request the client sent to the model, as its own `<hook_context>` part.
+ * Printing an envelope is not evidence that anything consumed it.
  */
 export function createGeminiCliAdapter() {
   return defineAdapter({
@@ -32,7 +42,7 @@ export function createGeminiCliAdapter() {
     displayName: "Gemini CLI",
     // The binary this client actually installs. Probed for a version to
     // decide whether the client is on this machine, so it has to be the
-    // real command rather than the adapter id: `0.55.1`.
+    // real command rather than the adapter id: `0.57.0`.
     client: { command: "gemini", certificationName: "gemini-cli", versionArgs: ["--version"] },
     certification,
     capabilities: {
@@ -42,7 +52,7 @@ export function createGeminiCliAdapter() {
       delivery: { nextTurn: true },
     },
     deliveryFallback: { diagnostic:
-      "Gemini CLI next-turn delivery is certified only for 0.37.0 on darwin-arm64; "
+      "Gemini CLI next-turn delivery is certified only for 0.57.0 on darwin-arm64; "
       + "other or unknown versions keep durable acc inbox access, and live push is unavailable" },
 
     startSession: async () => ({ ok: true, changes: [], diagnostics: [] }),
@@ -64,10 +74,14 @@ export function createGeminiCliAdapter() {
           + "that Claude Code and Kimi Code accept does not deny on this client",
         "write guards need an approval mode that offers the edit tools; in plan "
           + "mode the client declares no write tool at all",
-        // Both appeared with 0.55.1 and stop a headless session before any hook
-        // beyond SessionStart can matter.
-        "0.55.x needs an explicit security.auth.selectedType and a trusted "
-          + "workspace; without either, a headless run stops before the first turn",
+        // Both appeared with 0.55.1, persist through 0.57.0, and stop a headless
+        // session before any hook beyond SessionStart can matter. The trust
+        // check is the quieter of the two: it does not fail the run, it
+        // downgrades the approval mode, and with it the toolset a guard exists
+        // to protect.
+        "0.55.x and later need an explicit security.auth.selectedType and a "
+          + "trusted workspace; without either, a headless run stops before the "
+          + "first turn or silently loses its write and shell tools",
       ] };
     },
 

@@ -1,5 +1,20 @@
 # Gemini CLI hook fixtures
 
+The shipped set is the `-0.57.0` files, captured 2026-09-03 from `gemini -p` on 0.57.0 -
+the version this client installs as. They all come from one session, so the payload shapes
+and the behaviour around them belong to the same run rather than to a collection of them.
+
+The unsuffixed files are the 0.37.0 capture. They are kept as history and are deliberately
+**not** in the package's `files` allowlist: a recorded observation is never edited in
+place, and the matrix admits one exact certified version, so superseding a tier means a new
+capture beside the old one rather than a rewrite of it. Their records stay in
+`certification-provenance.json` with their original digests.
+
+The 0.57.0 capture needed one thing the earlier ones did not: folder trust off. An
+untrusted folder does not fail - it downgrades the approval mode, and the downgraded
+toolset contains no write or shell tool, so a guard simply never fires and nothing says
+why. The 0.37.0 notes below still describe how the guard payloads are reached at all.
+
 Captured 2026-08-16 from `gemini -p` on 0.37.0. The capture hooks lived in a temporary
 project's `.gemini/settings.json`, so nothing global was changed.
 
