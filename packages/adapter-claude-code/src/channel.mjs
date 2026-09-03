@@ -242,6 +242,52 @@ export function createAccChannel({ endpointDir, socketDir = defaultSocketDir(), 
 }
 
 /** Validate a channel registration read from disk, or throw. */
+/**
+ * The MCP server a Claude session gets when no ACC session is bound to it.
+ *
+ * Claude spawns this child for every session that enables the plugin, not only
+ * for the ones ACC's shim launched with the development-channel flag. Composing
+ * a real channel needs a live binding and the client's pid, and without them
+ * there is nothing to serve - but the child is already on Claude's MCP
+ * transport by then, and one that answers nothing is reported to the user as a
+ * server that failed to connect. Measured: the binary returned instead, left
+ * the event loop empty, and exited in 75ms without answering `initialize`.
+ *
+ * So the unbound case is a complete server rather than an absent one: it
+ * finishes the handshake, declares no `claude/channel` it cannot serve - a
+ * declaration would point Claude at an endpoint that is not there - and offers
+ * no tools, because `acc_reply` and `acc_ack` would have no session to write to.
+ */
+export function createInertChannel({ write }) {
+  function handleRequest(method, params) {
+    if (method === "initialize") {
+      return { protocolVersion: params.protocolVersion,
+        capabilities: { tools: {} },
+        serverInfo: { name: "agents-can-communicate", version: "0.2.0" } };
+    }
+    if (method === "tools/list") return { tools: [] };
+    if (method === "ping") return {};
+    return undefined;
+  }
+
+  async function handleLine(line) {
+    let message;
+    try { message = JSON.parse(line); }
+    catch { write({ jsonrpc: "2.0", error: { code: -32700, message: "parse error" } }); return; }
+    // A notification carries no id and takes no reply.
+    if (message.id === undefined || message.id === null) return;
+    const result = handleRequest(message.method, message.params ?? {});
+    if (result === undefined) {
+      write({ jsonrpc: "2.0", id: message.id,
+        error: { code: -32601, message: `unknown method: ${message.method}` } });
+      return;
+    }
+    write({ jsonrpc: "2.0", id: message.id, result });
+  }
+
+  return { handleLine };
+}
+
 export function readRegistration(source) {
   const record = JSON.parse(source);
   if (record?.schemaVersion !== 1) throw new Error("unknown channel registration schemaVersion");
