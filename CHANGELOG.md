@@ -29,7 +29,14 @@ until the binding appears, bounded so an unbound session is still answered.
 The Channel now also extends its endpoint lease while it is serving. The registration was
 written once and never renewed, so on a measured capture a session that had just live-pushed
 and been answered read as `reachable: false` about two minutes later - same process, same
-socket, still listening - and every later message fell back to the durable inbox. Renewal
+socket, still listening - and every later message fell back to the durable inbox.
+
+The Channel's reply instructions now name a fallback. They named `acc_reply` as the only way
+to answer; on a measured session the model reported that tool was not loaded in its context
+and would have failed without first fetching its schema, and it recovered only because it
+thought to look. The `acc` CLI is already a real reply path, so it is named as the fallback -
+while answering peer content in ordinary output stays forbidden, being the one route that
+records nothing. Renewal
 runs well inside the lease, stops when the channel closes, and keeps the endpoint identity
 so a peer that already resolved it is not locked out.
 
@@ -63,9 +70,9 @@ durable inbox.
 
 | | |
 |---|---|
-| Built from | `7af86cdc6c0a8b07fb19f837b68b9e99e8b92755` |
-| Tarball | `agents-can-communicate-0.2.0.tgz`, 249,655 bytes, 195 entries |
-| sha256 | `f961e2e3f8a578be2d30ab8ec61c838262801fd2f8acd6e3b8d5c2a46caf4362` |
+| Built from | `692890def23a993b9b66ba4844d5841c3e92c855` |
+| Tarball | `agents-can-communicate-0.2.0.tgz`, 249,914 bytes, 195 entries |
+| sha256 | `ae3d73d9af756d002efb0b2849f2c0b679c60dcd97edc56a94c89a1b7be1bb22` |
 | Node | 26.5.1; package requires Node >=24 |
 | Verified on | macOS 26.6.2 (darwin 25.6.0, arm64) |
 
