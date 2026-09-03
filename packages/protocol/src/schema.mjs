@@ -1,6 +1,6 @@
 import { assertMessageSemantics, MESSAGE_KINDS, OBLIGATIONS } from "./conversations.mjs";
 import { AccError, EXIT } from "./errors.mjs";
-import { id, invalid, listOf, nullable, oneOf, plainObject, positiveInteger,
+import { id, invalid, listOf, nullable, oneOf, optional, plainObject, positiveInteger,
   resourceUri, sequence, text, timestamp } from "./fields.mjs";
 
 export const SCHEMA_VERSION = 3;
@@ -120,7 +120,7 @@ const RECORDS = Object.freeze({
     // retirement says the session gave it up. They were once the same field -
     // clearing expired the lease - which made a renewal by a channel that had
     // not yet noticed indistinguishable from a legitimate extension.
-    leaseUntil: timestamp, retiredAt: nullable(timestamp) },
+    leaseUntil: timestamp, retiredAt: optional(nullable(timestamp)) },
 });
 
 export const RECORD_KINDS = Object.freeze(Object.keys(DURABLE_RECORDS));
@@ -142,6 +142,7 @@ export function validateRecord(kind, value) {
   }
   for (const [field, check] of Object.entries(fields)) {
     if (!Object.hasOwn(value, field)) {
+      if (check.optional === true) continue;
       throw new AccError(EXIT.DATA, `${kind} requires ${field}`, { kind, field });
     }
     check(value[field], field);
