@@ -53,18 +53,34 @@ function fakePeer({ userAgent = "acc/0.152.1 (Mac OS)", loaded = [THREAD],
     async close() { this.closed = true; } };
 }
 
-test("the probe is off without a daemon and supported with the queue protocol", async t => {
+// The queue transport itself works - that was captured and still is. What the
+// release capture measured is that ACC cannot tell which workspace such a
+// session belongs to. Native delivery here requires `codex --remote unix://`,
+// and in that mode the session runs inside the daemon: the hook payload reports
+// `cwd` as the daemon's directory, and the App Server's own `thread/list`
+// records the same. Measured on 0.152.1 - client working in
+// /private/tmp/acc-rel-home/project, thread recorded under the daemon's
+// /Users/.../agents-can-communicate - so ACC registered the session in a
+// different project entirely and fed it that project's peers.
+//
+// The earlier spike could not see this: it started the daemon itself, in the
+// same directory as the session, so the two cwds coincided.
+//
+// A session ACC cannot place is one it must not address, so the probe refuses
+// rather than claiming a live capability it cannot honour.
+test("the probe is off without a daemon and refuses even when the queue answers", async t => {
   const missing = await probeNativeDelivery({ realExecutable: "/vendor/codex",
     env: { CODEX_HOME: mkdtempSync(path.join(tmpdir(), "acc-codex-nodaemon-")) } });
   assert.equal(missing.reasonCode, "feature_probe_failed");
   const home = codexHome(t); await home.ready;
   const peer = fakePeer();
-  const ok = await probeNativeDelivery({ realExecutable: "/vendor/codex", env: home.env,
+  const answered = await probeNativeDelivery({ realExecutable: "/vendor/codex", env: home.env,
     open: () => peer });
-  assert.deepEqual(ok, { supported: true, clientVersion: "0.152.1",
-    protocolContract: "codex-app-server-thread-queue-v1", executableFingerprint: null,
-    modes: ["livePush", "idleWake", "busyQueue"], reasonCode: null });
-  assert.equal(peer.closed, true);
+  assert.equal(answered.supported, false,
+    "the transport works, but a session ACC cannot place must not be addressed");
+  assert.equal(answered.reasonCode, "workspace_identity_unavailable");
+  assert.deepEqual(answered.modes, [],
+    "no mode may be offered for a session whose workspace is unknown");
 });
 
 test("the activation uses the existing vendor daemon and adds only the remote flag", () => {
@@ -80,14 +96,16 @@ test("the activation uses the existing vendor daemon and adds only the remote fl
   assert.equal(planNativeActivation({ detection: {} }).eligible, false);
 });
 
-test("binding uses the hook's session id as the thread and verifies it", async t => {
+test("binding verifies the thread and still refuses a session it cannot place", async t => {
   const home = codexHome(t); await home.ready;
-  const bound = await bindNativeSession({ event: { sessionId: THREAD, cwd: CWD },
+  const located = await bindNativeSession({ event: { sessionId: THREAD, cwd: CWD },
     clientVersion: "0.152.1", env: home.env, open: () => fakePeer() });
-  assert.deepEqual(bound, { supported: true, clientVersion: "0.152.1",
-    protocolContract: "codex-app-server-thread-queue-v1",
-    modes: ["livePush", "idleWake", "busyQueue"], opaqueEndpointRef: THREAD,
-    leaseUntil: bound.leaseUntil, reasonCode: null });
+  // The thread is found - the lookup works - but the cwd it was found under came
+  // from a hook running inside the daemon, so it names the daemon's directory.
+  assert.equal(located.supported, false);
+  assert.equal(located.reasonCode, "workspace_identity_unavailable");
+  assert.equal(located.opaqueEndpointRef, null,
+    "an endpoint ACC cannot place must not become addressable");
   const wrong = await bindNativeSession({ event: { sessionId: "unknown", cwd: CWD },
     clientVersion: "0.152.1", env: home.env, open: () => fakePeer() });
   assert.deepEqual([wrong.supported, wrong.reasonCode], [false, "handshake_failed"]);

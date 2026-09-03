@@ -15,7 +15,7 @@
     "fixtures/UserPromptSubmit.json",
     "fixtures/PreToolUse.json",
     "fixtures/delivery/codex-cli-0.152.0.json",
-    "fixtures/delivery/codex-cli-0.152.1.json",
+    "fixtures/delivery/codex-cli-0.152.1-remote-workspace.json",
     "src/",
     "plugin/"
   ]

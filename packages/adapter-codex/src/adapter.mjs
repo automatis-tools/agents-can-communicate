@@ -46,28 +46,30 @@ export function createCodexAdapter() {
       // The captured Bash payload is an allowed PostToolUse event, not the
       // denied PreToolUse capture required to certify a shell guard.
       guards: { beforeWrite: true },
-      // nextTurn is the certified 0.147.0 hook projection; livePush rests on the
-      // 0.152.1 App Server queue capture and the native contract below. Codex
-      // answers through the acc reply CLI, so replyRoute stays false.
-      delivery: { nextTurn: true, livePush: true },
+      // nextTurn is the certified 0.147.0 hook projection. livePush rested on
+      // the 0.152.1 App Server queue capture until the release capture withdrew
+      // it: the transport works, but the mode it needs hides which workspace the
+      // session is in, and a session ACC cannot place must not be addressed.
+      delivery: { nextTurn: true, livePush: false },
     },
-    nativeDelivery: {
-      minimumByPlatform: { "darwin-arm64": CODEX_QUEUE_MINIMUM },
-      anchors: [{ platform: "darwin-arm64", version: CODEX_QUEUE_MINIMUM,
-        protocolContract: PROTOCOL_CONTRACT }],
-      knownBad: [],
-      activationKinds: ["native-service", "shell-bootstrap"],
-    },
+    // Native delivery is not declared. The contract is right to refuse a
+    // descriptor with no passing anchor, and the release capture withdrew the
+    // one this adapter had: the queue transport still works, but delivery here
+    // requires `codex --remote unix://`, and in that mode neither the hook
+    // payload's cwd nor the App Server's own thread record names the session's
+    // directory - both name the daemon's. Measured on 0.152.1 with a client
+    // working in one project and its thread recorded under another, ACC placed
+    // the session in the wrong workspace and fed it that workspace's peers.
+    //
+    // Nothing ACC can reach carries the real workspace, so this is not a gap to
+    // paper over with a default. Codex keeps next-turn delivery and the durable
+    // inbox, which do not depend on knowing the session's directory.
 
     startSession: async () => ({ ok: true, changes: [], diagnostics: [] }),
     endSession: async () => ({ ok: true, changes: [], diagnostics: [] }),
     guardWrite: async () => ({ ok: true, changes: [], diagnostics: [] }),
     guardShell: async () => ({ ok: true, changes: [], diagnostics: [] }),
 
-    probeNativeDelivery,
-    planNativeActivation,
-    bindNativeSession,
-    offerMessage,
 
     planInstall: context => planCodexInstall(context),
     detect: context => detectCodex(context),

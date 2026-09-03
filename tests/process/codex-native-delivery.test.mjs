@@ -56,14 +56,21 @@ async function daemon(t, { cwd }) {
   return { env: { CODEX_HOME: home }, state };
 }
 
-test("binding verifies the exact thread and an offer queues one labelled message", async t => {
+// The queue transport works against a real daemon and still does - that is
+// worth holding on to, because it is not what failed. What failed is placing
+// the session: native delivery needs codex --remote unix://, and in that mode
+// the hook payload's cwd and the App Server's own thread record both name the
+// daemon's directory rather than the session's. So the binding refuses even
+// when the thread is right there, and nothing becomes addressable.
+test("the queue still carries a labelled message, and the binding still refuses", async t => {
   const cwd = "/work/project";
   const place = await daemon(t, { cwd });
   const bound = await bindNativeSession({ event: { sessionId: THREAD, cwd },
     clientVersion: "0.152.1", env: place.env });
-  assert.equal(bound.supported, true);
-  assert.equal(bound.opaqueEndpointRef, THREAD);
-  assert.deepEqual(bound.modes, ["livePush", "idleWake", "busyQueue"]);
+  assert.equal(bound.supported, false);
+  assert.equal(bound.reasonCode, "workspace_identity_unavailable");
+  assert.equal(bound.opaqueEndpointRef, null,
+    "an endpoint ACC cannot place must not become addressable");
 
   const result = await offerMessage({ binding: { opaqueEndpointRef: THREAD,
     clientVersion: "0.152.1" }, message: { messageId: "message_1", kind: "question",

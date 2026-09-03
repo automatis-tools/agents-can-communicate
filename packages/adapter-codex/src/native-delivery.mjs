@@ -5,14 +5,26 @@ import { MINIMUM_VERSION, PROTOCOL_CONTRACT, addCodexQueueMessage, compareStable
   controlSocketPath, initializeCodex, locateCodexThread, openCodexAppServer, parseStableVersion,
   probeCodexQueue, safeReason, serverVersionOf } from "./app-server-client.mjs";
 
-// The Codex native-delivery adapter methods. Codex answers ACC through the
-// existing acc reply CLI, not a native callback, so only delivery.livePush is
-// claimed - never replyRoute. Detection and binding read the daemon and the
-// captured thread over the official queue protocol and never start, restart, or
-// steer anything. The opaque endpoint ref is the App Server thread id; there is
-// no ACC-owned socket to guard because the daemon is vendor-owned.
-
-const CHANNEL_MODES = Object.freeze(["livePush", "idleWake", "busyQueue"]);
+// The Codex native-delivery adapter methods. Detection and binding read the
+// daemon and the captured thread over the official queue protocol and never
+// start, restart, or steer anything. The opaque endpoint ref is the App Server
+// thread id; there is no ACC-owned socket to guard because the daemon is
+// vendor-owned.
+//
+// No live capability is claimed. The queue transport works - that is captured
+// and still true - but delivery here requires `codex --remote unix://`, and in
+// that mode the session runs inside the daemon: the hook payload's `cwd` and
+// the App Server's own thread record both name the daemon's directory, not the
+// session's. Measured on 0.152.1 with the client working in
+// /private/tmp/acc-rel-home/project while its thread was recorded under the
+// daemon's checkout, ACC registered that session in a different project and
+// injected that project's peers into it.
+//
+// Nothing ACC can reach carries the session's real workspace, so it cannot be
+// recovered - and a session placed in the wrong workspace is worse than one
+// that never joined. The earlier spike missed this because it started the
+// daemon itself, in the session's own directory, so the two cwds coincided.
+const CHANNEL_MODES = Object.freeze([]);
 const REMOTE_UNIX = "unix://";
 
 async function socketReady(env) {
@@ -34,8 +46,10 @@ export async function probeNativeDelivery({ realExecutable, timeoutMs = 750, env
     const probe = await probeCodexQueue(peer, { threadId: "thread_probe" });
     const serverVersion = probe.serverVersion;
     if (!probe.supported) return { ...unsupported(probe.reasonCode), clientVersion: serverVersion };
-    return { supported: true, clientVersion: serverVersion, protocolContract: PROTOCOL_CONTRACT,
-      executableFingerprint: null, modes: [...CHANNEL_MODES], reasonCode: null };
+    // The queue answered, so the transport is there. It is still not offered:
+    // the mode that makes a session reachable is the mode that hides which
+    // workspace it belongs to.
+    return { ...unsupported("workspace_identity_unavailable"), clientVersion: serverVersion };
   } catch (error) {
     return unsupported(safeReason(error));
   } finally {
@@ -79,9 +93,13 @@ export async function bindNativeSession({ event, clientVersion, cwd, env = proce
       || compareStableVersions(serverVersion, MINIMUM_VERSION) < 0) return closed("handshake_failed");
     const located = await locateCodexThread(peer, { threadId, cwd: cwd ?? event?.cwd });
     if (!located.found) return closed("handshake_failed");
-    return { supported: true, clientVersion: clientVersion ?? serverVersion,
-      protocolContract: PROTOCOL_CONTRACT, modes: [...CHANNEL_MODES], opaqueEndpointRef: threadId,
-      leaseUntil: new Date(Date.now() + 60_000).toISOString(), reasonCode: null };
+    // Located, and still refused. The cwd this lookup was given came from a
+    // hook running inside the daemon, so it names the daemon's directory rather
+    // than the session's - and the thread record carries the same. Binding an
+    // endpoint ACC cannot place would make it addressable from a project it is
+    // not in.
+    return { ...closed("workspace_identity_unavailable"),
+      clientVersion: clientVersion ?? serverVersion };
   } catch {
     return closed("handshake_failed");
   } finally {
