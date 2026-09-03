@@ -58,6 +58,7 @@ export function createAccChannel({ endpointDir, socketDir = defaultSocketDir(), 
   let initialized = false;
   let closed = false;
   let server = null;
+  let renewTimer = null;
 
   function record() {
     mkdirSync(endpointDir, { recursive: true, mode: 0o700 });
@@ -66,6 +67,25 @@ export function createAccChannel({ endpointDir, socketDir = defaultSocketDir(), 
       schemaVersion: 1, endpointId, clientPid, socketPath, nonce, protocolContract,
       modes: [...modes], leaseUntil: new Date(now() + leaseMs).toISOString(),
     }, null, 2)}\n`, { mode: 0o600 });
+  }
+
+  /**
+   * Extend the lease on an endpoint that is still serving.
+   *
+   * The registration is a lease, and nothing else can extend it: only this
+   * process holds the nonce and the socket. Written once, it expired under a
+   * live session - measured on a real capture, delivery was reachable and
+   * answering, then unreachable a minute later with the same process still
+   * listening, and every later message fell back to the durable inbox.
+   *
+   * The identity is deliberately unchanged: a renewal that rotated the endpoint
+   * id or the nonce would lock out a peer that had already resolved this
+   * endpoint. A closed channel renews nothing, so a torn-down endpoint is never
+   * advertised again.
+   */
+  function renew() {
+    if (closed) return;
+    record();
   }
 
   function reject(socket, reasonCode) {
@@ -221,6 +241,11 @@ export function createAccChannel({ endpointDir, socketDir = defaultSocketDir(), 
     });
     chmodSync(socketPath, 0o600);
     record();
+    // Well inside the lease, so a slow tick never leaves a live endpoint
+    // looking expired. Unref'd: the lease must not be the reason this process
+    // outlives the client whose stdin it is really waiting on.
+    renewTimer = setInterval(renew, Math.max(1_000, Math.floor(leaseMs / 3)));
+    if (typeof renewTimer.unref === "function") renewTimer.unref();
     observe({ event: "endpoint_listening", at: clock() });
     return { endpointId, socketPath };
   }
@@ -228,6 +253,7 @@ export function createAccChannel({ endpointDir, socketDir = defaultSocketDir(), 
   function close() {
     if (closed) return;
     closed = true;
+    if (renewTimer !== null) { clearInterval(renewTimer); renewTimer = null; }
     for (const socket of connections) socket.destroy();
     if (server !== null) server.close();
     for (const file of [socketPath, registrationPath]) {
@@ -236,7 +262,7 @@ export function createAccChannel({ endpointDir, socketDir = defaultSocketDir(), 
     observe({ event: "endpoint_closed", at: clock() });
   }
 
-  return { endpointId, socketPath, registrationPath, listen, handleLine, close,
+  return { endpointId, socketPath, registrationPath, listen, handleLine, close, renew,
     // For tests: current dedup size and a peek at connection count.
     get seenCount() { return seen.size; }, get connectionCount() { return connections.size; } };
 }
