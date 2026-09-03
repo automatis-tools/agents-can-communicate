@@ -29,16 +29,16 @@ until the binding appears, bounded so an unbound session is still answered.
 The Channel now also extends its endpoint lease while it is serving. The registration was
 written once and never renewed, so on a measured capture a session that had just live-pushed
 and been answered read as `reachable: false` about two minutes later - same process, same
-socket, still listening - and every later message fell back to the durable inbox.
+socket, still listening - and every later message fell back to the durable inbox. Renewal
+runs well inside the lease, stops when the channel closes, and keeps the endpoint identity
+so a peer that already resolved it is not locked out.
 
 The Channel's reply instructions now name a fallback. They named `acc_reply` as the only way
 to answer; on a measured session the model reported that tool was not loaded in its context
 and would have failed without first fetching its schema, and it recovered only because it
 thought to look. The `acc` CLI is already a real reply path, so it is named as the fallback -
 while answering peer content in ordinary output stays forbidden, being the one route that
-records nothing. Renewal
-runs well inside the lease, stops when the channel closes, and keeps the endpoint identity
-so a peer that already resolved it is not locked out.
+records nothing.
 
 Finally, the native handshake spends the budget it was already given. Both sides are started
 by SessionStart - the hook writes the session binding then handshakes, while the Channel is
@@ -68,11 +68,35 @@ probe and handshake answer `workspace_identity_unavailable`. The failure is reco
 own capture rather than by rewriting the passing one. Codex keeps next-turn delivery and the
 durable inbox.
 
+Gemini CLI is certified on the version it actually ships as. The tier named 0.37.0 while the
+installed client was 0.57.0, and this matrix admits one exact version, so every capability
+resolved false on a machine where the mechanism worked: such a session was recorded as
+advisory and manual, and the router did not treat it as next-turn certified, so a peer's
+message stayed in the inbox when it could have been projected. Erring that way is the safe
+direction and still the wrong answer. Everything was measured again on 0.57.0, all of it
+from one session. The deny contract holds, and so does the trap in it - the
+`hookSpecificOutput` shape other clients honour still does not deny here. Injection is now
+verified at the far end rather than at the hook: printing an envelope proves only that
+something printed, so a marker was looked for in the request the client sent to its model,
+and arrived as the client's own `<hook_context>` part. 0.57.0 also brings this client's
+quietest failure yet - an untrusted folder does not fail, it downgrades the approval mode,
+and the downgraded toolset has no write or shell tool, so a guard never fires and nothing
+names trust as the reason. Certifying the version people run necessarily takes the claim
+away from 0.37.0; that capture stays in the repository and in provenance with its original
+digest rather than being rewritten.
+
+Worth naming as the pattern behind both of those: certification is pinned to exact versions
+while clients keep moving. Codex was the harmful face of it, a claim that had become wrong;
+Gemini was the benign face, a truth that was not being claimed. Native delivery already has
+the cure - no maximum version, admitted by probe and a generation-bound handshake, which is
+how Claude 2.1.259 is served by a 2.1.258 anchor - and the older capability matrix does not.
+That asymmetry, not either client, is the thing left to fix.
+
 | | |
 |---|---|
-| Built from | `692890def23a993b9b66ba4844d5841c3e92c855` |
-| Tarball | `agents-can-communicate-0.2.0.tgz`, 249,914 bytes, 195 entries |
-| sha256 | `ae3d73d9af756d002efb0b2849f2c0b679c60dcd97edc56a94c89a1b7be1bb22` |
+| Built from | `1541ee37f4a26cda47b82fcc9e747536149a190e` |
+| Tarball | `agents-can-communicate-0.2.0.tgz`, 251,108 bytes, 195 entries |
+| sha256 | `457aaeba510d542dacdfcb8acf088c255d367c2b7e76db2c18eb4db72d3d55b2` |
 | Node | 26.5.1; package requires Node >=24 |
 | Verified on | macOS 26.6.2 (darwin 25.6.0, arm64) |
 
