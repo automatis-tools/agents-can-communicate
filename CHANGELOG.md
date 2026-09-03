@@ -47,13 +47,15 @@ that was still serving: measured, a question was live-pushed and answered native
 minutes later the same process and socket read as unreachable. The endpoint's owner now
 extends the lease, and giving a binding up became its own recorded fact so that a channel
 still renewing cannot undo a retirement. A retired binding is absent from status rather than
-reported unreachable.
+reported unreachable. A record written before that field existed stays readable: adding it as
+required made `acc status` fail outright against a store that had been working, and a
+coordination tool must not refuse to read what it wrote yesterday.
 
 | | |
 |---|---|
-| Built from | `bf989635fc662250cb7c96677ce16735cb63bc11` |
-| Tarball | `agents-can-communicate-0.2.0.tgz`, 247,628 bytes, 195 entries |
-| sha256 | `40682c53c4ad2b2173f53ad8592b70fb1d861028f1bf5df771b9987877788a95` |
+| Built from | `2e6d11e8aacfbec294feb3fb718d1ea31165bb86` |
+| Tarball | `agents-can-communicate-0.2.0.tgz`, 247,935 bytes, 195 entries |
+| sha256 | `96f0ddb5d884148046de137b3d19d71c2fe3e6d5da018d734e8044fa31121e3a` |
 | Node | 26.5.1; package requires Node >=24 |
 | Verified on | macOS 26.6.2 (darwin 25.6.0, arm64) |
 
