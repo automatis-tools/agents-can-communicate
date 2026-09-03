@@ -85,6 +85,17 @@ names trust as the reason. Certifying the version people run necessarily takes t
 away from 0.37.0; that capture stays in the repository and in provenance with its original
 digest rather than being rewritten.
 
+Codex's own explanation of the withdrawal was still the old one. `acc doctor` and the
+install report read out the adapter's delivery diagnostic, and it named the 0.152.0
+capture's absent app-server control socket - which is not why delivery is off any more. On
+0.152.1 that socket is present and the queue works; what stops delivery is that the mode
+reaching it reports the daemon's workspace instead of the session's. So an operator was
+being sent to look for something that is already there. The message now names the version
+it was measured on, the boundary that actually stops delivery, and that it is not a
+misconfiguration to repair - the part that decides whether someone keeps trying. A stale
+launch-time cache from before the withdrawal cannot bring the capability back either,
+verified against the installed tarball: the check refuses before it ever reads the cache.
+
 Worth naming as the pattern behind both of those: certification is pinned to exact versions
 while clients keep moving. Codex was the harmful face of it, a claim that had become wrong;
 Gemini was the benign face, a truth that was not being claimed. Native delivery already has
@@ -94,9 +105,9 @@ That asymmetry, not either client, is the thing left to fix.
 
 | | |
 |---|---|
-| Built from | `1541ee37f4a26cda47b82fcc9e747536149a190e` |
-| Tarball | `agents-can-communicate-0.2.0.tgz`, 251,108 bytes, 195 entries |
-| sha256 | `457aaeba510d542dacdfcb8acf088c255d367c2b7e76db2c18eb4db72d3d55b2` |
+| Built from | `fb9950d5bd49da08da9b7d2ea764e44990a64227` |
+| Tarball | `agents-can-communicate-0.2.0.tgz`, 251,776 bytes, 195 entries |
+| sha256 | `06a18a96319fbb43ce917fdb41a37ca698a696374a2c951ad2daaffacb7d608c` |
 | Node | 26.5.1; package requires Node >=24 |
 | Verified on | macOS 26.6.2 (darwin 25.6.0, arm64) |
 
