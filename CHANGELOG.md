@@ -33,11 +33,18 @@ socket, still listening - and every later message fell back to the durable inbox
 runs well inside the lease, stops when the channel closes, and keeps the endpoint identity
 so a peer that already resolved it is not locked out.
 
+Finally, the native handshake spends the budget it was already given. Both sides are started
+by SessionStart - the hook writes the session binding then handshakes, while the Channel is
+still waiting for that binding before it can register - so the endpoint appears after the
+handshake begins, and a single read gave up on a channel moments from ready. The budget is
+now spent waiting for it, without relaxing the rule that two sessions never share an
+endpoint.
+
 | | |
 |---|---|
-| Built from | `cfae16598ff3268cd1f2bc7b539d0f1d9f60673a` |
-| Tarball | `agents-can-communicate-0.2.0.tgz`, 246,052 bytes, 195 entries |
-| sha256 | `e6c33159093fc9c34adde2a4c6baa36e8fd2759f76fbf39d42636cf3762a714a` |
+| Built from | `2f6eee2fd90cd626c39b4657606c1e4623cba2b6` |
+| Tarball | `agents-can-communicate-0.2.0.tgz`, 246,474 bytes, 195 entries |
+| sha256 | `07a012952b064bded8e7b9bd01edf533ec28f01201bfb3e8c24f4d212f465366` |
 | Node | 26.5.1; package requires Node >=24 |
 | Verified on | macOS 26.6.2 (darwin 25.6.0, arm64) |
 
