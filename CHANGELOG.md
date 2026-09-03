@@ -12,11 +12,18 @@ built its detection context without a shell, so every shell-bootstrap client deg
 `unsupported_shell` - a zsh install with a working shim read as degraded on every run, the
 same shape install already resolves.
 
+The Claude Channel now answers MCP when no ACC session is bound to the client. Claude spawns
+that child for every session enabling the plugin, not only for the ones ACC's shim launched
+with the development-channel flag; with nothing to bind it returned, left the event loop
+empty, and exited without answering `initialize`, which Claude reports as a server that
+failed to connect. The unbound case is now a complete server that declares no channel it
+cannot serve and offers no tools.
+
 | | |
 |---|---|
-| Built from | `b577ce585297035edd83094def7bbd499a8b9fb6` |
-| Tarball | `agents-can-communicate-0.2.0.tgz`, 244,382 bytes, 195 entries |
-| sha256 | `a6029cc30b9afe17f011c6d0ed78b7b1068510438bdde44aa2cd2eda43bf51c6` |
+| Built from | `b9ce2297d610ffae95c7ae02c734182d3315600e` |
+| Tarball | `agents-can-communicate-0.2.0.tgz`, 245,115 bytes, 195 entries |
+| sha256 | `86560a4724445228964252ae8538e22cd60909710882064592f64a802015825e` |
 | Node | 26.5.1; package requires Node >=24 |
 | Verified on | macOS 26.6.2 (darwin 25.6.0, arm64) |
 
