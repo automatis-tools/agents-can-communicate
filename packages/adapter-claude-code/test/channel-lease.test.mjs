@@ -80,3 +80,62 @@ test("a closed channel does not resurrect its registration", async t => {
   assert.equal(existsSync(registrationPath), false,
     "a closed endpoint must stay gone; re-writing it would advertise a socket nobody serves");
 });
+
+// Renewing the file only helps the sender that reads the file. ACC's own record
+// of this binding has its own lease, and for a client with no heartbeat nothing
+// else moves it - so the endpoint's owner tells ACC the same lease it just
+// advertised, and the two stop drifting apart.
+test("renewing tells ACC the same lease the endpoint now advertises", async t => {
+  const dir = mkdtempSync(path.join(tmpdir(), "acc-lease-refresh-"));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  const clock = { value: 4_000_000 };
+  const refreshed = [];
+  const channel = createAccChannel({ endpointDir: dir, clientPid: 4242, leaseMs: 60_000,
+    now: () => clock.value, write: () => {},
+    refreshBinding: leaseUntil => { refreshed.push(leaseUntil); },
+    routeReply: async () => {}, routeAck: async () => {} });
+  t.after(() => channel.close());
+  await channel.listen();
+
+  clock.value += 30_000;
+  channel.renew();
+
+  assert.equal(refreshed.length, 1, "a renewal that ACC never hears about changes nothing");
+  assert.equal(refreshed[0], registrationIn(dir).leaseUntil,
+    "ACC must be told the same lease the endpoint advertises, not a different one");
+});
+
+test("a refresh that fails never breaks the channel", async t => {
+  const dir = mkdtempSync(path.join(tmpdir(), "acc-lease-failopen-"));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  const clock = { value: 5_000_000 };
+  const channel = createAccChannel({ endpointDir: dir, clientPid: 4242, leaseMs: 60_000,
+    now: () => clock.value, write: () => {},
+    refreshBinding: () => { throw new Error("acc is unreachable"); },
+    routeReply: async () => {}, routeAck: async () => {} });
+  t.after(() => channel.close());
+  await channel.listen();
+
+  clock.value += 30_000;
+  channel.renew();
+
+  assert.equal(Date.parse(registrationIn(dir).leaseUntil), clock.value + 60_000,
+    "the endpoint stays advertised even when ACC cannot be told");
+});
+
+test("a closed channel tells ACC nothing", async t => {
+  const dir = mkdtempSync(path.join(tmpdir(), "acc-lease-closed-refresh-"));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  const clock = { value: 6_000_000 };
+  const refreshed = [];
+  const channel = createAccChannel({ endpointDir: dir, clientPid: 4242, leaseMs: 60_000,
+    now: () => clock.value, write: () => {},
+    refreshBinding: leaseUntil => { refreshed.push(leaseUntil); },
+    routeReply: async () => {}, routeAck: async () => {} });
+  await channel.listen();
+
+  channel.close();
+  channel.renew();
+
+  assert.deepEqual(refreshed, [], "a torn-down endpoint must not keep its binding alive");
+});

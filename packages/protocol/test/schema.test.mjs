@@ -44,6 +44,7 @@ const DELIVERY_BINDING = base({
   sessionId: "session_a", generation: "generation_a", adapterId: "codex",
   clientVersion: "1.2.3", availableModes: ["nextTurn", "livePush", "replyRoute"],
   livePolicy: "actionable", opaqueEndpointRef: "socket_a", leaseUntil: NOW,
+  retiredAt: null,
 });
 
 test("durable record kinds are exactly the v0.2 snapshot vocabulary", () => {
@@ -94,6 +95,13 @@ test("delivery bindings are validated without joining the durable record kinds",
   assert.throws(() => validateRecord("deliveryBinding",
     { ...DELIVERY_BINDING, livePolicy: "implicit" }),
   error => error.code === EXIT.DATA && error.message.includes("livePolicy"));
+  // Retirement is a fact of its own, not an expired lease: a channel that is
+  // still renewing must not be able to express "given up" by moving a date.
+  const retired = { ...DELIVERY_BINDING, retiredAt: NOW };
+  assert.deepEqual(validateRecord("deliveryBinding", retired), retired);
+  assert.throws(() => validateRecord("deliveryBinding",
+    { ...DELIVERY_BINDING, retiredAt: "yesterday" }),
+  error => error.code === EXIT.DATA && error.message.includes("retiredAt"));
 });
 
 test("intent rejects the removed orchestration handle", () => {
