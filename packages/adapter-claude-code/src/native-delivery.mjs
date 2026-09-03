@@ -131,22 +131,40 @@ async function currentRegistrations(runtimeDir) {
 // Bind the exact Channel the hook-resolved Claude process owns: match clientPid,
 // verify the protocol, and return an opaque endpoint id. Never selects the first
 // registration; two Claude sessions cannot receive each other's endpoint.
-export async function bindNativeSession({ clientPid, clientVersion, runtimeDir, timeoutMs = 750 }) {
-  void clientVersion; void timeoutMs;
+export async function bindNativeSession({ clientPid, clientVersion, runtimeDir, timeoutMs = 750,
+  intervalMs = 50, now = () => Date.now(),
+  sleep = ms => new Promise(resolve => setTimeout(resolve, ms)) }) {
   const closed = reasonCode => ({ supported: false, clientVersion: clientVersion ?? null,
     protocolContract: PROTOCOL_CONTRACT, modes: [], opaqueEndpointRef: null, leaseUntil: null,
     reasonCode });
   if (!Number.isInteger(clientPid) || clientPid <= 0) return closed("handshake_failed");
-  const matches = (await currentRegistrations(runtimeDir))
-    .filter(record => record.clientPid === clientPid
-      && record.protocolContract === PROTOCOL_CONTRACT
-      && Date.parse(record.leaseUntil) > Date.now());
-  if (matches.length !== 1) return closed("handshake_failed");
-  const [record] = matches;
-  if (!isSocketSafe(record.socketPath)) return closed("handshake_failed");
-  return { supported: true, clientVersion: clientVersion ?? null, protocolContract: PROTOCOL_CONTRACT,
-    modes: [...record.modes], opaqueEndpointRef: record.endpointId, leaseUntil: record.leaseUntil,
-    reasonCode: null };
+  // Both sides of this handshake are started by SessionStart: the hook writes
+  // the session binding and then calls here, while the Channel is still waiting
+  // for that same binding before it can listen and register. So the endpoint
+  // reliably appears after this begins, and a single read gave up on a channel
+  // that was moments from ready - measured, a healthy endpoint landed on disk
+  // just after the hook had already recorded no binding at all.
+  //
+  // The budget was always passed in for this. It stops one interval short of
+  // the hook's own timer, which races the same budget: an answer that arrives
+  // together with that timer is a coin toss the session loses.
+  const deadline = now() + Math.max(0, timeoutMs - intervalMs);
+  for (;;) {
+    const matches = (await currentRegistrations(runtimeDir))
+      .filter(record => record.clientPid === clientPid
+        && record.protocolContract === PROTOCOL_CONTRACT
+        && Date.parse(record.leaseUntil) > Date.now());
+    // Exactly one, still: waiting must not relax the rule that two Claude
+    // sessions can never be handed each other's endpoint.
+    if (matches.length === 1 && isSocketSafe(matches[0].socketPath)) {
+      const [record] = matches;
+      return { supported: true, clientVersion: clientVersion ?? null,
+        protocolContract: PROTOCOL_CONTRACT, modes: [...record.modes],
+        opaqueEndpointRef: record.endpointId, leaseUntil: record.leaseUntil, reasonCode: null };
+    }
+    if (now() >= deadline) return closed("handshake_failed");
+    await sleep(intervalMs);
+  }
 }
 
 // Sender side: resolve the endpoint id to its registration under this
