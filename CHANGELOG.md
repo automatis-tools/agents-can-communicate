@@ -40,11 +40,20 @@ handshake begins, and a single read gave up on a channel moments from ready. The
 now spent waiting for it, without relaxing the rule that two sessions never share an
 endpoint.
 
+An idle session no longer loses live delivery. The binding's lease was written once by the
+handshake and moved again only by a turn, and Claude Code publishes no heartbeat - so a
+session sitting idle, which is the case live delivery exists for, expired under a channel
+that was still serving: measured, a question was live-pushed and answered natively, and two
+minutes later the same process and socket read as unreachable. The endpoint's owner now
+extends the lease, and giving a binding up became its own recorded fact so that a channel
+still renewing cannot undo a retirement. A retired binding is absent from status rather than
+reported unreachable.
+
 | | |
 |---|---|
-| Built from | `2f6eee2fd90cd626c39b4657606c1e4623cba2b6` |
-| Tarball | `agents-can-communicate-0.2.0.tgz`, 246,474 bytes, 195 entries |
-| sha256 | `07a012952b064bded8e7b9bd01edf533ec28f01201bfb3e8c24f4d212f465366` |
+| Built from | `bf989635fc662250cb7c96677ce16735cb63bc11` |
+| Tarball | `agents-can-communicate-0.2.0.tgz`, 247,628 bytes, 195 entries |
+| sha256 | `40682c53c4ad2b2173f53ad8592b70fb1d861028f1bf5df771b9987877788a95` |
 | Node | 26.5.1; package requires Node >=24 |
 | Verified on | macOS 26.6.2 (darwin 25.6.0, arm64) |
 
