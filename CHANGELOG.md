@@ -19,11 +19,18 @@ empty, and exited without answering `initialize`, which Claude reports as a serv
 failed to connect. The unbound case is now a complete server that declares no channel it
 cannot serve and offers no tools.
 
+The Channel also waits for the binding its session's SessionStart hook is still writing.
+Claude spawns the child while that hook runs - on a measured 2.1.259 launch the client, the
+child, and the binding all landed within two seconds - so a single lookup won or lost a
+sub-second race, and losing it was permanent: the session kept the unbound server and native
+delivery never activated, with nothing in the record saying why. The lookup now retries
+until the binding appears, bounded so an unbound session is still answered.
+
 | | |
 |---|---|
-| Built from | `b9ce2297d610ffae95c7ae02c734182d3315600e` |
-| Tarball | `agents-can-communicate-0.2.0.tgz`, 245,115 bytes, 195 entries |
-| sha256 | `86560a4724445228964252ae8538e22cd60909710882064592f64a802015825e` |
+| Built from | `e668aa84fcfa773fc945b23c786fb548296d2bef` |
+| Tarball | `agents-can-communicate-0.2.0.tgz`, 245,584 bytes, 195 entries |
+| sha256 | `f160994734ca4f9a81fe955164d2c1f36b8949c24a082dac7859b9f49e591202` |
 | Node | 26.5.1; package requires Node >=24 |
 | Verified on | macOS 26.6.2 (darwin 25.6.0, arm64) |
 
