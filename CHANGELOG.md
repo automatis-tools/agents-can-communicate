@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+The one question a new user is asked now speaks to them. It opened with `Enable native live
+delivery for Claude Code 2.1.260?` over a list of internal artefact names - `write native
+config claude-channel-mcp`, `create shim … for claude (actionable live delivery)` - which
+tells a first-time reader neither what they gain nor what it costs. It also left out the
+loudest consequence: saying yes makes their own `claude` start with the vendor's
+`--dangerously-load-development-channels` flag, and the client then shows its warning about
+that. A consent prompt that hides the thing the vendor itself calls dangerous is not
+consent. The question now runs in the reader's order - what changes for them, what it costs,
+what it writes into which of their files, and how to undo it - and says plainly that
+declining loses nothing, because a default-No prompt should make No a real option. The
+technical inventory stays exactly where it belongs, in what `--dry-run` prints.
+
 Two tests wrote down facts about the machine that ran them as if those facts were universal,
 and CI had been red since 0.3.0's feature merge because of it - through the release, which
 went out with a red matrix nobody had looked at.
@@ -37,9 +49,9 @@ artifact nobody verified.
 
 | | |
 |---|---|
-| Built from | `ea31740f6121f6362cc3b1ceffbc70ab7c45b4fc` |
-| Tarball | `agents-can-communicate-0.3.0.tgz`, 254,217 bytes, 196 entries |
-| sha256 | `9e6f93b6ea823f3b202cb20e340f270d33472da1d26a4d49196c4b4751524720` |
+| Built from | `399e5c514cacef2fffd3d2fdaa77c88ba01aee15` |
+| Tarball | `agents-can-communicate-0.3.0.tgz`, 255,098 bytes, 196 entries |
+| sha256 | `2e84751f398f06452e63962a6a7600659f5cd07226fc2122a47cb7ec8feef050` |
 | Node | 26.5.1; package requires Node >=24 |
 | Verified on | macOS 26.6.2 (darwin 25.6.0, arm64) |
 
