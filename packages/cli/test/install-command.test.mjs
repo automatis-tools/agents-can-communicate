@@ -283,11 +283,30 @@ test("an interactive install asks one default-No question per eligible client", 
   assert.deepEqual(decided.asked, ["claude_code", "codex"]);
   assert.equal(questions.length, 2, "the ineligible client is reported, not asked");
   const [first, io] = questions[0];
-  assert.match(first, /^Enable native live delivery for Claude Code 2\.1\.258\?/);
-  assert.match(first, /create shim \/data\/acc\/bin\/claude for claude/);
-  assert.match(first, /PATH block to \/home\/dana\/\.zshrc/);
-  assert.match(first, /newly started sessions/);
-  assert.match(first, /new or reloaded shell/);
+
+  // Written for someone who has never heard of this project. The old wording
+  // opened with "Enable native live delivery" over a list of internal artefact
+  // names, which told a first-time reader neither what they gained nor what it
+  // cost. Each assertion below is one thing such a reader has to be told.
+  assert.match(first, /^Let other agents reach Claude Code while it is working\?/,
+    "the question does not say, in the reader's words, what it is asking for");
+  assert.match(first, /acc inbox/,
+    "declining has to name what still works, or no is not a real option");
+  assert.match(first, /Nothing is lost either way/,
+    "a default-No prompt must say that no costs the reader nothing");
+
+  // The loudest consequence, and the one the old prompt omitted entirely: their
+  // own client will start with a flag its vendor calls dangerous.
+  assert.match(first, /`claude` will start through acc/);
+  assert.match(first, /--captured flag/,
+    "consent that hides the flag it adds to the client's own launch is not consent");
+
+  assert.match(first, /a launcher at \/data\/acc\/bin\/claude/);
+  assert.match(first, /one PATH line in ~\/\.zshrc/,
+    "paths under the reader's home are shortened; /home/dana is noise to them");
+  assert.match(first, /Only for sessions you start after this, in a new terminal\./);
+  assert.match(first, /acc install --adapter claude_code --delivery off/,
+    "the way back out belongs in the same breath as the way in");
   assert.deepEqual(io, { input: "in", output: "out" });
 });
 
