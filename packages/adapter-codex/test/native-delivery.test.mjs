@@ -11,13 +11,23 @@ import { bindNativeSession, offerMessage, planNativeActivation, probeNativeDeliv
 const THREAD = "01a063ed-a384-7fe2-b443-7fedf1593f6b";
 const CWD = "/work/capture";
 
+// macOS caps a Unix socket path at 104 bytes, and this one carries a suffix the
+// client dictates: `app-server-control/app-server-control.sock` is 42 bytes on
+// its own. A macOS runner's TMPDIR is around 48
+// (`/var/folders/../T/`), so binding under it fails with a bare `EINVAL` -
+// which passed on a laptop with a short TMPDIR and failed on CI. The product
+// keeps its own sockets in a short private directory for exactly this reason.
+const shortTmp = () => (process.platform === "win32" ? tmpdir() : "/tmp");
+
 // A CODEX_HOME whose control socket really is a Unix socket, so socketReady
 // passes; the App Server client itself is injected as a fake peer.
 function codexHome(t) {
-  const home = mkdtempSync(path.join(tmpdir(), "acc-codex-home-"));
+  const home = mkdtempSync(path.join(shortTmp(), "acc-cx-"));
   const dir = path.join(home, "app-server-control");
   mkdirSync(dir, { recursive: true });
   const socketPath = path.join(dir, "app-server-control.sock");
+  assert.ok(Buffer.byteLength(socketPath) < 104,
+    `socket path is too long for this platform: ${socketPath}`);
   const server = net.createServer();
   const listening = new Promise(resolve => server.listen(socketPath, resolve));
   t.after(() => { server.close(); rmSync(home, { recursive: true, force: true }); });

@@ -96,19 +96,48 @@ current tree.
 Publishing, tagging, and cutting a GitHub release are **external mutations**.
 They need explicit approval from the maintainer, every time.
 
-With two-factor authentication set to `auth-and-writes` — which is what `npm
-profile get` reports for this account — every publish needs a code, and npm
-does not prompt for one:
+Which credential is configured decides whether a code is needed, so check
+rather than assume. Publishing v0.3.0 needed no code at all:
+
+```bash
+npm publish agents-can-communicate-0.3.0.tgz   # no --otp; it succeeded
+npm profile get                                # 403 Forbidden on /-/npm/v1/user
+```
+
+That pair is the whole diagnosis. A credential that can publish but cannot read
+the account's own profile is a token rather than an interactive login, and a
+token with write access bypasses two-factor entirely. This page previously said
+every publish needs a code, which sent the next release looking for one it did
+not need.
+
+With an interactive login and two-factor set to `auth-and-writes`, a code *is*
+required and npm does not prompt for it:
 
 ```bash
 npm publish --otp=123456
 ```
 
-An npm *Automation* token, or a granular token with write access, publishes
-without a code. A granular token scoped to selected packages cannot create a
-package that does not exist yet, which is the case exactly once per package.
-The `Release` workflow builds and verifies a candidate and uploads it as an
-artifact; it does not publish.
+Publish the tarball by name rather than bare `npm publish`. A bare publish
+repacks, and what reaches the registry is then an artifact nobody verified; the
+file named above is the one the digest and the evidence page describe. After
+publishing, compare `npm view <pkg>@<version> dist.shasum` with `shasum` of the
+local file — they must be equal, and the registry can take a few minutes to
+answer at all.
+
+A granular token scoped to selected packages cannot create a package that does
+not exist yet, which is the case exactly once per package. The `Release`
+workflow builds and verifies a candidate and uploads it as an artifact; it does
+not publish.
+
+**This route has an expiry.** npm now prints, on any authenticated command:
+
+> npm tokens that bypass 2FA are being restricted for account changes and
+> direct publishing
+
+So the token that made the v0.3.0 publish possible without a code is on a path
+to being refused. Worth settling before it turns a release into an outage:
+either move publishing to a trusted-publisher workflow, or accept the
+interactive login and its code.
 
 ---
 

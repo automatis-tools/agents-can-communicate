@@ -45,7 +45,22 @@ const run = (place, args) => import("node:child_process").then(({ execFile }) =>
     { env: place.env }, (error, stdout, stderr) =>
       error ? reject(Object.assign(error, { stdout, stderr })) : resolve({ stdout, stderr }))));
 
-test("an eligible live install writes a channel .mcp.json pointing at packed binaries", async t => {
+/**
+ * Native delivery is captured on `darwin-arm64` and nowhere else, so eligibility
+ * is a property of the machine running this file. Written as one test that
+ * assumed a capture, it passed on the author's laptop and failed on Linux CI -
+ * which is how it was found, after the release had already gone out.
+ *
+ * So it is two tests rather than a skip. Where there is a capture, the install
+ * wires the channel. Where there is none, it must say so and wire nothing at
+ * all, which is the rule that actually matters - an uncaptured platform must
+ * never be promoted to a native path - and it is only checkable off darwin.
+ */
+const CAPTURED_PLATFORM = process.platform === "darwin" && process.arch === "arm64";
+
+test("an eligible live install writes a channel .mcp.json pointing at packed binaries", {
+  skip: CAPTURED_PLATFORM ? false : "native delivery is captured on darwin-arm64 only",
+}, async t => {
   const place = await machine(t);
   const installed = await run(place, ["install", "--adapter", "claude_code", "--delivery",
     "actionable", "--home", place.home]);
@@ -69,6 +84,35 @@ test("an eligible live install writes a channel .mcp.json pointing at packed bin
   assert.match(await readFile(shim, "utf8"), /dangerously-load-development-channels/);
   await run(place, ["uninstall", "--adapter", "claude_code", "--home", place.home]);
   await assert.rejects(readFile(source), { code: "ENOENT" });
+});
+
+test("a platform with no capture is told so, and no channel is wired", {
+  skip: CAPTURED_PLATFORM ? "this platform has a passing capture" : false,
+}, async t => {
+  const place = await machine(t);
+  const installed = await run(place, ["install", "--adapter", "claude_code", "--delivery",
+    "actionable", "--home", place.home]);
+
+  // Asking for `actionable` on an uncaptured platform is not an error and not a
+  // silent downgrade: the install happens, and it says which delivery the
+  // machine actually gets.
+  assert.doesNotMatch(installed.stdout, /native delivery is wired/i,
+    "an uncaptured platform was told a native path had been wired");
+  assert.match(installed.stdout, /native delivery is off/i,
+    "the downgrade was applied without saying so");
+  assert.match(installed.stdout, /acc inbox|next-turn/i,
+    "the downgrade did not name what is left");
+
+  // The claim and the artefact have to agree. A channel wired here would be a
+  // native path on a platform nobody captured, which is the exact thing the
+  // whole contract exists to refuse.
+  const source = path.join(place.home, ".claude", "plugins", "marketplaces", "acc-local",
+    "agents-can-communicate", ".mcp.json");
+  await assert.rejects(readFile(source), { code: "ENOENT" },
+    "a channel was wired on a platform with no passing capture");
+  const shim = path.join(place.dataHome, "acc", "bin", "claude");
+  await assert.rejects(readFile(shim), { code: "ENOENT" },
+    "a launch shim carrying the native flag was written with nothing to bind to");
 });
 
 test("a message is durably recorded before a native offer, and an explicit reply is a real answer",
