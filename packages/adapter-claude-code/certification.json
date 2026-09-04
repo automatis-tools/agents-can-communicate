@@ -1,85 +1,156 @@
 {
   "evidence": [
     {
-      "client": "claude-code", "version": "2.1.233", "platform": "darwin-arm64",
-      "observedAt": "2026-08-16", "capability": "lifecycle.sessionStart",
-      "fixture": "fixtures/SessionStart.json", "idleBehavior": "fires when a session starts",
-      "provenance": "fixtures/certification-provenance.json", "provenanceId": "session-start",
-      "busyBehavior": "fires before the first model turn", "authorityLevel": "advisory",
-      "limitations": ["capture used a one-session --plugin-dir"], "result": "pass"
-    },
-    {
-      "client": "claude-code", "version": "2.1.233", "platform": "darwin-arm64",
-      "observedAt": "2026-08-16", "capability": "lifecycle.sessionEnd",
-      "fixture": "fixtures/SessionEnd.json", "idleBehavior": "fires when a session exits",
-      "provenance": "fixtures/certification-provenance.json", "provenanceId": "session-end",
-      "busyBehavior": "does not run until the session exits", "authorityLevel": "advisory",
-      "limitations": ["cannot write a handoff after the model has stopped"], "result": "pass"
-    },
-    {
-      "client": "claude-code", "version": "2.1.233", "platform": "darwin-arm64",
-      "observedAt": "2026-08-16", "capability": "context.beforeTurnInjection",
-      "fixture": "fixtures/UserPromptSubmit.json", "idleBehavior": "waits for the next user prompt",
-      "provenance": "fixtures/certification-provenance.json", "provenanceId": "user-prompt-submit",
-      "busyBehavior": "does not interrupt an in-progress turn", "authorityLevel": "context",
-      "limitations": ["requires the hookSpecificOutput additionalContext envelope"], "result": "pass"
-    },
-    {
-      "client": "claude-code", "version": "2.1.233", "platform": "darwin-arm64",
-      "observedAt": "2026-08-16", "capability": "guards.beforeWrite",
-      "fixture": "fixtures/PreToolUse-Edit.json", "idleBehavior": "no write exists to guard",
-      "provenance": "fixtures/certification-provenance.json", "provenanceId": "pre-tool-use-edit",
-      "busyBehavior": "denies a file edit before disk mutation", "authorityLevel": "blocking",
-      "limitations": ["runtime writes are outside the hook boundary"], "result": "pass"
-    },
-    {
-      "client": "claude-code", "version": "2.1.233", "platform": "darwin-arm64",
-      "observedAt": "2026-08-16", "capability": "guards.beforeShell",
-      "fixture": "fixtures/PreToolUse.json", "idleBehavior": "no shell call exists to guard",
-      "provenance": "fixtures/certification-provenance.json", "provenanceId": "pre-tool-use-bash",
-      "busyBehavior": "denies a Bash call before execution", "authorityLevel": "blocking",
-      "limitations": ["only tool calls reaching PreToolUse are guarded"], "result": "pass"
-    },
-    {
-      "client": "claude-code", "version": "2.1.233", "platform": "darwin-arm64",
-      "observedAt": "2026-08-16", "capability": "delivery.nextTurn",
-      "fixture": "fixtures/UserPromptSubmit.json", "idleBehavior": "offers complete peer messages at the next prompt",
-      "provenance": "fixtures/certification-provenance.json", "provenanceId": "user-prompt-submit",
-      "busyBehavior": "does not interrupt an in-progress turn", "authorityLevel": "context",
-      "limitations": ["delivery requires the next normal user turn"], "result": "pass"
-    },
-    {
-      "client": "claude-code", "version": "2.1.252", "platform": "darwin-arm64",
-      "observedAt": "2026-09-01T16:17:06Z", "capability": "delivery.livePush",
-      "fixture": "fixtures/delivery/claude-code-2.1.252.json", "idleBehavior": "unobserved",
-      "provenance": "fixtures/certification-provenance.json", "provenanceId": "native-delivery-2-1-252",
-      "busyBehavior": "unobserved", "authorityLevel": "none",
-      "limitations": [
-        "Claude Code displayed the development-channel security warning and the operator did not accept it",
-        "Claude Code did not spawn the acc-spike MCP child and the Unix-domain socket was never created",
-        "idle, busy, reply, duplicate, and fallback branches were not observed"
-      ],
-      "result": "fail"
-    },
-    {
-      "client": "claude-code", "version": "2.1.252", "platform": "darwin-arm64",
-      "observedAt": "2026-09-01T16:17:06Z", "capability": "delivery.replyRoute",
-      "fixture": "fixtures/delivery/claude-code-2.1.252.json", "idleBehavior": "unobserved",
-      "provenance": "fixtures/certification-provenance.json", "provenanceId": "native-delivery-2-1-252",
-      "busyBehavior": "unobserved", "authorityLevel": "none",
-      "limitations": [
-        "Claude Code displayed the development-channel security warning and the operator did not accept it",
-        "Claude Code did not spawn the acc-spike MCP child and the Unix-domain socket was never created",
-        "idle, busy, reply, duplicate, and fallback branches were not observed"
-      ],
-      "result": "fail"
-    },
-    {
-      "client": "claude-code", "version": "2.1.258", "platform": "darwin-arm64",
-      "observedAt": "2026-09-02T21:20:11.676Z", "capability": "delivery.livePush",
-      "fixture": "fixtures/delivery/claude-code-2.1.258.json", "idleBehavior": "offered",
+      "client": "claude-code",
+      "version": "2.1.233",
+      "platform": "darwin-arm64",
+      "observedAt": "2026-08-16",
+      "capability": "lifecycle.sessionStart",
+      "fixture": "fixtures/SessionStart.json",
+      "idleBehavior": "fires when a session starts",
       "provenance": "fixtures/certification-provenance.json",
-      "provenanceId": "native-delivery-2-1-258", "busyBehavior": "queued_after_turn",
+      "provenanceId": "session-start",
+      "busyBehavior": "fires before the first model turn",
+      "authorityLevel": "advisory",
+      "limitations": [
+        "capture used a one-session --plugin-dir"
+      ],
+      "result": "pass"
+    },
+    {
+      "client": "claude-code",
+      "version": "2.1.233",
+      "platform": "darwin-arm64",
+      "observedAt": "2026-08-16",
+      "capability": "lifecycle.sessionEnd",
+      "fixture": "fixtures/SessionEnd.json",
+      "idleBehavior": "fires when a session exits",
+      "provenance": "fixtures/certification-provenance.json",
+      "provenanceId": "session-end",
+      "busyBehavior": "does not run until the session exits",
+      "authorityLevel": "advisory",
+      "limitations": [
+        "cannot write a handoff after the model has stopped"
+      ],
+      "result": "pass"
+    },
+    {
+      "client": "claude-code",
+      "version": "2.1.233",
+      "platform": "darwin-arm64",
+      "observedAt": "2026-08-16",
+      "capability": "context.beforeTurnInjection",
+      "fixture": "fixtures/UserPromptSubmit.json",
+      "idleBehavior": "waits for the next user prompt",
+      "provenance": "fixtures/certification-provenance.json",
+      "provenanceId": "user-prompt-submit",
+      "busyBehavior": "does not interrupt an in-progress turn",
+      "authorityLevel": "context",
+      "limitations": [
+        "requires the hookSpecificOutput additionalContext envelope"
+      ],
+      "result": "pass"
+    },
+    {
+      "client": "claude-code",
+      "version": "2.1.233",
+      "platform": "darwin-arm64",
+      "observedAt": "2026-08-16",
+      "capability": "guards.beforeWrite",
+      "fixture": "fixtures/PreToolUse-Edit.json",
+      "idleBehavior": "no write exists to guard",
+      "provenance": "fixtures/certification-provenance.json",
+      "provenanceId": "pre-tool-use-edit",
+      "busyBehavior": "denies a file edit before disk mutation",
+      "authorityLevel": "blocking",
+      "limitations": [
+        "runtime writes are outside the hook boundary"
+      ],
+      "result": "pass"
+    },
+    {
+      "client": "claude-code",
+      "version": "2.1.233",
+      "platform": "darwin-arm64",
+      "observedAt": "2026-08-16",
+      "capability": "guards.beforeShell",
+      "fixture": "fixtures/PreToolUse.json",
+      "idleBehavior": "no shell call exists to guard",
+      "provenance": "fixtures/certification-provenance.json",
+      "provenanceId": "pre-tool-use-bash",
+      "busyBehavior": "denies a Bash call before execution",
+      "authorityLevel": "blocking",
+      "limitations": [
+        "only tool calls reaching PreToolUse are guarded"
+      ],
+      "result": "pass"
+    },
+    {
+      "client": "claude-code",
+      "version": "2.1.233",
+      "platform": "darwin-arm64",
+      "observedAt": "2026-08-16",
+      "capability": "delivery.nextTurn",
+      "fixture": "fixtures/UserPromptSubmit.json",
+      "idleBehavior": "offers complete peer messages at the next prompt",
+      "provenance": "fixtures/certification-provenance.json",
+      "provenanceId": "user-prompt-submit",
+      "busyBehavior": "does not interrupt an in-progress turn",
+      "authorityLevel": "context",
+      "limitations": [
+        "delivery requires the next normal user turn"
+      ],
+      "result": "pass"
+    },
+    {
+      "client": "claude-code",
+      "version": "2.1.252",
+      "platform": "darwin-arm64",
+      "observedAt": "2026-09-01T16:17:06Z",
+      "capability": "delivery.livePush",
+      "fixture": "fixtures/delivery/claude-code-2.1.252.json",
+      "idleBehavior": "unobserved",
+      "provenance": "fixtures/certification-provenance.json",
+      "provenanceId": "native-delivery-2-1-252",
+      "busyBehavior": "unobserved",
+      "authorityLevel": "none",
+      "limitations": [
+        "Claude Code displayed the development-channel security warning and the operator did not accept it",
+        "Claude Code did not spawn the acc-spike MCP child and the Unix-domain socket was never created",
+        "idle, busy, reply, duplicate, and fallback branches were not observed"
+      ],
+      "result": "fail"
+    },
+    {
+      "client": "claude-code",
+      "version": "2.1.252",
+      "platform": "darwin-arm64",
+      "observedAt": "2026-09-01T16:17:06Z",
+      "capability": "delivery.replyRoute",
+      "fixture": "fixtures/delivery/claude-code-2.1.252.json",
+      "idleBehavior": "unobserved",
+      "provenance": "fixtures/certification-provenance.json",
+      "provenanceId": "native-delivery-2-1-252",
+      "busyBehavior": "unobserved",
+      "authorityLevel": "none",
+      "limitations": [
+        "Claude Code displayed the development-channel security warning and the operator did not accept it",
+        "Claude Code did not spawn the acc-spike MCP child and the Unix-domain socket was never created",
+        "idle, busy, reply, duplicate, and fallback branches were not observed"
+      ],
+      "result": "fail"
+    },
+    {
+      "client": "claude-code",
+      "version": "2.1.258",
+      "platform": "darwin-arm64",
+      "observedAt": "2026-09-02T21:20:11.676Z",
+      "capability": "delivery.livePush",
+      "fixture": "fixtures/delivery/claude-code-2.1.258.json",
+      "idleBehavior": "offered",
+      "provenance": "fixtures/certification-provenance.json",
+      "provenanceId": "native-delivery-2-1-258",
+      "busyBehavior": "queued_after_turn",
       "authorityLevel": "experimental",
       "limitations": [
         "captured on darwin-arm64 only; Linux and Windows remain uncaptured",
@@ -91,11 +162,16 @@
       "result": "pass"
     },
     {
-      "client": "claude-code", "version": "2.1.258", "platform": "darwin-arm64",
-      "observedAt": "2026-09-02T21:20:11.676Z", "capability": "delivery.replyRoute",
-      "fixture": "fixtures/delivery/claude-code-2.1.258.json", "idleBehavior": "offered",
+      "client": "claude-code",
+      "version": "2.1.258",
+      "platform": "darwin-arm64",
+      "observedAt": "2026-09-02T21:20:11.676Z",
+      "capability": "delivery.replyRoute",
+      "fixture": "fixtures/delivery/claude-code-2.1.258.json",
+      "idleBehavior": "offered",
       "provenance": "fixtures/certification-provenance.json",
-      "provenanceId": "native-delivery-2-1-258", "busyBehavior": "queued_after_turn",
+      "provenanceId": "native-delivery-2-1-258",
+      "busyBehavior": "queued_after_turn",
       "authorityLevel": "experimental",
       "limitations": [
         "captured on darwin-arm64 only; Linux and Windows remain uncaptured",
@@ -103,6 +179,48 @@
         "the plugin .mcp.json must live in the marketplace source copy; the plugin cache copy alone is not read",
         "acc_reply routed through the spike's explicit tool call; the spike created no durable ACC answer record",
         "presentation after the busy turn was observed by the operator; the channel log records the write at 21:18:45Z and the explicit reply at 21:19:21Z"
+      ],
+      "result": "pass"
+    },
+    {
+      "client": "claude-code",
+      "version": "2.1.259",
+      "platform": "darwin-arm64",
+      "observedAt": "2026-09-04T03:41:29.688Z",
+      "capability": "delivery.livePush",
+      "fixture": "fixtures/delivery/claude-code-2.1.259.json",
+      "idleBehavior": "offered",
+      "provenance": "fixtures/certification-provenance.json",
+      "provenanceId": "native-delivery-2-1-259",
+      "busyBehavior": "queued_after_turn",
+      "authorityLevel": "experimental",
+      "limitations": [
+        "captured on darwin-arm64 only; Linux and Windows remain uncaptured",
+        "the vendor development-channel warning stayed visible and was accepted by the operator by hand",
+        "two ordinary sessions in one workspace, each bound to its own client process; this capture is also the verification of the fix for a channel that bound another session's identity",
+        "duplicate was observed as one logical message id and one native offer: the repeated send took the durable path, so the channel was never asked to notify twice, and exactly one answer was recorded",
+        "busy was observed by the operator: the running turn completed before the channel presented the message, and the session named that order in its own answer"
+      ],
+      "result": "pass"
+    },
+    {
+      "client": "claude-code",
+      "version": "2.1.259",
+      "platform": "darwin-arm64",
+      "observedAt": "2026-09-04T03:41:29.688Z",
+      "capability": "delivery.replyRoute",
+      "fixture": "fixtures/delivery/claude-code-2.1.259.json",
+      "idleBehavior": "offered",
+      "provenance": "fixtures/certification-provenance.json",
+      "provenanceId": "native-delivery-2-1-259",
+      "busyBehavior": "queued_after_turn",
+      "authorityLevel": "experimental",
+      "limitations": [
+        "captured on darwin-arm64 only; Linux and Windows remain uncaptured",
+        "the vendor development-channel warning stayed visible and was accepted by the operator by hand",
+        "two ordinary sessions in one workspace, each bound to its own client process; this capture is also the verification of the fix for a channel that bound another session's identity",
+        "duplicate was observed as one logical message id and one native offer: the repeated send took the durable path, so the channel was never asked to notify twice, and exactly one answer was recorded",
+        "busy was observed by the operator: the running turn completed before the channel presented the message, and the session named that order in its own answer"
       ],
       "result": "pass"
     }

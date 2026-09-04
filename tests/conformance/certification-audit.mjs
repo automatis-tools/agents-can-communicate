@@ -53,6 +53,19 @@ export const PASS_EXPECTATIONS = Object.freeze({
           "acc_reply routed through the spike's explicit tool call; the spike created no durable ACC answer record",
           "presentation after the busy turn was observed by the operator; the channel log records the write at 21:18:45Z and the explicit reply at 21:19:21Z"
     ]),
+    // Passing evidence beside 2.1.258, and deliberately not a second anchor:
+    // an anchor is the minimum's proof, while this contract admits a newer
+    // stable client by probe and handshake. The release capture is what
+    // exercised that rule rather than replacing the tier it rests on.
+    ...nativeDelivery("claude-code", "2.1.259", "2026-09-04T03:41:29.688Z",
+      "fixtures/delivery/claude-code-2.1.259.json", "claude-code-channel-mcp-v1",
+      "offered", "queued_after_turn", [
+          "captured on darwin-arm64 only; Linux and Windows remain uncaptured",
+          "the vendor development-channel warning stayed visible and was accepted by the operator by hand",
+          "two ordinary sessions in one workspace, each bound to its own client process; this capture is also the verification of the fix for a channel that bound another session's identity",
+          "duplicate was observed as one logical message id and one native offer: the repeated send took the durable path, so the channel was never asked to notify twice, and exactly one answer was recorded",
+          "busy was observed by the operator: the running turn completed before the channel presented the message, and the session named that order in its own answer"
+    ]),
   ]),
   "adapter-codex": withFacts("codex-cli", "0.147.0", [
     row("lifecycle.sessionStart", "fixtures/SessionStart.json", "SessionStart", null,
