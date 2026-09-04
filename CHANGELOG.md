@@ -2,6 +2,27 @@
 
 ## Unreleased
 
+Two tests wrote down facts about the machine that ran them as if those facts were universal,
+and CI had been red since 0.3.0's feature merge because of it - through the release, which
+went out with a red matrix nobody had looked at.
+
+One asserted that installing with `--delivery actionable` reports native delivery wired.
+Native delivery is captured on `darwin-arm64` and nowhere else, so on Linux the install
+correctly reports it off. It is now two tests instead of a skip, because the second is worth
+having on its own: a platform with no capture must be told so and have **nothing** wired -
+no channel entry, no launch shim carrying the native flag - which is the rule the whole
+contract exists for, and is only checkable where there is no capture.
+
+The other bound a fake Codex control socket under the temporary directory. macOS caps a Unix
+socket path at 104 bytes; the client dictates a 42-byte suffix, and a macOS runner's
+temporary directory is about 47 more, so binding failed with a bare `listen EINVAL` that
+named nothing. Measured: 113 bytes on CI against 61 for the replacement. The socket now
+lives under a short base, as the Channel already does for this reason, and the length is
+asserted before binding so the next path that grows says why it broke.
+
+Both passed locally and only failed elsewhere, which is the point: a suite run on one
+machine cannot see them, and the platform matrix is what does.
+
 `docs/RELEASING.md` now says how publishing here is actually authenticated. It claimed every
 publish needs a two-factor code, on the strength of what `npm profile get` once reported.
 Publishing 0.3.0 needed no code, and that same command now answers `403 Forbidden` on the
@@ -16,7 +37,7 @@ artifact nobody verified.
 
 | | |
 |---|---|
-| Built from | `2d6b113747ab458f96400b47516e1eac2f4161be` |
+| Built from | `ea31740f6121f6362cc3b1ceffbc70ab7c45b4fc` |
 | Tarball | `agents-can-communicate-0.3.0.tgz`, 254,217 bytes, 196 entries |
 | sha256 | `9e6f93b6ea823f3b202cb20e340f270d33472da1d26a4d49196c4b4751524720` |
 | Node | 26.5.1; package requires Node >=24 |
