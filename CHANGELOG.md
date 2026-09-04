@@ -2,17 +2,13 @@
 
 ## Unreleased
 
-The one question a new user is asked now speaks to them. It opened with `Enable native live
-delivery for Claude Code 2.1.260?` over a list of internal artefact names - `write native
-config claude-channel-mcp`, `create shim … for claude (actionable live delivery)` - which
-tells a first-time reader neither what they gain nor what it costs. It also left out the
-loudest consequence: saying yes makes their own `claude` start with the vendor's
-`--dangerously-load-development-channels` flag, and the client then shows its warning about
-that. A consent prompt that hides the thing the vendor itself calls dangerous is not
-consent. The question now runs in the reader's order - what changes for them, what it costs,
-what it writes, and how to undo it - in five lines, because a question people skim past is
-not consent either. The technical inventory stays where it belongs, in what `--dry-run`
-prints.
+The one question a new user is asked is now a decision rather than a manifest. It opened
+with `Enable native live delivery for Claude Code 2.1.260?` over internal artefact names,
+and it left out the consequence that matters most: agreeing makes their own `claude` start
+with the vendor's `--dangerously-load-development-channels` flag. Someone deciding needs why
+they would want it, what happens if they agree, and what happens if they do not - so that is
+all it says. What gets written belongs to `--dry-run`; how to undo it belongs to the moment
+they want to undo it.
 
 Two tests wrote down facts about the machine that ran them as if those facts were universal,
 and CI had been red since 0.3.0's feature merge because of it - through the release, which
@@ -49,9 +45,9 @@ artifact nobody verified.
 
 | | |
 |---|---|
-| Built from | `9349e0342d928cea8f66fb81e2d99fb9df6a0a6b` |
-| Tarball | `agents-can-communicate-0.3.0.tgz`, 254,971 bytes, 196 entries |
-| sha256 | `c0d98fdc1a9d561a48745c743bf6f7bbab4a2d3111d7adab3f354fb95132d622` |
+| Built from | `0d01e92e1af145851b0e88a0f916cc6589501860` |
+| Tarball | `agents-can-communicate-0.3.0.tgz`, 254,611 bytes, 196 entries |
+| sha256 | `25a9b6ad286e0f7269a03c4b8c7af4921b42a7b7aa6a5feb2491dd2662a802d6` |
 | Node | 26.5.1; package requires Node >=24 |
 | Verified on | macOS 26.6.2 (darwin 25.6.0, arm64) |
 
