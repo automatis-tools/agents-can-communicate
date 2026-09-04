@@ -209,17 +209,18 @@ const isInteractive = runtime => typeof runtime.isInteractive === "function"
 function questionFor(entry, context) {
   const bootstrap = entry.nativeDelivery.activationPlan.mechanisms
     .find(mechanism => mechanism.kind === "shell-bootstrap") ?? null;
-  // Only the flags, not the plugin reference they carry: the reader is being
-  // warned about the one their client itself calls dangerous, and the rest is
-  // noise at this moment.
+  // The presence of a flag is what makes this worth asking about at all: it is
+  // why the client will warn at every start from now on. Which flag it is, and
+  // that a shim adds it, are answers to a question nobody is asking here - the
+  // shim `exec`s and is gone, so nothing runs "through" acc afterwards either.
   const flags = (bootstrap?.prefixArgs ?? []).filter(argument => argument.startsWith("--"));
   void context;
   return [
     "Let idle agents answer each other while you are away?",
     ...(flags.length === 0 || bootstrap === null
       ? ["  Yes: they reply on their own, without waiting for you."]
-      : [`  Yes: they reply on their own. \`${bootstrap.command}\` starts with its own`,
-        `       ${flags.join(" ")} flag and shows that warning.`]),
+      : [`  Yes: they reply on their own, and ${entry.displayName} warns about`,
+        "       development channels every time it starts."]),
     "  No:  messages still arrive, at the session's next turn.",
   ].join("\n");
 }
