@@ -101,12 +101,14 @@ noticed. A Channel is spawned by its client, so its own ancestry names that clie
 race can change it, and ownership is now decided by that alone. One that cannot name its own
 client serves nobody rather than guessing.
 
-The release capture then ran again on the fixed build and is recorded for 2.1.259: idle
-offered, busy queued behind a running turn, reply routed as a real ACC record, one message
-id for a repeated send, and a killed transport leaving the next message queued. It is
-evidence beside the 2.1.258 anchor rather than a new anchor - the contract has no maximum so
-that a newer client is admitted by probe and handshake, and this is the run that exercised
-that rather than replacing the tier it rests on. Two smaller facts came out of it: a note to
+The release capture then ran again on the fixed build and is recorded for 2.1.260 - the
+client updated itself mid-capture, so the version recorded is the one the delivery events
+actually carry rather than the one the run started on. Idle offered, busy queued behind a
+running turn, reply routed as a real ACC record, one message id for a repeated send, and a
+killed transport leaving the next message queued. It is evidence beside the 2.1.258 anchor
+rather than a new anchor - the contract has no maximum so that a newer client is admitted by
+probe and handshake, and this is the run that exercised that rather than replacing the tier
+it rests on: two minor versions of drift, served without a capture at either of them. Two smaller facts came out of it: a note to
 an `actionable` install is deliberately not pushed, because nothing about it needs acting
 on; and a recipient whose presence has gone stale is still reachable natively, because
 presence and delivery are separate facts.
@@ -126,14 +128,14 @@ Worth naming as the pattern behind both of those: certification is pinned to exa
 while clients keep moving. Codex was the harmful face of it, a claim that had become wrong;
 Gemini was the benign face, a truth that was not being claimed. Native delivery already has
 the cure - no maximum version, admitted by probe and a generation-bound handshake, which is
-how Claude 2.1.259 is served by a 2.1.258 anchor - and the older capability matrix does not.
+how Claude 2.1.260 is served by a 2.1.258 anchor - and the older capability matrix does not.
 That asymmetry, not either client, is the thing left to fix.
 
 | | |
 |---|---|
-| Built from | `99f3ea50d15a008a3959112e2fa99f330384ed84` |
-| Tarball | `agents-can-communicate-0.2.0.tgz`, 253,105 bytes, 196 entries |
-| sha256 | `57c62d612c651efc89b1e448f63bfc5c44607f3a35293425f609c232c3cac602` |
+| Built from | `b305192bd17f695c634474e941f28579dc578d7f` |
+| Tarball | `agents-can-communicate-0.2.0.tgz`, 253,309 bytes, 196 entries |
+| sha256 | `d32ab2c80b5c2e8bfa99d95edb2c1cf48034c451749d316b5bfd2929a1210470` |
 | Node | 26.5.1; package requires Node >=24 |
 | Verified on | macOS 26.6.2 (darwin 25.6.0, arm64) |
 
