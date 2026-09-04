@@ -290,23 +290,24 @@ test("an interactive install asks one default-No question per eligible client", 
   // cost. Each assertion below is one thing such a reader has to be told.
   assert.match(first, /^Let other agents reach Claude Code while it is working\?/,
     "the question does not say, in the reader's words, what it is asking for");
-  assert.match(first, /acc inbox/,
-    "declining has to name what still works, or no is not a real option");
-  assert.match(first, /Nothing is lost either way/,
-    "a default-No prompt must say that no costs the reader nothing");
 
   // The loudest consequence, and the one the old prompt omitted entirely: their
   // own client will start with a flag its vendor calls dangerous.
-  assert.match(first, /`claude` will start through acc/);
-  assert.match(first, /--captured flag/,
+  assert.match(first, /--captured flag to `claude`/,
     "consent that hides the flag it adds to the client's own launch is not consent");
 
-  assert.match(first, /a launcher at \/data\/acc\/bin\/claude/);
-  assert.match(first, /one PATH line in ~\/\.zshrc/,
+  assert.match(first, /Writes: a launcher, a PATH line in ~\/\.zshrc\./,
     "paths under the reader's home are shortened; /home/dana is noise to them");
-  assert.match(first, /Only for sessions you start after this, in a new terminal\./);
-  assert.match(first, /acc install --adapter claude_code --delivery off/,
+  assert.match(first, /Say no - messages still arrive next turn or via `acc inbox`/,
+    "a default-No prompt must say that no costs the reader nothing");
+  assert.match(first, /Undo: acc install --adapter claude_code --delivery off/,
     "the way back out belongs in the same breath as the way in");
+
+  // Short enough to read at a prompt: nobody weighs a decision they skim past.
+  const lines = first.split("\n");
+  assert.ok(lines.length <= 5, `the question grew to ${lines.length} lines`);
+  const longest = Math.max(...lines.map(line => line.length));
+  assert.ok(longest <= 88, `a line reached ${longest} characters and will wrap`);
   assert.deepEqual(io, { input: "in", output: "out" });
 });
 
