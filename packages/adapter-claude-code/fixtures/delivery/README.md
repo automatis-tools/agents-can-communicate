@@ -20,3 +20,10 @@ launched through a temporary shell bootstrap that added only the development-cha
 idle, busy (presented after the turn), reply (explicit `acc_reply`), duplicate, and
 fallback (queued after the Channel child was terminated) were all observed. Limitations
 name what the capture did not cover. `COMPATIBILITY.md` has the timeline.
+
+`claude-code-2.1.260.json` is the release capture: the packed artifact installed into a
+real home, two ordinary `claude` sessions in one workspace, and every branch observed again
+on the shipped Channel rather than the spike - including a reply that is a real ACC record
+(`channel-reply-<id>`), which the spike could not show. It is passing evidence beside the
+2.1.258 anchor and deliberately not a second anchor: the contract has no maximum so that a
+newer client is admitted by probe and handshake, and this run is what exercised that.

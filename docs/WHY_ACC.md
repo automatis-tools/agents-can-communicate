@@ -50,9 +50,9 @@ you need organizational planning. Choose a hosted service when participants must
 coordinate across machines.
 
 ACC also does not merge model memory, read raw conversations, approve tools, operate CI,
-or make guarded claims immune to unrelated local processes. Current native live push is
-uncertified, so workflows that require immediate interruption of an already-running model
-should not depend on ACC today.
+or make guarded claims immune to unrelated local processes. Live push exists for one client
+and never interrupts a turn in progress - a message that arrives mid-turn waits for the turn
+to finish - so workflows that require interrupting a running model should not depend on ACC.
 
 If the sessions should remain yours and simply stop working in isolation, that is the
 product ACC is designed to be.

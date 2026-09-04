@@ -33,10 +33,12 @@ Every other capability in the closed shape defaults to false, including session 
 child sessions, startup or safe-point injection, and before-read guards.
 
 The `delivery.livePush` and `delivery.replyRoute` row is `no` for the exact hook versions
-this matrix is keyed to. Native live delivery was captured on newer clients - Claude Code
-2.1.258 (livePush and replyRoute) and Codex 0.152.1 (livePush) - and is admitted through the
-native delivery contract rather than exact-version certification: it is off until a per-client
-opt-in, experimental, and never turns on for a client below the captured minimum.
+this matrix is keyed to. Native live delivery is captured on a newer client - Claude Code
+2.1.258, livePush and replyRoute, confirmed again on 2.1.260 through the installed package -
+and is admitted through the native delivery contract rather than exact-version
+certification: it is off until a per-client opt-in, experimental, and never turns on for a
+client below the captured minimum. Codex's queue capture passed and the capability was
+withdrawn; the row below says why.
 
 The limitations belong next to the adapters they affect:
 

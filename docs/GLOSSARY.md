@@ -16,7 +16,7 @@
 - **Retrieved** — the participant received the body; not proof of model attention.
 - **Acknowledged** — that participant explicitly acknowledged or replied; a reply is not proof requested work finished.
 - **Next-turn delivery** — certified projection at the client's next normal turn; it never interrupts an active turn.
-- **Live push** — optional delivery to an already-running session through an official certified client API. No shipped adapter currently qualifies.
+- **Live push** — optional delivery to an already-running session through an official certified client API. Claude Code 2.1.258+ on macOS arm64 qualifies, behind an opt-in; it waits for a turn in progress rather than interrupting it.
 - **Recipient policy** — `off`, `actionable`, or `all`; opt-in permission to spend a turn, not a capability.
 - **Delivery binding** — ephemeral, generation-bound reachability data owned by an adapter.
 - **Fallback** — durable inbox or exact-certified next-turn recovery when live delivery is unavailable.

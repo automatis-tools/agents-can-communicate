@@ -118,10 +118,11 @@ next normal turn. Native live push would additionally require passing certificat
 recipient's opt-in policy, exactly one current reachable binding, and a safe recipient
 state.
 
-No shipped adapter currently passes live-push certification. Codex 0.152.0 had no daemon
-control socket; Claude Code 2.1.252 stopped at the development-channel warning before its
-ACC child started. Those failures are shipped as evidence and result in visible fallback,
-not a stronger promise.
+One shipped adapter passes it: Claude Code, 2.1.258 and newer on macOS arm64, behind a
+per-client opt-in. Codex's transport also passed its capture and was withdrawn anyway,
+because the mode it needs hides which workspace a session belongs to - a session ACC
+cannot place must not be addressed. Every failed or withdrawn capture ships as evidence and
+results in visible fallback, not a stronger promise.
 
 ## Where state lives
 

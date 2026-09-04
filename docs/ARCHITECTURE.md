@@ -76,11 +76,12 @@ It does not say one particular session is reachable now. A binding says what tha
 generation exposes and whether its lease is current. Recipient policy says whether it may
 spend a turn. All three must agree before live delivery is possible.
 
-Codex and Claude Code currently ship failed native-delivery captures, so their
-`delivery.livePush` and `delivery.replyRoute` capabilities resolve false. Gemini CLI and
-Kimi Code have exact-version next-turn evidence only. Grok and generic MCP use inbox
-polling. The architecture includes a live seam without pretending the current clients
-proved it.
+Claude Code is the one client that proved the live seam: a Channel capture on 2.1.258,
+confirmed on 2.1.260 through the installed package, admitted by minimum-plus-probe rather
+than an exact version. Codex's queue transport passed its capture and the capability was
+withdrawn, because the mode it needs hides the session's workspace. Gemini CLI and Kimi
+Code have exact-version next-turn evidence only; Grok and generic MCP use inbox polling.
+The seam exists for every adapter; only one has earned it.
 
 ## Storage and workspace identity
 

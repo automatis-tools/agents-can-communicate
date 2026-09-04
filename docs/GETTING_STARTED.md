@@ -25,6 +25,11 @@ Install the package, then let ACC wire only the clients it detects:
 acc install
 ```
 
+If Claude Code is installed, one question follows: whether idle agents may answer each other
+while you are away. Saying yes makes Claude ask you to allow development channels at every
+start; saying no changes nothing else. Then open a **new** terminal - the launcher that
+makes live delivery work is added to `.zshrc`, which only new shells read.
+
 Restart those clients because hooks load at startup. Codex also asks you to trust the
 plugin. `acc doctor` names anything still missing and reports the effective delivery mode
 for each detected version.
@@ -112,12 +117,12 @@ presence. It does not close the external client.
 
 ## Delivery expectations
 
-Durable inbox delivery works for every participant. Certified next-turn delivery currently
-exists only for exact captured versions of Codex, Claude Code, Gemini CLI, and Kimi Code.
-Grok and generic MCP poll. No current adapter has certified native live push. Although
-`acc install --delivery off|actionable|all` defines recipient policy, unsupported or
-uncertified clients keep effective policy `off` and report their fallback beside the
-adapter result.
+Durable inbox delivery works for every participant. Certified next-turn delivery exists
+only for exact captured versions of Codex, Claude Code, Gemini CLI, and Kimi Code. Grok and
+generic MCP poll. Live push - a message handed to a session that is sitting idle - exists
+for Claude Code 2.1.258 and newer on macOS arm64, after the opt-in above. Although
+`acc install --delivery off|actionable|all` defines recipient policy, a client that cannot
+take the live path keeps effective policy `off` and says so beside the adapter result.
 
 ## Optional workspace configuration
 

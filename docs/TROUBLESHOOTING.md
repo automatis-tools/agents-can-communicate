@@ -35,12 +35,18 @@ automatically; `acc ack` is for acknowledgement-only messages.
 
 ## I enabled live delivery but got fallback
 
-`--delivery actionable|all` is recipient policy, not a capability switch. No current
-adapter has passing native live-push certification:
+`--delivery actionable|all` is recipient policy, not a capability switch. Only Claude Code
+2.1.258 and newer on macOS arm64 can take the live path; everything else is next-turn or
+inbox by design. When Claude does fall back, it is almost always one of these:
 
-- Codex 0.152.0: the existing app-server control socket was absent; ACC did not start one.
-- Claude Code 2.1.252: the capture stopped at the development-channel warning before the
-  ACC child process started.
+- **An old terminal.** The launcher is put on `PATH` by a line in `.zshrc`, which only new
+  interactive shells read. `which claude` must point into `…/acc/bin`.
+- **A failure from the last quarter hour.** Claude caches a failed channel connection in
+  `~/.claude/mcp-needs-auth-cache.json` and skips reconnecting for about fifteen minutes.
+  Remove the `acc` entry there and start the session again.
+- **A note.** Under `actionable`, only messages that need acting on are pushed; a `note`
+  reports `delivery_disabled` on purpose.
+- **Codex.** Its live capability was withdrawn, and `acc doctor` says why.
 
 The installer therefore keeps effective policy off and reports exact-certified next-turn
 or inbox fallback. This is expected, not a partially working live route.
