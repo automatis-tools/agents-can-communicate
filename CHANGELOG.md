@@ -1,5 +1,51 @@
 # Changelog
 
+## Unreleased
+
+Two tests wrote down facts about the machine that ran them as if those facts were universal,
+and CI had been red since 0.3.0's feature merge because of it - through the release, which
+went out with a red matrix nobody had looked at.
+
+One asserted that installing with `--delivery actionable` reports native delivery wired.
+Native delivery is captured on `darwin-arm64` and nowhere else, so on Linux the install
+correctly reports it off. It is now two tests instead of a skip, because the second is worth
+having on its own: a platform with no capture must be told so and have **nothing** wired -
+no channel entry, no launch shim carrying the native flag - which is the rule the whole
+contract exists for, and is only checkable where there is no capture.
+
+The other bound a fake Codex control socket under the temporary directory. macOS caps a Unix
+socket path at 104 bytes; the client dictates a 42-byte suffix, and a macOS runner's
+temporary directory is about 47 more, so binding failed with a bare `listen EINVAL` that
+named nothing. Measured: 113 bytes on CI against 61 for the replacement. The socket now
+lives under a short base, as the Channel already does for this reason, and the length is
+asserted before binding so the next path that grows says why it broke.
+
+Both passed locally and only failed elsewhere, which is the point: a suite run on one
+machine cannot see them, and the platform matrix is what does.
+
+`docs/RELEASING.md` now says how publishing here is actually authenticated. It claimed every
+publish needs a two-factor code, on the strength of what `npm profile get` once reported.
+Publishing 0.3.0 needed no code, and that same command now answers `403 Forbidden` on the
+account's own profile - which is the diagnosis rather than a separate puzzle: a credential
+that can publish but cannot read its own profile is a token, and a token with write access
+bypasses two-factor entirely. Both commands are written down together, because the pair is
+what tells you which route a machine is on. It also records the part with a deadline - npm
+now warns that tokens bypassing 2FA are being restricted for direct publishing, so the route
+that made this release possible is going away - and the habit that kept 0.3.0 honest:
+publish the tarball by name, because a bare `npm publish` repacks and sends the registry an
+artifact nobody verified.
+
+| | |
+|---|---|
+| Built from | `ea31740f6121f6362cc3b1ceffbc70ab7c45b4fc` |
+| Tarball | `agents-can-communicate-0.3.0.tgz`, 254,217 bytes, 196 entries |
+| sha256 | `9e6f93b6ea823f3b202cb20e340f270d33472da1d26a4d49196c4b4751524720` |
+| Node | 26.5.1; package requires Node >=24 |
+| Verified on | macOS 26.6.2 (darwin 25.6.0, arm64) |
+
+Not published. The published 0.3.0 artifact is the one recorded in its own section below;
+this candidate carries a documentation change only.
+
 ## 0.3.0
 
 Claude Code sessions can now be reached while they are running. A peer's question arrives in

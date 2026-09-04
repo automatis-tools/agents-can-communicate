@@ -12,12 +12,20 @@ import { acceptKey, decodeFrames, encodeFrame } from "../../packages/adapter-cod
 
 const THREAD = "01a063ed-a384-7fe2-b443-7fedf1593f6b";
 
+// macOS caps a Unix socket path at 104 bytes, and the client dictates a 42-byte
+// suffix here: `app-server-control/app-server-control.sock`. A macOS runner's
+// TMPDIR is around 48 (`/var/folders/../T/`), so binding under it fails with a
+// bare `EINVAL` - which passed on a laptop with a short TMPDIR and failed on CI.
+const shortTmp = () => (process.platform === "win32" ? tmpdir() : "/tmp");
+
 // A fake daemon at the real control-socket path under a temp CODEX_HOME, so the
 // adapter's own socket discovery and WebSocket client are exercised end to end.
 async function daemon(t, { cwd }) {
-  const home = await realpath(await mkdtemp(path.join(tmpdir(), "acc-codex-nd-")));
+  const home = await realpath(await mkdtemp(path.join(shortTmp(), "acc-cx-nd-")));
   await mkdir(path.join(home, "app-server-control"), { recursive: true });
   const socketPath = path.join(home, "app-server-control", "app-server-control.sock");
+  assert.ok(Buffer.byteLength(socketPath) < 104,
+    `socket path is too long for this platform: ${socketPath}`);
   const server = http.createServer((request, response) => response.writeHead(404).end());
   const state = { queue: [] };
   const sockets = new Set();
