@@ -205,10 +205,13 @@ function touches(entry, context) {
   const lines = [];
   for (const mechanism of entry.nativeDelivery.activationPlan.mechanisms) {
     if (mechanism.kind === "shell-bootstrap") {
-      lines.push(`a launcher at ${shorten(path.join(shimDir, mechanism.command), home)}`);
-      if (rcFile !== null) lines.push(`one PATH line in ${shorten(rcFile, home)}`);
+      // The launcher lives under acc's own state directory, so its path is
+      // noise here; the rc file is the reader's own and gets named.
+      void shimDir;
+      lines.push("a launcher");
+      if (rcFile !== null) lines.push(`a PATH line in ${shorten(rcFile, home)}`);
     } else if (mechanism.kind === "native-config") {
-      lines.push(`a channel entry in ${entry.displayName}'s own plugin config`);
+      lines.push("a plugin entry");
     } else if (mechanism.preExisting) {
       lines.push(`the ${mechanism.serviceId} service it already runs (not started by acc)`);
     } else if (mechanism.applyCommand !== null) {
@@ -241,22 +244,12 @@ function questionFor(entry, context) {
   const flags = (bootstrap?.prefixArgs ?? []).filter(argument => argument.startsWith("--"));
   return [
     `Let other agents reach ${entry.displayName} while it is working?`,
-    "",
-    `  Without this, a message from another session waits for your next turn,`,
-    `  or you read it with \`acc inbox\`. Nothing is lost either way.`,
-    `  With it, a session sitting idle is handed the message and can answer on its own.`,
-    "",
     ...(flags.length === 0 || bootstrap === null ? [] : [
-      `  The cost: \`${bootstrap.command}\` will start through acc, which adds`,
-      `  ${entry.displayName}'s own ${flags.join(" ")} flag,`,
-      `  so it shows its warning about that at startup.`,
-      "",
+      `  Adds its own ${flags.join(" ")} flag to \`${bootstrap.command}\`.`,
     ]),
-    "  It writes:",
-    ...touches(entry, context).map(line => `    ${line}`),
-    "",
-    `  Only for sessions you start after this, in a new terminal.`,
-    `  Change your mind any time: acc install --adapter ${entry.adapterId} --delivery off`,
+    `  Writes: ${touches(entry, context).join(", ")}.`,
+    `  New terminals only. Say no - messages still arrive next turn or via \`acc inbox\`.`,
+    `  Undo: acc install --adapter ${entry.adapterId} --delivery off`,
   ].join("\n");
 }
 
