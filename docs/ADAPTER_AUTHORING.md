@@ -131,9 +131,11 @@ The rules `defineAdapter` enforces, and the ones the runtime applies:
 | 3 | + realtime surface | delivery receipts, safe-point injection, child sessions | — |
 
 Installed hook wiring may reach tier 2, but the effective capability is still limited to
-an exact certified client/version/platform. Passing native captures exist for Claude Code
-2.1.258 and Codex 0.152.1 on macOS arm64; they become live capabilities only when the
-production transports ship behind the native delivery contract above.
+an exact certified client/version/platform. Tier 3 ships for one client: Claude Code, from
+2.1.258 on macOS arm64, behind the native delivery contract above. Codex reached a passing
+queue capture and was withdrawn anyway - the mode its transport needs reports the daemon's
+workspace as the session's - which is the standard: a capture that works is not the same
+claim as a capability that is safe to ship.
 
 ## normalizeHook
 

@@ -81,17 +81,17 @@ requested task finished.
 
 Durable inbox recovery is the baseline for every client. Certified next-turn injection
 reduces the polling for the exact captured client version and platform. Native live push is
-opt-in, experimental, and off until you choose it: **Claude Code 2.1.258 and Codex 0.152.1
-on macOS arm64 have passing live-push captures** and deliver an addressed message into a
-running session through the vendor's own transport, falling back to the durable inbox on any
-failure. Every other client, and any client below the captured minimum, stays next-turn or
-inbox only. The retained failed captures are shipped beside the passing ones as honest
-evidence.
+opt-in, experimental, and off until you choose it: **Claude Code 2.1.258 and newer on macOS
+arm64** delivers an addressed message into a running session through the vendor's own
+Channel, answers through a native reply that becomes a real ACC record, and falls back to
+the durable inbox on any failure. Every other client, and any client below the captured
+minimum, stays next-turn or inbox only. Failed and withdrawn captures ship beside the
+passing ones as evidence.
 
 | Client | Native delivery |
 |---|---|
-| Claude Code 2.1.258 (darwin-arm64) | experimental Channel: idle offer, queue-after-turn, native reply, off until opt-in |
-| Codex 0.152.1 (darwin-arm64) | experimental App Server queue: idle/after-turn, reply via `acc reply`, off until opt-in |
+| Claude Code 2.1.258+ (darwin-arm64) | experimental Channel: idle offer, queue-after-turn, native reply; off until opt-in |
+| Codex | withdrawn: the transport works, but the mode it needs hides which workspace a session is in; next-turn or inbox |
 | Gemini CLI, Kimi Code | next-turn or inbox only; no captured transparent transport |
 | Grok | awaiting a compatibility capture; inbox only |
 

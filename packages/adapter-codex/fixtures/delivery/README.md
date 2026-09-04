@@ -22,6 +22,10 @@ duplicate (the same queued submission on retry), and fallback (queued after `dae
 were all observed. Limitations name what the capture did not cover, including the missing
 native idempotency after a submission is consumed. `COMPATIBILITY.md` has the timeline.
 
-The shipped adapter now builds on `codex-cli-0.152.1.json`: `delivery.livePush` is declared
-true behind the `codex-app-server-thread-queue-v1` contract, and the transport is the
-daemon's WebSocket control socket. See `COMPATIBILITY.md` for the daemon-ownership boundary.
+`codex-cli-0.152.1-remote-workspace.json` is the capture that supersedes it, taken through
+the shipped adapter on a real client. The transport worked; what it revealed is that in
+`--remote` mode both the hook payload and the App Server's thread record report the
+daemon's directory as the session's, so ACC cannot tell which workspace the session is in.
+Every branch is `unobserved` because a session ACC cannot place is never addressed. The
+capability is withdrawn, the passing capture stays as history rather than being rewritten,
+and only the failure capture ships. `COMPATIBILITY.md` has the full account.

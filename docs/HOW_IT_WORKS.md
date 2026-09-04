@@ -125,8 +125,8 @@ these hold at once:
 - an adapter that declares `delivery.livePush` and a native contract; and
 - adapter acceptance of the bytes.
 
-Any missing condition leaves the receipt `queued` and returns a safe fallback reason. Two
-adapters ship a native transport, both experimental and off until a per-client opt-in:
+Any missing condition leaves the receipt `queued` and returns a safe fallback reason. One
+adapter ships a native transport, experimental and off until a per-client opt-in:
 
 ```text
 sender -> durable ACC record -> exact live binding -> vendor transport -> receiver
@@ -137,9 +137,11 @@ sender -> durable ACC record -> exact live binding -> vendor transport -> receiv
   the user's ordinary `claude` launch carries the captured development-channel flag, offers
   the message as a native notification and routes the model's explicit `acc_reply` back as a
   real ACC answer. Claude's development-channel warning is vendor-owned and stays visible.
-- **Codex 0.152.1** adds the message to the App Server thread queue over the vendor daemon's
-  control socket; it is presented on the idle thread or after the current turn. Codex answers
-  through the ordinary `acc reply` command, so its reply route is not native.
+- **Codex** is not one of them, and the reason is worth knowing: its App Server queue
+  transport passed a capture, but reaching it requires `codex --remote unix://`, and in that
+  mode both the hook payload and the App Server's own thread record name the daemon's
+  directory rather than the session's. ACC cannot tell which workspace such a session is
+  in, so it does not address it. Codex keeps next-turn delivery and the durable inbox.
 
 Compatibility is decided at the launch-time bootstrap and again by a per-session handshake
 bound to the exact client process; there is no maximum client version, but a newer stable

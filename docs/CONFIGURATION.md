@@ -120,8 +120,8 @@ The allowed values are `off`, `actionable`, and `all`; the default is `off`. Thi
 does not belong in `acc.workspace.json`, where a pull request could opt someone else into
 spending a turn. It also cannot create a capability: when the detected exact client
 version lacks passing live-push evidence, installation keeps the effective policy `off`
-and reports durable next-turn or inbox fallback. No shipped adapter currently qualifies
-for native live push.
+and reports durable next-turn or inbox fallback. Claude Code 2.1.258 and newer on macOS
+arm64 is the one client that qualifies today.
 
 ## Environment
 
