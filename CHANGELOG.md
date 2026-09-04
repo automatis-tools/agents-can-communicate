@@ -85,6 +85,32 @@ names trust as the reason. Certifying the version people run necessarily takes t
 away from 0.37.0; that capture stays in the repository and in provenance with its original
 digest rather than being rewritten.
 
+A second Claude session in the same workspace no longer takes the first one's identity.
+The Channel decided which session it served partly by counting: if exactly one session was
+live, it took that one. On a single-session machine that looked safe. But the Channel starts
+while its own SessionStart hook is still writing its binding, so the only binding a second
+client can see at that moment is the first client's - and the bounded wait added earlier to
+survive that race locks the wrong answer in on the first attempt, because a foreign binding
+is complete, live and plausible. Measured on two real 2.1.259 sessions: both Channels
+registered an endpoint under the first client's pid. The session that had been receiving
+live messages fell back to the durable inbox while it was still online, and an `acc_reply`
+from the second window would have been recorded as the first session's answer - a reply
+naming the wrong author, which is worse than a message that does not arrive. The rule that
+refuses two registrations for one client is not the bug here; it is the only thing that
+noticed. A Channel is spawned by its client, so its own ancestry names that client and no
+race can change it, and ownership is now decided by that alone. One that cannot name its own
+client serves nobody rather than guessing.
+
+The release capture then ran again on the fixed build and is recorded for 2.1.259: idle
+offered, busy queued behind a running turn, reply routed as a real ACC record, one message
+id for a repeated send, and a killed transport leaving the next message queued. It is
+evidence beside the 2.1.258 anchor rather than a new anchor - the contract has no maximum so
+that a newer client is admitted by probe and handshake, and this is the run that exercised
+that rather than replacing the tier it rests on. Two smaller facts came out of it: a note to
+an `actionable` install is deliberately not pushed, because nothing about it needs acting
+on; and a recipient whose presence has gone stale is still reachable natively, because
+presence and delivery are separate facts.
+
 Codex's own explanation of the withdrawal was still the old one. `acc doctor` and the
 install report read out the adapter's delivery diagnostic, and it named the 0.152.0
 capture's absent app-server control socket - which is not why delivery is off any more. On
@@ -105,9 +131,9 @@ That asymmetry, not either client, is the thing left to fix.
 
 | | |
 |---|---|
-| Built from | `fb9950d5bd49da08da9b7d2ea764e44990a64227` |
-| Tarball | `agents-can-communicate-0.2.0.tgz`, 251,776 bytes, 195 entries |
-| sha256 | `06a18a96319fbb43ce917fdb41a37ca698a696374a2c951ad2daaffacb7d608c` |
+| Built from | `99f3ea50d15a008a3959112e2fa99f330384ed84` |
+| Tarball | `agents-can-communicate-0.2.0.tgz`, 253,105 bytes, 196 entries |
+| sha256 | `57c62d612c651efc89b1e448f63bfc5c44607f3a35293425f609c232c3cac602` |
 | Node | 26.5.1; package requires Node >=24 |
 | Verified on | macOS 26.6.2 (darwin 25.6.0, arm64) |
 
