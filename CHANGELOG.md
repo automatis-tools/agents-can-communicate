@@ -1,5 +1,30 @@
 # Changelog
 
+## Unreleased
+
+`docs/RELEASING.md` now says how publishing here is actually authenticated. It claimed every
+publish needs a two-factor code, on the strength of what `npm profile get` once reported.
+Publishing 0.3.0 needed no code, and that same command now answers `403 Forbidden` on the
+account's own profile - which is the diagnosis rather than a separate puzzle: a credential
+that can publish but cannot read its own profile is a token, and a token with write access
+bypasses two-factor entirely. Both commands are written down together, because the pair is
+what tells you which route a machine is on. It also records the part with a deadline - npm
+now warns that tokens bypassing 2FA are being restricted for direct publishing, so the route
+that made this release possible is going away - and the habit that kept 0.3.0 honest:
+publish the tarball by name, because a bare `npm publish` repacks and sends the registry an
+artifact nobody verified.
+
+| | |
+|---|---|
+| Built from | `2d6b113747ab458f96400b47516e1eac2f4161be` |
+| Tarball | `agents-can-communicate-0.3.0.tgz`, 254,217 bytes, 196 entries |
+| sha256 | `9e6f93b6ea823f3b202cb20e340f270d33472da1d26a4d49196c4b4751524720` |
+| Node | 26.5.1; package requires Node >=24 |
+| Verified on | macOS 26.6.2 (darwin 25.6.0, arm64) |
+
+Not published. The published 0.3.0 artifact is the one recorded in its own section below;
+this candidate carries a documentation change only.
+
 ## 0.3.0
 
 Claude Code sessions can now be reached while they are running. A peer's question arrives in
