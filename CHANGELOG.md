@@ -4,11 +4,13 @@
 
 The one question a new user is asked is now a decision rather than a manifest. It opened
 with `Enable native live delivery for Claude Code 2.1.260?` over internal artefact names -
-a shim, a PATH block, a config entry - none of which anyone is choosing between. The reason
-the question exists is simpler and was never stated: from now on the client warns about
-development channels every time it starts. So that is what it says, next to what agreeing
-buys and what declining still gives. What gets written belongs to `--dry-run`, and how to
-undo it belongs to the moment someone wants to undo it.
+a shim, a PATH block, a config entry - none of which anyone is choosing between, and it
+never said what the reader would actually live with: from now on the client stops and asks
+to allow development channels at every start. It also left its own shape unexplained. A
+bare `[y/N]` reads as "not recommended", and one question among four installed clients
+reads as though the other three were forgotten; both are now answered where they are asked,
+and the "only client" half appears only while it is true. What gets written belongs to
+`--dry-run`, and how to undo it belongs to the moment someone wants to undo it.
 
 Two tests wrote down facts about the machine that ran them as if those facts were universal,
 and CI had been red since 0.3.0's feature merge because of it - through the release, which
@@ -45,9 +47,9 @@ artifact nobody verified.
 
 | | |
 |---|---|
-| Built from | `1ba208e0f91769cbd4359a06402882b4a06c8428` |
-| Tarball | `agents-can-communicate-0.3.0.tgz`, 254,650 bytes, 196 entries |
-| sha256 | `ad6c2b22f63da092338e9ac24cfa9bd4f44d332adcbb3a9dcc0493dfccaf3135` |
+| Built from | `9373b3b0c855b4932314d0ecd5904d4fed746ae8` |
+| Tarball | `agents-can-communicate-0.3.0.tgz`, 254,948 bytes, 196 entries |
+| sha256 | `f606904dc083ae986e2c3c2ae131465f820fbe1508445623029e2ea9f050f790` |
 | Node | 26.5.1; package requires Node >=24 |
 | Verified on | macOS 26.6.2 (darwin 25.6.0, arm64) |
 
