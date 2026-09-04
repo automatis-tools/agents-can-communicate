@@ -164,28 +164,28 @@ async function main() {
     }
     ok("workspaces bundled");
     const manifest = await readTarJson(tarball, "package.json");
-    if (manifest.version !== "0.2.0") fail(`root version is ${manifest.version}, not 0.2.0`);
+    if (manifest.version !== "0.3.0") fail(`root version is ${manifest.version}, not 0.3.0`);
     if (!manifest.bundleDependencies?.includes("@agents-can-communicate/delivery-router")) {
       fail("delivery-router is not bundled; installed message commands cannot start");
     }
     for (const dependency of manifest.bundleDependencies) {
       const workspaceManifest = await readTarJson(tarball,
         `node_modules/${dependency}/package.json`);
-      if (workspaceManifest.version !== "0.2.0") {
-        fail(`${dependency} is ${workspaceManifest.version}, not 0.2.0`);
+      if (workspaceManifest.version !== "0.3.0") {
+        fail(`${dependency} is ${workspaceManifest.version}, not 0.3.0`);
       }
     }
     const geminiManifest = await readTarJson(tarball,
       "node_modules/@agents-can-communicate/adapter-gemini-cli/"
       + "extension/gemini-extension.json");
-    if (geminiManifest.version !== "0.2.0") {
-      fail(`embedded Gemini extension is ${geminiManifest.version}, not 0.2.0`);
+    if (geminiManifest.version !== "0.3.0") {
+      fail(`embedded Gemini extension is ${geminiManifest.version}, not 0.3.0`);
     }
     const codexPlugin = await readTarJson(tarball,
       "node_modules/@agents-can-communicate/adapter-codex/"
       + "plugin/.codex-plugin/plugin.json");
     if (codexPlugin.license !== "MIT") fail("shipped Codex plugin license is not MIT");
-    ok(`root and ${manifest.bundleDependencies.length} bundled workspaces are 0.2.0`);
+    ok(`root and ${manifest.bundleDependencies.length} bundled workspaces are 0.3.0`);
 
     step("install into a clean directory");
     await writeFile(path.join(consumer, "package.json"),
@@ -240,7 +240,7 @@ async function main() {
     }
     const installedKimi = JSON.parse(await readFile(path.join(kimiHome, "plugins", "managed",
       "agents-can-communicate", ".kimi-plugin", "plugin.json"), "utf8"));
-    if (installedKimi.version !== "0.2.0") fail("installed Kimi manifest is not 0.2.0");
+    if (installedKimi.version !== "0.3.0") fail("installed Kimi manifest is not 0.3.0");
 
     const removed = JSON.parse((await acc("uninstall", "--adapter", "kimi",
       "--home", clientHome)
