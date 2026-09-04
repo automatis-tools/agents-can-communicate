@@ -193,35 +193,6 @@ const isInteractive = runtime => typeof runtime.isInteractive === "function"
   && runtime.isInteractive() === true;
 
 /**
- * What each mechanism means for the person answering, rather than what it is
- * called in the plan. `describeActivation` stays the inventory a `--dry-run`
- * prints; this is the sentence someone reads once, at the only moment they get
- * to say no.
- */
-function touches(entry, context) {
-  const home = context.home;
-  const shimDir = shimDirFor(context.stateRoot);
-  const rcFile = rcFileFor(context.home, context.shell);
-  const lines = [];
-  for (const mechanism of entry.nativeDelivery.activationPlan.mechanisms) {
-    if (mechanism.kind === "shell-bootstrap") {
-      // The launcher lives under acc's own state directory, so its path is
-      // noise here; the rc file is the reader's own and gets named.
-      void shimDir;
-      lines.push("a launcher");
-      if (rcFile !== null) lines.push(`a PATH line in ${shorten(rcFile, home)}`);
-    } else if (mechanism.kind === "native-config") {
-      lines.push("a plugin entry");
-    } else if (mechanism.preExisting) {
-      lines.push(`the ${mechanism.serviceId} service it already runs (not started by acc)`);
-    } else if (mechanism.applyCommand !== null) {
-      lines.push(`starting the ${mechanism.serviceId} service`);
-    }
-  }
-  return lines;
-}
-
-/**
  * One default-No question per eligible client, asked only after detection has
  * finished and only when a person is at both ends of the terminal.
  *
@@ -242,14 +213,14 @@ function questionFor(entry, context) {
   // warned about the one their client itself calls dangerous, and the rest is
   // noise at this moment.
   const flags = (bootstrap?.prefixArgs ?? []).filter(argument => argument.startsWith("--"));
+  void context;
   return [
-    `Let other agents reach ${entry.displayName} while it is working?`,
-    ...(flags.length === 0 || bootstrap === null ? [] : [
-      `  Adds its own ${flags.join(" ")} flag to \`${bootstrap.command}\`.`,
-    ]),
-    `  Writes: ${touches(entry, context).join(", ")}.`,
-    `  New terminals only. Say no - messages still arrive next turn or via \`acc inbox\`.`,
-    `  Undo: acc install --adapter ${entry.adapterId} --delivery off`,
+    "Let idle agents answer each other while you are away?",
+    ...(flags.length === 0 || bootstrap === null
+      ? ["  Yes: they reply on their own, without waiting for you."]
+      : [`  Yes: they reply on their own. \`${bootstrap.command}\` starts with its own`,
+        `       ${flags.join(" ")} flag and shows that warning.`]),
+    "  No:  messages still arrive, at the session's next turn.",
   ].join("\n");
 }
 
