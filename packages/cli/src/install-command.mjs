@@ -6,7 +6,7 @@ import { createCodexAdapter } from "@agents-can-communicate/adapter-codex";
 import { createGeminiCliAdapter } from "@agents-can-communicate/adapter-gemini-cli";
 import { createGrokAdapter } from "@agents-can-communicate/adapter-grok";
 import { createKimiAdapter } from "@agents-can-communicate/adapter-kimi";
-import { LIVE_POLICIES, applyPlan, describeActivation, detectInstallation, livePolicyOf,
+import { LIVE_POLICIES, applyPlan, detectInstallation, livePolicyOf,
   loadOwnership, planInstallation, rcFileFor, shellOf, shimDirFor }
   from "@agents-can-communicate/installer";
 import { AccError, EXIT } from "@agents-can-communicate/protocol";
@@ -192,18 +192,72 @@ export function actedOn(result) {
 const isInteractive = runtime => typeof runtime.isInteractive === "function"
   && runtime.isInteractive() === true;
 
-// One default-No question per eligible client, asked only after detection has
-// finished and only when a person is at both ends of the terminal. It names
-// the client, the mechanism, and the files or service it would touch, and says
-// when the choice takes effect.
+/**
+ * What each mechanism means for the person answering, rather than what it is
+ * called in the plan. `describeActivation` stays the inventory a `--dry-run`
+ * prints; this is the sentence someone reads once, at the only moment they get
+ * to say no.
+ */
+function touches(entry, context) {
+  const home = context.home;
+  const shimDir = shimDirFor(context.stateRoot);
+  const rcFile = rcFileFor(context.home, context.shell);
+  const lines = [];
+  for (const mechanism of entry.nativeDelivery.activationPlan.mechanisms) {
+    if (mechanism.kind === "shell-bootstrap") {
+      lines.push(`a launcher at ${shorten(path.join(shimDir, mechanism.command), home)}`);
+      if (rcFile !== null) lines.push(`one PATH line in ${shorten(rcFile, home)}`);
+    } else if (mechanism.kind === "native-config") {
+      lines.push(`a channel entry in ${entry.displayName}'s own plugin config`);
+    } else if (mechanism.preExisting) {
+      lines.push(`the ${mechanism.serviceId} service it already runs (not started by acc)`);
+    } else if (mechanism.applyCommand !== null) {
+      lines.push(`starting the ${mechanism.serviceId} service`);
+    }
+  }
+  return lines;
+}
+
+/**
+ * One default-No question per eligible client, asked only after detection has
+ * finished and only when a person is at both ends of the terminal.
+ *
+ * Written for someone who has never heard of this project. It used to open with
+ * "Enable native live delivery" over a list of internal artefact names, which
+ * told a first-time reader neither what they would gain nor what it would cost -
+ * and left out the part that matters most: saying yes makes their own `claude`
+ * start with the vendor's `--dangerously-load-development-channels` flag. A
+ * consent prompt that hides the loudest consequence is not consent.
+ *
+ * So the order is the reader's, not the installer's: what changes for them,
+ * what it costs, what it touches, and that "no" costs them nothing.
+ */
 function questionFor(entry, context) {
-  const activation = { livePolicy: "actionable", shell: context.shell,
-    rcFile: rcFileFor(context.home, context.shell), shimDir: shimDirFor(context.stateRoot),
-    mechanisms: entry.nativeDelivery.activationPlan.mechanisms };
-  return [`Enable native live delivery for ${entry.displayName} ${entry.version}?`,
-    ...describeActivation(activation).map(line => `  ${line}`),
-    "  applies to newly started sessions; a new PATH block needs a new or reloaded shell"]
-    .join("\n");
+  const bootstrap = entry.nativeDelivery.activationPlan.mechanisms
+    .find(mechanism => mechanism.kind === "shell-bootstrap") ?? null;
+  // Only the flags, not the plugin reference they carry: the reader is being
+  // warned about the one their client itself calls dangerous, and the rest is
+  // noise at this moment.
+  const flags = (bootstrap?.prefixArgs ?? []).filter(argument => argument.startsWith("--"));
+  return [
+    `Let other agents reach ${entry.displayName} while it is working?`,
+    "",
+    `  Without this, a message from another session waits for your next turn,`,
+    `  or you read it with \`acc inbox\`. Nothing is lost either way.`,
+    `  With it, a session sitting idle is handed the message and can answer on its own.`,
+    "",
+    ...(flags.length === 0 || bootstrap === null ? [] : [
+      `  The cost: \`${bootstrap.command}\` will start through acc, which adds`,
+      `  ${entry.displayName}'s own ${flags.join(" ")} flag,`,
+      `  so it shows its warning about that at startup.`,
+      "",
+    ]),
+    "  It writes:",
+    ...touches(entry, context).map(line => `    ${line}`),
+    "",
+    `  Only for sessions you start after this, in a new terminal.`,
+    `  Change your mind any time: acc install --adapter ${entry.adapterId} --delivery off`,
+  ].join("\n");
 }
 
 /**
