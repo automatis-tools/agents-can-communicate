@@ -296,8 +296,14 @@ test("an interactive install asks one default-No question per eligible client", 
     "the question has to say what the reader gets, not what the installer does");
   assert.match(first, /Yes: they reply on their own/,
     "agreeing has to name the gain");
-  assert.match(first, /--captured flag/,
-    "consent that hides the flag it adds to the client's own launch is not consent");
+
+  // The only reason this is asked at all: from now on the client warns at every
+  // start. That is the cost the reader lives with, so it is the cost they are
+  // shown - not the flag that causes it, which is ours to know.
+  assert.match(first, /Claude Code warns about\n\s+development channels every time it starts\./,
+    "the repeated warning is the whole reason for asking; hiding it hides the cost");
+  assert.doesNotMatch(first, /--captured|through acc/,
+    "the flag, and how it is added, are not what the reader is agreeing to");
   assert.match(first, /No:  messages still arrive, at the session's next turn\./,
     "declining has to name what still works, or no is not a real option");
 
