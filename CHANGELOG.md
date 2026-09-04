@@ -12,6 +12,15 @@ reads as though the other three were forgotten; both are now answered where they
 and the "only client" half appears only while it is true. What gets written belongs to
 `--dry-run`, and how to undo it belongs to the moment someone wants to undo it.
 
+The documentation says the same thing on every page now. Three generations of truth had
+been live at once: pages from 0.2.0 said no adapter had passing live-push certification,
+pages from mid-branch said two adapters ship a native transport, and the Codex row in the
+capabilities matrix contradicted the paragraph above it. The README still listed Codex as a
+passing capture; getting started never mentioned the one question a new user is asked;
+troubleshooting blamed fallbacks on failure captures two releases old. Every page, both
+compatibility timelines and both delivery-capture READMEs now describe what 0.3.0 ships.
+The skill text every agent reads was already right and is untouched.
+
 Two tests wrote down facts about the machine that ran them as if those facts were universal,
 and CI had been red since 0.3.0's feature merge because of it - through the release, which
 went out with a red matrix nobody had looked at.
@@ -47,9 +56,9 @@ artifact nobody verified.
 
 | | |
 |---|---|
-| Built from | `9373b3b0c855b4932314d0ecd5904d4fed746ae8` |
-| Tarball | `agents-can-communicate-0.3.0.tgz`, 254,948 bytes, 196 entries |
-| sha256 | `f606904dc083ae986e2c3c2ae131465f820fbe1508445623029e2ea9f050f790` |
+| Built from | `9c62fcfe848f5ce11774f37ad70d8b4ac273c56b` |
+| Tarball | `agents-can-communicate-0.3.0.tgz`, 255,733 bytes, 196 entries |
+| sha256 | `461c8591b6ae6218aa3f63a21c1d2862503493dcafd208bd9e893eec88035aff` |
 | Node | 26.5.1; package requires Node >=24 |
 | Verified on | macOS 26.6.2 (darwin 25.6.0, arm64) |
 
