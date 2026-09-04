@@ -113,6 +113,13 @@ an `actionable` install is deliberately not pushed, because nothing about it nee
 on; and a recipient whose presence has gone stale is still reachable natively, because
 presence and delivery are separate facts.
 
+An uninstall that changed nothing no longer says it edited anything. Running it a second
+time printed `edited` for six of the operator's configuration files - Claude settings, two
+plugin registries, the Codex config, Gemini settings, a marketplace manifest - whose bytes
+it had not touched, because that one line came from the plan while every other line on the
+report came from the run. The packed verifier already treats an empty change set as the
+definition of a no-op, and the report a person reads now uses the same one.
+
 Codex's own explanation of the withdrawal was still the old one. `acc doctor` and the
 install report read out the adapter's delivery diagnostic, and it named the 0.152.0
 capture's absent app-server control socket - which is not why delivery is off any more. On
@@ -133,9 +140,9 @@ That asymmetry, not either client, is the thing left to fix.
 
 | | |
 |---|---|
-| Built from | `b305192bd17f695c634474e941f28579dc578d7f` |
-| Tarball | `agents-can-communicate-0.2.0.tgz`, 253,309 bytes, 196 entries |
-| sha256 | `d32ab2c80b5c2e8bfa99d95edb2c1cf48034c451749d316b5bfd2929a1210470` |
+| Built from | `577b0d8fdcf437bf594aee89b3fa20b23e08bbad` |
+| Tarball | `agents-can-communicate-0.2.0.tgz`, 253,550 bytes, 196 entries |
+| sha256 | `b509594ecc41863be928b08d7394cf6c791d025a5783b0a6e833bf7b01bf53fe` |
 | Node | 26.5.1; package requires Node >=24 |
 | Verified on | macOS 26.6.2 (darwin 25.6.0, arm64) |
 
