@@ -138,6 +138,11 @@ test("an uninstall says what it removed and what it would not", async () => {
   const text = describeOutcome({ action: "uninstall", acted: 1, home, operations: [{
     adapterId: "claude_code", action: "uninstall", applied: true,
     artifacts: [{ path: `${home}/.claude/settings.json`, kind: "merge" }],
+    // What the adapter actually took out of those merge files. A run that
+    // removed ACC's plugin tree took its settings entries out too, and the
+    // `edited` line is reported from this rather than from the plan - see
+    // uninstall-reports-only-what-changed.test.mjs.
+    changes: ["enabledPlugins/agents-can-communicate@acc-local"],
     removed: [`${home}/.claude/plugins/cache/acc-local`],
     kept: [`${home}/.claude/plugins/marketplaces/acc-local`] }] });
 
