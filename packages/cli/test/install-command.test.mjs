@@ -294,14 +294,24 @@ test("an interactive install asks one default-No question per eligible client", 
   // replaced listed artefact names and omitted the flag entirely.
   assert.match(first, /^Let idle agents answer each other while you are away\?/,
     "the question has to say what the reader gets, not what the installer does");
-  assert.match(first, /Yes: they reply on their own/,
+  assert.match(first, /Yes: they reply without waiting for you/,
     "agreeing has to name the gain");
 
-  // The only reason this is asked at all: from now on the client warns at every
-  // start. That is the cost the reader lives with, so it is the cost they are
-  // shown - not the flag that causes it, which is ours to know.
-  assert.match(first, /Claude Code warns about\n\s+development channels every time it starts\./,
-    "the repeated warning is the whole reason for asking; hiding it hides the cost");
+  // A bare [y/N] reads as "not recommended", and one question among several
+  // installed clients reads as an oversight. Both are answered in the same
+  // breath, because both are questions the prompt itself provokes.
+  // Two clients are eligible here, so the "only" half would be a lie and is
+  // absent; the experimental half is why the default is No either way.
+  assert.match(first, /\(experimental\)/,
+    "a bare [y/N] reads as not recommended, and nothing here says why");
+  assert.doesNotMatch(first, /only\)/,
+    "claiming it is the only eligible client while asking about a second one");
+
+  // The reason this is asked at all: from now on the client stops to ask at
+  // every start. That is the cost the reader lives with, so it is the cost they
+  // are shown - not the flag behind it, which is ours to know.
+  assert.match(first, /Claude Code asks you\n\s+to allow development channels every time it starts\./,
+    "the repeated prompt is the whole reason for asking; hiding it hides the cost");
   assert.doesNotMatch(first, /--captured|through acc/,
     "the flag, and how it is added, are not what the reader is agreeing to");
   assert.match(first, /No:  messages still arrive, at the session's next turn\./,
@@ -317,6 +327,20 @@ test("an interactive install asks one default-No question per eligible client", 
   const longest = Math.max(...lines.map(line => line.length));
   assert.ok(longest <= 88, `a line reached ${longest} characters and will wrap`);
   assert.deepEqual(io, { input: "in", output: "out" });
+});
+
+// Being asked about one client while three others are installed looks like the
+// other three were forgotten. When it really is the only one that can do this,
+// the question says so instead of leaving the reader to wonder.
+test("the question says when this is the only client that can do it", async () => {
+  const questions = [];
+  const detected = DETECTED.filter(entry => entry.adapterId !== "codex");
+  await decideDelivery({ options: {}, detected, recorded: [], dryRun: false, context: CONTEXT,
+    runtime: { isInteractive: () => true, input: "in", output: "out",
+      confirm: async question => { questions.push(question); return false; } } });
+
+  assert.equal(questions.length, 1);
+  assert.match(questions[0], /\(experimental; Claude Code only\)/);
 });
 
 test("a recorded opt-in is kept on upgrade without a new question", async () => {

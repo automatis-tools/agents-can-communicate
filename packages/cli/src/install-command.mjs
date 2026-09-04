@@ -206,7 +206,7 @@ const isInteractive = runtime => typeof runtime.isInteractive === "function"
  * So the order is the reader's, not the installer's: what changes for them,
  * what it costs, what it touches, and that "no" costs them nothing.
  */
-function questionFor(entry, context) {
+function questionFor(entry, context, { onlyEligible = false } = {}) {
   const bootstrap = entry.nativeDelivery.activationPlan.mechanisms
     .find(mechanism => mechanism.kind === "shell-bootstrap") ?? null;
   // The presence of a flag is what makes this worth asking about at all: it is
@@ -215,12 +215,18 @@ function questionFor(entry, context) {
   // shim `exec`s and is gone, so nothing runs "through" acc afterwards either.
   const flags = (bootstrap?.prefixArgs ?? []).filter(argument => argument.startsWith("--"));
   void context;
+  // Why the default is No, and why only one client is being asked about, are
+  // the two questions the bare prompt provokes and never answered: a `[y/N]`
+  // reads as "not recommended" on its own, and a single question among four
+  // installed clients reads as an omission. Both have the same short answer.
+  const aside = ["experimental", ...(onlyEligible ? [`${entry.displayName} only`] : [])]
+    .join("; ");
   return [
-    "Let idle agents answer each other while you are away?",
+    `Let idle agents answer each other while you are away?  (${aside})`,
     ...(flags.length === 0 || bootstrap === null
-      ? ["  Yes: they reply on their own, without waiting for you."]
-      : [`  Yes: they reply on their own, and ${entry.displayName} warns about`,
-        "       development channels every time it starts."]),
+      ? ["  Yes: they reply without waiting for you."]
+      : [`  Yes: they reply without waiting for you, and ${entry.displayName} asks you`,
+        "       to allow development channels every time it starts."]),
     "  No:  messages still arrive, at the session's next turn.",
   ].join("\n");
 }
@@ -239,6 +245,11 @@ export async function decideDelivery({ options, detected, recorded, runtime, dry
     throw new AccError(EXIT.USAGE, `unknown delivery policy: ${explicit}`, { delivery: explicit });
   }
   const recordedById = new Map(recorded.map(install => [install.adapterId, install]));
+  // Whether this client is the only one that could be asked at all. When it is,
+  // the question says so, because otherwise being asked about one of four
+  // installed clients looks like the other three were forgotten.
+  const onlyEligible = detected
+    .filter(candidate => candidate.nativeDelivery?.state === "eligible").length === 1;
   const deliveryByAdapter = {};
   const asked = [];
   let withheld = 0;
@@ -253,7 +264,7 @@ export async function decideDelivery({ options, detected, recorded, runtime, dry
       deliveryByAdapter[entry.adapterId] = "off";
       if (eligible) withheld += 1;
     } else {
-      const yes = await runtime.confirm(questionFor(entry, context),
+      const yes = await runtime.confirm(questionFor(entry, context, { onlyEligible }),
         { input: runtime.input, output: runtime.output }) === true;
       deliveryByAdapter[entry.adapterId] = yes ? "actionable" : "off";
       asked.push(entry.adapterId);
