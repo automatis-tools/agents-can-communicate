@@ -47,7 +47,7 @@ else installs it.
 ## Record the evidence
 
 Put the tarball name, sha256, **the commit it was built from**, exact platform/client
-facts, fallback result, and known limitations in `docs/release-evidence/v0.2.0.md` and
+facts, fallback result, and known limitations in `docs/release-evidence/v0.3.0.md` and
 the current `CHANGELOG.md` release table. A release without them is a release nobody can
 audit later. Test count is deliberately left out: nothing verifies it, so it only
 decorates or, when it drifts, misleads.
@@ -80,6 +80,12 @@ For v0.2.0 neither Codex 0.152.0 nor Claude Code 2.1.252 did: the Codex control 
 absent and Claude stopped at the development-channel warning. Record those exact failed
 captures and run the packed inbox/next-turn fallback instead of promoting an unobserved
 native path. Windows is an explicit unsupported-platform skip, not a passing capture.
+
+By v0.3.0 that had gone both ways, which is the point of doing it per release rather than
+once. Claude Code passed and ships a live Channel; Codex's queue capture passed and the
+capability was **withdrawn anyway**, because the mode it needs hides which workspace the
+session belongs to, and a session that cannot be placed must not be addressed. A capture
+that works is not the same claim as a capability that is safe to ship.
 
 A published version's record is history and is not rewritten; later changes
 get a new `## Unreleased` entry at the top, checked the same way against the

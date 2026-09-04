@@ -1,6 +1,14 @@
 # Changelog
 
-## Unreleased
+## 0.3.0
+
+Claude Code sessions can now be reached while they are running. A peer's question arrives in
+an idle session without a human prompt, is answered through an explicit reply that becomes a
+real ACC record, and waits behind a turn that is already in progress rather than
+interrupting it. Codex's live-push claim is withdrawn in the same release: its transport
+works, but the mode that reaches it hides which workspace the session belongs to, and a
+session ACC cannot place must not be addressed. Both are the same rule applied honestly -
+delivery is claimed where it was observed and nowhere else.
 
 ACC now has one end-to-end engineering tour for readers who want to understand the system
 before trusting or extending it. It follows a real interaction from client startup and
@@ -140,18 +148,28 @@ That asymmetry, not either client, is the thing left to fix.
 
 | | |
 |---|---|
-| Built from | `577b0d8fdcf437bf594aee89b3fa20b23e08bbad` |
-| Tarball | `agents-can-communicate-0.2.0.tgz`, 253,550 bytes, 196 entries |
-| sha256 | `b509594ecc41863be928b08d7394cf6c791d025a5783b0a6e833bf7b01bf53fe` |
+| Built from | `9f2615fa403a50ed3ca81431179361e70f49619f` |
+| Tarball | `agents-can-communicate-0.3.0.tgz`, 253,715 bytes, 196 entries |
+| sha256 | `b558234ea050248dd461e2a753b2aaa0270d72166b617653de2968bdf1b53b18` |
 | Node | 26.5.1; package requires Node >=24 |
 | Verified on | macOS 26.6.2 (darwin 25.6.0, arm64) |
+| Native live delivery | Certified: Claude Code, anchored at 2.1.258 and captured again on 2.1.260 through the installed tarball. Withdrawn: Codex — the queue transport works and the mode reaching it hides the session's workspace |
+| Durable fallback | A killed transport left the next message queued on the durable path; an uncertified or unknown version keeps `acc inbox` |
+| Not supported | Windows — no capture, and the POSIX client probes do not certify it |
 
-Not published. The packed artifact contains `docs/HOW_IT_WORKS.md`; its README and
-documentation map link to it, and the clean-consumer verifier proves every packaged
-Markdown link resolves. The page separates the universal durable inbox, exact-version
-next-turn projection, and the currently uncertified native live-push seam instead of
-collapsing all three into “delivery.” It also names the shortest source-code path for
-auditing each claim.
+The working tree carried an untracked `docs/assets/` directory when this was packed, so
+`verify-package.mjs` printed its dirty warning. No tracked file was modified and nothing
+under that path is in the package allowlist, so the digest above is a true statement about
+`9f2615f`; it is recorded here rather than left for someone to rediscover.
+
+The packed artifact contains `docs/HOW_IT_WORKS.md`; its README and documentation map link
+to it, and the clean-consumer verifier proves every packaged Markdown link resolves. The
+page separates the universal durable inbox, exact-version next-turn projection, and the
+native live-push seam instead of collapsing all three into “delivery.” It also names the
+shortest source-code path for auditing each claim.
+
+Full commands, mutations, environment and limitations are in
+[the v0.3.0 release evidence](docs/release-evidence/v0.3.0.md).
 
 ## 0.2.0
 

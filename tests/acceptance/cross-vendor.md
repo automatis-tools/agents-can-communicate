@@ -1,6 +1,6 @@
 # Cross-vendor communication acceptance
 
-This is the v0.2 release contract for two independently opened sessions. It tests
+This is the v0.3 release contract for two independently opened sessions. It tests
 communication semantics, not whether ACC can create or control either client.
 
 ## Activation event
