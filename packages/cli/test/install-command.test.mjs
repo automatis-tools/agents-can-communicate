@@ -288,24 +288,26 @@ test("an interactive install asks one default-No question per eligible client", 
   // opened with "Enable native live delivery" over a list of internal artefact
   // names, which told a first-time reader neither what they gained nor what it
   // cost. Each assertion below is one thing such a reader has to be told.
-  assert.match(first, /^Let other agents reach Claude Code while it is working\?/,
-    "the question does not say, in the reader's words, what it is asking for");
-
-  // The loudest consequence, and the one the old prompt omitted entirely: their
-  // own client will start with a flag its vendor calls dangerous.
-  assert.match(first, /--captured flag to `claude`/,
+  // A person deciding needs three things: why they would want it, what happens
+  // if they agree, and what happens if they do not. Not an inventory of files,
+  // and not how to undo something they have not done yet. The prompt this
+  // replaced listed artefact names and omitted the flag entirely.
+  assert.match(first, /^Let idle agents answer each other while you are away\?/,
+    "the question has to say what the reader gets, not what the installer does");
+  assert.match(first, /Yes: they reply on their own/,
+    "agreeing has to name the gain");
+  assert.match(first, /--captured flag/,
     "consent that hides the flag it adds to the client's own launch is not consent");
+  assert.match(first, /No:  messages still arrive, at the session's next turn\./,
+    "declining has to name what still works, or no is not a real option");
 
-  assert.match(first, /Writes: a launcher, a PATH line in ~\/\.zshrc\./,
-    "paths under the reader's home are shortened; /home/dana is noise to them");
-  assert.match(first, /Say no - messages still arrive next turn or via `acc inbox`/,
-    "a default-No prompt must say that no costs the reader nothing");
-  assert.match(first, /Undo: acc install --adapter claude_code --delivery off/,
-    "the way back out belongs in the same breath as the way in");
+  assert.doesNotMatch(first, /PATH|shim|launcher|plugin entry|\.zshrc/,
+    "what it writes belongs in --dry-run, not in front of someone deciding");
+  assert.doesNotMatch(first, /Undo|uninstall|--delivery off/,
+    "how to reverse it is a question for the moment they want to reverse it");
 
-  // Short enough to read at a prompt: nobody weighs a decision they skim past.
   const lines = first.split("\n");
-  assert.ok(lines.length <= 5, `the question grew to ${lines.length} lines`);
+  assert.ok(lines.length <= 4, `the question grew to ${lines.length} lines`);
   const longest = Math.max(...lines.map(line => line.length));
   assert.ok(longest <= 88, `a line reached ${longest} characters and will wrap`);
   assert.deepEqual(io, { input: "in", output: "out" });
