@@ -114,11 +114,20 @@ export function describeChanges(operation, home) {
     return [...artifacts.filter(artifact => artifact.kind !== "merge")
       .map(artifact => `  created ${shorten(artifact.path, home)}`), ...edited];
   }
+  // An uninstall's merge edits come from the plan - every file ACC has ever
+  // written into - while everything else on this list is decided by the run.
+  // Printed unconditionally, a second uninstall told the operator it had edited
+  // six of their configuration files whose bytes it had not touched. `changes`
+  // is what the adapter actually took out, and is already what the packed
+  // verifier calls a no-op, so the report now follows the same definition. It
+  // is still the plan's list rather than a per-file one: this says whether
+  // anything was edited, not which of several files it was.
+  const editedIfAnything = (operation.changes ?? []).length === 0 ? [] : edited;
   return [
     ...(operation.removed ?? []).map(file => `  removed ${shorten(file, home)}`),
     ...(operation.removedDirectories ?? [])
       .map(file => `  removed ${shorten(file, home)}`),
-    ...edited,
+    ...editedIfAnything,
     ...(operation.kept ?? [])
       .map(file => `  kept    ${shorten(file, home)} - changed since ACC wrote it`),
   ];
