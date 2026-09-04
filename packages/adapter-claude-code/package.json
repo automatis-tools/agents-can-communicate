@@ -17,7 +17,7 @@
     "fixtures/PreToolUse.json",
     "fixtures/delivery/claude-code-2.1.252.json",
     "fixtures/delivery/claude-code-2.1.258.json",
-    "fixtures/delivery/claude-code-2.1.259.json",
+    "fixtures/delivery/claude-code-2.1.260.json",
     "src/",
     "plugin/"
   ]

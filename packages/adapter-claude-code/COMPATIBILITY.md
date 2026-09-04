@@ -191,11 +191,14 @@ evidence for 2.1.258 next to the retained 2.1.252 failure. The adapter's declare
 capabilities stay `false` until the production Channel ships, so `effectiveCapabilities()`
 still reports no live delivery.
 
-## Release capture on the installed tarball (2026-09-04, 2.1.259)
+## Release capture on the installed tarball (2026-09-04, 2.1.260)
 
 The spike above proved the protocol. This one proves the product: the packed artifact
 installed into the real home, two ordinary `claude` sessions in one workspace, no wrapper
-and no hand injection. It is passing evidence beside 2.1.258 and deliberately **not** a
+and no hand injection. The first attempt ran on 2.1.259 and is what exposed the Channel
+ownership defect; the client updated itself to 2.1.260 before the verification run, so the
+version recorded here is the one the delivery events actually carry, not the one the run
+started out as. It is passing evidence beside 2.1.258 and deliberately **not** a
 second anchor - an anchor is the minimum's proof, and the whole point of a contract with no
 maximum is that a newer stable client is admitted by probe and handshake rather than by
 another capture. This is the run that exercised that rule.

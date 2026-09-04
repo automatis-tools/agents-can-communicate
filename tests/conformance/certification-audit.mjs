@@ -57,12 +57,12 @@ export const PASS_EXPECTATIONS = Object.freeze({
     // an anchor is the minimum's proof, while this contract admits a newer
     // stable client by probe and handshake. The release capture is what
     // exercised that rule rather than replacing the tier it rests on.
-    ...nativeDelivery("claude-code", "2.1.259", "2026-09-04T03:41:29.688Z",
-      "fixtures/delivery/claude-code-2.1.259.json", "claude-code-channel-mcp-v1",
+    ...nativeDelivery("claude-code", "2.1.260", "2026-09-04T03:41:29.688Z",
+      "fixtures/delivery/claude-code-2.1.260.json", "claude-code-channel-mcp-v1",
       "offered", "queued_after_turn", [
           "captured on darwin-arm64 only; Linux and Windows remain uncaptured",
           "the vendor development-channel warning stayed visible and was accepted by the operator by hand",
-          "two ordinary sessions in one workspace, each bound to its own client process; this capture is also the verification of the fix for a channel that bound another session's identity",
+          "two ordinary sessions in one workspace, each bound to its own client process; the earlier 2.1.259 attempt is what exposed the channel binding another session identity, and this run is the verification of that fix",
           "duplicate was observed as one logical message id and one native offer: the repeated send took the durable path, so the channel was never asked to notify twice, and exactly one answer was recorded",
           "busy was observed by the operator: the running turn completed before the channel presented the message, and the session named that order in its own answer"
     ]),
