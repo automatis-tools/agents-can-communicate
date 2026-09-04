@@ -68,7 +68,7 @@ test("the tarball carries the workspaces where imports can find them", async t =
   const manifest = await manifestOf(tarball);
   const entries = await entriesOf(tarball);
 
-  assert.equal(manifest.version, "0.2.0");
+  assert.equal(manifest.version, "0.3.0");
   assert.equal((manifest.bundleDependencies ?? []).length > 0,
     true, "nothing is bundled, so every internal import would fail on install");
   assert.equal(manifest.bundleDependencies.includes(
@@ -83,7 +83,7 @@ test("the tarball carries the workspaces where imports can find them", async t =
   for (const dependency of manifest.bundleDependencies) {
     const workspace = JSON.parse((await run("tar", ["-xzOf", tarball,
       `package/node_modules/${dependency}/package.json`])).stdout);
-    assert.equal(workspace.version, "0.2.0", `${dependency} is not the v0.2 workspace`);
+    assert.equal(workspace.version, "0.3.0", `${dependency} is not the v0.3 workspace`);
   }
   const codexPlugin = JSON.parse((await run("tar", ["-xzOf", tarball,
     "package/node_modules/@agents-can-communicate/adapter-codex/"
@@ -92,7 +92,7 @@ test("the tarball carries the workspaces where imports can find them", async t =
   const geminiExtension = JSON.parse((await run("tar", ["-xzOf", tarball,
     "package/node_modules/@agents-can-communicate/adapter-gemini-cli/"
       + "extension/gemini-extension.json"])).stdout);
-  assert.equal(geminiExtension.version, "0.2.0",
+  assert.equal(geminiExtension.version, "0.3.0",
     "the embedded Gemini extension drifted from the release version");
 });
 
