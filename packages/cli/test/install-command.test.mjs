@@ -7,7 +7,10 @@ import test from "node:test";
 import { recordInstall } from "@agents-can-communicate/installer";
 import { EXIT } from "@agents-can-communicate/protocol";
 
-import { runInstallCommand } from "../src/install-command.mjs";
+import { PassThrough } from "node:stream";
+
+import { askConfirmation } from "../src/confirm.mjs";
+import { decideDelivery, runInstallCommand } from "../src/install-command.mjs";
 
 /**
  * The command's own wiring.
@@ -135,6 +138,11 @@ test("an uninstall says what it removed and what it would not", async () => {
   const text = describeOutcome({ action: "uninstall", acted: 1, home, operations: [{
     adapterId: "claude_code", action: "uninstall", applied: true,
     artifacts: [{ path: `${home}/.claude/settings.json`, kind: "merge" }],
+    // What the adapter actually took out of those merge files. A run that
+    // removed ACC's plugin tree took its settings entries out too, and the
+    // `edited` line is reported from this rather than from the plan - see
+    // uninstall-reports-only-what-changed.test.mjs.
+    changes: ["enabledPlugins/agents-can-communicate@acc-local"],
     removed: [`${home}/.claude/plugins/cache/acc-local`],
     kept: [`${home}/.claude/plugins/marketplaces/acc-local`] }] });
 
@@ -217,4 +225,100 @@ test("the status line says when the sessions it counts are not answering", async
   assert.equal(describePresence({ live: 3, stale: 3 }), "3 present, none answering");
   assert.equal(describePresence({ live: 3, stale: 1 }), "3 live (1 not answering)");
   assert.equal(describePresence(), "0 live");
+});
+
+// The per-client consent decision, fed a finished detection report and fake
+// ports, so what is asked and what is stored can be checked without a client.
+const eligible = (adapterId, displayName, command) => ({ adapterId, displayName, present: true,
+  version: "2.1.258", nativeDelivery: { state: "eligible", reasonCode: null,
+    realExecutable: `/vendor/${command}`, probe: null,
+    eligibility: { eligible: true, protocolContract: `${command}-native-v1` },
+    activationPlan: { eligible: true, reasonCode: null, mechanisms: [{ kind: "shell-bootstrap",
+      command, realExecutable: `/vendor/${command}`, prefixArgs: ["--captured"] }] } } });
+const ineligible = adapterId => ({ adapterId, displayName: adapterId, present: true,
+  version: "1.0.0", nativeDelivery: { state: "unsupported",
+    reasonCode: "native_delivery_unsupported", activationPlan: null } });
+const DETECTED = [eligible("claude_code", "Claude Code", "claude"),
+  eligible("codex", "Codex", "codex"), ineligible("grok")];
+const CONTEXT = { home: "/home/dana", stateRoot: "/data/acc", shell: "zsh" };
+const neverAsk = { isInteractive: () => true,
+  confirm: async () => { throw new Error("must not prompt"); } };
+const decide = overrides => decideDelivery({ options: {}, detected: DETECTED, recorded: [],
+  runtime: neverAsk, dryRun: false, context: CONTEXT, ...overrides });
+
+test("an explicit delivery applies uniformly to the selected clients and never prompts", async () => {
+  for (const delivery of ["actionable", "all", "off"]) {
+    const decided = await decide({ options: { delivery } });
+    assert.deepEqual(decided.deliveryByAdapter,
+      { claude_code: delivery, codex: delivery, grok: delivery });
+    assert.deepEqual(decided.asked, []);
+  }
+  await assert.rejects(decide({ options: { delivery: "sometimes" } }), /unknown delivery policy/);
+});
+
+test("delivery omitted without an interactive terminal installs off and asks nothing", async () => {
+  const decided = await decide({ runtime: { isInteractive: () => false,
+    confirm: async () => { throw new Error("must not prompt"); } } });
+  assert.deepEqual(decided.deliveryByAdapter, { claude_code: "off", codex: "off", grok: "off" });
+  assert.deepEqual(decided.asked, []);
+  assert.deepEqual(decided.notes, []);
+});
+
+test("a dry run with delivery omitted previews off and says no choice was made", async () => {
+  const recorded = [{ adapterId: "codex", nativeActivation: { livePolicy: "all",
+    protocolContract: "codex-native-v1", mechanisms: [] } }];
+  const decided = await decide({ dryRun: true, recorded });
+  assert.deepEqual(decided.deliveryByAdapter, { claude_code: "off", codex: "all", grok: "off" });
+  assert.match(decided.notes.join("\n"), /interactive choices were not made/);
+  assert.deepEqual(decided.asked, []);
+});
+
+test("an interactive install asks one default-No question per eligible client", async () => {
+  const questions = [];
+  const answers = [true, false];
+  const runtime = { isInteractive: () => true, input: "in", output: "out",
+    confirm: async (question, io) => { questions.push([question, io]); return answers.shift(); } };
+  const decided = await decide({ runtime });
+  assert.deepEqual(decided.deliveryByAdapter, { claude_code: "actionable", codex: "off", grok: "off" });
+  assert.deepEqual(decided.asked, ["claude_code", "codex"]);
+  assert.equal(questions.length, 2, "the ineligible client is reported, not asked");
+  const [first, io] = questions[0];
+  assert.match(first, /^Enable native live delivery for Claude Code 2\.1\.258\?/);
+  assert.match(first, /create shim \/data\/acc\/bin\/claude for claude/);
+  assert.match(first, /PATH block to \/home\/dana\/\.zshrc/);
+  assert.match(first, /newly started sessions/);
+  assert.match(first, /new or reloaded shell/);
+  assert.deepEqual(io, { input: "in", output: "out" });
+});
+
+test("a recorded opt-in is kept on upgrade without a new question", async () => {
+  const recorded = [{ adapterId: "claude_code", nativeActivation: { livePolicy: "all",
+    protocolContract: "claude-native-v1", mechanisms: [] } }];
+  const asked = [];
+  const runtime = { isInteractive: () => true, confirm: async question => {
+    asked.push(question); return false;
+  } };
+  const decided = await decide({ recorded, runtime });
+  assert.equal(decided.deliveryByAdapter.claude_code, "all");
+  assert.equal(decided.deliveryByAdapter.codex, "off");
+  assert.deepEqual(decided.asked, ["codex"]);
+  assert.equal(asked.length, 1);
+});
+
+test("EOF and blank input mean No, and only an explicit yes means Yes", async () => {
+  const ask = async text => {
+    const input = new PassThrough();
+    const output = new PassThrough();
+    output.resume();
+    const pending = askConfirmation("Enable?", { input, output });
+    if (text !== null) input.write(text);
+    input.end();
+    return pending;
+  };
+  assert.equal(await ask(null), false);
+  assert.equal(await ask("\n"), false);
+  assert.equal(await ask("   \n"), false);
+  assert.equal(await ask("maybe\n"), false);
+  assert.equal(await ask("y\n"), true);
+  assert.equal(await ask("YES\n"), true);
 });

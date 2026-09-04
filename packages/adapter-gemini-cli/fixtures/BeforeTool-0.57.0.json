@@ -1,0 +1,12 @@
+{
+  "session_id": "d3effafd-204b-4b94-8b01-ad3efed7bf18",
+  "transcript_path": "<redacted: conversation transcript>",
+  "cwd": "/tmp/example-workspace",
+  "hook_event_name": "BeforeTool",
+  "timestamp": "2026-09-03T16:29:35.450Z",
+  "tool_name": "write_file",
+  "tool_input": {
+    "file_path": "/tmp/example-workspace/notes.txt",
+    "content": "<redacted: conversation content>"
+  }
+}

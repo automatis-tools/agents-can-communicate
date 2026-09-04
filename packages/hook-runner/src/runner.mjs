@@ -12,6 +12,7 @@ import { createGitProbe, discoverWorkspace, platformDataHome, runtimePaths }
 
 import { resolveClientPid } from "./client-pid.mjs";
 import { probeClientVersion as defaultProbeClientVersion } from "./client-version.mjs";
+import { establishNativeBinding, livePolicyFrom } from "./native-binding.mjs";
 import { readProcessTable as defaultReadProcessTable } from "./process-table.mjs";
 
 // Kept cohesive above 300 lines because every handler shares one fail-open
@@ -184,6 +185,107 @@ async function openContext({ cwd, dataHome, runtime, env }) {
     service: createCoordinationService({ store, clock: runtime.clock, ids: runtime.ids }) };
 }
 
+// What this turn is shown and which complete groups it may commit as
+// offered. Runs after the heartbeat and the bounded native retry.
+async function projectTurn({ binding, context, adapter, adapterId }) {
+  const sync = await context.service.sync({ sessionId: binding.accSessionId,
+    cursor: null, scope: "delta" });
+
+  // Sync already carries the roster. Calling collectStatus here used to read
+  // the entire materialised store a second time on every prompt merely to
+  // rediscover this session's participant id.
+  const mine = sync.roster
+    .find(participant => participant.sessionId === binding.accSessionId);
+
+  // What peers have said to this participant and no model has been shown yet.
+  // Without this the projector's peer block never runs in production: an
+  // agent sees only the obligation attention line, not the durable body that
+  // may be offered after the stdout transport succeeds.
+  const delivery = await context.service.nextTurnDelivery({
+    workspaceId: context.descriptor.id,
+    participantId: mine?.participantId,
+    exceptSessionId: binding.accSessionId });
+  const messages = delivery.queuedMessages;
+
+  // Solo costs nothing: nothing to say means nothing printed, not a banner
+  // announcing that nobody else is here. But something already said to you is
+  // not nothing - the check used to run before the inbox was read, so the
+  // answer to your own request vanished the moment the agent working on it
+  // closed and left you as the only session.
+  if (sync.solo && messages.length === 0) return { stdout: "" };
+
+  // The ceiling a team agreed on in `acc.workspace.json`, or the default when
+  // there is no config. Validated by the protocol and, until now, never read:
+  // the projector was always called with its own default.
+  const effective = effectiveCapabilities(adapter, binding);
+  const hasStructuredRenderer = typeof adapter.renderContextResult === "function";
+  const canOfferNextTurn = effective.delivery.nextTurn === true && hasStructuredRenderer;
+  const projectionInput = { ...sync, messages: canOfferNextTurn ? messages : [],
+    liveOfferedMessageIds: delivery.liveOfferedMessageIds,
+    roomMessageIds: delivery.roomMessageIds,
+    currentParticipantId: mine?.participantId };
+  const projectionOptions = {
+    budgetBytes: context.descriptor.policy?.contextBudgetBytes };
+  // Delivery is state, not text parsing. Peer-controlled bodies can imitate
+  // another message's visible header, so only projector metadata proves
+  // which complete groups survived the byte budget. A custom adapter without
+  // metadata may still inject text, but cannot advance a receipt from it.
+  const projection = !hasStructuredRenderer
+    ? { text: await adapter.renderContext?.(projectionInput, projectionOptions) ?? "",
+      offeredMessageIds: [], includedAttentionIds: [] }
+    : await adapter.renderContextResult(projectionInput, projectionOptions);
+  const clientFactsKnown = typeof binding.clientVersion === "string"
+    && typeof binding.platform === "string";
+  const reason = !effective.delivery.nextTurn
+    ? clientFactsKnown
+      ? `client ${binding.clientVersion} on ${binding.platform} is not certified for nextTurn`
+      : "the client version or platform is unknown"
+    : !hasStructuredRenderer ? "this adapter lacks structured delivery metadata" : null;
+  const degradation = reason !== null && messages.length > 0
+    ? `acc: ${messages.length} pending message(s) withheld because ${reason}; read `
+      + `${messages[0].messageId} with acc inbox --message ${messages[0].messageId}` : null;
+  const visibleDegradation = degradation === null ? "" : `ACC: ${degradation.slice(5)}`;
+  const budgetBytes = projectionOptions.budgetBytes ?? 6_000;
+  const projected = degradation === null ? projection.text
+    : fitDegradation(projection.text, visibleDegradation, messages, budgetBytes);
+  if (projected === "") {
+    return degradation === null ? { stdout: "" } : { stdout: "", stderr: degradation };
+  }
+
+  // The renderer returns ids as metadata, never as text to parse. A peer body
+  // can imitate every visible label, so only a complete group selected by the
+  // projector is eligible for the post-write offer commit.
+  const offered = new Set(canOfferNextTurn ? projection.offeredMessageIds ?? [] : []);
+  const offerInputs = messages.filter(message => offered.has(message.messageId))
+    .map(message => ({ messageId: message.messageId,
+      recipientParticipantId: mine.participantId,
+      targetSessionId: binding.accSessionId, targetGeneration: binding.generation,
+      transport: "next-turn", adapterId,
+      clientVersion: binding.clientVersion }));
+  // Same again: Kimi Code shows the model a hook's raw stdout, while Gemini
+  // and Claude Code want an envelope and drop a bare string.
+  // The entry point owns the transport boundary. This handler only prepares
+  // offer inputs; recording them here would claim delivery before stdout's
+  // callback proves that the bytes crossed.
+  const outcome = { stdout: "", ...adapter.injectOutcome?.(projected) };
+  const writableOffers = outcome.stdout === "" ? [] : offerInputs;
+  if (degradation === null) return { ...outcome, offerInputs: writableOffers };
+  return { ...outcome,
+    stderr: [outcome.stderr, degradation].filter(Boolean).join("\n"),
+    offerInputs: writableOffers };
+}
+
+// One bounded, fail-open native handshake for this exact session generation.
+// The policy comes only from the environment an owned shell bootstrap
+// exported; an ordinary launch has none and stays durable.
+async function bindNative({ adapter, event, hookBinding, clientVersion, platform, context, paths,
+  deadline }) {
+  return establishNativeBinding({ adapter, event, hookBinding, clientVersion, platform,
+    livePolicy: livePolicyFrom(context.env), service: context.service, runtimeDir: paths.root,
+    clock: context.service.clock,
+    timeoutMs: Math.max(1, Math.min(750, deadline - Date.now())) });
+}
+
 const HANDLERS = {
   async sessionStart({ event, context, adapter, adapterId, binding, paths,
     readProcessTable, probeClientVersion, platform, deadline }) {
@@ -204,6 +306,9 @@ const HANDLERS = {
     const command = adapter.client?.command ?? null;
     const pid = command === null ? null
       : resolveClientPid({ table: await readProcessTable(), from: process.pid, command });
+    const clientPid = Number.isInteger(pid) && pid > 0 ? pid : undefined;
+    const native = hookBinding => bindNative({ adapter, event, hookBinding, ...clientFacts,
+      context, paths, deadline });
     const metadata = {
       pid,
       enforcement: capabilities.guards?.beforeWrite === true ? "guarded" : "advisory",
@@ -219,10 +324,12 @@ const HANDLERS = {
         ...metadata,
       });
       if (resumed !== null) {
+        const hookBinding = { accSessionId: resumed.sessionId, generation: resumed.generation,
+          ...clientFacts, clientPid };
         await storeSessionBinding({ runtimeDir: paths.root, harnessSessionId: event.sessionId,
-          accSessionId: resumed.sessionId, generation: resumed.generation, ...clientFacts });
+          ...hookBinding });
         return { accSessionId: resumed.sessionId, generation: resumed.generation,
-          ...clientFacts, capabilities };
+          ...clientFacts, capabilities, nativeBinding: await native(hookBinding) };
       }
     }
     const session = await context.service.openSession({
@@ -239,10 +346,12 @@ const HANDLERS = {
       ...metadata,
       descriptor: context.descriptor,
     });
+    const hookBinding = { accSessionId: session.sessionId, generation: session.generation,
+      ...clientFacts, clientPid };
     await storeSessionBinding({ runtimeDir: paths.root, harnessSessionId: event.sessionId,
-      accSessionId: session.sessionId, generation: session.generation, ...clientFacts });
+      ...hookBinding });
     return { accSessionId: session.sessionId, generation: session.generation,
-      ...clientFacts, capabilities };
+      ...clientFacts, capabilities, nativeBinding: await native(hookBinding) };
   },
 
   async heartbeat({ binding, context }) {
@@ -260,97 +369,21 @@ const HANDLERS = {
     return {};
   },
 
-  async beforeTurn({ binding, context, adapter, adapterId }) {
+  async beforeTurn(input) {
+    const { binding, context, adapter, event, paths, deadline } = input;
     if (binding === null) return {};
     // A turn is the clearest sign a session is alive. Never a reason to fail:
     // this runs in front of somebody's prompt.
     await context.service.heartbeatSession({ sessionId: binding.accSessionId,
       generation: binding.generation }).catch(() => null);
-    const sync = await context.service.sync({ sessionId: binding.accSessionId,
-      cursor: null, scope: "delta" });
-
-    // Sync already carries the roster. Calling collectStatus here used to read
-    // the entire materialised store a second time on every prompt merely to
-    // rediscover this session's participant id.
-    const mine = sync.roster
-      .find(participant => participant.sessionId === binding.accSessionId);
-
-    // What peers have said to this participant and no model has been shown yet.
-    // Without this the projector's peer block never runs in production: an
-    // agent sees only the obligation attention line, not the durable body that
-    // may be offered after the stdout transport succeeds.
-    const delivery = await context.service.nextTurnDelivery({
-      workspaceId: context.descriptor.id,
-      participantId: mine?.participantId,
-      exceptSessionId: binding.accSessionId });
-    const messages = delivery.queuedMessages;
-
-    // Solo costs nothing: nothing to say means nothing printed, not a banner
-    // announcing that nobody else is here. But something already said to you is
-    // not nothing - the check used to run before the inbox was read, so the
-    // answer to your own request vanished the moment the agent working on it
-    // closed and left you as the only session.
-    if (sync.solo && messages.length === 0) return { stdout: "" };
-
-    // The ceiling a team agreed on in `acc.workspace.json`, or the default when
-    // there is no config. Validated by the protocol and, until now, never read:
-    // the projector was always called with its own default.
-    const effective = effectiveCapabilities(adapter, binding);
-    const hasStructuredRenderer = typeof adapter.renderContextResult === "function";
-    const canOfferNextTurn = effective.delivery.nextTurn === true && hasStructuredRenderer;
-    const projectionInput = { ...sync, messages: canOfferNextTurn ? messages : [],
-      liveOfferedMessageIds: delivery.liveOfferedMessageIds,
-      roomMessageIds: delivery.roomMessageIds,
-      currentParticipantId: mine?.participantId };
-    const projectionOptions = {
-      budgetBytes: context.descriptor.policy?.contextBudgetBytes };
-    // Delivery is state, not text parsing. Peer-controlled bodies can imitate
-    // another message's visible header, so only projector metadata proves
-    // which complete groups survived the byte budget. A custom adapter without
-    // metadata may still inject text, but cannot advance a receipt from it.
-    const projection = !hasStructuredRenderer
-      ? { text: await adapter.renderContext?.(projectionInput, projectionOptions) ?? "",
-        offeredMessageIds: [], includedAttentionIds: [] }
-      : await adapter.renderContextResult(projectionInput, projectionOptions);
-    const clientFactsKnown = typeof binding.clientVersion === "string"
-      && typeof binding.platform === "string";
-    const reason = !effective.delivery.nextTurn
-      ? clientFactsKnown
-        ? `client ${binding.clientVersion} on ${binding.platform} is not certified for nextTurn`
-        : "the client version or platform is unknown"
-      : !hasStructuredRenderer ? "this adapter lacks structured delivery metadata" : null;
-    const degradation = reason !== null && messages.length > 0
-      ? `acc: ${messages.length} pending message(s) withheld because ${reason}; read `
-        + `${messages[0].messageId} with acc inbox --message ${messages[0].messageId}` : null;
-    const visibleDegradation = degradation === null ? "" : `ACC: ${degradation.slice(5)}`;
-    const budgetBytes = projectionOptions.budgetBytes ?? 6_000;
-    const projected = degradation === null ? projection.text
-      : fitDegradation(projection.text, visibleDegradation, messages, budgetBytes);
-    if (projected === "") {
-      return degradation === null ? { stdout: "" } : { stdout: "", stderr: degradation };
-    }
-
-    // The renderer returns ids as metadata, never as text to parse. A peer body
-    // can imitate every visible label, so only a complete group selected by the
-    // projector is eligible for the post-write offer commit.
-    const offered = new Set(canOfferNextTurn ? projection.offeredMessageIds ?? [] : []);
-    const offerInputs = messages.filter(message => offered.has(message.messageId))
-      .map(message => ({ messageId: message.messageId,
-        recipientParticipantId: mine.participantId,
-        targetSessionId: binding.accSessionId, targetGeneration: binding.generation,
-        transport: "next-turn", adapterId,
-        clientVersion: binding.clientVersion }));
-    // Same again: Kimi Code shows the model a hook's raw stdout, while Gemini
-    // and Claude Code want an envelope and drop a bare string.
-    // The entry point owns the transport boundary. This handler only prepares
-    // offer inputs; recording them here would claim delivery before stdout's
-    // callback proves that the bytes crossed.
-    const outcome = { stdout: "", ...adapter.injectOutcome?.(projected) };
-    const writableOffers = outcome.stdout === "" ? [] : offerInputs;
-    if (degradation === null) return { ...outcome, offerInputs: writableOffers };
-    return { ...outcome,
-      stderr: [outcome.stderr, degradation].filter(Boolean).join("\n"),
-      offerInputs: writableOffers };
+    // A native transport that became ready only after SessionStart is picked
+    // up here and a live lease is renewed: bounded, fail-open, never on a guard.
+    const nativeBinding = livePolicyFrom(context.env) === "off" ? undefined
+      : await bindNative({ adapter, event, hookBinding: binding,
+        clientVersion: binding.clientVersion, platform: binding.platform, context, paths,
+        deadline });
+    const turn = await projectTurn(input);
+    return nativeBinding === undefined ? turn : { ...turn, nativeBinding };
   },
 
   async beforeTool({ binding, context, event, adapter }) {

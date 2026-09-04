@@ -1,6 +1,6 @@
 import { assertMessageSemantics, MESSAGE_KINDS, OBLIGATIONS } from "./conversations.mjs";
 import { AccError, EXIT } from "./errors.mjs";
-import { id, invalid, listOf, nullable, oneOf, plainObject, positiveInteger,
+import { id, invalid, listOf, nullable, oneOf, optional, plainObject, positiveInteger,
   resourceUri, sequence, text, timestamp } from "./fields.mjs";
 
 export const SCHEMA_VERSION = 3;
@@ -64,6 +64,16 @@ const EVENT_TYPES = Object.freeze([
 ]);
 
 const eventType = oneOf(...EVENT_TYPES);
+
+// nextTurn is the durable hook projection; the other four are what a native
+// transport proved for one session generation. A mode listed twice would let a
+// reader count capabilities it does not have.
+export const DELIVERY_MODES = Object.freeze(["nextTurn", "livePush", "idleWake", "busyQueue",
+  "replyRoute"]);
+const uniqueListOf = check => (value, field) => {
+  listOf(check)(value, field);
+  if (new Set(value).size !== value.length) invalid(field, "must not repeat entries", value);
+};
 const receiptState = oneOf("queued", "offered", "retrieved", "acknowledged");
 
 const DURABLE_RECORDS = Object.freeze({
@@ -104,9 +114,13 @@ const DURABLE_RECORDS = Object.freeze({
 const RECORDS = Object.freeze({
   ...DURABLE_RECORDS,
   deliveryBinding: { sessionId: id, generation: id, adapterId: id, clientVersion: line,
-    availableModes: listOf(oneOf("nextTurn", "livePush", "replyRoute")),
+    availableModes: uniqueListOf(oneOf(...DELIVERY_MODES)),
     livePolicy: oneOf("off", "actionable", "all"), opaqueEndpointRef: prose,
-    leaseUntil: timestamp },
+    // The lease says how long the endpoint's owner has vouched for it; the
+    // retirement says the session gave it up. They were once the same field -
+    // clearing expired the lease - which made a renewal by a channel that had
+    // not yet noticed indistinguishable from a legitimate extension.
+    leaseUntil: timestamp, retiredAt: optional(nullable(timestamp)) },
 });
 
 export const RECORD_KINDS = Object.freeze(Object.keys(DURABLE_RECORDS));
@@ -128,6 +142,7 @@ export function validateRecord(kind, value) {
   }
   for (const [field, check] of Object.entries(fields)) {
     if (!Object.hasOwn(value, field)) {
+      if (check.optional === true) continue;
       throw new AccError(EXIT.DATA, `${kind} requires ${field}`, { kind, field });
     }
     check(value[field], field);

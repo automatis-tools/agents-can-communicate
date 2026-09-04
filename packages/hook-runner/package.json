@@ -4,7 +4,9 @@
   "private": true,
   "type": "module",
   "exports": {
-    ".": "./src/runner.mjs"
+    ".": "./src/runner.mjs",
+    "./client-pid": "./src/client-pid.mjs",
+    "./process-table": "./src/process-table.mjs"
   },
   "files": [
     "src/"

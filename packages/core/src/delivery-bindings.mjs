@@ -8,7 +8,7 @@ function conflict(sessionId) {
 }
 
 export function createDeliveryBindingService(ports, sessions) {
-  const { store } = ports;
+  const { store, clock } = ports;
 
   async function currentBindings(now) {
     const bindings = await store.ephemeral.list("deliveryBinding");
@@ -17,6 +17,10 @@ export function createDeliveryBindingService(ports, sessions) {
       const located = await sessions.locateSession(binding.sessionId);
       if (located?.record.state !== "open"
         || located.record.generation !== binding.generation) continue;
+      // A retirement is final. It is kept as a record rather than deleted so a
+      // stale generation cannot race a successor's publication, and it must
+      // never be read back as a live endpoint.
+      if (binding.retiredAt !== null && binding.retiredAt !== undefined) continue;
       current.push({ binding, participantId: located.record.participantId,
         reachable: Date.parse(binding.leaseUntil) > Date.parse(now) });
     }
@@ -42,6 +46,7 @@ export function createDeliveryBindingService(ports, sessions) {
         livePolicy: input.livePolicy,
         opaqueEndpointRef: input.opaqueEndpointRef,
         leaseUntil: input.leaseUntil,
+        retiredAt: null,
       });
     } catch (error) {
       if (error?.details?.field === "opaqueEndpointRef") {
@@ -71,11 +76,56 @@ export function createDeliveryBindingService(ports, sessions) {
     return binding;
   }
 
+  // Clearing is an in-place retirement under the same writer lock as
+  // publication. The store's update contract has no deletion sentinel and its
+  // delete() takes the same mutex, so this is the one atomic form: a stale
+  // generation cannot retire a successor's endpoint, and an absent or
+  // already-retired binding stays as it is.
+  //
+  // The retirement is recorded as its own fact rather than as an expired lease.
+  // Expiry and retirement used to be the same edit, so a channel still renewing
+  // its endpoint could extend a binding the session had already given up.
+  async function clearDeliveryBinding({ sessionId, generation }) {
+    await store.ephemeral.update("deliveryBinding", sessionId, async current => {
+      if (current === null || current === undefined) return null;
+      if (current.generation !== generation) throw conflict(sessionId);
+      if (current.retiredAt !== null && current.retiredAt !== undefined) return null;
+      const now = clock.now();
+      return { ...current, leaseUntil: now, retiredAt: now };
+    });
+  }
+
+  /**
+   * Extend the lease on a binding whose endpoint is still being served.
+   *
+   * Only the process holding the endpoint knows it is alive, and for a client
+   * with no heartbeat nothing else refreshes this record: measured on a real
+   * Claude 2.1.259 session, the channel kept its registration renewed while
+   * this lease went stale about a minute after the last turn, and the router
+   * stopped offering to a session that was still serving.
+   *
+   * Narrow on purpose. It moves the lease and nothing else, refuses anything
+   * but the current open generation, and will not revive a retired binding.
+   */
+  async function refreshDeliveryBinding({ sessionId, generation, leaseUntil }) {
+    const located = await sessions.locateSession(sessionId);
+    if (located?.record.state !== "open" || located.record.generation !== generation) {
+      throw conflict(sessionId);
+    }
+    await store.ephemeral.update("deliveryBinding", sessionId, async current => {
+      if (current === null || current === undefined) return null;
+      if (current.generation !== generation) throw conflict(sessionId);
+      if (current.retiredAt !== null && current.retiredAt !== undefined) return null;
+      return validateRecord("deliveryBinding", { ...current, leaseUntil });
+    });
+  }
+
   async function listDeliveryBindings({ participantId, now }) {
     return (await currentBindings(now))
       .filter(item => item.participantId === participantId && item.reachable)
       .map(item => item.binding);
   }
 
-  return { publishDeliveryBinding, listDeliveryBindings, currentBindings };
+  return { publishDeliveryBinding, clearDeliveryBinding, refreshDeliveryBinding,
+    listDeliveryBindings, currentBindings };
 }

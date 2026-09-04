@@ -17,7 +17,7 @@ platforms degrade to false. No weaker session inherits a stronger peer's capabil
 
 Passing evidence currently ships for these exact versions on `darwin-arm64`:
 
-| Capability | Codex 0.147.0 | Claude Code 2.1.233 | Gemini CLI 0.37.0 | Grok 1.0.13 | Kimi 0.36.1 |
+| Capability | Codex 0.147.0 | Claude Code 2.1.233 | Gemini CLI 0.57.0 | Grok 1.0.13 | Kimi 0.36.1 |
 |---|---:|---:|---:|---:|---:|
 | `lifecycle.sessionStart` | yes | yes | yes | no | yes |
 | `lifecycle.sessionEnd` | yes | yes | yes | no | no |
@@ -32,15 +32,21 @@ Passing evidence currently ships for these exact versions on `darwin-arm64`:
 Every other capability in the closed shape defaults to false, including session resume,
 child sessions, startup or safe-point injection, and before-read guards.
 
+The `delivery.livePush` and `delivery.replyRoute` row is `no` for the exact hook versions
+this matrix is keyed to. Native live delivery was captured on newer clients - Claude Code
+2.1.258 (livePush and replyRoute) and Codex 0.152.1 (livePush) - and is admitted through the
+native delivery contract rather than exact-version certification: it is off until a per-client
+opt-in, experimental, and never turns on for a client below the captured minimum.
+
 The limitations belong next to the adapters they affect:
 
 | Adapter | Exact limitation and evidence |
 |---|---|
-| Codex | 0.147.0 next-turn stdout arrives as unwrapped developer-role context and requires plugin trust. The separate 0.152.0 native capture found no daemon control socket; ACC did not start one, so live push and reply routing remain false. |
-| Claude Code | 2.1.233 next-turn delivery waits for the next user prompt. The 2.1.252 channel capture stopped at the development-channel warning before the ACC MCP child started; native delivery branches are unobserved and false. |
-| Gemini CLI | Only 0.37.0 has package-shipped next-turn certification. Write and shell tools depend on approval mode; other versions and platforms retain inbox access but no effective delivery capability. |
-| Grok | Documentation-shaped payloads do not count as real captures. UserPromptSubmit context was observed discarded, and no deny was captured stopping a real write; all capabilities remain false. |
-| Kimi Code | 0.36.1 has next-turn and guard evidence, plus a 60-second heartbeat. Prompt-mode `SessionEnd` never fired, and its next-turn path does not interrupt an active turn. |
+| Codex | 0.147.0 next-turn stdout arrives as unwrapped developer-role context and requires plugin trust. A 0.152.1 capture proved the App Server queue transport, but the release capture then measured that native delivery there requires `codex --remote unix://`, and in that mode the session runs inside the daemon: both the hook payload and the App Server's own thread record report the daemon's directory instead of the session's, so ACC cannot tell which workspace the session is in. Nothing ACC can reach carries the real one, and placing a session in the wrong workspace is worse than not placing it, so `delivery.livePush` is **not** claimed - the probe and the handshake both refuse with `workspace_identity_unavailable`. `replyRoute` stays false. |
+| Claude Code | 2.1.233 next-turn delivery waits for the next user prompt. A 2.1.258 Channel capture proved idle offer, busy queue-after-turn, explicit reply, duplicate suppression, and durable fallback, so `delivery.livePush` and `delivery.replyRoute` are live capabilities behind the native contract (experimental, off until opted in; Claude's development-channel warning is vendor-owned and visible). |
+| Gemini CLI | Only 0.57.0 has package-shipped next-turn certification. Its TUI has no captured external wake or queue interface and `--acp` changes launch ownership, so native delivery is fallback-only; live push and reply routing remain false. |
+| Grok | Documentation-shaped payloads do not count as real captures. The public leader surface exposed no proven addressed injection into an ordinary TUI session, so native delivery is `awaiting_compatibility_capture`; all capabilities remain false. |
+| Kimi Code | 0.36.1 has next-turn and guard evidence, plus a 60-second heartbeat. Its server/queue APIs do not prove a transparent binding to an independently opened session, so native delivery is fallback-only. |
 | Generic MCP | Tool polling is not next-turn injection, live push, or a native reply route. It has no write guard or client-lifecycle evidence. |
 
 `certification.json` beside each adapter is machine-readable. `COMPATIBILITY.md` records the
@@ -57,8 +63,17 @@ The router requires exactly one current eligible generation. No binding, an expi
 several live sessions for one participant, a busy target, or a version that does not match
 passing evidence all stay on durable fallback.
 
-Current shipped reality: no adapter publishes a native live binding, and no adapter has
-passing `livePush` certification. Codex and Claude Code are next-turn or inbox only;
+The lease is extended by whoever serves the endpoint, because only that process knows it is
+still alive. A client that publishes no heartbeat - Claude Code among them - would otherwise
+let the lease run out under an idle session, which is exactly when live delivery is worth
+having. Giving a binding up is a separate, final fact rather than an expired lease, so a
+channel that has not yet noticed cannot extend something the session already retired.
+
+Current shipped reality: Claude Code on darwin-arm64 has a passing experimental `livePush`
+capture behind the native delivery contract, off until a per-client opt-in. Codex is
+next-turn and inbox only: its queue transport works, but the mode that makes a session
+reachable is the mode that hides which workspace it is in. Every other client is next-turn or
+inbox only;
 Gemini CLI and Kimi Code are next-turn only at their exact captured versions; Grok and MCP
 poll inbox.
 
@@ -70,7 +85,7 @@ policy:
 | Policy | Meaning |
 |---|---|
 | `off` | normal next-turn and inbox only |
-| `actionable` | questions, requests, and addressed handoffs may use live push |
+| `actionable` | questions, requests, answers, decisions, and addressed handoffs may use live push; notes wait for the next turn |
 | `all` | every addressed message kind may use live push |
 
 The default is `off`. `acc install --delivery actionable|all` is an explicit request, not
@@ -84,7 +99,7 @@ Room messages are never live-push candidates.
 |---|---|
 | exact-certified Codex 0.147.0 | complete peer body at the next normal turn; `acc inbox` remains recoverable |
 | exact-certified Claude Code 2.1.233 | complete peer body at the next normal prompt; `acc inbox` remains recoverable |
-| exact-certified Gemini CLI 0.37.0 | complete peer body at the next normal turn; `acc inbox` remains recoverable |
+| exact-certified Gemini CLI 0.57.0 | complete peer body at the next normal turn; `acc inbox` remains recoverable |
 | exact-certified Kimi Code 0.36.1 | complete peer body at the next normal turn; `acc inbox` remains recoverable |
 | Grok, generic MCP, unknown version, other platform | explicit `acc inbox` polling |
 

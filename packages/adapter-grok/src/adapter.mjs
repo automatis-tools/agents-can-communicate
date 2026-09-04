@@ -31,7 +31,9 @@ export function createGrokAdapter() {
     // so no effective capability is certified from them.
     capabilities: {},
     deliveryFallback: { diagnostic:
-      "Grok has no certified next-turn or live delivery; polling through acc inbox remains active" },
+      "Grok native delivery is awaiting_compatibility_capture: the public leader surface exposes "
+      + "no proven addressed injection into an independently opened ordinary TUI session; polling "
+      + "through acc inbox remains active" },
 
     startSession: async () => ({ ok: true, changes: [], diagnostics: [] }),
     endSession: async () => ({ ok: true, changes: [], diagnostics: [] }),

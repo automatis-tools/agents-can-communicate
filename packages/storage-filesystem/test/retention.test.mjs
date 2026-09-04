@@ -30,7 +30,7 @@ const workspaceRecord = () => ({ schemaVersion: SCHEMA_VERSION, workspaceId: WOR
 const binding = () => ({ schemaVersion: SCHEMA_VERSION, sessionId: "session_a",
   generation: "generation_a", adapterId: "codex", clientVersion: "1.2.3",
   availableModes: ["nextTurn"], livePolicy: "actionable", opaqueEndpointRef: "socket_a",
-  leaseUntil: NOW });
+  leaseUntil: NOW, retiredAt: null });
 
 async function writeEphemeralMarker(root, sequence, state) {
   const directory = path.join(root, "retained", "ephemeral", "deliveryBinding", "session_a");

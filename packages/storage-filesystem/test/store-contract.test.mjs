@@ -43,6 +43,7 @@ const binding = (overrides = {}) => ({
   sessionId: "session_a", generation: "generation_a", adapterId: "codex",
   clientVersion: "1.2.3", availableModes: ["nextTurn", "livePush"],
   livePolicy: "actionable", opaqueEndpointRef: "socket_a", leaseUntil: NOW,
+  retiredAt: null,
   ...overrides,
 });
 

@@ -79,12 +79,21 @@ Messages commit before any delivery attempt. `queued`, `offered`, `retrieved`, a
 not proof of model attention, and a reply resolves communication rather than proving a
 requested task finished.
 
-Durable inbox recovery is the baseline for every client. Certified next-turn injection can
-reduce the polling, but only for the exact client version and platform captured by the
-adapter. Native live push is opt-in and would also require a current reachable binding;
-**no shipped adapter currently has passing live-push certification**. The failed Codex
-0.152.0 and Claude Code 2.1.252 captures are shipped as evidence, so ACC reports fallback
-instead of claiming realtime delivery.
+Durable inbox recovery is the baseline for every client. Certified next-turn injection
+reduces the polling for the exact captured client version and platform. Native live push is
+opt-in, experimental, and off until you choose it: **Claude Code 2.1.258 and Codex 0.152.1
+on macOS arm64 have passing live-push captures** and deliver an addressed message into a
+running session through the vendor's own transport, falling back to the durable inbox on any
+failure. Every other client, and any client below the captured minimum, stays next-turn or
+inbox only. The retained failed captures are shipped beside the passing ones as honest
+evidence.
+
+| Client | Native delivery |
+|---|---|
+| Claude Code 2.1.258 (darwin-arm64) | experimental Channel: idle offer, queue-after-turn, native reply, off until opt-in |
+| Codex 0.152.1 (darwin-arm64) | experimental App Server queue: idle/after-turn, reply via `acc reply`, off until opt-in |
+| Gemini CLI, Kimi Code | next-turn or inbox only; no captured transparent transport |
+| Grok | awaiting a compatibility capture; inbox only |
 
 ## What ACC owns
 

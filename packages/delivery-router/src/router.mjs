@@ -1,6 +1,3 @@
-import { effectiveCapabilities } from "@agents-can-communicate/adapter-sdk";
-
-const PLATFORM = `${process.platform}-${process.arch}`;
 const SAFE_ERRORS = new Set(["ambiguous_recipient_sessions", "delivery_disabled",
   "recipient_busy", "recipient_unavailable", "transport_error", "transport_rejected",
   "unsupported_client_version"]);
@@ -11,8 +8,23 @@ const adaptersById = adapters => adapters instanceof Map
   : new Map((Array.isArray(adapters) ? adapters : Object.values(adapters ?? {}))
     .map(adapter => [adapter.id, adapter]));
 
+// Everything that closes or advances a conversation is actionable: a question
+// or request asks for work, an answer or decision resolves it, a handoff
+// transfers it. A note informs and waits for the next turn. Room messages
+// have no recipient and are never offered live.
+const ACTIONABLE = new Set(["question", "request", "answer", "decision", "handoff"]);
 const permits = (policy, kind) => policy === "all"
-  || (policy === "actionable" && ["question", "request", "handoff"].includes(kind));
+  || (policy === "actionable" && ACTIONABLE.has(kind));
+
+// Compatibility was decided twice already - at bootstrap by the probe and at
+// SessionStart by the generation-bound handshake that published this binding.
+// The router validates binding identity and the adapter's answer; it does not
+// impose a third, exact-version rule that would reject a client the handshake
+// admitted.
+const liveCapable = (adapter, binding) => adapter !== undefined
+  && adapter.capabilities?.delivery?.livePush === true
+  && adapter.nativeDelivery !== undefined
+  && binding.availableModes.includes("livePush");
 
 const durable = (recipientParticipantId, errorCode) => ({ recipientParticipantId,
   outcome: "queued", transport: "durable", errorCode });
@@ -57,22 +69,24 @@ export function createDeliveryRouter({ service, adapters, clock }) {
     if (permitted.length === 0) return durable(participantId, "delivery_disabled");
     const reachable = permitted.filter(binding => binding.availableModes.includes("livePush"));
     if (reachable.length === 0) return durable(participantId, "recipient_unavailable");
-    const certified = reachable.map(binding => ({ binding,
+    const capable = reachable.map(binding => ({ binding,
       adapter: registry.get(binding.adapterId) }))
-      .filter(({ binding, adapter }) => adapter !== undefined
-        && effectiveCapabilities(adapter,
-          { clientVersion: binding.clientVersion, platform: PLATFORM }).delivery.livePush);
-    if (certified.length === 0) {
+      .filter(({ binding, adapter }) => liveCapable(adapter, binding));
+    if (capable.length === 0) {
       return durable(participantId, "unsupported_client_version");
     }
-    if (certified.length > 1) {
+    if (capable.length > 1) {
       return durable(participantId, "ambiguous_recipient_sessions");
     }
 
-    const { binding, adapter } = certified[0];
+    const { binding, adapter } = capable[0];
     let response;
     try {
-      response = await adapter.offerMessage({ binding, message });
+      // The store root is this workspace's runtime dir; the adapter resolves its
+      // opaque endpoint id under it. Passed as data, never as a leak into core:
+      // the router does not read what the adapter does with it.
+      response = await adapter.offerMessage({ binding, message,
+        runtimeDir: service.store?.root });
     } catch {
       await recordFailure(binding, message, participantId, "live-adapter", "transport_error");
       return durable(participantId, "transport_error");

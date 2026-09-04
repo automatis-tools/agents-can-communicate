@@ -4,7 +4,8 @@
   "private": true,
   "type": "module",
   "exports": {
-    ".": "./src/adapter.mjs"
+    ".": "./src/adapter.mjs",
+    "./channel": "./src/channel.mjs"
   },
   "files": [
     "certification.json",
@@ -15,6 +16,8 @@
     "fixtures/PreToolUse-Edit.json",
     "fixtures/PreToolUse.json",
     "fixtures/delivery/claude-code-2.1.252.json",
+    "fixtures/delivery/claude-code-2.1.258.json",
+    "fixtures/delivery/claude-code-2.1.260.json",
     "src/",
     "plugin/"
   ]

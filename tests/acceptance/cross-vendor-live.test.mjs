@@ -145,7 +145,13 @@ test("packed v0.2 completes cross-vendor fallback without human relay", {
     restartedClaude.session.sessionId, "--to", restartedCodex.participantId,
     "--type", "question", "--subject", "Unknown version",
     "--body", "Can you still recover this?", "--client-message-id", "unknown-version"]);
-  assert.equal(downgraded.delivery[0].errorCode, "unsupported_client_version");
+  // The router no longer imposes a third exact-version rule: compatibility is
+  // settled at the launch bootstrap and the generation-bound handshake. A
+  // binding published at an admitted version whose transport is not reachable
+  // here stays queued as recipient_unavailable, and recovery still works.
+  assert.equal(downgraded.delivery[0].outcome, "queued");
+  assert.equal(["recipient_unavailable", "unsupported_client_version"]
+    .includes(downgraded.delivery[0].errorCode), true, downgraded.delivery[0].errorCode);
   assert.equal((await packed.beforeTurn(restartedCodex)).stdout
     .includes("Can you still recover this?"), false);
   const recovered = await packed.acc(["inbox", "--session",

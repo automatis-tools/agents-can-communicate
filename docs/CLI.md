@@ -129,9 +129,16 @@ external AI client. An addressed handoff requires acknowledgement; a room handof
 | `acc help` | — |
 | `acc version` | — |
 
-`--delivery` is a recipient policy request, not a capability switch. The default is
-`off`. If the detected exact client version lacks certified live push, installation keeps
-the effective policy off and prints the adapter's durable fallback.
+`--delivery off|actionable|all` is a per-client recipient policy request, not a capability
+switch, and the default is `off`. `--adapter` is repeatable to name several clients. An
+explicit `--delivery` applies uniformly and never prompts; omitting it on an interactive
+terminal asks one default-No question per eligible client, and on a non-interactive run or a
+`--dry-run` it keeps fresh clients off. A recorded opt-in is kept on upgrade. If the detected
+client cannot receive native delivery - unsupported, below the captured minimum, a
+prerelease, known-bad, a wrong platform, or an unsupported shell - installation keeps the
+effective policy off and prints the reason. A live install writes an owned zsh PATH block and
+a per-command shim that keeps your command name and `exec`s the real client; `ACC_BYPASS=1`
+runs the unmodified client, and ACC is never the parent of the session after that `exec`.
 
 Only `update` touches the network. `ACC_NO_UPDATE_CHECK=1` disables update checks. Hooks
 never perform them.

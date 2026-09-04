@@ -2,15 +2,30 @@ import { defineAdapter, projectContext, projectContextResult }
   from "@agents-can-communicate/adapter-sdk";
 import certification from "../certification.json" with { type: "json" };
 
+import { PROTOCOL_CONTRACT } from "./app-server-client.mjs";
 import { allowOutcome, denyOutcome, injectOutcome, normalizeCodexHook }
   from "./hooks.mjs";
 import { planCodexInstall, detectCodex, installCodexPlugin, uninstallCodexPlugin } from "./install.mjs";
+// Nothing is imported from ./native-delivery.mjs on purpose. Its probe and bind
+// still exist and still answer `workspace_identity_unavailable` for anything
+// that reaches them directly, but this adapter wires none of it: an adapter that
+// imports the four native methods and then declares no descriptor reads as
+// half-withdrawn, and the launch-time check keys off the descriptor's absence.
 
 export const CODEX_VERSION = "0.147.0";
+export const CODEX_QUEUE_MINIMUM = "0.152.1";
+// Says why native delivery is off, and this is read out by `acc doctor`, so it
+// has to name the reason that actually applies. It used to name the 0.152.0
+// capture's absent control socket, which stopped being the operative reason
+// when 0.152.1 was withdrawn for a different and less fixable one - and reading
+// it, an operator would go looking for a socket that is in fact there.
 export const CODEX_DELIVERY_FALLBACK = Object.freeze({
-  diagnostic: "Codex native delivery is off: the codex-cli 0.152.0 capture found the "
-    + "app-server control socket absent; ACC did not start a daemon or target session; "
-    + "durable fallback remains exact-certified next-turn delivery or acc inbox",
+  diagnostic: "Codex native delivery is off: measured on codex-cli 0.152.1, the mode it "
+    + "requires runs the session inside the app-server daemon, which reports the "
+    + "daemon's workspace rather than the session's, so ACC has no honest way to "
+    + "address it - not a misconfiguration to repair; ACC did not start a daemon or "
+    + "target session; durable fallback remains exact-certified next-turn delivery "
+    + "or acc inbox",
 });
 
 /**
@@ -20,8 +35,10 @@ export const CODEX_DELIVERY_FALLBACK = Object.freeze({
  *
  * What stays false and why. `lifecycle.childSessions` is unverified:
  * SubagentStart and SubagentStop are in the binary's enum but no subagent ran
- * during the capture. Native live delivery and reply routing remain false after
- * the 0.152.0 capture found no existing app-server control socket.
+ * during the capture. Native live delivery and reply routing are false for a
+ * reason that outlived the 0.152.0 capture's absent control socket: on 0.152.1
+ * the socket is there and the queue works, and the mode that reaches it hides
+ * which workspace the session belongs to. See the note on the descriptor below.
  */
 export function createCodexAdapter() {
   return defineAdapter({
@@ -42,17 +59,35 @@ export function createCodexAdapter() {
       // The captured Bash payload is an allowed PostToolUse event, not the
       // denied PreToolUse capture required to certify a shell guard.
       guards: { beforeWrite: true },
-      delivery: { nextTurn: true },
+      // nextTurn is the certified 0.147.0 hook projection. livePush rested on
+      // the 0.152.1 App Server queue capture until the release capture withdrew
+      // it: the transport works, but the mode it needs hides which workspace the
+      // session is in, and a session ACC cannot place must not be addressed.
+      delivery: { nextTurn: true, livePush: false },
     },
+    // Native delivery is not declared. The contract is right to refuse a
+    // descriptor with no passing anchor, and the release capture withdrew the
+    // one this adapter had: the queue transport still works, but delivery here
+    // requires `codex --remote unix://`, and in that mode neither the hook
+    // payload's cwd nor the App Server's own thread record names the session's
+    // directory - both name the daemon's. Measured on 0.152.1 with a client
+    // working in one project and its thread recorded under another, ACC placed
+    // the session in the wrong workspace and fed it that workspace's peers.
+    //
+    // Nothing ACC can reach carries the real workspace, so this is not a gap to
+    // paper over with a default. Codex keeps next-turn delivery and the durable
+    // inbox, which do not depend on knowing the session's directory.
 
     startSession: async () => ({ ok: true, changes: [], diagnostics: [] }),
     endSession: async () => ({ ok: true, changes: [], diagnostics: [] }),
     guardWrite: async () => ({ ok: true, changes: [], diagnostics: [] }),
     guardShell: async () => ({ ok: true, changes: [], diagnostics: [] }),
 
+
     planInstall: context => planCodexInstall(context),
     detect: context => detectCodex(context),
-    install: context => installCodexPlugin(context),
+    install: context => installCodexPlugin({ ...context,
+      livePolicy: context.livePolicy ?? "off" }),
     uninstall: context => uninstallCodexPlugin(context),
 
     doctor: async context => {

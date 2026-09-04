@@ -1,0 +1,25 @@
+{
+  "client": "codex-cli",
+  "version": "0.152.1",
+  "platform": "darwin-arm64",
+  "observedAt": "2026-09-03T04:45:00.000Z",
+  "capability": "native_delivery",
+  "result": "fail",
+  "fixture": "codex-cli-0.152.1-remote-workspace",
+  "launchMode": "ordinary-command-with-install-time-bootstrap",
+  "protocolContract": "codex-app-server-thread-queue-v1",
+  "idle": "unobserved",
+  "busy": "unobserved",
+  "reply": "unobserved",
+  "duplicate": "unobserved",
+  "fallback": "unobserved",
+  "limitations": [
+    "release capture on the installed tarball, with the vendor daemon already running from a directory other than the session's",
+    "native delivery requires codex --remote unix://, and in that mode the session runs inside the daemon",
+    "the SessionStart hook payload reported cwd as the daemon's directory rather than the client's: the client was working in a temporary capture project while the payload named the daemon's own checkout",
+    "the App Server's own thread/list recorded that same daemon directory for the live thread, so the session's workspace is not available from anything ACC can reach",
+    "ACC placed the session in an unrelated workspace and injected that workspace's peers into it",
+    "no delivery branch could be observed because the session was never addressable from the workspace it was actually in",
+    "the earlier 0.152.1 pass started the daemon itself in the session's own directory, so the two directories coincided and the substitution was invisible"
+  ]
+}

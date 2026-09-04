@@ -42,6 +42,23 @@ test("a binding carries the client facts observed for this exact session", async
   });
 });
 
+test("a binding may name the client process, and only as a positive integer", async t => {
+  const dir = await runtimeDir(t);
+  await storeSessionBinding({ runtimeDir: dir, ...binding, clientPid: 4242 });
+  assert.deepEqual(await loadSessionBinding({ runtimeDir: dir,
+    harnessSessionId: binding.harnessSessionId }), {
+    accSessionId: "session_a", generation: "generation_a", clientPid: 4242,
+  });
+  // A restart before this field existed keeps its binding; it simply has no pid.
+  await storeSessionBinding({ runtimeDir: dir, ...binding });
+  assert.equal((await loadSessionBinding({ runtimeDir: dir,
+    harnessSessionId: binding.harnessSessionId })).clientPid, undefined);
+  for (const clientPid of [0, -1, 1.5, "4242", NaN]) {
+    await assert.rejects(storeSessionBinding({ runtimeDir: dir, ...binding, clientPid }),
+      error => error.code === EXIT.USAGE && /clientPid/.test(error.message));
+  }
+});
+
 test("an unknown harness session loads as null rather than throwing", async t => {
   const dir = await runtimeDir(t);
 

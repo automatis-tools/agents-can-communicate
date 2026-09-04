@@ -49,7 +49,7 @@ test("the executable reports a binding without exposing its endpoint", async t =
     generation: attached.generation, adapterId: "fixture_adapter", clientVersion: "1.2.3",
     availableModes: ["livePush"], livePolicy: "actionable",
     opaqueEndpointRef: "never-print-this-endpoint",
-    leaseUntil: new Date(Date.now() + 60_000).toISOString() });
+    leaseUntil: new Date(Date.now() + 60_000).toISOString(), retiredAt: null });
 
   const status = JSON.parse((await place.command("status")).stdout).data;
   assert.equal(status.deliveryBindings[0].reachable, true);
@@ -87,13 +87,17 @@ test("filesystem composition records before an offer failure and keeps command s
     generation: recipient.generation, adapterId: "fixture_adapter", clientVersion: "1.2.3",
     availableModes: ["livePush"], livePolicy: "actionable",
     opaqueEndpointRef: "never-print-this-process-endpoint",
-    leaseUntil: "2026-09-01T20:01:00.000Z" });
+    leaseUntil: "2026-09-01T20:01:00.000Z", retiredAt: null });
   let stateAtOffer;
+  const platform = `${process.platform}-${process.arch}`;
   const adapter = { id: "fixture_adapter", client: { command: "fixture-client" },
     capabilities: { delivery: { livePush: true } }, certification: { evidence: [{
       result: "pass", client: "fixture-client", version: "1.2.3",
-      platform: `${process.platform}-${process.arch}`, capability: "delivery.livePush",
-    }] }, offerMessage: async ({ message }) => {
+      platform, capability: "delivery.livePush",
+    }] }, nativeDelivery: { minimumByPlatform: { [platform]: "1.2.3" },
+      anchors: [{ platform, version: "1.2.3", protocolContract: "fixture-native-v1" }],
+      knownBad: [], activationKinds: ["shell-bootstrap"] },
+    offerMessage: async ({ message }) => {
       stateAtOffer = (await store.snapshot(status.workspaceId, { kinds: ["receipt"] }))
         .receipts.find(item => item.messageId === message.messageId).state;
       throw new Error("secret process transport detail");

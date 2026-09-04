@@ -2,75 +2,267 @@
   "schemaVersion": 1,
   "captures": [
     {
-      "id": "session-start", "client": "claude-code", "version": "2.1.233",
-      "platform": "darwin-arm64", "observedAt": "2026-08-16",
+      "id": "session-start",
+      "client": "claude-code",
+      "version": "2.1.233",
+      "platform": "darwin-arm64",
+      "observedAt": "2026-08-16",
       "fixture": "fixtures/SessionStart.json",
       "sha256": "f63baff4ba14b1490c1d66ccae1b5e355ca8185128e82639a22313c3c3a06fdc",
-      "event": "SessionStart", "tool": null,
-      "claims": [{ "capability": "lifecycle.sessionStart", "result": "pass",
-        "outcome": { "kind": "event-observed", "idle": "fires when a session starts",
-          "busy": "fires before the first model turn", "authority": "advisory",
-          "limitations": ["capture used a one-session --plugin-dir"] } }]
-    },
-    {
-      "id": "session-end", "client": "claude-code", "version": "2.1.233",
-      "platform": "darwin-arm64", "observedAt": "2026-08-16",
-      "fixture": "fixtures/SessionEnd.json",
-      "sha256": "165b89ab0c8398580c59c8a95febfeae6c833954767993f559b1d13867fc5ec9",
-      "event": "SessionEnd", "tool": null,
-      "claims": [{ "capability": "lifecycle.sessionEnd", "result": "pass",
-        "outcome": { "kind": "event-observed", "idle": "fires when a session exits",
-          "busy": "does not run until the session exits", "authority": "advisory",
-          "limitations": ["cannot write a handoff after the model has stopped"] } }]
-    },
-    {
-      "id": "user-prompt-submit", "client": "claude-code", "version": "2.1.233",
-      "platform": "darwin-arm64", "observedAt": "2026-08-16",
-      "fixture": "fixtures/UserPromptSubmit.json",
-      "sha256": "8d9edbc92de1b3c1601cfb36ddc341e45d1299df1803f0d5756890ecfbfd4a04",
-      "event": "UserPromptSubmit", "tool": null,
+      "event": "SessionStart",
+      "tool": null,
       "claims": [
-        { "capability": "context.beforeTurnInjection", "result": "pass",
-          "outcome": { "kind": "model-context-observed", "idle": "waits for the next user prompt",
-            "busy": "does not interrupt an in-progress turn", "authority": "context",
-            "limitations": ["requires the hookSpecificOutput additionalContext envelope"] } },
-        { "capability": "delivery.nextTurn", "result": "pass",
-          "outcome": { "kind": "model-context-observed", "idle": "offers complete peer messages at the next prompt",
-            "busy": "does not interrupt an in-progress turn", "authority": "context",
-            "limitations": ["delivery requires the next normal user turn"] } }
+        {
+          "capability": "lifecycle.sessionStart",
+          "result": "pass",
+          "outcome": {
+            "kind": "event-observed",
+            "idle": "fires when a session starts",
+            "busy": "fires before the first model turn",
+            "authority": "advisory",
+            "limitations": [
+              "capture used a one-session --plugin-dir"
+            ]
+          }
+        }
       ]
     },
     {
-      "id": "pre-tool-use-edit", "client": "claude-code", "version": "2.1.233",
-      "platform": "darwin-arm64", "observedAt": "2026-08-16",
+      "id": "session-end",
+      "client": "claude-code",
+      "version": "2.1.233",
+      "platform": "darwin-arm64",
+      "observedAt": "2026-08-16",
+      "fixture": "fixtures/SessionEnd.json",
+      "sha256": "165b89ab0c8398580c59c8a95febfeae6c833954767993f559b1d13867fc5ec9",
+      "event": "SessionEnd",
+      "tool": null,
+      "claims": [
+        {
+          "capability": "lifecycle.sessionEnd",
+          "result": "pass",
+          "outcome": {
+            "kind": "event-observed",
+            "idle": "fires when a session exits",
+            "busy": "does not run until the session exits",
+            "authority": "advisory",
+            "limitations": [
+              "cannot write a handoff after the model has stopped"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "user-prompt-submit",
+      "client": "claude-code",
+      "version": "2.1.233",
+      "platform": "darwin-arm64",
+      "observedAt": "2026-08-16",
+      "fixture": "fixtures/UserPromptSubmit.json",
+      "sha256": "8d9edbc92de1b3c1601cfb36ddc341e45d1299df1803f0d5756890ecfbfd4a04",
+      "event": "UserPromptSubmit",
+      "tool": null,
+      "claims": [
+        {
+          "capability": "context.beforeTurnInjection",
+          "result": "pass",
+          "outcome": {
+            "kind": "model-context-observed",
+            "idle": "waits for the next user prompt",
+            "busy": "does not interrupt an in-progress turn",
+            "authority": "context",
+            "limitations": [
+              "requires the hookSpecificOutput additionalContext envelope"
+            ]
+          }
+        },
+        {
+          "capability": "delivery.nextTurn",
+          "result": "pass",
+          "outcome": {
+            "kind": "model-context-observed",
+            "idle": "offers complete peer messages at the next prompt",
+            "busy": "does not interrupt an in-progress turn",
+            "authority": "context",
+            "limitations": [
+              "delivery requires the next normal user turn"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "pre-tool-use-edit",
+      "client": "claude-code",
+      "version": "2.1.233",
+      "platform": "darwin-arm64",
+      "observedAt": "2026-08-16",
       "fixture": "fixtures/PreToolUse-Edit.json",
       "sha256": "8768062d89190644cffb137572dfd0517473b83717a1e1b5c23aaa98e1501b36",
-      "event": "PreToolUse", "tool": "Edit",
-      "claims": [{ "capability": "guards.beforeWrite", "result": "pass",
-        "outcome": { "kind": "tool-denied-before-mutation", "idle": "no write exists to guard",
-          "busy": "denies a file edit before disk mutation", "authority": "blocking",
-          "limitations": ["runtime writes are outside the hook boundary"] } }]
+      "event": "PreToolUse",
+      "tool": "Edit",
+      "claims": [
+        {
+          "capability": "guards.beforeWrite",
+          "result": "pass",
+          "outcome": {
+            "kind": "tool-denied-before-mutation",
+            "idle": "no write exists to guard",
+            "busy": "denies a file edit before disk mutation",
+            "authority": "blocking",
+            "limitations": [
+              "runtime writes are outside the hook boundary"
+            ]
+          }
+        }
+      ]
     },
     {
-      "id": "pre-tool-use-bash", "client": "claude-code", "version": "2.1.233",
-      "platform": "darwin-arm64", "observedAt": "2026-08-16",
+      "id": "pre-tool-use-bash",
+      "client": "claude-code",
+      "version": "2.1.233",
+      "platform": "darwin-arm64",
+      "observedAt": "2026-08-16",
       "fixture": "fixtures/PreToolUse.json",
       "sha256": "fecdf3b8183e3c95da1535ca09bac4f571986c0e8c54b442b6423d5382d4a574",
-      "event": "PreToolUse", "tool": "Bash",
-      "claims": [{ "capability": "guards.beforeShell", "result": "pass",
-        "outcome": { "kind": "tool-denied-before-execution", "idle": "no shell call exists to guard",
-          "busy": "denies a Bash call before execution", "authority": "blocking",
-          "limitations": ["only tool calls reaching PreToolUse are guarded"] } }]
+      "event": "PreToolUse",
+      "tool": "Bash",
+      "claims": [
+        {
+          "capability": "guards.beforeShell",
+          "result": "pass",
+          "outcome": {
+            "kind": "tool-denied-before-execution",
+            "idle": "no shell call exists to guard",
+            "busy": "denies a Bash call before execution",
+            "authority": "blocking",
+            "limitations": [
+              "only tool calls reaching PreToolUse are guarded"
+            ]
+          }
+        }
+      ]
     },
     {
-      "id": "native-delivery-2-1-252", "client": "claude-code", "version": "2.1.252",
-      "platform": "darwin-arm64", "observedAt": "2026-09-01T16:17:06Z",
+      "id": "native-delivery-2-1-252",
+      "client": "claude-code",
+      "version": "2.1.252",
+      "platform": "darwin-arm64",
+      "observedAt": "2026-09-01T16:17:06Z",
       "fixture": "fixtures/delivery/claude-code-2.1.252.json",
-      "sha256": "a9b6bbad11ebf15bb01ace7b489f1b2d73f1a8226e9832e4cac5f1492c7ad7f7",
-      "event": null, "tool": null,
+      "sha256": "04ca2d59abc4d397167ba05a7dc6f9ec28f71158f340da27aa847109ef601617",
+      "event": null,
+      "tool": null,
       "claims": [
-        { "capability": "delivery.livePush", "result": "fail", "outcome": { "kind": "native-capture-failed" } },
-        { "capability": "delivery.replyRoute", "result": "fail", "outcome": { "kind": "native-capture-failed" } }
+        {
+          "capability": "delivery.livePush",
+          "result": "fail",
+          "outcome": {
+            "kind": "native-capture-failed"
+          }
+        },
+        {
+          "capability": "delivery.replyRoute",
+          "result": "fail",
+          "outcome": {
+            "kind": "native-capture-failed"
+          }
+        }
+      ]
+    },
+    {
+      "id": "native-delivery-2-1-258",
+      "client": "claude-code",
+      "version": "2.1.258",
+      "platform": "darwin-arm64",
+      "observedAt": "2026-09-02T21:20:11.676Z",
+      "fixture": "fixtures/delivery/claude-code-2.1.258.json",
+      "sha256": "c68e84989c02fa0657d0a8669a774ab1e301088d8c7856346cc9739d0fbad228",
+      "event": null,
+      "tool": null,
+      "claims": [
+        {
+          "capability": "delivery.livePush",
+          "result": "pass",
+          "outcome": {
+            "kind": "native-delivery-observed",
+            "idle": "offered",
+            "busy": "queued_after_turn",
+            "authority": "experimental",
+            "limitations": [
+              "captured on darwin-arm64 only; Linux and Windows remain uncaptured",
+              "the vendor development-channel warning stayed visible and was accepted by the operator by hand",
+              "the plugin .mcp.json must live in the marketplace source copy; the plugin cache copy alone is not read",
+              "acc_reply routed through the spike's explicit tool call; the spike created no durable ACC answer record",
+              "presentation after the busy turn was observed by the operator; the channel log records the write at 21:18:45Z and the explicit reply at 21:19:21Z"
+            ]
+          }
+        },
+        {
+          "capability": "delivery.replyRoute",
+          "result": "pass",
+          "outcome": {
+            "kind": "native-delivery-observed",
+            "idle": "offered",
+            "busy": "queued_after_turn",
+            "authority": "experimental",
+            "limitations": [
+              "captured on darwin-arm64 only; Linux and Windows remain uncaptured",
+              "the vendor development-channel warning stayed visible and was accepted by the operator by hand",
+              "the plugin .mcp.json must live in the marketplace source copy; the plugin cache copy alone is not read",
+              "acc_reply routed through the spike's explicit tool call; the spike created no durable ACC answer record",
+              "presentation after the busy turn was observed by the operator; the channel log records the write at 21:18:45Z and the explicit reply at 21:19:21Z"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "native-delivery-2-1-260",
+      "client": "claude-code",
+      "version": "2.1.260",
+      "platform": "darwin-arm64",
+      "observedAt": "2026-09-04T03:41:29.688Z",
+      "fixture": "fixtures/delivery/claude-code-2.1.260.json",
+      "sha256": "7513d13b6dc1c6b485d899550f43ae3577cd99fca108f06691f7ad07daf06f03",
+      "event": null,
+      "tool": null,
+      "claims": [
+        {
+          "capability": "delivery.livePush",
+          "result": "pass",
+          "outcome": {
+            "kind": "native-delivery-observed",
+            "idle": "offered",
+            "busy": "queued_after_turn",
+            "authority": "experimental",
+            "limitations": [
+              "captured on darwin-arm64 only; Linux and Windows remain uncaptured",
+              "the vendor development-channel warning stayed visible and was accepted by the operator by hand",
+              "two ordinary sessions in one workspace, each bound to its own client process; the earlier 2.1.259 attempt is what exposed the channel binding another session identity, and this run is the verification of that fix",
+              "duplicate was observed as one logical message id and one native offer: the repeated send took the durable path, so the channel was never asked to notify twice, and exactly one answer was recorded",
+              "busy was observed by the operator: the running turn completed before the channel presented the message, and the session named that order in its own answer"
+            ]
+          }
+        },
+        {
+          "capability": "delivery.replyRoute",
+          "result": "pass",
+          "outcome": {
+            "kind": "native-delivery-observed",
+            "idle": "offered",
+            "busy": "queued_after_turn",
+            "authority": "experimental",
+            "limitations": [
+              "captured on darwin-arm64 only; Linux and Windows remain uncaptured",
+              "the vendor development-channel warning stayed visible and was accepted by the operator by hand",
+              "two ordinary sessions in one workspace, each bound to its own client process; the earlier 2.1.259 attempt is what exposed the channel binding another session identity, and this run is the verification of that fix",
+              "duplicate was observed as one logical message id and one native offer: the repeated send took the durable path, so the channel was never asked to notify twice, and exactly one answer was recorded",
+              "busy was observed by the operator: the running turn completed before the channel presented the message, and the session named that order in its own answer"
+            ]
+          }
+        }
       ]
     }
   ]

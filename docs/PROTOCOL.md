@@ -182,7 +182,7 @@ livePolicy · opaqueEndpointRef · leaseUntil
 The recipient owns `livePolicy` because native push may start a model turn:
 
 - `off`: inbox and normal next-turn paths only;
-- `actionable`: questions, requests, and addressed handoffs may use live push;
+- `actionable`: questions, requests, answers, decisions, and addressed handoffs may use live push;
 - `all`: every addressed kind may use live push.
 
 Default is `off`. Policy never creates a capability. The router still requires a current

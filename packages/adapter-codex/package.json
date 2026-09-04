@@ -4,7 +4,8 @@
   "private": true,
   "type": "module",
   "exports": {
-    ".": "./src/adapter.mjs"
+    ".": "./src/adapter.mjs",
+    "./app-server": "./src/app-server-client.mjs"
   },
   "files": [
     "certification.json",
@@ -14,6 +15,7 @@
     "fixtures/UserPromptSubmit.json",
     "fixtures/PreToolUse.json",
     "fixtures/delivery/codex-cli-0.152.0.json",
+    "fixtures/delivery/codex-cli-0.152.1-remote-workspace.json",
     "src/",
     "plugin/"
   ]

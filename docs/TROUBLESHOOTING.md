@@ -53,8 +53,14 @@ do not run. `acc doctor` reports the installed cache copy and missing activation
 ## Gemini does not guard a write
 
 Default and `plan` modes expose no write tool to the model. `auto_edit` exposes edit tools;
-shell availability depends on approval mode. Only Gemini CLI 0.37.0 on `darwin-arm64` has
+shell availability depends on approval mode. Only Gemini CLI 0.57.0 on `darwin-arm64` has
 package-shipped delivery certification; other versions still use inbox.
+
+From 0.55 onwards there is a quieter cause with the same symptom: an untrusted folder. The
+client prints `Approval mode overridden to "default" because the current folder is not
+trusted` and keeps going, and the default mode has no write or shell tool to guard - so the
+guard never fires and the mode you passed appears to have been ignored. Trust the folder,
+or start the session somewhere trusted.
 
 ## Grok shows no injected message
 
