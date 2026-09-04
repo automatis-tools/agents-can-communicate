@@ -25,8 +25,13 @@ const runtime = {
   // answers no: in a real terminal the command printed "not written" and never
   // said why, and `--yes` - the flag documented for runs with nobody to ask -
   // was the only way to write the file.
-  confirm: question => askConfirmation(question,
-    { input: process.stdin, output: process.stdout }),
+  confirm: (question, io = { input: process.stdin, output: process.stdout }) =>
+    askConfirmation(question, io),
+  // The two streams and the fact that a person is at both ends, for the
+  // per-client native delivery question `acc install` asks only interactively.
+  input: process.stdin,
+  output: process.stdout,
+  isInteractive: () => process.stdin.isTTY === true && process.stdout.isTTY === true,
   // Asked for only by `acc version`, so a package missing its own manifest
   // fails that one command rather than every command.
   version: async () => JSON.parse(

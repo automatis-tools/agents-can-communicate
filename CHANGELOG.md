@@ -7,11 +7,142 @@ before trusting or extending it. It follows a real interaction from client start
 workspace identity through record-first storage, inbox and next-turn delivery, reply,
 receipt transitions, crash recovery, and the peer-content trust boundary.
 
+`acc doctor` now reports native-delivery state from the shell it actually runs in. It had
+built its detection context without a shell, so every shell-bootstrap client degraded to
+`unsupported_shell` - a zsh install with a working shim read as degraded on every run, the
+same shape install already resolves.
+
+The Claude Channel now answers MCP when no ACC session is bound to the client. Claude spawns
+that child for every session enabling the plugin, not only for the ones ACC's shim launched
+with the development-channel flag; with nothing to bind it returned, left the event loop
+empty, and exited without answering `initialize`, which Claude reports as a server that
+failed to connect. The unbound case is now a complete server that declares no channel it
+cannot serve and offers no tools.
+
+The Channel also waits for the binding its session's SessionStart hook is still writing.
+Claude spawns the child while that hook runs - on a measured 2.1.259 launch the client, the
+child, and the binding all landed within two seconds - so a single lookup won or lost a
+sub-second race, and losing it was permanent: the session kept the unbound server and native
+delivery never activated, with nothing in the record saying why. The lookup now retries
+until the binding appears, bounded so an unbound session is still answered.
+
+The Channel now also extends its endpoint lease while it is serving. The registration was
+written once and never renewed, so on a measured capture a session that had just live-pushed
+and been answered read as `reachable: false` about two minutes later - same process, same
+socket, still listening - and every later message fell back to the durable inbox. Renewal
+runs well inside the lease, stops when the channel closes, and keeps the endpoint identity
+so a peer that already resolved it is not locked out.
+
+The Channel's reply instructions now name a fallback. They named `acc_reply` as the only way
+to answer; on a measured session the model reported that tool was not loaded in its context
+and would have failed without first fetching its schema, and it recovered only because it
+thought to look. The `acc` CLI is already a real reply path, so it is named as the fallback -
+while answering peer content in ordinary output stays forbidden, being the one route that
+records nothing.
+
+Finally, the native handshake spends the budget it was already given. Both sides are started
+by SessionStart - the hook writes the session binding then handshakes, while the Channel is
+still waiting for that binding before it can register - so the endpoint appears after the
+handshake begins, and a single read gave up on a channel moments from ready. The budget is
+now spent waiting for it, without relaxing the rule that two sessions never share an
+endpoint.
+
+An idle session no longer loses live delivery. The binding's lease was written once by the
+handshake and moved again only by a turn, and Claude Code publishes no heartbeat - so a
+session sitting idle, which is the case live delivery exists for, expired under a channel
+that was still serving: measured, a question was live-pushed and answered natively, and two
+minutes later the same process and socket read as unreachable. The endpoint's owner now
+extends the lease, and giving a binding up became its own recorded fact so that a channel
+still renewing cannot undo a retirement. A retired binding is absent from status rather than
+reported unreachable. A record written before that field existed stays readable: adding it as
+required made `acc status` fail outright against a store that had been working, and a
+coordination tool must not refuse to read what it wrote yesterday.
+
+Codex native delivery is withdrawn. Its App Server queue capture was real and the transport
+still works, but the mode that capability needs - `codex --remote unix://` - runs the session
+inside the daemon, and both the hook payload's `cwd` and the App Server's own thread record
+then name the daemon's directory instead of the session's. ACC placed such a session in an
+unrelated workspace and injected that workspace's peers into it, and nothing ACC can reach
+carries the real one. `delivery.livePush` is false, no native descriptor is declared, and the
+probe and handshake answer `workspace_identity_unavailable`. The failure is recorded as its
+own capture rather than by rewriting the passing one. Codex keeps next-turn delivery and the
+durable inbox.
+
+Gemini CLI is certified on the version it actually ships as. The tier named 0.37.0 while the
+installed client was 0.57.0, and this matrix admits one exact version, so every capability
+resolved false on a machine where the mechanism worked: such a session was recorded as
+advisory and manual, and the router did not treat it as next-turn certified, so a peer's
+message stayed in the inbox when it could have been projected. Erring that way is the safe
+direction and still the wrong answer. Everything was measured again on 0.57.0, all of it
+from one session. The deny contract holds, and so does the trap in it - the
+`hookSpecificOutput` shape other clients honour still does not deny here. Injection is now
+verified at the far end rather than at the hook: printing an envelope proves only that
+something printed, so a marker was looked for in the request the client sent to its model,
+and arrived as the client's own `<hook_context>` part. 0.57.0 also brings this client's
+quietest failure yet - an untrusted folder does not fail, it downgrades the approval mode,
+and the downgraded toolset has no write or shell tool, so a guard never fires and nothing
+names trust as the reason. Certifying the version people run necessarily takes the claim
+away from 0.37.0; that capture stays in the repository and in provenance with its original
+digest rather than being rewritten.
+
+A second Claude session in the same workspace no longer takes the first one's identity.
+The Channel decided which session it served partly by counting: if exactly one session was
+live, it took that one. On a single-session machine that looked safe. But the Channel starts
+while its own SessionStart hook is still writing its binding, so the only binding a second
+client can see at that moment is the first client's - and the bounded wait added earlier to
+survive that race locks the wrong answer in on the first attempt, because a foreign binding
+is complete, live and plausible. Measured on two real 2.1.259 sessions: both Channels
+registered an endpoint under the first client's pid. The session that had been receiving
+live messages fell back to the durable inbox while it was still online, and an `acc_reply`
+from the second window would have been recorded as the first session's answer - a reply
+naming the wrong author, which is worse than a message that does not arrive. The rule that
+refuses two registrations for one client is not the bug here; it is the only thing that
+noticed. A Channel is spawned by its client, so its own ancestry names that client and no
+race can change it, and ownership is now decided by that alone. One that cannot name its own
+client serves nobody rather than guessing.
+
+The release capture then ran again on the fixed build and is recorded for 2.1.260 - the
+client updated itself mid-capture, so the version recorded is the one the delivery events
+actually carry rather than the one the run started on. Idle offered, busy queued behind a
+running turn, reply routed as a real ACC record, one message id for a repeated send, and a
+killed transport leaving the next message queued. It is evidence beside the 2.1.258 anchor
+rather than a new anchor - the contract has no maximum so that a newer client is admitted by
+probe and handshake, and this is the run that exercised that rather than replacing the tier
+it rests on: two minor versions of drift, served without a capture at either of them. Two smaller facts came out of it: a note to
+an `actionable` install is deliberately not pushed, because nothing about it needs acting
+on; and a recipient whose presence has gone stale is still reachable natively, because
+presence and delivery are separate facts.
+
+An uninstall that changed nothing no longer says it edited anything. Running it a second
+time printed `edited` for six of the operator's configuration files - Claude settings, two
+plugin registries, the Codex config, Gemini settings, a marketplace manifest - whose bytes
+it had not touched, because that one line came from the plan while every other line on the
+report came from the run. The packed verifier already treats an empty change set as the
+definition of a no-op, and the report a person reads now uses the same one.
+
+Codex's own explanation of the withdrawal was still the old one. `acc doctor` and the
+install report read out the adapter's delivery diagnostic, and it named the 0.152.0
+capture's absent app-server control socket - which is not why delivery is off any more. On
+0.152.1 that socket is present and the queue works; what stops delivery is that the mode
+reaching it reports the daemon's workspace instead of the session's. So an operator was
+being sent to look for something that is already there. The message now names the version
+it was measured on, the boundary that actually stops delivery, and that it is not a
+misconfiguration to repair - the part that decides whether someone keeps trying. A stale
+launch-time cache from before the withdrawal cannot bring the capability back either,
+verified against the installed tarball: the check refuses before it ever reads the cache.
+
+Worth naming as the pattern behind both of those: certification is pinned to exact versions
+while clients keep moving. Codex was the harmful face of it, a claim that had become wrong;
+Gemini was the benign face, a truth that was not being claimed. Native delivery already has
+the cure - no maximum version, admitted by probe and a generation-bound handshake, which is
+how Claude 2.1.260 is served by a 2.1.258 anchor - and the older capability matrix does not.
+That asymmetry, not either client, is the thing left to fix.
+
 | | |
 |---|---|
-| Built from | `062277db231e21243b9533dba9971e4884b8ebac` |
-| Tarball | `agents-can-communicate-0.2.0.tgz`, 205,285 bytes, 178 entries |
-| sha256 | `36843bb0355a0af792abff31ef5ec8156f17f65b419b50393df125f8f21ffe2b` |
+| Built from | `577b0d8fdcf437bf594aee89b3fa20b23e08bbad` |
+| Tarball | `agents-can-communicate-0.2.0.tgz`, 253,550 bytes, 196 entries |
+| sha256 | `b509594ecc41863be928b08d7394cf6c791d025a5783b0a6e833bf7b01bf53fe` |
 | Node | 26.5.1; package requires Node >=24 |
 | Verified on | macOS 26.6.2 (darwin 25.6.0, arm64) |
 

@@ -12,3 +12,11 @@ explicitly `unobserved`.
 
 The capture intentionally excludes session ids, user content, configuration, home paths,
 transcripts, credentials, and raw protocol traffic.
+
+`claude-code-2.1.258.json` records the first passing capture, on macOS arm64, produced by
+`scripts/spikes/claude-channel-fixture.mjs` from the disposable Channel's observation log
+plus the operator's attested busy and fallback verdicts. The ordinary `claude` command was
+launched through a temporary shell bootstrap that added only the development-channel flag;
+idle, busy (presented after the turn), reply (explicit `acc_reply`), duplicate, and
+fallback (queued after the Channel child was terminated) were all observed. Limitations
+name what the capture did not cover. `COMPATIBILITY.md` has the timeline.

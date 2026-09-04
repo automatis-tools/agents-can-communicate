@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "acc-channel": {
+      "command": "ACC_NODE_PLACEHOLDER",
+      "args": ["ACC_CHANNEL_PLACEHOLDER"]
+    }
+  }
+}

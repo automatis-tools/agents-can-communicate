@@ -25,7 +25,10 @@ const publicManifestSurface = manifest => JSON.stringify({
   files: (manifest.files ?? []).filter(file => !file.startsWith("fixtures/")),
 });
 
-async function machine(t, version = "codex-cli 0.152.0") {
+// 0.152.1 is the version the withdrawal was measured on: the one where the
+// queue transport works and delivery is off anyway. 0.152.0 only ever proved
+// that an absent socket stops it, which is the weaker of the two facts.
+async function machine(t, version = "codex-cli 0.152.1") {
   const home = await realpath(await mkdtemp(path.join(tmpdir(), "acc-codex-home-")));
   const dataHome = await realpath(await mkdtemp(path.join(tmpdir(), "acc-codex-data-")));
   const project = path.join(home, "project");
@@ -56,43 +59,34 @@ async function machine(t, version = "codex-cli 0.152.0") {
   return { command, home, pluginTrees };
 }
 
-test("Codex fallback-only source and public package surface omit the planned native bridge",
-  async () => {
-    for (const planned of [
-      path.join(repo, "packages", "adapter-codex", "src", "app-server-client.mjs"),
-      path.join(repo, "tests", "acceptance", "codex-live-real.test.mjs"),
-    ]) {
-      await assert.rejects(stat(planned), { code: "ENOENT" },
-        `unproven native-delivery artifact is present: ${planned}`);
-    }
-
-    const adapter = codexModule.createCodexAdapter();
-    for (const method of ["offerMessage", "routeReply"]) {
-      assert.equal(Object.hasOwn(adapter, method), false,
-        `Codex adapter exports unproven native method ${method}`);
-    }
-    for (const exported of ["connectExistingAppServer", "offerCodexMessage"]) {
-      assert.equal(Object.hasOwn(codexModule, exported), false,
-        `Codex package exports unproven native API ${exported}`);
-    }
-
-    for (const manifestPath of [
-      path.join(repo, "package.json"),
-      path.join(repo, "packages", "adapter-codex", "package.json"),
-    ]) {
-      const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
-      assert.doesNotMatch(publicManifestSurface(manifest), NATIVE_PACKAGE_SURFACE,
-        `native Codex bridge entered package surface: ${manifestPath}`);
-    }
-
-    const hooks = JSON.parse(await readFile(path.join(repo, "packages", "adapter-codex",
-      "plugin", "hooks.json"), "utf8"));
-    const commands = Object.values(hooks.hooks)
-      .flatMap(entries => entries.flatMap(entry => entry.hooks.map(hook => hook.command)));
-    assert.doesNotMatch(commands.join("\n"),
-      /app-server|proxy|livePush|replyRoute|opaqueEndpointRef/i,
-      "shipped Codex hooks contain unproven native-delivery wiring");
-  });
+// Codex ships no native-delivery surface. The 0.152.1 queue capture observed a
+// working transport, and the release capture then measured that the mode it
+// requires - codex --remote unix:// - runs the session inside the daemon, where
+// both the hook payload's cwd and the App Server's own thread record name the
+// daemon's directory instead of the session's. ACC placed such a session in an
+// unrelated workspace and fed it that workspace's peers. Nothing ACC can reach
+// carries the real one, so the capability is withdrawn rather than defaulted.
+test("the Codex native queue surface is absent, and no hook smuggles it back", async () => {
+  const adapter = codexModule.createCodexAdapter();
+  assert.equal(adapter.capabilities.delivery.livePush, false);
+  assert.equal(adapter.capabilities.delivery.replyRoute, false);
+  assert.equal(adapter.nativeDelivery, undefined);
+  for (const method of ["probeNativeDelivery", "planNativeActivation", "bindNativeSession",
+    "offerMessage", "routeReply"]) {
+    assert.equal(Object.hasOwn(adapter, method), false, method);
+  }
+  // Codex keeps next-turn delivery and the durable inbox: neither depends on
+  // knowing which directory the session is in.
+  assert.equal(adapter.capabilities.delivery.nextTurn, true);
+  // And no shipped hook may reintroduce the wiring by the back door.
+  const hooks = JSON.parse(await readFile(path.join(repo, "packages", "adapter-codex",
+    "plugin", "hooks.json"), "utf8"));
+  const commands = Object.values(hooks.hooks)
+    .flatMap(entries => entries.flatMap(entry => entry.hooks.map(hook => hook.command)));
+  assert.doesNotMatch(commands.join("\n"),
+    /app-server|proxy|daemon|livePush|opaqueEndpointRef/i,
+    "shipped Codex hooks contain native-delivery wiring");
+});
 
 for (const policy of ["actionable", "all"]) {
   test(`Codex ${policy} delivery stays off and installs no native bridge`, async t => {
@@ -103,14 +97,15 @@ for (const policy of ["actionable", "all"]) {
 
     assert.equal(operation.livePolicy, policy);
     assert.equal(operation.effectiveLivePolicy, "off");
-    assert.match(operation.deliveryDiagnostic, /0\.152\.0/);
-    assert.match(operation.deliveryDiagnostic, /control socket.*absent/i);
+    assert.match(operation.deliveryDiagnostic, /0\.152\.1/);
+    assert.match(operation.deliveryDiagnostic, /workspace/i);
+    assert.match(operation.deliveryDiagnostic, /not a misconfiguration/i);
     assert.match(operation.deliveryDiagnostic, /did not start.*daemon/i);
     assert.match(operation.deliveryDiagnostic, /next-turn.*acc inbox/);
 
     const installed = await place.command("install", "--adapter", "codex",
       "--delivery", policy, "--home", place.home);
-    assert.match(installed.stdout, /control socket.*absent/i,
+    assert.match(installed.stdout, /workspace/i,
       "the human install report hid the native-delivery downgrade");
     await assert.rejects(stat(path.join(place.home, ".codex", "app-server-control")),
       { code: "ENOENT" });
@@ -129,8 +124,9 @@ test("doctor names the failed Codex capture and withholds uncertified delivery",
   await place.command("install", "--adapter", "codex", "--home", place.home);
 
   const human = (await place.command("doctor", "--home", place.home)).stdout;
-  assert.match(human, /0\.152\.0/);
-  assert.match(human, /control socket.*absent/i);
+  assert.match(human, /0\.152\.1/);
+  assert.match(human, /workspace/i);
+  assert.match(human, /not a misconfiguration/i);
   assert.match(human, /did not start.*daemon/i);
   assert.match(human, /next-turn.*acc inbox/);
 
@@ -140,7 +136,7 @@ test("doctor names the failed Codex capture and withholds uncertified delivery",
   assert.equal(codex.capabilities.delivery.nextTurn, false);
   assert.equal(codex.capabilities.delivery.livePush, false);
   assert.equal(codex.capabilities.delivery.replyRoute, false);
-  assert.match(codex.deliveryDiagnostic, /control socket.*absent/i);
+  assert.match(codex.deliveryDiagnostic, /workspace/i);
   assert.match(codex.diagnostics.join(" "), /next-turn.*acc inbox/);
 });
 

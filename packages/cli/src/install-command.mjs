@@ -6,7 +6,8 @@ import { createCodexAdapter } from "@agents-can-communicate/adapter-codex";
 import { createGeminiCliAdapter } from "@agents-can-communicate/adapter-gemini-cli";
 import { createGrokAdapter } from "@agents-can-communicate/adapter-grok";
 import { createKimiAdapter } from "@agents-can-communicate/adapter-kimi";
-import { applyPlan, detectInstallation, loadOwnership, planInstallation }
+import { LIVE_POLICIES, applyPlan, describeActivation, detectInstallation, livePolicyOf,
+  loadOwnership, planInstallation, rcFileFor, shellOf, shimDirFor }
   from "@agents-can-communicate/installer";
 import { AccError, EXIT } from "@agents-can-communicate/protocol";
 
@@ -18,13 +19,18 @@ import { platformPaths } from "./platform-paths.mjs";
 // Each client keeps its own directory under the user's home, and an adapter
 // pointed at the home itself writes beside them rather than inside them. That
 // install reports success and the client never reads a byte of it.
-export const clientContext = (home, stateRoot) => ({
+export const clientContext = (home, stateRoot, { shell = null, env = {} } = {}) => ({
   home,
   configDir: path.join(home, ".claude"),
   agentsHome: home,
   codexHome: path.join(home, ".codex"),
   kimiHome: path.join(home, ".kimi-code"),
   grokHome: path.join(home, ".grok"),
+  // The user's login shell and PATH, for the optional native shell bootstrap:
+  // which rc file could carry an ACC PATH block and which real executable a
+  // shim would exec. Detection reads them; nothing here writes.
+  shell,
+  env,
   // Where ACC keeps its own state, for the client that has to be told. Codex
   // sandboxes the commands a model runs to the workspace, and ACC's state is
   // outside every workspace on purpose - so an agent there could read the
@@ -108,11 +114,20 @@ export function describeChanges(operation, home) {
     return [...artifacts.filter(artifact => artifact.kind !== "merge")
       .map(artifact => `  created ${shorten(artifact.path, home)}`), ...edited];
   }
+  // An uninstall's merge edits come from the plan - every file ACC has ever
+  // written into - while everything else on this list is decided by the run.
+  // Printed unconditionally, a second uninstall told the operator it had edited
+  // six of their configuration files whose bytes it had not touched. `changes`
+  // is what the adapter actually took out, and is already what the packed
+  // verifier calls a no-op, so the report now follows the same definition. It
+  // is still the plan's list rather than a per-file one: this says whether
+  // anything was edited, not which of several files it was.
+  const editedIfAnything = (operation.changes ?? []).length === 0 ? [] : edited;
   return [
     ...(operation.removed ?? []).map(file => `  removed ${shorten(file, home)}`),
     ...(operation.removedDirectories ?? [])
       .map(file => `  removed ${shorten(file, home)}`),
-    ...edited,
+    ...editedIfAnything,
     ...(operation.kept ?? [])
       .map(file => `  kept    ${shorten(file, home)} - changed since ACC wrote it`),
   ];
@@ -174,12 +189,81 @@ export function actedOn(result) {
         + (operation.changes?.length ?? 0) > 0)).length;
 }
 
+const isInteractive = runtime => typeof runtime.isInteractive === "function"
+  && runtime.isInteractive() === true;
+
+// One default-No question per eligible client, asked only after detection has
+// finished and only when a person is at both ends of the terminal. It names
+// the client, the mechanism, and the files or service it would touch, and says
+// when the choice takes effect.
+function questionFor(entry, context) {
+  const activation = { livePolicy: "actionable", shell: context.shell,
+    rcFile: rcFileFor(context.home, context.shell), shimDir: shimDirFor(context.stateRoot),
+    mechanisms: entry.nativeDelivery.activationPlan.mechanisms };
+  return [`Enable native live delivery for ${entry.displayName} ${entry.version}?`,
+    ...describeActivation(activation).map(line => `  ${line}`),
+    "  applies to newly started sessions; a new PATH block needs a new or reloaded shell"]
+    .join("\n");
+}
+
+/**
+ * Which live policy each selected client gets.
+ *
+ * An explicit --delivery applies uniformly and never prompts. Otherwise a
+ * recorded opt-in is kept as it was consented to, a fresh or never-activated
+ * client is off unless a person answers yes here, and a dry run or a
+ * non-interactive stdin/stdout makes no interactive choice at all.
+ */
+export async function decideDelivery({ options, detected, recorded, runtime, dryRun, context }) {
+  const explicit = options.delivery;
+  if (explicit !== undefined && !LIVE_POLICIES.includes(explicit)) {
+    throw new AccError(EXIT.USAGE, `unknown delivery policy: ${explicit}`, { delivery: explicit });
+  }
+  const recordedById = new Map(recorded.map(install => [install.adapterId, install]));
+  const deliveryByAdapter = {};
+  const asked = [];
+  let withheld = 0;
+  for (const entry of detected) {
+    const eligible = entry.nativeDelivery?.state === "eligible";
+    const previous = livePolicyOf(recordedById.get(entry.adapterId));
+    if (explicit !== undefined) {
+      deliveryByAdapter[entry.adapterId] = explicit;
+    } else if (previous !== "off") {
+      deliveryByAdapter[entry.adapterId] = previous;
+    } else if (!eligible || dryRun || !isInteractive(runtime)) {
+      deliveryByAdapter[entry.adapterId] = "off";
+      if (eligible) withheld += 1;
+    } else {
+      const yes = await runtime.confirm(questionFor(entry, context),
+        { input: runtime.input, output: runtime.output }) === true;
+      deliveryByAdapter[entry.adapterId] = yes ? "actionable" : "off";
+      asked.push(entry.adapterId);
+    }
+  }
+  const notes = explicit === undefined && dryRun && withheld > 0
+    ? ["interactive choices were not made: this preview keeps native delivery off for "
+      + `${withheld} eligible client(s) without a recorded opt-in`]
+    : [];
+  return { deliveryByAdapter, asked, notes };
+}
+
+// Said once, after the first PATH block is written: a running shell and a
+// running client know nothing about it.
+function reloadAdvice(operations) {
+  const appended = operations.filter(operation => operation.appendedRcBlock === true);
+  if (appended.length === 0) return [];
+  const rc = appended[0].nativeActivation?.rcFile ?? "your shell rc file";
+  return ["", `native delivery is wired for new sessions: open a new terminal (or reload ${rc}), `
+    + "then start the client normally; a session already running keeps durable delivery"];
+}
+
 export async function runInstallCommand({ options, runtime, action = "install" }) {
   const adapters = selectAdapters(options.adapter);
   const home = options.home ?? runtime.env?.HOME ?? homedir();
   const { data: dataHome } = platformPaths({ platform: runtime.platform,
     env: runtime.env ?? {} });
-  const context = clientContext(home, path.join(dataHome, "acc"));
+  const context = clientContext(home, path.join(dataHome, "acc"),
+    { shell: shellOf(runtime.env), env: runtime.env ?? {} });
 
   const detected = await detectInstallation({ adapters, context,
     probeTimeoutMs: probeTimeout(runtime.env) });
@@ -205,20 +289,28 @@ export async function runInstallCommand({ options, runtime, action = "install" }
   const requested = options.adapter === undefined
     ? []
     : (Array.isArray(options.adapter) ? options.adapter : [options.adapter]);
+  // Decided only after detection, from the operator's explicit answer, the
+  // recorded consent, or a default of off; never from inference.
+  const decided = action === "install"
+    ? await decideDelivery({ options, detected, recorded, runtime, dryRun, context })
+    : { deliveryByAdapter: {}, asked: [], notes: [] };
   const plan = planInstallation({ adapters, detected, context, action, recorded,
     accVersion, allowDowngrade: options.downgrade === true, requested,
-    delivery: options.delivery ?? "off" });
+    deliveryByAdapter: decided.deliveryByAdapter });
   const result = await applyPlan({ plan, adapters, context, dataHome, dryRun, accVersion });
 
   const acted = actedOn(result);
   if (dryRun) {
-    return { data: { ...result, plan, dataHome },
+    return { data: { ...result, plan, dataHome, deliveryByAdapter: decided.deliveryByAdapter },
       text: [`would ${action}:`, ...plan.operations.flatMap(operation => operation.summary),
-        ...plan.skipped.map(entry => `skip ${entry.adapterId}: ${entry.reason}`)].join("\n") };
+        ...plan.skipped.map(entry => `skip ${entry.adapterId}: ${entry.reason}`),
+        ...decided.notes].join("\n") };
   }
 
-  return { data: { ...result, plan, dataHome },
-    text: describeOutcome({ action, acted, failed: result.failed,
-      skipped: plan.skipped, operations: result.operations, home }),
-    error: failureOf({ action, acted, failed: result.failed }) };
+  return { data: { ...result, plan, dataHome, deliveryByAdapter: decided.deliveryByAdapter,
+    asked: decided.asked },
+  text: [describeOutcome({ action, acted, failed: result.failed,
+    skipped: plan.skipped, operations: result.operations, home }),
+  ...reloadAdvice(result.operations)].join("\n"),
+  error: failureOf({ action, acted, failed: result.failed }) };
 }

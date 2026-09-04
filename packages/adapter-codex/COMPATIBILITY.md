@@ -264,3 +264,72 @@ policy `off` and names this exact limitation. Only `codex-cli 0.147.0` on
 `darwin-arm64` retains its separately captured next-turn hook capability. `0.152.0` and
 unknown or uncertified versions retain the durable `acc inbox` recovery path; ACC does
 not start a daemon or target client to make native delivery appear available.
+
+## Native queue capture (2026-09-02)
+
+The installed `codex-cli 0.152.1` on `darwin-arm64` was started with the user's ordinary
+`codex` command plus the vendor's own `--remote unix://` attachment to the local App Server
+daemon. No daemon existed beforehand: `codex app-server daemon start` created it for this
+capture and `codex app-server daemon stop` removed it afterwards; ACC recorded that it was
+ACC-created. The daemon's control socket answers an HTTP upgrade and then speaks JSON-RPC
+one message per WebSocket text frame; a newline-framed line gets no answer.
+
+Observed, from the probe's closed result lines and from ACC's own records:
+
+- **idle** — with the thread `idle`, `thread/queue/add` (21:26:37Z) was accepted as a
+  queued submission; the thread started a turn by itself, and 19 s later an ACC answer
+  addressed to the asking session existed with `inReplyTo` set to the queued message id.
+- **busy** — with the thread `active` on a 40-line counting turn, a second submission
+  (21:31:05Z) was accepted and stayed in `thread/queue/list` until the count reached 40;
+  it was then presented as a user prompt and answered (ACC answer at 21:31:31Z):
+  `queued_after_turn`.
+- **reply** — both replies were `acc reply` calls made by the model through the ACC skill,
+  producing real ACC answer records. That proves the product loop, not a native reply
+  route, so `delivery.replyRoute` stays uncertified for Codex.
+- **duplicate** — retrying the busy submission while it was still queued returned the same
+  `queuedSubmissionId` (the probe checks `thread/queue/list` first). Retrying the idle id
+  after its submission had been consumed created a second submission and a short turn, but
+  the model recognised the id and no second ACC answer was recorded: native idempotency
+  holds only while a submission is queued.
+- **fallback** — after `daemon stop`, the probe reported `transport_unavailable` at
+  `initialize`, and a durable ACC question recorded at 21:32:19Z kept a `queued` receipt.
+
+Facts that shape the adapter:
+
+- exact thread discovery: `thread/loaded/list` names the live threads; `thread/list` with
+  `{ cwd: "<absolute path>", limit, useStateDbOnly: true }` answers in milliseconds and
+  filters exactly, while the default listing reads rollouts from disk (2.7 s for 20);
+- `thread/queue/add` takes `{ threadId, input: [{ type: "text", text }], clientUserMessageId }`
+  and answers `{ queuedSubmission: { id, clientUserMessageId, input } }`;
+- an unknown method is answered as `-32600 "Invalid request: unknown variant"`, an unloaded
+  thread as `-32603 "no rollout found"`;
+- the initialize `userAgent` is `<client>/<appServerVersion> (...)`;
+- minimum: this first passing capture, `0.152.1`; the 0.152.0 failure is retained;
+- not captured: `darwin-x64`, Linux, Windows, and a pre-existing daemon.
+
+`certification.json` now carries passing `delivery.livePush` evidence for 0.152.1; the
+adapter's declared capabilities stay `false` until the production App Server client ships.
+
+## Native queue adapter (2026-09-02)
+
+The shipped adapter declares `delivery.livePush` true behind the native contract
+`codex-app-server-thread-queue-v1`, minimum `0.152.1` on `darwin-arm64`.
+`delivery.replyRoute` stays false: Codex answers ACC through the existing `acc reply`
+CLI, not a native callback, and the adapter exposes no `routeReply`.
+
+The transport is JSON-RPC over WebSocket on the daemon's control Unix socket
+(`~/.codex/app-server-control/app-server-control.sock`); a newline-framed line gets no
+answer. `probeNativeDelivery` initializes and confirms `thread/queue/list` exists;
+`bindNativeSession` uses the hook's Codex `session_id` as the thread id and verifies the
+id and cwd; `offerMessage` re-verifies the thread and calls `thread/queue/add` with
+`{ threadId, input: [{ type: "text", text }], clientUserMessageId }`, the ACC message id as
+the stable `clientUserMessageId`, so a retry while the submission is still queued is the
+same offer.
+
+ACC never starts, restarts, supervises, or stops the daemon. Detection only reaches an
+eligible verdict when a daemon already answered the probe, so the recorded
+`native-service` mechanism is always `preExisting: true` with no apply or teardown command,
+and uninstall leaves the vendor daemon in place. To use native Codex delivery, start the
+daemon yourself (`codex app-server daemon start`) before `acc install`; the install detects
+it and adds only the `--remote unix://` attachment to the ordinary `codex` command. With no
+daemon the client stays durable/next-turn only.

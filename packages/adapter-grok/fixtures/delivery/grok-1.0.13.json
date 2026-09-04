@@ -1,0 +1,23 @@
+{
+  "client": "grok",
+  "version": "1.0.13",
+  "platform": "darwin-arm64",
+  "observedAt": "2026-09-02T20:29:24.226Z",
+  "capability": "native_delivery",
+  "result": "fail",
+  "fixture": "grok-1.0.13-leader",
+  "launchMode": "no-client-launched",
+  "protocolContract": "grok-leader-public-surface-v1",
+  "idle": "unobserved",
+  "busy": "unobserved",
+  "reply": "unobserved",
+  "duplicate": "unobserved",
+  "fallback": "unobserved",
+  "limitations": [
+    "the public leader surface (--leader, --no-leader, --leader-socket, grok agent leader) shares one backend between clients but exposes no addressed message injection into an independently opened ordinary TUI session",
+    "the leader socket protocol is private and was not reverse-engineered",
+    "grok agent serve and grok agent stdio change launch ownership and are outside the transparent-delivery boundary",
+    "no Grok client, leader, or ACP server was started by this capture",
+    "idle, busy, reply, duplicate, and fallback branches were not observed"
+  ]
+}

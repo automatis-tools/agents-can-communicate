@@ -1,5 +1,8 @@
 import { AccError, EXIT } from "@agents-can-communicate/protocol";
 
+import { LIVE_POLICIES, describeActivation, describeDeactivation, rcFileFor, shimDirFor }
+  from "./native-activation.mjs";
+
 /**
  * Turn a detection report into exactly what would happen.
  *
@@ -9,14 +12,26 @@ import { AccError, EXIT } from "@agents-can-communicate/protocol";
  */
 export function planInstallation({ adapters, detected, context, action = "install",
   recorded = [], accVersion = null, allowDowngrade = false, requested = [],
-  delivery = "off" }) {
+  deliveryByAdapter = {} }) {
   if (!["install", "uninstall"].includes(action)) {
     throw new AccError(EXIT.USAGE, `unknown installation action: ${action}`, { action });
   }
-  if (!["off", "actionable", "all"].includes(delivery)) {
-    throw new AccError(EXIT.USAGE, `unknown delivery policy: ${delivery}`, { delivery });
-  }
   const byId = new Map(adapters.map(adapter => [adapter.id, adapter]));
+  // One explicit answer per selected client. A missing entry is off; a policy
+  // for a client that is not part of this run is a mistake to say out loud,
+  // not something to store for later.
+  if (deliveryByAdapter === null || typeof deliveryByAdapter !== "object") {
+    throw new AccError(EXIT.USAGE, "deliveryByAdapter must map adapter ids to policies");
+  }
+  for (const [adapterId, policy] of Object.entries(deliveryByAdapter)) {
+    if (!byId.has(adapterId)) {
+      throw new AccError(EXIT.USAGE,
+        `delivery policy names ${adapterId}, which is not part of this install`, { adapterId });
+    }
+    if (!LIVE_POLICIES.includes(policy)) {
+      throw new AccError(EXIT.USAGE, `unknown delivery policy: ${policy}`, { adapterId, policy });
+    }
+  }
   // What ACC recorded writing, by client. For an uninstall this is the
   // authority rather than detection: the record is the only account of what was
   // written, and a client's configuration directory outlives the client.
@@ -86,15 +101,31 @@ export function planInstallation({ adapters, detected, context, action = "instal
     // From the record when the client is gone, because that is what was written
     // and so what will be removed. Asking the adapter instead would describe an
     // install for a machine this one no longer is.
-    const liveDeliverySupported = entry.capabilities?.delivery?.livePush === true;
+    const delivery = deliveryByAdapter[entry.adapterId] ?? "off";
+    const native = entry.nativeDelivery ?? null;
+    const liveDeliverySupported = native?.state === "eligible"
+      && native.activationPlan?.eligible === true;
     const effectiveLivePolicy = liveDeliverySupported ? delivery : "off";
     const deliveryDiagnostic = action === "install" && delivery !== "off"
       && !liveDeliverySupported
       ? entry.deliveryDiagnostic ?? adapter.deliveryFallback?.diagnostic
-        ?? `${adapter.displayName ?? adapter.id} has no certified live delivery for this client; durable fallback remains active`
+        ?? `${adapter.displayName ?? adapter.id} cannot receive native delivery `
+          + `(${native?.reasonCode ?? "native_delivery_unsupported"}); durable fallback remains active`
       : null;
     const installContext = { ...context, requestedLivePolicy: delivery,
       livePolicy: effectiveLivePolicy };
+    // A consented activation that this run keeps, activates, or takes back.
+    // Only an explicit off or an uninstall removes one; an absent record never
+    // creates one.
+    const previous = recordedById.get(entry.adapterId)?.nativeActivation ?? null;
+    const nativeActivation = action === "install" && effectiveLivePolicy !== "off"
+      ? { livePolicy: effectiveLivePolicy, protocolContract: native.eligibility.protocolContract,
+        shell: context?.shell ?? null, rcFile: rcFileFor(context?.home, context?.shell),
+        shimDir: typeof context?.stateRoot === "string" ? shimDirFor(context.stateRoot) : null,
+        mechanisms: native.activationPlan.mechanisms }
+      : null;
+    const deactivation = previous !== null
+      && (action === "uninstall" || effectiveLivePolicy === "off") ? previous : null;
     const artifacts = (record?.artifacts ?? adapter.planInstall(installContext))
       .map(artifact => ({ path: artifact.path, kind: artifact.kind ?? "file" }))
       .sort((a, b) => a.path.localeCompare(b.path));
@@ -112,6 +143,8 @@ export function planInstallation({ adapters, detected, context, action = "instal
       livePolicy: delivery,
       effectiveLivePolicy,
       ...(deliveryDiagnostic === null ? {} : { deliveryDiagnostic }),
+      ...(nativeActivation === null ? {} : { nativeActivation }),
+      ...(deactivation === null ? {} : { deactivation }),
       artifacts,
       // Said in the operator's terms, not in paths: which files ACC creates
       // outright and which belong to the user and are only edited.
@@ -123,6 +156,8 @@ export function planInstallation({ adapters, detected, context, action = "instal
           .map(a => `${action === "install" ? "create" : "remove"} ${a.path}`),
         ...artifacts.filter(a => a.kind === "merge")
           .map(a => `${action === "install" ? "add ACC entries to" : "remove ACC entries from"} ${a.path}`),
+        ...(nativeActivation === null ? [] : describeActivation(nativeActivation)),
+        ...(deactivation === null ? [] : describeDeactivation(deactivation)),
       ],
     });
   }

@@ -20,6 +20,9 @@ function certifiedAdapter(offerMessage = async ({ binding }) => ({
     capabilities: { delivery: { livePush: true } },
     certification: { evidence: [{ result: "pass", client: "fixture-client",
       version: "1.2.3", platform: PLATFORM, capability: "delivery.livePush" }] },
+    nativeDelivery: { minimumByPlatform: { [PLATFORM]: "1.2.3" },
+      anchors: [{ platform: PLATFORM, version: "1.2.3", protocolContract: "fixture-native-v1" }],
+      knownBad: [], activationKinds: ["shell-bootstrap"] },
     offerMessage,
   };
 }
@@ -255,33 +258,80 @@ test("lease expiry and generation replacement remove a binding from eligibility"
   assert.deepEqual(await f.router.offer(replaced), durable("recipient_unavailable"));
 });
 
-test("off, missing reachability, and uncertified versions stay queued for distinct reasons",
+test("off, missing reachability, and live-incapable adapters stay queued for distinct reasons",
   async () => {
-    for (const [name, overrides, errorCode] of [
-      ["off", { livePolicy: "off" }, "delivery_disabled"],
-      ["no-mode", { availableModes: ["nextTurn"] }, "recipient_unavailable"],
-      ["unknown", { clientVersion: "unknown" }, "unsupported_client_version"],
+    const noContract = { ...certifiedAdapter(), nativeDelivery: undefined };
+    const declaredOff = { ...certifiedAdapter(), capabilities: { delivery: { livePush: false } } };
+    for (const [name, overrides, errorCode, adapter] of [
+      ["off", { livePolicy: "off" }, "delivery_disabled", undefined],
+      ["no-mode", { availableModes: ["nextTurn"] }, "recipient_unavailable", undefined],
+      ["no-native-contract", {}, "unsupported_client_version", noContract],
+      ["capability-off", {}, "unsupported_client_version", declaredOff],
+      ["unknown-adapter", { adapterId: "other_adapter" }, "unsupported_client_version", undefined],
     ]) {
-      const f = await fixture();
+      const f = await fixture(adapter === undefined ? {} : { adapter });
       await publish(f.service, f.sessions[0], overrides);
       const message = await send(f.service, f.sender, "question", name);
-      assert.deepEqual(await f.router.offer(message), durable(errorCode));
+      assert.deepEqual(await f.router.offer(message), durable(errorCode), name);
       assert.equal((await receipt(f.store, message.messageId)).state, "queued");
     }
   });
 
-test("actionable permits only questions, requests, and addressed handoffs", async () => {
-  for (const kind of ["question", "request", "handoff"]) {
+test("a newer binding version admitted by the handshake is offered without re-certification",
+  async () => {
     const f = await fixture();
-    await publish(f.service, f.sessions[0]);
-    const message = await send(f.service, f.sender, kind, `actionable_${kind}`);
-    assert.equal((await f.router.offer(message))[0].outcome, "offered", kind);
-  }
-  for (const kind of ["note", "decision"]) {
-    const f = await fixture();
-    await publish(f.service, f.sessions[0]);
-    const message = await send(f.service, f.sender, kind, `actionable_${kind}`);
-    assert.deepEqual(await f.router.offer(message), durable("delivery_disabled"));
+    await publish(f.service, f.sessions[0], { clientVersion: "9.9.9" });
+    const message = await send(f.service, f.sender, "question", "newer");
+    assert.equal((await f.router.offer(message))[0].outcome, "offered");
+    assert.equal((await receipt(f.store, message.messageId)).state, "offered");
+  });
+
+test("an offer whose reported client version differs from the binding stays queued", async () => {
+  const f = await fixture({ adapter: certifiedAdapter(async () => ({ accepted: true,
+    transport: "codex-app-server", clientVersion: "1.2.4" })) });
+  await publish(f.service, f.sessions[0]);
+  const message = await send(f.service, f.sender, "question", "drift");
+  assert.deepEqual(await f.router.offer(message), durable("unsupported_client_version"));
+  assert.equal((await receipt(f.store, message.messageId)).state, "queued");
+});
+
+const POLICY_MATRIX = [
+  ["question", "offered", "offered"], ["request", "offered", "offered"],
+  ["answer", "offered", "offered"], ["decision", "offered", "offered"],
+  ["handoff", "offered", "offered"], ["note", "queued", "offered"],
+];
+
+async function sendKind(f, kind, suffix) {
+  if (kind !== "answer") return send(f.service, f.sender, kind, suffix);
+  const asked = await send(f.service, f.sender, "question", `${suffix}_root`);
+  return f.service.sendMessage({ sessionId: f.sender.sessionId, generation: f.sender.generation,
+    clientMessageId: `client_${suffix}`, toParticipantIds: ["models"], artifacts: [],
+    inReplyTo: asked.messageId, ...content("answer") });
+}
+
+test("actionable offers every conversation-advancing kind and holds notes for the next turn",
+  async () => {
+    for (const [kind, underActionable] of POLICY_MATRIX) {
+      const f = await fixture();
+      await publish(f.service, f.sessions[0]);
+      const message = await sendKind(f, kind, `actionable_${kind}`);
+      const [outcome] = await f.router.offer(message);
+      assert.equal(outcome.outcome, underActionable, kind);
+      if (underActionable === "queued") assert.equal(outcome.errorCode, "delivery_disabled");
+      assert.equal((await receipt(f.store, message.messageId)).state, underActionable, kind);
+    }
+  });
+
+test("off holds every kind and all offers every addressed kind", async () => {
+  for (const [kind, , underAll] of POLICY_MATRIX) {
+    const off = await fixture();
+    await publish(off.service, off.sessions[0], { livePolicy: "off" });
+    assert.deepEqual(await off.router.offer(await sendKind(off, kind, `off_${kind}`)),
+      durable("delivery_disabled"), kind);
+    const all = await fixture();
+    await publish(all.service, all.sessions[0], { livePolicy: "all" });
+    assert.equal((await all.router.offer(await sendKind(all, kind, `all_${kind}`)))[0].outcome,
+      underAll, kind);
   }
 });
 

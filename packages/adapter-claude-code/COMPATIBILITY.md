@@ -142,3 +142,89 @@ capture, keeps the effective policy `off`, and installs no Channel MCP entry. Th
 is also `off`. Messages remain durable for the certified 2.1.233 next-turn hook or for
 explicit recovery through `acc inbox`; an unknown or uncertified version retains the inbox
 path without being promoted to next-turn support. `acc doctor` reports the same boundary.
+
+## Native Channel capture (2026-09-02)
+
+The installed Claude Code `2.1.258` on `darwin-arm64` was started with the user's ordinary
+`claude` command. A temporary shell bootstrap added only
+`--dangerously-load-development-channels plugin:agents-can-communicate@acc-local`, and the
+plugin's `.mcp.json` pointed at the disposable ACC Channel under `scripts/spikes/`. The
+operator accepted the vendor's full-screen development-channel warning by hand; ACC neither
+suppressed nor answered it.
+
+Observed, from the Channel's redacted log and the operator's terminal:
+
+- **idle** — a question written to the Channel at 21:16:07Z was presented without any human
+  prompt; Claude called the explicit `acc_reply` tool at 21:16:39Z.
+- **busy** — during a 37 s counting turn, a second question written at 21:18:45Z appeared as
+  an inbound line at once, but Claude acted on it only after the turn completed
+  (`acc_reply` at 21:19:21Z): `queued_after_turn`, matching the vendor's documented
+  queueing of channel events until the next turn.
+- **reply** — both replies were explicit tool calls bound to the exact message id; the
+  model sees the tool as `mcp__plugin_agents-can-communicate_acc-channel__acc_reply`.
+- **duplicate** — the same id resent was answered `duplicate: true` with no second
+  notification and no second reply.
+- **fallback** — after the Channel child was terminated (21:19:45Z) a native attempt failed
+  with `transport_unavailable`, and a durable ACC question recorded at 21:20:11Z stayed
+  `queued` on the durable transport.
+
+Facts that shape the adapter:
+
+- Claude Code reads plugin components, including `.mcp.json`, from the marketplace source
+  copy (`plugins/marketplaces/<marketplace>/<plugin>/`), not from the plugin cache alone;
+  `claude plugin details` reports `MCP servers (0)` until the source copy carries the file.
+- The Channel is a stdio MCP server declaring `experimental: { "claude/channel": {} }` and
+  `tools: {}`; the model receives
+  `<channel source="plugin:agents-can-communicate:acc-channel" message_id="…" kind="…">`;
+  meta keys must be identifier characters.
+- The endpoint's Unix socket path must stay under 104 bytes (macOS `sun_path`).
+- Minimum: the research lower bound is `2.1.80`, where Channels first appeared; the shipped
+  minimum is this first passing capture, `2.1.258`, until an older release is captured.
+- Still experimental: the development-channel flag and its warning are vendor-owned and
+  visible; no official allowlist path exists for ACC yet.
+- Not captured: `darwin-x64`, Linux, Windows, and the durable ACC answer record (the spike's
+  `acc_reply` routes to the channel; the production adapter must route it through ACC's
+  conversation service and prove that in a process test).
+
+`certification.json` now carries passing `delivery.livePush` and `delivery.replyRoute`
+evidence for 2.1.258 next to the retained 2.1.252 failure. The adapter's declared
+capabilities stay `false` until the production Channel ships, so `effectiveCapabilities()`
+still reports no live delivery.
+
+## Release capture on the installed tarball (2026-09-04, 2.1.260)
+
+The spike above proved the protocol. This one proves the product: the packed artifact
+installed into the real home, two ordinary `claude` sessions in one workspace, no wrapper
+and no hand injection. The first attempt ran on 2.1.259 and is what exposed the Channel
+ownership defect; the client updated itself to 2.1.260 before the verification run, so the
+version recorded here is the one the delivery events actually carry, not the one the run
+started out as. It is passing evidence beside 2.1.258 and deliberately **not** a
+second anchor - an anchor is the minimum's proof, and the whole point of a contract with no
+maximum is that a newer stable client is admitted by probe and handshake rather than by
+another capture. This is the run that exercised that rule.
+
+- **idle** — `offered` over `claude-channel` to a session sitting at its prompt; the peer's
+  question was answered with no human turn in between.
+- **reply** — `routed`, and this time all the way through: the answer is a real ACC record
+  whose `clientMessageId` is `channel-reply-<message id>`, which is the Channel's own
+  `acc_reply` route rather than the CLI. The spike could not show this.
+- **duplicate** — `same_message_id`. The repeated send returned the same message id and
+  took the durable path, so the Channel was never asked to notify twice, and exactly one
+  answer came back.
+- **busy** — `queued_after_turn`, watched on the terminal: a 400-number counting turn ran to
+  completion, and only then did the inbound line appear and get answered. The session said
+  so itself before replying.
+- **fallback** — `queued`. With the receiving Channel process killed, the next message was
+  recorded and queued on the durable transport with `recipient_unavailable`.
+
+Two behaviours worth knowing, both measured here rather than assumed:
+
+- A `note` to an `actionable` install is **not** pushed: it comes back
+  `queued`/`delivery_disabled`, because nothing about it needs acting on. Only messages
+  carrying an obligation take the live path.
+- A recipient whose presence has gone `stale` is still reachable natively. Presence and
+  delivery are separate facts, and an idle session that has not taken a turn recently is
+  not thereby unaddressable.
+
+This capture is also the verification of the Channel ownership fix: before it, a second
+session in the same workspace made both Channels register under the first client's pid.

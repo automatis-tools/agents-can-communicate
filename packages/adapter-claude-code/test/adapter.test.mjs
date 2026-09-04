@@ -117,8 +117,24 @@ test("only capabilities observed in a real session are declared true", () => {
   assert.equal(capabilities.lifecycle.childSessions, false);
   assert.equal(capabilities.context.startupInjection, false);
   assert.equal(capabilities.delivery.nextTurn, true);
-  assert.equal(capabilities.delivery.livePush, false);
-  assert.equal(capabilities.delivery.replyRoute, false);
+  // Declared true from the 2.1.258 Channel capture and gated by the native
+  // contract; effectiveCapabilities() still turns them off on any other version.
+  assert.equal(capabilities.delivery.livePush, true);
+  assert.equal(capabilities.delivery.replyRoute, true);
+});
+
+test("native delivery is declared with a captured contract and its five methods", () => {
+  const adapter = createClaudeCodeAdapter();
+  assert.deepEqual(adapter.nativeDelivery.minimumByPlatform, { "darwin-arm64": "2.1.258" });
+  assert.equal(adapter.nativeDelivery.anchors[0].protocolContract, "claude-code-channel-mcp-v1");
+  assert.deepEqual(adapter.nativeDelivery.activationKinds, ["shell-bootstrap", "native-config"]);
+  for (const method of ["probeNativeDelivery", "planNativeActivation", "bindNativeSession",
+    "offerMessage", "routeReply"]) {
+    assert.equal(typeof adapter[method], "function", method);
+  }
+  // Off on an older or unknown client, on only on an exact certified version.
+  const { effectiveCapabilities } = adapter;
+  assert.equal(adapter.capabilities.delivery.livePush, true);
 });
 
 test("captured payloads normalise and drop conversation content", async () => {

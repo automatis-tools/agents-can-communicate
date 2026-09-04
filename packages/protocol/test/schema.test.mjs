@@ -44,6 +44,7 @@ const DELIVERY_BINDING = base({
   sessionId: "session_a", generation: "generation_a", adapterId: "codex",
   clientVersion: "1.2.3", availableModes: ["nextTurn", "livePush", "replyRoute"],
   livePolicy: "actionable", opaqueEndpointRef: "socket_a", leaseUntil: NOW,
+  retiredAt: null,
 });
 
 test("durable record kinds are exactly the v0.2 snapshot vocabulary", () => {
@@ -81,12 +82,31 @@ for (const [kind, fixture] of Object.entries(VALID)) {
 
 test("delivery bindings are validated without joining the durable record kinds", () => {
   assert.deepEqual(validateRecord("deliveryBinding", DELIVERY_BINDING), DELIVERY_BINDING);
+  const native = { ...DELIVERY_BINDING,
+    availableModes: ["nextTurn", "livePush", "idleWake", "busyQueue", "replyRoute"] };
+  assert.deepEqual(validateRecord("deliveryBinding", native), native);
+  assert.throws(() => validateRecord("deliveryBinding",
+    { ...DELIVERY_BINDING, availableModes: ["livePush", "livePush"] }),
+  error => error.code === EXIT.DATA && error.message.includes("availableModes")
+    && /repeat/.test(error.message));
   assert.throws(() => validateRecord("deliveryBinding",
     { ...DELIVERY_BINDING, availableModes: ["telepathy"] }),
   error => error.code === EXIT.DATA && error.message.includes("availableModes"));
   assert.throws(() => validateRecord("deliveryBinding",
     { ...DELIVERY_BINDING, livePolicy: "implicit" }),
   error => error.code === EXIT.DATA && error.message.includes("livePolicy"));
+  // Retirement is a fact of its own, not an expired lease: a channel that is
+  // still renewing must not be able to express "given up" by moving a date.
+  // A record written before retirement was a field must still be readable: an
+  // upgrade that makes ACC refuse its own store breaks the coordination it
+  // exists to provide, and "never retired" is exactly what an absent fact means.
+  const { retiredAt: _absent, ...legacy } = DELIVERY_BINDING;
+  assert.deepEqual(validateRecord("deliveryBinding", legacy), legacy);
+  const retired = { ...DELIVERY_BINDING, retiredAt: NOW };
+  assert.deepEqual(validateRecord("deliveryBinding", retired), retired);
+  assert.throws(() => validateRecord("deliveryBinding",
+    { ...DELIVERY_BINDING, retiredAt: "yesterday" }),
+  error => error.code === EXIT.DATA && error.message.includes("retiredAt"));
 });
 
 test("intent rejects the removed orchestration handle", () => {

@@ -43,11 +43,21 @@ export function createCoordinationService({ store, clock, ids,
     ids,
     policies: Object.freeze({ ...policies }),
     ...sessions,
+    // Closing a session also retires its live endpoint under the same
+    // generation, so nothing can be offered into a session that has left.
+    closeSession: async input => {
+      const closed = await sessions.closeSession(input);
+      await deliveryBindings.clearDeliveryBinding({ sessionId: input.sessionId,
+        generation: input.generation });
+      return closed;
+    },
     ...intents,
     ...claims,
     ...conversations,
     publishDeliveryBinding: deliveryBindings.publishDeliveryBinding,
+    clearDeliveryBinding: deliveryBindings.clearDeliveryBinding,
     listDeliveryBindings: deliveryBindings.listDeliveryBindings,
+    refreshDeliveryBinding: deliveryBindings.refreshDeliveryBinding,
     ...inbox,
     ...receipts,
     ...sync,
