@@ -10,9 +10,9 @@ loudest consequence: saying yes makes their own `claude` start with the vendor's
 `--dangerously-load-development-channels` flag, and the client then shows its warning about
 that. A consent prompt that hides the thing the vendor itself calls dangerous is not
 consent. The question now runs in the reader's order - what changes for them, what it costs,
-what it writes into which of their files, and how to undo it - and says plainly that
-declining loses nothing, because a default-No prompt should make No a real option. The
-technical inventory stays exactly where it belongs, in what `--dry-run` prints.
+what it writes, and how to undo it - in five lines, because a question people skim past is
+not consent either. The technical inventory stays where it belongs, in what `--dry-run`
+prints.
 
 Two tests wrote down facts about the machine that ran them as if those facts were universal,
 and CI had been red since 0.3.0's feature merge because of it - through the release, which
@@ -49,9 +49,9 @@ artifact nobody verified.
 
 | | |
 |---|---|
-| Built from | `399e5c514cacef2fffd3d2fdaa77c88ba01aee15` |
-| Tarball | `agents-can-communicate-0.3.0.tgz`, 255,098 bytes, 196 entries |
-| sha256 | `2e84751f398f06452e63962a6a7600659f5cd07226fc2122a47cb7ec8feef050` |
+| Built from | `9349e0342d928cea8f66fb81e2d99fb9df6a0a6b` |
+| Tarball | `agents-can-communicate-0.3.0.tgz`, 254,971 bytes, 196 entries |
+| sha256 | `c0d98fdc1a9d561a48745c743bf6f7bbab4a2d3111d7adab3f354fb95132d622` |
 | Node | 26.5.1; package requires Node >=24 |
 | Verified on | macOS 26.6.2 (darwin 25.6.0, arm64) |
 
