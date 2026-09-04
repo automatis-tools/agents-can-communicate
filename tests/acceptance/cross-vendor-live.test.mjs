@@ -80,15 +80,15 @@ async function exchange(packed, { from, to, subject, body, answer, key }) {
   return { question, answer: response };
 }
 
-test("packed v0.2 completes cross-vendor fallback without human relay", {
+test("packed v0.3 completes cross-vendor fallback without human relay", {
   timeout: 120_000,
   skip: process.platform === "win32"
-    ? "v0.2 supports macOS/Linux; its native captures and POSIX client probes do not certify Windows"
+    ? "v0.3 supports macOS/Linux; its native captures and POSIX client probes do not certify Windows"
     : false,
 }, async t => {
   const packed = await createPackedAcc(t);
-  assert.equal(packed.manifest.version, "0.2.0");
-  assert.equal((await packed.acc(["version"])).version, "0.2.0");
+  assert.equal(packed.manifest.version, "0.3.0");
+  assert.equal((await packed.acc(["version"])).version, "0.3.0");
   await packed.setClientVersions(CAPTURE_VERSIONS);
 
   const claude = { adapterId: "claude_code", participantId: "claude_peer",
@@ -191,7 +191,7 @@ test("packed v0.2 completes cross-vendor fallback without human relay", {
     ".kimi-code/plugins/managed/agents-can-communicate/.kimi-plugin/plugin.json",
   ];
   for (const manifest of manifests) {
-    assert.equal((await readJson(path.join(packed.clientHome, manifest))).version, "0.2.0",
+    assert.equal((await readJson(path.join(packed.clientHome, manifest))).version, "0.3.0",
       `${manifest} was not stamped from the installed package`);
   }
 
