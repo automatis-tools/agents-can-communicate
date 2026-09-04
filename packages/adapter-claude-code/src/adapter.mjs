@@ -52,6 +52,13 @@ export function createClaudeCodeAdapter() {
     },
     // The first passing capture is the shipped minimum; the research lower
     // bound (2.1.80) is documented but not admitted without its own capture.
+    //
+    // The 2.1.259 release capture is passing evidence beside this, deliberately
+    // not a second anchor: an anchor is the minimum's proof, one per platform,
+    // and this contract has no maximum precisely so a newer stable client is
+    // admitted by probe and a generation-bound handshake instead of by another
+    // anchor. That capture is what exercised the rule - every branch observed
+    // on 2.1.259 while the minimum stayed here.
     nativeDelivery: {
       minimumByPlatform: { "darwin-arm64": CLAUDE_CHANNEL_MINIMUM },
       anchors: [{ platform: "darwin-arm64", version: CLAUDE_CHANNEL_MINIMUM,
