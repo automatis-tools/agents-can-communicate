@@ -11,8 +11,11 @@ import { realpathSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { createClaudeCodeAdapter } from "@agents-can-communicate/adapter-claude-code";
 import { listSessionBindings } from "@agents-can-communicate/adapter-sdk";
 import { createCoordinationService } from "@agents-can-communicate/core";
+import { resolveClientPid } from "@agents-can-communicate/hook-runner/client-pid";
+import { readProcessTable } from "@agents-can-communicate/hook-runner/process-table";
 import { createId } from "@agents-can-communicate/protocol";
 import { openFilesystemStore } from "@agents-can-communicate/storage-filesystem";
 import { createGitProbe, discoverWorkspace, platformDataHome, runtimePaths }
@@ -24,21 +27,54 @@ import { createAccChannel, createInertChannel, endpointDir, routeAck, routeReply
 const clock = { now: () => new Date().toISOString() };
 const ids = { next: kind => createId(kind, randomBytes) };
 
-// The ACC session this Claude process opened, matched by the harness session id
-// it exports (CLAUDE_CODE_SESSION_ID), exactly as the CLI's session-owner does.
-async function resolveSession({ runtimeDir, service, env }) {
-  const bindings = await listSessionBindings({ runtimeDir });
+/**
+ * The ACC session this Claude process opened - decided by which client process
+ * this Channel is running under, never by how many sessions happen to be
+ * visible.
+ *
+ * There used to be a fallback here: if exactly one session was live, it was
+ * taken to be this one. On a single-session machine that looked safe, and with
+ * two sessions it silently handed one client the other's identity. The Channel
+ * starts while its own SessionStart hook is still writing its binding, so the
+ * only binding a second client can see at that moment is the *first* client's -
+ * and the wait that was added to survive that race then locks the wrong answer
+ * in on the first attempt, because it is a complete, live, plausible binding.
+ *
+ * Measured on two real 2.1.259 sessions: both Channels registered an endpoint
+ * under the first client's pid. `bindNativeSession` refuses two registrations
+ * for one pid, so the session that had been receiving live messages dropped
+ * back to the durable inbox - and an `acc_reply` from the second window would
+ * have been recorded as the first session's answer, which is a false record
+ * rather than a lost message.
+ *
+ * This process was spawned by its client, so its own ancestry names that
+ * client, and no race can change that. Ownership is decided by it.
+ */
+export async function resolveSession({ runtimeDir, service, env, ownClientPid,
+  listBindings = listSessionBindings }) {
+  if (!Number.isInteger(ownClientPid)) return null;
+  const bindings = await listBindings({ runtimeDir });
   if (bindings.length === 0) return null;
   const status = await service.collectStatus({});
-  const live = new Map(status.participants
+  const live = new Set(status.participants
     .filter(participant => participant.presence !== "offline")
-    .map(participant => [participant.sessionId, participant]));
-  const current = bindings.filter(binding => live.has(binding.accSessionId));
-  const exported = new Set(Object.values(env).filter(value => typeof value === "string"));
-  const matched = current.filter(binding => exported.has(binding.harnessSessionId));
-  const chosen = matched.length === 1 ? matched[0] : current.length === 1 ? current[0] : null;
+    .map(participant => participant.sessionId));
+  const mine = bindings.filter(binding => live.has(binding.accSessionId)
+    && binding.clientPid === ownClientPid);
+  // One client process can outlive a session and open another, so the pid alone
+  // can still name two. The harness session id the client exports separates
+  // them; with nothing to separate them the answer is nobody, as before.
+  const exported = new Set(Object.values(env ?? {}).filter(value => typeof value === "string"));
+  const matched = mine.filter(binding => exported.has(binding.harnessSessionId));
+  const chosen = mine.length === 1 ? mine[0] : matched.length === 1 ? matched[0] : null;
   return chosen === null ? null
     : { sessionId: chosen.accSessionId, generation: chosen.generation, clientPid: chosen.clientPid };
+}
+
+/** The client process this Channel was spawned by, or null when nobody knows. */
+export async function ownClient({ table = null, from = process.pid,
+  command = createClaudeCodeAdapter().client.command } = {}) {
+  return resolveClientPid({ table: table ?? await readProcessTable(), from, command });
 }
 
 // How long the Channel will wait for the hook to publish this session's
@@ -76,8 +112,12 @@ async function main() {
     workspaceId: descriptor.id });
   const service = createCoordinationService({ store, clock, ids });
   const write = payload => process.stdout.write(`${JSON.stringify(payload)}\n`);
+  // Read once: the ancestry that decides ownership cannot change while this
+  // process runs, and re-reading it on every poll would spawn `ps` in a loop.
+  const clientPid = await ownClient();
   const session = await resolveWithin({
-    resolve: () => resolveSession({ runtimeDir: paths.root, service, env: process.env }),
+    resolve: () => resolveSession({ runtimeDir: paths.root, service, env: process.env,
+      ownClientPid: clientPid }),
     deadline: Date.now() + BINDING_WAIT_MS });
   // No binding to serve - but Claude is already speaking MCP to this child, and
   // returning here left the event loop empty: the process exited in 75ms
