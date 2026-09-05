@@ -42,7 +42,7 @@ The order is part of the public guarantee:
 
 1. validate and commit the message plus one `queued` receipt per resolved recipient;
 2. resolve the recipient's current delivery bindings;
-3. check recipient policy, current reachability, and exact client-version certification;
+3. check recipient policy and the current binding's reachability and offered native mode;
 4. ask one adapter to cross its transport boundary;
 5. only after acceptance, commit `offered` and an immutable success event.
 
@@ -72,10 +72,14 @@ lease without exposing the endpoint.
 
 ## Certified capability versus current reachability
 
-A capability says an exact client version on an exact platform passed a captured behavior.
-It does not say one particular session is reachable now. A binding says what that current
-generation exposes and whether its lease is current. Recipient policy says whether it may
-spend a turn. All three must agree before live delivery is possible.
+Ordinary hook capabilities say an exact client version on an exact platform passed a
+captured behavior. Native live delivery uses a separate contract: installation checks the
+captured minimum, platform, and current feature probe, then each session publishes a binding
+only after a generation-bound handshake. The router trusts that admission and verifies the
+binding, recipient policy, declared adapter capability, and adapter response; it does not add
+a third exact-version certification check. A binding says what that current generation
+exposes and whether its lease is current, while recipient policy says whether it may spend a
+turn.
 
 Claude Code is the one client that proved the live seam: a Channel capture on 2.1.258,
 confirmed on 2.1.260 through the installed package, admitted by minimum-plus-probe rather

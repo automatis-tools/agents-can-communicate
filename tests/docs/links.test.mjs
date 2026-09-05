@@ -5,6 +5,8 @@ import test from "node:test";
 
 const repo = path.resolve(import.meta.dirname, "..", "..");
 
+// Focused current-corpus helpers: public docs use inline links and three-character fences.
+// This is not a general Markdown parser for reference links or arbitrary fence lengths.
 function outsideFences(markdown) {
   const kept = [];
   let fence = null;

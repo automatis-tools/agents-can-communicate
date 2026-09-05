@@ -122,10 +122,12 @@ acc install --adapter codex --delivery off
 The allowed values are `off`, `actionable`, and `all`; the default is `off`. This setting
 does not belong in `acc.workspace.json`, where a pull request could opt someone else into
 spending a turn. It also cannot create a capability. Exact-version evidence governs
-ordinary hook features; Claude Code live delivery separately requires macOS arm64,
-version 2.1.258 or newer, a current feature probe, and a per-session handshake. If those
-checks fail, installation keeps the effective policy `off` and reports next-turn or inbox
-fallback.
+ordinary hook features; Claude Code live delivery separately requires macOS arm64, version
+2.1.258 or newer, and a current feature probe before installation applies the requested
+policy. If those install-time checks fail, effective policy remains `off` and the installer
+reports next-turn or inbox fallback. Each later session must also pass its own
+generation-bound handshake. A failed session handshake clears or refuses that binding and
+reports degraded reachability; it does not rewrite the installed consent.
 
 ## Override local paths and identity
 
