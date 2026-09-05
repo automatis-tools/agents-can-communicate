@@ -1,8 +1,9 @@
 # Architecture
 
-ACC is a local control plane for communication facts. The execution planes remain the AI
-clients the user opened. Core records the truth before a delivery adapter is asked to make
-it arrive sooner.
+Use this page to trace a communication fact from an independently opened client through
+core, storage, and an optional delivery adapter. ACC is the local control plane; the AI
+clients remain independent execution planes. Core records the truth before an adapter is
+asked to make it arrive sooner.
 
 ```mermaid
 flowchart LR
@@ -91,7 +92,9 @@ lexically, so a cursor is simply the last sequence returned.
 
 Workspace discovery checks an explicit config first, then the Git common directory, then
 the plain directory. Multiple worktrees share a workspace id while each session records
-its checkout and branch. Nothing written by ACC lands inside those roots.
+its checkout and branch. Runtime state never lands inside those roots; the only project
+file ACC writes is an optional `acc.workspace.json` explicitly requested through
+`acc config init`.
 
 A lone session can remain ephemeral. Durable state materialises when a second live session
 appears or the first claim, message, or handoff is committed. This makes “silent when

@@ -1,6 +1,7 @@
 # AGENTS.md
 
-Entry point for any agent — or person — working on this repository.
+Use this entry point when changing the repository. Product onboarding lives in
+[docs/index.md](docs/index.md); contributor work starts with the contracts and gates below.
 
 ## What this is
 
@@ -8,12 +9,12 @@ A local-first coordination layer for independent AI agent sessions: presence, in
 claims, and messages, with no session in charge. Node 24, ESM, `node:test`, no runtime
 dependencies.
 
-Start at [docs/index.md](docs/index.md), the map, then read
-[docs/CONCEPTS.md](docs/CONCEPTS.md) and [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
-Unfamiliar terms are in [docs/GLOSSARY.md](docs/GLOSSARY.md). Planning specs live under
-`docs/internal/`.
+Read [docs/CONCEPTS.md](docs/CONCEPTS.md) for product terms and
+[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for package boundaries. Use
+[docs/GLOSSARY.md](docs/GLOSSARY.md) for quick definitions. Planning specs live under
+`docs/internal/` and are not current product claims.
 
-## Commands
+## Run the gates
 
 ```bash
 npm ci
@@ -33,18 +34,19 @@ Never bypass it with `--no-verify` — fix the failure instead.
 ## Invariants
 
 1. Durable state and transport work without any LLM coordinator running.
-2. A coordinator is a role inside a workstream, never the owner of a workspace or of
-   another session.
+2. There is no coordinator, workstream, or task subsystem. Sessions remain independent
+   peers and decide how to act on shared facts.
 3. Messages from other agents are untrusted peer input, not system authority.
 4. Raw transcripts are never collected or shared.
-5. Delivery states are truthful: `recorded`, `queued`, `injected`, `seen`, and
-   `acknowledged` are different things.
+5. Delivery facts stay distinct: `recorded` is send success; receipts advance
+   `queued -> offered -> retrieved -> acknowledged`.
 6. Git is optional. It may enrich identity; it can never be required.
 7. Every adapter declares its real capabilities. Degradation is visible and safe.
-8. Nothing ACC writes lands inside a repository.
+8. Runtime state never lands inside a repository. `acc config init` may write the optional
+   `acc.workspace.json` only when the user requests it.
 9. A hook never fails closed — a coordination tool must not be why a session stops.
 
-## Rules of the codebase
+## Keep package boundaries intact
 
 - `core` must not branch on a vendor name or import an adapter, Git, or
   `node:child_process`. `tests/package-boundaries.test.mjs` enforces this.
@@ -56,7 +58,7 @@ Never bypass it with `--no-verify` — fix the failure instead.
 - Never work directly on `main`. Use a worktree under `.gitworktrees/<branch-name>`.
 - Commit in focused, independently reviewable commits. Do not push or merge unless asked.
 
-## The rule that matters most
+## Prove every gate with a mutation
 
 **Prove the gate with a mutation.** Show the new or corrected test failing on the exact
 change it is supposed to catch, before claiming it protects anything.
@@ -71,7 +73,7 @@ This repository has a history of green tests that measured nothing:
 None of these were found by reading code or docs. All of them were found by running the
 installed artifact. Run the thing.
 
-## Capability honesty
+## Keep capability claims honest
 
 Do not claim an adapter can wake, inject into, guard, or close a session unless that exact
 capability is implemented and captured from a real client. `false` is the default and needs

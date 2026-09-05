@@ -1,9 +1,9 @@
 # Writing an adapter
 
-An adapter teaches ACC one client. Nothing else in ACC knows that client exists. This page
-assumes the vocabulary in [Protocol](PROTOCOL.md#identity-hierarchy) — session, participant,
-claim — and points to [Capabilities](CAPABILITIES.md) for what was actually measured per
-client; see the [documentation map](index.md) for where both fit among the rest.
+Use this page to add one client without leaking vendor behavior into core. Start with the
+[identity contract](PROTOCOL.md#identity), then compare the shipped evidence under
+[certified support](CAPABILITIES.md#certified-support). The [documentation map](index.md)
+links the surrounding concepts and runtime architecture.
 
 ```mermaid
 graph LR
@@ -14,7 +14,7 @@ graph LR
   R --> H
 ```
 
-## The manifest
+## Define the manifest
 
 ```js
 export function createExampleAdapter() {
@@ -37,8 +37,8 @@ export function createExampleAdapter() {
 ```
 
 `renderContextResult` is required wherever an adapter renders peer messages. It returns
-`{ text, includedMessageIds, includedAttentionIds }`, and the [delivery
-lifecycle](PROTOCOL.md#delivery-lifecycle) advances only from those ids — never by searching
+`{ text, offeredMessageIds, includedAttentionIds }`, and the [receipt
+lifecycle](PROTOCOL.md#receipt-lifecycle) advances only from those ids — never by searching
 `text` for one, because peer text is untrusted and can imitate another message's header.
 `projectContextResult()` implements this contract; `projectContext()` remains the text-only
 convenience API for adapters that don't need it. An adapter with only the older
@@ -53,7 +53,7 @@ actually runs as — `command: "claude"` for a client that really runs as `node`
 nothing, and the failure is silent: the session gets `pid: null` and falls back to reading
 presence by age alone, with nothing telling you why.
 
-## Capabilities
+## Declare only proven capabilities
 
 Fourteen booleans in four groups, declared in the manifest's `capabilities` object:
 
@@ -68,7 +68,8 @@ Fourteen booleans in four groups, declared in the manifest's `capabilities` obje
 `defineAdapter` enforces the method — declaring `guards.beforeWrite: true` without
 `guardWrite()` is a usage error at construction. It also requires a passing entry in the
 validated `certification.json`; method existence is never evidence. What each shipped
-client was actually observed doing against this list is [Capabilities](CAPABILITIES.md#matrix).
+client was actually observed doing against this list is under
+[certified support](CAPABILITIES.md#certified-support).
 
 `lifecycle.heartbeat` is deliberately not a flavour of `delivery.nextTurn`. Next-turn
 delivery happens only when the client reaches a normal turn boundary; heartbeat fires on a
@@ -121,14 +122,14 @@ The rules `defineAdapter` enforces, and the ones the runtime applies:
 - The three native methods return closed facts (`validateNativeActivationPlan()` closes the
   activation plan) and never put vendor data - endpoints, sockets, raw errors - into core.
 
-## How far you can get
+## Choose the integration depth
 
 | Tier | You register | You get | You do not get |
 |---|---|---|---|
 | 0 | nothing — humans run `acc` | durable messages, status, claims | anything automatic |
 | 1 | the MCP server | attach on first call, read, claim, message | guards, session end |
-| 2 | hooks + skill | automatic attach, turn context, write guards, cleanup | realtime |
-| 3 | + realtime surface | delivery receipts, safe-point injection, child sessions | — |
+| 2 | hooks + skill | only the lifecycle, context, guard, and next-turn behaviors separately captured for this client | uncaptured hook behaviors |
+| 3 | + native delivery surface | only captured live-push and reply-route modes | safe-point injection or child sessions unless separately captured |
 
 Installed hook wiring may reach tier 2, but the effective capability is still limited to
 an exact certified client/version/platform. Tier 3 ships for one client: Claude Code, from
@@ -137,7 +138,7 @@ queue capture and was withdrawn anyway - the mode its transport needs reports th
 workspace as the session's - which is the standard: a capture that works is not the same
 claim as a capability that is safe to ship.
 
-## normalizeHook
+## Normalize hook input
 
 Whitelist, never a filter. Every client hands hooks the prompt, the transcript path, or the
 tool output; none of it may survive.
@@ -153,7 +154,7 @@ return normalizedEvent({
 Refuse an unrecognised payload. Inventing a session attaches the wrong one, or a new one
 every hook, and looks like it is working.
 
-## Response contracts do not port
+## Measure response contracts
 
 Measure them. Every client differs, and a wrong shape fails **silently**:
 
@@ -168,10 +169,11 @@ Measure them. Every client differs, and a wrong shape fails **silently**:
 `denyOutcome(reason)` returns `{ stdout, stderr, exitCode }`, so the runtime never has to
 know which client it is talking to. This table is only the shape each shipped adapter
 actually uses; the full experimental grid — every candidate shape tried against every
-client, including which ones are silently ignored — is measured in
-[Capabilities](CAPABILITIES.md#response-contracts-which-do-not-port).
+client, including which ones are silently ignored — is recorded in each adapter's
+`COMPATIBILITY.md` and certification fixtures. The cross-client summary is under
+[guard limitations](CAPABILITIES.md#guard-limitations).
 
-## Install and ownership
+## Preserve install ownership
 
 ```mermaid
 graph TB
@@ -190,7 +192,7 @@ Rules that are not negotiable:
 `planInstall` must use the same path helpers as `install`. A conformance test compares
 them, because a plan that drifts makes `--dry-run` a decoration.
 
-## Conformance
+## Run conformance
 
 ```bash
 node --test tests/conformance/*.test.mjs
@@ -200,7 +202,7 @@ node --test tests/process/hook-wiring.test.mjs
 The second one *executes* what your install wrote. Three adapters once shipped a hook
 command that did not exist anywhere; every test was green.
 
-## Record what you learned
+## Record the evidence
 
 One `COMPATIBILITY.md` per adapter: client version, event names, payload fields, the deny
 matrix, and what you could **not** observe. The next person's alternative is guessing.

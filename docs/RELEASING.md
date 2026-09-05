@@ -1,144 +1,120 @@
 # Releasing
 
+Use this procedure to build one auditable npm artifact, verify that exact tarball, and keep
+its evidence tied to the commit that supplied its bytes. The package is currently `0.3.0`;
+the commands derive the version from `package.json` so the filename cannot drift.
+
 ```mermaid
 graph LR
-  A[npm ci] --> B[npm run check] --> C[npm test] --> D[clean candidate commit] --> E[npm pack] --> F[verify-package] --> G{approved?}
-  G -->|yes| H[tag · publish · release]
-  G -->|no| I[stop]
+  A[tests] --> B[candidate commit A]
+  B --> C[pack exact tarball]
+  C --> D[verify installed artifact]
+  D --> E[evidence commit B]
+  E --> F{maintainer approval}
+  F -->|yes| G[tag · publish · release]
+  F -->|no| H[stop]
 ```
 
-## Build the candidate
+## Prepare candidate commit A
+
+Commit A must contain every file npm will pack and every release gate. Start from the
+intended release branch, update the version and release notes, then run:
 
 ```bash
-npm ci
+release_cache="$(mktemp -d "${TMPDIR:-/tmp}/acc-npm-cache.XXXXXX")"
+candidate_dir="$(mktemp -d "${TMPDIR:-/tmp}/acc-candidate.XXXXXX")"
+package_version="$(node -p "require('./package.json').version")"
+
+env npm_config_cache="$release_cache" npm ci
 npm run check
-env npm_config_cache=/private/tmp/acc-npm-cache-v02 npm test
-git status --short
-git commit -m "release: prepare ACC v0.2.0"
-candidate_dir="$(mktemp -d /private/tmp/acc-v0.2.XXXXXX)"
-env npm_config_cache=/private/tmp/acc-npm-cache-v02 npm pack --pack-destination "$candidate_dir"
-env npm_config_cache=/private/tmp/acc-npm-cache-v02 node scripts/verify-package.mjs \
-  "$candidate_dir/agents-can-communicate-0.2.0.tgz"
+env npm_config_cache="$release_cache" npm test
 git diff --check
+git status --short
+git commit -m "release: prepare ACC v$package_version"
+candidate_commit="$(git rev-parse HEAD)"
+test -z "$(git status --short)"
 ```
 
-`verify-package.mjs` is the gate that matters. It installs the tarball into a
-clean directory with **no workspace anywhere** and then drives the product. The
-acceptance suite additionally opens independent Claude/Codex hook sessions from
-the installed artifact, completes both message directions, proves downgrade and
-restart behavior, exercises the installed MCP binary, and removes client wiring twice.
+Never bypass the pre-push hook. A failing recorded-candidate check means packed files have
+changed since the recorded candidate; refresh the candidate instead of disabling the gate.
 
-Development cannot catch what this catches. Workspace symlinks are always
-present there, so an unbundled package imports fine right up until somebody
-else installs it.
-
-## What it refuses
-
-| Refused | Why |
-|---|---|
-| `tests/`, `test/` | test suite |
-| unreferenced `fixtures/` | material that is not exact redacted certification evidence |
-| `scripts/spikes/`, `*.sock` | development probes and local endpoints |
-| runtime, transcript, or secret directories | machine state and private material |
-| `.github/`, `.githooks/`, `.agents/` | local configuration |
-| `*.jsonl` | looks like a transcript |
-| Workspaces missing from `node_modules/` | every internal import would fail |
-
-## Record the evidence
-
-Put the tarball name, sha256, **the commit it was built from**, exact platform/client
-facts, fallback result, and known limitations in `docs/release-evidence/v0.3.0.md` and
-the current `CHANGELOG.md` release table. A release without them is a release nobody can
-audit later. Test count is deliberately left out: nothing verifies it, so it only
-decorates or, when it drifts, misleads.
-
-The commit matters because every workspace travels inside the tarball, so any
-change to shipped code changes the digest. A digest recorded alone goes stale
-on the next merge and then reads as a false claim about the current tree
-rather than a true one about an older commit. `verify-package.mjs` prints
-both on one line for exactly this reason, and refuses to imply
-reproducibility when the working tree is dirty:
-
-```text
-PASS  agents-can-communicate-0.0.0.tgz  sha256 a5c8bb1d…  built from 39d0dcf
-```
-
-It went stale four times in a row anyway, each caught by hand and only
-because someone happened to run the script. So `npm test` now checks it:
-`tests/acceptance/recorded-candidate.test.mjs` fails when shipped code has
-changed since the recorded commit, and names the files. A shallow clone that
-does not have the commit reports that instead of failing — the check is of
-the record, not of the checkout depth.
-
-The candidate therefore uses two commits. Commit A contains every packed file and every
-release gate. Pack and verify clean commit A, then commit B records its digest and evidence
-only in files that are not packed. Never record a dirty-tree digest: changing a packed file
-after commit A means making a new candidate commit and packing again.
-
-Native real-client tests run only where the retained capture proved that native boundary.
-For v0.2.0 neither Codex 0.152.0 nor Claude Code 2.1.252 did: the Codex control socket was
-absent and Claude stopped at the development-channel warning. Record those exact failed
-captures and run the packed inbox/next-turn fallback instead of promoting an unobserved
-native path. Windows is an explicit unsupported-platform skip, not a passing capture.
-
-By v0.3.0 that had gone both ways, which is the point of doing it per release rather than
-once. Claude Code passed and ships a live Channel; Codex's queue capture passed and the
-capability was **withdrawn anyway**, because the mode it needs hides which workspace the
-session belongs to, and a session that cannot be placed must not be addressed. A capture
-that works is not the same claim as a capability that is safe to ship.
-
-A published version's record is history and is not rewritten; later changes
-get a new `## Unreleased` entry at the top, checked the same way against the
-current tree.
-
-## Then stop
-
-Publishing, tagging, and cutting a GitHub release are **external mutations**.
-They need explicit approval from the maintainer, every time.
-
-Which credential is configured decides whether a code is needed, so check
-rather than assume. Publishing v0.3.0 needed no code at all:
+## Pack and verify the exact artifact
 
 ```bash
-npm publish agents-can-communicate-0.3.0.tgz   # no --otp; it succeeded
-npm profile get                                # 403 Forbidden on /-/npm/v1/user
+env npm_config_cache="$release_cache" npm pack --pack-destination "$candidate_dir"
+tarball="$candidate_dir/agents-can-communicate-$package_version.tgz"
+shasum -a 256 "$tarball"
+env npm_config_cache="$release_cache" node scripts/verify-package.mjs "$tarball"
 ```
 
-That pair is the whole diagnosis. A credential that can publish but cannot read
-the account's own profile is a token rather than an interactive login, and a
-token with write access bypasses two-factor entirely. This page previously said
-every publish needs a code, which sent the next release looking for one it did
-not need.
+`verify-package.mjs` installs the supplied tarball into a clean directory with no workspace
+symlinks, then exercises doctor, a non-Git workspace, client install/uninstall, bundled
+workspaces, certification evidence, and packed documentation links. It rejects tests,
+development probes, sockets, transcript-shaped data, runtime state, and unreferenced
+fixtures.
 
-With an interactive login and two-factor set to `auth-and-writes`, a code *is*
-required and npm does not prompt for it:
+When passed an existing tarball, the verifier intentionally prints `revision unknown`:
+the current checkout cannot prove which commit produced arbitrary supplied bytes. Record
+`$candidate_commit`, captured while the tree was clean immediately before packing, as the
+artifact's source. Running the verifier without a tarball makes it pack the current tree
+itself and can report that tree's revision, but it does not verify a separately saved
+release artifact.
+
+## Record evidence in commit B
+
+Write the tarball name, SHA-256, `$candidate_commit`, platform and client facts, fallback
+result, and known limitations to `docs/release-evidence/v$package_version.md` and the
+matching `CHANGELOG.md` section. Do not record an unverifiable test count.
+
+Commit B contains only evidence files that npm does not pack. If a packed file changes,
+discard the candidate artifact, make a new commit A, and repeat the pack and verification.
 
 ```bash
-npm publish --otp=123456
+git diff --check
+git status --short
+git commit -m "release: record ACC v$package_version candidate"
+env npm_config_cache="$release_cache" npm test
 ```
 
-Publish the tarball by name rather than bare `npm publish`. A bare publish
-repacks, and what reaches the registry is then an artifact nobody verified; the
-file named above is the one the digest and the evidence page describe. After
-publishing, compare `npm view <pkg>@<version> dist.shasum` with `shasum` of the
-local file — they must be equal, and the registry can take a few minutes to
-answer at all.
+Published evidence is history. Do not rewrite it into a current capability claim; later
+work belongs under `Unreleased` and gets a new candidate record.
 
-A granular token scoped to selected packages cannot create a package that does
-not exist yet, which is the case exactly once per package. The `Release`
-workflow builds and verifies a candidate and uploads it as an artifact; it does
-not publish.
+## Capture only capabilities you observed
 
-**This route has an expiry.** npm now prints, on any authenticated command:
+Run native real-client checks only on the versions and platforms where retained fixtures
+prove that boundary. Exact-version evidence governs normal-turn and guard behavior. Claude
+Code live delivery instead uses its captured macOS arm64 minimum plus a current feature
+probe and per-session handshake, and its vendor development-channel warning remains part
+of startup. Codex's queue capture passed but live delivery was withdrawn because the
+required mode hides session workspace identity.
 
-> npm tokens that bypass 2FA are being restricted for account changes and
-> direct publishing
+Record failed and unavailable paths as such, then exercise the packed next-turn or inbox
+fallback. An unsupported platform is an explicit skip, never a passing capture. See
+[Capabilities](CAPABILITIES.md) and each adapter's `COMPATIBILITY.md` for current evidence.
 
-So the token that made the v0.3.0 publish possible without a code is on a path
-to being refused. Worth settling before it turns a release into an outage:
-either move publishing to a trusted-publisher workflow, or accept the
-interactive login and its code.
+## Publish only after explicit approval
 
----
+Tagging, npm publication, and creating a GitHub release are external mutations. Stop after
+commit B until a maintainer explicitly approves them. The manual `Release` workflow builds
+and uploads a candidate; it does not publish.
 
-See also: [README](index.md) for navigation and [Glossary](GLOSSARY.md) for terms.
+Authentication requirements depend on the credential and npm policy in effect at release
+time. Consult npm's current documentation and inspect the configured route instead of
+copying a historical command. For example, the v0.3.0 publication succeeded without an OTP
+while `npm profile get` returned `403`; that is a historical observation, not a universal
+claim about current npm authentication or credential type.
+
+After approval, publish the verified tarball by filename. Bare `npm publish` repacks the
+tree and would send different, unverified bytes.
+
+```bash
+npm publish "$tarball"
+npm view "agents-can-communicate@$package_version" dist.shasum
+shasum "$tarball"
+```
+
+Add `--otp` only when the current authenticated npm route requires it. Compare the registry
+SHA-1 with the local `shasum`, allowing for registry propagation delay, before creating the
+tag or release record.
+
+See also: [documentation map](index.md) · [Security model](SECURITY_MODEL.md)

@@ -6,6 +6,8 @@ import path from "node:path";
 import test from "node:test";
 import { promisify } from "node:util";
 
+import { projectContextResult } from "@agents-can-communicate/adapter-sdk";
+
 const run = promisify(execFile);
 const repo = path.resolve(import.meta.dirname, "..", "..");
 
@@ -135,11 +137,13 @@ test("public docs describe the communication product that actually ships", async
   }
 });
 
-test("the release check uses the same isolated npm cache as pack and tests", async () => {
+test("release commands create and reuse one isolated npm cache", async () => {
   const releasing = await readFile(path.join(repo, "docs", "RELEASING.md"), "utf8");
-  assert.match(releasing,
-    /env npm_config_cache=\/private\/tmp\/acc-npm-cache-v02 node scripts\/verify-package\.mjs/,
-  "verify-package can fall back to the machine's root-owned npm cache");
+  assert.match(releasing, /release_cache="\$\(mktemp -d /,
+    "release instructions do not create a fresh npm cache");
+  const cacheUsers = [...releasing.matchAll(/^env npm_config_cache="\$release_cache" /gm)];
+  assert.equal(cacheUsers.length >= 4, true,
+    "install, tests, pack, and verification do not share the isolated npm cache");
 });
 
 test("every command the CLI accepts appears in the CLI reference", async () => {
@@ -159,4 +163,12 @@ test("the adapter guide describes the contract an author must satisfy", async ()
     "defineAdapter"]) {
     assert.match(guide, new RegExp(required), `missing: ${required}`);
   }
+
+  const projectorResult = projectContextResult({ solo: true });
+  for (const key of Object.keys(projectorResult).filter(key => key !== "text")) {
+    assert.match(guide, new RegExp(`\\b${key}\\b`),
+      `adapter guide omits projector result field: ${key}`);
+  }
+  assert.doesNotMatch(guide, /\bincludedMessageIds\b/,
+    "adapter guide teaches the old projector result field");
 });
