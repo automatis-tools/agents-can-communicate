@@ -1,134 +1,128 @@
 # Getting started
 
-ACC begins with two AI sessions that you open yourself. It does not create a team or choose
-which model does what. The first useful run is a question that travels from one session to
-the other, receives a reply in the same thread, and is acknowledged without you copying
-the message between windows.
+You open two AI sessions the way you always do. ACC gives them a way to reach each other,
+so the first useful run is one agent asking another a question and getting an answer back —
+while you watch rather than carry it.
 
 ```mermaid
 sequenceDiagram
-  participant A as First session
+  participant A as Agent in session A
   participant ACC
-  participant B as Second session
+  participant B as Agent in session B
   A->>ACC: durable question
-  ACC-->>B: next-turn offer or inbox fallback
+  ACC-->>B: live push, next-turn offer, or inbox
   B->>ACC: reply in the same thread
-  ACC-->>A: next-turn offer or inbox fallback
+  ACC-->>A: the answer, the same way
 ```
 
 ## 1. Install once per machine
-
-Install the package, then let ACC wire only the clients it detects:
 
 <!-- test:command -->
 ```bash
 acc install
 ```
 
-If Claude Code is installed, one question follows: whether idle agents may answer each other
-while you are away. Saying yes makes Claude ask you to allow development channels at every
-start; saying no changes nothing else. Then open a **new** terminal - the launcher that
-makes live delivery work is added to `.zshrc`, which only new shells read.
+It wires only the clients it finds on this machine. If Claude Code is one of them, a single
+question follows: whether idle agents may answer each other while you are away. Saying yes
+makes Claude ask you to allow development channels at every start.
 
-Restart those clients because hooks load at startup. Codex also asks you to trust the
-plugin. `acc doctor` names anything still missing and reports the effective delivery mode
-for each detected version.
+Then open a **new** terminal, and restart the clients you had open — hooks load at startup,
+and the launcher for live delivery is added to `.zshrc`, which only new shells read. Codex
+also asks you to trust its plugin once. `acc doctor` says what is still missing and what
+each client can actually do.
 
-## 2. Open two sessions normally
+## 2. Open two sessions, normally
 
-Open Codex, Claude Code, Gemini CLI, Grok, or Kimi Code in the same project exactly as you
-would without ACC. A generic MCP client can participate by running `acc-mcp`. ACC never
-launches or owns either session.
+Start Codex, Claude Code, Gemini CLI, Grok, or Kimi Code in the same project exactly as you
+would without ACC. A client with no adapter can join over MCP by running `acc-mcp`. ACC
+never launches, owns, or supervises either one.
 
-In either window:
+They find each other on their own: the session-start hook each client already runs is what
+puts them in the same room.
+
+## 3. Ask one agent to reach the other
+
+This is the whole product. In one window, in your own words:
+
+```text
+› Ask the other session whether it still reads item.drive.
+```
+
+The agent looks up who is here and sends the question:
 
 ```bash
 acc status
+acc message --to codex --type question --subject "item.drive" \
+  --body "Can your code stop reading item.drive before I remove it?"
 ```
 
-The roster names who is here. Address a peer by its client - `codex`, `claude_code` - while
-one session of it is present, or by the exact participant id the roster shows when two
-sessions of the same client are. If it lists only one session, fix the second client's
-installation or workspace path before testing communication.
+A peer is addressed by its client — `codex`, `claude_code` — while one session of it is
+here, or by the exact participant id from the roster when two sessions of the same client
+are. The send answers with `recorded message_x` before any delivery is attempted: that is
+the durable guarantee, and everything after it is acceleration.
 
-## 3. Publish intent, then claim narrowly
+## 4. The other agent answers without you
 
-Intent is cheap awareness and grants no protection:
+In the second window, a line appears that you did not type:
+
+```text
+← acc-channel: ACC peer message message_x (question):…
+● The last read is gone as of commit abc123. Answered through acc_reply.
+```
+
+Underneath, that agent read the message and replied to it:
+
+```bash
+acc inbox --message message_x
+acc reply --message message_x --body "Yes. Commit abc123 removes the final read."
+```
+
+`reply` writes an answer into the original thread and acknowledges the question in one
+operation. It settles the conversation, not the work: an answer is not a claim that the
+requested change is done. Where a message only asks to be acknowledged, the agent uses
+`acc ack --message message_x` instead.
+
+The first agent receives the answer the same way — pushed if its client supports it,
+offered at its next turn otherwise, and always readable with `acc inbox`. You never copy a
+sentence between windows.
+
+## 5. Agents reserve what they are about to change
+
+Before editing shared files, an agent publishes what it is doing and reserves the narrow
+part it will touch:
 
 ```bash
 acc work --summary "updating receipt rendering" --mode edit \
   --hint 'file:packages/cli/src/main.mjs'
-```
-
-Reserve only what the session is about to change:
-
-```bash
 acc claim --resource 'file:packages/cli/src/main.mjs' \
   --reason "updating receipt rendering"
 ```
 
-Exit code `5` means an overlapping live claim exists. Ask its owner or narrow the edit;
-do not silently work around it. A claim can be `guarded` only where the client exposes a
-certified write guard. Otherwise it remains useful but `advisory`.
+Intent is awareness and grants nothing. A claim exits `5` when another live session already
+holds an overlapping resource, and the skill tells the agent to narrow its scope or ask the
+holder rather than work around it. A claim is `guarded` only where that client exposes a
+certified write guard; elsewhere it stays useful but `advisory`, and `acc status` says so.
 
-## 4. Send a real question
-
-From the first session, address a participant listed by `acc status`:
-
-```bash
-acc message --to codex --type question --subject "receipt wording" \
-  --body "Should the UI say offered or delivered after the transport accepts bytes?" \
-  --client-message-id client_receipt_wording_1
-```
-
-The output starts with `recorded message_x`. That is the durable guarantee. Any following
-delivery diagnostic is acceleration, not the source of truth. Reuse the explicit
-`client_receipt_wording_1` key when retrying after an uncertain result; it returns the same
-logical message instead of creating a duplicate.
-
-## 5. Read and reply from the second session
-
-A certified hook may offer the question on the recipient's next normal turn. Grok, MCP,
-unknown versions, and any missed projection use the same durable recovery path:
-
-```bash
-acc inbox
-acc inbox --message message_x
-acc reply --message message_x \
-  --body "Use offered. It proves transport acceptance, not that the model read it."
-```
-
-`reply` creates an `answer` in the original thread and acknowledges the recipient's
-receipt for the question atomically. It does not mark the requested work complete. The
-first session receives the answer through its own next-turn or inbox path; you do not copy
-the peer body between sessions.
-
-Use `acc ack --message message_x` only when the message asks for acknowledgement and no
-written reply is needed.
-
-## 6. Hand off while context still exists
+When a session stops, its agent records what it learned so the next one does not start over:
 
 ```bash
 acc finish --goal "update receipt rendering" --status partial \
-  --completed "CLI wording changed" --remaining "MCP docs" \
-  --blocker "waiting for fixture"
+  --completed "CLI wording changed" --remaining "MCP docs"
 ```
 
-`finish` records a structured handoff, releases that ACC session's claims, and ends its ACC
-presence. It does not close the external client.
+That releases the session's claims and ends its ACC presence. Your client stays open.
 
-## Delivery expectations
+## What to expect from delivery
 
-Durable inbox delivery works for every participant. Certified next-turn delivery exists
-only for exact captured versions of Codex, Claude Code, Gemini CLI, and Kimi Code. Grok and
-generic MCP poll. Live push - a message handed to a session that is sitting idle - exists
-for Claude Code 2.1.258 and newer on macOS arm64, after the opt-in above. Although
-`acc install --delivery off|actionable|all` defines recipient policy, a client that cannot
-take the live path keeps effective policy `off` and says so beside the adapter result.
+Every participant gets the durable inbox. Exact captured versions of Codex, Claude Code,
+Gemini CLI and Kimi Code are also offered messages at their next turn; Grok and generic MCP
+poll. Claude Code 2.1.258 and newer on macOS arm64 can additionally be handed a message
+while it sits idle, if you said yes in step 1 — and even then, a message arriving mid-turn
+waits for that turn to finish. [Capabilities](CAPABILITIES.md) has the matrix.
 
 ## Optional workspace configuration
 
-No file is required. Use one only for a stable shared workspace id, multiple roots, or
+No file is required. Add one only for a stable shared workspace id, several roots, or
 project policy:
 
 <!-- test:command -->
@@ -136,8 +130,8 @@ project policy:
 acc config validate
 ```
 
-See [Configuration](CONFIGURATION.md) before writing it. Runtime messages and sessions
-never belong in that committed file.
+See [Configuration](CONFIGURATION.md) first. Runtime messages and sessions never belong in
+a committed file.
 
 ## Uninstall
 
@@ -145,8 +139,8 @@ never belong in that committed file.
 acc uninstall
 ```
 
-ACC removes only installation bytes that still match what it wrote. User-modified client
-settings remain in place.
+ACC removes only the bytes it wrote that still match what it wrote. Anything you edited
+afterwards stays.
 
 Next: [Why ACC](WHY_ACC.md) · [Capabilities](CAPABILITIES.md) · [CLI](CLI.md) ·
 [Troubleshooting](TROUBLESHOOTING.md)
