@@ -1,8 +1,8 @@
 # Glossary
 
-- **Workspace** — one local coordination room; all worktrees of a Git repository share it.
-- **Participant** — the stable address that sends and receives messages.
-- **Session** — one independently opened client conversation participating in a workspace.
+- **Workspace** — one same-machine, same-OS-user coordination room; all worktrees of a Git repository share it.
+- **Participant** — the address that sends and receives messages; it survives unrelated conversations only when explicitly configured.
+- **Session** — one independently opened client conversation participating in a workspace; its id supplies the default participant address.
 - **Generation** — the token proving a mutation belongs to the current opening of a session.
 - **Presence** — `online`, `stale`, or `offline`, based only on observed heartbeat and pid facts.
 - **Intent** — a session's current summary and resource hints; awareness, not permission.

@@ -1,8 +1,9 @@
 # Protocol
 
-The protocol is the vendor-neutral contract shared by core, CLI, MCP, storage, and every
-adapter. Version 0.2 uses store schema version `3` and deliberately rejects v0.1 state.
-There is no compatibility reader, conversion, archive path, or automatic deletion.
+Use this page when implementing or checking a boundary shared by core, CLI, MCP, storage,
+and adapters. Protocol version 0.2 uses store schema version `3` and deliberately rejects
+v0.1 state. There is no compatibility reader, conversion, archive path, or automatic
+deletion.
 
 ## Durable records
 
@@ -24,7 +25,9 @@ Workspace
 ```
 
 - A workspace is one local coordination room.
-- A participant is the stable recipient of a message.
+- A participant is the recipient address for a message. A hooked session gets a default
+  address derived from its client session id; only an explicitly supplied participant id
+  is stable across unrelated client conversations.
 - A session is one client conversation. Its unguessable generation token proves that a
   later mutation still belongs to the current opening.
 
@@ -186,9 +189,11 @@ The recipient owns `livePolicy` because native push may start a model turn:
 - `all`: every addressed kind may use live push.
 
 Default is `off`. Policy never creates a capability. The router still requires a current
-reachable binding, one unambiguous recipient generation, a passing exact-version
-certification, and adapter acceptance. The current Codex and Claude captures do not meet
-those requirements; all shipped native live routes therefore fall back durably.
+reachable binding, one unambiguous recipient generation, supported client evidence, and
+adapter acceptance. Claude Code live delivery on macOS arm64 uses a captured 2.1.258
+minimum plus a current feature probe and per-session protocol handshake; it was confirmed
+again on 2.1.260. Codex's queue transport was captured but withdrawn because its required
+mode hides the session workspace. Every unavailable or refused route falls back durably.
 
 ## Attention and sync
 

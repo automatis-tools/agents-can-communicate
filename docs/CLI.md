@@ -1,9 +1,10 @@
 # CLI
 
-The `acc` command is the universal local boundary. Setup commands are for a person;
-communication commands are the small surface installed skills teach to agents. Every
-command accepts `--json` and `--cwd <path>`. `--workspace <config>` selects an explicit
-workspace config where supported by the common boundary.
+Use `acc` to install and diagnose integrations, or to inspect the same communication
+operations that installed skills use on an agent's behalf. Setup commands are for a
+person; communication commands are the smaller agent-facing vocabulary. Every command
+accepts `--json` and `--cwd <path>`. `--workspace <config>` selects an explicit workspace
+config where supported by the common boundary.
 
 <!-- test:command -->
 ```bash
@@ -11,7 +12,7 @@ acc help
 acc version
 ```
 
-## Communication commands
+## Coordinate from a session
 
 | Command | Required | Optional |
 |---|---|---|
@@ -71,6 +72,10 @@ otherwise. Two sessions of one client are refused by name rather than guessed be
 same way `--session` refuses. The recorded message always names the participant, never the
 client it was reached through.
 
+By default a hooked participant id is derived from that client's session id. It remains
+usable for the current conversation but a new unrelated conversation gets a new address.
+Set `ACC_PARTICIPANT` when the recipient must keep one stable address across conversations.
+
 `message` accepts generic kinds `note`, `question`, `request`, and `decision`. Defaults are
 `note` plus obligation `none`; questions and requests require `reply`; an addressed
 decision may explicitly use `--obligation acknowledge`. `answer` is created only by
@@ -122,7 +127,7 @@ Status is `complete`, `partial`, or `blocked`. `finish` records a structured han
 releases the caller's claims, and ends ACC presence for that session. It never closes the
 external AI client. An addressed handoff requires acknowledgement; a room handoff does not.
 
-## Setup and maintenance
+## Install, diagnose, and update
 
 | Command | Flags |
 |---|---|
@@ -149,7 +154,7 @@ runs the unmodified client, and ACC is never the parent of the session after tha
 Only `update` touches the network. `ACC_NO_UPDATE_CHECK=1` disables update checks. Hooks
 never perform them.
 
-## Adapter lifecycle commands
+## Integrate a client lifecycle
 
 `acc attach --participant <id>`, `acc heartbeat --session <id> --generation <token>`, and
 `acc detach --session <id> --generation <token>` are public executable boundaries used by
