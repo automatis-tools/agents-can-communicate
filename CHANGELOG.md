@@ -12,6 +12,16 @@ reads as though the other three were forgotten; both are now answered where they
 and the "only client" half appears only while it is true. What gets written belongs to
 `--dry-run`, and how to undo it belongs to the moment someone wants to undo it.
 
+The entry pages are written for the person watching agents work, rather than driving them.
+ACC is an agentic tool, and the getting-started guide read as a human CLI tutorial: "In
+either window:" then `acc status`, "From the first session, address a participant" then
+`acc message`. The commands stay, because seeing what an agent will run before it runs is
+the argument against this being magic, but the reader is no longer the one typing them.
+Step three is now the product - you ask, in your own words, and the agent looks up who is
+here and sends the question - and step four is the answer arriving in the other window
+without you. `CLI.md` already drew that line between setup commands for a person and
+communication commands for agents; the guide contradicted it.
+
 The README opens with the problem rather than the architecture. Every heading had ACC as
 the subject - "ACC connects", "ACC exists for", "ACC owns" - which is the voice of the
 thing that was built, not of the person deciding whether to try it; the pain it solves
@@ -82,9 +92,9 @@ artifact nobody verified.
 
 | | |
 |---|---|
-| Built from | `d51222a1818eb10eaa1026c12e15c3160c8e3a70` |
-| Tarball | `agents-can-communicate-0.3.0.tgz`, 256,511 bytes, 196 entries |
-| sha256 | `fd44c17b80449828dd56fe0799b05e8b3b0308614078b94df19f3ed4159fedae` |
+| Built from | `6bedf6736bf9878c23eb12455a419702e9cfa5aa` |
+| Tarball | `agents-can-communicate-0.3.0.tgz`, 256,675 bytes, 196 entries |
+| sha256 | `511c207abc8d82c8f8f9dc803a992429dca45d720364eceae49367b491e80b9e` |
 | Node | 26.5.1; package requires Node >=24 |
 | Verified on | macOS 26.6.2 (darwin 25.6.0, arm64) |
 
