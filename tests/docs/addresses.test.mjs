@@ -36,8 +36,10 @@ const isParticipantId = value => [...ADAPTER_IDS].some(id => value.startsWith(`$
 
 async function documents() {
   const files = ["README.md"];
-  for (const entry of await readdir(path.join(repo, "docs"))) {
-    if (entry.endsWith(".md")) files.push(path.join("docs", entry));
+  for (const root of ["docs", "examples"]) {
+    for (const entry of await readdir(path.join(repo, root))) {
+      if (entry.endsWith(".md")) files.push(path.join(root, entry));
+    }
   }
   for (const pkg of await readdir(path.join(repo, "packages"))) {
     for (const shape of ["plugin/skills/acc/SKILL.md", "extension/skills/acc/SKILL.md"]) {

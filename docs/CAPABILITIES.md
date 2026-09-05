@@ -1,5 +1,11 @@
 # Capabilities
 
+Use this page to set expectations after installation. Integration means ACC can introduce
+peer awareness and coordination instructions; it does not guarantee what a model will do
+with them. Delivery also varies independently from awareness. The durable inbox works for
+every participant, supported exact versions may add next-turn delivery, and only the
+experimental Claude Code channel can deliver while a session is idle.
+
 Capability honesty separates four questions that are easy to collapse:
 
 1. **Certified support** — did this exact client version and platform pass a shipped
@@ -12,6 +18,10 @@ Capability honesty separates four questions that are easy to collapse:
 
 A source method or vendor documentation is not certification. Unknown versions and
 platforms degrade to false. No weaker session inherits a stronger peer's capability.
+
+Run `acc doctor` in the project when observed behavior differs from this page. It reports
+the installed client version, platform, effective capability, and fallback instead of
+assuming that a newer or differently packaged client behaves like a captured one.
 
 ## Certified support
 
@@ -75,9 +85,9 @@ Current shipped reality: Claude Code on darwin-arm64 has a passing experimental 
 capture behind the native delivery contract, off until a per-client opt-in. Codex is
 next-turn and inbox only: its queue transport works, but the mode that makes a session
 reachable is the mode that hides which workspace it is in. Every other client is next-turn or
-inbox only;
-Gemini CLI and Kimi Code are next-turn only at their exact captured versions; Grok and MCP
-poll inbox.
+inbox only. Gemini CLI and Kimi Code are next-turn only at their exact captured versions;
+Grok and MCP poll inbox. On Linux, the shipped captures above do not establish next-turn or
+live delivery, so the honest expectation is the durable inbox.
 
 ## Recipient policy
 

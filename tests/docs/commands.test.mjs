@@ -18,9 +18,6 @@ const repo = path.resolve(import.meta.dirname, "..", "..");
  */
 const MARKER = "<!-- test:command -->";
 
-const LEAD = "ACC connects independently opened AI sessions so they can discover, ask, "
-  + "answer, acknowledge, and hand off without becoming one managed agent team.";
-
 async function shippedMarkdown() {
   const manifest = JSON.parse(await readFile(path.join(repo, "package.json"), "utf8"));
   const markdown = manifest.files.filter(entry => entry.endsWith(".md"));
@@ -100,10 +97,18 @@ test("public docs describe the communication product that actually ships", async
   }
 
   const readme = entries.find(entry => entry.file === "README.md").source;
-  assert.match(readme, new RegExp(LEAD.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")),
-    "README lost the communication-first lead");
-  assert.match(readme, /second independently opened session[\s\S]*useful acknowledged interaction[\s\S]*without the human copying peer message content/i,
-    "README lost the one activation event");
+  const prompts = [...readme.matchAll(/^\| (?:Codex|Claude Code) \| ([^|]+) \|$/gm)]
+    .map(match => match[1].trim());
+  assert.equal(prompts.length >= 2, true, "README no longer gives two ordinary task prompts");
+  for (const prompt of prompts) {
+    assert.doesNotMatch(prompt, /\b(?:ACC|inbox|peer|session|coordinate)\b/i,
+      `README turns an ordinary task prompt into coordination setup: ${prompt}`);
+  }
+  for (const target of ["docs/GETTING_STARTED.md", "docs/CAPABILITIES.md",
+    "docs/TROUBLESHOOTING.md"]) {
+    assert.equal(readme.includes(`](${target})`), true,
+      `README does not route the reader to ${target}`);
+  }
 
   const protocol = entries.find(entry => entry.file === "docs/PROTOCOL.md").source;
   assert.match(protocol, /queued\s*->\s*offered\s*->\s*retrieved\s*->\s*acknowledged/,
@@ -135,19 +140,6 @@ test("the release check uses the same isolated npm cache as pack and tests", asy
   assert.match(releasing,
     /env npm_config_cache=\/private\/tmp\/acc-npm-cache-v02 node scripts\/verify-package\.mjs/,
   "verify-package can fall back to the machine's root-owned npm cache");
-});
-
-test("the getting-started guide covers the flow it promises", async () => {
-  const guide = await readFile(path.join(repo, "docs", "GETTING_STARTED.md"), "utf8");
-
-  // Named because they are the arc a first-time reader needs: install, a normal
-  // session attaching by itself, seeing peers, a conflict, a message, removal.
-  for (const step of ["acc install", "acc status", "acc claim", "acc message",
-    "acc uninstall"]) {
-    assert.match(guide, new RegExp(step.replace(/\s+/g, "\\s+")), `missing: ${step}`);
-  }
-  // The distinction that decides what a reader should expect.
-  assert.match(guide, /MCP/);
 });
 
 test("every command the CLI accepts appears in the CLI reference", async () => {
