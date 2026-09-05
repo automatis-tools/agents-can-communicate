@@ -1,18 +1,21 @@
 # Configuration
 
-ACC works with no configuration at all. A workspace is identified by its Git common
-directory when there is one and by the directory itself otherwise. Independently opened
-sessions can communicate without adding runtime state to the project.
+Start without configuration. ACC identifies a workspace from its Git common directory, or
+from the directory itself when Git is absent. Sessions can communicate only when they run
+as the same operating-system user on the same machine and resolve that same local
+workspace.
 
-`acc.workspace.json` is only for stable workspace identity, roots, and shared claim/context
-policy. It never defines agents, messages, execution state, or delivery endpoints. Project
-map: [README](index.md). Terms used below: [Glossary](GLOSSARY.md).
+Create `acc.workspace.json` only for stable workspace identity, roots, or shared
+claim/context policy. It is optional project configuration that `acc config init` may write
+at your request; runtime state remains in platform app data outside the repository. The
+file never defines agents, messages, execution state, or delivery endpoints. Project map:
+[README](index.md). Terms used below: [Glossary](GLOSSARY.md).
 
-## When you need a config
+## Decide whether you need a config
 
-- **Identity that survives a move.** Without a config, the same project checked out at two
-  paths is two workspaces, and two people whose clones sit in different directories do not
-  see each other. `workspaceId` fixes that, and it is the usual reason this file exists.
+- **Identity that survives a local move.** Without a config, the same non-Git project at two
+  paths is two workspaces. `workspaceId` lets the same OS user move or reopen it locally.
+  Matching ids never connect different machines or OS users.
 - **More than one root.** A monorepo whose apps live in separate directories, or a
   workspace that spans sibling checkouts.
 - **Shared policy.** Claim mode and context budget, agreed once and committed, rather than
@@ -21,7 +24,7 @@ map: [README](index.md). Terms used below: [Glossary](GLOSSARY.md).
   to be installed, so `acc doctor` can say what is missing rather than leaving a session
   silently uncoordinated.
 
-### The file
+### Define the file
 
 `acc.workspace.json`, at the root of the workspace. One name, so discovery is a lookup and
 not a search. It is found by walking up from the working directory, because sessions start
@@ -64,7 +67,7 @@ like nothing at all to a parser that ignores what it does not know, and the resu
 team whose policy quietly stopped applying. `extensions` is the one declared door for
 anything ACC does not define.
 
-### What it must never contain
+### Keep runtime state out
 
 Sessions, participants, messages, claims, receipts, intents, events, tokens, credentials.
 All of it is refused, by name, with the key that caused it, for two reasons. Runtime state
@@ -73,7 +76,7 @@ without carrying presence and locks along. And a config lives in a repository, w
 who can open a pull request can edit it — a file that could declare sessions would be a way
 to hand a peer state it should have had to earn.
 
-### Writing one while sessions are running
+### Change identity safely
 
 The config carries the workspace identity, so writing one moves the project to a new
 workspace. Sessions already attached stay on the old one: they keep heartbeating it, they
@@ -90,7 +93,7 @@ pass --force to write anyway.
 
 Close them, or pass `--force` if you mean it — and restart them afterwards.
 
-### Commands
+### Create or validate it
 
 <!-- test:illustration asks a person to confirm; there is nobody to ask in a test -->
 ```bash
@@ -107,7 +110,7 @@ and replacing it on a mistyped command would split one workspace into two.
 thing it is inspecting. With no config present it reports the defaults rather than failing,
 because not having one is a valid state.
 
-## Delivery policy is not project policy
+## Keep delivery consent user-owned
 
 Live delivery may start a model turn and spend that recipient's tokens, so it is configured
 through the recipient's user-owned client installation:
@@ -118,12 +121,15 @@ acc install --adapter codex --delivery off
 
 The allowed values are `off`, `actionable`, and `all`; the default is `off`. This setting
 does not belong in `acc.workspace.json`, where a pull request could opt someone else into
-spending a turn. It also cannot create a capability: when the detected exact client
-version lacks passing live-push evidence, installation keeps the effective policy `off`
-and reports durable next-turn or inbox fallback. No shipped adapter currently qualifies
-for native live push.
+spending a turn. It also cannot create a capability. Exact-version evidence governs
+ordinary hook features; Claude Code live delivery separately requires macOS arm64, version
+2.1.258 or newer, and a current feature probe before installation applies the requested
+policy. If those install-time checks fail, effective policy remains `off` and the installer
+reports next-turn or inbox fallback. Each later session must also pass its own
+generation-bound handshake. A failed session handshake clears or refuses that binding and
+reports degraded reachability; it does not rewrite the installed consent.
 
-## Environment
+## Override local paths and identity
 
 Nothing in `acc.workspace.json` says where state is stored, and nothing there can — that is
 the job of these variables, or the platform's own locations, and ACC refuses any of them

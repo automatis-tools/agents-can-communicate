@@ -187,9 +187,10 @@ Facts that shape the adapter:
   conversation service and prove that in a process test).
 
 `certification.json` now carries passing `delivery.livePush` and `delivery.replyRoute`
-evidence for 2.1.258 next to the retained 2.1.252 failure. The adapter's declared
-capabilities stay `false` until the production Channel ships, so `effectiveCapabilities()`
-still reports no live delivery.
+evidence for 2.1.258 next to the retained 2.1.252 failure. At the time this was written
+the adapter's declared capabilities were still `false`; the production Channel has since
+shipped and both are declared true behind the native contract - see the release capture
+below.
 
 ## Release capture on the installed tarball (2026-09-04, 2.1.260)
 

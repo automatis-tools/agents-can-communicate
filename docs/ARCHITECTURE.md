@@ -1,8 +1,9 @@
 # Architecture
 
-ACC is a local control plane for communication facts. The execution planes remain the AI
-clients the user opened. Core records the truth before a delivery adapter is asked to make
-it arrive sooner.
+Use this page to trace a communication fact from an independently opened client through
+core, storage, and an optional delivery adapter. ACC is the local control plane; the AI
+clients remain independent execution planes. Core records the truth before an adapter is
+asked to make it arrive sooner.
 
 ```mermaid
 flowchart LR
@@ -41,7 +42,7 @@ The order is part of the public guarantee:
 
 1. validate and commit the message plus one `queued` receipt per resolved recipient;
 2. resolve the recipient's current delivery bindings;
-3. check recipient policy, current reachability, and exact client-version certification;
+3. check recipient policy and the current binding's reachability and offered native mode;
 4. ask one adapter to cross its transport boundary;
 5. only after acceptance, commit `offered` and an immutable success event.
 
@@ -71,16 +72,21 @@ lease without exposing the endpoint.
 
 ## Certified capability versus current reachability
 
-A capability says an exact client version on an exact platform passed a captured behavior.
-It does not say one particular session is reachable now. A binding says what that current
-generation exposes and whether its lease is current. Recipient policy says whether it may
-spend a turn. All three must agree before live delivery is possible.
+Ordinary hook capabilities say an exact client version on an exact platform passed a
+captured behavior. Native live delivery uses a separate contract: installation checks the
+captured minimum, platform, and current feature probe, then each session publishes a binding
+only after a generation-bound handshake. The router trusts that admission and verifies the
+binding, recipient policy, declared adapter capability, and adapter response; it does not add
+a third exact-version certification check. A binding says what that current generation
+exposes and whether its lease is current, while recipient policy says whether it may spend a
+turn.
 
-Codex and Claude Code currently ship failed native-delivery captures, so their
-`delivery.livePush` and `delivery.replyRoute` capabilities resolve false. Gemini CLI and
-Kimi Code have exact-version next-turn evidence only. Grok and generic MCP use inbox
-polling. The architecture includes a live seam without pretending the current clients
-proved it.
+Claude Code is the one client that proved the live seam: a Channel capture on 2.1.258,
+confirmed on 2.1.260 through the installed package, admitted by minimum-plus-probe rather
+than an exact version. Codex's queue transport passed its capture and the capability was
+withdrawn, because the mode it needs hides the session's workspace. Gemini CLI and Kimi
+Code have exact-version next-turn evidence only; Grok and generic MCP use inbox polling.
+The seam exists for every adapter; only one has earned it.
 
 ## Storage and workspace identity
 
@@ -90,7 +96,9 @@ lexically, so a cursor is simply the last sequence returned.
 
 Workspace discovery checks an explicit config first, then the Git common directory, then
 the plain directory. Multiple worktrees share a workspace id while each session records
-its checkout and branch. Nothing written by ACC lands inside those roots.
+its checkout and branch. Runtime state never lands inside those roots; the only project
+file ACC writes is an optional `acc.workspace.json` explicitly requested through
+`acc config init`.
 
 A lone session can remain ephemeral. Durable state materialises when a second live session
 appears or the first claim, message, or handoff is committed. This makes “silent when

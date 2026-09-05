@@ -1,11 +1,13 @@
 # Security model
 
-ACC connects independently controlled sessions without merging their authority. A peer can
-send useful context, a question, or a request; its text never becomes system policy or a
-human instruction merely because ACC transported it.
+Use this model to decide which boundary owns a security claim and which failure belongs to
+the client or local account instead. ACC connects independently controlled sessions
+without merging their authority. A peer can send context, a question, or a request; its
+text never becomes system policy or a human instruction merely because ACC transported it.
 
-The first release coordinates processes under one local OS user. Same-user access protects
-local transport from the network; it does not make model output trustworthy.
+The current local boundary coordinates processes under one OS user on one machine.
+Same-user access protects local transport from the network; it does not make model output
+trustworthy.
 
 ## Trust boundaries
 
@@ -64,10 +66,13 @@ There is no model-attention claim and no public state override. Failed accelerat
 the message queued and records only a closed safe error code. Diagnostics and offer events
 never copy the peer body.
 
-A future live adapter must match exact passing evidence, one unexpired generation-bound
+A live adapter must match its declared evidence contract, one unexpired generation-bound
 binding, and the recipient's opt-in policy. Opaque endpoint references remain inside the
-adapter and outside repositories. Current Codex and Claude native captures failed, so no
-live transport is enabled.
+adapter and outside repositories. Claude Code live delivery is currently supported on
+macOS arm64 from the captured 2.1.258 minimum when a current feature probe and per-session
+handshake pass; it remains experimental and off by default. Codex's queue capture passed,
+but the capability was withdrawn because the required mode hides session workspace
+identity.
 
 ## Claims
 

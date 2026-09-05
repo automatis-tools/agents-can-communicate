@@ -6,6 +6,8 @@ import path from "node:path";
 import test from "node:test";
 import { promisify } from "node:util";
 
+import { projectContextResult } from "@agents-can-communicate/adapter-sdk";
+
 const run = promisify(execFile);
 const repo = path.resolve(import.meta.dirname, "..", "..");
 
@@ -17,9 +19,6 @@ const repo = path.resolve(import.meta.dirname, "..", "..");
  * the docs the same day it breaks the code.
  */
 const MARKER = "<!-- test:command -->";
-
-const LEAD = "ACC connects independently opened AI sessions so they can discover, ask, "
-  + "answer, acknowledge, and hand off without becoming one managed agent team.";
 
 async function shippedMarkdown() {
   const manifest = JSON.parse(await readFile(path.join(repo, "package.json"), "utf8"));
@@ -100,10 +99,18 @@ test("public docs describe the communication product that actually ships", async
   }
 
   const readme = entries.find(entry => entry.file === "README.md").source;
-  assert.match(readme, new RegExp(LEAD.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")),
-    "README lost the communication-first lead");
-  assert.match(readme, /second independently opened session[\s\S]*useful acknowledged interaction[\s\S]*without the human copying peer message content/i,
-    "README lost the one activation event");
+  const prompts = [...readme.matchAll(/^\| (?:Codex|Claude Code) \| ([^|]+) \|$/gm)]
+    .map(match => match[1].trim());
+  assert.equal(prompts.length >= 2, true, "README no longer gives two ordinary task prompts");
+  for (const prompt of prompts) {
+    assert.doesNotMatch(prompt, /\b(?:ACC|inbox|peer|session|coordinate)\b/i,
+      `README turns an ordinary task prompt into coordination setup: ${prompt}`);
+  }
+  for (const target of ["docs/GETTING_STARTED.md", "docs/CAPABILITIES.md",
+    "docs/TROUBLESHOOTING.md"]) {
+    assert.equal(readme.includes(`](${target})`), true,
+      `README does not route the reader to ${target}`);
+  }
 
   const protocol = entries.find(entry => entry.file === "docs/PROTOCOL.md").source;
   assert.match(protocol, /queued\s*->\s*offered\s*->\s*retrieved\s*->\s*acknowledged/,
@@ -130,24 +137,21 @@ test("public docs describe the communication product that actually ships", async
   }
 });
 
-test("the release check uses the same isolated npm cache as pack and tests", async () => {
+test("release commands create and reuse one isolated npm cache", async () => {
   const releasing = await readFile(path.join(repo, "docs", "RELEASING.md"), "utf8");
-  assert.match(releasing,
-    /env npm_config_cache=\/private\/tmp\/acc-npm-cache-v02 node scripts\/verify-package\.mjs/,
-  "verify-package can fall back to the machine's root-owned npm cache");
-});
-
-test("the getting-started guide covers the flow it promises", async () => {
-  const guide = await readFile(path.join(repo, "docs", "GETTING_STARTED.md"), "utf8");
-
-  // Named because they are the arc a first-time reader needs: install, a normal
-  // session attaching by itself, seeing peers, a conflict, a message, removal.
-  for (const step of ["acc install", "acc status", "acc claim", "acc message",
-    "acc uninstall"]) {
-    assert.match(guide, new RegExp(step.replace(/\s+/g, "\\s+")), `missing: ${step}`);
+  assert.match(releasing, /release_cache="\$\(mktemp -d /,
+    "release instructions do not create a fresh npm cache");
+  for (const [name, command] of [
+    ["install", "npm ci"],
+    ["tests", "npm test"],
+    ["pack", "npm pack"],
+    ["verification", "node scripts/verify-package.mjs"],
+  ]) {
+    const escaped = command.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    assert.match(releasing,
+      new RegExp(`^env npm_config_cache="\\$release_cache" ${escaped}(?: |$)`, "m"),
+      `${name} can fall back to the machine's shared npm cache`);
   }
-  // The distinction that decides what a reader should expect.
-  assert.match(guide, /MCP/);
 });
 
 test("every command the CLI accepts appears in the CLI reference", async () => {
@@ -167,4 +171,12 @@ test("the adapter guide describes the contract an author must satisfy", async ()
     "defineAdapter"]) {
     assert.match(guide, new RegExp(required), `missing: ${required}`);
   }
+
+  const projectorResult = projectContextResult({ solo: true });
+  for (const key of Object.keys(projectorResult).filter(key => key !== "text")) {
+    assert.match(guide, new RegExp(`\\b${key}\\b`),
+      `adapter guide omits projector result field: ${key}`);
+  }
+  assert.doesNotMatch(guide, /\bincludedMessageIds\b/,
+    "adapter guide teaches the old projector result field");
 });

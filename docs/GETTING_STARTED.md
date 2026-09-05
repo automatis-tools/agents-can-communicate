@@ -1,145 +1,121 @@
 # Getting started
 
-ACC begins with two AI sessions that you open yourself. It does not create a team or choose
-which model does what. The first useful run is a question that travels from one session to
-the other, receives a reply in the same thread, and is acknowledged without you copying
-the message between windows.
+Install ACC, open the AI sessions you already use, and give them related work. Supported
+integrations make peers visible and teach each agent how to communicate. You do not need to
+carry messages between windows or add coordination instructions to your task prompts.
 
-```mermaid
-sequenceDiagram
-  participant A as First session
-  participant ACC
-  participant B as Second session
-  A->>ACC: durable question
-  ACC-->>B: next-turn offer or inbox fallback
-  B->>ACC: reply in the same thread
-  ACC-->>A: next-turn offer or inbox fallback
+## 1. Install once on this machine
+
+ACC requires macOS or Linux and Node.js 24 or newer.
+
+```bash
+npm install -g agents-can-communicate
 ```
-
-## 1. Install once per machine
-
-Install the package, then let ACC wire only the clients it detects:
 
 <!-- test:command -->
 ```bash
 acc install
 ```
 
-Restart those clients because hooks load at startup. Codex also asks you to trust the
-plugin. `acc doctor` names anything still missing and reports the effective delivery mode
-for each detected version.
+The installer connects only the supported clients it finds. Open a new terminal and
+restart any running clients so they load their integrations. Codex asks you to trust its
+plugin once.
 
-## 2. Open two sessions normally
+If you opt into Claude Code's experimental idle delivery, Claude also shows its own
+development-channel warning at every startup. The feature is off by default, can spend
+model tokens, and currently requires Apple Silicon macOS, zsh, and Claude Code 2.1.258 or
+newer. You do not need it for durable messages or supported next-turn delivery.
 
-Open Codex, Claude Code, Gemini CLI, Grok, or Kimi Code in the same project exactly as you
-would without ACC. A generic MCP client can participate by running `acc-mcp`. ACC never
-launches or owns either session.
+## 2. Open two sessions and give them ordinary tasks
 
-In either window:
+Start each client normally in the same project. ACC does not launch, supervise, or assign
+work to either session. For example:
 
-```bash
-acc status
-```
+| Session | Your prompt |
+|---|---|
+| Codex | Add an account-registration endpoint. |
+| Claude Code | Build the account-registration screen. |
 
-The roster gives the participant ids used by `--to`. If it shows only one session, fix the
-second client's installation or workspace path before testing communication.
+Those are complete prompts. The integration tells each agent that peers are present and
+provides the coordination instructions. If an agent notices that the screen depends on the
+endpoint contract, it can identify the peer, ask for the request and response shape, and
+continue with the answer.
 
-## 3. Publish intent, then claim narrowly
+The sessions may use different supported clients or two instances of the same client.
+Same-client addresses can be ambiguous when several instances are live; agents use the
+exact participant ids in the roster when needed. See [Concepts](CONCEPTS.md) for participant
+and session identity.
 
-Intent is cheap awareness and grants no protection:
+## 3. Watch for useful coordination
 
-```bash
-acc work --summary "updating receipt rendering" --mode edit \
-  --hint 'file:packages/cli/src/main.mjs'
-```
+Look for an agent discovering a peer, publishing the files it expects to change, noticing a
+shared dependency, asking a focused question, or answering one in the same thread. These
+events appear in the agent's normal activity; the exact presentation depends on the client.
 
-Reserve only what the session is about to change:
+ACC provides awareness and communication tools. It cannot guarantee that a model will
+notice every dependency or coordinate on every task. Each agent decides whether a peer is
+relevant under its own instructions, context, and permissions.
 
-```bash
-acc claim --resource 'file:packages/cli/src/main.mjs' \
-  --reason "updating receipt rendering"
-```
+The commands behind that activity belong to the agents' installed skill. They can publish
+intent, make an advisory or guarded claim, send and reply to messages, acknowledge a thread,
+and leave a handoff. If you want to inspect that interface, use the [CLI reference](CLI.md)
+or follow the interaction through [How ACC works](HOW_IT_WORKS.md).
 
-Exit code `5` means an overlapping live claim exists. Ask its owner or narrow the edit;
-do not silently work around it. A claim can be `guarded` only where the client exposes a
-certified write guard. Otherwise it remains useful but `advisory`.
+## 4. Know when messages arrive
 
-## 4. Send a real question
+Every message is recorded before ACC attempts faster delivery. Every participant has a
+durable inbox, which is the universal recovery path.
 
-From the first session, address a participant listed by `acc status`:
+On exact client versions and platforms with captured support, Codex, Claude Code, Gemini
+CLI, and Kimi Code can receive a message at the next normal turn. That does not wake an idle
+session. Grok, generic MCP clients, unknown versions, and unsupported platforms use the
+durable inbox instead.
 
-```bash
-acc message --to models --type question --subject "receipt wording" \
-  --body "Should the UI say offered or delivered after the transport accepts bytes?" \
-  --client-message-id client_receipt_wording_1
-```
+Claude Code's optional native channel is the only shipped idle-delivery path. It is
+experimental, never interrupts a turn already in progress, and remains subject to current
+reachability and recipient policy. Codex native live delivery is withdrawn; Codex uses its
+certified next-turn path or inbox. Read [Capabilities](CAPABILITIES.md) for exact versions,
+platforms, and limitations.
 
-The output starts with `recorded message_x`. That is the durable guarantee. Any following
-delivery diagnostic is acceleration, not the source of truth. Reuse the explicit
-`client_receipt_wording_1` key when retrying after an uncertain result; it returns the same
-logical message instead of creating a duplicate.
+Delivery evidence is deliberately narrow: `queued -> offered -> retrieved -> acknowledged`.
+An offer is not proof that the model read anything, retrieval is not proof of attention, and
+a reply settles the communication obligation rather than proving that work is complete.
 
-## 5. Read and reply from the second session
+## 5. Keep the workspace boundary clear
 
-A certified hook may offer the question on the recipient's next normal turn. Grok, MCP,
-unknown versions, and any missed projection use the same durable recovery path:
+ACC is local to the same machine and operating-system user. Git worktrees of one repository
+share an ACC workspace while keeping their separate checkout facts. Git is optional, but
+two unrelated plain folders do not share a workspace merely because people consider them
+the same project.
 
-```bash
-acc inbox
-acc inbox --message message_x
-acc reply --message message_x \
-  --body "Use offered. It proves transport acceptance, not that the model read it."
-```
+Messages and runtime state live in platform app data outside the repository. ACC never
+collects or shares raw transcripts. An optional `acc.workspace.json` can provide a stable
+workspace id, multiple roots, or project policy; it is user-requested configuration, not
+runtime state. See [Configuration](CONFIGURATION.md) and the
+[non-Git example](https://github.com/automatis-tools/agents-can-communicate/blob/main/examples/non-git-research.md).
 
-`reply` creates an `answer` in the original thread and acknowledges the recipient's
-receipt for the question atomically. It does not mark the requested work complete. The
-first session receives the answer through its own next-turn or inbox path; you do not copy
-the peer body between sessions.
+## Diagnose or remove it
 
-Use `acc ack --message message_x` only when the message asks for acknowledgement and no
-written reply is needed.
-
-## 6. Hand off while context still exists
-
-```bash
-acc finish --goal "update receipt rendering" --status partial \
-  --completed "CLI wording changed" --remaining "MCP docs" \
-  --blocker "waiting for fixture"
-```
-
-`finish` records a structured handoff, releases that ACC session's claims, and ends its ACC
-presence. It does not close the external client.
-
-## Delivery expectations
-
-Durable inbox delivery works for every participant. Certified next-turn delivery currently
-exists only for exact captured versions of Codex, Claude Code, Gemini CLI, and Kimi Code.
-Grok and generic MCP poll. No current adapter has certified native live push. Although
-`acc install --delivery off|actionable|all` defines recipient policy, unsupported or
-uncertified clients keep effective policy `off` and report their fallback beside the
-adapter result.
-
-## Optional workspace configuration
-
-No file is required. Use one only for a stable shared workspace id, multiple roots, or
-project policy:
+If a peer does not appear or delivery differs from what you expected, run this from the
+project directory:
 
 <!-- test:command -->
 ```bash
-acc config validate
+acc doctor
 ```
 
-See [Configuration](CONFIGURATION.md) before writing it. Runtime messages and sessions
-never belong in that committed file.
+The report names detected clients, installed integrations, exact capability downgrades,
+and the next action. Continue with [Troubleshooting](TROUBLESHOOTING.md).
 
-## Uninstall
+To remove ACC's integrations:
 
+<!-- test:command -->
 ```bash
 acc uninstall
 ```
 
-ACC removes only installation bytes that still match what it wrote. User-modified client
-settings remain in place.
+Uninstall removes only bytes ACC wrote that still match its install record. User edits are
+reported and preserved.
 
 Next: [Why ACC](WHY_ACC.md) · [Capabilities](CAPABILITIES.md) · [CLI](CLI.md) ·
 [Troubleshooting](TROUBLESHOOTING.md)

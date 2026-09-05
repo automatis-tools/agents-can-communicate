@@ -307,13 +307,16 @@ Facts that shape the adapter:
 - minimum: this first passing capture, `0.152.1`; the 0.152.0 failure is retained;
 - not captured: `darwin-x64`, Linux, Windows, and a pre-existing daemon.
 
-`certification.json` now carries passing `delivery.livePush` evidence for 0.152.1; the
-adapter's declared capabilities stay `false` until the production App Server client ships.
+`certification.json` carried passing `delivery.livePush` evidence for 0.152.1 for one day.
+It was superseded by the failure capture recorded in the withdrawal below, and the passing
+capture stays in the repository as history rather than being rewritten.
 
-## Native queue adapter (2026-09-02)
+## Native queue adapter (2026-09-02) - withdrawn the next day
 
-The shipped adapter declares `delivery.livePush` true behind the native contract
-`codex-app-server-thread-queue-v1`, minimum `0.152.1` on `darwin-arm64`.
+For one day the shipped adapter declared `delivery.livePush` true behind the native
+contract `codex-app-server-thread-queue-v1`, minimum `0.152.1` on `darwin-arm64`. The
+section after this one records why that stopped. What follows describes the transport as
+it was built, and it still works; what it cannot do is tell ACC where the session is.
 `delivery.replyRoute` stays false: Codex answers ACC through the existing `acc reply`
 CLI, not a native callback, and the adapter exposes no `routeReply`.
 
@@ -333,3 +336,27 @@ and uninstall leaves the vendor daemon in place. To use native Codex delivery, s
 daemon yourself (`codex app-server daemon start`) before `acc install`; the install detects
 it and adds only the `--remote unix://` attachment to the ordinary `codex` command. With no
 daemon the client stays durable/next-turn only.
+
+## Native delivery withdrawn (2026-09-03)
+
+The release capture ran the shipped adapter against a real client working in one project
+while the daemon had been started in another. In `--remote` mode the session runs inside
+the daemon, and **both** the hook payload's `cwd` and the App Server's own `thread/list`
+reported the daemon's directory as the session's:
+
+```
+thread/list { useStateDbOnly: true, cwd: /path/B }   -> { data: [] }
+thread/list { useStateDbOnly: true, cwd: /path/A }   -> { data: [ { id: …, cwd: /path/A } ] }
+```
+
+ACC registered the session in the daemon's workspace and injected that workspace's peers
+into it. Nothing ACC can reach carries the real directory, so there is no honest way to
+address such a session, and a session ACC cannot place must not be addressed.
+
+So the capability is withdrawn: no `nativeDelivery` descriptor, `delivery.livePush` false,
+and the probe and handshake answer `workspace_identity_unavailable`. This is recorded as
+its own capture, `fixtures/delivery/codex-cli-0.152.1-remote-workspace.json`, beside the
+passing one it supersedes. Withdrawing it also repaired ordinary Codex use: ACC no longer
+adds `--remote`, so hooks fire with the correct `cwd` again. The earlier spike missed this
+by starting the daemon in the session's own directory, where the two coincide. An upstream
+issue was filed against the client.

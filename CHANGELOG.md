@@ -2,6 +2,56 @@
 
 ## Unreleased
 
+The one question a new user is asked is now a decision rather than a manifest. It opened
+with `Enable native live delivery for Claude Code 2.1.260?` over internal artefact names -
+a shim, a PATH block, a config entry - none of which anyone is choosing between, and it
+never said what the reader would actually live with: from now on the client stops and asks
+to allow development channels at every start. It also left its own shape unexplained. A
+bare `[y/N]` reads as "not recommended", and one question among four installed clients
+reads as though the other three were forgotten; both are now answered where they are asked,
+and the "only client" half appears only while it is true. What gets written belongs to
+`--dry-run`, and how to undo it belongs to the moment someone wants to undo it.
+
+The entry pages now describe the product as peer coordination among independent sessions,
+not as a human-operated messaging tutorial. You open the clients you already use, give
+each agent an ordinary task, and let the installed integration provide peer awareness and
+the coordination interface. The agents decide whether their work overlaps, whom to ask,
+and what to agree on; ACC does not assign work or promise that every model will coordinate
+on every task. The CLI reference still exposes the exact communication operations for
+inspection, while separating them from the setup commands a person runs.
+
+The README now leads with that workflow and the analogy to coordination among subagents,
+extended across the independent sessions a user opens. A compact, explicitly illustrative
+exchange shows agents discovering an interface dependency without turning the dialogue
+into a guaranteed script. Setup, delivery limits, worktrees, privacy and removal remain on
+the entry page; deeper concepts, architecture and protocol details live in the documentation
+map instead of making the README an architecture tour.
+
+A peer can be addressed by the client it runs in, and every example that taught that now
+works. `--to models` shipped in the README, the getting-started guide, the CLI reference
+and all five skills; `--to claude_code` was in every skill's request example. Recipients
+were exact participant ids only, so both produced exit 4 - and the skills tell an agent to
+report a failed command briefly and carry on, so an agent following its own instructions
+stopped coordinating on its first attempt and said little about why. Rather than teach
+`codex-fbqX8o`, the product accepts what an agent knows about its peers: a name matching no
+participant is tried as a client name, and one live session of it resolves. Two refuse and
+name them, the way `--session` already refuses to choose between two sessions of one client.
+An exact participant id is never overruled, and the recorded message names the participant
+rather than the client it was reached through. A new gate checks every `--to` in the
+documentation and the skills, because the executable-doc test only runs blocks marked as
+commands - which is how eighteen wrong examples survived. Running those examples against an
+installed build then found one more: a client name never resolves to the sender own client,
+so each skill has to name a peer rather than the client that ships it.
+
+The documentation says the same thing on every page now. Three generations of truth had
+been live at once: pages from 0.2.0 said no adapter had passing live-push certification,
+pages from mid-branch said two adapters ship a native transport, and the Codex row in the
+capabilities matrix contradicted the paragraph above it. The README still listed Codex as a
+passing capture; getting started never mentioned the one question a new user is asked;
+troubleshooting blamed fallbacks on failure captures two releases old. Every page, both
+compatibility timelines and both delivery-capture READMEs now describe what 0.3.0 ships.
+The skill text every agent reads was already right and is untouched.
+
 Two tests wrote down facts about the machine that ran them as if those facts were universal,
 and CI had been red since 0.3.0's feature merge because of it - through the release, which
 went out with a red matrix nobody had looked at.
@@ -23,23 +73,20 @@ asserted before binding so the next path that grows says why it broke.
 Both passed locally and only failed elsewhere, which is the point: a suite run on one
 machine cannot see them, and the platform matrix is what does.
 
-`docs/RELEASING.md` now says how publishing here is actually authenticated. It claimed every
-publish needs a two-factor code, on the strength of what `npm profile get` once reported.
-Publishing 0.3.0 needed no code, and that same command now answers `403 Forbidden` on the
-account's own profile - which is the diagnosis rather than a separate puzzle: a credential
-that can publish but cannot read its own profile is a token, and a token with write access
-bypasses two-factor entirely. Both commands are written down together, because the pair is
-what tells you which route a machine is on. It also records the part with a deadline - npm
-now warns that tokens bypassing 2FA are being restricted for direct publishing, so the route
-that made this release possible is going away - and the habit that kept 0.3.0 honest:
-publish the tarball by name, because a bare `npm publish` repacks and sends the registry an
-artifact nobody verified.
+`docs/RELEASING.md` now treats a release candidate as two auditable commits. Commit A is a
+clean tree containing every packed byte and release gate; the exact saved tarball is then
+packed and verified in isolation. Commit B records evidence without changing the packed
+artifact, after which the full suite makes candidate freshness a normal passing gate. A
+supplied tarball deliberately verifies as `revision unknown`, so its source is the clean
+commit captured immediately before packing rather than a later evidence commit. Publishing
+still uses the verified tarball by filename, while the 0.3.0 authentication result is kept
+as history rather than generalized into current npm credential advice.
 
 | | |
 |---|---|
-| Built from | `ea31740f6121f6362cc3b1ceffbc70ab7c45b4fc` |
-| Tarball | `agents-can-communicate-0.3.0.tgz`, 254,217 bytes, 196 entries |
-| sha256 | `9e6f93b6ea823f3b202cb20e340f270d33472da1d26a4d49196c4b4751524720` |
+| Built from | `b6710270d2de9eacbabbcce5222d100840f49be5` |
+| Tarball | `agents-can-communicate-0.3.0.tgz`, 256,238 bytes, 196 entries |
+| sha256 | `8edcdd9de4dcc7619f839f22e492b3628fde835cd509f4c2482d44c18671066b` |
 | Node | 26.5.1; package requires Node >=24 |
 | Verified on | macOS 26.6.2 (darwin 25.6.0, arm64) |
 

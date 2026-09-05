@@ -283,12 +283,64 @@ test("an interactive install asks one default-No question per eligible client", 
   assert.deepEqual(decided.asked, ["claude_code", "codex"]);
   assert.equal(questions.length, 2, "the ineligible client is reported, not asked");
   const [first, io] = questions[0];
-  assert.match(first, /^Enable native live delivery for Claude Code 2\.1\.258\?/);
-  assert.match(first, /create shim \/data\/acc\/bin\/claude for claude/);
-  assert.match(first, /PATH block to \/home\/dana\/\.zshrc/);
-  assert.match(first, /newly started sessions/);
-  assert.match(first, /new or reloaded shell/);
+
+  // Written for someone who has never heard of this project. The old wording
+  // opened with "Enable native live delivery" over a list of internal artefact
+  // names, which told a first-time reader neither what they gained nor what it
+  // cost. Each assertion below is one thing such a reader has to be told.
+  // A person deciding needs three things: why they would want it, what happens
+  // if they agree, and what happens if they do not. Not an inventory of files,
+  // and not how to undo something they have not done yet. The prompt this
+  // replaced listed artefact names and omitted the flag entirely.
+  assert.match(first, /^Let idle agents answer each other while you are away\?/,
+    "the question has to say what the reader gets, not what the installer does");
+  assert.match(first, /Yes: they reply without waiting for you/,
+    "agreeing has to name the gain");
+
+  // A bare [y/N] reads as "not recommended", and one question among several
+  // installed clients reads as an oversight. Both are answered in the same
+  // breath, because both are questions the prompt itself provokes.
+  // Two clients are eligible here, so the "only" half would be a lie and is
+  // absent; the experimental half is why the default is No either way.
+  assert.match(first, /\(experimental\)/,
+    "a bare [y/N] reads as not recommended, and nothing here says why");
+  assert.doesNotMatch(first, /only\)/,
+    "claiming it is the only eligible client while asking about a second one");
+
+  // The reason this is asked at all: from now on the client stops to ask at
+  // every start. That is the cost the reader lives with, so it is the cost they
+  // are shown - not the flag behind it, which is ours to know.
+  assert.match(first, /Claude Code asks you\n\s+to allow development channels every time it starts\./,
+    "the repeated prompt is the whole reason for asking; hiding it hides the cost");
+  assert.doesNotMatch(first, /--captured|through acc/,
+    "the flag, and how it is added, are not what the reader is agreeing to");
+  assert.match(first, /No:  messages still arrive, at the session's next turn\./,
+    "declining has to name what still works, or no is not a real option");
+
+  assert.doesNotMatch(first, /PATH|shim|launcher|plugin entry|\.zshrc/,
+    "what it writes belongs in --dry-run, not in front of someone deciding");
+  assert.doesNotMatch(first, /Undo|uninstall|--delivery off/,
+    "how to reverse it is a question for the moment they want to reverse it");
+
+  const lines = first.split("\n");
+  assert.ok(lines.length <= 4, `the question grew to ${lines.length} lines`);
+  const longest = Math.max(...lines.map(line => line.length));
+  assert.ok(longest <= 88, `a line reached ${longest} characters and will wrap`);
   assert.deepEqual(io, { input: "in", output: "out" });
+});
+
+// Being asked about one client while three others are installed looks like the
+// other three were forgotten. When it really is the only one that can do this,
+// the question says so instead of leaving the reader to wonder.
+test("the question says when this is the only client that can do it", async () => {
+  const questions = [];
+  const detected = DETECTED.filter(entry => entry.adapterId !== "codex");
+  await decideDelivery({ options: {}, detected, recorded: [], dryRun: false, context: CONTEXT,
+    runtime: { isInteractive: () => true, input: "in", output: "out",
+      confirm: async question => { questions.push(question); return false; } } });
+
+  assert.equal(questions.length, 1);
+  assert.match(questions[0], /\(experimental; Claude Code only\)/);
 });
 
 test("a recorded opt-in is kept on upgrade without a new question", async () => {

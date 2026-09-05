@@ -1,68 +1,63 @@
-# Three workstreams, one repo
+# Three agents, one repository
 
-Visual, models, and physics — three clients, one checkout.
+Open three sessions in worktrees of the same repository and give them related tasks:
+
+| Session | Your prompt |
+|---|---|
+| Claude Code | Add material controls to the renderer. |
+| Codex | Add material fields to the core model. |
+| Kimi Code | Make the simulator consume the new material fields. |
+
+The prompts describe the work, not the coordination. ACC's integrations tell the agents
+about their peers; each agent decides which dependencies need a conversation.
 
 ```mermaid
 graph TB
-  subgraph Workspace
-    V[visual<br/>Claude Code] -->|claims file:renderer/**| R[(renderer)]
-    M[models<br/>Codex] -->|claims file:packages/core/**| C[(core)]
-    P[physics<br/>Kimi] -->|claims file:sim/**| S[(sim)]
-  end
+  V["Claude Code<br/>renderer controls"] -->|needs field names| M["Codex<br/>core model"]
+  P["Kimi Code<br/>simulator"] -->|needs field semantics| M
+  V -.->|shared integration fixture| P
 ```
 
-Claims are workspace-global, so even workstreams that never touch each other's
-files still can't step on one another.
+Git worktrees share the ACC workspace because they share a Git common directory. Their
+checkout files and branches remain separate.
 
-## What each session does
+## What the agents may do
 
-Publish intent, then claim the directory:
+The following commands are examples of agent activity, not setup steps for the user. Each
+agent's installed skill teaches it to publish a narrow intent before editing:
 
 ```bash
-acc work --summary "porting the material slots" --mode edit
-
-acc claim --resource 'file:packages/core/**' --enforcement guarded --reason "porting"
+acc work --summary "adding material fields" --mode edit \
+  --hint 'file:packages/core/**'
+acc claim --resource 'file:packages/core/**' --reason "adding material fields"
 ```
 
-## When two want the same thing
+A claim makes overlap visible. It is `guarded` only when every relevant live client exposes
+a certified write guard; otherwise it is advisory. Claims do not prevent unrelated local
+processes from writing, and different files are not automatically in conflict.
 
-```mermaid
-sequenceDiagram
-  participant P as physics
-  participant ACC
-  participant M as models
-  P->>ACC: claim file:packages/core/**
-  ACC-->>P: exit 5 — held by models
-  P->>ACC: message models "need core for 20 min?"
-  M->>ACC: release
-  P->>ACC: claim
-  ACC-->>P: ok
-```
-
-A conflict is a race, not an error: `claim` exits `5` and names the holder,
-physics messages models directly, models releases, physics claims again.
-Nobody arbitrates — the sessions settle it themselves.
-
-## Asking across workstreams
-
-Any session can answer for the whole workspace:
+When Claude needs the model shape, it can address the Codex peer by client name:
 
 ```bash
-acc sync --scope full --json
+acc message --to codex --type question --subject "material field contract" \
+  --body "Which names and units should the renderer use?"
 ```
 
-"What is physics doing?" is answerable from visual's session — authority is
-scoped per claim, knowledge isn't.
+If two Codex sessions are live, `codex` is ambiguous. The asking agent reads the roster in
+`acc status --json` and uses the exact participant id instead. A reply stays in the same
+thread and acknowledges the question; it does not prove the implementation is complete.
 
-## Ending
+If Kimi later needs a fixture Claude has claimed, its claim exits `5` and names the holder.
+The agents can narrow their work or agree on a handoff. No ACC coordinator arbitrates the
+decision.
 
 ```bash
-acc finish --goal "port the material slots" --status partial \
-  --completed "slots ported" --remaining "physics review"
+acc finish --goal "add material fields" --status partial \
+  --completed "core shape exported" --remaining "simulator validation"
 ```
 
-`finish` writes the handoff and releases the claims while the session can
-still speak for itself — a hook firing after the session has already stopped
-can't summarise a conversation it never saw.
+`finish` records the handoff and releases that session's claims while the agent can still
+speak for its own work.
 
-See [`../docs/index.md`](../docs/index.md) for the rest of the docs.
+See the [documentation index](https://github.com/automatis-tools/agents-can-communicate/blob/main/docs/index.md)
+for the rest of the guide.

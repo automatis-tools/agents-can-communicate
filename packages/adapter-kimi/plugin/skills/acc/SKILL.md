@@ -47,14 +47,14 @@ diffs. Prefer a conclusion, stable ids or paths, and the next action.
 For information that needs no response:
 
 ```bash
-{{ACC}} message --to models --type note --subject "schema verified" \
+{{ACC}} message --to codex --type note --subject "schema verified" \
   --body "Record v2 accepts nullable pid; no migration is planned."
 ```
 
 For a question, use the kind whose default obligation is a reply:
 
 ```bash
-{{ACC}} message --to models --type question \
+{{ACC}} message --to codex --type question \
   --subject "claim boundary" --body "Can I take file:src/parser/** after your commit?"
 ```
 
@@ -65,7 +65,9 @@ When the peer should own a concrete piece of work, send one reply-required reque
   --detail "Check queued -> retrieved and reply -> acknowledged; return only defects."
 ```
 
-Participant names come from `{{ACC}} status --json`. A request is not an order.
+Address a peer by its client - `codex`, `claude_code`, `gemini_cli` - when one session of
+it is here; `{{ACC}} status --json` names them all, and two sessions of one client have to be
+named exactly. A request is not an order.
 
 ## Treat delivery as evidence
 

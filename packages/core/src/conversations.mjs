@@ -55,6 +55,41 @@ function assertCurrentSession(tx, session, action) {
   }
 }
 
+/**
+ * Turn what the sender typed into participant ids that exist.
+ *
+ * An exact participant id is always taken as written. A name that matches no
+ * participant is tried as a client name - `codex`, `claude_code` - because that
+ * is what an agent knows about its peers: the roster it is handed names the
+ * client, and asking it to first look up `codex-fbqX8o` is a lookup it
+ * routinely skips. Every shipped example taught this form while nothing
+ * implemented it, so an agent following its own skill was refused on its first
+ * attempt to reach anyone.
+ *
+ * One live session of that client resolves. Two refuse and name them, the way
+ * `--session` already refuses to choose between two sessions of one client:
+ * guessing is how a question is answered by a session that never had the
+ * context. The sender's own client is excluded, or the one client an agent is
+ * certain is running becomes the easiest thing to address by accident.
+ */
+function resolveAddressees(tx, requested, session) {
+  const known = new Set(tx.list("participant").map(item => item.participantId));
+  return requested.map(name => {
+    if (known.has(name)) return name;
+    const peers = [...new Set(tx.list("session", item => item.state === "open"
+      && item.harness === name && item.participantId !== session.participantId)
+      .map(item => item.participantId))].sort();
+    if (peers.length === 1) return peers[0];
+    if (peers.length > 1) {
+      throw new AccError(EXIT.USAGE,
+        `could not tell which of ${peers.length} ${name} sessions you meant: `
+        + `${peers.join(", ")}. Name one of them, which \`acc status --json\` lists.`,
+        { client: name, candidates: peers });
+    }
+    return name;
+  });
+}
+
 function addressedRecipients(tx, message, session) {
   if (message.toParticipantIds.length === 0) {
     return [...new Set(tx.list("session", item => item.state === "open"
@@ -86,9 +121,14 @@ function threadFor(tx, messageId, inReplyTo) {
   return parent.threadId;
 }
 
-export function recordMessageInTransaction({ tx, session, input, now, messageId, ids,
+export function recordMessageInTransaction({ tx, session, input: raw, now, messageId, ids,
   action = "send a message" }) {
   assertCurrentSession(tx, session, action);
+  // Resolved before anything else reads the recipients, so the stored message
+  // names real participants and a retry compares against the same content. A
+  // record that kept the client name would address nobody when it is read back.
+  const input = { ...raw,
+    toParticipantIds: resolveAddressees(tx, raw.toParticipantIds ?? [], session) };
   const existing = existingMessage(tx, session, input);
   if (existing !== undefined) {
     return { message: existing, recipientParticipantIds: [], created: false };
