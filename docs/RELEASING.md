@@ -6,19 +6,20 @@ the commands derive the version from `package.json` so the filename cannot drift
 
 ```mermaid
 graph LR
-  A[tests] --> B[candidate commit A]
+  A[syntax · diff · staged-set review] --> B[candidate commit A]
   B --> C[pack exact tarball]
   C --> D[verify installed artifact]
   D --> E[evidence commit B]
-  E --> F{maintainer approval}
-  F -->|yes| G[tag · publish · release]
-  F -->|no| H[stop]
+  E --> F[full suite]
+  F --> G{maintainer approval}
+  G -->|yes| H[tag · publish · release]
+  G -->|no| I[stop]
 ```
 
 ## Prepare candidate commit A
 
-Commit A must contain every file npm will pack and every release gate. Start from the
-intended release branch, update the version and release notes, then run:
+Commit A must contain every file npm will pack and every release gate. Start from a clean,
+dedicated release worktree, update the version and candidate files, then run:
 
 ```bash
 release_cache="$(mktemp -d "${TMPDIR:-/tmp}/acc-npm-cache.XXXXXX")"
@@ -27,16 +28,26 @@ package_version="$(node -p "require('./package.json').version")"
 
 env npm_config_cache="$release_cache" npm ci
 npm run check
-env npm_config_cache="$release_cache" npm test
 git diff --check
 git status --short
+git diff --name-only
+# Repeat with every reviewed candidate path; never use `.` or `-A` here.
+git add -- path/to/reviewed-file
+git diff --cached --name-status
+git diff --cached --check
 git commit -m "release: prepare ACC v$package_version"
 candidate_commit="$(git rev-parse HEAD)"
 test -z "$(git status --short)"
 ```
 
-Never bypass the pre-push hook. A failing recorded-candidate check means packed files have
-changed since the recorded candidate; refresh the candidate instead of disabling the gate.
+Replace `path/to/reviewed-file` with each explicit path you just reviewed. Never use
+`git add .` or `git add -A` in this procedure: an unrelated file does not become release
+content merely because it shares a worktree. Check `git diff --cached --name-status` before
+committing and stop if `git status --short` after the commit is not empty.
+
+Never bypass the pre-push hook. The full suite belongs after commit B because the
+recorded-candidate gate deliberately includes working-tree and committed packed changes;
+before refreshed evidence exists, that one check is expected to fail.
 
 ## Pack and verify the exact artifact
 
@@ -72,9 +83,17 @@ discard the candidate artifact, make a new commit A, and repeat the pack and ver
 ```bash
 git diff --check
 git status --short
+git add -- CHANGELOG.md "docs/release-evidence/v$package_version.md"
+git diff --cached --name-status
+git diff --cached --check
 git commit -m "release: record ACC v$package_version candidate"
+test -z "$(git status --short)"
 env npm_config_cache="$release_cache" npm test
 ```
+
+The staged-set review for commit B must name only those two evidence files. The final full
+suite now sees candidate A's packed bytes plus candidate B's matching record, so candidate
+freshness is a normal passing gate rather than an expected failure.
 
 Published evidence is history. Do not rewrite it into a current capability claim; later
 work belongs under `Unreleased` and gets a new candidate record.

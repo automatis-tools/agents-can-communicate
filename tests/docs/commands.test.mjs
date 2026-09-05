@@ -141,9 +141,17 @@ test("release commands create and reuse one isolated npm cache", async () => {
   const releasing = await readFile(path.join(repo, "docs", "RELEASING.md"), "utf8");
   assert.match(releasing, /release_cache="\$\(mktemp -d /,
     "release instructions do not create a fresh npm cache");
-  const cacheUsers = [...releasing.matchAll(/^env npm_config_cache="\$release_cache" /gm)];
-  assert.equal(cacheUsers.length >= 4, true,
-    "install, tests, pack, and verification do not share the isolated npm cache");
+  for (const [name, command] of [
+    ["install", "npm ci"],
+    ["tests", "npm test"],
+    ["pack", "npm pack"],
+    ["verification", "node scripts/verify-package.mjs"],
+  ]) {
+    const escaped = command.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    assert.match(releasing,
+      new RegExp(`^env npm_config_cache="\\$release_cache" ${escaped}(?: |$)`, "m"),
+      `${name} can fall back to the machine's shared npm cache`);
+  }
 });
 
 test("every command the CLI accepts appears in the CLI reference", async () => {
