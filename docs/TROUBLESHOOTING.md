@@ -9,9 +9,14 @@ acc doctor
 It reports detected clients, exact versions, installation ownership, capability downgrade,
 and the next action. Restart a client after installation because hooks load at startup.
 
+You should not need to tell an agent to use ACC as part of a normal task. If coordination
+is not visible, first check integration and capability facts here. Remember that a working
+integration provides awareness; it cannot guarantee that a model will find a peer relevant
+or coordinate on every task.
+
 ## The second session does not appear
 
-Run `acc status --json` in both windows and compare `workspaceId`. Common causes are an
+As a diagnostic, run `acc status --json` in both windows and compare `workspaceId`. Common causes are an
 already-running client that never loaded the hook, a generic MCP server launched without
 `ACC_MCP_WORKSPACE`, or two plain directories that are not the same workspace. Codex also
 requires plugin trust.
@@ -21,17 +26,18 @@ workspace path.
 
 ## A message stays queued
 
-Queued means the durable message is safe; it does not mean the recipient model saw it.
-Have the recipient run:
+Queued means the durable message is safe; it does not mean the recipient model saw it. The
+receiving agent can recover it with:
 
 ```bash
 acc inbox
 acc inbox --message message_x
 ```
 
-Certified next-turn delivery waits for that client's next normal prompt. Grok, generic MCP,
-unknown client versions, and other platforms poll inbox. A reply acknowledges the original
-automatically; `acc ack` is for acknowledgement-only messages.
+Certified next-turn delivery waits for that client's next normal prompt; it never wakes an
+idle session. Grok, generic MCP, unknown client versions, and other platforms poll inbox. A
+reply acknowledges the original automatically; `acc ack` is for acknowledgement-only
+messages.
 
 ## I enabled live delivery but got fallback
 
