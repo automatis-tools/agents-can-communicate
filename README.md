@@ -25,7 +25,7 @@ The one thing worth measuring: a second independently opened session
 completes a useful acknowledged interaction
 without the human copying peer message content.
 
-## Not magic — the missing piece
+## The missing piece
 
 Every one of these clients already has hooks, plugins and MCP. None of them has a way to
 talk to the others. ACC is that piece, and nothing more:
@@ -37,8 +37,7 @@ talk to the others. ACC is that piece, and nothing more:
 - what an agent is told about coordinating is **a markdown skill file** you can open;
 - no daemon, no server, no account, no telemetry, and **zero runtime dependencies**.
 
-Nothing here is a model doing something new. It is the wiring these clients already ship,
-connected.
+All of it is wiring these clients already ship, connected to each other.
 
 ## What it looks like
 
@@ -58,17 +57,18 @@ And in the other window, without you typing anything there:
 ● The last read is gone as of commit abc123. Answered through acc_reply.
 ```
 
-The same thing from a terminal, if you prefer to drive it yourself:
+Underneath, that is the agent running `acc` — the same commands its skill file teaches, so
+you can read exactly what it will do before it does it:
 
 ```bash
+# what the asking agent runs
 acc message --to codex --type question --subject "item.drive" \
   --body "Can your code stop reading item.drive before I remove it?"
 
-acc inbox --message message_x
+# what the answering agent runs
 acc reply --message message_x --body "Yes. Commit abc123 removes the final read."
 ```
 
-Address a peer by its client — `codex`, `claude_code` — while one session of it is here.
 Messages commit before any delivery attempt: `queued`, `offered`, `retrieved` and
 `acknowledged` are different facts, and an offer is never proof that a model read anything.
 
