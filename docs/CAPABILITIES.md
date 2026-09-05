@@ -72,8 +72,10 @@ would publish a generation-bound binding with `availableModes`, `clientVersion`,
 with a computed `reachable` boolean while keeping the opaque endpoint private.
 
 The router requires exactly one current eligible generation. No binding, an expired lease,
-several live sessions for one participant, a busy target, or a version that does not match
-passing evidence all stay on durable fallback.
+several live sessions for one participant, and an adapter refusal each keep delivery on the
+durable fallback. Busy behavior belongs to the transport: Claude's Channel can accept a
+message while the target is busy and queue it until the current turn finishes; an adapter
+that instead refuses with `recipient_busy` leaves the message on the durable path.
 
 The lease is extended by whoever serves the endpoint, because only that process knows it is
 still alive. A client that publishes no heartbeat - Claude Code among them - would otherwise
@@ -101,9 +103,13 @@ policy:
 | `all` | every addressed message kind may use live push |
 
 The default is `off`. `acc install --delivery actionable|all` is an explicit request, not
-a force switch. The installer applies it only when the detected exact client has certified
-live push; otherwise effective policy remains off and the fallback diagnostic is printed.
-Room messages are never live-push candidates.
+a force switch. Exact-version certification governs ordinary hook capabilities. Native live
+delivery is separate: the installer applies the requested policy only when the client meets
+the captured minimum version, runs on a captured platform, and passes the current feature
+probe; otherwise effective policy remains off and the fallback diagnostic is printed. Each
+enabled session must then pass its generation-bound handshake. A failed handshake clears or
+refuses that session's binding and reports degraded reachability without rewriting the
+installed consent. Room messages are never live-push candidates.
 
 ## Fallback
 

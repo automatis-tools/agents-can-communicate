@@ -1,7 +1,25 @@
 # Research without Git
 
 Two sessions opened by the same operating-system user on one machine can coordinate in a
-plain folder. Give them related research tasks:
+plain folder. Before opening them, decide whether the directory path is enough identity or
+whether this workspace needs the optional stable identity below.
+
+## Optional stable identity
+
+The directory path supplies identity by default. If the user wants the workspace identity
+to survive a rename or cover several configured roots, they can deliberately add config:
+
+<!-- test:command -->
+```bash
+acc config init --yes
+```
+
+This writes `acc.workspace.json` in the folder. It is optional user-requested configuration;
+messages, presence, claims, and other runtime state still live in platform app data outside
+the workspace. See [Configuration](../docs/CONFIGURATION.md) for the preview, confirmation,
+and active-session safeguards.
+
+Now open the sessions and give them related ordinary research tasks:
 
 | Session | Your prompt |
 |---|---|
@@ -18,20 +36,6 @@ graph LR
   B["Kimi Code<br/>compare findings"] --> N
   A -.->|source question| B
 ```
-
-## Optional stable identity
-
-The directory path supplies identity by default. If the user wants the workspace identity
-to survive a rename or cover several configured roots, they can deliberately add config:
-
-<!-- test:command -->
-```bash
-acc config init --yes
-```
-
-This writes `acc.workspace.json` in the folder. It is optional user-requested configuration;
-messages, presence, claims, and other runtime state still live in platform app data outside
-the workspace.
 
 ## What the agents may do
 

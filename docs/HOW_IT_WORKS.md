@@ -26,13 +26,15 @@ sequenceDiagram
 
 ## 1. The integrations introduce the peers
 
-`acc install` adds supported hooks, plugins, or extensions to clients it finds. At session
-startup, the client calls `acc-hook`; a generic MCP client joins through `acc-mcp`. The
-integration does two related things:
+`acc install` adds supported hooks, plugins, or extensions to native clients it finds. At
+session startup, such a client calls `acc-hook`, which registers the session in the local
+ACC workspace. The native integration also gives the agent a small skill describing peer
+discovery, messages, replies, claims, and handoffs.
 
-- it registers the session in the local ACC workspace; and
-- it gives the agent a small skill describing peer discovery, messages, replies, claims,
-  and handoffs.
+A generic MCP client instead joins through `acc-mcp`, which resolves its configured
+participant and workspace when tools or resources are called. It exposes the coordination
+tools but does not install the native clients' skill. See its
+[manual MCP boundary](MCP.md#account-for-the-manual-boundary).
 
 ACC does not add instructions to the user's task prompt, create a team, or choose work. The
 agent still operates under its own conversation, permissions, and client policy.
