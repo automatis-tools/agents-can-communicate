@@ -12,25 +12,20 @@ reads as though the other three were forgotten; both are now answered where they
 and the "only client" half appears only while it is true. What gets written belongs to
 `--dry-run`, and how to undo it belongs to the moment someone wants to undo it.
 
-The entry pages are written for the person watching agents work, rather than driving them.
-ACC is an agentic tool, and the getting-started guide read as a human CLI tutorial: "In
-either window:" then `acc status`, "From the first session, address a participant" then
-`acc message`. The commands stay, because seeing what an agent will run before it runs is
-the argument against this being magic, but the reader is no longer the one typing them.
-Step three is now the product - you ask, in your own words, and the agent looks up who is
-here and sends the question - and step four is the answer arriving in the other window
-without you. `CLI.md` already drew that line between setup commands for a person and
-communication commands for agents; the guide contradicted it.
+The entry pages now describe the product as peer coordination among independent sessions,
+not as a human-operated messaging tutorial. You open the clients you already use, give
+each agent an ordinary task, and let the installed integration provide peer awareness and
+the coordination interface. The agents decide whether their work overlaps, whom to ask,
+and what to agree on; ACC does not assign work or promise that every model will coordinate
+on every task. The CLI reference still exposes the exact communication operations for
+inspection, while separating them from the setup commands a person runs.
 
-The README opens with the problem rather than the architecture. Every heading had ACC as
-the subject - "ACC connects", "ACC exists for", "ACC owns" - which is the voice of the
-thing that was built, not of the person deciding whether to try it; the pain it solves
-arrived in the third paragraph and what it actually is arrived nowhere. It now leads with
-being the message bus yourself, the two diagrams that were already drawn and referenced by
-nothing, and then the part that removes the magic: these clients already ship hooks,
-plugins and MCP, the room is plain JSON files, an agent's instructions are a markdown file,
-and there is no daemon, server or account. The native-delivery matrix moved to Capabilities
-where someone wanting a matrix is already looking.
+The README now leads with that workflow and the analogy to coordination among subagents,
+extended across the independent sessions a user opens. A compact, explicitly illustrative
+exchange shows agents discovering an interface dependency without turning the dialogue
+into a guaranteed script. Setup, delivery limits, worktrees, privacy and removal remain on
+the entry page; deeper concepts, architecture and protocol details live in the documentation
+map instead of making the README an architecture tour.
 
 A peer can be addressed by the client it runs in, and every example that taught that now
 works. `--to models` shipped in the README, the getting-started guide, the CLI reference
@@ -78,17 +73,14 @@ asserted before binding so the next path that grows says why it broke.
 Both passed locally and only failed elsewhere, which is the point: a suite run on one
 machine cannot see them, and the platform matrix is what does.
 
-`docs/RELEASING.md` now says how publishing here is actually authenticated. It claimed every
-publish needs a two-factor code, on the strength of what `npm profile get` once reported.
-Publishing 0.3.0 needed no code, and that same command now answers `403 Forbidden` on the
-account's own profile - which is the diagnosis rather than a separate puzzle: a credential
-that can publish but cannot read its own profile is a token, and a token with write access
-bypasses two-factor entirely. Both commands are written down together, because the pair is
-what tells you which route a machine is on. It also records the part with a deadline - npm
-now warns that tokens bypassing 2FA are being restricted for direct publishing, so the route
-that made this release possible is going away - and the habit that kept 0.3.0 honest:
-publish the tarball by name, because a bare `npm publish` repacks and sends the registry an
-artifact nobody verified.
+`docs/RELEASING.md` now treats a release candidate as two auditable commits. Commit A is a
+clean tree containing every packed byte and release gate; the exact saved tarball is then
+packed and verified in isolation. Commit B records evidence without changing the packed
+artifact, after which the full suite makes candidate freshness a normal passing gate. A
+supplied tarball deliberately verifies as `revision unknown`, so its source is the clean
+commit captured immediately before packing rather than a later evidence commit. Publishing
+still uses the verified tarball by filename, while the 0.3.0 authentication result is kept
+as history rather than generalized into current npm credential advice.
 
 | | |
 |---|---|
