@@ -24,7 +24,9 @@ name them, the way `--session` already refuses to choose between two sessions of
 An exact participant id is never overruled, and the recorded message names the participant
 rather than the client it was reached through. A new gate checks every `--to` in the
 documentation and the skills, because the executable-doc test only runs blocks marked as
-commands - which is how eighteen wrong examples survived.
+commands - which is how eighteen wrong examples survived. Running those examples against an
+installed build then found one more: a client name never resolves to the sender own client,
+so each skill has to name a peer rather than the client that ships it.
 
 The documentation says the same thing on every page now. Three generations of truth had
 been live at once: pages from 0.2.0 said no adapter had passing live-push certification,
@@ -70,9 +72,9 @@ artifact nobody verified.
 
 | | |
 |---|---|
-| Built from | `deac9a3fd6134c1aec4450bd569eb502eb6009d1` |
-| Tarball | `agents-can-communicate-0.3.0.tgz`, 256,643 bytes, 196 entries |
-| sha256 | `b38b8558d7ddf541c6943bb17ef6a702f6bb7d60227256c66dfae06ae97f4dc0` |
+| Built from | `53ce0e36a58e8231d90d10a0daa822570b29cf30` |
+| Tarball | `agents-can-communicate-0.3.0.tgz`, 256,664 bytes, 196 entries |
+| sha256 | `21b11bdc9a764e5964d88ca079410f99f8a69393afde250cacb12a91eb45c5eb` |
 | Node | 26.5.1; package requires Node >=24 |
 | Verified on | macOS 26.6.2 (darwin 25.6.0, arm64) |
 
