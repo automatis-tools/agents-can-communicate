@@ -64,6 +64,26 @@ test("every documented --to names something the product would accept", async () 
     "these addresses resolve to nobody; a reader copying them gets exit 4");
 });
 
+// Found by running the shipped examples against an installed build rather than
+// by reading them: a client name never resolves to the sender's own client, so
+// `request --to claude_code` in Claude's own skill is refused for the one agent
+// most likely to run it. Every skill has to name a peer.
+test("no skill tells an agent to address its own client", async () => {
+  const wrong = [];
+  for (const { file, source } of await documents()) {
+    if (!file.endsWith("SKILL.md")) continue;
+    const own = [...ADAPTER_IDS].find(id =>
+      file.includes(`adapter-${id.replaceAll("_", "-")}/`) || file.includes(`adapter-${id}/`));
+    assert.ok(own, `cannot tell which adapter ships ${file}`);
+    for (const match of source.matchAll(/--to\s+(\S+)/g)) {
+      if (match[1] === own) wrong.push(`${file}: --to ${own}`);
+    }
+  }
+
+  assert.deepEqual(wrong, [],
+    "the sender's own client is excluded from resolution, so this example is refused");
+});
+
 test("at least one skill teaches addressing by client, since that is what an agent knows",
   async () => {
     const skills = (await documents()).filter(entry => entry.file.endsWith("SKILL.md"));
