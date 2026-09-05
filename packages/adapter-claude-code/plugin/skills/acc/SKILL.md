@@ -61,7 +61,7 @@ For a question, use the kind whose default obligation is a reply:
 When the peer should own a concrete piece of work, send one reply-required request:
 
 ```bash
-{{ACC}} request --to claude_code --title "review inbox transitions" \
+{{ACC}} request --to codex --title "review inbox transitions" \
   --detail "Check queued -> retrieved and reply -> acknowledged; return only defects."
 ```
 

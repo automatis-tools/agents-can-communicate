@@ -47,14 +47,14 @@ diffs. Prefer a conclusion, stable ids or paths, and the next action.
 For information that needs no response:
 
 ```bash
-{{ACC}} message --to codex --type note --subject "schema verified" \
+{{ACC}} message --to claude_code --type note --subject "schema verified" \
   --body "Record v2 accepts nullable pid; no migration is planned."
 ```
 
 For a question, use the kind whose default obligation is a reply:
 
 ```bash
-{{ACC}} message --to codex --type question \
+{{ACC}} message --to claude_code --type question \
   --subject "claim boundary" --body "Can I take file:src/parser/** after your commit?"
 ```
 
