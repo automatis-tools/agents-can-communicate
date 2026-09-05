@@ -12,6 +12,20 @@ reads as though the other three were forgotten; both are now answered where they
 and the "only client" half appears only while it is true. What gets written belongs to
 `--dry-run`, and how to undo it belongs to the moment someone wants to undo it.
 
+A peer can be addressed by the client it runs in, and every example that taught that now
+works. `--to models` shipped in the README, the getting-started guide, the CLI reference
+and all five skills; `--to claude_code` was in every skill's request example. Recipients
+were exact participant ids only, so both produced exit 4 - and the skills tell an agent to
+report a failed command briefly and carry on, so an agent following its own instructions
+stopped coordinating on its first attempt and said little about why. Rather than teach
+`codex-fbqX8o`, the product accepts what an agent knows about its peers: a name matching no
+participant is tried as a client name, and one live session of it resolves. Two refuse and
+name them, the way `--session` already refuses to choose between two sessions of one client.
+An exact participant id is never overruled, and the recorded message names the participant
+rather than the client it was reached through. A new gate checks every `--to` in the
+documentation and the skills, because the executable-doc test only runs blocks marked as
+commands - which is how eighteen wrong examples survived.
+
 The documentation says the same thing on every page now. Three generations of truth had
 been live at once: pages from 0.2.0 said no adapter had passing live-push certification,
 pages from mid-branch said two adapters ship a native transport, and the Codex row in the
@@ -56,9 +70,9 @@ artifact nobody verified.
 
 | | |
 |---|---|
-| Built from | `9c62fcfe848f5ce11774f37ad70d8b4ac273c56b` |
-| Tarball | `agents-can-communicate-0.3.0.tgz`, 255,733 bytes, 196 entries |
-| sha256 | `461c8591b6ae6218aa3f63a21c1d2862503493dcafd208bd9e893eec88035aff` |
+| Built from | `deac9a3fd6134c1aec4450bd569eb502eb6009d1` |
+| Tarball | `agents-can-communicate-0.3.0.tgz`, 256,643 bytes, 196 entries |
+| sha256 | `b38b8558d7ddf541c6943bb17ef6a702f6bb7d60227256c66dfae06ae97f4dc0` |
 | Node | 26.5.1; package requires Node >=24 |
 | Verified on | macOS 26.6.2 (darwin 25.6.0, arm64) |
 
