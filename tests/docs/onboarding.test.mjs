@@ -11,7 +11,7 @@ test("getting started follows the user journey and names its boundaries", async 
   assert.match(guide, /npm install -g agents-can-communicate/,
     "onboarding does not install the package before configuring clients");
   assert.match(guide, /acc install/, "onboarding lost the client integration step");
-  assert.equal(/(?:restart|reopen)[^\n]*clients?/i.test(guide), true,
+  assert.equal(/(?:restart|reopen|relaunch)[^\n]*clients?/i.test(guide), true,
     "onboarding does not tell readers that clients must reload their integrations");
   assert.match(guide, /(?:ordinary|normal)[^\n]*tasks?/i,
     "onboarding no longer starts with ordinary user tasks");
