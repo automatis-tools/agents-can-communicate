@@ -6,94 +6,88 @@
 
 ACC connects independently opened AI sessions so they can discover, ask, answer, acknowledge, and hand off without becoming one managed agent team.
 
-It is a local-first communication layer for sessions you already run. Each session keeps
-its own client, model, checkout, permissions, context, and human direction. ACC supplies a
-shared room with presence, intent, narrow file claims, durable conversation threads, and
-truthful per-recipient receipts. It does not launch, steer, supervise, or terminate agents.
+## You are the message bus
 
-The project uses Node's standard library with **zero runtime dependencies**. Coordination
-state stays in platform app data outside the repository, and ACC never collects raw
-transcripts.
+Claude Code in one window, Codex in another, Gemini in a third. One of them finds that
+removing `item.drive` will break something the second one owns. Neither knows the other
+exists, so the warning stops at you: copy it across, copy the answer back, remember who was
+told what.
 
-## Stop relaying between windows
+![Three sessions that can only reach each other through you](https://raw.githubusercontent.com/automatis-tools/agents-can-communicate/main/docs/assets/acc-without.png)
 
-One session finds that removing `item.drive` will break another area. A second session is
-working there, but neither client knows the other exists. Without ACC, the warning stops at
-you: copy it to the other window, copy the answer back, and repeat for every question.
+With ACC they share one local room. The first session asks; the second reads it, answers in
+the same thread, and thereby acknowledges the question; the first reads the answer. You set
+direction and review — you stop carrying sentences between windows.
 
-With ACC, the first session sends an attributed question. The second retrieves it, replies
-in the same thread, and thereby acknowledges the original. The first retrieves the answer.
-The message is durable throughout; neither model gains authority over the other.
+![The same three sessions sharing an ACC room](https://raw.githubusercontent.com/automatis-tools/agents-can-communicate/main/docs/assets/acc-room.png)
 
-```mermaid
-flowchart LR
-  A["session A — independently opened"] <--> R["ACC room<br/>presence · messages · receipts · claims"]
-  B["session B — independently opened"] <--> R
-  U["You — direction and authority"] --> A
-  U --> B
+The one thing worth measuring: a second independently opened session
+completes a useful acknowledged interaction
+without the human copying peer message content.
+
+## Not magic — the missing piece
+
+Every one of these clients already has hooks, plugins and MCP. None of them has a way to
+talk to the others. ACC is that piece, and nothing more:
+
+- your client already runs a hook when a session starts and before each turn — ACC registers
+  one per event, beside your own;
+- the room is **plain JSON files** under your app-data directory. `ls` them, read them,
+  delete them;
+- what an agent is told about coordinating is **a markdown skill file** you can open;
+- no daemon, no server, no account, no telemetry, and **zero runtime dependencies**.
+
+Nothing here is a model doing something new. It is the wiring these clients already ship,
+connected.
+
+## What it looks like
+
+Ask your agent, in its own window, in your own words:
+
+```text
+› Ask the other session whether it still reads item.drive.
+
+● Using the acc skill to reach the peer session.
+  recorded message_u7HSEomFHCQm2AW1f0ESFA
 ```
 
-The product's canonical activation event is simple: a second independently opened session
-completes a useful acknowledged interaction without the human copying peer message content.
+And in the other window, without you typing anything there:
+
+```text
+← acc-channel: ACC peer message message_u7HSEomFHCQm2AW1f0ESFA (question):…
+● The last read is gone as of commit abc123. Answered through acc_reply.
+```
+
+The same thing from a terminal, if you prefer to drive it yourself:
+
+```bash
+acc message --to codex --type question --subject "item.drive" \
+  --body "Can your code stop reading item.drive before I remove it?"
+
+acc inbox --message message_x
+acc reply --message message_x --body "Yes. Commit abc123 removes the final read."
+```
+
+Address a peer by its client — `codex`, `claude_code` — while one session of it is here.
+Messages commit before any delivery attempt: `queued`, `offered`, `retrieved` and
+`acknowledged` are different facts, and an offer is never proof that a model read anything.
 
 ## Install
 
-On macOS or Linux with Node 24 or newer:
+macOS or Linux, Node 24 or newer:
 
 ```bash
 npm install -g agents-can-communicate
 acc install
 ```
 
-Restart the clients whose hooks were installed; Codex also requires trusting the plugin.
-Then open two sessions in the same repository or plain directory as usual. They remain
-independent and join the same ACC workspace. Use `acc doctor` to see exact versions,
-installation health, and delivery downgrades.
+`acc install` wires only the clients it finds, then restart them so their hooks load. Codex
+also asks you to trust its plugin. `acc doctor` says what is missing and what each client
+can actually do.
 
-Runtime state lives in `~/Library/Application Support/acc` on macOS or the XDG data
-directory on Linux. `ACC_DATA_HOME` can override it, but ACC refuses a location inside a
-workspace. Git is optional; worktrees of one repository share awareness.
-
-## The communication loop
-
-```bash
-# Session A publishes awareness and reserves only what it will edit.
-acc work --summary "changing the item schema" --mode edit --hint 'file:src/item.mjs'
-acc claim --resource 'file:src/item.mjs' --reason "changing the item schema"
-
-# Session A asks the Codex session in this workspace; `acc status` names them all.
-acc message --to codex --type question --subject "item.drive" \
-  --body "Can your code stop reading item.drive before I remove it?"
-
-# Session B reads and answers the exact message.
-acc inbox --message message_x
-acc reply --message message_x --body "Yes. Commit abc123 removes the final read."
-
-# Either session records a handoff while context is still available.
-acc finish --goal "remove item.drive" --status complete \
-  --completed "schema and reader updated" --remaining "none"
-```
-
-Messages commit before any delivery attempt. `queued`, `offered`, `retrieved`, and
-`acknowledged` describe different observable facts: an offer is not a read, retrieval is
-not proof of model attention, and a reply resolves communication rather than proving a
-requested task finished.
-
-Durable inbox recovery is the baseline for every client. Certified next-turn injection
-reduces the polling for the exact captured client version and platform. Native live push is
-opt-in, experimental, and off until you choose it: **Claude Code 2.1.258 and newer on macOS
-arm64** delivers an addressed message into a running session through the vendor's own
-Channel, answers through a native reply that becomes a real ACC record, and falls back to
-the durable inbox on any failure. Every other client, and any client below the captured
-minimum, stays next-turn or inbox only. Failed and withdrawn captures ship beside the
-passing ones as evidence.
-
-| Client | Native delivery |
-|---|---|
-| Claude Code 2.1.258+ (darwin-arm64) | experimental Channel: idle offer, queue-after-turn, native reply; off until opt-in |
-| Codex | withdrawn: the transport works, but the mode it needs hides which workspace a session is in; next-turn or inbox |
-| Gemini CLI, Kimi Code | next-turn or inbox only; no captured transparent transport |
-| Grok | awaiting a compatibility capture; inbox only |
+Messages reach every client through the durable inbox. Claude Code can also be handed a
+message while it sits idle, which is opt-in and off until you say yes — see
+[Capabilities](docs/CAPABILITIES.md).
 
 ## What ACC owns
 
@@ -106,17 +100,18 @@ passing ones as evidence.
 
 A peer message is untrusted input, never system authority. A guarded claim can stop only
 the write paths a client actually exposes; `acc status` reports `advisory` when that cannot
-be guaranteed.
+be guaranteed. State lives in platform app data outside your repository, and ACC never
+collects raw transcripts.
 
 ## Documentation
 
-Start with [Getting started](docs/GETTING_STARTED.md), then read
-[How ACC works](docs/HOW_IT_WORKS.md) for the end-to-end engineering tour or use the
-[documentation map](docs/index.md). The exact surfaces are in the [CLI](docs/CLI.md),
-[MCP](docs/MCP.md), [Protocol](docs/PROTOCOL.md), and
-[Capabilities](docs/CAPABILITIES.md) references. Adapter evidence lives beside each
-adapter in its `COMPATIBILITY.md` and `certification.json`.
+[Getting started](docs/GETTING_STARTED.md) is the first useful run.
+[How ACC works](docs/HOW_IT_WORKS.md) is the engineering tour, from client hook to durable
+record to reply. The [documentation map](docs/index.md) has the rest: [CLI](docs/CLI.md),
+[MCP](docs/MCP.md), [Protocol](docs/PROTOCOL.md), [Capabilities](docs/CAPABILITIES.md).
+Adapter evidence lives beside each adapter in its `COMPATIBILITY.md` and
+`certification.json`.
 
-Contributing starts with the repository's
+Contributing starts with
 [AGENTS.md](https://github.com/automatis-tools/agents-can-communicate/blob/main/AGENTS.md).
 Node 24+, Git optional, MIT licensed.
