@@ -12,6 +12,16 @@ reads as though the other three were forgotten; both are now answered where they
 and the "only client" half appears only while it is true. What gets written belongs to
 `--dry-run`, and how to undo it belongs to the moment someone wants to undo it.
 
+The README opens with the problem rather than the architecture. Every heading had ACC as
+the subject - "ACC connects", "ACC exists for", "ACC owns" - which is the voice of the
+thing that was built, not of the person deciding whether to try it; the pain it solves
+arrived in the third paragraph and what it actually is arrived nowhere. It now leads with
+being the message bus yourself, the two diagrams that were already drawn and referenced by
+nothing, and then the part that removes the magic: these clients already ship hooks,
+plugins and MCP, the room is plain JSON files, an agent's instructions are a markdown file,
+and there is no daemon, server or account. The native-delivery matrix moved to Capabilities
+where someone wanting a matrix is already looking.
+
 A peer can be addressed by the client it runs in, and every example that taught that now
 works. `--to models` shipped in the README, the getting-started guide, the CLI reference
 and all five skills; `--to claude_code` was in every skill's request example. Recipients
@@ -72,9 +82,9 @@ artifact nobody verified.
 
 | | |
 |---|---|
-| Built from | `53ce0e36a58e8231d90d10a0daa822570b29cf30` |
-| Tarball | `agents-can-communicate-0.3.0.tgz`, 256,664 bytes, 196 entries |
-| sha256 | `21b11bdc9a764e5964d88ca079410f99f8a69393afde250cacb12a91eb45c5eb` |
+| Built from | `d51222a1818eb10eaa1026c12e15c3160c8e3a70` |
+| Tarball | `agents-can-communicate-0.3.0.tgz`, 256,511 bytes, 196 entries |
+| sha256 | `fd44c17b80449828dd56fe0799b05e8b3b0308614078b94df19f3ed4159fedae` |
 | Node | 26.5.1; package requires Node >=24 |
 | Verified on | macOS 26.6.2 (darwin 25.6.0, arm64) |
 
