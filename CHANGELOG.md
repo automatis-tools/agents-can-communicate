@@ -84,9 +84,9 @@ as history rather than generalized into current npm credential advice.
 
 | | |
 |---|---|
-| Built from | `6bedf6736bf9878c23eb12455a419702e9cfa5aa` |
-| Tarball | `agents-can-communicate-0.3.0.tgz`, 256,675 bytes, 196 entries |
-| sha256 | `511c207abc8d82c8f8f9dc803a992429dca45d720364eceae49367b491e80b9e` |
+| Built from | `b0a15d66f4d7ea188834e08aff09481746953431` |
+| Tarball | `agents-can-communicate-0.3.0.tgz`, 255,844 bytes, 196 entries |
+| sha256 | `435c4a21aaf4d8087628848966e966fb7f1094dfc9f2356f336279b7ad9fe21b` |
 | Node | 26.5.1; package requires Node >=24 |
 | Verified on | macOS 26.6.2 (darwin 25.6.0, arm64) |
 
