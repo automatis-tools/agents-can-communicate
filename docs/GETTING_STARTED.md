@@ -46,8 +46,10 @@ In either window:
 acc status
 ```
 
-The roster gives the participant ids used by `--to`. If it shows only one session, fix the
-second client's installation or workspace path before testing communication.
+The roster names who is here. Address a peer by its client - `codex`, `claude_code` - while
+one session of it is present, or by the exact participant id the roster shows when two
+sessions of the same client are. If it lists only one session, fix the second client's
+installation or workspace path before testing communication.
 
 ## 3. Publish intent, then claim narrowly
 
@@ -74,7 +76,7 @@ certified write guard. Otherwise it remains useful but `advisory`.
 From the first session, address a participant listed by `acc status`:
 
 ```bash
-acc message --to models --type question --subject "receipt wording" \
+acc message --to codex --type question --subject "receipt wording" \
   --body "Should the UI say offered or delivered after the transport accepts bytes?" \
   --client-message-id client_receipt_wording_1
 ```

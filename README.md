@@ -61,8 +61,8 @@ workspace. Git is optional; worktrees of one repository share awareness.
 acc work --summary "changing the item schema" --mode edit --hint 'file:src/item.mjs'
 acc claim --resource 'file:src/item.mjs' --reason "changing the item schema"
 
-# Session A asks a participant named by `acc status`.
-acc message --to models --type question --subject "item.drive" \
+# Session A asks the Codex session in this workspace; `acc status` names them all.
+acc message --to codex --type question --subject "item.drive" \
   --body "Can your code stop reading item.drive before I remove it?"
 
 # Session B reads and answers the exact message.

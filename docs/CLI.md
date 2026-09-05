@@ -57,13 +57,19 @@ reason; ordinary sessions release only their own claims.
 ### Messages and requests
 
 ```bash
-acc message --to models --type question --subject "receipt wording" \
+acc message --to codex --type question --subject "receipt wording" \
   --body "Should transport acceptance be called offered?" \
   --client-message-id client_stable_1
 
-acc request --to models --title "review receipt wording" \
+acc request --to codex --title "review receipt wording" \
   --detail "Check CLI and MCP results; reply with defects only."
 ```
+
+`--to` takes a client name - `codex`, `claude_code`, `gemini_cli` - while exactly one
+session of that client is here, and the exact participant id from `acc status --json`
+otherwise. Two sessions of one client are refused by name rather than guessed between, the
+same way `--session` refuses. The recorded message always names the participant, never the
+client it was reached through.
 
 `message` accepts generic kinds `note`, `question`, `request`, and `decision`. Defaults are
 `note` plus obligation `none`; questions and requests require `reply`; an addressed
@@ -109,7 +115,7 @@ no state override.
 ```bash
 acc finish --goal "document receipt semantics" --status partial \
   --completed "protocol updated" --remaining "acceptance proof" \
-  --blocker "packed test not run" --to models
+  --blocker "packed test not run" --to codex
 ```
 
 Status is `complete`, `partial`, or `blocked`. `finish` records a structured handoff,
