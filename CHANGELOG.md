@@ -4,7 +4,7 @@
 
 | | |
 |---|---|
-| Built from | `00a2bc6a095e63241b187f8b4962de5093aee256` |
+| Built from | `c28757c113666c9226ff3b84c50fba9f1bb816aa` |
 | Tarball | `agents-can-communicate-0.3.1.tgz`, 256,368 bytes, 196 entries |
 | sha256 | `05ad35d8d6dbd64612fd4ce177a19d7fcd55374c7713e2ba077235d5411a6e90` |
 
@@ -107,7 +107,7 @@ as history rather than generalized into current npm credential advice.
 
 | | |
 |---|---|
-| Built from | `bb15eca373b194019372dd4e08b35de247c0bc4b` |
+| Built from | `df7d246fe86a360ab4386a7409977b54e75c83dd` |
 | Tarball | `agents-can-communicate-0.3.1.tgz`, 256,236 bytes, 196 entries |
 | sha256 | `2de2aa9f55053baac078d181423984ee2e91660b7945ad8f8bbba7b2ddcbbb0a` |
 | Node | 26.5.1; package requires Node >=24 |
@@ -116,7 +116,7 @@ as history rather than generalized into current npm credential advice.
 | Durable fallback | Exercised through the installed tarball: a full coordination cycle in a workspace with no Git, leaving nothing behind in the project |
 | Not supported | Windows - still no capture, and the POSIX client probes do not certify it |
 
-The tree was clean at `bb15eca`, so `verify-package.mjs` printed no dirty warning. It was
+The tree was clean at `df7d246`, so `verify-package.mjs` printed no dirty warning. It was
 given the saved tarball rather than the tree and therefore reported `revision unknown`; the
 candidate commit above was captured while the tree was clean immediately before packing.
 
@@ -268,7 +268,7 @@ That asymmetry, not either client, is the thing left to fix.
 
 | | |
 |---|---|
-| Built from | `9f2615fa403a50ed3ca81431179361e70f49619f` |
+| Built from | `7705649ed6dc9e192d4d03b8867537865f3a1a1e` |
 | Tarball | `agents-can-communicate-0.3.0.tgz`, 253,715 bytes, 196 entries |
 | sha256 | `b558234ea050248dd461e2a753b2aaa0270d72166b617653de2968bdf1b53b18` |
 | Node | 26.5.1; package requires Node >=24 |
@@ -280,7 +280,7 @@ That asymmetry, not either client, is the thing left to fix.
 The working tree carried an untracked `docs/assets/` directory when this was packed, so
 `verify-package.mjs` printed its dirty warning. No tracked file was modified and nothing
 under that path is in the package allowlist, so the digest above is a true statement about
-`9f2615f`; it is recorded here rather than left for someone to rediscover.
+`7705649`; it is recorded here rather than left for someone to rediscover.
 
 The packed artifact contains `docs/HOW_IT_WORKS.md`; its README and documentation map link
 to it, and the clean-consumer verifier proves every packaged Markdown link resolves. The
@@ -300,7 +300,7 @@ advisory protection around that communication layer, not the product's centre.
 
 | | |
 |---|---|
-| Built from | `98469d195924169c9576f305c57a24a92fecdc75` |
+| Built from | `6188f72a0ff1cb97c457a01b0c131f0fdbdd5fcc` |
 | Tarball | `agents-can-communicate-0.2.0.tgz`, 201,295 bytes, 177 entries |
 | sha256 | `4ef3d36208421b6659382b9253c5bdcebcaf679b352dd2945f0e3247e527b6f3` |
 | Node | 26.5.1 for this release proof; package requires Node >=24 |
@@ -347,7 +347,7 @@ targeted inbox/reply path recovers and closes the exact message that matters.
 
 | | |
 |---|---|
-| Built from | `3ab46be` |
+| Built from | `344b7f0` |
 | Tarball | `agents-can-communicate-0.1.18.tgz`, 159 KB, 122 entries |
 | sha256 | `5ede54cd894f41adc24089638356896e8284b95e4170ad6beede4753b88f386b` |
 | Node | 24 (current production LTS) |
@@ -400,7 +400,7 @@ a decision a peer sent you - which is exactly what happened to two agents.
 
 | | |
 |---|---|
-| Built from | `e6518cc` |
+| Built from | `4e2f8b4` |
 | Tarball | `agents-can-communicate-0.1.17.tgz`, 155 KB, 114 entries |
 | sha256 | `4ccc3fd64aa218af977e864ba69344ccc788a5e665120c739f2dfbe18b200c2a` |
 | Node | 24 (current production LTS) |
@@ -426,7 +426,7 @@ into a client, not the hook runtime, which `npm install -g` already refreshed.
 
 | | |
 |---|---|
-| Built from | `0b75f4e` |
+| Built from | `a841122` |
 | Tarball | `agents-can-communicate-0.1.16.tgz`, 154 KB, 114 entries |
 | sha256 | `098a8f48c96718c64e348ebe6d71803f513bf5dc1413ab0fc9996ffe8a43a93e` |
 | Node | 24 (current production LTS) |
@@ -451,7 +451,7 @@ skill teaches the field that feeds it.
 
 | | |
 |---|---|
-| Built from | `55bcb64` |
+| Built from | `d1a9412` |
 | Tarball | `agents-can-communicate-0.1.15.tgz`, 154 KB, 114 entries |
 | sha256 | `8a7bb11d1e34681aa41613dcfedf5ca5e74850735c011161eda4b659a01bf742` |
 | Node | 24 (current production LTS) |
@@ -479,7 +479,7 @@ and ACC now says so plainly instead of failing three different ways.
 
 | | |
 |---|---|
-| Built from | `0badbe8` |
+| Built from | `c8090c8` |
 | Tarball | `agents-can-communicate-0.1.14.tgz`, 153 KB, 114 entries |
 | sha256 | `b5ee8e088a2ac6f734706e3da757ef9385cb2dbaee61641bcaa8e924af292e00` |
 | Node | 24 (current production LTS) |
@@ -535,7 +535,7 @@ silent: the session simply never appears.
 
 | | |
 |---|---|
-| Built from | `8ef19b9` |
+| Built from | `3b1defe` |
 | Tarball | `agents-can-communicate-0.1.13.tgz`, 148 KB, 111 entries |
 | sha256 | `13748bcbd3b0262b1c7ce6418ecb5e41290d0ceea39e243c5df16e6f159da86a` |
 | Node | 24 (current production LTS) |
@@ -584,7 +584,7 @@ territory nobody had walked.
 
 | | |
 |---|---|
-| Built from | `93ea98b` |
+| Built from | `f4988f6` |
 | Tarball | `agents-can-communicate-0.1.12.tgz`, 148 KB, 111 entries |
 | sha256 | `df1d0f07619eecffb17f7616a3713037a155778714d650ec411c84441079b947` |
 | Node | 24 (current production LTS) |
@@ -631,7 +631,7 @@ been told their store was broken. Absent and unreadable are now different things
 
 | | |
 |---|---|
-| Built from | `5b2e66f` |
+| Built from | `3114d65` |
 | Tarball | `agents-can-communicate-0.1.11.tgz`, 147 KB, 111 entries |
 | sha256 | `b3b35a86bfc62a48ba054b0fff780299454a94ff7d5a31ed8824630817c6b2e7` |
 
@@ -670,7 +670,7 @@ health. Anyone who ran that pair is unprotected there until they upgrade.
 
 | | |
 |---|---|
-| Built from | `bdd78a2` |
+| Built from | `c4e0bd1` |
 | Tarball | `agents-can-communicate-0.1.11.tgz`, 147 KB, 111 entries |
 | sha256 | `0eec8874230233671aad83313b5f4030bc67a6b915ea0140d1e912ef4ac7d0ac` |
 | Node | 24 (current production LTS) |
@@ -738,7 +738,7 @@ did not here.
 
 | | |
 |---|---|
-| Built from | `1c994f7` |
+| Built from | `f508e84` |
 | Tarball | `agents-can-communicate-0.1.10.tgz`, 146 KB, 111 entries |
 | sha256 | `cbf695c209f9eaa109a1254e09d0095c41a7c51641be2f2fc3dbf6fe94c96b89` |
 | Node | 24 (current production LTS) |
@@ -770,7 +770,7 @@ root once took a plugin the user had installed themselves.
 
 | | |
 |---|---|
-| Built from | `3ace271` |
+| Built from | `3b7b90a` |
 | Tarball | `agents-can-communicate-0.1.9.tgz`, 146 KB, 111 entries |
 | sha256 | `49a0400e6c2db38b3e56ee6258f58a8b4dc9931be813bdb752e9e7b84d1aac57` |
 
@@ -806,7 +806,7 @@ that case had been disarmed by the same event.
 
 | | |
 |---|---|
-| Built from | `4697a72` |
+| Built from | `011dd5e` |
 | Tarball | `agents-can-communicate-0.1.9.tgz`, 145 KB, 110 entries |
 | sha256 | `f83415d679f300ac0d58c92b53a18a4739133c45846f0c386d7607f59fed40fc` |
 | Node | 24 (current production LTS) |
@@ -864,7 +864,7 @@ session rather than by its author.
 
 | | |
 |---|---|
-| Built from | `9364e42` |
+| Built from | `a18698f` |
 | Tarball | `agents-can-communicate-0.1.8.tgz`, 142 KB, 110 entries |
 | sha256 | `13da399ce7d27dd650831458c708bee1e68dbaffba7294449cc92906f7617d1d` |
 | Node | 24 (current production LTS) |
@@ -916,7 +916,7 @@ through it.
 
 | | |
 |---|---|
-| Built from | `22ee9c9` |
+| Built from | `021de64` |
 | Tarball | `agents-can-communicate-0.1.7.tgz`, 142 KB, 110 entries |
 | sha256 | `16bbddfe242df6da5bf48aeec30a6f0c70cd7491cfbb71320fa4d60ef408c642` |
 | Node | 24 (current production LTS) |
@@ -985,7 +985,7 @@ rather than with hand-written payloads.
 
 | | |
 |---|---|
-| Built from | `b047ec5` |
+| Built from | `e5b3567` |
 | Tarball | `agents-can-communicate-0.1.6.tgz`, 136 KB, 109 entries |
 | sha256 | `66c50759dbfb5cec31f6fa128e454542eb4f89fdb5fcdcd2ca9c9421f14d04fa` |
 | Node | 24 (current production LTS) |
@@ -1040,7 +1040,7 @@ command that could not run. `0.1.0` through `0.1.4` are affected.
 
 | | |
 |---|---|
-| Built from | `479b240` |
+| Built from | `7bdceb2` |
 | Tarball | `agents-can-communicate-0.1.5.tgz`, 135 KB, 109 entries |
 | sha256 | `5022560495d527fec8e37cf2ba9ea37ff4df3dcbafa2bef468f22108c7e925f5` |
 | Node | 24 (current production LTS) |
@@ -1072,7 +1072,7 @@ wondering where everybody had gone.
 
 | | |
 |---|---|
-| Built from | `508795e` |
+| Built from | `3a3cf07` |
 | Tarball | `agents-can-communicate-0.1.4.tgz`, 135 KB, 109 entries |
 | sha256 | `bb210f6b88ba150bba6c9238600bb4677e1446e5f7b8dd61f812fcbd95c373a9` |
 | Node | 24 (current production LTS) |
@@ -1109,7 +1109,7 @@ reported as not installed, and a message that told the reader nothing.
 
 | | |
 |---|---|
-| Built from | `8679ae8` |
+| Built from | `21cfc9a` |
 | Tarball | `agents-can-communicate-0.1.3.tgz`, 135 KB, 109 entries |
 | sha256 | `b3821785071c578a5198d869c2dfb03c25226c34a14a8669ba8882f153477c6d` |
 | Node | 24 (current production LTS) |
@@ -1163,7 +1163,7 @@ turned out to be that something was already broken and saying nothing about it.
 
 | | |
 |---|---|
-| Built from | `200b847` |
+| Built from | `cb56a6f` |
 | Tarball | `agents-can-communicate-0.1.2.tgz`, 134 KB, 109 entries |
 | sha256 | `c0103bd03f157308db30b30deaf29180df7c67086f873e293d2b8d52b3167d5c` |
 | Node | 24 (current production LTS) |
@@ -1252,7 +1252,7 @@ different file format than the one that broke it.
 
 | | |
 |---|---|
-| Built from | `de01634` |
+| Built from | `03a580c` |
 | Tarball | `agents-can-communicate-0.1.1.tgz`, 127 KB, 106 entries |
 | sha256 | `fbe2c3e0f169159af447e3a48428181b77e0cc89acbf3da5884d33db78a8bda7` |
 | Node | 24 (current production LTS) |
@@ -1305,7 +1305,7 @@ thing in here that was not measured.
 
 | | |
 |---|---|
-| Built from | `c318458`, published from `b428ca7` — the merge changed nothing packed |
+| Built from | `05e10c2`, published from `83ea1fa` — the merge changed nothing packed |
 | Tarball | `agents-can-communicate-0.1.0.tgz`, 123 KB, 105 entries |
 | sha256 | `e4ed773feb25dd40a0fb5d2bb010f66261613a3cac14882750b431f3ab2a3480` |
 | Node | 24 (current production LTS) |
