@@ -1,9 +1,10 @@
 # CLI
 
-The `acc` command is the universal local boundary. Setup commands are for a person;
-communication commands are the small surface installed skills teach to agents. Every
-command accepts `--json` and `--cwd <path>`. `--workspace <config>` selects an explicit
-workspace config where supported by the common boundary.
+Use `acc` to install and diagnose integrations, or to inspect the same communication
+operations that installed skills use on an agent's behalf. Setup commands are for a
+person; communication commands are the smaller agent-facing vocabulary. Every command
+accepts `--json` and `--cwd <path>`. `--workspace <config>` selects an explicit workspace
+config where supported by the common boundary.
 
 <!-- test:command -->
 ```bash
@@ -11,7 +12,7 @@ acc help
 acc version
 ```
 
-## Communication commands
+## Coordinate from a session
 
 | Command | Required | Optional |
 |---|---|---|
@@ -57,13 +58,23 @@ reason; ordinary sessions release only their own claims.
 ### Messages and requests
 
 ```bash
-acc message --to models --type question --subject "receipt wording" \
+acc message --to codex --type question --subject "receipt wording" \
   --body "Should transport acceptance be called offered?" \
   --client-message-id client_stable_1
 
-acc request --to models --title "review receipt wording" \
+acc request --to codex --title "review receipt wording" \
   --detail "Check CLI and MCP results; reply with defects only."
 ```
+
+`--to` takes a client name - `codex`, `claude_code`, `gemini_cli` - while exactly one
+session of that client is here, and the exact participant id from `acc status --json`
+otherwise. Two sessions of one client are refused by name rather than guessed between, the
+same way `--session` refuses. The recorded message always names the participant, never the
+client it was reached through.
+
+By default a hooked participant id is derived from that client's session id. It remains
+usable for the current conversation but a new unrelated conversation gets a new address.
+Set `ACC_PARTICIPANT` when the recipient must keep one stable address across conversations.
 
 `message` accepts generic kinds `note`, `question`, `request`, and `decision`. Defaults are
 `note` plus obligation `none`; questions and requests require `reply`; an addressed
@@ -109,14 +120,14 @@ no state override.
 ```bash
 acc finish --goal "document receipt semantics" --status partial \
   --completed "protocol updated" --remaining "acceptance proof" \
-  --blocker "packed test not run" --to models
+  --blocker "packed test not run" --to codex
 ```
 
 Status is `complete`, `partial`, or `blocked`. `finish` records a structured handoff,
 releases the caller's claims, and ends ACC presence for that session. It never closes the
 external AI client. An addressed handoff requires acknowledgement; a room handoff does not.
 
-## Setup and maintenance
+## Install, diagnose, and update
 
 | Command | Flags |
 |---|---|
@@ -143,7 +154,7 @@ runs the unmodified client, and ACC is never the parent of the session after tha
 Only `update` touches the network. `ACC_NO_UPDATE_CHECK=1` disables update checks. Hooks
 never perform them.
 
-## Adapter lifecycle commands
+## Integrate a client lifecycle
 
 `acc attach --participant <id>`, `acc heartbeat --session <id> --generation <token>`, and
 `acc detach --session <id> --generation <token>` are public executable boundaries used by

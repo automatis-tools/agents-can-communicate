@@ -1,8 +1,10 @@
 # Design decisions
 
-Why ACC is shaped the way it is, and what is deliberately still open.
+Use this log to understand constraints that should survive refactors and proposals that
+remain open. Runtime contracts live in [Protocol](PROTOCOL.md); this page records why the
+boundaries exist.
 
-## Settled
+## Preserve these decisions
 
 | Decision | Reason |
 |---|---|
@@ -24,7 +26,7 @@ Why ACC is shaped the way it is, and what is deliberately still open.
 | Node 24 (current production LTS) | Uses `node:test`, modern `fs` promises, and no transpiler. |
 | MCP session from launch config | Never from `initialize` or `clientInfo` — those are attacker-controllable. See the threat scenarios in [SECURITY_MODEL.md](SECURITY_MODEL.md) (scenario 8). |
 
-## Rejected, and why
+## Avoid these rejected designs
 
 | Rejected | Why |
 |---|---|
@@ -35,6 +37,8 @@ Why ACC is shaped the way it is, and what is deliberately still open.
 | Collecting or sharing raw transcripts | Raw transcripts are never collected or shared. Explicit peer messages are bounded records the sender chose to address. |
 | Reporting queued messages as delivered | A delivery state that overstates itself is worse than no state. |
 | Guessing file paths out of shell commands | It would block work at random and still miss real writes. See [CAPABILITIES.md](CAPABILITIES.md). |
+
+### Reversals backed by failures
 
 **Reversed in 0.1.11: removing the client's hook-trust record on uninstall.**
 0.1.9 took Codex's `[hooks.state."<plugin>:…"]` tables out on uninstall,
@@ -72,7 +76,7 @@ declared. Coverage is deliberately partial, and
 [CAPABILITIES.md](CAPABILITIES.md) says where it ends: an agent that knows
 where a guard stops behaves better than one that believes it absolute.
 
-## Still open
+## Decide these later
 
 1. **Storage backend.** The hardened filesystem store ships first. A transactional backend
    can go behind the same interface later — but not merely to avoid a dependency.
