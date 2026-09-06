@@ -4,12 +4,18 @@
 
 | | |
 |---|---|
-| Built from | `44ff112ac9c08b95684fa9eaabddf893c7d19483` |
-| Tarball | `agents-can-communicate-0.3.1.tgz`, 257,639 bytes, 197 entries |
-| sha256 | `cac6738e3c3a0481319d8b3333c3dab14b6579ebc5f5d91d27eceedce2915391` |
+| Built from | `d919220b36681c07097b9340e8d44d45867e66e8` |
+| Tarball | `agents-can-communicate-0.3.1.tgz`, 257,818 bytes, 197 entries |
+| sha256 | `81ffc440f01cd4e517df70bcff1bcfa18e9d97c3153a829220b16e5b3c1943b8` |
 
 Not published. A published record says what the registry serves and is not
 rewritten, so shipped code that changes after a release is measured here instead.
+
+Malformed MCP input such as a line containing `null` now receives a JSON-RPC error
+instead of terminating the server. Request envelopes are checked before dispatch;
+invalid parameters keep the `-32602` contract, and usable request IDs are preserved.
+Raw-stream and installed-package regressions verify rejection followed by a valid
+request in the same process. Four deliberate mutations fail these tests.
 
 ACC MCP now connects to the observed Codex CLI 0.153.4 and Claude Code 2.1.263 clients.
 Their 2025 initialization requests previously failed because the server required 2026
