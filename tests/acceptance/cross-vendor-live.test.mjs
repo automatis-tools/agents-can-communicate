@@ -87,8 +87,8 @@ test("packed v0.3 completes cross-vendor fallback without human relay", {
     : false,
 }, async t => {
   const packed = await createPackedAcc(t);
-  assert.equal(packed.manifest.version, "0.3.0");
-  assert.equal((await packed.acc(["version"])).version, "0.3.0");
+  assert.equal(packed.manifest.version, "0.3.1");
+  assert.equal((await packed.acc(["version"])).version, "0.3.1");
   await packed.setClientVersions(CAPTURE_VERSIONS);
 
   const claude = { adapterId: "claude_code", participantId: "claude_peer",
@@ -191,7 +191,7 @@ test("packed v0.3 completes cross-vendor fallback without human relay", {
     ".kimi-code/plugins/managed/agents-can-communicate/.kimi-plugin/plugin.json",
   ];
   for (const manifest of manifests) {
-    assert.equal((await readJson(path.join(packed.clientHome, manifest))).version, "0.3.0",
+    assert.equal((await readJson(path.join(packed.clientHome, manifest))).version, "0.3.1",
       `${manifest} was not stamped from the installed package`);
   }
 
