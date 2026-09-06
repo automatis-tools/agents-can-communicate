@@ -29,9 +29,17 @@ identity for this server. It comes from user-owned launch configuration, never f
 server uses its launch directory, which may be a different workspace from the other
 sessions.
 
-The server implements MCP protocol revision `2026-07-28` over newline-delimited JSON-RPC
-stdio. Tool input schemas are closed: unknown fields and invalid conditional shapes are
-rejected before a session is resolved.
+The server supports initialized MCP clients using `2025-06-18` or `2025-11-25`, and
+the per-request metadata interface in `2026-07-28`, over newline-delimited JSON-RPC stdio.
+Initialized clients send `initialize`, accept the negotiated revision, then send
+`notifications/initialized` before calling tools. Unknown initialization revisions receive
+`2025-11-25`; the client decides whether it supports that revision. Transport initialization
+does not create an ACC participant: a tool call or inbox resource read resolves it.
+
+Tool input schemas are closed: unknown fields and invalid conditional shapes are
+rejected before a session is resolved. Approve the ACC tools through your client's normal
+permission controls. A headless client configured to reject approval requests can connect
+successfully yet refuse tool calls; that is distinct from a protocol handshake failure.
 
 ## Call the durable tools
 
@@ -58,10 +66,20 @@ pairs and advances only this participant's receipts to `retrieved`. `acc_reply` 
 `answer` and acknowledges the original atomically. `acc_ack` exposes no receipt-state
 parameter.
 
+For initialized 2025 clients, array results such as `acc_inbox` are JSON in text content,
+with `structuredContent` omitted because those revisions require an object there.
+Object results retain both representations. The 2026 interface also returns raw arrays
+in `structuredContent` and uses the `resultType: "complete"` envelope.
+
 Resources are `acc://snapshot`, `acc://roster`, and `acc://inbox`. Reading `acc://inbox`
 resolves the configured MCP participant and advances only the returned receipts to
 `retrieved`, just like the inbox tool. Snapshot and roster reads do not advance receipts.
 A full snapshot is for explicit workspace forensics.
+
+An addressed handoff requires a participant already known to the workspace. For a future
+session that has not joined, omit `toParticipantId` to leave a workspace handoff. A later
+session can recover that historical handoff with `acc_sync` using `scope: "full"`;
+its addressed inbox will not contain past workspace broadcasts.
 
 ## Account for the manual boundary
 
