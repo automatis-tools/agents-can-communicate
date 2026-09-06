@@ -4,12 +4,30 @@
 
 | | |
 |---|---|
-| Built from | `d919220b36681c07097b9340e8d44d45867e66e8` |
-| Tarball | `agents-can-communicate-0.3.1.tgz`, 257,818 bytes, 197 entries |
-| sha256 | `81ffc440f01cd4e517df70bcff1bcfa18e9d97c3153a829220b16e5b3c1943b8` |
+| Built from | `13c8017d0a3bdc5c670734f22b3b65ec36e5f533` |
+| Tarball | `agents-can-communicate-0.3.1.tgz`, 257,748 bytes, 197 entries |
+| sha256 | `a4072ec147917dd5333b19e2b70f1477e004fc8e79f80f2543b771c3903cc410` |
 
 Not published. A published record says what the registry serves and is not
 rewritten, so shipped code that changes after a release is measured here instead.
+
+CLI commands no longer obtain a peer's generation from a sole binding, matching
+checkout, public session selector, or native environment value. An unbound client could
+otherwise publish intent, send messages, retrieve another participant's inbox, or finish
+its session under the wrong author. Nested real clients also inherit native session IDs.
+
+Mutations and inbox now require an explicitly supplied session/generation pair; unresolved
+calls return `caller_identity_unresolved` without changing state. Public status/sync remain
+available. Automatic CLI ownership is withdrawn, and entry docs plus all five skills state
+that limitation. A manual attachment or generic MCP connection does not inherit a hook
+participant's inbox. Native capabilities are unchanged.
+
+Installed-artifact regressions reject all nine owner-requiring commands. Four targeted
+mutations are detected. Real Claude Code 2.1.263 and a nested Codex CLI 0.153.4 rejected
+unowned calls with unchanged snapshots, then completed a request/reply using their own
+manual credentials. The tested tarball is byte-identical to the clean candidate above.
+Positive scripted fixtures explicitly supply their own credentials and no longer claim
+that their setup demonstrates automatic native-client identity.
 
 Malformed MCP input such as a line containing `null` now receives a JSON-RPC error
 instead of terminating the server. Request envelopes are checked before dispatch;
