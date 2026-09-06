@@ -237,12 +237,27 @@ export async function serve({ input, output, log, context }) {
       try {
         message = JSON.parse(line);
       } catch {
-        write({ jsonrpc: "2.0", error: { code: -32700, message: "parse error" } });
+        write({ jsonrpc: "2.0", id: null, error: { code: -32700, message: "parse error" } });
         continue;
       }
-      // Notifications get no reply, by rule.
+      // Validate the envelope before accessing fields or treating it as a notification.
+      const id = typeof message?.id === "string" || typeof message?.id === "number"
+        ? message.id : null;
+      if (message === null || typeof message !== "object" || Array.isArray(message)
+        || message.jsonrpc !== "2.0" || typeof message.method !== "string"
+        || (message.id !== undefined && message.id !== null
+          && typeof message.id !== "string" && typeof message.id !== "number")) {
+        write({ jsonrpc: "2.0", id, error: { code: -32600, message: "invalid request" } });
+        continue;
+      }
+      // Once the envelope is valid, notifications get no reply, even for invalid params.
       if (message.id === undefined || message.id === null) {
         protocol.notify(message);
+        continue;
+      }
+      if (message.params !== undefined
+        && (message.params === null || typeof message.params !== "object")) {
+        write({ jsonrpc: "2.0", id, error: { code: -32602, message: "invalid params" } });
         continue;
       }
       try {
