@@ -6,6 +6,8 @@ import path from "node:path";
 import test from "node:test";
 import { promisify } from "node:util";
 
+import { fixtureOwnerEnv } from "../helpers/fixture-owner.mjs";
+
 const run = promisify(execFile);
 const repo = path.resolve(import.meta.dirname, "..", "..");
 const acc = path.join(repo, "bin", "acc.mjs");
@@ -48,9 +50,10 @@ async function project(t) {
     [acc, "status", "--cwd", root, "--json"], { env })).stdout).data;
   const holder = status.participants.find(item => item.participantId === "holder");
 
-  const claim = resource => run(process.execPath, [acc, "claim", "--cwd", root,
+  const claim = async resource => run(process.execPath, [acc, "claim", "--cwd", root,
     "--session", holder.sessionId, "--resource", resource,
-    "--enforcement", "guarded", "--reason", "editing"], { env });
+    "--enforcement", "guarded", "--reason", "editing"],
+  { env: { ...env, ...await fixtureOwnerEnv(env.ACC_DATA_HOME, "holder") } });
 
   const write = file => {
     const child = run(process.execPath, [hook, "codex"],

@@ -8,6 +8,8 @@ import { promisify } from "node:util";
 
 import { EXIT } from "@agents-can-communicate/protocol";
 
+import { fixtureOwnerEnv } from "../helpers/fixture-owner.mjs";
+
 const run = promisify(execFile);
 const repo = path.resolve(import.meta.dirname, "..", "..");
 const acc = path.join(repo, "bin", "acc.mjs");
@@ -38,8 +40,8 @@ async function workspace(t) {
   child.child.stdin.end(JSON.stringify({ hook_event_name: "SessionStart",
     session_id: "worker", cwd: project, source: "startup" }));
   await child;
-  const cli = (...argv) => run(process.execPath, [acc, ...argv, "--cwd", project, "--json"],
-    { env });
+  const cli = async (...argv) => run(process.execPath, [acc, ...argv, "--cwd", project, "--json"],
+    { env: { ...env, ...await fixtureOwnerEnv(env.ACC_DATA_HOME, "worker") } });
   await cli("claim", "--resource", "file:x", "--reason", "editing");
   const session = JSON.parse((await cli("status")).stdout).data.participants[0].sessionId;
   const syncFrom = cursor => cli("sync", "--session", session,

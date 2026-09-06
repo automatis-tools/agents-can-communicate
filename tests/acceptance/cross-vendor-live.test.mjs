@@ -12,10 +12,15 @@ const ADAPTER_IDS = Object.freeze(["claude_code", "codex", "gemini_cli", "grok",
 
 const operationIds = result => result.operations.map(operation => operation.adapterId);
 const readJson = file => readFile(file, "utf8").then(JSON.parse);
+// Scripted transport lifecycle with explicit fixture credentials; real-client
+// automatic ownership is not established by this test.
+const ownerEnv = (packed, peer) => packed.ownerEnv(peer.harnessSessionId);
 
 async function exchange(packed, { from, to, subject, body, answer, key }) {
   const traceStart = packed.commandTrace.length;
-  const sent = await packed.acc(["message", "--session", from.session.sessionId,
+  const fromAcc = async args => packed.acc(args, await ownerEnv(packed, from));
+  const toAcc = async args => packed.acc(args, await ownerEnv(packed, to));
+  const sent = await fromAcc(["message", "--session", from.session.sessionId,
     "--to", to.participantId, "--type", "question", "--subject", subject,
     "--body", body, "--client-message-id", `${key}-question`]);
   const question = sent.message;
@@ -30,14 +35,14 @@ async function exchange(packed, { from, to, subject, body, answer, key }) {
   assert.equal((await packed.receipt(from.session.sessionId, question.messageId,
     to.participantId)).state, "queued");
 
-  const inbox = await packed.acc(["inbox", "--session", to.session.sessionId,
+  const inbox = await toAcc(["inbox", "--session", to.session.sessionId,
     "--message", question.messageId]);
   assert.equal(inbox[0].message.messageId, question.messageId);
   assert.equal(inbox[0].message.body, body);
   assert.equal((await packed.receipt(from.session.sessionId, question.messageId,
     to.participantId)).state, "retrieved");
 
-  const replied = await packed.acc(["reply", "--session", to.session.sessionId,
+  const replied = await toAcc(["reply", "--session", to.session.sessionId,
     "--message", question.messageId, "--body", answer,
     "--client-message-id", `${key}-answer`]);
   const response = replied.message;
@@ -49,18 +54,18 @@ async function exchange(packed, { from, to, subject, body, answer, key }) {
 
   const answerProjection = await packed.beforeTurn(from);
   assert.equal(answerProjection.stdout.includes(answer), false);
-  const answerInbox = await packed.acc(["inbox", "--session", from.session.sessionId,
+  const answerInbox = await fromAcc(["inbox", "--session", from.session.sessionId,
     "--message", response.messageId]);
   assert.equal(answerInbox[0].message.messageId, response.messageId);
-  await packed.acc(["ack", "--session", from.session.sessionId,
+  await fromAcc(["ack", "--session", from.session.sessionId,
     "--message", response.messageId]);
   assert.equal((await packed.receipt(to.session.sessionId, response.messageId,
     from.participantId)).state, "acknowledged");
 
-  const sentAgain = await packed.acc(["message", "--session", from.session.sessionId,
+  const sentAgain = await fromAcc(["message", "--session", from.session.sessionId,
     "--to", to.participantId, "--type", "question", "--subject", subject,
     "--body", body, "--client-message-id", `${key}-question`]);
-  const replyAgain = await packed.acc(["reply", "--session", to.session.sessionId,
+  const replyAgain = await toAcc(["reply", "--session", to.session.sessionId,
     "--message", question.messageId, "--body", answer,
     "--client-message-id", `${key}-answer`]);
   assert.equal(sentAgain.message.messageId, question.messageId);
@@ -80,7 +85,7 @@ async function exchange(packed, { from, to, subject, body, answer, key }) {
   return { question, answer: response };
 }
 
-test("packed v0.3 completes cross-vendor fallback without human relay", {
+test("packed v0.3 completes scripted cross-vendor fallback with explicit owners", {
   timeout: 120_000,
   skip: process.platform === "win32"
     ? "v0.3 supports macOS/Linux; its native captures and POSIX client probes do not certify Windows"
@@ -118,9 +123,9 @@ test("packed v0.3 completes cross-vendor fallback without human relay", {
   assert.equal((await packed.acc(["status"])).deliveryBindings.length, 2);
 
   await packed.acc(["finish", "--session", claude.session.sessionId,
-    "--goal", "restart Claude", "--status", "complete"]);
+    "--goal", "restart Claude", "--status", "complete"], await ownerEnv(packed, claude));
   await packed.acc(["finish", "--session", codex.session.sessionId,
-    "--goal", "restart Codex", "--status", "complete"]);
+    "--goal", "restart Codex", "--status", "complete"], await ownerEnv(packed, codex));
   assert.notEqual(await packed.findBinding(claude.harnessSessionId), null,
     "the test did not retain a stale binding to challenge owner resolution");
 
@@ -136,7 +141,7 @@ test("packed v0.3 completes cross-vendor fallback without human relay", {
   assert.deepEqual((await packed.acc(["status"])).deliveryBindings, [],
     "closed generations kept their stale delivery endpoints reachable");
   assert.notEqual(await packed.accError(["work", "--session", claude.session.sessionId,
-    "--summary", "stale owner"]), null);
+    "--summary", "stale owner"], await ownerEnv(packed, claude)), null);
 
   await packed.publishBinding({ sessionId: newCodexBinding.accSessionId,
     generation: newCodexBinding.generation, adapterId: "codex",
@@ -144,7 +149,8 @@ test("packed v0.3 completes cross-vendor fallback without human relay", {
   const downgraded = await packed.acc(["message", "--session",
     restartedClaude.session.sessionId, "--to", restartedCodex.participantId,
     "--type", "question", "--subject", "Unknown version",
-    "--body", "Can you still recover this?", "--client-message-id", "unknown-version"]);
+    "--body", "Can you still recover this?", "--client-message-id", "unknown-version"],
+  await ownerEnv(packed, restartedClaude));
   // The router no longer imposes a third exact-version rule: compatibility is
   // settled at the launch bootstrap and the generation-bound handshake. A
   // binding published at an admitted version whose transport is not reachable
@@ -155,7 +161,8 @@ test("packed v0.3 completes cross-vendor fallback without human relay", {
   assert.equal((await packed.beforeTurn(restartedCodex)).stdout
     .includes("Can you still recover this?"), false);
   const recovered = await packed.acc(["inbox", "--session",
-    restartedCodex.session.sessionId, "--message", downgraded.message.messageId]);
+    restartedCodex.session.sessionId, "--message", downgraded.message.messageId],
+  await ownerEnv(packed, restartedCodex));
   assert.equal(recovered[0].message.messageId, downgraded.message.messageId);
 
   const mcp = connectMcp({ binary: packed.mcpBin, cwd: packed.project,

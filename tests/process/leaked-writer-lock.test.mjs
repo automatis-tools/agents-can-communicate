@@ -9,6 +9,8 @@ import { promisify } from "node:util";
 import { EXIT } from "@agents-can-communicate/protocol";
 import { withWriterMutex } from "../../packages/storage-filesystem/src/writer-mutex.mjs";
 
+import { fixtureOwnerEnv } from "../helpers/fixture-owner.mjs";
+
 const run = promisify(execFile);
 const repo = path.resolve(import.meta.dirname, "..", "..");
 const acc = path.join(repo, "bin", "acc.mjs");
@@ -99,7 +101,8 @@ async function workspace(t) {
       session_id: participant, cwd: project, source: "startup" }));
     await child;
   };
-  const cli = (...argv) => run(process.execPath, [acc, ...argv, "--cwd", project], { env });
+  const cli = async (...argv) => run(process.execPath, [acc, ...argv, "--cwd", project],
+    { env: { ...env, ...await fixtureOwnerEnv(env.ACC_DATA_HOME, "first") } });
   return { base, env, project, attach, cli };
 }
 

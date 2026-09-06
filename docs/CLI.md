@@ -28,8 +28,21 @@ acc version
 | `acc ack` | `--message` | owner flags |
 | `acc finish` | `--goal` | `--status`, `--to`, repeated `--completed`, `--remaining`, `--blocker`, `--client-message-id`, owner flags |
 
-Owner flags are `--session` and `--generation`. A normal hooked session omits them because
-the CLI resolves its current binding. Scripts and adapters may pass them explicitly.
+Owner flags are `--session` and `--generation`; both are needed. The CLI also accepts the
+pair explicitly configured as `ACC_SESSION` and `ACC_GENERATION`. Hooks do not export that
+pair to shell commands. Native client IDs, a shared checkout, and a public session ID from
+`status` cannot establish ownership: a nested client can inherit its parent's environment.
+
+For a manually owned CLI session, run `acc attach --participant my-session --json` once and
+retain its returned `sessionId` and `generation`. Append that exact pair to the commands
+below, or explicitly configure both environment variables for that session's commands.
+Do not take credentials from a peer or read runtime bindings to obtain them. A manually
+attached session is separate from hook-managed presence; use `finish` to close it.
+
+Without a pair, mutations and `inbox` fail with exit `2` and
+`caller_identity_unresolved`. `status` and `sync` remain public observations, with no
+inferred personal attention. Session-bound [MCP tools](MCP.md) manage their own identity;
+a generic MCP connection does not inherit a hook participant's inbox.
 
 ### Presence and intent
 
@@ -69,7 +82,7 @@ acc request --to codex --title "review receipt wording" \
 `--to` takes a client name - `codex`, `claude_code`, `gemini_cli` - while exactly one
 session of that client is here, and the exact participant id from `acc status --json`
 otherwise. Two sessions of one client are refused by name rather than guessed between, the
-same way `--session` refuses. The recorded message always names the participant, never the
+same way an ambiguous recipient must be named explicitly. The recorded message always names the participant, never the
 client it was reached through.
 
 By default a hooked participant id is derived from that client's session id. It remains

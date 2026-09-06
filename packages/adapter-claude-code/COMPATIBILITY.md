@@ -229,3 +229,17 @@ Two behaviours worth knowing, both measured here rather than assumed:
 
 This capture is also the verification of the Channel ownership fix: before it, a second
 session in the same workspace made both Channels register under the first client's pid.
+
+## CLI ownership observation — 2026-09-06
+
+Claude Code 2.1.263 exported its own `CLAUDE_CODE_SESSION_ID` while retaining an inherited
+`CODEX_THREAD_ID` from the launching Codex process. Neither ACC owner variable was set.
+The process ancestry showed an intervening shell and the Claude process, but a PID is
+not a per-session credential. This capture does not establish automatic CLI ownership.
+
+CLI owner inference has been withdrawn: native IDs can be inherited by a different
+client, and a public roster entry cannot provide its generation. Commands require an
+explicit caller-owned pair; session-bound MCP identity is unchanged. Hook presence and
+certified delivery capabilities do not imply shell commands have owner credentials.
+The observation retained only a fixed session-ID allowlist and process metadata, not a
+client transcript. No capability was promoted by this capture.

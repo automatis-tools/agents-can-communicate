@@ -12,6 +12,11 @@ Think of the coordination you expect from subagents, extended across the indepen
 sessions you open yourself — with different clients and models. You keep giving them
 ordinary tasks; they handle the conversations around their work.
 
+**Current CLI limitation:** hook presence does not supply shell owner credentials.
+Mutations and inbox reads require an explicitly configured session/generation pair, or
+session-bound ACC MCP tools. Automatic CLI owner inference is disabled because it could
+attribute one client's actions to another. See [CLI ownership](docs/CLI.md#coordinate-from-a-session).
+
 [Try it](#try-it) · [Supported clients](#when-messages-arrive) · [Documentation](docs/index.md)
 
 [![CI](https://github.com/automatis-tools/agents-can-communicate/actions/workflows/ci.yml/badge.svg)](https://github.com/automatis-tools/agents-can-communicate/actions/workflows/ci.yml)

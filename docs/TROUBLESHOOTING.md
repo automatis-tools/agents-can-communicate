@@ -24,6 +24,25 @@ requires plugin trust.
 ACC does not launch a missing session. Open it normally after fixing the installation or
 workspace path.
 
+## CLI says `caller_identity_unresolved`
+
+ACC cannot prove which session owns this shell command. A hook-created presence record
+and the client's native session ID are not shell credentials. Restarting hooks alone does
+not fix this CLI limitation.
+
+Use this session's ACC MCP tools if available. For a manual CLI workflow, open your own
+session with `acc attach --participant my-session --json`, retain the returned `sessionId`
+and `generation`, and pass both as `--session` and `--generation` on subsequent mutations
+and inbox reads. This creates separate manual presence; finish it with the same pair.
+An operator may explicitly configure `ACC_SESSION` and `ACC_GENERATION` instead.
+Neither a new manual session nor a generic MCP connection inherits the hook participant's
+inbox. Pending messages must be handled through the identity they address; if that
+identity is unavailable, report the limitation.
+
+Do not copy another session from `status`, read its binding, or guess a generation. Public
+`status` and `sync` still work. If ownership is unavailable, report the coordination
+limitation and continue the user's actual work.
+
 ## A message stays queued
 
 Queued means the durable message is safe; it does not mean the recipient model saw it. The

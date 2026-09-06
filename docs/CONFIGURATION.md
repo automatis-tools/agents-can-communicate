@@ -142,7 +142,7 @@ that resolves inside a workspace.
 | `ACC_CACHE_HOME` | The same override, for cache data the platform would otherwise keep under its own cache location |
 | `ACC_PARTICIPANT` | Which participant a session belongs to, when the client does not say |
 | `ACC_WORKSPACE_ROOT` | The project to work in, instead of discovering one from the working directory. Absolute, or it is refused |
-| `ACC_SESSION` · `ACC_GENERATION` | Which session a command acts as when it is not worked out automatically. A supplied generation proves the exact opening; with only a session id the CLI resolves the current generation and refuses ambiguity |
+| `ACC_SESSION` · `ACC_GENERATION` | Explicit CLI owner credentials, supplied together by the operator for this session. Hooks do not set them. A public session ID alone never resolves a generation; see [CLI ownership](CLI.md#coordinate-from-a-session) |
 | `ACC_MCP_PARTICIPANT` | Who `acc-mcp` takes part as. `mcp` by default |
 | `ACC_MCP_WORKSPACE` | The project `acc-mcp` joins. Without it the server takes the directory the client launched it in, which is rarely the project |
 | `ACC_NO_UPDATE_CHECK=1` | Never ask npm whether a newer ACC exists. `acc update` then says it is off, which is a different answer from "nothing is newer" |

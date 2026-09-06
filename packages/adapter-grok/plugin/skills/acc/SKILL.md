@@ -16,6 +16,19 @@ Grok does not deliver UserPromptSubmit hook stdout to the model. After you
 understand the request, read coordination state with the commands below rather
 than waiting for injected peer text.
 
+## Use your own CLI credentials
+
+The examples below require your own session/generation pair: append `--session` and
+`--generation` with values explicitly provided for this session, or use a pair the
+operator configured as `ACC_SESSION` and `ACC_GENERATION`. Hooks do not set these
+variables. A native client ID or a session visible in status is not proof of ownership.
+
+If the CLI reports `caller_identity_unresolved`, use this session's ACC MCP tools when
+available. Otherwise report the missing CLI credentials briefly and continue the user's
+work. An MCP connection can have a different participant from the hook session;
+use inbox/reply only for the participant the message addresses. Do not borrow a
+peer's ID, read runtime bindings, or improvise credentials.
+
 ## Start shared work once
 
 After understanding the request, publish one concise intent:

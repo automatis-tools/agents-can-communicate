@@ -8,6 +8,8 @@ import { promisify } from "node:util";
 
 import { EXIT } from "@agents-can-communicate/protocol";
 
+import { fixtureOwnerEnv } from "../helpers/fixture-owner.mjs";
+
 const run = promisify(execFile);
 const repo = path.resolve(import.meta.dirname, "..", "..");
 
@@ -82,10 +84,9 @@ function argv(command) {
 }
 
 /**
- * A sandbox with a session already attached, because that is the situation the
- * documentation describes. Attached through the hook runtime rather than `acc
- * attach`, so what the commands resolve against is what a real client leaves
- * behind.
+ * Command syntax with explicit fixture credentials. This checks accepted CLI
+ * vocabulary, not whether a real client supplies owner credentials. Real-client
+ * ownership needs its own installed-artifact capture.
  */
 async function sandbox(t) {
   const home = await realpath(await mkdtemp(path.join(tmpdir(), "acc-exec-home-")));
@@ -101,7 +102,7 @@ async function sandbox(t) {
   child.child.stdin.end(JSON.stringify({ hook_event_name: "SessionStart",
     session_id: "docs-reader", cwd, source: "startup" }));
   await child;
-  return { home, cwd, dataHome, env };
+  return { home, cwd, dataHome, env: { ...env, ...await fixtureOwnerEnv(dataHome, "docs-reader") } };
 }
 
 test("every documented acc command is one the CLI accepts", async t => {

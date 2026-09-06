@@ -10,6 +10,8 @@ import { createCoordinationService } from "@agents-can-communicate/core";
 
 import { createFakeClock, createFakeIds, createMemoryStore } from "../helpers/memory-store.mjs";
 
+import { fixtureOwnerEnv } from "../helpers/fixture-owner.mjs";
+
 const run = promisify(execFile);
 const repo = path.resolve(import.meta.dirname, "..", "..");
 const acc = path.join(repo, "bin", "acc.mjs");
@@ -115,8 +117,8 @@ async function workspace(t) {
         + "*** End Patch" } }));
     return child.then(() => "allow", () => "deny");
   };
-  const cli = (args, who) => run(process.execPath, [acc, ...args, "--cwd", project],
-    { env: { ...env, CLAUDE_CODE_SESSION_ID: who } });
+  const cli = async (args, who) => run(process.execPath, [acc, ...args, "--cwd", project],
+    { env: { ...env, ...await fixtureOwnerEnv(env.ACC_DATA_HOME, who) } });
   return { project, env, attach, write, cli };
 }
 

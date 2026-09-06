@@ -360,3 +360,16 @@ passing one it supersedes. Withdrawing it also repaired ordinary Codex use: ACC 
 adds `--remote`, so hooks fire with the correct `cwd` again. The earlier spike missed this
 by starting the daemon in the session's own directory, where the two coincide. An upstream
 issue was filed against the client.
+
+## CLI ownership observation — 2026-09-06
+
+Codex CLI 0.153.4 exported `CODEX_THREAD_ID`; neither ACC owner variable was set.
+Its normal workspace-write shell sandbox refused the process-table probe with `EPERM`.
+This capture does not establish automatic CLI ownership or plugin hook activation.
+
+CLI owner inference has been withdrawn: native IDs can be inherited by a different
+client, and a public roster entry cannot provide its generation. Commands require an
+explicit caller-owned pair; session-bound MCP identity is unchanged. Hook presence and
+certified delivery capabilities do not imply shell commands have owner credentials.
+The observation retained only a fixed session-ID allowlist and process metadata, not a
+client transcript. No capability was promoted by this capture.

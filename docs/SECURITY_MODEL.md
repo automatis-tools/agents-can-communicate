@@ -42,7 +42,11 @@ own instruction hierarchy are the mitigation; ACC is not a model sandbox.
 ## Identity and ownership
 
 - Participant identity is the address; session identity is one current client opening.
-- Mutating calls prove their owner with the session generation.
+- Mutating CLI calls and inbox reads require an explicitly supplied session/generation
+  pair. The CLI never obtains a generation from a public ID, checkout, sole peer binding,
+  or inherited native environment value.
+- `ACC_SESSION`/`ACC_GENERATION` are operator-supplied credentials. They do not authenticate
+  a process or protect against intentional sharing under the same local OS account.
 - A stale process cannot renew or release records owned by a newer generation.
 - Inbox, reply, and acknowledgement validate the recipient's participant id.
 - One participant cannot advance another participant's receipt.

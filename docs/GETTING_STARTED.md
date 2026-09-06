@@ -4,6 +4,11 @@ Install ACC, open the AI sessions you already use, and give them related work. S
 integrations make peers visible and teach each agent how to communicate. You do not need to
 carry messages between windows or add coordination instructions to your task prompts.
 
+**Current CLI limitation:** hook presence does not supply shell owner credentials.
+Mutations and inbox reads require an explicitly configured session/generation pair, or
+session-bound ACC MCP tools. Automatic CLI owner inference is disabled because it could
+attribute one client's actions to another. See [CLI ownership](CLI.md#coordinate-from-a-session).
+
 ## 1. Install once on this machine
 
 ACC requires macOS or Linux and Node.js 24 or newer.

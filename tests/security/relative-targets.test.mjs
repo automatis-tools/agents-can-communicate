@@ -6,6 +6,8 @@ import path from "node:path";
 import test from "node:test";
 import { promisify } from "node:util";
 
+import { fixtureOwnerEnv } from "../helpers/fixture-owner.mjs";
+
 const run = promisify(execFile);
 const repo = path.resolve(import.meta.dirname, "..", "..");
 const acc = path.join(repo, "bin", "acc.mjs");
@@ -74,9 +76,10 @@ async function guard({ env }, { session, cwd, file, from }) {
     error => ({ decision: "deny", exitCode: error.code, stderr: error.stderr }));
 }
 
-const claim = ({ env }, cwd, resource) => run(process.execPath,
+const claim = async ({ env }, cwd, resource) => run(process.execPath,
   [acc, "claim", "--resource", resource, "--enforcement", "guarded",
-    "--reason", "editing", "--cwd", cwd], { env });
+    "--reason", "editing", "--cwd", cwd],
+  { env: { ...env, ...await fixtureOwnerEnv(env.ACC_DATA_HOME, "graphics") } });
 
 test("a claim is enforced wherever the hook process happens to start", async t => {
   const place = await repository(t);
@@ -127,8 +130,8 @@ test("a session started in a subdirectory shares one name for one file", async t
   const inner = path.join(place.worktrees.graphics, "src");
   await run("mkdir", ["-p", inner]);
   await attach(place, "graphics", place.worktrees.graphics);
-  // Claimed before the second session exists: both are in this checkout, and
-  // `acc` refuses to guess which of two live sessions is calling it.
+  // The fixture holder's explicit pair owns this claim, even when another session
+  // subsequently opens in the same checkout.
   await claim(place, place.worktrees.graphics, "file:src/physics.mjs");
   await attach(place, "deep", inner);
 

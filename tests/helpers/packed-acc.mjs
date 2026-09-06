@@ -7,6 +7,8 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { promisify } from "node:util";
 
+import { fixtureOwnerEnv } from "./fixture-owner.mjs";
+
 const run = promisify(execFile);
 const repo = path.resolve(import.meta.dirname, "..", "..");
 const isWindows = process.platform === "win32";
@@ -85,6 +87,10 @@ export async function createPackedAcc(t) {
   const env = { ...process.env, ACC_DATA_HOME: dataHome, HOME: clientHome,
     PATH: clientBin,
     GIT_DIR: "", GIT_WORK_TREE: "" };
+  // The caller's real credentials do not belong to this isolated runtime.
+  // A fixture may explicitly supply its own pair through extraEnv.
+  delete env.ACC_SESSION;
+  delete env.ACC_GENERATION;
 
   const commandTrace = [];
   const acc = async (args, extraEnv = {}) => {
@@ -165,7 +171,7 @@ export async function createPackedAcc(t) {
 
   return { root, repo, pack, consumer, project, dataHome, clientHome, clientBin,
     tarball, installed, accBin, hookBin, mcpBin, env, acc, accError, commandTrace,
-    hook, start,
+    hook, start, ownerEnv: nativeId => fixtureOwnerEnv(dataHome, nativeId),
     beforeTurn, receipt, setClientVersions, publishBinding,
     manifest: JSON.parse(await readFile(path.join(installed, "package.json"), "utf8")),
     snapshotClientFiles: () => treeSnapshot(clientHome),

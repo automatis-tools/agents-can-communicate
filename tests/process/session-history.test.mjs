@@ -6,6 +6,8 @@ import path from "node:path";
 import test from "node:test";
 import { promisify } from "node:util";
 
+import { fixtureOwnerEnv } from "../helpers/fixture-owner.mjs";
+
 const run = promisify(execFile);
 const repo = path.resolve(import.meta.dirname, "..", "..");
 const acc = path.join(repo, "bin", "acc.mjs");
@@ -28,7 +30,7 @@ const hook = path.join(repo, "bin", "acc-hook.mjs");
  * be retired, and it is true now - the retention itself is a decision about how
  * much history a project wants to keep, which is not this code's to make.
  */
-async function workspace(t) {
+async function workspace(t, caller = "keeper") {
   const base = await realpath(await mkdtemp(path.join(tmpdir(), "acc-history-")));
   t.after(() => rm(base, { recursive: true, force: true }));
   const project = path.join(base, "project");
@@ -54,7 +56,8 @@ async function workspace(t) {
     if (stdout.trim() === "" || !stdout.trimStart().startsWith("{")) return stdout;
     return JSON.parse(stdout).hookSpecificOutput?.additionalContext ?? stdout;
   };
-  const cli = (...argv) => run(process.execPath, [acc, ...argv, "--cwd", project], { env });
+  const cli = async (...argv) => run(process.execPath, [acc, ...argv, "--cwd", project],
+    { env: { ...env, ...await fixtureOwnerEnv(env.ACC_DATA_HOME, caller) } });
   const roster = async (...argv) => JSON.parse((await cli("status", ...argv, "--json"))
     .stdout).data.participants;
   return { project, env, attach, close, turn, cli, roster };
@@ -97,7 +100,7 @@ test("the history is still there for whoever needs it", async t => {
 });
 
 test("a message says who sent it, not only which session did", async t => {
-  const place = await workspace(t);
+  const place = await workspace(t, "asker-1");
   await place.attach("asker", "asker-1");
   await place.attach("helper", "helper-1");
   const roster = await place.roster();
@@ -114,7 +117,7 @@ test("a message says who sent it, not only which session did", async t => {
 });
 
 test("a stalled question survives the session that asked it", async t => {
-  const place = await workspace(t);
+  const place = await workspace(t, "asker-1");
   await place.attach("asker", "asker-1");
   await place.attach("helper", "helper-1");
   const roster = await place.roster();
