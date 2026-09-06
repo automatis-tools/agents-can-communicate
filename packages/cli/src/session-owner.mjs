@@ -19,8 +19,13 @@ import { AccError, EXIT } from "@agents-can-communicate/protocol";
  * way for a shell inside that session to find its own binding. Each step below
  * answers that from something the caller demonstrably has.
  */
+// Communication and lifecycle only. `task`, `workstream` and `decide` sat here
+// long after those commands were removed: unreachable, because the parser
+// refuses an unknown command before anything asks who owns the session, and
+// unnoticed, because `orchestration-is-absent` watches the public command table
+// and the packed text rather than this set.
 const NEEDS_OWNER = Object.freeze(new Set(["work", "claim", "release", "message",
-  "inbox", "reply", "request", "ack", "workstream", "task", "finish", "decide"]));
+  "inbox", "reply", "request", "ack", "finish"]));
 
 /**
  * Reads that are answers about *you*.
