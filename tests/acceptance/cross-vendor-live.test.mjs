@@ -177,9 +177,13 @@ test("packed v0.3 completes cross-vendor fallback without human relay", {
   await writeFile(path.join(packed.clientHome, ".kimi-code", "config.toml"),
     'default_model = "k3"\n');
   const beforeInstall = await packed.snapshotClientFiles();
-  const installed = await packed.acc(["install", "--home", packed.clientHome]);
+  // This gate measures all-client installation and exact restoration, not
+  // cold-start latency. Match the process fixtures' probe budget: under load,
+  // the default 3s deadline can classify these real subprocess shims as absent.
+  const probeEnv = { ACC_PROBE_TIMEOUT_MS: "30000" };
+  const installed = await packed.acc(["install", "--home", packed.clientHome], probeEnv);
   assert.deepEqual(installed.failed, []);
-  assert.deepEqual(operationIds(installed), ADAPTER_IDS);
+  assert.deepEqual(operationIds(installed), ADAPTER_IDS, JSON.stringify(installed.skipped));
   assert.equal(installed.operations.every(operation => operation.applied), true);
   assert.notDeepEqual(await packed.snapshotClientFiles(), beforeInstall,
     "install did not change the client-home topology");
@@ -195,7 +199,7 @@ test("packed v0.3 completes cross-vendor fallback without human relay", {
       `${manifest} was not stamped from the installed package`);
   }
 
-  const uninstalled = await packed.acc(["uninstall", "--home", packed.clientHome]);
+  const uninstalled = await packed.acc(["uninstall", "--home", packed.clientHome], probeEnv);
   assert.deepEqual(uninstalled.failed, []);
   assert.deepEqual(operationIds(uninstalled), ADAPTER_IDS);
   assert.equal(uninstalled.operations.every(operation => operation.applied), true);
@@ -205,7 +209,7 @@ test("packed v0.3 completes cross-vendor fallback without human relay", {
   assert.deepEqual(await packed.snapshotClientFiles(), beforeInstall,
     "first uninstall did not restore the exact pre-install topology");
 
-  const repeated = await packed.acc(["uninstall", "--home", packed.clientHome]);
+  const repeated = await packed.acc(["uninstall", "--home", packed.clientHome], probeEnv);
   assert.deepEqual(repeated.failed, []);
   assert.deepEqual(operationIds(repeated), ADAPTER_IDS);
   assert.equal(repeated.operations.every(operation => operation.applied), true);
