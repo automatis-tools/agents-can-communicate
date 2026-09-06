@@ -9,9 +9,14 @@ acc doctor
 It reports detected clients, exact versions, installation ownership, capability downgrade,
 and the next action. Restart a client after installation because hooks load at startup.
 
+You should not need to tell an agent to use ACC as part of a normal task. If coordination
+is not visible, first check integration and capability facts here. Remember that a working
+integration provides awareness; it cannot guarantee that a model will find a peer relevant
+or coordinate on every task.
+
 ## The second session does not appear
 
-Run `acc status --json` in both windows and compare `workspaceId`. Common causes are an
+As a diagnostic, run `acc status --json` in both windows and compare `workspaceId`. Common causes are an
 already-running client that never loaded the hook, a generic MCP server launched without
 `ACC_MCP_WORKSPACE`, or two plain directories that are not the same workspace. Codex also
 requires plugin trust.
@@ -21,26 +26,33 @@ workspace path.
 
 ## A message stays queued
 
-Queued means the durable message is safe; it does not mean the recipient model saw it.
-Have the recipient run:
+Queued means the durable message is safe; it does not mean the recipient model saw it. The
+receiving agent can recover it with:
 
 ```bash
 acc inbox
 acc inbox --message message_x
 ```
 
-Certified next-turn delivery waits for that client's next normal prompt. Grok, generic MCP,
-unknown client versions, and other platforms poll inbox. A reply acknowledges the original
-automatically; `acc ack` is for acknowledgement-only messages.
+Certified next-turn delivery waits for that client's next normal prompt; it never wakes an
+idle session. Grok, generic MCP, unknown client versions, and other platforms poll inbox. A
+reply acknowledges the original automatically; `acc ack` is for acknowledgement-only
+messages.
 
 ## I enabled live delivery but got fallback
 
-`--delivery actionable|all` is recipient policy, not a capability switch. No current
-adapter has passing native live-push certification:
+`--delivery actionable|all` is recipient policy, not a capability switch. Only Claude Code
+2.1.258 and newer on macOS arm64 can take the live path; everything else is next-turn or
+inbox by design. When Claude does fall back, it is almost always one of these:
 
-- Codex 0.152.0: the existing app-server control socket was absent; ACC did not start one.
-- Claude Code 2.1.252: the capture stopped at the development-channel warning before the
-  ACC child process started.
+- **An old terminal.** The launcher is put on `PATH` by a line in `.zshrc`, which only new
+  interactive shells read. `which claude` must point into `…/acc/bin`.
+- **A failure from the last quarter hour.** Claude caches a failed channel connection in
+  `~/.claude/mcp-needs-auth-cache.json` and skips reconnecting for about fifteen minutes.
+  Remove the `acc` entry there and start the session again.
+- **A note.** Under `actionable`, only messages that need acting on are pushed; a `note`
+  reports `delivery_disabled` on purpose.
+- **Codex.** Its live capability was withdrawn, and `acc doctor` says why.
 
 The installer therefore keeps effective policy off and reports exact-certified next-turn
 or inbox fallback. This is expected, not a partially working live route.

@@ -1,9 +1,9 @@
 # MCP
 
-`acc-mcp` lets a client with no native ACC adapter participate over stdio. It exposes the
-same durable messages, threads, receipts, intent, claims, and handoffs, but it cannot infer
-the client's lifecycle, intercept writes, inject a normal turn, or push a message. The
-client polls tools under its own control.
+Use `acc-mcp` when a client can call MCP tools but has no native ACC adapter. The server
+exposes durable messages, threads, receipts, intent, claims, and handoffs over stdio. It is
+a manual polling integration: it cannot infer the client's lifecycle, intercept writes,
+inject a normal turn, or push a message.
 
 ```mermaid
 graph LR
@@ -11,7 +11,7 @@ graph LR
   M --> S[("ACC durable store")]
 ```
 
-## Register
+## Configure the server
 
 ```json
 {
@@ -33,7 +33,7 @@ The server implements MCP protocol revision `2026-07-28` over newline-delimited 
 stdio. Tool input schemas are closed: unknown fields and invalid conditional shapes are
 rejected before a session is resolved.
 
-## Tools
+## Call the durable tools
 
 | Tool | Required input | Optional input |
 |---|---|---|
@@ -63,7 +63,7 @@ resolves the configured MCP participant and advances only the returned receipts 
 `retrieved`, just like the inbox tool. Snapshot and roster reads do not advance receipts.
 A full snapshot is for explicit workspace forensics.
 
-## Capability floor
+## Account for the manual boundary
 
 The generic MCP capability declaration is all false:
 
@@ -79,7 +79,7 @@ An MCP participant therefore reports `advisory` enforcement and `manual` lifecyc
 workspace protection is the weakest live participant's real guarantee, one MCP session
 makes guarded claims advisory for the room.
 
-## Durable polling semantics
+## Poll without overstating delivery
 
 Every outgoing message commits first. `acc_message`, `acc_request`, `acc_reply`, and
 `acc_finish` cannot promise push; delivery results remain queued with a durable diagnostic.

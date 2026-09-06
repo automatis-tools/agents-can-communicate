@@ -1,5 +1,11 @@
 # Capabilities
 
+Use this page to set expectations after installation. Integration means ACC can introduce
+peer awareness and coordination instructions; it does not guarantee what a model will do
+with them. Delivery also varies independently from awareness. The durable inbox works for
+every participant, supported exact versions may add next-turn delivery, and only the
+experimental Claude Code channel can deliver while a session is idle.
+
 Capability honesty separates four questions that are easy to collapse:
 
 1. **Certified support** — did this exact client version and platform pass a shipped
@@ -12,6 +18,10 @@ Capability honesty separates four questions that are easy to collapse:
 
 A source method or vendor documentation is not certification. Unknown versions and
 platforms degrade to false. No weaker session inherits a stronger peer's capability.
+
+Run `acc doctor` in the project when observed behavior differs from this page. It reports
+the installed client version, platform, effective capability, and fallback instead of
+assuming that a newer or differently packaged client behaves like a captured one.
 
 ## Certified support
 
@@ -33,10 +43,12 @@ Every other capability in the closed shape defaults to false, including session 
 child sessions, startup or safe-point injection, and before-read guards.
 
 The `delivery.livePush` and `delivery.replyRoute` row is `no` for the exact hook versions
-this matrix is keyed to. Native live delivery was captured on newer clients - Claude Code
-2.1.258 (livePush and replyRoute) and Codex 0.152.1 (livePush) - and is admitted through the
-native delivery contract rather than exact-version certification: it is off until a per-client
-opt-in, experimental, and never turns on for a client below the captured minimum.
+this matrix is keyed to. Native live delivery is captured on a newer client - Claude Code
+2.1.258, livePush and replyRoute, confirmed again on 2.1.260 through the installed package -
+and is admitted through the native delivery contract rather than exact-version
+certification: it is off until a per-client opt-in, experimental, and never turns on for a
+client below the captured minimum. Codex's queue capture passed and the capability was
+withdrawn; the row below says why.
 
 The limitations belong next to the adapters they affect:
 
@@ -60,8 +72,10 @@ would publish a generation-bound binding with `availableModes`, `clientVersion`,
 with a computed `reachable` boolean while keeping the opaque endpoint private.
 
 The router requires exactly one current eligible generation. No binding, an expired lease,
-several live sessions for one participant, a busy target, or a version that does not match
-passing evidence all stay on durable fallback.
+several live sessions for one participant, and an adapter refusal each keep delivery on the
+durable fallback. Busy behavior belongs to the transport: Claude's Channel can accept a
+message while the target is busy and queue it until the current turn finishes; an adapter
+that instead refuses with `recipient_busy` leaves the message on the durable path.
 
 The lease is extended by whoever serves the endpoint, because only that process knows it is
 still alive. A client that publishes no heartbeat - Claude Code among them - would otherwise
@@ -73,9 +87,9 @@ Current shipped reality: Claude Code on darwin-arm64 has a passing experimental 
 capture behind the native delivery contract, off until a per-client opt-in. Codex is
 next-turn and inbox only: its queue transport works, but the mode that makes a session
 reachable is the mode that hides which workspace it is in. Every other client is next-turn or
-inbox only;
-Gemini CLI and Kimi Code are next-turn only at their exact captured versions; Grok and MCP
-poll inbox.
+inbox only. Gemini CLI and Kimi Code are next-turn only at their exact captured versions;
+Grok and MCP poll inbox. On Linux, the shipped captures above do not establish next-turn or
+live delivery, so the honest expectation is the durable inbox.
 
 ## Recipient policy
 
@@ -89,9 +103,13 @@ policy:
 | `all` | every addressed message kind may use live push |
 
 The default is `off`. `acc install --delivery actionable|all` is an explicit request, not
-a force switch. The installer applies it only when the detected exact client has certified
-live push; otherwise effective policy remains off and the fallback diagnostic is printed.
-Room messages are never live-push candidates.
+a force switch. Exact-version certification governs ordinary hook capabilities. Native live
+delivery is separate: the installer applies the requested policy only when the client meets
+the captured minimum version, runs on a captured platform, and passes the current feature
+probe; otherwise effective policy remains off and the fallback diagnostic is printed. Each
+enabled session must then pass its generation-bound handshake. A failed handshake clears or
+refuses that session's binding and reports degraded reachability without rewriting the
+installed consent. Room messages are never live-push candidates.
 
 ## Fallback
 

@@ -1,6 +1,9 @@
 # Security policy
 
-## Reporting
+This page is for reporting a vulnerability. For system boundaries and threat reasoning,
+read the [security model](docs/SECURITY_MODEL.md).
+
+## Report privately
 
 Report privately via [GitHub security advisories](https://github.com/automatis-tools/agents-can-communicate/security/advisories/new).
 
@@ -9,7 +12,7 @@ Please do not open a public issue first.
 Include: what you ran, what happened, what you expected, and the client and
 version. A reproduction against a throwaway `ACC_DATA_HOME` is ideal.
 
-## Scope
+## Check the scope
 
 | In scope | Out of scope |
 |---|---|
@@ -21,11 +24,11 @@ version. A reproduction against a throwaway `ACC_DATA_HOME` is ideal.
 
 Reasoning behind each: [docs/SECURITY_MODEL.md](docs/SECURITY_MODEL.md).
 
-## Supported versions
+## Target a supported version
 
 Pre-1.0: the latest release only.
 
-## What we will do
+## Expect this response
 
 Acknowledge, reproduce, and tell you whether it is in scope. If it is, the fix
 ships with a test in `tests/security/` so it cannot come back quietly.

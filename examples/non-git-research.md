@@ -1,56 +1,67 @@
-# Research with no repository
+# Research without Git
 
-A folder of notes. No Git, no branches, no commits — two agents still need to
-divide the work and stay out of each other's way.
+Two sessions opened by the same operating-system user on one machine can coordinate in a
+plain folder. Before opening them, decide whether the directory path is enough identity or
+whether this workspace needs the optional stable identity below.
 
-```mermaid
-graph LR
-  A[research<br/>Gemini] --> N[(notes/)]
-  B[review<br/>Kimi] --> N
-```
+## Optional stable identity
 
-ACC identifies the workspace by the directory itself, so nothing below changes
-without Git.
-
-## A stable identity
+The directory path supplies identity by default. If the user wants the workspace identity
+to survive a rename or cover several configured roots, they can deliberately add config:
 
 <!-- test:command -->
 ```bash
 acc config init --yes
 ```
 
-Writes `acc.workspace.json` with an id that survives a rename or a move —
-without Git, this file is what carries identity.
+This writes `acc.workspace.json` in the folder. It is optional user-requested configuration;
+messages, presence, claims, and other runtime state still live in platform app data outside
+the workspace. See [Configuration](../docs/CONFIGURATION.md) for the preview, confirmation,
+and active-session safeguards.
 
-## Claim before you write
+Now open the sessions and give them related ordinary research tasks:
+
+| Session | Your prompt |
+|---|---|
+| Gemini CLI | Collect primary sources about the proposed protocol. |
+| Kimi Code | Compare the sources and draft a short findings note. |
+
+ACC does not sync folders or connect remote users. Both sessions must resolve to the same
+local workspace; a directory on another machine has different runtime state even if a file
+sync service copies its contents.
+
+```mermaid
+graph LR
+  A["Gemini CLI<br/>collect sources"] --> N[("local notes folder")]
+  B["Kimi Code<br/>compare findings"] --> N
+  A -.->|source question| B
+```
+
+## What the agents may do
+
+These are examples of commands the installed skill may teach agents to use. Gemini can
+publish the file it expects to change:
 
 ```bash
-acc claim --resource 'file:notes/sources.md' --reason "collecting sources"
+acc work --summary "collecting primary sources" --mode edit \
+  --hint 'file:notes/sources.md'
+acc claim --resource 'file:notes/sources.md' --reason "collecting primary sources"
 ```
 
-The reviewer claims `file:notes/summary.md` the same way. Two claims, two
-files, no collision.
+Kimi can claim `file:notes/summary.md` independently. Because the resources do not overlap,
+neither claim blocks the other. Protection is advisory if either live client lacks a
+certified guard.
 
-## Hand over a finding
+When Gemini finds a disagreement that affects the summary, it can ask the Kimi peer:
 
 ```bash
-acc message --to review --subject "Two sources disagree" \
-  --body "Fig. 3 vs Table 2 — which do we trust?" --type question
+acc message --to kimi --subject "Two sources disagree" \
+  --body "Figure 3 and Table 2 conflict. Which evidence should the summary qualify?" \
+  --type question
 ```
 
-The `question` kind stays open until review answers it.
+The question stays durable until the recipient retrieves it. A reply acknowledges the
+question but remains peer input, not proof that the review work is finished.
 
-## Check the room
-
-```bash
-acc status
-```
-
-```text
-2 live; 2 claim(s); protection advisory
-```
-
-No Git errors, no files written into the folder — coordination state lives
-under the platform data directory, reachable with just `acc install`.
-
-See [the docs index](../docs/index.md) for the rest.
+See the [documentation index](https://github.com/automatis-tools/agents-can-communicate/blob/main/docs/index.md)
+for installation, capability limits, and troubleshooting.
