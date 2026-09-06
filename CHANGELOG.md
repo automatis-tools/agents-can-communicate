@@ -4,12 +4,24 @@
 
 | | |
 |---|---|
-| Built from | `c28757c113666c9226ff3b84c50fba9f1bb816aa` |
-| Tarball | `agents-can-communicate-0.3.1.tgz`, 256,368 bytes, 196 entries |
-| sha256 | `05ad35d8d6dbd64612fd4ce177a19d7fcd55374c7713e2ba077235d5411a6e90` |
+| Built from | `44ff112ac9c08b95684fa9eaabddf893c7d19483` |
+| Tarball | `agents-can-communicate-0.3.1.tgz`, 257,639 bytes, 197 entries |
+| sha256 | `cac6738e3c3a0481319d8b3333c3dab14b6579ebc5f5d91d27eceedce2915391` |
 
 Not published. A published record says what the registry serves and is not
 rewritten, so shipped code that changes after a release is measured here instead.
+
+ACC MCP now connects to the observed Codex CLI 0.153.4 and Claude Code 2.1.263 clients.
+Their 2025 initialization requests previously failed because the server required 2026
+per-request metadata. The transport now supports both initialized revisions while keeping
+the 2026 interface and config-derived ACC identity. Older clients also receive inbox arrays
+as JSON text, avoiding their rejection of nonobject `structuredContent`.
+
+Subprocess and installed-package tests cover the actual handshake and linked peer replies;
+the gates fail when initialization support or array compatibility is removed. Real clients
+completed a review, clarification, code fix, independent tests and structured handoffs.
+A fresh session recovered the handoff through ACC alone. Native delivery capabilities
+were not changed or re-certified. See the MCP compatibility record for observed limits.
 
 The set that decides which commands need a session owner named three the CLI does
 not have. `task`, `workstream` and `decide` went with the orchestration surface
