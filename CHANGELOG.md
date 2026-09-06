@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.3.1
 
 The one question a new user is asked is now a decision rather than a manifest. It opened
 with `Enable native live delivery for Claude Code 2.1.260?` over internal artefact names -
@@ -84,14 +84,18 @@ as history rather than generalized into current npm credential advice.
 
 | | |
 |---|---|
-| Built from | `b6710270d2de9eacbabbcce5222d100840f49be5` |
-| Tarball | `agents-can-communicate-0.3.0.tgz`, 256,238 bytes, 196 entries |
-| sha256 | `8edcdd9de4dcc7619f839f22e492b3628fde835cd509f4c2482d44c18671066b` |
+| Built from | `bb15eca373b194019372dd4e08b35de247c0bc4b` |
+| Tarball | `agents-can-communicate-0.3.1.tgz`, 256,236 bytes, 196 entries |
+| sha256 | `2de2aa9f55053baac078d181423984ee2e91660b7945ad8f8bbba7b2ddcbbb0a` |
 | Node | 26.5.1; package requires Node >=24 |
 | Verified on | macOS 26.6.2 (darwin 25.6.0, arm64) |
+| Native live delivery | Not re-captured. `cli/src/install-command.mjs` and `core/src/conversations.mjs` are the only shipped `src/` files that changed since `v0.3.0`, and neither is transport, so 0.3.0's Claude Code certification and its Codex withdrawal still describe what ships here |
+| Durable fallback | Exercised through the installed tarball: a full coordination cycle in a workspace with no Git, leaving nothing behind in the project |
+| Not supported | Windows - still no capture, and the POSIX client probes do not certify it |
 
-Not published. The published 0.3.0 artifact is the one recorded in its own section below;
-this candidate carries a documentation change only.
+The tree was clean at `bb15eca`, so `verify-package.mjs` printed no dirty warning. It was
+given the saved tarball rather than the tree and therefore reported `revision unknown`; the
+candidate commit above was captured while the tree was clean immediately before packing.
 
 ## 0.3.0
 
