@@ -1,5 +1,28 @@
 # Changelog
 
+## Unreleased
+
+| | |
+|---|---|
+| Built from | `00a2bc6a095e63241b187f8b4962de5093aee256` |
+| Tarball | `agents-can-communicate-0.3.1.tgz`, 256,368 bytes, 196 entries |
+| sha256 | `05ad35d8d6dbd64612fd4ce177a19d7fcd55374c7713e2ba077235d5411a6e90` |
+
+Not published. A published record says what the registry serves and is not
+rewritten, so shipped code that changes after a release is measured here instead.
+
+The set that decides which commands need a session owner named three the CLI does
+not have. `task`, `workstream` and `decide` went with the orchestration surface
+they belonged to and stayed behind in `NEEDS_OWNER`, unreachable: the parser
+refuses an unknown command before anything asks who owns the session.
+
+Nothing ran differently, and that is the point. A frozen set of command names
+reads as an authoritative list, and this one had been wrong since those commands
+were removed - long enough for the names to be copied out of it as though they
+were real. `orchestration-is-absent` guards the public command table, the packed
+text, the MCP tools and the service operations; this set is not among them, which
+is how three names outlived what they named.
+
 ## 0.3.1
 
 The one question a new user is asked is now a decision rather than a manifest. It opened
