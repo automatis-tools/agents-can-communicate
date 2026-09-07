@@ -4,12 +4,28 @@
 
 | | |
 |---|---|
-| Built from | `c58063a98a67d5f93b407178d6e821eafe2e5abe` |
-| Tarball | `agents-can-communicate-0.3.1.tgz`, 262,877 bytes, 197 entries |
-| sha256 | `81ac8d37b651e7c3982efb9b707060a292a986a6f115873b079cc38c9209be36` |
+| Built from | `ac8a1540b416372c5f5442bfaa7dd476c7f1e53a` |
+| Tarball | `agents-can-communicate-0.3.1.tgz`, 263,520 bytes, 199 entries |
+| sha256 | `f223c9b55d5fc6ea23e4d268621f54b48de090266769b3d9eb4a5f74dd05d183` |
 
 Not published. A published record says what the registry serves and is not
 rewritten, so shipped code that changes after a release is measured here instead.
+
+Session opening now acquires ownership under the writer lock in both stores. Concurrent
+opens of one session id cannot both claim success, and a delayed open follows workspace
+promotion instead of returning an unusable generation. Existing participant metadata is
+preserved. Opening and resuming reject a different workspace.
+
+Hook start and end now serialize binding lookup through publication for one native session
+id. Repeated starts share one ACC owner; different native sessions remain independent.
+Expired waiters cannot publish later, and a corrupt binding fails open without inventing
+another session. The three production fixes are separate commits. All 357 adjacent checks
+passed and 13 exact mutations were caught and restored. On the exact installed archive,
+six same-id CLI attaches produced one usable owner and five conflicts; six distinct ids all
+worked. Four concurrent executable hook starts left one live session. Package verification
+passed. These are filesystem/executable observations, with no new native capability claim.
+
+Earlier intent/claim correction:
 
 Intent and claim writes now validate the current session under the writer lock. A delayed
 operation from a closed or replaced owner cannot overwrite its successor's intent or
@@ -22,7 +38,7 @@ record and refuses an ephemeral owner in another explicitly selected workspace.
 The two production fixes are separate commits. All 75 focused checks and 260 adjacent
 core/MCP/hook/process checks passed without skips. All 21 exact mutations were caught and
 restored. A clean install of the previous archive accepted four scheduled stale writes;
-the exact archive above rejected all four with exit 5 and preserved the intended state.
+that intent/claim archive rejected all four with exit 5 and preserved the intended state.
 The installed CLI intent/claim/release/clear/finish cycle and package verification passed.
 These are installed filesystem and executable observations; no new live-model or adapter
 capability capture is claimed.
