@@ -4,7 +4,7 @@
 
 | | |
 |---|---|
-| Built from | `3dd613faaab28648414887c8d9b65f8f83b336a8` |
+| Built from | `319cc5cc3d91aa76027769dabd48d2006931b9aa` |
 | Tarball | `agents-can-communicate-0.3.1.tgz`, 266,198 bytes, 200 entries |
 | sha256 | `170424207429240978ccda7e6a3bc60d17e3c8192576dcce32b7c1c755397a05` |
 
@@ -33,9 +33,16 @@ A further live audit on the same fixed archive completed review across two Git
 worktrees. Claude rejected the author's defective proposal while its own checkout
 remained at the baseline. Codex committed a correction; the same reviewer resolved
 and approved its full SHA, and the author retrieved that verdict before finishing.
-Ten final fixture tests passed; seven failed on the original source. No ACC code
-changed. This is one bounded observation; adapter compatibility notes record the
+Ten final fixture tests passed; seven failed on the original source. No ACC runtime
+code changed. This is one bounded observation; adapter compatibility notes record the
 capture limits and an incorrect incidental statement in the review.
+
+The full audit gate also exposed a deadline-dependent fixture failure: two simulated
+external replacements reused a service from a completed hook, including that hook's
+expired five-second budget. Those tests now invoke the installed CLI as independent
+callers. Deliberately crossing the old deadline failed before the correction and passed
+after it; removing the runtime generation guard still fails the corrected test.
+No runtime timeout or ownership check was relaxed, and no new test was added.
 
 Earlier foreground review correction (archive `aa947539f5e0ae4d9491775e3ad809c7a5279f615f6a5769fd468f69c4d37fc2`):
 
