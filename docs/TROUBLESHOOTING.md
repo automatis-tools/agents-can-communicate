@@ -78,8 +78,14 @@ or inbox fallback. This is expected, not a partially working live route.
 
 ## Codex plugin is listed but inactive
 
-Trust the plugin in Codex, then restart it. Until the client accepts that trust step, hooks
-do not run. `acc doctor` reports the installed cache copy and missing activation separately.
+Open `/plugins` in Codex and check ACC is enabled. Open `/hooks`, review each ACC hook,
+and enable/trust its current definition if needed; then restart the session. New or changed
+definitions need review, and a trusted hook can still be disabled.
+
+`acc doctor` reports installed files separately from hook readiness, which it leaves
+unverified. A saved trust record cannot prove current activation. If installation preserved
+your own sandbox configuration, doctor also names the ACC state directory whose access
+you should check in `sandbox_workspace_write.writable_roots`.
 
 ## Gemini does not guard a write
 

@@ -111,10 +111,8 @@ export function createCodexAdapter() {
           "write guards cover apply_patch and the shell writes ACC can read; a model "
             + "without apply_patch edits through the shell, where a redirection or an "
             + "mv is matched and a runtime opening the file is not",
-          // Was a standing sentence here, true and useless: it said the same
-          // thing on a machine whose hooks were trusted, on one whose were not,
-          // and on one with nothing installed. Detection reads the client's own
-          // record now and speaks only when it has something to report.
+          // Installed files and certification do not verify this user's current
+          // hook enablement/trust. Detection directs that check to the client.
         ],
       };
     },

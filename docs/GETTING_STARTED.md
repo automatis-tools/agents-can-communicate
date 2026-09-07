@@ -23,8 +23,15 @@ acc install
 ```
 
 The installer connects only the supported clients it finds. Open a new terminal and
-restart any running clients so they load their integrations. Codex asks you to trust its
-plugin once.
+restart any running clients so they load their integrations. Follow the activation steps
+printed by the installer. In Codex, use `/plugins` to check ACC is enabled, then `/hooks`
+to review each ACC hook and enable/trust its current definition if needed. Restart the
+session after that review; changed hook definitions may require trust again.
+
+If the installer preserved your existing Codex sandbox settings, verify the named ACC
+state directory is in `sandbox_workspace_write.writable_roots` in the config it identifies.
+ACC keeps those user settings unchanged. Installed files alone do not establish that hooks
+are active; `acc doctor` leaves current readiness unverified and directs you to Codex.
 
 If you opt into Claude Code's experimental idle delivery, Claude also shows its own
 development-channel warning at every startup. The feature is off by default, can spend

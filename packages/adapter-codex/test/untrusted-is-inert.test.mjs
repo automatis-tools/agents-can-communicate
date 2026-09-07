@@ -6,24 +6,9 @@ import test from "node:test";
 
 import { createCodexAdapter } from "../src/adapter.mjs";
 
-/**
- * Installed, enabled, and running nothing.
- *
- * This client will not run a hook it has no trust record for, and it does not
- * say so. It prints `hook: SessionStart Completed` and executes nothing - proven
- * by replacing ACC's hook with a two-line script that only appends its stdin to
- * a file, and getting an empty file alongside a `Completed` line.
- *
- * Every other indicator says the opposite. On the machine where this was found:
- *
- *   acc doctor         → 4 of 4 adapter(s) installed
- *   codex plugin list  → installed, enabled, 0.1.10
- *   the write guard    → off
- *
- * Silently losing the write guard is the worst failure this tool has, so the one
- * condition that decides whether ACC runs here at all is worth reading before
- * reporting the client healthy.
- */
+// A saved hash is not current readiness: the real client listed partial,
+// commented and stale trust as untrusted/modified, and allows trusted hooks
+// to be disabled. ACC must direct verification to the client in each case.
 async function home(t) {
   const dir = await mkdtemp(path.join(tmpdir(), "acc-inert-"));
   const state = await mkdtemp(path.join(tmpdir(), "acc-inert-state-"));
@@ -32,7 +17,7 @@ async function home(t) {
   return { home: dir, stateRoot: state };
 }
 
-const TRUSTED = `
+const RECORDED = `
 [hooks.state."agents-can-communicate@acc-local:hooks.json:pre_tool_use:0:0"]
 trusted_hash = "sha256:8d4a13568a8748e93b91e512b415eaf97817fbc138997bd91017bec936e6be14"
 `;
@@ -43,28 +28,30 @@ const diagnosticsOf = async context =>
 const actionsOf = async context =>
   (await createCodexAdapter().detect(context)).needsAction ?? [];
 
-test("an installed plugin with no trust record is reported as inert", async t => {
+test("an installed cache reports hook readiness as unverified", async t => {
   const context = await home(t);
   await createCodexAdapter().install(context);
 
   const said = await diagnosticsOf(context);
 
-  assert.equal(said.some(line => /not trusted|inert/i.test(line)), true,
-    `nothing said the hooks will not run: ${JSON.stringify(said, null, 2)}`);
-  // The state is described here; what to do about it is an action, and the test
-  // below checks it separately - because only a person can carry it out.
+  assert.match(said.join("\n"), /hook.*unverified|hook.*not verified/i);
+  assert.doesNotMatch(said.join("\n"), /runs nothing|hooks are not trusted/i);
 });
 
-test("once the client has trusted them, the warning goes away", async t => {
+test("saved, disabled or commented hook records cannot verify current readiness", async t => {
   const context = await home(t);
   await createCodexAdapter().install(context);
   const file = path.join(context.home, ".codex", "config.toml");
-  await writeFile(file, (await readFile(file, "utf8")) + TRUSTED);
-
-  const said = await diagnosticsOf(context);
-
-  assert.equal(said.some(line => /not trusted|inert/i.test(line)), false,
-    `a healthy install was told its hooks will not run: ${JSON.stringify(said, null, 2)}`);
+  const original = await readFile(file, "utf8");
+  for (const record of [RECORDED, RECORDED + "enabled = false\n",
+    '\n# [hooks.state."agents-can-communicate@acc-local:hooks.json:pre_tool_use:0:0"]\n']) {
+    await writeFile(file, original + record);
+    assert.match((await diagnosticsOf(context)).join("\n"), /hook.*unverified|hook.*not verified/i);
+    assert.ok((await actionsOf(context)).some(line => /\/hooks/.test(line)),
+      "a saved trust substring suppressed current hook review");
+    assert.equal(await readFile(file, "utf8"), original + record,
+      "detection changed the client's trust decision");
+  }
 });
 
 test("the thing a person must do is said where a person reads it", async t => {
@@ -79,6 +66,16 @@ test("the thing a person must do is said where a person reads it", async t => {
   assert.equal(actions.length, 1, `no action was asked for: ${JSON.stringify(actions)}`);
   assert.match(actions[0], /codex/);
   assert.match(actions[0], /trust/i);
+  assert.match(actions[0], /\/hooks/);
+});
+
+test("a plugin registration cannot establish that the client enabled it", async t => {
+  const context = await home(t);
+  await createCodexAdapter().install(context);
+  const file = path.join(context.home, ".codex", "config.toml");
+  await writeFile(file, (await readFile(file, "utf8")).replace("enabled = true", "enabled = false"));
+  assert.doesNotMatch((await diagnosticsOf(context)).join("\n"), /plugin enabled|no hook would run/i);
+  assert.ok((await actionsOf(context)).some(line => /\/plugins/.test(line)));
 });
 
 test("a client with no ACC installed at all is not nagged about trust", async t => {
@@ -89,6 +86,7 @@ test("a client with no ACC installed at all is not nagged about trust", async t 
 
   const said = await diagnosticsOf(context);
 
-  assert.equal(said.some(line => /not trusted|inert/i.test(line)), false,
+  assert.equal(said.some(line => /hook.*unverified|hook.*not verified/i.test(line)), false,
     `an empty machine was warned about trust: ${JSON.stringify(said, null, 2)}`);
+  assert.deepEqual(await actionsOf(context), []);
 });

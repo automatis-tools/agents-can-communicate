@@ -47,16 +47,18 @@ perturbed the record instead of removing it — a hook whose recorded hash no
 longer matched was still observed running, so absence was never actually
 tested.
 
-Absence is the whole mechanism. With no record, the client runs no hook at
-all, prints `hook: SessionStart Completed` while executing nothing, and ACC's
-write guard goes silently off — while `acc doctor` and `codex plugin list`
-both report it enabled. On a real machine, a shell write walked through a
+Absence was sufficient to disable the hooks in that historical capture. With no
+record, that client ran no hook, printed `hook: SessionStart Completed` while
+executing nothing, and ACC's write guard went silently off — while `acc doctor`
+and `codex plugin list` both reported it enabled. A shell write walked through a
 guarded claim; writing the exact same hashes back (captured before deletion,
 from an ACC three releases older) revived the guard immediately.
 
-That is why removal is never ACC's to do: the record is granted once by a
-person, survives ACC upgrades, and nothing ACC writes can restore it.
-Tidiness is not worth a permission only a human can re-grant.
+That is why removal is never ACC's to do: it preserves the client's trust decision.
+The historical observation above does not establish trust across arbitrary upgrades.
+Codex 0.153.4 compares each current definition's hash and reports changed definitions
+as modified; a trusted hook can also be disabled. ACC preserves the records but leaves
+current readiness unverified, directing the user to `/hooks` in Codex.
 
 **The generalisation, since this cost a release:** to learn whether state is
 load-bearing, take it away. Changing it tests something else.

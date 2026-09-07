@@ -104,7 +104,8 @@ possible without touching the operator's install.
    `--dangerously-bypass-hook-trust`, and the docs say "Review and trust plugin hooks
    before you enable them". Installation therefore cannot be silent: `acc install` can
    place the plugin, but the user must trust its hooks before any of them run, and
-   `acc doctor` has to report the untrusted state rather than implying protection.
+   `acc doctor` must leave current readiness unverified rather than infer protection
+   from installed files or saved trust records. See the onboarding observation below.
 2. **Distribution is marketplace-based.** `codex plugin add` installs from a configured
    marketplace snapshot; the personal marketplace lives at
    `~/.agents/plugins/marketplace.json`. A file drop into a plugins directory is not the
@@ -479,3 +480,33 @@ schedule session replacement before inbox, acknowledgement, heartbeat and close
 writes; those tests reproduce and guard the corrected races. The real-client
 run is evidence for recovery, not evidence that those precise races occurred
 naturally. No capability flag or certification version changed.
+
+## Onboarding and hook readiness — Codex 0.153.4, 2026-09-07
+
+The real CLI's `app-server --stdio` and `hooks/list` inspected an ACC installation in
+an isolated temporary home on macOS arm64. The installed artifact was the hook-deadline
+candidate, SHA-256 `72c4ecfc0ed32f537c14fbbc8b2667c89f0f299c35e2dff3cff5ceccf64bbe58`.
+Only ACC's five hook metadata records were retained; no model turn, hook execution or
+raw conversation was collected. No running user daemon or user config was changed.
+
+| Fixture configuration | Real client's metadata |
+|---|---|
+| No saved trust | Five untrusted hooks |
+| One current hash | One trusted, four untrusted |
+| Commented trust table | Five untrusted |
+| Five stale hashes | Five modified |
+| Five current hashes, guard disabled | Five trusted, guard enabled=false |
+| Five current hashes, all enabled | Five trusted, all enabled |
+
+The preceding ACC doctor suppressed its activation action for every saved or commented
+trust substring above. It also called a plugin enabled based only on its config table
+header. Detection now reports current hook readiness as unverified and directs the
+operator to `/plugins` and `/hooks`. It does not start App Server or reproduce the
+client's TOML/hash rules. The installed CLI now renders adapter activation steps and
+the access check for a preserved user sandbox, without editing trust decisions.
+
+The current [hook documentation](https://learn.chatgpt.com/docs/hooks#review-and-trust-hooks)
+describes review of each exact definition. The correction preserves existing trust
+records; it does not guarantee that they still apply after a definition changes. This
+is configuration/metadata evidence, not new delivery, lifecycle or guard certification.
+The interactive trust UI and a new live model turn were not exercised in this audit.

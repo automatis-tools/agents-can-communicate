@@ -123,7 +123,7 @@ test("detect is read-only and reports registration honestly", async t => {
   await adapter.install(context);
   const after = await adapter.detect(context);
 
-  assert.match(after.diagnostics.join(" "), /registered/);
+  assert.match(after.diagnostics.join(" "), /plugin installed in the client's cache/);
   assert.deepEqual(await theirs(), EXISTING, "ACC edited the user's marketplace");
 });
 

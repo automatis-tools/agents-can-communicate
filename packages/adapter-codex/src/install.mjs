@@ -26,8 +26,8 @@ const PLUGIN_NAME = "agents-can-communicate";
 // again to confirm a root of ACC's own is accepted and reported enabled.
 const MARKETPLACE = "acc-local";
 const QUALIFIED = `${PLUGIN_NAME}@${MARKETPLACE}`;
-const HOOK_REVIEW = "open codex and run /hooks; check each ACC hook is enabled, "
-  + "review and trust its current definition if needed, then restart the session";
+const HOOK_REVIEW = "hook readiness unverified: open codex; check ACC is enabled in /plugins; in /hooks, review "
+  + "each ACC hook and enable/trust its current definition if needed, then restart the session";
 
 // A marketplace is a root holding `.agents/plugins/marketplace.json`, and every
 // `source.path` in that manifest - `./plugins/<name>` - is resolved by this
@@ -267,9 +267,9 @@ export async function uninstallCodexPlugin({ home, agentsHome = home,
   // `hook: SessionStart Completed` while executing nothing, and ACC's write
   // guard is silently off while `acc doctor` reports the adapter installed.
   //
-  // The record is granted once, by a person, and survives ACC upgrades - hashes
-  // captured under 0.1.6 still admitted 0.1.10's hooks. Nothing ACC writes can
-  // put it back. So it is not ACC's to remove.
+  // Those historical hashes admitted the historical hooks. Current Codex checks
+  // exact definitions, so preservation cannot establish present readiness. The
+  // decision remains the client's to keep or revise, never ACC's to remove.
   // The marketplace directory is ACC's too, so it goes rather than being left
   // behind empty.
   // A blank TOML config and an absent one are the same to this client, and a
@@ -309,46 +309,32 @@ export async function detectCodex({ home, agentsHome = home,
   const published = (marketplace?.plugins ?? []).some(entry => entry.name === PLUGIN_NAME);
   const config = await readFile(configPath(codexHome), "utf8").catch(() => "");
   const registered = config.includes(`[marketplaces.${MARKETPLACE}]`);
-  const enabled = config.includes(`[plugins."${QUALIFIED}"]`);
+  const pluginEntry = config.includes(`[plugins."${QUALIFIED}"]`);
   const cached = await stat(cachePath(codexHome))
     .then(() => true).catch(() => false);
-  // The condition that decides whether ACC runs here at all, and the only one
-  // this client will not tell you about: with no trust record it runs no hook,
-  // prints `hook: SessionStart Completed`, and executes nothing. Everything else
-  // - published, registered, enabled, cached - can be true while the write guard
-  // is off. Only asked when something is wired: a warning about hooks that do
-  // not exist is how a real one gets ignored.
-  const untrusted = cached && !config.includes(`hooks.state."${QUALIFIED}:`);
+  // Saved trust is not readiness. Codex compares every current definition's
+  // hash and can disable a trusted hook. Even a commented or stale single record
+  // previously suppressed this check. Leave verification to Codex's /hooks;
+  // detection neither invents its hash algorithm nor starts a client service.
   return { ok: true, changes: [], diagnostics: [
     published ? "acc plugin published in the marketplace" : "acc plugin not registered",
-    registered && enabled
-      ? "marketplace registered and plugin enabled"
-      : "marketplace not registered with the client; no hook would run",
+    registered && pluginEntry
+      ? "marketplace and plugin entries found in config; activation not verified"
+      : "marketplace/plugin registration not verified from this config",
     // Publishing, registering and enabling are all necessary and still not
     // sufficient: hooks stay silent until the client copies the plugin into its
     // own cache. Only the client does that, so ACC names the command.
     cached
       ? "plugin installed in the client's cache"
       : `plugin not installed yet; run: codex plugin add ${QUALIFIED}`,
-    // The condition that decides whether ACC runs here at all, and the only one
-    // this client will not tell you about: with no trust record it runs no hook,
-    // prints `hook: SessionStart Completed`, and executes nothing. Everything
-    // else - published, registered, enabled, cached - can be true while the
-    // write guard is off. Said only when there is something to trust, because a
-    // warning on a machine with nothing wired is how a real one gets ignored.
-    ...(untrusted
-      ? ["hooks are not trusted, so this client reports them completed and runs "
-        + "nothing"]
+    ...(cached
+      ? ["hook readiness is unverified by ACC; Codex checks whether each current "
+        + "definition is enabled and trusted"]
       : []),
   ],
-  // Said as an action rather than an observation, because a person has to do it
-  // and no acc command can: the client grants this once, from its own prompt.
-  // A diagnostic alone would have stayed in `--json`, which is where the first
-  // version of this fix put it and where nobody would have read it.
-  needsAction: [...(untrusted
-    ? ["start codex once and accept the hook trust prompt  "
-      + "# its hooks run nothing until then"]
-    : []), ...(cached ? sandboxReview(config, configPath(codexHome), stateRoot) : [])] };
+  needsAction: cached
+    ? [HOOK_REVIEW, ...sandboxReview(config, configPath(codexHome), stateRoot)]
+    : [] };
 }
 
 /**
