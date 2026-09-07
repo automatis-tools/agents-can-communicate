@@ -21,11 +21,18 @@ const HEARTBEAT_CADENCE_MS = 60_000;
  * persisted through a binding so a restarted process resolves to the same
  * session instead of creating a second participant.
  */
-async function resolveSession(context) {
+async function resolveSession(context, { forFinish = false } = {}) {
   const key = `mcp:${context.participantId}:${context.workspaceId}`;
   const existing = await loadSessionBinding({ runtimeDir: context.runtimeDir,
     harnessSessionId: key });
   if (existing !== null) {
+    if (forFinish) {
+      const current = await context.service.locateSession(existing.accSessionId, context.workspaceId);
+      // Core validates and closes this exact generation, including retries.
+      // A prior heartbeat could race another finish and reopen a different owner.
+      if (current !== null
+        && current.record.generation === existing.generation) return current.record;
+    }
     try {
       return await context.service.heartbeatSession({ sessionId: existing.accSessionId,
         generation: existing.generation, workspaceId: context.workspaceId });
@@ -104,7 +111,7 @@ function obligationFor(kind, explicit, addressed) {
  * agreeing to it.
  */
 async function callTool(name, args, context) {
-  const session = await resolveSession(context);
+  const session = await resolveSession(context, { forFinish: name === "acc_finish" });
   const owner = { sessionId: session.sessionId, generation: session.generation,
     workspaceId: context.workspaceId, descriptor: context.descriptor };
   const service = context.service;
