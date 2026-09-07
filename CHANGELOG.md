@@ -4,12 +4,24 @@
 
 | | |
 |---|---|
-| Built from | `153943af838b5e3be702a3dd2a6e971cb8c71bca` |
-| Tarball | `agents-can-communicate-0.3.1.tgz`, 259,401 bytes, 197 entries |
-| sha256 | `585035ad54e3b208ff52e8558bf2171f148389036325229f3269c56326c33e5d` |
+| Built from | `1096e3243567de8ea8f396d06a93519a0a908c23` |
+| Tarball | `agents-can-communicate-0.3.1.tgz`, 261,461 bytes, 197 entries |
+| sha256 | `f5b342e3ec4f989aeba5ae074e064092f4daba4a8a85df12fab66015e019c650` |
 
 Not published. A published record says what the registry serves and is not
 rewritten, so shipped code that changes after a release is measured here instead.
+
+`acc <command> --help`, `-h`, and `acc help <command>` now show command options and
+accepted values, including config subcommands and structured `--json` descriptions.
+Help bypasses workspace discovery, ownership and execution; a literal `--help` option
+value is still delivered as data. Inherited JavaScript property names are rejected as
+unknown commands with the caller's original spelling.
+
+Real Codex CLI 0.153.4 could not discover attachment or handoff syntax through the old
+built-in help. On bytes identical to the candidate above, the same diagnostic completed
+manual attach, reviewing intent, inbox, reply and a complete handoff using help alone;
+all 11 commands succeeded. Ten exact mutations were caught by installed-package regressions.
+The exact final archive passed package verification. No adapter capability claim changed.
 
 After replying, a participant can inspect the original message with `inbox --message`
 without an exit-5 error. An acknowledged receipt remains unchanged: no timestamp refresh,
@@ -19,7 +31,7 @@ to the recorded outgoing message and its separate delivery result; CLI text name
 
 The failure was reproduced with real Codex using the original request ID. Both real Codex
 CLI 0.153.4 with its own manual attachment and Claude Code 2.1.263 with native hook identity
-then completed read/reply/reinspection on bytes identical to this final tarball. All Claude
+then completed read/reply/reinspection on the earlier reply-receipt candidate. All Claude
 commands succeeded; Codex needed corrections to guessed CLI options and an invalid finish
 status. Seven exact mutations were caught, including lost receipt output, state regression,
 timestamp refresh, and cross-participant inspection. No native capability claim changed.
@@ -44,7 +56,7 @@ certifications are unchanged.
 Installed-artifact regressions reject all nine owner-requiring commands. Four targeted
 mutations are detected. Real Claude Code 2.1.263 and a nested Codex CLI 0.153.4 rejected
 unowned calls with unchanged snapshots, then completed a request/reply using their own
-manual credentials. The tested tarball is byte-identical to the clean candidate above.
+manual credentials. That tarball matched the CLI-ownership candidate recorded in release evidence.
 Positive scripted fixtures explicitly supply their own credentials and no longer claim
 that their setup demonstrates automatic native-client identity.
 
@@ -55,7 +67,7 @@ report the missing pair. Optional overflow counts cannot hide the first recovery
 Installed-package regressions exercise the emitted pair itself, including same-client
 sessions and restart. Five deliberate mutations are detected. Real Claude and Codex used
 the installed skill and hook context to publish intent, claim, reply and finish without
-manual attach; Codex answered the question Claude left durably. The final candidate was
+manual attach; Codex answered the question Claude left durably. That hook-owner candidate was
 also rerun through both real clients.
 
 Malformed MCP input such as a line containing `null` now receives a JSON-RPC error
