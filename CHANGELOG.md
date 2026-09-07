@@ -4,12 +4,26 @@
 
 | | |
 |---|---|
-| Built from | `32146c3b04162409adea9c9dd275a9b3fb026c05` |
-| Tarball | `agents-can-communicate-0.3.1.tgz`, 264,220 bytes, 199 entries |
-| sha256 | `dbc99215ab174b48ce49c9aa49dd3617d812f85703e1b08d57a9d8208bafdecf` |
+| Built from | `8ee7a571a5bde2d013dc365c6b44d346e28266e9` |
+| Tarball | `agents-can-communicate-0.3.1.tgz`, 264,720 bytes, 200 entries |
+| sha256 | `72c4ecfc0ed32f537c14fbbc8b2667c89f0f299c35e2dff3cff5ceccf64bbe58` |
 
 Not published. A published record says what the registry serves and is not
 rewritten, so shipped code that changes after a release is measured here instead.
+
+One hook budget now covers normalization, workspace discovery, recovery, handling and
+the final status read. Expired operations cannot publish a new owner or binding after
+returning a timeout. Storage checks the deadline immediately before atomic publication;
+already accepted writes still complete or recover. Owned Git, client-version and process
+table probes are forcibly terminated at their limits, including probes that ignore SIGTERM.
+Timeouts emit the same short fail-open diagnostic as other hook failures.
+
+Storage and hook fixes are separate commits. All 462 adjacent checks passed; all 20 exact
+mutations failed their regressions and the restored copy passed its 25 focused checks.
+The saved archive above passed package verification. These observations cover installed
+executables and filesystem operations; they do not add native-client capabilities.
+
+Earlier hook process-crash correction:
 
 Hook starts now preserve their exact session owner across process crashes by writing the
 binding before creating its session. A lifecycle waiter recovers any journal left by the
@@ -21,7 +35,7 @@ Failed hooks now emit a short generic diagnostic while continuing with exit 0. T
 recovery and diagnostic fixes are separate commits. All 322 adjacent checks passed; thirteen
 exact mutations failed and restored copies passed. SIGKILL checks use real installed hook
 processes and filesystem writes. They establish process-crash recovery, not power-loss or
-new native-client capabilities. The saved archive above passed package verification.
+new native-client capabilities. That stage's saved archive passed package verification.
 
 Earlier session-opening correction:
 
