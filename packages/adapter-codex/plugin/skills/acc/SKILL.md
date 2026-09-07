@@ -115,6 +115,13 @@ To answer a direct message, reply and acknowledge it in one operation:
 {{ACC}} reply --message message_x --body "Yes. The boundary is free after commit abc123."
 ```
 
+The reply result confirms two different messages: `recorded <reply-id>` is your
+outgoing answer; `acknowledged <original-id>` resolves the message you answered.
+With `--json`, `message` and `delivery` describe the answer, while `receipt` describes
+your acknowledgement of the original. For an exact recheck, use the original id
+with `inbox --message`; an acknowledged receipt remains unchanged. Resolved messages
+stay out of plain `inbox`. Your outgoing reply belongs to its recipient's inbox.
+
 If the sender chose the `acknowledge` obligation, acknowledge it directly:
 
 ```bash

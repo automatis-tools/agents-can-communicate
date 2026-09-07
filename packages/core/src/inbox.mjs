@@ -57,8 +57,7 @@ export function createInboxService(ports, sessions) {
       if (input.messageId === undefined) {
         selected = selected.filter(receipt => listable(messages.get(receipt.messageId), receipt));
       } else {
-        selected = selected.filter(receipt => receipt.messageId === input.messageId
-          && receipt.state !== "acknowledged");
+        selected = selected.filter(receipt => receipt.messageId === input.messageId);
         if (selected.length === 0) {
           throw new AccError(EXIT.CONFLICT,
             "that message is not recoverable by this participant",
@@ -70,8 +69,11 @@ export function createInboxService(ports, sessions) {
         const b = messages.get(right.messageId);
         return a.sentAt.localeCompare(b.sentAt) || a.messageId.localeCompare(b.messageId);
       });
-      return selected.map(receipt => advanceOwned(tx, session, receipt.messageId,
-        "retrieved", now));
+      // An exact read can inspect a resolved message. Inspection must neither
+      // move its receipt backward nor refresh its timestamp or emit an event.
+      return selected.map(receipt => receipt.state === "acknowledged"
+        ? { message: messages.get(receipt.messageId), receipt }
+        : advanceOwned(tx, session, receipt.messageId, "retrieved", now));
     }, { kinds: ["message", "receipt"] });
   }
 

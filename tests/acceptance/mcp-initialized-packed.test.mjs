@@ -51,7 +51,14 @@ test("installed initialized peers exchange and acknowledge linked replies", asyn
     body: "No. slice expects an end index; use offset + limit." });
   assert.equal(reply.message.inReplyTo, sent.message.messageId);
   assert.equal(reply.message.threadId, sent.message.threadId);
+  assert.equal(reply.receipt.messageId, sent.message.messageId);
+  assert.equal(reply.receipt.recipientParticipantId, "reviewer");
+  assert.equal(reply.receipt.state, "acknowledged");
   assert.equal((await receipt()).state, "acknowledged");
+  const [inspected] = await reviewer("acc_inbox", { messageId: sent.message.messageId });
+  assert.equal(inspected.message.messageId, sent.message.messageId);
+  assert.deepEqual(inspected.receipt, reply.receipt);
+  assert.deepEqual(await reviewer("acc_inbox"), []);
   const answer = await author("acc_inbox");
   assert.equal(answer[0].message.messageId, reply.message.messageId);
   assert.equal(answer[0].message.fromParticipantId, "reviewer");

@@ -271,8 +271,8 @@ const HANDLERS = Object.freeze({
       generation: options.generation, messageId: options.message, body: options.body,
       subject: options.subject, clientMessageId: clientMessageId(options, context) }) });
     const result = routed.recorded;
-    return { data: { message: result.reply, delivery: routed.delivery },
-      text: recordedText(result.reply, routed.delivery) };
+    return { data: { message: result.reply, receipt: result.receipt, delivery: routed.delivery },
+      text: `${recordedText(result.reply, routed.delivery)}; acknowledged ${result.receipt.messageId}` };
   },
 
   request: async ({ options, context }) => {

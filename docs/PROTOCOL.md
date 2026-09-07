@@ -155,13 +155,18 @@ leaves the receipt queued.
 
 ## Inbox, reply, and acknowledgement
 
-`inbox` returns unresolved messages owned by the calling participant and advances only
-that participant's receipt to `retrieved`. An exact message id is the recovery path after
-compaction or an over-budget projection.
+Without an id, `inbox` returns unresolved messages owned by the calling participant and
+advances only that participant's receipt to `retrieved`. An exact message id is the narrow
+recovery and inspection path, including after compaction or acknowledgement. Reading an
+acknowledged message preserves its receipt, timestamp, and event history; it does not put
+the message back into the unresolved inbox. Ownership and current-generation checks still
+apply to every read.
 
 `reply` verifies that ownership, records an `answer` in the original thread, and advances
 the original receipt to `acknowledged` in one transaction. Only after that durable commit
 may the answer be offered to the original author. A transport error cannot roll back it.
+CLI and MCP reply results expose both facts: `message` and `delivery` describe the outgoing
+answer, while `receipt` describes the caller's acknowledgement of the original message.
 
 `ack` advances the caller's receipt without creating a reply. It exposes no state override;
 callers cannot claim that a transport offered or a participant retrieved a message.

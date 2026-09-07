@@ -276,10 +276,12 @@ test("a peer can read one MCP inbox item and reply without syncing the workspace
       arguments: replyArgs, _meta: meta });
     const replied = response.result.structuredContent;
     const replyRetry = responseRetry.result.structuredContent;
-    assert.deepEqual(Object.keys(replied).sort(), ["delivery", "message"]);
     assert.equal(replied.message.inReplyTo, messageId);
     assert.equal(replied.message.clientMessageId, "client_mcp_reply_retry");
+    assert.equal(replied.receipt.messageId, messageId);
+    assert.equal(replied.receipt.state, "acknowledged");
     assert.equal(replyRetry.message.messageId, replied.message.messageId);
+    assert.deepEqual(replyRetry.receipt, replied.receipt);
   }, { reuse: location, env: { ACC_MCP_PARTICIPANT: "answerer" } });
 });
 

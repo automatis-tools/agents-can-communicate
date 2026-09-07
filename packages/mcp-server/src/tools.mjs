@@ -105,16 +105,18 @@ export const PUBLIC_TOOLS = Object.freeze([
   {
     name: "acc_inbox",
     description: `Read unresolved messages addressed to this participant without loading `
-      + `the roster, event log, claims, or workspace snapshot. Optionally select one id. `
+      + `the roster, event log, claims, or workspace snapshot. An exact id also inspects `
+      + `an acknowledged message without changing its receipt. `
       + `${POLLED}`,
     inputSchema: object({
-      messageId: string("Read exactly this addressed message; omit for all unresolved mail."),
+      messageId: string("Inspect this addressed message, including acknowledged mail; omit for unresolved mail."),
     }),
   },
   {
     name: "acc_reply",
     description: `Reply to one addressed message and acknowledge the original in the same `
       + `operation. The reply is attributed, linked with inReplyTo, and delivered by polling. `
+      + `Returns message and delivery for the outgoing reply, plus receipt for the original. `
       + `${POLLED}`,
     inputSchema: object({
       messageId: string("The addressed message being answered."),

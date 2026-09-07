@@ -62,9 +62,12 @@ client-control tools.
 
 Send-like tools return a raw structured object with `{ message, delivery }`; their text
 content is the JSON serialization of the same value. `acc_inbox` returns message/receipt
-pairs and advances only this participant's receipts to `retrieved`. `acc_reply` writes an
-`answer` and acknowledges the original atomically. `acc_ack` exposes no receipt-state
-parameter.
+pairs and advances only this participant's receipts to `retrieved` when needed. With an
+exact `messageId`, it also inspects acknowledged mail without changing receipt state,
+timestamp, or event history; without an id, resolved mail remains omitted.
+`acc_reply` writes an `answer` and acknowledges the original atomically. It additionally
+returns `receipt` for that original message; `message` and `delivery` describe the outgoing
+answer. `acc_ack` exposes no receipt-state parameter.
 
 For initialized 2025 clients, array results such as `acc_inbox` are JSON in text content,
 with `structuredContent` omitted because those revisions require an object there.

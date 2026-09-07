@@ -124,6 +124,10 @@ Human output starts with `recorded message_x`. A transport failure after that co
 not change the command exit code. Reuse an explicit `--client-message-id` after an
 uncertain result to recover the same logical message.
 
+`reply` additionally returns `receipt`: the original message id, the replying participant,
+and state `acknowledged`. Its `message` and `delivery` describe the outgoing answer.
+Human output distinguishes `recorded <reply-id>` from `acknowledged <original-id>`.
+
 ### Inbox, reply, and acknowledgement
 
 ```bash
@@ -133,10 +137,14 @@ acc reply --message message_x --body "Yes. Use offered."
 acc ack --message message_y
 ```
 
-Inbox returns only unresolved messages addressed to this participant. Reading advances
-that participant's receipt to `retrieved`. Reply creates an `answer` in the same thread and
-acknowledges the original atomically. `ack` acknowledges without writing an answer and has
-no state override.
+Without `--message`, inbox returns unresolved messages addressed to this participant.
+Reading advances that participant's receipt to `retrieved` when needed. An exact id also
+reads an acknowledged message, preserving its receipt, timestamp, and event history.
+Use the original message id to inspect acknowledgement; the outgoing reply belongs to
+its recipient's inbox. Resolved messages stay out of the ordinary inbox.
+
+Reply creates an `answer` in the same thread and acknowledges the original atomically.
+`ack` acknowledges without writing an answer and has no state override.
 
 ### Handoff
 

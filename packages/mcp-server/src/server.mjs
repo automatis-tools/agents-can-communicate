@@ -149,7 +149,8 @@ async function callTool(name, args, context) {
         record: () => service.replyToMessage({ ...owner, messageId: args.messageId,
           body: args.body, subject: args.subject,
           clientMessageId: clientMessageId(args, service) }) });
-      return { message: routed.recorded.reply, delivery: routed.delivery };
+      return { message: routed.recorded.reply, receipt: routed.recorded.receipt,
+        delivery: routed.delivery };
     }
     case "acc_request": {
       const routed = await recordAndOffer({ router: context.deliveryRouter,
