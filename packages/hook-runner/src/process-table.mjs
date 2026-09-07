@@ -20,7 +20,7 @@ export async function readProcessTable({ run: exec = run,
   timeoutMs = DEFAULT_TIMEOUT_MS } = {}) {
   try {
     const { stdout } = await exec("ps", ["-o", "pid=,ppid=,comm=", "-A"],
-      { timeout: timeoutMs });
+      { timeout: timeoutMs, killSignal: "SIGKILL" });
     const table = new Map();
     for (const line of stdout.split("\n")) {
       const match = LINE.exec(line);

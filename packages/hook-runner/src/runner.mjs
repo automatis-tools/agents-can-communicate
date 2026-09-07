@@ -25,6 +25,10 @@ import { withSessionLifecycle } from "./session-lifecycle.mjs";
 // let a call through than to make someone's session sit waiting on us.
 const DEFAULT_BUDGET_MS = 5_000;
 
+function assertHookBudget(deadline, message = "hook deadline expired") {
+  if (Date.now() >= deadline) throw new Error(message);
+}
+
 const byteLength = value => Buffer.byteLength(value, "utf8");
 
 function compactInboxRecovery(messages) {
@@ -179,16 +183,18 @@ export function participantFor(adapterId, harnessSessionId, env = {}) {
   return `${adapterId}-${suffix}`;
 }
 
-async function openContext({ cwd, dataHome, runtime, env }) {
+async function openContext({ cwd, dataHome, runtime, env, deadline }) {
+  assertHookBudget(deadline);
   const descriptor = await discoverWorkspace({ cwd, env: env ?? {},
-    gitProbe: createGitProbe() });
+    gitProbe: createGitProbe({ deadlineAt: deadline }) });
+  assertHookBudget(deadline);
   const paths = runtimePaths({
     dataHome: dataHome ?? platformDataHome({ env: env ?? {} }),
     workspaceId: descriptor.id,
     workspaceRoots: descriptor.roots,
   });
   const store = await openFilesystemStore({ root: paths.root, clock: runtime.clock,
-    ids: runtime.ids, workspaceId: descriptor.id });
+    ids: runtime.ids, workspaceId: descriptor.id, deadlineAt: deadline });
   return { descriptor, paths, env: env ?? {}, realpath: runtime.realpath ?? realpath,
     service: createCoordinationService({ store, clock: runtime.clock, ids: runtime.ids }) };
 }
@@ -306,6 +312,7 @@ async function projectTurn({ binding, context, adapter, adapterId }) {
 // exported; an ordinary launch has none and stays durable.
 async function bindNative({ adapter, event, hookBinding, clientVersion, platform, context, paths,
   deadline }) {
+  assertHookBudget(deadline);
   return establishNativeBinding({ adapter, event, hookBinding, clientVersion, platform,
     livePolicy: livePolicyFrom(context.env), service: context.service, runtimeDir: paths.root,
     clock: context.service.clock,
@@ -319,11 +326,12 @@ const HANDLERS = {
     // certified facts before any probe, PID lookup, resume, or open can fail;
     // keep only the generation identity needed for a successful resume.
     if (binding !== null) {
-      await storeSessionBinding({ runtimeDir: paths.root, harnessSessionId: event.sessionId,
+      await storeSessionBinding({ runtimeDir: paths.root, deadlineAt: deadline, harnessSessionId: event.sessionId,
         accSessionId: binding.accSessionId, generation: binding.generation });
     }
     const clientVersion = await probeClientVersion(adapter,
       { timeoutMs: Math.max(1, Math.min(1_000, deadline - Date.now())) });
+    assertHookBudget(deadline);
     const clientFacts = { clientVersion, platform };
     const capabilities = effectiveCapabilities(adapter, clientFacts);
     // Once per session, never per turn. A client that cannot be found yields
@@ -331,7 +339,9 @@ const HANDLERS = {
     // behaviour every session had before this existed.
     const command = adapter.client?.command ?? null;
     const pid = command === null ? null
-      : resolveClientPid({ table: await readProcessTable(), from: process.pid, command });
+      : resolveClientPid({ table: await readProcessTable({
+        timeoutMs: Math.max(1, Math.min(1_000, deadline - Date.now())) }), from: process.pid, command });
+    assertHookBudget(deadline);
     const clientPid = Number.isInteger(pid) && pid > 0 ? pid : undefined;
     const native = hookBinding => bindNative({ adapter, event, hookBinding, ...clientFacts,
       context, paths, deadline });
@@ -352,7 +362,7 @@ const HANDLERS = {
       if (resumed !== null) {
         const hookBinding = { accSessionId: resumed.sessionId, generation: resumed.generation,
           ...clientFacts, clientPid };
-        await storeSessionBinding({ runtimeDir: paths.root, harnessSessionId: event.sessionId,
+        await storeSessionBinding({ runtimeDir: paths.root, deadlineAt: deadline, harnessSessionId: event.sessionId,
           ...hookBinding });
         return { accSessionId: resumed.sessionId, generation: resumed.generation,
           ...clientFacts, capabilities, nativeBinding: await native(hookBinding) };
@@ -363,7 +373,7 @@ const HANDLERS = {
     // happened (or it was closed), a retry allocates a NEW pair, never revives it.
     const opening = { sessionId: context.service.ids.next("session"),
       generation: context.service.ids.next("generation") };
-    await storeSessionBinding({ runtimeDir: paths.root, harnessSessionId: event.sessionId,
+    await storeSessionBinding({ runtimeDir: paths.root, deadlineAt: deadline, harnessSessionId: event.sessionId,
       accSessionId: opening.sessionId, generation: opening.generation });
     const session = await context.service.openSession({
       ...opening,
@@ -382,7 +392,7 @@ const HANDLERS = {
     });
     const hookBinding = { accSessionId: session.sessionId, generation: session.generation,
       ...clientFacts, clientPid };
-    await storeSessionBinding({ runtimeDir: paths.root, harnessSessionId: event.sessionId,
+    await storeSessionBinding({ runtimeDir: paths.root, deadlineAt: deadline, harnessSessionId: event.sessionId,
       ...hookBinding });
     return { accSessionId: session.sessionId, generation: session.generation,
       ...clientFacts, capabilities, nativeBinding: await native(hookBinding) };
@@ -395,7 +405,7 @@ const HANDLERS = {
     return {};
   },
 
-  async sessionEnd({ binding, context, event, paths }) {
+  async sessionEnd({ binding, context, event, paths, deadline }) {
     if (binding === null) return {};
     const owner = { sessionId: binding.accSessionId, generation: binding.generation };
     const current = await context.service.locateSession(binding.accSessionId);
@@ -406,7 +416,7 @@ const HANDLERS = {
       // endpoint and binding; do not close a replacement or repeat a close event.
       await context.service.clearDeliveryBinding(owner);
     }
-    await clearSessionBinding({ runtimeDir: paths.root, harnessSessionId: event.sessionId });
+    await clearSessionBinding({ runtimeDir: paths.root, deadlineAt: deadline, harnessSessionId: event.sessionId });
     return {};
   },
 
@@ -499,27 +509,29 @@ export async function runHook({ adapterId, payload, adapters, dataHome, env,
   probeClientVersion = defaultProbeClientVersion,
   platform = `${process.platform}-${process.arch}` }) {
   const deadline = Date.now() + budgetMs;
-  const result = { stdout: "", exitCode: 0, decision: "allow", sessions: [], deadlineAt: deadline,
+  const fallback = { stdout: "", exitCode: 0, decision: "allow", sessions: [], deadlineAt: deadline,
     commitOffers: async () => {} };
-  let timer = null;
-  try {
+  const execute = async () => {
+    assertHookBudget(deadline);
     const adapter = adapters?.[adapterId];
     if (adapter === undefined) throw new Error(`no adapter named ${adapterId}`);
 
     const event = await adapter.normalizeHook(payload);
-    const context = await openContext({ cwd: event.cwd, dataHome, runtime, env });
+    const context = await openContext({ cwd: event.cwd, dataHome, runtime, env, deadline });
     const handler = HANDLERS[event.kind];
     const lifecycle = event.kind === "sessionStart" || event.kind === "sessionEnd";
     const invoke = async () => {
+      assertHookBudget(deadline);
       if (lifecycle) {
         // A previous holder may have died after journalling its session while
         // this process waited. Recover that write before interpreting its binding.
         const store = await openFilesystemStore({ root: context.paths.root, clock: runtime.clock,
-          ids: runtime.ids, workspaceId: context.descriptor.id });
+          ids: runtime.ids, workspaceId: context.descriptor.id, deadlineAt: deadline });
         context.service = createCoordinationService({ store, clock: runtime.clock, ids: runtime.ids });
       }
       const binding = await loadSessionBinding({ runtimeDir: context.paths.root,
         harnessSessionId: event.sessionId });
+      assertHookBudget(deadline);
       return handler === undefined ? {} : handler({ event, context, adapter, adapterId,
         binding, paths: context.paths,
         readProcessTable, probeClientVersion, platform, deadline });
@@ -528,25 +540,17 @@ export async function runHook({ adapterId, payload, adapters, dataHome, env,
       ? withSessionLifecycle({ root: context.paths.root, sessionId: event.sessionId,
         clock: runtime.clock, deadlineAt: deadline }, invoke)
       : invoke();
-
-    // The loser of a race is not cancelled, so the timer is cleared explicitly:
-    // an outstanding one keeps the process alive long past its answer.
-    const budget = new Promise(resolve => {
-      timer = setTimeout(() => resolve({ timedOut: true }), budgetMs);
-    });
-    Object.assign(result, await Promise.race([work, budget]));
-
+    // Keep the late continuation's result private. Once the budget wins, it
+    // cannot change the fail-open answer or restore withdrawn output/offers.
+    const result = { ...fallback, ...await work };
+    assertHookBudget(deadline);
     const offerInputs = result.offerInputs ?? [];
     let commitPromise = null;
     result.commitOffers = () => {
       if (commitPromise !== null) return commitPromise;
       commitPromise = (async () => {
         for (const input of offerInputs) {
-          const remaining = deadline - Date.now();
-          if (remaining <= 0) throw new Error("hook budget exhausted before offer commit");
-          // The durable transaction owns deadline cancellation. Racing it here
-          // would only reject the public promise while the losing writer kept
-          // waiting and could publish later.
+          assertHookBudget(deadline, "hook budget exhausted before offer commit");
           await context.service.recordOfferSucceeded({ ...input, deadlineAt: deadline });
         }
       })();
@@ -556,18 +560,26 @@ export async function runHook({ adapterId, payload, adapters, dataHome, env,
 
     const status = await context.service.collectStatus({
       workspaceId: context.descriptor.id });
+    assertHookBudget(deadline);
     result.sessions = status.participants.filter(p => p.presence !== "offline");
     result.service = context.service;
+    return result;
+  };
+
+  let timer;
+  try {
+    // One budget covers normalization, discovery, recovery, handling and the
+    // final status read. Store/binding deadlines fence undecided writes; an
+    // activated journal still completes under its writer lock after expiry.
+    const budget = new Promise(resolve => {
+      timer = setTimeout(() => resolve({ ...fallback, timedOut: true }),
+        Math.max(0, deadline - Date.now()));
+    });
+    return await Promise.race([execute(), budget]);
   } catch (error) {
-    result.failed = true;
-    result.reason = error.message;
-    result.decision = "allow";
-    result.stdout = "";
-    // A later failure may happen after a turn prepared offer inputs. Once the
-    // fail-open path withdraws stdout, no transport boundary remains to commit.
-    result.commitOffers = async () => {};
+    return { ...fallback, failed: true, reason: error.message,
+      ...(Date.now() >= deadline ? { timedOut: true } : {}) };
   } finally {
-    if (timer !== null) clearTimeout(timer);
+    clearTimeout(timer);
   }
-  return result;
 }

@@ -28,7 +28,7 @@ export async function crashHook(packed, { boundary, payload, participantId = "cr
           "  await rename(temporary, file);",
           "  if (record.platform !== undefined) await globalThis.accCrashCheckpoint(record);\\n"],
         "after-close": ["/hook-runner/src/runner.mjs",
-          "    await clearSessionBinding({ runtimeDir: paths.root, harnessSessionId: event.sessionId });",
+          "    await clearSessionBinding({ runtimeDir: paths.root, deadlineAt: deadline, harnessSessionId: event.sessionId });",
           "    await globalThis.accCrashCheckpoint(null);\\n"],
       };
       const [suffix, needle, pause] = targets[${JSON.stringify(boundary)}];

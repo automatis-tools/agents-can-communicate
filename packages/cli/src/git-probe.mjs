@@ -16,9 +16,15 @@ export function hermeticEnv(env = process.env) {
   return Object.fromEntries(Object.entries(env).filter(([key]) => !key.startsWith("GIT_")));
 }
 
-export function createGitProbe({ run } = {}) {
-  const exec = run ?? (async (cwd, args) =>
-    (await execFileAsync("git", args, { cwd, env: hermeticEnv() })).stdout.trim());
+export function createGitProbe({ run, deadlineAt } = {}) {
+  const exec = async (cwd, args) => {
+    const remaining = deadlineAt === undefined ? 0 : deadlineAt - Date.now();
+    if (deadlineAt !== undefined && remaining <= 0) throw new Error("Git probe deadline expired");
+    return run === undefined
+      ? (await execFileAsync("git", args, { cwd, env: hermeticEnv(), timeout: remaining,
+        killSignal: "SIGKILL" })).stdout.trim()
+      : run(cwd, args);
+  };
 
   return async function gitProbe({ cwd }) {
     const commonDir = await exec(cwd, ["rev-parse", "--path-format=absolute",

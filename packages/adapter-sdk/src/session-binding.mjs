@@ -36,8 +36,15 @@ function assertIdentity(record, harnessSessionId) {
   }
 }
 
+function assertBindingDeadline(deadlineAt) {
+  if (deadlineAt !== undefined && Date.now() >= deadlineAt) {
+    throw new AccError(EXIT.CONFLICT, "hook deadline expired before binding publication", {});
+  }
+}
+
 export async function storeSessionBinding({ runtimeDir, harnessSessionId, accSessionId,
-  generation, clientVersion, platform, clientPid }) {
+  generation, clientVersion, platform, clientPid, deadlineAt }) {
+  assertBindingDeadline(deadlineAt);
   const file = fileFor(runtimeDir, harnessSessionId);
   const record = { schemaVersion: SCHEMA_VERSION, harnessSessionId, accSessionId, generation };
   assertIdentity(record);
@@ -59,6 +66,7 @@ export async function storeSessionBinding({ runtimeDir, harnessSessionId, accSes
   await writeFile(temporary, `${JSON.stringify(record, null, 2)}\n`, "utf8");
   // Replace rather than append: re-attaching supersedes the old generation, and
   // two live bindings for one harness session would be worse than none.
+  assertBindingDeadline(deadlineAt);
   await rename(temporary, file);
 }
 
@@ -88,7 +96,8 @@ export async function loadSessionBinding({ runtimeDir, harnessSessionId }) {
   return binding;
 }
 
-export async function clearSessionBinding({ runtimeDir, harnessSessionId }) {
+export async function clearSessionBinding({ runtimeDir, harnessSessionId, deadlineAt }) {
+  assertBindingDeadline(deadlineAt);
   await rm(fileFor(runtimeDir, harnessSessionId), { force: true });
 }
 
