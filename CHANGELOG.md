@@ -4,7 +4,7 @@
 
 | | |
 |---|---|
-| Built from | `4c315f831d7d88f1e00239d9e2e13fe809aeb9a3` |
+| Built from | `b881fce2c61f1620b20a3720a63fee80cc05556a` |
 | Tarball | `agents-can-communicate-0.3.1.tgz`, 265,744 bytes, 200 entries |
 | sha256 | `aa947539f5e0ae4d9491775e3ad809c7a5279f615f6a5769fd468f69c4d37fc2` |
 
@@ -23,6 +23,12 @@ both original authors retrieved the verdict before completing, and both pairs cl
 without claims or owner bindings. Native Codex trust was reviewed before each run and
 temporary user settings were restored exactly. This is in-turn polling evidence; no new
 capability or model-compliance guarantee is claimed.
+
+A further live review on these unchanged bytes completed two rounds: Claude rejected
+an intentionally defective fixture, Codex corrected it, and the original reviewer reread
+the revised files and approved them. The author retrieved that verdict before finishing.
+Nine revised fixture tests passed; six failed on the original implementation. This adds
+one observed correction cycle, without a new ACC fix or capability claim.
 
 Earlier Codex onboarding correction:
 
