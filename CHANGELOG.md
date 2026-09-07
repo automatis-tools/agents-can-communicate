@@ -4,12 +4,28 @@
 
 | | |
 |---|---|
-| Built from | `767b2265424c467523f8592ab1be351cbee748b4` |
-| Tarball | `agents-can-communicate-0.3.1.tgz`, 262,425 bytes, 197 entries |
-| sha256 | `7ee404cae17b925ebf4a1c3b7f559266bedce3ec5566c57fccb14b8480f622cf` |
+| Built from | `c58063a98a67d5f93b407178d6e821eafe2e5abe` |
+| Tarball | `agents-can-communicate-0.3.1.tgz`, 262,877 bytes, 197 entries |
+| sha256 | `81ac8d37b651e7c3982efb9b707060a292a986a6f115873b079cc38c9209be36` |
 
 Not published. A published record says what the registry serves and is not
 rewritten, so shipped code that changes after a release is measured here instead.
+
+Intent and claim writes now validate the current session under the writer lock. A delayed
+operation from a closed or replaced owner cannot overwrite its successor's intent or
+acquire, renew, release, or force-release claims. Lazy materialisation reads the ephemeral
+records under that same lock, so a first claim cannot restore a retired owner. Intent
+writes follow promotion into durable storage; heartbeat, resume and close preserve changes
+made while the old ephemeral copies await cleanup. Session lookup prefers the durable
+record and refuses an ephemeral owner in another explicitly selected workspace.
+
+The two production fixes are separate commits. All 75 focused checks and 260 adjacent
+core/MCP/hook/process checks passed without skips. All 21 exact mutations were caught and
+restored. A clean install of the previous archive accepted four scheduled stale writes;
+the exact archive above rejected all four with exit 5 and preserved the intended state.
+The installed CLI intent/claim/release/clear/finish cycle and package verification passed.
+These are installed filesystem and executable observations; no new live-model or adapter
+capability capture is claimed.
 
 The full suite caught a regression in MCP finish retries after closed heartbeats became
 invalid: the resolver reopened a different owner before retrying the completed handoff.
@@ -17,8 +33,8 @@ For finish only, the resolver now passes its bound generation directly to core, 
 validates and records or replays it under the transaction lock. Repeated, restarted and
 concurrent finish calls preserve the original result without opening another session.
 Ordinary work still opens a new owner; stale generations and conflicting replays fail.
-All 119 focused checks passed and four exact mutations were caught. The exact archive
-above passed package verification and finish replay through both supported 2025 MCP revisions.
+All 119 focused checks passed and four exact mutations were caught. That MCP correction's
+archive passed package verification and finish replay through both supported 2025 MCP revisions.
 
 Inbox retrieval and acknowledgement now recheck the session owner under the writer lock.
 A call delayed past close or replacement rejects with exit 5 without changing receipts.
@@ -32,7 +48,7 @@ core/storage/process checks passed. A real Claude reviewer was interrupted after
 and before reply. A fresh conversation at the same participant address recovered the request,
 reviewed the fixture and replied; the original Codex process retrieved APPROVE and completed
 its handoff. That generation-race archive matched the native run and passed package
-verification; this candidate changes only the MCP server module in its shipped files.
+verification; the subsequent MCP correction changed only its shipped MCP server module.
 This observes graceful recovery with an operator-launched successor; no
 abrupt-crash, idle-wake or live-delivery capability was added. Details and unsuccessful
 harness attempts are recorded in the release evidence.
