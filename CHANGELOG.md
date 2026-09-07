@@ -4,7 +4,7 @@
 
 | | |
 |---|---|
-| Built from | `a0fc2a67bb597593a42d178c852d5356f89b2d74` |
+| Built from | `3dd613faaab28648414887c8d9b65f8f83b336a8` |
 | Tarball | `agents-can-communicate-0.3.1.tgz`, 266,198 bytes, 200 entries |
 | sha256 | `170424207429240978ccda7e6a3bc60d17e3c8192576dcce32b7c1c755397a05` |
 
