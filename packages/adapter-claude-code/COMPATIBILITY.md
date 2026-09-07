@@ -626,3 +626,42 @@ runs ended with closed ACC sessions and no claims or bindings; temporary native 
 cache/trust changes were restored exactly. Delivery was off. No ACC runtime code,
 maintained test or capability changed. These captures do not establish a native restart,
 transfer to another participant, automatic wake-up or enforcement of semantic blockers.
+
+## New-client recovery of a late review, 2026-09-07
+
+A further capture used the unchanged archive SHA-256
+`170424207429240978ccda7e6a3bc60d17e3c8192576dcce32b7c1c755397a05`.
+Codex CLI 0.153.4 completed a bounded smoke-test handoff and exited. A separate
+Claude Code 2.1.263 reviewer then reproduced inherited-index and custom-iterator
+defects at that exact committed revision, sent a blocking request to the closed
+Codex participant, and exited. The reviewer prompt named these defect classes.
+
+A new Claude conversation started afterward in the author's checkout with its own
+native id, PID and ACC participant. Its prewritten prompt asked to recover prior
+coordination context; it contained no message ids, finding text or old credentials.
+A successful public full sync returned the complete predecessor handoff and late
+finding bodies before observed edits. These were workspace-history reads, not inbox
+retrieval by the original addressee. The successor acquired its own two file claims;
+recorded leases and releases covered the observed changes. It committed a correction
+and recorded a complete handoff. Eleven fixture tests passed independently; restoring
+only the original implementation failed three. Five separate deviation checks passed.
+
+The original closed session, handoffs and review request stayed unchanged. The old
+recipient's receipt remained queued. The successor sent its own resolution note to
+the exited reviewer, referencing the original request without replying or acknowledging
+on the addressee's behalf. That note remained queued; the original reviewer did not
+retrieve or approve the correction. The successor's room handoff had no recipients
+or receipts, and explicitly preserved the original unanswered communication obligation.
+
+Two phrases in the native report were inaccurate: acknowledgement belongs to the
+owning participant, not specifically to a Codex client; the resolution note was queued,
+while the room handoff was recorded without an addressed receipt. Full finding bodies
+came from the full-sync snapshot, not the delta event payload. The original records
+are preserved; those phrases are not product guarantees.
+
+All three native processes exited naturally; all ACC sessions closed, with no claims
+or hook bindings remaining. Temporary Codex trust/cache changes were restored exactly.
+Delivery stayed off. This is one explicit continuation in a small fresh workspace,
+not automatic client restart, unsaved-context recovery, arbitrary-history discovery or
+transfer of another participant's inbox. No ACC runtime, maintained test or capability
+changed. File samples do not exclude transient changes between observations.

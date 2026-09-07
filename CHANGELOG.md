@@ -61,6 +61,13 @@ a third completed with command-specific approval for the synthetic commit. 16 fi
 fixture tests passed; 4 failed with the original source restored. No ACC runtime code,
 maintained tests or capabilities changed. Compatibility notes record the capture limits.
 
+A new-client continuation also recovered the prior handoff and a late review sent to
+an exited Codex participant. A fresh Claude participant read both through public
+workspace history, committed the correction, and recorded its own resolution without
+advancing the old recipient's receipt. Eleven fixture tests passed; restoring the
+original source failed three. The separate resolution note stayed queued for the exited
+reviewer. No ACC runtime or capability changed; compatibility notes record the limits.
+
 Earlier foreground review correction (archive `aa947539f5e0ae4d9491775e3ad809c7a5279f615f6a5769fd468f69c4d37fc2`):
 
 For an agreed review, all five installed skills now direct the agent to read inbox and
