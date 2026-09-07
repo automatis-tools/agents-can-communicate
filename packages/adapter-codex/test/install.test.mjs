@@ -596,8 +596,9 @@ test("a config that sets its own sandbox is not written over", async t => {
   assert.equal((text.match(/\[sandbox_workspace_write\]/g) ?? []).length, 1,
     "the table is declared twice, which this client refuses to load at all");
   assert.match(text, /writable_roots = \["\/tmp\/theirs"\]/);
-  assert.match(result.diagnostics.join(" "),
-    /sets its own sandbox_workspace_write.*read the roster and record nothing/s);
+  assert.ok(result.needsAction.some(line => line.includes("writable_roots")
+    && line.includes(stateRoot) && line.includes(config)),
+  "the existing sandbox's access check was not exposed as an operator action");
 });
 
 test("uninstall takes the sandbox declaration back out", async t => {

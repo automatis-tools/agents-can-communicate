@@ -1,3 +1,5 @@
+// Installation, removal, detection and planning share the exact marketplace,
+// cache and config paths below; keeping them together avoids divergent ownership.
 import { cp, mkdir, readdir, readFile, rm, rmdir, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -24,6 +26,8 @@ const PLUGIN_NAME = "agents-can-communicate";
 // again to confirm a root of ACC's own is accepted and reported enabled.
 const MARKETPLACE = "acc-local";
 const QUALIFIED = `${PLUGIN_NAME}@${MARKETPLACE}`;
+const HOOK_REVIEW = "open codex and run /hooks; check each ACC hook is enabled, "
+  + "review and trust its current definition if needed, then restart the session";
 
 // A marketplace is a root holding `.agents/plugins/marketplace.json`, and every
 // `source.path` in that manifest - `./plugins/<name>` - is resolved by this
@@ -148,6 +152,12 @@ const declaresSandbox = config =>
   /^\s*\[sandbox_workspace_write[\].]/m.test(config)
   || /^\s*sandbox_workspace_write\s*[.=]/m.test(config);
 
+const sandboxReview = (config, file, stateRoot) =>
+  typeof stateRoot === "string" && stateRoot !== "" && declaresSandbox(stripBlock(config))
+    ? [`verify sandbox_workspace_write.writable_roots in ${file} includes ${stateRoot}; `
+      + "your existing sandbox configuration was preserved"]
+    : [];
+
 export async function installCodexPlugin({ home, agentsHome = home,
   codexHome = path.join(home, ".codex"), stateRoot, runner, node }) {
   // Read before writing, so a manifest that will not parse is found before a
@@ -224,11 +234,9 @@ export async function installCodexPlugin({ home, agentsHome = home,
   // while ACC invented its own marketplace name and so had a root to itself.
   // make the record stale the moment the plugin version changes.
   return { ok: true, changes: [target, file, config, cachePath(codexHome)],
+    needsAction: [HOOK_REVIEW, ...sandboxReview(before, config, stateRoot)],
     diagnostics: ["hooks require explicit trust in Codex before they run",
-      ...(theirSandbox
-        ? [`this config sets its own sandbox_workspace_write; add ${stateRoot} to `
-          + "writable_roots, or an agent here can read the roster and record nothing"]
-        : [])] };
+      ...sandboxReview(before, config, stateRoot)] };
 }
 
 /** Remove each directory that is empty, in the order given. */
@@ -296,7 +304,7 @@ export async function uninstallCodexPlugin({ home, agentsHome = home,
 }
 
 export async function detectCodex({ home, agentsHome = home,
-  codexHome = path.join(home, ".codex") }) {
+  codexHome = path.join(home, ".codex"), stateRoot }) {
   const marketplace = await readJson(marketplacePath(agentsHome), null);
   const published = (marketplace?.plugins ?? []).some(entry => entry.name === PLUGIN_NAME);
   const config = await readFile(configPath(codexHome), "utf8").catch(() => "");
@@ -337,10 +345,10 @@ export async function detectCodex({ home, agentsHome = home,
   // and no acc command can: the client grants this once, from its own prompt.
   // A diagnostic alone would have stayed in `--json`, which is where the first
   // version of this fix put it and where nobody would have read it.
-  needsAction: untrusted
+  needsAction: [...(untrusted
     ? ["start codex once and accept the hook trust prompt  "
       + "# its hooks run nothing until then"]
-    : [] };
+    : []), ...(cached ? sandboxReview(config, configPath(codexHome), stateRoot) : [])] };
 }
 
 /**

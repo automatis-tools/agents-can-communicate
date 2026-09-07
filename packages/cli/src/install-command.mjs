@@ -142,6 +142,9 @@ export function describeOutcome({ action, acted, failed = [], skipped = [],
   ...operations.filter(operation => operation.applied
     && typeof operation.deliveryDiagnostic === "string")
     .map(operation => `  ${operation.deliveryDiagnostic}`),
+  ...operations.filter(operation => operation.applied)
+    .flatMap(operation => (operation.needsAction ?? [])
+      .map(step => `  ${operation.adapterId}: ${step}`)),
   ...skipped.map(entry => `  skip ${entry.adapterId}: ${entry.reason}`),
   ...failed.map(entry => `  ${entry.adapterId}: ${entry.error}`),
   // Said once, where it is needed: the reader has just been shown a list of

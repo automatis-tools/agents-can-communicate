@@ -62,6 +62,7 @@ export async function applyPlan({ plan, adapters, context, dataHome, dryRun = fa
           version: operation.clientVersion ?? null, accVersion,
           artifacts: operation.artifacts, createdDirectories, nativeActivation: native });
         results.operations.push({ ...operation, applied: true, appendedRcBlock,
+          needsAction: outcome.needsAction ?? [],
           changes: outcome.changes ?? [], diagnostics: [
             ...(operation.deliveryDiagnostic === undefined
               ? [] : [operation.deliveryDiagnostic]),
