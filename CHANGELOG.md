@@ -4,12 +4,26 @@
 
 | | |
 |---|---|
-| Built from | `8ee7a571a5bde2d013dc365c6b44d346e28266e9` |
-| Tarball | `agents-can-communicate-0.3.1.tgz`, 264,720 bytes, 200 entries |
-| sha256 | `72c4ecfc0ed32f537c14fbbc8b2667c89f0f299c35e2dff3cff5ceccf64bbe58` |
+| Built from | `fabf6e5c779c35be06e30b29f64e02dab529e976` |
+| Tarball | `agents-can-communicate-0.3.1.tgz`, 265,142 bytes, 200 entries |
+| sha256 | `7121e89c21d1d979c84a1f4b8055626cf79ad3415115f634ea5304a64845fdb3` |
 
 Not published. A published record says what the registry serves and is not
 rewritten, so shipped code that changes after a release is measured here instead.
+
+Installation now prints the adapter's activation steps and keeps them in JSON results.
+Codex users are directed to /plugins and /hooks, then to restart their session. When ACC
+preserves an existing sandbox configuration, install and doctor name the exact state
+directory and config to check. Trust and user sandbox decisions remain unchanged.
+
+Codex doctor no longer treats a saved trust substring or a plugin table header as proof
+of active hooks. It reports readiness as unverified and leaves current-definition review
+to Codex. The real 0.153.4 client distinguished partial, stale, commented, disabled and
+fully trusted configurations that ACC had previously conflated. This is metadata evidence,
+not a new live-model or capability capture. All 176 applicable adjacent checks passed;
+eight exact mutations were caught and restored. The saved archive passed package verification.
+
+Earlier hook invocation deadline correction:
 
 One hook budget now covers normalization, workspace discovery, recovery, handling and
 the final status read. Expired operations cannot publish a new owner or binding after
@@ -20,7 +34,7 @@ Timeouts emit the same short fail-open diagnostic as other hook failures.
 
 Storage and hook fixes are separate commits. All 462 adjacent checks passed; all 20 exact
 mutations failed their regressions and the restored copy passed its 25 focused checks.
-The saved archive above passed package verification. These observations cover installed
+That stage's saved archive passed package verification. These observations cover installed
 executables and filesystem operations; they do not add native-client capabilities.
 
 Earlier hook process-crash correction:
