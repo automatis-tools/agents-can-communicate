@@ -248,7 +248,9 @@ test("inbox reads one message and reply answers plus acknowledges it", async t =
   const replied = await json(["reply", "--session", recipient.sessionId, "--generation",
     recipient.generation, "--message", messageId, "--body", "Yes, proceed."]);
   assert.equal(replied.code, 0, replied.stderr);
-  assert.deepEqual(Object.keys(replied.body.data).sort(), ["delivery", "message"]);
+  assert.equal(replied.body.data.receipt.messageId, messageId);
+  assert.equal(replied.body.data.receipt.recipientParticipantId, "models");
+  assert.equal(replied.body.data.receipt.state, "acknowledged");
   assert.equal(replied.body.data.message.inReplyTo, messageId);
   assert.equal(replied.body.data.message.kind, "answer");
   assert.equal(typeof replied.body.data.message.clientMessageId, "string");
