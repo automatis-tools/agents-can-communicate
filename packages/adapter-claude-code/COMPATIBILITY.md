@@ -317,3 +317,40 @@ Claude unnecessarily loaded the ACC skill and then read the file. With the updat
 condition, it only read the file and returned the same correct answer. Neither run
 issued a coordination command. This is one observed before/after sample, not a
 promise about every model turn.
+
+## Interrupted review recovery, 2026-09-07
+
+A controlled restart check used Claude Code 2.1.263 and Codex CLI 0.153.4 on
+macOS arm64 with stock installed plugins, delivery off and a non-Git fixture.
+Codex requested review. After Claude retrieved the request, the harness paused
+that process, confirmed there was no reply, then resumed it and sent SIGINT.
+Its close hook completed. A fresh Claude conversation used the same configured
+public participant address, without the old transcript, message ID or owner pair.
+It recovered the pending request through ACC, independently reviewed the files,
+ran all eight fixture tests and sent APPROVE. The request became acknowledged;
+the original Codex process retrieved the verdict and recorded a complete handoff.
+All three sessions closed, no claims remained, and an old-owner inbox call was
+rejected with exit 5.
+
+This is one graceful interruption/recovery observation with a stable participant
+address. The harness launched the successor; ACC did not restart a client. It
+does not establish abrupt-crash recovery, idle wake, live push, or a new certified
+capability. The successful run reused fixture code from an earlier attempt;
+Codex verified it and added failure-path immutability coverage.
+
+The first attempt ended before a request existed because the reviewer finished
+waiting. A second reached the request but failed in the diagnostic controller's
+non-atomic metadata read. Neither is a passing restart capture. The successful
+retry used atomic metadata writes and a fresh runtime. Temporary Codex hook trust
+and cache changes were removed; the original configuration matched byte-for-byte.
+
+The installed development artifact was SHA-256
+`84209b478b02e4d7a8943f939a958581b8b8791e3ff60d81cabdca101a690c68`.
+Its 61 shipped modules across core, storage-filesystem, hook-runner, CLI and both
+adapters matched the corrected sources byte-for-byte. The final archive has the
+same SHA-256; this repository-only observation is excluded from npm packaging.
+Separately, installed-package tests deliberately
+schedule session replacement before inbox, acknowledgement, heartbeat and close
+writes; those tests reproduce and guard the corrected races. The real-client
+run is evidence for recovery, not evidence that those precise races occurred
+naturally. No capability flag or certification version changed.

@@ -326,9 +326,12 @@ export async function openFilesystemStore({ root, clock, ids, workspaceId, failA
         return next;
       });
     },
-    async delete(kind, id) {
+    async delete(kind, id, guard = () => true) {
       return withWriterMutex(paths, publishOptions, async () => {
-        if (await readEphemeral(kind, id) === null) return null;
+        // Decide and delete under the same lock; a caller may be retiring an
+        // old generation while its replacement is waiting to write this id.
+        const current = await readEphemeral(kind, id);
+        if (current === null || !await guard(current)) return null;
         await retainFile(ephemeralPath(kind, id), { root });
         await markEphemeral(paths, publishOptions, kind, id, "deleted");
         return null;

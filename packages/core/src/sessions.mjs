@@ -113,7 +113,11 @@ export function createSessionService(ports) {
     }
   }
 
-  function assertGeneration(existing, generation, action) {
+  function assertGeneration(existing, generation, action, workspaceId) {
+    if (workspaceId !== undefined && existing.record.workspaceId !== workspaceId) {
+      throw new AccError(EXIT.CONFLICT, "session is not open in this workspace",
+        { sessionId: existing.record.sessionId, workspaceId });
+    }
     if (existing.record.generation !== generation) {
       throw new AccError(EXIT.CONFLICT, `cannot ${action} a replaced session generation`,
         { sessionId: existing.record.sessionId, expected: generation,
@@ -166,21 +170,25 @@ export function createSessionService(ports) {
   }
 
   async function heartbeatSession({ sessionId, workspaceId, generation }) {
-    const existing = await locate(sessionId, workspaceId);
-    if (existing === null) throw new AccError(EXIT.CONFLICT, "session is not open", { sessionId });
-    assertGeneration(existing, generation, "heartbeat");
-    const beaten = { ...existing.record, heartbeatAt: clock.now() };
-
+    const beat = current => {
+      if (current === null) return null;
+      assertGeneration({ record: current }, generation, "heartbeat", workspaceId ?? store.workspaceId);
+      if (current.state !== "open") {
+        throw new AccError(EXIT.CONFLICT, "session is not open", { sessionId });
+      }
+      return { ...current, heartbeatAt: clock.now() };
+    };
     // Heartbeats never append to the semantic event feed: only open, close, and
-    // presence transitions surface through cursor sync (spec section 6.4).
-    if (!existing.durable) {
-      await store.ephemeral.put("session", sessionId, beaten);
+    // presence transitions surface through cursor sync. Read and validate under
+    // the writer lock, so a pending heartbeat cannot restore an old generation.
+    const ephemeral = await store.ephemeral.update("session", sessionId, beat);
+    if (ephemeral !== null) return ephemeral;
+    return store.transaction(tx => {
+      const beaten = beat(tx.get("session", sessionId));
+      if (beaten === null) throw new AccError(EXIT.CONFLICT, "session is not open", { sessionId });
+      tx.put("session", sessionId, beaten, tx.generationOf("session", sessionId));
       return beaten;
-    }
-    await store.transaction(async tx =>
-      tx.put("session", sessionId, beaten, tx.generationOf("session", sessionId)),
-    { kinds: ["session"] });
-    return beaten;
+    }, { kinds: ["session"] });
   }
 
   /**
@@ -231,27 +239,32 @@ export function createSessionService(ports) {
   }
 
   async function closeSession({ sessionId, workspaceId, generation }) {
-    const existing = await locate(sessionId, workspaceId);
-    if (existing === null) throw new AccError(EXIT.CONFLICT, "session is not open", { sessionId });
-    assertGeneration(existing, generation, "close");
-    const now = clock.now();
-    const closed = { ...existing.record, state: "closed", heartbeatAt: now };
-
-    if (!existing.durable) {
-      // An ephemeral-only workspace vanishes with its sessions: nothing durable
-      // was written, so nothing has to be cleaned up later.
-      await store.ephemeral.delete("session", sessionId);
-      await store.ephemeral.delete("intent", sessionId);
-      return closed;
+    const close = current => {
+      assertGeneration({ record: current }, generation, "close", workspaceId ?? store.workspaceId);
+      return { ...current, state: "closed", heartbeatAt: clock.now() };
+    };
+    let ephemeral = null;
+    await store.ephemeral.delete("session", sessionId, current => {
+      ephemeral = close(current);
+      return true;
+    });
+    if (ephemeral !== null) {
+      // Cleanup is a separate locked write; a successor may have appeared since
+      // the close. Its intent must survive the old session's delayed cleanup.
+      await store.ephemeral.delete("intent", sessionId,
+        async () => await store.ephemeral.get("session", sessionId) === null);
+      return ephemeral;
     }
-
-    await store.transaction(async tx => {
+    return store.transaction(tx => {
+      const current = tx.get("session", sessionId);
+      if (current === null) throw new AccError(EXIT.CONFLICT, "session is not open", { sessionId });
+      const closed = close(current);
       tx.put("session", sessionId, closed, tx.generationOf("session", sessionId));
       tx.append({ schemaVersion: SCHEMA_VERSION, eventId: ids.next("event"),
         workspaceId: closed.workspaceId, actorSessionId: sessionId, type: "session.closed",
-        occurredAt: now, payload: {} });
+        occurredAt: closed.heartbeatAt, payload: {} });
+      return closed;
     }, { kinds: ["session"] });
-    return closed;
   }
 
   async function listLiveSessions({ participantId, workspaceId, now = clock.now() }) {
