@@ -23,7 +23,7 @@ test("installed command help answers without credentials, discovery, or writes",
     const result = await invoke([name, "--help", "--json"]);
     assert.equal(result.stderr, "");
     const data = JSON.parse(result.stdout).data;
-    if (name !== "help") assert.equal(data.name, name);
+    assert.equal(data.name, name);
   }
   for (const argv of [["help", "attach"], ["attach", "-h"],
     ["config", "--help"], ["help", "config", "init"],
@@ -35,6 +35,16 @@ test("installed command help answers without credentials, discovery, or writes",
   }
   assert.deepEqual(await readdir(packed.project), []);
   assert.deepEqual(await readdir(packed.clientHome), []);
+});
+
+test("installed sync accepts each scope advertised in help", async t => {
+  const packed = await createPackedAcc(t);
+  const help = await packed.acc(["sync", "--help"]);
+  assert.ok(help.choices.scope.length > 0);
+  for (const scope of help.choices.scope) {
+    const result = await packed.acc(["sync", "--scope", scope]);
+    assert.equal(result.scope, scope);
+  }
 });
 
 test("installed help supplies usable attach, work, and finish arguments", async t => {

@@ -1,7 +1,7 @@
 import { AccError, EXIT } from "@agents-can-communicate/protocol";
 
-// Commands the model is offered stay few and high level; attach, heartbeat, and
-// detach exist for adapters and are deliberately not advertised as model tools.
+// Native adapters manage session lifecycle automatically. Manual CLI sessions
+// use attach, heartbeat, and detach; both paths are described in command help.
 //
 // `--session` and `--generation` are optional on every agent-facing command:
 // an operator may instead configure the explicit owner pair in the environment
@@ -41,8 +41,8 @@ export const COMMANDS = Object.freeze({
   // The one command with a subcommand. Kept as an explicit list rather than a
   // free positional: `acc config delete` should fail at the parser, not deep
   // inside a handler that has already decided what to do.
-  config: { required: [], optional: [], flags: ["yes", "force"],
-    subcommands: ["init", "validate"] },
+  config: { required: [], optional: [], subcommands: ["init", "validate"],
+    subcommandOptions: { init: { flags: ["yes", "force"] }, validate: { flags: [] } } },
   // No `--yes`: neither of these ever asked, so the flag agreed to nothing. It
   // was accepted and read by nobody, which is a promise that a confirmation
   // exists to be skipped.
@@ -78,6 +78,11 @@ function usage(message, details = {}) {
 
 const camel = name => name.replace(/-([a-z])/g, (_, letter) => letter.toUpperCase());
 
+export function commandSpec(name, subcommand) {
+  const spec = COMMANDS[name];
+  return { ...spec, ...spec.subcommandOptions?.[subcommand] };
+}
+
 export function parseArgs(argv) {
   if (!Array.isArray(argv) || argv.length === 0) {
     usage("a command is required - `acc help` lists them");
@@ -89,7 +94,7 @@ export function parseArgs(argv) {
     command = rest.shift();
     helpRequested = true;
   }
-  const spec = COMMANDS[command];
+  let spec = COMMANDS[command];
   if (!Object.hasOwn(COMMANDS, command)) {
     usage(`unknown command: ${command} - \`acc help\` lists them`, { command });
   }
@@ -105,6 +110,7 @@ export function parseArgs(argv) {
         { command, subcommand: subcommand ?? null });
     }
   }
+  spec = commandSpec(command, subcommand);
 
   const repeated = new Set(spec.repeated ?? []);
   const flags = new Set([...(spec.flags ?? []), "json"]);
@@ -157,7 +163,7 @@ export function parseArgs(argv) {
     else options[key] = value;
   }
 
-  if (helpRequested && command !== "help") {
+  if (helpRequested) {
     return { command: "help", options: { helpCommand: command,
       ...(subcommand === undefined ? {} : { subcommand }),
       ...(options.json === true ? { json: true } : {}) } };

@@ -2,7 +2,8 @@ import { CLAIM_ENFORCEMENTS, CLAIM_MODES, GENERIC_MESSAGE_KINDS, HANDOFF_STATUSE
   INTENT_MODES, INTENT_STATES, OBLIGATIONS } from "@agents-can-communicate/protocol";
 import { LIVE_POLICIES } from "@agents-can-communicate/installer";
 
-import { COMMANDS } from "./args.mjs";
+import { COMMANDS, commandSpec } from "./args.mjs";
+import { ALL_ADAPTERS } from "./install-command.mjs";
 import { needsOwner } from "./session-owner.mjs";
 
 /**
@@ -63,13 +64,15 @@ export function describeCommands() {
 const DOCS = "https://github.com/automatis-tools/agents-can-communicate"
   + "/blob/main/docs/CLI.md";
 
+const ADAPTER_IDS = Object.freeze(ALL_ADAPTERS().map(adapter => adapter.id));
 const CHOICES = Object.freeze({
   work: { mode: INTENT_MODES, state: INTENT_STATES },
   claim: { mode: CLAIM_MODES, enforcement: CLAIM_ENFORCEMENTS },
   finish: { status: HANDOFF_STATUSES },
   message: { type: GENERIC_MESSAGE_KINDS, obligation: OBLIGATIONS },
   sync: { scope: ["delta", "full"] },
-  install: { delivery: LIVE_POLICIES },
+  install: { delivery: LIVE_POLICIES, adapter: ADAPTER_IDS },
+  uninstall: { adapter: ADAPTER_IDS },
 });
 
 const NOTES = Object.freeze({
@@ -86,17 +89,25 @@ const NOTES = Object.freeze({
   reply: ["Returns the outgoing message/delivery plus the original acknowledged receipt."],
   finish: ["Default status: partial. Records a handoff, releases claims, and closes this ACC session."],
   config: ["init writes optional workspace configuration; validate only checks it.",
-    "init requires confirmation or --yes. --force bypasses the active-session check; an existing config is never overwritten."],
+    "Use acc config <subcommand> --help for its options."],
+});
+
+const CONFIG_HELP = Object.freeze({
+  init: { summary: "write optional workspace configuration",
+    notes: ["init requires confirmation or --yes. --force bypasses the active-session check; an existing config is never overwritten."] },
+  validate: { summary: "check optional workspace configuration",
+    notes: ["Checks acc.workspace.json in the selected directory without writing it."] },
 });
 
 export function describeCommand(name, subcommand) {
-  const spec = COMMANDS[name];
-  return { name, summary: SUMMARY[name],
+  const spec = commandSpec(name, subcommand);
+  const detail = name === "config" ? CONFIG_HELP[subcommand] : undefined;
+  return { name, summary: detail?.summary ?? SUMMARY[name],
     ...(subcommand === undefined ? {} : { subcommand }),
     required: spec.required ?? [], optional: spec.optional ?? [],
     repeated: spec.repeated ?? [], flags: spec.flags ?? [],
     subcommands: spec.subcommands ?? [], choices: CHOICES[name] ?? {},
-    notes: [...(NOTES[name] ?? []), ...(needsOwner(name)
+    notes: [...(detail?.notes ?? NOTES[name] ?? []), ...(needsOwner(name)
       ? ["Use your own --session and --generation from the ACC hook or manual attach; never a peer's pair."]
       : [])] };
 }
@@ -116,7 +127,12 @@ export function commandHelpText(command) {
     }
     lines.push("");
   }
-  lines.push("Global: --json, --cwd <path>, --workspace <config>, --help, -h", "", ...notes,
+  const globals = ["--json", "--help", "-h"];
+  if (!["install", "uninstall", "update", "help", "version"].includes(name)) {
+    globals.push("--cwd <path>");
+    if (name !== "config" || subcommand !== "validate") globals.push("--workspace <config>");
+  }
+  lines.push(`Global: ${globals.join(", ")}`, "", ...notes,
     `Full reference: ${DOCS}`);
   return lines.join("\n");
 }
@@ -133,7 +149,7 @@ export function helpText() {
   }
   // The longer reference is linked to the repository named in the manifest;
   // installed command help supplies local syntax without needing that link.
-  lines.push("Every command takes --json for machine output and --cwd to choose the workspace.",
+  lines.push("Every command takes --json for machine output.",
     "Use acc <command> --help or acc help <command> for options and accepted values.",
     `Full reference: ${DOCS}`);
   return lines.join("\n");
