@@ -762,3 +762,44 @@ observations. Temporary Codex cache and trust changes were removed, with exact o
 config restoration. Delivery was off. These are observations of explicitly scoped
 review and a delayed verdict, not generic revision enforcement, automatic wake-up,
 universal review accuracy or recovery of a late correction in a successor session.
+
+## Late review after a completed turn, 2026-09-07
+
+Three Claude Code 2.1.263 / Codex CLI 0.153.4 captures used the unchanged
+`170424207429240978ccda7e6a3bc60d17e3c8192576dcce32b7c1c755397a05` archive.
+Codex first completed an explicitly bounded smoke-test handoff without editing.
+Claude then reviewed the committed implementation from a separate worktree and sent
+a blocking request to the closed author's exact participant. The reviewer prompt
+directed inherited-index and custom-iterator checks: this demonstrates reproduction
+of those seeded defect classes, not unaided discovery or universal review accuracy.
+
+The late request was captured queued before a prewritten continuation prompt was
+submitted to the same ephemeral native conversation. The prompt contained no finding
+text or message id. A fresh ACC owner retained the author's participant and native PID;
+the old closed session and handoff stayed unchanged. The continuation retrieved the
+complete finding through inbox before observed edits, acquired its own two file claims,
+corrected the implementation and replied under its new owner. A hook message id alone
+was not counted as proof of body receipt. The reviewer had already exited, so the reply
+remained queued; no receipt or attention by the exited reviewer is claimed.
+
+In the first run, native sandbox policy blocked the synthetic Git index lock. The
+author left a truthful partial handoff with an uncommitted correction. In the second
+run, the throwaway harness rejected a native Git approval request and the author again
+finished partial. An isolated replay proved that the handler incorrectly rejected
+shell-wrapped Git commands before operator review; the rejected live command itself
+was not retained. After correcting that handler, a third run used command-specific
+approval for the already-authorized fixture Git commit; it committed the correction
+and completed its handoff. The final run's 16 fixture tests
+and independent checks passed; restoring only the original source failed 4 tests.
+Both defect classes and representative variants were also checked separately against
+the old and corrected source. SPEC.md stayed unchanged. The final handoff explicitly
+retained the reviewer's non-blocking hostile-Proxy spoofing limit; independent replay
+confirmed that behavior remains. A complete status here is scoped to this correction.
+
+Codex's app-server transport can include internal review child events. Captured root
+thread and requested-turn identities distinguish those reports from the actual author's
+completion. Sampled files cannot exclude transient edits between observations. All three
+runs ended with closed ACC sessions and no claims or bindings; temporary native Codex
+cache/trust changes were restored exactly. Delivery was off. No ACC runtime code,
+maintained test or capability changed. These captures do not establish a native restart,
+transfer to another participant, automatic wake-up or enforcement of semantic blockers.

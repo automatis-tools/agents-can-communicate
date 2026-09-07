@@ -53,6 +53,14 @@ after the author exited; B already fixed those missed cases. No ACC runtime code
 capability changed. Compatibility notes distinguish the delivered verdict from the
 later unread amendment and record the limits of the capture.
 
+A late-review audit on the same archive recovered a blocking request after the
+author's bounded complete handoff. A new ACC owner in the same native conversation
+retrieved and fixed the finding while preserving the old session and handoff. The first
+two runs stopped partial after a native Git denial and a harness approval rejection;
+a third completed with command-specific approval for the synthetic commit. 16 final
+fixture tests passed; 4 failed with the original source restored. No ACC runtime code,
+maintained tests or capabilities changed. Compatibility notes record the capture limits.
+
 Earlier foreground review correction (archive `aa947539f5e0ae4d9491775e3ad809c7a5279f615f6a5769fd468f69c4d37fc2`):
 
 For an agreed review, all five installed skills now direct the agent to read inbox and
