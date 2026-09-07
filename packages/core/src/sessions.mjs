@@ -114,9 +114,11 @@ export function createSessionService(ports) {
    * not a second agent arriving.
    */
   async function resumeSession({ sessionId, workspaceId, generation, ...metadata }) {
+    const resolvedWorkspace = workspaceId ?? store.workspaceId;
     const resume = current => {
       if (current === null || current.state !== "open"
-        || current.generation !== generation) return null;
+        || current.generation !== generation
+        || resolvedWorkspace !== undefined && current.workspaceId !== resolvedWorkspace) return null;
       return { ...current,
       pid: metadata.pid ?? null,
       checkoutRoot: metadata.checkoutRoot ?? current.checkoutRoot,
@@ -138,7 +140,6 @@ export function createSessionService(ports) {
     // Re-read and validate inside the durable transaction for the same reason.
     // Using generationOf only as the put token is insufficient: it protects
     // the envelope write, not the semantic generation carried by the record.
-    const resolvedWorkspace = workspaceId ?? store.workspaceId;
     if (resolvedWorkspace === undefined) return null;
     return store.transaction(async tx => {
       const current = tx.get("session", sessionId);
