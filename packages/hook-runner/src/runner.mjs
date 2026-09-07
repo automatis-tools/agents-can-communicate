@@ -14,6 +14,7 @@ import { resolveClientPid } from "./client-pid.mjs";
 import { probeClientVersion as defaultProbeClientVersion } from "./client-version.mjs";
 import { establishNativeBinding, livePolicyFrom } from "./native-binding.mjs";
 import { readProcessTable as defaultReadProcessTable } from "./process-table.mjs";
+import { withSessionLifecycle } from "./session-lifecycle.mjs";
 
 // Kept cohesive above 300 lines because every handler shares one fail-open
 // hook boundary, binding lifecycle, and client-specific outcome contract.
@@ -492,14 +493,19 @@ export async function runHook({ adapterId, payload, adapters, dataHome, env,
 
     const event = await adapter.normalizeHook(payload);
     const context = await openContext({ cwd: event.cwd, dataHome, runtime, env });
-    const binding = await loadSessionBinding({ runtimeDir: context.paths.root,
-      harnessSessionId: event.sessionId }).catch(() => null);
-
     const handler = HANDLERS[event.kind];
-    const work = handler === undefined
-      ? Promise.resolve({})
-      : handler({ event, context, adapter, adapterId, binding, paths: context.paths,
+    const invoke = async () => {
+      const binding = await loadSessionBinding({ runtimeDir: context.paths.root,
+        harnessSessionId: event.sessionId });
+      return handler === undefined ? {} : handler({ event, context, adapter, adapterId,
+        binding, paths: context.paths,
         readProcessTable, probeClientVersion, platform, deadline });
+    };
+    const lifecycle = event.kind === "sessionStart" || event.kind === "sessionEnd";
+    const work = lifecycle
+      ? withSessionLifecycle({ root: context.paths.root, sessionId: event.sessionId,
+        clock: runtime.clock, deadlineAt: deadline }, invoke)
+      : invoke();
 
     // The loser of a race is not cancelled, so the timer is cleared explicitly:
     // an outstanding one keeps the process alive long past its answer.
