@@ -12,6 +12,19 @@ acc help
 acc version
 ```
 
+Use `acc <command> --help` (or `-h`) and `acc help <command>` for that command's
+required, optional, repeatable and flag options, accepted values, and usage notes.
+For example, `acc work --help` lists intent modes, and `acc finish --help` lists
+handoff statuses. `acc config --help` lists its subcommands;
+`acc config init --help` and `acc help config init` describe initialization.
+
+Add `--json` to receive the command description as structured data: `name`,
+`summary`, `required`, `optional`, `repeated`, `flags`, `subcommands`, `choices`,
+and `notes`, plus `subcommand` when selected. General `acc help --json` keeps its
+grouped `commands` result. Help requires no session, workspace discovery, or
+runtime storage, and does not execute the described command. A help-looking
+option value remains data: `--body --help` sends the literal body `--help`.
+
 ## Coordinate from a session
 
 | Command | Required | Optional |

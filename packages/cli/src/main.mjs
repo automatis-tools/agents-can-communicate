@@ -13,7 +13,7 @@ import { parseArgs, positiveNumber } from "./args.mjs";
 // A usage error names what is missing rather than failing deeper in a service
 // with the argument already half-applied.
 const usage = message => new AccError(EXIT.USAGE, message);
-import { describeCommands, helpText } from "./help.mjs";
+import { commandHelpText, describeCommand, describeCommands, helpText } from "./help.mjs";
 import { runUpdateCommand } from "./update-command.mjs";
 import { runConfigCommand } from "./config-command.mjs";
 import { runInstallCommand } from "./install-command.mjs";
@@ -362,7 +362,13 @@ const HANDLERS = Object.freeze({
 
   update: async ({ options, runtime }) => runUpdateCommand({ options, runtime }),
 
-  help: async () => ({ data: { commands: describeCommands() }, text: helpText() }),
+  help: async ({ options }) => {
+    if (options.helpCommand === undefined) {
+      return { data: { commands: describeCommands() }, text: helpText() };
+    }
+    const data = describeCommand(options.helpCommand, options.subcommand);
+    return { data, text: commandHelpText(data) };
+  },
 
   version: async ({ runtime }) => {
     // Read by the composition root from the package manifest: `bin/` sits at

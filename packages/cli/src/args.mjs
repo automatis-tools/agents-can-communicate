@@ -65,10 +65,8 @@ export const COMMANDS = Object.freeze({
   version: { required: [], optional: [] },
 });
 
-// Spelled as the commands they mean, and only in first position. A message body
-// legitimately begins with "--" - exchanging diffs is the point of this tool -
-// so reading them anywhere in the argv would make `acc message --body "--help"`
-// print the help instead of sending it.
+// Leading aliases select a command. Command-local help is recognized while
+// consuming options below, never by searching inside their values.
 const ALIASES = Object.freeze({ "--help": "help", "-h": "help",
   "--version": "version", "-v": "version", "-V": "version" });
 
@@ -85,17 +83,24 @@ export function parseArgs(argv) {
     usage("a command is required - `acc help` lists them");
   }
   const [first, ...rest] = argv;
-  const command = ALIASES[first] ?? first;
+  let command = Object.hasOwn(ALIASES, first) ? ALIASES[first] : first;
+  let helpRequested = false;
+  if (command === "help" && rest[0] !== undefined && !rest[0].startsWith("-")) {
+    command = rest.shift();
+    helpRequested = true;
+  }
   const spec = COMMANDS[command];
-  if (spec === undefined) {
+  if (!Object.hasOwn(COMMANDS, command)) {
     usage(`unknown command: ${command} - \`acc help\` lists them`, { command });
   }
 
   let tokens = rest;
   let subcommand;
   if (spec.subcommands !== undefined) {
-    [subcommand, ...tokens] = rest;
-    if (subcommand === undefined || !spec.subcommands.includes(subcommand)) {
+    if (rest[0] !== undefined && !rest[0].startsWith("-")) {
+      [subcommand, ...tokens] = rest;
+    }
+    if (subcommand !== undefined && !spec.subcommands.includes(subcommand)) {
       usage(`${command} requires one of: ${spec.subcommands.join(", ")}`,
         { command, subcommand: subcommand ?? null });
     }
@@ -117,6 +122,12 @@ export function parseArgs(argv) {
 
   for (let index = 0; index < tokens.length; index += 1) {
     const token = tokens[index];
+    // A preceding value-taking option has already consumed its value. In
+    // particular, `--body --help` still sends the literal text "--help".
+    if (token === "--help" || token === "-h") {
+      helpRequested = true;
+      continue;
+    }
     if (!token.startsWith("--") || token.length === 2) usage(`unexpected argument: ${token}`);
     const separator = token.indexOf("=");
     const name = separator === -1 ? token.slice(2) : token.slice(2, separator);
@@ -146,6 +157,15 @@ export function parseArgs(argv) {
     else options[key] = value;
   }
 
+  if (helpRequested && command !== "help") {
+    return { command: "help", options: { helpCommand: command,
+      ...(subcommand === undefined ? {} : { subcommand }),
+      ...(options.json === true ? { json: true } : {}) } };
+  }
+  if (spec.subcommands !== undefined && subcommand === undefined) {
+    usage(`${command} requires one of: ${spec.subcommands.join(", ")}`,
+      { command, subcommand: null });
+  }
   for (const name of spec.required ?? []) {
     if (!Object.hasOwn(options, camel(name))) {
       usage(`${command} requires --${name}`, { command, option: name });

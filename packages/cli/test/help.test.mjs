@@ -39,8 +39,8 @@ test("`acc` on its own says how to find the commands", () => {
 });
 
 test("a message body may still be the word --help", () => {
-  // The reason the spellings are read in first position only. Agents exchange
-  // diffs and console output, and a body that begins with "--" is ordinary.
+  // Help flags are read at option boundaries, not inside consumed values.
+  // Agents exchange console output, so a body beginning with "--" is ordinary.
   const parsed = parseArgs(["message", "--to", "peer", "--subject", "s",
     "--body", "--help"]);
 
