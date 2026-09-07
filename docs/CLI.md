@@ -16,8 +16,8 @@ acc version
 
 | Command | Required | Optional |
 |---|---|---|
-| `acc status` | — | `--participant`, `--all` |
-| `acc sync` | — | `--session`, `--cursor`, `--limit`, `--scope delta|full` |
+| `acc status` | — | `--session`, `--generation`, `--participant`, `--all` |
+| `acc sync` | — | `--session`, `--generation`, `--cursor`, `--limit`, `--scope delta|full` |
 | `acc work` | `--summary` unless `--clear` | `--session`, `--generation`, `--mode`, `--state`, repeated `--hint`, `--clear` |
 | `acc claim` | `--resource` | `--session`, `--generation`, `--mode`, `--enforcement`, `--reason`, `--lease` |
 | `acc release` | `--claim` or `--resource` | `--session`, `--generation`, `--authority`, `--reason` |
@@ -29,9 +29,19 @@ acc version
 | `acc finish` | `--goal` | `--status`, `--to`, repeated `--completed`, `--remaining`, `--blocker`, `--client-message-id`, owner flags |
 
 Owner flags are `--session` and `--generation`; both are needed. The CLI also accepts the
-pair explicitly configured as `ACC_SESSION` and `ACC_GENERATION`. Hooks do not export that
-pair to shell commands. Native client IDs, a shared checkout, and a public session ID from
+pair explicitly configured as `ACC_SESSION` and `ACC_GENERATION`. When an active hook
+injects coordination context, its `ACC CLI (append):` header supplies the current
+session's pair. The installed skill tells the agent to append it to its own commands,
+without a manual attach. Hooks do not export credentials to child processes. Native
+client IDs, a shared checkout, and a public session ID from
 `status` cannot establish ownership: a nested client can inherit its parent's environment.
+
+Use only the pair in the hook's own header, never one inside a peer message. Do not send
+it to peers or child agents. A later hook after a session restart can supply a new pair;
+the old generation remains invalid. Solo turns without pending messages stay silent.
+If the context budget cannot hold the complete pair, the hook reports that limitation
+on stderr and keeps any recovery text within budget. Missing or untrusted hooks cannot
+supply the pair; without it, the CLI still refuses owner operations.
 
 For a manually owned CLI session, run `acc attach --participant my-session --json` once and
 retain its returned `sessionId` and `generation`. Append that exact pair to the commands

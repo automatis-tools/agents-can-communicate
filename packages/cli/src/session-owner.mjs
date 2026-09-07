@@ -10,9 +10,9 @@ export const needsOwner = command => NEEDS_OWNER.has(command);
 
 const unresolved = command => new AccError(EXIT.USAGE,
   `${command} could not tell which session is running it. Pass both --session and `
-  + "--generation returned by your own acc attach, or use this session's ACC MCP tools. "
-  + "Do not copy a peer's session from acc status. Native session IDs, hooks, and a "
-  + "shared checkout do not supply CLI owner credentials.",
+  + "--generation from this turn's ACC hook header or your own acc attach, or use this "
+  + "session's ACC MCP tools. Do not copy a peer's session from acc status. Native "
+  + "session IDs and a shared checkout do not establish CLI ownership.",
   { command, reasonCode: "caller_identity_unresolved" });
 
 /**

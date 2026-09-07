@@ -4,15 +4,15 @@ import { AccError, EXIT } from "@agents-can-communicate/protocol";
 // detach exist for adapters and are deliberately not advertised as model tools.
 //
 // `--session` and `--generation` are optional on every agent-facing command:
-// the CLI works out which session is calling it (see session-owner.mjs). They
-// stay accepted because an adapter, a script, or an agent holding a session id
-// from `acc status --json` has a reason to be explicit. They remain required on
-// attach, heartbeat and detach, which are the adapter's own lifecycle calls.
+// an operator may instead configure the explicit owner pair in the environment
+// (see session-owner.mjs). Public status/sync also work without an owner pair.
+// A public session id alone proves nothing. Heartbeat and detach always require
+// both arguments; attach creates and returns the pair.
 export const COMMANDS = Object.freeze({
   attach: { required: ["participant"], optional: ["harness", "cadence", "parent", "session"] },
   heartbeat: { required: ["session", "generation"], optional: [] },
   detach: { required: ["session", "generation"], optional: [] },
-  sync: { required: [], optional: ["session", "cursor", "limit", "scope"] },
+  sync: { required: [], optional: ["session", "generation", "cursor", "limit", "scope"] },
   work: { required: [], optional: ["session", "generation", "summary", "mode",
     "state"], repeated: ["hint"], flags: ["clear"] },
   claim: { required: ["resource"],
@@ -36,7 +36,7 @@ export const COMMANDS = Object.freeze({
   finish: { required: ["goal"], optional: ["session", "generation", "status", "to",
     "client-message-id"],
     repeated: ["completed", "remaining", "blocker"] },
-  status: { required: [], optional: ["participant"], flags: ["all"] },
+  status: { required: [], optional: ["session", "generation", "participant"], flags: ["all"] },
   doctor: { required: [], optional: ["home"], flags: ["repair"] },
   // The one command with a subcommand. Kept as an explicit list rather than a
   // free positional: `acc config delete` should fail at the parser, not deep

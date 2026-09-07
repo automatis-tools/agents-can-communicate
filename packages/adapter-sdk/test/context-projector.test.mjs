@@ -234,6 +234,17 @@ test("a tiny budget emits no partial recovery command", () => {
     "a truncated message id or command is not an actionable recovery path");
 });
 
+test("an optional overflow count cannot hide the first complete recovery command", () => {
+  const first = "message_1234567890123456789012";
+  const result = projectContextResult(syncResult({ messages: [
+    peerMessage({ messageId: first, body: "x".repeat(300) }),
+    peerMessage({ messageId: "message_abcdefghijklmnopqrstuv", body: "y".repeat(300) }),
+  ] }), { budgetBytes: 84 });
+  assert.match(result.text, new RegExp(`acc inbox --message ${first}`));
+  assert.ok(Buffer.byteLength(result.text) <= 84);
+  assert.deepEqual(result.offeredMessageIds, []);
+});
+
 test("what the budget leaves out is stated, not silently dropped", () => {
   const rendered = projectContext(syncResult({
     roster: [],

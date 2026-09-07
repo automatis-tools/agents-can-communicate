@@ -4,10 +4,10 @@ Install ACC, open the AI sessions you already use, and give them related work. S
 integrations make peers visible and teach each agent how to communicate. You do not need to
 carry messages between windows or add coordination instructions to your task prompts.
 
-**Current CLI limitation:** hook presence does not supply shell owner credentials.
-Mutations and inbox reads require an explicitly configured session/generation pair, or
-session-bound ACC MCP tools. Automatic CLI owner inference is disabled because it could
-attribute one client's actions to another. See [CLI ownership](CLI.md#coordinate-from-a-session).
+Active hooks supply each agent's own CLI arguments in coordination context; the installed
+skill tells the agent to use them. This path was observed in Claude Code 2.1.263 and
+Codex 0.153.4. Hooks must be enabled and trusted by the client. Without hook context, owner
+operations require an explicit pair or session-bound ACC MCP tools. See [CLI ownership](CLI.md#coordinate-from-a-session).
 
 ## 1. Install once on this machine
 

@@ -5,7 +5,7 @@ import path from "node:path";
 import { clearSessionBinding, effectiveCapabilities, loadSessionBinding, storeSessionBinding }
   from "@agents-can-communicate/adapter-sdk";
 import { createCoordinationService } from "@agents-can-communicate/core";
-import { createId } from "@agents-can-communicate/protocol";
+import { assertPortableId, createId } from "@agents-can-communicate/protocol";
 import { openFilesystemStore } from "@agents-can-communicate/storage-filesystem";
 import { createGitProbe, discoverWorkspace, platformDataHome, runtimePaths }
   from "@agents-can-communicate/cli";
@@ -224,8 +224,22 @@ async function projectTurn({ binding, context, adapter, adapterId }) {
     liveOfferedMessageIds: delivery.liveOfferedMessageIds,
     roomMessageIds: delivery.roomMessageIds,
     currentParticipantId: mine?.participantId };
+  // Only this hook's payload selected the binding. Supply its own pair as
+  // trusted context, outside peer bodies, rather than exporting inheritable
+  // credentials or teaching the CLI to guess from a public roster.
+  const owner = "ACC CLI (append): --session "
+    + assertPortableId(binding.accSessionId, "sessionId") + " --generation "
+    + assertPortableId(binding.generation, "generation");
+  const totalBudget = context.descriptor.policy?.contextBudgetBytes ?? 6_000;
+  // Credentials alone cannot replace the command that reaches a queued body.
+  // If both cannot fit, preserve recovery and explain the missing owner pair.
+  const minimumBodyBytes = messages.length === 0 ? 1
+    : byteLength(compactInboxRecovery(messages.slice(0, 1)));
+  const ownerFits = byteLength(owner) + 1 + minimumBodyBytes <= totalBudget;
+  const ownerWarning = ownerFits ? null
+    : "acc: context budget cannot fit owner arguments with coordination context; increase contextBudgetBytes";
   const projectionOptions = {
-    budgetBytes: context.descriptor.policy?.contextBudgetBytes };
+    budgetBytes: ownerFits ? totalBudget - byteLength(owner) - 1 : totalBudget };
   // Delivery is state, not text parsing. Peer-controlled bodies can imitate
   // another message's visible header, so only projector metadata proves
   // which complete groups survived the byte budget. A custom adapter without
@@ -246,10 +260,12 @@ async function projectTurn({ binding, context, adapter, adapterId }) {
       + `${messages[0].messageId} with acc inbox --message ${messages[0].messageId}` : null;
   const visibleDegradation = degradation === null ? "" : `ACC: ${degradation.slice(5)}`;
   const budgetBytes = projectionOptions.budgetBytes ?? 6_000;
-  const projected = degradation === null ? projection.text
+  const body = degradation === null ? projection.text
     : fitDegradation(projection.text, visibleDegradation, messages, budgetBytes);
+  const projected = body === "" ? "" : ownerFits ? `${owner}\n${body}` : body;
   if (projected === "") {
-    return degradation === null ? { stdout: "" } : { stdout: "", stderr: degradation };
+    return { stdout: "", stderr: messages.length === 0 ? ""
+      : [ownerWarning, degradation].filter(Boolean).join("\n") };
   }
 
   // The renderer returns ids as metadata, never as text to parse. A peer body
@@ -269,9 +285,8 @@ async function projectTurn({ binding, context, adapter, adapterId }) {
   // callback proves that the bytes crossed.
   const outcome = { stdout: "", ...adapter.injectOutcome?.(projected) };
   const writableOffers = outcome.stdout === "" ? [] : offerInputs;
-  if (degradation === null) return { ...outcome, offerInputs: writableOffers };
   return { ...outcome,
-    stderr: [outcome.stderr, degradation].filter(Boolean).join("\n"),
+    stderr: [outcome.stderr, ownerWarning, degradation].filter(Boolean).join("\n"),
     offerInputs: writableOffers };
 }
 

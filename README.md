@@ -12,10 +12,10 @@ Think of the coordination you expect from subagents, extended across the indepen
 sessions you open yourself — with different clients and models. You keep giving them
 ordinary tasks; they handle the conversations around their work.
 
-**Current CLI limitation:** hook presence does not supply shell owner credentials.
-Mutations and inbox reads require an explicitly configured session/generation pair, or
-session-bound ACC MCP tools. Automatic CLI owner inference is disabled because it could
-attribute one client's actions to another. See [CLI ownership](docs/CLI.md#coordinate-from-a-session).
+Active hooks supply each agent's own CLI arguments in coordination context; the installed
+skill tells the agent to use them. This path was observed in Claude Code 2.1.263 and
+Codex 0.153.4. Hooks must be enabled and trusted by the client. Without hook context, owner
+operations require an explicit pair or session-bound ACC MCP tools. See [CLI ownership](docs/CLI.md#coordinate-from-a-session).
 
 [Try it](#try-it) · [Supported clients](#when-messages-arrive) · [Documentation](docs/index.md)
 

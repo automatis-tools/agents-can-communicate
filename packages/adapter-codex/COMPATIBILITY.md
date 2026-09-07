@@ -373,3 +373,31 @@ explicit caller-owned pair; session-bound MCP identity is unchanged. Hook presen
 certified delivery capabilities do not imply shell commands have owner credentials.
 The observation retained only a fixed session-ID allowlist and process metadata, not a
 client transcript. No capability was promoted by this capture.
+
+## Hook-provided CLI ownership, observed 2026-09-06
+
+In a disposable non-Git workspace, the installed hook supplied its own
+`--session`/`--generation` pair in the `UserPromptSubmit` context. The real client
+loaded the installed skill and used that pair for intent, a file claim, inbox,
+reply, and finish. No pair was placed in the task prompt or exported environment;
+the agent did not manually attach or read runtime bindings. Durable messages had
+the native hook session as author, the answered question became `acknowledged`,
+and finish released its claim.
+
+The run retained diagnostic metadata and ACC records, not raw conversation or tool
+transcripts. A scripted peer seeded the initial request; Claude then left a question
+which the real Codex session answered. These were sequential client turns, not an
+idle wake or live injection test. Native delivery capabilities and certification
+versions are unchanged. Unsupported next-turn bodies remain withheld with an inbox
+recovery command; this observation proves use of the hook's own CLI arguments.
+
+The CLI still refuses a caller lacking its own pair. Hooks never export credentials
+that a nested client could inherit. Solo turns without pending coordination remain
+silent. Very small context budgets can retain recovery without the pair and report
+that limitation on stderr. The agent must have permission to execute the CLI.
+
+Observed client: Codex CLI **0.153.4**, macOS arm64. The native `/hooks` review
+screen showed all five installed ACC hooks active after review. Enabling the
+plugin alone had left them untrusted and skipped. The test used normal persisted
+hook trust, without a hook-trust bypass; prompt context arrived as developer text.
+Temporary candidate cache and trust changes were scoped to this verification.

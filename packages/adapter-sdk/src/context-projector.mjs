@@ -89,7 +89,7 @@ function ambientHeader(count) {
 function recoveryNote(ids) {
   const first = ids[0];
   const rest = ids.length > 1 ? ` (+${ids.length - 1} more in \`acc inbox\`)` : "";
-  return `- read ${first}: \`acc inbox --message ${first}\`${rest}`;
+  return `- read: \`acc inbox --message ${first}\`${rest}`;
 }
 
 /**
@@ -166,7 +166,9 @@ export function projectContextResult(sync, { budgetBytes = DEFAULT_BUDGET_BYTES 
       lines.length = 0;
       used = 0;
     }
-    const fitted = recoveryNote([...new Set(droppedMessages)]);
+    const withCount = recoveryNote([...new Set(droppedMessages)]);
+    const fitted = used + bytes(withCount) + 1 <= budgetBytes
+      ? withCount : recoveryNote(droppedMessages.slice(0, 1));
     // An incomplete id or command is not a recovery path. When a deliberately
     // tiny budget cannot hold the shortest truthful instruction, say nothing
     // and leave every omitted receipt queued for a later turn.
