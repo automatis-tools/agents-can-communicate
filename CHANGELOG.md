@@ -4,12 +4,31 @@
 
 | | |
 |---|---|
-| Built from | `1096e3243567de8ea8f396d06a93519a0a908c23` |
-| Tarball | `agents-can-communicate-0.3.1.tgz`, 261,461 bytes, 197 entries |
-| sha256 | `f5b342e3ec4f989aeba5ae074e064092f4daba4a8a85df12fab66015e019c650` |
+| Built from | `9d3ae91315f4e2836e72dc206500e0d5529171ce` |
+| Tarball | `agents-can-communicate-0.3.1.tgz`, 261,952 bytes, 197 entries |
+| sha256 | `5c0a75056946cd01730668b58e92895748153c2e7cfc4d32e7abf32c7c1ea3fe` |
 
 Not published. A published record says what the registry serves and is not
 rewritten, so shipped code that changes after a release is measured here instead.
+
+A native session that starts alone now receives its own CLI arguments on its first turn,
+so it can read and answer a peer joining later without manual reattachment or a new prompt.
+A lone owner header does not itself trigger the ACC skill. Own claims preserve that header;
+too-small budgets report the missing pair. Codex and Kimi no longer add a raw-context newline
+that exceeded the exact byte ceiling. Pending-message recovery and receipt rules are unchanged.
+
+A delayed real Claude/Codex run completed implementation, review request, APPROVED reply and
+complete handoff with the stock plugins. The first session retained its native identity;
+the request became acknowledged and the author retrieved the verdict. There were no scripted
+peers, operator continuations, or prompt-supplied credentials. The installed development
+artifact and final-candidate provenance are distinguished in release evidence. All 105 focused
+tests passed and eight exact mutations were detected. No capability flag was promoted.
+
+Independent review also corrected command help: config subcommands describe only their own
+flags and reject init-only flags on validate; adapter choices follow the installer registry;
+help lists effective workspace selectors; and help can describe itself. Nine exact mutations
+were caught and all 37 focused CLI/help tests passed. Each production correction is a separate
+commit; the exact final archive above passed package verification.
 
 `acc <command> --help`, `-h`, and `acc help <command>` now show command options and
 accepted values, including config subcommands and structured `--json` descriptions.
@@ -18,7 +37,7 @@ value is still delivered as data. Inherited JavaScript property names are reject
 unknown commands with the caller's original spelling.
 
 Real Codex CLI 0.153.4 could not discover attachment or handoff syntax through the old
-built-in help. On bytes identical to the candidate above, the same diagnostic completed
+built-in help. On the earlier command-help candidate, the same diagnostic completed
 manual attach, reviewing intent, inbox, reply and a complete handoff using help alone;
 all 11 commands succeeded. Ten exact mutations were caught by installed-package regressions.
 The exact final archive passed package verification. No adapter capability claim changed.
@@ -60,8 +79,8 @@ manual credentials. That tarball matched the CLI-ownership candidate recorded in
 Positive scripted fixtures explicitly supply their own credentials and no longer claim
 that their setup demonstrates automatic native-client identity.
 
-The hook-owner correction also accepts explicit owner flags on `status` and `sync`,
-preserves silence when only the session's own claim remains, and fits complete owner
+The earlier hook-owner candidate accepted explicit owner flags on `status` and `sync`,
+preserved silence when only its own claim remained (superseded above), and fitted complete owner
 arguments with pending-message recovery. Budgets too small for both retain recovery and
 report the missing pair. Optional overflow counts cannot hide the first recovery command.
 Installed-package regressions exercise the emitted pair itself, including same-client
