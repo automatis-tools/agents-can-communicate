@@ -4,12 +4,21 @@
 
 | | |
 |---|---|
-| Built from | `9a7287fe24cb65423dede98b27af807bd5897459` |
-| Tarball | `agents-can-communicate-0.3.1.tgz`, 262,315 bytes, 197 entries |
-| sha256 | `84209b478b02e4d7a8943f939a958581b8b8791e3ff60d81cabdca101a690c68` |
+| Built from | `767b2265424c467523f8592ab1be351cbee748b4` |
+| Tarball | `agents-can-communicate-0.3.1.tgz`, 262,425 bytes, 197 entries |
+| sha256 | `7ee404cae17b925ebf4a1c3b7f559266bedce3ec5566c57fccb14b8480f622cf` |
 
 Not published. A published record says what the registry serves and is not
 rewritten, so shipped code that changes after a release is measured here instead.
+
+The full suite caught a regression in MCP finish retries after closed heartbeats became
+invalid: the resolver reopened a different owner before retrying the completed handoff.
+For finish only, the resolver now passes its bound generation directly to core, which
+validates and records or replays it under the transaction lock. Repeated, restarted and
+concurrent finish calls preserve the original result without opening another session.
+Ordinary work still opens a new owner; stale generations and conflicting replays fail.
+All 119 focused checks passed and four exact mutations were caught. The exact archive
+above passed package verification and finish replay through both supported 2025 MCP revisions.
 
 Inbox retrieval and acknowledgement now recheck the session owner under the writer lock.
 A call delayed past close or replacement rejects with exit 5 without changing receipts.
@@ -22,8 +31,9 @@ one. All 14 exact mutations were caught; 23 inbox checks, 42 lifecycle checks an
 core/storage/process checks passed. A real Claude reviewer was interrupted after retrieval
 and before reply. A fresh conversation at the same participant address recovered the request,
 reviewed the fixture and replied; the original Codex process retrieved APPROVE and completed
-its handoff. The exact final archive above matches that native run and passed package
-verification. This observes graceful recovery with an operator-launched successor; no
+its handoff. That generation-race archive matched the native run and passed package
+verification; this candidate changes only the MCP server module in its shipped files.
+This observes graceful recovery with an operator-launched successor; no
 abrupt-crash, idle-wake or live-delivery capability was added. Details and unsuccessful
 harness attempts are recorded in the release evidence.
 
