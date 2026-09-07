@@ -4,7 +4,7 @@
 
 | | |
 |---|---|
-| Built from | `4c4034136b574419e8d7161f938a9e5e3348cfbb` |
+| Built from | `3a061c16e344ee02a2a2670545989c8ea9537d9a` |
 | Tarball | `agents-can-communicate-0.3.1.tgz`, 265,744 bytes, 200 entries |
 | sha256 | `aa947539f5e0ae4d9491775e3ad809c7a5279f615f6a5769fd468f69c4d37fc2` |
 
@@ -35,6 +35,12 @@ left partial work and an unwritten product decision in a room handoff before exi
 A new Codex participant recovered it through public history, preserved the decision and
 finished the implementation. This establishes explicit handoff recovery, not recovery of
 unsaved context or actual provider-quota exhaustion. No ACC behavior changed in this audit.
+
+An abrupt-interruption audit on the same bytes also completed: SIGKILL after a saved
+Claude decision left its unexpired claims intact; fresh Codex recovered the decision,
+received an offline-owner conflict, waited for the explicitly shortened leases, then
+claimed and completed the files. Active claims ended at zero; expired records and the
+crashed session remained in history. No runtime fix or capability change was needed.
 
 Earlier Codex onboarding correction:
 
