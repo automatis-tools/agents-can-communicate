@@ -4,9 +4,9 @@
 
 | | |
 |---|---|
-| Built from | `13c8017d0a3bdc5c670734f22b3b65ec36e5f533` |
-| Tarball | `agents-can-communicate-0.3.1.tgz`, 257,748 bytes, 197 entries |
-| sha256 | `a4072ec147917dd5333b19e2b70f1477e004fc8e79f80f2543b771c3903cc410` |
+| Built from | `ac5d7afe09a584467f9417d2badd203e6fcd4e26` |
+| Tarball | `agents-can-communicate-0.3.1.tgz`, 258,635 bytes, 197 entries |
+| sha256 | `af66590f496d8d9d591212b194b61be0e8eb1afd27d0c7485e60beff1b006d43` |
 
 Not published. A published record says what the registry serves and is not
 rewritten, so shipped code that changes after a release is measured here instead.
@@ -18,9 +18,11 @@ its session under the wrong author. Nested real clients also inherit native sess
 
 Mutations and inbox now require an explicitly supplied session/generation pair; unresolved
 calls return `caller_identity_unresolved` without changing state. Public status/sync remain
-available. Automatic CLI ownership is withdrawn, and entry docs plus all five skills state
-that limitation. A manual attachment or generic MCP connection does not inherit a hook
-participant's inbox. Native capabilities are unchanged.
+available. Automatic inference remains disabled. Active hooks now supply their own pair
+in trusted turn context, and all five installed skills tell the agent to append it to its
+commands. No credentials are exported for nested clients to inherit. A manual attachment
+or generic MCP connection does not inherit a hook participant's inbox. Native capability
+certifications are unchanged.
 
 Installed-artifact regressions reject all nine owner-requiring commands. Four targeted
 mutations are detected. Real Claude Code 2.1.263 and a nested Codex CLI 0.153.4 rejected
@@ -28,6 +30,16 @@ unowned calls with unchanged snapshots, then completed a request/reply using the
 manual credentials. The tested tarball is byte-identical to the clean candidate above.
 Positive scripted fixtures explicitly supply their own credentials and no longer claim
 that their setup demonstrates automatic native-client identity.
+
+The hook-owner correction also accepts explicit owner flags on `status` and `sync`,
+preserves silence when only the session's own claim remains, and fits complete owner
+arguments with pending-message recovery. Budgets too small for both retain recovery and
+report the missing pair. Optional overflow counts cannot hide the first recovery command.
+Installed-package regressions exercise the emitted pair itself, including same-client
+sessions and restart. Five deliberate mutations are detected. Real Claude and Codex used
+the installed skill and hook context to publish intent, claim, reply and finish without
+manual attach; Codex answered the question Claude left durably. The final candidate was
+also rerun through both real clients.
 
 Malformed MCP input such as a line containing `null` now receives a JSON-RPC error
 instead of terminating the server. Request envelopes are checked before dispatch;
