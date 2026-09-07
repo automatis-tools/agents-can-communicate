@@ -389,3 +389,30 @@ These are two observed in-turn polling successes, not a guarantee of model
 compliance or an idle-wake/restart capability. Delivery remained off. Other clients'
 waiting behavior was not exercised; their skills carry the same portable guidance.
 Capability flags, certification versions and runtime code are unchanged.
+
+## Iterative review on unchanged ACC bytes, 2026-09-07
+
+The foreground-wait archive above (SHA-256
+`aa947539f5e0ae4d9491775e3ad809c7a5279f615f6a5769fd468f69c4d37fc2`)
+completed a further real Claude Code 2.1.263 / Codex CLI 0.153.4 review on macOS
+arm64. A fresh non-Git fixture contained a deliberately defective normalizeTags
+implementation and two passing tests. The author requested review before editing.
+Claude independently reported input mutation, reordered output, last-spelling
+retention and missing regression coverage, then remained available. Codex received
+the findings, corrected the fixture and requested review again. Metadata records
+successful Claude Read calls for both revised files after that request; the
+implementation hash differs from the initial version and matches the final file.
+
+The original reviewer sent APPROVED for the revised request, and the original
+author retrieved that verdict before its complete handoff. Both processes exited
+naturally with code 0, both sessions closed, and no claims or owner bindings
+remained. All nine revised fixture tests passed; six failed with the original
+implementation restored in a scratch copy. An independent specification check
+failed before and passed after the fixture correction.
+
+This is one two-round observation on the existing ACC implementation, not a new
+ACC fix or capability certification. No model continuation prompt, seeded peer
+message or operator relay was used. Delivery stayed off. Native Codex hook review
+preceded the run; temporary trust/cache changes were restored exactly afterward.
+Clarification was unnecessary in this fixture, so a clarification-question round
+and different-checkout version selection remain unobserved by this capture.
