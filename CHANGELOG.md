@@ -4,12 +4,27 @@
 
 | | |
 |---|---|
-| Built from | `fabf6e5c779c35be06e30b29f64e02dab529e976` |
-| Tarball | `agents-can-communicate-0.3.1.tgz`, 265,142 bytes, 200 entries |
-| sha256 | `7121e89c21d1d979c84a1f4b8055626cf79ad3415115f634ea5304a64845fdb3` |
+| Built from | `4c315f831d7d88f1e00239d9e2e13fe809aeb9a3` |
+| Tarball | `agents-can-communicate-0.3.1.tgz`, 265,744 bytes, 200 entries |
+| sha256 | `aa947539f5e0ae4d9491775e3ad809c7a5279f615f6a5769fd468f69c4d37fc2` |
 
 Not published. A published record says what the registry serves and is not
 rewritten, so shipped code that changes after a release is measured here instead.
+
+For an agreed review, all five installed skills now direct the agent to read inbox and
+use separate short foreground waits until the required request or verdict arrives.
+A background poll is not a completed review or a promise that an exited client resumes.
+A blocked or limited wait leaves a truthful partial handoff.
+
+The preceding real Claude reviewer exited before the request arrived. Generic waiting
+advice passed once and failed on repeat; the concrete recipe then completed two fresh
+Claude/Codex reviews on the exact archive recorded above. Both original reviewers replied,
+both original authors retrieved the verdict before completing, and both pairs closed
+without claims or owner bindings. Native Codex trust was reviewed before each run and
+temporary user settings were restored exactly. This is in-turn polling evidence; no new
+capability or model-compliance guarantee is claimed.
+
+Earlier Codex onboarding correction:
 
 Installation now prints the adapter's activation steps and keeps them in JSON results.
 Codex users are directed to /plugins and /hooks, then to restart their session. When ACC
