@@ -416,3 +416,32 @@ message or operator relay was used. Delivery stayed off. Native Codex hook revie
 preceded the run; temporary trust/cache changes were restored exactly afterward.
 Clarification was unnecessary in this fixture, so a clarification-question round
 and different-checkout version selection remain unobserved by this capture.
+
+## Continuation by a different client, 2026-09-07
+
+The same installed archive, SHA-256
+`aa947539f5e0ae4d9491775e3ad809c7a5279f615f6a5769fd468f69c4d37fc2`,
+completed one sequential Claude Code 2.1.263 → Codex CLI 0.153.4 continuation on
+macOS arm64. In a fresh non-Git fixture, Claude implemented and tested a validation
+helper, left aggregation unfinished, and recorded a partial room handoff before
+exiting. The handoff preserved a product decision to clamp per-SKU totals to 17
+and the rejected alternative of throwing on overflow. That value was absent from
+the project files and the successor prompt.
+
+A new Codex conversation started after Claude's process exited, with its own
+native session and participant. No prior transcript, message id or owner pair
+was supplied. After an empty inbox, public ACC sync returned the prior handoff id
+before implementation edits. Codex retained the helper, implemented the carried
+ceiling/clamping decision, passed 22 fixture tests and recorded its own complete
+handoff. An independent specification check passed, while changing the ceiling
+to 18 in a scratch copy failed it; the original nine helper tests still passed.
+
+The old handoff remained unchanged. History recovery created no addressed receipt
+for a participant that did not exist when that room handoff was recorded. Both
+processes exited naturally with code 0; both sessions closed, with no remaining
+claims or bindings. Temporary native Codex trust/cache changes were restored
+exactly. Delivery was off, with no operator relay or continuation intervention.
+
+This is one explicit handoff/continuation observation, not an abrupt crash,
+provider-quota exhaustion or recovery of unsaved context. The harness opened the
+successor; ACC did not restart a client. No runtime code or capability changed.
