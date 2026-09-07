@@ -4,6 +4,7 @@ import path from "node:path";
 
 import { AccError, EXIT } from "@agents-can-communicate/protocol";
 
+import { assertPublicationDeadline } from "./deadline.mjs";
 import { assertManagedDirectory, ensureManagedDirectory } from "./safe-directory.mjs";
 import { readRegularNoFollow } from "./safe-file.mjs";
 
@@ -62,7 +63,8 @@ async function replaceHandleBytes(handle, bytes) {
  *
  * @returns {Promise<"published" | "already_published">}
  */
-export async function publishAtomic(destination, bytes, { root, tmpDir, replace = false }) {
+export async function publishAtomic(destination, bytes, { root, tmpDir, replace = false, deadlineAt }) {
+  assertPublicationDeadline(deadlineAt);
   const destinationDir = path.dirname(destination);
   await Promise.all([
     ensureManagedDirectory(root, tmpDir),
@@ -87,12 +89,14 @@ export async function publishAtomic(destination, bytes, { root, tmpDir, replace 
     if (replace) {
       await handle.close();
       handle = null;
+      assertPublicationDeadline(deadlineAt);
       await rename(temporary, destination);
       await syncDirectory(destinationDir);
       return "published";
     }
 
     try {
+      assertPublicationDeadline(deadlineAt);
       await link(temporary, destination);
       stageAcceptedBytes = true;
       await syncDirectory(destinationDir);

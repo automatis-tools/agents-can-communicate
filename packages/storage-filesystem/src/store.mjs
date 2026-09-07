@@ -7,6 +7,7 @@ import { AccError, EXIT, assertPortableId, validateRecord }
 import { encode, listDirectoryEntries, listJsonFiles, publishAtomic, readJsonIfPresent,
   retainFile } from "./atomic-json.mjs";
 import { initialiseActiveJournal } from "./active-journal.mjs";
+import { assertPublicationDeadline } from "./deadline.mjs";
 import { requireStoreIdentity } from "./identity.mjs";
 import { journalEntry, readJournalCeiling, readOpenJournals, rollForward, writeJournalEntry }
   from "./journal.mjs";
@@ -31,13 +32,6 @@ export const ZERO_CURSOR = "0".repeat(SEQUENCE_WIDTH);
 const DIRECTORIES = ["state", "events", "journal", "locks", "ephemeral", "retained", "tmp"];
 
 const pad = value => String(value).padStart(SEQUENCE_WIDTH, "0");
-
-function assertBeforePublication(deadlineAt) {
-  if (deadlineAt !== undefined && Date.now() >= deadlineAt) {
-    throw new AccError(EXIT.CONFLICT,
-      "transaction deadline expired before durable publication", {});
-  }
-}
 
 export function storePaths(root) {
   return Object.freeze(Object.fromEntries([["root", root],
@@ -77,7 +71,9 @@ async function nextSequence(paths, root) {
   return last === undefined ? 1 : Number(path.basename(last, ".json")) + 1;
 }
 
-export async function openFilesystemStore({ root, clock, ids, workspaceId, failAt }) {
+export async function openFilesystemStore({ root, clock, ids, workspaceId, failAt,
+  deadlineAt: storeDeadline }) {
+  assertPublicationDeadline(storeDeadline);
   const paths = storePaths(root);
   // The caller owns the root path, so its ancestors are created here. Inside the
   // root, containment rules apply and each level is created individually so a
@@ -100,7 +96,7 @@ export async function openFilesystemStore({ root, clock, ids, workspaceId, failA
   async function recoverOpenJournals() {
     const open = await readOpenJournals(paths, root);
     if (open.length === 0) return [];
-    return withWriterMutex(paths, { root, tmpDir: paths.tmp, clock }, async () => {
+    return withWriterMutex(paths, { root, tmpDir: paths.tmp, clock, deadlineAt: storeDeadline }, async () => {
       const completed = [];
       for (const entry of await readOpenJournals(paths, root)) {
         completed.push(...await rollForward(paths, { root, tmpDir: paths.tmp, clock }, entry));
@@ -125,6 +121,8 @@ export async function openFilesystemStore({ root, clock, ids, workspaceId, failA
    * Declaring nothing reads everything, which is what this always did.
    */
   async function transaction(callback, { kinds, deadlineAt } = {}) {
+    // A caller may tighten this invocation's budget, never extend it.
+    deadlineAt = Math.min(deadlineAt ?? Infinity, storeDeadline ?? Infinity);
     const wanted = kinds === undefined ? null : new Set(kinds);
     const declared = kind => {
       if (wanted !== null && !wanted.has(kind)) {
@@ -135,7 +133,7 @@ export async function openFilesystemStore({ root, clock, ids, workspaceId, failA
       return kind;
     };
     return withWriterMutex(paths, { ...publishOptions, deadlineAt }, async () => {
-      assertBeforePublication(deadlineAt);
+      assertPublicationDeadline(deadlineAt);
       // Reads are loaded once per transaction so get, list, and the generation
       // that put() compares against all describe the same instant.
       const loaded = await loadAllState(paths, root, wanted);
@@ -224,14 +222,13 @@ export async function openFilesystemStore({ root, clock, ids, workspaceId, failA
       ];
       if (publications.length === 0) return result;
 
-      // Cancellation is safe up to this point: nothing durable has decided the
-      // transaction. Once the journal write starts, recovery must finish it and
-      // the caller waits for that atomic outcome instead of reporting a false
-      // timeout while publication continues in the background.
-      assertBeforePublication(deadlineAt);
+      // Preparation is still cancellable. The active journal's atomic
+      // publication decides the write; roll-forward must then finish even if
+      // this invocation expires, so its publication options carry no deadline.
+      assertPublicationDeadline(deadlineAt);
       const entry = journalEntry(ids.next("transaction"), firstSequence, publications,
         clock.now());
-      await writeJournalEntry(paths, publishOptions, entry);
+      await writeJournalEntry(paths, { ...publishOptions, deadlineAt }, entry);
       await failAt?.("after-journal");
       await rollForward(paths, publishOptions, entry);
       return result;
@@ -308,32 +305,33 @@ export async function openFilesystemStore({ root, clock, ids, workspaceId, failA
     },
     async put(kind, id, record) {
       validateRecord(kind, record);
-      return withWriterMutex(paths, publishOptions, async () => {
+      return withWriterMutex(paths, { ...publishOptions, deadlineAt: storeDeadline }, async () => {
         await publishAtomic(ephemeralPath(kind, id), encode(record),
-          { root, tmpDir: paths.tmp, replace: true });
+          { root, tmpDir: paths.tmp, replace: true, deadlineAt: storeDeadline });
+        // Once record bytes are accepted, finish the same logical publication.
         await markEphemeral(paths, publishOptions, kind, id, "present");
         return record;
       });
     },
     async update(kind, id, updater) {
-      return withWriterMutex(paths, publishOptions, async () => {
+      return withWriterMutex(paths, { ...publishOptions, deadlineAt: storeDeadline }, async () => {
         const next = await updater(await readEphemeral(kind, id));
         if (next === null) return null;
         validateRecord(kind, next);
         await publishAtomic(ephemeralPath(kind, id), encode(next),
-          { root, tmpDir: paths.tmp, replace: true });
+          { root, tmpDir: paths.tmp, replace: true, deadlineAt: storeDeadline });
         await markEphemeral(paths, publishOptions, kind, id, "present");
         return next;
       });
     },
     async delete(kind, id, guard = () => true) {
-      return withWriterMutex(paths, publishOptions, async () => {
+      return withWriterMutex(paths, { ...publishOptions, deadlineAt: storeDeadline }, async () => {
         // Decide and delete under the same lock; a caller may be retiring an
         // old generation while its replacement is waiting to write this id.
         const current = await readEphemeral(kind, id);
         if (current === null || !await guard(current)) return null;
         await retainFile(ephemeralPath(kind, id), { root });
-        await markEphemeral(paths, publishOptions, kind, id, "deleted");
+        await markEphemeral(paths, { ...publishOptions, deadlineAt: storeDeadline }, kind, id, "deleted");
         return null;
       });
     },
