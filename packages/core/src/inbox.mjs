@@ -9,14 +9,19 @@ const listable = (message, receipt) => receipt.state === "queued" || receipt.sta
 export function createInboxService(ports, sessions) {
   const { store, clock, ids } = ports;
 
-  async function requireOpen(input, action) {
-    const located = await sessions.locateSession(input.sessionId, input.workspaceId);
-    if (located === null || located.record.state !== "open"
-      || located.record.generation !== input.generation) {
+  async function requireOpen(input, action, tx) {
+    // A solo inbox may have no durable session yet. Inside a transaction the
+    // same writer lock also protects this ephemeral read from replacement.
+    const current = tx === undefined
+      ? (await sessions.locateSession(input.sessionId, input.workspaceId))?.record
+      : tx.get("session", input.sessionId)
+        ?? await store.ephemeral.get("session", input.sessionId);
+    if (current == null || current.state !== "open"
+      || current.generation !== input.generation) {
       throw new AccError(EXIT.CONFLICT, `cannot ${action} from this session generation`,
         { sessionId: input.sessionId });
     }
-    return located.record;
+    return current;
   }
 
   function requireOwnedReceipt(tx, session, messageId) {
@@ -49,7 +54,8 @@ export function createInboxService(ports, sessions) {
   async function readInbox(input) {
     const session = await requireOpen(input, "read the inbox");
     const now = clock.now();
-    return store.transaction(tx => {
+    return store.transaction(async tx => {
+      await requireOpen(input, "read the inbox", tx);
       const messages = new Map(tx.list("message").map(item => [item.messageId, item]));
       let selected = tx.list("receipt", receipt =>
         receipt.recipientParticipantId === session.participantId)
@@ -74,15 +80,16 @@ export function createInboxService(ports, sessions) {
       return selected.map(receipt => receipt.state === "acknowledged"
         ? { message: messages.get(receipt.messageId), receipt }
         : advanceOwned(tx, session, receipt.messageId, "retrieved", now));
-    }, { kinds: ["message", "receipt"] });
+    }, { kinds: ["session", "message", "receipt"] });
   }
 
   async function acknowledgeMessage(input) {
     const session = await requireOpen(input, "acknowledge a message");
     const now = clock.now();
-    return store.transaction(tx => advanceOwned(tx, session, input.messageId,
-      "acknowledged", now).receipt,
-    { kinds: ["message", "receipt"] });
+    return store.transaction(async tx => {
+      await requireOpen(input, "acknowledge a message", tx);
+      return advanceOwned(tx, session, input.messageId, "acknowledged", now).receipt;
+    }, { kinds: ["session", "message", "receipt"] });
   }
 
   async function replyToMessage(input) {
