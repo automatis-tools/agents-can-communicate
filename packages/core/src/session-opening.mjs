@@ -65,18 +65,28 @@ export function createSessionOpener(ports, locate) {
     }
     assertPortableId(input.participantId, "participant id");
     const sessionId = input.sessionId ?? createId("session");
+    // A caller may persist a fresh owner pair before creation. Such a reserved
+    // generation is insert-only: it must never replace an existing session.
+    const assertAvailable = current => {
+      if (current === null) return;
+      if (input.generation !== undefined) {
+        throw new AccError(EXIT.CONFLICT, "a reserved generation requires a new session id",
+          { sessionId });
+      }
+      assertReplaceable({ record: current }, input.probe);
+    };
     const existing = await locate(sessionId, workspaceId);
-    if (existing !== null) assertReplaceable(existing, input.probe);
+    assertAvailable(existing?.record ?? null);
 
     const now = clock.now();
     const session = sessionRecord({ ...input, workspaceId, sessionId }, now,
-      ids.next("generation"));
+      input.generation === undefined ? ids.next("generation") : input.generation);
     const participant = participantRecord({ ...input, workspaceId }, now);
 
     const openDurable = async () => {
       await store.transaction(async tx => {
         const current = tx.get("session", sessionId);
-        if (current !== null) assertReplaceable({ record: current }, input.probe);
+        assertAvailable(current);
         const replaced = current?.generation ?? null;
         if (tx.get("participant", participant.participantId) === null) {
           tx.put("participant", participant.participantId, participant);
@@ -98,7 +108,7 @@ export function createSessionOpener(ports, locate) {
       // Check even when no copy remains: promotion may have retired it while
       // this opener waited. Only the durable transaction may acquire that id now.
       if (await isMaterialised(store, workspaceId)) return null;
-      if (current !== null) assertReplaceable({ record: current }, input.probe);
+      assertAvailable(current);
       return session;
     });
     if (opened === null) return openDurable();

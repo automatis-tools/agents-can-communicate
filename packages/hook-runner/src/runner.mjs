@@ -358,7 +358,15 @@ const HANDLERS = {
           ...clientFacts, capabilities, nativeBinding: await native(hookBinding) };
       }
     }
+    // Persist ownership before creating its session. If the hook dies after
+    // creation, the next start resumes this exact pair. If creation never
+    // happened (or it was closed), a retry allocates a NEW pair, never revives it.
+    const opening = { sessionId: context.service.ids.next("session"),
+      generation: context.service.ids.next("generation") };
+    await storeSessionBinding({ runtimeDir: paths.root, harnessSessionId: event.sessionId,
+      accSessionId: opening.sessionId, generation: opening.generation });
     const session = await context.service.openSession({
+      ...opening,
       workspaceId: context.descriptor.id,
       participantId: participantFor(adapterId, event.sessionId, context.env),
       displayName: participantFor(adapterId, event.sessionId, context.env),
@@ -389,8 +397,15 @@ const HANDLERS = {
 
   async sessionEnd({ binding, context, event, paths }) {
     if (binding === null) return {};
-    await context.service.closeSession({ sessionId: binding.accSessionId,
-      generation: binding.generation });
+    const owner = { sessionId: binding.accSessionId, generation: binding.generation };
+    const current = await context.service.locateSession(binding.accSessionId);
+    if (current?.record.generation === binding.generation && current.record.state === "open") {
+      await context.service.closeSession(owner);
+    } else {
+      // Close may have committed before this hook died. Retire only the old
+      // endpoint and binding; do not close a replacement or repeat a close event.
+      await context.service.clearDeliveryBinding(owner);
+    }
     await clearSessionBinding({ runtimeDir: paths.root, harnessSessionId: event.sessionId });
     return {};
   },
@@ -401,7 +416,7 @@ const HANDLERS = {
     // A turn is the clearest sign a session is alive. Never a reason to fail:
     // this runs in front of somebody's prompt.
     await context.service.heartbeatSession({ sessionId: binding.accSessionId,
-      generation: binding.generation }).catch(() => null);
+      generation: binding.generation });
     // A native transport that became ready only after SessionStart is picked
     // up here and a live lease is renewed: bounded, fail-open, never on a guard.
     const nativeBinding = livePolicyFrom(context.env) === "off" ? undefined
@@ -494,14 +509,21 @@ export async function runHook({ adapterId, payload, adapters, dataHome, env,
     const event = await adapter.normalizeHook(payload);
     const context = await openContext({ cwd: event.cwd, dataHome, runtime, env });
     const handler = HANDLERS[event.kind];
+    const lifecycle = event.kind === "sessionStart" || event.kind === "sessionEnd";
     const invoke = async () => {
+      if (lifecycle) {
+        // A previous holder may have died after journalling its session while
+        // this process waited. Recover that write before interpreting its binding.
+        const store = await openFilesystemStore({ root: context.paths.root, clock: runtime.clock,
+          ids: runtime.ids, workspaceId: context.descriptor.id });
+        context.service = createCoordinationService({ store, clock: runtime.clock, ids: runtime.ids });
+      }
       const binding = await loadSessionBinding({ runtimeDir: context.paths.root,
         harnessSessionId: event.sessionId });
       return handler === undefined ? {} : handler({ event, context, adapter, adapterId,
         binding, paths: context.paths,
         readProcessTable, probeClientVersion, platform, deadline });
     };
-    const lifecycle = event.kind === "sessionStart" || event.kind === "sessionEnd";
     const work = lifecycle
       ? withSessionLifecycle({ root: context.paths.root, sessionId: event.sessionId,
         clock: runtime.clock, deadlineAt: deadline }, invoke)

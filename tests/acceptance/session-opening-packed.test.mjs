@@ -72,6 +72,53 @@ test("installed opening preserves the owner that acquired the session first", as
   }
 
   for (const mode of ["ephemeral", "durable"]) {
+    await t.test(`${mode} reserved generation is exact and cannot replace a dead or closed owner`, async () => {
+      const { service, inspect } = await fixture(`${mode}-reserved`, mode);
+      const input = { ...opening("reserved", "session_reserved"), generation: "generation_reserved" };
+      const original = await service.openSession(input);
+      assert.equal(original.generation, input.generation);
+      assert.equal((await service.heartbeatSession(owner(original))).generation, input.generation);
+      const before = await inspect();
+      await assert.rejects(service.openSession({ ...input, generation: "generation_other",
+        probe: () => false }), error => error.code === 5);
+      assert.deepEqual(await inspect(), before);
+      if (mode === "durable") {
+        await service.closeSession(owner(original));
+        const closed = await inspect();
+        await assert.rejects(service.openSession(input), error => error.code === 5);
+        assert.deepEqual(await inspect(), closed);
+      }
+      await assert.rejects(service.openSession({ ...opening("invalid", "session_invalid"),
+        generation: "../invalid" }));
+      assert.equal(await service.locateSession("session_invalid"), null);
+    });
+
+    await t.test(`${mode} reserved open rechecks insert-only ownership under its writer lock`, async () => {
+      const { store, service, inspect } = await fixture(`${mode}-reserved-race`, mode);
+      const input = { ...opening("reserved", "session_reserved"), generation: "generation_reserved",
+        probe: () => false };
+      let armed = true, checkpoint;
+      const intervene = async () => {
+        if (!armed) return;
+        armed = false;
+        await service.openSession({ ...opening("reserved", input.sessionId), pid: 42 });
+        checkpoint = await inspect();
+      };
+      const racingStore = { ...store, ephemeral: { ...store.ephemeral },
+        transaction: async (callback, options) => {
+          if (mode === "durable") await intervene();
+          return store.transaction(callback, options);
+        } };
+      racingStore.ephemeral.update = async (kind, ...args) => {
+        if (mode === "ephemeral" && kind === "session") await intervene();
+        return store.ephemeral.update(kind, ...args);
+      };
+      const racing = createCoordinationService({ store: racingStore, clock, ids });
+      await assert.rejects(racing.openSession(input), error => error.code === 5);
+      assert.equal(armed, false);
+      assert.deepEqual(await inspect(), checkpoint);
+    });
+
     await t.test(`${mode} open rejects a different workspace before writing`, async () => {
       const { store, service, inspect } = await fixture(`${mode}-scope`, mode);
       const before = await inspect();

@@ -6,7 +6,7 @@ import test from "node:test";
 
 import { EXIT } from "@agents-can-communicate/protocol";
 
-import { clearSessionBinding, loadSessionBinding, storeSessionBinding }
+import { clearSessionBinding, listSessionBindings, loadSessionBinding, storeSessionBinding }
   from "../src/session-binding.mjs";
 
 async function runtimeDir(t) {
@@ -141,4 +141,20 @@ test("a binding records nothing about the conversation", async t => {
   // transcript, no harness state.
   assert.deepEqual(Object.keys(stored).sort(),
     ["accSessionId", "generation", "harnessSessionId", "schemaVersion"]);
+});
+
+test("invalid binding identities are rejected instead of becoming absent or usable owners", async t => {
+  const dir = await runtimeDir(t);
+  await storeSessionBinding({ runtimeDir: dir, ...binding });
+  const file = path.join(dir, "bindings", (await readdir(path.join(dir, "bindings")))[0]);
+  for (const invalid of [{ generation: undefined }, { accSessionId: undefined },
+    { harnessSessionId: "" }, { accSessionId: "../outside" }]) {
+    await writeFile(file, JSON.stringify({ schemaVersion: 1, ...binding, ...invalid }));
+    await assert.rejects(loadSessionBinding({ runtimeDir: dir, harnessSessionId: binding.harnessSessionId }));
+    assert.deepEqual(await listSessionBindings({ runtimeDir: dir }), []);
+    await assert.rejects(storeSessionBinding({ runtimeDir: dir, ...binding, ...invalid }));
+  }
+  await writeFile(file, JSON.stringify({ schemaVersion: 1, ...binding, harnessSessionId: "another" }));
+  await assert.rejects(loadSessionBinding({ runtimeDir: dir, harnessSessionId: binding.harnessSessionId }),
+    error => error.code === EXIT.DATA);
 });
