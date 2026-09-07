@@ -4,12 +4,28 @@
 
 | | |
 |---|---|
-| Built from | `9d3ae91315f4e2836e72dc206500e0d5529171ce` |
-| Tarball | `agents-can-communicate-0.3.1.tgz`, 261,952 bytes, 197 entries |
-| sha256 | `5c0a75056946cd01730668b58e92895748153c2e7cfc4d32e7abf32c7c1ea3fe` |
+| Built from | `9a7287fe24cb65423dede98b27af807bd5897459` |
+| Tarball | `agents-can-communicate-0.3.1.tgz`, 262,315 bytes, 197 entries |
+| sha256 | `84209b478b02e4d7a8943f939a958581b8b8791e3ff60d81cabdca101a690c68` |
 
 Not published. A published record says what the registry serves and is not
 rewritten, so shipped code that changes after a release is measured here instead.
+
+Inbox retrieval and acknowledgement now recheck the session owner under the writer lock.
+A call delayed past close or replacement rejects with exit 5 without changing receipts.
+Heartbeat and close also read and validate the current generation under that lock, preserve
+current metadata, reject another workspace, and cannot overwrite a successor's session.
+Delayed solo close cleanup preserves a successor's intent. The fixes are separate commits.
+
+An installed reproduction failed on the preceding archive and passed on the corrected
+one. All 14 exact mutations were caught; 23 inbox checks, 42 lifecycle checks and 253 adjacent
+core/storage/process checks passed. A real Claude reviewer was interrupted after retrieval
+and before reply. A fresh conversation at the same participant address recovered the request,
+reviewed the fixture and replied; the original Codex process retrieved APPROVE and completed
+its handoff. The exact final archive above matches that native run and passed package
+verification. This observes graceful recovery with an operator-launched successor; no
+abrupt-crash, idle-wake or live-delivery capability was added. Details and unsuccessful
+harness attempts are recorded in the release evidence.
 
 A native session that starts alone now receives its own CLI arguments on its first turn,
 so it can read and answer a peer joining later without manual reattachment or a new prompt.
@@ -28,7 +44,7 @@ Independent review also corrected command help: config subcommands describe only
 flags and reject init-only flags on validate; adapter choices follow the installer registry;
 help lists effective workspace selectors; and help can describe itself. Nine exact mutations
 were caught and all 37 focused CLI/help tests passed. Each production correction is a separate
-commit; the exact final archive above passed package verification.
+commit; that earlier archive passed package verification.
 
 `acc <command> --help`, `-h`, and `acc help <command>` now show command options and
 accepted values, including config subcommands and structured `--json` descriptions.
