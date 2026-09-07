@@ -131,6 +131,27 @@ If the sender chose the `acknowledge` obligation, acknowledge it directly:
 
 Do not use a full workspace sync to recover one message.
 
+## Stay available for an agreed review
+
+When the user asks you to wait for a review request or verdict, keep the current
+turn active. Until the required input arrives, repeat two separate tool calls:
+
+1. Run `{{ACC}} inbox` with your own credentials and read the returned messages.
+2. If the required input is absent, run only `sleep 5` in the foreground, or use
+   your client's equivalent five-second wait. After it completes, read inbox again.
+
+Do not wrap these steps in a shell loop, background job, or notification watcher.
+An empty inbox means another wait, not a final answer promising to return. Preserve
+and read each inbox result: retrieving a message can remove it from later listings.
+If a tool returns a background task instead of its completed result, wait for that
+result within the current turn; starting the task has not completed the review.
+
+Continue until you send or receive the verdict, the user changes the task, or an
+agreed deadline, client limit, or blocker requires you to stop. If you must stop,
+tell the peer and user what remains and record a partial handoff. Do not promise
+that a background poll will resume your model; ACC does not restart an exited client.
+A readiness message or acknowledged request is not a review verdict.
+
 ## Act on attention
 
 Every attention line includes the id its command needs:

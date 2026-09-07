@@ -58,6 +58,12 @@ idle session. Grok, generic MCP, unknown client versions, and other platforms po
 reply acknowledges the original automatically; `acc ack` is for acknowledgement-only
 messages.
 
+A background inbox command is not evidence that the model will resume. If a reviewer
+ends its turn or exits before the request arrives, the review is still incomplete. For
+an agreed review in the current session, keep the turn active through bounded foreground
+waits and inbox checks; if the wait must end, report the pending review and leave a partial
+handoff. ACC does not restart an exited client.
+
 ## I enabled live delivery but got fallback
 
 `--delivery actionable|all` is recipient policy, not a capability switch. Only Claude Code

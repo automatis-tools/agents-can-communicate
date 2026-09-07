@@ -510,3 +510,28 @@ describes review of each exact definition. The correction preserves existing tru
 records; it does not guarantee that they still apply after a definition changes. This
 is configuration/metadata evidence, not new delivery, lifecycle or guard certification.
 The interactive trust UI and a new live model turn were not exercised in this audit.
+
+## Live review after native activation, 2026-09-07
+
+The subsequent real-client check used Codex CLI 0.153.4 with Claude Code 2.1.263
+on macOS arm64. The native `/hooks` UI reviewed all five current ACC definitions
+before launching the author. The temporary plugin cache and hook trust records
+were restored afterward; the original configuration matched byte-for-byte.
+
+Two fresh non-Git fixtures installed the same archive, SHA-256
+`aa947539f5e0ae4d9491775e3ad809c7a5279f615f6a5769fd468f69c4d37fc2`.
+Codex used the original hook-provided owner pair to publish intent, claim files,
+request review and retrieve the original Claude reviewer's approval. It recorded
+its complete handoff after verdict retrieval. Both processes exited naturally
+with code 0, both sessions closed, and no claims or owner bindings remained.
+The fixture tests passed (eight and six cases). All 200 installed archive files
+in the repeat matched the source and tarball byte-for-byte.
+
+The earlier baseline and one generic-guidance repeat failed because the Claude
+reviewer exited after starting a background poll. The final skills specify
+separate inbox reads and short foreground waits for an agreed review; the
+[Claude observation](../adapter-claude-code/COMPATIBILITY.md#foreground-review-waiting-2026-09-07)
+retains both failures and the first generic-guidance success. Task prompts and
+client background settings were unchanged. This observes model turns and native
+owner use after trust, extending the metadata-only onboarding audit above.
+Delivery remained off; no capability or certification version was promoted.

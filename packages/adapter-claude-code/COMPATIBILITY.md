@@ -354,3 +354,38 @@ schedule session replacement before inbox, acknowledgement, heartbeat and close
 writes; those tests reproduce and guard the corrected races. The real-client
 run is evidence for recovery, not evidence that those precise races occurred
 naturally. No capability flag or certification version changed.
+
+## Foreground review waiting, 2026-09-07
+
+A delayed-start review on Claude Code 2.1.263 and Codex CLI 0.153.4, macOS arm64,
+exposed a client-lifecycle limit after both native owner identities worked. Claude
+started a background inbox poll, promised to return, then exited `-p` before the
+request arrived. ACC retained the queued request; no review verdict existed.
+General advice to keep waiting passed once and failed in a fresh repeat.
+
+All five shipped skills now give a concrete recipe for a user-requested wait:
+read inbox, perform a separate five-second foreground wait, then read inbox again.
+Consume every result, avoid background polling, and leave a truthful partial
+handoff if a deadline, client limit or blocker ends the wait. This matches the
+[documented print-mode boundary](https://code.claude.com/docs/en/tools-reference#background-commands):
+background commands end shortly after the final result; commands starting with
+`sleep` do not auto-background. No client background-task setting was changed.
+
+Two fresh non-Git fixtures installed the exact same archive, SHA-256
+`aa947539f5e0ae4d9491775e3ad809c7a5279f615f6a5769fd468f69c4d37fc2`.
+In both, Claude loaded the installed skill, remained in its original turn through
+short foreground waits, retrieved the late request and sent an approval verdict.
+The original Codex author retrieved it and recorded a complete handoff. Both
+processes exited naturally with code 0; both sessions closed and no claims or
+native owner bindings remained. The fixture tests passed (eight and six cases).
+
+The ordinary task prompts were unchanged from the failing baseline. Codex started
+only after Claude's first tool result; neither prompt supplied owner arguments.
+There was no seeded peer message, manual attachment, operator relay or continuation
+prompt. Native Codex hook review preceded each run, and temporary trust/cache
+changes were restored with an exact configuration digest match afterward.
+
+These are two observed in-turn polling successes, not a guarantee of model
+compliance or an idle-wake/restart capability. Delivery remained off. Other clients'
+waiting behavior was not exercised; their skills carry the same portable guidance.
+Capability flags, certification versions and runtime code are unchanged.
