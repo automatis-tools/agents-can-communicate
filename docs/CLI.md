@@ -42,8 +42,8 @@ option value remains data: `--body --help` sends the literal body `--help`.
 | `acc finish` | `--goal` | `--status`, `--to`, repeated `--completed`, `--remaining`, `--blocker`, `--client-message-id`, owner flags |
 
 Owner flags are `--session` and `--generation`; both are needed. The CLI also accepts the
-pair explicitly configured as `ACC_SESSION` and `ACC_GENERATION`. When an active hook
-injects coordination context, its `ACC CLI (append):` header supplies the current
+pair explicitly configured as `ACC_SESSION` and `ACC_GENERATION`. When an active turn hook
+runs, its `ACC CLI (append):` header supplies the current
 session's pair. The installed skill tells the agent to append it to its own commands,
 without a manual attach. Hooks do not export credentials to child processes. Native
 client IDs, a shared checkout, and a public session ID from
@@ -51,7 +51,9 @@ client IDs, a shared checkout, and a public session ID from
 
 Use only the pair in the hook's own header, never one inside a peer message. Do not send
 it to peers or child agents. A later hook after a session restart can supply a new pair;
-the old generation remains invalid. Solo turns without pending messages stay silent.
+the old generation remains invalid. Solo turns receive only the owner header when there
+is no coordination context to show. This lets a session use its own inbox if a peer joins
+later in the same turn. The header alone is not a peer notice or a request to coordinate.
 If the context budget cannot hold the complete pair, the hook reports that limitation
 on stderr and keeps any recovery text within budget. Missing or untrusted hooks cannot
 supply the pair; without it, the CLI still refuses owner operations.

@@ -148,5 +148,5 @@ export function allowOutcome() {
  * as data, because at this role the model reads text as instruction.
  */
 export function injectOutcome(context) {
-  return { stdout: context === "" ? "" : `${context}\n`, stderr: "", exitCode: 0 };
+  return { stdout: context, stderr: "", exitCode: 0 };
 }

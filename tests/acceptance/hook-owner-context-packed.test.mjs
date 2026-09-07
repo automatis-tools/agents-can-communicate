@@ -13,7 +13,33 @@ function ownerFlags(context) {
   return ["--session", match[1], "--generation", match[2]];
 }
 
-async function stage(t, budgetBytes = 6_000, queued = true) {
+for (const adapterId of ["claude_code", "codex"]) {
+  test(`${adapterId} can answer a peer that joins after its turn started`, async t => {
+    const packed = await createPackedAcc(t);
+    const early = await packed.start({ adapterId, participantId: "early",
+      harnessSessionId: "native-early" });
+    const first = await packed.beforeTurn({ adapterId, harnessSessionId: "native-early" });
+    const context = adapterId === "codex" ? first.stdout
+      : first.stdout.trim() === "" ? ""
+        : JSON.parse(first.stdout).hookSpecificOutput?.additionalContext ?? "";
+    const flags = ownerFlags(context);
+    const late = await packed.acc(["attach", "--participant", "late"]);
+    const request = await packed.acc(["request", "--session", late.sessionId,
+      "--generation", late.generation, "--to", "early", "--title", "Review arrived"]);
+    // No second prompt, binding lookup, environment inheritance, or manual
+    // reattachment for the early reader: only its original hook's arguments.
+    const [received] = await packed.acc(["inbox", ...flags]);
+    assert.equal(received.message.messageId, request.message.messageId);
+    const reply = await packed.acc(["reply", ...flags, "--message", received.message.messageId,
+      "--body", "Reviewed from the original session"]);
+    assert.equal(reply.message.fromSessionId, early.sessionId);
+    assert.equal(reply.receipt.state, "acknowledged");
+    const status = await packed.acc(["status"]);
+    assert.equal(status.participants.filter(p => p.participantId === "early").length, 1);
+  });
+}
+
+async function stage(t, budgetBytes = 6_000, queued = true, adapterId = "claude_code") {
   const packed = await createPackedAcc(t);
   await writeFile(path.join(packed.project, "acc.workspace.json"), JSON.stringify({
     schemaVersion: 1, workspaceId: "workspace_hook_owner", displayName: "hook owner",
@@ -21,15 +47,15 @@ async function stage(t, budgetBytes = 6_000, queued = true) {
   }));
   const sender = await packed.acc(["attach", "--participant", "sender"]);
   const senderFlags = ["--session", sender.sessionId, "--generation", sender.generation];
-  const reader = await packed.start({ adapterId: "claude_code", participantId: "reader",
+  const reader = await packed.start({ adapterId, participantId: "reader",
     harnessSessionId: "native-reader" });
   const question = queued ? await packed.acc(["request", ...senderFlags, "--to", "reader",
     "--title", "receipt review", "--detail", "A long question. ".repeat(60)]) : null;
   const turn = async () => {
-    const output = await packed.beforeTurn({ adapterId: "claude_code",
-      harnessSessionId: "native-reader" });
-    const context = output.stdout.trim() === "" ? ""
-      : JSON.parse(output.stdout).hookSpecificOutput.additionalContext;
+    const output = await packed.beforeTurn({ adapterId, harnessSessionId: "native-reader" });
+    const context = ["codex", "kimi"].includes(adapterId) ? output.stdout
+      : output.stdout.trim() === "" ? ""
+        : JSON.parse(output.stdout).hookSpecificOutput.additionalContext;
     return { ...output, context };
   };
   return { packed, reader, question, senderFlags, turn };
@@ -118,17 +144,26 @@ test("same-client sessions get distinct pairs and a restarted session rejects th
   assert.equal(intent.sessionId, replacement.sessionId);
 });
 
-test("a remaining own claim does not make an otherwise solo turn print credentials", async t => {
-  const { packed, senderFlags, turn } = await stage(t, 6_000, false);
-  const flags = ownerFlags((await turn()).context);
-  await packed.acc(["claim", ...flags, "--resource", "file:mine.mjs"]);
-  await packed.acc(["detach", ...senderFlags]);
-  assert.equal((await turn()).context, "");
-  const configFile = path.join(packed.project, "acc.workspace.json");
-  const config = JSON.parse(await readFile(configFile, "utf8"));
-  config.policy.contextBudgetBytes = 84;
-  await writeFile(configFile, JSON.stringify(config));
-  const quiet = await turn();
-  assert.equal(quiet.context, "");
-  assert.equal(quiet.stderr, "");
-});
+for (const adapterId of ["claude_code", "codex", "kimi"]) {
+  test(`${adapterId} solo owner arguments respect their exact byte budget`, async t => {
+    const { packed, senderFlags, turn } = await stage(t, 6_000, false, adapterId);
+    const flags = ownerFlags((await turn()).context);
+    await packed.acc(["claim", ...flags, "--resource", "file:mine.mjs"]);
+    await packed.acc(["detach", ...senderFlags]);
+    const solo = (await turn()).context;
+    assert.deepEqual(ownerFlags(solo), flags);
+    assert.equal(solo.trim().split("\n").length, 1, "solo ownership must not narrate a peer roster");
+    const configFile = path.join(packed.project, "acc.workspace.json");
+    const config = JSON.parse(await readFile(configFile, "utf8"));
+    config.policy.contextBudgetBytes = Buffer.byteLength(solo.trim());
+    await writeFile(configFile, JSON.stringify(config));
+    const exact = (await turn()).context;
+    assert.deepEqual(ownerFlags(exact), flags, "the exact budget must fit");
+    assert.equal(Buffer.byteLength(exact), config.policy.contextBudgetBytes);
+    config.policy.contextBudgetBytes -= 1;
+    await writeFile(configFile, JSON.stringify(config));
+    const quiet = await turn();
+    assert.equal(quiet.context, "");
+    assert.match(quiet.stderr, /budget.*owner arguments/i);
+  });
+}

@@ -232,12 +232,14 @@ test("a path outside the workspace is not silently treated as inside it", async 
   assert.equal(allowed.decision, "allow");
 });
 
-test("beforeTurn injects peer context, and says nothing when alone", async t => {
+test("beforeTurn supplies its own arguments before peers appear", async t => {
   const place = await workspace(t);
-  await run("kimi", event("sessionStart"), place);
+  const started = await run("kimi", event("sessionStart"), place);
 
   const solo = await run("kimi", event("beforeTurn"), place);
-  assert.equal(solo.stdout, "", "a solo session narrated the absence of peers");
+  assert.ok(solo.stdout.includes(`--session ${started.accSessionId}`));
+  assert.ok(solo.stdout.includes(`--generation ${started.generation}`));
+  assert.equal(solo.stdout.trim().split("\n").length, 1);
 
   await run("kimi", event("sessionStart", { sessionId: "peer" }), place);
   const withPeer = await run("kimi", event("beforeTurn"), place);

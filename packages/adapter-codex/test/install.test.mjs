@@ -486,7 +486,7 @@ test("injection is plain text, because this client wraps nothing", () => {
   // Emitting Claude Code's JSON envelope here would put the envelope itself
   // into the conversation, exactly as it would on Kimi Code.
   assert.deepEqual(injectOutcome("2 peers"),
-    { stdout: "2 peers\n", stderr: "", exitCode: 0 });
+    { stdout: "2 peers", stderr: "", exitCode: 0 });
   assert.deepEqual(injectOutcome(""), { stdout: "", stderr: "", exitCode: 0 });
 });
 

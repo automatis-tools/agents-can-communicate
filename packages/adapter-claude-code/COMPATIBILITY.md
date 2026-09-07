@@ -262,10 +262,58 @@ versions are unchanged. Unsupported next-turn bodies remain withheld with an inb
 recovery command; this observation proves use of the hook's own CLI arguments.
 
 The CLI still refuses a caller lacking its own pair. Hooks never export credentials
-that a nested client could inherit. Solo turns without pending coordination remain
-silent. Very small context budgets can retain recovery without the pair and report
-that limitation on stderr. The agent must have permission to execute the CLI.
+that a nested client could inherit. In this earlier capture, solo turns without
+pending coordination remained silent; the later startup-order correction below
+supersedes that behavior. Very small context budgets can retain recovery without
+the pair and report that limitation on stderr. The agent must have permission to
+execute the CLI.
 
 Observed client: Claude Code **2.1.263**, macOS arm64. The invocation loaded the
 installed plugin through `--plugin-dir`; hook context used the documented
 `hookSpecificOutput.additionalContext` envelope.
+
+## Solo ownership and a late peer, 2026-09-06
+
+A simultaneous stock-plugin review exposed a startup-order defect: the first
+session began its turn alone, its hook omitted the owner header, and `inbox`
+returned `caller_identity_unresolved` after the second client joined. A separate
+installed-artifact reproduction showed that the next user prompt restored the
+pair; a tool event during the original turn did not.
+
+Turn hooks now supply their own complete CLI pair even while solo, with no peer
+roster or instruction to coordinate. The same applies when only an own claim
+remains. A budget too small for the pair yields empty context and an explicit
+stderr diagnostic. Pending-message recovery and delivery receipts retain their
+existing rules. This supersedes the earlier solo-silence observation above.
+
+A fresh delayed-start check used real Claude Code 2.1.263 and Codex CLI 0.153.4 on
+macOS arm64, both with stock installed plugins and delivery off. Claude began a
+small code review alone; Codex was launched only after Claude's first tool result.
+Codex implemented the temporary fixture and requested review. Claude retrieved
+that request and answered APPROVED from its original native session; the request
+became acknowledged and Codex retrieved the answer. There were exactly two native
+participants, no manual attachment, no prompt-supplied owner arguments, no seeded
+peer messages, and no operator relay or continuation prompt. The clients chose
+inbox polling themselves. This observes in-turn CLI use, not idle wake or live push.
+
+This real-client run installed a packed development artifact with SHA-256
+`f6d183f13ef0e8cac15060e256335597ea602a3b97559ee54f7ba7fde42466a4`.
+Its Claude/Codex hook and skill code matches this correction; the final candidate
+also removes Kimi's extra raw-context newline and adds this evidence. Deterministic
+packed tests cover the retained first-turn pair, actual inbox/reply author and
+receipt, own-claim behavior, and exact context ceilings for Claude, Codex and Kimi.
+Codex and Kimi now emit raw context without an extra trailing newline.
+
+The non-Git fixture required Codex exec's normal `--skip-git-repo-check` option;
+an initial harness launch omitted it and stopped before Codex started a session.
+The successful retry used an empty runtime. Codex hooks were reviewed through the
+native trust UI. Diagnostics retain bounded tool categories, final reports and
+ACC facts, not raw transcripts. Capability flags and certification versions are
+unchanged; this capture does not certify any new injection or guard capability.
+
+The skill trigger was also checked in two real solo Claude runs with the same
+ordinary request to read a package name/version. With the broad old description,
+Claude unnecessarily loaded the ACC skill and then read the file. With the updated
+condition, it only read the file and returned the same correct answer. Neither run
+issued a coordination command. This is one observed before/after sample, not a
+promise about every model turn.

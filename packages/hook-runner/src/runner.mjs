@@ -46,6 +46,13 @@ function fitDegradation(projection, visibleDegradation, messages, budgetBytes) {
   return projection;
 }
 
+function ownerOnlyOutcome(adapter, owner, budgetBytes) {
+  if (byteLength(owner) > budgetBytes) {
+    return { stdout: "", stderr: "acc: context budget cannot fit owner arguments; increase contextBudgetBytes" };
+  }
+  return { stdout: "", ...adapter.injectOutcome?.(owner) };
+}
+
 // Declared by this process on the session it opens, so peers can tell an idle
 // session from a dead one. Only one of the four clients fires a heartbeat event,
 // so the rest refresh here: on every turn, and during a long one whenever the
@@ -207,12 +214,19 @@ async function projectTurn({ binding, context, adapter, adapterId }) {
     exceptSessionId: binding.accSessionId });
   const messages = delivery.queuedMessages;
 
-  // Solo costs nothing: nothing to say means nothing printed, not a banner
-  // announcing that nobody else is here. But something already said to you is
-  // not nothing - the check used to run before the inbox was read, so the
-  // answer to your own request vanished the moment the agent working on it
-  // closed and left you as the only session.
-  if (sync.solo && messages.length === 0) return { stdout: "" };
+  // Only this hook's payload selected the binding. Supply its own pair as
+  // trusted context, outside peer bodies, rather than exporting inheritable
+  // credentials or teaching the CLI to guess from a public roster.
+  const owner = "ACC CLI (append): --session "
+    + assertPortableId(binding.accSessionId, "sessionId") + " --generation "
+    + assertPortableId(binding.generation, "generation");
+  const totalBudget = context.descriptor.policy?.contextBudgetBytes ?? 6_000;
+  // A peer can join after this prompt has begun. The current turn must already
+  // have its own arguments when it needs inbox/reply, without reattaching or
+  // waiting for another user prompt. Solo emits identity, not a peer notice.
+  if (sync.solo && messages.length === 0) {
+    return ownerOnlyOutcome(adapter, owner, totalBudget);
+  }
 
   // The ceiling a team agreed on in `acc.workspace.json`, or the default when
   // there is no config. Validated by the protocol and, until now, never read:
@@ -224,13 +238,6 @@ async function projectTurn({ binding, context, adapter, adapterId }) {
     liveOfferedMessageIds: delivery.liveOfferedMessageIds,
     roomMessageIds: delivery.roomMessageIds,
     currentParticipantId: mine?.participantId };
-  // Only this hook's payload selected the binding. Supply its own pair as
-  // trusted context, outside peer bodies, rather than exporting inheritable
-  // credentials or teaching the CLI to guess from a public roster.
-  const owner = "ACC CLI (append): --session "
-    + assertPortableId(binding.accSessionId, "sessionId") + " --generation "
-    + assertPortableId(binding.generation, "generation");
-  const totalBudget = context.descriptor.policy?.contextBudgetBytes ?? 6_000;
   // Credentials alone cannot replace the command that reaches a queued body.
   // If both cannot fit, preserve recovery and explain the missing owner pair.
   const minimumBodyBytes = messages.length === 0 ? 1
@@ -262,6 +269,9 @@ async function projectTurn({ binding, context, adapter, adapterId }) {
   const budgetBytes = projectionOptions.budgetBytes ?? 6_000;
   const body = degradation === null ? projection.text
     : fitDegradation(projection.text, visibleDegradation, messages, budgetBytes);
+  // Own claims make sync non-solo but produce no peer context. They cannot
+  // remove this turn's identity or consume a nonexistent body separator.
+  if (body === "" && messages.length === 0) return ownerOnlyOutcome(adapter, owner, totalBudget);
   const projected = body === "" ? "" : ownerFits ? `${owner}\n${body}` : body;
   if (projected === "") {
     return { stdout: "", stderr: messages.length === 0 ? ""

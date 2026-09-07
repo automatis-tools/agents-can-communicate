@@ -122,5 +122,5 @@ export function denyOutcome(reason) {
 
 export function injectOutcome(context) {
   const rendered = injectResponse(context);
-  return { stdout: rendered === null ? "" : `${rendered}\n`, stderr: "", exitCode: 0 };
+  return { stdout: rendered ?? "", stderr: "", exitCode: 0 };
 }

@@ -101,8 +101,10 @@ file ACC writes is an optional `acc.workspace.json` explicitly requested through
 `acc config init`.
 
 A lone session can remain ephemeral. Durable state materialises when a second live session
-appears or the first claim, message, or handoff is committed. This makes “silent when
-alone” an architectural behavior, not a UI preference.
+appears or the first claim, message, or handoff is committed. Solo presence therefore
+does not require durable workspace history. Native turn hooks still supply the session's
+own CLI arguments, so a peer joining later in the same turn does not require reattachment.
+Without relevant coordination context, that identity header is the only projected content.
 
 ## Inbox, attention, and projection
 
