@@ -29,6 +29,14 @@ That recovery kept its owner open while asking; it is distinct from the lifecycl
 The full suite passed 1617 checks with zero failures and two explicit skips. No adapter
 capability was added. Temporary native client settings were restored exactly.
 
+A further live audit on the same fixed archive completed review across two Git
+worktrees. Claude rejected the author's defective proposal while its own checkout
+remained at the baseline. Codex committed a correction; the same reviewer resolved
+and approved its full SHA, and the author retrieved that verdict before finishing.
+Ten final fixture tests passed; seven failed on the original source. No ACC code
+changed. This is one bounded observation; adapter compatibility notes record the
+capture limits and an incorrect incidental statement in the review.
+
 Earlier foreground review correction (archive `aa947539f5e0ae4d9491775e3ad809c7a5279f615f6a5769fd468f69c4d37fc2`):
 
 For an agreed review, all five installed skills now direct the agent to read inbox and

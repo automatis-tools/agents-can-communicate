@@ -676,3 +676,47 @@ all synthetic project trust changes were removed with exact original config rest
 Prompts explicitly required claim respect; the direct regression explicitly requested
 partial finish. These are bounded observations, not universal model compliance, actual
 quota exhaustion, unsaved-context recovery, automatic restart or new capabilities.
+
+## Review across distinct Git worktrees, 2026-09-07
+
+One real Claude Code 2.1.263 reviewer and Codex CLI 0.153.4 author completed two
+review rounds on the unchanged installed archive
+`170424207429240978ccda7e6a3bc60d17e3c8192576dcce32b7c1c755397a05`.
+Both worktrees resolved to one ACC workspace; status retained their distinct
+checkout roots and branches. The reviewer stayed at the correct baseline while
+the author's proposal added an in-place sort that broke the specification.
+The original fixture test passed in both checkouts; an independent oracle failed
+only on the proposal.
+
+The author requested review before its first observed edit. The reviewer retrieved
+the request, ran Git inspection and returned four valid blocking findings against
+that proposal. Initial provenance rests on the request's unique short SHA, Git diff
+activity and proposal-specific findings; the collector did not capture a resolved
+initial SHA or the proposed source returned to the reviewer.
+
+Codex acquired both file claims, added regressions, removed the sort and committed
+the correction. The same reviewer retrieved the second request and independently
+resolved the author's full new SHA through Git before approving that exact revision.
+The author retrieved and acknowledged the verdict before its complete handoff.
+Independent verification passed all ten final fixture tests and the specification
+oracle; restoring the original defective source in a scratch copy failed seven of
+those tests and the oracle. The old single test still passed on both implementations.
+
+Both clients exited naturally with code 0. Their sessions closed, with no claims
+or hook bindings left. The final reviewer checkout was clean at its original commit;
+its HEAD at tool results and three fixture-file hashes at 250 ms samples stayed
+unchanged. The author's observed final revision also stayed unchanged after approval.
+These samples do not exclude transient edits between observations. Temporary Codex
+hook/cache and project trust changes were removed, restoring original config bytes.
+
+The reviewer made one incorrect incidental claim: an already-sorted frozen array
+of length two also throws on the proposal, contrary to its assertion that this case
+escapes the bug. Independent execution confirmed this; the four blocking findings
+remain valid. Test/reply commands were sometimes bundled, so tool-result timestamps
+do not establish the order of individual checks inside those commands.
+
+Prompts explicitly requested review across worktrees and revision-specific verdicts.
+No ready-made ACC messages, manual relay or model continuation was supplied; delivery
+was off. This is one observed exchange, not automatic revision pinning, a moving-HEAD
+or dirty-checkout audit, or a guarantee of review accuracy. No ACC runtime behavior
+or capability changed.
