@@ -4,7 +4,7 @@
 
 | | |
 |---|---|
-| Built from | `15bc261550c584798691536f1ae55301c8c2b88c` |
+| Built from | `153943af838b5e3be702a3dd2a6e971cb8c71bca` |
 | Tarball | `agents-can-communicate-0.3.1.tgz`, 259,401 bytes, 197 entries |
 | sha256 | `585035ad54e3b208ff52e8558bf2171f148389036325229f3269c56326c33e5d` |
 
@@ -23,6 +23,10 @@ then completed read/reply/reinspection on bytes identical to this final tarball.
 commands succeeded; Codex needed corrections to guessed CLI options and an invalid finish
 status. Seven exact mutations were caught, including lost receipt output, state regression,
 timestamp refresh, and cross-participant inspection. No native capability claim changed.
+The full suite exposed one older CLI assertion that prohibited the added field. It now
+checks the original message, recipient and acknowledged state, and fails when the receipt
+is omitted or its recipient is changed. Repacking after this test correction produced
+identical bytes; the exact archive passed package verification again.
 
 CLI commands no longer obtain a peer's generation from a sole binding, matching
 checkout, public session selector, or native environment value. An unbound client could
