@@ -4,12 +4,26 @@
 
 | | |
 |---|---|
-| Built from | `ac8a1540b416372c5f5442bfaa7dd476c7f1e53a` |
-| Tarball | `agents-can-communicate-0.3.1.tgz`, 263,520 bytes, 199 entries |
-| sha256 | `f223c9b55d5fc6ea23e4d268621f54b48de090266769b3d9eb4a5f74dd05d183` |
+| Built from | `32146c3b04162409adea9c9dd275a9b3fb026c05` |
+| Tarball | `agents-can-communicate-0.3.1.tgz`, 264,220 bytes, 199 entries |
+| sha256 | `dbc99215ab174b48ce49c9aa49dd3617d812f85703e1b08d57a9d8208bafdecf` |
 
 Not published. A published record says what the registry serves and is not
 rewritten, so shipped code that changes after a release is measured here instead.
+
+Hook starts now preserve their exact session owner across process crashes by writing the
+binding before creating its session. A lifecycle waiter recovers any journal left by the
+previous holder before reading that binding. Retrying an interrupted close removes the old
+binding without closing a successor or repeating the close event. Incomplete identities are
+rejected, and a pending binding cannot project unusable CLI owner arguments.
+
+Failed hooks now emit a short generic diagnostic while continuing with exit 0. The crash
+recovery and diagnostic fixes are separate commits. All 322 adjacent checks passed; thirteen
+exact mutations failed and restored copies passed. SIGKILL checks use real installed hook
+processes and filesystem writes. They establish process-crash recovery, not power-loss or
+new native-client capabilities. The saved archive above passed package verification.
+
+Earlier session-opening correction:
 
 Session opening now acquires ownership under the writer lock in both stores. Concurrent
 opens of one session id cannot both claim success, and a delayed open follows workspace
@@ -20,7 +34,7 @@ Hook start and end now serialize binding lookup through publication for one nati
 id. Repeated starts share one ACC owner; different native sessions remain independent.
 Expired waiters cannot publish later, and a corrupt binding fails open without inventing
 another session. The three production fixes are separate commits. All 357 adjacent checks
-passed and 13 exact mutations were caught and restored. On the exact installed archive,
+passed and 13 exact mutations were caught and restored. On that correction's exact installed archive,
 six same-id CLI attaches produced one usable owner and five conflicts; six distinct ids all
 worked. Four concurrent executable hook starts left one live session. Package verification
 passed. These are filesystem/executable observations, with no new native capability claim.
