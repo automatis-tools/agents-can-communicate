@@ -87,12 +87,13 @@ export function createSessionService(ports) {
 
   async function locate(sessionId, workspaceId) {
     const ephemeral = await store.ephemeral.get("session", sessionId);
-    if (ephemeral !== null) return { record: ephemeral, durable: false };
-    const resolved = workspaceId ?? store.workspaceId;
+    const resolved = workspaceId ?? store.workspaceId ?? ephemeral?.workspaceId;
     if (resolved === undefined) return null;
     const durable = (await store.snapshot(resolved, { kinds: ["session"] })).sessions
       .find(session => session.sessionId === sessionId) ?? null;
-    return durable === null ? null : { record: durable, durable: true };
+    if (durable !== null) return { record: durable, durable: true };
+    return ephemeral !== null && ephemeral.workspaceId === resolved
+      ? { record: ephemeral, durable: false } : null;
   }
 
   function assertReplaceable(existing, probe) {
@@ -181,7 +182,9 @@ export function createSessionService(ports) {
     // Heartbeats never append to the semantic event feed: only open, close, and
     // presence transitions surface through cursor sync. Read and validate under
     // the writer lock, so a pending heartbeat cannot restore an old generation.
-    const ephemeral = await store.ephemeral.update("session", sessionId, beat);
+    // Promoted copies may await cleanup; their durable record already owns writes.
+    const ephemeral = await store.ephemeral.update("session", sessionId, async current =>
+      current !== null && !await isMaterialised(store, current.workspaceId) ? beat(current) : null);
     if (ephemeral !== null) return ephemeral;
     return store.transaction(tx => {
       const beaten = beat(tx.get("session", sessionId));
@@ -221,7 +224,8 @@ export function createSessionService(ports) {
     // The compare and replacement happen under the ephemeral store's writer
     // lock. A close or a replacement generation can win before this update or
     // after it, but can never be overwritten from a record read beforehand.
-    const ephemeral = await store.ephemeral.update("session", sessionId, resume);
+    const ephemeral = await store.ephemeral.update("session", sessionId, async current =>
+      current !== null && !await isMaterialised(store, current.workspaceId) ? resume(current) : null);
     if (ephemeral !== null) return ephemeral;
 
     // Re-read and validate inside the durable transaction for the same reason.
@@ -244,7 +248,8 @@ export function createSessionService(ports) {
       return { ...current, state: "closed", heartbeatAt: clock.now() };
     };
     let ephemeral = null;
-    await store.ephemeral.delete("session", sessionId, current => {
+    await store.ephemeral.delete("session", sessionId, async current => {
+      if (await isMaterialised(store, current.workspaceId)) return false;
       ephemeral = close(current);
       return true;
     });

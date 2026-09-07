@@ -24,13 +24,15 @@ export async function isMaterialised(store, workspaceId) {
 export async function materialise({ store, clock, ids }, { workspaceId, descriptor, reason }) {
   const now = clock.now();
   const staged = [];
-  for (const entry of EPHEMERAL_KINDS) {
-    staged.push({ ...entry, records: await store.ephemeral.list(entry.kind) });
-  }
-  const actorSessionId = staged.find(entry => entry.kind === "session")?.records.at(-1)?.sessionId
-    ?? "session_bootstrap";
 
   await store.transaction(async tx => {
+    // Ephemeral writers use this same mutex. Reading before taking it could
+    // resurrect a closed owner or replace an intent with an older snapshot.
+    for (const entry of EPHEMERAL_KINDS) {
+      staged.push({ ...entry, records: await store.ephemeral.list(entry.kind) });
+    }
+    const actorSessionId = staged.find(entry => entry.kind === "session")?.records.at(-1)?.sessionId
+      ?? "session_bootstrap";
     // Asked again inside the lock. `ensureMaterialised` asks before taking it,
     // which is a check-then-act across processes: agents starting together in a
     // workspace neither had opened - the ordinary way two agents start - all saw
