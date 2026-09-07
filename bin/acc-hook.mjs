@@ -89,6 +89,11 @@ function tryWrite(stream, output) {
 
 export async function completeHookOutput(result,
   { stdout = process.stdout, stderr = process.stderr } = {}) {
+  if (result.failed) {
+    // Hook failures can include arbitrary payload or filesystem text. Report
+    // degradation without reflecting those details into the client's output.
+    tryWrite(stderr, "acc: coordination unavailable; hook continued without context\n");
+  }
   try {
     await writeOutput(stdout, result.stdout ?? "", { deadlineAt: result.deadlineAt });
   } catch (error) {
