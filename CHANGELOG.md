@@ -4,7 +4,7 @@
 
 | | |
 |---|---|
-| Built from | `b881fce2c61f1620b20a3720a63fee80cc05556a` |
+| Built from | `4c4034136b574419e8d7161f938a9e5e3348cfbb` |
 | Tarball | `agents-can-communicate-0.3.1.tgz`, 265,744 bytes, 200 entries |
 | sha256 | `aa947539f5e0ae4d9491775e3ad809c7a5279f615f6a5769fd468f69c4d37fc2` |
 
@@ -29,6 +29,12 @@ an intentionally defective fixture, Codex corrected it, and the original reviewe
 the revised files and approved them. The author retrieved that verdict before finishing.
 Nine revised fixture tests passed; six failed on the original implementation. This adds
 one observed correction cycle, without a new ACC fix or capability claim.
+
+The same archive also completed one sequential Claude-to-Codex continuation. Claude
+left partial work and an unwritten product decision in a room handoff before exiting.
+A new Codex participant recovered it through public history, preserved the decision and
+finished the implementation. This establishes explicit handoff recovery, not recovery of
+unsaved context or actual provider-quota exhaustion. No ACC behavior changed in this audit.
 
 Earlier Codex onboarding correction:
 
