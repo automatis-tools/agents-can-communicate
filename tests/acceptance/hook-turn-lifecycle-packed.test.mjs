@@ -90,9 +90,9 @@ test("turns with missing or stale bindings and heartbeats cannot allocate owners
     if (state !== "absent") await f.storeSessionBinding({ runtimeDir, harnessSessionId: state,
       accSessionId: state === "missing" ? "session_not_created" : owner.sessionId,
       generation: state === "heartbeat" ? owner.generation : "generation_stale" });
-    if (state === "open-mismatch") await start.service.openSession({
-      sessionId: owner.sessionId, participantId: "replacement", harness: "fixture",
-      heartbeatCadenceMs: 60_000 });
+    // A separate caller gets a fresh operation budget, not the old hook's deadline.
+    if (state === "open-mismatch") await f.packed.acc(["attach", "--session", owner.sessionId,
+      "--participant", "replacement", "--harness", "fixture", "--cadence", "60000"]);
     const before = await f.snapshot();
     let probes = 0;
     const result = await f.invoke(state === "heartbeat" ? "heartbeat" : "beforeTurn", state,
@@ -139,13 +139,13 @@ test("a replacement turn retains its client PID and performs one native handshak
 
 test("a CLI replacement during a paused turn probe is not adopted or reopened", async t => {
   const f = await fixture(t);
-  const { start, owner } = await f.prepare("replaced");
+  const { owner } = await f.prepare("replaced");
   const probe = pauseProbe();
   const turn = f.invoke("beforeTurn", "replaced", { probeClientVersion: probe.probeClientVersion });
   await probe.reached;
   try {
-    await start.service.openSession({ sessionId: owner.sessionId,
-      participantId: "external", harness: "fixture", heartbeatCadenceMs: 60_000 });
+    await f.packed.acc(["attach", "--session", owner.sessionId,
+      "--participant", "external", "--harness", "fixture", "--cadence", "60000"]);
   } finally { probe.release(); }
   const result = await turn;
   assert.equal(result.exitCode, 0);
