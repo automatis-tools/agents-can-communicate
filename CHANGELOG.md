@@ -4,12 +4,32 @@
 
 | | |
 |---|---|
-| Built from | `3a061c16e344ee02a2a2670545989c8ea9537d9a` |
-| Tarball | `agents-can-communicate-0.3.1.tgz`, 265,744 bytes, 200 entries |
-| sha256 | `aa947539f5e0ae4d9491775e3ad809c7a5279f615f6a5769fd468f69c4d37fc2` |
+| Built from | `a0fc2a67bb597593a42d178c852d5356f89b2d74` |
+| Tarball | `agents-can-communicate-0.3.1.tgz`, 266,198 bytes, 200 entries |
+| sha256 | `170424207429240978ccda7e6a3bc60d17e3c8192576dcce32b7c1c755397a05` |
 
 Not published. A published record says what the registry serves and is not
 rewritten, so shipped code that changes after a release is measured here instead.
+
+A genuine user turn after `acc finish` now registers a fresh ACC owner in the same
+native conversation. The closed session and its handoff remain unchanged. Turn hooks
+serialize with native start/end hooks; missing or stale bindings fail open. Tool hooks
+and heartbeats do not create replacement owners. This fixes a real two-turn Codex
+recovery that could not use an explicit user approval after its partial finish.
+
+Eight installed regression checks cover continuation, stale ownership, native delivery,
+concurrent turns/end and deadlines. Five exact runtime mutations failed those checks.
+The original reproduction also failed on the preceding package for Claude and Codex.
+
+On the fixed installed archive, real Codex completed an explicitly requested partial
+finish, then used a fresh owner on the next turn of that same conversation without
+another native SessionStart. A separate default-lease crash recovery asked permission,
+released only the two approved claims, acquired its own and completed the carried decision.
+That recovery kept its owner open while asking; it is distinct from the lifecycle capture.
+The full suite passed 1617 checks with zero failures and two explicit skips. No adapter
+capability was added. Temporary native client settings were restored exactly.
+
+Earlier foreground review correction (archive `aa947539f5e0ae4d9491775e3ad809c7a5279f615f6a5769fd468f69c4d37fc2`):
 
 For an agreed review, all five installed skills now direct the agent to read inbox and
 use separate short foreground waits until the required request or verdict arrives.
@@ -18,7 +38,7 @@ A blocked or limited wait leaves a truthful partial handoff.
 
 The preceding real Claude reviewer exited before the request arrived. Generic waiting
 advice passed once and failed on repeat; the concrete recipe then completed two fresh
-Claude/Codex reviews on the exact archive recorded above. Both original reviewers replied,
+Claude/Codex reviews on the then-current archive. Both original reviewers replied,
 both original authors retrieved the verdict before completing, and both pairs closed
 without claims or owner bindings. Native Codex trust was reviewed before each run and
 temporary user settings were restored exactly. This is in-turn polling evidence; no new

@@ -480,3 +480,22 @@ recovery, real quota exhaustion, automatic restart, write-guard certification or
 new capability is established. Delivery was off. The 180-second lease was a test
 parameter; the default is 1800 seconds. Original Codex config/trust bytes were
 restored and the temporary native cache removed.
+
+## Default-lease crash checkpoint, 2026-09-07
+
+Claude Code 2.1.263 on macOS arm64 participated in the authorized-recovery capture
+on archive `170424207429240978ccda7e6a3bc60d17e3c8192576dcce32b7c1c755397a05`.
+It claimed two files with the default 1800-second lease, implemented a validation
+helper, passed eight tests and recorded a durable unaddressed decision. The harness
+sent SIGKILL to that child after observing the saved decision id in a successful
+tool result. No finish or aggregation edit had occurred. The decision preserved the
+ceiling 23, clamping and the rejected throwing alternative; 23 was absent from all
+four project files. The independent aggregation oracle was still failing.
+
+Codex subsequently asked permission, released only those two claims after explicit
+approval and completed the carried decision. Claude's session stayed open/offline,
+its original decision and hook binding remained, and completion addressed to it stayed
+queued. It did not resume or acknowledge anything. Full successor and separate native
+Codex turn-renewal observations are in the Codex compatibility record. No new Claude
+capability is claimed; after-finish behavior for Claude was checked with installed hook
+executables, not an additional live Claude conversation.

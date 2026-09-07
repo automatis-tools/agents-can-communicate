@@ -626,3 +626,53 @@ recovery, real quota exhaustion, automatic restart, write-guard certification or
 new capability is established. Delivery was off. The 180-second lease was a test
 parameter; the default is 1800 seconds. Original Codex config/trust bytes were
 restored and the temporary native cache removed.
+
+## Authorized recovery and turns after finish, 2026-09-07
+
+A real two-turn Codex CLI 0.153.4 app-server conversation exposed a lifecycle bug
+on the preceding `aa947539f5e0ae4d9491775e3ad809c7a5279f615f6a5769fd468f69c4d37fc2`
+archive. After recovering a crashed Claude decision, Codex encountered its two
+unexpired default 1800-second claims, asked permission and recorded a partial finish.
+That closed its ACC owner. The next user turn supplied scoped release approval, but
+the hook could not heartbeat the closed record and projected no fresh owner arguments.
+Claim, heartbeat and human-authority release failed; files and old claims were unchanged.
+
+The hook runner now opens a fresh owner on a genuine turn after its exact completed
+binding. Installed Claude/Codex regressions failed on the old code and pass on the fix.
+Native lifecycle hooks serialize; the post-probe check also detects a replacement during
+probing. This does not claim atomic exclusion of every later external CLI replacement.
+
+The fixed archive, SHA-256
+`170424207429240978ccda7e6a3bc60d17e3c8192576dcce32b7c1c755397a05`,
+was installed from clean commit `a0fc2a67bb597593a42d178c852d5356f89b2d74`.
+Two distinct native app-server captures on macOS arm64 completed:
+
+- Default-lease recovery: Claude Code 2.1.263 saved its helper and decision, then the
+  harness killed that child. Fresh Codex recovered the decision through public sync,
+  reported the offline holder, both files and about 27 minutes remaining, and asked
+  permission without changing files or claims. In this replay it kept its ACC owner
+  open. After one explicit approval in the same thread, it force-released only those
+  two claims with human authority and a reason, acquired both files under its own
+  owner, completed the implementation and recorded a complete handoff. The original
+  eight tests, 26 final tests and an independent specification oracle passed. Changing
+  the recovered ceiling from 23 to 24 failed the oracle. The value was absent from all
+  predecessor project files and the successor prompt; the saved decision contained it.
+- Direct lifecycle regression: a separate ephemeral conversation explicitly recorded
+  a partial finish and waited. Its next user prompt received a new owner pair without
+  another native SessionStart or client restart. That owner published work, claimed
+  the fixture file, verified it and finished successfully. The participant and PID
+  stayed the same, the captured prior closed-session fields and full handoff were
+  unchanged, and no claims
+  or hook bindings remained. No project files changed in this capture.
+
+Both Codex processes exited naturally with code 0. The recovery capture retained the
+crashed Claude session as open/offline and its old hook binding, with no claims. Its
+completion receipt stayed queued for that offline participant. File hashes were sampled
+at 250 ms from before thread creation through exit; the first observed recovery edit
+followed both new acquisitions. This cannot exclude transient edits between samples.
+
+Delivery was off; native hook trust was checked through Codex, and temporary cache and
+all synthetic project trust changes were removed with exact original config restoration.
+Prompts explicitly required claim respect; the direct regression explicitly requested
+partial finish. These are bounded observations, not universal model compliance, actual
+quota exhaustion, unsaved-context recovery, automatic restart or new capabilities.
