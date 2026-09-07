@@ -4,12 +4,25 @@
 
 | | |
 |---|---|
-| Built from | `ac5d7afe09a584467f9417d2badd203e6fcd4e26` |
-| Tarball | `agents-can-communicate-0.3.1.tgz`, 258,635 bytes, 197 entries |
-| sha256 | `af66590f496d8d9d591212b194b61be0e8eb1afd27d0c7485e60beff1b006d43` |
+| Built from | `15bc261550c584798691536f1ae55301c8c2b88c` |
+| Tarball | `agents-can-communicate-0.3.1.tgz`, 259,401 bytes, 197 entries |
+| sha256 | `585035ad54e3b208ff52e8558bf2171f148389036325229f3269c56326c33e5d` |
 
 Not published. A published record says what the registry serves and is not
 rewritten, so shipped code that changes after a release is measured here instead.
+
+After replying, a participant can inspect the original message with `inbox --message`
+without an exit-5 error. An acknowledged receipt remains unchanged: no timestamp refresh,
+new event, or return to the ordinary pending inbox. Owner and current-generation checks
+still apply. CLI and MCP reply results now include the original acknowledged receipt next
+to the recorded outgoing message and its separate delivery result; CLI text names both IDs.
+
+The failure was reproduced with real Codex using the original request ID. Both real Codex
+CLI 0.153.4 with its own manual attachment and Claude Code 2.1.263 with native hook identity
+then completed read/reply/reinspection on bytes identical to this final tarball. All Claude
+commands succeeded; Codex needed corrections to guessed CLI options and an invalid finish
+status. Seven exact mutations were caught, including lost receipt output, state regression,
+timestamp refresh, and cross-participant inspection. No native capability claim changed.
 
 CLI commands no longer obtain a peer's generation from a sole binding, matching
 checkout, public session selector, or native environment value. An unbound client could
