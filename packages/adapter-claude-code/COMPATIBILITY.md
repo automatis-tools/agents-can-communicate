@@ -445,3 +445,38 @@ exactly. Delivery was off, with no operator relay or continuation intervention.
 This is one explicit handoff/continuation observation, not an abrupt crash,
 provider-quota exhaustion or recovery of unsaved context. The harness opened the
 successor; ACC did not restart a client. No runtime code or capability changed.
+
+## Continuation after abrupt client death, 2026-09-07
+
+One real Claude Code 2.1.263 → fresh Codex CLI 0.153.4 run used the unchanged
+`aa947539f5e0ae4d9491775e3ad809c7a5279f615f6a5769fd468f69c4d37fc2` archive.
+After implementing and testing a helper, Claude renewed two explicitly configured
+180-second advisory file claims and recorded an unaddressed decision with the
+remaining aggregation rule. The harness sent SIGKILL to that exact child process
+immediately after its successful message result, before any finish. Its recorded
+session stayed open, presence became offline, and both claims remained active.
+
+The new Codex participant recovered the decision through public sync. An attempted
+claim returned exit 5, identifying the crashed owner's resource and lease expiry.
+Codex had been explicitly instructed to respect reservations and allow up to four
+minutes for expiry. It acquired both files under its own identity after expiry,
+completed the carried clamping rule, and recorded its own complete handoff.
+The first observed file change followed acquisition. File hashes were sampled at
+250 ms from shortly before expiry through successor exit; this does not exclude
+transient changes between samples or before observation began.
+
+Independent checks passed 22 final fixture tests, the original nine helper tests,
+and a specification oracle. The successor exited naturally with code 0. Its claims
+were released and session closed; the crashed session remained open/offline with
+two expired claim records and its old hook binding. Active claims were zero. No
+post-crash event used the old owner, and no force release occurred. The original
+decision was unchanged; the completion addressed to the offline Claude participant
+remained queued. Neither that receipt nor history retrieval proves model attention.
+
+The ceiling value also appeared as an invalid helper input in a predecessor test;
+this is not a clean number-absence experiment. The aggregation/clamping rule was
+absent from the specification and predecessor implementation. No unsaved-context
+recovery, real quota exhaustion, automatic restart, write-guard certification or
+new capability is established. Delivery was off. The 180-second lease was a test
+parameter; the default is 1800 seconds. Original Codex config/trust bytes were
+restored and the temporary native cache removed.
