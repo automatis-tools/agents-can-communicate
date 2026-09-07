@@ -543,3 +543,45 @@ No ready-made ACC messages, manual relay or model continuation was supplied; del
 was off. This is one observed exchange, not automatic revision pinning, a moving-HEAD
 or dirty-checkout audit, or a guarantee of review accuracy. No ACC runtime behavior
 or capability changed.
+
+## Review while the author advances its revision, 2026-09-07
+
+One further Claude Code 2.1.263 / Codex CLI 0.153.4 exchange used the unchanged
+`170424207429240978ccda7e6a3bc60d17e3c8192576dcce32b7c1c755397a05` archive.
+The author requested review of commit A, then implemented an optional limit and
+committed B before reading A's verdict. The reviewer was explicitly instructed to
+review the requested commit and its specification. The author prompt specified
+review of the current committed implementation followed by the enhancement, without
+supplying ACC messages. The resulting request identified the full A SHA.
+
+The harness paused its own reviewer process after its inbox result contained the
+initial request id and full A SHA. The stopped PID was observed; it resumed after
+158 seconds when a new clean B commit existed, within the 180-second timing bound.
+This was one deliberate timing intervention. ACC did not pause or schedule a client,
+and the harness injected no coordination messages or model continuation prompts.
+
+The original reviewer approved A after B was committed. Codex explicitly restricted
+that approval to A and requested a separate review of B. Parsed Git-show metadata
+contained each full SHA with matching returned implementation hashes; raw commands
+and separately hashed specification output were not retained. The same reviewer
+approved B, and the author retrieved and acknowledged that verdict before its complete
+handoff. B was still the final clean commit. Fourteen final fixture tests and an
+independent oracle passed; restoring A's source failed seven tests and the new-feature
+oracle. No ACC runtime or capability change was required.
+
+After the author exited, the reviewer sent a separate amendment: its initial approval
+had missed inherited sparse-hole values and custom iterators hiding invalid entries.
+Independent execution confirmed both deviation classes in A and their correction in B.
+The amendment's exact global-prototype example was imprecise: its non-writable index
+itself causes TypeError; the scoped inherited-index and iterator examples do reproduce
+the missed defects. The original approval record remained unchanged. The amendment's
+receipt stayed queued for the closed author; receipt of B's approval does not imply
+receipt of this later correction. B's approval was not withdrawn.
+
+Both clients exited with code 0, and both ACC sessions closed with no claims or hook
+bindings. The reviewer ended clean at its initial commit; sampled fixture files and
+HEAD observations stayed unchanged. Samples cannot exclude transient edits between
+observations. Temporary Codex cache and trust changes were removed, with exact original
+config restoration. Delivery was off. These are observations of explicitly scoped
+review and a delayed verdict, not generic revision enforcement, automatic wake-up,
+universal review accuracy or recovery of a late correction in a successor session.

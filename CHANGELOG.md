@@ -44,6 +44,15 @@ callers. Deliberately crossing the old deadline failed before the correction and
 after it; removing the runtime generation guard still fails the corrected test.
 No runtime timeout or ownership check was relaxed, and no new test was added.
 
+A controlled moving-revision audit also completed on the same archive: the author
+committed B before receiving an approval of A, kept that approval scoped to A, and
+retrieved a separate B verdict before finishing. The harness used one disclosed
+reviewer pause/resume to establish the ordering. Fourteen fixture tests passed;
+seven failed with A's source restored. A later amendment to A's review stayed queued
+after the author exited; B already fixed those missed cases. No ACC runtime code or
+capability changed. Compatibility notes distinguish the delivered verdict from the
+later unread amendment and record the limits of the capture.
+
 Earlier foreground review correction (archive `aa947539f5e0ae4d9491775e3ad809c7a5279f615f6a5769fd468f69c4d37fc2`):
 
 For an agreed review, all five installed skills now direct the agent to read inbox and
