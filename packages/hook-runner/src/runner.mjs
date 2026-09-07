@@ -353,6 +353,16 @@ const HANDLERS = {
       checkoutRoot: context.descriptor.git?.worktreeRoot ?? context.descriptor.roots[0],
       branch: context.descriptor.git?.branch ?? null,
     };
+    if (event.kind === "beforeTurn") {
+      // A real prompt may continue after finish closed this native owner's
+      // record. Recheck after the probes: a CLI replacement can run outside
+      // the native lifecycle lock. Never adopt that replacement's identity.
+      const previous = await context.service.locateSession(binding.accSessionId);
+      if (previous?.record.state !== "closed"
+        || previous.record.generation !== binding.generation) {
+        throw new Error("the completed hook owner changed during turn registration");
+      }
+    }
     if (binding !== null) {
       const resumed = await context.service.resumeSession({
         sessionId: binding.accSessionId,
@@ -423,6 +433,18 @@ const HANDLERS = {
   async beforeTurn(input) {
     const { binding, context, adapter, event, paths, deadline } = input;
     if (binding === null) return {};
+    const current = await context.service.locateSession(binding.accSessionId);
+    if (current?.record.state === "closed" && current.record.generation === binding.generation) {
+      // finish ends an ACC incarnation, not the native conversation. Only a
+      // genuine new user turn can start another one; tool hooks cannot. Reuse
+      // the crash-safe opening path, retaining its full published client facts
+      // and its single native handshake rather than binding a second time.
+      const started = await HANDLERS.sessionStart(input);
+      const fresh = await loadSessionBinding({ runtimeDir: paths.root,
+        harnessSessionId: event.sessionId });
+      const turn = await projectTurn({ ...input, binding: fresh });
+      return { ...turn, nativeBinding: started.nativeBinding };
+    }
     // A turn is the clearest sign a session is alive. Never a reason to fail:
     // this runs in front of somebody's prompt.
     await context.service.heartbeatSession({ sessionId: binding.accSessionId,
@@ -519,7 +541,7 @@ export async function runHook({ adapterId, payload, adapters, dataHome, env,
     const event = await adapter.normalizeHook(payload);
     const context = await openContext({ cwd: event.cwd, dataHome, runtime, env, deadline });
     const handler = HANDLERS[event.kind];
-    const lifecycle = event.kind === "sessionStart" || event.kind === "sessionEnd";
+    const lifecycle = ["sessionStart", "sessionEnd", "beforeTurn"].includes(event.kind);
     const invoke = async () => {
       assertHookBudget(deadline);
       if (lifecycle) {
