@@ -4,9 +4,9 @@
 
 | | |
 |---|---|
-| Built from | `de823212fc7b33213886bf7964fbac546b818bc3` |
-| Tarball | `agents-can-communicate-0.3.1.tgz`, 266,198 bytes, 200 entries |
-| sha256 | `170424207429240978ccda7e6a3bc60d17e3c8192576dcce32b7c1c755397a05` |
+| Built from | `7cbb46120d69afb04b8516a0d1288d1edf7b2d2f` |
+| Tarball | `agents-can-communicate-0.3.1.tgz`, 267,041 bytes, 201 entries |
+| sha256 | `7dd08dd8923771f8025f7dd37a3f66994226b68bfe7e2f84ec4bc9e136f7ffec` |
 
 Not published. A published record says what the registry serves and is not
 rewritten, so shipped code that changes after a release is measured here instead.
@@ -17,7 +17,12 @@ new peer bodies, using this recipient's `offered` or `retrieved` receipts. A bac
 and claim conflicts remain individual notices; inbox/status retain the full pending list.
 Projection neither resolves obligations nor advances receipts from a summary. Five focused
 regressions cover selection, tight budgets, and the installed hook; eight deliberate
-runtime mutations failed them. No adapter capability changed.
+runtime mutations failed them. Two existing receipt checks now expect counts and verify
+the complete receipt stays unchanged; removing reminder metadata fails both. The full
+suite passes 1622 checks with zero failures and two explicit skips. Six installed-process
+scenarios cover 300 measured synthetic hook invocations: the 60-request backlog falls from 5868
+to 167 bytes per repeated turn, and the fresh body is offered on the first turn. These
+measurements are hook output bytes, not native model turns. No adapter capability changed.
 
 A genuine user turn after `acc finish` now registers a fresh ACC owner in the same
 native conversation. The closed session and its handoff remain unchanged. Turn hooks
