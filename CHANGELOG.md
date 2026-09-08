@@ -4,12 +4,44 @@
 
 | | |
 |---|---|
-| Built from | `7cbb46120d69afb04b8516a0d1288d1edf7b2d2f` |
-| Tarball | `agents-can-communicate-0.3.1.tgz`, 267,041 bytes, 201 entries |
-| sha256 | `7dd08dd8923771f8025f7dd37a3f66994226b68bfe7e2f84ec4bc9e136f7ffec` |
+| Built from | `1e85b2bf9b2d5459473a44dabfe68224d0069619` |
+| Tarball | `agents-can-communicate-0.3.1.tgz`, 271,687 bytes, 202 entries |
+| sha256 | `7c579aa30c5299617114fe2ba36f7adc3d61ad7c612ce40bb891ef27134e14fa` |
 
 Not published. A published record says what the registry serves and is not
 rewritten, so shipped code that changes after a release is measured here instead.
+
+Default CLI/MCP inbox and `acc://inbox` now return read-only `{items, nextCursor}`
+summary pages. Previously, listing a backlog returned every body and marked every message
+retrieved. Exact inbox reads retain their one-item full-message array and receipt semantics.
+This intentionally changes the default response shape; callers must list, select an id,
+then retrieve that body. All five bundled skills and public references describe the workflow.
+
+`sync --scope history` discovers historical message headers with an optional kind filter,
+then reads one complete record by id without changing receipts. Pages default to 20 items
+and stay within 12,000 formatted JSON bytes before CLI/MCP framing. Complete message-id
+cursors remain usable after an anchor is read or acknowledged. Full sync and the snapshot
+resource remain explicit unbounded forensic reads; historical records do not acquire
+semantic freshness from pagination.
+
+Six focused core checks, two installed end-to-end checks, and existing generation-race
+checks cover limits, Unicode, payload omission, receipt preservation, and cursor recovery.
+Eighteen deliberate runtime regressions were rejected, including restoring bulk retrieval,
+which failed 18 migrated/new workflow checks. On installed archives, 60 old note bodies
+previously produced 237,692 formatted data bytes and 60 retrievals; the new first page
+contains 11,423 bytes of headers and zero retrievals. Selecting one id retrieves only its
+complete body. A fresh agent recovered the latest handoff through the installed skill's
+history list and exact read with 1,718 CLI response bytes and no unrelated bodies.
+These are CLI/application measurements, not native-client capability certification.
+
+The full-suite follow-up corrected two fixture assumptions. Unblocked hook recovery now
+uses the normal five-second budget and explicitly rejects a timed-out result; held expiry
+checks retain their short budget and state assertions. Executable documentation checks
+obtain a real history cursor through public commands before testing continuation syntax.
+A controlled 1.2-second retry delay reproduces the old fixture failure and passes after
+correction. Removing either publication deadline protection or the documented cursor flag
+still fails the corresponding gates (three additional mutations).
+The final full suite passes 1632 checks with zero failures and two explicit environment skips.
 
 Repeated unresolved reply and acknowledgement notices now become a compact count after
 new peer bodies, using this recipient's `offered` or `retrieved` receipts. A backlog of
