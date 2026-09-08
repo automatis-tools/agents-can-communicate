@@ -7,7 +7,7 @@ import path from "node:path";
 import test from "node:test";
 import { applyPlan } from "../src/apply.mjs";
 import { detectInstallation } from "../src/detect.mjs";
-import { applyNativeActivation } from "../src/native-activation.mjs";
+import { applyNativeActivation, planActivationRetirements } from "../src/native-activation.mjs";
 import { loadOwnership, recordInstall } from "../src/ownership.mjs";
 import { planInstallation } from "../src/plan.mjs";
 import { planNativeActivation } from "../../adapter-codex/src/native-delivery.mjs";
@@ -152,4 +152,18 @@ test("doctor exposes a retained modified native shim from ownership", async t =>
     runtime: { env: { HOME: h.home, ACC_DATA_HOME: h.dataHome }, platform: process.platform },
     detect: async () => [{ adapterId: "codex", present: true, installed: true }] });
   assert.ok(report.owned.modified.includes(h.shim));
+});
+
+
+test("shell retirement compares command identity and refuses an empty legacy identity", () => {
+  const desired = { mechanisms: [{ kind: "shell-bootstrap", command: "claude" }] };
+  const shell = command => ({ kind: "shell-bootstrap", command, ownedFiles: [] });
+  for (const old of [shell("codex"), { kind: "shell-bootstrap", ownedFiles: [] },
+    { kind: "shell-bootstrap", ownedFiles: [{ path: "/old/bin/codex" }] }]) {
+    assert.deepEqual(planActivationRetirements({ previous: { mechanisms: [old] }, desired }), [old]);
+  }
+  for (const old of [shell("claude"),
+    { kind: "shell-bootstrap", ownedFiles: [{ path: "/old/bin/claude" }] }]) {
+    assert.deepEqual(planActivationRetirements({ previous: { mechanisms: [old] }, desired }), []);
+  }
 });

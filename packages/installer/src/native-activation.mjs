@@ -122,7 +122,7 @@ export async function applyNativeActivation({ adapter, activation, dataHome,
         const result = await installShellBootstrap({ plan });
         if (!result.ok) throw new Error(`shell bootstrap refused: ${result.reasonCode}`);
         shell = result;
-        record.mechanisms.push({ kind: mechanism.kind, shimDir: activation.shimDir,
+        record.mechanisms.push({ kind: mechanism.kind, command: mechanism.command, shimDir: activation.shimDir,
           ownedFiles: result.shims.map(shim => ({ path: shim.path, sha256: shim.sha256 })),
           rcFile: result.rcFile });
       }
@@ -145,7 +145,9 @@ export function planActivationRetirements({ previous, desired }) {
   const matches = (old, next) => old.kind === next.kind && (old.kind === "native-service"
     ? old.serviceId === next.serviceId : old.kind === "native-config"
       ? JSON.stringify([...old.artifactIds].sort()) === JSON.stringify([...next.artifactIds].sort())
-      : old.ownedFiles?.every(file => path.basename(file.path) === next.command));
+      : typeof old.command === "string" ? old.command === next.command
+        : old.ownedFiles?.length > 0
+          && old.ownedFiles.every(file => path.basename(file.path) === next.command));
   return (previous?.mechanisms ?? []).filter(old => !wanted.some(next => matches(old, next)));
 }
 

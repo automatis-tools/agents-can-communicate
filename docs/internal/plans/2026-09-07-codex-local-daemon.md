@@ -130,6 +130,11 @@ createDeliveryRouter({ service, adapters, clock, platform, readLivePolicy });
 - [ ] Run focused installer, SDK, hook, CLI/MCP/router tests and commit
   `feat: read native delivery consent from installation records`.
 
+Execution addition: pin the same data home in Codex's baked skill command as in
+its hook. A daemon started before installation exports neither value to model
+shell tools. Execute the installed skill command with a stripped environment and
+literal metacharacter paths; it must reach the same runtime as the hook.
+
 ## Task 2: Remove Codex launch rewriting and reconcile old ownership
 
 **Files:**
@@ -137,9 +142,11 @@ createDeliveryRouter({ service, adapters, clock, platform, readLivePolicy });
 - Modify `packages/adapter-codex/src/native-delivery.mjs`.
 - Modify `packages/installer/src/{plan,apply,native-activation,ownership}.mjs`.
 - Create `packages/installer/test/native-activation-migration.test.mjs`.
-- Modify `packages/adapter-codex/test/native-delivery.test.mjs`,
-  `tests/process/native-shell-bootstrap.test.mjs`, and
-  `packages/cli/test/native-delivery-doctor.test.mjs`.
+- Exercise activation, ordinary argv and doctor retained-artifact assertions in the
+  new focused migration test, sharing its real temporary ownership machine.
+  Run the existing native-delivery, native-shell-bootstrap and native-delivery-doctor
+  suites for regressions; they need no duplicate assertion changes. This execution
+  correction was adopted after review to keep one behavioral test per boundary.
 
 **Interfaces:**
 
@@ -358,7 +365,7 @@ server. Python is test-only stdlib PTY support, not a package dependency.
   repurpose shell HOME variables; pass isolated home values in child spawn env.
 - [ ] Start the owned vendor daemon in A **before** ACC install/opt-in and without
   ACC_NATIVE_DELIVERY_POLICY or ACC_DATA_HOME in its environment. Then run installed
-  `acc install --adapter codex --delivery actionable --yes --json` using the isolated
+  `acc install --adapter codex --delivery actionable --json` using the isolated
   home/data home and CODEX_HOME. Assert applied operations and empty failures, not
   just exit zero. Handle the actual client's hook trust dialog; do not claim trust
   by editing ACC's own record. Launch ordinary Codex clients in B and C.
@@ -366,7 +373,8 @@ server. Python is test-only stdlib PTY support, not a package dependency.
   Consume terminal bytes ephemerally; never write terminal transcripts. A small
   metadata observer may wrap the **real generated hook**, retaining only event,
   ID, cwd, process identity and timestamps while preserving stdin/stdout/exit.
-  Also run the base product path without that observer to detect instrumentation
+  The real SessionStart is deferred until the first submitted prompt: seed one
+  normal turn before asserting idle ACC addressability. Also run the base product path without that observer to detect instrumentation
   effects. Codex-owned temporary session storage is deleted at cleanup.
 - [ ] The product phase sends via installed `acc message/request`; receives via
   the shipped hook/binding/router; the model uses the installed skill's absolute
@@ -427,7 +435,7 @@ server. Python is test-only stdlib PTY support, not a package dependency.
 | P11 | Stop owned daemon, send; install/reinstall while absent | Queue retained, truthful degraded diagnostic, consent retained; no daemon automatically started; later ordinary session can bind once daemon is explicitly restored |
 | P12 | New remote thread without --cd; separate diagnostic only | Actual pwd/hook/thread all A; no assertion that terminal B is its workspace; negative control for old wrapper, not a supported ACC launch recipe |
 | P13 | Remote absolute --cd B; relative --cd; resume/fork B from C | Explicit modes preserve measured actual cwd; exact-thread checks govern eligibility; ACC adds no arguments |
-| P14 | Ordinary /cd C where supported; close/resume/fork sessions | New ID/generation mapped correctly; closed/retired generations cannot receive; 0.152.1 unsupported /cd recorded as a boundary, not a fictitious pass |
+| P14 | Ordinary /cd C where supported; close/resume/fork sessions | New ID/generation mapped correctly; closed/retired generations cannot receive; unsupported /cd recorded only for the launch mode where observed, not assumed for ordinary 0.152.1 |
 | P15 | Sender CODEX_HOME differs from receiver home | Recipient's registered socket is used; sender's daemon queues remain untouched |
 | P16 | Wrong server version, unloaded ID, missing socket, malformed metadata | No offer success; queued receipt and sanitized diagnosis; no raw endpoint in CLI/MCP output |
 | P17 | Send live, then next normal hook | Already live-offered message is not projected again; uncertified nextTurn does not claim offered; durable inbox works |
