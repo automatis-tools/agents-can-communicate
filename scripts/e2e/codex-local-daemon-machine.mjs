@@ -2,14 +2,16 @@
 // terminal output is persisted; the outer scenario layer records closed facts.
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { execFile, spawn } from "node:child_process";
-import { chmod, copyFile, mkdir, mkdtemp, readFile, realpath, rm, stat, symlink, writeFile }
+import { execFile } from "node:child_process";
+import { chmod, copyFile, mkdir, mkdtemp, readFile, readdir, realpath, rm, stat, symlink, writeFile }
   from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { createInterface } from "node:readline";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { promisify } from "node:util";
+import { buildClientEnvironment, createPtyDriver, prepareOwnedTools, prerequisiteChecks,
+  resolveExecutable, verifyInstalledCommands, verifyInstalledTarget }
+  from "./codex-local-daemon-harness.mjs";
 
 const execute = promisify(execFile);
 export const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
@@ -36,60 +38,39 @@ export async function until(label, read, { timeoutMs = 90_000, intervalMs = 300 
   throw new Error(`deadline: ${label}`);
 }
 
-function driver() {
-  const child = spawn("python3", [fileURLToPath(new URL("./codex-local-daemon-client.py", import.meta.url))],
-    { stdio: ["pipe", "pipe", "ignore"] });
-  const pending = new Map();
-  let nextId = 0;
-  createInterface({ input: child.stdout }).on("line", line => {
-    const reply = JSON.parse(line);
-    const request = pending.get(reply.id);
-    if (!request) return;
-    pending.delete(reply.id);
-    clearTimeout(request.timer);
-    if (reply.error) request.reject(new Error(`PTY control: ${reply.error}`));
-    else request.resolve(reply.result);
-  });
-  const fail = () => {
-    for (const request of pending.values()) {
-      clearTimeout(request.timer); request.reject(new Error("PTY driver closed"));
-    }
-    pending.clear();
-  };
-  child.on("error", fail); child.on("exit", fail);
-  const request = command => new Promise((resolve, reject) => {
-    const id = ++nextId;
-    const timer = setTimeout(() => { pending.delete(id); reject(new Error("PTY control deadline")); }, 10_000);
-    pending.set(id, { resolve, reject, timer });
-    child.stdin.write(`${JSON.stringify({ ...command, id })}\n`);
-  });
-  return { request, async close() {
-    await request({ action: "shutdown" }).catch(() => null);
-    child.stdin.end();
-    if (child.exitCode === null) await Promise.race([
-      new Promise(resolve => child.once("exit", resolve)), delay(4_000).then(() => child.kill("SIGTERM"))]);
-  } };
-}
-
 export async function createMachine({ tarball, codex, phase, output }) {
   for (const value of [tarball, codex, output]) assert.ok(path.isAbsolute(value), "explicit absolute path required");
   assert.ok(["transport", "product"].includes(phase), "unknown phase");
-  await stat(tarball); await stat(codex);
+  const [python, npm] = await Promise.all([resolveExecutable("python3"), resolveExecutable("npm")]);
+  try { await prerequisiteChecks({ tarball, codex, python }); }
+  catch (error) {
+    error.harness = { phase, scenarios: [], cleanup: { attempted: true, outcome: "passed",
+      ownedProcesses: "stopped", temporaryState: "removed" } };
+    throw error;
+  }
+  if (npm === null) throw new Error("prerequisite: npm unavailable");
   const root = await realpath(await mkdtemp(path.join(os.tmpdir().startsWith("/var/") ? "/tmp" : os.tmpdir(), "cx-e2e-")));
   const h = { root, codex, phase, output, tarball, roles: {}, daemonStarted: false, cleanupDone: false };
   h.home = path.join(root, "user"); h.codexHome = path.join(root, "cx");
   h.dataHome = path.join(root, "data"); h.prefix = path.join(root, "prefix with spaces");
+  h.toolDir = path.join(root, "owned-tools");
   h.A = path.join(root, "A"); h.B = path.join(root, "B receiver with spaces"); h.C = path.join(root, "C");
   h.packageSha256 = sha256(await readFile(tarball));
-  const inherited = Object.fromEntries(Object.entries(process.env)
-    .filter(([key]) => !key.startsWith("ACC_") && !key.startsWith("CODEX_")));
-  h.env = { ...inherited, HOME: h.home, CODEX_HOME: h.codexHome,
-    PATH: `${path.dirname(codex)}:${process.env.PATH}`, ZDOTDIR: h.home, SHELL: "/bin/zsh", TERM: "xterm-256color" };
+  await prepareOwnedTools({ toolDir: h.toolDir, npm, python });
+  h.env = buildClientEnvironment({ inherited: process.env, codex, toolDir: h.toolDir,
+    home: h.home, codexHome: h.codexHome });
   h.accEnv = { ...h.env, ACC_DATA_HOME: h.dataHome, ACC_UPDATE_CHECK: "0" };
   h.cleanup = async () => {
+    if (h.cleanupResult) return h.cleanupResult;
     let processes = true;
     let state = true;
     await h.pty?.close().catch(() => { processes = false; });
+    for (const role of Object.values(h.roles)) {
+      if (!Number.isInteger(role.pid)) continue;
+      await until(`owned client ${role.role} exit`, () => {
+        try { process.kill(role.pid, 0); return false; } catch { return true; }
+      }, { timeoutMs: 2_000 }).catch(() => { processes = false; });
+    }
     if (h.daemonStarted) {
       await run(codex, ["app-server", "daemon", "stop"],
         { cwd: h.A, env: h.env, timeout: 20_000 }).catch(() => null);
@@ -111,8 +92,9 @@ export async function createMachine({ tarball, codex, phase, output }) {
     }
     await rm(root, { recursive: true, force: true }).catch(() => { state = false; });
     h.cleanupDone = processes && state;
-    return { attempted: true, outcome: h.cleanupDone ? "passed" : "failed",
+    h.cleanupResult = { attempted: true, outcome: h.cleanupDone ? "passed" : "failed",
       ownedProcesses: processes ? "stopped" : "failed", temporaryState: state ? "removed" : "failed" };
+    return h.cleanupResult;
   };
   try {
     for (const dir of [h.home, h.codexHome, h.dataHome, h.A, h.B, h.C, output]) await mkdir(dir, { recursive: true });
@@ -127,11 +109,17 @@ export async function createMachine({ tarball, codex, phase, output }) {
     const version = await run(codex, ["--version"], { cwd: h.A, env: h.env });
     h.version = /^codex-cli (\d+\.\d+\.\d+)\s*$/.exec(version.trim())?.[1];
     assert.ok(h.version, "exact stable vendor version required");
-    await run("npm", ["install", "--prefix", h.prefix, "--no-audit", "--no-fund", tarball],
+    await run(path.join(h.toolDir, "npm"), ["install", "--prefix", h.prefix, "--no-audit", "--no-fund", tarball],
       { env: { ...h.env, npm_config_cache: path.join(root, "npm-cache") } });
-    h.packageRoot = path.join(h.prefix, "node_modules", "agents-can-communicate");
-    h.cli = path.join(h.packageRoot, "bin", "acc.mjs");
-    h.module = relative => import(pathToFileURL(path.join(h.packageRoot, "node_modules", "@agents-can-communicate", relative)));
+    h.packageRoot = await verifyInstalledTarget(path.join(h.prefix, "node_modules",
+      "agents-can-communicate"), { packageRoot: h.prefix, label: "ACC package" });
+    h.cli = await verifyInstalledTarget(path.join(h.packageRoot, "bin", "acc.mjs"),
+      { packageRoot: h.packageRoot, label: "CLI" });
+    h.module = async relative => {
+      const target = await verifyInstalledTarget(path.join(h.packageRoot, "node_modules",
+        "@agents-can-communicate", relative), { packageRoot: h.packageRoot, label: "ACC module" });
+      return import(pathToFileURL(target));
+    };
     h.acc = async (args, { cwd = h.B, env = h.accEnv } = {}) => JSON.parse(
       await run(process.execPath, [h.cli, ...args, "--json"], { cwd, env }));
     h.install = async policy => {
@@ -151,12 +139,28 @@ export async function createMachine({ tarball, codex, phase, output }) {
     h.daemonAt = new Date().toISOString();
     await h.install(phase === "product" ? "actionable" : "off");
     h.installedAt = new Date().toISOString();
-    h.pty = driver();
+    h.hookShim = path.join(h.home, ".agents", "acc-local", "plugins",
+      "agents-can-communicate", "acc-hook.sh");
+    const cache = path.join(h.codexHome, "plugins", "cache", "acc-local", "agents-can-communicate");
+    const versions = await readdir(cache);
+    assert.equal(versions.length, 1, "installed Codex plugin cache has one exact version");
+    const cached = path.join(cache, versions[0]);
+    h.installedSkill = path.join(cached, "skills", "acc", "SKILL.md");
+    h.installedCommands = await verifyInstalledCommands({ hook: h.hookShim,
+      skill: h.installedSkill, packageRoot: h.packageRoot,
+      hookManifest: path.join(cached, "hooks.json") });
+    h.pty = createPtyDriver({ python });
     h.hookFile = path.join(root, "hooks.jsonl");
     h.hooks = async () => (await readFile(h.hookFile, "utf8").catch(() => ""))
       .trim().split("\n").filter(Boolean).map(line => JSON.parse(line));
     return h;
-  } catch (error) { await h.cleanup().catch(() => null); throw error; }
+  } catch (error) {
+    const cleanup = await h.cleanup().catch(() => ({ attempted: true, outcome: "failed",
+      ownedProcesses: "failed", temporaryState: "failed" }));
+    error.harness = { phase, version: h.version ?? null, packageSha256: h.packageSha256,
+      scenarios: h.scenarios ?? [], cleanup };
+    throw error;
+  }
 }
 
 export async function observeHooks(h) {

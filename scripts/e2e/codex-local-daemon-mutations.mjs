@@ -12,13 +12,14 @@ import { changePolicy } from "./codex-local-daemon-product-policy.mjs";
 const { values } = parseArgs({ options: Object.fromEntries(
   ["tarball", "codex", "output", "mutation"].map(key => [key, { type: "string" }])), strict: true });
 for (const key of ["tarball", "codex", "output"]) assert.ok(path.isAbsolute(values[key]));
-assert.ok(["remote-wrapper", "wrong-thread"].includes(values.mutation));
+assert.ok(["remote-wrapper", "wrong-thread", "cwd-validation"].includes(values.mutation));
 await mkdir(values.output, { recursive: true });
 const temporary = await mkdtemp("/private/tmp/acc-product-mutant-");
 const tarball = path.join(values.output, "mutant.tgz");
 const expected = values.mutation === "remote-wrapper"
   ? "ordinary launch must preserve receiver B in hooks, actual cwd and daemon metadata"
-  : "only exact B1 executes an automatic turn";
+  : values.mutation === "wrong-thread" ? "only exact B1 executes an automatic turn"
+    : "same Codex thread must reject A cwd";
 const report = { source: "controlled-installed-package-mutation", mutation: values.mutation,
   originalPackageSha256: sha256(await readFile(values.tarball)), expectedFailure: expected,
   startedAt: new Date().toISOString(), caught: false };
@@ -38,17 +39,22 @@ try {
       "      applyCommand: null, teardownCommand: null },",
       '      applyCommand: null, teardownCommand: null },\n'
       + '    { kind: "shell-bootstrap", command: "codex", realExecutable, prefixArgs: ["--remote", "unix://"] },');
-  } else {
+  } else if (values.mutation === "wrong-thread") {
     await replace(path.join(adapter, "native-delivery.mjs"),
       "      await addCodexQueueMessage(peer, { threadId: endpoint.threadId,",
       '      const siblings = await peer.request("thread/list", { useStateDbOnly: true, limit: 100 });\n'
       + '      const wrong = siblings.data.find(item => item.id !== endpoint.threadId && item.cwd === endpoint.cwd);\n'
       + '      await addCodexQueueMessage(peer, { threadId: wrong?.id ?? endpoint.threadId,');
+  } else {
+    await replace(path.join(adapter, "native-delivery.mjs"),
+      "const located = await locateCodexThread(peer, { threadId: endpoint.threadId, cwd: endpoint.cwd });",
+      "const located = await locateCodexThread(peer, { threadId: endpoint.threadId, cwd: undefined });");
   }
   await run("tar", ["-czf", tarball, "-C", temporary, "package"]);
   report.mutantPackageSha256 = sha256(await readFile(tarball));
   assert.notEqual(report.originalPackageSha256, report.mutantPackageSha256);
-  h = await createMachine({ tarball, codex: values.codex, phase: "product", output: values.output });
+  h = await createMachine({ tarball, codex: values.codex,
+    phase: values.mutation === "cwd-validation" ? "transport" : "product", output: values.output });
   h.scenarios = [];
   await observeHooks(h);
   if (values.mutation === "remote-wrapper") {
@@ -58,8 +64,21 @@ try {
     await stat(path.join(h.dataHome, "acc/bin/codex"));
   }
   try {
-    await productSetup(h);
-    if (values.mutation === "wrong-thread") await productIsolation(h);
+    if (values.mutation === "cwd-validation") {
+      await launch(h, "receiver-b1");
+      const receiver = await identify(h, "receiver-b1");
+      const native = await h.module("adapter-codex/src/native-delivery.mjs");
+      const result = await native.bindNativeSession({
+        event: { sessionId: receiver.threadId, cwd: h.A },
+        clientPid: receiver.clientPid, clientVersion: h.version,
+        runtimeDir: receiver.runtimeDir, env: h.env, timeoutMs: 3_000,
+      });
+      assert.deepEqual([result.supported, result.opaqueEndpointRef, result.modes,
+        result.reasonCode], [false, null, [], "workspace_identity_unavailable"], expected);
+    } else {
+      await productSetup(h);
+      if (values.mutation === "wrong-thread") await productIsolation(h);
+    }
     throw new Error("mutant unexpectedly passed");
   } catch (error) {
     assert.ok(error.message.includes(expected), `unrelated failure: ${error.message}`);

@@ -21,6 +21,11 @@ export async function transportScenarios(h) {
   exact.check(Number.isInteger(receiver.clientPid), "real daemon PID must be identified");
   const handshake = await native.bindNativeSession(input);
   exact.equal(handshake.supported, true);
+  const wrongCwd = await native.bindNativeSession({ ...input,
+    event: { sessionId: receiver.threadId, cwd: h.A } });
+  exact.equal([wrongCwd.supported, wrongCwd.opaqueEndpointRef, wrongCwd.modes,
+    wrongCwd.reasonCode], [false, null, [], "workspace_identity_unavailable"],
+  "same Codex thread must reject A cwd");
   const binding = { opaqueEndpointRef: handshake.opaqueEndpointRef, clientVersion: h.version };
   exact.fact("binding", "matched", "receiver-b1", "receiver-b1"); exact.finish();
   const offer = message => native.offerMessage({ binding, message, runtimeDir: receiver.runtimeDir });

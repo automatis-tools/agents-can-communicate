@@ -19,7 +19,7 @@ async function productMigration(h) {
   s.equal(result.candidatePackageSha256, h.packageSha256);
   s.equal(result.cleanup.outcome, "passed");
   s.fact("artifact", "preserved", "daemon-a"); s.fact("artifact", "removed");
-  s.fact("consent", "preserved"); s.finish();
+  s.finish();
 }
 
 export async function productScenarios(h) {

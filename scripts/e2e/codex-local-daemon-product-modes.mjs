@@ -1,8 +1,9 @@
 import { mkdir } from "node:fs/promises";
 import path from "node:path";
 import { shellLiteral, until } from "./codex-local-daemon-machine.mjs";
-import { identify, launch, threadState, trust, typePrompt, waitMarker, withPeer }
+import { identify, launch, queueState, receipt, sendMessage, threadState, trust, typePrompt, waitMarker, withPeer }
   from "./codex-local-daemon-actions.mjs";
+import { exists } from "./codex-local-daemon-product-state.mjs";
 import { scenario } from "./codex-local-daemon-observations.mjs";
 
 const remote = h => ["--remote", `unix://${path.join(h.codexHome, "app-server-control/app-server-control.sock")}`];
@@ -66,7 +67,8 @@ export async function productSessionChanges(h) {
   const loadedBefore = new Set((await withPeer(h, peer => peer.request("thread/loaded/list", {}))).data);
   await typePrompt(h, "receiver-b1", `/cd ${h.C}`);
   await until("ordinary /cd loaded a new thread", async () => {
-    await trust(h, "receiver-b1");
+    const status = await trust(h, "receiver-b1");
+    if (status.cdBlock) throw new Error(`vendor /cd refused: ${status.cdBlock}`);
     return (await withPeer(h, peer => peer.request("thread/loaded/list", {}))).data.some(id => !loadedBefore.has(id));
   },
   { timeoutMs: 20_000 });
@@ -91,6 +93,15 @@ export async function productSessionChanges(h) {
   s.check(retired === null || retired.retiredAt != null);
   s.equal((await h.service.listDeliveryBindings({ participantId: resumed.participantId,
     now: new Date().toISOString(), includeExpired: true })).length, 0);
+  const closedMarker = path.join(h.B, "closed-generation.txt");
+  const sentClosed = await sendMessage(h, { id: "product_closed_generation", kind: "note",
+    body: `For this isolated test, run only: pwd > ${shellLiteral(closedMarker)}. Keep the session open.` });
+  s.equal(sentClosed.delivery[0].outcome, "queued",
+    "a closed generation must refuse native delivery after durable recording");
+  s.equal((await receipt(h, sentClosed.message)).state, "queued");
+  s.equal((await queueState(h, resumed.threadId)).filter(item =>
+    item.clientMessageId === sentClosed.message.messageId).length, 0);
+  s.equal(await exists(closedMarker), false);
   await launch(h, "receiver-b1", { cwd: h.C, expectedCwd: h.B, args: ["fork", old.threadId] });
   const forked = await identify(h, "receiver-b1");
   s.check(forked.threadId !== old.threadId);

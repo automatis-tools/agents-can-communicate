@@ -17,6 +17,13 @@ import sys
 import termios
 import time
 
+if sys.argv[1:] == ["--probe"]:
+    probe_master, probe_slave = pty.openpty()
+    os.close(probe_master)
+    os.close(probe_slave)
+    print("pty-ok", flush=True)
+    raise SystemExit(0)
+
 clients = {}
 ansi = re.compile(r"\x1b\[[0-?]*[ -/]*[@-~]")
 osc = re.compile(r"\x1b\][^\x07]*(?:\x07|\x1b\\)")
@@ -108,6 +115,23 @@ def handle(command):
                 "limitDialog": [token for token in ["reached", "hit your usage limit", "usage limit", "rate limit", "reset", "try again at", "usage_limit_reached", "credits", "upgrade", "Upgrade", "Press", "temporarily unavailable", "try again", "Try again", "Switch", "switch", "Enter", "Esc", "continue", "Continue", "dismiss", "Dismiss", "tab", "status", "footer", "? for shortcuts", "Tip:", "Tip", "tokens", "Context", "100%", "›", "❯", "❱", "help", "select", "Press", "Press enter", "ctrl", "esc"] if token in text],
                 "connectionError": "Reconnecting" in text or "stream disconnected" in text,
                 "unsupportedCd": "Unrecognized command '/cd'" in text,
+                "cwdSelection": all(phrase in text for phrase in [
+                    "Choose working directory to",
+                    "Use session directory (",
+                    "Use current directory ("
+                ]),
+                "cdBlock": next((code for phrase, code in [
+                    ("This directory is not trusted; run Codex there.", "destination-untrusted"),
+                    ("This task cannot be safely replaced.", "unsafe-replacement"),
+                    ("MCP inventory is still loading.", "inventory-loading"),
+                    ("Cannot change: another agent is running.", "another-agent-running"),
+                    ("Permission profile has different settings.", "permission-settings"),
+                    ("Permission profile cannot be preserved by /cd.", "permission-preservation"),
+                    ("Conversation history is not saved.", "history-unpersisted"),
+                    ("Active background terminals block /cd.", "background-terminals"),
+                    ("Requested directory or permissions not applied.", "transition-refused")
+                ] if phrase in text), None),
+                "directoryChanged": "Working directory changed to:" in text,
                 "invalidArgs": "unexpected argument" in text,
                 "updatePrompt": "Update now" in text,
                 "ready": "gpt-" in text and "context left" in text,

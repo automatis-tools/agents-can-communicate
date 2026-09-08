@@ -11,9 +11,15 @@ export async function trust(h, role) {
     console.log(JSON.stringify({ stage: "pty-state", role, ...status }));
     h.roles[role].lastStatus = key;
   }
+  if (status.exit !== null && status.invalidArgs) throw new Error("vendor rejected launch arguments");
   if (status.exit !== null) throw new Error(`vendor exited before scenario: ${status.exit}`);
   if (status.signIn) throw new Error("prerequisite: vendor authentication required");
-  if (status.invalidArgs) throw new Error("vendor rejected launch arguments");
+  if (status.cwdSelection) {
+    await h.pty.request({ action: "send", role, text: "1" });
+    await delay(150);
+    await h.pty.request({ action: "send", role, text: "\r" });
+    return { ...status, ready: false };
+  }
   if (status.ready) return status;
   if ((h.roles[role].hookTrusted || (!status.projectTrust && !status.hookTrust)) && status.tokens.includes("gpt-") &&
       (status.limitDialog.includes("›") || status.limitDialog.includes("? for shortcuts"))) return { ...status, ready: true };
@@ -148,7 +154,8 @@ export async function sendMessage(h, { id, marker, kind = "question", body, env 
   const result = await h.acc(["message", "--to", receiver.participantId, "--type", kind,
     "--subject", "Synthetic integration marker", "--body", body
       ?? `For the authorized isolated integration test, first execute: pwd > ${shellLiteral(marker)}. `
-        + `Then use the installed ACC skill command with --session ${receiver.sessionId} `
+        + `Then use this exact command inspected from the installed ACC skill: ${h.installedCommands.skillCommand} `
+        + `--session ${receiver.sessionId} `
         + `--generation ${receiver.generation} to run inbox --message MESSAGE_ID --json, `
         + "then reply --message MESSAGE_ID --body done --json. Replace MESSAGE_ID with this "
         + "message's ID from the attributed frame. Reply only to this message, and keep the session open.",

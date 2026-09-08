@@ -11,6 +11,7 @@ import os from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { parseArgs, promisify } from "node:util";
+import { prepareOwnedTools, resolveExecutable } from "./codex-local-daemon-harness.mjs";
 
 const execute = promisify(execFile);
 const sha256 = bytes => createHash("sha256").update(bytes).digest("hex");
@@ -113,6 +114,16 @@ async function userConfigPreserved(place, stripBlock) {
       === JSON.stringify(USER_PLUGIN);
 }
 
+export function migrationEnvironments(baseEnv, place) {
+  const clean = Object.fromEntries(Object.entries(baseEnv).filter(([key]) =>
+    !key.startsWith("ACC_") && !key.startsWith("CODEX_")
+      && !["NODE_OPTIONS", "NODE_PATH"].includes(key)));
+  const daemonEnv = { ...clean, HOME: place.home, CODEX_HOME: place.codexHome,
+    SHELL: "/bin/zsh" };
+  return { daemonEnv, commandEnv: { ...daemonEnv, ACC_DATA_HOME: place.dataHome,
+    ACC_UPDATE_CHECK: "0", ACC_PROBE_TIMEOUT_MS: "30000" } };
+}
+
 async function runCase({ root, name, modify, legacyRoot, candidateRoot, codex, baseEnv }) {
   const caseRoot = path.join(root, name);
   const home = path.join(caseRoot, "home");
@@ -124,21 +135,19 @@ async function runCase({ root, name, modify, legacyRoot, candidateRoot, codex, b
     "marketplace.json");
   place.shimDir = path.join(place.dataHome, "acc", "bin");
   const socket = path.join(place.codexHome, "app-server-control", "app-server-control.sock");
-  const env = { ...baseEnv, HOME: home, CODEX_HOME: place.codexHome,
-    ACC_DATA_HOME: place.dataHome, ACC_UPDATE_CHECK: "0", ACC_PROBE_TIMEOUT_MS: "30000",
-    SHELL: "/bin/zsh" };
+  const { daemonEnv, commandEnv } = migrationEnvironments(baseEnv, place);
   await mkdir(place.project, { recursive: true });
   await seedUserConfig(place, codex);
   let pid = null;
   let stopped = false;
   try {
-    await run(codex, ["app-server", "daemon", "start"], { cwd: place.project, env });
+    await run(codex, ["app-server", "daemon", "start"], { cwd: place.project, env: daemonEnv });
     await until("legacy daemon socket", () => stat(socket).then(s => s.isSocket(), () => false));
     pid = await until("legacy daemon pid", () => daemonPid(socket));
     const legacyCli = path.join(legacyRoot, "bin", "acc.mjs");
     const candidateCli = path.join(candidateRoot, "bin", "acc.mjs");
     await command(legacyCli, ["install", "--adapter", "codex", "--delivery", "actionable"],
-      env, place.project);
+      commandEnv, place.project);
     const wrapper = path.join(place.shimDir, "codex");
     const original = await readFile(wrapper, "utf8");
     assert.match(original, /--remote/);
@@ -152,19 +161,19 @@ async function runCase({ root, name, modify, legacyRoot, candidateRoot, codex, b
     if (modify) await writeFile(wrapper, expectedWrapper);
 
     const first = await command(candidateCli,
-      ["install", "--adapter", "codex", "--delivery", "actionable"], env, place.project);
+      ["install", "--adapter", "codex", "--delivery", "actionable"], commandEnv, place.project);
     const afterFirst = { rc: await readFile(place.rcFile, "utf8"),
       shared: await readFile(path.join(place.shimDir, "claude"), "utf8"),
       wrapper: await readFile(wrapper, "utf8").catch(() => null), record: await ownership(place) };
     const second = await command(candidateCli,
-      ["install", "--adapter", "codex", "--delivery", "actionable"], env, place.project);
+      ["install", "--adapter", "codex", "--delivery", "actionable"], commandEnv, place.project);
     const afterSecond = { rc: await readFile(place.rcFile, "utf8"),
       shared: await readFile(path.join(place.shimDir, "claude"), "utf8"),
       wrapper: await readFile(wrapper, "utf8").catch(() => null), record: await ownership(place) };
     const repeatStable = JSON.stringify(afterFirst) === JSON.stringify(afterSecond);
     const reportsKept = [...(first.operations?.[0]?.diagnostics ?? []),
       ...(second.operations?.[0]?.diagnostics ?? [])].some(line => /kept shim/.test(line));
-    await command(candidateCli, ["uninstall", "--adapter", "codex"], env, place.project);
+    await command(candidateCli, ["uninstall", "--adapter", "codex"], commandEnv, place.project);
     const finalRecord = await ownership(place);
     const currentModule = await import(pathToFileURL(path.join(candidateRoot, "node_modules",
       "@agents-can-communicate", "adapter-sdk", "src", "toml-block.mjs")));
@@ -173,7 +182,7 @@ async function runCase({ root, name, modify, legacyRoot, candidateRoot, codex, b
     const pathBlockPreserved = await readFile(place.rcFile, "utf8")
       .then(bytes => bytes === rcBefore, () => false);
     const daemonRetained = await daemonPid(socket) === pid
-      && await run(codex, ["app-server", "daemon", "version"], { cwd: place.project, env })
+      && await run(codex, ["app-server", "daemon", "version"], { cwd: place.project, env: daemonEnv })
         .then(() => true, () => false);
     const common = { legacyWrapperCreated: true, sharedShimPreserved, pathBlockPreserved,
       userConfigPreserved: await userConfigPreserved(place, currentModule.stripBlock),
@@ -184,7 +193,7 @@ async function runCase({ root, name, modify, legacyRoot, candidateRoot, codex, b
       ownershipPreserved: ownedWrapper(finalRecord)?.sha256 === legacyOwned.sha256,
       preservationReported: reportsKept } : { ...common, wrapperRetired: afterFirst.wrapper === null && afterSecond.wrapper === null && !await exists(wrapper) };
   } finally {
-    await run(codex, ["app-server", "daemon", "stop"], { cwd: place.project, env }).catch(() => null);
+    await run(codex, ["app-server", "daemon", "stop"], { cwd: place.project, env: daemonEnv }).catch(() => null);
     if (pid !== null) {
       stopped = await until("legacy daemon stop", () => !processAlive(pid))
         .then(() => true, () => false);
@@ -248,9 +257,14 @@ export async function runLegacyMigration({ legacyTarball, candidateTarball, code
   let removed = false;
   try {
     const inherited = Object.fromEntries(Object.entries(process.env)
-      .filter(([key]) => !key.startsWith("ACC_") && !key.startsWith("CODEX_")));
+      .filter(([key]) => !key.startsWith("ACC_") && !key.startsWith("CODEX_")
+        && !["NODE_OPTIONS", "NODE_PATH"].includes(key)));
+    const npm = await resolveExecutable("npm");
+    if (npm === null) throw new Error("prerequisite: npm unavailable");
+    const toolDir = path.join(root, "owned-tools");
+    await prepareOwnedTools({ toolDir, npm });
     const baseEnv = { ...inherited,
-      PATH: `${path.dirname(codex)}:${inherited.PATH ?? "/usr/bin:/bin"}`,
+      PATH: `${path.dirname(codex)}:${toolDir}:/usr/bin:/bin:/usr/sbin:/sbin`,
       npm_config_cache: path.join(root, "npm-cache") };
     const [legacyRoot, candidateRoot] = await Promise.all([
       installTarball(legacyTarball, path.join(root, "legacy-prefix"), baseEnv),
