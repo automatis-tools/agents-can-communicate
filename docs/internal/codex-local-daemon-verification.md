@@ -28,6 +28,10 @@ loaded thread when identity checks fail.
   `includeTurns:false` only after complete valid listings omit an already-loaded ID.
 - A 120-second delivery lease can be refreshed on demand for the same live endpoint.
   Retirement/generation races refuse refresh; presence still expires after 24 hours.
+- Retirement uses one shared deadline, including acquisition of the storage writer
+  lock and the check before publication. An indeterminate clear refuses a new
+  handshake. A queued clear cannot begin after its deadline; this does not promise
+  cancellation of a filesystem write that has already begun.
 - Upgrade retires unchanged owned Codex wrappers. Modified wrappers remain visible
   with their original cleanup authority; unrelated shared shell artifacts and
   pre-existing daemons remain in place.
@@ -99,10 +103,12 @@ exactly-once execution after consumption.
   while their facts named B1; those attempts are not certification evidence.
 - The generic terminal detector matched `unexpected argument` in model tool stderr
   during the observer-free path. This is not proof that the vendor rejected its
-  launch. Startup classification and owned-process cleanup are under review.
+  launch. Startup classification and owned-process cleanup were corrected and
+  passed scoped review, including allocation failure before canonicalization.
 - Package audit review found that dispatching solely on a capture's own capability
   label let an empty or relabelled file bypass product-evidence validation. The
-  passing Codex manifest claim must require full evidence regardless of that label.
+  passing Codex manifest claim now requires full evidence regardless of that label.
+  The correction passed its exact mutation and scoped review.
 - Partial diagnostic commands deliberately exit nonzero and write
   `incomplete-evidence.json`; their passing subsets cannot certify the full matrix.
 
@@ -114,6 +120,17 @@ checks retain durable inbox access. Turning delivery off or uninstalling blocks 
 offers; it cannot withdraw a submission already accepted by the vendor queue.
 Replies use `acc reply`; native `delivery.replyRoute` remains false. This work adds no
 new lifecycle, guard, or exact-version next-turn certification.
+
+Closing the TUI does not necessarily end its daemon-owned thread. On both tested
+versions, normal terminal exit left the thread loaded; an opted-in ACC question
+then executed the requested synthetic command and received an actual model reply
+without a frontend. Resuming that loaded thread produced a fresh exact
+`UserPromptSubmit` but no new `SessionStart`. The exact-version upstream documents
+describe eventual unload after 30 minutes without subscribers or thread activity,
+and `SessionEnd` before archive, delete, or graceful server shutdown. The 30-minute
+interval is source evidence, not an observed wait in these tests.
+See the [0.152.1 app-server lifecycle contract](https://github.com/openai/codex/blob/rust-v0.152.1/codex-rs/app-server/README.md#example-unsubscribe-from-a-loaded-thread)
+and [0.153.4 contract](https://github.com/openai/codex/blob/rust-v0.153.4/codex-rs/app-server/README.md#example-unsubscribe-from-a-loaded-thread).
 
 Final gate counts, complete matrix receipts, artifact equivalence and review verdicts
 will be appended after completion.
@@ -180,3 +197,37 @@ values. The actual policy mismatch is being diagnosed separately. Both failed
 attempts retained verified cleanup. An initial selected-policy diagnostic omitted
 its required P01 setup and failed with PTY KeyError; the corrected command includes
 P01. None of these partial attempts is product certification.
+
+## Retirement and lifecycle follow-up
+
+A later 0.153.4 P08 failure preserved closed diagnostic facts: one live receiver
+with the expected generation and actionable policy, but a retired binding and no
+`SessionEnd`. Its fresh `UserPromptSubmit` failed before entering adapter binding.
+The old retirement helper independently bounded its steps; a core clear waiting
+for the filesystem writer could outlive that wait and retire the prior endpoint
+after the hook had refused to rebind. Real-filesystem contention tests reproduced
+both the premature refusal and late retirement, then passed the shared-deadline
+fix. Three exact mutations caught quarter-budget restoration, missing core deadline
+forwarding, and missing pre-publication deadline checking. A follow-up hung-service
+test also caught the optional no-cleanup branch's direct unbounded await.
+
+The runtime fixes are `61316f1` and `1f2ad4e`, with 77 initial focused passes and
+18 follow-up focused passes; scoped reviews are clean. A natural instrumented
+retry passed with clear durations of 43–125 ms. It did not observe a naturally
+over-budget clear, so that timing is not claimed as captured production evidence.
+
+The resume-directory dialog used terminal cursor positioning between words.
+Whitespace normalization of only its three literal markers corrected recognition;
+the client expects one selection byte, with no following Enter. Commit `37f06f9`
+passed the real PTY regression, its exact literal-whitespace mutation, and scoped
+review. This correction alone did not make P14 pass.
+
+Both `product-01521-detach-archive-2` and `product-01534-detach-archive-2` observed
+detached execution/reply and fresh resume identity as described above. Their UI
+`/archive` attempts did not exit within the deadline. Both remain incomplete,
+with verified cleanup. Real `thread/archive` API diagnostics now test actual
+server teardown and generated hooks separately; no successful UI archive is
+claimed. The new private package is
+`b8eb1bee2296746953b3929ef37b45434588264736f756ac9811f5b80107b300`,
+packed after the runtime fixes, and remains non-release-certifiable until the
+complete product matrix passes.
