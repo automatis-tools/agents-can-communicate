@@ -43,7 +43,7 @@ installer, transport, and certification releases.
   `.gitworktrees/`; never edit main. Check `git status` before every mutation.
 - [x] Run `npm ci`, `npm run check`, `npm test` once as the implementation baseline.
   Record existing failures separately. Do not fix an unrelated peer branch here.
-- [ ] Implement Tasks 1–5 with public Codex native capability still disabled.
+- [x] Implement Tasks 1–5 with public Codex native capability still disabled.
 - [ ] Run Task 6's real installed-method capture, then wire the candidate and run
   full product E2E. Complete Task 7 only after the required observations exist.
 
@@ -355,36 +355,36 @@ server. Python is test-only stdlib PTY support, not a package dependency.
   facts; do not force unobserved reply/fallback fields to pass. These can anchor
   the private candidate at SDK construction, but cannot pass final product
   certification audits or replace the required installed-product capture.
-- [ ] Package with `npm pack --pack-destination /private/tmp/<run>`, install the
+- [x] Package with `npm pack --pack-destination /private/tmp/<run>`, install the
   returned tarball into a clean npm prefix, and resolve every ACC executable and
   hook from that installation. Record package SHA-256. Confirm no path points
   back to the repository's bin, packages, or node_modules.
-- [ ] Create short temporary paths (Unix socket path <104 bytes), data home, custom
+- [x] Create short temporary paths (Unix socket path <104 bytes), data home, custom
   CODEX_HOME, daemon project A, recipient project B and unrelated project C. Start
   with plain directories without Git. Pin exact vendor binary/version. Never
   repurpose shell HOME variables; pass isolated home values in child spawn env.
-- [ ] Start the owned vendor daemon in A **before** ACC install/opt-in and without
+- [x] Start the owned vendor daemon in A **before** ACC install/opt-in and without
   ACC_NATIVE_DELIVERY_POLICY or ACC_DATA_HOME in its environment. Then run installed
   `acc install --adapter codex --delivery actionable --json` using the isolated
   home/data home and CODEX_HOME. Assert applied operations and empty failures, not
   just exit zero. Handle the actual client's hook trust dialog; do not claim trust
   by editing ACC's own record. Launch ordinary Codex clients in B and C.
-- [ ] Use the PTY driver only for startup, trust and synthetic diagnostic prompts.
+- [x] Use the PTY driver only for startup, trust and synthetic diagnostic prompts.
   Consume terminal bytes ephemerally; never write terminal transcripts. A small
   metadata observer may wrap the **real generated hook**, retaining only event,
   ID, cwd, process identity and timestamps while preserving stdin/stdout/exit.
   The real SessionStart is deferred until the first submitted prompt: seed one
   normal turn before asserting idle ACC addressability. Also run the base product path without that observer to detect instrumentation
   effects. Codex-owned temporary session storage is deleted at cleanup.
-- [ ] The product phase sends via installed `acc message/request`; receives via
+- [x] The product phase sends via installed `acc message/request`; receives via
   the shipped hook/binding/router; the model uses the installed skill's absolute
   ACC command to read/reply. No direct queue/add in this positive path. Use direct
   read-only queue/thread inspection for assertions only, with closed metadata.
-- [ ] Automate deadline-based waits for hooks/markers/status. Busy requires an
+- [x] Automate deadline-based waits for hooks/markers/status. Busy requires an
   observed PreToolUse and active state before send, queue pending during that
   interval, Stop before follow-up UserPromptSubmit, and ordered marker completion.
   Never classify a pasted draft or a fixed sleep after typing as busy evidence.
-- [ ] Implement finally cleanup with owned PIDs, isolated daemon stop and temporary
+- [x] Implement finally cleanup with owned PIDs, isolated daemon stop and temporary
   credential-link removal. Preserve only sanitized evidence; do not retain raw
   user auth, hook bodies, protocol traffic or vendor transcripts. Failure cleanup
   also records its outcome and cannot turn a failed scenario into a pass.
@@ -443,7 +443,7 @@ server. Python is test-only stdlib PTY support, not a package dependency.
 | P19 | Existing binding then uninstall, send immediately | Removed consent prevents further submissions even before previous lease expires; no unrelated artifacts removed |
 | P20 | User-selected paths with spaces/symlinks; repeat base without Git | Canonical receiver identity and ACC workspace agree; hook/skill executable paths work from installed tarball |
 
-- [ ] P14's unsupported subcase is explicitly expected only where observed; it
+- [x] P14's unsupported subcase is explicitly expected only where observed; it
   cannot replace the close/resume/fork requirements. If a client stops exposing a
   prerequisite, mark that case failed/unobserved and keep that capability disabled.
   Lifecycle correction from both real clients: TUI exit detaches but leaves the
@@ -456,7 +456,7 @@ server. Python is test-only stdlib PTY support, not a package dependency.
 - [x] For P16 label malformed/mismatched metadata as controlled fault injection,
   not as naturally observed Codex behavior. Preserve the original valid observation
   and assert the installed sender refuses the mutated endpoint before queue/add.
-- [ ] For P18 pack legacy commit `fb148d41c0c890d86e3219e79ed961e78005eb9f`
+- [x] For P18 pack legacy commit `fb148d41c0c890d86e3219e79ed961e78005eb9f`
   (parent of native withdrawal `9accc44`) in a separate temporary worktree. Install
   that real artifact only into the isolated home, then upgrade to the candidate.
   Record both hashes. Do not manufacture the ownership record and call it an
@@ -464,7 +464,7 @@ server. Python is test-only stdlib PTY support, not a package dependency.
 - [x] Validate the queue-consumed/ambiguous-ack duplicate boundary separately with
   controlled transport failure. State that transport execution may repeat; do not
   claim exactly-once simply because ACC answer deduplication hid a second turn.
-- [ ] Run two actual package mutants, each packed and installed independently:
+- [x] Run two actual package mutants, each packed and installed independently:
   M-E2E-1 reinstate the old remote wrapper (P01 must fail cwd/workspace=B);
   M-E2E-2 replace the exact receiver ID with B2's loaded ID (P02 must fail target
   marker/receipt isolation). Restore source and rerun the affected positive cases.

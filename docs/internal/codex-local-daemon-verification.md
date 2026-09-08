@@ -1,8 +1,8 @@
 # Codex LocalDaemon implementation and verification
 
 Work in progress on `feat/codex-local-daemon`; this report is not a release certificate.
-Public native delivery remains disabled until the full installed matrix and final
-artifact gates pass. Nothing has been pushed, merged, published, or posted to GitHub.
+Both private installed product matrices now pass. Public capability wiring and
+final release-candidate artifact gates are being completed. Nothing has been pushed, merged, published, or posted to GitHub.
 
 ## Diagnosis
 
@@ -55,8 +55,10 @@ is collected. Disposable vendor state and the authentication symlink are removed
 The reviewed transport matrix passed on Codex 0.152.1 and 0.153.4, macOS arm64:
 four cases and 15 assertions per version. It checks exact B binding, same-thread
 rejection with A cwd, idle queue acceptance, pending busy delivery and rejected
-submission with a durable queued receipt. Product baseline, long idle, busy and exact receiver cases
-have passed; the complete P01-P20 product matrix is still being executed.
+submission with a durable queued receipt. The complete P01-P20 installed product matrix passed on both versions: 20 cases
+and 189 assertions per version, with verified cleanup and valid final evidence.
+Both used the reviewed private artifact `a6a38da5...`; final public-artifact
+verification remains pending.
 
 Real installed migration used legacy commit
 `fb148d41c0c890d86e3219e79ed961e78005eb9f`, package 0.2.0, SHA-256
@@ -193,7 +195,8 @@ The fresh `full-2` product attempts on both versions completed P01/P02/P03/P06/P
 P05/P07, then failed in P08. Node26's `assert.deepEqual` masked a failed comparison
 when passed an explicit undefined optional message. Commit `652ac68` fixes the
 harness diagnostic to name the case and assertion without emitting raw compared
-values. The actual policy mismatch is being diagnosed separately. Both failed
+values. The later retirement investigation below explains a reproduced binding failure;
+these earlier runs did not preserve enough facts to identify their precise cause. Both failed
 attempts retained verified cleanup. An initial selected-policy diagnostic omitted
 its required P01 setup and failed with PTY KeyError; the corrected command includes
 P01. None of these partial attempts is product certification.
@@ -226,8 +229,8 @@ Both `product-01521-detach-archive-2` and `product-01534-detach-archive-2` obser
 detached execution/reply and fresh resume identity as described above. Their UI
 `/archive` attempts did not exit within the deadline. Both remain incomplete,
 with verified cleanup. Real `thread/archive` API diagnostics now test actual
-server teardown and generated hooks separately; no successful UI archive is
-claimed. The new private package is
+server teardown and generated hooks separately. Later successful UI archive
+captures are recorded below; these earlier attempts remain incomplete. The new private package is
 `b8eb1bee2296746953b3929ef37b45434588264736f756ac9811f5b80107b300`,
 packed after the runtime fixes, and remains non-release-certifiable until the
 complete product matrix passes.
@@ -253,13 +256,13 @@ Codex had inserted its project-trust table before ACC's trailing managed-block
 marker. Replacing that entire comment-delimited region deleted client-owned
 state. Re-trusting C in P14 would hide this defect. The Codex installer must
 preserve foreign settings placed inside its marker region on reinstall and
-uninstall; implementation and focused mutation tests are in progress.
+uninstall. The reviewed correction and its exact mutations are recorded below.
 
 The reviewed lifecycle harness (`c6dfd4e`) now requires the actual archive
 confirmation, exact `SessionEnd`, unloaded thread, retired binding and a queued
 actionable question before starting a fresh receiver. Its 16 focused tests and
-three exact mutations passed, with clean scoped review. The full matrix remains
-uncertified while the config-preservation fix and actual UI checks complete.
+three exact mutations passed, with clean scoped review. At that point the full matrix remained uncertified pending configuration
+preservation and actual UI verification; later results are recorded below.
 
 
 ## Config preservation and actual archive verification
@@ -278,14 +281,14 @@ content before modifying plugin files. Both initial install/uninstall regression
 failed against the old implementation. The corrected focused set passed 65 tests;
 restoring blind managed-region removal failed five of the 15 new tests. A scoped
 review found an additional inline-table preflight conflict, so this correction
-is not yet considered review-complete.
+was not considered review-complete until the follow-up below.
 
 The new public-disabled tarball, SHA-256
 `8b8fc8012c8f28f41755922ad08131ff1140c0352bab30d54b8d6b2b0395d634`,
 passed installed-package verification. The corresponding private runtime candidate
 is `1a903ae79414355e460b975b3f90fbdf4f46633366f147080f833e0f1ec1cc49`.
-New real trust-preservation and full-product runs are in progress on that artifact;
-no outcome is inferred from the focused tests or package check.
+The subsequent real trust-preservation and full-product outcomes are recorded
+below; no outcome is inferred from the focused tests or package check.
 
 
 The follow-up `f03b136` refuses closed foreign registration-parent assignments
@@ -305,8 +308,8 @@ The reviewed corrected runtime candidate is now
 `a6a38da5a36911baabfbef0ccf934847fcf7b51000197264c273d21430f7fea2`.
 Its public-disabled precursor
 `0474d566b14f446ecaf600e9112dfe6fcb002491c94f48f0e250ad96ccbfc3c1`
-passed installed package verification. The two `config-full-1` matrices run
-against the same corrected candidate. Outcomes remain pending.
+passed installed package verification. The two `config-full-1` matrices ran against the same corrected candidate; their
+rejected evidence and subsequent valid full runs are recorded below.
 
 
 ## Complete behavioral runs rejected by evidence validation
@@ -323,7 +326,8 @@ The first harness correction moved actual identity resolution before P13's
 snapshot. Its additional global early guard also blocked P01, which deliberately
 checks actual cwd before resolving ACC identity and then refreshes its record.
 Scoped review found that regression; both `config-full-2` attempts confirmed it
-at P01 and cleaned up. The guard is being limited to P13.
+at P01 and cleaned up. Commit `28117b3` limits the guard to P13; 17 focused
+tests, the exact scope mutation and scoped re-review passed.
 
 The first external P13 old-order mutation was confounded by that P01 failure;
 it does not prove the intended P13 gate. Its diagnostic is retained, and the
@@ -332,6 +336,32 @@ result. A separate read-only process reconciliation at 09:22:36 UTC found no
 Codex process whose cwd remained under the owned E2E/preflight roots; this does
 not rewrite any historical cleanup receipt.
 
+
+## Validated complete private product captures
+
+`product-01521-config-full-3/evidence.json` and
+`product-01534-config-full-3/evidence.json` each passed all 20 required scenarios
+and 189 assertions with no failed case. Both runner processes exited 0, then an
+independent `assertRunEvidence` invocation accepted both final records. Cleanup
+records owned processes stopped and temporary state removed. Both name the same
+reviewed implementation artifact:
+`a6a38da5a36911baabfbef0ccf934847fcf7b51000197264c273d21430f7fea2`.
+These are the first valid complete product certificates; earlier incomplete
+records are retained without modification.
+
+The corrected P13 mutation check first requires successful actual P01 setup.
+`p13-record-mutant-01521-2/p13-record-check.json` then rejects the old snapshot
+order at the P13 identity guard; `p13-record-positive-01534-2/p13-record-check.json`
+passes the actual P13 record validator. Both clean up. The preceding `-1`
+diagnostics were confounded by the P01 regression and are not mutation proof.
+
+Independent `product-01521-config-cold-1` and
+`product-01534-config-cold-1` runs also passed P01/P03/P06/P04, including 150
+seconds without a hook heartbeat: 38 assertions and verified cleanup each.
+They are intentionally partial full-matrix records; each selected scenario was
+validated independently. The final public-artifact full runs will provide the
+third independent reviewed-runtime cold/idle observation per version, contingent
+on actual runtime byte equivalence and complete valid results.
 
 ## Implementation decisions and their costs
 
