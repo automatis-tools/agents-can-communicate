@@ -26,14 +26,14 @@
 
 | | |
 |---|---|
-| Built from | `669e7edfcde128f5b97f2b55d768c663edc0ed27` |
-| Tarball | `agents-can-communicate-0.4.0.tgz`, 327,495 bytes, 248 entries |
-| sha256 | `3ef39f03b58a70bcf1e321f6f5345c2c9932f0071183530a20e1bad4e4d9b30a` |
+| Built from | `8a0ea9ef93ce3daa72b1a3a2dcbb8fa203fc12f5` |
+| Tarball | `agents-can-communicate-0.4.0.tgz`, 330,508 bytes, 248 entries |
+| sha256 | `76b96ca1a8ac6f8b2682e5e4e2fe878b57882752ab944cd4239ce16a6721c9a0` |
 
 This combined candidate includes PR #116. The saved archive passed installed-package verification
 and the published-0.3.1 upgrade preflight; 248/248 source/archive/installed/managed files match.
 See [candidate evidence](docs/release-evidence/v0.4.0.md) for current validation status and limits.
-Recorded local artifact checks completed; final review and publication approval remain separate.
+Validation in progress; this candidate is not ready for publication.
 
 ## 0.3.1
 
