@@ -7,7 +7,7 @@ import { clearSessionBinding, effectiveCapabilities, loadSessionBinding, storeSe
   from "@agents-can-communicate/adapter-sdk";
 import { createCoordinationService } from "@agents-can-communicate/core";
 import { readInstalledLivePolicy } from "@agents-can-communicate/installer";
-import { assertPortableId, createId } from "@agents-can-communicate/protocol";
+import { AccError, assertPortableId, createId } from "@agents-can-communicate/protocol";
 import { openFilesystemStore } from "@agents-can-communicate/storage-filesystem";
 import { createGitProbe, discoverWorkspace, platformDataHome, runtimePaths }
   from "@agents-can-communicate/cli";
@@ -621,6 +621,8 @@ export async function runHook({ adapterId, payload, adapters, dataHome, env,
     return await Promise.race([execute(), budget]);
   } catch (error) {
     return { ...fallback, failed: true, reason: error.message,
+      ...(error instanceof AccError && error.details?.reasonCode === "workspace_contains_runtime"
+        ? { failureCode: "workspace_contains_runtime" } : {}),
       ...(Date.now() >= deadline ? { timedOut: true } : {}) };
   } finally {
     clearTimeout(timer);

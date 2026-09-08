@@ -24,6 +24,21 @@ requires plugin trust.
 ACC does not launch a missing session. Open it normally after fixing the installation or
 workspace path.
 
+## A hook says `workspace contains ACC runtime state`
+
+The current directory contains ACC's own state, so ACC cannot use it as a workspace.
+This commonly happens when a client starts in your home directory (`~`). The client
+continues normally, but ACC provides no coordination context there.
+
+Open a project directory and restart the client from it. A project inside your home
+works normally; Git is optional. If you intentionally need the broader directory as
+a workspace, configure `ACC_DATA_HOME` outside it for all participating clients.
+This changes the state location; it does not migrate existing history or integrations.
+
+For a generic `coordination unavailable` warning, run `acc status --json` from the
+same directory to see the detailed workspace error, and `acc doctor` to check the
+installation. Hook warnings deliberately omit arbitrary paths and error details.
+
 ## CLI says `caller_identity_unresolved`
 
 ACC cannot prove which session owns this shell command. A hook-created presence record

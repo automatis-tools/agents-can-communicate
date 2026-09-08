@@ -40,7 +40,7 @@ export function runtimePaths({ dataHome, workspaceId, workspaceRoots = [] }) {
         `${workspaceRoot} holds ACC's own state at ${path.join(dataHome, "acc")}, `
         + "so it cannot be a workspace. Run acc inside a project, or point "
         + "ACC_DATA_HOME outside this directory.",
-        { root, dataHome, workspaceRoot });
+        { root, dataHome, workspaceRoot, reasonCode: "workspace_contains_runtime" });
     }
   }
   return Object.freeze(Object.fromEntries([["root", root],

@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Hooks now explain when a workspace contains ACC's own state, as when a client
+  starts in `~`, and tell the user to restart in a project directory. Failures still
+  let the client continue and do not reflect arbitrary error details.
 - Reinstalling after a full uninstall restores the remembered automatic-update setting.
   Explicit opt-outs remain off, and a partial uninstall failure keeps updates paused.
   Existing 0.4.0 uninstall records cannot recover a lost preference; use
