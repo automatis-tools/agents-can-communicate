@@ -354,7 +354,7 @@ const HANDLERS = {
       checkoutRoot: context.descriptor.git?.worktreeRoot ?? context.descriptor.roots[0],
       branch: context.descriptor.git?.branch ?? null,
     };
-    if (event.kind === "beforeTurn") {
+    if (event.kind === "beforeTurn" && binding !== null) {
       // A real prompt may continue after finish closed this native owner's
       // record. Recheck after the probes: a CLI replacement can run outside
       // the native lifecycle lock. Never adopt that replacement's identity.
@@ -433,7 +433,18 @@ const HANDLERS = {
 
   async beforeTurn(input) {
     const { binding, context, adapter, event, paths, deadline } = input;
-    if (binding === null) return {};
+    if (binding === null) {
+      // SessionStart can be skipped when an automatic runtime refresh races
+      // process admission. A genuine prompt is the next safe proof that this
+      // native conversation exists, and it is already inside the same
+      // lifecycle mutex as startup. Reuse that opening path so publication,
+      // crash recovery, client facts, and the native handshake stay atomic.
+      const started = await HANDLERS.sessionStart(input);
+      const fresh = await loadSessionBinding({ runtimeDir: paths.root,
+        harnessSessionId: event.sessionId });
+      const turn = await projectTurn({ ...input, binding: fresh });
+      return { ...turn, nativeBinding: started.nativeBinding };
+    }
     const current = await context.service.locateSession(binding.accSessionId);
     if (current?.record.state === "closed" && current.record.generation === binding.generation) {
       // finish ends an ACC incarnation, not the native conversation. Only a

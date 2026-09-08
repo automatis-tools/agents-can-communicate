@@ -53,9 +53,20 @@ for (const adapterId of ["claude_code", "codex"]) {
       closed.participantId, "the native conversation keeps its participant address");
     assert.deepEqual(ownerFlags((await hook("UserPromptSubmit")).stdout, adapterId), fresh);
     await packed.acc(["finish", ...fresh, "--goal", "approved work complete"]);
+    const beforeEnd = await snapshot();
+    const closedFresh = beforeEnd.sessions.find(s => s.sessionId === fresh[1]);
+    assert.equal(closedFresh.state, "closed");
     await hook("SessionEnd");
     assert.equal(await packed.findBinding(payload.session_id), null);
-    assert.equal((await hook("UserPromptSubmit")).stdout, "");
-    assert.equal((await snapshot()).sessions.length, 2);
+    const next = ownerFlags((await hook("UserPromptSubmit")).stdout, adapterId);
+    const binding = await packed.findBinding(payload.session_id);
+    assert.notDeepEqual(next, fresh);
+    assert.equal(binding.accSessionId, next[1]);
+    assert.equal(binding.generation, next[3]);
+    const afterEnd = await snapshot();
+    assert.deepEqual(afterEnd.sessions.find(s => s.sessionId === first[1]), closed);
+    assert.deepEqual(afterEnd.sessions.find(s => s.sessionId === fresh[1]), closedFresh);
+    assert.equal(afterEnd.sessions.find(s => s.sessionId === next[1]).state, "open");
+    assert.equal(afterEnd.sessions.length, 3);
   });
 }

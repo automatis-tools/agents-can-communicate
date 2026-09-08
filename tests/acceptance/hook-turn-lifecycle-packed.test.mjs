@@ -82,12 +82,34 @@ test("a native end waits for the replacement turn to publish its owner", async t
   assert.equal((await f.snapshot()).sessions.filter(s => s.state === "open").length, 0);
 });
 
-test("turns with missing or stale bindings and heartbeats cannot allocate owners", async t => {
+test("a genuine turn with no binding establishes its own fresh owner", async t => {
+  const f = await fixture(t);
+  const { owner } = await f.prepare("closed");
+  const before = await f.snapshot();
+  let probes = 0;
+
+  const result = await f.invoke("beforeTurn", "absent", {
+    probeClientVersion: async () => { probes += 1; return "1.0.0"; },
+  });
+  const binding = await f.packed.findBinding("absent");
+  const after = await f.snapshot();
+
+  assert.equal(result.failed, undefined, result.reason);
+  assert.equal(probes, 1);
+  assert.notEqual(binding.accSessionId, owner.sessionId);
+  assert.notEqual(binding.generation, owner.generation);
+  assert.match(result.stdout, new RegExp(`--session ${binding.accSessionId}`));
+  assert.deepEqual(after.sessions.find(s => s.sessionId === owner.sessionId),
+    before.sessions.find(s => s.sessionId === owner.sessionId));
+  assert.equal(after.sessions.find(s => s.sessionId === binding.accSessionId).state, "open");
+});
+
+test("stale bindings and heartbeats cannot allocate owners", async t => {
   const f = await fixture(t);
   const { start, owner } = await f.prepare("closed");
   const runtimeDir = start.service.store.root;
-  for (const state of ["heartbeat", "absent", "missing", "closed-mismatch", "open-mismatch"]) {
-    if (state !== "absent") await f.storeSessionBinding({ runtimeDir, harnessSessionId: state,
+  for (const state of ["heartbeat", "missing", "closed-mismatch", "open-mismatch"]) {
+    await f.storeSessionBinding({ runtimeDir, harnessSessionId: state,
       accSessionId: state === "missing" ? "session_not_created" : owner.sessionId,
       generation: state === "heartbeat" ? owner.generation : "generation_stale" });
     // A separate caller gets a fresh operation budget, not the old hook's deadline.
