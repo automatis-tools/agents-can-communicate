@@ -71,17 +71,17 @@ would publish a generation-bound binding with `availableModes`, `clientVersion`,
 `livePolicy`, and `leaseUntil`. `acc status --json` reports these as `deliveryBindings`
 with a computed `reachable` boolean while keeping the opaque endpoint private.
 
-The router requires exactly one current eligible generation. No binding, an expired lease,
-several live sessions for one participant, and an adapter refusal each keep delivery on the
-durable fallback. Busy behavior belongs to the transport: Claude's Channel can accept a
+The router requires exactly one current eligible generation. No binding, several live
+sessions for one participant, and an adapter refusal keep delivery on the durable
+fallback. An expired lease may be revalidated by an adapter's optional refresh method;
+failure leaves the message queued. Busy behavior belongs to the transport: Claude's Channel can accept a
 message while the target is busy and queue it until the current turn finishes; an adapter
 that instead refuses with `recipient_busy` leaves the message on the durable path.
 
-The lease is extended by whoever serves the endpoint, because only that process knows it is
-still alive. A client that publishes no heartbeat - Claude Code among them - would otherwise
-let the lease run out under an idle session, which is exactly when live delivery is worth
-having. Giving a binding up is a separate, final fact rather than an expired lease, so a
-channel that has not yet noticed cannot extend something the session already retired.
+An endpoint may renew its lease, or an adapter may revalidate that exact endpoint on
+demand without a client heartbeat. Retirement is final: neither route may revive a
+retired binding, a closed session or an old generation. Delivery lease refresh does
+not renew participant presence.
 
 Current shipped reality: Claude Code on darwin-arm64 has a passing experimental `livePush`
 capture behind the native delivery contract, off until a per-client opt-in. Codex is
@@ -102,14 +102,16 @@ policy:
 | `actionable` | questions, requests, answers, decisions, and addressed handoffs may use live push; notes wait for the next turn |
 | `all` | every addressed message kind may use live push |
 
-The default is `off`. `acc install --delivery actionable|all` is an explicit request, not
-a force switch. Exact-version certification governs ordinary hook capabilities. Native live
-delivery is separate: the installer applies the requested policy only when the client meets
-the captured minimum version, runs on a captured platform, and passes the current feature
-probe; otherwise effective policy remains off and the fallback diagnostic is printed. Each
-enabled session must then pass its generation-bound handshake. A failed handshake clears or
-refuses that session's binding and reports degraded reachability without rewriting the
-installed consent. Room messages are never live-push candidates.
+The default is `off`. `acc install --delivery actionable|all` records recipient consent.
+Current activation remains off when the platform, captured minimum or feature probe
+does not qualify; that temporary failure does not erase the requested policy. Each
+session must pass its own generation-bound handshake. An adapter using the installation
+record rereads consent at hooks and before offers, so a long-running vendor process
+cannot retain permission through an old environment value or binding snapshot.
+
+For an adapter using recorded consent, `--delivery off` and uninstall prevent new
+native offers. They cannot withdraw a submission already accepted by the vendor queue. Ordinary hook capabilities still
+require exact-version certification. Room messages are never live-push candidates.
 
 ## Fallback
 

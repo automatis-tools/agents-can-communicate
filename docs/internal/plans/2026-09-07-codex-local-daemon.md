@@ -37,11 +37,11 @@ installer, transport, and certification releases.
 
 ## Preparation and execution order
 
-- [ ] Read the spec, AGENTS.md, docs/CONCEPTS.md, docs/ARCHITECTURE.md and relevant
+- [x] Read the spec, AGENTS.md, docs/CONCEPTS.md, docs/ARCHITECTURE.md and relevant
   adapter COMPATIBILITY.md. Inspect ACC coordination state and claim exact files.
-- [ ] Continue from the plan branch in an implementation worktree under
+- [x] Continue from the plan branch in an implementation worktree under
   `.gitworktrees/`; never edit main. Check `git status` before every mutation.
-- [ ] Run `npm ci`, `npm run check`, `npm test` once as the implementation baseline.
+- [x] Run `npm ci`, `npm run check`, `npm test` once as the implementation baseline.
   Record existing failures separately. Do not fix an unrelated peer branch here.
 - [ ] Implement Tasks 1–5 with public Codex native capability still disabled.
 - [ ] Run Task 6's real installed-method capture, then wire the candidate and run
@@ -86,7 +86,7 @@ createDeliveryRouter({ service, adapters, clock, platform, readLivePolicy });
 // Default: off for installation-record; binding.livePolicy for legacy adapters.
 ```
 
-- [ ] Add the consent reader tests before implementing it. Concrete assertions:
+- [x] Add the consent reader tests before implementing it. Concrete assertions:
 
   ```js
   assert.equal(livePolicyOf({ deliveryPolicy: 'off',
@@ -100,19 +100,19 @@ createDeliveryRouter({ service, adapters, clock, platform, readLivePolicy });
   Use a temporary data home and real `recordInstall`/`loadOwnership` for the reader
   tests. Corrupt the JSON in a dedicated test directory and assert the reader
   returns off without changing bytes. Unknown schema and missing file also read off.
-- [ ] Run `node --test packages/installer/test/live-policy.test.mjs`; first failure
+- [x] Run `node --test packages/installer/test/live-policy.test.mjs`; first failure
   may identify the absent API. Then implement strict precedence and bounded
   fail-open reads. Store `operation.livePolicy`, even if effective activation is off.
-- [ ] Add the SDK field with closed validation/default; preserve existing Claude
+- [x] Add the SDK field with closed validation/default; preserve existing Claude
   manifests unchanged. An invalid policySource must throw, not fall back silently.
-- [ ] Add optional dataHome export to the generated hook shim using its existing
+- [x] Add optional dataHome export to the generated hook shim using its existing
   shell-quoting helper. Pass the install data home from Codex install only. Resolve
   `context.codexHome` from explicit CODEX_HOME, otherwise the supplied home/.codex.
   Test paths containing spaces, apostrophes, `$()` and backticks as literal paths.
-- [ ] Hook openContext retains the resolved dataHome; resolve installed policy
+- [x] Hook openContext retains the resolved dataHome; resolve installed policy
   inside bindNative. Remove beforeTurn's environment-only skip, so off can retire
   a previous binding. Pass hook `env` explicitly to adapter bind for socket lookup.
-- [ ] Resolve the current recorded policy in CLI and MCP composition callbacks.
+- [x] Resolve the current recorded policy in CLI and MCP composition callbacks.
   Router replaces its snapshot-only permitted-bindings filter with current-policy
   evaluation, then reads policy again immediately before refresh/offer; for recorded
   policy use the current recorded value, allowing both narrowing and expansion
@@ -121,13 +121,13 @@ createDeliveryRouter({ service, adapters, clock, platform, readLivePolicy });
   Test `actionable` binding plus newly recorded `all` with a note: it must reach
   offer without waiting for another recipient hook. Otherwise the first filter
   would silently defeat the later policy read.
-- [ ] Test an old `all` binding with recorded off: the durable send succeeds,
+- [x] Test an old `all` binding with recorded off: the durable send succeeds,
   receipt stays queued, adapter offer call count is zero. Test actionable rejects
   note, permits question/request/answer; all permits note. Same assertions through
   CLI and MCP, not only a direct router call. Test a failed reader stays queued.
-- [ ] Mutations: prefer old environment over recorded off; skip policy-off
+- [x] Mutations: prefer old environment over recorded off; skip policy-off
   retirement; omit the shim's dataHome export. Each must fail its behavioral test.
-- [ ] Run focused installer, SDK, hook, CLI/MCP/router tests and commit
+- [x] Run focused installer, SDK, hook, CLI/MCP/router tests and commit
   `feat: read native delivery consent from installation records`.
 
 Execution addition: pin the same data home in Codex's baked skill command as in
@@ -161,26 +161,26 @@ planNativeActivation({ detection, context, livePolicy });
 planActivationRetirements({ previous, desired }); // previous mechanisms to retire
 ```
 
-- [ ] Write a test with recorded Codex shell shim + shared Claude shim + live
+- [x] Write a test with recorded Codex shell shim + shared Claude shim + live
   policy actionable. Plan another actionable install with only native-service.
   Assert the plan retires the old Codex shell mechanism; dry-run does not mutate.
-- [ ] Change Codex activation to the exact plan above. Probe context receives
+- [x] Change Codex activation to the exact plan above. Probe context receives
   `env: context.env` explicitly. Non-zsh shells must not produce unsupported_shell
   when no shell-bootstrap is requested. No daemon start/stop commands are emitted.
-- [ ] Implement mechanism reconciliation for enabled-to-enabled migration. Apply
+- [x] Implement mechanism reconciliation for enabled-to-enabled migration. Apply
   only the planned retirements. Reuse existing hash/rc-block protection. A modified
   shim is kept with a diagnostic and cleanup ownership preserved; a shared PATH
   block remains while Claude uses it. Do not delete user aliases/functions.
-- [ ] Exercise migration twice: no duplicate entries or lost cleanup authority.
+- [x] Exercise migration twice: no duplicate entries or lost cleanup authority.
   Exercise failure between teardown and record publication, then rerun. Preserve
   the pre-existing service and make actual retained artifacts visible in doctor.
-- [ ] Assert launch plans and installed files contain no generated Codex wrapper.
+- [x] Assert launch plans and installed files contain no generated Codex wrapper.
   A fake vendor command records argv to prove ordinary invocation with existing
   --cd, relative cwd, resume and config options receives byte-identical arguments.
-- [ ] Mutations: restore the remote prefix; suppress enabled-to-enabled cleanup;
+- [x] Mutations: restore the remote prefix; suppress enabled-to-enabled cleanup;
   remove a modified shim without checking its fingerprint. Require corresponding
   launch, migration, and retained-file assertions to fail.
-- [ ] Run focused migration/bootstrap/doctor tests and commit
+- [x] Run focused migration/bootstrap/doctor tests and commit
   `fix: retire the Codex remote launch wrapper safely`.
 
 ## Task 3: Receiver registration and exact-thread protocol checks
@@ -211,25 +211,25 @@ refreshNativeSession({ binding, runtimeDir, timeoutMs }); // same SDK handshake 
 offerMessage({ binding, message, runtimeDir, timeoutMs }); // no sender env routing
 ```
 
-- [ ] Add real filesystem tests for the closed record schema in the spec:
+- [x] Add real filesystem tests for the closed record schema in the spec:
   malformed ID, traversal, symlink, wrong socket type, missing record, expired
   observation, atomic publication and private permissions. A read may return an
   expired record only as metadata for fresh verification, not as an accepted offer.
-- [ ] Expand the socket process test to two daemons and two threads in one cwd.
+- [x] Expand the socket process test to two daemons and two threads in one cwd.
   Build a valid binding from receiver B's hook, then change sender CODEX_HOME to A.
   Assert only B's exact thread queue grows. This test uses real sockets plus a fake
   vendor server and is labelled a process test, never real-client certification.
-- [ ] Strengthen `locateCodexThread`: require exact loaded ID and canonical cwd
+- [x] Strengthen `locateCodexThread`: require exact loaded ID and canonical cwd
   equality; return observed cwd. Reject missing metadata, unknown status, repeated
   pagination cursors and exhausted page budget. Only idle/active threads qualify.
-- [ ] Tighten queue probing: require valid list structure for an actual loaded
+- [x] Tighten queue probing: require valid list structure for an actual loaded
   thread. An arbitrary caught RPC exception must not mean method support. Assert
   malformed response, timeout, missing method and wrong server version all refuse.
-- [ ] Implement bind: canonical event cwd, receiver socket, stable matching server
+- [x] Implement bind: canonical event cwd, receiver socket, stable matching server
   version, exact thread, queue protocol, then a fresh random registration ID and
   bounded lease. Return only the closed SDK handshake. Keep public adapter wiring
   disabled at this step. Never invent a passing certification entry for tests.
-- [ ] Implement refresh using the registration's saved receiver socket/cwd/ID;
+- [x] Implement refresh using the registration's saved receiver socket/cwd/ID;
   it returns the same endpoint ID with a fresh lease only after all checks pass.
   Offer repeats identity/version validation on the same connection before add.
 
@@ -240,10 +240,10 @@ offerMessage({ binding, message, runtimeDir, timeoutMs }); // no sender env rout
   // Continue with addCodexQueueMessage only after version and protocol checks.
   ```
 
-- [ ] Test cwd changed after binding, thread unloaded, mismatched initialize
+- [x] Test cwd changed after binding, thread unloaded, mismatched initialize
   version, socket replaced, missing event.cwd, symlink-equivalent cwd, and names
   containing spaces. Each rejection must leave queue/add call count zero.
-- [ ] Hook runner reads the previous binding before retirement, confirms retirement
+- [x] Hook runner reads the previous binding before retirement, confirms retirement
   succeeded, then calls optional adapter.retireNativeSession with that exact
   binding/runtimeDir. Apply the same cleanup on SessionEnd. Validate the optional
   method's type in SDK capabilities. A successor's fresh random endpoint must not
@@ -264,10 +264,10 @@ offerMessage({ binding, message, runtimeDir, timeoutMs }); // no sender env rout
   Keep this cleanup in a bounded fail-open helper; a read/cleanup error cannot
   prevent the primary core retirement attempt or fail the hook. Test a successor
   appearing between the two reads and require its endpoint file to remain intact.
-- [ ] Mutations: drop cwd comparison; select the first loaded ID; resolve socket
+- [x] Mutations: drop cwd comparison; select the first loaded ID; resolve socket
   from sender env; treat queue/list timeout as support. Each must fail a transport
   assertion, not a parser/import assertion.
-- [ ] Run adapter and socket-process tests; commit
+- [x] Run adapter and socket-process tests; commit
   `feat: bind Codex delivery to verified receiver endpoints`.
 
 ## Task 4: Renew expired bindings on demand without reviving retirement
@@ -292,26 +292,26 @@ refreshExpiredBinding({ service, adapter, binding, runtimeDir, platform, clock,
 // Uses adapter.refreshNativeSession and SDK validateNativeHandshake.
 ```
 
-- [ ] With the existing in-memory core test harness, publish a binding, move the
+- [x] With the existing in-memory core test harness, publish a binding, move the
   fake clock beyond leaseUntil, and assert default list is empty while explicitly
   including expiry returns the binding. Retire it and assert both lists are empty.
-- [ ] Add router tests with an expired binding and a successful counted refresh.
+- [x] Add router tests with an expired binding and a successful counted refresh.
   Assert one refresh, one subsequent offer, offered receipt, and bounded new lease.
   With no refresh method, assert queued and zero offer calls (Claude regression).
-- [ ] Implement optional query behavior and refresh helper. Require a valid
+- [x] Implement optional query behavior and refresh helper. Require a valid
   handshake, same endpoint, same version, current platform, finite future lease
   capped to 120 seconds; call existing generation-checked refreshDeliveryBinding.
   Re-read the binding afterwards. Never republish it to overcome retirement.
-- [ ] Insert barriers in tests: close session during refresh; retire during RPC;
+- [x] Insert barriers in tests: close session during refresh; retire during RPC;
   publish a successor generation before response; remove endpoint; revoke policy.
   Every case must leave offer count zero. Two live sessions remain ambiguous even
   if only one is reachable. Never choose a recipient by most recent activity.
-- [ ] Keep existing 24-hour presence expiry and document it. Do not spoof a hook
+- [x] Keep existing 24-hour presence expiry and document it. Do not spoof a hook
   heartbeat merely because a daemon socket exists. A daemon is not a thread.
-- [ ] Mutations: return expired bindings by default; include retired bindings;
+- [x] Mutations: return expired bindings by default; include retired bindings;
   replace refresh with publish; skip the post-refresh generation check. Require
   distinct assertions to fail and restore each edit.
-- [ ] Run core binding/router/package-boundary tests; commit
+- [x] Run core binding/router/package-boundary tests; commit
   `feat: revalidate expired native delivery bindings on demand`.
 
 ## Task 5: Installed-package harness and honest capture contracts
@@ -341,12 +341,12 @@ scenario for that phase passed, not skipped. Missing binary/auth/PTY support is
 a named nonzero prerequisite failure. It does not silently substitute a fake
 server. Python is test-only stdlib PTY support, not a package dependency.
 
-- [ ] Build the evidence validator first, with synthetic samples clearly marked
+- [x] Build the evidence validator first, with synthetic samples clearly marked
   as unit fixtures. `assertScenarioEvidence(record)` requires case ID, phase,
   client version, role identifiers, ordered timestamps, closed observed outcomes,
   package hash, assertion counts and cleanup result. Reject zero observations,
   unknown fields, prompt/transcript/body fields and missing required case IDs.
-- [ ] Extend the general capture contract with
+- [x] Extend the general capture contract with
   `ordinary-command-with-installed-hooks` as a passing launch mode. Keep old
   bootstrap captures valid. For new Codex certification require the associated
   installed-product evidence validator; a manual invocation alone cannot pass.
@@ -388,7 +388,7 @@ server. Python is test-only stdlib PTY support, not a package dependency.
   credential-link removal. Preserve only sanitized evidence; do not retain raw
   user auth, hook bodies, protocol traffic or vendor transcripts. Failure cleanup
   also records its outcome and cannot turn a failed scenario into a pass.
-- [ ] Mutate evidence input: empty scenario list, swap A/B equality outcomes,
+- [x] Mutate evidence input: empty scenario list, swap A/B equality outcomes,
   move queuedAt beyond first Stop, omit package identity. Validator must fail each
   exact assertion. Run the synthetic validator/capture tests; commit
   `test: add installed Codex LocalDaemon capture harness`.
@@ -403,12 +403,12 @@ server. Python is test-only stdlib PTY support, not a package dependency.
 - Modify `packages/adapter-codex/{certification.json,package.json}` and
   `packages/adapter-codex/fixtures/certification-provenance.json`.
 
-- [ ] Run transport phase on the packed implementation while public capability
+- [x] Run transport phase on the packed implementation while public capability
   remains false. Real installed hooks supply session event metadata; invoke the
   implemented native methods from the installed package. Prove correct B binding,
   idle and busy queue behavior and rejection of A mismatch. Record limited
   transport provenance; do not label this full ACC routing.
-- [ ] Use only that observed pass as the initial livePush anchor for the isolated
+- [x] Use only that observed pass as the initial livePush anchor for the isolated
   candidate. Declare policySource installation-record, activationKinds
   native-service and modes livePush/idleWake/busyQueue. Wire probe, activation,
   bind, refresh and offer methods. Keep replyRoute false. Do not modify the old
@@ -446,7 +446,7 @@ server. Python is test-only stdlib PTY support, not a package dependency.
 - [ ] P14's unsupported subcase is explicitly expected only where observed; it
   cannot replace the close/resume/fork requirements. If a client stops exposing a
   prerequisite, mark that case failed/unobserved and keep that capability disabled.
-- [ ] For P16 label malformed/mismatched metadata as controlled fault injection,
+- [x] For P16 label malformed/mismatched metadata as controlled fault injection,
   not as naturally observed Codex behavior. Preserve the original valid observation
   and assert the installed sender refuses the mutated endpoint before queue/add.
 - [ ] For P18 pack legacy commit `fb148d41c0c890d86e3219e79ed961e78005eb9f`
@@ -454,7 +454,7 @@ server. Python is test-only stdlib PTY support, not a package dependency.
   that real artifact only into the isolated home, then upgrade to the candidate.
   Record both hashes. Do not manufacture the ownership record and call it an
   installed upgrade; synthetic ownership fixtures belong to Task 2's tests.
-- [ ] Validate the queue-consumed/ambiguous-ack duplicate boundary separately with
+- [x] Validate the queue-consumed/ambiguous-ack duplicate boundary separately with
   controlled transport failure. State that transport execution may repeat; do not
   claim exactly-once simply because ACC answer deduplication hid a second turn.
 - [ ] Run two actual package mutants, each packed and installed independently:
@@ -463,7 +463,7 @@ server. Python is test-only stdlib PTY support, not a package dependency.
   marker/receipt isolation). Restore source and rerun the affected positive cases.
   For the cwd-check mutation, use a controlled inconsistent registration/protocol
   process test; never claim real same-ID cwd drift that was not observed.
-- [ ] Check real hook PID ancestry and version matching in P01 on both versions.
+- [x] Check real hook PID ancestry and version matching in P01 on both versions.
   If unresolved, stop enabling the descriptor and revise the narrow adapter/SDK
   contract with observed evidence; never globally remove PID or version gates.
 - [ ] Persist closed product evidence and certification only for observed passes.

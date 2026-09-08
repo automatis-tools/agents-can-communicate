@@ -119,8 +119,29 @@ The rules `defineAdapter` enforces, and the ones the runtime applies:
   when numerically newer. `knownBad` names exact versions or inclusive intervals.
 - Exact-version certification still governs every non-native capability;
   `effectiveCapabilities()` is unchanged. The native rule is used for live delivery alone.
-- The three native methods return closed facts (`validateNativeActivationPlan()` closes the
+- Native methods return closed facts (`validateNativeActivationPlan()` closes the
   activation plan) and never put vendor data - endpoints, sockets, raw errors - into core.
+
+`nativeDelivery.policySource` defaults to the session environment. An adapter may
+declare `"installation-record"` when hooks and senders must read current recorded
+recipient consent independently of the vendor process environment. Installation
+records the requested policy even when current activation is unavailable. An absent
+or invalid record means `off`; a previously published binding cannot override it.
+
+The optional `refreshNativeSession()` method may revalidate an expired lease before
+an offer. It returns the same closed handshake shape as `bindNativeSession()` and
+must preserve the exact endpoint and protocol identity. The router rechecks the
+current session, generation, retirement, uniqueness and policy before publishing
+the refreshed lease. Refresh is not a heartbeat and cannot extend presence beyond
+its own expiry. Optional `retireNativeSession()` cleans adapter-owned endpoint state
+after confirmed core retirement; it must remain bounded and fail open for hooks.
+
+A package-shipped passing Codex installed-hook capture additionally references its
+complete real product matrix through the selected provenance record's
+`productEvidence: { fixture, sha256 }`. Package verification checks the actual file,
+raw digest and client/version/platform/package identity. A transport-only capture
+cannot certify the installed product route. `historicalFixtures` may retain hashed
+earlier failures without duplicating a certification tuple.
 
 ## Choose the integration depth
 
