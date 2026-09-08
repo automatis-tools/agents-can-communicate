@@ -18,6 +18,14 @@ export function closedDeliveryDiagnostic(kind, result) {
       errorCode: closed(DELIVERY_ERROR_CODES, item?.errorCode, item?.errorCode === undefined ? "none" : "unknown") })) };
 }
 
+export function selectLaunchHook(hooks, { startedAt, expectedThreadId }) {
+  const fresh = hooks.filter(hook => hook.at >= startedAt);
+  const start = fresh.find(hook => hook.event === "SessionStart");
+  if (start) return expectedThreadId === undefined || start.threadId === expectedThreadId ? start : null;
+  if (expectedThreadId === undefined) return null;
+  return fresh.find(hook => hook.event === "UserPromptSubmit" && hook.threadId === expectedThreadId) ?? null;
+}
+
 export async function trust(h, role) {
   const status = await h.pty.request({ action: "status", role });
   const key = JSON.stringify({ ...status, terminalBytes: undefined });
@@ -52,6 +60,23 @@ export async function typePrompt(h, role, text) {
   await h.pty.request({ action: "send", role, text: "\r" });
 }
 
+export async function archive(h, role = "receiver-b1") {
+  assert.equal(role, "receiver-b1", "archive is limited to the owned synthetic receiver");
+  await typePrompt(h, role, "/archive");
+  await until("archive confirmation", async () => (await h.pty.request({ action: "status", role })).archiveConfirmation,
+    { timeoutMs: 30_000, intervalMs: 300 });
+  await h.pty.request({ action: "send", role, text: "\x1b[B" });
+  await delay(150);
+  await h.pty.request({ action: "send", role, text: "\r" });
+  const exited = await until("archive process exit", async () => {
+    const status = await h.pty.request({ action: "status", role });
+    return status.exit === null ? false : status;
+  }, { timeoutMs: 30_000, intervalMs: 300 });
+  assert.equal(exited.exit, 0, "archive confirmation exits the owned client successfully");
+  await h.pty.request({ action: "close", role });
+  return exited;
+}
+
 export async function launch(h, role, { cwd = h.B, expectedCwd = cwd, expectedThreadId, args = [], seed = true } = {}) {
   const startedAt = new Date().toISOString();
   const { pid } = await h.pty.request({ action: "launch", role,
@@ -71,8 +96,7 @@ export async function launch(h, role, { cwd = h.B, expectedCwd = cwd, expectedTh
     return readFile(marker, "utf8").then(value => value.trim(), () => false);
   });
   const hooks = await h.hooks();
-  let observed = hooks.find(hook => hook.event === "SessionStart" && hook.at >= startedAt
-    && (expectedThreadId === undefined || hook.threadId === expectedThreadId));
+  let observed = selectLaunchHook(hooks, { startedAt, expectedThreadId });
   if (!h.generatedHook) {
     const status = (await h.acc(["status"], { cwd: expectedCwd })).data;
     const { runtimePaths } = await h.module("cli/src/runtime-paths.mjs");
@@ -83,8 +107,10 @@ export async function launch(h, role, { cwd = h.B, expectedCwd = cwd, expectedTh
     observed = { threadId: bindings[0].harnessSessionId,
       parents: [{ name: "codex", pid: bindings[0].clientPid }] };
   }
-  assert.ok(observed, "a real generated SessionStart hook must identify the receiver");
+  assert.ok(observed, "a real generated hook must identify the receiver");
+  if (h.generatedHook) assert.equal(observed.cwd, expectedCwd, "generated hook cwd matches the expected receiver cwd");
   const clientPid = observed.parents.find(parent => parent.name === "codex")?.pid;
+  assert.ok(Number.isInteger(clientPid), "generated hook ancestry identifies the client process");
   Object.assign(h.roles[role], { threadId: observed.threadId, hookCwd: observed.cwd, clientPid,
     actualCwd: (await readFile(marker, "utf8")).trim() });
   await until(`seed completed ${role}`, async () => h.generatedHook

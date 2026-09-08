@@ -106,6 +106,7 @@ def handle(command):
     if action == "status":
         text = ansi.sub("", osc.sub("", client["screen"]))
         cwd_compact = re.sub(r"\s+", "", text)
+        archive_compact = re.sub(r"\s+", "", text)
         return {"pid": client["process"].pid, "exit": client["process"].poll(),
                 "projectTrust": "Yes, continue" in text or "Do you trust" in text,
                 "hookTrust": bool(re.search(r"trust\s*all", text, re.I)) or ("Hooks" in text and "Trust" in text and "Continue" in text),
@@ -120,6 +121,11 @@ def handle(command):
                     "Chooseworkingdirectoryto",
                     "Usesessiondirectory(",
                     "Usecurrentdirectory("
+                ]),
+                "archiveConfirmation": all(phrase in archive_compact for phrase in [
+                    "Archivethissession?",
+                    "No,don'tarchive",
+                    "Yes,archiveandexit"
                 ]),
                 "cdBlock": next((code for phrase, code in [
                     ("This directory is not trusted; run Codex there.", "destination-untrusted"),

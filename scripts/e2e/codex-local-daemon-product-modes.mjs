@@ -1,7 +1,7 @@
 import { mkdir } from "node:fs/promises";
 import path from "node:path";
 import { shellLiteral, until } from "./codex-local-daemon-machine.mjs";
-import { identify, launch, queueState, receipt, sendMessage, threadState, trust, typePrompt, waitMarker, withPeer }
+import { archive, identify, launch, receipt, sendMessage, threadState, trust, typePrompt, waitMarker, withPeer }
   from "./codex-local-daemon-actions.mjs";
 import { exists } from "./codex-local-daemon-product-state.mjs";
 import { scenario } from "./codex-local-daemon-observations.mjs";
@@ -85,28 +85,34 @@ export async function productSessionChanges(h) {
     args: ["resume", old.threadId] });
   const resumed = await identify(h, "receiver-b1");
   s.equal(resumed.threadId, old.threadId);
-  const closeAt = new Date().toISOString();
   await close(h, "receiver-b1");
-  await until("real client SessionEnd", async () => (await h.hooks()).find(item =>
-    item.event === "SessionEnd" && item.threadId === resumed.threadId && item.at >= closeAt));
-  const retired = await h.service.store.ephemeral.get("deliveryBinding", resumed.sessionId);
-  s.check(retired === null || retired.retiredAt != null);
-  s.equal((await h.service.listDeliveryBindings({ participantId: resumed.participantId,
-    now: new Date().toISOString(), includeExpired: true })).length, 0);
-  const closedMarker = path.join(h.B, "closed-generation.txt");
-  const sentClosed = await sendMessage(h, { id: "product_closed_generation", kind: "note",
-    body: `For this isolated test, run only: pwd > ${shellLiteral(closedMarker)}. Keep the session open.` });
-  s.equal(sentClosed.delivery[0].outcome, "queued",
-    "a closed generation must refuse native delivery after durable recording");
-  s.equal((await receipt(h, sentClosed.message)).state, "queued");
-  s.equal((await queueState(h, resumed.threadId)).filter(item =>
-    item.clientMessageId === sentClosed.message.messageId).length, 0);
-  s.equal(await exists(closedMarker), false);
   await launch(h, "receiver-b1", { cwd: h.C, expectedCwd: h.B, args: ["fork", old.threadId] });
   const forked = await identify(h, "receiver-b1");
   s.check(forked.threadId !== old.threadId);
   s.check(forked.sessionId !== resumed.sessionId || forked.generation !== resumed.generation);
   s.equal(forked.actualCwd, h.B);
+  const archiveAt = new Date().toISOString();
+  await archive(h);
+  await until("real archived SessionEnd", async () => (await h.hooks()).find(item =>
+    item.event === "SessionEnd" && item.threadId === forked.threadId && item.at >= archiveAt));
+  const retired = await h.service.store.ephemeral.get("deliveryBinding", forked.sessionId);
+  s.check(retired === null || retired.retiredAt != null);
+  s.equal((await h.service.listDeliveryBindings({ participantId: forked.participantId,
+    now: new Date().toISOString(), includeExpired: true })).length, 0);
+  s.equal((await threadState(h, forked.threadId)).loaded, false);
+  const closedMarker = path.join(h.B, "closed-generation.txt");
+  const sentClosed = await sendMessage(h, { id: "product_closed_generation", kind: "question",
+    body: `For this isolated test, run only: pwd > ${shellLiteral(closedMarker)}. Keep the session open.` });
+  s.equal(sentClosed.delivery[0].outcome, "queued",
+    "a closed generation must refuse native delivery after durable recording");
+  s.equal((await receipt(h, sentClosed.message)).state, "queued");
+  s.equal(await exists(closedMarker), false);
+  await launch(h, "receiver-b1", { cwd: h.B });
+  const fresh = await identify(h, "receiver-b1");
+  s.check(fresh.threadId !== forked.threadId);
+  s.check(fresh.sessionId !== forked.sessionId || fresh.generation !== forked.generation);
+  const active = await h.service.store.ephemeral.get("deliveryBinding", fresh.sessionId);
+  s.check(active && active.retiredAt === null);
   s.fact("binding", "retired"); s.fact("binding", "fresh", "receiver-b1");
   s.fact("actual-cwd", "matched", "receiver-b1", "receiver-b1"); s.finish();
 }
