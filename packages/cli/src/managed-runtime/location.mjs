@@ -48,5 +48,8 @@ export async function validateManagedLocation({ managerRoot, dataHome, cwd = pro
   if ([...roots].some(workspace => contains(workspace, dataHome) || contains(workspace, root))) {
     throw new Error("ACC data home must be outside every repository or workspace");
   }
+  if (root !== path.join(dataHome, "acc", "runtime")) {
+    throw new Error("ACC cannot relocate only its runtime; relocate the entire data home with ACC_DATA_HOME");
+  }
   return root;
 }

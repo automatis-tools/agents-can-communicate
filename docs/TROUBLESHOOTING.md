@@ -145,7 +145,9 @@ ACC removes only bytes that still match its install record. Anything edited by t
 reported and retained. Remove those leftovers manually if desired.
 
 Runtime state is outside the repository by design. `ACC_DATA_HOME` can relocate it, but ACC
-refuses a path inside any workspace root.
+refuses a path inside any workspace root. Relocate the whole data directory; a symlink for
+that directory is supported. Install rejects a symlink that moves only the internal
+`acc/runtime` tree, because runtime admission and the bootstrap cache need the same data home.
 
 Next: [Getting started](GETTING_STARTED.md) · [Capabilities](CAPABILITIES.md) ·
 [Configuration](CONFIGURATION.md)

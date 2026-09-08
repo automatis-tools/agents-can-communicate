@@ -10,7 +10,7 @@ const entry = new URL("../src/managed-runtime/entry.mjs", import.meta.url).href;
 async function fixture(t) {
   const root = await realpath(await mkdtemp(path.join(tmpdir(), "acc-entry-")));
   t.after(() => rm(root, { recursive: true, force: true }));
-  const managerRoot = path.join(root, "manager");
+  const managerRoot = path.join(root, "acc", "runtime");
   const runtime = { version: "0.4.0", root: path.join(managerRoot, "generations", "0.4.0-test") };
   await mkdir(path.join(runtime.root, "bin", "entrypoints"), { recursive: true });
   const marker = path.join(root, "imported");
@@ -33,7 +33,10 @@ async function fixture(t) {
   return { root, managerRoot, runtime, marker, control };
 }
 function child(t, f, kind) {
-  const code = `import {runEntry} from ${JSON.stringify(entry)}; await runEntry(${JSON.stringify({
+  const args = kind === "acc-bootstrap" ? ["--adapter", "claude_code", "--real-executable",
+    process.execPath, "--data-home", f.root] : [];
+  const code = `process.argv = [process.execPath, "fixture", ...${JSON.stringify(args)}];
+import {runEntry} from ${JSON.stringify(entry)}; await runEntry(${JSON.stringify({
     kind, managerRoot: f.managerRoot, packageRoot: path.join(f.root, "missing-source") })});`;
   const cp = spawn(process.execPath, ["--input-type=module", "-e", code], {
     env: { ...process.env, ACC_NO_UPDATE_CHECK: "1" }, stdio: ["pipe", "pipe", "pipe"] });

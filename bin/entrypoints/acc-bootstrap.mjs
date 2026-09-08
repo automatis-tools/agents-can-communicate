@@ -13,27 +13,15 @@ import { createGeminiCliAdapter } from "@agents-can-communicate/adapter-gemini-c
 import { createGrokAdapter } from "@agents-can-communicate/adapter-grok";
 import { createKimiAdapter } from "@agents-can-communicate/adapter-kimi";
 
-const FLAGS = new Map([["--adapter", "adapter"], ["--real-executable", "realExecutable"],
-  ["--data-home", "dataHome"]]);
+import { parseBootstrapOptions } from "@agents-can-communicate/cli/managed-entry";
 
 function debug(line) {
   if (process.env.ACC_BOOTSTRAP_DEBUG === "1") process.stderr.write(`acc-bootstrap: ${line}\n`);
 }
 
-function parse(args) {
-  const options = {};
-  for (let index = 0; index < args.length; index += 2) {
-    const key = FLAGS.get(args[index]);
-    const value = args[index + 1];
-    if (key === undefined || typeof value !== "string" || value === "" || key in options) return null;
-    options[key] = value;
-  }
-  return FLAGS.values().every(key => key in options) ? options : null;
-}
-
 export async function main() {
 try {
-  const options = parse(process.argv.slice(2));
+  const options = parseBootstrapOptions(process.argv.slice(2));
   if (options === null) {
     debug("usage: --adapter <id> --real-executable <path> --data-home <path>");
     process.exit(2);

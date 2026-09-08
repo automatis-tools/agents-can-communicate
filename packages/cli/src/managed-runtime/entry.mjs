@@ -9,6 +9,22 @@ export const ENTRY_KINDS = Object.freeze([
   "acc", "acc-hook", "acc-mcp", "acc-bootstrap", "acc-claude-channel",
 ]);
 
+const BOOTSTRAP_FLAGS = new Map([["--adapter", "adapter"], ["--real-executable", "realExecutable"],
+  ["--data-home", "dataHome"]]);
+
+/** Shared with the runtime; parse before admission without importing installer code. */
+export function parseBootstrapOptions(args) {
+  const options = {};
+  for (let index = 0; index < args.length; index += 2) {
+    const key = BOOTSTRAP_FLAGS.get(args[index]);
+    const value = args[index + 1];
+    if (key === undefined || typeof value !== "string" || value === "" || key in options) return null;
+    options[key] = value;
+  }
+  return BOOTSTRAP_FLAGS.values().every(key => key in options) && path.isAbsolute(options.dataHome)
+    ? options : null;
+}
+
 // Bootstrap resolution deliberately needs only Node built-ins: no selected
 // generation is imported until admission and its actual PID lease are durable.
 export function managerLocation({ env = process.env, platform = process.platform } = {}) {
@@ -40,11 +56,27 @@ function unavailable(kind) {
 /** The lease lasts until OS process death, including callbacks after main returns. */
 export async function runEntry({ kind, packageRoot, managerRoot, managedRequired = false }) {
   if (!ENTRY_KINDS.includes(kind)) throw new Error("unknown ACC entry point");
+  const bootstrapOptions = kind === "acc-bootstrap" ? parseBootstrapOptions(process.argv.slice(2)) : null;
+  if (kind === "acc-bootstrap" && bootstrapOptions === null) {
+    if (process.env.ACC_BOOTSTRAP_DEBUG === "1") {
+      process.stderr.write("acc-bootstrap: usage: --adapter <id> --real-executable <path> --data-home <path>\n");
+    }
+    process.exitCode = 2;
+    return;
+  }
   let selected = packageRoot;
   let managed = null;
   let root;
   try {
-    root = await canonicalManagerRoot(managerRoot ?? managerLocation());
+    const requestedDataHome = bootstrapOptions === null ? null : await canonicalManagerRoot(bootstrapOptions.dataHome);
+    const requestedRoot = requestedDataHome === null ? null
+      : await canonicalManagerRoot(path.join(requestedDataHome, "acc", "runtime"));
+    if (managerRoot && requestedDataHome !== null
+      && requestedDataHome !== await canonicalManagerRoot(path.dirname(path.dirname(managerRoot)))) {
+      throw new Error("bootstrap cache home differs from its launcher");
+    }
+    root = await canonicalManagerRoot(managerRoot ?? requestedRoot ?? managerLocation());
+    if (requestedRoot !== null && root !== requestedRoot) throw new Error("bootstrap data home differs from its launcher");
     const control = await readControl(root);
     if (control !== null) {
       selected = control.active.root;
