@@ -3,9 +3,9 @@ import path from "node:path";
 import { BEGIN, END, renderBlock } from "@agents-can-communicate/adapter-sdk";
 import { AccError, EXIT } from "@agents-can-communicate/protocol";
 
-const unsafe = () => {
-  throw new AccError(EXIT.CONFLICT, "cannot safely edit Codex config; "
-    + "repair ambiguous TOML or ACC markers before retrying");
+const unsafe = (reason = "unrecognized TOML declaration") => {
+  throw new AccError(EXIT.CONFLICT, `cannot safely edit Codex config: ${reason}; `
+    + "repair ambiguous TOML or ACC markers before retrying", { reason });
 };
 const OWNED = new Map([
   [JSON.stringify(["marketplaces", "acc-local"]), ["source_type", "source"]],
@@ -28,11 +28,11 @@ function* statements(source) {
         let count = quote.length;
         if (quote.length === 3) {
           while (source[i + count] === quote[0]) count++;
-          if (count > 5) unsafe();
+          if (count > 5) unsafe("unsupported string quote delimiter");
         }
         code += source.slice(i, i + count); i += count; quote = null; continue;
       }
-      if (quote.length === 1 && /[\r\n]/.test(char)) unsafe();
+      if (quote.length === 1 && /[\r\n]/.test(char)) unsafe("newline in single-line string");
       code += char; i++; continue;
     }
     if (char === "#") {
@@ -45,7 +45,7 @@ function* statements(source) {
     }
     if (char === "[" || char === "{") stack.push(char);
     if (char === "]" || char === "}") {
-      if (stack.pop() !== (char === "]" ? "[" : "{")) unsafe();
+      if (stack.pop() !== (char === "]" ? "[" : "{")) unsafe("mismatched collection delimiter");
     }
     code += char; i++;
     if (char === "\n" && stack.length === 0) {
@@ -53,7 +53,7 @@ function* statements(source) {
       start = i; code = "";
     }
   }
-  if (quote || stack.length) unsafe();
+  if (quote || stack.length) unsafe(quote ? "unclosed string" : "unclosed collection");
   if (start < source.length) yield { raw: source.slice(start), code: code.trim() };
 }
 
@@ -62,10 +62,12 @@ function decodeKey(key) {
   if (key[0] !== '"') return key;
   return key.slice(1, -1).replace(/\\(U[\da-fA-F]{8}|u[\da-fA-F]{4}|[btnfr"\\])|\\./g,
     (match, escape) => {
-      if (!escape) unsafe();
+      if (!escape) unsafe("unsupported quoted-key escape");
       if (/^[uU]/.test(escape)) {
         const point = Number.parseInt(escape.slice(1), 16);
-        if (point > 0x10ffff || (point >= 0xd800 && point <= 0xdfff)) unsafe();
+        if (point > 0x10ffff || (point >= 0xd800 && point <= 0xdfff)) {
+          unsafe("invalid quoted-key Unicode escape");
+        }
         return String.fromCodePoint(point);
       }
       return ({ b: "\b", t: "\t", n: "\n", f: "\f", r: "\r", '"': '"', "\\": "\\" })[escape];
@@ -77,7 +79,7 @@ function keyPath(code) {
   let rest = code.trimStart();
   for (;;) {
     const match = /^(?:[A-Za-z0-9_-]+|'[^'\r\n]*'|"(?:[^"\\\r\n]|\\[^\r\n])*")/.exec(rest);
-    if (!match) unsafe();
+    if (!match) unsafe("unrecognized TOML key");
     keys.push(decodeKey(match[0]));
     rest = rest.slice(match[0].length).trimStart();
     if (!rest.startsWith(".")) return { keys, rest };
@@ -100,16 +102,16 @@ function declaration(code) {
  * discard them. Codex may insert foreign tables before END; retain their raw
  * bytes in order and append the replacement block after them.
  */
-export function inspectConfig(source) {
+function inspect(source) {
   const kept = [], declarations = [];
   let inside = false, owned = null, table = [];
   for (const { raw, code } of statements(source)) {
     if (!code && raw.trim() === BEGIN) {
-      if (inside) unsafe();
+      if (inside) unsafe("nested BEGIN marker");
       inside = true; continue;
     }
     if (!code && raw.trim() === END) {
-      if (!inside) unsafe();
+      if (!inside) unsafe("unmatched END marker");
       inside = false; continue;
     }
     if (!code) {
@@ -120,23 +122,41 @@ export function inspectConfig(source) {
     if (entry.header) {
       table = entry.keys;
       owned = inside ? OWNED.get(JSON.stringify(table)) : null;
-      if (owned && entry.array) unsafe();
+      if (owned && entry.array) unsafe("owned table declared as an array");
     } else if (owned) {
       // Markers are comments, so END does not close a TOML table. Removing its
       // header would attach any following foreign assignment to another table.
-      if (!inside || entry.keys.length !== 1 || !owned.includes(entry.keys[0])) unsafe();
+      if (!inside) unsafe("assignment continues owned table after END marker");
+      if (entry.keys.length !== 1 || !owned.includes(entry.keys[0])) {
+        unsafe("unknown key in owned table");
+      }
     }
     if (!owned) {
       kept.push(raw);
-      declarations.push(entry.header ? table : [...table, ...entry.keys]);
+      declarations.push({ keys: entry.header ? table : [...table, ...entry.keys],
+        header: entry.header });
     }
   }
-  if (inside) unsafe();
-  const has = prefix => declarations.some(keys => prefix.every((key, i) => keys[i] === key));
+  if (inside) unsafe("missing END marker");
+  const has = prefix => declarations.some(({ keys }) => prefix.every((key, i) => keys[i] === key));
+  // Assignments occupy their exact namespace: even an empty inline parent is
+  // closed to later child tables. Ordinary headers and sibling keys stay valid.
+  const assignedParent = declarations.some(({ keys, header }) => !header
+    && keys.length === 1 && ["marketplaces", "plugins"].includes(keys[0]));
   return { source: kept.join(""),
     sandbox: has(["sandbox_workspace_write"]),
-    registration: has(["marketplaces", "acc-local"])
+    registration: assignedParent || has(["marketplaces", "acc-local"])
       || has(["plugins", "agents-can-communicate@acc-local"]) };
+}
+
+export function inspectConfig(source, file = "config.toml") {
+  try {
+    return inspect(source);
+  } catch (error) {
+    if (!(error instanceof AccError)) throw error;
+    // Structural reasons are fixed labels: never include key names or values.
+    throw new AccError(error.code, `${file}: ${error.message}`, { ...error.details, file });
+  }
 }
 
 export async function readConfig(file) {
@@ -147,7 +167,7 @@ export async function readConfig(file) {
 }
 
 export async function writeTomlBlock(file, body) {
-  const { source } = inspectConfig(await readConfig(file));
+  const { source } = inspectConfig(await readConfig(file), file);
   const separator = source === "" || source.endsWith("\n") ? "" : "\n";
   await mkdir(path.dirname(file), { recursive: true });
   await writeFile(file, `${source}${separator}${renderBlock(body)}\n`);
@@ -156,7 +176,7 @@ export async function writeTomlBlock(file, body) {
 
 export async function removeTomlBlock(file) {
   const before = await readConfig(file);
-  const { source } = inspectConfig(before);
+  const { source } = inspectConfig(before, file);
   if (source === before) return false;
   await writeFile(file, source);
   return true;

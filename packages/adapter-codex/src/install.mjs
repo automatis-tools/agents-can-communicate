@@ -157,7 +157,7 @@ export async function installCodexPlugin({ home, agentsHome = home,
   // whatever its manifest calls itself - the id ACC enabled was one the client
   // never forms, and the plugin sat there listed and not installed.
   const config = configPath(codexHome);
-  const foreign = inspectConfig(await readConfig(config));
+  const foreign = inspectConfig(await readConfig(config), config);
   // Preflight before touching installed files: a duplicate table makes Codex
   // refuse the config, and ambiguous ownership must never delete client state.
   if (foreign.registration) {
@@ -241,7 +241,7 @@ export async function uninstallCodexPlugin({ home, agentsHome = home,
   const file = marketplacePath(agentsHome);
   const existing = await readJson(file, null);
   const changes = [];
-  inspectConfig(await readConfig(configPath(codexHome)));
+  inspectConfig(await readConfig(configPath(codexHome)), configPath(codexHome));
   if (existing !== null) {
     const kept = (existing.plugins ?? []).filter(entry => entry.name !== PLUGIN_NAME);
     if (kept.length !== (existing.plugins ?? []).length) changes.push(PLUGIN_NAME);

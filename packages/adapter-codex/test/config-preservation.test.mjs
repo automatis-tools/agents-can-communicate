@@ -173,3 +173,66 @@ test("equivalent quoted and escaped owned headers are updated and removed once",
   assertPreserved(await read());
   assert.ok(!(await read()).includes('sandbox_workspace'));
 });
+
+for (const foreign of [
+  'plugins = {}\n',
+  'marketplaces = {}\n',
+  'plugins = { "other@foreign" = { enabled = true } }\n',
+  'marketplaces = { "acc-local" = { source_type = "local", source = "/tmp/theirs" } }\n',
+  '"marketplaces" = {}\n',
+]) {
+  test(`closed registration parent refuses before writes: ${foreign.trim()}`, async t => {
+    const { context, file, read } = await fixture(t);
+    await writeFile(file, foreign);
+    const plugin = path.join(context.home, ".agents", "acc-local", "plugins",
+      "agents-can-communicate", "hooks.json");
+    const sentinel = '{ "sentinel": "keep installed bytes on refusal" }\n';
+    await writeFile(plugin, sentinel);
+    await assert.rejects(installCodexPlugin(context), /already registered/);
+    assert.equal(await read(), foreign, "refusal changed config bytes");
+    assert.equal(await readFile(plugin, "utf8"), sentinel);
+  });
+}
+
+for (const foreign of [
+  '[plugins]\n[marketplaces]\n',
+  'plugins."other@foreign".enabled = true\nmarketplaces.foreign.source_type = "local"\n',
+  '["plugins"]\n"other@foreign" = { enabled = true }\n[marketplaces]\nforeign = {}\n',
+]) {
+  test(`extensible registration namespace survives install/remove: ${foreign.split("\n")[0]}`, async t => {
+    const { context, file, read } = await fixture(t);
+    await writeFile(file, foreign);
+    await installCodexPlugin(context);
+    const installed = await read();
+    assert.ok(installed.startsWith(foreign));
+    assert.ok(installed.includes('[marketplaces.acc-local]'));
+    assert.ok(installed.includes('[plugins."agents-can-communicate@acc-local"]'));
+    await installCodexPlugin(context);
+    assert.equal(await read(), installed);
+    await uninstallCodexPlugin(context);
+    assert.equal(await read(), foreign);
+  });
+}
+
+for (const [damage, reason] of [
+  [source => source.replace('enabled = true', 'enabled = true\nextra = "private-value-123"'),
+    /unknown key in owned table/],
+  [source => source.replace(END, '[other]\nnote = """private-value-123\n' + END),
+    /unclosed string/],
+]) {
+  test("ambiguity diagnostics identify config and structural reason without values", async t => {
+    const { context, file, read } = await fixture(t);
+    const before = damage(await read());
+    await writeFile(file, before);
+    for (const operation of [installCodexPlugin, uninstallCodexPlugin]) {
+      await assert.rejects(operation(context), error => {
+        assert.ok(error.message.includes(file), "diagnostic omitted config path");
+        assert.match(error.message, reason);
+        assert.ok(!JSON.stringify(error).includes("private-value-123"));
+        assert.ok(!error.message.includes("private-value-123"));
+        return true;
+      });
+      assert.equal(await read(), before);
+    }
+  });
+}
