@@ -16,7 +16,7 @@ function barrier() {
     async pause() { entered.resolve(); await resumed.promise; } };
 }
 
-async function fixture({ refreshed, boundary }) {
+async function fixture({ refreshed, boundary, kind = "question" }) {
   const clock = createFakeClock("2026-09-01T20:00:00.000Z");
   const ids = createFakeIds();
   const store = createMemoryStore({ clock, ids, workspaceId: WORKSPACE });
@@ -36,6 +36,7 @@ async function fixture({ refreshed, boundary }) {
   let policyReads = 0;
   let sessionReads = 0;
   let refreshes = 0;
+  let historyReads = 0;
   const offers = [];
   const adapter = { id: "fixture", capabilities: { delivery: { livePush: true } },
     nativeDelivery: { policySource: "installation-record",
@@ -53,7 +54,11 @@ async function fixture({ refreshed, boundary }) {
       return { accepted: true, clientVersion: "1.2.3" };
     } };
   const router = createDeliveryRouter({
-    service: { ...service, listLiveSessions: async input => {
+    service: { ...service, sync: async input => {
+      const result = await service.sync(input);
+      if (++historyReads === 2 && boundary === "history") await gate.pause();
+      return result;
+    }, listLiveSessions: async input => {
       const sessions = await service.listLiveSessions(input);
       if (++sessionReads === 2 && boundary === "session") await gate.pause();
       return sessions;
@@ -65,8 +70,8 @@ async function fixture({ refreshed, boundary }) {
     },
   });
   const message = await service.sendMessage({ sessionId: sender.sessionId,
-    generation: sender.generation, clientMessageId: "client_current_binding", kind: "question",
-    obligation: "reply", toParticipantIds: ["receiver"], subject: "Binding race", body: "Fixture",
+    generation: sender.generation, clientMessageId: "client_current_binding", kind,
+    obligation: kind === "decision" ? "none" : "reply", toParticipantIds: ["receiver"], subject: "Binding race", body: "Fixture",
     artifacts: [], inReplyTo: null, handoff: null });
   return { clock, service, store, recipient, original, future, gate, offers,
     refreshes: () => refreshes, router, message };
@@ -135,3 +140,18 @@ for (const refreshed of [false, true]) {
         recipientParticipantId: "receiver" })).state, "offered");
     });
 }
+
+// The merged decision read is another await before the final binding lookup.
+// Moving that lookup above this read must let the retired endpoint reach transport.
+test("a decision history read racing with retirement cannot offer the obsolete binding", async () => {
+  const f = await fixture({ refreshed: false, boundary: "history", kind: "decision" });
+  const pending = f.router.offer(f.message);
+  await f.gate.entered;
+  try { await f.service.clearDeliveryBinding(f.recipient); } finally { f.gate.resume(); }
+  const outcomes = await pending;
+  assert.equal(f.offers.length, 0);
+  assert.deepEqual(outcomes, [{ recipientParticipantId: "receiver", outcome: "queued",
+    transport: "durable", errorCode: "recipient_unavailable" }]);
+  assert.equal((await f.service.readReceipt({ messageId: f.message.messageId,
+    recipientParticipantId: "receiver" })).state, "queued");
+});
