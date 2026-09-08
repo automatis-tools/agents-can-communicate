@@ -4,9 +4,9 @@
 
 | | |
 |---|---|
-| Built from | `1e85b2bf9b2d5459473a44dabfe68224d0069619` |
-| Tarball | `agents-can-communicate-0.3.1.tgz`, 271,687 bytes, 202 entries |
-| sha256 | `7c579aa30c5299617114fe2ba36f7adc3d61ad7c612ce40bb891ef27134e14fa` |
+| Built from | `dc15a57e5067ff4cb9e5a93be1a64b68c13fba5f` |
+| Tarball | `agents-can-communicate-0.3.1.tgz`, 277,306 bytes, 206 entries |
+| sha256 | `88c026168c09e37b1f9b8b77971f8dd8ea4935aa43cbdf52c8e9f7674ccdf313` |
 
 Not published. A published record says what the registry serves and is not
 rewritten, so shipped code that changes after a release is measured here instead.
@@ -22,6 +22,13 @@ Next-turn and native text retain lifecycle links. Live routing refreshes decisio
 before each recipient's offer; text already sent cannot be recalled. The optional stored
 field preserves this build's access to existing schema-3 records; older ACC builds may
 reject new records, so participating installations should be upgraded together.
+
+Verified from `dc15a57`: 365 modules passed syntax checking; the full suite ran
+1644 tests (1642 passed, 0 failed, 2 environment skips). All 26 targeted runtime
+mutations were caught. Installed CLI/MCP/channel scenarios, actual hook-runner
+projection, and skill application preserved history and receipts; the hook showed
+the withdrawal and none of 12 replaced bodies. All 206 installed files matched
+the recorded archive, which passed clean installation and package verification.
 
 Default CLI/MCP inbox and `acc://inbox` now return read-only `{items, nextCursor}`
 summary pages. Previously, listing a backlog returned every body and marked every message
