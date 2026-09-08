@@ -331,3 +331,19 @@ checker now requires a passed P01 prerequisite before accepting a P13 mutation
 result. A separate read-only process reconciliation at 09:22:36 UTC found no
 Codex process whose cwd remained under the owned E2E/preflight roots; this does
 not rewrite any historical cleanup receipt.
+
+
+## Implementation decisions and their costs
+
+These are the execution rulings, in the order recorded in the task ledger.
+They remain visible here after local review scratch is removed.
+
+| Decision | Basis | Cost if wrong |
+|---|---|---|
+| Use delegated implementation and scoped review despite the plan's inline note | The execution skill requires this workflow; product scope is unchanged | Additional process overhead |
+| Drop unsupported install `--yes`; treat `/cd` support per observed launch mode; seed a normal prompt before testing idle addressability | Explicit delivery is noninteractive, ordinary and remote modes differ, and real SessionStart begins with a prompt | Rework setup and repeat captures; a virgin TUI remains unproven as an ACC recipient |
+| Keep T04 limited to rejected submission plus a durable queued receipt | Direct transport observations do not establish the installed fallback route | Capture-schema and fixture migration |
+| Allow metadata-only `thread/read(includeTurns:false)` for an already-loaded ID absent from a complete valid listing | Real first-turn hooks precede persisted thread/list metadata | Conservative degraded delivery and a required fresh client capture |
+| Bound indeterminate retirement and carry one deadline through storage lock acquisition/publication | Hooks must fail open; a timed-out queued clear must not start later | Conservative delivery degradation until a later valid hook; an already-started write cannot be promised cancelled |
+| Distinguish TUI detachment from actual thread teardown; resume/fork before explicit archive, then launch a fresh receiver | Both real versions retain loaded threads after terminal exit; real archive produces SessionEnd | Rework lifecycle E2E and keep capability disabled until the complete matrix passes |
+| Preserve foreign TOML even when Codex inserts it inside ACC markers; fix the installer instead of re-trusting the test directory | Real client trust was present after P02 and deleted by P08 reinstall | Conservative install refusal or parser maintenance; foreign settings must never be silently discarded |
