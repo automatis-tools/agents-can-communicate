@@ -738,6 +738,9 @@ test("an uncertified platform drops an optional count before an exact inbox reco
   });
 
 test("SessionEnd retires core binding before adapter endpoint cleanup", async t => {
+  // This case checks retirement order, not wall-clock I/O speed under the full
+  // suite. Deadline behavior is exercised by the focused retirement fixtures.
+  t.mock.timers.enable({ apis: ["setTimeout"] });
   const place = await workspace(t);
   const cleaned = [];
   let service;
