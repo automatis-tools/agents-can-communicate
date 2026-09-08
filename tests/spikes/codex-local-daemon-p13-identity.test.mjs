@@ -9,6 +9,8 @@ const harness = participantId => ({ phase: "product", version: "0.152.1",
   } });
 
 test("P13 cannot snapshot receiver-b1 before its observed identity is resolved", () => {
+  assert.doesNotThrow(() => scenario(harness(null), "P01"),
+    "P01 snapshots before its deliberate independent identity refresh");
   assert.throws(() => scenario(harness(null), "P13"),
     /receiver-b1 must be identified before scenario snapshot/);
 
