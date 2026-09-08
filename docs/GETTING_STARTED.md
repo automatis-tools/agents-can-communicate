@@ -24,6 +24,11 @@ npm install -g agents-can-communicate
 acc install
 ```
 
+Installation also enables automatic updates. ACC downloads releases in the background and
+refreshes its runtime and skills when active clients have left. Use `acc update` for an
+immediate update, or `acc update --auto off` to disable background updates. See
+[update controls](UPGRADING.md#automatic-updates-after-installation).
+
 The installer connects only the supported clients it finds. Open a new terminal and
 restart any running clients so they load their integrations. Follow the activation steps
 printed by the installer. In Codex, use `/plugins` to check ACC is enabled, then `/hooks`

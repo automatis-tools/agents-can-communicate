@@ -226,7 +226,7 @@ external AI client. An addressed handoff requires acknowledgement; a room handof
 | `acc doctor` | `--home`, `--repair` |
 | `acc config init` | `--yes`, `--force` |
 | `acc config validate` | — |
-| `acc update` | `--apply` |
+| `acc update` | `--check`, `--auto on\|off`, `--pin VERSION\|none`, `--apply` (alias) |
 | `acc help` | — |
 | `acc version` | — |
 
@@ -241,15 +241,24 @@ effective policy off and prints the reason. A live install writes an owned zsh P
 a per-command shim that keeps your command name and `exec`s the real client; `ACC_BYPASS=1`
 runs the unmodified client, and ACC is never the parent of the session after that `exec`.
 
-Only `update` touches the network. `ACC_NO_UPDATE_CHECK=1` disables update checks. Hooks
-never perform them.
+A normal `acc install` enables automatic updates. A background worker checks stable releases
+at most once a day, downloads and verifies a separate runtime, then refreshes installed
+integrations and skills when running ACC processes and native clients have left. Hooks do
+not wait for network work. `ACC_NO_UPDATE_CHECK=1` disables update networking and background
+scheduling.
 
-When a newer version is available, `update --apply` refreshes the package and then runs
-`acc install`. A failed step exits
-with code `4`; JSON error details retain `applied` and `failed`, and the error names the
-remaining commands. Success includes the installer's output in `installation.stdout` /
-`installation.stderr` and a restart reminder in `activation`. Follow those instructions
-before relying on running clients. See [Upgrading](UPGRADING.md) for the 0.3.1 transition.
+`acc update` requests the update immediately; it reports a pending update when a running or
+unidentified client prevents activation. `--check` only checks and cannot be combined with
+settings changes. `--auto off` disables background updates, and `--auto on` enables them.
+`--pin 0.4.0` holds an exact stable version; `--pin none` follows stable releases. A pin
+cannot downgrade the active runtime. The old `--apply` flag remains accepted.
+
+Failed downloads keep the working runtime. A failed integration refresh exits with code
+`4`, names the failed adapter and configuration error, and keeps workspace admission closed.
+Fix the reported configuration problem, then run `acc update` to finish it. `acc doctor`
+reports the update policy and pending notice. Native clients may still require hook trust
+or activation review. See [Upgrading](UPGRADING.md) for the initial 0.3.1 transition and
+recovery details.
 
 ## Integrate a client lifecycle
 

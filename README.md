@@ -60,6 +60,9 @@ acc install
 
 The installer connects the clients it finds. Open a new terminal and restart your AI
 clients to load the integration. If you use Codex, accept its plugin trust prompt.
+ACC then keeps its runtime and skills updated in the background, waiting for active clients
+to exit before switching versions. [Update controls](docs/UPGRADING.md#automatic-updates-after-installation)
+include manual update, opt-out, and version pinning.
 
 Open two sessions in your project and give them ordinary tasks, as in the example above.
 On supported clients, ACC introduces peer awareness through the client's own integration;

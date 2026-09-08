@@ -149,3 +149,21 @@ refuses a path inside any workspace root.
 
 Next: [Getting started](GETTING_STARTED.md) · [Capabilities](CAPABILITIES.md) ·
 [Configuration](CONFIGURATION.md)
+
+## An automatic update is pending
+
+Run `acc doctor` to see the update policy and pending notice. Close running native clients
+and persistent ACC MCP servers; finishing an ACC session does not prove its client exited.
+If ACC cannot identify a binding's process, it waits for that client's lifecycle to clear
+the binding. It does not expire safety holds by elapsed time.
+
+Use `acc update` to retry a failed download or finish an interrupted integration refresh.
+A download failure keeps the working version. A partial integration refresh blocks
+workspace commands until recovery completes, while hooks let the client continue without
+ACC context. `acc update` names the failed adapter, cause, and known configuration paths;
+fix that problem and rerun it. Help and update recovery remain available. `ACC_NO_UPDATE_CHECK=1` prevents
+new downloads but permits manual activation of an already verified pending update.
+
+To stop automatic downloads, use `acc update --auto off`. To stay on the current release,
+use `acc update --pin <version>`. Neither setting converts workspace data for an older
+runtime. See the [upgrade guide](UPGRADING.md).

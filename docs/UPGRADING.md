@@ -41,13 +41,47 @@ inside clients. `acc install` preserves user settings and the recorded delivery 
 it does not turn experimental delivery on for a previously opted-out client. Effective
 delivery still depends on the current client's capabilities.
 
-When a newer version is available, the new `acc update --apply` runs both installation
-steps, reports a failed step with exit code `4`, and names the commands still needed.
-Successful application includes the installer's
-activation instructions and a restart reminder. Published 0.3.1 can return exit code `0`
-despite a failed step, so use the explicit commands above for this transition. If npm
-succeeds but refreshing integrations fails, fix that error and rerun `acc install`;
-checking for a newer package again does not finish that step.
+## Automatic updates after installation
+
+After a normal `acc install`, automatic updates are on. ACC checks for stable releases in
+an independent background process, normally at most once a day, downloads and verifies a
+separate runtime copy, and refreshes the installed integrations and skills before switching.
+The global npm package provides a launcher; the active runtime lives under ACC's data home.
+
+Running ACC processes and native client bindings hold the current version. An idle MCP
+server still counts, as does a client whose ACC session was finished. Close those clients
+to let a pending update activate. A binding whose process cannot be identified keeps the
+update pending until its lifecycle clears it; elapsed time alone is not proof of exit.
+Hooks never wait for a network download. If integration refresh temporarily prevents
+coordination, a hook lets the client continue; its next genuine user turn can restore a
+missing binding.
+
+```bash
+acc update                    # download and apply, or report what is keeping it pending
+acc update --check            # check without installing or changing update settings
+acc update --auto off         # disable background updates
+acc update --auto on          # enable them again
+acc update --pin 0.4.0        # stay on this exact stable version
+acc update --pin none         # follow stable releases again
+```
+
+`--apply` remains an alias for the plain update command. Pins cannot downgrade an active
+runtime. `ACC_NO_UPDATE_CHECK=1` disables update networking and background scheduling;
+manual recovery of an already downloaded update still works. Downloading needs npm, but
+does not require permission to replace a global installation and never runs package
+lifecycle scripts. `acc doctor` reports the automatic-update policy and pending notice.
+
+A failed download or verification keeps the active runtime. An interrupted integration
+refresh keeps workspace admission closed until `acc update` finishes the refresh. It does
+not roll workspace history back. A failed refresh exits with code `4` and reports the adapter
+and configuration problem to fix before retrying; a verified update waiting for live clients
+remains pending. Previous runtime and plugin cache versions are
+retained so existing launch paths survive the change.
+
+Client trust is still controlled by the client. Follow any reported activation or hook
+review steps; copied files do not prove the client has activated them. The initial
+published-0.3.1 transition above still requires a coordinated restart: old direct binaries
+and existing embedded core consumers cannot be enrolled retroactively.
 
 ## Update scripts and MCP consumers
 

@@ -157,3 +157,31 @@ it, but a coordination tool must not be the reason a session stops working.
 
 Next: [Protocol](PROTOCOL.md) · [Capabilities](CAPABILITIES.md) ·
 [Security model](SECURITY_MODEL.md)
+
+## Managed runtime activation
+
+The CLI owns installation generations under `<dataHome>/acc/runtime`, outside workspaces.
+All five launch paths select a generation and publish an actual-process lease under one
+admission mutex before loading workspace-capable code. Immutable launcher modules and
+runtime directories preserve in-progress imports. Leases survive `main()` returning and
+are removed only after confirmed process death. Parsed help, version, and update recovery
+remain available when workspace admission is unavailable.
+
+An independent worker downloads npm packages with lifecycle scripts disabled, checks exact
+stable package identity and the discovered integrity, and health-checks the staged runtime.
+Installer detection and planning happen before exclusive admission. The worker then checks
+ACC process leases and native binding PIDs, records `activating`, applies every integration,
+and only publishes the new active pointer after all applications succeed. Partial refresh
+remains fenced and repairs forward. Presence TTLs and finished session records cannot prove
+native client exit. Unknown PIDs remain holds.
+
+Lock ownership never expires by age. Retained nonempty tombstones prevent delayed observers
+from reclaiming a successor. Under an acquired lock, maintenance removes historical
+bookkeeping only when no live or unknown contender could still reference it; a stopped
+contender postpones cleanup. Admission also removes confirmed-dead process leases. None of
+this metadata is agent conversation history or injected context.
+
+The first upgrade from an unmanaged binary still requires a restart. ACC cannot fence old
+direct binaries or external applications importing core. Native trust and client-side cache
+activation remain vendor responsibilities; refreshed files do not establish observed
+capabilities.
