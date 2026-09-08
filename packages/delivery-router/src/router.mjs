@@ -119,6 +119,14 @@ export function createDeliveryRouter({ service, adapters, clock, platform, readL
     if (!permits(currentPolicy, message.kind)) {
       return durable(participantId, "delivery_disabled");
     }
+    // A refresh RPC or policy read can overlap another session opening. The
+    // receiver must still be the sole live session when we hand off to transport.
+    const currentSessions = await service.listLiveSessions({ participantId, now: clock.now() });
+    if (currentSessions.length > 1) return durable(participantId, "ambiguous_recipient_sessions");
+    if (currentSessions.length !== 1 || currentSessions[0].sessionId !== binding.sessionId
+      || currentSessions[0].generation !== binding.generation) {
+      return durable(participantId, "recipient_unavailable");
+    }
     const currentBinding = { ...binding, livePolicy: currentPolicy };
     let response;
     try {

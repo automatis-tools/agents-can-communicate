@@ -306,3 +306,21 @@ test("one settled recipient does not suppress another recipient's queued offer",
   ]);
   assert.deepEqual(calls, [other.sessionId]);
 });
+
+test("a second live recipient appearing during refresh keeps the message queued", async () => {
+  let f;
+  let offers = 0;
+  f = await fixture(async ({ binding }) => {
+    offers += 1;
+    return { accepted: true, transport: "codex-app-server", clientVersion: binding.clientVersion };
+  }, { refreshNativeSession: async () => {
+    await f.service.openSession({ workspaceId: WORKSPACE, participantId: "models",
+      sessionId: "session_new_live", harness: "fixture", heartbeatCadenceMs: 30_000 });
+    return refreshedHandshake();
+  } });
+  await publish(f.service, f.recipient);
+  f.clock.advance(60_001);
+  const [outcome] = await f.router.offer(await send(f, "became_ambiguous"));
+  assert.equal(outcome.errorCode, "ambiguous_recipient_sessions");
+  assert.equal(offers, 0);
+});
