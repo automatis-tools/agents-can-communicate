@@ -243,6 +243,7 @@ async function projectTurn({ binding, context, adapter, adapterId }) {
   const canOfferNextTurn = effective.delivery.nextTurn === true && hasStructuredRenderer;
   const projectionInput = { ...sync, messages: canOfferNextTurn ? messages : [],
     liveOfferedMessageIds: delivery.liveOfferedMessageIds,
+    reminderMessageIds: delivery.reminderMessageIds,
     roomMessageIds: delivery.roomMessageIds,
     currentParticipantId: mine?.participantId };
   // Credentials alone cannot replace the command that reaches a queued body.

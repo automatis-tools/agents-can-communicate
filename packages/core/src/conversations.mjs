@@ -6,6 +6,7 @@ import { AccError, EXIT, SCHEMA_VERSION, validateRecord }
 
 import { projectReleasedClaim, reconstructFinishRetry } from "./finish-retries.mjs";
 import { ensureMaterialised } from "./materialisation.mjs";
+import { nextTurnDelivery as selectNextTurnDelivery } from "./next-turn-delivery.mjs";
 
 export const receiptId = (messageId, participantId) => `receipt_${createHash("sha256")
   .update(JSON.stringify([messageId, participantId])).digest("base64url")}`;
@@ -288,28 +289,8 @@ export function createConversationService(ports, sessions) {
     return (await nextTurnDelivery(input)).queuedMessages;
   }
 
-  async function nextTurnDelivery(input = {}) {
-    if (typeof input.participantId !== "string" || input.participantId === "") {
-      return { queuedMessages: [], liveOfferedMessageIds: [], roomMessageIds: [] };
-    }
-    const snapshot = await store.snapshot(input.workspaceId ?? store.workspaceId,
-      { kinds: ["message", "receipt"] });
-    const receiptByMessage = new Map(snapshot.receipts
-      .filter(item => item.recipientParticipantId === input.participantId)
-      .map(item => [item.messageId, item]));
-    const eligible = snapshot.messages.filter(message => receiptByMessage.has(message.messageId)
-      && message.fromSessionId !== input.exceptSessionId)
-      .sort((left, right) => left.sentAt.localeCompare(right.sentAt)
-        || left.messageId.localeCompare(right.messageId));
-    return {
-      queuedMessages: eligible.filter(message =>
-        receiptByMessage.get(message.messageId).state === "queued"),
-      liveOfferedMessageIds: eligible.filter(message => message.toParticipantIds.length > 0
-        && receiptByMessage.get(message.messageId).state === "offered")
-        .map(message => message.messageId),
-      roomMessageIds: eligible.filter(message => message.toParticipantIds.length === 0)
-        .map(message => message.messageId),
-    };
+  function nextTurnDelivery(input) {
+    return selectNextTurnDelivery(store, input);
   }
 
   return { sendMessage, finishSession, pendingMessages, nextTurnDelivery };

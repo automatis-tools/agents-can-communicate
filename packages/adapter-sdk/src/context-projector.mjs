@@ -71,6 +71,20 @@ function messageGroups(messages) {
   }));
 }
 
+function reminderGroups(attention) {
+  const replies = attention.filter(item => item.kind === "reply_required").length;
+  const acknowledgements = attention.length - replies;
+  const counts = [
+    replies === 0 ? null : `${replies} ${replies === 1 ? "reply" : "replies"}`,
+    acknowledgements === 0 ? null
+      : `${acknowledgements} acknowledgement${acknowledgements === 1 ? "" : "s"}`,
+  ].filter(Boolean);
+  // Counts preserve pending obligations without claiming that any individual
+  // item was shown, read, or resolved. The complete list remains in the inbox.
+  return counts.length === 0 ? [] : [{ kind: "reminder", truncatable: false,
+    lines: [`- Pending: ${counts.join(", ")}; \`acc inbox\`.`] }];
+}
+
 const groupBytes = group => group.lines.reduce((total, line) => total + bytes(line) + 1, 0);
 
 function peerCount(sync) {
@@ -105,13 +119,17 @@ export function projectContextResult(sync, { budgetBytes = DEFAULT_BUDGET_BYTES 
     .sort((left, right) => left.priority - right.priority
       || (left.sourceId ?? "").localeCompare(right.sourceId ?? ""));
   const leadsPeerBodies = item => item.priority <= 2 || item.kind === "claim_conflict";
-  const urgent = attention.filter(leadsPeerBodies);
-  const informational = attention.filter(item => !leadsPeerBodies(item));
+  const reminderMessageIds = new Set(sync.reminderMessageIds ?? []);
+  const isReminder = item => reminderMessageIds.has(item.sourceId)
+    && ["reply_required", "acknowledgement_required"].includes(item.kind);
+  const urgent = attention.filter(item => !isReminder(item) && leadsPeerBodies(item));
+  const informational = attention.filter(item => !isReminder(item) && !leadsPeerBodies(item));
   const messages = sync.messages ?? [];
   const liveOfferedMessageIds = new Set(sync.liveOfferedMessageIds ?? []);
   const groups = [
     ...attentionGroups(urgent, { truncatable: true, liveOfferedMessageIds }),
     ...messageGroups(messages),
+    ...reminderGroups(attention.filter(isReminder)),
     ...attentionGroups(informational, { truncatable: false }),
   ];
   const peers = peerCount(sync);

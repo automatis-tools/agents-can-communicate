@@ -131,6 +131,12 @@ Adapters project peer bodies in an attributed untrusted frame. If a complete bod
 fit, the projection keeps the message id and points to `acc inbox --message <id>` instead
 of silently truncating it.
 
+For this participant's unresolved messages already `offered` or `retrieved`, the standard
+projector combines reply and acknowledgement reminders into a compact count after new
+message bodies. Queued obligations and claim conflicts remain individual attention items.
+The full pending list stays available through `acc inbox` and owned `acc status`; projection
+does not acknowledge, delete, or decide that an obligation is obsolete.
+
 ## Hooks fail open
 
 Hook execution is bounded. If coordination state cannot be read or a decision cannot be

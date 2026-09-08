@@ -11,6 +11,14 @@
 Not published. A published record says what the registry serves and is not
 rewritten, so shipped code that changes after a release is measured here instead.
 
+Repeated unresolved reply and acknowledgement notices now become a compact count after
+new peer bodies, using this recipient's `offered` or `retrieved` receipts. A backlog of
+60 such messages previously displaced a new request's body on every turn. Queued requests
+and claim conflicts remain individual notices; inbox/status retain the full pending list.
+Projection neither resolves obligations nor advances receipts from a summary. Five focused
+regressions cover selection, tight budgets, and the installed hook; eight deliberate
+runtime mutations failed them. No adapter capability changed.
+
 A genuine user turn after `acc finish` now registers a fresh ACC owner in the same
 native conversation. The closed session and its handoff remain unchanged. Turn hooks
 serialize with native start/end hooks; missing or stale bindings fail open. Tool hooks
