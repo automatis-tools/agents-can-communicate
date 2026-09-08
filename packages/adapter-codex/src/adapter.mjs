@@ -5,7 +5,8 @@ import certification from "../certification.json" with { type: "json" };
 import { PROTOCOL_CONTRACT } from "./app-server-client.mjs";
 import { allowOutcome, denyOutcome, injectOutcome, normalizeCodexHook }
   from "./hooks.mjs";
-import { planCodexInstall, detectCodex, installCodexPlugin, uninstallCodexPlugin } from "./install.mjs";
+import { planCodexInstall, detectCodex, installCodexPlugin, preflightCodexUninstall,
+  uninstallCodexPlugin } from "./install.mjs";
 // Nothing is imported from ./native-delivery.mjs on purpose. Its probe and bind
 // still exist and still answer `workspace_identity_unavailable` for anything
 // that reaches them directly, but this adapter wires none of it: an adapter that
@@ -88,6 +89,7 @@ export function createCodexAdapter() {
     detect: context => detectCodex(context),
     install: context => installCodexPlugin({ ...context,
       livePolicy: context.livePolicy ?? "off" }),
+    preflightUninstall: context => preflightCodexUninstall(context),
     uninstall: context => uninstallCodexPlugin(context),
 
     doctor: async context => {

@@ -70,6 +70,9 @@ export async function applyPlan({ plan, adapters, context, dataHome, dryRun = fa
             ...notes,
           ] });
       } else {
+        // Config ownership can veto removal. Ask before teardown or recorded
+        // artifact deletion; an adapter-local check would run after those writes.
+        await adapter.preflightUninstall?.(context);
         // Keep the record until every cleanup step succeeds. It is both the
         // authority for deletion and the only durable recipe a retry has when
         // the client or one of ACC's own artifacts is already gone.

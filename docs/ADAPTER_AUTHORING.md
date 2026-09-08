@@ -28,6 +28,7 @@ export function createExampleAdapter() {
 
     detect, install, uninstall, doctor,
     planInstall,                      // what install would write
+    preflightUninstall,               // optional read-only removal validation
     normalizeHook,                    // client payload -> normalised event
     renderContext,                    // SyncResult -> text
     renderContextResult,              // text + ids of complete rendered groups
@@ -35,6 +36,11 @@ export function createExampleAdapter() {
   });
 }
 ```
+
+`preflightUninstall(context)` is optional and read-only. Throw to refuse unsafe
+removal before the installer deactivates native integration or deletes recorded
+artifacts. `uninstall` should retain its own validation for direct adapter callers;
+recorded artifact fingerprint checks still determine the `keep` paths it receives.
 
 `renderContextResult` is required wherever an adapter renders peer messages. It returns
 `{ text, offeredMessageIds, includedAttentionIds }`, and the [receipt

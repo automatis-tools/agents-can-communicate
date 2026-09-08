@@ -4,8 +4,9 @@ import path from "node:path";
 // Two clients keep configuration ACC must add to in TOML, and ACC ships without
 // dependencies. Parsing and re-emitting the file would mean writing a TOML
 // round-tripper and losing the user's comments and formatting to it. Instead ACC
-// owns a delimited region and never reads the rest: install replaces the region,
-// uninstall deletes it, and everything outside comes back byte for byte.
+// offers a delimited-region default. Clients that relocate comments must pass
+// an ownership-aware cleanup callback; a comment boundary alone cannot establish
+// ownership after the client has rewritten its configuration.
 export const BEGIN = "# >>> agents-can-communicate (managed; edits here are overwritten)";
 export const END = "# <<< agents-can-communicate";
 
@@ -40,17 +41,18 @@ export const tomlString = value =>
 
 /**
  * Replace ACC's region in a TOML file, creating the file if needed.
+ * Clients that rewrite comments must supply their own ownership-aware cleanup.
  *
  * The block goes at the end because a table header there closes whatever table
  * preceded it: appended anywhere else, the user's last section would swallow
  * ACC's keys.
  */
-export async function writeTomlBlock(file, body) {
+export async function writeTomlBlock(file, body, strip = stripBlock) {
   const existing = await readFile(file, "utf8").catch(error => {
     if (error.code === "ENOENT") return "";
     throw error;
   });
-  const withoutOurs = stripBlock(existing);
+  const withoutOurs = strip(existing);
   const separator = withoutOurs === "" || withoutOurs.endsWith("\n") ? "" : "\n";
   await mkdir(path.dirname(file), { recursive: true });
   await writeFile(file, `${withoutOurs}${separator}${renderBlock(body)}\n`);
@@ -58,13 +60,13 @@ export async function writeTomlBlock(file, body) {
 }
 
 /** Remove ACC's region, reporting whether anything was there. */
-export async function removeTomlBlock(file) {
+export async function removeTomlBlock(file, strip = stripBlock) {
   const existing = await readFile(file, "utf8").catch(error => {
     if (error.code === "ENOENT") return null;
     throw error;
   });
   if (existing === null) return false;
-  const stripped = stripBlock(existing);
+  const stripped = strip(existing);
   if (stripped === existing) return false;
   await writeFile(file, stripped);
   return true;

@@ -6,10 +6,12 @@ import { fileURLToPath } from "node:url";
 
 import { bakeSkillCommand, blankJson, blankText, removeIfEmpty, removeInstalledTree,
   keepOnlyVersion, ownVersion, stampPluginVersion,
-  removeTomlBlock, stripBlock, tomlString,
+  removeTomlBlock, tomlString,
   writeForeignJson, writeHookShim, writeTomlBlock }
   from "@agents-can-communicate/adapter-sdk";
 import { AccError, EXIT } from "@agents-can-communicate/protocol";
+
+import { declaresCodexTable, sandboxOwnership, stripCodexBlock } from "./config-ownership.mjs";
 
 const bundle = fileURLToPath(new URL("../plugin", import.meta.url));
 const PLUGIN_NAME = "agents-can-communicate";
@@ -140,20 +142,14 @@ const entryFor = () => ({
 const sandboxTable = (stateRoot, theirs) => {
   if (typeof stateRoot !== "string" || stateRoot === "") return [];
   if (theirs) return [];
-  return ["", "[sandbox_workspace_write]",
+  return ["", "[sandbox_workspace_write]", sandboxOwnership(stateRoot),
     `writable_roots = [${tomlString(stateRoot)}]`];
 };
 
-// Every spelling TOML allows for the same table: the header, a sub-table
-// header, a dotted key, and an inline table on one line. Missing one means ACC
-// appends a second declaration - which is the duplicate this exists to avoid,
-// and the client refuses the whole config over it.
-const declaresSandbox = config =>
-  /^\s*\[sandbox_workspace_write[\].]/m.test(config)
-  || /^\s*sandbox_workspace_write\s*[.=]/m.test(config);
+const declaresSandbox = config => declaresCodexTable(config, "sandbox_workspace_write");
 
 const sandboxReview = (config, file, stateRoot) =>
-  typeof stateRoot === "string" && stateRoot !== "" && declaresSandbox(stripBlock(config))
+  typeof stateRoot === "string" && stateRoot !== "" && declaresSandbox(stripCodexBlock(config))
     ? [`verify sandbox_workspace_write.writable_roots in ${file} includes ${stateRoot}; `
       + "your existing sandbox configuration was preserved"]
     : [];
@@ -170,6 +166,18 @@ export async function installCodexPlugin({ home, agentsHome = home,
   // whatever its manifest calls itself - the id ACC enabled was one the client
   // never forms, and the plugin sat there listed and not installed.
   const before = await readFile(configPath(codexHome), "utf8").catch(() => "");
+
+  const config = configPath(codexHome);
+  const withoutOurs = stripCodexBlock(before);
+  // A marketplace declared twice makes this client refuse the whole config, and
+  // then every plugin the user has stops working. If they registered it
+  // themselves, say so rather than appending a duplicate table.
+  if (declaresCodexTable(withoutOurs, "marketplaces", MARKETPLACE)
+    || declaresCodexTable(withoutOurs, "plugins", QUALIFIED)) {
+    throw new AccError(EXIT.CONFLICT,
+      `marketplace ${MARKETPLACE} is already registered in this config; `
+      + "remove it and install again", { config });
+  }
 
   const target = pluginPath(agentsHome);
   await rm(target, { recursive: true, force: true });
@@ -188,16 +196,7 @@ export async function installCodexPlugin({ home, agentsHome = home,
   const others = (existing.plugins ?? []).filter(entry => entry.name !== PLUGIN_NAME);
   await writeMarketplace(file, { ...existing, plugins: [...others, entryFor()] });
 
-  const config = configPath(codexHome);
-  // A marketplace declared twice makes this client refuse the whole config, and
-  // then every plugin the user has stops working. If they registered it
-  // themselves, say so rather than appending a duplicate table.
-  if (stripBlock(before).includes(`[marketplaces.${MARKETPLACE}]`)) {
-    throw new AccError(EXIT.CONFLICT,
-      `marketplace ${MARKETPLACE} is already registered in this config; `
-      + "remove it and install again", { config });
-  }
-  const theirSandbox = declaresSandbox(stripBlock(before));
+  const theirSandbox = declaresSandbox(withoutOurs);
   await writeTomlBlock(config, [
     `[marketplaces.${MARKETPLACE}]`,
     `source_type = "local"`,
@@ -206,7 +205,7 @@ export async function installCodexPlugin({ home, agentsHome = home,
     `[plugins.${tomlString(QUALIFIED)}]`,
     "enabled = true",
     ...sandboxTable(stateRoot, theirSandbox),
-  ]);
+  ], stripCodexBlock);
 
   // The client runs the cached copy, so this has to happen after the shim and
   // the rewritten hooks.json are in place.
@@ -247,17 +246,28 @@ async function removeEmptyDirs(directories) {
 }
 
 
+export async function preflightCodexUninstall({ home, agentsHome = home,
+  codexHome = path.join(home, ".codex") }) {
+  const existing = await readJson(marketplacePath(agentsHome), null);
+  const before = await readFile(configPath(codexHome), "utf8").catch(error => {
+    if (error.code === "ENOENT") return "";
+    throw error;
+  });
+  return { existing, withoutOurs: stripCodexBlock(before) };
+}
+
 export async function uninstallCodexPlugin({ home, agentsHome = home,
   codexHome = path.join(home, ".codex"), keep = [] }) {
   const file = marketplacePath(agentsHome);
-  const existing = await readJson(file, null);
+  // Direct adapter callers need the same check as the installer boundary.
+  const { existing, withoutOurs } = await preflightCodexUninstall({ home, agentsHome, codexHome });
   const changes = [];
   if (existing !== null) {
     const kept = (existing.plugins ?? []).filter(entry => entry.name !== PLUGIN_NAME);
     if (kept.length !== (existing.plugins ?? []).length) changes.push(PLUGIN_NAME);
     await writeMarketplace(file, { ...existing, plugins: kept });
   }
-  if (await removeTomlBlock(configPath(codexHome))) changes.push(configPath(codexHome));
+  if (await removeTomlBlock(configPath(codexHome), stripCodexBlock)) changes.push(configPath(codexHome));
   // The client's `[hooks.state."<plugin>:…"]` tables stay. 0.1.9 removed them as
   // litter naming a plugin that was gone; that was wrong, and wrong in a way
   // worth writing down. The check behind it perturbed the record - a hook whose
@@ -300,7 +310,9 @@ export async function uninstallCodexPlugin({ home, agentsHome = home,
     marketplaceRoot(agentsHome),
     cacheRoot(codexHome),
   ]);
-  return { ok: true, changes, diagnostics: [] };
+  return { ok: true, changes, diagnostics: declaresSandbox(withoutOurs)
+    ? ["existing sandbox_workspace_write configuration was preserved; review any retained writable_roots after removal"]
+    : [] };
 }
 
 export async function detectCodex({ home, agentsHome = home,
