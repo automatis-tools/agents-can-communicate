@@ -67,12 +67,14 @@ export async function productSessionChanges(h) {
   const beforeCd = new Date().toISOString();
   const loadedBefore = new Set((await withPeer(h, peer => peer.request("thread/loaded/list", {}))).data);
   await typePrompt(h, "receiver-b1", `/cd ${h.C}`);
-  await until("ordinary /cd loaded a new thread", async () => {
+  const newThreadId = await until("ordinary /cd loaded a new thread", async () => {
     const status = await trust(h, "receiver-b1");
     if (status.cdBlock) throw new Error(`vendor /cd refused: ${status.cdBlock}`);
-    return (await withPeer(h, peer => peer.request("thread/loaded/list", {}))).data.some(id => !loadedBefore.has(id));
+    return (await withPeer(h, peer => peer.request("thread/loaded/list", {}))).data.find(id => !loadedBefore.has(id));
   },
   { timeoutMs: 20_000 });
+  await until("ordinary /cd new thread idle", async () =>
+    (await threadState(h, newThreadId)).status === "idle", { timeoutMs: 20_000 });
   const marker = path.join(h.C, "ordinary-cd.txt");
   await typePrompt(h, "receiver-b1", `Run only: pwd > ${shellLiteral(marker)}. Answer DONE and keep the session open.`);
   await waitMarker(h, "receiver-b1", marker, h.C);
