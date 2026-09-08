@@ -231,3 +231,32 @@ claimed. The new private package is
 `b8eb1bee2296746953b3929ef37b45434588264736f756ac9811f5b80107b300`,
 packed after the runtime fixes, and remains non-release-certifiable until the
 complete product matrix passes.
+
+## Client trust lost during policy reinstall
+
+Both `product-01521-retirement-full-1` and
+`product-01534-retirement-full-1` passed 13 cases through P13, including the
+previously failing P08/P15 routes, then P14 refused `/cd C` with the vendor's
+`destination-untrusted` diagnostic. Both verified cleanup. Separate fresh
+`retirement-cold-1` runs passed P01/P03/P06/P04 on each version: 38 assertions,
+including 150 seconds without a hook heartbeat, plus verified cleanup.
+
+The controlled 0.153.4 `trust-lifecycle-1` run confirmed an installer defect:
+after the real P02 C launch, the isolated configuration recorded C as trusted;
+applying ACC's `stripBlock` to those bytes in memory removed that trust entry.
+After P08's actual installed policy reinstalls, the trust entry was absent from
+the real file, and remained absent through P13. P14 then reproduced the refusal.
+Only closed trust-state metadata was retained; configuration contents were not
+persisted in the diagnostic. Cleanup passed.
+
+Codex had inserted its project-trust table before ACC's trailing managed-block
+marker. Replacing that entire comment-delimited region deleted client-owned
+state. Re-trusting C in P14 would hide this defect. The Codex installer must
+preserve foreign settings placed inside its marker region on reinstall and
+uninstall; implementation and focused mutation tests are in progress.
+
+The reviewed lifecycle harness (`c6dfd4e`) now requires the actual archive
+confirmation, exact `SessionEnd`, unloaded thread, retired binding and a queued
+actionable question before starting a fresh receiver. Its 16 focused tests and
+three exact mutations passed, with clean scoped review. The full matrix remains
+uncertified while the config-preservation fix and actual UI checks complete.
