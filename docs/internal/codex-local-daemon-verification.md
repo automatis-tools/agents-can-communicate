@@ -1,9 +1,69 @@
 # Codex LocalDaemon implementation and verification
 
-Work in progress on `feat/codex-local-daemon`; this report is not a release certificate.
-Initial private and public installed product matrices passed. Whole-branch review
-then reproduced a router retirement race; its correction passed scoped review
-and now awaits fresh installed evidence. This remains an unpublished candidate. Nothing has been pushed, merged, published, or posted to GitHub.
+Implementation and verification are complete on `feat/codex-local-daemon`.
+This is a verified local candidate, not a published release. Nothing has been
+pushed, merged, published, or posted to GitHub.
+
+## Final outcome
+
+Ordinary Codex launch from B now remains in B while ACC delivers to that exact
+verified LocalDaemon thread, even when the daemon started earlier in A. The final
+installed npm artifact passed all P01–P20 scenarios on **both 0.152.1 and 0.153.4,
+darwin-arm64**: **20 cases / 189 assertions per version**, zero failed cases,
+owned processes stopped and temporary state removed.
+
+| Required gate | Observed result |
+|---|---|
+| `npm ci` | PASS |
+| `npm run check` | 357 files, PASS |
+| `npm test` | 1,567 total; 1,565 PASS, 0 FAIL, 2 existing conditional skips |
+| Actual packed install / doctor / install / uninstall / evidence checks | PASS |
+| Remove selected full product evidence from independently repacked artifact | Rejected by exact missing-evidence gate |
+| Corrected candidate → final artifact | All 131 runtime files byte-identical; no added/missing files |
+| Current-binding retirement/replacement mutation | 26 intended failures, 4 safe controls; restored 30/30 |
+| Independent corrected-runtime cold/150-second idle observations | Three per client version, six distinct receiver threads |
+| Whole-branch review and scoped correction review | One Important issue fixed; no remaining findings |
+| Refreshed primary evidence / independent audit review | PASS, no findings |
+| `git diff --check` | PASS |
+
+Repository gates ran on Node v26.5.1 / npm 11.17.0,
+darwin-arm64.
+The two skips are pre-existing environment branches: Gemini is installed on this
+machine, and darwin-arm64 has a passing capture. No new test was skipped.
+
+Final artifact: `agents-can-communicate-0.3.1.tgz`, 279,820 bytes,
+213 entries, built from `85f347d201df126b1f60cff96e1e6a5a14b0c8d8`.
+SHA-256: `ebe370dc8452fd14f1441138aacfd4a13b0f85c3b94ba710cec3ec35837e3ccb`.
+The artifact is retained at
+`/private/tmp/acc-codex-implementation/public-final-reviewed/agents-can-communicate-0.3.1.tgz`.
+
+The shipped selected product receipts name the prior tested corrected runtime
+`945f6178357b6424a219b59cc3b9c4688b322c9da07cadf2bc7205bf20770940`.
+The external final receipts name the final tarball itself; together with runtime
+byte equivalence, this avoids a self-referential package hash. Earlier positive,
+negative and partial capture bytes remain unchanged.
+
+Durable records:
+[final gates](evidence/codex-local-daemon/final-gates.json),
+[0.152.1 final matrix](evidence/codex-local-daemon/codex-0.152.1-final-product.json),
+[0.153.4 final matrix](evidence/codex-local-daemon/codex-0.153.4-final-product.json),
+[cold/idle repetitions](evidence/codex-local-daemon/cold-start-repetitions.json),
+[artifact equivalence](evidence/codex-local-daemon/runtime-equivalence.json),
+[missing-evidence mutation](evidence/codex-local-daemon/missing-product-evidence-mutation.json),
+[current-binding mutation](evidence/codex-local-daemon/current-binding-mutation.json),
+[initial final review](evidence/codex-local-daemon/initial-final-review.md),
+[correction review](evidence/codex-local-daemon/current-binding-review.md),
+[refreshed evidence review](evidence/codex-local-daemon/refreshed-evidence-review.md),
+[complete attempt register](evidence/codex-local-daemon/attempt-register.json), and
+[hashed evidence index](evidence/codex-local-daemon/index.json).
+The remaining sections preserve the diagnosis, boundaries and chronological
+investigation; old hashes/results describe the implementation at that point.
+The register retains 82 individual attempts, including rejected and partial runs.
+The historical `transport-01534-3` cleanup failure remains a failure in its original
+receipt. A [final read-only reconciliation](evidence/codex-local-daemon/final-cleanup-reconciliation.json)
+found no Codex process remaining under the owned E2E/preflight roots; it does not
+rewrite that historical result.
+
 
 ## Diagnosis
 
@@ -51,15 +111,15 @@ outcomes, synthetic identifiers, timestamps, package hashes and assertion/cleanu
 counts. No transcript, prompt, answer, authentication content or raw protocol traffic
 is collected. Disposable vendor state and the authentication symlink are removed.
 
-## Results recorded so far
+## Initial recorded results
 
 The reviewed transport matrix passed on Codex 0.152.1 and 0.153.4, macOS arm64:
 four cases and 15 assertions per version. It checks exact B binding, same-thread
 rejection with A cwd, idle queue acceptance, pending busy delivery and rejected
 submission with a durable queued receipt. The complete P01-P20 installed product matrix passed on both versions: 20 cases
 and 189 assertions per version, with verified cleanup and valid final evidence.
-Both used the reviewed private artifact `a6a38da5...`; final public-artifact
-verification remains pending.
+Both initially used the reviewed private artifact `a6a38da5...`; later corrected
+runtime and final public-artifact results are recorded above.
 
 Real installed migration used legacy commit
 `fb148d41c0c890d86e3219e79ed961e78005eb9f`, package 0.2.0, SHA-256
@@ -136,7 +196,7 @@ See the [0.152.1 app-server lifecycle contract](https://github.com/openai/codex/
 and [0.153.4 contract](https://github.com/openai/codex/blob/rust-v0.153.4/codex-rs/app-server/README.md#example-unsubscribe-from-a-loaded-thread).
 
 Final gate counts, complete matrix receipts, artifact equivalence and review verdicts
-will be appended after completion.
+are recorded at the beginning of this report.
 
 
 ## Attempt register before final harness review
@@ -229,12 +289,12 @@ review. This correction alone did not make P14 pass.
 Both `product-01521-detach-archive-2` and `product-01534-detach-archive-2` observed
 detached execution/reply and fresh resume identity as described above. Their UI
 `/archive` attempts did not exit within the deadline. Both remain incomplete,
-with verified cleanup. Real `thread/archive` API diagnostics now test actual
+with verified cleanup. Real `thread/archive` API diagnostics subsequently tested actual
 server teardown and generated hooks separately. Later successful UI archive
 captures are recorded below; these earlier attempts remain incomplete. The new private package is
 `b8eb1bee2296746953b3929ef37b45434588264736f756ac9811f5b80107b300`,
-packed after the runtime fixes, and remains non-release-certifiable until the
-complete product matrix passes.
+packed after those runtime fixes; it was not release-certifiable while the
+complete product matrix remained incomplete.
 
 ## Client trust lost during policy reinstall
 
@@ -305,7 +365,7 @@ trusted after both policy reinstalls and removal, and ACC markers were absent
 after uninstall. Cleanup passed. This is deliberately partial evidence, not a
 full certificate.
 
-The reviewed corrected runtime candidate is now
+The reviewed corrected runtime candidate at that point was
 `a6a38da5a36911baabfbef0ccf934847fcf7b51000197264c273d21430f7fea2`.
 Its public-disabled precursor
 `0474d566b14f446ecaf600e9112dfe6fcb002491c94f48f0e250ad96ccbfc3c1`
@@ -360,9 +420,9 @@ Independent `product-01521-config-cold-1` and
 `product-01534-config-cold-1` runs also passed P01/P03/P06/P04, including 150
 seconds without a hook heartbeat: 38 assertions and verified cleanup each.
 They are intentionally partial full-matrix records; each selected scenario was
-validated independently. The final public-artifact full runs will provide the
-third independent reviewed-runtime cold/idle observation per version, contingent
-on actual runtime byte equivalence and complete valid results.
+validated independently. The earlier public-artifact full runs supplied a third observation for that
+runtime. After the final router correction, all three independent observations
+per version were repeated on the corrected runtime, as recorded above.
 
 ## Public package and evidence gate
 
@@ -391,8 +451,13 @@ full suite ran 1,537 tests: 1,533 passed, two failed and two were skipped.
 Both failures reproduce independently: a synthetic Codex binding without recorded
 consent now correctly reports `delivery_disabled`, while the old acceptance test
 expected a transport/version failure; a dry-run test expected obsolete prose.
-The bounded test correction is being completed without runtime changes. These
-failed runs are retained, and no all-green suite is claimed yet.
+Commits `6403e31` and `c175d64` corrected those two tests without runtime changes.
+The no-consent case now asserts `delivery_disabled` and durable inbox retrieval;
+the isolated dry-run case records that no app-server command launches. An
+expected-value-only edit was rejected as mutation proof; the real launcher-argv
+mutation proves the no-launch gate. The restored pre-router suite passed 1,535
+of 1,537 tests with two existing conditional skips; its scoped review was clean.
+Original failed logs remain retained. Final post-router counts are above.
 
 ## Final-review retirement race and corrected candidate
 
@@ -423,11 +488,23 @@ The corrected candidate
 `945f6178357b6424a219b59cc3b9c4688b322c9da07cadf2bc7205bf20770940`
 passed installed-package verification. Comparing it with `a6a38da5...` correctly
 rejects runtime equivalence: exactly `delivery-router/src/router.mjs` changed
-among 131 runtime files, with none added or missing. The next complete product
-captures and independent cold runs must therefore use this corrected candidate;
-new primary evidence will preserve previous positive and negative capture bytes.
+among 131 runtime files, with none added or missing. Fresh complete product
+captures and independent cold runs therefore used this corrected candidate;
+new primary evidence preserves previous positive and negative capture bytes.
 Scoped final-fix review approved the correction with no remaining findings and
-independently passed all 30 new tests. Fresh client outcomes remain pending here.
+independently passed all 30 new tests. Both `product-01521-router-full-1` and
+`product-01534-router-full-1` completed 20 cases / 189 assertions, exited 0 and
+passed independent full-record validation with successful cleanup. Separate
+`router-cold-1` runs passed P01/P03/P06/P04, 38 assertions and cleanup on each
+version. Those intentionally partial records were validated by scenario.
+
+The selected new `local-daemon-current-binding-product` fixture pairs copy these
+complete corrected-runtime records byte-for-byte. Their new provenance records
+hash earlier positive product captures, transport records and original remote
+failure without modifying any previous file or record. A separate scoped data
+and independent-audit review passed. The final artifact's complete matrices and
+runtime equivalence then supplied each version's third independent corrected
+cold/long-idle observation, with results linked above.
 
 ## Implementation decisions and their costs
 

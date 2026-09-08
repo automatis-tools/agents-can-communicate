@@ -44,7 +44,7 @@ installer, transport, and certification releases.
 - [x] Run `npm ci`, `npm run check`, `npm test` once as the implementation baseline.
   Record existing failures separately. Do not fix an unrelated peer branch here.
 - [x] Implement Tasks 1–5 with public Codex native capability still disabled.
-- [ ] Run Task 6's real installed-method capture, then wire the candidate and run
+- [x] Run Task 6's real installed-method capture, then wire the candidate and run
   full product E2E. Complete Task 7 only after the required observations exist.
 
 Task commits are focused review units; mutation edits are restored before commit.
@@ -416,7 +416,7 @@ server. Python is test-only stdlib PTY support, not a package dependency.
   This intermediate candidate is intentionally not release-certifiable. Final
   audit expectations and its production certification entry are replaced with
   the later actual product evidence before committing capability enablement.
-- [ ] Repack. Run **all** product cases below for both exact binary versions.
+- [x] Repack. Run **all** product cases below for both exact binary versions.
   Test repeated cold starts of the base A/B isolation and long-idle path three
   times per version; report individual attempts and failures, not a best-of pass.
 
@@ -502,7 +502,7 @@ server. Python is test-only stdlib PTY support, not a package dependency.
 - [x] Ensure both positive LocalDaemon product fixtures and the historical remote
   failure fixture ship in the tarball, with resolvable provenance. A passing
   descriptor must not be satisfiable by an empty or missing installed evidence file.
-- [ ] Mutate the candidate by removing a referenced product evidence file from
+- [x] Mutate the candidate by removing a referenced product evidence file from
   package files: the installed package verification must fail on missing evidence.
   Restore it and run the final required gates:
 
@@ -515,14 +515,14 @@ server. Python is test-only stdlib PTY support, not a package dependency.
   git diff --check
   ```
 
-- [ ] Install the final tarball and rerun the complete product matrix if runtime,
+- [x] Install the final tarball and rerun the complete product matrix if runtime,
   hook, packaging or fixture-loading code changed after capture. If only prose
   changed, rerun P01/P03/P04/P06/P09/P11/P18/P19 plus package fixture validation
   and record the final tarball hash as an artifact-equivalence confirmation.
   Avoid a self-referential tarball hash: capture receipts live outside the tarball;
   shipped evidence names the prior tested runtime build, while the final receipt
   proves the final artifact carries identical runtime bytes and passing evidence.
-- [ ] Review the diff against each spec requirement and all mutation receipts.
+- [x] Review the diff against each spec requirement and all mutation receipts.
   Commit `docs: describe verified Codex delivery boundaries`. End with clean
   branch status, commit IDs, gate results, full E2E report and named limitations.
   Record ACC handoff/release claims. No push, merge or public issue reply.
@@ -549,3 +549,21 @@ Duplicate listed IDs, malformed pagination and cwd mismatches never enter fallba
 This uses live metadata before persistence; it does not request conversation history.
 The real installed product matrix must prove the correction, with the old lookup
 retained as its observed negative control.
+
+
+## Completion record (2026-09-08)
+
+All seven tasks and final gates are complete. The final artifact built from
+`85f347d201df126b1f60cff96e1e6a5a14b0c8d8` has SHA-256
+`ebe370dc8452fd14f1441138aacfd4a13b0f85c3b94ba710cec3ec35837e3ccb`.
+Both exact client versions passed all 20 product scenarios / 189 assertions with
+verified cleanup; each has three independent corrected-runtime cold/long-idle
+observations. All 131 runtime files match the tested corrected candidate.
+Repository gates passed: syntax 357 files, test suite 1,565 passes / zero failures /
+two existing conditional skips, installed-package verification and exact
+missing-evidence mutation. Whole-branch review's one Important retirement race
+was corrected and passed scoped re-review; refreshed evidence review was clean.
+
+See [the verification report](../codex-local-daemon-verification.md) for final
+receipts, mutation evidence, historical failures, all execution decisions and
+limitations. Work remains local on `feat/codex-local-daemon`.

@@ -1,0 +1,20 @@
+{
+  "source": "retained-actual-installed-mutation-logs",
+  "note": "Derived from retained original logs and tarballs; no new client run or observation time inferred.",
+  "mutations": [
+    {
+      "mutation": "skip-wrapper-retirement",
+      "sourceLogSha256": "59b676552187444c13d4452185452f95f7ba2d02d50e4314704e4e3cc4dc1156",
+      "mutantPackageSha256": "e2d0729202c50f4aa1109ec5e9f1735d95bf2920074f703862d714e9e06d05ef",
+      "expectedFailure": "unmodified legacy Codex wrapper was not retired",
+      "caught": true
+    },
+    {
+      "mutation": "remove-modified-wrapper",
+      "sourceLogSha256": "811596a331741bdba63026b4596889d81fa100f9e21e62bbe397eb14bb750def",
+      "mutantPackageSha256": "fd4edb1aec91d1f75e76d86d6178f5cc38b3303e3d6eb45f76ed277e173c0784",
+      "expectedFailure": "modified legacy Codex wrapper was removed",
+      "caught": true
+    }
+  ]
+}

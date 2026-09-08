@@ -1,0 +1,121 @@
+{
+  "source": "closed-local-verification-records",
+  "generatedAt": "2026-09-08T11:14:03.235Z",
+  "files": [
+    {
+      "file": "codex-0.152.1-cold-repeat.json",
+      "source": "product-01521-router-cold-1/incomplete-evidence.json",
+      "sha256": "0cb1832d1c68f004f16b276e819cd55c5b2e6bac03f4ea48c23a17489b9a4fd6"
+    },
+    {
+      "file": "codex-0.152.1-final-product.json",
+      "source": "product-01521-router-final-1/evidence.json",
+      "sha256": "daae4cd920a58817651db7bf3fd96124fc6672519275c348f2228a8760afd285"
+    },
+    {
+      "file": "codex-0.153.4-cold-repeat.json",
+      "source": "product-01534-router-cold-1/incomplete-evidence.json",
+      "sha256": "8b20f38ce64322665a6f64f1639f1d4c0e19cb221c69d6969cbe023826ed94ef"
+    },
+    {
+      "file": "codex-0.153.4-final-product.json",
+      "source": "product-01534-router-final-1/evidence.json",
+      "sha256": "3d359b62b93085102911147861b569476bad576e27969ff0ab75c2ec0bec171b"
+    },
+    {
+      "file": "runtime-equivalence.json",
+      "source": "public-final-reviewed/runtime-equivalence.json",
+      "sha256": "099ed8a76a954635f836f75d72f16a9c6c349e324b994a7c982791e7b30ed772"
+    },
+    {
+      "file": "missing-product-evidence-mutation.json",
+      "source": "public-missing-evidence-mutant-2/mutation.json",
+      "sha256": "4ef3d51e5d7eab50ded70e2da99beecaba8b45b20c0c8df8a2dde8cef4d74c70"
+    },
+    {
+      "file": "codex-0.152.1-ambiguous-ack.json",
+      "source": "ambiguous-01521-2/ambiguous-ack.json",
+      "sha256": "3831194485d3d4a354e881da8038362e2282d1412654fdc6fd928f8d80d408ef"
+    },
+    {
+      "file": "codex-0.153.4-ambiguous-ack.json",
+      "source": "ambiguous-01534-1/ambiguous-ack.json",
+      "sha256": "4f39a021d0fdace5e5642f4ccbec3d892223a30625858be8097b235be75343d7"
+    },
+    {
+      "file": "wrong-cwd-mutation.json",
+      "source": "mutant-cwd-reviewed-1/mutation.json",
+      "sha256": "d9048a4097ba05b63f5aa13dead0fc8c14835f4c98827c07c0b7e3608dff054b"
+    },
+    {
+      "file": "remote-wrapper-mutation.json",
+      "source": "product-mutant-remote-1/mutation.json",
+      "sha256": "9c4a95cb373c591994cb5a6f28038012468a1cca2fbd5f3f104ff8581cbc0e45"
+    },
+    {
+      "file": "wrong-thread-mutation.json",
+      "source": "product-mutant-thread-1/mutation.json",
+      "sha256": "b8af4f9f181712f4cd8c735880758dd8fbbaabac75ca52943f8c396709c6c1f5"
+    },
+    {
+      "file": "p13-record-mutation.json",
+      "source": "p13-record-mutant-01521-2/p13-record-check.json",
+      "sha256": "13e2c0c865838b9ebc93530aea4ba0cdf45ab8c0db08cbb86514e3598791d304"
+    },
+    {
+      "file": "p13-record-positive.json",
+      "source": "p13-record-positive-01534-2/p13-record-check.json",
+      "sha256": "b4f9e297e8c10f5ff0f7ef85337d0e0a72c986bb05255666939b0c793dfe697b"
+    },
+    {
+      "file": "attempt-register.json",
+      "source": "attempt-register.json",
+      "sha256": "11240f96b7a21f933b5ed77d493000cfccf53bf158f19564817b48df318f9423"
+    },
+    {
+      "file": "migration-mutations-summary.json",
+      "source": "migration-mutations-summary.json",
+      "sha256": "76e0dd814c258f81f7946818960d45be19817299f69a8e81443bd8217c30490f"
+    },
+    {
+      "file": "legacy-migration-initial.md",
+      "source": "migration-installed.md",
+      "sha256": "193917a86144d87283241147b677202268046eca54a6858b2e1f7b99d28b4b2f"
+    },
+    {
+      "file": "current-binding-mutation.json",
+      "source": "current-binding-mutation.json",
+      "sha256": "d80475cc9fb688ae38af75aeb807207b33ab8fb3018a69496163ec06c2c9a7df"
+    },
+    {
+      "file": "final-gates.json",
+      "source": "final-gates-reviewed.json",
+      "sha256": "5ec182c4062cb5ee6eae0a57b97b1cb3ccdda50433293cf5fe3974f924ad465a"
+    },
+    {
+      "file": "initial-final-review.md",
+      "source": "SDD/final-review.md",
+      "sha256": "ae5e0a1085c056f9ca35c5fa90870afb8bfa407fa8aa032ee3ca903bbd3bfbeb"
+    },
+    {
+      "file": "current-binding-review.md",
+      "source": "SDD/final-fix-rereview.md",
+      "sha256": "ef37f90c0b8fde8b8a8309f957f7f7af5eb6814b3f4f827cb4dca18981cf6037"
+    },
+    {
+      "file": "refreshed-evidence-review.md",
+      "source": "SDD/task-6-reviewed-evidence-review.md",
+      "sha256": "f62cfc6075398cfa04b26a7afe67535cb0f3f80079c0480659cb5adcaf588fc0"
+    },
+    {
+      "file": "cold-start-repetitions.json",
+      "source": "validated corrected candidate, independent cold and final artifact receipts",
+      "sha256": "866cfdf849310d8145a3ffa050abf8164ccc51c8794d3d5b7d1e4584a213744e"
+    },
+    {
+      "file": "final-cleanup-reconciliation.json",
+      "source": "final-cleanup-reconciliation.json",
+      "sha256": "65fd9d0afabaf19a0d3a7402addb092d71fc4124f59fecde9d37ae04163aad54"
+    }
+  ]
+}
