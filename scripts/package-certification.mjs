@@ -1,7 +1,8 @@
 import { createHash } from "node:crypto";
 import path from "node:path";
 
-import { validateCapture } from "./spikes/delivery-capture.mjs";
+import { INSTALLED_HOOKS_LAUNCH_MODE, validateCapture }
+  from "./spikes/delivery-capture.mjs";
 
 const CERTIFICATION =
   /^node_modules\/@agents-can-communicate\/adapter-[^/]+\/certification\.json$/;
@@ -89,6 +90,20 @@ export async function verifyCertificationFixtureAllowlist(listed, readJson, read
           throw new Error(`${certification} evidence ${index} ${key} differs from selected provenance`);
         }
       }
+      const requiresInstalledProduct = evidence.client === "codex-cli"
+        && evidence.capability === "delivery.livePush" && evidence.result === "pass";
+      if (requiresInstalledProduct) {
+        const claims = record.claims?.filter(claim => claim.capability === evidence.capability);
+        if (claims?.length !== 1) {
+          throw new Error(`${certification} evidence ${index} does not select one provenance claim`);
+        }
+        if (claims[0].result !== evidence.result) {
+          throw new Error(`${certification} evidence ${index} result differs from selected provenance claim`);
+        }
+        if (record.productEvidence === undefined) {
+          throw new Error("installed-hook pass requires product evidence");
+        }
+      }
 
       let productEvidence;
       if (record.productEvidence !== undefined) {
@@ -106,7 +121,17 @@ export async function verifyCertificationFixtureAllowlist(listed, readJson, read
       }
 
       const capture = await readJson(`${packageRoot}/${evidence.fixture}`);
-      if (capture?.capability === "native_delivery") {
+      if (requiresInstalledProduct) {
+        for (const key of ["client", "version", "platform", "observedAt", "result"]) {
+          if (capture?.[key] !== evidence[key]) {
+            throw new Error(`${certification} evidence ${index} capture ${key} differs from selected claim`);
+          }
+        }
+        if (capture.launchMode !== INSTALLED_HOOKS_LAUNCH_MODE) {
+          throw new Error("installed Codex livePush capture uses installed hooks");
+        }
+        validateCapture(capture, { productEvidence });
+      } else if (capture?.capability === "native_delivery") {
         validateCapture(capture, { productEvidence });
       }
     }

@@ -15,23 +15,24 @@ const SHA256 = value => createHash("sha256").update(value).digest("hex");
 
 function installedPackage(options = {}) {
   const product = options.product ?? matrixEvidence();
-  const capture = { client: "codex-cli", version: "0.152.1", platform: "darwin-arm64",
-    observedAt: "2026-09-08T12:00:00.000Z", capability: "native_delivery", result: "pass",
+  const identity = { client: "codex-cli", version: "0.152.1", platform: "darwin-arm64",
+    observedAt: "2026-09-08T12:00:00.000Z" };
+  const defaultCapture = { ...identity, capability: "native_delivery", result: "pass",
     fixture: "codex-cli-0.152.1", launchMode: "ordinary-command-with-installed-hooks",
     protocolContract: "codex-app-server-thread-queue-v1", idle: "offered",
     busy: "queued_after_turn", reply: "routed", duplicate: "same_message_id",
-    fallback: "queued", packageSha256: "a".repeat(64), limitations: ["unit fixture"],
-    ...options.capture };
+    fallback: "queued", packageSha256: "a".repeat(64), limitations: ["unit fixture"] };
+  const capture = options.captureValue ?? { ...defaultCapture, ...options.capture };
   const historical = { result: "fail", fixture: "remote-workspace" };
   const sources = new Map([
     [CAPTURE, JSON.stringify(capture)],
     [PRODUCT, options.productSource ?? JSON.stringify(product)],
     [HISTORICAL, JSON.stringify(historical)],
   ]);
-  const record = { id: "native-delivery-0-152-1", client: capture.client,
-    version: capture.version, platform: capture.platform, observedAt: capture.observedAt,
+  const record = { id: "native-delivery-0-152-1", ...identity,
     fixture: "fixtures/delivery/codex-cli-0.152.1.json",
     sha256: SHA256(sources.get(CAPTURE)), event: null, tool: null,
+    claims: [{ capability: "delivery.livePush", result: "pass" }],
     productEvidence: { fixture: "fixtures/delivery/codex-cli-0.152.1-product.json",
       sha256: SHA256(sources.get(PRODUCT)) },
     historicalFixtures: [{
@@ -40,8 +41,7 @@ function installedPackage(options = {}) {
     }], ...options.record };
   const provenance = { schemaVersion: 1, captures: [
     ...(options.otherRecords ?? []), record] };
-  const certification = { evidence: [{ client: capture.client, version: capture.version,
-    platform: capture.platform, observedAt: capture.observedAt, capability: "delivery.livePush",
+  const certification = { evidence: [{ ...identity, capability: "delivery.livePush",
     fixture: record.fixture, provenance: "fixtures/certification-provenance.json",
     provenanceId: record.id, result: "pass", ...options.evidence }] };
   sources.set(CERTIFICATION, JSON.stringify(certification));
@@ -86,6 +86,37 @@ test("an installed-hooks pass requires its selected provenance product evidence"
   await assert.rejects(verify(fixture), /installed-hook pass requires product evidence/);
 });
 
+test("a passing Codex livePush claim cannot let malformed capture bytes opt out", async () => {
+  const validCapture = await installedPackage().readJson(CAPTURE);
+  const missingCapability = { ...validCapture };
+  delete missingCapability.capability;
+  for (const [captureValue, expected] of [
+    [{}, /capture client differs from selected claim/],
+    [missingCapability, /capture requires capability/],
+    [{ ...validCapture, capability: "transport-only" },
+      /capture capability is native_delivery/],
+    [{ ...validCapture, result: "fail" },
+      /capture result differs from selected claim/],
+    [{ ...validCapture, launchMode: "ordinary-command-with-install-time-bootstrap" },
+      /installed Codex livePush capture uses installed hooks/],
+  ]) {
+    await assert.rejects(verify(installedPackage({ captureValue })), expected);
+  }
+});
+
+test("a passing manifest claim requires one matching selected provenance claim", async () => {
+  for (const claims of [undefined, [
+    { capability: "delivery.livePush", result: "pass" },
+    { capability: "delivery.livePush", result: "pass" },
+  ]]) {
+    const fixture = installedPackage({ record: { claims } });
+    await assert.rejects(verify(fixture), /does not select one provenance claim/);
+  }
+  const failed = installedPackage({ record: { claims: [
+    { capability: "delivery.livePush", result: "fail" }] } });
+  await assert.rejects(verify(failed), /result differs from selected provenance claim/);
+});
+
 test("only the manifest-selected provenance record contributes package references", async () => {
   const fixture = installedPackage({ otherRecords: [{ id: "not-selected",
     productEvidence: { fixture: "../../private.json", sha256: "bad" } }] });
@@ -127,7 +158,11 @@ test("empty, synthetic, transport-only, and mismatched product matrices fail", a
   /real-client product evidence/);
   await assert.rejects(verify(installedPackage({ product: matrixEvidence("transport") })),
     /product-phase evidence/);
-  await assert.rejects(verify(installedPackage({ capture: { version: "0.153.4" } })),
+  const mismatchedProduct = matrixEvidence();
+  mismatchedProduct.clientVersion = "0.153.4";
+  mismatchedProduct.scenarios = mismatchedProduct.scenarios.map(scenario =>
+    ({ ...scenario, clientVersion: "0.153.4" }));
+  await assert.rejects(verify(installedPackage({ product: mismatchedProduct })),
     /client version matches product evidence/);
 });
 
@@ -138,5 +173,10 @@ test("installed evidence identity matches the selected provenance record", async
     const fixture = installedPackage({ evidence: { [key]: value },
       extraListed: key === "fixture" ? [`${ROOT}/${value}`] : [] });
     await assert.rejects(verify(fixture), new RegExp(`${key} differs from selected provenance`));
+  }
+  for (const [key, value] of [["client", "other-client"], ["version", "0.153.4"],
+    ["platform", "linux-x64"], ["observedAt", "2026-09-08T13:00:00.000Z"]]) {
+    const fixture = installedPackage({ capture: { [key]: value } });
+    await assert.rejects(verify(fixture), new RegExp(`capture ${key} differs from selected claim`));
   }
 });
