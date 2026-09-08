@@ -360,7 +360,7 @@ const HANDLERS = Object.freeze({
       ids: runtime.ids });
     if (result.subcommand === "validate") {
       return { data: result, text: result.present
-        ? `${result.file} is valid` : `no ${CONFIG_FILENAME}; defaults apply` };
+        ? `${result.file} is valid` : `no ${CONFIG_FILENAME} in selected directory; ancestors not checked` };
     }
     return { data: result,
       text: result.written ? `wrote ${result.file}` : `not written: ${result.file}` };

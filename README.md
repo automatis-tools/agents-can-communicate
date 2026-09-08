@@ -116,7 +116,8 @@ queue entries remain with the client.
 - **Separate checkouts, one project.** Git worktrees share an ACC workspace.
   Plain project folders work too; Git is optional.
 - **Agree before editing.** Agents can reserve files and identify overlapping work.
-  Reservations are advisory unless the clients support enforcement.
+  CLI reservations default to advisory. `--enforcement guarded` requests enforcement,
+  which still requires certified guards from every live participant.
   [How reservations work](docs/CONCEPTS.md#intent-is-awareness-a-claim-commits).
 - **Local coordination.** Messages live in app data outside your project. ACC doesn't
   collect or share raw transcripts. Your clients use their usual model providers.

@@ -1,5 +1,15 @@
 # Codex compatibility
 
+## Observed ACC 0.3.1 to 0.4 hook activation
+
+On stock Codex 0.153.4, the 0.4 hook-command quoting change modified all five ACC hook
+definitions from published 0.3.1. Codex required a fresh `/hooks` review; after the operator
+reviewed/enabled the modified definitions, a subsequent restart retained all five active
+without another prompt. This is activation evidence for that observed transition, not new
+hook-event certification or a promise that arbitrary future upgrades preserve trust.
+See the [recorded 0.4 candidate evidence](https://github.com/automatis-tools/agents-can-communicate/blob/main/docs/release-evidence/v0.4.0.md)
+for its source and artifact provenance. The historical captures below remain unchanged.
+
 ## Current LocalDaemon delivery (2026-09-08)
 
 The installed npm package was exercised against exact Codex CLI 0.152.1 and

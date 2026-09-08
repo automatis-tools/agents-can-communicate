@@ -172,8 +172,11 @@ stable package identity and the discovered integrity, and health-checks the stag
 Installer detection and planning happen before exclusive admission. The worker then checks
 ACC process leases and native binding PIDs, records `activating`, applies every integration,
 and only publishes the new active pointer after all applications succeed. Partial refresh
-remains fenced and repairs forward. Presence TTLs and finished session records cannot prove
-native client exit. Unknown PIDs remain holds.
+remains fenced and repairs forward, with the old active pointer retained but normal
+workspace admission unavailable until recovery completes. Native bindings cease holding
+after observed SessionEnd cleanup or confirmed process death; the vendor daemon may remain
+running. Unknown PIDs remain holds until lifecycle cleanup. Presence TTL, `acc finish`,
+and delivery off alone do not prove native lifecycle end. ACC never manages the daemon.
 
 Lock ownership never expires by age. Retained nonempty tombstones prevent delayed observers
 from reclaiming a successor. Under an acquired lock, maintenance removes historical

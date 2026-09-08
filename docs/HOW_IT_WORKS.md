@@ -32,7 +32,8 @@ ACC workspace. The native integration also gives the agent a small skill describ
 discovery, messages, replies, claims, and handoffs.
 
 A generic MCP client instead joins through `acc-mcp`, which resolves its configured
-participant and workspace when tools or resources are called. It exposes the coordination
+participant and workspace on tool calls or inbox resource reads. Snapshot and roster
+resource reads do not need that owner resolution. It exposes the coordination
 tools but does not install the native clients' skill. See its
 [manual MCP boundary](MCP.md#account-for-the-manual-boundary).
 
@@ -148,13 +149,26 @@ Before changing files, an agent can publish intent and claim a narrow resource s
 `file:packages/api/**`. Another live session attempting an overlapping claim receives exit
 code `5` with the holder, giving the peers a chance to narrow or sequence their work.
 
-Claims are not operating-system locks. A claim is `guarded` only when every relevant live
-client exposes a captured pre-write guard for the path ACC can recognize. Otherwise it is
-`advisory`. Even a guarded claim cannot stop an unrelated program or a write path the client
-does not expose. [Concepts](CONCEPTS.md#intent-is-awareness-a-claim-commits) explains the
+Claims are not operating-system locks. CLI claims default to `advisory`. Explicit
+`--enforcement guarded` also requires every relevant live client to expose a captured
+pre-write guard for the path ACC can recognize; otherwise workspace protection is advisory.
+Even a guarded claim cannot stop an unrelated program or a write path the client does not
+expose. [Concepts](CONCEPTS.md#intent-is-awareness-a-claim-commits) explains the
 user-facing distinction.
 
-## 8. The boundaries remain visible
+## 8. Peers recover history and explicit decision changes
+
+Inbox and history listings expose bounded summaries. After compaction or a new conversation,
+a peer selects exact records to recover full decisions or handoffs; a new participant does
+not inherit an old participant's inbox. History reads preserve receipt state.
+
+A peer can explicitly supersede or withdraw an earlier decision. Prior records remain,
+and current-decision discovery shows terminal positions, withdrawals, and competing
+branches. This reports peers' recorded positions, not verified current truth. See
+[historical recovery](CLI.md#historical-recovery) and
+[decision lifecycle](PROTOCOL.md#decision-lifecycle). No full history is automatically injected.
+
+## 9. The boundaries remain visible
 
 ACC stores only coordination data an agent explicitly publishes: identity, presence,
 one-line intent, claims, messages, replies, handoffs, receipts, and events. It never collects

@@ -49,8 +49,9 @@ acc claim --resource 'file:notes/sources.md' --reason "collecting primary source
 ```
 
 Kimi can claim `file:notes/summary.md` independently. Because the resources do not overlap,
-neither claim blocks the other. Protection is advisory if either live client lacks a
-certified guard.
+neither claim conflicts with the other. The shown claim is advisory by default. Add
+`--enforcement guarded` to request guarded protection; it still becomes advisory if either
+live client lacks a certified guard.
 
 When Gemini finds a disagreement that affects the summary, it can ask the Kimi peer:
 

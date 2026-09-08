@@ -31,6 +31,10 @@ restores access; deleting or editing the record is not a remedy.
    diagnostics, and follow any activation instructions from `acc install`. In Codex,
    check `/plugins`, review and enable/trust the current ACC definitions in `/hooks`, then
    restart the session. Doctor cannot establish that the client has activated its hooks.
+   In the observed stock Codex 0.153.4 upgrade from 0.3.1 to 0.4, command quoting changed
+   all five ACC hook definitions and required a fresh review of the modified hooks. After
+   that review, a subsequent restart retained all five active. This is activation evidence
+   for that transition, not a promise of trust across arbitrary future upgrades.
 4. Resume the intended conversations and confirm peer presence with `acc status`. An
    unrelated new conversation normally has a new participant id; it does not inherit the
    previous conversation's addressed inbox. Historical decisions and handoffs remain
@@ -48,10 +52,12 @@ an independent background process, normally at most once a day, downloads and ve
 separate runtime copy, and refreshes the installed integrations and skills before switching.
 The global npm package provides a launcher; the active runtime lives under ACC's data home.
 
-Running ACC processes and native client bindings hold the current version. An idle MCP
-server still counts, as does a client whose ACC session was finished. Close those clients
-to let a pending update activate. A binding whose process cannot be identified keeps the
-update pending until its lifecycle clears it; elapsed time alone is not proof of exit.
+Running ACC processes, including idle MCP servers, hold the current version until
+confirmed process exit. Native bindings hold until observed client SessionEnd cleanup or
+confirmed process death; the vendor daemon can remain running after that lifecycle event.
+Unknown PIDs remain conservative holds until lifecycle cleanup. `acc finish`, presence TTL,
+and delivery off alone do not prove native end. Close the relevant client sessions and
+persistent ACC processes to release holds; ACC does not manage the vendor daemon.
 Hooks never wait for a network download. If integration refresh temporarily prevents
 coordination, a hook lets the client continue; its next genuine user turn can restore a
 missing binding.

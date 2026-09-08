@@ -100,9 +100,10 @@ defaults to 600s.
 
 ## Consequence for the plan
 
-Grok is tier 2 for attach, presence, and skill-driven polling. It is not tier 2
-for turn injection or proven write/shell guards. Advertise that honestly; do
-not inherit Claude Code's capability row.
+Grok installs hooks and a skill for coordination and inbox polling, but has no certified
+effective capability tier. `SessionStart` remains unobserved; installed wiring does not
+prove lifecycle, turn injection, or write/shell guards. Do not inherit another adapter's
+capability row.
 
 For message delivery this means polling and durable `acc inbox` only. Grok has
 no certified next-turn or live-push transport, including on the observed 1.0.13

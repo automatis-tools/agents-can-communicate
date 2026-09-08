@@ -33,7 +33,7 @@ option value remains data: `--body --help` sends the literal body `--help`.
 | `acc sync` | — | `--session`, `--generation`, `--cursor`, `--limit`, `--scope delta|full|history`, `--type`, `--message`, `--current` |
 | `acc work` | `--summary` unless `--clear` | `--session`, `--generation`, `--mode`, `--state`, repeated `--hint`, `--clear` |
 | `acc claim` | `--resource` | `--session`, `--generation`, `--mode`, `--enforcement`, `--reason`, `--lease` |
-| `acc release` | `--claim` or `--resource` | `--session`, `--generation`, `--authority`, `--reason` |
+| `acc release` | `--claim` or `--resource` | `--session`, `--generation`, `--authority` (`human` or `policy`), `--reason` |
 | `acc message` | `--subject`, `--body` | repeated `--to`, `--supersedes` or `--withdraws`, `--type`, `--obligation`, `--client-message-id`, owner flags |
 | `acc request` | `--to`, `--title` | `--detail`, `--client-message-id`, owner flags |
 | `acc inbox` | — | `--message`, `--cursor`, `--limit`, owner flags |
@@ -90,9 +90,15 @@ acc claim --resource 'file:packages/core/**' --reason "editing receipt logic"
 acc release --resource 'file:packages/core/**'
 ```
 
-File resources use repository-relative paths. A directory claim ends in `/**`. Exit code
-`5` means a conflict. `--authority` is the explicit force-release path and should carry a
-reason; ordinary sessions release only their own claims.
+File resources use repository-relative paths. A directory claim ends in `/**`. The example
+creates an advisory claim: omitted `--enforcement` always means `advisory`, even with
+certified clients. Request `--enforcement guarded` explicitly when needed; an incapable
+live participant still downgrades workspace protection. MCP claims are always advisory.
+
+Exit code `5` means a conflict. Ordinary sessions release only their own claims. Releasing
+another owner's claim requires `--authority human` or `--authority policy`, identifying the
+actual human decision or approved policy that permits the release; explain it with
+`--reason`. A peer's request alone is not force-release authority.
 
 ### Messages and requests
 
@@ -237,14 +243,20 @@ terminal asks one default-No question per eligible client, and on a non-interact
 `--dry-run` it keeps fresh clients off. A recorded opt-in is kept on upgrade. If the detected
 client cannot receive native delivery - unsupported, below the captured minimum, a
 prerelease, known-bad, a wrong platform, or an unsupported shell - installation keeps the
-effective policy off and prints the reason. A live install writes an owned zsh PATH block and
-a per-command shim that keeps your command name and `exec`s the real client; `ACC_BYPASS=1`
-runs the unmodified client, and ACC is never the parent of the session after that `exec`.
+effective policy off and prints the reason. Claude Code shell activation writes an owned
+zsh PATH block and a shim that `exec`s the real client; `ACC_BYPASS=1` bypasses that
+activation. Codex LocalDaemon delivery uses recorded installation consent without changing
+ordinary launch arguments. Its opt-in remains active when shim variables are absent or
+bypassed; `acc install --adapter codex --delivery off` disables new native offers. ACC never
+starts or stops the vendor daemon. See [delivery consent](CONFIGURATION.md#keep-delivery-consent-user-owned).
 
 A normal `acc install` enables automatic updates. A background worker checks stable releases
 at most once a day, downloads and verifies a separate runtime, then refreshes installed
-integrations and skills when running ACC processes and native clients have left. Hooks do
-not wait for network work. `ACC_NO_UPDATE_CHECK=1` disables update networking and background
+integrations and skills after ACC process leases and native binding holds clear. ACC leases
+require confirmed process exit; a native binding can clear on observed SessionEnd even
+while its vendor daemon remains alive, or on confirmed process death. Unknown PIDs remain
+holds. `finish`, presence TTL, and delivery off are not observed native end. Hooks do not
+wait for network work. `ACC_NO_UPDATE_CHECK=1` disables update networking and background
 scheduling.
 
 `acc update` requests the update immediately; it reports a pending update when a running or

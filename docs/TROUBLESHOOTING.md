@@ -128,8 +128,8 @@ Exit code `5` names the overlapping claim and owner. Ask the owner or wait for r
 an explicit authority has decided to replace it:
 
 ```bash
-acc release --claim claim_x --authority "agreed with models" \
-  --reason "handing over the file"
+acc release --claim claim_x --authority human \
+  --reason "human approved the handover after agreement with the models"
 ```
 
 ## Protection says advisory
@@ -159,10 +159,12 @@ Next: [Getting started](GETTING_STARTED.md) Â· [Capabilities](CAPABILITIES.md) Â
 
 ## An automatic update is pending
 
-Run `acc doctor` to see the update policy and pending notice. Close running native clients
-and persistent ACC MCP servers; finishing an ACC session does not prove its client exited.
-If ACC cannot identify a binding's process, it waits for that client's lifecycle to clear
-the binding. It does not expire safety holds by elapsed time.
+Run `acc doctor` to see the update policy and pending notice. ACC process leases, including
+persistent MCP servers, require confirmed process exit. Native bindings clear on observed
+SessionEnd or confirmed process death; a vendor daemon may remain alive after SessionEnd.
+Unknown PIDs remain holds until lifecycle cleanup. Close the relevant client sessions and
+ACC processes; `finish`, presence TTL, and delivery off do not prove native end. ACC never
+manages the daemon or expires safety holds merely by elapsed time.
 
 Use `acc update` to retry a failed download or finish an interrupted integration refresh.
 A download failure keeps the working version. A partial integration refresh blocks

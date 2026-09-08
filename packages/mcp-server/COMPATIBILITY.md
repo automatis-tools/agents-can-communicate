@@ -75,8 +75,12 @@ configuration, as approved on 2026-08-16. It is never derived from `clientInfo`,
 initialization, or process identity. Presence is refreshed on tool calls. A restarted
 server resolves the same durable binding; EOF does not close that ACC session.
 
-Manual MCP polling does not implement `delivery.nextTurn`, `delivery.livePush`, or
-`delivery.replyRoute`. Lifecycle, injection and guard capabilities also stay false.
+As a receiver, generic MCP has no native binding, push/wake, or reply route:
+`delivery.nextTurn`, `delivery.livePush`, and `delivery.replyRoute` remain false, as do
+lifecycle, injection and guard capabilities. The installed MCP server separately records
+outgoing message/request/reply/handoff operations before routing them through eligible,
+opted-in recipient adapters. Inspect their delivery results; native acceptance does not
+establish model attention, a separate retrieval, or a reply.
 
 ## Primary sources
 

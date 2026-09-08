@@ -18,12 +18,15 @@ boundaries exist.
 | Runtime state outside the repository | A checkout can be deleted, cloned, or synced; presence and locks must not travel with it. |
 | Project config optional and runtime-free | A committed file is editable by anyone with a PR, so it may carry policy — never sessions or tokens. |
 | Durable state is authoritative | Next-turn or live delivery may accelerate an interaction; neither becomes the source of truth. |
+| Bounded discovery, explicit history recovery | Automatic context stays small; peers select exact messages or historical records when they need full bodies. |
+| Immutable explicit decision links | Replacements and withdrawals preserve prior records and expose competing branches without choosing by timestamp. |
+| Fence managed runtime activation | Refresh all integrations before switching the active generation; partial refresh stays fenced until forward recovery completes. |
 | No heartbeat helper in v1 | An idle session is honestly reported `stale`. A sidecar process to fake liveness is worse than the truth. |
 | Presence reads the process, never writes the record | A pid answers "gone" at once; an age floor covers what a pid cannot, including its own reuse. Nothing is written back — no session has authority to edit another's record. This checks a process already there, not one beating on a session's behalf like the heartbeat helper above. |
-| No process launching | ACC attaches to sessions you already own. Owning them is a different product. |
+| No AI client or session launching | ACC attaches to sessions you already own; its separate update worker manages ACC packages, not those sessions. |
 | One publishable package | One version and one release rather than twelve coordinated ones. |
 | MIT | Widest reuse, least friction. |
-| Node 24 (current production LTS) | Uses `node:test`, modern `fs` promises, and no transpiler. |
+| Node 24 or newer required | Uses `node:test`, modern `fs` promises, and no transpiler. |
 | MCP session from launch config | Never from `initialize` or `clientInfo` — those are attacker-controllable. See the threat scenarios in [SECURITY_MODEL.md](SECURITY_MODEL.md) (scenario 8). |
 
 ## Avoid these rejected designs
@@ -32,7 +35,7 @@ boundaries exist.
 |---|---|
 | A file in each repo that agents poll | No guard, no identity, no atomicity — and it ends up committed. |
 | A permanent global lead session | Turns peers into workers and makes one crash fatal. |
-| Treating MCP as a lifecycle guarantee | MCP is a tool surface. It cannot attach, guard, or wake anything. |
+| Treating MCP as an external-client lifecycle guarantee | Tool calls resolve MCP's own participant, but cannot infer the client's lifecycle, intercept writes, or wake its receiver. |
 | Requiring Git, tmux, PostgreSQL, or a service | Every requirement is a reason the tool is not installed. |
 | Collecting or sharing raw transcripts | Raw transcripts are never collected or shared. Explicit peer messages are bounded records the sender chose to address. |
 | Reporting queued messages as delivered | A delivery state that overstates itself is worse than no state. |
@@ -83,7 +86,7 @@ where a guard stops behaves better than one that believes it absolute.
 1. **Storage backend.** The hardened filesystem store ships first. A transactional backend
    can go behind the same interface later — but not merely to avoid a dependency.
 2. **Remote coordination.** v2, or a separate product.
-3. **Process launching.** Possibly never; possibly an external integration.
+3. **AI client/session launching.** Possibly never; possibly an external integration.
 4. **Multi-root discovery rules** beyond the current `roots` list.
 5. **Default claim lease length** for hook-only adapters. A hook-only session cannot sustain
    a short renewal cadence, so lease policy must not assume one.

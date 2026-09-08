@@ -16,9 +16,10 @@
   changes.
 - A normal `acc install` enables managed automatic updates, and plain `acc update`
   downloads and applies an available stable release. Live ACC processes, including idle MCP
-  servers and native client bindings, hold activation until they exit. Restart clients after
-  integration changes and complete each client's activation or trust review; copied files
-  alone do not prove hooks are active.
+  servers, hold activation until confirmed process exit. Native bindings hold until observed
+  client SessionEnd cleanup or confirmed process death; unknown PIDs remain holds. ACC does
+  not manage the vendor daemon. Restart clients after integration changes and complete each
+  client's activation or trust review; copied files alone do not prove hooks are active.
 - Codex live delivery can reuse an opted-in, already-loaded LocalDaemon thread without rewriting launch arguments. Exact receiver/workspace checks, safe binding refresh and wrapper migration preserve durable fallback and client-owned configuration.
 
 ### Candidate evidence
