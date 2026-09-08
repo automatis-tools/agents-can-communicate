@@ -139,12 +139,26 @@ export async function applyNativeActivation({ adapter, activation, dataHome,
   }
 }
 
+// Compare planned mechanisms with the deletion authority saved by older installs.
+export function planActivationRetirements({ previous, desired }) {
+  const wanted = desired?.mechanisms ?? [];
+  const matches = (old, next) => old.kind === next.kind && (old.kind === "native-service"
+    ? old.serviceId === next.serviceId : old.kind === "native-config"
+      ? JSON.stringify([...old.artifactIds].sort()) === JSON.stringify([...next.artifactIds].sort())
+      : old.ownedFiles?.every(file => path.basename(file.path) === next.command));
+  return (previous?.mechanisms ?? []).filter(old => !wanted.some(next => matches(old, next)));
+}
+
 export async function deactivateNative({ nativeActivation, exec = defaultExec }) {
-  const report = { shell: null, services: [] };
+  const report = { shell: null, services: [], retainedMechanisms: [] };
   for (const mechanism of nativeActivation?.mechanisms ?? []) {
     if (mechanism.kind === "shell-bootstrap") {
       report.shell = await uninstallShellBootstrap({ ownership: { shims: mechanism.ownedFiles,
         shimDir: mechanism.shimDir, rcFile: mechanism.rcFile } });
+      if (report.shell.keptShims.length > 0 || report.shell.rcBlock === "modified") {
+        report.retainedMechanisms.push({ ...mechanism,
+          ownedFiles: mechanism.ownedFiles.filter(file => report.shell.keptShims.includes(file.path)) });
+      }
     } else if (mechanism.kind === "native-service") {
       if (mechanism.createdByAcc && mechanism.teardownCommand !== null) {
         await exec(mechanism.teardownCommand.executable, mechanism.teardownCommand.args);

@@ -48,7 +48,8 @@ export async function probeNativeDelivery({ timeoutMs = 750, env = process.env,
   }
 }
 
-// Legacy activation is reconciled in the installer task before public enablement.
+// Ordinary Codex chooses its own cwd and launch mode; ACC only reuses a
+// verified pre-existing service and never starts a daemon or rewrites argv.
 export function planNativeActivation({ detection }) {
   const realExecutable = detection?.realExecutable;
   if (typeof realExecutable !== "string" || realExecutable === "") {
@@ -57,7 +58,6 @@ export function planNativeActivation({ detection }) {
   return { eligible: true, reasonCode: null, mechanisms: [
     { kind: "native-service", serviceId: "codex-app-server", preExisting: true,
       applyCommand: null, teardownCommand: null },
-    { kind: "shell-bootstrap", command: "codex", realExecutable, prefixArgs: ["--remote", "unix://"] },
   ] };
 }
 

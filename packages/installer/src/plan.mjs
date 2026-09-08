@@ -1,6 +1,6 @@
 import { AccError, EXIT } from "@agents-can-communicate/protocol";
 
-import { LIVE_POLICIES, describeActivation, describeDeactivation, rcFileFor, shimDirFor }
+import { LIVE_POLICIES, describeActivation, describeDeactivation, planActivationRetirements, rcFileFor, shimDirFor }
   from "./native-activation.mjs";
 
 /**
@@ -124,8 +124,8 @@ export function planInstallation({ adapters, detected, context, action = "instal
         shimDir: typeof context?.stateRoot === "string" ? shimDirFor(context.stateRoot) : null,
         mechanisms: native.activationPlan.mechanisms }
       : null;
-    const deactivation = previous !== null
-      && (action === "uninstall" || effectiveLivePolicy === "off") ? previous : null;
+    const retirements = planActivationRetirements({ previous, desired: nativeActivation });
+    const deactivation = retirements.length > 0 ? { ...previous, mechanisms: retirements } : null;
     const artifacts = (record?.artifacts ?? adapter.planInstall(installContext))
       .map(artifact => ({ path: artifact.path, kind: artifact.kind ?? "file" }))
       .sort((a, b) => a.path.localeCompare(b.path));
