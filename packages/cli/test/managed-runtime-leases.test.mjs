@@ -91,10 +91,11 @@ test("a stopped admitted process holds its runtime until actual OS death", { tim
   const lease = await c.next();
   assert.equal(lease.pid, c.proc.pid);
   c.proc.kill("SIGSTOP");
-  assert.equal((await listRuntimeHolds(f.root)).length, 1);
+  const second = await acquireRuntime(f.root);
+  assert.deepEqual(new Set((await listRuntimeHolds(f.root)).map(hold => hold.token)), new Set([lease.token, second.token]));
   c.proc.kill("SIGKILL");
   await once(c.proc, "exit");
-  assert.equal((await listRuntimeHolds(f.root)).length, 0);
+  assert.deepEqual((await listRuntimeHolds(f.root)).map(hold => hold.token), [second.token]);
 });
 
 test("competing admission records selected runtime before activation can inspect holds", { timeout: 10000 }, async t => {
@@ -173,4 +174,99 @@ test("malformed and symlink leases block management instead of disappearing", as
   await writeFile(outside, JSON.stringify(lease));
   await symlink(outside, file);
   await assert.rejects(listRuntimeHolds(f.root), /ELOOP|symbolic|symlink/i);
+});
+
+
+test("sequential child admissions clean dead leases even when automatic updates are off", { timeout: 15000 }, async t => {
+  const f = await fixture(t);
+  f.control.auto = false;
+  await initialize(f);
+  for (let i = 0; i < 8; i++) {
+    const c = child(t, `process.send(await acquireRuntime(root)); process.disconnect();`, f.root);
+    const exited = once(c.proc, "exit");
+    const lease = await c.next();
+    assert.deepEqual(await exited, [0, null]);
+    assert.deepEqual(await readdir(path.join(f.root, "leases")), [`${lease.token}.json`]);
+    assert.equal((await readdir(f.root)).filter(name => name.startsWith("manager.reclaimed-")).length, 1);
+  }
+});
+
+test("admission housekeeping preserves malformed leases without blocking ordinary admission", async t => {
+  const f = await fixture(t);
+  await initialize(f);
+  const directory = path.join(f.root, "leases");
+  await mkdir(directory);
+  await writeFile(path.join(directory, "broken.json"), "null");
+  const lease = await acquireRuntime(f.root);
+  assert.equal(lease.runtime.version, "0.4.0");
+  assert.equal(await readFile(path.join(directory, "broken.json"), "utf8"), "null");
+  await assert.rejects(listRuntimeHolds(f.root), /lease/i);
+});
+
+test("a SIGSTOP registered observer retains old fencing through another admission and cannot retire its successor", { timeout: 10000 }, async t => {
+  const f = await fixture(t);
+  await initialize(f);
+  const holder = child(t, `await withManagerLock(root,async()=>{
+    process.send("held"); await new Promise(r=>process.once("message",r));
+  }); process.send("released"); process.disconnect();`, f.root);
+  assert.equal(await holder.next(), "held");
+  const old = JSON.parse(await readFile(path.join(f.root, "manager.lock", "owner.json")));
+  const observer = child(t, `try {
+    await withManagerLock(root,()=>"stole lock",{timeoutMs:1200,pidIsAlive:async pid=>{
+      if(pid!==${old.pid}) return true;
+      process.send("observed"); await new Promise(r=>process.once("message",r)); return false;
+    }}); process.send("unexpected admission");
+  } catch(e) { process.send({error:e.message}); } process.disconnect();`, f.root);
+  assert.equal(await observer.next(), "observed");
+  observer.proc.kill("SIGSTOP");
+  const candidate = (await readdir(f.root)).find(name => name.startsWith(`manager.candidate-${observer.proc.pid}-`));
+  assert.ok(candidate, "observer must publish a PID-identifiable candidate before probing");
+  const holderExit = once(holder.proc, "exit");
+  holder.proc.send("release");
+  assert.equal(await holder.next(), "released");
+  await holderExit;
+  const retired = (await readdir(f.root)).find(name => name.startsWith("manager.reclaimed-"));
+  const oldFile = path.join(f.root, retired, "owner.json");
+  assert.deepEqual(JSON.parse(await readFile(oldFile)), old);
+  await withManagerLock(f.root, () => {});
+  assert.deepEqual(JSON.parse(await readFile(oldFile)), old);
+  await withManagerLock(f.root, async () => {
+    const current = await readFile(path.join(f.root, "manager.lock", "owner.json"), "utf8");
+    observer.proc.send("resume");
+    observer.proc.kill("SIGCONT");
+    assert.match((await observer.next()).error, /held|timeout/i);
+    assert.equal(await readFile(path.join(f.root, "manager.lock", "owner.json"), "utf8"), current);
+  });
+  await withManagerLock(f.root, () => {});
+  assert.equal((await readdir(f.root)).filter(name => name.startsWith("manager.reclaimed-")).length, 1);
+});
+
+
+test("admission leaves uncertain process leases and corrupt symlinks intact", async t => {
+  const f = await fixture(t);
+  await initialize(f);
+  const lease = await acquireRuntime(f.root, { pid: 123456789 });
+  const kill = process.kill;
+  t.mock.method(process, "kill", (pid, signal) => {
+    if (pid === lease.pid) throw Object.assign(new Error("unknown PID permission"), { code: "EPERM" });
+    return kill.call(process, pid, signal);
+  });
+  await acquireRuntime(f.root);
+  const directory = path.join(f.root, "leases");
+  assert.ok((await readdir(directory)).includes(`${lease.token}.json`));
+  const outside = path.join(f.parent, "outside.json");
+  await writeFile(outside, "null");
+  await symlink(outside, path.join(directory, "aaa.json"));
+  await acquireRuntime(f.root);
+  assert.equal(await readFile(outside, "utf8"), "null");
+  await assert.rejects(listRuntimeHolds(f.root), /ELOOP|symbolic|symlink/i);
+});
+
+test("activation refusal happens before admission lease housekeeping", async t => {
+  const f = await fixture(t);
+  await initialize(f);
+  const lease = await acquireRuntime(f.root, { pid: 123456789 });
+  await writeControl(f.root, { ...f.control, phase: "activating" });
+  await assert.rejects(acquireRuntime(f.root), /activation/i);
+  assert.deepEqual(await readdir(path.join(f.root, "leases")), [`${lease.token}.json`]);
 });

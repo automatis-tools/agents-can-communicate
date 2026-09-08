@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import fs, { mkdir, mkdtemp, readFile, readdir, realpath, rename, rm, stat, symlink, writeFile } from "node:fs/promises";
 import { syncBuiltinESMExports } from "node:module";
 import { tmpdir } from "node:os";
@@ -70,13 +70,14 @@ test("old live or unknown lock owners are never reclaimed", async t => {
   }
 });
 
-test("dead lock reclaim retains a nonempty deterministic tombstone", async t => {
+test("dead lock reclaim retains a nonempty deterministic tombstone for unknown contenders", async t => {
   const f = await fixture(t);
   await mkdir(path.join(f.root, "manager.lock"), { recursive: true });
   const owner = { pid: 123456789, token: "dead-owner", acquiredAt: "2000-01-01T00:00:00.000Z" };
   await writeFile(path.join(f.root, "manager.lock", "owner.json"), JSON.stringify(owner));
   const identity = createHash("sha256").update(JSON.stringify([owner.pid, owner.token, owner.acquiredAt])).digest("hex");
   const tombstone = path.join(f.root, `manager.reclaimed-${identity}.lock`);
+  await mkdir(path.join(f.root, "manager.candidate-legacy.lock"));
   assert.equal(await withManagerLock(f.root, () => 42, { pidIsAlive: () => false }), 42);
   assert.deepEqual(JSON.parse(await readFile(path.join(tombstone, "owner.json"))), owner);
 });
@@ -180,5 +181,65 @@ test("lock inspection retries when a successor appears after owner open saw ENOE
   } finally {
     fs.open = originalOpen;
     syncBuiltinESMExports();
+  }
+});
+
+
+test("quiescent lock admissions keep only the most recent release tombstone", async t => {
+  const f = await fixture(t);
+  for (let i = 0; i < 8; i++) {
+    await withManagerLock(f.root, () => {});
+    const names = await readdir(f.root);
+    assert.equal(names.filter(name => name.startsWith("manager.reclaimed-")).length, 1);
+    assert.equal(names.filter(name => name.startsWith("manager.candidate-")).length, 0);
+  }
+});
+
+test("quiescent maintenance removes confirmed-dead preparations including ownerless ones", async t => {
+  const f = await fixture(t);
+  await withManagerLock(f.root, () => {});
+  const preparations = [];
+  for (const published of [false, true]) {
+    const token = randomUUID();
+    const directory = path.join(f.root, `manager.candidate-123456789-${token}.lock`);
+    await mkdir(directory);
+    if (published) await writeFile(path.join(directory, "owner.json"), JSON.stringify({
+      pid: 123456789, token, acquiredAt: "2000-01-01T00:00:00.000Z",
+    }));
+    preparations.push(path.basename(directory));
+  }
+  await withManagerLock(f.root, () => {});
+  const names = await readdir(f.root);
+  assert.equal(names.filter(name => preparations.includes(name)).length, 0);
+  assert.equal(names.filter(name => name.startsWith("manager.reclaimed-")).length, 1);
+});
+
+test("any live, unknown, malformed, unreadable or symlink candidate defers the entire GC snapshot", async t => {
+  const f = await fixture(t);
+  for (const kind of ["live", "unknown", "legacy", "mismatch", "malformed", "unreadable", "symlink"]) {
+    const root = path.join(f.root, kind);
+    await withManagerLock(root, () => {});
+    const retained = (await readdir(root)).find(name => name.startsWith("manager.reclaimed-"));
+    const dead = `manager.candidate-123456789-${randomUUID()}.lock`;
+    await mkdir(path.join(root, dead));
+    const token = randomUUID();
+    const name = kind === "legacy" ? "manager.candidate-legacy.lock"
+      : `manager.candidate-${kind === "live" ? process.pid : 123456788}-${token}.lock`;
+    const directory = path.join(root, name);
+    if (kind === "symlink") await symlink(f.parent, directory);
+    else {
+      await mkdir(directory);
+      if (kind === "mismatch") await writeFile(path.join(directory, "owner.json"), JSON.stringify({
+        pid: 123456789, token, acquiredAt: "2000-01-01T00:00:00.000Z",
+      }));
+      if (kind === "malformed") await writeFile(path.join(directory, "owner.json"), "{}");
+      if (kind === "unreadable") await mkdir(path.join(directory, "owner.json"));
+    }
+    await withManagerLock(root, () => {}, { pidIsAlive: pid =>
+      pid === 123456789 ? false : kind === "unknown" ? undefined : pid === process.pid });
+    const names = await readdir(root);
+    assert.ok(names.includes(retained), `${kind} must retain historical fencing`);
+    assert.ok(names.includes(name), `${kind} candidate must survive`);
+    assert.ok(names.includes(dead), `${kind} must postpone all snapshot cleanup`);
   }
 });

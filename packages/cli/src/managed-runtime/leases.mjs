@@ -15,6 +15,10 @@ export async function acquireRuntime(root, { pid = process.pid, kind = "cli" } =
     const control = await readControl(root);
     if (!control) throw new Error("managed runtime is not initialized");
     if (control.phase !== "ready") throw new Error("managed runtime activation in progress");
+    // Ordinary admission also reaps dead processes when updates are off or no
+    // new version exists. Corrupt unrelated records remain a management hold,
+    // but must not introduce a new failure for ordinary runtime selection.
+    try { await listRuntimeHolds(root); } catch { /* Defer uncertain housekeeping. */ }
     const lease = { schemaVersion: 1, token: randomUUID(), pid, kind,
       runtime: control.active, createdAt: new Date().toISOString() };
     const directory = path.join(root, "leases");
