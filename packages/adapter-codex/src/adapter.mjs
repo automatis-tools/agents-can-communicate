@@ -1,5 +1,6 @@
 import { defineAdapter, projectContext, projectContextResult }
   from "@agents-can-communicate/adapter-sdk";
+import { probeNativeDelivery, planNativeActivation, bindNativeSession, refreshNativeSession, retireNativeSession, offerMessage } from "./native-delivery.mjs";
 import certification from "../certification.json" with { type: "json" };
 
 import { PROTOCOL_CONTRACT } from "./app-server-client.mjs";
@@ -47,10 +48,18 @@ export function createCodexAdapter() {
       // denied PreToolUse capture required to certify a shell guard.
       guards: { beforeWrite: true },
       // nextTurn remains limited to its exact 0.147.0 hook capture.
-      delivery: { nextTurn: true, livePush: false },
+      delivery: { nextTurn: true, livePush: true },
     },
     // Native acceleration is a separate, per-session eligibility decision.
 
+    nativeDelivery: {
+      minimumByPlatform: { "darwin-arm64": CODEX_QUEUE_MINIMUM },
+      anchors: [{ platform: "darwin-arm64", version: CODEX_QUEUE_MINIMUM,
+        protocolContract: PROTOCOL_CONTRACT }], knownBad: [],
+      activationKinds: ["native-service"], policySource: "installation-record",
+    },
+    probeNativeDelivery, planNativeActivation, bindNativeSession,
+    refreshNativeSession, retireNativeSession, offerMessage,
     startSession: async () => ({ ok: true, changes: [], diagnostics: [] }),
     endSession: async () => ({ ok: true, changes: [], diagnostics: [] }),
     guardWrite: async () => ({ ok: true, changes: [], diagnostics: [] }),

@@ -194,6 +194,108 @@
           }
         }
       ]
+    },
+    {
+      "id": "native-delivery-0-152-1-local-daemon-product",
+      "client": "codex-cli",
+      "version": "0.152.1",
+      "platform": "darwin-arm64",
+      "observedAt": "2026-09-08T09:42:03.910Z",
+      "fixture": "fixtures/delivery/codex-cli-0.152.1-local-daemon-product.json",
+      "sha256": "12ba4994612c8ac38adb3f02bac4710b14dc897c8ae51f41d5ac8f81efcda7a9",
+      "event": null,
+      "tool": null,
+      "claims": [
+        {
+          "capability": "delivery.livePush",
+          "result": "pass",
+          "outcome": {
+            "kind": "native-delivery-observed",
+            "idle": "offered",
+            "busy": "queued_after_turn",
+            "authority": "experimental",
+            "limitations": [
+              "Observed on darwin-arm64 with an already-running LocalDaemon and ordinary commands; ACC adds no launch arguments and owns no vendor daemon lifecycle.",
+              "Recorded recipient opt-in and exact current thread, canonical cwd, live process, stable version and protocol checks are required for every session.",
+              "A 120-second delivery lease can refresh on demand for the same non-retired endpoint; this does not renew the 24-hour presence expiry.",
+              "Unsupported or Embedded sessions and unreachable or rejected endpoints retain durable inbox delivery; accepted vendor queue entries cannot be withdrawn by policy off or uninstall.",
+              "A loaded daemon thread may execute opted-in messages after its TUI exits. TUI detachment is not SessionEnd; explicit thread archive or actual server teardown retires it.",
+              "Transport deduplication covers a pending queue entry only. Execution can repeat after queue consumption and acknowledgement loss.",
+              "The observed reply loop uses the installed acc reply CLI; native delivery.replyRoute remains false. No new lifecycle, guard or next-turn certification follows.",
+              "P16 is controlled endpoint fault injection. P18 uses an actual legacy npm artifact; its unrelated Claude shell artifact is not a real Claude capability capture."
+            ]
+          }
+        }
+      ],
+      "productEvidence": {
+        "fixture": "fixtures/delivery/codex-cli-0.152.1-local-daemon-product-evidence.json",
+        "sha256": "1a53d02db21a472ba7e8b37cca3d935826a3e1a17a8c17223dc56ecbebac1e21"
+      },
+      "historicalFixtures": [
+        {
+          "fixture": "fixtures/delivery/codex-cli-0.152.1-local-daemon-transport.json",
+          "sha256": "3cea07a9d655b7a78764eacd30bbcdc941a81095633ba08eee1c1c0900958c18"
+        },
+        {
+          "fixture": "fixtures/delivery/codex-cli-0.152.1-local-daemon-transport-evidence.json",
+          "sha256": "911a8e451bd726aedfb2be9379ed521e4042b2c7a8be1f280349dbeabc101cf1"
+        },
+        {
+          "fixture": "fixtures/delivery/codex-cli-0.152.1-remote-workspace.json",
+          "sha256": "e4f419111d254223f3930eeee61c30c447bb68dd51a4faf81be2a33b144bbaca"
+        }
+      ]
+    },
+    {
+      "id": "native-delivery-0-153-4-local-daemon-product",
+      "client": "codex-cli",
+      "version": "0.153.4",
+      "platform": "darwin-arm64",
+      "observedAt": "2026-09-08T09:42:02.609Z",
+      "fixture": "fixtures/delivery/codex-cli-0.153.4-local-daemon-product.json",
+      "sha256": "35cc452a24dd9cbbb4a0f130928ce8b3ed89784d362518d6997cded3b5ea2c1b",
+      "event": null,
+      "tool": null,
+      "claims": [
+        {
+          "capability": "delivery.livePush",
+          "result": "pass",
+          "outcome": {
+            "kind": "native-delivery-observed",
+            "idle": "offered",
+            "busy": "queued_after_turn",
+            "authority": "experimental",
+            "limitations": [
+              "Observed on darwin-arm64 with an already-running LocalDaemon and ordinary commands; ACC adds no launch arguments and owns no vendor daemon lifecycle.",
+              "Recorded recipient opt-in and exact current thread, canonical cwd, live process, stable version and protocol checks are required for every session.",
+              "A 120-second delivery lease can refresh on demand for the same non-retired endpoint; this does not renew the 24-hour presence expiry.",
+              "Unsupported or Embedded sessions and unreachable or rejected endpoints retain durable inbox delivery; accepted vendor queue entries cannot be withdrawn by policy off or uninstall.",
+              "A loaded daemon thread may execute opted-in messages after its TUI exits. TUI detachment is not SessionEnd; explicit thread archive or actual server teardown retires it.",
+              "Transport deduplication covers a pending queue entry only. Execution can repeat after queue consumption and acknowledgement loss.",
+              "The observed reply loop uses the installed acc reply CLI; native delivery.replyRoute remains false. No new lifecycle, guard or next-turn certification follows.",
+              "P16 is controlled endpoint fault injection. P18 uses an actual legacy npm artifact; its unrelated Claude shell artifact is not a real Claude capability capture."
+            ]
+          }
+        }
+      ],
+      "productEvidence": {
+        "fixture": "fixtures/delivery/codex-cli-0.153.4-local-daemon-product-evidence.json",
+        "sha256": "81ff85c16e7320df233d353267bf216dc2c40ee5b86ccbcc2e2fe754e2e99591"
+      },
+      "historicalFixtures": [
+        {
+          "fixture": "fixtures/delivery/codex-cli-0.153.4-local-daemon-transport.json",
+          "sha256": "a458fdcc9fc843580663f8d21c79e911e202fe8e5db83a951b9e22ed79761168"
+        },
+        {
+          "fixture": "fixtures/delivery/codex-cli-0.153.4-local-daemon-transport-evidence.json",
+          "sha256": "2fb31e3a8503582472b2589f2009e39e0d8a6b91f6c361682eaa3989eafef4c2"
+        },
+        {
+          "fixture": "fixtures/delivery/codex-cli-0.152.1-remote-workspace.json",
+          "sha256": "e4f419111d254223f3930eeee61c30c447bb68dd51a4faf81be2a33b144bbaca"
+        }
+      ]
     }
   ]
 }

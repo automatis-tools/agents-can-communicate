@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "client": "codex-cli",
+  "version": "0.152.1",
+  "platform": "darwin-arm64",
+  "observedAt": "2026-09-08T06:23:41.408Z",
+  "capability": "native_delivery_transport",
+  "result": "pass",
+  "fixture": "codex-cli-0.152.1-local-daemon-transport",
+  "phase": "transport",
+  "packageSha256": "bdd78a4c1978f05322e156737660a43150971beecdcdc45985afaa66faa349dc",
+  "protocolContract": "codex-app-server-thread-queue-v1",
+  "exactBinding": "receiver_thread_matched",
+  "idle": "queue_add_accepted",
+  "busy": "queued_while_active",
+  "rejectedSubmission": "observed",
+  "durableReceipt": "queued",
+  "limitations": [
+    "Direct installed-adapter transport methods only; this capture does not certify the installed product route or a native reply callback."
+  ]
+}

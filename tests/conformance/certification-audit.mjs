@@ -13,14 +13,30 @@ const withFacts = (client, version, entries, observedAt = "2026-08-16") => entri
   .map(entry => ({ client, version, platform: "darwin-arm64", observedAt, ...entry }));
 
 // A native delivery capture has no hook event or tool: it proves an ordinary
-// launch, a protocol contract, and the five delivery branches instead. Both
-// livePush and replyRoute rest on the same redacted capture.
+// launch, a protocol contract, and the five delivery branches instead.
 const nativeDelivery = (client, version, observedAt, fixture, protocolContract, idle, busy,
   limitations, capabilities = ["delivery.livePush", "delivery.replyRoute"]) => capabilities
   .map(capability => ({
   client, version, platform: "darwin-arm64", observedAt, capability, fixture, event: null,
   tool: null, protocolContract, outcome: "native-delivery-observed", idleBehavior: idle,
   busyBehavior: busy, authorityLevel: "experimental", limitations }));
+
+const codexLocalDaemonLimitations = Object.freeze([
+  "Observed on darwin-arm64 with an already-running LocalDaemon and ordinary commands; ACC adds no launch arguments and owns no vendor daemon lifecycle.",
+  "Recorded recipient opt-in and exact current thread, canonical cwd, live process, stable version and protocol checks are required for every session.",
+  "A 120-second delivery lease can refresh on demand for the same non-retired endpoint; this does not renew the 24-hour presence expiry.",
+  "Unsupported or Embedded sessions and unreachable or rejected endpoints retain durable inbox delivery; accepted vendor queue entries cannot be withdrawn by policy off or uninstall.",
+  "A loaded daemon thread may execute opted-in messages after its TUI exits. TUI detachment is not SessionEnd; explicit thread archive or actual server teardown retires it.",
+  "Transport deduplication covers a pending queue entry only. Execution can repeat after queue consumption and acknowledgement loss.",
+  "The observed reply loop uses the installed acc reply CLI; native delivery.replyRoute remains false. No new lifecycle, guard or next-turn certification follows.",
+  "P16 is controlled endpoint fault injection. P18 uses an actual legacy npm artifact; its unrelated Claude shell artifact is not a real Claude capability capture.",
+]);
+
+const codexNativeDelivery = (version, observedAt) => nativeDelivery("codex-cli", version,
+  observedAt, `fixtures/delivery/codex-cli-${version}-local-daemon-product.json`,
+  "codex-app-server-thread-queue-v1", "offered", "queued_after_turn",
+  codexLocalDaemonLimitations, ["delivery.livePush"])
+  .map(entry => ({ ...entry, launchMode: "ordinary-command-with-installed-hooks" }));
 
 export const PASS_EXPECTATIONS = Object.freeze({
   "adapter-claude-code": withFacts("claude-code", "2.1.233", [
@@ -67,7 +83,8 @@ export const PASS_EXPECTATIONS = Object.freeze({
           "busy was observed by the operator: the running turn completed before the channel presented the message, and the session named that order in its own answer"
     ]),
   ]),
-  "adapter-codex": withFacts("codex-cli", "0.147.0", [
+  "adapter-codex": [
+    ...withFacts("codex-cli", "0.147.0", [
     row("lifecycle.sessionStart", "fixtures/SessionStart.json", "SessionStart", null,
       "event-observed", "fires when a client session starts",
       "fires before the first model turn", "advisory",
@@ -86,13 +103,10 @@ export const PASS_EXPECTATIONS = Object.freeze({
       ["runtime and unrecognised shell writes can bypass the guard"]),
     nextTurn("fixtures/UserPromptSubmit.json", "UserPromptSubmit",
       "delivery requires the next normal user turn"),
-    // Codex has no native-delivery pass. The 0.152.1 queue capture observed a
-    // working transport; the release capture then measured that the mode it
-    // requires - codex --remote unix:// - reports the daemon's directory as the
-    // session's, from both the hook payload and the App Server's thread record.
-    // A session ACC cannot place must not be addressed, so the verdict for that
-    // tuple is the failure capture and the capability is withdrawn.
-  ]),
+    ]),
+    ...codexNativeDelivery("0.152.1", "2026-09-08T09:42:03.910Z"),
+    ...codexNativeDelivery("0.153.4", "2026-09-08T09:42:02.609Z"),
+  ],
   // Re-captured on the version this machine actually runs. 0.57.0 added folder
   // trust, which silently downgrades the approval mode and with it the toolset,
   // so the guard paths are reachable only from an explicitly trusted folder.

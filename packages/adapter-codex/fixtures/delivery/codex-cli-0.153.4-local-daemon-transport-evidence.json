@@ -1,0 +1,259 @@
+{
+  "schemaVersion": 1,
+  "source": "real-client-capture",
+  "client": "codex-cli",
+  "phase": "transport",
+  "clientVersion": "0.153.4",
+  "platform": "darwin-arm64",
+  "packageSha256": "bdd78a4c1978f05322e156737660a43150971beecdcdc45985afaa66faa349dc",
+  "startedAt": "2026-09-08T06:27:01.695Z",
+  "finishedAt": "2026-09-08T06:30:02.382Z",
+  "scenarioCount": 4,
+  "passedCount": 4,
+  "failedCount": 0,
+  "cleanup": {
+    "attempted": true,
+    "outcome": "passed",
+    "ownedProcesses": "stopped",
+    "temporaryState": "removed"
+  },
+  "scenarios": [
+    {
+      "schemaVersion": 1,
+      "source": "real-client-capture",
+      "client": "codex-cli",
+      "caseId": "T01",
+      "phase": "transport",
+      "clientVersion": "0.153.4",
+      "platform": "darwin-arm64",
+      "packageSha256": "bdd78a4c1978f05322e156737660a43150971beecdcdc45985afaa66faa349dc",
+      "roles": [
+        {
+          "role": "daemon-a",
+          "participantId": null,
+          "threadId": null
+        },
+        {
+          "role": "receiver-b1",
+          "participantId": "codex-lWX1Mg",
+          "threadId": "01a07fb2-de8a-72e3-ac19-006b2f61c78c"
+        },
+        {
+          "role": "sender",
+          "participantId": "synthetic-sender",
+          "threadId": null
+        }
+      ],
+      "timestamps": {
+        "startedAt": "2026-09-08T06:27:38.943Z",
+        "idleSinceAt": null,
+        "preToolUseAt": null,
+        "queuedAt": null,
+        "stopAt": null,
+        "nextTurnAt": null,
+        "finishedAt": "2026-09-08T06:27:39.014Z"
+      },
+      "outcome": "passed",
+      "observations": [
+        {
+          "kind": "binding",
+          "at": "2026-09-08T06:27:39.014Z",
+          "actor": "receiver-b1",
+          "target": "receiver-b1",
+          "outcome": "matched"
+        }
+      ],
+      "observationCount": 1,
+      "assertionCount": 4,
+      "cleanup": {
+        "attempted": true,
+        "outcome": "passed",
+        "ownedProcesses": "stopped",
+        "temporaryState": "removed"
+      }
+    },
+    {
+      "schemaVersion": 1,
+      "source": "real-client-capture",
+      "client": "codex-cli",
+      "caseId": "T02",
+      "phase": "transport",
+      "clientVersion": "0.153.4",
+      "platform": "darwin-arm64",
+      "packageSha256": "bdd78a4c1978f05322e156737660a43150971beecdcdc45985afaa66faa349dc",
+      "roles": [
+        {
+          "role": "daemon-a",
+          "participantId": null,
+          "threadId": null
+        },
+        {
+          "role": "receiver-b1",
+          "participantId": "codex-lWX1Mg",
+          "threadId": "01a07fb2-de8a-72e3-ac19-006b2f61c78c"
+        },
+        {
+          "role": "sender",
+          "participantId": "synthetic-sender",
+          "threadId": null
+        }
+      ],
+      "timestamps": {
+        "startedAt": "2026-09-08T06:27:39.014Z",
+        "idleSinceAt": null,
+        "preToolUseAt": null,
+        "queuedAt": null,
+        "stopAt": null,
+        "nextTurnAt": null,
+        "finishedAt": "2026-09-08T06:28:09.810Z"
+      },
+      "outcome": "passed",
+      "observations": [
+        {
+          "kind": "submission",
+          "at": "2026-09-08T06:28:09.810Z",
+          "actor": "receiver-b1",
+          "target": null,
+          "outcome": "accepted"
+        }
+      ],
+      "observationCount": 1,
+      "assertionCount": 2,
+      "cleanup": {
+        "attempted": true,
+        "outcome": "passed",
+        "ownedProcesses": "stopped",
+        "temporaryState": "removed"
+      }
+    },
+    {
+      "schemaVersion": 1,
+      "source": "real-client-capture",
+      "client": "codex-cli",
+      "caseId": "T03",
+      "phase": "transport",
+      "clientVersion": "0.153.4",
+      "platform": "darwin-arm64",
+      "packageSha256": "bdd78a4c1978f05322e156737660a43150971beecdcdc45985afaa66faa349dc",
+      "roles": [
+        {
+          "role": "daemon-a",
+          "participantId": null,
+          "threadId": null
+        },
+        {
+          "role": "receiver-b1",
+          "participantId": "codex-lWX1Mg",
+          "threadId": "01a07fb2-de8a-72e3-ac19-006b2f61c78c"
+        },
+        {
+          "role": "sender",
+          "participantId": "synthetic-sender",
+          "threadId": null
+        }
+      ],
+      "timestamps": {
+        "startedAt": "2026-09-08T06:28:46.371Z",
+        "idleSinceAt": null,
+        "preToolUseAt": "2026-09-08T06:28:58.420Z",
+        "queuedAt": "2026-09-08T06:28:58.970Z",
+        "stopAt": "2026-09-08T06:29:26.636Z",
+        "nextTurnAt": "2026-09-08T06:29:26.934Z",
+        "finishedAt": "2026-09-08T06:29:48.020Z"
+      },
+      "outcome": "passed",
+      "observations": [
+        {
+          "kind": "session-state",
+          "at": "2026-09-08T06:28:58.637Z",
+          "actor": "receiver-b1",
+          "target": null,
+          "outcome": "active"
+        },
+        {
+          "kind": "queue",
+          "at": "2026-09-08T06:28:58.992Z",
+          "actor": "receiver-b1",
+          "target": null,
+          "outcome": "pending"
+        },
+        {
+          "kind": "submission",
+          "at": "2026-09-08T06:29:48.020Z",
+          "actor": "receiver-b1",
+          "target": null,
+          "outcome": "accepted"
+        }
+      ],
+      "observationCount": 3,
+      "assertionCount": 7,
+      "cleanup": {
+        "attempted": true,
+        "outcome": "passed",
+        "ownedProcesses": "stopped",
+        "temporaryState": "removed"
+      }
+    },
+    {
+      "schemaVersion": 1,
+      "source": "real-client-capture",
+      "client": "codex-cli",
+      "caseId": "T04",
+      "phase": "transport",
+      "clientVersion": "0.153.4",
+      "platform": "darwin-arm64",
+      "packageSha256": "bdd78a4c1978f05322e156737660a43150971beecdcdc45985afaa66faa349dc",
+      "roles": [
+        {
+          "role": "daemon-a",
+          "participantId": null,
+          "threadId": null
+        },
+        {
+          "role": "receiver-b1",
+          "participantId": "codex-lWX1Mg",
+          "threadId": "01a07fb2-de8a-72e3-ac19-006b2f61c78c"
+        },
+        {
+          "role": "sender",
+          "participantId": "synthetic-sender",
+          "threadId": null
+        }
+      ],
+      "timestamps": {
+        "startedAt": "2026-09-08T06:29:48.021Z",
+        "idleSinceAt": null,
+        "preToolUseAt": null,
+        "queuedAt": null,
+        "stopAt": null,
+        "nextTurnAt": null,
+        "finishedAt": "2026-09-08T06:29:48.444Z"
+      },
+      "outcome": "passed",
+      "observations": [
+        {
+          "kind": "submission",
+          "at": "2026-09-08T06:29:48.444Z",
+          "actor": "receiver-b1",
+          "target": null,
+          "outcome": "rejected"
+        },
+        {
+          "kind": "receipt",
+          "at": "2026-09-08T06:29:48.444Z",
+          "actor": "receiver-b1",
+          "target": null,
+          "outcome": "queued"
+        }
+      ],
+      "observationCount": 2,
+      "assertionCount": 2,
+      "cleanup": {
+        "attempted": true,
+        "outcome": "passed",
+        "ownedProcesses": "stopped",
+        "temporaryState": "removed"
+      }
+    }
+  ]
+}

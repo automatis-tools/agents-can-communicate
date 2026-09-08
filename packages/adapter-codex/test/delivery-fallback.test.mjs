@@ -26,7 +26,7 @@ test("doctor explains per-session native eligibility and durable fallback", asyn
     "historical remote-wrapper failure cannot become a universal workspace impossibility");
 });
 
-test("only the exact captured Codex version keeps certified next-turn delivery", () => {
+test("legacy next-turn and captured LocalDaemon delivery keep distinct evidence boundaries", () => {
   const adapter = createCodexAdapter();
   const capabilities = clientVersion => effectiveCapabilities(adapter,
     { clientVersion, platform: "darwin-arm64" }).delivery;
@@ -40,4 +40,34 @@ test("only the exact captured Codex version keeps certified next-turn delivery",
     assert.equal(capabilities(version).livePush, false);
     assert.equal(capabilities(version).replyRoute, false);
   }
+  for (const version of ["0.152.1", "0.153.4"]) {
+    assert.equal(capabilities(version).nextTurn, false,
+      `${version} inherited a next-turn claim from the 0.147.0 hook capture`);
+    assert.equal(capabilities(version).livePush, true,
+      `${version} lost its captured LocalDaemon capability`);
+    assert.equal(capabilities(version).replyRoute, false,
+      `${version} gained an unobserved native reply route`);
+  }
+});
+
+// Replacing this with a launcher, shell bootstrap, or teardown command would
+// make the assertion fail. Codex owns its argv and daemon lifecycle.
+test("native activation reuses only an already-running LocalDaemon", () => {
+  const plan = createCodexAdapter().planNativeActivation({ detection: {
+    realExecutable: "/opt/codex/bin/codex",
+  } });
+
+  assert.deepEqual(plan, { eligible: true, reasonCode: null, mechanisms: [{
+    kind: "native-service", serviceId: "codex-app-server", preExisting: true,
+    applyCommand: null, teardownCommand: null,
+  }] });
+});
+
+test("uncaptured platforms retain durable fallback", () => {
+  const delivery = effectiveCapabilities(createCodexAdapter(),
+    { clientVersion: "0.152.1", platform: "linux-arm64" }).delivery;
+
+  assert.equal(delivery.nextTurn, false);
+  assert.equal(delivery.livePush, false);
+  assert.equal(delivery.replyRoute, false);
 });

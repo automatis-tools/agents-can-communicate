@@ -17,6 +17,14 @@
     "fixtures/delivery/codex-cli-0.152.0.json",
     "fixtures/delivery/codex-cli-0.152.1-remote-workspace.json",
     "src/",
-    "plugin/"
+    "plugin/",
+    "fixtures/delivery/codex-cli-0.152.1-local-daemon-product.json",
+    "fixtures/delivery/codex-cli-0.152.1-local-daemon-product-evidence.json",
+    "fixtures/delivery/codex-cli-0.152.1-local-daemon-transport.json",
+    "fixtures/delivery/codex-cli-0.152.1-local-daemon-transport-evidence.json",
+    "fixtures/delivery/codex-cli-0.153.4-local-daemon-product.json",
+    "fixtures/delivery/codex-cli-0.153.4-local-daemon-product-evidence.json",
+    "fixtures/delivery/codex-cli-0.153.4-local-daemon-transport.json",
+    "fixtures/delivery/codex-cli-0.153.4-local-daemon-transport-evidence.json"
   ]
 }

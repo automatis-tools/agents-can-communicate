@@ -144,27 +144,29 @@ test("only capabilities observed in a real session are declared true", () => {
   // Not observed, so not claimed: no subagent ran during the capture.
   assert.equal(capabilities.lifecycle.childSessions, false);
   assert.equal(capabilities.delivery.nextTurn, true);
-  // The 0.152.1 queue capture observed a working transport, and the release
-  // capture then measured that the mode it requires - codex --remote unix:// -
-  // reports the daemon's directory as the session's, from both the hook payload
-  // and the App Server's own thread record. A session ACC cannot place must not
-  // be addressed, so neither live capability is claimed.
-  assert.equal(capabilities.delivery.livePush, false);
+  // The LocalDaemon transport was captured on ordinary installed Codex clients.
+  // A per-session handshake still decides whether a particular receiver can be
+  // reached, but the adapter may now offer that captured transport.
+  assert.equal(capabilities.delivery.livePush, true);
   assert.equal(capabilities.delivery.replyRoute, false);
 });
 
-// The contract refuses a native-delivery descriptor with no passing anchor, and
-// it is right to: an anchor asserts a capability proved on that release. The
-// release capture withdrew the only one Codex had, so the adapter declares no
-// native delivery at all rather than a descriptor it cannot back.
-test("native delivery is not declared, because no capture backs it", () => {
+// Removing the native descriptor, its product anchor, or a backing method must
+// make this fail: without all three, ACC cannot safely reuse LocalDaemon.
+test("native delivery names the captured LocalDaemon contract and leaves replies unrouted", () => {
   const adapter = createCodexAdapter();
-  assert.equal(adapter.nativeDelivery, undefined,
-    "declaring native delivery would assert a capability no capture supports");
+  assert.deepEqual(adapter.nativeDelivery.minimumByPlatform, { "darwin-arm64": "0.152.1" });
+  assert.deepEqual(adapter.nativeDelivery.anchors, [{ platform: "darwin-arm64", version: "0.152.1",
+    protocolContract: "codex-app-server-thread-queue-v1" }]);
+  assert.deepEqual(adapter.nativeDelivery.activationKinds, ["native-service"]);
+  assert.equal(adapter.nativeDelivery.policySource, "installation-record");
   for (const method of ["probeNativeDelivery", "planNativeActivation", "bindNativeSession",
-    "offerMessage", "routeReply"]) {
-    assert.equal(Object.hasOwn(adapter, method), false, method);
+    "refreshNativeSession", "retireNativeSession", "offerMessage"]) {
+    assert.equal(typeof adapter[method], "function", method);
   }
+  assert.equal(adapter.capabilities.delivery.replyRoute, false);
+  assert.equal(Object.hasOwn(adapter, "routeReply"), false,
+    "a CLI reply receipt must not be misrepresented as a native reply route");
 });
 
 test("doctor reports the capture and the trust requirement", async t => {
