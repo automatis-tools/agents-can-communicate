@@ -244,6 +244,13 @@ runs the unmodified client, and ACC is never the parent of the session after tha
 Only `update` touches the network. `ACC_NO_UPDATE_CHECK=1` disables update checks. Hooks
 never perform them.
 
+When a newer version is available, `update --apply` refreshes the package and then runs
+`acc install`. A failed step exits
+with code `4`; JSON error details retain `applied` and `failed`, and the error names the
+remaining commands. Success includes the installer's output in `installation.stdout` /
+`installation.stderr` and a restart reminder in `activation`. Follow those instructions
+before relying on running clients. See [Upgrading](UPGRADING.md) for the 0.3.1 transition.
+
 ## Integrate a client lifecycle
 
 `acc attach --participant <id>`, `acc heartbeat --session <id> --generation <token>`, and

@@ -13,6 +13,8 @@ decides what its task requires.
 3. [Capabilities](CAPABILITIES.md) — check what your client and platform can actually do.
 4. [Troubleshooting](TROUBLESHOOTING.md) — diagnose missing peers, queued messages, and
    capability fallback.
+5. [Upgrading from 0.3.1](UPGRADING.md) — preserve history, refresh integrations, and
+   update scripts for the new inbox response.
 
 ## See it in context
 

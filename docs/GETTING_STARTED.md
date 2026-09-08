@@ -13,6 +13,8 @@ operations require an explicit pair or session-bound ACC MCP tools. See [CLI own
 
 ACC requires macOS or Linux and Node.js 24 or newer.
 
+Already using 0.3.1? Follow the [upgrade guide](UPGRADING.md) before mixing versions.
+
 ```bash
 npm install -g agents-can-communicate
 ```
