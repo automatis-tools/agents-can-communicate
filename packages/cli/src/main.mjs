@@ -73,23 +73,24 @@ async function locateContext(options, runtime) {
     gitProbe: runtime.gitProbe ?? createGitProbe(),
     explicitConfig: options.workspace,
   });
+  const dataHome = runtime.dataHome ?? platformDataHome({ platform: runtime.platform,
+    env: runtime.env });
   const paths = runtimePaths({
-    dataHome: runtime.dataHome ?? platformDataHome({ platform: runtime.platform,
-      env: runtime.env }),
+    dataHome,
     workspaceId: descriptor.id,
     workspaceRoots: descriptor.roots,
   });
-  return { descriptor, paths };
+  return { descriptor, paths, dataHome };
 }
 
-async function withService({ descriptor, paths }, runtime) {
+async function withService({ descriptor, paths, dataHome }, runtime) {
   const store = await openFilesystemStore({ root: paths.root, clock: runtime.clock,
     ids: runtime.ids, workspaceId: descriptor.id });
   const service = createCoordinationService({ store, clock: runtime.clock, ids: runtime.ids });
-  return { descriptor, paths,
+  return { descriptor, paths, dataHome,
     service,
     deliveryRouter: typeof runtime.createDeliveryRouter === "function"
-      ? runtime.createDeliveryRouter({ service, clock: runtime.clock }) : null };
+      ? runtime.createDeliveryRouter({ service, clock: runtime.clock, dataHome }) : null };
 }
 
 async function openContext(options, runtime) {

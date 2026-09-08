@@ -24,14 +24,27 @@
 
 | | |
 |---|---|
-| Built from | `e1f2e8d45620e219d3fec1ed10c53baba2981a74` |
-| Tarball | `agents-can-communicate-0.4.0.tgz`, 305,269 bytes, 232 entries |
-| sha256 | `06b685e4f476fba3efdb8e4018682923fe3b54cb59bb37f8ce2c97d67053bf80` |
+| Status | Previous candidate superseded; combined 0.4.0 artifact validation pending |
 
-The exact saved archive passed installed-package verification and the published-0.3.1
-upgrade preflight. All 232 source, archive, installed and managed-runtime files matched.
-See [the candidate evidence](docs/release-evidence/v0.4.0.md) for platform results,
-native observations and remaining limits. This candidate is not published.
+The earlier source/archive digests in [historical candidate evidence](docs/release-evidence/v0.4.0.md)
+certify that earlier build only. Fresh combined-source and installed-artifact evidence is pending.
+
+Codex delivery now reuses an ordinary, already-loaded LocalDaemon thread without
+adding launch arguments or starting a daemon. Historical pre-integration
+installed-package matrices on Codex 0.152.1 and 0.153.4, macOS arm64, each passed 20 scenarios and 189
+assertions. Delivery verifies the exact receiver, workspace, process, version and
+socket; missing or unsupported endpoints retain durable inbox access. Opt-in is
+recorded separately from reachability, and expired live bindings can refresh
+without reviving retired generations. The router rechecks the authoritative
+current binding after its final policy and session reads; retirement or endpoint
+replacement during those reads cannot offer through the obsolete binding.
+
+The upgrade removes only unchanged ACC-owned Codex wrappers and preserves edited
+or unrelated shell artifacts. Reinstall and uninstall preserve client-owned TOML
+even when Codex inserts it inside ACC's configuration markers. Live delivery can
+spend tokens after the terminal detaches from a still-loaded thread; turning it
+off prevents new offers but cannot retract an already-accepted queue entry.
+Native replies remain uncertified; the observed reply loop uses `acc reply`.
 
 ## 0.3.1
 

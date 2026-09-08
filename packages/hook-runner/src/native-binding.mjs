@@ -1,5 +1,6 @@
 import { validateNativeHandshake } from "@agents-can-communicate/adapter-sdk";
 import { EXIT } from "@agents-can-communicate/protocol";
+import { retireNativeBinding } from "./native-retirement.mjs";
 
 // The hook side of native delivery: one bounded, fail-open attempt to bind
 // this exact ACC session generation to the vendor session the adapter can
@@ -29,7 +30,7 @@ export function livePolicyFrom(env) {
 const isPid = value => Number.isInteger(value) && value > 0;
 
 export async function establishNativeBinding({ adapter, event, hookBinding, clientVersion,
-  platform, livePolicy, service, runtimeDir, clock,
+  platform, livePolicy, service, runtimeDir, clock, env,
   timeoutMs = DEFAULT_TIMEOUT_MS, heartbeatCadenceMs = DEFAULT_CADENCE_MS }) {
   const outcome = (state, reasonCode, modes = []) =>
     Object.freeze({ state, reasonCode, modes: Object.freeze([...modes]) });
@@ -37,7 +38,7 @@ export async function establishNativeBinding({ adapter, event, hookBinding, clie
   const generation = hookBinding?.generation;
   if (typeof sessionId !== "string" || typeof generation !== "string") return outcome("off", null);
   const policy = LIVE_POLICIES.includes(livePolicy) ? livePolicy : "off";
-  const clear = () => service.clearDeliveryBinding({ sessionId, generation }).catch(() => null);
+  const clear = () => retireNativeBinding({ adapter, service, sessionId, generation, runtimeDir, timeoutMs });
   if (policy === "off") {
     await clear();
     return outcome("off", null);
@@ -52,12 +53,13 @@ export async function establishNativeBinding({ adapter, event, hookBinding, clie
   }
   // Whatever this generation published before is retired first, so a failed
   // re-handshake can never leave yesterday's endpoint reachable.
-  await clear();
+  if (!await clear()) return outcome("degraded", "handshake_failed");
   let timer = null;
   try {
     const budget = Math.max(1, Math.floor(timeoutMs));
     const handshake = await Promise.race([
-      adapter.bindNativeSession({ event, clientPid, clientVersion, runtimeDir, timeoutMs: budget }),
+      adapter.bindNativeSession({ event, clientPid, clientVersion, runtimeDir,
+        timeoutMs: budget, env }),
       new Promise((_resolve, reject) => {
         timer = setTimeout(() => reject(Object.assign(new Error("native handshake timed out"),
           { code: "ETIMEDOUT" })), budget);

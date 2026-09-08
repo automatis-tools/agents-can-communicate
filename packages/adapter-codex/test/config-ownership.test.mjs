@@ -187,3 +187,19 @@ test("TOML eight-digit Unicode escapes preserve foreign keys and identify owned 
   await assert.rejects(adapter.install(context), /already registered/);
   assert.equal(await readFile(file, "utf8"), userRegistration);
 });
+
+test("changed or incomplete managed registration refuses before deleting its values", async t => {
+  for (const edit of [
+    text => text.replace('source_type = "local"', 'source_type = "remote"'),
+    text => text.replace('enabled = true', 'enabled = true\nenabled = false'),
+    text => text.replace('enabled = true', ''),
+  ]) {
+    const { context, file, adapter } = await fixture(t);
+    const original = edit(rewrittenCodexConfig(context.stateRoot));
+    await writeFile(file, original);
+    for (const operation of ["install", "uninstall"]) {
+      await assert.rejects(adapter[operation](context), /ambiguous.*TOML/i);
+      assert.equal(await readFile(file, "utf8"), original);
+    }
+  }
+});

@@ -110,7 +110,7 @@ async function saveOwnership({ dataHome, record }) {
  * runtime, and leaves the bundle inside the client exactly where it was.
  */
 export async function recordInstall({ dataHome, adapterId, version, accVersion = null,
-  artifacts, createdDirectories = [], nativeActivation = null }) {
+  artifacts, createdDirectories = [], deliveryPolicy, nativeActivation = null }) {
   const stamped = await Promise.all(artifacts.map(async artifact => ({
     path: artifact.path,
     kind: artifact.kind ?? "file",
@@ -128,6 +128,7 @@ export async function recordInstall({ dataHome, adapterId, version, accVersion =
     installs: [...record.installs.filter(install => install.adapterId !== adapterId),
       { adapterId, version, accVersion, artifacts: stamped,
         ...(directories.length === 0 ? {} : { createdDirectories: directories }),
+        ...(deliveryPolicy === undefined ? {} : { deliveryPolicy }),
         // Present only for a consented native activation. A record without it
         // - every 0.2 install - reads as live policy off and is never rewritten
         // merely to add the field.
@@ -221,7 +222,10 @@ export async function verifyOwned({ dataHome, adapterId }) {
   const install = installFor(await loadOwnership({ dataHome }), adapterId);
   const result = { adapterId, present: install !== null, modified: [], missing: [],
     intact: [], delegated: [] };
-  for (const artifact of install?.artifacts ?? []) {
+  const nativeFiles = (install?.nativeActivation?.mechanisms ?? [])
+    .filter(item => item.kind === "shell-bootstrap").flatMap(item => item.ownedFiles)
+    .map(file => ({ ...file, kind: "file" }));
+  for (const artifact of [...(install?.artifacts ?? []), ...nativeFiles]) {
     if (artifact.kind === "merge") { result.delegated.push(artifact.path); continue; }
     const current = await fingerprintFor(artifact);
     if (current === null) result.missing.push(artifact.path);
@@ -252,12 +256,14 @@ export async function removeOwnedArtifacts({ dataHome, adapterId }) {
 }
 
 /** Forget one install only after every adapter-owned cleanup step succeeded. */
-export async function finalizeRemoval({ dataHome, adapterId }) {
+export async function finalizeRemoval({ dataHome, adapterId, retainedNativeActivation = null }) {
   const record = await loadOwnership({ dataHome });
   if (installFor(record, adapterId) === null) return false;
 
   await saveOwnership({ dataHome, record: { schemaVersion: SCHEMA_VERSION,
-    installs: record.installs.filter(entry => entry.adapterId !== adapterId) } });
+    installs: record.installs.flatMap(entry => entry.adapterId !== adapterId ? [entry]
+      : retainedNativeActivation === null ? [] : [{ ...entry, artifacts: [], createdDirectories: [],
+        deliveryPolicy: "off", nativeActivation: retainedNativeActivation }]) } });
   return true;
 }
 

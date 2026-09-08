@@ -1,0 +1,10 @@
+{
+  "privatePackageSha256": "945f6178357b6424a219b59cc3b9c4688b322c9da07cadf2bc7205bf20770940",
+  "publicPackageSha256": "ebe370dc8452fd14f1441138aacfd4a13b0f85c3b94ba710cec3ec35837e3ccb",
+  "scope": "all packed bin, src, plugin and skills regular files; certification and documentation differ intentionally",
+  "runtimeFiles": 131,
+  "missing": [],
+  "added": [],
+  "changed": [],
+  "passed": true
+}

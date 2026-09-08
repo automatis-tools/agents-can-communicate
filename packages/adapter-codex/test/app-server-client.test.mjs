@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, realpathSync, rmSync } from "node:fs";
 import http from "node:http";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -11,14 +11,14 @@ import { addCodexQueueMessage, compareStableVersions, isMethodMissing, locateCod
 import { acceptKey, decodeFrames, encodeFrame } from "../src/ws-json-rpc.mjs";
 
 const THREAD = "01a063ed-a384-7fe2-b443-7fedf1593f6b";
-const CWD = "/work/capture";
+const CWD = realpathSync(tmpdir());
 const SECRET_PREVIEW = "SECRET-PREVIEW-3f2a must never surface";
 const USER_AGENT = "agents-can-communicate/0.152.1 (Mac OS 26.6.2; arm64) Apple_Terminal";
 
 // A fake daemon: HTTP upgrade on a Unix socket, then one JSON-RPC message per
 // text frame, exactly as codex-cli 0.152.1 answered.
 function startDaemon({ userAgent = USER_AGENT, loaded = [THREAD], threads, queue = [],
-  queueSupported = true, missingCode = -32601 } = {}) {
+  queueSupported = true, missingCode = -32601, unsolicited = false } = {}) {
   const state = { queue: [...queue] };
   const dir = mkdtempSync(path.join(tmpdir(), "acc-codex-daemon-"));
   const socketPath = path.join(dir, "control.sock");
@@ -51,6 +51,7 @@ function startDaemon({ userAgent = USER_AGENT, loaded = [THREAD], threads, queue
     : rpcError(-32600, `Invalid request: unknown variant \`${method}\``);
   const handle = (message, reply) => {
     const { id, method, params = {} } = message;
+    if (unsolicited) reply({ method: "item/agentMessage/delta", params: { delta: SECRET_PREVIEW } });
     if (method === "initialize") return reply({ id, result: { userAgent, codexHome: "/x" } });
     if (method === "thread/loaded/list") return reply({ id, result: { data: loaded, nextCursor: null } });
     if (method === "thread/list") return reply({ id, result: { data: known, nextCursor: null } });
@@ -120,7 +121,7 @@ test("the exact thread is discovered from loaded state, never guessed",
     { id: "other", cwd: "/elsewhere", status: { type: "idle" } },
     { id: THREAD, cwd: CWD, status: { type: "active" } }] }, async peer => {
     assert.deepEqual(await locateCodexThread(peer, { threadId: THREAD, cwd: CWD }),
-      { found: true, threadId: THREAD, status: "active" });
+      { found: true, threadId: THREAD, cwd: CWD, status: "active" });
     assert.deepEqual(await locateCodexThread(peer, { threadId: "absent", cwd: CWD }),
       { found: false, reasonCode: "thread_not_loaded" });
     assert.deepEqual(await locateCodexThread(peer, { threadId: THREAD, cwd: "/nope" }),
@@ -150,3 +151,10 @@ test("frames round-trip and a partial frame is buffered", () => {
   }
   assert.deepEqual(decodeFrames(encodeFrame("hi", { mask: false }).subarray(0, 2)).frames, []);
 });
+
+
+test("production queue connections discard unsolicited transcript notifications", withDaemon(
+  { unsolicited: true }, async peer => {
+    await probeCodexQueue(peer, { threadId: THREAD });
+    assert.deepEqual(peer.notifications, []);
+  }));

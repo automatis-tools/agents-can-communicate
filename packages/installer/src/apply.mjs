@@ -42,10 +42,12 @@ export async function applyPlan({ plan, adapters, context, dataHome, dryRun = fa
         // a fixed order; an explicit off takes a recorded one back first so the
         // record written below describes the machine as it now is.
         const notes = [];
+        let retainedMechanisms = [];
         if (operation.deactivation !== undefined) {
           const report = await deactivateNative({ nativeActivation: operation.deactivation,
             ...activation });
           notes.push(...describeTeardown(report));
+          retainedMechanisms = report.retainedMechanisms;
         }
         let native = null;
         let appendedRcBlock = false;
@@ -55,12 +57,17 @@ export async function applyPlan({ plan, adapters, context, dataHome, dryRun = fa
           native = applied.nativeActivation;
           appendedRcBlock = applied.appendedRcBlock;
         }
+        if (retainedMechanisms.length > 0) {
+          native = { ...(native ?? operation.deactivation),
+            mechanisms: [...(native?.mechanisms ?? []), ...retainedMechanisms] };
+        }
         // Recorded after the write, so a record never claims an install that
         // did not happen. The reverse order would leave uninstall trying to
         // remove files nothing created.
         await recordInstall({ dataHome, adapterId: adapter.id,
           version: operation.clientVersion ?? null, accVersion,
-          artifacts: operation.artifacts, createdDirectories, nativeActivation: native });
+          artifacts: operation.artifacts, createdDirectories,
+          deliveryPolicy: operation.livePolicy, nativeActivation: native });
         results.operations.push({ ...operation, applied: true, appendedRcBlock,
           needsAction: outcome.needsAction ?? [],
           changes: outcome.changes ?? [], diagnostics: [
@@ -77,10 +84,12 @@ export async function applyPlan({ plan, adapters, context, dataHome, dryRun = fa
         // authority for deletion and the only durable recipe a retry has when
         // the client or one of ACC's own artifacts is already gone.
         const notes = [];
+        let retainedMechanisms = [];
         if (operation.deactivation !== undefined) {
           const report = await deactivateNative({ nativeActivation: operation.deactivation,
             ...activation });
           notes.push(...describeTeardown(report));
+          retainedMechanisms = report.retainedMechanisms;
         }
         const owned = await removeOwnedArtifacts({ dataHome, adapterId: adapter.id });
         // What ownership held back is passed on, because the adapter would
@@ -90,7 +99,9 @@ export async function applyPlan({ plan, adapters, context, dataHome, dryRun = fa
         const outcome = await adapter.uninstall({ ...context, keep: owned.kept });
         const directories = await removeEmptyOwnedDirectories({ home: context.home,
           directories: owned.createdDirectories });
-        await finalizeRemoval({ dataHome, adapterId: adapter.id });
+        await finalizeRemoval({ dataHome, adapterId: adapter.id,
+          retainedNativeActivation: retainedMechanisms.length === 0 ? null
+            : { ...operation.deactivation, mechanisms: retainedMechanisms } });
         results.operations.push({ ...operation, applied: true,
           changes: outcome.changes ?? [], removed: owned.removed, kept: owned.kept,
           removedDirectories: directories.removed, keptDirectories: directories.kept,

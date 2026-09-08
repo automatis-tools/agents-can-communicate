@@ -240,12 +240,14 @@ The recipient owns `livePolicy` because native push may start a model turn:
 - `actionable`: questions, requests, answers, decisions, and addressed handoffs may use live push;
 - `all`: every addressed kind may use live push.
 
-Default is `off`. Policy never creates a capability. The router still requires a current
-reachable binding, one unambiguous recipient generation, supported client evidence, and
-adapter acceptance. Claude Code live delivery on macOS arm64 uses a captured 2.1.258
-minimum plus a current feature probe and per-session protocol handshake; it was confirmed
-again on 2.1.260. Codex's queue transport was captured but withdrawn because its required
-mode hides the session workspace. Every unavailable or refused route falls back durably.
+Default is `off`. Policy never creates a capability. The router requires one
+current eligible recipient generation, supported client evidence, a verified
+binding and adapter acceptance. Claude Code Channel uses a captured 2.1.258
+minimum, confirmed on 2.1.260. Codex LocalDaemon uses a 0.152.1 minimum, confirmed
+through installed-product captures on 0.152.1 and 0.153.4; recorded consent and
+exact thread, cwd, process, version and protocol verification govern every session.
+Unavailable or refused routes fall back durably. Codex replies use the ACC CLI;
+its native reply route remains false.
 
 ## Attention and sync
 

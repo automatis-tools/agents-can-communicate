@@ -1,0 +1,19 @@
+{
+  "source": "controlled-installed-package-mutation",
+  "mutation": "wrong-thread",
+  "originalPackageSha256": "131ded0a90a8a03131e72fe5ebac87be62a5e19617675da06685429deb90d456",
+  "expectedFailure": "only exact B1 executes an automatic turn",
+  "startedAt": "2026-09-08T05:29:20.988Z",
+  "caught": true,
+  "mutantPackageSha256": "944852ead966e1431d337d8a63edd7919381d05e17c0e4bd2245ad3b49c9f7a8",
+  "client": "codex-cli",
+  "clientVersion": "0.152.1",
+  "platform": "darwin-arm64",
+  "cleanup": {
+    "attempted": true,
+    "outcome": "passed",
+    "ownedProcesses": "stopped",
+    "temporaryState": "removed"
+  },
+  "finishedAt": "2026-09-08T05:31:40.205Z"
+}

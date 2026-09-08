@@ -127,24 +127,49 @@
       "client": "codex-cli",
       "version": "0.152.1",
       "platform": "darwin-arm64",
-      "observedAt": "2026-09-03T04:45:00.000Z",
+      "observedAt": "2026-09-08T10:45:27.843Z",
       "capability": "delivery.livePush",
-      "fixture": "fixtures/delivery/codex-cli-0.152.1-remote-workspace.json",
+      "fixture": "fixtures/delivery/codex-cli-0.152.1-local-daemon-current-binding-product.json",
       "provenance": "fixtures/certification-provenance.json",
-      "provenanceId": "native-delivery-0-152-1-remote-workspace",
-      "idleBehavior": "unobserved",
-      "busyBehavior": "unobserved",
+      "provenanceId": "native-delivery-0-152-1-local-daemon-current-binding-product",
+      "idleBehavior": "offered",
+      "busyBehavior": "queued_after_turn",
       "authorityLevel": "experimental",
       "limitations": [
-        "release capture on the installed tarball, with the vendor daemon already running from a directory other than the session's",
-        "native delivery requires codex --remote unix://, and in that mode the session runs inside the daemon",
-        "the SessionStart hook payload reported cwd as the daemon's directory rather than the client's: the client was working in a temporary capture project while the payload named the daemon's own checkout",
-        "the App Server's own thread/list recorded that same daemon directory for the live thread, so the session's workspace is not available from anything ACC can reach",
-        "ACC placed the session in an unrelated workspace and injected that workspace's peers into it",
-        "no delivery branch could be observed because the session was never addressable from the workspace it was actually in",
-        "the earlier 0.152.1 pass started the daemon itself in the session's own directory, so the two directories coincided and the substitution was invisible"
+        "Observed on darwin-arm64 with an already-running LocalDaemon and ordinary commands; ACC adds no launch arguments and owns no vendor daemon lifecycle.",
+        "Recorded recipient opt-in and exact current thread, canonical cwd, live process, stable version and protocol checks are required for every session.",
+        "A 120-second delivery lease can refresh on demand for the same non-retired endpoint; this does not renew the 24-hour presence expiry.",
+        "Unsupported or Embedded sessions and unreachable or rejected endpoints retain durable inbox delivery; accepted vendor queue entries cannot be withdrawn by policy off or uninstall.",
+        "A loaded daemon thread may execute opted-in messages after its TUI exits. TUI detachment is not SessionEnd; explicit thread archive or actual server teardown retires it.",
+        "Transport deduplication covers a pending queue entry only. Execution can repeat after queue consumption and acknowledgement loss.",
+        "The observed reply loop uses the installed acc reply CLI; native delivery.replyRoute remains false. No new lifecycle, guard or next-turn certification follows.",
+        "P16 is controlled endpoint fault injection. P18 uses an actual legacy npm artifact; its unrelated Claude shell artifact is not a real Claude capability capture."
       ],
-      "result": "fail"
+      "result": "pass"
+    },
+    {
+      "client": "codex-cli",
+      "version": "0.153.4",
+      "platform": "darwin-arm64",
+      "observedAt": "2026-09-08T10:45:35.663Z",
+      "capability": "delivery.livePush",
+      "fixture": "fixtures/delivery/codex-cli-0.153.4-local-daemon-current-binding-product.json",
+      "provenance": "fixtures/certification-provenance.json",
+      "provenanceId": "native-delivery-0-153-4-local-daemon-current-binding-product",
+      "idleBehavior": "offered",
+      "busyBehavior": "queued_after_turn",
+      "authorityLevel": "experimental",
+      "limitations": [
+        "Observed on darwin-arm64 with an already-running LocalDaemon and ordinary commands; ACC adds no launch arguments and owns no vendor daemon lifecycle.",
+        "Recorded recipient opt-in and exact current thread, canonical cwd, live process, stable version and protocol checks are required for every session.",
+        "A 120-second delivery lease can refresh on demand for the same non-retired endpoint; this does not renew the 24-hour presence expiry.",
+        "Unsupported or Embedded sessions and unreachable or rejected endpoints retain durable inbox delivery; accepted vendor queue entries cannot be withdrawn by policy off or uninstall.",
+        "A loaded daemon thread may execute opted-in messages after its TUI exits. TUI detachment is not SessionEnd; explicit thread archive or actual server teardown retires it.",
+        "Transport deduplication covers a pending queue entry only. Execution can repeat after queue consumption and acknowledgement loss.",
+        "The observed reply loop uses the installed acc reply CLI; native delivery.replyRoute remains false. No new lifecycle, guard or next-turn certification follows.",
+        "P16 is controlled endpoint fault injection. P18 uses an actual legacy npm artifact; its unrelated Claude shell artifact is not a real Claude capability capture."
+      ],
+      "result": "pass"
     }
   ]
 }

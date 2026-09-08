@@ -70,13 +70,14 @@ There is no model-attention claim and no public state override. Failed accelerat
 the message queued and records only a closed safe error code. Diagnostics and offer events
 never copy the peer body.
 
-A live adapter must match its declared evidence contract, one unexpired generation-bound
-binding, and the recipient's opt-in policy. Opaque endpoint references remain inside the
-adapter and outside repositories. Claude Code live delivery is currently supported on
-macOS arm64 from the captured 2.1.258 minimum when a current feature probe and per-session
-handshake pass; it remains experimental and off by default. Codex's queue capture passed,
-but the capability was withdrawn because the required mode hides session workspace
-identity.
+A live adapter must match its declared evidence contract, one current
+generation-bound binding and recipient opt-in. Opaque endpoints remain private
+and outside repositories. Claude Code Channel and Codex LocalDaemon delivery are
+experimental and off by default. Codex verifies the exact receiver thread,
+canonical cwd, live process, stable version and protocol, and rereads recorded
+consent before offers. A loaded daemon thread can receive messages after its TUI
+exits. Delivery off and uninstall prevent new Codex submissions; a submission
+already accepted by the vendor queue cannot be withdrawn.
 
 ## Claims
 

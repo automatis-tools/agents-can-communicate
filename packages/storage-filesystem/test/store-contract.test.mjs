@@ -12,6 +12,7 @@ import { openFilesystemStore } from "../src/store.mjs";
 
 const NOW = "2026-08-16T01:00:00.000Z";
 const roots = [];
+const delay = milliseconds => new Promise(resolve => { setTimeout(resolve, milliseconds); });
 
 // The runner owns the lifecycle of each store, so roots are collected and
 // removed once rather than wrapped per test.
@@ -140,6 +141,23 @@ test("filesystem: ephemeral list validates hand-written delivery bindings", asyn
 
   await assert.rejects(() => store.ephemeral.list("deliveryBinding"),
     error => error.code === EXIT.DATA && /schemaVersion/.test(error.message));
+});
+
+test("filesystem: an update that expires before publication leaves the prior record intact", async () => {
+  // Removing the update publication deadline check writes `endpoint_new` here.
+  const store = await filesystemStore();
+  await store.ephemeral.put("deliveryBinding", "session_a", binding());
+  const deadlineAt = Date.now() + 500;
+  let entered = false;
+  await assert.rejects(store.ephemeral.update("deliveryBinding", "session_a", async current => {
+    entered = true;
+    await delay(Math.max(1, deadlineAt - Date.now() + 20));
+    return { ...current, opaqueEndpointRef: "endpoint_new" };
+  }, { deadlineAt }), error => error.code === EXIT.CONFLICT
+    && /deadline expired before (?:durable )?publication/.test(error.message));
+  assert.equal(entered, true, "the deadline expired before the writer acquired the lock");
+  assert.equal((await store.ephemeral.get("deliveryBinding", "session_a")).opaqueEndpointRef,
+    "socket_a");
 });
 
 for (const [name, overrides, message] of [

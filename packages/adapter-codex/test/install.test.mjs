@@ -1,8 +1,11 @@
 import assert from "node:assert/strict";
-import { mkdir, mkdtemp, readFile, readdir, realpath, rm, writeFile } from "node:fs/promises";
+import { execFile } from "node:child_process";
+import { chmod, mkdir, mkdtemp, readFile, readdir, realpath, rm, writeFile }
+  from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
+import { promisify } from "node:util";
 
 import { CODEX_PLUGIN, pluginVersion } from "../../../tests/helpers/plugin-version.mjs";
 
@@ -10,6 +13,8 @@ import { EXIT } from "@agents-can-communicate/protocol";
 
 import { createCodexAdapter } from "../src/adapter.mjs";
 import { CODEX_HOOK_EVENTS, injectOutcome, normalizeCodexHook } from "../src/hooks.mjs";
+
+const run = promisify(execFile);
 
 // Kept cohesive above 300 lines because every case shares the same real Codex
 // home/marketplace topology and jointly proves install, upgrade, and uninstall
@@ -139,27 +144,29 @@ test("only capabilities observed in a real session are declared true", () => {
   // Not observed, so not claimed: no subagent ran during the capture.
   assert.equal(capabilities.lifecycle.childSessions, false);
   assert.equal(capabilities.delivery.nextTurn, true);
-  // The 0.152.1 queue capture observed a working transport, and the release
-  // capture then measured that the mode it requires - codex --remote unix:// -
-  // reports the daemon's directory as the session's, from both the hook payload
-  // and the App Server's own thread record. A session ACC cannot place must not
-  // be addressed, so neither live capability is claimed.
-  assert.equal(capabilities.delivery.livePush, false);
+  // The LocalDaemon transport was captured on ordinary installed Codex clients.
+  // A per-session handshake still decides whether a particular receiver can be
+  // reached, but the adapter may now offer that captured transport.
+  assert.equal(capabilities.delivery.livePush, true);
   assert.equal(capabilities.delivery.replyRoute, false);
 });
 
-// The contract refuses a native-delivery descriptor with no passing anchor, and
-// it is right to: an anchor asserts a capability proved on that release. The
-// release capture withdrew the only one Codex had, so the adapter declares no
-// native delivery at all rather than a descriptor it cannot back.
-test("native delivery is not declared, because no capture backs it", () => {
+// Removing the native descriptor, its product anchor, or a backing method must
+// make this fail: without all three, ACC cannot safely reuse LocalDaemon.
+test("native delivery names the captured LocalDaemon contract and leaves replies unrouted", () => {
   const adapter = createCodexAdapter();
-  assert.equal(adapter.nativeDelivery, undefined,
-    "declaring native delivery would assert a capability no capture supports");
+  assert.deepEqual(adapter.nativeDelivery.minimumByPlatform, { "darwin-arm64": "0.152.1" });
+  assert.deepEqual(adapter.nativeDelivery.anchors, [{ platform: "darwin-arm64", version: "0.152.1",
+    protocolContract: "codex-app-server-thread-queue-v1" }]);
+  assert.deepEqual(adapter.nativeDelivery.activationKinds, ["native-service"]);
+  assert.equal(adapter.nativeDelivery.policySource, "installation-record");
   for (const method of ["probeNativeDelivery", "planNativeActivation", "bindNativeSession",
-    "offerMessage", "routeReply"]) {
-    assert.equal(Object.hasOwn(adapter, method), false, method);
+    "refreshNativeSession", "retireNativeSession", "offerMessage"]) {
+    assert.equal(typeof adapter[method], "function", method);
   }
+  assert.equal(adapter.capabilities.delivery.replyRoute, false);
+  assert.equal(Object.hasOwn(adapter, "routeReply"), false,
+    "a CLI reply receipt must not be misrepresented as a native reply route");
 });
 
 test("doctor reports the capture and the trust requirement", async t => {
@@ -444,9 +451,39 @@ test("the cached copy carries the same absolute hook command", async t => {
     "cache", "acc-local", "agents-can-communicate", await pluginVersion(CODEX_PLUGIN),
   "hooks.json"), "utf8"));
   const command = Object.values(cached.hooks)[0][0].hooks[0].command;
-  const executable = command.match(/"([^"]+)"/)[1];
+  const executable = command.match(/^sh (['"])(.*?)\1 /)[2];
   assert.equal(path.isAbsolute(executable), true, `relative command: ${command}`);
 });
+
+test("the installed hook command preserves literal metacharacters and exports its data home",
+  async t => {
+    const base = await realpath(await mkdtemp(path.join(tmpdir(), "acc-codex-command-")));
+    t.after(() => rm(base, { recursive: true, force: true }));
+    const home = path.join(base, "space ' $() `printf tick`");
+    const dataHome = path.join(base, "data space ' $() `literal`");
+    const node = path.join(base, "node");
+    const runner = path.join(base, "acc-hook.mjs");
+    await mkdir(home, { recursive: true });
+    await writeFile(node, '#!/bin/sh\nprintf "%s\\n" "$ACC_DATA_HOME"\n');
+    await chmod(node, 0o755);
+    await writeFile(runner, "// runner fixture\n");
+
+    const context = { home, codexHome: path.join(home, ".codex"), dataHome, node, runner };
+    await createCodexAdapter().install(context);
+    const cached = JSON.parse(await readFile(path.join(context.codexHome, "plugins", "cache",
+      "acc-local", "agents-can-communicate", await pluginVersion(CODEX_PLUGIN), "hooks.json"),
+    "utf8"));
+    const command = Object.values(cached.hooks)[0][0].hooks[0].command;
+
+    const result = await run("sh", ["-c", command], { env: { PATH: "/usr/bin:/bin" } });
+    assert.equal(result.stdout, `${dataHome}\n`);
+    const skill = await readFile(path.join(context.codexHome, "plugins", "cache", "acc-local",
+      "agents-can-communicate", await pluginVersion(CODEX_PLUGIN), "skills", "acc", "SKILL.md"), "utf8");
+    const skillCommand = skill.match(/```bash\n([\s\S]*?)\n```/)[1];
+    const skillRun = await run("sh", ["-c", skillCommand], { env: { PATH: "/usr/bin:/bin" } });
+    assert.equal(skillRun.stdout, `${dataHome}\n`,
+      "the installed skill must reach the same data home without daemon environment exports");
+  });
 
 test("detect reports the plugin as installed straight after install", async t => {
   const { context } = await realFixture(t);

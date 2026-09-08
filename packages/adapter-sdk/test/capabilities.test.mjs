@@ -132,3 +132,10 @@ test("an adapter without a client binary is refused at construction", () => {
   assert.throws(() => defineAdapter({ ...base(), client: { command: "  " } }),
     error => error.code === EXIT.USAGE);
 });
+
+test("optional native refresh and retirement methods must be callable", () => {
+  for (const method of ["refreshNativeSession", "retireNativeSession"]) {
+    assert.throws(() => defineAdapter(base({ [method]: true })), new RegExp(method));
+    assert.equal(typeof defineAdapter(base({ [method]: noop }))[method], "function");
+  }
+});

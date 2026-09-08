@@ -1,3 +1,4 @@
+import { retireNativeBinding } from "./native-retirement.mjs";
 import { createHash, randomBytes } from "node:crypto";
 import { realpath } from "node:fs/promises";
 import path from "node:path";
@@ -5,6 +6,7 @@ import path from "node:path";
 import { clearSessionBinding, effectiveCapabilities, loadSessionBinding, storeSessionBinding }
   from "@agents-can-communicate/adapter-sdk";
 import { createCoordinationService } from "@agents-can-communicate/core";
+import { readInstalledLivePolicy } from "@agents-can-communicate/installer";
 import { assertPortableId, createId } from "@agents-can-communicate/protocol";
 import { openFilesystemStore } from "@agents-can-communicate/storage-filesystem";
 import { createGitProbe, discoverWorkspace, platformDataHome, runtimePaths }
@@ -188,14 +190,15 @@ async function openContext({ cwd, dataHome, runtime, env, deadline }) {
   const descriptor = await discoverWorkspace({ cwd, env: env ?? {},
     gitProbe: createGitProbe({ deadlineAt: deadline }) });
   assertHookBudget(deadline);
+  const resolvedDataHome = dataHome ?? platformDataHome({ env: env ?? {} });
   const paths = runtimePaths({
-    dataHome: dataHome ?? platformDataHome({ env: env ?? {} }),
+    dataHome: resolvedDataHome,
     workspaceId: descriptor.id,
     workspaceRoots: descriptor.roots,
   });
   const store = await openFilesystemStore({ root: paths.root, clock: runtime.clock,
     ids: runtime.ids, workspaceId: descriptor.id, deadlineAt: deadline });
-  return { descriptor, paths, env: env ?? {}, realpath: runtime.realpath ?? realpath,
+  return { descriptor, paths, dataHome: resolvedDataHome, env: env ?? {}, realpath: runtime.realpath ?? realpath,
     service: createCoordinationService({ store, clock: runtime.clock, ids: runtime.ids }) };
 }
 
@@ -309,14 +312,18 @@ async function projectTurn({ binding, context, adapter, adapterId }) {
 }
 
 // One bounded, fail-open native handshake for this exact session generation.
-// The policy comes only from the environment an owned shell bootstrap
-// exported; an ordinary launch has none and stays durable.
+// New adapters read durable consent from their installation record; legacy
+// adapters keep the environment exported by an owned shell bootstrap.
 async function bindNative({ adapter, event, hookBinding, clientVersion, platform, context, paths,
   deadline }) {
   assertHookBudget(deadline);
+  const livePolicy = adapter?.nativeDelivery?.policySource === "installation-record"
+    ? await readInstalledLivePolicy({ dataHome: context.dataHome, adapterId: adapter.id })
+    : livePolicyFrom(context.env);
+  assertHookBudget(deadline);
   return establishNativeBinding({ adapter, event, hookBinding, clientVersion, platform,
-    livePolicy: livePolicyFrom(context.env), service: context.service, runtimeDir: paths.root,
-    clock: context.service.clock,
+    livePolicy, service: context.service, runtimeDir: paths.root,
+    clock: context.service.clock, env: context.env,
     timeoutMs: Math.max(1, Math.min(750, deadline - Date.now())) });
 }
 
@@ -416,8 +423,11 @@ const HANDLERS = {
     return {};
   },
 
-  async sessionEnd({ binding, context, event, paths, deadline }) {
+  async sessionEnd({ binding, context, event, paths, adapter, deadline }) {
     if (binding === null) return {};
+    await retireNativeBinding({ adapter, service: context.service, sessionId: binding.accSessionId,
+      generation: binding.generation, runtimeDir: paths.root,
+      timeoutMs: Math.max(1, Math.min(200, deadline - Date.now())) });
     const owner = { sessionId: binding.accSessionId, generation: binding.generation };
     const current = await context.service.locateSession(binding.accSessionId);
     if (current?.record.generation === binding.generation && current.record.state === "open") {
@@ -463,10 +473,9 @@ const HANDLERS = {
       generation: binding.generation });
     // A native transport that became ready only after SessionStart is picked
     // up here and a live lease is renewed: bounded, fail-open, never on a guard.
-    const nativeBinding = livePolicyFrom(context.env) === "off" ? undefined
-      : await bindNative({ adapter, event, hookBinding: binding,
-        clientVersion: binding.clientVersion, platform: binding.platform, context, paths,
-        deadline });
+    const nativeBinding = await bindNative({ adapter, event, hookBinding: binding,
+      clientVersion: binding.clientVersion, platform: binding.platform, context, paths,
+      deadline });
     const turn = await projectTurn(input);
     return nativeBinding === undefined ? turn : { ...turn, nativeBinding };
   },

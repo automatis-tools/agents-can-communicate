@@ -313,13 +313,15 @@ export async function openFilesystemStore({ root, clock, ids, workspaceId, failA
         return record;
       });
     },
-    async update(kind, id, updater) {
-      return withWriterMutex(paths, { ...publishOptions, deadlineAt: storeDeadline }, async () => {
+    async update(kind, id, updater, { deadlineAt = storeDeadline } = {}) {
+      deadlineAt = Math.min(deadlineAt ?? Infinity, storeDeadline ?? Infinity);
+      return withWriterMutex(paths, { ...publishOptions, deadlineAt }, async () => {
         const next = await updater(await readEphemeral(kind, id));
         if (next === null) return null;
         validateRecord(kind, next);
+        assertPublicationDeadline(deadlineAt);
         await publishAtomic(ephemeralPath(kind, id), encode(next),
-          { root, tmpDir: paths.tmp, replace: true, deadlineAt: storeDeadline });
+          { root, tmpDir: paths.tmp, replace: true, deadlineAt });
         await markEphemeral(paths, publishOptions, kind, id, "present");
         return next;
       });

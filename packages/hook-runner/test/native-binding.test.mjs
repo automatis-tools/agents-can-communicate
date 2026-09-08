@@ -65,8 +65,21 @@ test("policy off clears the current binding and never handshakes", async () => {
   const result = await establish(nativeAdapter(async () => { handshakes += 1; return HANDSHAKE; }),
     service, { livePolicy: "off" });
   assert.deepEqual(result, { state: "off", reasonCode: null, modes: [] });
-  assert.deepEqual(service.calls, [["clear", { sessionId: "session_a", generation: "generation_a" }]]);
+  assert.deepEqual(service.calls.map(([name, input]) => [name, input.sessionId, input.generation]),
+    [["clear", "session_a", "generation_a"]]);
+  assert.equal(Number.isFinite(service.calls[0][1].deadlineAt), true);
   assert.equal(handshakes, 0);
+});
+
+test("the hook environment reaches the adapter handshake for endpoint lookup", async () => {
+  let received;
+  const env = { CODEX_HOME: "/literal/codex", ACC_APP_SERVER_SOCKET: "/runtime/socket" };
+  const service = fakeService();
+
+  await establish(nativeAdapter(async input => { received = input; return HANDSHAKE; }),
+    service, { env });
+
+  assert.equal(received.env, env);
 });
 
 test("a missing, malformed, or foreign policy value is off", () => {
@@ -95,7 +108,8 @@ test("a successful handshake publishes only adapter modes, an opaque ref, and a 
       modes: ["livePush", "idleWake", "busyQueue", "replyRoute"] });
     assert.equal(Object.isFrozen(result), true);
     assert.deepEqual(service.calls, [
-      ["clear", { sessionId: "session_a", generation: "generation_a" }],
+      ["clear", { sessionId: "session_a", generation: "generation_a",
+        deadlineAt: service.calls[0][1].deadlineAt }],
       ["publish", { sessionId: "session_a", generation: "generation_a", adapterId: "fixture",
         clientVersion: "2.1.258", availableModes: ["livePush", "idleWake", "busyQueue", "replyRoute"],
         livePolicy: "all", opaqueEndpointRef: "adapter-owned-endpoint-id",
@@ -161,5 +175,7 @@ test("a binding without a resolved client process cannot go live until a fresh s
   const result = await establish(nativeAdapter(), service,
     { hookBinding: { accSessionId: "session_a", generation: "generation_a" } });
   assert.deepEqual(result, { state: "degraded", reasonCode: "client_process_unknown", modes: [] });
-  assert.deepEqual(service.calls, [["clear", { sessionId: "session_a", generation: "generation_a" }]]);
+  assert.deepEqual(service.calls.map(([name, input]) => [name, input.sessionId, input.generation]),
+    [["clear", "session_a", "generation_a"]]);
+  assert.equal(Number.isFinite(service.calls[0][1].deadlineAt), true);
 });

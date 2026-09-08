@@ -1,5 +1,67 @@
 # Codex compatibility
 
+## Current LocalDaemon delivery (2026-09-08)
+
+The installed npm package was exercised against exact Codex CLI 0.152.1 and
+0.153.4 on darwin-arm64, with an already-running daemon in A and an ordinary
+receiver in B. The complete P01–P20 product matrices cover real generated hooks,
+installed CLI sends, actual model marker commands and ACC inbox/reply operations.
+Separate T01–T04 captures cover direct installed-adapter transport only.
+
+| Exact client | Installed product evidence | Transport evidence |
+|---|---|---|
+| 0.152.1 | [Product](fixtures/delivery/codex-cli-0.152.1-local-daemon-current-binding-product.json) and [full matrix](fixtures/delivery/codex-cli-0.152.1-local-daemon-current-binding-product-evidence.json) | [Transport](fixtures/delivery/codex-cli-0.152.1-local-daemon-transport.json) |
+| 0.153.4 | [Product](fixtures/delivery/codex-cli-0.153.4-local-daemon-current-binding-product.json) and [full matrix](fixtures/delivery/codex-cli-0.153.4-local-daemon-current-binding-product-evidence.json) | [Transport](fixtures/delivery/codex-cli-0.153.4-local-daemon-transport.json) |
+
+These selected product captures were repeated after the router’s final current-binding
+check was corrected. Earlier positive product captures and the original remote
+workspace failure remain unchanged in hashed provenance history. The retirement
+race itself is covered by separate deterministic router regression tests.
+
+Native `delivery.livePush` uses the darwin-arm64 minimum 0.152.1, current feature
+probe, recorded recipient consent, and exact thread, canonical cwd, live process,
+stable version and protocol checks. ACC adds no client arguments and does not
+start, restart or stop a vendor daemon. Unsupported platforms, older clients,
+Embedded sessions, unavailable sockets and failed identity checks keep the durable
+inbox. Ordinary hook capabilities remain limited to their exact 0.147.0 capture.
+
+An expired 120-second lease can refresh on demand for the same current endpoint;
+retirement or a changed generation cannot be revived. Refresh does not extend the
+24-hour participant-presence limit. Private endpoint references are registered in
+the receiver's ACC data home, so a sender's different CODEX_HOME cannot redirect
+its offer. Hook and skill commands pin the installed ACC data home even when a
+daemon predates opt-in and has no ACC environment variables.
+
+Messages accepted while a turn is running wait for it to finish. An idle thread
+can start an automatic turn and spend tokens. Closing the TUI can leave the thread
+loaded: both tested versions executed an opted-in synthetic ACC question and
+replied after terminal exit. A loaded resume may emit fresh UserPromptSubmit
+without a new SessionStart. Actual archive and SessionEnd retire the binding;
+terminal exit alone is not an opt-out. Delivery off or uninstall blocks new offers
+but cannot withdraw a queue entry the vendor already accepted.
+
+Codex can insert its own project-trust and other tables between ACC config
+markers. Reinstall and uninstall preserve those foreign settings. Ambiguous
+owned TOML or a closed inline parent namespace causes a conflict before install
+writes; diagnostics identify the file and a structural reason. This bounded
+preservation scan does not lock out concurrent Codex config edits.
+
+The observed reply loop uses the installed `acc reply` CLI; native
+`delivery.replyRoute` remains false. Pending queue entries deduplicate by ACC
+message ID. Controlled acknowledgement loss after queue consumption produced two
+actual executions on both versions: there is no exactly-once guarantee after
+consumption. No additional lifecycle, guard, child-session or next-turn capability
+is certified by these product captures.
+
+The earlier September 3 workspace interpretation is corrected by actual `pwd`
+measurements: a new explicit `--remote` thread without `--cd` really works in A,
+the daemon's directory. Its hook and thread cwd are consistent with that execution.
+Ordinary LocalDaemon launch from B preserves B. ACC therefore removes its old
+launch rewrite and verifies the existing ordinary thread. The original failure
+fixture and provenance bytes remain unchanged as hashed historical evidence.
+Dated sections below describe their captures and former implementation, not the
+current adapter contract.
+
 Verified 2026-08-16 against the installed client and the material it ships.
 
 | Item | Value |
@@ -119,8 +181,8 @@ capture. Certified true on 0.147.0 darwin-arm64: `lifecycle.sessionStart`,
 `delivery.nextTurn`. The shell denial was observed, but its `PreToolUse` payload was not
 retained — the shipped Bash JSON is an allowed `PostToolUse` event — so it cannot satisfy
 the package-local evidence gate and `guards.beforeShell` is now false. Child sessions remain
-unobserved. Native `delivery.livePush` and `delivery.replyRoute` remain false after the
-0.152.0 boundary capture.
+unobserved. Native `delivery.livePush` has the separate LocalDaemon contract and
+installed-product evidence above; native `delivery.replyRoute` remains false.
 
 ## Certification findings (2026-08-16)
 

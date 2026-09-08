@@ -3,6 +3,7 @@ import { randomBytes } from "node:crypto";
 
 import { EXIT, createId } from "@agents-can-communicate/protocol";
 import { createCoordinationService } from "@agents-can-communicate/core";
+import { readInstalledLivePolicy } from "@agents-can-communicate/installer";
 import { createDeliveryRouter } from "@agents-can-communicate/delivery-router";
 import { openFilesystemStore } from "@agents-can-communicate/storage-filesystem";
 import { ALL_ADAPTERS, createGitProbe, discoverWorkspace, platformDataHome, runtimePaths }
@@ -51,7 +52,10 @@ await serve({
   log: message => process.stderr.write(`acc-mcp: ${message}\n`),
   context: {
     service,
-    deliveryRouter: createDeliveryRouter({ service, adapters, clock }),
+    deliveryRouter: createDeliveryRouter({ service, adapters, clock,
+      platform: `${process.platform}-${process.arch}`,
+      readLivePolicy: ({ adapter }) => readInstalledLivePolicy({ dataHome,
+        adapterId: adapter.id }) }),
     workspaceId: descriptor.id,
     participantId,
     descriptor,

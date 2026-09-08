@@ -131,8 +131,29 @@ The rules `defineAdapter` enforces, and the ones the runtime applies:
   when numerically newer. `knownBad` names exact versions or inclusive intervals.
 - Exact-version certification still governs every non-native capability;
   `effectiveCapabilities()` is unchanged. The native rule is used for live delivery alone.
-- The three native methods return closed facts (`validateNativeActivationPlan()` closes the
+- Native methods return closed facts (`validateNativeActivationPlan()` closes the
   activation plan) and never put vendor data - endpoints, sockets, raw errors - into core.
+
+`nativeDelivery.policySource` defaults to the session environment. An adapter may
+declare `"installation-record"` when hooks and senders must read current recorded
+recipient consent independently of the vendor process environment. Installation
+records the requested policy even when current activation is unavailable. An absent
+or invalid record means `off`; a previously published binding cannot override it.
+
+The optional `refreshNativeSession()` method may revalidate an expired lease before
+an offer. It returns the same closed handshake shape as `bindNativeSession()` and
+must preserve the exact endpoint and protocol identity. The router rechecks the
+current session, generation, retirement, uniqueness and policy before publishing
+the refreshed lease. Refresh is not a heartbeat and cannot extend presence beyond
+its own expiry. Optional `retireNativeSession()` cleans adapter-owned endpoint state
+after confirmed core retirement; it must remain bounded and fail open for hooks.
+
+A package-shipped passing Codex installed-hook capture additionally references its
+complete real product matrix through the selected provenance record's
+`productEvidence: { fixture, sha256 }`. Package verification checks the actual file,
+raw digest and client/version/platform/package identity. A transport-only capture
+cannot certify the installed product route. `historicalFixtures` may retain hashed
+earlier failures without duplicating a certification tuple.
 
 ## Choose the integration depth
 
@@ -143,12 +164,13 @@ The rules `defineAdapter` enforces, and the ones the runtime applies:
 | 2 | hooks + skill | only the lifecycle, context, guard, and next-turn behaviors separately captured for this client | uncaptured hook behaviors |
 | 3 | + native delivery surface | only captured live-push and reply-route modes | safe-point injection or child sessions unless separately captured |
 
-Installed hook wiring may reach tier 2, but the effective capability is still limited to
-an exact certified client/version/platform. Tier 3 ships for one client: Claude Code, from
-2.1.258 on macOS arm64, behind the native delivery contract above. Codex reached a passing
-queue capture and was withdrawn anyway - the mode its transport needs reports the daemon's
-workspace as the session's - which is the standard: a capture that works is not the same
-claim as a capability that is safe to ship.
+Installed hook wiring may reach tier 2, but each effective hook capability still
+requires exact client/version/platform evidence. Tier 3 has separate native
+contracts: Claude Code Channel from 2.1.258 and Codex LocalDaemon from 0.152.1 on
+macOS arm64, with current probes and exact session handshakes. Codex's earlier
+remote-wrapper failure remains historical evidence. Ordinary launch now preserves
+workspace identity; the full installed product matrix, including negative controls
+and fallback, backs its native claim.
 
 ## Normalize hook input
 

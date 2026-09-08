@@ -8,6 +8,9 @@ import { createCoordinationService } from "../src/service.mjs";
 import { createFakeClock, createFakeIds, createMemoryStore }
   from "../../../tests/helpers/memory-store.mjs";
 
+// Kept cohesive above 300 lines because every case drives the same binding
+// service and generation lifecycle; splitting would duplicate the race harness.
+
 const NOW = "2026-09-01T20:00:00.000Z";
 const WORKSPACE = "workspace_delivery";
 
@@ -50,20 +53,36 @@ test("a delivery binding belongs to one open session generation", async () => {
   assert.deepEqual(listed, [binding(session)]);
 });
 
-test("expired and replaced-generation bindings cannot be inherited", async () => {
+test("expired bindings are opt-in while retired bindings remain hidden", async () => {
+  const { service, clock } = fixture();
+  const session = await open(service, "models", "session_models");
+  await service.publishDeliveryBinding(binding(session));
+
+  clock.advance(60_001);
+  assert.deepEqual(await service.listDeliveryBindings({
+    participantId: "models", now: clock.now() }), []);
+  assert.deepEqual(await service.listDeliveryBindings({
+    participantId: "models", now: clock.now(), includeExpired: true }), [binding(session)]);
+
+  await service.clearDeliveryBinding({ sessionId: session.sessionId,
+    generation: session.generation });
+  assert.deepEqual(await service.listDeliveryBindings({
+    participantId: "models", now: clock.now() }), []);
+  assert.deepEqual(await service.listDeliveryBindings({
+    participantId: "models", now: clock.now(), includeExpired: true }), []);
+});
+
+test("an expired binding from a replaced generation cannot be inherited", async () => {
   const { service, clock } = fixture();
   const first = await open(service, "models", "session_models");
   await service.publishDeliveryBinding(binding(first));
 
   clock.advance(60_001);
-  assert.deepEqual(await service.listDeliveryBindings({
-    participantId: "models", now: clock.now() }), []);
-
   await service.closeSession({ sessionId: first.sessionId, generation: first.generation });
   const replacement = await open(service, "models", first.sessionId);
   assert.notEqual(replacement.generation, first.generation);
   assert.deepEqual(await service.listDeliveryBindings({
-    participantId: "models", now: NOW }), []);
+    participantId: "models", now: clock.now(), includeExpired: true }), []);
   await assert.rejects(service.publishDeliveryBinding(binding(first)),
     /open session generation/);
 });
@@ -163,6 +182,11 @@ test("the current generation may clear its binding, and an absent binding is a n
   assert.equal((await service.listDeliveryBindings({ participantId: "models", now: NOW })).length, 1);
 
   await service.clearDeliveryBinding({ sessionId: session.sessionId,
+    generation: session.generation, opaqueEndpointRef: null });
+  assert.equal((await service.listDeliveryBindings({ participantId: "models", now: NOW })).length, 1,
+    "an explicit unknown endpoint cannot retire an existing address");
+
+  await service.clearDeliveryBinding({ sessionId: session.sessionId,
     generation: session.generation });
   await service.clearDeliveryBinding({ sessionId: session.sessionId,
     generation: session.generation });
@@ -172,6 +196,45 @@ test("the current generation may clear its binding, and an absent binding is a n
   // session has given up invites a reader to wait for an endpoint that will
   // never answer.
   assert.deepEqual((await service.collectStatus({ workspaceId: WORKSPACE })).deliveryBindings, []);
+});
+
+test("a delayed endpoint-scoped clear cannot retire a same-generation successor", async () => {
+  const session = { sessionId: "session_models", generation: "generation_current" };
+  const old = binding(session, { opaqueEndpointRef: "endpoint:old" });
+  const successor = binding(session, { opaqueEndpointRef: "endpoint:successor" });
+  let stored = old;
+  let releaseClear;
+  let markClearStarted;
+  const clearStarted = new Promise(resolve => { markClearStarted = resolve; });
+  const clearMayContinue = new Promise(resolve => { releaseClear = resolve; });
+  let updates = 0;
+  const store = { ephemeral: {
+    list: async () => [stored],
+    update: async (_kind, _id, updater) => {
+      updates += 1;
+      if (updates === 1) {
+        markClearStarted();
+        await clearMayContinue;
+      }
+      const next = await updater(stored);
+      if (next !== null) stored = next;
+      return next;
+    },
+  } };
+  const sessions = { locateSession: async () => ({ record: { ...session,
+    participantId: "models", state: "open" } }) };
+  const service = createDeliveryBindingService({ store,
+    clock: { now: () => "2026-09-01T20:00:30.000Z" } }, sessions);
+
+  const clearing = service.clearDeliveryBinding({ ...session,
+    opaqueEndpointRef: old.opaqueEndpointRef });
+  await clearStarted;
+  await service.publishDeliveryBinding(successor);
+  releaseClear();
+  await clearing;
+
+  assert.deepEqual(await service.listDeliveryBindings({ participantId: "models", now: NOW }),
+    [successor]);
 });
 
 test("a stale generation cannot clear a successor's binding", async () => {

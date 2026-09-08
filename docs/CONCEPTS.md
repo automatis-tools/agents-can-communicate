@@ -115,11 +115,11 @@ recoverable rather than creating a terminal failure state.
 
 ## Durable first, faster delivery second
 
-The durable inbox is universal. Exact-version certified adapters may also offer messages at
-the next normal turn. That does not wake an idle client. Claude Code has the only shipped
-experimental live path, off by default and subject to recipient policy and current
-reachability; Codex live delivery is withdrawn. [Capabilities](CAPABILITIES.md) is the
-current adapter matrix.
+The durable inbox is universal. Exact-version certified adapters may also offer
+messages at the next normal turn. Codex LocalDaemon and Claude Code Channel add
+experimental live delivery, off by default and subject to recipient policy and
+current reachability. Codex can retain an eligible daemon thread after its terminal
+exits. [Capabilities](CAPABILITIES.md) gives the current limits.
 
 ## Handoffs preserve explicit context
 

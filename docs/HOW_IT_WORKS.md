@@ -106,9 +106,15 @@ All recipients have the same durable record, but adapters expose different accel
   default, can spend tokens, never interrupts a running turn, and requires the vendor's
   visible development-channel warning.
 
-Codex native live delivery is withdrawn because the required remote mode hides the
-session's real workspace. Grok, generic MCP, unknown versions, and uncaptured platforms use
-inbox polling. [Capabilities](CAPABILITIES.md) lists the evidence and exact fallbacks.
+- **Optional Codex LocalDaemon delivery:** on Apple Silicon macOS, a captured
+  minimum of 0.152.1 plus a current probe and exact session checks allow delivery
+  to an independently opened thread. It is experimental, off by default, and can
+  spend tokens. Messages wait for a running turn to finish; a daemon-retained
+  thread can receive them after its terminal exits. ACC adds no launch arguments
+  and does not manage the vendor daemon.
+
+Grok, generic MCP, unsupported versions and uncaptured platforms use inbox polling.
+[Capabilities](CAPABILITIES.md) lists evidence and fallback.
 
 When a complete projected body cannot fit the configured byte budget, ACC keeps the message
 id and exact inbox recovery command rather than silently truncating the peer's words.

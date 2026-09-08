@@ -1,0 +1,66 @@
+{
+  "source": "observed-command-results",
+  "observedAt": "2026-09-08T10:56:26.844139+00:00",
+  "sourceCommit": "85f347d201df126b1f60cff96e1e6a5a14b0c8d8",
+  "builtFrom": "85f347d201df126b1f60cff96e1e6a5a14b0c8d8",
+  "packageSha256": "ebe370dc8452fd14f1441138aacfd4a13b0f85c3b94ba710cec3ec35837e3ccb",
+  "gates": {
+    "npmCi": {
+      "exitCode": 0
+    },
+    "syntax": {
+      "exitCode": 0,
+      "files": 357
+    },
+    "test": {
+      "exitCode": 0,
+      "tests": 1567,
+      "passed": 1565,
+      "failed": 0,
+      "skipped": 2,
+      "skipReasons": [
+        "﹣ uninstall is planned from the record, not only from the machine (626.938166ms) # Gemini CLI is installed here, so the client never left the machine",
+        "﹣ a platform with no capture is told so, and no channel is wired (0.174958ms) # this platform has a passing capture"
+      ]
+    },
+    "pack": {
+      "exitCode": 0,
+      "bytes": 279820,
+      "entries": 213
+    },
+    "verifyInstalledPackage": {
+      "exitCode": 0
+    },
+    "diffCheck": {
+      "exitCode": 0
+    }
+  },
+  "logs": [
+    {
+      "file": "final-ci-reviewed.log",
+      "sha256": "e542ff45c0a0409b7259c1f387e79d4aa3cdf3d15169de2cd23051ceb3aac2c7"
+    },
+    {
+      "file": "final-check-reviewed.log",
+      "sha256": "76c01231507c48e26c12d566c0c61bc0cec0d1e7dc38e93cc3fb3c7493ea469e"
+    },
+    {
+      "file": "final-test-reviewed.log",
+      "sha256": "8b06aff22a04d29defa6a8107ae771f3513f03d3b3831905e1433e4b3ea78a07"
+    },
+    {
+      "file": "public-final-reviewed/verify-package.log",
+      "sha256": "7cb4570dba321e21984da3fb88d50c66f257b3208d008d86dbcb41ca074f81d6"
+    },
+    {
+      "file": "public-final-reviewed/pack.json",
+      "sha256": "b885e9817987344ad7fb0b0b70f8ea269e199b9cbc980998d6ffd6fff23afec7"
+    }
+  ],
+  "environment": {
+    "node": "v26.5.1",
+    "npm": "11.17.0",
+    "platform": "darwin",
+    "architecture": "arm64"
+  }
+}

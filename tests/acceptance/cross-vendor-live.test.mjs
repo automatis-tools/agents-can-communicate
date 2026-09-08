@@ -149,22 +149,24 @@ test("packed release completes scripted cross-vendor fallback with explicit owne
     clientVersion: "99.0.0" });
   const downgraded = await packed.acc(["message", "--session",
     restartedClaude.session.sessionId, "--to", restartedCodex.participantId,
-    "--type", "question", "--subject", "Unknown version",
-    "--body", "Can you still recover this?", "--client-message-id", "unknown-version"],
+    "--type", "question", "--subject", "No recorded consent",
+    "--body", "Can you still recover this?", "--client-message-id", "no-recorded-consent"],
   await ownerEnv(packed, restartedClaude));
-  // The router no longer imposes a third exact-version rule: compatibility is
-  // settled at the launch bootstrap and the generation-bound handshake. A
-  // binding published at an admitted version whose transport is not reachable
-  // here stays queued as recipient_unavailable, and recovery still works.
+  // Synthetic bindings describe a reachable generation but cannot manufacture
+  // the receiver's installation-record consent. Codex therefore declines the
+  // native offer, while the addressed durable inbox remains recoverable.
   assert.equal(downgraded.delivery[0].outcome, "queued");
-  assert.equal(["recipient_unavailable", "unsupported_client_version"]
-    .includes(downgraded.delivery[0].errorCode), true, downgraded.delivery[0].errorCode);
+  assert.equal(downgraded.delivery[0].errorCode, "delivery_disabled");
+  assert.equal((await packed.receipt(restartedClaude.session.sessionId,
+    downgraded.message.messageId, restartedCodex.participantId)).state, "queued");
   assert.equal((await packed.beforeTurn(restartedCodex)).stdout
     .includes("Can you still recover this?"), false);
   const recovered = await packed.acc(["inbox", "--session",
     restartedCodex.session.sessionId, "--message", downgraded.message.messageId],
   await ownerEnv(packed, restartedCodex));
   assert.equal(recovered[0].message.messageId, downgraded.message.messageId);
+  assert.equal((await packed.receipt(restartedClaude.session.sessionId,
+    downgraded.message.messageId, restartedCodex.participantId)).state, "retrieved");
 
   const mcp = connectMcp({ binary: packed.mcpBin, cwd: packed.project,
     dataHome: packed.dataHome, participant: "packed_observer",

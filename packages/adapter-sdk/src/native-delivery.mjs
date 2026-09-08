@@ -18,7 +18,14 @@ export { validateNativeActivationPlan } from "./native-activation.mjs";
 const orderedModes = modes => NATIVE_BINDING_MODES.filter(mode => modes.includes(mode));
 
 export function validateNativeDeliveryContract(value, { certification, client }) {
-  closed(value, ["minimumByPlatform", "anchors", "knownBad", "activationKinds"], "nativeDelivery");
+  const policySource = Object.hasOwn(value ?? {}, "policySource")
+    ? value.policySource : "bootstrap-environment";
+  closed({ ...value, policySource },
+    ["minimumByPlatform", "anchors", "knownBad", "activationKinds", "policySource"],
+    "nativeDelivery");
+  if (!["installation-record", "bootstrap-environment"].includes(policySource)) {
+    usage("nativeDelivery.policySource must be installation-record or bootstrap-environment");
+  }
   const minimums = value.minimumByPlatform;
   if (!isPlainObject(minimums) || Object.keys(minimums).length === 0) {
     usage("nativeDelivery.minimumByPlatform must map at least one captured platform to a version");
@@ -86,7 +93,7 @@ export function validateNativeDeliveryContract(value, { certification, client })
     usage(`nativeDelivery.activationKinds must be unique entries of ${NATIVE_ACTIVATION_KINDS.join(", ")}`);
   }
   return deepFreeze({ minimumByPlatform: { ...minimums }, anchors, knownBad,
-    activationKinds: [...kinds] });
+    activationKinds: [...kinds], policySource });
 }
 
 function knownBadHit(contract, version) {
