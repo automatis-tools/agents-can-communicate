@@ -98,7 +98,7 @@ export function createDeliveryBindingService(ports, sessions) {
       if (current.retiredAt !== null && current.retiredAt !== undefined) return null;
       const now = clock.now();
       return { ...current, leaseUntil: now, retiredAt: now };
-    });
+    }, { deadlineAt: input.deadlineAt });
   }
 
   /**

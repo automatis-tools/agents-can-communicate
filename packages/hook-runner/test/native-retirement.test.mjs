@@ -29,8 +29,13 @@ test("policy off retires in core before cleaning exactly the old adapter endpoin
   const service = fixture();
   const outcome = await run(service, async input => service.calls.push(["cleanup", input]));
   assert.equal(outcome.state, "off");
-  assert.deepEqual(service.calls, [["clear", { sessionId: prior.sessionId, generation, opaqueEndpointRef: prior.opaqueEndpointRef }],
-    ["cleanup", { binding: prior, runtimeDir: "/private/runtime" }]]);
+  const [clear, cleanup] = service.calls;
+  const { deadlineAt, ...clearInput } = clear[1];
+  assert.equal(clear[0], "clear");
+  assert.deepEqual(clearInput, { sessionId: prior.sessionId, generation,
+    opaqueEndpointRef: prior.opaqueEndpointRef });
+  assert.equal(Number.isFinite(deadlineAt), true);
+  assert.deepEqual(cleanup, ["cleanup", { binding: prior, runtimeDir: "/private/runtime" }]);
 });
 
 test("failed retirement or successor publication cannot clean an endpoint", async () => {
