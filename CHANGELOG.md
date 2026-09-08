@@ -20,17 +20,18 @@
   integration changes and complete each client's activation or trust review; copied files
   alone do not prove hooks are active.
 
-### Previous development evidence
-
-This is preserved evidence for an earlier unpublished 0.3.1 development archive. It is not
-final 0.4.0 verification and will be replaced only after the exact 0.4.0 candidate is built
-and checked.
+### Candidate evidence
 
 | | |
 |---|---|
-| Built from | `937c0fea2dcec1ffa59cbfa7927167e94aef3301` |
-| Tarball | `agents-can-communicate-0.3.1.tgz`, 301,393 bytes, 230 entries |
-| sha256 | `4554026d4a96135e44aec90956ef328c4ce386973d2f791b28a1d4f8fcb06c7f` |
+| Built from | `e1f2e8d45620e219d3fec1ed10c53baba2981a74` |
+| Tarball | `agents-can-communicate-0.4.0.tgz`, 305,269 bytes, 232 entries |
+| sha256 | `06b685e4f476fba3efdb8e4018682923fe3b54cb59bb37f8ce2c97d67053bf80` |
+
+The exact saved archive passed installed-package verification and the published-0.3.1
+upgrade preflight. All 232 source, archive, installed and managed-runtime files matched.
+See [the candidate evidence](docs/release-evidence/v0.4.0.md) for platform results,
+native observations and remaining limits. This candidate is not published.
 
 ## 0.3.1
 
