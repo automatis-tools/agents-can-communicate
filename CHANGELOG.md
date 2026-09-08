@@ -7,6 +7,17 @@
   Existing 0.4.0 uninstall records cannot recover a lost preference; use
   `acc update --auto on` once if updates should resume.
 
+| Candidate | Value |
+|---|---|
+| Built from | `c389a18067caa260d6ae13b54c7adc2a07d74f76` |
+| Tarball | `agents-can-communicate-0.4.0.tgz`, 330,967 bytes, 248 files |
+| sha256 | `dd69e0fe812b6e9be5eb080f5b847ac8eb0ca7296570bb9295f5e4c9bcc58e47` |
+
+This is an unpublished development artifact with the existing package version;
+it must not replace the published 0.4.0 archive. Clean installation, package verification,
+and actual uninstall/reinstall preference checks passed on macOS arm64 with Node 24.4.0.
+See [reinstall candidate evidence](docs/release-evidence/unreleased-reinstall.md).
+
 ## 0.4.0 — 2026-09-08
 
 - Independent peers now recover ordinary coordination, exact-revision review, correction,
