@@ -38,8 +38,8 @@ for (const version of ["2025-06-18", "2025-11-25"]) {
       assert.deepEqual(await request("ping", {}, "still-alive"), {
         jsonrpc: "2.0", id: "still-alive", result: {} });
       const inbox = await request("tools/call", { name: "acc_inbox", arguments: {} });
-      assert.equal(Object.hasOwn(inbox.result, "structuredContent"), false);
-      assert.deepEqual(JSON.parse(inbox.result.content[0].text), []);
+      assert.deepEqual(inbox.result.structuredContent, { items: [], nextCursor: null });
+      assert.deepEqual(JSON.parse(inbox.result.content[0].text), { items: [], nextCursor: null });
       const invalid = await request("tools/call", { name: "acc_work", arguments: {} });
       assert.equal(invalid.result.isError, true);
       assert.match(invalid.result.content[0].text, /acc_work/);
@@ -108,7 +108,7 @@ test("legacy initialization never supplies missing modern request metadata", asy
     assert.equal(modern.result.resultType, "complete");
     const modernInbox = await request("tools/call", { name: "acc_inbox",
       arguments: {}, _meta: meta });
-    assert.deepEqual(modernInbox.result.structuredContent, []);
+    assert.deepEqual(modernInbox.result.structuredContent, { items: [], nextCursor: null });
     const legacy = await request("tools/list", { _meta: { arbitrary: "extension" } });
     assert.equal(legacy.error, undefined, JSON.stringify(legacy.error));
     assert.equal(Object.hasOwn(legacy.result, "resultType"), false);

@@ -88,8 +88,17 @@ test("an installed hook compacts a prior session's backlog without resolving it"
   const status = await packed.acc(["status", ...flags]);
   assert.equal(status.attention.filter(item => ["reply_required", "acknowledgement_required"]
     .includes(item.kind)).length, 61);
-  const inbox = await packed.acc(["inbox", ...flags]);
-  assert.equal(inbox.length, 61);
-  assert.equal(inbox.find(item => item.message.messageId === oldIds[0]).message.body,
+  const messages = [];
+  let cursor;
+  do {
+    const page = await packed.acc(["inbox", ...flags, ...(cursor ? ["--cursor", cursor] : [])]);
+    messages.push(...page.items);
+    cursor = page.nextCursor;
+    assert.ok(messages.length <= 61, "inbox replayed a page");
+  } while (cursor !== null);
+  assert.equal(messages.length, 61);
+  assert.equal(new Set(messages.map(item => item.message.messageId)).size, 61);
+  const [old] = await packed.acc(["inbox", ...flags, "--message", oldIds[0]]);
+  assert.equal(old.message.body,
     "Original review request 0; still unresolved.");
 });

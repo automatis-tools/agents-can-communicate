@@ -1,5 +1,5 @@
 import { CLAIM_ENFORCEMENTS, CLAIM_MODES, GENERIC_MESSAGE_KINDS, HANDOFF_STATUSES,
-  INTENT_MODES, INTENT_STATES, OBLIGATIONS } from "@agents-can-communicate/protocol";
+  INTENT_MODES, INTENT_STATES, MESSAGE_KINDS, OBLIGATIONS } from "@agents-can-communicate/protocol";
 import { LIVE_POLICIES } from "@agents-can-communicate/installer";
 
 import { COMMANDS, commandSpec } from "./args.mjs";
@@ -30,13 +30,13 @@ const SUMMARY = Object.freeze({
   doctor: "clients, versions, install health, and what to run next",
   config: "write or check acc.workspace.json (init | validate)",
   status: "who else is here, what they hold, how protected this workspace is",
-  sync: "what has happened since a cursor; silent while you are alone",
+  sync: "events since a cursor, or bounded message history",
   work: "publish what this session is doing, or --clear when it has stopped",
   claim: "reserve a resource; exit 5 when someone else already holds it",
   release: "give a claim back",
   ack: "answer a message that asked for one, so it stops asking",
   message: "send a typed message to named participants",
-  inbox: "read addressed messages; --message also inspects acknowledged ones",
+  inbox: "list pending message headers; --message reads one complete message",
   reply: "reply to one message and acknowledge it in the same operation",
   request: "ask another agent to do something in a reply-required message",
   finish: "write the handoff and release what this session held",
@@ -70,7 +70,7 @@ const CHOICES = Object.freeze({
   claim: { mode: CLAIM_MODES, enforcement: CLAIM_ENFORCEMENTS },
   finish: { status: HANDOFF_STATUSES },
   message: { type: GENERIC_MESSAGE_KINDS, obligation: OBLIGATIONS },
-  sync: { scope: ["delta", "full"] },
+  sync: { scope: ["delta", "full", "history"], type: MESSAGE_KINDS },
   install: { delivery: LIVE_POLICIES, adapter: ADAPTER_IDS },
   uninstall: { adapter: ADAPTER_IDS },
 });
@@ -85,7 +85,15 @@ const NOTES = Object.freeze({
   release: ["Provide --claim or --resource. Releasing another owner's claim requires human or policy authority."],
   message: ["Default type: note. question/request require --to and obligation reply; note uses none.",
     "decision permits none, or acknowledge when addressed. Use reply for answers and finish for handoffs."],
-  inbox: ["Without --message, returns unresolved mail. Exact acknowledged inspection leaves the receipt unchanged."],
+  inbox: ["Without --message, returns read-only {items, nextCursor} summary pages, newest first.",
+    "Default: 20 items, at most 12000 bytes of formatted page JSON. --limit accepts 1..500.",
+    "Continue with --cursor <nextCursor>; omit it to see new arrivals. Listing never retrieves bodies.",
+    "--message reads one complete addressed message, including acknowledged mail; do not combine with cursor or limit.",
+    "Exact reads return a one-item array. Acknowledged inspection leaves the receipt unchanged."],
+  sync: ["Default delta uses 16-digit event cursors. full adds an unbounded diagnostic snapshot.",
+    "history lists read-only message summaries, newest first: default 20 items, at most 12000 bytes of formatted page JSON.",
+    "With history, --type filters before paging; --cursor takes the complete message ID in nextCursor.",
+    "history --message reads one complete historical message without changing receipts; do not combine with cursor, limit, or type."],
   reply: ["Returns the outgoing message/delivery plus the original acknowledged receipt."],
   finish: ["Default status: partial. Records a handoff, releases claims, and closes this ACC session."],
   config: ["init writes optional workspace configuration; validate only checks it.",

@@ -46,13 +46,13 @@ successfully yet refuse tool calls; that is distinct from a protocol handshake f
 | Tool | Required input | Optional input |
 |---|---|---|
 | `acc_status` | — | — |
-| `acc_sync` | — | `cursor`, `scope: delta|full`, `limit: 1..500` |
+| `acc_sync` | — | `cursor`, `scope: delta|full|history`, `limit: 1..500`, `kind`, `messageId` |
 | `acc_work` | `summary` and `mode`, or `clear: true` | `state`, `resourceHints` |
 | `acc_claim` | `action`; `resource` for acquire, `claimId` for renew | `mode`, `reason`, `leaseSeconds` where valid |
 | `acc_release` | `claimId` | — |
 | `acc_message` | `to`, `subject`, `body` | `kind`, `obligation`, `clientMessageId` |
 | `acc_request` | `toParticipantId`, `title` | `detail`, `clientMessageId` |
-| `acc_inbox` | — | `messageId` |
+| `acc_inbox` | — | `messageId`, `cursor`, `limit: 1..500` |
 | `acc_reply` | `messageId`, `body` | `subject`, `clientMessageId` |
 | `acc_ack` | `messageId` | — |
 | `acc_finish` | `goal` | `status`, `completed`, `remaining`, `blockers`, `toParticipantId`, `clientMessageId` |
@@ -61,27 +61,45 @@ All tool names above are the complete model-facing surface. There are no executi
 client-control tools.
 
 Send-like tools return a raw structured object with `{ message, delivery }`; their text
-content is the JSON serialization of the same value. `acc_inbox` returns message/receipt
-pairs and advances only this participant's receipts to `retrieved` when needed. With an
-exact `messageId`, it also inspects acknowledged mail without changing receipt state,
-timestamp, or event history; without an id, resolved mail remains omitted.
+content is the JSON serialization of the same value. Default `acc_inbox` returns
+`{items, nextCursor}`: read-only pending message summaries paired with receipts, newest
+first. It never retrieves bodies. Pages default to 20 items, at most 12,000 bytes of
+formatted page JSON before MCP framing. `cursor` is the complete message id from
+`nextCursor`; omit it on a new poll to see arrivals. Reading or acknowledging the anchor
+between pages does not shift continuation. The summary field allowlist, byte limit,
+and live-page semantics are described in [CLI](CLI.md#inbox-reply-and-acknowledgement).
+
+With an exact `messageId`, `acc_inbox` returns a one-item array with the complete
+message/receipt pair and advances only that participant's receipt to `retrieved` when
+needed. Exact acknowledged inspection preserves receipt state, timestamp, and event
+history. Do not combine `messageId` with cursor or limit. Resolved mail stays out of lists.
 `acc_reply` writes an `answer` and acknowledges the original atomically. It additionally
 returns `receipt` for that original message; `message` and `delivery` describe the outgoing
 answer. `acc_ack` exposes no receipt-state parameter.
 
-For initialized 2025 clients, array results such as `acc_inbox` are JSON in text content,
+For initialized 2025 clients, array results such as exact `acc_inbox` reads are JSON in text content,
 with `structuredContent` omitted because those revisions require an object there.
 Object results retain both representations. The 2026 interface also returns raw arrays
 in `structuredContent` and uses the `resultType: "complete"` envelope.
 
 Resources are `acc://snapshot`, `acc://roster`, and `acc://inbox`. Reading `acc://inbox`
-resolves the configured MCP participant and advances only the returned receipts to
-`retrieved`, just like the inbox tool. Snapshot and roster reads do not advance receipts.
-A full snapshot is for explicit workspace forensics.
+resolves the configured MCP participant and returns the same read-only summary page as
+`acc_inbox {}`. Continue via the tool using `cursor`; retrieve a body with `messageId`.
+Snapshot and roster reads do not advance receipts either. `acc://snapshot` and sync with
+`scope: "full"` remain unbounded, for explicit workspace forensics.
+
+`acc_sync {scope: "history", kind: "handoff"}` returns
+`{scope: "history", view: "summary", items, nextCursor}` using the same message summary
+fields and page limits. The optional kind filter applies before paging. Continue with
+the complete `nextCursor` message id and the same filter. Then use
+`acc_sync {scope: "history", messageId: "message_x"}` to receive one complete historical
+message in `items`, with `view: "message"` and no receipt change. Exact reads reject
+cursor, limit, and kind. `kind` and `messageId` require history scope; delta/full retain
+16-digit event cursors. History exposes recorded peer claims, not their current validity.
 
 An addressed handoff requires a participant already known to the workspace. For a future
 session that has not joined, omit `toParticipantId` to leave a workspace handoff. A later
-session can recover that historical handoff with `acc_sync` using `scope: "full"`;
+session can recover that historical handoff through the history list and exact read;
 its addressed inbox will not contain past workspace broadcasts.
 
 ## Account for the manual boundary
@@ -104,7 +122,7 @@ makes guarded claims advisory for the room.
 
 Every outgoing message commits first. `acc_message`, `acc_request`, `acc_reply`, and
 `acc_finish` cannot promise push; delivery results remain queued with a durable diagnostic.
-The recipient calls `acc_inbox` to retrieve the body. Being returned by a tool is
+The recipient calls `acc_inbox` with `messageId` to retrieve the body. Being returned by a tool is
 `retrieved`, not proof that a model attended to or obeyed it. A reply or explicit ack is
 `acknowledged`.
 

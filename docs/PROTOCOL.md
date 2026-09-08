@@ -74,7 +74,7 @@ inside the message so an uncertain caller can retry explicitly.
 
 An empty `toParticipantIds` creates a room record. At commit time, core resolves every
 known peer participant with an open session and creates a receipt for each. Participants
-that arrive later can inspect room history through a full sync but do not receive
+that arrive later can inspect room records through history sync but do not receive
 retroactive receipts. Those already-present recipients get the normal inbox and certified
 next-turn path; a successful next-turn write advances their room receipt to `offered`.
 Room records are never eligible for native live push.
@@ -155,8 +155,9 @@ leaves the receipt queued.
 
 ## Inbox, reply, and acknowledgement
 
-Without an id, `inbox` returns unresolved messages owned by the calling participant and
-advances only that participant's receipt to `retrieved`. An exact message id is the narrow
+Without an id, public `inbox` lists bounded summary pages for unresolved messages owned
+by the calling participant, without changing receipts. An exact read returns the complete
+message and advances only that participant's receipt to `retrieved`. It is the narrow
 recovery and inspection path, including after compaction or acknowledgement. Reading an
 acknowledged message preserves its receipt, timestamp, and event history; it does not put
 the message back into the unresolved inbox. Ownership and current-generation checks still
@@ -202,8 +203,11 @@ mode hides the session workspace. Every unavailable or refused route falls back 
 
 ## Attention and sync
 
-Bounded sync returns events after a cursor plus explicit attention. Full sync is a
-forensic workspace snapshot, not the normal way to recover one message. Attention is
+Default sync returns a bounded event page after a 16-digit cursor plus explicit attention.
+History sync returns read-only message summaries (20 items by default, at most 12,000
+formatted JSON bytes) and complete-message-id cursors, or one exact full message. Neither
+history mode changes receipts. Full sync adds an unbounded forensic workspace snapshot.
+Message discovery and exact-read contracts are in [CLI](CLI.md) and [MCP](MCP.md). Attention is
 limited to six explicit rules: `reply_required`, `acknowledgement_required`,
 `recipient_unavailable`, `claim_conflict`, `claim_contended`, and `claim_expired`.
 

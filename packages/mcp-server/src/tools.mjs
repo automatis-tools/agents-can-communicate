@@ -1,4 +1,4 @@
-import { GENERIC_MESSAGE_KINDS } from "@agents-can-communicate/protocol";
+import { GENERIC_MESSAGE_KINDS, MESSAGE_KINDS } from "@agents-can-communicate/protocol";
 
 // The model-facing surface stays at a small set of high-level operations.
 //
@@ -29,15 +29,18 @@ export const PUBLIC_TOOLS = Object.freeze([
   {
     name: "acc_sync",
     description: `Read coordination state for this workspace: roster, attention items, and `
-      + `events since a cursor. Use scope "full" to answer questions about the whole `
-      + `workspace, including other participants' collapsed child sessions. Use acc_inbox `
-      + `instead for addressed messages. ${POLLED}`,
+      + `events since a cursor. Use scope "history" for bounded message summaries, then `
+      + `messageId to read one complete historical message without changing receipts. `
+      + `Scope "full" is an unbounded forensic workspace snapshot. Use acc_inbox for `
+      + `your addressed messages. ${POLLED}`,
     inputSchema: object({
-      cursor: string("Resume from this cursor; omit to start from the beginning."),
-      scope: { type: "string", enum: ["delta", "full"],
-        description: "delta is a bounded update; full returns the whole workspace snapshot." },
+      cursor: string("Event sequence for delta/full; nextCursor message id for history. Omit for the newest history page."),
+      scope: { type: "string", enum: ["delta", "full", "history"],
+        description: "delta: events; history: read-only message discovery; full: complete forensic snapshot." },
       limit: { type: "integer", minimum: 1, maximum: 500,
-        description: "Maximum number of events to return." },
+        description: "Maximum events (default 100), or history summaries (default 20, also byte-bounded)." },
+      kind: { type: "string", enum: [...MESSAGE_KINDS], description: "Filter history before paging." },
+      messageId: string("Read this complete history message; requires history scope and no list controls."),
     }),
   },
   {
@@ -104,12 +107,16 @@ export const PUBLIC_TOOLS = Object.freeze([
   },
   {
     name: "acc_inbox",
-    description: `Read unresolved messages addressed to this participant without loading `
-      + `the roster, event log, claims, or workspace snapshot. An exact id also inspects `
-      + `an acknowledged message without changing its receipt. `
+    description: `List a bounded page of unresolved message summaries, newest first, without `
+      + `changing receipts. Use nextCursor for older entries; omit it to see new arrivals. `
+      + `Use messageId to retrieve exactly one complete addressed message. An acknowledged `
+      + `message can be inspected without changing its receipt. `
       + `${POLLED}`,
     inputSchema: object({
-      messageId: string("Inspect this addressed message, including acknowledged mail; omit for unresolved mail."),
+      messageId: string("Read this complete addressed message; omit for read-only summaries. Cannot combine with cursor/limit."),
+      cursor: string("nextCursor from a previous inbox page; omit for the newest pending messages."),
+      limit: { type: "integer", minimum: 1, maximum: 500,
+        description: "Maximum summaries, default 20; pages are also byte-bounded." },
     }),
   },
   {
@@ -169,7 +176,7 @@ export const RESOURCES = Object.freeze([
   { uri: "acc://roster", name: "Participant roster", mimeType: "application/json",
     description: "Sessions with their harness and presence, including collapsed children." },
   { uri: "acc://inbox", name: "Inbox", mimeType: "application/json",
-    description: "Messages addressed to this participant, rendered as attributed data." },
+    description: "Read-only pending message headers. Continue with acc_inbox cursor; retrieve a body with messageId." },
 ]);
 
 // Declared, not assumed. Manual MCP tool polling is not next-turn injection,

@@ -2,6 +2,7 @@ import { AccError, EXIT, SCHEMA_VERSION, advanceReceipt }
   from "@agents-can-communicate/protocol";
 
 import { receiptId, recordMessageInTransaction } from "./conversations.mjs";
+import { messagePage, messageSummary } from "./message-pages.mjs";
 
 const listable = (message, receipt) => receipt.state === "queued" || receipt.state === "offered"
   || (receipt.state === "retrieved" && message.obligation !== "none");
@@ -49,6 +50,22 @@ export function createInboxService(ports, sessions) {
       type: `message.${state}`, occurredAt: now,
       payload: { messageId, recipientParticipantId: session.participantId } });
     return { message: owned.message, receipt };
+  }
+
+  async function listInbox(input) {
+    const session = await requireOpen(input, "list the inbox");
+    return store.transaction(async tx => {
+      await requireOpen(input, "list the inbox", tx);
+      const receipts = new Map(tx.list("receipt", receipt =>
+        receipt.recipientParticipantId === session.participantId)
+        .map(receipt => [receipt.messageId, receipt]));
+      const messages = tx.list("message", message => receipts.has(message.messageId));
+      return messagePage(messages, input, {
+        include: message => listable(message, receipts.get(message.messageId)),
+        project: message => ({ message: messageSummary(message),
+          receipt: receipts.get(message.messageId) }),
+      });
+    }, { kinds: ["session", "message", "receipt"] });
   }
 
   async function readInbox(input) {
@@ -123,5 +140,5 @@ export function createInboxService(ports, sessions) {
     }, { kinds: ["participant", "session", "message", "receipt"] });
   }
 
-  return { readInbox, replyToMessage, acknowledgeMessage };
+  return { listInbox, readInbox, replyToMessage, acknowledgeMessage };
 }

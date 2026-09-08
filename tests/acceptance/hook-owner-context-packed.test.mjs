@@ -28,7 +28,9 @@ for (const adapterId of ["claude_code", "codex"]) {
       "--generation", late.generation, "--to", "early", "--title", "Review arrived"]);
     // No second prompt, binding lookup, environment inheritance, or manual
     // reattachment for the early reader: only its original hook's arguments.
-    const [received] = await packed.acc(["inbox", ...flags]);
+    const listed = await packed.acc(["inbox", ...flags]);
+    const [received] = await packed.acc(["inbox", ...flags,
+      "--message", listed.items[0].message.messageId]);
     assert.equal(received.message.messageId, request.message.messageId);
     const reply = await packed.acc(["reply", ...flags, "--message", received.message.messageId,
       "--body", "Reviewed from the original session"]);

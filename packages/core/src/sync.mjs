@@ -2,10 +2,11 @@ import { AccError, EXIT } from "@agents-can-communicate/protocol";
 
 import { computeAttention } from "./attention.mjs";
 import { classifySessionPresence } from "./sessions.mjs";
+import { assertMessageId, messagePage } from "./message-pages.mjs";
 
 const DEFAULT_LIMIT = 100;
 const CURSOR = /^[0-9]{16}$/;
-const SCOPES = Object.freeze(["delta", "full"]);
+const SCOPES = Object.freeze(["delta", "full", "history"]);
 
 function assertScope(scope) {
   if (scope != null && !SCOPES.includes(scope)) {
@@ -25,9 +26,30 @@ function assertCursor(cursor) {
 export function createSyncService(ports, sessions) {
   const { store, clock, pidIsAlive } = ports;
 
+  async function history(input) {
+    const exact = input.messageId !== undefined;
+    if (exact && (input.cursor != null || input.limit !== undefined || input.kind !== undefined)) {
+      throw new AccError(EXIT.USAGE, "an exact history read cannot use cursor, limit, or type");
+    }
+    if (exact) assertMessageId(input.messageId);
+    const { messages } = await store.snapshot(input.workspaceId ?? store.workspaceId,
+      { kinds: ["message"] });
+    if (!exact) return messagePage(messages, input,
+      { metadata: { scope: "history", view: "summary" } });
+    const message = messages.find(item => item.messageId === input.messageId);
+    if (message === undefined) {
+      throw new AccError(EXIT.DATA, "message is not in this workspace's history");
+    }
+    return { scope: "history", view: "message", items: [message], nextCursor: null };
+  }
+
   async function sync(input = {}) {
-    if (input.cursor != null) assertCursor(input.cursor);
     assertScope(input.scope);
+    if (input.scope === "history") return history(input);
+    if (input.messageId !== undefined || input.kind !== undefined) {
+      throw new AccError(EXIT.USAGE, "message and type require history scope");
+    }
+    if (input.cursor != null) assertCursor(input.cursor);
     const workspaceId = input.workspaceId ?? store.workspaceId;
     const now = clock.now();
     const located = input.sessionId === undefined

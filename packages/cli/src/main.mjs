@@ -200,7 +200,9 @@ const HANDLERS = Object.freeze({
   sync: async ({ options, context }) => {
     const result = await context.service.sync({ sessionId: options.session,
       cursor: options.cursor ?? null, scope: options.scope,
+      messageId: options.message, kind: options.type,
       limit: options.limit ? positiveNumber(options.limit, "limit") : undefined });
+    if (result.scope === "history") return { data: result, text: JSON.stringify(result, null, 2) };
     // Solo zero-overhead: nothing to say means nothing printed, not a banner.
     const text = result.solo ? "" : `${result.attention.length} attention; `
       + `${result.roster.length} session(s); cursor ${result.cursor}`;
@@ -258,6 +260,15 @@ const HANDLERS = Object.freeze({
   },
 
   inbox: async ({ options, context }) => {
+    if (options.message === undefined) {
+      const page = await context.service.listInbox({ sessionId: options.session,
+        generation: options.generation, cursor: options.cursor,
+        limit: options.limit === undefined ? undefined : positiveNumber(options.limit, "limit") });
+      return { data: page, text: JSON.stringify(page, null, 2) };
+    }
+    if (options.cursor !== undefined || options.limit !== undefined) {
+      throw usage("an exact inbox read cannot use --cursor or --limit");
+    }
     const messages = await context.service.readInbox({ sessionId: options.session,
       generation: options.generation, messageId: options.message });
     return { data: messages, text: messages.length === 0

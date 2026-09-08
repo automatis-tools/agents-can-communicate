@@ -30,13 +30,13 @@ option value remains data: `--body --help` sends the literal body `--help`.
 | Command | Required | Optional |
 |---|---|---|
 | `acc status` | — | `--session`, `--generation`, `--participant`, `--all` |
-| `acc sync` | — | `--session`, `--generation`, `--cursor`, `--limit`, `--scope delta|full` |
+| `acc sync` | — | `--session`, `--generation`, `--cursor`, `--limit`, `--scope delta|full|history`, `--type`, `--message` |
 | `acc work` | `--summary` unless `--clear` | `--session`, `--generation`, `--mode`, `--state`, repeated `--hint`, `--clear` |
 | `acc claim` | `--resource` | `--session`, `--generation`, `--mode`, `--enforcement`, `--reason`, `--lease` |
 | `acc release` | `--claim` or `--resource` | `--session`, `--generation`, `--authority`, `--reason` |
 | `acc message` | `--subject`, `--body` | repeated `--to`, `--type`, `--obligation`, `--client-message-id`, owner flags |
 | `acc request` | `--to`, `--title` | `--detail`, `--client-message-id`, owner flags |
-| `acc inbox` | — | `--message`, owner flags |
+| `acc inbox` | — | `--message`, `--cursor`, `--limit`, owner flags |
 | `acc reply` | `--message`, `--body` | `--subject`, `--client-message-id`, owner flags |
 | `acc ack` | `--message` | owner flags |
 | `acc finish` | `--goal` | `--status`, `--to`, repeated `--completed`, `--remaining`, `--blocker`, `--client-message-id`, owner flags |
@@ -79,8 +79,9 @@ acc work --clear
 ```
 
 `status` returns participants, current intent, claims, protection, attention, and current
-delivery bindings. `sync` is a bounded event read; use `--scope full` only for an explicit
-whole-workspace forensic question. Neither is the recovery path for one message.
+delivery bindings. Default `sync` reads events after a 16-digit event cursor (100 by
+default, up to 500). `--scope history` discovers historical message headers and reads
+selected records; `--scope full` adds an unbounded snapshot for explicit workspace forensics.
 
 ### Claims
 
@@ -152,14 +153,45 @@ acc reply --message message_x --body "Yes. Use offered."
 acc ack --message message_y
 ```
 
-Without `--message`, inbox returns unresolved messages addressed to this participant.
-Reading advances that participant's receipt to `retrieved` when needed. An exact id also
-reads an acknowledged message, preserving its receipt, timestamp, and event history.
+Without `--message`, inbox returns `{items, nextCursor}`. Each item has a `message`
+summary and its `receipt`; listing never returns bodies or changes receipts. Summaries
+include the complete message/thread/sender ids, kind, obligation, timestamp, reply link,
+subject (up to 160 UTF-8 bytes), `bodyBytes`, `artifactCount`, and untrusted attribution.
+Bodies, artifact details, handoff payloads, and recipient lists require an exact read.
+
+Pages are newest first (descending message id breaks timestamp ties), default to 20 items,
+and contain at most 12,000 bytes of formatted page JSON, excluding the CLI envelope.
+`--limit` accepts 1..500 but cannot raise the byte ceiling. Continue with
+`acc inbox --cursor <nextCursor>` until it is `null`. The cursor is a complete message id,
+not an offset; reading or acknowledging it does not shift the next page. These are live
+pages: omit the cursor to see new arrivals. An unknown or foreign cursor is an error.
+
+`--message <id>` returns the existing one-item array with the complete message/receipt
+pair, advancing that participant's receipt to `retrieved` when needed. It cannot be
+combined with `--cursor` or `--limit`. An exact id also reads an acknowledged message,
+preserving its receipt, timestamp, and event history.
 Use the original message id to inspect acknowledgement; the outgoing reply belongs to
 its recipient's inbox. Resolved messages stay out of the ordinary inbox.
 
 Reply creates an `answer` in the same thread and acknowledges the original atomically.
 `ack` acknowledges without writing an answer and has no state override.
+
+### Historical recovery
+
+```bash
+acc sync --scope history --type handoff --json
+acc sync --scope history --type handoff --cursor message_x --json
+acc sync --scope history --message message_y --json
+```
+
+History returns `{scope: "history", view: "summary", items, nextCursor}` with the same
+summary fields, ordering, page limits, and message-id cursors as inbox. `--type` accepts
+any message kind and filters before pagination; keep the same filter between pages.
+This public workspace observation includes records from before your session joined.
+Exact history reads return `view: "message"` and one complete message in `items`,
+without changing any receipt. Do not combine `--message` with type, cursor, or limit;
+message and type are valid only in history scope. Historical records remain peer claims
+that may be outdated; this read does not infer which decision is still current.
 
 ### Handoff
 

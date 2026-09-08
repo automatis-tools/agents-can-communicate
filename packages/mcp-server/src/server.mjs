@@ -121,7 +121,7 @@ async function callTool(name, args, context) {
       return service.collectStatus({});
     case "acc_sync":
       return service.sync({ ...owner, cursor: args.cursor ?? null,
-        scope: args.scope, limit: args.limit });
+        scope: args.scope, limit: args.limit, messageId: args.messageId, kind: args.kind });
     case "acc_work":
       if (args.clear === true) {
         await service.clearIntent({ ...owner });
@@ -149,6 +149,12 @@ async function callTool(name, args, context) {
       return { message, delivery: routed.delivery };
     }
     case "acc_inbox":
+      if (args.messageId === undefined) {
+        return service.listInbox({ ...owner, cursor: args.cursor, limit: args.limit });
+      }
+      if (args.cursor !== undefined || args.limit !== undefined) {
+        throw new AccError(EXIT.USAGE, "an exact inbox read cannot use cursor or limit");
+      }
       return service.readInbox({ ...owner, messageId: args.messageId });
     case "acc_reply": {
       const routed = await recordAndOffer({ router: context.deliveryRouter,
@@ -191,9 +197,8 @@ async function handle(message, context) {
     case "resources/list":
       return { resources: [...RESOURCES] };
     case "resources/read": {
-      // Snapshot and roster are observation-only. Inbox is a delivery boundary:
-      // resolve this configured participant's durable session and let the core
-      // inbox service record that the returned bodies were retrieved.
+      // Inbox discovery uses this configured participant's current owner but
+      // returns summaries only. Reading this resource never retrieves bodies.
       const resourceContext = params.uri === "acc://inbox"
         ? { ...context, session: await resolveSession(context) }
         : context;

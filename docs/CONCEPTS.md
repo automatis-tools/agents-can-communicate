@@ -100,9 +100,10 @@ queued -> offered -> retrieved -> acknowledged
 
 - `queued`: the durable message and receipt committed;
 - `offered`: ACC or a certified client accepted the delivery bytes, not proof of reading;
-- `retrieved`: the participant fetched the message, not proof of model attention;
+- `retrieved`: the participant fetched the body through its inbox, not proof of model attention;
 - `acknowledged`: the participant acknowledged it or replied, not proof of task completion.
 
+Listing inbox headers and observing workspace history do not change receipts.
 There is no `seen` receipt. A failed delivery attempt leaves the message queued and
 recoverable rather than creating a terminal failure state.
 

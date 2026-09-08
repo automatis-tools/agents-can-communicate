@@ -29,7 +29,7 @@ test("installed reply exposes the original acknowledgement and supports exact in
     "--message", sent.message.messageId]);
   assert.deepEqual(inspected.receipt, reply.receipt);
   assert.equal(inspected.message.body, "Does reply acknowledge the original?");
-  assert.deepEqual(await packed.acc(["inbox", ...owner(reader)]), []);
+  assert.deepEqual(await packed.acc(["inbox", ...owner(reader)]), { items: [], nextCursor: null });
 
   // An idempotent retry exercises the actual human formatter without creating
   // another answer. It must distinguish the outgoing reply from the original.

@@ -74,7 +74,7 @@ test("resources are declared with stable uris", () => {
 test("acc_sync exposes the full scope so any session can answer for the workspace", () => {
   const sync = PUBLIC_TOOLS.find(tool => tool.name === "acc_sync");
 
-  assert.deepEqual(sync.inputSchema.properties.scope.enum, ["delta", "full"]);
+  assert.ok(sync.inputSchema.properties.scope.enum.includes("full"));
   assert.match(sync.description, /whole workspace|full/i);
 });
 

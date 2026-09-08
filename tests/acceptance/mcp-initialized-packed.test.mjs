@@ -39,7 +39,10 @@ test("installed initialized peers exchange and acknowledge linked replies", asyn
   const sent = await author("acc_request", { toParticipantId: "reviewer",
     title: "Check pagination", detail: "Does a nonzero offset still return limit items?" });
   assert.equal(sent.message.fromParticipantId, "author");
-  const received = await reviewer("acc_inbox");
+  const listed = await reviewer("acc_inbox");
+  assert.equal(listed.items.length, 1);
+  assert.equal(listed.items[0].message.body, undefined);
+  const received = await reviewer("acc_inbox", { messageId: listed.items[0].message.messageId });
   assert.equal(received.length, 1);
   assert.equal(received[0].message.messageId, sent.message.messageId);
   assert.equal(received[0].message.body, "Does a nonzero offset still return limit items?");
@@ -58,10 +61,10 @@ test("installed initialized peers exchange and acknowledge linked replies", asyn
   const [inspected] = await reviewer("acc_inbox", { messageId: sent.message.messageId });
   assert.equal(inspected.message.messageId, sent.message.messageId);
   assert.deepEqual(inspected.receipt, reply.receipt);
-  assert.deepEqual(await reviewer("acc_inbox"), []);
+  assert.deepEqual(await reviewer("acc_inbox"), { items: [], nextCursor: null });
   const answer = await author("acc_inbox");
-  assert.equal(answer[0].message.messageId, reply.message.messageId);
-  assert.equal(answer[0].message.fromParticipantId, "reviewer");
+  assert.equal(answer.items[0].message.messageId, reply.message.messageId);
+  assert.equal(answer.items[0].message.fromParticipantId, "reviewer");
   await author("acc_ack", { messageId: reply.message.messageId });
-  assert.deepEqual(await author("acc_inbox"), []);
+  assert.deepEqual(await author("acc_inbox"), { items: [], nextCursor: null });
 });

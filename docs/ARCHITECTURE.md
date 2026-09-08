@@ -108,8 +108,11 @@ Without relevant coordination context, that identity header is the only projecte
 
 ## Inbox, attention, and projection
 
-Inbox reads only messages addressed to the calling participant and advances that
-participant's receipt to `retrieved`. Reply validates ownership, creates an `answer` in the
+Public inbox discovery uses core `listInbox`: bounded, read-only message summaries
+addressed to the current participant. Exact body reads use `readInbox` and advance only
+that participant's receipt to `retrieved`; the embedded core API still supports bulk
+retrieval. History sync reads message records without receipt changes, using the same
+summary pager or one exact id. Reply validates ownership, creates an `answer` in the
 same thread, and acknowledges the original atomically. No participant can advance another
 participant's receipt.
 
@@ -134,7 +137,8 @@ of silently truncating it.
 For this participant's unresolved messages already `offered` or `retrieved`, the standard
 projector combines reply and acknowledgement reminders into a compact count after new
 message bodies. Queued obligations and claim conflicts remain individual attention items.
-The full pending list stays available through `acc inbox` and owned `acc status`; projection
+All pending headers stay discoverable through `acc inbox` pages; owned `acc status` retains
+its complete attention list. Full bodies require an exact inbox read; projection
 does not acknowledge, delete, or decide that an obligation is obsolete.
 
 ## Hooks fail open

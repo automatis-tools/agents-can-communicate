@@ -65,7 +65,10 @@ test("the whole request loop preserves explicitly configured owners", async t =>
 
   const { stdout: waiting } = await cli(["inbox", "--json"],
     await owner("phy"));
-  const [request] = JSON.parse(waiting).data;
+  const listed = JSON.parse(waiting).data;
+  const { stdout: exact } = await cli(["inbox", "--message",
+    listed.items[0].message.messageId, "--json"], await owner("phy"));
+  const [request] = JSON.parse(exact).data;
   assert.equal(request.message.subject, "Tank sinks through mud");
   const { stdout: replied } = await cli(["reply", "--message", request.message.messageId,
     "--body", "I will review the settling path."],

@@ -43,9 +43,10 @@ export async function readResource(uri, { service, participantId, workspaceId, s
         throw new AccError(EXIT.DATA, "the inbox resource requires a resolved session",
           { participantId });
       }
-      const inbox = await service.readInbox({ workspaceId, sessionId: session.sessionId,
+      const inbox = await service.listInbox({ workspaceId, sessionId: session.sessionId,
         generation: session.generation });
-      return inbox.map(item => attributedMessage(item.message));
+      return { ...inbox, items: inbox.items.map(item => ({ ...item,
+        message: attributedMessage(item.message) })) };
     }
     default:
       throw new AccError(EXIT.DATA, `unknown resource: ${uri}`, { uri });

@@ -95,8 +95,9 @@ receipts. [Protocol](PROTOCOL.md) defines these rules precisely.
 
 All recipients have the same durable record, but adapters expose different acceleration:
 
-- **Durable inbox:** universal recovery. An agent can retrieve the complete addressed
-  message with `acc inbox`, including by exact message id after compaction.
+- **Durable inbox:** universal recovery. `acc inbox` discovers bounded message headers;
+  `acc inbox --message <id>` retrieves one complete addressed message after selection
+  or compaction.
 - **Next normal turn:** exact captured versions of Codex, Claude Code, Gemini CLI, and Kimi
   Code can receive complete attributed peer context when the user next prompts that client.
   This does not wake an idle session.

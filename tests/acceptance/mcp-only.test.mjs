@@ -133,8 +133,8 @@ test("the MCP client sees the peer's claim, so it can choose to respect it", asy
  *
  * The hook runtime hands a session its pending messages when it builds a turn.
  * Before `acc_inbox`, reading a peer's body required a full workspace sync and
- * searching its nested snapshot. The narrow operation returns only unresolved
- * addressed messages and moves their own receipts truthfully to `retrieved`.
+ * searching its nested snapshot. Discovery now lists addressed headers; an
+ * exact read returns the body and moves its own receipt to `retrieved`.
  */
 async function mailed(t, { kind = "question" } = {}) {
   const place = await workspace(t);
@@ -162,7 +162,8 @@ test("a message addressed to an MCP client reaches it, body and all", async t =>
 
   const inbox = await call("acc_inbox");
 
-  const [message] = inbox.map(item => item.message);
+  const [item] = await call("acc_inbox", { messageId: inbox.items[0].message.messageId });
+  const message = item.message;
   assert.notEqual(message, undefined, "nothing was handed over");
   assert.equal(message.subject, "which way should the hull clamp?");
   assert.equal(message.body, "Blocking me.");
@@ -170,20 +171,23 @@ test("a message addressed to an MCP client reaches it, body and all", async t =>
 
 test("a note that has been read is not handed over again", async t => {
   const { call } = await mailed(t, { kind: "note" });
-  await call("acc_inbox");
+  const listed = await call("acc_inbox");
+  await call("acc_inbox", { messageId: listed.items[0].message.messageId });
 
   const second = await call("acc_inbox");
 
   // A client that polls every few seconds would otherwise be told the same
   // thing until it acknowledged it, and most messages ask for no answer.
-  assert.deepEqual(second, []);
+  assert.deepEqual(second, { items: [], nextCursor: null });
 });
 
 test("the sender stops being told its message is undelivered", async t => {
   const { call, receipts } = await mailed(t);
   assert.deepEqual(await receipts(), ["queued"]);
 
-  await call("acc_inbox");
+  const listed = await call("acc_inbox");
+  assert.deepEqual(await receipts(), ["queued"]);
+  await call("acc_inbox", { messageId: listed.items[0].message.messageId });
 
   assert.deepEqual(await receipts(), ["retrieved"]);
 });
@@ -191,7 +195,8 @@ test("the sender stops being told its message is undelivered", async t => {
 test("being shown something is still not agreeing to it", async t => {
   const { call, receipts } = await mailed(t);
   const inbox = await call("acc_inbox");
-  const [message] = inbox.map(item => item.message);
+  const [item] = await call("acc_inbox", { messageId: inbox.items[0].message.messageId });
+  const message = item.message;
 
   await call("acc_ack", { messageId: message.messageId });
 
@@ -214,7 +219,7 @@ test("an MCP client can ask a peer for work and receive its reply", async t => {
   const asked = await call("acc_request", { toParticipantId: "physics",
     title: "Tank sinks through mud", detail: "Not mine to fix. Can you take it?" });
   const [received] = await cli(place, ["inbox", "--session", peer.sessionId,
-    "--generation", peer.generation]);
+    "--generation", peer.generation, "--message", asked.message.messageId]);
   assert.equal(received.message.messageId, asked.message.messageId);
   await cli(place, ["reply", "--session", peer.sessionId, "--generation", peer.generation,
     "--message", asked.message.messageId, "--body", "Done; the mud clamp now holds."]);
@@ -222,6 +227,7 @@ test("an MCP client can ask a peer for work and receive its reply", async t => {
   // The whole loop, from the tier with no hooks at all: asked, answered, and the
   // answer arrives where this client can see it.
   const inbox = await call("acc_inbox");
-  assert.deepEqual(inbox.map(item => item.message.body),
+  const exact = await call("acc_inbox", { messageId: inbox.items[0].message.messageId });
+  assert.deepEqual(exact.map(item => item.message.body),
     ["Done; the mud clamp now holds."]);
 });

@@ -10,7 +10,7 @@ test("an installed solo inbox accepts its valid ephemeral owner", async t => {
   const session = await packed.acc(["attach", "--participant", "solo"]);
   const inbox = await packed.acc(["inbox", "--session", session.sessionId,
     "--generation", session.generation]);
-  assert.deepEqual(inbox, []);
+  assert.deepEqual(inbox, { items: [], nextCursor: null });
   const state = await packed.acc(["sync", "--scope", "full"]);
   assert.equal(state.snapshot.workspace, null);
 });
@@ -29,7 +29,7 @@ test("installed inbox operations cannot outlive their owner generation", async t
   const ids = { next: kind => createId(kind) };
   const owner = session => ({ sessionId: session.sessionId, generation: session.generation });
 
-  for (const operation of ["readInbox", "acknowledgeMessage"]) {
+  for (const operation of ["listInbox", "readInbox", "acknowledgeMessage"]) {
     for (const transition of ["close", "replace"]) {
       await t.test(`${operation} refuses a ${transition} before its commit`, async () => {
         const workspaceId = "workspace_inbox_race";
@@ -59,7 +59,8 @@ test("installed inbox operations cannot outlive their owner generation", async t
         const racing = createCoordinationService({ store: racingStore, clock, ids });
 
         await assert.rejects(racing[operation]({ ...owner(reader),
-          messageId: message.messageId }), error => error.code === 5);
+          ...(operation === "listInbox" ? {} : { messageId: message.messageId }) }),
+        error => error.code === 5);
         assert.equal(armed, false, "the lifecycle transition was never exercised");
         assert.deepEqual(await store.snapshot(workspaceId), checkpoint);
         assert.deepEqual(await store.eventsSince(workspaceId, null, 100), eventsBefore);

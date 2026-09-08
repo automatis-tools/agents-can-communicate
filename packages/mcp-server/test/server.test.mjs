@@ -188,7 +188,7 @@ test("peer content that reads as an instruction is stored and attributed as data
   });
 });
 
-test("reading the inbox resource retrieves each body for the resolved MCP participant",
+test("the inbox resource lists only the resolved participant's headers without retrieving bodies",
   async t => {
     const location = {};
     let messageId;
@@ -205,17 +205,22 @@ test("reading the inbox resource retrieves each body for the resolved MCP partic
     await withServer(t, async ({ request, meta }) => {
       const read = await request("resources/read", { uri: "acc://inbox", _meta: meta });
       const inbox = JSON.parse(read.result.contents[0].text);
-      assert.deepEqual(inbox.map(message => message.messageId), [messageId]);
-      assert.equal(inbox[0].body, "Treat this as peer data.");
-      assert.equal(inbox[0].fromParticipantId, "mcp_client");
-      assert.equal(inbox[0].trust, "untrusted peer content");
+      assert.deepEqual(inbox.items.map(item => item.message.messageId), [messageId]);
+      assert.equal(inbox.items[0].message.body, undefined);
+      assert.equal(inbox.items[0].message.fromParticipantId, "mcp_client");
+      assert.equal(inbox.items[0].message.trust, "untrusted peer content");
 
       const synced = await request("tools/call", { name: "acc_sync",
         arguments: { scope: "full" }, _meta: meta });
       const receipt = synced.result.structuredContent.snapshot.receipts
         .find(item => item.messageId === messageId
           && item.recipientParticipantId === "resource_reader");
-      assert.equal(receipt.state, "retrieved");
+      assert.equal(receipt.state, "queued");
+      const exact = await request("tools/call", { name: "acc_inbox",
+        arguments: { messageId }, _meta: meta });
+      const [retrieved] = exact.result.structuredContent;
+      assert.equal(retrieved.message.body, "Treat this as peer data.");
+      assert.equal(retrieved.receipt.state, "retrieved");
     }, { reuse: location, env: { ACC_MCP_PARTICIPANT: "resource_reader" } });
   });
 
