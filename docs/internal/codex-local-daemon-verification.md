@@ -307,3 +307,27 @@ Its public-disabled precursor
 `0474d566b14f446ecaf600e9112dfe6fcb002491c94f48f0e250ad96ccbfc3c1`
 passed installed package verification. The two `config-full-1` matrices run
 against the same corrected candidate. Outcomes remain pending.
+
+
+## Complete behavioral runs rejected by evidence validation
+
+Both `product-01521-config-full-1` and `product-01534-config-full-1`
+completed all 20 cases with 189 assertions and verified cleanup against the
+`a6a38da5...` candidate. Both exited incomplete because P13 created its role
+snapshot before `identify()` resolved the primary participant. The final
+validator correctly rejected `participantId: null`. These are complete behavioral
+observations but are not valid product certificates; their original bytes remain
+unchanged.
+
+The first harness correction moved actual identity resolution before P13's
+snapshot. Its additional global early guard also blocked P01, which deliberately
+checks actual cwd before resolving ACC identity and then refreshes its record.
+Scoped review found that regression; both `config-full-2` attempts confirmed it
+at P01 and cleaned up. The guard is being limited to P13.
+
+The first external P13 old-order mutation was confounded by that P01 failure;
+it does not prove the intended P13 gate. Its diagnostic is retained, and the
+checker now requires a passed P01 prerequisite before accepting a P13 mutation
+result. A separate read-only process reconciliation at 09:22:36 UTC found no
+Codex process whose cwd remained under the owned E2E/preflight roots; this does
+not rewrite any historical cleanup receipt.
