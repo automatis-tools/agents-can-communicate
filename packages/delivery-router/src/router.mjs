@@ -127,7 +127,20 @@ export function createDeliveryRouter({ service, adapters, clock, platform, readL
       || currentSessions[0].generation !== binding.generation) {
       return durable(participantId, "recipient_unavailable");
     }
-    const currentBinding = { ...binding, livePolicy: currentPolicy };
+    // Consent and session reads can outlive retirement or a re-handshake in
+    // the same generation. Core filters retired, expired and stale-generation
+    // bindings; require the selected identity and live mode immediately before
+    // transport, with no further awaited policy/session work in between.
+    const currentBindings = (await service.listDeliveryBindings({
+      participantId, now: clock.now() })).filter(item => item.sessionId === binding.sessionId
+        && item.generation === binding.generation
+        && item.adapterId === binding.adapterId
+        && item.clientVersion === binding.clientVersion
+        && item.opaqueEndpointRef === binding.opaqueEndpointRef
+        && item.availableModes.includes("livePush")
+        && Date.parse(item.leaseUntil) > Date.parse(clock.now()));
+    if (currentBindings.length !== 1) return durable(participantId, "recipient_unavailable");
+    const currentBinding = { ...currentBindings[0], livePolicy: currentPolicy };
     let response;
     try {
       // The store root is this workspace's runtime dir; the adapter resolves its
