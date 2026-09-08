@@ -1,3 +1,5 @@
+import { refreshExpiredBinding } from "./refresh-binding.mjs";
+
 const SAFE_ERRORS = new Set(["ambiguous_recipient_sessions", "delivery_disabled",
   "recipient_busy", "recipient_unavailable", "transport_error", "transport_rejected",
   "unsupported_client_version"]);
@@ -42,7 +44,6 @@ function safeTransport(value, opaqueEndpointRef) {
 
 export function createDeliveryRouter({ service, adapters, clock, platform, readLivePolicy }) {
   const registry = adaptersById(adapters);
-  void platform;
 
   async function policyFor(adapter, binding) {
     if (adapter?.nativeDelivery?.policySource !== "installation-record") {
@@ -69,13 +70,17 @@ export function createDeliveryRouter({ service, adapters, clock, platform, readL
     const receipt = await service.readReceipt({ messageId: message.messageId,
       recipientParticipantId: participantId });
     if (receipt.state !== "queued") return settled(receipt);
+    // Core keeps its existing 24-hour presence hard expiry. Refreshing an
+    // endpoint lease never sends a hook heartbeat: a daemon is reachability,
+    // not evidence that this particular session thread is still present.
     const liveSessions = await service.listLiveSessions({ participantId, now });
     if (liveSessions.length === 0) return durable(participantId, "recipient_unavailable");
     if (liveSessions.length > 1) {
       return durable(participantId, "ambiguous_recipient_sessions");
     }
     const [target] = liveSessions;
-    const bindings = (await service.listDeliveryBindings({ participantId, now }))
+    const bindings = (await service.listDeliveryBindings({
+      participantId, now, includeExpired: true }))
       .filter(binding => binding.sessionId === target.sessionId
         && binding.generation === target.generation);
     if (bindings.length === 0) return durable(participantId, "recipient_unavailable");
@@ -95,7 +100,21 @@ export function createDeliveryRouter({ service, adapters, clock, platform, readL
       return durable(participantId, "ambiguous_recipient_sessions");
     }
 
-    const { binding, adapter } = capable[0];
+    let { binding } = capable[0];
+    const { adapter } = capable[0];
+    if (Date.parse(binding.leaseUntil) <= Date.parse(now)) {
+      const refreshed = await refreshExpiredBinding({ service, adapter, binding,
+        runtimeDir: service.store?.root, platform, clock });
+      if (!refreshed) return durable(participantId, "recipient_unavailable");
+      const current = (await service.listDeliveryBindings({
+        participantId, now: clock.now() })).filter(item => item.sessionId === binding.sessionId
+          && item.generation === binding.generation
+          && item.adapterId === binding.adapterId
+          && item.clientVersion === binding.clientVersion
+          && item.opaqueEndpointRef === binding.opaqueEndpointRef);
+      if (current.length !== 1) return durable(participantId, "recipient_unavailable");
+      [binding] = current;
+    }
     const currentPolicy = await policyFor(adapter, binding);
     if (!permits(currentPolicy, message.kind)) {
       return durable(participantId, "delivery_disabled");
