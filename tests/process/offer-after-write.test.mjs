@@ -152,12 +152,14 @@ test("a rejected offer commit leaves that receipt queued", async t => {
 });
 
 test("an expired hook budget refuses to start an offer commit", async t => {
-  const { invoke, receipt } = await fixture(t);
-  const result = await invoke("beforeTurn", "recipient-session", { budgetMs: 1_000 });
-  await new Promise(resolve => setTimeout(resolve, 1_050));
-
-  await assert.rejects(result.commitOffers, /budget exhausted/);
-
+  const { invoke, receipt, message } = await fixture(t);
+  const result = await invoke("beforeTurn", "recipient-session", { budgetMs: 30_000 });
+  assert.equal(result.failed, undefined, result.reason);
+  assert.equal(result.timedOut, undefined, "offer preparation must finish before expiring its commit");
+  assert.ok(result.stdout.includes(message.body), "the prepared offer must contain the message body");
+  t.mock.method(Date, "now", () => result.deadlineAt);
+  try { await assert.rejects(result.commitOffers, /budget exhausted/); }
+  finally { t.mock.restoreAll(); }
   assert.equal((await receipt()).state, "queued");
 });
 
