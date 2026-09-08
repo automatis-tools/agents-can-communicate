@@ -8,9 +8,12 @@ import { createPackedAcc } from "../helpers/packed-acc.mjs";
 
 // A real installed hook process with a version-only client shim. This checks
 // projection and receipts, not whether a native model notices the reminder.
-test("an installed hook compacts a prior session's backlog without resolving it", async t => {
+for (const clientVersion of ["2.1.233", "99.0.0"]) {
+test(`an installed hook preserves a prior backlog with client ${clientVersion}`, async t => {
+  // Only this exact version/platform has a captured next-turn capability.
+  const certified = clientVersion === "2.1.233" && process.platform === "darwin" && process.arch === "arm64";
   const packed = await createPackedAcc(t);
-  await packed.setClientVersions({ claude: "2.1.233", codex: "0.0.0" });
+  await packed.setClientVersions({ claude: clientVersion, codex: "0.0.0" });
   const load = name => import(pathToFileURL(path.join(packed.installed,
     "node_modules", "@agents-can-communicate", name, "src", "index.mjs")));
   const [{ createCoordinationService }, { openFilesystemStore }, { createId },
@@ -60,20 +63,28 @@ test("an installed hook compacts a prior session's backlog without resolving it"
   const turn = async () => {
     const output = await packed.beforeTurn({ adapterId: "claude_code",
       harnessSessionId: "native-reader" });
-    assert.equal(output.stderr, "");
+    if (certified) assert.equal(output.stderr, "");
+    else {
+      assert.match(output.stderr, /pending message\(s\) withheld because client .* is not certified for nextTurn/);
+      assert.ok(output.stderr.includes(`acc inbox --message ${fresh.message.messageId}`));
+    }
     return JSON.parse(output.stdout).hookSpecificOutput.additionalContext;
   };
   const first = await turn();
-  assert.ok(first.includes(body), "old obligations displaced the fresh request's whole body");
+  assert.equal(first.includes(body), certified, "body delivery must follow the captured capability");
+  if (!certified) assert.match(first, /withheld.*not certified for nextTurn/);
   assert.match(first, /40 replies/);
   assert.match(first, /20 acknowledgements/);
   assert.ok(first.includes(`[reply_required] ${fresh.message.messageId}`),
     "a queued request is still an individual urgent item");
   assert.ok(Buffer.byteLength(first) < 1_000);
+  assert.equal((await snapshot()).receipts.find(item => item.messageId === fresh.message.messageId).state,
+    certified ? "offered" : "queued", "the first hook must not offer a withheld body");
   for (let i = 0; i < 3; i += 1) {
     const context = await turn();
-    assert.ok(Buffer.byteLength(context) < 400, "repeated context grew with the backlog");
-    assert.match(context, /41 replies/);
+    assert.ok(Buffer.byteLength(context) < (certified ? 400 : 1_000), "repeated context grew with the backlog");
+    assert.match(context, certified ? /41 replies/ : /40 replies/);
+    if (!certified) assert.match(context, /withheld.*not certified for nextTurn/);
     assert.match(context, /20 acknowledgements/);
     assert.match(context, /`acc inbox`/);
     assert.ok(!context.includes(body), "an offered body was offered again");
@@ -82,7 +93,7 @@ test("an installed hook compacts a prior session's backlog without resolving it"
   const after = await snapshot();
   assert.deepEqual(oldReceipts(after), oldReceipts(before));
   assert.equal(after.receipts.find(item => item.messageId === fresh.message.messageId).state,
-    "offered", "a summary must neither retrieve nor acknowledge a message");
+    certified ? "offered" : "queued", "withheld bodies and reminders must not advance receipts");
   const flags = /^ACC CLI \(append\): (--session \S+ --generation \S+)$/m.exec(first)[1]
     .split(" ");
   const status = await packed.acc(["status", ...flags]);
@@ -98,7 +109,12 @@ test("an installed hook compacts a prior session's backlog without resolving it"
   } while (cursor !== null);
   assert.equal(messages.length, 61);
   assert.equal(new Set(messages.map(item => item.message.messageId)).size, 61);
+  const [current] = await packed.acc(["inbox", ...flags, "--message", fresh.message.messageId]);
+  assert.equal(current.message.body, body, "explicit reading recovers a withheld body");
+  assert.equal((await snapshot()).receipts.find(item => item.messageId === fresh.message.messageId).state,
+    "retrieved", "only explicit reading retrieves the body");
   const [old] = await packed.acc(["inbox", ...flags, "--message", oldIds[0]]);
   assert.equal(old.message.body,
     "Original review request 0; still unresolved.");
 });
+}
