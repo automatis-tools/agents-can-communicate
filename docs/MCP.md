@@ -1,9 +1,11 @@
 # MCP
 
 Use `acc-mcp` when a client can call MCP tools but has no native ACC adapter. The server
-exposes durable messages, threads, receipts, intent, claims, and handoffs over stdio. It is
-a manual polling integration: it cannot infer the client's lifecycle, intercept writes,
-inject a normal turn, or push a message.
+exposes durable messages, threads, receipts, intent, claims, and handoffs over stdio.
+Receiving through MCP requires manual polling: it cannot infer the client's lifecycle,
+intercept writes, inject a normal turn, or wake the MCP client for incoming messages.
+Outgoing messages commit first and may then be offered through an eligible recipient's
+native adapter when that recipient's delivery policy permits it.
 
 ```mermaid
 graph LR
@@ -135,14 +137,25 @@ See [decision lifecycle](PROTOCOL.md#decision-lifecycle).
 
 ## Poll without overstating delivery
 
-Every outgoing message commits first. `acc_message`, `acc_request`, `acc_reply`, and
-`acc_finish` cannot promise push; delivery results remain queued with a durable diagnostic.
-The recipient calls `acc_inbox` with `messageId` to retrieve the body. Being returned by a tool is
-`retrieved`, not proof that a model attended to or obeyed it. A reply or explicit ack is
-`acknowledged`.
+`acc_message`, `acc_request`, `acc_reply`, and `acc_finish` record their outgoing message
+before attempting delivery. The installed server uses the delivery router and recipient
+policy to offer addressed messages through eligible, opted-in native adapters. If no
+eligible route accepts a pending message, it remains queued for durable retrieval.
+Inspect the returned `delivery` outcomes; sending through MCP does not guarantee a native
+offer, model attention, or a reply. These outgoing routes add no receiving capability to MCP.
 
-MCP is therefore a complete communication participant with higher latency, not a fake
-native adapter. Use it when a client can call tools but exposes no measured hook boundary.
+Poll `acc_inbox`, `acc_status`, or `acc_sync` to observe changes. Never repeat a mutation
+merely to poll. For an intentional send retry, reuse the same `clientMessageId` and payload.
+Supply the key on the first call if you need it available after a lost response; an omitted
+key is generated and returned in `message`.
+
+An MCP recipient retrieves a body with `acc_inbox` and its exact `messageId`. That read
+advances the receipt to `retrieved` when needed, without proving model attention. A reply
+or explicit ack records `acknowledged`; that state alone proves neither a separate retrieval
+nor a native reply. Inspect the answer message separately when a response is required.
+
+Use MCP when a client can call tools but exposes no measured hook boundary, and allow for
+the polling latency of incoming messages.
 
 Next: [Protocol](PROTOCOL.md) · [Capabilities](CAPABILITIES.md) ·
 [Security model](SECURITY_MODEL.md)
