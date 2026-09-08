@@ -435,7 +435,7 @@ server. Python is test-only stdlib PTY support, not a package dependency.
 | P11 | Stop owned daemon, send; install/reinstall while absent | Queue retained, truthful degraded diagnostic, consent retained; no daemon automatically started; later ordinary session can bind once daemon is explicitly restored |
 | P12 | New remote thread without --cd; separate diagnostic only | Actual pwd/hook/thread all A; no assertion that terminal B is its workspace; negative control for old wrapper, not a supported ACC launch recipe |
 | P13 | Remote absolute --cd B; relative --cd; resume/fork B from C | Explicit modes preserve measured actual cwd; exact-thread checks govern eligibility; ACC adds no arguments |
-| P14 | Ordinary /cd C where supported; close/resume/fork sessions | New ID/generation mapped correctly; closed/retired generations cannot receive; unsupported /cd recorded only for the launch mode where observed, not assumed for ordinary 0.152.1 |
+| P14 | Ordinary /cd C where supported; detach/resume/fork an unarchived thread; explicitly archive the current synthetic thread; start a fresh ordinary receiver | New ID/generation mapped correctly; actual SessionEnd retires the archived generation, which cannot receive an actionable question; fresh receiver binds; unsupported /cd recorded only for the launch mode where observed |
 | P15 | Sender CODEX_HOME differs from receiver home | Recipient's registered socket is used; sender's daemon queues remain untouched |
 | P16 | Wrong server version, unloaded ID, missing socket, malformed metadata | No offer success; queued receipt and sanitized diagnosis; no raw endpoint in CLI/MCP output |
 | P17 | Send live, then next normal hook | Already live-offered message is not projected again; uncertified nextTurn does not claim offered; durable inbox works |
@@ -446,6 +446,13 @@ server. Python is test-only stdlib PTY support, not a package dependency.
 - [ ] P14's unsupported subcase is explicitly expected only where observed; it
   cannot replace the close/resume/fork requirements. If a client stops exposing a
   prerequisite, mark that case failed/unobserved and keep that capability disabled.
+  Lifecycle correction from both real clients: TUI exit detaches but leaves the
+  daemon thread loaded. A known loaded resume may identify itself with a fresh
+  exact `UserPromptSubmit` instead of a new `SessionStart`; new/unknown threads
+  still require fresh `SessionStart`. Archive requires its real UI confirmation
+  and observed `SessionEnd`. Check unloaded state rather than expecting an empty
+  `queue/list` response from an unloaded thread. Fork while the source remains
+  unarchived; archived-fork support is outside this gate.
 - [x] For P16 label malformed/mismatched metadata as controlled fault injection,
   not as naturally observed Codex behavior. Preserve the original valid observation
   and assert the installed sender refuses the mutated endpoint before queue/add.
