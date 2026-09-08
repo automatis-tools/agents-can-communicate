@@ -10,6 +10,7 @@ import { ALL_ADAPTERS, clientContext, probeTimeout } from "./install-command.mjs
 import { describePresence } from "./main.mjs";
 import { platformPaths } from "./platform-paths.mjs";
 import { noticeUpdate } from "./update-check.mjs";
+import { readControl } from "./managed-runtime/state.mjs";
 import { diagnoseFilesystemStore, repairFilesystemStore }
   from "@agents-can-communicate/storage-filesystem";
 
@@ -229,9 +230,13 @@ export async function runDoctor({ options, context, runtime }) {
   const running = typeof runtime?.version === "function"
     ? await runtime.version().catch(() => null)
     : null;
-  const update = await noticeUpdate({ dataHome, running, env: runtime?.env ?? {},
-    now: Date.parse(clock.now()), get: runtime?.fetch,
-    io: { readFile, writeFile, mkdir } });
+  const manager = runtime?.managerRoot ? await readControl(runtime.managerRoot) : null;
+  const update = manager === null
+    ? await noticeUpdate({ dataHome, running, env: runtime?.env ?? {},
+      now: Date.parse(clock.now()), get: runtime?.fetch, io: { readFile, writeFile, mkdir } })
+    : { checked: false, running, latest: manager.pending?.version ?? null,
+      newer: manager.pending !== null, auto: manager.auto, pin: manager.pin,
+      pending: manager.pending?.version ?? null, phase: manager.phase, notice: manager.notice };
 
   // Before the store is read for anything else. `collectStatus` reads every
   // record, so on the store this command exists to describe it threw first and
@@ -285,7 +290,7 @@ export async function runDoctor({ options, context, runtime }) {
     remediation: [...adapters.flatMap(adapter => adapter.remediation),
       // Said here rather than in its own line of prose, because this list is
       // what a reader acts on and an upgrade is one more thing to run.
-      ...(update.newer ? [`acc update --apply  # ${update.latest} is on npm, `
+      ...(update.newer ? [`acc update  # ${update.latest} is on npm, `
         + `you have ${running}`] : [])],
   };
   const installed = adapters.filter(adapter => adapter.installed).length;
@@ -303,6 +308,8 @@ export async function runDoctor({ options, context, runtime }) {
   // claims that "active" means a model read anything.
   ...adapters.filter(adapter => adapter.present)
     .map(adapter => `  ${adapter.displayName} native delivery: ${describeNative(adapter.nativeDelivery)}`),
+  ...(manager === null ? [] : [`  automatic updates ${manager.auto ? "on" : "off"}; ACC ${manager.active.version}`
+    + (manager.pin ? `; pinned to ${manager.pin}` : ""), ...(manager.notice ? [`  ${manager.notice}`] : [])]),
   ...data.remediation.map(line => `  ${line}`),
   // `0 of 4` is a true line that reads as a broken machine, and on an
   // MCP-only one it would read that way on every run forever. The server needs

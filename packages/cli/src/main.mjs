@@ -409,6 +409,9 @@ export async function main(argv, runtime) {
   let parsed;
   try {
     parsed = parseArgs(argv);
+    if (runtime.managementOnly && !["help", "version", "update"].includes(parsed.command)) {
+      throw new AccError(EXIT.DATA, "runtime unavailable; retry after the update or run acc update to recover");
+    }
     // `config` is the one command that must work on a workspace ACC cannot
     // open. Discovery validates the config too, so a broken one would fail
     // there first and `acc config validate` - the command a user runs to find

@@ -7,6 +7,8 @@ import { AccError, EXIT } from "@agents-can-communicate/protocol";
 import { platformPaths } from "./platform-paths.mjs";
 import { checkingIsOff, fetchLatest, isNewer, writeCachedCheck } from "./update-check.mjs";
 
+import { runManagedUpdate, validateUpdateOptions } from "./managed-runtime/command.mjs";
+
 const execFileAsync = promisify(execFile);
 
 /**
@@ -28,6 +30,11 @@ const spell = ([command, argv]) => `  ${command} ${argv.join(" ")}`;
 export async function runUpdateCommand({ options, runtime }) {
   if (options.check === true && options.apply === true) {
     throw new AccError(EXIT.USAGE, "use either --check or --apply");
+  }
+  validateUpdateOptions(options);
+  if (runtime.managerRoot) return runManagedUpdate({ options, runtime });
+  if (options.auto !== undefined || options.pin !== undefined) {
+    throw new AccError(EXIT.USAGE, "run acc install before configuring automatic updates");
   }
   const env = runtime.env ?? {};
   const { data: dataHome } = platformPaths({ platform: runtime.platform, env });

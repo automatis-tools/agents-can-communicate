@@ -62,7 +62,7 @@ const withShim = (wiring, shim) => ({ hooks: Object.fromEntries(
  * No environment variable is copied or persisted. The extension declares what
  * it needs; secrets stay where the user put them.
  */
-export async function installGeminiExtension({ home, runner, node }) {
+export async function installGeminiExtension({ home, runner, cli, node }) {
   // Read before writing: a settings file that will not parse must not be found
   // out after the extension tree is already on disk.
   const found = await readJson(settingsPath(home), null);
@@ -82,7 +82,7 @@ export async function installGeminiExtension({ home, runner, node }) {
   await rm(path.join(target, "hooks", "hooks.json"), { force: true });
   // The skill ships with a placeholder where the command belongs: `acc` is
   // not on PATH everywhere, and an agent that cannot run it improvises.
-  await bakeSkillCommand({ root: target, node });
+  await bakeSkillCommand({ root: target, node, cli });
   // This client offers no plugin-root variable in a hook command, so the shim's
   // absolute path is written in at install time.
   const shim = await writeHookShim({ dir: path.join(target, "hooks"),

@@ -159,7 +159,7 @@ const sandboxReview = (config, file, stateRoot) =>
     : [];
 
 export async function installCodexPlugin({ home, agentsHome = home,
-  codexHome = path.join(home, ".codex"), stateRoot, runner, node }) {
+  codexHome = path.join(home, ".codex"), stateRoot, runner, node, cli, preserveVersions = false }) {
   // Read before writing, so a manifest that will not parse is found before a
   // plugin tree is laid down that nothing will then be able to remove.
   const existing = await readJson(marketplacePath(agentsHome), { name: MARKETPLACE,
@@ -176,7 +176,7 @@ export async function installCodexPlugin({ home, agentsHome = home,
   await cp(bundle, target, { recursive: true });
   // The skill ships with a placeholder where the command belongs: `acc` is
   // not on PATH everywhere, and an agent that cannot run it improvises.
-  await bakeSkillCommand({ root: target, node });
+  await bakeSkillCommand({ root: target, node, cli });
   const shim = await writeHookShim({ dir: target, adapterId: "codex", runner, node });
   await writeJson(path.join(target, "hooks.json"),
     withShim(await readJson(path.join(bundle, "hooks.json"), { hooks: {} }), shim));
@@ -222,7 +222,7 @@ export async function installCodexPlugin({ home, agentsHome = home,
   await cp(target, cached, { recursive: true });
   // One copy, the one just written - and only inside this plugin's own
   // directory. The marketplace cache root above it holds other people's plugins.
-  await keepOnlyVersion({ root: path.dirname(cached), version, io: { readdir, rm } });
+  if (!preserveVersions) await keepOnlyVersion({ root: path.dirname(cached), version, io: { readdir, rm } });
 
   // The plugin's own directory in the cache. Not the versioned one inside it,
   // which goes stale the moment the version changes - and not the marketplace

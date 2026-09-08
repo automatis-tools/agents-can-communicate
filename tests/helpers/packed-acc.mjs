@@ -24,7 +24,7 @@ async function runWithInput(command, args, options, input) {
   return pending;
 }
 
-async function treeSnapshot(root) {
+export async function treeSnapshot(root) {
   const entries = await readdir(root, { recursive: true, withFileTypes: true });
   const snapshot = [];
   for (const entry of entries) {
@@ -84,7 +84,7 @@ export async function createPackedAcc(t) {
   const accBin = path.join(installed, "bin", "acc.mjs");
   const hookBin = path.join(installed, "bin", "acc-hook.mjs");
   const mcpBin = path.join(installed, "bin", "acc-mcp.mjs");
-  const env = { ...process.env, ACC_DATA_HOME: dataHome, HOME: clientHome,
+  const env = { ...process.env, ACC_NO_UPDATE_CHECK: "1", ACC_DATA_HOME: dataHome, HOME: clientHome,
     PATH: clientBin,
     GIT_DIR: "", GIT_WORK_TREE: "" };
   // The caller's real credentials do not belong to this isolated runtime.
