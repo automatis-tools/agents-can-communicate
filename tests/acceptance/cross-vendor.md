@@ -1,7 +1,11 @@
-# Cross-vendor communication acceptance
+# Cross-vendor fallback communication acceptance
 
-This is the v0.3 release contract for two independently opened sessions. It tests
-communication semantics, not whether ACC can create or control either client.
+This is the packed scripted fallback scenario in `cross-vendor-live.test.mjs`. It retains
+the historical failed native fixtures below to test durable communication and honest
+downgrade behavior. It is not the complete current release capability contract or proof
+that independent real models chose to coordinate autonomously. Current routes and release
+provenance are in [Capabilities](../../docs/CAPABILITIES.md) and
+[0.4 candidate evidence](../../docs/release-evidence/v0.4.0.md).
 
 ## Activation event
 
@@ -22,7 +26,7 @@ Then Codex asks Claude and the same assertions hold. The question root has
 `threadId === messageId`; the answer preserves that thread and names the question in
 `inReplyTo`. Recipient receipts belong to that participant alone.
 
-## Delivery route used by this release
+## Historical delivery fixtures used by this scenario
 
 The real-client feasibility captures deliberately did not manufacture native reachability:
 
@@ -31,14 +35,14 @@ The real-client feasibility captures deliberately did not manufacture native rea
 | Codex CLI 0.152.0 on `darwin-arm64` | fail — existing app-server control socket absent; no daemon or target process started | exact-certified Codex 0.147.0 next-turn delivery, otherwise `acc inbox` |
 | Claude Code 2.1.252 on `darwin-arm64` | fail — development-channel warning stopped the run before the ACC MCP child started | exact-certified Claude Code 2.1.233 next-turn delivery, otherwise `acc inbox` |
 
-Therefore the release acceptance completes the semantic flow through certified next-turn
-or explicit inbox fallback. It must not report `livePush`, native reply routing, or model
-attention. A queued message remains a valid durable message; retrieval and acknowledgement
-are separate observations.
+The scripted scenario therefore completes the semantic flow through explicit inbox
+fallback. These deliberately unsupported fixture versions must not report `livePush`,
+native reply routing, or model attention. A queued message remains a valid durable message;
+retrieval and acknowledgement are separate observations.
 
 ## Packed-artifact proof
 
-The automated release test installs the generated tarball into a clean temporary prefix
+The automated fallback test installs the generated tarball into a clean temporary prefix
 and invokes only the packed bins and bundled packages. For each direction it must prove:
 
 1. the question commits before any delivery attempt;
@@ -51,9 +55,11 @@ and invokes only the packed bins and bundled packages. For each direction it mus
 8. an unknown client version visibly falls back while inbox communication still completes;
 9. uninstall is idempotent and preserves every foreign client setting.
 
-The human-relay sentinel starts false and must remain false for the entire flow. Test code
-may carry ids between commands; it may not copy a peer message body into another session's
-input.
+The `commandTrace` assertion checks which commands carry each question/answer body. Only
+the original send/reply and their same-key retries may carry their respective bodies; the
+other participant's commands must not copy them. Test code may carry ids between calls.
+This proves the scripted flow does not relay body text through command inputs, not that
+real models independently decided to communicate.
 
 ## Capability assertions
 
@@ -67,7 +73,8 @@ The same acceptance run records four independent dimensions:
 | fallback | next-turn or inbox completes with a queued/retrieved/acknowledged trail |
 
 An `offered` receipt would require captured bytes crossing a certified transport boundary.
-This release's Codex and Claude fallback scenario should not manufacture one.
+This Codex and Claude fallback scenario must not manufacture one; separate current
+native captures may establish offers for their own eligible clients.
 
 ## Supporting evidence
 
@@ -76,5 +83,5 @@ This release's Codex and Claude fallback scenario should not manufacture one.
 - each adapter's `certification.json` and `COMPATIBILITY.md`
 - packed acceptance tests under `tests/acceptance/`
 
-The release gate is successful only when the installed artifact, not the source checkout,
+This fallback gate is successful only when the installed artifact, not the source checkout,
 completes both directions and reports the downgrade truthfully.

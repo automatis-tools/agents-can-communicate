@@ -3,11 +3,11 @@
 Captured 2026-08-16 from `kimi -p` on 0.36.1. The capture ran under an isolated
 `KIMI_CODE_HOME`, so nothing in the user's own installation was touched.
 
-`session_id` and `cwd` are replaced with fixed placeholders. Every field that carried
-conversation content — `prompt`, `tool_output`, `error_message`, the written file's
-`content` and `path` — is replaced with a string containing the word `redacted`. That
-marker is load-bearing: the adapter test asserts the word does not appear anywhere in the
-normalised event, so anything the whitelist failed to drop shows up as a failure.
+`session_id`, `cwd`, and file paths use fixed neutral placeholders. Paths such as
+`/workspace/project/notes.txt` survive normalization as resource targets. Conversation
+content — prompts, tool output, error text, and written content — uses `redacted` markers
+that must not survive normalization. The adapter test checks both the retained path and
+the absence of those content markers.
 
 Three runs were needed, because the events are mutually exclusive by nature:
 

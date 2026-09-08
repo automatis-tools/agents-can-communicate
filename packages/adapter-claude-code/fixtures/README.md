@@ -6,6 +6,7 @@ for one session only, so nothing was installed into the operator's configuration
 `transcript_path`, `prompt`, and written file content are replaced. A fixture records the
 shape; it must never carry a transcript.
 
-The surviving `PreToolUse.json` is the `Bash` capture. A `Write` capture was taken first
-and overwritten by the later run; both were observed being denied, and the evidence is
-recorded in `../COMPATIBILITY.md`.
+`PreToolUse.json` is the retained `Bash` capture; `PreToolUse-Edit.json` separately retains
+the edit capture used for before-write certification. During earlier collection, a `Write`
+capture was taken first and overwritten by a later run; that is collection history, not
+the current fixture inventory. The observations are recorded in `../COMPATIBILITY.md`.

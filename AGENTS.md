@@ -11,8 +11,9 @@ dependencies.
 
 Read [docs/CONCEPTS.md](docs/CONCEPTS.md) for product terms and
 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for package boundaries. Use
-[docs/GLOSSARY.md](docs/GLOSSARY.md) for quick definitions. Planning specs live under
-`docs/internal/` and are not current product claims.
+[docs/GLOSSARY.md](docs/GLOSSARY.md) for quick definitions. Dated planning/reference material under
+`docs/internal/` and `docs/superpowers/` is not current product documentation. Published
+release-evidence records retain their original source, artifact, and capture provenance.
 
 ## Run the gates
 

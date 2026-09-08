@@ -1,14 +1,16 @@
 # Presence and pid-reuse — archived design note
 
-> Internal reference. The live [architecture doc](../ARCHITECTURE.md) carries a
-> three-state summary; this is the full rationale it points to.
+> Archived design rationale, including removed coordinator/workstream/task semantics.
+> The body records an earlier design and is not the current product contract. Read
+> [Concepts](../CONCEPTS.md), [Protocol](../PROTOCOL.md), and
+> [Architecture](../ARCHITECTURE.md) for current behavior; they do not endorse this historical body.
 
 ## Presence
 
 Three observable states: online, stale, offline. Heartbeats arrive only where a harness
 exposes them — hook safe points, or tool calls for MCP. An idle-but-open session degrades
 to `stale`, and that is truthful reporting rather than an error. Only Kimi Code fires on a
-timer; see [CAPABILITIES.md](CAPABILITIES.md).
+timer; see [current capabilities](../CAPABILITIES.md).
 
 A session reads `offline` when it is closed; when its recorded process is confirmed dead;
 when it has no recorded process and has been silent past thirty minutes — the point past
@@ -20,7 +22,7 @@ unrelated and a pid that still answers is not proof it is the same session. `onl
 A recorded process to confirm dead is not something every client gets, either - it comes
 from matching the adapter's own binary name against the operating system's name for the
 process, which fails for a client that is a script rather than an executable. Half of the
-shipped adapters resolve one and half do not; see [CAPABILITIES.md](CAPABILITIES.md).
+shipped adapters resolve one and half do not; see [current capabilities](../CAPABILITIES.md).
 
 An open session's id is reused only once its recorded process is confirmed dead — a closed
 one is already free, since closing is the session's own choice, not a presence judgment
@@ -40,7 +42,8 @@ naming an existing one.
 
 A claim follows the same restraint for its own reason: presence never releases one, only
 an expired lease or an explicit force release does — see
-[PROTOCOL.md](PROTOCOL.md#claim-lifetime-and-stale-owners).
+[current intent and claim rules](../PROTOCOL.md#intent-and-claims); the surrounding
+reasoning here remains historical.
 
 A workstream coordinator is one role presence staleness alone *does* replace: it is
 contestable by any peer the moment its holder reads `offline`, silence-based cases

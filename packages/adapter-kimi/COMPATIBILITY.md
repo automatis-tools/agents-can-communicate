@@ -18,8 +18,8 @@ Kimi Code has no certified live-push binding.
 
 ## The integration surface is not the plugin
 
-This is the first of the four clients where hooks do **not** live in the plugin. Its
-plugin manifest (`.kimi-plugin/plugin.json`) has no `hooks` key at all — the keys it
+Kimi hooks do **not** live in the plugin. Its plugin manifest (`.kimi-plugin/plugin.json`)
+has no `hooks` key at all — the keys it
 carries are `name`, `version`, `description`, `skills`, `sessionStart.skill`,
 `skillInstructions` and `interface`. Hooks are a top-level `[[hooks]]` array in
 `config.toml`, and there is no project-level config to put them in, so ACC edits the
@@ -85,8 +85,8 @@ is still working.
 ## SessionHeartbeat
 
 Observed at `uptime_ms` 60002, 120004 and 180006 — a fixed 60s cadence, independent of
-whether the session is doing anything. No other adapter has this: the other three reach
-a hook only when the user takes a turn, so an idle session's presence goes stale while
+whether the session is doing anything. No other shipped adapter has this timer-driven
+heartbeat; without a fresh observed hook, an idle session's presence goes stale while
 its process is alive. This is what `lifecycle.heartbeat` records.
 
 ## The deny contract

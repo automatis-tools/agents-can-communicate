@@ -8,7 +8,7 @@ project only actionable coordination plus a compact peer trigger; implement
 addressed-message reads and reply-plus-ack in core and expose them through CLI
 and MCP. Rewrite the bundled skill around selective communication.
 
-**Spec:** `docs/superpowers/specs/2026-08-31-context-efficient-coordination-design.md`
+**Spec:** `docs/internal/specs/2026-08-31-context-efficient-coordination-design.md`
 
 ## Constraints
 

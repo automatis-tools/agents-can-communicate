@@ -50,5 +50,11 @@ decides what its task requires.
 - [Design decisions](DESIGN_DECISIONS.md) — architectural decisions and reversals.
 - [Releasing](RELEASING.md) — packed-artifact verification.
 
+Dated planning/reference material under
+[`docs/internal/`](https://github.com/automatis-tools/agents-can-communicate/tree/main/docs/internal)
+and [`docs/superpowers/`](https://github.com/automatis-tools/agents-can-communicate/tree/main/docs/superpowers)
+is not current product documentation. Published release-evidence records retain their
+original source/artifact/capture provenance rather than certifying a later build.
+
 Runtime state and raw transcripts are not documentation artifacts and never belong in the
 repository.
