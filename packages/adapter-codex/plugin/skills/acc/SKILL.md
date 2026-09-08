@@ -176,6 +176,35 @@ read that exact message before answering or acknowledging it:
 - `recipient_unavailable message_x`: contact the recipient or wait for their reply.
 - `claim_expired`: stop assuming the resource is reserved; reclaim if needed.
 
+## Keep decisions explicit
+
+To recover the currently recorded positions, use
+`{{ACC}} sync --scope history --type decision --current --json`, then read the
+chosen IDs with `sync --scope history --message <id> --json`. Keep `--current`
+and the type filter while paging. A terminal withdrawal is included: it means
+that branch was cancelled, not that its body is a new instruction.
+
+Check `decisionStatus` before acting. `isHead: false` is historical; follow
+`currentMessageId` when present. `conflicted: true` means several explicit
+branches remain. Read the competing heads in the same `groupId` and surface the
+disagreement; do not pick the newest timestamp. `current` means no recorded
+successor, not truth, agreement, or permission from another session.
+
+Record a changed position with `message --type decision --supersedes <old-id>
+--subject "Port choice" --body "Use port 7319"`. To withdraw it, use
+`message --type decision --withdraws <old-id> --subject "Port choice"
+--body "Cancel this selection; the requirement changed"`. Prefix these commands
+with `{{ACC}}` and append your own credentials. Repeat the chosen flag for each
+of 1..16 target decisions; never combine the two flags. To resolve competing
+branches, explicitly supersede all their current IDs in one decision.
+
+Any peer may record an attributed change. ACC inherits the target authors and
+recipients, including offline participants; add `--to` only for extra recipients.
+Old bodies and receipts remain in exact inbox/history reads. Replaced decisions
+leave ordinary inbox and automatic reminders without being acknowledged. Do not
+acknowledge an obsolete decision just to clear its old receipt, infer replacement
+from prose, or rewrite stored records. Replacing a withdrawal records a new choice.
+
 ## Choose the narrow read
 
 - `{{ACC}} inbox` — read-only pages of pending headers addressed to you.
@@ -192,8 +221,8 @@ read that exact message before answering or acknowledging it:
 
 History uses the same 20-item/12,000-byte summary pages. Continue with
 `--cursor <nextCursor>` and the same type filter. Exact `--message` reads take no
-cursor, limit, or type. These reads expose historical facts, not proof they remain
-current; verify the selected handoff or decision against the present work.
+cursor, limit, type, or current. Lifecycle metadata reports explicit decision changes;
+verify the selected handoff or decision against the present work.
 
 One workspace spans a repository's worktrees. Status carries checkout and branch
 when you genuinely need ownership information; those details are intentionally

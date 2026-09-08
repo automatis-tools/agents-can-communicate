@@ -32,6 +32,7 @@ export function messageSummary(message) {
     subject: shortSubject(message.subject), sentAt: message.sentAt,
     inReplyTo: message.inReplyTo, bodyBytes: Buffer.byteLength(message.body),
     artifactCount: message.artifacts.length, trust: "untrusted peer content",
+    ...(message.decisionStatus === undefined ? {} : { decisionStatus: message.decisionStatus }),
   };
 }
 

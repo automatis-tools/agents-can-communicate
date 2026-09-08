@@ -40,6 +40,7 @@ export const PUBLIC_TOOLS = Object.freeze([
       limit: { type: "integer", minimum: 1, maximum: 500,
         description: "Maximum events (default 100), or history summaries (default 20, also byte-bounded)." },
       kind: { type: "string", enum: [...MESSAGE_KINDS], description: "Filter history before paging." },
+      current: { type: "boolean", description: "With history and kind decision, list only terminal decisions/withdrawals; conflicts remain visible." },
       messageId: string("Read this complete history message; requires history scope and no list controls."),
     }),
   },
@@ -103,12 +104,16 @@ export const PUBLIC_TOOLS = Object.freeze([
       obligation: { type: "string", enum: ["none", "acknowledge", "reply"],
         description: "Override only where the kind/obligation matrix permits it." },
       clientMessageId: string("Retry key; omit to generate one and return it in message."),
+      supersedes: { ...stringList("Decision IDs this new decision replaces. Inherits recipients and authors. Exclusive with withdraws."),
+        minItems: 1, maxItems: 16, uniqueItems: true },
+      withdraws: { ...stringList("Decision IDs explicitly withdrawn, with body as reason. Decision kind only; inherits recipients and authors."),
+        minItems: 1, maxItems: 16, uniqueItems: true },
     }, ["to", "subject", "body"]),
   },
   {
     name: "acc_inbox",
     description: `List a bounded page of unresolved message summaries, newest first, without `
-      + `changing receipts. Use nextCursor for older entries; omit it to see new arrivals. `
+      + `changing receipts. Replaced decisions remain available by exact ID and history. Use nextCursor for older entries; omit it to see new arrivals. `
       + `Use messageId to retrieve exactly one complete addressed message. An acknowledged `
       + `message can be inspected without changing its receipt. `
       + `${POLLED}`,

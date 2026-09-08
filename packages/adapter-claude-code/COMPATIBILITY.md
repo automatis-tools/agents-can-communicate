@@ -1,5 +1,11 @@
 # Claude Code compatibility
 
+Decision lifecycle rendering is checked by `tests/acceptance/decision-lifecycle-packed.test.mjs`
+using the installed ACC channel and a local socket. Replacement/withdrawal links and
+status survive in its existing untrusted text envelope. This is a transport regression
+fixture, not a new observation of a Claude model interpreting the change; it adds no
+capability claim.
+
 Verified 2026-08-16 against the installed client and the primary documentation.
 
 | Item | Value |

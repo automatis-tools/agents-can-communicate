@@ -121,7 +121,7 @@ async function callTool(name, args, context) {
       return service.collectStatus({});
     case "acc_sync":
       return service.sync({ ...owner, cursor: args.cursor ?? null,
-        scope: args.scope, limit: args.limit, messageId: args.messageId, kind: args.kind });
+        scope: args.scope, limit: args.limit, messageId: args.messageId, kind: args.kind, current: args.current });
     case "acc_work":
       if (args.clear === true) {
         await service.clearIntent({ ...owner });
@@ -144,7 +144,9 @@ async function callTool(name, args, context) {
       const routed = await recordAndOffer({ router: context.deliveryRouter, record: () =>
         service.sendMessage({ ...owner, clientMessageId: clientMessageId(args, service),
         toParticipantIds, subject: args.subject, body: args.body, kind,
-        obligation: obligationFor(kind, args.obligation, toParticipantIds.length > 0) }) });
+        supersedes: args.supersedes, withdraws: args.withdraws,
+        obligation: obligationFor(kind, args.obligation, toParticipantIds.length > 0
+          || args.supersedes !== undefined || args.withdraws !== undefined) }) });
       const message = routed.recorded;
       return { message, delivery: routed.delivery };
     }

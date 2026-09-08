@@ -30,11 +30,11 @@ option value remains data: `--body --help` sends the literal body `--help`.
 | Command | Required | Optional |
 |---|---|---|
 | `acc status` | — | `--session`, `--generation`, `--participant`, `--all` |
-| `acc sync` | — | `--session`, `--generation`, `--cursor`, `--limit`, `--scope delta|full|history`, `--type`, `--message` |
+| `acc sync` | — | `--session`, `--generation`, `--cursor`, `--limit`, `--scope delta|full|history`, `--type`, `--message`, `--current` |
 | `acc work` | `--summary` unless `--clear` | `--session`, `--generation`, `--mode`, `--state`, repeated `--hint`, `--clear` |
 | `acc claim` | `--resource` | `--session`, `--generation`, `--mode`, `--enforcement`, `--reason`, `--lease` |
 | `acc release` | `--claim` or `--resource` | `--session`, `--generation`, `--authority`, `--reason` |
-| `acc message` | `--subject`, `--body` | repeated `--to`, `--type`, `--obligation`, `--client-message-id`, owner flags |
+| `acc message` | `--subject`, `--body` | repeated `--to`, `--supersedes` or `--withdraws`, `--type`, `--obligation`, `--client-message-id`, owner flags |
 | `acc request` | `--to`, `--title` | `--detail`, `--client-message-id`, owner flags |
 | `acc inbox` | — | `--message`, `--cursor`, `--limit`, owner flags |
 | `acc reply` | `--message`, `--body` | `--subject`, `--client-message-id`, owner flags |
@@ -120,7 +120,8 @@ Set `ACC_PARTICIPANT` when the recipient must keep one stable address across con
 decision may explicitly use `--obligation acknowledge`. `answer` is created only by
 `reply`, and `handoff` only by `finish`.
 
-No `--to` creates a room message where the kind allows it. Addressed messages create a
+No `--to` creates a room message where the kind allows it, except decision changes
+that inherit explicit recipients from their targets. Addressed messages create a
 separate receipt for each recipient. `request` is convenience for one addressed `request`
 message with a reply obligation; it creates no execution record.
 
@@ -190,8 +191,19 @@ any message kind and filters before pagination; keep the same filter between pag
 This public workspace observation includes records from before your session joined.
 Exact history reads return `view: "message"` and one complete message in `items`,
 without changing any receipt. Do not combine `--message` with type, cursor, or limit;
-message and type are valid only in history scope. Historical records remain peer claims
-that may be outdated; this read does not infer which decision is still current.
+message and type are valid only in history scope. Decision reads also include `decisionStatus`. Use
+`acc sync --scope history --type decision --current --json` for terminal decisions
+and withdrawals; keep these filters when paging. Exact reads cannot use `--current`.
+`current` means no explicit successor, not truth or consensus.
+
+To change a decision, send another `acc message --type decision` with repeated
+`--supersedes <message-id>` or `--withdraws <message-id>` (1..16 unique IDs; exclusive).
+Use subject/body for the new position or withdrawal reason. Changes inherit the target
+recipients and authors, including offline participants; `--to` adds recipients.
+Any owned participant can record an attributed change. Multiple successor branches
+remain conflicted until a new change explicitly references all current alternatives.
+Old records leave ordinary inbox/automatic attention without any receipt change;
+exact inbox and history still recover them. See [decision lifecycle](PROTOCOL.md#decision-lifecycle).
 
 ### Handoff
 

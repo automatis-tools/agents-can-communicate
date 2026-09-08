@@ -1,5 +1,6 @@
 import { existsSync } from "node:fs";
 import { stat } from "node:fs/promises";
+import { decisionBody } from "@agents-can-communicate/adapter-sdk";
 
 import { MINIMUM_VERSION, PROTOCOL_CONTRACT, addCodexQueueMessage, compareStableVersions,
   controlSocketPath, initializeCodex, locateCodexThread, openCodexAppServer, parseStableVersion,
@@ -144,7 +145,7 @@ function renderText(message) {
     `Subject: ${message.subject ?? ""}`,
   ];
   if (typeof message.inReplyTo === "string") lines.push(`In reply to: ${message.inReplyTo}`);
-  lines.push("", message.body ?? "");
+  lines.push("", decisionBody(message));
   return lines.join("\n");
 }
 

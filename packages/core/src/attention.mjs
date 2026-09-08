@@ -2,6 +2,7 @@ import { AccError, EXIT } from "@agents-can-communicate/protocol";
 
 import { overlaps } from "./claims.mjs";
 import { classifySessionPresence } from "./sessions.mjs";
+import { decisionView, isCurrentDecision } from "./decision-state.mjs";
 
 export const ATTENTION_PRIORITY = Object.freeze({
   reply_required: 1,
@@ -95,6 +96,8 @@ export function computeAttention(snapshot, { session, participantId, now, pidIsA
   if (typeof pidIsAlive !== "function") {
     throw new AccError(EXIT.USAGE, "computeAttention requires a pidIsAlive probe", {});
   }
+  snapshot = { ...snapshot, messages: (snapshot.messages ?? [])
+    .map(decisionView(snapshot.messages ?? [])).filter(isCurrentDecision) };
   return [
     ...obligationItems(snapshot, participantId),
     ...unavailableRecipients(snapshot, participantId, now, pidIsAlive),

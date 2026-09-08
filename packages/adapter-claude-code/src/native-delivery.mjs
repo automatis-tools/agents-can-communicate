@@ -1,6 +1,7 @@
 import { readFile, readdir, stat } from "node:fs/promises";
 import net from "node:net";
 import path from "node:path";
+import { decisionBody } from "@agents-can-communicate/adapter-sdk";
 
 import { PROTOCOL_CONTRACT, endpointDir, isSocketSafe, readRegistration, routeAck, routeReply }
   from "./channel.mjs";
@@ -197,7 +198,7 @@ export async function offerMessage({ binding, message, runtimeDir, timeoutMs = 2
 
 function sendEnvelope({ record, message, binding, connect, timeoutMs, rejected }) {
   const envelope = { nonce: record.nonce, messageId: message.messageId, kind: message.kind,
-    subject: message.subject ?? "", body: message.body ?? "",
+    subject: message.subject ?? "", body: decisionBody(message),
     ...(typeof message.inReplyTo === "string" ? { inReplyTo: message.inReplyTo } : {}) };
   return new Promise(resolve => {
     const socket = connect(record.socketPath);

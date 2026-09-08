@@ -11,6 +11,18 @@
 Not published. A published record says what the registry serves and is not
 rewritten, so shipped code that changes after a release is measured here instead.
 
+Decisions now support explicit replacement and withdrawal through repeated CLI
+`--supersedes` / `--withdraws` flags and corresponding MCP arrays. Any owned peer can
+record an attributed change; target authors and recipients inherit delivery, including
+offline recipients. Current history lists terminal decisions and withdrawals, exposing
+competing branches instead of picking the latest timestamp. Old records remain readable,
+but leave default inbox, automatic body delivery, and attention without any fake acknowledgement.
+
+Next-turn and native text retain lifecycle links. Live routing refreshes decision state
+before each recipient's offer; text already sent cannot be recalled. The optional stored
+field preserves this build's access to existing schema-3 records; older ACC builds may
+reject new records, so participating installations should be upgraded together.
+
 Default CLI/MCP inbox and `acc://inbox` now return read-only `{items, nextCursor}`
 summary pages. Previously, listing a backlog returned every body and marked every message
 retrieved. Exact inbox reads retain their one-item full-message array and receipt semantics.

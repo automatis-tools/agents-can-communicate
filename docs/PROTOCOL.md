@@ -79,6 +79,52 @@ retroactive receipts. Those already-present recipients get the normal inbox and 
 next-turn path; a successful next-turn write advances their room receipt to `offered`.
 Room records are never eligible for native live push.
 
+## Decision lifecycle
+
+A decision may additionally carry `decisionChange` with exactly two fields:
+`action` (`replace` or `withdraw`) and `messageIds` (1..16 unique portable IDs of
+existing decisions in the same workspace). Generic send inputs use `supersedes`
+or `withdraws`; the durable payload is built after transactional validation.
+The sorted target set participates in idempotency. The author may be any owned
+participant; attribution does not confer system authority.
+
+Targets and their receipts are immutable. Changes inherit target receipt recipients
+and target authors, excluding the changing author from inherited recipients. Extra
+explicit recipients are merged, sorted, and persisted in `toParticipantIds` before
+recording. This also notifies offline readers and makes live routing use the same set.
+No old receipt is acknowledged, deleted, or advanced by a lifecycle change.
+
+Explicit links form a graph. Within a connected group, terminal records are heads;
+multiple heads mean a conflict, even if their prose looks similar. A change may target
+an already replaced decision, creating a competing branch. Resolve branches by
+explicitly linking a new change to all their current heads. A withdrawal is itself
+a terminal record; superseding it explicitly records a new decision.
+
+Decision summaries and exact read copies expose `decisionStatus`:
+
+| Field | Meaning |
+|---|---|
+| `state` | `current` for a terminal choice; `withdrawn` for a terminal cancellation or history with only cancelled heads; otherwise `superseded` |
+| `isHead` | no recorded successor links to this record |
+| `conflicted` / `headCount` | whether the group has multiple terminal positions and their count |
+| `currentMessageId` | sole current head, or null if there is no unique head |
+| `groupId` | derived representative root ID for finding related heads; may change when groups are joined |
+
+This metadata is never persisted. `history` + kind `decision` + `current: true`
+lists heads, including withdrawals and conflicts, using the same summary budget.
+Ordinary inbox, bulk reads, automatic delivery and attention omit non-head decisions;
+exact inbox/history retain them. Timestamps and acknowledgements never choose a winner.
+A decision without an explicit successor may still be factually stale.
+
+Next-turn context and each native offer use a lifecycle snapshot; text already shown
+or in flight cannot be recalled. Changes get their own delivery receipts. Native
+transport carries the change/status inside its existing untrusted text envelope.
+
+The optional field preserves reading of existing schema-3 records by this build.
+Older ACC builds cannot interpret these semantics and may reject new records with
+unknown fields. Upgrade participating ACC installations together; this is not a
+forward-compatible promise or an automatic state migration.
+
 ## Kinds and obligations
 
 | Kind | Valid obligation | Addressing |

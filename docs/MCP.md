@@ -46,11 +46,11 @@ successfully yet refuse tool calls; that is distinct from a protocol handshake f
 | Tool | Required input | Optional input |
 |---|---|---|
 | `acc_status` | — | — |
-| `acc_sync` | — | `cursor`, `scope: delta|full|history`, `limit: 1..500`, `kind`, `messageId` |
+| `acc_sync` | — | `cursor`, `scope: delta|full|history`, `limit: 1..500`, `kind`, `messageId`, `current` |
 | `acc_work` | `summary` and `mode`, or `clear: true` | `state`, `resourceHints` |
 | `acc_claim` | `action`; `resource` for acquire, `claimId` for renew | `mode`, `reason`, `leaseSeconds` where valid |
 | `acc_release` | `claimId` | — |
-| `acc_message` | `to`, `subject`, `body` | `kind`, `obligation`, `clientMessageId` |
+| `acc_message` | `to`, `subject`, `body` | `kind`, `obligation`, `clientMessageId`, `supersedes`, `withdraws` |
 | `acc_request` | `toParticipantId`, `title` | `detail`, `clientMessageId` |
 | `acc_inbox` | — | `messageId`, `cursor`, `limit: 1..500` |
 | `acc_reply` | `messageId`, `body` | `subject`, `clientMessageId` |
@@ -117,6 +117,21 @@ An MCP participant therefore reports `advisory` enforcement and `manual` lifecyc
 `manual` describes ACC presence reporting, not ownership of the external client. Because
 workspace protection is the weakest live participant's real guarantee, one MCP session
 makes guarded claims advisory for the room.
+
+## Decision changes
+
+`acc_message` with `kind: "decision"` accepts either `supersedes: ["message_x"]`
+or `withdraws: ["message_x"]`: 1..16 unique existing decision IDs. Supply `to: []`
+to inherit target authors and recipients, including offline participants, or add
+recipients explicitly. Body states the new position or reason for withdrawal.
+Any owned peer may record a change; competing branches are visible, not resolved by time.
+
+`acc_sync {scope: "history", kind: "decision", current: true}` lists terminal
+positions and withdrawals with bounded `decisionStatus` metadata. Exact history
+reads include the same status and preserve receipts. `current` cannot accompany
+an exact ID or other scopes/kinds. Replaced decisions leave ordinary inbox/attention;
+they remain available by exact ID without an automatic acknowledgement.
+See [decision lifecycle](PROTOCOL.md#decision-lifecycle).
 
 ## Poll without overstating delivery
 

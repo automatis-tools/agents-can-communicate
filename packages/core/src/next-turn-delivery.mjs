@@ -8,7 +8,8 @@ export async function nextTurnDelivery(store, input = {}) {
   const receiptByMessage = new Map(snapshot.receipts
     .filter(item => item.recipientParticipantId === input.participantId)
     .map(item => [item.messageId, item]));
-  const eligible = snapshot.messages.filter(message => receiptByMessage.has(message.messageId)
+  const eligible = snapshot.messages.map(decisionView(snapshot.messages))
+    .filter(message => isCurrentDecision(message) && receiptByMessage.has(message.messageId)
     && message.fromSessionId !== input.exceptSessionId)
     .sort((left, right) => left.sentAt.localeCompare(right.sentAt)
       || left.messageId.localeCompare(right.messageId));
@@ -27,3 +28,4 @@ export async function nextTurnDelivery(store, input = {}) {
       .map(message => message.messageId),
   };
 }
+import { decisionView, isCurrentDecision } from "./decision-state.mjs";

@@ -116,7 +116,14 @@ summary pager or one exact id. Reply validates ownership, creates an `answer` in
 same thread, and acknowledges the original atomically. No participant can advance another
 participant's receipt.
 
-Attention is computed from six explicit rules:
+Decision lifecycle is derived from immutable message links, without a new record kind
+or mutable decision store. Read copies carry bounded status; raw forensic snapshots stay
+unchanged. Non-head decisions leave pending inbox, bulk delivery, and attention while
+exact reads retain them. Replacement/withdrawal records inherit recipients before commit,
+so offline readers receive the change without a forged acknowledgement. See
+[the protocol contract](PROTOCOL.md#decision-lifecycle).
+
+Attention is computed from six explicit rules for current obligations:
 
 | Priority | Kind | Observable trigger |
 |---|---|---|
@@ -139,7 +146,8 @@ projector combines reply and acknowledgement reminders into a compact count afte
 message bodies. Queued obligations and claim conflicts remain individual attention items.
 All pending headers stay discoverable through `acc inbox` pages; owned `acc status` retains
 its complete attention list. Full bodies require an exact inbox read; projection
-does not acknowledge, delete, or decide that an obligation is obsolete.
+does not acknowledge or delete records. Explicit decision links, rather than the
+projector or message age, retire old decision obligations.
 
 ## Hooks fail open
 

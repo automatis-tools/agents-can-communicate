@@ -79,6 +79,12 @@ Message kinds describe the conversation:
 An **obligation** is the communication response owed by a recipient. A request is not an
 order, and a reply is not proof that work is complete.
 
+A decision can explicitly replace or withdraw earlier decisions. The old records stay
+attributed and recoverable, while current reads and reminders follow the recorded links.
+Any peer may record a change; competing branches remain visible until explicitly joined.
+A current decision is a recorded position, not agreement or authority. See
+[decision lifecycle](PROTOCOL.md#decision-lifecycle).
+
 ## Threads keep the exchange together
 
 The first message is a **thread** root. A reply names the original message and stays in that

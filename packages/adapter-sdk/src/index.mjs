@@ -13,6 +13,7 @@ export { assertRunner, bakeSkillCommand, defaultBootstrap, defaultChannel, defau
 export { BEGIN, END, removeTomlBlock, renderBlock, stripBlock, tomlString, writeTomlBlock }
   from "./toml-block.mjs";
 export { projectContext, projectContextResult } from "./context-projector.mjs";
+export { decisionBody, decisionLines } from "./decision-text.mjs";
 export { shellWriteTargets } from "./shell-writes.mjs";
 export { keepOnlyVersion, ownVersion, stampPluginVersion } from "./own-version.mjs";
 export { editJson, readJson } from "./json-text.mjs";

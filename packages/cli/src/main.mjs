@@ -200,7 +200,7 @@ const HANDLERS = Object.freeze({
   sync: async ({ options, context }) => {
     const result = await context.service.sync({ sessionId: options.session,
       cursor: options.cursor ?? null, scope: options.scope,
-      messageId: options.message, kind: options.type,
+      messageId: options.message, kind: options.type, current: options.current,
       limit: options.limit ? positiveNumber(options.limit, "limit") : undefined });
     if (result.scope === "history") return { data: result, text: JSON.stringify(result, null, 2) };
     // Solo zero-overhead: nothing to say means nothing printed, not a banner.
@@ -252,7 +252,9 @@ const HANDLERS = Object.freeze({
       context.service.sendMessage({ sessionId: options.session,
       generation: options.generation, clientMessageId: clientMessageId(options, context),
       toParticipantIds, kind,
-      obligation: obligationFor(kind, options.obligation, toParticipantIds.length > 0),
+      supersedes: options.supersedes, withdraws: options.withdraws,
+      obligation: obligationFor(kind, options.obligation, toParticipantIds.length > 0
+        || options.supersedes !== undefined || options.withdraws !== undefined),
       subject: options.subject, body: options.body, descriptor: context.descriptor }) });
     const message = routed.recorded;
     return { data: { message, delivery: routed.delivery },

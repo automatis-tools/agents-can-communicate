@@ -3,6 +3,7 @@ import { AccError, EXIT, SCHEMA_VERSION, advanceReceipt }
 
 import { receiptId, recordMessageInTransaction } from "./conversations.mjs";
 import { messagePage, messageSummary } from "./message-pages.mjs";
+import { decisionView, isCurrentDecision } from "./decision-state.mjs";
 
 const listable = (message, receipt) => receipt.state === "queued" || receipt.state === "offered"
   || (receipt.state === "retrieved" && message.obligation !== "none");
@@ -59,9 +60,10 @@ export function createInboxService(ports, sessions) {
       const receipts = new Map(tx.list("receipt", receipt =>
         receipt.recipientParticipantId === session.participantId)
         .map(receipt => [receipt.messageId, receipt]));
-      const messages = tx.list("message", message => receipts.has(message.messageId));
+      const all = tx.list("message"), view = decisionView(all);
+      const messages = all.filter(message => receipts.has(message.messageId)).map(view);
       return messagePage(messages, input, {
-        include: message => listable(message, receipts.get(message.messageId)),
+        include: message => isCurrentDecision(message) && listable(message, receipts.get(message.messageId)),
         project: message => ({ message: messageSummary(message),
           receipt: receipts.get(message.messageId) }),
       });
@@ -73,12 +75,14 @@ export function createInboxService(ports, sessions) {
     const now = clock.now();
     return store.transaction(async tx => {
       await requireOpen(input, "read the inbox", tx);
-      const messages = new Map(tx.list("message").map(item => [item.messageId, item]));
+      const all = tx.list("message"), view = decisionView(all);
+      const messages = new Map(all.map(item => [item.messageId, view(item)]));
       let selected = tx.list("receipt", receipt =>
         receipt.recipientParticipantId === session.participantId)
         .filter(receipt => messages.has(receipt.messageId));
       if (input.messageId === undefined) {
-        selected = selected.filter(receipt => listable(messages.get(receipt.messageId), receipt));
+        selected = selected.filter(receipt => listable(messages.get(receipt.messageId), receipt)
+          && isCurrentDecision(messages.get(receipt.messageId)));
       } else {
         selected = selected.filter(receipt => receipt.messageId === input.messageId);
         if (selected.length === 0) {
@@ -96,7 +100,8 @@ export function createInboxService(ports, sessions) {
       // move its receipt backward nor refresh its timestamp or emit an event.
       return selected.map(receipt => receipt.state === "acknowledged"
         ? { message: messages.get(receipt.messageId), receipt }
-        : advanceOwned(tx, session, receipt.messageId, "retrieved", now));
+        : { ...advanceOwned(tx, session, receipt.messageId, "retrieved", now),
+          message: messages.get(receipt.messageId) });
     }, { kinds: ["session", "message", "receipt"] });
   }
 

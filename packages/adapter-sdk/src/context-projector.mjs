@@ -63,6 +63,7 @@ function messageGroups(messages) {
       `messageId: ${message.messageId}`,
       `sender: ${message.fromParticipantId} (session ${message.fromSessionId})`,
       `obligation: ${message.obligation}`,
+      ...decisionLines(message).map(escapePeerText),
       `subject: ${oneLine(escapePeerText(message.subject))}`,
       "body:",
       escapePeerText(message.body),
@@ -210,3 +211,4 @@ export function projectContextResult(sync, { budgetBytes = DEFAULT_BUDGET_BYTES 
 export function projectContext(sync, options) {
   return projectContextResult(sync, options).text;
 }
+import { decisionLines } from "./decision-text.mjs";

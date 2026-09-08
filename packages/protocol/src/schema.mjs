@@ -1,4 +1,5 @@
 import { assertMessageSemantics, MESSAGE_KINDS, OBLIGATIONS } from "./conversations.mjs";
+import { assertDecisionChange } from "./decision-changes.mjs";
 import { AccError, EXIT } from "./errors.mjs";
 import { id, invalid, listOf, nullable, oneOf, optional, plainObject, positiveInteger,
   resourceUri, sequence, text, timestamp } from "./fields.mjs";
@@ -110,7 +111,7 @@ const DURABLE_RECORDS = Object.freeze({
     fromParticipantId: id, fromSessionId: id, toParticipantIds: listOf(id),
     kind: oneOf(...MESSAGE_KINDS), obligation: oneOf(...OBLIGATIONS),
     subject: line, body: prose, inReplyTo: nullable(id), artifacts: listOf(artifactRef),
-    handoff: nullable(handoffPayload), sentAt: timestamp },
+    handoff: nullable(handoffPayload), decisionChange: optional(assertDecisionChange), sentAt: timestamp },
 
   receipt: { messageId: id, workspaceId: id, recipientParticipantId: id,
     state: receiptState, updatedAt: timestamp },

@@ -1,12 +1,12 @@
 import { createHash } from "node:crypto";
 import { isDeepStrictEqual } from "node:util";
-
 import { AccError, EXIT, SCHEMA_VERSION, validateRecord }
   from "@agents-can-communicate/protocol";
 
 import { projectReleasedClaim, reconstructFinishRetry } from "./finish-retries.mjs";
 import { ensureMaterialised } from "./materialisation.mjs";
 import { nextTurnDelivery as selectNextTurnDelivery } from "./next-turn-delivery.mjs";
+import { prepareDecisionChange } from "./decision-changes.mjs";
 
 export const receiptId = (messageId, participantId) => `receipt_${createHash("sha256")
   .update(JSON.stringify([messageId, participantId])).digest("base64url")}`;
@@ -20,6 +20,7 @@ const logicalContent = message => ({
   inReplyTo: message.inReplyTo,
   artifacts: message.artifacts,
   handoff: message.handoff,
+  decisionChange: message.decisionChange ?? null,
 });
 
 const normalizedContent = input => logicalContent({
@@ -31,6 +32,7 @@ const normalizedContent = input => logicalContent({
   inReplyTo: input.inReplyTo ?? null,
   artifacts: input.artifacts ?? [],
   handoff: input.handoff ?? null,
+  decisionChange: input.decisionChange,
 });
 
 function existingMessage(tx, session, input) {
@@ -128,8 +130,8 @@ export function recordMessageInTransaction({ tx, session, input: raw, now, messa
   // Resolved before anything else reads the recipients, so the stored message
   // names real participants and a retry compares against the same content. A
   // record that kept the client name would address nobody when it is read back.
-  const input = { ...raw,
-    toParticipantIds: resolveAddressees(tx, raw.toParticipantIds ?? [], session) };
+  const input = prepareDecisionChange(tx, { ...raw,
+    toParticipantIds: resolveAddressees(tx, raw.toParticipantIds ?? [], session) }, session);
   const existing = existingMessage(tx, session, input);
   if (existing !== undefined) {
     return { message: existing, recipientParticipantIds: [], created: false };
@@ -152,6 +154,7 @@ export function recordMessageInTransaction({ tx, session, input: raw, now, messa
     inReplyTo,
     artifacts: input.artifacts ?? [],
     handoff: input.handoff ?? null,
+    ...(input.decisionChange === undefined ? {} : { decisionChange: input.decisionChange }),
     sentAt: now,
   });
   const recipientParticipantIds = addressedRecipients(tx, message, session);
