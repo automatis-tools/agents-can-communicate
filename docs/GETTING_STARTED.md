@@ -65,6 +65,16 @@ Same-client addresses can be ambiguous when several instances are live; agents u
 exact participant ids in the roster when needed. See [Concepts](CONCEPTS.md) for participant
 and session identity.
 
+A second repeatable pattern is review and handoff. Ask the implementing agent to request
+review of an identified revision (a commit when Git is available, or named files and
+version otherwise) and wait for the verdict. Ask the reviewer to return blocking defects
+or approval. If either session must stop, it can leave a durable handoff naming completed
+work, remaining work, and blockers. A later session can recover it from history. The
+underlying commands are [`acc request`](CLI.md#messages-and-requests), exact
+[`acc inbox --message`](CLI.md#inbox-reply-and-acknowledgement),
+[`acc reply`](CLI.md#inbox-reply-and-acknowledgement), and
+[`acc finish`](CLI.md#handoff).
+
 ## 3. Watch for useful coordination
 
 Look for an agent discovering a peer, publishing the files it expects to change, noticing a

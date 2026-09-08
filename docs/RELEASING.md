@@ -1,7 +1,7 @@
 # Releasing
 
 Use this procedure to build one auditable npm artifact, verify that exact tarball, and keep
-its evidence tied to the commit that supplied its bytes. The package is currently `0.3.1`;
+its evidence tied to the commit that supplied its bytes. The package is currently `0.4.0`;
 the commands derive the version from `package.json` so the filename cannot drift.
 
 ```mermaid
@@ -18,8 +18,9 @@ graph LR
 
 ## Prepare candidate commit A
 
-Commit A must contain every file npm will pack and every release gate. Start from a clean,
-dedicated release worktree, update the version and candidate files, then run:
+Commit A must contain every file npm will pack and every release gate. Use a clean,
+dedicated release worktree; an existing clean isolated worktree is fine. Update the version
+and candidate files, then run:
 
 ```bash
 release_cache="$(mktemp -d "${TMPDIR:-/tmp}/acc-npm-cache.XXXXXX")"

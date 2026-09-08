@@ -86,6 +86,8 @@ function localMarkdownTargets(markdown, from) {
 }
 
 async function main() {
+  const intendedVersion = JSON.parse(
+    await readFile(path.join(repo, "package.json"), "utf8")).version;
   const workspace = await realpath(await mkdtemp(path.join(tmpdir(), "acc-verify-")));
   const consumer = path.join(workspace, "consumer");
   const project = path.join(workspace, "project");
@@ -164,28 +166,30 @@ async function main() {
     }
     ok("workspaces bundled");
     const manifest = await readTarJson(tarball, "package.json");
-    if (manifest.version !== "0.3.1") fail(`root version is ${manifest.version}, not 0.3.1`);
+    if (manifest.version !== intendedVersion) {
+      fail(`root version is ${manifest.version}, not ${intendedVersion}`);
+    }
     if (!manifest.bundleDependencies?.includes("@agents-can-communicate/delivery-router")) {
       fail("delivery-router is not bundled; installed message commands cannot start");
     }
     for (const dependency of manifest.bundleDependencies) {
       const workspaceManifest = await readTarJson(tarball,
         `node_modules/${dependency}/package.json`);
-      if (workspaceManifest.version !== "0.3.1") {
-        fail(`${dependency} is ${workspaceManifest.version}, not 0.3.1`);
+      if (workspaceManifest.version !== intendedVersion) {
+        fail(`${dependency} is ${workspaceManifest.version}, not ${intendedVersion}`);
       }
     }
     const geminiManifest = await readTarJson(tarball,
       "node_modules/@agents-can-communicate/adapter-gemini-cli/"
       + "extension/gemini-extension.json");
-    if (geminiManifest.version !== "0.3.1") {
-      fail(`embedded Gemini extension is ${geminiManifest.version}, not 0.3.1`);
+    if (geminiManifest.version !== intendedVersion) {
+      fail(`embedded Gemini extension is ${geminiManifest.version}, not ${intendedVersion}`);
     }
     const codexPlugin = await readTarJson(tarball,
       "node_modules/@agents-can-communicate/adapter-codex/"
       + "plugin/.codex-plugin/plugin.json");
     if (codexPlugin.license !== "MIT") fail("shipped Codex plugin license is not MIT");
-    ok(`root and ${manifest.bundleDependencies.length} bundled workspaces are 0.3.1`);
+    ok(`root and ${manifest.bundleDependencies.length} bundled workspaces are ${intendedVersion}`);
 
     step("install into a clean directory");
     await writeFile(path.join(consumer, "package.json"),
@@ -240,7 +244,9 @@ async function main() {
     }
     const installedKimi = JSON.parse(await readFile(path.join(kimiHome, "plugins", "managed",
       "agents-can-communicate", ".kimi-plugin", "plugin.json"), "utf8"));
-    if (installedKimi.version !== "0.3.1") fail("installed Kimi manifest is not 0.3.1");
+    if (installedKimi.version !== intendedVersion) {
+      fail(`installed Kimi manifest is ${installedKimi.version}, not ${intendedVersion}`);
+    }
 
     const removed = JSON.parse((await acc("uninstall", "--adapter", "kimi",
       "--home", clientHome)

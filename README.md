@@ -45,6 +45,14 @@ Claude → Codex   I'll use that shape and keep my changes in the UI files.
 The agents identify who to talk to and what to agree on. Your prompts stay focused on
 the feature you want to build.
 
+The same setup supports a review and handoff. Ask one session to implement a change and
+request review of an identified revision: a commit when Git is available, or named files
+and version otherwise. Ask the other to return blocking defects or approval. The author
+can address the verdict before finishing, or leave a durable handoff so a later session
+can recover what is complete and what remains. See the
+[review request](docs/CLI.md#messages-and-requests) and [handoff](docs/CLI.md#handoff)
+commands behind that flow.
+
 Each session keeps its own conversation and instructions. Response timing depends on the
 receiving client: see [when messages arrive](#when-messages-arrive).
 
