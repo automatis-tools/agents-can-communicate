@@ -1,8 +1,8 @@
 # Codex LocalDaemon implementation and verification
 
 Work in progress on `feat/codex-local-daemon`; this report is not a release certificate.
-Both private installed product matrices now pass. Public capability wiring and
-final release-candidate artifact gates are being completed. Nothing has been pushed, merged, published, or posted to GitHub.
+Both private installed product matrices now pass, and public capability wiring
+is committed. Final public-artifact execution and whole-branch review remain pending. Nothing has been pushed, merged, published, or posted to GitHub.
 
 ## Diagnosis
 
@@ -362,6 +362,36 @@ They are intentionally partial full-matrix records; each selected scenario was
 validated independently. The final public-artifact full runs will provide the
 third independent reviewed-runtime cold/idle observation per version, contingent
 on actual runtime byte equivalence and complete valid results.
+
+## Public package and evidence gate
+
+Public wiring is committed in `aad8ed0`; its scoped spec and quality review found
+no Critical, Important or Minor issue. The runtime enables only the observed
+native live-push path on darwin-arm64; new hook/lifecycle or native reply routing
+claims were not added. Public documentation is in `9b95339`.
+
+The candidate built from `aad8ed07af3f3f5608ec1578645d2a08e5bca3ea` is
+`agents-can-communicate-0.3.1.tgz`, 273,141 bytes and 209 entries, SHA-256
+`8dc730105b9a80c8245a7fc63392c1f7ded423ac538b3146d7dc5a83fde4e058`.
+It passed actual installed-package verification. All 131 packed runtime files
+under bin/src/plugin/skills are byte-identical to the tested private candidate;
+there are no missing, added or changed runtime files. Documentation and
+certification/provenance records differ intentionally.
+
+Removing the actual referenced 0.152.1 full product evidence from an independently
+unpacked/repacked candidate produced mutant SHA-256
+`387b24c31f71aeb31375420c426851dda236d372767e0e50f9f25f3fc7789c3d`.
+The positive package passed again, then the mutant failed at the exact
+`certification fixture is missing` gate for the selected product evidence.
+Temporary mutation state was removed.
+
+Required `npm ci` passed; syntax checking covered 356 files. The first final
+full suite ran 1,537 tests: 1,533 passed, two failed and two were skipped.
+Both failures reproduce independently: a synthetic Codex binding without recorded
+consent now correctly reports `delivery_disabled`, while the old acceptance test
+expected a transport/version failure; a dry-run test expected obsolete prose.
+The bounded test correction is being completed without runtime changes. These
+failed runs are retained, and no all-green suite is claimed yet.
 
 ## Implementation decisions and their costs
 

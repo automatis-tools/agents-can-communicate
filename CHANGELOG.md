@@ -4,12 +4,27 @@
 
 | | |
 |---|---|
-| Built from | `c28757c113666c9226ff3b84c50fba9f1bb816aa` |
-| Tarball | `agents-can-communicate-0.3.1.tgz`, 256,368 bytes, 196 entries |
-| sha256 | `05ad35d8d6dbd64612fd4ce177a19d7fcd55374c7713e2ba077235d5411a6e90` |
+| Built from | `aad8ed07af3f3f5608ec1578645d2a08e5bca3ea` |
+| Tarball | `agents-can-communicate-0.3.1.tgz`, 273,141 bytes, 209 entries |
+| sha256 | `8dc730105b9a80c8245a7fc63392c1f7ded423ac538b3146d7dc5a83fde4e058` |
 
 Not published. A published record says what the registry serves and is not
 rewritten, so shipped code that changes after a release is measured here instead.
+
+Codex delivery now reuses an ordinary, already-loaded LocalDaemon thread without
+adding launch arguments or starting a daemon. Actual installed-package matrices
+on Codex 0.152.1 and 0.153.4, macOS arm64, each passed 20 scenarios and 189
+assertions. Delivery verifies the exact receiver, workspace, process, version and
+socket; missing or unsupported endpoints retain durable inbox access. Opt-in is
+recorded separately from reachability, and expired live bindings can refresh
+without reviving retired generations.
+
+The upgrade removes only unchanged ACC-owned Codex wrappers and preserves edited
+or unrelated shell artifacts. Reinstall and uninstall preserve client-owned TOML
+even when Codex inserts it inside ACC's configuration markers. Live delivery can
+spend tokens after the terminal detaches from a still-loaded thread; turning it
+off prevents new offers but cannot retract an already-accepted queue entry.
+Native replies remain uncertified; the observed reply loop uses `acc reply`.
 
 The set that decides which commands need a session owner named three the CLI does
 not have. `task`, `workstream` and `decide` went with the orchestration surface

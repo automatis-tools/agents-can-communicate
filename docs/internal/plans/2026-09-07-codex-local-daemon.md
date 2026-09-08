@@ -473,7 +473,7 @@ server. Python is test-only stdlib PTY support, not a package dependency.
 - [x] Check real hook PID ancestry and version matching in P01 on both versions.
   If unresolved, stop enabling the descriptor and revise the narrow adapter/SDK
   contract with observed evidence; never globally remove PID or version gates.
-- [ ] Persist closed product evidence and certification only for observed passes.
+- [x] Persist closed product evidence and certification only for observed passes.
   Commit feature wiring and real evidence together as
   `feat: enable verified Codex LocalDaemon delivery`.
 
@@ -491,15 +491,15 @@ server. Python is test-only stdlib PTY support, not a package dependency.
 - Modify `packages/adapter-codex/test/delivery-fallback.test.mjs` to assert current
   reasons instead of universal workspace impossibility.
 
-- [ ] Rewrite the operative fallback explanation: ordinary reachable sessions can
+- [x] Rewrite the operative fallback explanation: ordinary reachable sessions can
   deliver; embedded, disabled, unsupported or failed identity checks stay durable.
   Preserve historical statements inside dated evidence, with a current correction
   around them. Distinguish actual session cwd from terminal invocation directory.
-- [ ] Document recorded consent, runtime reachability, long-idle refresh,
+- [x] Document recorded consent, runtime reachability, long-idle refresh,
   24-hour presence expiry, already-accepted queue behavior after policy off,
   pending-only transport idempotency and uncaptured platforms. No new guard,
   lifecycle, nextTurn or native replyRoute claim follows from this delivery work.
-- [ ] Ensure both positive LocalDaemon product fixtures and the historical remote
+- [x] Ensure both positive LocalDaemon product fixtures and the historical remote
   failure fixture ship in the tarball, with resolvable provenance. A passing
   descriptor must not be satisfiable by an empty or missing installed evidence file.
 - [ ] Mutate the candidate by removing a referenced product evidence file from
