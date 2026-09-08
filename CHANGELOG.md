@@ -1,6 +1,13 @@
 # Changelog
 
-## Unreleased — 0.4.0 candidate
+## Unreleased
+
+- Reinstalling after a full uninstall restores the remembered automatic-update setting.
+  Explicit opt-outs remain off, and a partial uninstall failure keeps updates paused.
+  Existing 0.4.0 uninstall records cannot recover a lost preference; use
+  `acc update --auto on` once if updates should resume.
+
+## 0.4.0 — 2026-09-08
 
 - Independent peers now recover ordinary coordination, exact-revision review, correction,
   and durable handoff flows across process exits, late replies, and new session owners.

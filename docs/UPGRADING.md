@@ -47,7 +47,9 @@ delivery still depends on the current client's capabilities.
 
 ## Automatic updates after installation
 
-After a normal `acc install`, automatic updates are on. ACC checks for stable releases in
+An initial `acc install` turns automatic updates on. Later installs preserve an explicit
+`acc update --auto off` choice. Full uninstall pauses updates and preserves the setting
+for the next install. ACC checks for stable releases in
 an independent background process, normally at most once a day, downloads and verifies a
 separate runtime copy, and refreshes the installed integrations and skills before switching.
 The global npm package provides a launcher; the active runtime lives under ACC's data home.
@@ -70,6 +72,11 @@ acc update --auto on          # enable them again
 acc update --pin 0.4.0        # stay on this exact stable version
 acc update --pin none         # follow stable releases again
 ```
+
+ACC 0.4.0 lost the previous update setting during a full uninstall. If you already ran
+that version's `uninstall` and want updates enabled after reinstalling, run
+`acc update --auto on` once. A later installer cannot distinguish that old uninstall
+state from an explicit opt-out, so it keeps the recorded `off` value until you change it.
 
 `--apply` remains an alias for the plain update command. Pins cannot downgrade an active
 runtime. `ACC_NO_UPDATE_CHECK=1` disables update networking and background scheduling;

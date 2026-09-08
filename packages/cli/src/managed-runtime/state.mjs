@@ -94,6 +94,7 @@ export async function validateRuntime(root, runtime) {
 async function validateControl(root, value) {
   if (!value || value.schemaVersion !== 1 || !["ready", "activating"].includes(value.phase)
     || typeof value.auto !== "boolean" || !nullableString(value.pin)
+    || value.autoPreference !== undefined && typeof value.autoPreference !== "boolean"
     || !nullableString(value.checkedAt) || !nullableString(value.notice)
     || !nonempty(value.home) || !path.isAbsolute(value.home)
     || !Array.isArray(value.targets) || !value.targets.every(nonempty)

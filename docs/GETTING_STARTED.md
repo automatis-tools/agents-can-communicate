@@ -24,7 +24,8 @@ npm install -g agents-can-communicate
 acc install
 ```
 
-Installation also enables automatic updates. ACC downloads releases in the background and
+Initial installation also enables automatic updates; reinstalling keeps an explicit opt-out.
+ACC downloads releases in the background and
 refreshes its runtime and skills when active clients have left. Use `acc update` for an
 immediate update, or `acc update --auto off` to disable background updates. See
 [update controls](UPGRADING.md#automatic-updates-after-installation).

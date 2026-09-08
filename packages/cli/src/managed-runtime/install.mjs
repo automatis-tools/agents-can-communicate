@@ -37,8 +37,12 @@ export async function installManaged({ packageRoot, managerRoot, dataHome, home,
       throw new Error("install from the active managed runtime; use acc update to switch versions");
     }
     const runtime = { version: candidate.version, root: candidate.root };
+    const autoPreference = previous?.autoPreference ?? previous?.auto ?? true;
+    // Full removal pauses workers without revoking the user's choice. Keep a
+    // partial-removal pause until explicit opt-in; this install may omit its failed target.
+    const auto = previous?.targets.length ? previous.auto : autoPreference;
     const control = { schemaVersion: 1, active: runtime, pending: runtime, phase: "activating",
-      auto: previous?.auto ?? true, pin: previous?.pin ?? null,
+      auto, autoPreference, pin: previous?.pin ?? null,
       checkedAt: previous?.checkedAt ?? null, home,
       targets: [...new Set([...(previous?.targets ?? []), ...targets])], notice: null };
     await writeControl(root, control);
@@ -66,6 +70,7 @@ export async function uninstallManaged({ managerRoot, apply }) {
       .map(operation => operation.adapterId));
     const targets = control.targets.filter(id => !removed.has(id));
     await writeControl(root, { ...control, targets,
+      autoPreference: control.autoPreference ?? control.auto,
       auto: targets.length > 0 && result.failed.length === 0 && control.auto,
       pending: targets.length > 0 ? control.pending : null, notice: null });
     return result;

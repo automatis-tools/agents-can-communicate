@@ -104,7 +104,9 @@ from operating merely because its own state is unavailable.
 
 ## Managed automatic updates
 
-A normal managed installation enables automatic updates. The latency-sensitive hook path
+An initial managed installation enables automatic updates; later installs preserve an
+explicit opt-out. Full uninstall pauses updates while retaining the setting for a later
+reinstall. The latency-sensitive hook path
 does no network download; it may schedule a detached worker. That worker uses the configured
 npm registry/network and local npm executable, checks stable package identity/version and
 sha512 integrity against registry metadata, installs with lifecycle scripts disabled, and

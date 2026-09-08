@@ -104,7 +104,7 @@ const NOTES = Object.freeze({
     "Use acc config <subcommand> --help for its options."],
   update: ["Run acc update to install the latest release and refresh client integrations.",
     "Use acc update --check to only report whether a newer release exists.",
-    "Automatic updates are on after acc install; activation waits for active clients and ACC processes.",
+    "An initial acc install enables automatic updates; reinstalling preserves your choice. Activation waits for active clients and ACC processes.",
     "--auto on|off changes automatic updates; --pin VERSION holds an exact stable version; --pin none follows stable releases.",
     "--apply remains accepted as a compatibility alias for acc update."],
 });
