@@ -53,7 +53,7 @@ export async function establishNativeBinding({ adapter, event, hookBinding, clie
   }
   // Whatever this generation published before is retired first, so a failed
   // re-handshake can never leave yesterday's endpoint reachable.
-  await clear();
+  if (!await clear()) return outcome("degraded", "handshake_failed");
   let timer = null;
   try {
     const budget = Math.max(1, Math.floor(timeoutMs));

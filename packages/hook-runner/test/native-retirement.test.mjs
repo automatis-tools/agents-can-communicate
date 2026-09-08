@@ -29,7 +29,7 @@ test("policy off retires in core before cleaning exactly the old adapter endpoin
   const service = fixture();
   const outcome = await run(service, async input => service.calls.push(["cleanup", input]));
   assert.equal(outcome.state, "off");
-  assert.deepEqual(service.calls, [["clear", { sessionId: prior.sessionId, generation }],
+  assert.deepEqual(service.calls, [["clear", { sessionId: prior.sessionId, generation, opaqueEndpointRef: prior.opaqueEndpointRef }],
     ["cleanup", { binding: prior, runtimeDir: "/private/runtime" }]]);
 });
 
@@ -56,4 +56,20 @@ test("adapter cleanup failure and timeout remain bounded and fail open", async (
       new Promise(resolve => setTimeout(() => resolve("unbounded"), 300))]);
     assert.equal(result.state, "off");
   }
+});
+
+
+test("an indeterminate retirement must not start or publish a new handshake", async () => {
+  let bindCalls = 0;
+  let publishCalls = 0;
+  const service = fixture();
+  service.clearDeliveryBinding = async () => new Promise(() => {});
+  service.publishDeliveryBinding = async () => { publishCalls += 1; };
+  const result = await establishNativeBinding({ adapter: { nativeDelivery: {},
+    retireNativeSession: async () => {}, bindNativeSession: async () => { bindCalls += 1; } },
+    hookBinding: { accSessionId: prior.sessionId, generation, clientPid: 42 },
+    service, livePolicy: "actionable", runtimeDir: "/private/runtime", timeoutMs: 40 });
+  assert.equal(result.state, "degraded");
+  assert.equal(bindCalls, 0);
+  assert.equal(publishCalls, 0);
 });

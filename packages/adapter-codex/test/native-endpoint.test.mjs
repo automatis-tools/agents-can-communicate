@@ -1,10 +1,11 @@
 import assert from "node:assert/strict";
+import { execFileSync, spawnSync } from "node:child_process";
 import { chmod, readFile, rename, stat, symlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 import test from "node:test";
 
 import { bindNativeSession, retireNativeSession } from "../src/native-delivery.mjs";
-import { readNativeEndpoint } from "../src/native-endpoint.mjs";
+import { readNativeEndpoint, writeNativeEndpoint } from "../src/native-endpoint.mjs";
 import { nativeFixture } from "./native-fixture.mjs";
 
 async function registered(t) {
@@ -63,4 +64,32 @@ test("retiring an old address leaves a later binding's registration available", 
   assert.equal(await readNativeEndpoint(h), null);
   assert.equal((await readNativeEndpoint({ ...h, endpointId: newer.opaqueEndpointRef })).threadId,
     h.record.threadId);
+});
+
+
+test("a nonregular FIFO registration is refused without waiting for a writer", {
+  skip: process.platform === "win32" ? "Unix FIFO semantics" : false,
+}, async t => {
+  const h = await registered(t);
+  await rename(h.file, `${h.file}.original`);
+  execFileSync("mkfifo", ["-m", "600", h.file]);
+  const script = `import { readNativeEndpoint } from ${JSON.stringify(new URL("../src/native-endpoint.mjs", import.meta.url).href)};
+    const result = await readNativeEndpoint(JSON.parse(process.argv[1]));
+    if (result !== null) process.exit(2);`;
+  const child = spawnSync(process.execPath, ["--input-type=module", "-e", script,
+    JSON.stringify({ runtimeDir: h.runtimeDir, endpointId: h.endpointId })], { timeout: 1_000 });
+  assert.equal(child.status, 0, "endpoint read must refuse FIFO within the subprocess deadline");
+});
+
+test("publication exposes complete records while concurrent readers inspect the address", async t => {
+  const h = await registered(t);
+  const results = [];
+  let done = false;
+  const publication = writeNativeEndpoint({ runtimeDir: h.runtimeDir, record: h.record })
+    .finally(() => { done = true; });
+  do { results.push(await readNativeEndpoint(h)); } while (!done);
+  await publication;
+  assert.ok(results.length > 0);
+  assert.ok(results.every(record => record?.endpointId === h.endpointId),
+    "atomic replacement must never expose missing or partially written JSON");
 });

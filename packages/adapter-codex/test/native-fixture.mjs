@@ -8,7 +8,7 @@ export const THREAD = "01a063ed-a384-7fe2-b443-7fedf1593f6b";
 export async function nativeFixture(t) {
   const root = await realpath(await mkdtemp(path.join(
     process.platform === "win32" ? tmpdir() : "/tmp", "acc-cx-")));
-  const cwd = path.join(root, "B");
+  const cwd = path.join(root, "B receiver with spaces");
   const runtimeDir = path.join(root, "runtime");
   const home = path.join(root, "home");
   await mkdir(cwd);

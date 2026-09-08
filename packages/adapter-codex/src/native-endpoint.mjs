@@ -77,7 +77,8 @@ export async function readNativeEndpoint({ runtimeDir, endpointId }) {
   let handle;
   try {
     const dir = await directory(runtimeDir);
-    handle = await open(path.join(dir, `${endpointId}.json`), constants.O_RDONLY | constants.O_NOFOLLOW);
+    handle = await open(path.join(dir, `${endpointId}.json`),
+      constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
     const info = await handle.stat();
     if (!info.isFile() || !own(info) || info.size > MAX_BYTES || (info.mode & 0o077) !== 0) return null;
     const record = JSON.parse(await handle.readFile("utf8"));

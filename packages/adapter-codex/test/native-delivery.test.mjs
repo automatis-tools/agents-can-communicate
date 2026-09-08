@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdir, readFile, readdir, writeFile } from "node:fs/promises";
+import { mkdir, readFile, readdir, rename, writeFile } from "node:fs/promises";
 import path from "node:path";
 import test from "node:test";
 
@@ -111,4 +111,18 @@ test("missing registrations and failed queue checks cannot leak raw errors or of
   assert.equal(result.accepted, false);
   assert.equal(JSON.stringify(result).includes("secret"), false);
   assert.equal(h.state.queue.length, 0);
+});
+
+
+test("replacing the receiver socket with a regular file blocks bind, refresh and offer", async t => {
+  const h = await nativeFixture(t);
+  const binding = await native.bindNativeSession(h);
+  assert.equal(binding.supported, true);
+  await rename(h.socketPath, `${h.socketPath}.previous`);
+  await writeFile(h.socketPath, "not a socket");
+  h.calls.length = 0;
+  assert.equal((await native.bindNativeSession(h)).supported, false);
+  assert.equal((await native.refreshNativeSession({ ...h, binding })).supported, false);
+  assert.equal((await native.offerMessage({ ...h, binding, message: { messageId: "socket-replaced", kind: "note" } })).accepted, false);
+  assert.equal(h.calls.length, 0, "wrong socket type must be rejected before RPC");
 });
