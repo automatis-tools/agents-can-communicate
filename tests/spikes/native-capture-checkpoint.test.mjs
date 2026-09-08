@@ -7,6 +7,9 @@ import test from "node:test";
 
 import { decideNativeCaptures, parseCheckpointArgs, renderDecisionTable }
   from "../../scripts/spikes/check-native-captures.mjs";
+import { INSTALLED_HOOKS_LAUNCH_MODE } from "../../scripts/spikes/delivery-capture.mjs";
+import { PRODUCT_CASE_IDS, REQUIRED_OBSERVATIONS }
+  from "../../scripts/e2e/codex-local-daemon-evidence.mjs";
 import { runProcess } from "../helpers/claude-channel.mjs";
 
 const script = fileURLToPath(new URL("../../scripts/spikes/check-native-captures.mjs",
@@ -38,6 +41,10 @@ function fixtureDir() {
     claudePass: write("claude-pass.json", capture("claude-code", "pass")),
     claudeFail: write("claude-fail.json", capture("claude-code", "fail")),
     codexPass: write("codex-pass.json", capture("codex-cli", "pass")),
+    codexInstalledPass: write("codex-installed-pass.json", capture("codex-cli", "pass", {
+      version: "0.152.1", fixture: "codex-cli-0.152.1-installed",
+      launchMode: INSTALLED_HOOKS_LAUNCH_MODE })),
+    productEvidence: write("codex-product.json", productEvidence()),
     codexFail: write("codex-fail.json", capture("codex-cli", "fail")),
     grokFail: write("grok-fail.json", capture("grok", "fail")),
     invalidJson: write("invalid.json", "{ not json"),
@@ -46,6 +53,34 @@ function fixtureDir() {
     missing: path.join(dir, "missing.json"),
     remove: () => rmSync(dir, { recursive: true, force: true }),
   };
+}
+
+function productEvidence() {
+  const cleanup = { attempted: true, outcome: "passed",
+    ownedProcesses: "stopped", temporaryState: "removed" };
+  const scenarios = PRODUCT_CASE_IDS.map(caseId => {
+    const timestamps = { startedAt: "2026-09-08T12:00:00.000Z", idleSinceAt: null,
+      preToolUseAt: null, queuedAt: null, stopAt: null, nextTurnAt: null,
+      finishedAt: "2026-09-08T12:03:00.000Z" };
+    if (caseId === "P04") timestamps.idleSinceAt = timestamps.startedAt;
+    if (caseId === "P05") Object.assign(timestamps, {
+      preToolUseAt: "2026-09-08T12:00:01.000Z", queuedAt: "2026-09-08T12:00:02.000Z",
+      stopAt: "2026-09-08T12:00:03.000Z", nextTurnAt: "2026-09-08T12:00:04.000Z" });
+    const observations = REQUIRED_OBSERVATIONS[caseId].map(item =>
+      ({ ...item, at: timestamps.startedAt }));
+    return { schemaVersion: 1, source: "real-client-capture", caseId, phase: "product",
+      clientVersion: "0.152.1", platform: "darwin-arm64", packageSha256: "a".repeat(64),
+      roles: [{ role: "daemon-a", participantId: null, threadId: null },
+        { role: "receiver-b1", participantId: "participant-b", threadId: "thread-b" },
+        { role: "sender", participantId: "participant-s", threadId: "thread-s" }],
+      timestamps, outcome: "passed", observations, observationCount: observations.length,
+      assertionCount: 1, cleanup: { ...cleanup } };
+  });
+  return { schemaVersion: 1, source: "real-client-capture", phase: "product",
+    clientVersion: "0.152.1", platform: "darwin-arm64", packageSha256: "a".repeat(64),
+    startedAt: "2026-09-08T12:00:00.000Z", finishedAt: "2026-09-08T13:00:00.000Z",
+    scenarioCount: scenarios.length, passedCount: scenarios.length, failedCount: 0,
+    cleanup, scenarios };
 }
 
 const withFixtures = fn => async () => {
@@ -80,6 +115,18 @@ test("Codex failure blocks production implementation", withFixtures(async (f) =>
   assert.equal(result.code, 1);
   assert.match(result.stdout, /^Codex {8}fail/m);
 }));
+
+test("an installed-hook Codex pass requires its associated product evidence",
+  withFixtures(async (f) => {
+    const without = await run(["--required", `codex=${f.codexInstalledPass}`]);
+    assert.equal(without.code, 1);
+    assert.match(without.stdout, /^Codex\s+invalid/m);
+
+    const withProduct = await run(["--required", `codex=${f.codexInstalledPass}`,
+      "--product-evidence", `codex=${f.productEvidence}`]);
+    assert.equal(withProduct.code, 0, withProduct.stderr);
+    assert.match(withProduct.stdout, /^Codex\s+pass/m);
+  }));
 
 test("Claude Code failure blocks production implementation", withFixtures(async (f) => {
   const decision = decideNativeCaptures({
@@ -132,7 +179,11 @@ test("the checkpoint refuses arguments outside its closed usage", async () => {
   assert.equal(parseCheckpointArgs(["--wrong", "codex=/abs.json"]), null);
   assert.deepEqual(parseCheckpointArgs(["--required", "codex=/a.json", "--optional", "grok=/b.json"]),
     { required: [{ client: "codex", file: "/a.json" }],
-      optional: [{ client: "grok", file: "/b.json" }] });
+      optional: [{ client: "grok", file: "/b.json" }], productEvidence: [] });
+  assert.deepEqual(parseCheckpointArgs(["--required", "codex=/a.json",
+    "--product-evidence", "codex=/e.json"]),
+  { required: [{ client: "codex", file: "/a.json" }], optional: [],
+    productEvidence: [{ client: "codex", file: "/e.json" }] });
   const result = await run(["--required", "codex"]);
   assert.equal(result.code, 2);
   assert.match(result.stderr, /usage:/);

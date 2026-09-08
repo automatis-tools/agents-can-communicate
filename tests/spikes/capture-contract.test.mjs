@@ -1,3 +1,6 @@
+// This focused file intentionally keeps the legacy, installed-product, and
+// transport capture variants together so they exercise one canonical fixture
+// and prove that the schemas cannot substitute for one another.
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -6,10 +9,16 @@ import test from "node:test";
 import {
   DELIVERY_CAPTURE_FIELDS,
   DELIVERY_LAUNCH_MODES,
+  INSTALLED_HOOKS_LAUNCH_MODE,
   PASSING_DELIVERY_BRANCHES,
   PASSING_LAUNCH_MODE,
+  TRANSPORT_CAPTURE_FIELDS,
+  TRANSPORT_PASSING_FACTS,
   validateCapture,
+  validateTransportCapture,
 } from "../../scripts/spikes/delivery-capture.mjs";
+import { PRODUCT_CASE_IDS, REQUIRED_OBSERVATIONS, TRANSPORT_CASE_IDS }
+  from "../../scripts/e2e/codex-local-daemon-evidence.mjs";
 import { validateCapture as legacyValidateCapture }
   from "../../scripts/spikes/json-rpc-peer.mjs";
 
@@ -50,6 +59,35 @@ function rejects(capture, pattern) {
 
 function accepts(capture) {
   assert.doesNotThrow(() => validateCapture(capture));
+}
+
+const CLEANUP = { attempted: true, outcome: "passed",
+  ownedProcesses: "stopped", temporaryState: "removed" };
+function matrixEvidence(phase = "product") {
+  const ids = phase === "product" ? PRODUCT_CASE_IDS : TRANSPORT_CASE_IDS;
+  const scenarios = ids.map(caseId => {
+    const timestamps = { startedAt: "2026-09-08T12:00:00.000Z", idleSinceAt: null,
+      preToolUseAt: null, queuedAt: null, stopAt: null, nextTurnAt: null,
+      finishedAt: "2026-09-08T12:03:00.000Z" };
+    if (caseId === "P04") timestamps.idleSinceAt = timestamps.startedAt;
+    if (["P05", "T03"].includes(caseId)) Object.assign(timestamps, {
+      preToolUseAt: "2026-09-08T12:00:01.000Z", queuedAt: "2026-09-08T12:00:02.000Z",
+      stopAt: "2026-09-08T12:00:03.000Z", nextTurnAt: "2026-09-08T12:00:04.000Z" });
+    const observations = REQUIRED_OBSERVATIONS[caseId].map(item =>
+      ({ ...item, at: timestamps.startedAt }));
+    return { schemaVersion: 1, source: "real-client-capture", caseId, phase,
+      clientVersion: "0.152.1", platform: "darwin-arm64", packageSha256: "a".repeat(64),
+      roles: [{ role: "daemon-a", participantId: null, threadId: null },
+        { role: "receiver-b1", participantId: "participant-b1", threadId: "thread-b1" },
+        { role: "sender", participantId: "participant-s", threadId: "thread-s" }],
+      timestamps, outcome: "passed", observations, observationCount: observations.length,
+      assertionCount: 1, cleanup: { ...CLEANUP } };
+  });
+  return { schemaVersion: 1, source: "real-client-capture", phase,
+    clientVersion: "0.152.1", platform: "darwin-arm64", packageSha256: "a".repeat(64),
+    startedAt: "2026-09-08T12:00:00.000Z", finishedAt: "2026-09-08T13:00:00.000Z",
+    scenarioCount: scenarios.length, passedCount: scenarios.length, failedCount: 0,
+    cleanup: { ...CLEANUP }, scenarios };
 }
 
 test("a passing native capture names every observed branch", () => {
@@ -135,17 +173,47 @@ test("capture capability and result are closed", () => {
   }
 });
 
-test("a passing capture launches the ordinary command through the install-time bootstrap", () => {
+test("legacy bootstrap passes remain valid while installed hooks require product evidence", () => {
   assert.equal(PASSING_LAUNCH_MODE, "ordinary-command-with-install-time-bootstrap");
+  assert.equal(INSTALLED_HOOKS_LAUNCH_MODE, "ordinary-command-with-installed-hooks");
   for (const launchMode of DELIVERY_LAUNCH_MODES) {
     accepts({ ...BASE_CAPTURE, launchMode });
-    if (launchMode === PASSING_LAUNCH_MODE) continue;
-    rejects({ ...PASSING_CAPTURE, launchMode },
-      /a passing capture launches the ordinary command through the install-time bootstrap/);
+    if (launchMode === PASSING_LAUNCH_MODE) accepts({ ...PASSING_CAPTURE, launchMode });
   }
+  const installed = { ...PASSING_CAPTURE, client: "codex-cli", version: "0.152.1",
+    launchMode: INSTALLED_HOOKS_LAUNCH_MODE };
+  assert.throws(() => validateCapture(installed), /installed-hook pass requires product evidence/);
+  assert.doesNotThrow(() => validateCapture(installed, { productEvidence: matrixEvidence() }));
+  assert.throws(() => validateCapture(installed, { productEvidence: matrixEvidence("transport") }),
+    /installed-hook pass requires product-phase evidence/);
+  assert.throws(() => validateCapture(installed, {
+    productEvidence: { ...matrixEvidence(), source: "synthetic-unit-fixture",
+      scenarios: matrixEvidence().scenarios.map(item =>
+        ({ ...item, source: "synthetic-unit-fixture" })) } }), /real-client product evidence/);
   for (const launchMode of ["acc-run-wrapper", "", "ordinary", null]) {
     rejects({ ...BASE_CAPTURE, launchMode }, /capture launchMode is one of/);
   }
+});
+
+test("transport captures use a separate closed schema and prove all four live-push facts", () => {
+  const transport = { schemaVersion: 1, client: "codex-cli", version: "0.152.1",
+    platform: "darwin-arm64", observedAt: "2026-09-08T12:00:00.000Z",
+    capability: "native_delivery_transport", result: "pass", fixture: "codex-cli-0.152.1-transport",
+    phase: "transport", packageSha256: "b".repeat(64),
+    protocolContract: "codex-app-server-thread-queue-v1",
+    exactBinding: "receiver_thread_matched", idle: "queue_add_accepted",
+    busy: "queued_while_active", fallback: "durable_queued", limitations: ["unit fixture"] };
+  assert.deepEqual(validateTransportCapture(transport), transport);
+  assert.deepEqual([...TRANSPORT_CAPTURE_FIELDS], Object.keys(transport));
+  assert.deepEqual(TRANSPORT_PASSING_FACTS, { exactBinding: "receiver_thread_matched",
+    idle: "queue_add_accepted", busy: "queued_while_active", fallback: "durable_queued" });
+  for (const key of Object.keys(TRANSPORT_PASSING_FACTS)) {
+    assert.throws(() => validateTransportCapture({ ...transport, [key]: "unobserved" }),
+      new RegExp(`passing transport capture proves ${key}`));
+  }
+  assert.throws(() => validateTransportCapture({ ...transport, body: "secret" }),
+    /transport capture has unknown field body/);
+  assert.throws(() => validateCapture(transport), /capture has unknown field schemaVersion/);
 });
 
 test("a capture names a closed protocol contract identifier", () => {

@@ -10,6 +10,7 @@
 //
 // usage: check-native-captures.mjs --required <client>=<absolute path> ...
 //        [--optional <client>=<absolute path> ...]
+//        [--product-evidence <client>=<absolute path> ...]
 
 import { existsSync, readFileSync, realpathSync } from "node:fs";
 import path from "node:path";
@@ -20,17 +21,19 @@ const CLIENT_LABELS = Object.freeze({ claude_code: "Claude Code", codex: "Codex"
 const CLIENT_ID = /^[a-z][a-z0-9_]*$/;
 const RESULT_WIDTH = 7;
 
-export function decideNativeCaptures({ required, optional = [], readFile = defaultReadFile }) {
+export function decideNativeCaptures({ required, optional = [], productEvidence = [],
+  readFile = defaultReadFile }) {
+  const evidence = new Map(productEvidence.map(entry => [entry.client, entry.file]));
   const rows = [
-    ...required.map((entry) => ({ ...readCapture(entry, readFile), required: true })),
-    ...optional.map((entry) => ({ ...readCapture(entry, readFile), required: false })),
+    ...required.map((entry) => ({ ...readCapture(entry, readFile, evidence), required: true })),
+    ...optional.map((entry) => ({ ...readCapture(entry, readFile, evidence), required: false })),
   ];
   const blocking = rows.filter((row) => row.required && row.result !== "pass");
   return { rows, proceed: required.length > 0 && blocking.length === 0,
     blocking: blocking.map((row) => row.client) };
 }
 
-function readCapture({ client, file }, readFile) {
+function readCapture({ client, file }, readFile, evidence) {
   const row = { client, label: CLIENT_LABELS[client] ?? client, result: "absent",
     version: "-", platform: "-", protocolContract: "-" };
   let source;
@@ -40,7 +43,10 @@ function readCapture({ client, file }, readFile) {
     return row;
   }
   try {
-    const capture = validateCapture(JSON.parse(source));
+    const evidenceFile = evidence.get(client);
+    const productEvidence = evidenceFile === undefined ? undefined
+      : JSON.parse(readFile(evidenceFile));
+    const capture = validateCapture(JSON.parse(source), { productEvidence });
     if (capture.client !== expectedClient(client)) return { ...row, result: "invalid" };
     return { ...row, result: capture.result, version: capture.version,
       platform: capture.platform, protocolContract: capture.protocolContract };
@@ -68,10 +74,12 @@ function defaultReadFile(file) {
 export function parseCheckpointArgs(args) {
   const required = [];
   const optional = [];
+  const productEvidence = [];
   for (let index = 0; index < args.length; index += 2) {
     const flag = args[index];
     const value = args[index + 1];
-    const target = flag === "--required" ? required : flag === "--optional" ? optional : null;
+    const target = flag === "--required" ? required : flag === "--optional" ? optional
+      : flag === "--product-evidence" ? productEvidence : null;
     const separator = typeof value === "string" ? value.indexOf("=") : -1;
     if (target === null || separator <= 0) return null;
     const client = value.slice(0, separator);
@@ -80,14 +88,19 @@ export function parseCheckpointArgs(args) {
     target.push({ client, file });
   }
   if (required.length === 0) return null;
-  return { required, optional };
+  const captures = new Set([...required, ...optional].map(entry => entry.client));
+  const evidenceClients = productEvidence.map(entry => entry.client);
+  if (evidenceClients.some(client => !captures.has(client))
+    || new Set(evidenceClients).size !== evidenceClients.length) return null;
+  return { required, optional, productEvidence };
 }
 
 function main() {
   const parsed = parseCheckpointArgs(process.argv.slice(2));
   if (parsed === null) {
     process.stderr.write("usage: check-native-captures.mjs --required <client>=<absolute path> "
-      + "[--required ...] [--optional <client>=<absolute path> ...]\n");
+      + "[--required ...] [--optional <client>=<absolute path> ...] "
+      + "[--product-evidence <client>=<absolute path> ...]\n");
     process.exit(2);
   }
   const decision = decideNativeCaptures(parsed);
