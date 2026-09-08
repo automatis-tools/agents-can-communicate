@@ -1,8 +1,9 @@
 # Codex LocalDaemon implementation and verification
 
 Work in progress on `feat/codex-local-daemon`; this report is not a release certificate.
-Both private installed product matrices now pass, and public capability wiring
-is committed. Final public-artifact execution and whole-branch review remain pending. Nothing has been pushed, merged, published, or posted to GitHub.
+Initial private and public installed product matrices passed. Whole-branch review
+then reproduced a router retirement race; its correction passed scoped review
+and now awaits fresh installed evidence. This remains an unpublished candidate. Nothing has been pushed, merged, published, or posted to GitHub.
 
 ## Diagnosis
 
@@ -370,7 +371,7 @@ no Critical, Important or Minor issue. The runtime enables only the observed
 native live-push path on darwin-arm64; new hook/lifecycle or native reply routing
 claims were not added. Public documentation is in `9b95339`.
 
-The candidate built from `aad8ed07af3f3f5608ec1578645d2a08e5bca3ea` is
+The first public candidate built from `aad8ed07af3f3f5608ec1578645d2a08e5bca3ea` is
 `agents-can-communicate-0.3.1.tgz`, 273,141 bytes and 209 entries, SHA-256
 `8dc730105b9a80c8245a7fc63392c1f7ded423ac538b3146d7dc5a83fde4e058`.
 It passed actual installed-package verification. All 131 packed runtime files
@@ -392,6 +393,41 @@ consent now correctly reports `delivery_disabled`, while the old acceptance test
 expected a transport/version failure; a dry-run test expected obsolete prose.
 The bounded test correction is being completed without runtime changes. These
 failed runs are retained, and no all-green suite is claimed yet.
+
+## Final-review retirement race and corrected candidate
+
+The single whole-branch review found one Important issue, with no Critical or
+Minor findings. After selecting a fresh or refreshed binding, the router awaited
+its final consent read and then checked only live session identity. A retirement
+or same-generation endpoint replacement during that await left the old endpoint
+eligible for an offer. A deterministic actual-core/in-memory reproduction showed
+all four variants submitting to the obsolete endpoint and advancing its receipt.
+Best-effort endpoint-file deletion cannot provide core retirement authority.
+
+Commit `0aca9aeffef0af90baf49e9445bf925ae625172c` adds a final authoritative
+eligible-binding query after policy/session awaits. It requires the selected
+session, generation, adapter, client version and endpoint, live mode and a current
+lease. Thirty promise-barrier tests pass, covering the reported variants and
+mode/version/lease/generation changes. The old code and an exact removal of the
+new gate each fail 26 protective cases; four already-safe controls still pass.
+The restored covering router/core/boundary set passes 114 tests. This does not
+claim atomicity with a vendor submission already in flight.
+
+Both `product-01521-public-final-1/evidence.json` and
+`product-01534-public-final-1/evidence.json` completed all 20 cases and 189
+assertions, exited 0, passed independent full-record validation and verified
+cleanup on the earlier `8dc73010...` artifact. They remain valid observations
+of that earlier implementation, and cannot certify the changed router.
+
+The corrected candidate
+`945f6178357b6424a219b59cc3b9c4688b322c9da07cadf2bc7205bf20770940`
+passed installed-package verification. Comparing it with `a6a38da5...` correctly
+rejects runtime equivalence: exactly `delivery-router/src/router.mjs` changed
+among 131 runtime files, with none added or missing. The next complete product
+captures and independent cold runs must therefore use this corrected candidate;
+new primary evidence will preserve previous positive and negative capture bytes.
+Scoped final-fix review approved the correction with no remaining findings and
+independently passed all 30 new tests. Fresh client outcomes remain pending here.
 
 ## Implementation decisions and their costs
 
