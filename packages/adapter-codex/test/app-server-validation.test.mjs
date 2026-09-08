@@ -65,3 +65,36 @@ test("missing cwd and non-live status cannot supply a usable thread address", as
     assert.equal((await locateCodexThread(peer, { threadId: THREAD })).found, false);
   }
 });
+
+test("a loaded thread before first-turn persistence uses exact metadata without turns", async () => {
+  const cwd = await realpath(tmpdir());
+  let readCount = 0;
+  const peer = peerFor({ "thread/loaded/list": { data: [THREAD], nextCursor: null },
+    "thread/list": { data: [], nextCursor: null },
+    "thread/read": params => {
+      readCount += 1;
+      assert.deepEqual(params, { threadId: THREAD, includeTurns: false });
+      return { thread: { id: THREAD, cwd, status: { type: "active" }, turns: [] } };
+    } });
+  assert.deepEqual(await locateCodexThread(peer, { threadId: THREAD, cwd }),
+    { found: true, threadId: THREAD, cwd, status: "active" });
+  assert.equal(readCount, 1);
+});
+
+test("metadata fallback refuses another ID, history, missing fields, or duplicate listed IDs", async () => {
+  const cwd = await realpath(tmpdir());
+  const base = { id: THREAD, cwd, status: { type: "idle" }, turns: [] };
+  for (const thread of [{ ...base, id: "another" }, { ...base, turns: [{ private: "transcript" }] },
+    { id: THREAD, cwd, status: base.status }, { ...base, cwd: undefined },
+    { ...base, status: { type: "notLoaded" } }]) {
+    const peer = peerFor({ "thread/loaded/list": { data: [THREAD], nextCursor: null },
+      "thread/list": { data: [], nextCursor: null }, "thread/read": { thread } });
+    const result = await locateCodexThread(peer, { threadId: THREAD, cwd });
+    assert.equal(result.found, false);
+    assert.equal(JSON.stringify(result).includes("transcript"), false);
+  }
+  const duplicate = peerFor({ "thread/loaded/list": { data: [THREAD], nextCursor: null },
+    "thread/list": { data: [base, base], nextCursor: null },
+    "thread/read": () => { assert.fail("duplicate identity must not enter fallback"); } });
+  assert.equal((await locateCodexThread(duplicate, { threadId: THREAD, cwd })).found, false);
+});

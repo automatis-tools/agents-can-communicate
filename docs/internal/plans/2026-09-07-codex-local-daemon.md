@@ -528,3 +528,17 @@ revocation and missing/unreachable endpoints remain durable; legacy owned launch
 wiring is retired safely. Real captures on both target versions, negative controls,
 all designated mutations and installed-package gates substantiate these claims.
 Until those conditions hold, Codex native capability remains disabled for release.
+
+### First-turn metadata correction observed during implementation
+
+The installed product diagnostic on 0.152.1 observed correct hook PID/version and
+recorded actionable consent, with queue/list succeeding, but thread/list returning
+no record for the exact loaded ID during SessionStart and the first UserPromptSubmit.
+Waiting until a later user turn would leave the initial idle session unreachable.
+When the complete list contains no matching record, the adapter now asks
+thread/read for that exact already-loaded ID with includeTurns:false. It accepts
+only matching identity, matching canonical cwd, live status and an empty turns array.
+Duplicate listed IDs, malformed pagination and cwd mismatches never enter fallback.
+This uses live metadata before persistence; it does not request conversation history.
+The real installed product matrix must prove the correction, with the old lookup
+retained as its observed negative control.

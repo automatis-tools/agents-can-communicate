@@ -6,10 +6,9 @@ import { openWebSocketPeer } from "./ws-json-rpc.mjs";
 
 // The Codex App Server queue protocol, captured on codex-cli 0.152.1. Every
 // method here is official and present in the generated schema: initialize,
-// thread/loaded/list, thread/list, thread/queue/list, thread/queue/add. The
-// client never resumes, starts, steers, or reads a thread, and never reads
-// assistant transcript content. Closed safe results only; no vendor string
-// escapes to core.
+// thread/loaded/list, thread/list, metadata-only thread/read, thread/queue/list,
+// thread/queue/add. Thread history is never requested; metadata reads explicitly
+// exclude turns. Closed safe results only; no vendor string escapes to core.
 
 export const PROTOCOL_CONTRACT = "codex-app-server-thread-queue-v1";
 export const MINIMUM_VERSION = "0.152.1";
@@ -117,7 +116,17 @@ export async function locateCodexThread(peer, { threadId, cwd }) {
   // would hide a thread recorded through a symlink to the same directory.
   const threads = await pageAll(peer, "thread/list", { limit: 100, useStateDbOnly: true });
   const matches = threads.filter(item => item?.id === threadId);
-  const found = matches.length === 1 ? matches[0] : null;
+  let found = matches.length === 1 ? matches[0] : null;
+  if (matches.length === 0) {
+    // A real first SessionStart/UserPromptSubmit runs before persistence has
+    // materialized the thread. The loaded ID still has an authoritative live
+    // metadata snapshot; includeTurns:false never asks for conversation history.
+    const response = await peer.request("thread/read", { threadId, includeTurns: false });
+    const metadata = response?.thread;
+    if (metadata?.id === threadId && Array.isArray(metadata.turns) && metadata.turns.length === 0) {
+      found = metadata;
+    }
+  }
   if (!found) return { found: false, reasonCode: "thread_not_found" };
   const actualCwd = await canonicalCwd(found.cwd);
   if (actualCwd === null || (cwd !== undefined && actualCwd !== await canonicalCwd(cwd))) {
