@@ -98,3 +98,14 @@ test("metadata fallback refuses another ID, history, missing fields, or duplicat
     "thread/read": () => { assert.fail("duplicate identity must not enter fallback"); } });
   assert.equal((await locateCodexThread(duplicate, { threadId: THREAD, cwd })).found, false);
 });
+
+test("malformed listed entries never masquerade as zero matches for metadata fallback", async () => {
+  for (const data of [[null], [{}], [{ id: "" }], ["thread"], [[]]]) {
+    let readCount = 0;
+    const peer = peerFor({ "thread/loaded/list": { data: [THREAD], nextCursor: null },
+      "thread/list": { data, nextCursor: null },
+      "thread/read": () => { readCount += 1; return {}; } });
+    await assert.rejects(locateCodexThread(peer, { threadId: THREAD }), { code: "EPROTOCOL" });
+    assert.equal(readCount, 0, JSON.stringify(data));
+  }
+});

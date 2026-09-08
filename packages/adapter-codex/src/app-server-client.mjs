@@ -101,6 +101,12 @@ function queueEntries(response) {
   return response.data;
 }
 
+function threadEntries(items) {
+  if (items.some(item => item === null || typeof item !== "object" || Array.isArray(item)
+    || typeof item.id !== "string" || item.id === "")) throw protocolError();
+  return items;
+}
+
 export async function canonicalCwd(cwd) {
   if (typeof cwd !== "string" || !path.isAbsolute(cwd) || cwd.includes("\0")) return null;
   try {
@@ -114,8 +120,9 @@ export async function locateCodexThread(peer, { threadId, cwd }) {
   if (!loaded.includes(threadId)) return { found: false, reasonCode: "thread_not_loaded" };
   // Filter locally after canonicalization: a server-side lexical cwd filter
   // would hide a thread recorded through a symlink to the same directory.
-  const threads = await pageAll(peer, "thread/list", { limit: 100, useStateDbOnly: true });
-  const matches = threads.filter(item => item?.id === threadId);
+  const threads = threadEntries(await pageAll(peer, "thread/list",
+    { limit: 100, useStateDbOnly: true }));
+  const matches = threads.filter(item => item.id === threadId);
   let found = matches.length === 1 ? matches[0] : null;
   if (matches.length === 0) {
     // A real first SessionStart/UserPromptSubmit runs before persistence has
