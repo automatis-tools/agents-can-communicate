@@ -286,3 +286,24 @@ passed installed-package verification. The corresponding private runtime candida
 is `1a903ae79414355e460b975b3f90fbdf4f46633366f147080f833e0f1ec1cc49`.
 New real trust-preservation and full-product runs are in progress on that artifact;
 no outcome is inferred from the focused tests or package check.
+
+
+The follow-up `f03b136` refuses closed foreign registration-parent assignments
+before writes, while ordinary table headers and unrelated sibling declarations
+remain usable. Five exact omission-mutant failures prove that refusal gate; two
+diagnostic mutations prove config-path/structural-reason checks. The 75-test
+covering set and scoped re-review passed, with no remaining findings. The scanner
+still preserves values as raw bytes and uses no generic inline-value parser.
+
+The actual 0.153.4 `product-01534-trust-preservation-1` run passed P01/P02/P08
+and a real installed uninstall on `1a903ae7...`: client-written C trust remained
+trusted after both policy reinstalls and removal, and ACC markers were absent
+after uninstall. Cleanup passed. This is deliberately partial evidence, not a
+full certificate.
+
+The reviewed corrected runtime candidate is now
+`a6a38da5a36911baabfbef0ccf934847fcf7b51000197264c273d21430f7fea2`.
+Its public-disabled precursor
+`0474d566b14f446ecaf600e9112dfe6fcb002491c94f48f0e250ad96ccbfc3c1`
+passed installed package verification. The two `config-full-1` matrices run
+against the same corrected candidate. Outcomes remain pending.
