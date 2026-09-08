@@ -178,8 +178,9 @@ export const defaultCli = () => ownBinary("acc.mjs");
  * is pinned here for the same reason it is pinned in the shim.
  */
 export async function bakeSkillCommand({ root, node = process.execPath,
-  cli = defaultCli() }) {
-  const command = `${quote(node)} ${quote(cli)}`;
+  cli = defaultCli(), dataHome }) {
+  const command = `${dataHome === undefined ? "" : `ACC_DATA_HOME=${quote(dataHome)} `}`
+    + `${quote(node)} ${quote(cli)}`;
   const baked = [];
   const walk = async directory => {
     for (const entry of await readdir(directory, { withFileTypes: true })) {

@@ -171,7 +171,7 @@ export async function installCodexPlugin({ home, agentsHome = home,
   await cp(bundle, target, { recursive: true });
   // The skill ships with a placeholder where the command belongs: `acc` is
   // not on PATH everywhere, and an agent that cannot run it improvises.
-  await bakeSkillCommand({ root: target, node });
+  await bakeSkillCommand({ root: target, node, dataHome });
   const shim = await writeHookShim({ dir: target, adapterId: "codex",
     dataHome, runner, node });
   await writeJson(path.join(target, "hooks.json"),

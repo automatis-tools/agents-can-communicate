@@ -475,6 +475,12 @@ test("the installed hook command preserves literal metacharacters and exports it
 
     const result = await run("sh", ["-c", command], { env: { PATH: "/usr/bin:/bin" } });
     assert.equal(result.stdout, `${dataHome}\n`);
+    const skill = await readFile(path.join(context.codexHome, "plugins", "cache", "acc-local",
+      "agents-can-communicate", await pluginVersion(CODEX_PLUGIN), "skills", "acc", "SKILL.md"), "utf8");
+    const skillCommand = skill.match(/```bash\n([\s\S]*?)\n```/)[1];
+    const skillRun = await run("sh", ["-c", skillCommand], { env: { PATH: "/usr/bin:/bin" } });
+    assert.equal(skillRun.stdout, `${dataHome}\n`,
+      "the installed skill must reach the same data home without daemon environment exports");
   });
 
 test("detect reports the plugin as installed straight after install", async t => {
