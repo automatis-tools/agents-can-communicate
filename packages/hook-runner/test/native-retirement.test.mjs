@@ -78,3 +78,30 @@ test("an indeterminate retirement must not start or publish a new handshake", as
   assert.equal(bindCalls, 0);
   assert.equal(publishCalls, 0);
 });
+
+test("an optional cleanup branch bounds an indeterminate clear without rebinding", async () => {
+  // Replacing the deadline attempt with a direct await leaves this race unresolved.
+  let bindCalls = 0;
+  let publishCalls = 0;
+  const clearInputs = [];
+  const service = { clearDeliveryBinding: async input => {
+    clearInputs.push(input);
+    return new Promise(() => {});
+  }, publishDeliveryBinding: async () => { publishCalls += 1; } };
+  const result = await Promise.race([
+    establishNativeBinding({ adapter: { nativeDelivery: {}, bindNativeSession: async () => {
+      bindCalls += 1;
+    } }, hookBinding: { accSessionId: prior.sessionId, generation, clientPid: 42 },
+    service, livePolicy: "actionable", runtimeDir: "/private/runtime", timeoutMs: 40 }),
+    new Promise(resolve => setTimeout(() => resolve("unbounded"), 200)),
+  ]);
+
+  assert.notEqual(result, "unbounded");
+  assert.equal(result.state, "degraded");
+  assert.equal(bindCalls, 0);
+  assert.equal(publishCalls, 0);
+  const { deadlineAt, ...clearInput } = clearInputs[0];
+  assert.deepEqual(clearInput, { sessionId: prior.sessionId, generation });
+  assert.equal(Number.isFinite(deadlineAt), true);
+  assert.equal(Object.hasOwn(clearInput, "opaqueEndpointRef"), false);
+});

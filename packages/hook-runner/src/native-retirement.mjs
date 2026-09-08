@@ -22,8 +22,10 @@ export async function retireNativeBinding({ adapter, service, sessionId, generat
     ? service.clearDeliveryBinding({ sessionId, generation, deadlineAt })
     : service.clearDeliveryBinding({ sessionId, generation, opaqueEndpointRef, deadlineAt });
   if (!cleanup) {
-    try { await clear(undefined); return true; }
-    catch { return false; }
+    return await attempt(async () => {
+      await clear(undefined);
+      return true;
+    }, deadlineAt) === true;
   }
   // Observation is metadata, not the state transition. A hung read leaves half
   // the shared retirement window for the exact core clear; a cheap read spends
