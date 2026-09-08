@@ -48,7 +48,11 @@ test("recorded installed uninstall refuses ambiguous TOML before deleting any ar
 
   const refused = await packed.accError(["uninstall", ...args]);
   assert.ok(refused, "ambiguous config did not refuse recorded uninstall");
-  assert.match(refused.stdout, /ambiguous Codex TOML ownership/);
+  const error = JSON.parse(refused.stdout).error;
+  assert.equal(error.code, 4);
+  assert.equal(error.details.failed[0].adapterId, "codex");
+  assert.match(error.details.failed[0].error, /cannot safely edit Codex config: unknown key in owned table/);
+  assert.ok(error.details.failed[0].error.includes(config));
   assert.deepEqual(await packed.snapshotClientFiles(), before,
     "recorded cleanup deleted client artifacts before ownership preflight");
   assert.equal(await readFile(record, "utf8"), ownership);
