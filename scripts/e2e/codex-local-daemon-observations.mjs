@@ -11,6 +11,9 @@ export function scenario(h, caseId) {
     timestamps: { startedAt, idleSinceAt: null, preToolUseAt: null, queuedAt: null,
       stopAt: null, nextTurnAt: null, finishedAt: null }, outcome: "failed",
     observations: [], observationCount: 0, assertionCount: 0, cleanup: null };
+  const receiver = record.roles.find(role => role.role === "receiver-b1");
+  if (receiver) assert.ok(receiver.participantId && receiver.threadId,
+    "receiver-b1 must be identified before scenario snapshot");
   return { record, check(condition, message) {
     record.assertionCount += 1; assert.ok(condition, message);
   }, equal(actual, expected, message) {

@@ -33,8 +33,9 @@ export async function productRemoteNegative(h) {
 export async function productExplicitModes(h) {
   await close(h, "receiver-b1");
   await launch(h, "receiver-b1", { cwd: h.C, expectedCwd: h.B, args: [...remote(h), "--cd", h.B] });
+  const original = await identify(h, "receiver-b1");
   const s = scenario(h, "P13");
-  const original = await matched(h, s, h.B, "receiver-b1");
+  await matched(h, s, h.B, "receiver-b1");
   await close(h, "receiver-b1");
   await launch(h, "receiver-b1", { cwd: h.C, expectedCwd: h.B, expectedThreadId: original.threadId,
     args: [...remote(h), "resume", original.threadId] });
