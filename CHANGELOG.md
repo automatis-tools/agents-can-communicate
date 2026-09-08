@@ -4,29 +4,40 @@
 
 | | |
 |---|---|
-| Built from | `f6b92a83fde11698ea1eece7477adabae8e25e05` |
-| Tarball | `agents-can-communicate-0.3.1.tgz`, 279,425 bytes, 207 entries |
-| sha256 | `9205d27fce346e2a350467f0932a25cd58515492891edce1f58b69acd26a5218` |
+| Built from | `a22e3471ed21a44230fae136bf3ee95ad9b8c260` |
+| Tarball | `agents-can-communicate-0.3.1.tgz`, 301,009 bytes, 230 entries |
+| sha256 | `671f5b6a6143fb3668cf10e9c406081b7e8259887f38debe8e6b5e20fffdd965` |
 
 Not published. A published record says what the registry serves and is not
 rewritten, so shipped code that changes after a release is measured here instead.
 
-`acc update --apply` now exits with code 4 when either installation step fails,
-retains the completed/failed steps in JSON, and prints the remaining commands. Successful
-application relays the installer's activation instructions and reminds users to restart
-running clients. The installed-package regression catches deliberate restoration of false
-success, discarded installer output, and a missing restart reminder. Twelve updater checks
-and 38 combined updater/documentation checks passed; syntax covered 366 modules.
+`acc update` now applies by default; `--check` is read-only and `--apply` remains
+compatible. A normal `acc install` enables background updates, with `--auto off` and exact
+version pins available. Stable launchers use separate immutable runtime generations. An
+independent worker verifies a downloaded package and refreshes the installed integrations
+and skills before switching; live ACC processes and native binding PIDs hold activation.
+Failures keep the working runtime or fence a partial refresh until manual forward recovery.
+Manual errors name the failed adapter, cause, and relevant configuration paths.
 
-The packaged upgrade guide covers the 0.3.1 transition, changed inbox response shape,
-client activation, and downgrade limits. A registry-authenticated published 0.3.1 archive
-and this candidate were installed into isolated consumers. Refreshing Claude/Codex retained
-workspace bytes, five existing messages, queued/acknowledged receipts, intent, claims, user
-settings, and the disabled native policy; all four skill copies refreshed. After a new
-decision replacement, old 0.3.1 refused the new field without changing data, and the new
-reader recovered access without repair. All 207 candidate/source/installed files matched.
-This is an upgrade preflight, not a real-client activation capture or a released 0.4.0;
-the final versioned release archive still needs the same check.
+Actual installed-package checks cover automatic activation without another command, idle
+MCP holds, changed registry integrity, stable launchers after source removal, hostile npm
+settings, repository containment through symlinks, inert Channel MCP during refresh, and
+failed-config repair. Exact mutations exposed and corrected an import-scanner gap, and
+verify the admission, activation, update-policy, and recovery boundaries. Genuine user
+turns recover missing startup bindings; native eligibility cache entries include ACC's
+version. Confirmed-dead leases and quiescent lock bookkeeping are reclaimed without age
+expiry or changing live ownership. These process checks add no native capability claim.
+
+The packaged upgrade guide covers the initial 0.3.1 transition, changed inbox response
+shape, client activation, and downgrade limits. A registry-authenticated published 0.3.1
+archive and this exact candidate were installed into isolated consumers. Refreshing
+Claude/Codex retained workspace bytes, five existing messages, queued/acknowledged receipts,
+intent, claims, user settings, and the disabled native policy; all four skill copies
+refreshed. After a new decision replacement, old 0.3.1 refused the new field without changing
+data, and the new reader recovered access without repair. All 230 committed-source,
+archive, installed-package, and managed-generation files matched. Package verification
+passed on macOS arm64 with Node 26.5.1. This remains an unpublished development candidate;
+the final versioned 0.4.0 archive still needs release-platform and real-client checks.
 
 Decisions now support explicit replacement and withdrawal through repeated CLI
 `--supersedes` / `--withdraws` flags and corresponding MCP arrays. Any owned peer can
