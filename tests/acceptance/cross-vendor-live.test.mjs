@@ -85,15 +85,16 @@ async function exchange(packed, { from, to, subject, body, answer, key }) {
   return { question, answer: response };
 }
 
-test("packed v0.3 completes scripted cross-vendor fallback with explicit owners", {
+test("packed release completes scripted cross-vendor fallback with explicit owners", {
   timeout: 120_000,
   skip: process.platform === "win32"
-    ? "v0.3 supports macOS/Linux; its native captures and POSIX client probes do not certify Windows"
+    ? "ACC supports macOS/Linux; its native captures and POSIX client probes do not certify Windows"
     : false,
 }, async t => {
   const packed = await createPackedAcc(t);
-  assert.equal(packed.manifest.version, "0.3.1");
-  assert.equal((await packed.acc(["version"])).version, "0.3.1");
+  const expectedVersion = (await readJson(path.join(packed.repo, "package.json"))).version;
+  assert.equal(packed.manifest.version, expectedVersion);
+  assert.equal((await packed.acc(["version"])).version, expectedVersion);
   await packed.setClientVersions(CAPTURE_VERSIONS);
 
   const claude = { adapterId: "claude_code", participantId: "claude_peer",
@@ -202,7 +203,7 @@ test("packed v0.3 completes scripted cross-vendor fallback with explicit owners"
     ".kimi-code/plugins/managed/agents-can-communicate/.kimi-plugin/plugin.json",
   ];
   for (const manifest of manifests) {
-    assert.equal((await readJson(path.join(packed.clientHome, manifest))).version, "0.3.1",
+    assert.equal((await readJson(path.join(packed.clientHome, manifest))).version, expectedVersion,
       `${manifest} was not stamped from the installed package`);
   }
 
