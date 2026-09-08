@@ -1,11 +1,15 @@
 import assert from "node:assert/strict";
-import { mkdir, mkdtemp, readFile, realpath, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, readdir, realpath, rename, rm, symlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { tmpdir } from "node:os";
 import test from "node:test";
 import { activatePending, listNativeHolds } from "../src/managed-runtime/activation.mjs";
 import { readControl, writeControl } from "../src/managed-runtime/state.mjs";
 import { acquireRuntime } from "../src/managed-runtime/leases.mjs";
+import { createCoordinationService } from "@agents-can-communicate/core";
+import { openFilesystemStore } from "@agents-can-communicate/storage-filesystem";
+import { storeSessionBinding } from "@agents-can-communicate/adapter-sdk";
+import { createId } from "@agents-can-communicate/protocol";
 
 async function fixture(t) {
   const dataHome = await realpath(await mkdtemp(path.join(tmpdir(), "acc-activation-")));
@@ -71,4 +75,86 @@ test("partial integration refresh keeps admission closed and retry repairs forwa
   assert.equal(repaired.activated, true);
   assert.equal((await readControl(f.root)).phase, "ready");
   assert.deepEqual((await readControl(f.root)).active, f.pending);
+});
+
+async function mcpBinding(t) {
+  const f = await fixture(t);
+  const workspaceId = "project", participantId = "mcp_peer";
+  const runtimeDir = path.join(f.dataHome, "acc", "workspaces", workspaceId);
+  const clock = { now: () => "2026-09-08T12:00:00.000Z" };
+  const ids = { next: createId };
+  const store = await openFilesystemStore({ root: runtimeDir, workspaceId, clock, ids });
+  const service = createCoordinationService({ store, clock, ids });
+  const session = await service.openSession({ workspaceId, participantId,
+    harness: "mcp", heartbeatCadenceMs: 60_000 });
+  await storeSessionBinding({ runtimeDir, harnessSessionId: `mcp:${participantId}:${workspaceId}`,
+    accSessionId: session.sessionId, generation: session.generation });
+  const file = path.join(runtimeDir, "bindings", (await readdir(path.join(runtimeDir, "bindings")))[0]);
+  return { ...f, file, runtimeDir, session, service, record: JSON.parse(await readFile(file, "utf8")) };
+}
+
+test("validated MCP continuity survives activation for ephemeral and finished durable owners", async t => {
+  for (const finished of [false, true]) {
+    const f = await mcpBinding(t);
+    if (finished) await f.service.finishSession({ sessionId: f.session.sessionId,
+      generation: f.session.generation, goal: "done", clientMessageId: "finish_retry" });
+    const bytes = await readFile(f.file, "utf8");
+    assert.deepEqual(await listNativeHolds(f.root), []);
+    const result = await activatePending(f.root, { prepare: async () => async () => ({ failed: [] }) });
+    assert.equal(result.activated, true);
+    assert.equal(await readFile(f.file, "utf8"), bytes, "continuity must not be rewritten or removed");
+  }
+});
+
+test("misleading or ambiguous MCP-like bindings retain native activation holds", async t => {
+  const cases = [
+    ["prefix only", f => ({ ...f.record, harnessSessionId: "mcp:foreign" })],
+    ["wrong workspace", f => ({ ...f.record, harnessSessionId: "mcp:mcp_peer:other" })],
+    ["unknown schema", f => ({ ...f.record, schemaVersion: 2 })],
+    ["invalid owner id", f => ({ ...f.record, accSessionId: "../outside" })],
+    ["missing owner", f => ({ ...f.record, accSessionId: "session_absent" })],
+    ["wrong generation", f => ({ ...f.record, generation: "generation_wrong" })],
+    ["native pid", f => ({ ...f.record, clientPid: process.pid })],
+    ["unknown native pid", f => ({ ...f.record, clientPid: null })],
+    ["native metadata", f => ({ ...f.record, clientVersion: "1.2.3" })],
+    ["native owner", f => f.record, async f => {
+      const file = path.join(f.runtimeDir, "ephemeral", "session", `${f.session.sessionId}.json`);
+      const record = JSON.parse(await readFile(file, "utf8"));
+      await writeFile(file, JSON.stringify({ ...record, harness: "native" }));
+    }],
+    ["corrupt owner", f => f.record, f => writeFile(path.join(f.runtimeDir, "ephemeral", "session",
+      `${f.session.sessionId}.json`), "{bad")],
+    ["symlinked owner directory", f => f.record, async f => {
+      const directory = path.join(f.runtimeDir, "ephemeral", "session");
+      const outside = path.join(f.dataHome, "external-sessions");
+      await rename(directory, outside);
+      await symlink(outside, directory);
+    }],
+    ["wrong filename", f => f.record, async f => {
+      await rm(f.file); f.file = path.join(path.dirname(f.file), "unmatched.json");
+    }],
+  ];
+  for (const [label, change, prepare] of cases) {
+    const f = await mcpBinding(t);
+    await prepare?.(f);
+    await writeFile(f.file, JSON.stringify(change(f)));
+    assert.equal((await listNativeHolds(f.root)).length, 1, label);
+    assert.equal((await activatePending(f.root, { prepare: async () => async () => ({ failed: [] }) }))
+      .activated, false, label);
+  }
+});
+
+test("published 0.3.1 MCP continuity is reusable without migration", async t => {
+  const f = await fixture(t);
+  const captured = JSON.parse(await readFile(new URL("fixtures/mcp-continuity-0.3.1.json", import.meta.url), "utf8"));
+  const root = path.join(f.dataHome, "acc", "workspaces", captured.workspaceId);
+  for (const dir of ["bindings", "ephemeral/session"]) await mkdir(path.join(root, dir), { recursive: true });
+  const file = path.join(root, "bindings", captured.filename);
+  await writeFile(file, JSON.stringify(captured.binding));
+  await writeFile(path.join(root, "protocol.json"), JSON.stringify(captured.protocol));
+  await writeFile(path.join(root, "ephemeral", "session", `${captured.binding.accSessionId}.json`),
+    JSON.stringify(captured.session));
+  assert.deepEqual(await listNativeHolds(f.root), []);
+  assert.equal((await activatePending(f.root, { prepare: async () => async () => ({ failed: [] }) })).activated, true);
+  assert.deepEqual(JSON.parse(await readFile(file, "utf8")), captured.binding);
 });

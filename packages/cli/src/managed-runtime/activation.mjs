@@ -1,11 +1,33 @@
+import { createHash } from "node:crypto";
 import { readdir } from "node:fs/promises";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
+import { assertPortableId } from "@agents-can-communicate/protocol";
+import { readSessionRecord } from "@agents-can-communicate/storage-filesystem";
 import { listRuntimeHolds } from "./leases.mjs";
 import { confirmedDead, defaultPidIsAlive, withManagerLock } from "./mutex.mjs";
 import { canonicalManagerRoot, managedDirectory, readControl, readManagedJson, writeControl } from "./state.mjs";
 
-/** Bindings outlive finish/presence TTL; only OS death removes their safety hold. */
+// Both 0.3.1 and current MCP write this exact continuity record, without
+// native client facts. A foreign harness id may look like an MCP key: require
+// its canonical file and a validated matching MCP owner before exempting it.
+async function isMcpContinuity(record, name, workspaceRoot, workspaceId) {
+  if (record?.schemaVersion !== 1 || Object.keys(record).sort().join(",")
+    !== "accSessionId,generation,harnessSessionId,schemaVersion") return false;
+  try {
+    const parts = record.harnessSessionId.split(":");
+    if (parts.length !== 3 || parts[0] !== "mcp" || parts[2] !== workspaceId) return false;
+    for (const id of [parts[1], parts[2], record.accSessionId, record.generation]) assertPortableId(id, "MCP continuity id");
+    const expected = createHash("sha256").update(record.harnessSessionId).digest("hex").slice(0, 32) + ".json";
+    if (name !== expected) return false;
+    const owner = await readSessionRecord({ root: workspaceRoot, workspaceId, sessionId: record.accSessionId });
+    return owner?.harness === "mcp" && owner.participantId === parts[1]
+      && owner.workspaceId === workspaceId && owner.sessionId === record.accSessionId
+      && owner.generation === record.generation;
+  } catch { return false; } // Ambiguous or corrupt ownership remains a safety hold.
+}
+
+/** Native bindings outlive finish/TTL; MCP process lifetime is covered by its runtime lease. */
 export async function listNativeHolds(root, { pidIsAlive = defaultPidIsAlive } = {}) {
   const workspaces = path.join(path.dirname(await canonicalManagerRoot(root)), "workspaces");
   if (!await managedDirectory(workspaces)) return [];
@@ -21,6 +43,7 @@ export async function listNativeHolds(root, { pidIsAlive = defaultPidIsAlive } =
       if (!name.endsWith(".json")) continue;
       const record = await readManagedJson(path.join(bindings, name)).catch(() => null);
       if (record === undefined) continue; // Concurrent lifecycle removal, before fencing.
+      if (await isMcpContinuity(record, name, path.dirname(bindings), entry.name)) continue;
       const pid = record?.schemaVersion === 1 && Number.isSafeInteger(record.clientPid)
         && record.clientPid > 0 ? record.clientPid : null;
       if (pid !== null && await confirmedDead(pid, pidIsAlive)) continue;

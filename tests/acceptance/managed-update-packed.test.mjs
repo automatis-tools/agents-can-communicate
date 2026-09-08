@@ -1,12 +1,12 @@
 import assert from "node:assert/strict";
-import { execFile, spawn } from "node:child_process";
-import { once } from "node:events";
+import { execFile } from "node:child_process";
 import { readFile, readdir, rm } from "node:fs/promises";
 import path from "node:path";
 import test from "node:test";
 import { promisify } from "node:util";
 import { createPackedAcc } from "../helpers/packed-acc.mjs";
 import { createUpdateRegistry } from "../helpers/update-registry.mjs";
+import { connectMcp } from "../helpers/mcp-client.mjs";
 const run = promisify(execFile);
 
 async function until(predicate, label, timeout = 20_000) {
@@ -26,7 +26,7 @@ async function stopBackground(f) {
   if (owner?.pid) { try { process.kill(owner.pid, "SIGTERM"); } catch { /* Already finished. */ } }
 }
 
-test("installed manual update verifies an archive, waits for idle MCP, then refreshes and switches", async t => {
+test("installed manual update verifies an archive, waits for live MCP, then switches with reusable continuity", async t => {
   const f = await createPackedAcc(t);
   const registry = await createUpdateRegistry(t, f);
   const env = { ...f.env, ACC_NO_UPDATE_CHECK: "0", npm_config_registry: registry.url,
@@ -58,9 +58,26 @@ test("installed manual update verifies an archive, waits for idle MCP, then refr
   assert.equal((await readState(f)).pending, null);
   registry.setDiscoveryIntegrity(null);
 
-  const mcp = spawn(process.execPath, [f.mcpBin], { cwd: f.project, env: f.env, stdio: ["pipe", "pipe", "pipe"] });
-  const exited = once(mcp, "exit");
-  t.after(() => { if (mcp.exitCode === null) mcp.kill("SIGKILL"); });
+  const connect = () => {
+    const client = connectMcp({ cwd: f.project, dataHome: f.dataHome,
+      binary: f.mcpBin, env: { ...f.env, ACC_MCP_PARTICIPANT: "update_peer",
+        ACC_MCP_WORKSPACE: f.project }, participant: "update_peer" });
+    t.after(() => { if (client.child.exitCode === null) client.child.kill("SIGKILL"); });
+    return client;
+  };
+  const initialize = async client => {
+    const response = await client.request("initialize", { protocolVersion: "2025-11-25",
+      capabilities: {}, clientInfo: { name: "update-test", version: "1" } });
+    assert.equal(response.error, undefined);
+    client.child.stdin.write(JSON.stringify({ jsonrpc: "2.0", method: "notifications/initialized" }) + "\n");
+  };
+  const status = async client => {
+    const response = await client.request("tools/call", { name: "acc_status", arguments: {} });
+    assert.equal(response.error, undefined);
+    assert.notEqual(response.result.isError, true, response.result.content[0].text);
+    return response.result.structuredContent;
+  };
+  const mcp = connect();
   await until(async () => {
     const leases = await readdir(path.join(managerOf(f), "leases"));
     const records = await Promise.all(leases.filter(n => n.endsWith(".json"))
@@ -72,14 +89,25 @@ test("installed manual update verifies an archive, waits for idle MCP, then refr
           throw error;
         }
       }));
-    return records.some(lease => lease?.pid === mcp.pid && lease.kind === "acc-mcp");
+    return records.some(lease => lease?.pid === mcp.child.pid && lease.kind === "acc-mcp");
   }, "idle MCP registered before receiving any request");
   const pending = await f.acc(["update"], env);
   assert.equal(pending.reason, "processes_active");
   assert.deepEqual((await readState(f)).active, before.active);
   assert.equal((await readState(f)).pending.version, registry.version);
   assert.equal(registry.requests.some(url => url.includes(".tgz")), true);
-  mcp.kill("SIGTERM"); await exited;
+  await initialize(mcp);
+  const firstStatus = await status(mcp);
+  const owner = firstStatus.participants.find(peer => peer.participantId === "update_peer");
+  assert.ok(owner);
+  const workspaceId = (await readdir(path.join(f.dataHome, "acc", "workspaces")))[0];
+  const key = `mcp:update_peer:${workspaceId}`;
+  const continuity = await f.findBinding(key);
+  assert.equal(continuity.accSessionId, owner.sessionId);
+  const live = await f.acc(["update", "--apply"], env);
+  assert.equal(live.reason, "processes_active", "MCP still holds after creating continuity");
+  assert.deepEqual((await readState(f)).active, before.active);
+  assert.equal(await mcp.close(), 0, mcp.stderr());
   // Activation needs no further network when the verified candidate is present.
   const applied = await f.acc(["update"], { ...env, ACC_NO_UPDATE_CHECK: "1" });
   assert.equal(applied.activated, true);
@@ -89,6 +117,13 @@ test("installed manual update verifies an archive, waits for idle MCP, then refr
   assert.equal(after.active.version, registry.version);
   assert.notEqual(after.active.root, before.active.root);
   assert.equal(JSON.parse(await readFile(path.join(before.active.root, "package.json"), "utf8")).version, f.manifest.version);
+  assert.deepEqual(await f.findBinding(key), continuity, "activation retains MCP continuity");
+  const restarted = connect();
+  await initialize(restarted);
+  const resumed = (await status(restarted)).participants.find(peer => peer.participantId === "update_peer");
+  assert.equal(resumed.sessionId, owner.sessionId);
+  assert.deepEqual(await f.findBinding(key), continuity, "restart reuses the same owner generation");
+  assert.equal(await restarted.close(), 0, restarted.stderr());
   await rm(f.installed, { recursive: true });
   const version = await run(process.execPath, [path.join(managerOf(f), "bin", "acc.mjs"), "version", "--json"],
     { cwd: f.project, env: f.env });
