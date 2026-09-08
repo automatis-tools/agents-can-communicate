@@ -4,9 +4,9 @@
 
 | | |
 |---|---|
-| Built from | `a22e3471ed21a44230fae136bf3ee95ad9b8c260` |
-| Tarball | `agents-can-communicate-0.3.1.tgz`, 301,009 bytes, 230 entries |
-| sha256 | `671f5b6a6143fb3668cf10e9c406081b7e8259887f38debe8e6b5e20fffdd965` |
+| Built from | `937c0fea2dcec1ffa59cbfa7927167e94aef3301` |
+| Tarball | `agents-can-communicate-0.3.1.tgz`, 301,393 bytes, 230 entries |
+| sha256 | `4554026d4a96135e44aec90956ef328c4ce386973d2f791b28a1d4f8fcb06c7f` |
 
 Not published. A published record says what the registry serves and is not
 rewritten, so shipped code that changes after a release is measured here instead.
@@ -17,7 +17,9 @@ version pins available. Stable launchers use separate immutable runtime generati
 independent worker verifies a downloaded package and refreshes the installed integrations
 and skills before switching; live ACC processes and native binding PIDs hold activation.
 Failures keep the working runtime or fence a partial refresh until manual forward recovery.
-Manual errors name the failed adapter, cause, and relevant configuration paths.
+Manual errors name the failed adapter, cause, and relevant configuration paths. Bootstrap
+honors its explicit data home before admission, including launches without HOME. Install
+rejects relocating only the runtime; aliases of the whole data home remain supported.
 
 Actual installed-package checks cover automatic activation without another command, idle
 MCP holds, changed registry integrity, stable launchers after source removal, hostile npm
