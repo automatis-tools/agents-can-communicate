@@ -8,6 +8,7 @@ import test from "node:test";
 
 import {
   DELIVERY_CAPTURE_FIELDS,
+  DELIVERY_CAPTURE_REQUIRED_FIELDS,
   DELIVERY_LAUNCH_MODES,
   INSTALLED_HOOKS_LAUNCH_MODE,
   PASSING_DELIVERY_BRANCHES,
@@ -17,8 +18,7 @@ import {
   validateCapture,
   validateTransportCapture,
 } from "../../scripts/spikes/delivery-capture.mjs";
-import { PRODUCT_CASE_IDS, REQUIRED_OBSERVATIONS, TRANSPORT_CASE_IDS }
-  from "../../scripts/e2e/codex-local-daemon-evidence.mjs";
+import { matrixEvidence } from "../helpers/codex-local-daemon-evidence.mjs";
 import { validateCapture as legacyValidateCapture }
   from "../../scripts/spikes/json-rpc-peer.mjs";
 
@@ -61,35 +61,6 @@ function accepts(capture) {
   assert.doesNotThrow(() => validateCapture(capture));
 }
 
-const CLEANUP = { attempted: true, outcome: "passed",
-  ownedProcesses: "stopped", temporaryState: "removed" };
-function matrixEvidence(phase = "product") {
-  const ids = phase === "product" ? PRODUCT_CASE_IDS : TRANSPORT_CASE_IDS;
-  const scenarios = ids.map(caseId => {
-    const timestamps = { startedAt: "2026-09-08T12:00:00.000Z", idleSinceAt: null,
-      preToolUseAt: null, queuedAt: null, stopAt: null, nextTurnAt: null,
-      finishedAt: "2026-09-08T12:03:00.000Z" };
-    if (caseId === "P04") timestamps.idleSinceAt = timestamps.startedAt;
-    if (["P05", "T03"].includes(caseId)) Object.assign(timestamps, {
-      preToolUseAt: "2026-09-08T12:00:01.000Z", queuedAt: "2026-09-08T12:00:02.000Z",
-      stopAt: "2026-09-08T12:00:03.000Z", nextTurnAt: "2026-09-08T12:00:04.000Z" });
-    const observations = REQUIRED_OBSERVATIONS[caseId].map(item =>
-      ({ ...item, at: timestamps.startedAt }));
-    return { schemaVersion: 1, source: "real-client-capture", caseId, phase,
-      clientVersion: "0.152.1", platform: "darwin-arm64", packageSha256: "a".repeat(64),
-      roles: [{ role: "daemon-a", participantId: null, threadId: null },
-        { role: "receiver-b1", participantId: "participant-b1", threadId: "thread-b1" },
-        { role: "sender", participantId: "participant-s", threadId: "thread-s" }],
-      timestamps, outcome: "passed", observations, observationCount: observations.length,
-      assertionCount: 1, cleanup: { ...CLEANUP } };
-  });
-  return { schemaVersion: 1, source: "real-client-capture", phase,
-    clientVersion: "0.152.1", platform: "darwin-arm64", packageSha256: "a".repeat(64),
-    startedAt: "2026-09-08T12:00:00.000Z", finishedAt: "2026-09-08T13:00:00.000Z",
-    scenarioCount: scenarios.length, passedCount: scenarios.length, failedCount: 0,
-    cleanup: { ...CLEANUP }, scenarios };
-}
-
 test("a passing native capture names every observed branch", () => {
   assert.deepEqual(validateCapture(PASSING_CAPTURE), PASSING_CAPTURE);
 });
@@ -102,11 +73,12 @@ test("the capture vocabulary is frozen and closed", () => {
   for (const branch of BRANCHES) {
     assert.equal(Object.isFrozen(PASSING_DELIVERY_BRANCHES[branch]), true);
   }
-  assert.deepEqual([...DELIVERY_CAPTURE_FIELDS], Object.keys(BASE_CAPTURE));
+  assert.deepEqual([...DELIVERY_CAPTURE_REQUIRED_FIELDS], Object.keys(BASE_CAPTURE));
+  assert.deepEqual([...DELIVERY_CAPTURE_FIELDS], [...Object.keys(BASE_CAPTURE), "packageSha256"]);
 });
 
 test("a capture includes every redacted evidence field", () => {
-  for (const key of DELIVERY_CAPTURE_FIELDS) {
+  for (const key of DELIVERY_CAPTURE_REQUIRED_FIELDS) {
     const capture = { ...PASSING_CAPTURE };
     delete capture[key];
     rejects(capture, new RegExp(`capture requires ${key}`));
@@ -177,13 +149,24 @@ test("legacy bootstrap passes remain valid while installed hooks require product
   assert.equal(PASSING_LAUNCH_MODE, "ordinary-command-with-install-time-bootstrap");
   assert.equal(INSTALLED_HOOKS_LAUNCH_MODE, "ordinary-command-with-installed-hooks");
   for (const launchMode of DELIVERY_LAUNCH_MODES) {
-    accepts({ ...BASE_CAPTURE, launchMode });
+    if (launchMode === INSTALLED_HOOKS_LAUNCH_MODE) {
+      accepts({ ...BASE_CAPTURE, client: "codex-cli", launchMode,
+        packageSha256: "a".repeat(64) });
+    } else accepts({ ...BASE_CAPTURE, launchMode });
     if (launchMode === PASSING_LAUNCH_MODE) accepts({ ...PASSING_CAPTURE, launchMode });
   }
   const installed = { ...PASSING_CAPTURE, client: "codex-cli", version: "0.152.1",
-    launchMode: INSTALLED_HOOKS_LAUNCH_MODE };
+    launchMode: INSTALLED_HOOKS_LAUNCH_MODE, packageSha256: "a".repeat(64) };
   assert.throws(() => validateCapture(installed), /installed-hook pass requires product evidence/);
   assert.doesNotThrow(() => validateCapture(installed, { productEvidence: matrixEvidence() }));
+  const noPackage = { ...installed };
+  delete noPackage.packageSha256;
+  assert.throws(() => validateCapture(noPackage, { productEvidence: matrixEvidence() }),
+    /installed-hook capture requires packageSha256/);
+  assert.throws(() => validateCapture({ ...installed, client: "claude-code" },
+    { productEvidence: matrixEvidence() }), /installed-hook capture client is codex-cli/);
+  assert.throws(() => validateCapture({ ...installed, packageSha256: "b".repeat(64) },
+    { productEvidence: matrixEvidence() }), /package SHA-256 matches product evidence/);
   assert.throws(() => validateCapture(installed, { productEvidence: matrixEvidence("transport") }),
     /installed-hook pass requires product-phase evidence/);
   assert.throws(() => validateCapture(installed, {
@@ -202,11 +185,13 @@ test("transport captures use a separate closed schema and prove all four live-pu
     phase: "transport", packageSha256: "b".repeat(64),
     protocolContract: "codex-app-server-thread-queue-v1",
     exactBinding: "receiver_thread_matched", idle: "queue_add_accepted",
-    busy: "queued_while_active", fallback: "durable_queued", limitations: ["unit fixture"] };
+    busy: "queued_while_active", rejectedSubmission: "observed",
+    durableReceipt: "queued", limitations: ["unit fixture"] };
   assert.deepEqual(validateTransportCapture(transport), transport);
   assert.deepEqual([...TRANSPORT_CAPTURE_FIELDS], Object.keys(transport));
   assert.deepEqual(TRANSPORT_PASSING_FACTS, { exactBinding: "receiver_thread_matched",
-    idle: "queue_add_accepted", busy: "queued_while_active", fallback: "durable_queued" });
+    idle: "queue_add_accepted", busy: "queued_while_active", rejectedSubmission: "observed",
+    durableReceipt: "queued" });
   for (const key of Object.keys(TRANSPORT_PASSING_FACTS)) {
     assert.throws(() => validateTransportCapture({ ...transport, [key]: "unobserved" }),
       new RegExp(`passing transport capture proves ${key}`));

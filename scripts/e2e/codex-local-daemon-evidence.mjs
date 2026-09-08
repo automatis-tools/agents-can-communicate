@@ -69,10 +69,10 @@ const REQUIRED = {
 export const REQUIRED_OBSERVATIONS = Object.freeze(Object.fromEntries(
   Object.entries(REQUIRED).map(([id, facts]) => [id, Object.freeze(facts)])));
 
-const SCENARIO_FIELDS = ["schemaVersion", "source", "caseId", "phase", "clientVersion",
+const SCENARIO_FIELDS = ["schemaVersion", "source", "caseId", "phase", "client", "clientVersion",
   "platform", "packageSha256", "roles", "timestamps", "outcome", "observations",
   "observationCount", "assertionCount", "cleanup"];
-const RUN_FIELDS = ["schemaVersion", "source", "phase", "clientVersion", "platform",
+const RUN_FIELDS = ["schemaVersion", "source", "phase", "client", "clientVersion", "platform",
   "packageSha256", "startedAt", "finishedAt", "scenarioCount", "passedCount",
   "failedCount", "cleanup", "scenarios"];
 const ROLE_FIELDS = ["role", "participantId", "threadId"];
@@ -94,6 +94,7 @@ export function assertScenarioEvidence(value) {
   expect(caseIds.includes(value.caseId), "scenario caseId is required and closed");
   const expectedPhase = value.caseId.startsWith("P") ? "product" : "transport";
   expect(value.phase === expectedPhase, `scenario ${value.caseId} phase is ${expectedPhase}`);
+  expect(value.client === "codex-cli", "scenario client is codex-cli");
   expect(matches(VERSION, value.clientVersion), "scenario clientVersion is exact semver");
   expect(matches(PLATFORM, value.platform), "scenario platform is closed");
   expect(matches(SHA256, value.packageSha256), "scenario packageSha256 is lowercase SHA-256");
@@ -107,6 +108,9 @@ export function assertScenarioEvidence(value) {
     objectWithFields(item, OBSERVATION_FIELDS, "observation");
     expect(OBSERVATION_KINDS.includes(item.kind), "observation kind is closed");
     expect(timestamp(item.at), "observation at is a UTC timestamp");
+    expect(Date.parse(item.at) >= Date.parse(value.timestamps.startedAt)
+      && Date.parse(item.at) <= Date.parse(value.timestamps.finishedAt),
+    "observation at is within scenario bounds");
     expect(Date.parse(item.at) >= previous, "scenario observations are timestamp ordered");
     previous = Date.parse(item.at);
     expect(roleNames.has(item.actor), "observation actor names a scenario role");
@@ -132,6 +136,7 @@ export function assertRunEvidence(value) {
   expect(value.schemaVersion === EVIDENCE_SCHEMA_VERSION, "run schemaVersion is 1");
   expect(EVIDENCE_SOURCES.includes(value.source), "run source is closed");
   expect(["product", "transport"].includes(value.phase), "run phase is product or transport");
+  expect(value.client === "codex-cli", "run client is codex-cli");
   expect(matches(VERSION, value.clientVersion), "run clientVersion is exact semver");
   expect(matches(PLATFORM, value.platform), "run platform is closed");
   expect(matches(SHA256, value.packageSha256), "run packageSha256 is lowercase SHA-256");
@@ -147,9 +152,12 @@ export function assertRunEvidence(value) {
   "run has exactly one of every required case");
   const scenarios = value.scenarios.map(assertScenarioEvidence);
   for (const item of scenarios) {
-    for (const key of ["source", "phase", "clientVersion", "platform", "packageSha256"]) {
+    for (const key of ["source", "phase", "client", "clientVersion", "platform", "packageSha256"]) {
       expect(item[key] === value[key], `scenario ${key} matches run`);
     }
+    expect(Date.parse(item.timestamps.startedAt) >= Date.parse(value.startedAt)
+      && Date.parse(item.timestamps.finishedAt) <= Date.parse(value.finishedAt),
+    "scenario timestamps are within run bounds");
   }
   const passed = scenarios.filter(item => item.outcome === "passed").length;
   expect(value.scenarioCount === scenarios.length && value.passedCount === passed

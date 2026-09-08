@@ -63,3 +63,22 @@ reported no whitespace errors on the six owned implementation/test paths.
 The whole suite was intentionally not run here because the root agent was concurrently
 building the remaining Task 5 harness. A broad suite run remains the root agent's integration
 gate after the scoped commits are assembled.
+
+## Review hardening
+
+A focused follow-up closed four review gaps:
+
+- Scenario and run evidence now name the exact client as `codex-cli`.
+- Every observation is bounded by its scenario timestamps, and every scenario is bounded by
+  its run timestamps.
+- New installed-hooks captures require a package SHA-256 and match the product aggregate on
+  client, exact version, platform, and package SHA-256. Historical bootstrap captures keep
+  their original shape and remain valid.
+- The narrow transport summary records `rejectedSubmission` and `durableReceipt` separately;
+  a generic fallback label can no longer collapse transport refusal and durable state.
+
+The tests now build evidence from hand-derived literal facts in
+`tests/helpers/codex-local-daemon-evidence.mjs`. They compare the exported production contract
+to those independent literals, so an incorrect required fact cannot create its own passing
+fixture. The new tests were observed failing first on the absent `client` field support and
+missing optional package field contract. The focused total after hardening is 41 passing tests.

@@ -3,14 +3,14 @@ import test from "node:test";
 
 import {
   EVIDENCE_SOURCES,
-  PRODUCT_CASE_IDS,
   REQUIRED_OBSERVATIONS,
-  TRANSPORT_CASE_IDS,
   assertRunEvidence,
   assertScenarioEvidence,
 } from "../../scripts/e2e/codex-local-daemon-evidence.mjs";
+import { CLEANUP, EXPECTED_CASE_FACTS, TRANSPORT_IDS,
+  evidenceScenario as scenario, matrixEvidence }
+  from "../helpers/codex-local-daemon-evidence.mjs";
 
-const SHA = "a".repeat(64);
 const AT = Object.freeze({
   startedAt: "2026-09-08T12:00:00.000Z",
   idleSinceAt: null,
@@ -20,79 +20,20 @@ const AT = Object.freeze({
   nextTurnAt: null,
   finishedAt: "2026-09-08T12:00:10.000Z",
 });
-const CLEAN = Object.freeze({ attempted: true, outcome: "passed",
-  ownedProcesses: "stopped", temporaryState: "removed" });
-const ROLES = Object.freeze([
-  { role: "daemon-a", participantId: null, threadId: null },
-  { role: "receiver-b1", participantId: "participant-b1", threadId: "thread-b1" },
-  { role: "sender", participantId: "participant-sender", threadId: "thread-sender" },
-]);
 
 function observation(kind, actor, target, outcome, at = AT.startedAt) {
   return { kind, at, actor, target, outcome };
 }
-
-function requiredObservations(caseId) {
-  return REQUIRED_OBSERVATIONS[caseId].map(({ kind, actor, target, outcome }) =>
-    observation(kind, actor, target, outcome));
-}
-
-function scenario(caseId, overrides = {}) {
-  const phase = caseId.startsWith("P") ? "product" : "transport";
-  const observations = requiredObservations(caseId);
-  const timestamps = caseId === "P04" ? { ...AT,
-    idleSinceAt: "2026-09-08T12:00:00.000Z", finishedAt: "2026-09-08T12:02:30.000Z" }
-    : ["P05", "T03"].includes(caseId) ? { ...AT,
-      preToolUseAt: "2026-09-08T12:00:01.000Z",
-      queuedAt: "2026-09-08T12:00:02.000Z",
-      stopAt: "2026-09-08T12:00:03.000Z",
-      nextTurnAt: "2026-09-08T12:00:04.000Z" }
-      : { ...AT };
-  return {
-    schemaVersion: 1,
-    source: "synthetic-unit-fixture",
-    caseId,
-    phase,
-    clientVersion: "0.152.1",
-    platform: "darwin-arm64",
-    packageSha256: SHA,
-    roles: ROLES.map(role => ({ ...role })),
-    timestamps,
-    outcome: "passed",
-    observations,
-    observationCount: observations.length,
-    assertionCount: 1,
-    cleanup: { ...CLEAN },
-    ...overrides,
-  };
-}
-
-function run(phase, overrides = {}) {
-  const ids = phase === "product" ? PRODUCT_CASE_IDS : TRANSPORT_CASE_IDS;
-  const scenarios = ids.map(caseId => scenario(caseId));
-  return {
-    schemaVersion: 1,
-    source: "synthetic-unit-fixture",
-    phase,
-    clientVersion: "0.152.1",
-    platform: "darwin-arm64",
-    packageSha256: SHA,
-    startedAt: AT.startedAt,
-    finishedAt: "2026-09-08T13:00:00.000Z",
-    scenarioCount: scenarios.length,
-    passedCount: scenarios.length,
-    failedCount: 0,
-    cleanup: { ...CLEAN },
-    scenarios,
-    ...overrides,
-  };
-}
+const run = (phase, overrides = {}) => matrixEvidence(phase,
+  { source: "synthetic-unit-fixture", ...overrides });
 
 test("synthetic unit fixtures satisfy the closed scenario and run contracts", () => {
   assert.deepEqual(assertScenarioEvidence(scenario("P02")), scenario("P02"));
   assert.deepEqual(assertRunEvidence(run("product")), run("product"));
   assert.deepEqual(assertRunEvidence(run("transport")), run("transport"));
   assert.deepEqual([...EVIDENCE_SOURCES], ["synthetic-unit-fixture", "real-client-capture"]);
+  assert.deepEqual(REQUIRED_OBSERVATIONS, EXPECTED_CASE_FACTS,
+    "the exported case contract must match independent literal expectations");
 });
 
 test("an empty or incomplete scenario list cannot stand in for the required matrix", () => {
@@ -162,23 +103,32 @@ test("scenario evidence rejects zero observations, missing package identity and 
   }
 });
 
+test("evidence is explicitly Codex and observations stay inside scenario time", () => {
+  assert.throws(() => assertScenarioEvidence(scenario("P02", { client: "claude-code" })),
+    /scenario client is codex-cli/);
+  const outside = scenario("P02");
+  outside.observations[0].at = "2026-09-08T12:03:00.001Z";
+  assert.throws(() => assertScenarioEvidence(outside), /observation at is within scenario bounds/);
+});
+
 test("observation vocabulary, timestamps, counts and cleanup are closed and honest", () => {
   const unknown = scenario("P02");
   unknown.observations[0].outcome = "probably";
   assert.throws(() => assertScenarioEvidence(unknown), /observation outcome/);
   const unordered = scenario("P02");
+  unordered.observations[0].at = "2026-09-08T12:01:00.000Z";
   unordered.observations.push(observation("message", "receiver-b1", null, "observed",
-    "2026-09-08T11:59:59.000Z"));
+    "2026-09-08T12:00:30.000Z"));
   unordered.observationCount += 1;
   assert.throws(() => assertScenarioEvidence(unordered), /observations are timestamp ordered/);
   assert.throws(() => assertScenarioEvidence(scenario("P02", { assertionCount: 0 })),
     /positive assertionCount/);
   assert.throws(() => assertScenarioEvidence(scenario("P02", {
-    cleanup: { ...CLEAN, outcome: "failed" } })), /passing scenario requires successful cleanup/);
+    cleanup: { ...CLEANUP, outcome: "failed" } })), /passing scenario requires successful cleanup/);
 });
 
 test("transport cases require exact binding, idle, busy and durable fallback observations", () => {
-  for (const caseId of TRANSPORT_CASE_IDS) {
+  for (const caseId of TRANSPORT_IDS) {
     const evidence = scenario(caseId);
     evidence.observations.pop();
     evidence.observationCount -= 1;
@@ -204,6 +154,12 @@ test("run aggregates reject mismatched metadata and failed count arithmetic", ()
   const mismatch = run("product");
   mismatch.scenarios[1].clientVersion = "0.153.4";
   assert.throws(() => assertRunEvidence(mismatch), /scenario clientVersion matches run/);
+  const beforeRun = run("product");
+  beforeRun.scenarios[0].timestamps.startedAt = "2026-09-08T11:59:59.999Z";
+  assert.throws(() => assertRunEvidence(beforeRun), /scenario timestamps are within run bounds/);
+  const afterRun = run("product");
+  afterRun.scenarios[0].timestamps.finishedAt = "2026-09-08T13:00:00.001Z";
+  assert.throws(() => assertRunEvidence(afterRun), /scenario timestamps are within run bounds/);
   assert.throws(() => assertRunEvidence(run("product", { passedCount: 19, failedCount: 0 })),
     /scenario counts match/);
 });

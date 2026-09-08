@@ -14,10 +14,13 @@ import { assertRunEvidence } from "../e2e/codex-local-daemon-evidence.mjs";
 export const CAPTURE_CAPABILITY = "native_delivery";
 export const UNOBSERVED = "unobserved";
 
-export const DELIVERY_CAPTURE_FIELDS = Object.freeze([
+export const DELIVERY_CAPTURE_REQUIRED_FIELDS = Object.freeze([
   "client", "version", "platform", "observedAt", "capability", "result", "fixture",
   "launchMode", "protocolContract", "idle", "busy", "reply", "duplicate", "fallback",
   "limitations",
+]);
+export const DELIVERY_CAPTURE_FIELDS = Object.freeze([
+  ...DELIVERY_CAPTURE_REQUIRED_FIELDS, "packageSha256",
 ]);
 
 export const DELIVERY_CAPTURE_PLATFORMS = Object.freeze([
@@ -56,13 +59,14 @@ const UTC_TIMESTAMP = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$/;
 export const TRANSPORT_CAPTURE_FIELDS = Object.freeze([
   "schemaVersion", "client", "version", "platform", "observedAt", "capability", "result",
   "fixture", "phase", "packageSha256", "protocolContract", "exactBinding", "idle", "busy",
-  "fallback", "limitations",
+  "rejectedSubmission", "durableReceipt", "limitations",
 ]);
 export const TRANSPORT_PASSING_FACTS = Object.freeze({
   exactBinding: "receiver_thread_matched",
   idle: "queue_add_accepted",
   busy: "queued_while_active",
-  fallback: "durable_queued",
+  rejectedSubmission: "observed",
+  durableReceipt: "queued",
 });
 const TRANSPORT_FACTS = Object.freeze(Object.fromEntries(Object.entries(TRANSPORT_PASSING_FACTS)
   .map(([key, value]) => [key, Object.freeze([value, UNOBSERVED])])));
@@ -77,7 +81,7 @@ export function validateCapture(value, { productEvidence } = {}) {
       throw new Error(`capture has unknown field ${key}`);
     }
   }
-  for (const key of DELIVERY_CAPTURE_FIELDS) {
+  for (const key of DELIVERY_CAPTURE_REQUIRED_FIELDS) {
     if (!Object.hasOwn(value, key)) throw new Error(`capture requires ${key}`);
   }
 
@@ -94,6 +98,11 @@ export function validateCapture(value, { productEvidence } = {}) {
     `capture launchMode is one of ${DELIVERY_LAUNCH_MODES.join(", ")}`);
   expect(matches(IDENTIFIER, value.protocolContract),
     "capture protocolContract is a closed identifier");
+  if (value.launchMode === INSTALLED_HOOKS_LAUNCH_MODE) {
+    expect(value.client === "codex-cli", "installed-hook capture client is codex-cli");
+    expect(matches(SHA256, value.packageSha256),
+      "installed-hook capture requires packageSha256");
+  }
   for (const [branch, passing] of Object.entries(PASSING_DELIVERY_BRANCHES)) {
     expect(passing.includes(value[branch]) || value[branch] === UNOBSERVED,
       `capture ${branch} is ${passing.join(", ")} or ${UNOBSERVED}`);
@@ -120,11 +129,17 @@ export function validateCapture(value, { productEvidence } = {}) {
         "installed-hook pass client version matches product evidence");
       expect(evidence.platform === value.platform,
         "installed-hook pass platform matches product evidence");
+      expect(evidence.client === value.client,
+        "installed-hook pass client matches product evidence");
+      expect(evidence.packageSha256 === value.packageSha256,
+        "installed-hook pass package SHA-256 matches product evidence");
     }
   }
 
   const capture = {};
-  for (const key of DELIVERY_CAPTURE_FIELDS) capture[key] = value[key];
+  for (const key of DELIVERY_CAPTURE_FIELDS) {
+    if (Object.hasOwn(value, key)) capture[key] = value[key];
+  }
   capture.limitations = Object.freeze([...value.limitations]);
   return Object.freeze(capture);
 }
