@@ -21,19 +21,18 @@
   alone do not prove hooks are active.
 - Codex live delivery can reuse an opted-in, already-loaded LocalDaemon thread without rewriting launch arguments. Exact receiver/workspace checks, safe binding refresh and wrapper migration preserve durable fallback and client-owned configuration.
 
-
 ### Candidate evidence
 
 | | |
 |---|---|
-| Built from | `bf3ac01b0ed17611ff3f8a9929a63d793b801367` |
-| Tarball | `agents-can-communicate-0.4.0.tgz`, 327,454 bytes, 248 entries |
-| sha256 | `7ce5bc633b333ac34a738af7dae2fa5cdd444125bd94c3b51714d868379959b9` |
+| Built from | `669e7edfcde128f5b97f2b55d768c663edc0ed27` |
+| Tarball | `agents-can-communicate-0.4.0.tgz`, 327,495 bytes, 248 entries |
+| sha256 | `3ef39f03b58a70bcf1e321f6f5345c2c9932f0071183530a20e1bad4e4d9b30a` |
 
 This combined candidate includes PR #116. The saved archive passed installed-package verification
 and the published-0.3.1 upgrade preflight; 248/248 source/archive/installed/managed files match.
 See [candidate evidence](docs/release-evidence/v0.4.0.md) for current validation status and limits.
-Validation in progress; this candidate is not ready for publication.
+Recorded local artifact checks completed; final review and publication approval remain separate.
 
 ## 0.3.1
 
