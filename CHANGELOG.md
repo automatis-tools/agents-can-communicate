@@ -4,12 +4,29 @@
 
 | | |
 |---|---|
-| Built from | `dc15a57e5067ff4cb9e5a93be1a64b68c13fba5f` |
-| Tarball | `agents-can-communicate-0.3.1.tgz`, 277,306 bytes, 206 entries |
-| sha256 | `88c026168c09e37b1f9b8b77971f8dd8ea4935aa43cbdf52c8e9f7674ccdf313` |
+| Built from | `f6b92a83fde11698ea1eece7477adabae8e25e05` |
+| Tarball | `agents-can-communicate-0.3.1.tgz`, 279,425 bytes, 207 entries |
+| sha256 | `9205d27fce346e2a350467f0932a25cd58515492891edce1f58b69acd26a5218` |
 
 Not published. A published record says what the registry serves and is not
 rewritten, so shipped code that changes after a release is measured here instead.
+
+`acc update --apply` now exits with code 4 when either installation step fails,
+retains the completed/failed steps in JSON, and prints the remaining commands. Successful
+application relays the installer's activation instructions and reminds users to restart
+running clients. The installed-package regression catches deliberate restoration of false
+success, discarded installer output, and a missing restart reminder. Twelve updater checks
+and 38 combined updater/documentation checks passed; syntax covered 366 modules.
+
+The packaged upgrade guide covers the 0.3.1 transition, changed inbox response shape,
+client activation, and downgrade limits. A registry-authenticated published 0.3.1 archive
+and this candidate were installed into isolated consumers. Refreshing Claude/Codex retained
+workspace bytes, five existing messages, queued/acknowledged receipts, intent, claims, user
+settings, and the disabled native policy; all four skill copies refreshed. After a new
+decision replacement, old 0.3.1 refused the new field without changing data, and the new
+reader recovered access without repair. All 207 candidate/source/installed files matched.
+This is an upgrade preflight, not a real-client activation capture or a released 0.4.0;
+the final versioned release archive still needs the same check.
 
 Decisions now support explicit replacement and withdrawal through repeated CLI
 `--supersedes` / `--withdraws` flags and corresponding MCP arrays. Any owned peer can
