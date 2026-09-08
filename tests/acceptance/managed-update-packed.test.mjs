@@ -64,8 +64,15 @@ test("installed manual update verifies an archive, waits for idle MCP, then refr
   await until(async () => {
     const leases = await readdir(path.join(managerOf(f), "leases"));
     const records = await Promise.all(leases.filter(n => n.endsWith(".json"))
-      .map(n => readFile(path.join(managerOf(f), "leases", n), "utf8").then(JSON.parse)));
-    return records.some(lease => lease.pid === mcp.pid && lease.kind === "acc-mcp");
+      .map(async n => {
+        try {
+          return JSON.parse(await readFile(path.join(managerOf(f), "leases", n), "utf8"));
+        } catch (error) {
+          if (error.code === "ENOENT") return null;
+          throw error;
+        }
+      }));
+    return records.some(lease => lease?.pid === mcp.pid && lease.kind === "acc-mcp");
   }, "idle MCP registered before receiving any request");
   const pending = await f.acc(["update"], env);
   assert.equal(pending.reason, "processes_active");
