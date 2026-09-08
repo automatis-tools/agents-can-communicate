@@ -95,7 +95,7 @@ const quote = value => `"${String(value).replace(/(["\\$`])/g, "\\$1")}"`;
  * install time.
  */
 export async function writeHookShim({ dir, adapterId, runner = defaultRunner(),
-  node = process.execPath, name = "acc-hook.sh" }) {
+  node = process.execPath, name = "acc-hook.sh", dataHome }) {
   await assertRunner(runner);
   const target = path.join(dir, name);
   await mkdir(dir, { recursive: true });
@@ -112,6 +112,7 @@ export async function writeHookShim({ dir, adapterId, runner = defaultRunner(),
     "# and nothing anywhere saying why.",
     `ACC_NODE=${quote(node)}`,
     `ACC_RUNNER=${quote(runner)}`,
+    ...(dataHome === undefined ? [] : [`export ACC_DATA_HOME=${quote(dataHome)}`]),
     'if [ -x "$ACC_NODE" ] && [ -f "$ACC_RUNNER" ]; then',
     `  exec "$ACC_NODE" "$ACC_RUNNER" ${adapterId} "$@"`,
     "fi",

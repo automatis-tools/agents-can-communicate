@@ -29,7 +29,7 @@ export function livePolicyFrom(env) {
 const isPid = value => Number.isInteger(value) && value > 0;
 
 export async function establishNativeBinding({ adapter, event, hookBinding, clientVersion,
-  platform, livePolicy, service, runtimeDir, clock,
+  platform, livePolicy, service, runtimeDir, clock, env,
   timeoutMs = DEFAULT_TIMEOUT_MS, heartbeatCadenceMs = DEFAULT_CADENCE_MS }) {
   const outcome = (state, reasonCode, modes = []) =>
     Object.freeze({ state, reasonCode, modes: Object.freeze([...modes]) });
@@ -57,7 +57,8 @@ export async function establishNativeBinding({ adapter, event, hookBinding, clie
   try {
     const budget = Math.max(1, Math.floor(timeoutMs));
     const handshake = await Promise.race([
-      adapter.bindNativeSession({ event, clientPid, clientVersion, runtimeDir, timeoutMs: budget }),
+      adapter.bindNativeSession({ event, clientPid, clientVersion, runtimeDir,
+        timeoutMs: budget, env }),
       new Promise((_resolve, reject) => {
         timer = setTimeout(() => reject(Object.assign(new Error("native handshake timed out"),
           { code: "ETIMEDOUT" })), budget);

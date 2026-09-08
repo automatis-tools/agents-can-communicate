@@ -13,6 +13,7 @@ const adaptersById = adapters => adapters instanceof Map
 // transfers it. A note informs and waits for the next turn. Room messages
 // have no recipient and are never offered live.
 const ACTIONABLE = new Set(["question", "request", "answer", "decision", "handoff"]);
+const LIVE_POLICIES = new Set(["off", "actionable", "all"]);
 const permits = (policy, kind) => policy === "all"
   || (policy === "actionable" && ACTIONABLE.has(kind));
 
@@ -39,8 +40,22 @@ function safeTransport(value, opaqueEndpointRef) {
   return opaqueEndpointRef === "live-adapter" ? "native-live" : "live-adapter";
 }
 
-export function createDeliveryRouter({ service, adapters, clock }) {
+export function createDeliveryRouter({ service, adapters, clock, platform, readLivePolicy }) {
   const registry = adaptersById(adapters);
+  void platform;
+
+  async function policyFor(adapter, binding) {
+    if (adapter?.nativeDelivery?.policySource !== "installation-record") {
+      return LIVE_POLICIES.has(binding.livePolicy) ? binding.livePolicy : "off";
+    }
+    if (typeof readLivePolicy !== "function") return "off";
+    try {
+      const policy = await readLivePolicy({ adapter, binding });
+      return LIVE_POLICIES.has(policy) ? policy : "off";
+    } catch {
+      return "off";
+    }
+  }
 
   async function recordFailure(binding, message, participantId, transport, safeErrorCode) {
     await service.recordOfferFailed({ messageId: message.messageId,
@@ -64,14 +79,15 @@ export function createDeliveryRouter({ service, adapters, clock }) {
       .filter(binding => binding.sessionId === target.sessionId
         && binding.generation === target.generation);
     if (bindings.length === 0) return durable(participantId, "recipient_unavailable");
-    const permitted = bindings.filter(binding => binding.livePolicy !== "off"
-      && permits(binding.livePolicy, message.kind));
+    const evaluated = await Promise.all(bindings.map(async binding => {
+      const adapter = registry.get(binding.adapterId);
+      return { binding, adapter, policy: await policyFor(adapter, binding) };
+    }));
+    const permitted = evaluated.filter(({ policy }) => permits(policy, message.kind));
     if (permitted.length === 0) return durable(participantId, "delivery_disabled");
-    const reachable = permitted.filter(binding => binding.availableModes.includes("livePush"));
+    const reachable = permitted.filter(({ binding }) => binding.availableModes.includes("livePush"));
     if (reachable.length === 0) return durable(participantId, "recipient_unavailable");
-    const capable = reachable.map(binding => ({ binding,
-      adapter: registry.get(binding.adapterId) }))
-      .filter(({ binding, adapter }) => liveCapable(adapter, binding));
+    const capable = reachable.filter(({ binding, adapter }) => liveCapable(adapter, binding));
     if (capable.length === 0) {
       return durable(participantId, "unsupported_client_version");
     }
@@ -80,12 +96,17 @@ export function createDeliveryRouter({ service, adapters, clock }) {
     }
 
     const { binding, adapter } = capable[0];
+    const currentPolicy = await policyFor(adapter, binding);
+    if (!permits(currentPolicy, message.kind)) {
+      return durable(participantId, "delivery_disabled");
+    }
+    const currentBinding = { ...binding, livePolicy: currentPolicy };
     let response;
     try {
       // The store root is this workspace's runtime dir; the adapter resolves its
       // opaque endpoint id under it. Passed as data, never as a leak into core:
       // the router does not read what the adapter does with it.
-      response = await adapter.offerMessage({ binding, message,
+      response = await adapter.offerMessage({ binding: currentBinding, message,
         runtimeDir: service.store?.root });
     } catch {
       await recordFailure(binding, message, participantId, "live-adapter", "transport_error");

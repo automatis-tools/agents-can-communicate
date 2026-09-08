@@ -60,7 +60,8 @@ export async function applyPlan({ plan, adapters, context, dataHome, dryRun = fa
         // remove files nothing created.
         await recordInstall({ dataHome, adapterId: adapter.id,
           version: operation.clientVersion ?? null, accVersion,
-          artifacts: operation.artifacts, createdDirectories, nativeActivation: native });
+          artifacts: operation.artifacts, createdDirectories,
+          deliveryPolicy: operation.livePolicy, nativeActivation: native });
         results.operations.push({ ...operation, applied: true, appendedRcBlock,
           changes: outcome.changes ?? [], diagnostics: [
             ...(operation.deliveryDiagnostic === undefined

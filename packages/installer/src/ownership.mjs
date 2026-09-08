@@ -110,7 +110,7 @@ async function saveOwnership({ dataHome, record }) {
  * runtime, and leaves the bundle inside the client exactly where it was.
  */
 export async function recordInstall({ dataHome, adapterId, version, accVersion = null,
-  artifacts, createdDirectories = [], nativeActivation = null }) {
+  artifacts, createdDirectories = [], deliveryPolicy, nativeActivation = null }) {
   const stamped = await Promise.all(artifacts.map(async artifact => ({
     path: artifact.path,
     kind: artifact.kind ?? "file",
@@ -128,6 +128,7 @@ export async function recordInstall({ dataHome, adapterId, version, accVersion =
     installs: [...record.installs.filter(install => install.adapterId !== adapterId),
       { adapterId, version, accVersion, artifacts: stamped,
         ...(directories.length === 0 ? {} : { createdDirectories: directories }),
+        ...(deliveryPolicy === undefined ? {} : { deliveryPolicy }),
         // Present only for a consented native activation. A record without it
         // - every 0.2 install - reads as live policy off and is never rewritten
         // merely to add the field.

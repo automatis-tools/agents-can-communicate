@@ -1,7 +1,12 @@
 import assert from "node:assert/strict";
+import { mkdtemp, realpath, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import path from "node:path";
 import test from "node:test";
 
-import { recordAndOffer } from "../src/main.mjs";
+import { createDeliveryRouter } from "@agents-can-communicate/delivery-router";
+
+import { main, recordAndOffer } from "../src/main.mjs";
 
 const message = { messageId: "message_a", toParticipantIds: ["models"] };
 
@@ -30,4 +35,73 @@ test("a CLI router diagnostic keeps the durable command successful", async () =>
   assert.deepEqual(result.delivery, [{ recipientParticipantId: "models",
     outcome: "queued", transport: "durable", errorCode: "transport_error" }]);
   assert.equal(JSON.stringify(result).includes("secret transport detail"), false);
+});
+
+test("the CLI composition root supplies the resolved data home to its router", async t => {
+  const cwd = await realpath(await mkdtemp(path.join(tmpdir(), "acc-router-cwd-")));
+  const dataHome = await realpath(await mkdtemp(path.join(tmpdir(), "acc-router-data-")));
+  t.after(() => Promise.all([cwd, dataHome]
+    .map(directory => rm(directory, { recursive: true, force: true }))));
+  let routedDataHome;
+  const output = { write: (_text, done) => { done?.(); return true; } };
+
+  const code = await main(["status", "--cwd", cwd, "--json"], {
+    cwd, env: { HOME: cwd, ACC_DATA_HOME: dataHome }, platform: process.platform,
+    stdout: output, stderr: output, clock: { now: () => "2026-09-07T12:00:00.000Z" },
+    ids: { next: kind => `${kind}_router` },
+    createDeliveryRouter: input => { routedDataHome = input.dataHome; return null; },
+  });
+
+  assert.equal(code, 0);
+  assert.equal(routedDataHome, dataHome);
+});
+
+function routed(policy, kind, { bindingPolicy = "all", failed = false } = {}) {
+  let offers = 0;
+  const receipt = { recipientParticipantId: "models", state: "queued" };
+  const binding = { sessionId: "session_models", generation: "generation_models",
+    adapterId: "fixture", clientVersion: "1.2.3", availableModes: ["livePush"],
+    livePolicy: bindingPolicy, opaqueEndpointRef: "opaque", leaseUntil: "2099-01-01T00:00:00.000Z" };
+  const service = { store: { root: "/runtime" },
+    readReceipt: async () => receipt,
+    listLiveSessions: async () => [{ sessionId: binding.sessionId,
+      generation: binding.generation }],
+    listDeliveryBindings: async () => [binding],
+    recordOfferFailed: async () => {},
+    recordOfferSucceeded: async () => { receipt.state = "offered"; } };
+  const adapter = { id: "fixture", capabilities: { delivery: { livePush: true } },
+    nativeDelivery: { policySource: "installation-record" },
+    offerMessage: async ({ binding: offered }) => {
+      offers += 1;
+      assert.equal(offered.livePolicy, policy);
+      return { accepted: true, transport: "codex-app-server",
+        clientVersion: offered.clientVersion };
+    } };
+  const router = createDeliveryRouter({ service, adapters: { fixture: adapter },
+    clock: { now: () => "2026-09-07T12:00:00.000Z" },
+    readLivePolicy: async () => {
+      if (failed) throw new Error("reader failed");
+      return policy;
+    } });
+  return { offers: () => offers, receipt, router,
+    message: { messageId: `message_${policy}_${kind}`, toParticipantIds: ["models"], kind } };
+}
+
+test("CLI delivery follows current recorded off, actionable, all, and reader failure", async () => {
+  for (const [policy, kind, expected, options] of [
+    ["off", "question", "queued", { bindingPolicy: "all" }],
+    ["actionable", "note", "queued"],
+    ["actionable", "question", "offered"],
+    ["actionable", "request", "offered"],
+    ["actionable", "answer", "offered"],
+    ["all", "note", "offered", { bindingPolicy: "actionable" }],
+    ["all", "question", "queued", { failed: true }],
+  ]) {
+    const f = routed(policy, kind, options);
+    const result = await recordAndOffer({ record: async () => f.message, router: f.router });
+    assert.equal(result.recorded, f.message, `${policy} ${kind}`);
+    assert.equal(result.delivery[0].outcome, expected, `${policy} ${kind}`);
+    assert.equal(f.receipt.state, expected, `${policy} ${kind}`);
+    assert.equal(f.offers(), expected === "offered" ? 1 : 0, `${policy} ${kind}`);
+  }
 });

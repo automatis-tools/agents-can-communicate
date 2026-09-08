@@ -7,6 +7,10 @@ import { createDeliveryRouter } from "../src/router.mjs";
 import { createFakeClock, createFakeIds, createMemoryStore }
   from "../../../tests/helpers/memory-store.mjs";
 
+// Kept cohesive above 300 lines because every case drives the same real core
+// service and binding lifecycle; splitting would duplicate the delivery state
+// fixture and obscure the policy, transport, and receipt transition matrix.
+
 const NOW = "2026-09-01T20:00:00.000Z";
 const WORKSPACE = "workspace_router";
 const PLATFORM = `${process.platform}-${process.arch}`;
@@ -27,7 +31,8 @@ function certifiedAdapter(offerMessage = async ({ binding }) => ({
   };
 }
 
-async function fixture({ adapter = certifiedAdapter(), secondRecipientSession = false } = {}) {
+async function fixture({ adapter = certifiedAdapter(), secondRecipientSession = false,
+  readLivePolicy } = {}) {
   const clock = createFakeClock(NOW);
   const ids = createFakeIds();
   const store = createMemoryStore({ clock, ids, workspaceId: WORKSPACE });
@@ -43,7 +48,7 @@ async function fixture({ adapter = certifiedAdapter(), secondRecipientSession = 
     workspaceId: WORKSPACE, participantId: "models", sessionId: "session_models_two",
     harness: "fixture", heartbeatCadenceMs: 30_000 }));
   const router = createDeliveryRouter({ service,
-    adapters: { fixture_adapter: adapter }, clock });
+    adapters: { fixture_adapter: adapter }, clock, platform: PLATFORM, readLivePolicy });
   return { adapter, clock, router, sender, service, sessions, store };
 }
 
@@ -78,6 +83,12 @@ async function receipt(store, messageId) {
 
 const durable = errorCode => [{ recipientParticipantId: "models", outcome: "queued",
   transport: "durable", errorCode }];
+
+const installationAdapter = offerMessage => {
+  const adapter = certifiedAdapter(offerMessage);
+  return { ...adapter, nativeDelivery: { ...adapter.nativeDelivery,
+    policySource: "installation-record" } };
+};
 
 test("one eligible certified binding is offered and only then committed", async () => {
   const f = await fixture();
@@ -319,8 +330,76 @@ test("actionable offers every conversation-advancing kind and holds notes for th
       assert.equal(outcome.outcome, underActionable, kind);
       if (underActionable === "queued") assert.equal(outcome.errorCode, "delivery_disabled");
       assert.equal((await receipt(f.store, message.messageId)).state, underActionable, kind);
-    }
-  });
+  }
+});
+
+test("current recorded policy narrows and expands an existing binding", async () => {
+  // The final row broadens an actionable binding to all. Its note must reach
+  // offer now, without waiting for another recipient hook to rewrite the
+  // binding; filtering on the binding snapshot would defeat the current read.
+  for (const [policy, bindingPolicy, kind, expected] of [
+    ["off", "all", "question", "queued"],
+    ["actionable", "all", "note", "queued"],
+    ["actionable", "all", "question", "offered"],
+    ["actionable", "all", "request", "offered"],
+    ["actionable", "all", "answer", "offered"],
+    ["all", "actionable", "note", "offered"],
+  ]) {
+    let offers = 0;
+    const adapter = installationAdapter(async ({ binding }) => {
+      offers += 1;
+      assert.equal(binding.livePolicy, policy);
+      return { accepted: true, transport: "codex-app-server",
+        clientVersion: binding.clientVersion };
+    });
+    const f = await fixture({ adapter, readLivePolicy: async () => policy });
+    await publish(f.service, f.sessions[0], { livePolicy: bindingPolicy });
+    const message = await sendKind(f, kind, `recorded_${policy}_${kind}`);
+
+    const [outcome] = await f.router.offer(message);
+
+    assert.equal(outcome.outcome, expected, `${policy} ${kind}`);
+    assert.equal(offers, expected === "offered" ? 1 : 0, `${policy} ${kind}`);
+    assert.equal((await receipt(f.store, message.messageId)).state, expected);
+  }
+});
+
+test("policy is read again immediately before offer", async () => {
+  const reads = [];
+  let offers = 0;
+  const f = await fixture({ adapter: installationAdapter(async () => {
+    offers += 1;
+    return { accepted: true, transport: "codex-app-server", clientVersion: "1.2.3" };
+  }), readLivePolicy: async () => {
+    const policy = reads.length === 0 ? "all" : "off";
+    reads.push(policy);
+    return policy;
+  } });
+  await publish(f.service, f.sessions[0], { livePolicy: "all" });
+  const message = await send(f.service, f.sender, "question", "policy_race");
+
+  assert.deepEqual(await f.router.offer(message), durable("delivery_disabled"));
+  assert.deepEqual(reads, ["all", "off"]);
+  assert.equal(offers, 0);
+  assert.equal((await receipt(f.store, message.messageId)).state, "queued");
+});
+
+test("missing or failed recorded-policy readers disable live delivery", async () => {
+  for (const [name, readLivePolicy] of [
+    ["missing", undefined],
+    ["failed", async () => { throw new Error("corrupt installation record"); }],
+  ]) {
+    let offers = 0;
+    const f = await fixture({ adapter: installationAdapter(async () => { offers += 1; }),
+      readLivePolicy });
+    await publish(f.service, f.sessions[0], { livePolicy: "all" });
+    const message = await send(f.service, f.sender, "question", `reader_${name}`);
+
+    assert.deepEqual(await f.router.offer(message), durable("delivery_disabled"), name);
+    assert.equal(offers, 0, name);
+    assert.equal((await receipt(f.store, message.messageId)).state, "queued", name);
+  }
+});
 
 test("off holds every kind and all offers every addressed kind", async () => {
   for (const [kind, , underAll] of POLICY_MATRIX) {

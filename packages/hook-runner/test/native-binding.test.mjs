@@ -69,6 +69,17 @@ test("policy off clears the current binding and never handshakes", async () => {
   assert.equal(handshakes, 0);
 });
 
+test("the hook environment reaches the adapter handshake for endpoint lookup", async () => {
+  let received;
+  const env = { CODEX_HOME: "/literal/codex", ACC_APP_SERVER_SOCKET: "/runtime/socket" };
+  const service = fakeService();
+
+  await establish(nativeAdapter(async input => { received = input; return HANDSHAKE; }),
+    service, { env });
+
+  assert.equal(received.env, env);
+});
+
 test("a missing, malformed, or foreign policy value is off", () => {
   assert.deepEqual(LIVE_POLICIES, ["off", "actionable", "all"]);
   for (const value of [undefined, "", "ALL", "1", "true", "actionable ", " off"]) {

@@ -1,8 +1,11 @@
 import assert from "node:assert/strict";
-import { mkdir, mkdtemp, readFile, readdir, realpath, rm, writeFile } from "node:fs/promises";
+import { execFile } from "node:child_process";
+import { chmod, mkdir, mkdtemp, readFile, readdir, realpath, rm, writeFile }
+  from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
+import { promisify } from "node:util";
 
 import { CODEX_PLUGIN, pluginVersion } from "../../../tests/helpers/plugin-version.mjs";
 
@@ -10,6 +13,8 @@ import { EXIT } from "@agents-can-communicate/protocol";
 
 import { createCodexAdapter } from "../src/adapter.mjs";
 import { CODEX_HOOK_EVENTS, injectOutcome, normalizeCodexHook } from "../src/hooks.mjs";
+
+const run = promisify(execFile);
 
 // Kept cohesive above 300 lines because every case shares the same real Codex
 // home/marketplace topology and jointly proves install, upgrade, and uninstall
@@ -444,9 +449,33 @@ test("the cached copy carries the same absolute hook command", async t => {
     "cache", "acc-local", "agents-can-communicate", await pluginVersion(CODEX_PLUGIN),
   "hooks.json"), "utf8"));
   const command = Object.values(cached.hooks)[0][0].hooks[0].command;
-  const executable = command.match(/"([^"]+)"/)[1];
+  const executable = command.match(/^sh (['"])(.*?)\1 /)[2];
   assert.equal(path.isAbsolute(executable), true, `relative command: ${command}`);
 });
+
+test("the installed hook command preserves literal metacharacters and exports its data home",
+  async t => {
+    const base = await realpath(await mkdtemp(path.join(tmpdir(), "acc-codex-command-")));
+    t.after(() => rm(base, { recursive: true, force: true }));
+    const home = path.join(base, "space ' $() `printf tick`");
+    const dataHome = path.join(base, "data space ' $() `literal`");
+    const node = path.join(base, "node");
+    const runner = path.join(base, "acc-hook.mjs");
+    await mkdir(home, { recursive: true });
+    await writeFile(node, '#!/bin/sh\nprintf "%s\\n" "$ACC_DATA_HOME"\n');
+    await chmod(node, 0o755);
+    await writeFile(runner, "// runner fixture\n");
+
+    const context = { home, codexHome: path.join(home, ".codex"), dataHome, node, runner };
+    await createCodexAdapter().install(context);
+    const cached = JSON.parse(await readFile(path.join(context.codexHome, "plugins", "cache",
+      "acc-local", "agents-can-communicate", await pluginVersion(CODEX_PLUGIN), "hooks.json"),
+    "utf8"));
+    const command = Object.values(cached.hooks)[0][0].hooks[0].command;
+
+    const result = await run("sh", ["-c", command], { env: { PATH: "/usr/bin:/bin" } });
+    assert.equal(result.stdout, `${dataHome}\n`);
+  });
 
 test("detect reports the plugin as installed straight after install", async t => {
   const { context } = await realFixture(t);

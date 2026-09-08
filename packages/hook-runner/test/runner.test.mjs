@@ -5,6 +5,7 @@ import path from "node:path";
 import test from "node:test";
 
 import { projectContext, projectContextResult } from "@agents-can-communicate/adapter-sdk";
+import { recordInstall } from "@agents-can-communicate/installer";
 
 import { canonicalTarget, covers, resourceFor, runHook } from "../src/runner.mjs";
 
@@ -53,7 +54,7 @@ const ADAPTERS = { kimi, gemini_cli: gemini };
 
 // A native adapter whose handshake succeeds, used to prove the runner attaches
 // and retries a native binding without reaching a real vendor process.
-function nativeHookAdapter(onBind = () => {}) {
+function nativeHookAdapter(onBind = () => {}, policySource) {
   return {
     id: "native",
     client: { command: "native-client", certificationName: "native-client",
@@ -62,7 +63,8 @@ function nativeHookAdapter(onBind = () => {}) {
     certification: { evidence: [pass("native-client", "2.1.258", "delivery.livePush")] },
     nativeDelivery: { minimumByPlatform: { "darwin-arm64": "2.1.258" },
       anchors: [{ platform: "darwin-arm64", version: "2.1.258",
-        protocolContract: "native-v1" }], knownBad: [], activationKinds: ["shell-bootstrap"] },
+        protocolContract: "native-v1" }], knownBad: [], activationKinds: ["shell-bootstrap"],
+      ...(policySource === undefined ? {} : { policySource }) },
     normalizeHook: payload => payload,
     denyOutcome: reason => ({ stdout: "", stderr: reason, exitCode: 2 }),
     injectOutcome: context => ({ stdout: context, stderr: "", exitCode: 0 }),
@@ -536,14 +538,46 @@ test("a native adapter binds at start and retries on a later turn under a live p
   assert.equal(turn.nativeBinding.state, "active");
   assert.deepEqual(handshakes, ["sessionStart", "beforeTurn"]);
 
-  // With no exported policy an ordinary launch never handshakes.
+  // With no exported policy an ordinary launch never handshakes, but still
+  // retires any binding that an earlier consented turn published.
   handshakes.length = 0;
   const plain = await runHook({ adapterId: "native", adapters: { native },
     dataHome: place.dataHome, env: {}, readProcessTable: async () => table,
     probeClientVersion: async () => "2.1.258", platform: "darwin-arm64",
     payload: event("beforeTurn", { cwd: place.root }) });
-  assert.equal(plain.nativeBinding, undefined);
+  assert.deepEqual(plain.nativeBinding, { state: "off", reasonCode: null, modes: [] });
   assert.deepEqual(handshakes, []);
+});
+
+test("recorded off retires an existing binding despite a stale live environment", async t => {
+  const place = await workspace(t);
+  const handshakes = [];
+  const native = nativeHookAdapter(input => { handshakes.push(input.event.kind); },
+    "installation-record");
+  const table = new Map([[process.pid, { ppid: 900, comm: "node" }],
+    [900, { ppid: 1, comm: "native-client" }]]);
+  const invoke = kind => runHook({ adapterId: "native", adapters: { native },
+    dataHome: place.dataHome, env: { ACC_NATIVE_DELIVERY_POLICY: "all" },
+    readProcessTable: async () => table, probeClientVersion: async () => "2.1.258",
+    platform: "darwin-arm64", payload: event(kind, { cwd: place.root }) });
+  await recordInstall({ dataHome: place.dataHome, adapterId: "native", version: "2.1.258",
+    artifacts: [], deliveryPolicy: "all" });
+
+  const started = await invoke("sessionStart");
+  assert.equal(started.nativeBinding.state, "active");
+  assert.deepEqual(handshakes, ["sessionStart"]);
+  const participantId = (await started.service.store.ephemeral.get("session",
+    started.accSessionId)).participantId;
+
+  await recordInstall({ dataHome: place.dataHome, adapterId: "native", version: "2.1.258",
+    artifacts: [], deliveryPolicy: "off" });
+  const turn = await invoke("beforeTurn");
+  const bindings = await turn.service.listDeliveryBindings({ participantId,
+    now: new Date(Date.now() + 1_000).toISOString() });
+
+  assert.deepEqual(turn.nativeBinding, { state: "off", reasonCode: null, modes: [] });
+  assert.deepEqual(handshakes, ["sessionStart"]);
+  assert.deepEqual(bindings, []);
 });
 
 test("an offered note is not replayed on the next turn", async t => {

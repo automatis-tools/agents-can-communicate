@@ -6,6 +6,7 @@ import { defaultBootstrap } from "@agents-can-communicate/adapter-sdk";
 
 import { installShellBootstrap, planShellBootstrap, uninstallShellBootstrap }
   from "./shell-bootstrap.mjs";
+import { LIVE_POLICIES, livePolicyOf } from "./live-policy.mjs";
 
 // The installer's side of a native activation: which owned mechanisms an
 // eligible adapter asked for, how they are applied in a fixed order, what is
@@ -14,12 +15,9 @@ import { installShellBootstrap, planShellBootstrap, uninstallShellBootstrap }
 // adapter's own install; a vendor service is started only here, only during
 // apply, and only when it did not already exist.
 
-export const LIVE_POLICIES = Object.freeze(["off", "actionable", "all"]);
+export { LIVE_POLICIES, livePolicyOf };
 const MECHANISM_ORDER = ["native-config", "native-service", "shell-bootstrap"];
 const SERVICE_TIMEOUT_MS = 15_000;
-
-export const livePolicyOf = install => (LIVE_POLICIES.includes(install?.nativeActivation?.livePolicy)
-  ? install.nativeActivation.livePolicy : "off");
 
 export const shellOf = env => {
   const shell = env?.SHELL;

@@ -4,6 +4,7 @@ import { readFile } from "node:fs/promises";
 
 import { createId } from "@agents-can-communicate/protocol";
 import { createDeliveryRouter } from "@agents-can-communicate/delivery-router";
+import { readInstalledLivePolicy } from "@agents-can-communicate/installer";
 import { ALL_ADAPTERS, askConfirmation, main } from "@agents-can-communicate/cli";
 
 const adapters = Object.fromEntries(ALL_ADAPTERS().map(adapter => [adapter.id, adapter]));
@@ -18,8 +19,11 @@ const runtime = {
   stderr: process.stderr,
   clock: { now: () => new Date().toISOString() },
   ids: { next: kind => createId(kind, randomBytes) },
-  createDeliveryRouter: ({ service, clock }) =>
-    createDeliveryRouter({ service, adapters, clock }),
+  createDeliveryRouter: ({ service, clock, dataHome }) =>
+    createDeliveryRouter({ service, adapters, clock,
+      platform: `${process.platform}-${process.arch}`,
+      readLivePolicy: ({ adapter }) => readInstalledLivePolicy({ dataHome,
+        adapterId: adapter.id }) }),
   // Asked only by `acc config init`, and only when stdout is a terminal. There
   // was no port here at all, so the question went to the fallback that always
   // answers no: in a real terminal the command printed "not written" and never

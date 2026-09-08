@@ -9,6 +9,10 @@ import { bakeSkillCommand, blankJson, blankText, removeIfEmpty, removeInstalledT
   from "@agents-can-communicate/adapter-sdk";
 import { AccError, EXIT } from "@agents-can-communicate/protocol";
 
+// Kept cohesive above 300 lines because Codex plugin install, cache, config,
+// detection, and ownership share one client topology; splitting would duplicate
+// path authority and make install/uninstall symmetry harder to audit.
+
 const bundle = fileURLToPath(new URL("../plugin", import.meta.url));
 const PLUGIN_NAME = "agents-can-communicate";
 
@@ -79,11 +83,12 @@ async function readJson(file, fallback) {
 // Replace the bundle's placeholder command with the shim just written. The
 // client copies an installed plugin into a cache of its own, so the command has
 // to be absolute: a path relative to the bundle would not survive the copy.
+const shellLiteral = value => `'${String(value).replaceAll("'", "'\\''")}'`;
 const withShim = (wiring, shim) => ({ ...wiring, hooks: Object.fromEntries(
   Object.entries(wiring.hooks).map(([event, entries]) => [event, entries.map(entry => ({
     ...entry,
     hooks: entry.hooks.map(hook => ({ ...hook,
-      command: `sh "${shim}" ${hook.command.split(" ").pop()}` })),
+      command: `sh ${shellLiteral(shim)} ${hook.command.split(" ").pop()}` })),
   }))])) });
 
 const writeJson = async (file, value) => {
@@ -149,7 +154,7 @@ const declaresSandbox = config =>
   || /^\s*sandbox_workspace_write\s*[.=]/m.test(config);
 
 export async function installCodexPlugin({ home, agentsHome = home,
-  codexHome = path.join(home, ".codex"), stateRoot, runner, node }) {
+  codexHome = path.join(home, ".codex"), dataHome, stateRoot, runner, node }) {
   // Read before writing, so a manifest that will not parse is found before a
   // plugin tree is laid down that nothing will then be able to remove.
   const existing = await readJson(marketplacePath(agentsHome), { name: MARKETPLACE,
@@ -167,7 +172,8 @@ export async function installCodexPlugin({ home, agentsHome = home,
   // The skill ships with a placeholder where the command belongs: `acc` is
   // not on PATH everywhere, and an agent that cannot run it improvises.
   await bakeSkillCommand({ root: target, node });
-  const shim = await writeHookShim({ dir: target, adapterId: "codex", runner, node });
+  const shim = await writeHookShim({ dir: target, adapterId: "codex",
+    dataHome, runner, node });
   await writeJson(path.join(target, "hooks.json"),
     withShim(await readJson(path.join(bundle, "hooks.json"), { hooks: {} }), shim));
 

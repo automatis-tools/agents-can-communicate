@@ -10,7 +10,21 @@ import { EXIT } from "@agents-can-communicate/protocol";
 import { PassThrough } from "node:stream";
 
 import { askConfirmation } from "../src/confirm.mjs";
-import { decideDelivery, runInstallCommand } from "../src/install-command.mjs";
+import { clientContext, decideDelivery, runInstallCommand } from "../src/install-command.mjs";
+
+// Kept cohesive above 300 lines because each case drives the same installer
+// command boundary and machine-home fixture; splitting would duplicate consent,
+// ownership, and reporting setup while hiding their round-trip behavior.
+
+test("the Codex home respects an explicit CODEX_HOME and otherwise follows the supplied home", () => {
+  assert.equal(clientContext("/supplied/home", "/state", {
+    env: { HOME: "/ambient/home", CODEX_HOME: "/explicit/codex" } }).codexHome,
+  "/explicit/codex");
+  assert.equal(clientContext("/supplied/home", "/state", {
+    env: { HOME: "/ambient/home" } }).codexHome, "/supplied/home/.codex");
+  assert.equal(clientContext("/supplied/home", "/state", {
+    env: { CODEX_HOME: "" } }).codexHome, "/supplied/home/.codex");
+});
 
 /**
  * The command's own wiring.

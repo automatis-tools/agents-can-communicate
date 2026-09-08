@@ -13,17 +13,23 @@ import { AccError, EXIT } from "@agents-can-communicate/protocol";
 
 import { platformPaths } from "./platform-paths.mjs";
 
+// Kept cohesive above 300 lines because this is the install command boundary:
+// detection, consent, planning, application, and reporting share one context
+// and result contract that would otherwise be duplicated across modules.
+
 // Where each client keeps its own configuration. All of it derives from one
 // home, so a test - or an operator with a second account - can point the whole
 // installation somewhere else in one move.
 // Each client keeps its own directory under the user's home, and an adapter
 // pointed at the home itself writes beside them rather than inside them. That
 // install reports success and the client never reads a byte of it.
-export const clientContext = (home, stateRoot, { shell = null, env = {} } = {}) => ({
+export const clientContext = (home, stateRoot, { shell = null, env = {}, dataHome } = {}) => ({
   home,
+  ...(dataHome === undefined ? {} : { dataHome }),
   configDir: path.join(home, ".claude"),
   agentsHome: home,
-  codexHome: path.join(home, ".codex"),
+  codexHome: typeof env.CODEX_HOME === "string" && env.CODEX_HOME !== ""
+    ? env.CODEX_HOME : path.join(home, ".codex"),
   kimiHome: path.join(home, ".kimi-code"),
   grokHome: path.join(home, ".grok"),
   // The user's login shell and PATH, for the optional native shell bootstrap:
@@ -293,7 +299,7 @@ export async function runInstallCommand({ options, runtime, action = "install" }
   const { data: dataHome } = platformPaths({ platform: runtime.platform,
     env: runtime.env ?? {} });
   const context = clientContext(home, path.join(dataHome, "acc"),
-    { shell: shellOf(runtime.env), env: runtime.env ?? {} });
+    { shell: shellOf(runtime.env), env: runtime.env ?? {}, dataHome });
 
   const detected = await detectInstallation({ adapters, context,
     probeTimeoutMs: probeTimeout(runtime.env) });
