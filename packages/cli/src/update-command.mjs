@@ -26,6 +26,9 @@ export const upgradeSteps = version => [
 const spell = ([command, argv]) => `  ${command} ${argv.join(" ")}`;
 
 export async function runUpdateCommand({ options, runtime }) {
+  if (options.check === true && options.apply === true) {
+    throw new AccError(EXIT.USAGE, "use either --check or --apply");
+  }
   const env = runtime.env ?? {};
   const { data: dataHome } = platformPaths({ platform: runtime.platform, env });
   const running = typeof runtime.version === "function"
@@ -61,9 +64,9 @@ export async function runUpdateCommand({ options, runtime }) {
   const data = { checked: true, running, latest, newer: true,
     steps: steps.map(([command, argv]) => [command, ...argv].join(" ")) };
 
-  if (options.apply !== true) {
+  if (options.check === true) {
     return { data, text: [`acc ${latest} is available; you have ${running}`, "",
-      ...steps.map(spell), "", "or run: acc update --apply"].join("\n") };
+      ...steps.map(spell), "", "or run: acc update"].join("\n") };
   }
 
   const spawn = runtime.spawn ?? ((command, argv) => execFileAsync(command, argv, { env }));

@@ -45,7 +45,7 @@ const SUMMARY = Object.freeze({
   detach: "close a session",
   help: "list commands, or inspect one with acc help <command>",
   version: "print the version that is installed",
-  update: "ask npm whether a newer acc exists; --apply installs it",
+  update: "install a newer acc and refresh clients; --check only reports",
 });
 
 /** The same list `acc help --json` returns, so a tool can read it too. */
@@ -102,6 +102,9 @@ const NOTES = Object.freeze({
   finish: ["Default status: partial. Records a handoff, releases claims, and closes this ACC session."],
   config: ["init writes optional workspace configuration; validate only checks it.",
     "Use acc config <subcommand> --help for its options."],
+  update: ["Run acc update to install the latest release and refresh client integrations.",
+    "Use acc update --check to only report whether a newer release exists.",
+    "--apply remains accepted as a compatibility alias for acc update."],
 });
 
 const CONFIG_HELP = Object.freeze({

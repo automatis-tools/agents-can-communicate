@@ -23,18 +23,19 @@ test("installed update reports failed steps as failures and preserves successful
       + (command === "acc" ? 'console.log("ACTIVATION_SENTINEL: trust the refreshed hooks, then restart the client");\n' : ''),
     { mode: 0o755 });
   }
-  const invoke = async (failure, json = true) => {
+  const invoke = async ({ args = [], failure = "", json = true } = {}) => {
     await writeFile(trace, "");
     const env = { ...p.env, PATH: bin, ACC_NO_UPDATE_CHECK: "0",
       ACC_UPDATE_TRACE: trace, ACC_UPDATE_FAIL: failure };
-    const argv = ["--import", bootstrap, p.accBin, "update", "--apply", ...(json ? ["--json"] : [])];
+    const argv = ["--import", bootstrap, p.accBin, "update", ...args,
+      ...(json ? ["--json"] : [])];
     const result = await run(process.execPath, argv, { env, cwd: p.project })
       .then(output => ({ code: 0, ...output }), e => ({ code: e.code, stdout: e.stdout, stderr: e.stderr }));
     const calls = (await readFile(trace, "utf8")).trim().split("\n").filter(Boolean).map(JSON.parse);
     return { ...result, calls, response: json ? JSON.parse(result.stdout) : null };
   };
   for (const failedStep of ["npm", "acc"]) {
-    const result = await invoke(failedStep);
+    const result = await invoke({ args: ["--apply"], failure: failedStep });
     assert.equal(result.code, 4, `${failedStep} failed but update exited successfully`);
     assert.equal(result.response.ok, false);
     assert.match(result.response.error.message, /fixture step refused/);
@@ -43,21 +44,33 @@ test("installed update reports failed steps as failures and preserves successful
     assert.deepEqual(result.calls.map(c => c.command), failedStep === "npm" ? ["npm"] : ["npm", "acc"]);
     assert.doesNotMatch(result.stdout, /updated to 99\.0\.0/);
   }
-  const failedHuman = await invoke("acc", false);
+  const failedHuman = await invoke({ args: ["--apply"], failure: "acc", json: false });
   assert.equal(failedHuman.code, 4);
   assert.match(failedHuman.stderr, /fixture step refused/);
   assert.match(failedHuman.stderr, /finish it with:\n  acc install/);
   assert.doesNotMatch(failedHuman.stderr, /finish it with:\n  npm/);
-  const success = await invoke("");
-  assert.equal(success.code, 0);
-  assert.equal(success.response.ok, true);
-  assert.match(success.response.data.installation.stdout, /ACTIVATION_SENTINEL/);
-  assert.match(success.response.data.activation, /Restart all running agent clients/);
-  assert.deepEqual(success.calls, [
+  const applied = await invoke();
+  assert.equal(applied.code, 0);
+  assert.equal(applied.response.ok, true);
+  assert.deepEqual(applied.calls.map(call => call.command), ["npm", "acc"]);
+  assert.match(applied.response.data.installation.stdout, /ACTIVATION_SENTINEL/);
+  assert.match(applied.response.data.activation, /Restart all running agent clients/);
+  assert.deepEqual(applied.calls, [
     { command: "npm", args: ["install", "--global", "agents-can-communicate@99.0.0"] },
     { command: "acc", args: ["install"] },
   ]);
-  const human = await invoke("", false);
+  const checked = await invoke({ args: ["--check"] });
+  assert.equal(checked.code, 0);
+  assert.equal(checked.response.ok, true);
+  assert.equal(checked.response.data.newer, true);
+  assert.deepEqual(checked.calls, []);
+
+  const conflicting = await invoke({ args: ["--check", "--apply"] });
+  assert.equal(conflicting.code, 2);
+  assert.equal(conflicting.response.ok, false);
+  assert.deepEqual(conflicting.calls, []);
+
+  const human = await invoke({ json: false });
   assert.equal(human.code, 0);
   assert.match(human.stdout, /ACTIVATION_SENTINEL/);
   assert.match(human.stdout, /restart/i);
