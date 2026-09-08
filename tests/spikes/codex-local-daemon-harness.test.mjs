@@ -216,6 +216,32 @@ test("owned-tool setup failures remove the allocated root and close the receipt"
   assert.equal(JSON.parse(await readFile(path.join(output, "incomplete-evidence.json"), "utf8")).complete, false);
 });
 
+test("root canonicalization failures remove the earliest owned allocation and close the receipt", async t => {
+  const root = await fixture(t);
+  const tarball = path.join(root, "candidate.tgz");
+  const output = path.join(root, "output");
+  await writeFile(tarball, "fixture");
+  let allocatedRoot;
+  t.after(() => allocatedRoot && rm(allocatedRoot, { recursive: true, force: true }));
+  const error = await createMachine({ tarball, codex: "/bin/sh", phase: "transport", output,
+    resolveRoot: async rawRoot => {
+      allocatedRoot = rawRoot;
+      throw new Error("controlled root canonicalization failure");
+    } }).then(() => assert.fail("root canonicalization should fail"), value => value);
+  assert.match(error.message, /controlled root canonicalization failure/);
+  assert.equal(error.harness.version, null);
+  assert.equal(error.harness.packageSha256, null);
+  assert.deepEqual(error.harness.cleanup, { attempted: true, outcome: "passed",
+    ownedProcesses: "stopped", temporaryState: "removed" });
+  await assert.rejects(access(allocatedRoot), item => item?.code === "ENOENT");
+  const result = await finalizeHarnessRun({ setupFailure: error.harness, output,
+    startedAt: "2026-09-08T00:00:00.000Z", failed: true,
+    failure: { stage: "setup-or-scenario", error: error.message }, validate: () => {} });
+  assert.equal(result.complete, false);
+  assert.deepEqual(result.cleanup, error.harness.cleanup);
+  assert.equal(JSON.parse(await readFile(path.join(output, "incomplete-evidence.json"), "utf8")).complete, false);
+});
+
 test("scenario equality emits closed mismatch reasons and retains named assertions", () => {
   const h = { phase: "product", version: "0.153.4", packageSha256: "a".repeat(64), roles: {}, scenarios: [] };
   const unnamed = scenario(h, "P08");

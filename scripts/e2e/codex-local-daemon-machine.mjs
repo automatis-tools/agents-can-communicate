@@ -38,7 +38,8 @@ export async function until(label, read, { timeoutMs = 90_000, intervalMs = 300 
   throw new Error(`deadline: ${label}`);
 }
 
-export async function createMachine({ tarball, codex, phase, output, prepareTools = prepareOwnedTools }) {
+export async function createMachine({ tarball, codex, phase, output, prepareTools = prepareOwnedTools,
+  resolveRoot = realpath }) {
   for (const value of [tarball, codex, output]) assert.ok(path.isAbsolute(value), "explicit absolute path required");
   assert.ok(["transport", "product"].includes(phase), "unknown phase");
   const [python, npm] = await Promise.all([resolveExecutable("python3"), resolveExecutable("npm")]);
@@ -54,8 +55,8 @@ export async function createMachine({ tarball, codex, phase, output, prepareTool
       attempted: true, outcome: "passed", ownedProcesses: "stopped", temporaryState: "removed" } };
     throw error;
   }
-  const root = await realpath(await mkdtemp(path.join(os.tmpdir().startsWith("/var/") ? "/tmp" : os.tmpdir(), "cx-e2e-")));
-  const h = { root, codex, phase, output, tarball, version: null, packageSha256: null,
+  const rawRoot = await mkdtemp(path.join(os.tmpdir().startsWith("/var/") ? "/tmp" : os.tmpdir(), "cx-e2e-"));
+  const h = { root: rawRoot, codex, phase, output, tarball, version: null, packageSha256: null,
     roles: {}, daemonStarted: false, cleanupDone: false };
   h.cleanup = async () => {
     if (h.cleanupResult) return h.cleanupResult;
@@ -87,13 +88,15 @@ export async function createMachine({ tarball, codex, phase, output, prepareTool
           .catch(() => { processes = false; });
       }
     }
-    await rm(root, { recursive: true, force: true }).catch(() => { state = false; });
+    await rm(h.root, { recursive: true, force: true }).catch(() => { state = false; });
     h.cleanupDone = processes && state;
     h.cleanupResult = { attempted: true, outcome: h.cleanupDone ? "passed" : "failed",
       ownedProcesses: processes ? "stopped" : "failed", temporaryState: state ? "removed" : "failed" };
     return h.cleanupResult;
   };
   try {
+    const root = await resolveRoot(rawRoot);
+    h.root = root;
     h.home = path.join(root, "user"); h.codexHome = path.join(root, "cx");
     h.dataHome = path.join(root, "data"); h.prefix = path.join(root, "prefix with spaces");
     h.toolDir = path.join(root, "owned-tools");
