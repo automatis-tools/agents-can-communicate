@@ -36,8 +36,9 @@ const descriptor = await discoverWorkspace({
   env: process.env,
   gitProbe: createGitProbe(),
 });
+const dataHome = platformDataHome({ platform: process.platform, env: process.env });
 const paths = runtimePaths({
-  dataHome: platformDataHome({ platform: process.platform, env: process.env }),
+  dataHome,
   workspaceId: descriptor.id,
   workspaceRoots: descriptor.roots,
 });
