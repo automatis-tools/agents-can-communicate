@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
-import { chmod, mkdir, mkdtemp, readFile, realpath, rm, writeFile } from "node:fs/promises";
+import { access, chmod, mkdir, mkdtemp, readFile, realpath, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -12,6 +12,10 @@ import { buildClientEnvironment, createPtyDriver, prerequisiteChecks,
   from "../../scripts/e2e/codex-local-daemon-harness.mjs";
 import { migrationEnvironments }
   from "../../scripts/e2e/codex-local-daemon-migration.mjs";
+import { createMachine }
+  from "../../scripts/e2e/codex-local-daemon-machine.mjs";
+import { scenario }
+  from "../../scripts/e2e/codex-local-daemon-observations.mjs";
 import { finalizeHarnessRun }
   from "../../scripts/e2e/codex-local-daemon-runner.mjs";
 
@@ -184,4 +188,42 @@ test("setup prerequisite failures still write closed incomplete evidence", async
   assert.deepEqual(result.cleanup, cleanup);
   assert.equal(result.failure.stage, "setup-or-scenario");
   assert.equal(JSON.parse(await readFile(path.join(output, "incomplete-evidence.json"), "utf8")).complete, false);
+});
+
+test("owned-tool setup failures remove the allocated root and close the receipt", async t => {
+  const root = await fixture(t);
+  const tarball = path.join(root, "candidate.tgz");
+  const output = path.join(root, "output");
+  await writeFile(tarball, "fixture");
+  let allocatedRoot;
+  t.after(() => allocatedRoot && rm(allocatedRoot, { recursive: true, force: true }));
+  const error = await createMachine({ tarball, codex: "/bin/sh", phase: "transport", output,
+    prepareTools: async ({ toolDir }) => {
+      allocatedRoot = path.dirname(toolDir);
+      throw new Error("controlled owned-tool setup failure");
+    } }).then(() => assert.fail("owned tool setup should fail"), value => value);
+  assert.match(error.message, /controlled owned-tool setup failure/);
+  assert.equal(error.harness.version, null);
+  assert.match(error.harness.packageSha256, /^[a-f0-9]{64}$/);
+  assert.deepEqual(error.harness.cleanup, { attempted: true, outcome: "passed",
+    ownedProcesses: "stopped", temporaryState: "removed" });
+  await assert.rejects(access(allocatedRoot), item => item?.code === "ENOENT");
+  const result = await finalizeHarnessRun({ setupFailure: error.harness, output,
+    startedAt: "2026-09-08T00:00:00.000Z", failed: true,
+    failure: { stage: "setup-or-scenario", error: error.message }, validate: () => {} });
+  assert.equal(result.complete, false);
+  assert.deepEqual(result.cleanup, error.harness.cleanup);
+  assert.equal(JSON.parse(await readFile(path.join(output, "incomplete-evidence.json"), "utf8")).complete, false);
+});
+
+test("scenario equality emits closed mismatch reasons and retains named assertions", () => {
+  const h = { phase: "product", version: "0.153.4", packageSha256: "a".repeat(64), roles: {}, scenarios: [] };
+  const unnamed = scenario(h, "P08");
+  assert.throws(() => unnamed.equal("actual-sentinel", "expected-sentinel"), error =>
+    error?.message === "scenario P08 assertion 1 failed: deep equality mismatch"
+      && !error.message.includes("actual-sentinel") && !error.message.includes("expected-sentinel"));
+  const named = scenario(h, "T01");
+  assert.throws(() => named.equal("actual-sentinel", "expected-sentinel", "same Codex thread must reject A cwd"), error =>
+    error?.message === "scenario T01 assertion 1 failed: same Codex thread must reject A cwd"
+      && !error.message.includes("actual-sentinel") && !error.message.includes("expected-sentinel"));
 });

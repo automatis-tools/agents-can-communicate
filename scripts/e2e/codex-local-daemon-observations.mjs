@@ -14,7 +14,14 @@ export function scenario(h, caseId) {
   return { record, check(condition, message) {
     record.assertionCount += 1; assert.ok(condition, message);
   }, equal(actual, expected, message) {
-    record.assertionCount += 1; assert.deepEqual(actual, expected, message);
+    const index = ++record.assertionCount;
+    const detail = typeof message === "string" && message !== "" ? message : "deep equality mismatch";
+    try {
+      if (message === undefined) assert.deepEqual(actual, expected);
+      else assert.deepEqual(actual, expected, message);
+    } catch {
+      throw new Error(`scenario ${caseId} assertion ${index} failed: ${detail}`);
+    }
   }, fact(kind, outcome, actor = "receiver-b1", target = null) {
     record.observations.push({ kind, at: new Date().toISOString(), actor, target, outcome });
   }, finish() {

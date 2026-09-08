@@ -38,28 +38,25 @@ export async function until(label, read, { timeoutMs = 90_000, intervalMs = 300 
   throw new Error(`deadline: ${label}`);
 }
 
-export async function createMachine({ tarball, codex, phase, output }) {
+export async function createMachine({ tarball, codex, phase, output, prepareTools = prepareOwnedTools }) {
   for (const value of [tarball, codex, output]) assert.ok(path.isAbsolute(value), "explicit absolute path required");
   assert.ok(["transport", "product"].includes(phase), "unknown phase");
   const [python, npm] = await Promise.all([resolveExecutable("python3"), resolveExecutable("npm")]);
   try { await prerequisiteChecks({ tarball, codex, python }); }
   catch (error) {
-    error.harness = { phase, scenarios: [], cleanup: { attempted: true, outcome: "passed",
+    error.harness = { phase, version: null, packageSha256: null, scenarios: [], cleanup: { attempted: true, outcome: "passed",
       ownedProcesses: "stopped", temporaryState: "removed" } };
     throw error;
   }
-  if (npm === null) throw new Error("prerequisite: npm unavailable");
+  if (npm === null) {
+    const error = new Error("prerequisite: npm unavailable");
+    error.harness = { phase, version: null, packageSha256: null, scenarios: [], cleanup: {
+      attempted: true, outcome: "passed", ownedProcesses: "stopped", temporaryState: "removed" } };
+    throw error;
+  }
   const root = await realpath(await mkdtemp(path.join(os.tmpdir().startsWith("/var/") ? "/tmp" : os.tmpdir(), "cx-e2e-")));
-  const h = { root, codex, phase, output, tarball, roles: {}, daemonStarted: false, cleanupDone: false };
-  h.home = path.join(root, "user"); h.codexHome = path.join(root, "cx");
-  h.dataHome = path.join(root, "data"); h.prefix = path.join(root, "prefix with spaces");
-  h.toolDir = path.join(root, "owned-tools");
-  h.A = path.join(root, "A"); h.B = path.join(root, "B receiver with spaces"); h.C = path.join(root, "C");
-  h.packageSha256 = sha256(await readFile(tarball));
-  await prepareOwnedTools({ toolDir: h.toolDir, npm, python });
-  h.env = buildClientEnvironment({ inherited: process.env, codex, toolDir: h.toolDir,
-    home: h.home, codexHome: h.codexHome });
-  h.accEnv = { ...h.env, ACC_DATA_HOME: h.dataHome, ACC_UPDATE_CHECK: "0" };
+  const h = { root, codex, phase, output, tarball, version: null, packageSha256: null,
+    roles: {}, daemonStarted: false, cleanupDone: false };
   h.cleanup = async () => {
     if (h.cleanupResult) return h.cleanupResult;
     let processes = true;
@@ -97,6 +94,15 @@ export async function createMachine({ tarball, codex, phase, output }) {
     return h.cleanupResult;
   };
   try {
+    h.home = path.join(root, "user"); h.codexHome = path.join(root, "cx");
+    h.dataHome = path.join(root, "data"); h.prefix = path.join(root, "prefix with spaces");
+    h.toolDir = path.join(root, "owned-tools");
+    h.A = path.join(root, "A"); h.B = path.join(root, "B receiver with spaces"); h.C = path.join(root, "C");
+    h.packageSha256 = sha256(await readFile(tarball));
+    await prepareTools({ toolDir: h.toolDir, npm, python });
+    h.env = buildClientEnvironment({ inherited: process.env, codex, toolDir: h.toolDir,
+      home: h.home, codexHome: h.codexHome });
+    h.accEnv = { ...h.env, ACC_DATA_HOME: h.dataHome, ACC_UPDATE_CHECK: "0" };
     for (const dir of [h.home, h.codexHome, h.dataHome, h.A, h.B, h.C, output]) await mkdir(dir, { recursive: true });
     const auth = path.join(os.homedir(), ".codex", "auth.json");
     await stat(auth); // Existence only; credentials are never read into the harness.
@@ -157,7 +163,7 @@ export async function createMachine({ tarball, codex, phase, output }) {
   } catch (error) {
     const cleanup = await h.cleanup().catch(() => ({ attempted: true, outcome: "failed",
       ownedProcesses: "failed", temporaryState: "failed" }));
-    error.harness = { phase, version: h.version ?? null, packageSha256: h.packageSha256,
+    error.harness = { phase, version: h.version, packageSha256: h.packageSha256,
       scenarios: h.scenarios ?? [], cleanup };
     throw error;
   }
