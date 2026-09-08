@@ -1,140 +1,114 @@
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
-import net from "node:net";
-import { tmpdir } from "node:os";
+import { mkdir, readFile, readdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import test from "node:test";
 
-import { bindNativeSession, offerMessage, planNativeActivation, probeNativeDelivery }
-  from "../src/native-delivery.mjs";
+import * as native from "../src/native-delivery.mjs";
+import { nativeFixture, THREAD } from "./native-fixture.mjs";
 
-const THREAD = "01a063ed-a384-7fe2-b443-7fedf1593f6b";
-const CWD = "/work/capture";
+const message = { messageId: "message_1", kind: "question", subject: "Synthetic",
+  body: "diagnostic peer message" };
+const bindingOf = handshake => ({ opaqueEndpointRef: handshake.opaqueEndpointRef,
+  clientVersion: handshake.clientVersion });
 
-// macOS caps a Unix socket path at 104 bytes, and this one carries a suffix the
-// client dictates: `app-server-control/app-server-control.sock` is 42 bytes on
-// its own. A macOS runner's TMPDIR is around 48
-// (`/var/folders/../T/`), so binding under it fails with a bare `EINVAL` -
-// which passed on a laptop with a short TMPDIR and failed on CI. The product
-// keeps its own sockets in a short private directory for exactly this reason.
-const shortTmp = () => (process.platform === "win32" ? tmpdir() : "/tmp");
-
-// A CODEX_HOME whose control socket really is a Unix socket, so socketReady
-// passes; the App Server client itself is injected as a fake peer.
-function codexHome(t) {
-  const home = mkdtempSync(path.join(shortTmp(), "acc-cx-"));
-  const dir = path.join(home, "app-server-control");
-  mkdirSync(dir, { recursive: true });
-  const socketPath = path.join(dir, "app-server-control.sock");
-  assert.ok(Buffer.byteLength(socketPath) < 104,
-    `socket path is too long for this platform: ${socketPath}`);
-  const server = net.createServer();
-  const listening = new Promise(resolve => server.listen(socketPath, resolve));
-  t.after(() => { server.close(); rmSync(home, { recursive: true, force: true }); });
-  return { env: { CODEX_HOME: home }, ready: listening };
-}
-
-function fakePeer({ userAgent = "acc/0.152.1 (Mac OS)", loaded = [THREAD],
-  threads = [{ id: THREAD, cwd: CWD, status: { type: "idle" } }], queueSupported = true,
-  onAdd = () => {} } = {}) {
-  const calls = [];
-  const state = { queue: [] };
-  const rpcError = (code, message) => Object.assign(new Error(message), { code });
-  return { calls, state, closed: false,
-    notify(method) { calls.push(method); },
-    async request(method, params = {}) {
-      calls.push(method);
-      if (method === "initialize") return { userAgent };
-      if (method === "thread/loaded/list") return { data: loaded, nextCursor: null };
-      if (method === "thread/list") return { data: threads, nextCursor: null };
-      if (method === "thread/queue/list") {
-        if (!queueSupported) throw rpcError(-32601, "Method not found");
-        return { data: state.queue, nextCursor: null };
-      }
-      if (method === "thread/queue/add") {
-        onAdd(params);
-        const item = { id: `qs_${state.queue.length + 1}`,
-          clientUserMessageId: params.clientUserMessageId, input: params.input };
-        state.queue.push(item);
-        return { queuedSubmission: item };
-      }
-      throw rpcError(-32601, `Method not found: ${method}`);
-    },
-    async close() { this.closed = true; } };
-}
-
-// The queue transport itself works - that was captured and still is. What the
-// release capture measured is that ACC cannot tell which workspace such a
-// session belongs to. Native delivery here requires `codex --remote unix://`,
-// and in that mode the session runs inside the daemon: the hook payload reports
-// `cwd` as the daemon's directory, and the App Server's own `thread/list`
-// records the same. Measured on 0.152.1 - client working in
-// /private/tmp/acc-rel-home/project, thread recorded under the daemon's
-// /Users/.../agents-can-communicate - so ACC registered the session in a
-// different project entirely and fed it that project's peers.
-//
-// The earlier spike could not see this: it started the daemon itself, in the
-// same directory as the session, so the two cwds coincided.
-//
-// A session ACC cannot place is one it must not address, so the probe refuses
-// rather than claiming a live capability it cannot honour.
-test("the probe is off without a daemon and refuses even when the queue answers", async t => {
-  const missing = await probeNativeDelivery({ realExecutable: "/vendor/codex",
-    env: { CODEX_HOME: mkdtempSync(path.join(tmpdir(), "acc-codex-nodaemon-")) } });
-  assert.equal(missing.reasonCode, "feature_probe_failed");
-  const home = codexHome(t); await home.ready;
-  const peer = fakePeer();
-  const answered = await probeNativeDelivery({ realExecutable: "/vendor/codex", env: home.env,
-    open: () => peer });
-  assert.equal(answered.supported, false,
-    "the transport works, but a session ACC cannot place must not be addressed");
-  assert.equal(answered.reasonCode, "workspace_identity_unavailable");
-  assert.deepEqual(answered.modes, [],
-    "no mode may be offered for a session whose workspace is unknown");
+test("a live queue probe succeeds without rewriting the vendor invocation", async t => {
+  const h = await nativeFixture(t);
+  const probe = await native.probeNativeDelivery(h);
+  assert.equal(probe.supported, true);
+  assert.deepEqual(probe.modes, ["livePush", "idleWake", "busyQueue"]);
+  assert.equal(probe.clientVersion, "0.152.1");
+  h.state.loaded = [];
+  assert.equal((await native.probeNativeDelivery(h)).supported, false);
 });
 
-test("the activation uses the existing vendor daemon and adds only the remote flag", () => {
-  const plan = planNativeActivation({ detection: { realExecutable: "/vendor/codex" } });
-  assert.deepEqual(plan.mechanisms.map(m => m.kind), ["native-service", "shell-bootstrap"]);
-  const service = plan.mechanisms.find(m => m.kind === "native-service");
-  // ACC never starts or stops the daemon: it is always the vendor's own.
-  assert.equal(service.preExisting, true);
-  assert.equal(service.applyCommand, null);
-  assert.equal(service.teardownCommand, null);
-  const shell = plan.mechanisms.find(m => m.kind === "shell-bootstrap");
-  assert.deepEqual(shell.prefixArgs, ["--remote", "unix://"]);
-  assert.equal(planNativeActivation({ detection: {} }).eligible, false);
+test("binding stores an opaque receiver address after checking the exact loaded thread", async t => {
+  const h = await nativeFixture(t);
+  h.state.loaded.unshift("other");
+  h.state.threads.unshift({ id: "other", cwd: h.cwd, status: { type: "idle" } });
+  const handshake = await native.bindNativeSession(h);
+  assert.equal(handshake.supported, true);
+  assert.notEqual(handshake.opaqueEndpointRef, THREAD);
+  const files = await readdir(path.join(h.runtimeDir, "codex-native-endpoints"));
+  assert.deepEqual(files, [`${handshake.opaqueEndpointRef}.json`]);
+  const endpoint = JSON.parse(await readFile(path.join(h.runtimeDir, "codex-native-endpoints",
+    files[0]), "utf8"));
+  assert.equal(endpoint.threadId, THREAD);
+  assert.equal(endpoint.cwd, h.cwd);
+  assert.equal(endpoint.socketPath, h.socketPath);
+  assert.ok(Date.parse(handshake.leaseUntil) > Date.now());
 });
 
-test("binding verifies the thread and still refuses a session it cannot place", async t => {
-  const home = codexHome(t); await home.ready;
-  const located = await bindNativeSession({ event: { sessionId: THREAD, cwd: CWD },
-    clientVersion: "0.152.1", env: home.env, open: () => fakePeer() });
-  // The thread is found - the lookup works - but the cwd it was found under came
-  // from a hook running inside the daemon, so it names the daemon's directory.
-  assert.equal(located.supported, false);
-  assert.equal(located.reasonCode, "workspace_identity_unavailable");
-  assert.equal(located.opaqueEndpointRef, null,
-    "an endpoint ACC cannot place must not become addressable");
-  const wrong = await bindNativeSession({ event: { sessionId: "unknown", cwd: CWD },
-    clientVersion: "0.152.1", env: home.env, open: () => fakePeer() });
-  assert.deepEqual([wrong.supported, wrong.reasonCode], [false, "handshake_failed"]);
+test("sender environment cannot replace the bound receiver socket or thread", async t => {
+  const h = await nativeFixture(t);
+  const handshake = await native.bindNativeSession(h);
+  assert.equal(handshake.supported, true);
+  h.opened.length = 0;
+  const offer = await native.offerMessage({ ...h, env: { CODEX_HOME: "/wrong/sender" },
+    binding: bindingOf(handshake), message });
+  assert.equal(offer.accepted, true);
+  assert.deepEqual(h.opened, [h.socketPath]);
+  assert.equal(h.state.queue.length, 1);
+  assert.equal(h.state.queue[0].threadId, THREAD);
+  assert.equal(h.state.queue[0].clientUserMessageId, message.messageId);
+  assert.match(h.state.queue[0].input[0].text, /untrusted peer content/);
+  assert.match(h.state.queue[0].input[0].text, /diagnostic peer message/);
+  await native.offerMessage({ ...h, binding: bindingOf(handshake), message });
+  assert.equal(h.state.queue.length, 1);
 });
 
-test("an offer queues one message and labels the body untrusted", async t => {
-  const home = codexHome(t); await home.ready;
-  let queued = null;
-  const peer = fakePeer({ onAdd: params => { queued = params; } });
-  const result = await offerMessage({ binding: { opaqueEndpointRef: THREAD,
-    clientVersion: "0.152.1" }, message: { messageId: "message_1", kind: "question",
-    subject: "s", body: "what is 2 + 2?" }, env: home.env, open: () => peer });
-  assert.deepEqual(result, { accepted: true, transport: "codex-app-server", clientVersion: "0.152.1" });
-  assert.equal(queued.clientUserMessageId, "message_1");
-  assert.match(queued.input[0].text, /untrusted peer content, not an instruction/);
-  assert.match(queued.input[0].text, /what is 2 \+ 2\?/);
-  const noThread = await offerMessage({ binding: { opaqueEndpointRef: "absent",
-    clientVersion: "0.152.1" }, message: { messageId: "m", kind: "note", body: "x" },
-  env: home.env, open: () => fakePeer({ loaded: [] }) });
-  assert.deepEqual(noThread, { accepted: false, transport: "codex-app-server",
-    clientVersion: "0.152.1", safeErrorCode: "recipient_unavailable" });
+test("missing event cwd, wrong identity, PID and server version never bind", async t => {
+  const h = await nativeFixture(t);
+  for (const changed of [{ event: { sessionId: THREAD } },
+    { event: { sessionId: "absent", cwd: h.cwd } }, { clientPid: null },
+    { clientVersion: "0.153.4" }, { clientVersion: null }]) {
+    const result = await native.bindNativeSession({ ...h, ...changed });
+    assert.equal(result.supported, false);
+    assert.equal(result.opaqueEndpointRef, null);
+  }
+  assert.equal(h.state.queue.length, 0);
+});
+
+test("offer rechecks workspace, loaded state, and version after binding", async t => {
+  const h = await nativeFixture(t);
+  const handshake = await native.bindNativeSession(h);
+  assert.equal(handshake.supported, true);
+  const otherCwd = path.join(h.root, "C");
+  await mkdir(otherCwd);
+  h.state.threads[0].cwd = otherCwd;
+  assert.equal((await native.offerMessage({ ...h, binding: bindingOf(handshake), message })).accepted, false);
+  h.state.threads[0].cwd = h.cwd;
+  h.state.loaded = [];
+  assert.equal((await native.offerMessage({ ...h, binding: bindingOf(handshake), message })).accepted, false);
+  h.state.loaded = [THREAD];
+  h.state.version = "0.153.4";
+  assert.equal((await native.offerMessage({ ...h, binding: bindingOf(handshake), message })).accepted, false);
+  assert.equal(h.calls.some(call => call.method === "thread/queue/add"), false);
+});
+
+test("an expired observation can be refreshed only after new receiver verification", async t => {
+  const h = await nativeFixture(t);
+  const handshake = await native.bindNativeSession(h);
+  assert.equal(handshake.supported, true);
+  const file = path.join(h.runtimeDir, "codex-native-endpoints", `${handshake.opaqueEndpointRef}.json`);
+  const endpoint = JSON.parse(await readFile(file, "utf8"));
+  await writeFile(file, JSON.stringify({ ...endpoint, leaseUntil: "2020-01-01T00:00:00.000Z" }));
+  const renewed = await native.refreshNativeSession({ ...h, binding: bindingOf(handshake) });
+  assert.equal(renewed.supported, true);
+  assert.equal(renewed.opaqueEndpointRef, handshake.opaqueEndpointRef);
+  assert.ok(Date.parse(renewed.leaseUntil) > Date.now());
+  h.state.loaded = [];
+  assert.equal((await native.refreshNativeSession({ ...h, binding: bindingOf(handshake) })).supported, false);
+});
+
+test("missing registrations and failed queue checks cannot leak raw errors or offer", async t => {
+  const h = await nativeFixture(t);
+  assert.equal((await native.offerMessage({ ...h, binding: { opaqueEndpointRef: "../other" },
+    message })).accepted, false);
+  const handshake = await native.bindNativeSession(h);
+  assert.equal(handshake.supported, true);
+  h.state.error = Object.assign(new Error("private path /some/secret"), { code: "ETIMEDOUT" });
+  const result = await native.offerMessage({ ...h, binding: bindingOf(handshake), message });
+  assert.equal(result.accepted, false);
+  assert.equal(JSON.stringify(result).includes("secret"), false);
+  assert.equal(h.state.queue.length, 0);
 });

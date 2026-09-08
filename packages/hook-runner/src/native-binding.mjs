@@ -1,5 +1,6 @@
 import { validateNativeHandshake } from "@agents-can-communicate/adapter-sdk";
 import { EXIT } from "@agents-can-communicate/protocol";
+import { retireNativeBinding } from "./native-retirement.mjs";
 
 // The hook side of native delivery: one bounded, fail-open attempt to bind
 // this exact ACC session generation to the vendor session the adapter can
@@ -37,7 +38,7 @@ export async function establishNativeBinding({ adapter, event, hookBinding, clie
   const generation = hookBinding?.generation;
   if (typeof sessionId !== "string" || typeof generation !== "string") return outcome("off", null);
   const policy = LIVE_POLICIES.includes(livePolicy) ? livePolicy : "off";
-  const clear = () => service.clearDeliveryBinding({ sessionId, generation }).catch(() => null);
+  const clear = () => retireNativeBinding({ adapter, service, sessionId, generation, runtimeDir, timeoutMs });
   if (policy === "off") {
     await clear();
     return outcome("off", null);

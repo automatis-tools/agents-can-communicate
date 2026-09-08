@@ -63,7 +63,8 @@ export function acceptKey(key) {
   return createHash("sha1").update(`${key}${GUID}`).digest("base64");
 }
 
-export function openWebSocketPeer({ socketPath, timeoutMs, path = "/", host = "localhost" }) {
+export function openWebSocketPeer({ socketPath, timeoutMs, path = "/", host = "localhost",
+  retainNotifications = true }) {
   const notifications = [];
   const pending = new Map();
   const key = randomBytes(16).toString("base64");
@@ -126,7 +127,7 @@ export function openWebSocketPeer({ socketPath, timeoutMs, path = "/", host = "l
       return;
     }
     if (!Object.hasOwn(message, "id") || message.id === null) {
-      notifications.push(message);
+      if (retainNotifications) notifications.push(message);
       return;
     }
     const request = pending.get(message.id);

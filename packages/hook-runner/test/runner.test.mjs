@@ -736,3 +736,26 @@ test("an uncertified platform drops an optional count before an exact inbox reco
     assert.match(turn.stderr, /not certified for nextTurn/);
     assert.equal(receipt.state, "queued");
   });
+
+test("SessionEnd retires core binding before adapter endpoint cleanup", async t => {
+  const place = await workspace(t);
+  const cleaned = [];
+  let service;
+  const native = { ...nativeHookAdapter(), retireNativeSession: async input => {
+    const stored = await service.store.ephemeral.get("deliveryBinding", input.binding.sessionId);
+    assert.ok(stored.retiredAt, "core retirement must precede adapter cleanup");
+    cleaned.push(input.binding.opaqueEndpointRef);
+  } };
+  const table = new Map([[process.pid, { ppid: 900, comm: "node" }],
+    [900, { ppid: 1, comm: "native-client" }]]);
+  const invoke = kind => runHook({ adapterId: "native", adapters: { native },
+    dataHome: place.dataHome, env: { ACC_NATIVE_DELIVERY_POLICY: "actionable" },
+    readProcessTable: async () => table, probeClientVersion: async () => "2.1.258",
+    platform: "darwin-arm64", payload: event(kind, { cwd: place.root }) });
+  const started = await invoke("sessionStart");
+  assert.equal(started.nativeBinding.state, "active");
+  service = started.service;
+  const ended = await invoke("sessionEnd");
+  assert.equal(ended.exitCode, 0);
+  assert.deepEqual(cleaned, ["native-endpoint-secret"]);
+});

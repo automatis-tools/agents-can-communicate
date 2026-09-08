@@ -116,6 +116,11 @@ export function defineAdapter(manifest) {
     }
   }
   const native = {};
+  for (const method of ["refreshNativeSession", "retireNativeSession"]) {
+    if (manifest[method] !== undefined && typeof manifest[method] !== "function") {
+      usage(`optional native method ${method} must be a function`, { id: manifest.id, method });
+    }
+  }
   if (manifest.nativeDelivery !== undefined) {
     const client = manifest.client.certificationName ?? manifest.client.command;
     native.nativeDelivery = validateNativeDeliveryContract(manifest.nativeDelivery,

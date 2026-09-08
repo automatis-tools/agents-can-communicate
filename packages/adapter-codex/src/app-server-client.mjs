@@ -1,5 +1,6 @@
 import os from "node:os";
 import path from "node:path";
+import { realpath, stat } from "node:fs/promises";
 
 import { openWebSocketPeer } from "./ws-json-rpc.mjs";
 
@@ -42,7 +43,7 @@ export function isMethodMissing(error) {
 }
 
 export function openCodexAppServer({ socketPath, timeoutMs = 5_000 }) {
-  return openWebSocketPeer({ socketPath, timeoutMs });
+  return openWebSocketPeer({ socketPath, timeoutMs, retainNotifications: false });
 }
 
 export async function initializeCodex(peer) {
@@ -52,7 +53,7 @@ export async function initializeCodex(peer) {
   return serverVersionOf(initialized?.userAgent);
 }
 
-export async function probeCodexQueue(peer, { threadId, minimum = MINIMUM_VERSION }) {
+export async function probeCodexQueue(peer, { threadId, minimum = MINIMUM_VERSION } = {}) {
   const serverVersion = await initializeCodex(peer);
   if (serverVersion === null || parseStableVersion(serverVersion) === null) {
     return { supported: false, serverVersion, reasonCode: "prerelease_not_captured" };
@@ -61,9 +62,16 @@ export async function probeCodexQueue(peer, { threadId, minimum = MINIMUM_VERSIO
     return { supported: false, serverVersion, reasonCode: "below_minimum_version" };
   }
   try {
-    await peer.request("thread/queue/list", { threadId });
+    if (threadId === undefined) {
+      const loaded = await pageAll(peer, "thread/loaded/list", {});
+      threadId = loaded.find(id => typeof id === "string" && id !== "");
+      if (threadId === undefined) return { supported: false, serverVersion,
+        reasonCode: "feature_probe_failed" };
+    }
+    queueEntries(await peer.request("thread/queue/list", { threadId }));
   } catch (error) {
-    if (isMethodMissing(error)) return { supported: false, serverVersion, reasonCode: "protocol_mismatch" };
+    return { supported: false, serverVersion, reasonCode: error?.code === "ETIMEDOUT"
+      ? "probe_timeout" : "protocol_mismatch" };
   }
   return { supported: true, serverVersion, reasonCode: null, modes: [...QUEUE_MODES] };
 }
@@ -71,25 +79,53 @@ export async function probeCodexQueue(peer, { threadId, minimum = MINIMUM_VERSIO
 async function pageAll(peer, method, params) {
   const items = [];
   let cursor = null;
+  const cursors = new Set();
   for (let page = 0; page < MAX_PAGES; page += 1) {
     const response = await peer.request(method, cursor === null ? params : { ...params, cursor });
-    items.push(...(response?.data ?? []));
+    if (!Array.isArray(response?.data)) throw protocolError();
+    items.push(...response.data);
     cursor = response?.nextCursor ?? null;
-    if (cursor === null) break;
+    if (cursor === null) return items;
+    if (typeof cursor !== "string" || cursor === "" || cursors.has(cursor)) throw protocolError();
+    cursors.add(cursor);
   }
-  return items;
+  throw protocolError();
 }
 
-const listParams = cwd => ({ limit: 100, useStateDbOnly: true, ...(cwd ? { cwd } : {}) });
+const protocolError = () => Object.assign(new Error("invalid queue protocol response"),
+  { code: "EPROTOCOL" });
+
+function queueEntries(response) {
+  if (!Array.isArray(response?.data) || response.data.some(item => typeof item?.id !== "string"
+    || item.id === "" || (item.clientUserMessageId != null
+      && typeof item.clientUserMessageId !== "string"))) throw protocolError();
+  return response.data;
+}
+
+export async function canonicalCwd(cwd) {
+  if (typeof cwd !== "string" || !path.isAbsolute(cwd) || cwd.includes("\0")) return null;
+  try {
+    const resolved = await realpath(cwd);
+    return (await stat(resolved)).isDirectory() ? resolved : null;
+  } catch { return null; }
+}
 
 export async function locateCodexThread(peer, { threadId, cwd }) {
   const loaded = await pageAll(peer, "thread/loaded/list", {});
   if (!loaded.includes(threadId)) return { found: false, reasonCode: "thread_not_loaded" };
-  const threads = await pageAll(peer, "thread/list", listParams(cwd));
-  const found = threads.find(item => item?.id === threadId);
+  // Filter locally after canonicalization: a server-side lexical cwd filter
+  // would hide a thread recorded through a symlink to the same directory.
+  const threads = await pageAll(peer, "thread/list", { limit: 100, useStateDbOnly: true });
+  const matches = threads.filter(item => item?.id === threadId);
+  const found = matches.length === 1 ? matches[0] : null;
   if (!found) return { found: false, reasonCode: "thread_not_found" };
-  if (cwd !== undefined && found.cwd !== cwd) return { found: false, reasonCode: "cwd_mismatch" };
-  return { found: true, threadId, status: found.status?.type ?? "unknown" };
+  const actualCwd = await canonicalCwd(found.cwd);
+  if (actualCwd === null || (cwd !== undefined && actualCwd !== await canonicalCwd(cwd))) {
+    return { found: false, reasonCode: "cwd_mismatch" };
+  }
+  const status = found.status?.type;
+  if (!["idle", "active"].includes(status)) return { found: false, reasonCode: "thread_not_loaded" };
+  return { found: true, threadId, cwd: actualCwd, status };
 }
 
 // thread/queue/list first, so a retried client message id is the same offer
@@ -97,14 +133,15 @@ export async function locateCodexThread(peer, { threadId, cwd }) {
 // clientUserMessageId.
 export async function addCodexQueueMessage(peer, { threadId, messageId, text }) {
   const listed = await peer.request("thread/queue/list", { threadId });
-  const existing = (listed?.data ?? []).find(item => item?.clientUserMessageId === messageId);
+  const existing = queueEntries(listed).find(item => item.clientUserMessageId === messageId);
   if (existing) {
     return { accepted: true, duplicate: true, queuedSubmissionId: existing.id };
   }
   const added = await peer.request("thread/queue/add", { threadId,
     input: [{ type: "text", text }], clientUserMessageId: messageId });
   const submission = added?.queuedSubmission;
-  if (!submission || submission.clientUserMessageId !== messageId) {
+  if (!submission || typeof submission.id !== "string" || submission.id === ""
+    || submission.clientUserMessageId !== messageId) {
     throw Object.assign(new Error("queue acknowledgement did not echo the client message id"),
       { code: "EPROTOCOL" });
   }

@@ -1,3 +1,4 @@
+import { retireNativeBinding } from "./native-retirement.mjs";
 import { createHash, randomBytes } from "node:crypto";
 import { realpath } from "node:fs/promises";
 import path from "node:path";
@@ -367,8 +368,11 @@ const HANDLERS = {
     return {};
   },
 
-  async sessionEnd({ binding, context, event, paths }) {
+  async sessionEnd({ binding, context, event, paths, adapter, deadline }) {
     if (binding === null) return {};
+    await retireNativeBinding({ adapter, service: context.service, sessionId: binding.accSessionId,
+      generation: binding.generation, runtimeDir: paths.root,
+      timeoutMs: Math.max(1, Math.min(200, deadline - Date.now())) });
     await context.service.closeSession({ sessionId: binding.accSessionId,
       generation: binding.generation });
     await clearSessionBinding({ runtimeDir: paths.root, harnessSessionId: event.sessionId });
