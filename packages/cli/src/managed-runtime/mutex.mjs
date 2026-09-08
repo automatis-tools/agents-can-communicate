@@ -100,12 +100,13 @@ export async function withManagerLock(root, operation, { timeoutMs = 1000, pidIs
   const directory = path.join(root, "manager.lock");
   const owner = { pid: process.pid, token: randomUUID(), acquiredAt: new Date().toISOString() };
   const candidate = path.join(root, `manager.candidate-${owner.pid}-${owner.token}.lock`);
-  const deadline = performance.now() + timeoutMs;
   await mkdir(candidate, { mode: 0o700 });
   let owned = false;
   try {
     await writeManagedJson(path.join(candidate, "owner.json"), owner);
     await syncDirectory(candidate);
+    // Budget contention after durable preparation; slow fsync is not another worker.
+    const deadline = performance.now() + timeoutMs;
     while (performance.now() < deadline) {
       const current = await readOwner(directory);
       if (current) {

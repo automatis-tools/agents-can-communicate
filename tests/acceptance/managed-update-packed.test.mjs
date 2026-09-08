@@ -3,6 +3,7 @@ import { execFile } from "node:child_process";
 import { readFile, readdir, rm } from "node:fs/promises";
 import path from "node:path";
 import test from "node:test";
+import { pathToFileURL } from "node:url";
 import { promisify } from "node:util";
 import { createPackedAcc } from "../helpers/packed-acc.mjs";
 import { createUpdateRegistry } from "../helpers/update-registry.mjs";
@@ -91,7 +92,29 @@ test("installed manual update verifies an archive, waits for live MCP, then swit
       }));
     return records.some(lease => lease?.pid === mcp.child.pid && lease.kind === "acc-mcp");
   }, "idle MCP registered before receiving any request");
-  const pending = await f.acc(["update"], env);
+  const { withManagerLock } = await import(pathToFileURL(path.join(before.active.root,
+    "node_modules", "@agents-can-communicate", "cli", "src", "managed-runtime", "mutex.mjs")));
+  const entered = Promise.withResolvers();
+  const released = Promise.withResolvers();
+  t.after(() => released.resolve());
+  const holder = withManagerLock(path.join(managerOf(f), "worker"), async () => {
+    entered.resolve();
+    await released.promise;
+  });
+  await entered.promise;
+  let sawContention = false;
+  let pending;
+  await until(async () => {
+    pending = await f.acc(["update"], env);
+    if (pending.inProgress === true) {
+      sawContention = true;
+      released.resolve();
+      await holder;
+      return false;
+    }
+    return true;
+  }, "manual update retries after the actual worker releases its lock");
+  assert.equal(sawContention, true, "the installed command must report the held worker");
   assert.equal(pending.reason, "processes_active");
   assert.deepEqual((await readState(f)).active, before.active);
   assert.equal((await readState(f)).pending.version, registry.version);
