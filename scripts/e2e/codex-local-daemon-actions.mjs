@@ -30,8 +30,6 @@ export async function trust(h, role) {
   if (status.signIn) throw new Error("prerequisite: vendor authentication required");
   if (status.cwdSelection) {
     await h.pty.request({ action: "send", role, text: "1" });
-    await delay(150);
-    await h.pty.request({ action: "send", role, text: "\r" });
     return { ...status, ready: false };
   }
   if (status.ready) return status;

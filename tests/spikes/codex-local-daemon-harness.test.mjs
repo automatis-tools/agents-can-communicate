@@ -110,12 +110,13 @@ test("cwd selection is recognized and trust chooses the existing session directo
   const root = await fixture(t);
   const marker = path.join(root, "choice.txt");
   const program = [
-    "import pathlib,sys,time",
-    "print('Choose working directory to continue')",
-    "print('1. Use session directory (/session)')",
-    "print('2. Use current directory (/current)')",
-    "print('Press Enter to continue', flush=True)",
-    `pathlib.Path(${JSON.stringify(marker)}).write_text(sys.stdin.readline())`,
+    "import os,pathlib,sys,time,tty",
+    "tty.setraw(sys.stdin.fileno())",
+    "sys.stdout.write('Choose  working\\n directory\\tto')",
+    "sys.stdout.write('\\x1b[3;7HUse\\n session  directory (/session)')",
+    "sys.stdout.write('\\x1b[5;2HUse\\tcurrent\\n directory (/current)')",
+    "sys.stdout.flush()",
+    `pathlib.Path(${JSON.stringify(marker)}).write_bytes(os.read(sys.stdin.fileno(), 1))`,
     "print('gpt-test context left ›', flush=True)",
     "time.sleep(30)",
   ].join(";");
@@ -128,7 +129,7 @@ test("cwd selection is recognized and trust chooses the existing session directo
   const status = await trust(h, "receiver");
   assert.equal(status.cwdSelection, true);
   await new Promise(resolve => setTimeout(resolve, 150));
-  assert.equal((await readFile(marker, "utf8")).trim(), "1");
+  assert.equal(await readFile(marker, "utf8"), "1");
 });
 
 test("unexpected argument text is a launch error only when the vendor exits", async t => {

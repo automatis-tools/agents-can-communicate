@@ -105,6 +105,7 @@ def handle(command):
         return {"sent": True}
     if action == "status":
         text = ansi.sub("", osc.sub("", client["screen"]))
+        cwd_compact = re.sub(r"\s+", "", text)
         return {"pid": client["process"].pid, "exit": client["process"].poll(),
                 "projectTrust": "Yes, continue" in text or "Do you trust" in text,
                 "hookTrust": bool(re.search(r"trust\s*all", text, re.I)) or ("Hooks" in text and "Trust" in text and "Continue" in text),
@@ -115,10 +116,10 @@ def handle(command):
                 "limitDialog": [token for token in ["reached", "hit your usage limit", "usage limit", "rate limit", "reset", "try again at", "usage_limit_reached", "credits", "upgrade", "Upgrade", "Press", "temporarily unavailable", "try again", "Try again", "Switch", "switch", "Enter", "Esc", "continue", "Continue", "dismiss", "Dismiss", "tab", "status", "footer", "? for shortcuts", "Tip:", "Tip", "tokens", "Context", "100%", "›", "❯", "❱", "help", "select", "Press", "Press enter", "ctrl", "esc"] if token in text],
                 "connectionError": "Reconnecting" in text or "stream disconnected" in text,
                 "unsupportedCd": "Unrecognized command '/cd'" in text,
-                "cwdSelection": all(phrase in text for phrase in [
-                    "Choose working directory to",
-                    "Use session directory (",
-                    "Use current directory ("
+                "cwdSelection": all(phrase in cwd_compact for phrase in [
+                    "Chooseworkingdirectoryto",
+                    "Usesessiondirectory(",
+                    "Usecurrentdirectory("
                 ]),
                 "cdBlock": next((code for phrase, code in [
                     ("This directory is not trusted; run Codex there.", "destination-untrusted"),
