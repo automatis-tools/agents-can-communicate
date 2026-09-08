@@ -4,9 +4,9 @@
 
 | | |
 |---|---|
-| Built from | `aad8ed07af3f3f5608ec1578645d2a08e5bca3ea` |
-| Tarball | `agents-can-communicate-0.3.1.tgz`, 273,141 bytes, 209 entries |
-| sha256 | `8dc730105b9a80c8245a7fc63392c1f7ded423ac538b3146d7dc5a83fde4e058` |
+| Built from | `85f347d201df126b1f60cff96e1e6a5a14b0c8d8` |
+| Tarball | `agents-can-communicate-0.3.1.tgz`, 279,820 bytes, 213 entries |
+| sha256 | `ebe370dc8452fd14f1441138aacfd4a13b0f85c3b94ba710cec3ec35837e3ccb` |
 
 Not published. A published record says what the registry serves and is not
 rewritten, so shipped code that changes after a release is measured here instead.
@@ -17,7 +17,9 @@ on Codex 0.152.1 and 0.153.4, macOS arm64, each passed 20 scenarios and 189
 assertions. Delivery verifies the exact receiver, workspace, process, version and
 socket; missing or unsupported endpoints retain durable inbox access. Opt-in is
 recorded separately from reachability, and expired live bindings can refresh
-without reviving retired generations.
+without reviving retired generations. The router rechecks the authoritative
+current binding after its final policy and session reads; retirement or endpoint
+replacement during those reads cannot offer through the obsolete binding.
 
 The upgrade removes only unchanged ACC-owned Codex wrappers and preserves edited
 or unrelated shell artifacts. Reinstall and uninstall preserve client-owned TOML
