@@ -1,0 +1,12 @@
+{
+  "source": "controlled-installed-package-mutation",
+  "mutation": "missing-product-evidence",
+  "originalPackageSha256": "ebe370dc8452fd14f1441138aacfd4a13b0f85c3b94ba710cec3ec35837e3ccb",
+  "startedAt": "2026-09-08T10:53:20.185Z",
+  "caught": true,
+  "originalPassed": true,
+  "mutantPackageSha256": "5e4d11647e427ee0c50fd268161d3b0f398d1e521de05062767ce395d8553c80",
+  "expectedFailure": "certification fixture is missing: node_modules/@agents-can-communicate/adapter-codex/fixtures/delivery/codex-cli-0.152.1-local-daemon-current-binding-product-evidence.json",
+  "temporaryMutationStateRemoved": true,
+  "finishedAt": "2026-09-08T10:53:22.733Z"
+}

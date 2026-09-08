@@ -315,11 +315,12 @@ export async function openFilesystemStore({ root, clock, ids, workspaceId, failA
         return record;
       });
     },
-    async update(kind, id, updater) {
-      return withWriterMutex(paths, publishOptions, async () => {
+    async update(kind, id, updater, { deadlineAt } = {}) {
+      return withWriterMutex(paths, { ...publishOptions, deadlineAt }, async () => {
         const next = await updater(await readEphemeral(kind, id));
         if (next === null) return null;
         validateRecord(kind, next);
+        assertBeforePublication(deadlineAt);
         await publishAtomic(ephemeralPath(kind, id), encode(next),
           { root, tmpDir: paths.tmp, replace: true });
         await markEphemeral(paths, publishOptions, kind, id, "present");

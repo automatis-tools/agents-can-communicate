@@ -81,12 +81,12 @@ a third exact-version certification check. A binding says what that current gene
 exposes and whether its lease is current, while recipient policy says whether it may spend a
 turn.
 
-Claude Code is the one client that proved the live seam: a Channel capture on 2.1.258,
-confirmed on 2.1.260 through the installed package, admitted by minimum-plus-probe rather
-than an exact version. Codex's queue transport passed its capture and the capability was
-withdrawn, because the mode it needs hides the session's workspace. Gemini CLI and Kimi
-Code have exact-version next-turn evidence only; Grok and generic MCP use inbox polling.
-The seam exists for every adapter; only one has earned it.
+Claude Code Channel has installed-client evidence on 2.1.258 and 2.1.260; Codex
+LocalDaemon has it on 0.152.1 and 0.153.4. Both use a captured platform minimum,
+current probe and exact session handshake. Codex preserves the ordinary client
+launch and verifies its registered thread and workspace; ACC owns no vendor daemon
+lifecycle. Gemini CLI and Kimi Code have exact-version next-turn evidence only;
+Grok and generic MCP use inbox polling.
 
 ## Storage and workspace identity
 

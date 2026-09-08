@@ -1,0 +1,19 @@
+{
+  "source": "controlled-installed-package-mutation",
+  "mutation": "cwd-validation",
+  "originalPackageSha256": "bdd78a4c1978f05322e156737660a43150971beecdcdc45985afaa66faa349dc",
+  "expectedFailure": "same Codex thread must reject A cwd",
+  "startedAt": "2026-09-08T06:21:11.638Z",
+  "caught": true,
+  "mutantPackageSha256": "d42568a895fa6bd559ac8f340298d09035797e2823852eb48dfe8e6062a1891b",
+  "client": "codex-cli",
+  "clientVersion": "0.152.1",
+  "platform": "darwin-arm64",
+  "cleanup": {
+    "attempted": true,
+    "outcome": "passed",
+    "ownedProcesses": "stopped",
+    "temporaryState": "removed"
+  },
+  "finishedAt": "2026-09-08T06:22:07.061Z"
+}

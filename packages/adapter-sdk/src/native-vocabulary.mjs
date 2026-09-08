@@ -25,12 +25,8 @@ export const NATIVE_REASON_CODES = Object.freeze([
   "feature_probe_failed", "probe_timeout", "probe_version_mismatch", "protocol_mismatch",
   "handshake_failed", "handshake_timeout", "handshake_version_mismatch",
   "session_generation_stale", "client_process_unknown", "unsupported_shell",
-  // The transport works, but ACC cannot tell which workspace the session is in,
-  // so it has no honest way to address it. Measured on Codex 0.152.1: native
-  // delivery requires `--remote unix://`, and in that mode the hook payload and
-  // the App Server's own thread record both report the daemon's directory
-  // rather than the session's. Joining a session to whatever project the daemon
-  // happened to start in is worse than not joining it at all.
+  // The current session's canonical workspace identity could not be verified.
+  // This is a per-session refusal, not a universal vendor limitation.
   "workspace_identity_unavailable",
 ]);
 

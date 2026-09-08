@@ -1,0 +1,140 @@
+{
+  "runtimeEquivalence": {
+    "privatePackageSha256": "945f6178357b6424a219b59cc3b9c4688b322c9da07cadf2bc7205bf20770940",
+    "publicPackageSha256": "ebe370dc8452fd14f1441138aacfd4a13b0f85c3b94ba710cec3ec35837e3ccb",
+    "scope": "all packed bin, src, plugin and skills regular files; certification and documentation differ intentionally",
+    "runtimeFiles": 131,
+    "missing": [],
+    "added": [],
+    "changed": [],
+    "passed": true
+  },
+  "observations": [
+    {
+      "clientVersion": "0.152.1",
+      "attempt": "product-01521-router-full-1",
+      "receiptSha256": "72eac209e0007c617c51038b0e780de4fafe4601753e525172b09b480337295e",
+      "packageSha256": "945f6178357b6424a219b59cc3b9c4688b322c9da07cadf2bc7205bf20770940",
+      "startedAt": "2026-09-08T10:31:03.757Z",
+      "receiverThreadId": "01a08092-48ed-7433-8a1c-5346fa794611",
+      "selectedCases": [
+        "P01",
+        "P03",
+        "P06",
+        "P04"
+      ],
+      "assertions": 38,
+      "cleanup": {
+        "attempted": true,
+        "outcome": "passed",
+        "ownedProcesses": "stopped",
+        "temporaryState": "removed"
+      }
+    },
+    {
+      "clientVersion": "0.152.1",
+      "attempt": "product-01521-router-cold-1",
+      "receiptSha256": "0cb1832d1c68f004f16b276e819cd55c5b2e6bac03f4ea48c23a17489b9a4fd6",
+      "packageSha256": "945f6178357b6424a219b59cc3b9c4688b322c9da07cadf2bc7205bf20770940",
+      "startedAt": "2026-09-08T10:32:30.133Z",
+      "receiverThreadId": "01a08093-9b2c-7191-b497-92f4cd027d20",
+      "selectedCases": [
+        "P01",
+        "P03",
+        "P06",
+        "P04"
+      ],
+      "assertions": 38,
+      "cleanup": {
+        "attempted": true,
+        "outcome": "passed",
+        "ownedProcesses": "stopped",
+        "temporaryState": "removed"
+      }
+    },
+    {
+      "clientVersion": "0.152.1",
+      "attempt": "product-01521-router-final-1",
+      "receiptSha256": "daae4cd920a58817651db7bf3fd96124fc6672519275c348f2228a8760afd285",
+      "packageSha256": "ebe370dc8452fd14f1441138aacfd4a13b0f85c3b94ba710cec3ec35837e3ccb",
+      "startedAt": "2026-09-08T10:55:54.501Z",
+      "receiverThreadId": "01a080a9-0832-7510-aa06-e347c69d3152",
+      "selectedCases": [
+        "P01",
+        "P03",
+        "P06",
+        "P04"
+      ],
+      "assertions": 38,
+      "cleanup": {
+        "attempted": true,
+        "outcome": "passed",
+        "ownedProcesses": "stopped",
+        "temporaryState": "removed"
+      }
+    },
+    {
+      "clientVersion": "0.153.4",
+      "attempt": "product-01534-router-full-1",
+      "receiptSha256": "8aad29c7bf32098d12f3acb8d63fa18246e5feaf3d106de9c6eb32c7f1a7d562",
+      "packageSha256": "945f6178357b6424a219b59cc3b9c4688b322c9da07cadf2bc7205bf20770940",
+      "startedAt": "2026-09-08T10:31:03.301Z",
+      "receiverThreadId": "01a08092-47d8-7440-a6f9-bffdc62dcf17",
+      "selectedCases": [
+        "P01",
+        "P03",
+        "P06",
+        "P04"
+      ],
+      "assertions": 38,
+      "cleanup": {
+        "attempted": true,
+        "outcome": "passed",
+        "ownedProcesses": "stopped",
+        "temporaryState": "removed"
+      }
+    },
+    {
+      "clientVersion": "0.153.4",
+      "attempt": "product-01534-router-cold-1",
+      "receiptSha256": "8b20f38ce64322665a6f64f1639f1d4c0e19cb221c69d6969cbe023826ed94ef",
+      "packageSha256": "945f6178357b6424a219b59cc3b9c4688b322c9da07cadf2bc7205bf20770940",
+      "startedAt": "2026-09-08T10:32:30.885Z",
+      "receiverThreadId": "01a08093-9d54-7c72-b29b-b3ee3cd3018a",
+      "selectedCases": [
+        "P01",
+        "P03",
+        "P06",
+        "P04"
+      ],
+      "assertions": 38,
+      "cleanup": {
+        "attempted": true,
+        "outcome": "passed",
+        "ownedProcesses": "stopped",
+        "temporaryState": "removed"
+      }
+    },
+    {
+      "clientVersion": "0.153.4",
+      "attempt": "product-01534-router-final-1",
+      "receiptSha256": "3d359b62b93085102911147861b569476bad576e27969ff0ab75c2ec0bec171b",
+      "packageSha256": "ebe370dc8452fd14f1441138aacfd4a13b0f85c3b94ba710cec3ec35837e3ccb",
+      "startedAt": "2026-09-08T10:55:50.398Z",
+      "receiverThreadId": "01a080a8-f8c8-7301-b27e-7641f8476854",
+      "selectedCases": [
+        "P01",
+        "P03",
+        "P06",
+        "P04"
+      ],
+      "assertions": 38,
+      "cleanup": {
+        "attempted": true,
+        "outcome": "passed",
+        "ownedProcesses": "stopped",
+        "temporaryState": "removed"
+      }
+    }
+  ]
+}

@@ -71,11 +71,12 @@ CLI, and Kimi Code can receive a message at the next normal turn. That does not 
 session. Grok, generic MCP clients, unknown versions, and unsupported platforms use the
 durable inbox instead.
 
-Claude Code's optional native channel is the only shipped idle-delivery path. It is
-experimental, never interrupts a turn already in progress, and remains subject to current
-reachability and recipient policy. Codex native live delivery is withdrawn; Codex uses its
-certified next-turn path or inbox. Read [Capabilities](CAPABILITIES.md) for exact versions,
-platforms, and limitations.
+Codex LocalDaemon and Claude Code Channel offer optional native delivery on
+Apple Silicon macOS. They are experimental, can spend tokens, and queue messages
+until a running turn finishes. Codex requires 0.152.1 or newer, an already-running
+LocalDaemon, recorded opt-in and a verified session; start it with your normal
+command. A loaded daemon thread can receive messages after its terminal exits.
+[Capabilities](CAPABILITIES.md) explains policy, versions and fallback.
 
 Delivery evidence is deliberately narrow: `queued -> offered -> retrieved -> acknowledged`.
 An offer is not proof that the model read anything, retrieval is not proof of attention, and

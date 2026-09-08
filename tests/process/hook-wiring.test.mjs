@@ -105,8 +105,8 @@ for (const adapter of ADAPTERS) {
       for (const command of commands) {
         // The executable is the first quoted path, or the first word for a
         // bare command. Either way it must exist on disk.
-        const quoted = command.match(/"([^"]+)"/);
-        const executable = quoted === null ? command.split(" ")[0] : quoted[1];
+        const quoted = command.match(/"([^"]+)"|'([^']+)'/);
+        const executable = quoted === null ? command.split(" ")[0] : (quoted[1] ?? quoted[2]);
         assert.equal(path.isAbsolute(executable), true,
           `${adapter.name} wired a relative command: ${command}`);
         const info = await stat(executable);

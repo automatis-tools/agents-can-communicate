@@ -66,7 +66,7 @@ async function detectNative(adapter, entry, { context, platform, probeTimeoutMs,
     const facts = { realExecutable, probe: null, eligibility: null };
     try {
       facts.probe = await withTimeout(Promise.resolve(adapter.probeNativeDelivery({
-        realExecutable, timeoutMs: probeTimeoutMs })), probeTimeoutMs,
+        realExecutable, timeoutMs: probeTimeoutMs, env: context?.env })), probeTimeoutMs,
       `${adapter.id} native probe`);
     } catch {
       facts.probe = null;

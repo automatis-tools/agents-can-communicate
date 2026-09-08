@@ -100,12 +100,13 @@ work belongs under `Unreleased` and gets a new candidate record.
 
 ## Capture only capabilities you observed
 
-Run native real-client checks only on the versions and platforms where retained fixtures
-prove that boundary. Exact-version evidence governs normal-turn and guard behavior. Claude
-Code live delivery instead uses its captured macOS arm64 minimum plus a current feature
-probe and per-session handshake, and its vendor development-channel warning remains part
-of startup. Codex's queue capture passed but live delivery was withdrawn because the
-required mode hides session workspace identity.
+Run native real-client checks on the exact versions and platforms recorded in
+retained fixtures. Exact-version evidence governs normal-turn and guard behavior.
+Claude Code Channel uses its captured macOS arm64 minimum plus a current probe and
+per-session handshake; its vendor warning remains part of startup. Codex LocalDaemon
+uses a separate 0.152.1 minimum with installed-product captures on 0.152.1 and
+0.153.4. Its passing capture must ship the hashed complete product matrix and
+historical evidence references. Direct queue success alone cannot certify that route.
 
 Record failed and unavailable paths as such, then exercise the packed next-turn or inbox
 fallback. An unsupported platform is an explicit skip, never a passing capture. See

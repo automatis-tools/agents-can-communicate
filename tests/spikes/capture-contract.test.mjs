@@ -1,3 +1,6 @@
+// This focused file intentionally keeps the legacy, installed-product, and
+// transport capture variants together so they exercise one canonical fixture
+// and prove that the schemas cannot substitute for one another.
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -5,11 +8,17 @@ import test from "node:test";
 
 import {
   DELIVERY_CAPTURE_FIELDS,
+  DELIVERY_CAPTURE_REQUIRED_FIELDS,
   DELIVERY_LAUNCH_MODES,
+  INSTALLED_HOOKS_LAUNCH_MODE,
   PASSING_DELIVERY_BRANCHES,
   PASSING_LAUNCH_MODE,
+  TRANSPORT_CAPTURE_FIELDS,
+  TRANSPORT_PASSING_FACTS,
   validateCapture,
+  validateTransportCapture,
 } from "../../scripts/spikes/delivery-capture.mjs";
+import { matrixEvidence } from "../helpers/codex-local-daemon-evidence.mjs";
 import { validateCapture as legacyValidateCapture }
   from "../../scripts/spikes/json-rpc-peer.mjs";
 
@@ -64,11 +73,12 @@ test("the capture vocabulary is frozen and closed", () => {
   for (const branch of BRANCHES) {
     assert.equal(Object.isFrozen(PASSING_DELIVERY_BRANCHES[branch]), true);
   }
-  assert.deepEqual([...DELIVERY_CAPTURE_FIELDS], Object.keys(BASE_CAPTURE));
+  assert.deepEqual([...DELIVERY_CAPTURE_REQUIRED_FIELDS], Object.keys(BASE_CAPTURE));
+  assert.deepEqual([...DELIVERY_CAPTURE_FIELDS], [...Object.keys(BASE_CAPTURE), "packageSha256"]);
 });
 
 test("a capture includes every redacted evidence field", () => {
-  for (const key of DELIVERY_CAPTURE_FIELDS) {
+  for (const key of DELIVERY_CAPTURE_REQUIRED_FIELDS) {
     const capture = { ...PASSING_CAPTURE };
     delete capture[key];
     rejects(capture, new RegExp(`capture requires ${key}`));
@@ -135,17 +145,60 @@ test("capture capability and result are closed", () => {
   }
 });
 
-test("a passing capture launches the ordinary command through the install-time bootstrap", () => {
+test("legacy bootstrap passes remain valid while installed hooks require product evidence", () => {
   assert.equal(PASSING_LAUNCH_MODE, "ordinary-command-with-install-time-bootstrap");
+  assert.equal(INSTALLED_HOOKS_LAUNCH_MODE, "ordinary-command-with-installed-hooks");
   for (const launchMode of DELIVERY_LAUNCH_MODES) {
-    accepts({ ...BASE_CAPTURE, launchMode });
-    if (launchMode === PASSING_LAUNCH_MODE) continue;
-    rejects({ ...PASSING_CAPTURE, launchMode },
-      /a passing capture launches the ordinary command through the install-time bootstrap/);
+    if (launchMode === INSTALLED_HOOKS_LAUNCH_MODE) {
+      accepts({ ...BASE_CAPTURE, client: "codex-cli", launchMode,
+        packageSha256: "a".repeat(64) });
+    } else accepts({ ...BASE_CAPTURE, launchMode });
+    if (launchMode === PASSING_LAUNCH_MODE) accepts({ ...PASSING_CAPTURE, launchMode });
   }
+  const installed = { ...PASSING_CAPTURE, client: "codex-cli", version: "0.152.1",
+    launchMode: INSTALLED_HOOKS_LAUNCH_MODE, packageSha256: "a".repeat(64) };
+  assert.throws(() => validateCapture(installed), /installed-hook pass requires product evidence/);
+  assert.doesNotThrow(() => validateCapture(installed, { productEvidence: matrixEvidence() }));
+  const noPackage = { ...installed };
+  delete noPackage.packageSha256;
+  assert.throws(() => validateCapture(noPackage, { productEvidence: matrixEvidence() }),
+    /installed-hook capture requires packageSha256/);
+  assert.throws(() => validateCapture({ ...installed, client: "claude-code" },
+    { productEvidence: matrixEvidence() }), /installed-hook capture client is codex-cli/);
+  assert.throws(() => validateCapture({ ...installed, packageSha256: "b".repeat(64) },
+    { productEvidence: matrixEvidence() }), /package SHA-256 matches product evidence/);
+  assert.throws(() => validateCapture(installed, { productEvidence: matrixEvidence("transport") }),
+    /installed-hook pass requires product-phase evidence/);
+  assert.throws(() => validateCapture(installed, {
+    productEvidence: { ...matrixEvidence(), source: "synthetic-unit-fixture",
+      scenarios: matrixEvidence().scenarios.map(item =>
+        ({ ...item, source: "synthetic-unit-fixture" })) } }), /real-client product evidence/);
   for (const launchMode of ["acc-run-wrapper", "", "ordinary", null]) {
     rejects({ ...BASE_CAPTURE, launchMode }, /capture launchMode is one of/);
   }
+});
+
+test("transport captures use a separate closed schema and prove all four live-push facts", () => {
+  const transport = { schemaVersion: 1, client: "codex-cli", version: "0.152.1",
+    platform: "darwin-arm64", observedAt: "2026-09-08T12:00:00.000Z",
+    capability: "native_delivery_transport", result: "pass", fixture: "codex-cli-0.152.1-transport",
+    phase: "transport", packageSha256: "b".repeat(64),
+    protocolContract: "codex-app-server-thread-queue-v1",
+    exactBinding: "receiver_thread_matched", idle: "queue_add_accepted",
+    busy: "queued_while_active", rejectedSubmission: "observed",
+    durableReceipt: "queued", limitations: ["unit fixture"] };
+  assert.deepEqual(validateTransportCapture(transport), transport);
+  assert.deepEqual([...TRANSPORT_CAPTURE_FIELDS], Object.keys(transport));
+  assert.deepEqual(TRANSPORT_PASSING_FACTS, { exactBinding: "receiver_thread_matched",
+    idle: "queue_add_accepted", busy: "queued_while_active", rejectedSubmission: "observed",
+    durableReceipt: "queued" });
+  for (const key of Object.keys(TRANSPORT_PASSING_FACTS)) {
+    assert.throws(() => validateTransportCapture({ ...transport, [key]: "unobserved" }),
+      new RegExp(`passing transport capture proves ${key}`));
+  }
+  assert.throws(() => validateTransportCapture({ ...transport, body: "secret" }),
+    /transport capture has unknown field body/);
+  assert.throws(() => validateCapture(transport), /capture has unknown field schemaVersion/);
 });
 
 test("a capture names a closed protocol contract identifier", () => {

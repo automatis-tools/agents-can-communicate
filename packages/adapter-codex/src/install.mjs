@@ -4,10 +4,14 @@ import { fileURLToPath } from "node:url";
 
 import { bakeSkillCommand, blankJson, blankText, removeIfEmpty, removeInstalledTree,
   keepOnlyVersion, ownVersion, stampPluginVersion,
-  removeTomlBlock, stripBlock, tomlString,
-  writeForeignJson, writeHookShim, writeTomlBlock }
+  tomlString, writeForeignJson, writeHookShim }
   from "@agents-can-communicate/adapter-sdk";
 import { AccError, EXIT } from "@agents-can-communicate/protocol";
+import { inspectConfig, readConfig, removeTomlBlock, writeTomlBlock } from "./config-block.mjs";
+
+// Kept cohesive above 300 lines because Codex plugin install, cache, config,
+// detection, and ownership share one client topology; splitting would duplicate
+// path authority and make install/uninstall symmetry harder to audit.
 
 const bundle = fileURLToPath(new URL("../plugin", import.meta.url));
 const PLUGIN_NAME = "agents-can-communicate";
@@ -79,11 +83,12 @@ async function readJson(file, fallback) {
 // Replace the bundle's placeholder command with the shim just written. The
 // client copies an installed plugin into a cache of its own, so the command has
 // to be absolute: a path relative to the bundle would not survive the copy.
+const shellLiteral = value => `'${String(value).replaceAll("'", "'\\''")}'`;
 const withShim = (wiring, shim) => ({ ...wiring, hooks: Object.fromEntries(
   Object.entries(wiring.hooks).map(([event, entries]) => [event, entries.map(entry => ({
     ...entry,
     hooks: entry.hooks.map(hook => ({ ...hook,
-      command: `sh "${shim}" ${hook.command.split(" ").pop()}` })),
+      command: `sh ${shellLiteral(shim)} ${hook.command.split(" ").pop()}` })),
   }))])) });
 
 const writeJson = async (file, value) => {
@@ -140,16 +145,8 @@ const sandboxTable = (stateRoot, theirs) => {
     `writable_roots = [${tomlString(stateRoot)}]`];
 };
 
-// Every spelling TOML allows for the same table: the header, a sub-table
-// header, a dotted key, and an inline table on one line. Missing one means ACC
-// appends a second declaration - which is the duplicate this exists to avoid,
-// and the client refuses the whole config over it.
-const declaresSandbox = config =>
-  /^\s*\[sandbox_workspace_write[\].]/m.test(config)
-  || /^\s*sandbox_workspace_write\s*[.=]/m.test(config);
-
 export async function installCodexPlugin({ home, agentsHome = home,
-  codexHome = path.join(home, ".codex"), stateRoot, runner, node }) {
+  codexHome = path.join(home, ".codex"), dataHome, stateRoot, runner, node }) {
   // Read before writing, so a manifest that will not parse is found before a
   // plugin tree is laid down that nothing will then be able to remove.
   const existing = await readJson(marketplacePath(agentsHome), { name: MARKETPLACE,
@@ -159,15 +156,25 @@ export async function installCodexPlugin({ home, agentsHome = home,
   // marketplace at this root - discovered without any config entry, under
   // whatever its manifest calls itself - the id ACC enabled was one the client
   // never forms, and the plugin sat there listed and not installed.
-  const before = await readFile(configPath(codexHome), "utf8").catch(() => "");
+  const config = configPath(codexHome);
+  const foreign = inspectConfig(await readConfig(config), config);
+  // Preflight before touching installed files: a duplicate table makes Codex
+  // refuse the config, and ambiguous ownership must never delete client state.
+  if (foreign.registration) {
+    throw new AccError(EXIT.CONFLICT,
+      `marketplace ${MARKETPLACE} or its plugin is already registered in this config; `
+      + "remove it and install again", { config });
+  }
+  const theirSandbox = foreign.sandbox;
 
   const target = pluginPath(agentsHome);
   await rm(target, { recursive: true, force: true });
   await cp(bundle, target, { recursive: true });
   // The skill ships with a placeholder where the command belongs: `acc` is
   // not on PATH everywhere, and an agent that cannot run it improvises.
-  await bakeSkillCommand({ root: target, node });
-  const shim = await writeHookShim({ dir: target, adapterId: "codex", runner, node });
+  await bakeSkillCommand({ root: target, node, dataHome });
+  const shim = await writeHookShim({ dir: target, adapterId: "codex",
+    dataHome, runner, node });
   await writeJson(path.join(target, "hooks.json"),
     withShim(await readJson(path.join(bundle, "hooks.json"), { hooks: {} }), shim));
 
@@ -178,16 +185,6 @@ export async function installCodexPlugin({ home, agentsHome = home,
   const others = (existing.plugins ?? []).filter(entry => entry.name !== PLUGIN_NAME);
   await writeMarketplace(file, { ...existing, plugins: [...others, entryFor()] });
 
-  const config = configPath(codexHome);
-  // A marketplace declared twice makes this client refuse the whole config, and
-  // then every plugin the user has stops working. If they registered it
-  // themselves, say so rather than appending a duplicate table.
-  if (stripBlock(before).includes(`[marketplaces.${MARKETPLACE}]`)) {
-    throw new AccError(EXIT.CONFLICT,
-      `marketplace ${MARKETPLACE} is already registered in this config; `
-      + "remove it and install again", { config });
-  }
-  const theirSandbox = declaresSandbox(stripBlock(before));
   await writeTomlBlock(config, [
     `[marketplaces.${MARKETPLACE}]`,
     `source_type = "local"`,
@@ -244,6 +241,7 @@ export async function uninstallCodexPlugin({ home, agentsHome = home,
   const file = marketplacePath(agentsHome);
   const existing = await readJson(file, null);
   const changes = [];
+  inspectConfig(await readConfig(configPath(codexHome)), configPath(codexHome));
   if (existing !== null) {
     const kept = (existing.plugins ?? []).filter(entry => entry.name !== PLUGIN_NAME);
     if (kept.length !== (existing.plugins ?? []).length) changes.push(PLUGIN_NAME);

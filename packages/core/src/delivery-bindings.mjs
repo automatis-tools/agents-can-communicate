@@ -81,18 +81,24 @@ export function createDeliveryBindingService(ports, sessions) {
   // delete() takes the same mutex, so this is the one atomic form: a stale
   // generation cannot retire a successor's endpoint, and an absent or
   // already-retired binding stays as it is.
+  // A caller that captured an endpoint may also scope retirement to that exact
+  // address. This protects a same-generation re-handshake that publishes while
+  // an older bounded cleanup call is still waiting to enter the writer lock.
   //
   // The retirement is recorded as its own fact rather than as an expired lease.
   // Expiry and retirement used to be the same edit, so a channel still renewing
   // its endpoint could extend a binding the session had already given up.
-  async function clearDeliveryBinding({ sessionId, generation }) {
+  async function clearDeliveryBinding(input) {
+    const { sessionId, generation } = input;
+    const endpointScoped = Object.hasOwn(input, "opaqueEndpointRef");
     await store.ephemeral.update("deliveryBinding", sessionId, async current => {
       if (current === null || current === undefined) return null;
       if (current.generation !== generation) throw conflict(sessionId);
+      if (endpointScoped && current.opaqueEndpointRef !== input.opaqueEndpointRef) return null;
       if (current.retiredAt !== null && current.retiredAt !== undefined) return null;
       const now = clock.now();
       return { ...current, leaseUntil: now, retiredAt: now };
-    });
+    }, { deadlineAt: input.deadlineAt });
   }
 
   /**
@@ -120,9 +126,10 @@ export function createDeliveryBindingService(ports, sessions) {
     });
   }
 
-  async function listDeliveryBindings({ participantId, now }) {
+  async function listDeliveryBindings({ participantId, now, includeExpired = false }) {
     return (await currentBindings(now))
-      .filter(item => item.participantId === participantId && item.reachable)
+      .filter(item => item.participantId === participantId
+        && (includeExpired || item.reachable))
       .map(item => item.binding);
   }
 

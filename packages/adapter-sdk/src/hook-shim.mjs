@@ -95,7 +95,7 @@ const quote = value => `"${String(value).replace(/(["\\$`])/g, "\\$1")}"`;
  * install time.
  */
 export async function writeHookShim({ dir, adapterId, runner = defaultRunner(),
-  node = process.execPath, name = "acc-hook.sh" }) {
+  node = process.execPath, name = "acc-hook.sh", dataHome }) {
   await assertRunner(runner);
   const target = path.join(dir, name);
   await mkdir(dir, { recursive: true });
@@ -112,6 +112,7 @@ export async function writeHookShim({ dir, adapterId, runner = defaultRunner(),
     "# and nothing anywhere saying why.",
     `ACC_NODE=${quote(node)}`,
     `ACC_RUNNER=${quote(runner)}`,
+    ...(dataHome === undefined ? [] : [`export ACC_DATA_HOME=${quote(dataHome)}`]),
     'if [ -x "$ACC_NODE" ] && [ -f "$ACC_RUNNER" ]; then',
     `  exec "$ACC_NODE" "$ACC_RUNNER" ${adapterId} "$@"`,
     "fi",
@@ -177,8 +178,9 @@ export const defaultCli = () => ownBinary("acc.mjs");
  * is pinned here for the same reason it is pinned in the shim.
  */
 export async function bakeSkillCommand({ root, node = process.execPath,
-  cli = defaultCli() }) {
-  const command = `${quote(node)} ${quote(cli)}`;
+  cli = defaultCli(), dataHome }) {
+  const command = `${dataHome === undefined ? "" : `ACC_DATA_HOME=${quote(dataHome)} `}`
+    + `${quote(node)} ${quote(cli)}`;
   const baked = [];
   const walk = async directory => {
     for (const entry of await readdir(directory, { withFileTypes: true })) {

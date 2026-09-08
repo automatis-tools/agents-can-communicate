@@ -1,0 +1,1549 @@
+{
+  "schemaVersion": 1,
+  "source": "real-client-capture",
+  "client": "codex-cli",
+  "phase": "product",
+  "clientVersion": "0.153.4",
+  "platform": "darwin-arm64",
+  "packageSha256": "ebe370dc8452fd14f1441138aacfd4a13b0f85c3b94ba710cec3ec35837e3ccb",
+  "startedAt": "2026-09-08T10:55:50.398Z",
+  "finishedAt": "2026-09-08T11:13:18.496Z",
+  "scenarioCount": 20,
+  "passedCount": 20,
+  "failedCount": 0,
+  "cleanup": {
+    "attempted": true,
+    "outcome": "passed",
+    "ownedProcesses": "stopped",
+    "temporaryState": "removed"
+  },
+  "scenarios": [
+    {
+      "schemaVersion": 1,
+      "source": "real-client-capture",
+      "client": "codex-cli",
+      "caseId": "P01",
+      "phase": "product",
+      "clientVersion": "0.153.4",
+      "platform": "darwin-arm64",
+      "packageSha256": "ebe370dc8452fd14f1441138aacfd4a13b0f85c3b94ba710cec3ec35837e3ccb",
+      "roles": [
+        {
+          "role": "daemon-a",
+          "participantId": null,
+          "threadId": null
+        },
+        {
+          "role": "receiver-b1",
+          "participantId": "codex-TXQZ1x",
+          "threadId": "01a080a8-f8c8-7301-b27e-7641f8476854"
+        },
+        {
+          "role": "sender",
+          "participantId": "synthetic-sender",
+          "threadId": null
+        }
+      ],
+      "timestamps": {
+        "startedAt": "2026-09-08T10:56:12.562Z",
+        "idleSinceAt": null,
+        "preToolUseAt": null,
+        "queuedAt": null,
+        "stopAt": null,
+        "nextTurnAt": null,
+        "finishedAt": "2026-09-08T10:56:13.212Z"
+      },
+      "outcome": "passed",
+      "observations": [
+        {
+          "kind": "installed-runtime",
+          "at": "2026-09-08T10:56:13.212Z",
+          "actor": "receiver-b1",
+          "target": null,
+          "outcome": "observed"
+        },
+        {
+          "kind": "workspace",
+          "at": "2026-09-08T10:56:13.212Z",
+          "actor": "receiver-b1",
+          "target": "receiver-b1",
+          "outcome": "matched"
+        },
+        {
+          "kind": "hook-cwd",
+          "at": "2026-09-08T10:56:13.212Z",
+          "actor": "receiver-b1",
+          "target": "receiver-b1",
+          "outcome": "matched"
+        },
+        {
+          "kind": "thread-cwd",
+          "at": "2026-09-08T10:56:13.212Z",
+          "actor": "receiver-b1",
+          "target": "receiver-b1",
+          "outcome": "matched"
+        },
+        {
+          "kind": "actual-cwd",
+          "at": "2026-09-08T10:56:13.212Z",
+          "actor": "receiver-b1",
+          "target": "receiver-b1",
+          "outcome": "matched"
+        },
+        {
+          "kind": "actual-cwd",
+          "at": "2026-09-08T10:56:13.212Z",
+          "actor": "daemon-a",
+          "target": "daemon-a",
+          "outcome": "matched"
+        },
+        {
+          "kind": "participant",
+          "at": "2026-09-08T10:56:13.212Z",
+          "actor": "receiver-b1",
+          "target": "daemon-a",
+          "outcome": "absent"
+        }
+      ],
+      "observationCount": 7,
+      "assertionCount": 10,
+      "cleanup": {
+        "attempted": true,
+        "outcome": "passed",
+        "ownedProcesses": "stopped",
+        "temporaryState": "removed"
+      }
+    },
+    {
+      "schemaVersion": 1,
+      "source": "real-client-capture",
+      "client": "codex-cli",
+      "caseId": "P02",
+      "phase": "product",
+      "clientVersion": "0.153.4",
+      "platform": "darwin-arm64",
+      "packageSha256": "ebe370dc8452fd14f1441138aacfd4a13b0f85c3b94ba710cec3ec35837e3ccb",
+      "roles": [
+        {
+          "role": "daemon-a",
+          "participantId": null,
+          "threadId": null
+        },
+        {
+          "role": "receiver-b1",
+          "participantId": "codex-TXQZ1x",
+          "threadId": "01a080a8-f8c8-7301-b27e-7641f8476854"
+        },
+        {
+          "role": "sender",
+          "participantId": "synthetic-sender",
+          "threadId": null
+        },
+        {
+          "role": "receiver-b2",
+          "participantId": "codex-eyezD-",
+          "threadId": "01a080a9-4a2a-7761-bef6-a236c3f8ca75"
+        },
+        {
+          "role": "unrelated-c1",
+          "participantId": "codex-G_EIMv",
+          "threadId": "01a080a9-d334-7ad1-b651-a973b647f571"
+        }
+      ],
+      "timestamps": {
+        "startedAt": "2026-09-08T10:57:19.401Z",
+        "idleSinceAt": null,
+        "preToolUseAt": null,
+        "queuedAt": null,
+        "stopAt": null,
+        "nextTurnAt": null,
+        "finishedAt": "2026-09-08T10:58:12.636Z"
+      },
+      "outcome": "passed",
+      "observations": [
+        {
+          "kind": "message",
+          "at": "2026-09-08T10:58:12.636Z",
+          "actor": "receiver-b1",
+          "target": null,
+          "outcome": "one"
+        },
+        {
+          "kind": "participant",
+          "at": "2026-09-08T10:58:12.636Z",
+          "actor": "receiver-b2",
+          "target": "receiver-b1",
+          "outcome": "absent"
+        },
+        {
+          "kind": "participant",
+          "at": "2026-09-08T10:58:12.636Z",
+          "actor": "unrelated-c1",
+          "target": "receiver-b1",
+          "outcome": "absent"
+        }
+      ],
+      "observationCount": 3,
+      "assertionCount": 9,
+      "cleanup": {
+        "attempted": true,
+        "outcome": "passed",
+        "ownedProcesses": "stopped",
+        "temporaryState": "removed"
+      }
+    },
+    {
+      "schemaVersion": 1,
+      "source": "real-client-capture",
+      "client": "codex-cli",
+      "caseId": "P03",
+      "phase": "product",
+      "clientVersion": "0.153.4",
+      "platform": "darwin-arm64",
+      "packageSha256": "ebe370dc8452fd14f1441138aacfd4a13b0f85c3b94ba710cec3ec35837e3ccb",
+      "roles": [
+        {
+          "role": "daemon-a",
+          "participantId": null,
+          "threadId": null
+        },
+        {
+          "role": "receiver-b1",
+          "participantId": "codex-TXQZ1x",
+          "threadId": "01a080a8-f8c8-7301-b27e-7641f8476854"
+        },
+        {
+          "role": "sender",
+          "participantId": "synthetic-sender",
+          "threadId": null
+        },
+        {
+          "role": "receiver-b2",
+          "participantId": "codex-eyezD-",
+          "threadId": "01a080a9-4a2a-7761-bef6-a236c3f8ca75"
+        },
+        {
+          "role": "unrelated-c1",
+          "participantId": "codex-G_EIMv",
+          "threadId": "01a080a9-d334-7ad1-b651-a973b647f571"
+        }
+      ],
+      "timestamps": {
+        "startedAt": "2026-09-08T10:58:12.659Z",
+        "idleSinceAt": null,
+        "preToolUseAt": null,
+        "queuedAt": null,
+        "stopAt": null,
+        "nextTurnAt": null,
+        "finishedAt": "2026-09-08T10:58:31.208Z"
+      },
+      "outcome": "passed",
+      "observations": [
+        {
+          "kind": "receipt",
+          "at": "2026-09-08T10:58:31.208Z",
+          "actor": "receiver-b1",
+          "target": null,
+          "outcome": "recorded"
+        },
+        {
+          "kind": "receipt",
+          "at": "2026-09-08T10:58:31.208Z",
+          "actor": "receiver-b1",
+          "target": null,
+          "outcome": "offered"
+        }
+      ],
+      "observationCount": 2,
+      "assertionCount": 4,
+      "cleanup": {
+        "attempted": true,
+        "outcome": "passed",
+        "ownedProcesses": "stopped",
+        "temporaryState": "removed"
+      }
+    },
+    {
+      "schemaVersion": 1,
+      "source": "real-client-capture",
+      "client": "codex-cli",
+      "caseId": "P06",
+      "phase": "product",
+      "clientVersion": "0.153.4",
+      "platform": "darwin-arm64",
+      "packageSha256": "ebe370dc8452fd14f1441138aacfd4a13b0f85c3b94ba710cec3ec35837e3ccb",
+      "roles": [
+        {
+          "role": "daemon-a",
+          "participantId": null,
+          "threadId": null
+        },
+        {
+          "role": "receiver-b1",
+          "participantId": "codex-TXQZ1x",
+          "threadId": "01a080a8-f8c8-7301-b27e-7641f8476854"
+        },
+        {
+          "role": "sender",
+          "participantId": "synthetic-sender",
+          "threadId": null
+        },
+        {
+          "role": "receiver-b2",
+          "participantId": "codex-eyezD-",
+          "threadId": "01a080a9-4a2a-7761-bef6-a236c3f8ca75"
+        },
+        {
+          "role": "unrelated-c1",
+          "participantId": "codex-G_EIMv",
+          "threadId": "01a080a9-d334-7ad1-b651-a973b647f571"
+        }
+      ],
+      "timestamps": {
+        "startedAt": "2026-09-08T10:58:31.208Z",
+        "idleSinceAt": null,
+        "preToolUseAt": null,
+        "queuedAt": null,
+        "stopAt": null,
+        "nextTurnAt": null,
+        "finishedAt": "2026-09-08T10:58:54.958Z"
+      },
+      "outcome": "passed",
+      "observations": [
+        {
+          "kind": "receipt",
+          "at": "2026-09-08T10:58:54.958Z",
+          "actor": "receiver-b1",
+          "target": null,
+          "outcome": "retrieved"
+        },
+        {
+          "kind": "receipt",
+          "at": "2026-09-08T10:58:54.958Z",
+          "actor": "receiver-b1",
+          "target": null,
+          "outcome": "acknowledged"
+        },
+        {
+          "kind": "answer",
+          "at": "2026-09-08T10:58:54.958Z",
+          "actor": "receiver-b1",
+          "target": null,
+          "outcome": "one"
+        },
+        {
+          "kind": "obligation",
+          "at": "2026-09-08T10:58:54.958Z",
+          "actor": "receiver-b1",
+          "target": null,
+          "outcome": "resolved"
+        }
+      ],
+      "observationCount": 4,
+      "assertionCount": 4,
+      "cleanup": {
+        "attempted": true,
+        "outcome": "passed",
+        "ownedProcesses": "stopped",
+        "temporaryState": "removed"
+      }
+    },
+    {
+      "schemaVersion": 1,
+      "source": "real-client-capture",
+      "client": "codex-cli",
+      "caseId": "P04",
+      "phase": "product",
+      "clientVersion": "0.153.4",
+      "platform": "darwin-arm64",
+      "packageSha256": "ebe370dc8452fd14f1441138aacfd4a13b0f85c3b94ba710cec3ec35837e3ccb",
+      "roles": [
+        {
+          "role": "daemon-a",
+          "participantId": null,
+          "threadId": null
+        },
+        {
+          "role": "receiver-b1",
+          "participantId": "codex-TXQZ1x",
+          "threadId": "01a080a8-f8c8-7301-b27e-7641f8476854"
+        },
+        {
+          "role": "sender",
+          "participantId": "synthetic-sender",
+          "threadId": null
+        },
+        {
+          "role": "receiver-b2",
+          "participantId": "codex-eyezD-",
+          "threadId": "01a080a9-4a2a-7761-bef6-a236c3f8ca75"
+        },
+        {
+          "role": "unrelated-c1",
+          "participantId": "codex-G_EIMv",
+          "threadId": "01a080a9-d334-7ad1-b651-a973b647f571"
+        }
+      ],
+      "timestamps": {
+        "startedAt": "2026-09-08T10:58:54.983Z",
+        "idleSinceAt": "2026-09-08T10:58:54.983Z",
+        "preToolUseAt": null,
+        "queuedAt": null,
+        "stopAt": null,
+        "nextTurnAt": null,
+        "finishedAt": "2026-09-08T11:01:37.272Z"
+      },
+      "outcome": "passed",
+      "observations": [
+        {
+          "kind": "lease",
+          "at": "2026-09-08T11:01:37.272Z",
+          "actor": "receiver-b1",
+          "target": null,
+          "outcome": "fresh"
+        },
+        {
+          "kind": "receipt",
+          "at": "2026-09-08T11:01:37.272Z",
+          "actor": "receiver-b1",
+          "target": null,
+          "outcome": "offered"
+        }
+      ],
+      "observationCount": 2,
+      "assertionCount": 20,
+      "cleanup": {
+        "attempted": true,
+        "outcome": "passed",
+        "ownedProcesses": "stopped",
+        "temporaryState": "removed"
+      }
+    },
+    {
+      "schemaVersion": 1,
+      "source": "real-client-capture",
+      "client": "codex-cli",
+      "caseId": "P05",
+      "phase": "product",
+      "clientVersion": "0.153.4",
+      "platform": "darwin-arm64",
+      "packageSha256": "ebe370dc8452fd14f1441138aacfd4a13b0f85c3b94ba710cec3ec35837e3ccb",
+      "roles": [
+        {
+          "role": "daemon-a",
+          "participantId": null,
+          "threadId": null
+        },
+        {
+          "role": "receiver-b1",
+          "participantId": "codex-TXQZ1x",
+          "threadId": "01a080a8-f8c8-7301-b27e-7641f8476854"
+        },
+        {
+          "role": "sender",
+          "participantId": "synthetic-sender",
+          "threadId": null
+        },
+        {
+          "role": "receiver-b2",
+          "participantId": "codex-eyezD-",
+          "threadId": "01a080a9-4a2a-7761-bef6-a236c3f8ca75"
+        },
+        {
+          "role": "unrelated-c1",
+          "participantId": "codex-G_EIMv",
+          "threadId": "01a080a9-d334-7ad1-b651-a973b647f571"
+        }
+      ],
+      "timestamps": {
+        "startedAt": "2026-09-08T11:02:02.235Z",
+        "idleSinceAt": null,
+        "preToolUseAt": "2026-09-08T11:02:13.964Z",
+        "queuedAt": "2026-09-08T11:02:14.557Z",
+        "stopAt": "2026-09-08T11:02:36.018Z",
+        "nextTurnAt": "2026-09-08T11:02:36.234Z",
+        "finishedAt": "2026-09-08T11:02:48.358Z"
+      },
+      "outcome": "passed",
+      "observations": [
+        {
+          "kind": "session-state",
+          "at": "2026-09-08T11:02:14.226Z",
+          "actor": "receiver-b1",
+          "target": null,
+          "outcome": "active"
+        },
+        {
+          "kind": "queue",
+          "at": "2026-09-08T11:02:14.723Z",
+          "actor": "receiver-b1",
+          "target": null,
+          "outcome": "pending"
+        },
+        {
+          "kind": "marker-order",
+          "at": "2026-09-08T11:02:48.358Z",
+          "actor": "receiver-b1",
+          "target": "receiver-b1",
+          "outcome": "before"
+        }
+      ],
+      "observationCount": 3,
+      "assertionCount": 8,
+      "cleanup": {
+        "attempted": true,
+        "outcome": "passed",
+        "ownedProcesses": "stopped",
+        "temporaryState": "removed"
+      }
+    },
+    {
+      "schemaVersion": 1,
+      "source": "real-client-capture",
+      "client": "codex-cli",
+      "caseId": "P07",
+      "phase": "product",
+      "clientVersion": "0.153.4",
+      "platform": "darwin-arm64",
+      "packageSha256": "ebe370dc8452fd14f1441138aacfd4a13b0f85c3b94ba710cec3ec35837e3ccb",
+      "roles": [
+        {
+          "role": "daemon-a",
+          "participantId": null,
+          "threadId": null
+        },
+        {
+          "role": "receiver-b1",
+          "participantId": "codex-TXQZ1x",
+          "threadId": "01a080a8-f8c8-7301-b27e-7641f8476854"
+        },
+        {
+          "role": "sender",
+          "participantId": "synthetic-sender",
+          "threadId": null
+        },
+        {
+          "role": "receiver-b2",
+          "participantId": "codex-eyezD-",
+          "threadId": "01a080a9-4a2a-7761-bef6-a236c3f8ca75"
+        },
+        {
+          "role": "unrelated-c1",
+          "participantId": "codex-G_EIMv",
+          "threadId": "01a080a9-d334-7ad1-b651-a973b647f571"
+        }
+      ],
+      "timestamps": {
+        "startedAt": "2026-09-08T11:02:14.227Z",
+        "idleSinceAt": null,
+        "preToolUseAt": null,
+        "queuedAt": null,
+        "stopAt": null,
+        "nextTurnAt": null,
+        "finishedAt": "2026-09-08T11:03:11.758Z"
+      },
+      "outcome": "passed",
+      "observations": [
+        {
+          "kind": "message",
+          "at": "2026-09-08T11:03:11.758Z",
+          "actor": "receiver-b1",
+          "target": null,
+          "outcome": "one"
+        },
+        {
+          "kind": "queue",
+          "at": "2026-09-08T11:03:11.758Z",
+          "actor": "receiver-b1",
+          "target": null,
+          "outcome": "one"
+        },
+        {
+          "kind": "answer",
+          "at": "2026-09-08T11:03:11.758Z",
+          "actor": "receiver-b1",
+          "target": null,
+          "outcome": "one"
+        }
+      ],
+      "observationCount": 3,
+      "assertionCount": 8,
+      "cleanup": {
+        "attempted": true,
+        "outcome": "passed",
+        "ownedProcesses": "stopped",
+        "temporaryState": "removed"
+      }
+    },
+    {
+      "schemaVersion": 1,
+      "source": "real-client-capture",
+      "client": "codex-cli",
+      "caseId": "P08",
+      "phase": "product",
+      "clientVersion": "0.153.4",
+      "platform": "darwin-arm64",
+      "packageSha256": "ebe370dc8452fd14f1441138aacfd4a13b0f85c3b94ba710cec3ec35837e3ccb",
+      "roles": [
+        {
+          "role": "daemon-a",
+          "participantId": null,
+          "threadId": null
+        },
+        {
+          "role": "receiver-b1",
+          "participantId": "codex-TXQZ1x",
+          "threadId": "01a080a8-f8c8-7301-b27e-7641f8476854"
+        },
+        {
+          "role": "sender",
+          "participantId": "synthetic-sender",
+          "threadId": null
+        },
+        {
+          "role": "receiver-b2",
+          "participantId": "codex-eyezD-",
+          "threadId": "01a080a9-4a2a-7761-bef6-a236c3f8ca75"
+        },
+        {
+          "role": "unrelated-c1",
+          "participantId": "codex-G_EIMv",
+          "threadId": "01a080a9-d334-7ad1-b651-a973b647f571"
+        }
+      ],
+      "timestamps": {
+        "startedAt": "2026-09-08T11:03:11.783Z",
+        "idleSinceAt": null,
+        "preToolUseAt": null,
+        "queuedAt": null,
+        "stopAt": null,
+        "nextTurnAt": null,
+        "finishedAt": "2026-09-08T11:04:25.156Z"
+      },
+      "outcome": "passed",
+      "observations": [
+        {
+          "kind": "policy",
+          "at": "2026-09-08T11:04:25.156Z",
+          "actor": "receiver-b1",
+          "target": null,
+          "outcome": "observed"
+        },
+        {
+          "kind": "receipt",
+          "at": "2026-09-08T11:04:25.156Z",
+          "actor": "receiver-b1",
+          "target": null,
+          "outcome": "queued"
+        },
+        {
+          "kind": "receipt",
+          "at": "2026-09-08T11:04:25.156Z",
+          "actor": "receiver-b1",
+          "target": null,
+          "outcome": "offered"
+        },
+        {
+          "kind": "daemon",
+          "at": "2026-09-08T11:04:25.156Z",
+          "actor": "daemon-a",
+          "target": null,
+          "outcome": "unchanged"
+        }
+      ],
+      "observationCount": 4,
+      "assertionCount": 7,
+      "cleanup": {
+        "attempted": true,
+        "outcome": "passed",
+        "ownedProcesses": "stopped",
+        "temporaryState": "removed"
+      }
+    },
+    {
+      "schemaVersion": 1,
+      "source": "real-client-capture",
+      "client": "codex-cli",
+      "caseId": "P15",
+      "phase": "product",
+      "clientVersion": "0.153.4",
+      "platform": "darwin-arm64",
+      "packageSha256": "ebe370dc8452fd14f1441138aacfd4a13b0f85c3b94ba710cec3ec35837e3ccb",
+      "roles": [
+        {
+          "role": "daemon-a",
+          "participantId": null,
+          "threadId": null
+        },
+        {
+          "role": "receiver-b1",
+          "participantId": "codex-TXQZ1x",
+          "threadId": "01a080a8-f8c8-7301-b27e-7641f8476854"
+        },
+        {
+          "role": "sender",
+          "participantId": "synthetic-sender",
+          "threadId": null
+        },
+        {
+          "role": "receiver-b2",
+          "participantId": "codex-eyezD-",
+          "threadId": "01a080a9-4a2a-7761-bef6-a236c3f8ca75"
+        },
+        {
+          "role": "unrelated-c1",
+          "participantId": "codex-G_EIMv",
+          "threadId": "01a080a9-d334-7ad1-b651-a973b647f571"
+        }
+      ],
+      "timestamps": {
+        "startedAt": "2026-09-08T11:04:25.286Z",
+        "idleSinceAt": null,
+        "preToolUseAt": null,
+        "queuedAt": null,
+        "stopAt": null,
+        "nextTurnAt": null,
+        "finishedAt": "2026-09-08T11:05:00.222Z"
+      },
+      "outcome": "passed",
+      "observations": [
+        {
+          "kind": "binding",
+          "at": "2026-09-08T11:05:00.109Z",
+          "actor": "sender",
+          "target": "receiver-b1",
+          "outcome": "matched"
+        }
+      ],
+      "observationCount": 1,
+      "assertionCount": 5,
+      "cleanup": {
+        "attempted": true,
+        "outcome": "passed",
+        "ownedProcesses": "stopped",
+        "temporaryState": "removed"
+      }
+    },
+    {
+      "schemaVersion": 1,
+      "source": "real-client-capture",
+      "client": "codex-cli",
+      "caseId": "P16",
+      "phase": "product",
+      "clientVersion": "0.153.4",
+      "platform": "darwin-arm64",
+      "packageSha256": "ebe370dc8452fd14f1441138aacfd4a13b0f85c3b94ba710cec3ec35837e3ccb",
+      "roles": [
+        {
+          "role": "daemon-a",
+          "participantId": null,
+          "threadId": null
+        },
+        {
+          "role": "receiver-b1",
+          "participantId": "codex-TXQZ1x",
+          "threadId": "01a080a8-f8c8-7301-b27e-7641f8476854"
+        },
+        {
+          "role": "sender",
+          "participantId": "synthetic-sender",
+          "threadId": null
+        },
+        {
+          "role": "receiver-b2",
+          "participantId": "codex-eyezD-",
+          "threadId": "01a080a9-4a2a-7761-bef6-a236c3f8ca75"
+        },
+        {
+          "role": "unrelated-c1",
+          "participantId": "codex-G_EIMv",
+          "threadId": "01a080a9-d334-7ad1-b651-a973b647f571"
+        }
+      ],
+      "timestamps": {
+        "startedAt": "2026-09-08T11:05:00.247Z",
+        "idleSinceAt": null,
+        "preToolUseAt": null,
+        "queuedAt": null,
+        "stopAt": null,
+        "nextTurnAt": null,
+        "finishedAt": "2026-09-08T11:05:01.737Z"
+      },
+      "outcome": "passed",
+      "observations": [
+        {
+          "kind": "diagnostic",
+          "at": "2026-09-08T11:05:01.737Z",
+          "actor": "receiver-b1",
+          "target": null,
+          "outcome": "sanitized"
+        },
+        {
+          "kind": "submission",
+          "at": "2026-09-08T11:05:01.737Z",
+          "actor": "receiver-b1",
+          "target": null,
+          "outcome": "rejected"
+        },
+        {
+          "kind": "receipt",
+          "at": "2026-09-08T11:05:01.737Z",
+          "actor": "receiver-b1",
+          "target": null,
+          "outcome": "queued"
+        }
+      ],
+      "observationCount": 3,
+      "assertionCount": 28,
+      "cleanup": {
+        "attempted": true,
+        "outcome": "passed",
+        "ownedProcesses": "stopped",
+        "temporaryState": "removed"
+      }
+    },
+    {
+      "schemaVersion": 1,
+      "source": "real-client-capture",
+      "client": "codex-cli",
+      "caseId": "P17",
+      "phase": "product",
+      "clientVersion": "0.153.4",
+      "platform": "darwin-arm64",
+      "packageSha256": "ebe370dc8452fd14f1441138aacfd4a13b0f85c3b94ba710cec3ec35837e3ccb",
+      "roles": [
+        {
+          "role": "daemon-a",
+          "participantId": null,
+          "threadId": null
+        },
+        {
+          "role": "receiver-b1",
+          "participantId": "codex-TXQZ1x",
+          "threadId": "01a080a8-f8c8-7301-b27e-7641f8476854"
+        },
+        {
+          "role": "sender",
+          "participantId": "synthetic-sender",
+          "threadId": null
+        },
+        {
+          "role": "receiver-b2",
+          "participantId": "codex-eyezD-",
+          "threadId": "01a080a9-4a2a-7761-bef6-a236c3f8ca75"
+        },
+        {
+          "role": "unrelated-c1",
+          "participantId": "codex-G_EIMv",
+          "threadId": "01a080a9-d334-7ad1-b651-a973b647f571"
+        }
+      ],
+      "timestamps": {
+        "startedAt": "2026-09-08T11:05:01.762Z",
+        "idleSinceAt": null,
+        "preToolUseAt": null,
+        "queuedAt": null,
+        "stopAt": null,
+        "nextTurnAt": null,
+        "finishedAt": "2026-09-08T11:05:15.095Z"
+      },
+      "outcome": "passed",
+      "observations": [
+        {
+          "kind": "message",
+          "at": "2026-09-08T11:05:15.095Z",
+          "actor": "receiver-b1",
+          "target": null,
+          "outcome": "one"
+        },
+        {
+          "kind": "receipt",
+          "at": "2026-09-08T11:05:15.095Z",
+          "actor": "receiver-b1",
+          "target": null,
+          "outcome": "retrieved"
+        }
+      ],
+      "observationCount": 2,
+      "assertionCount": 5,
+      "cleanup": {
+        "attempted": true,
+        "outcome": "passed",
+        "ownedProcesses": "stopped",
+        "temporaryState": "removed"
+      }
+    },
+    {
+      "schemaVersion": 1,
+      "source": "real-client-capture",
+      "client": "codex-cli",
+      "caseId": "P12",
+      "phase": "product",
+      "clientVersion": "0.153.4",
+      "platform": "darwin-arm64",
+      "packageSha256": "ebe370dc8452fd14f1441138aacfd4a13b0f85c3b94ba710cec3ec35837e3ccb",
+      "roles": [
+        {
+          "role": "daemon-a",
+          "participantId": null,
+          "threadId": null
+        },
+        {
+          "role": "receiver-b1",
+          "participantId": "codex-TXQZ1x",
+          "threadId": "01a080a8-f8c8-7301-b27e-7641f8476854"
+        },
+        {
+          "role": "sender",
+          "participantId": "synthetic-sender",
+          "threadId": null
+        },
+        {
+          "role": "receiver-b2",
+          "participantId": null,
+          "threadId": "01a080b1-9217-7330-90c4-4874d57a824f"
+        },
+        {
+          "role": "unrelated-c1",
+          "participantId": "codex-G_EIMv",
+          "threadId": "01a080a9-d334-7ad1-b651-a973b647f571"
+        }
+      ],
+      "timestamps": {
+        "startedAt": "2026-09-08T11:05:41.392Z",
+        "idleSinceAt": null,
+        "preToolUseAt": null,
+        "queuedAt": null,
+        "stopAt": null,
+        "nextTurnAt": null,
+        "finishedAt": "2026-09-08T11:05:41.504Z"
+      },
+      "outcome": "passed",
+      "observations": [
+        {
+          "kind": "actual-cwd",
+          "at": "2026-09-08T11:05:41.504Z",
+          "actor": "daemon-a",
+          "target": "daemon-a",
+          "outcome": "matched"
+        },
+        {
+          "kind": "workspace",
+          "at": "2026-09-08T11:05:41.504Z",
+          "actor": "receiver-b2",
+          "target": "daemon-a",
+          "outcome": "matched"
+        }
+      ],
+      "observationCount": 2,
+      "assertionCount": 2,
+      "cleanup": {
+        "attempted": true,
+        "outcome": "passed",
+        "ownedProcesses": "stopped",
+        "temporaryState": "removed"
+      }
+    },
+    {
+      "schemaVersion": 1,
+      "source": "real-client-capture",
+      "client": "codex-cli",
+      "caseId": "P13",
+      "phase": "product",
+      "clientVersion": "0.153.4",
+      "platform": "darwin-arm64",
+      "packageSha256": "ebe370dc8452fd14f1441138aacfd4a13b0f85c3b94ba710cec3ec35837e3ccb",
+      "roles": [
+        {
+          "role": "daemon-a",
+          "participantId": null,
+          "threadId": null
+        },
+        {
+          "role": "receiver-b1",
+          "participantId": "codex-ja-0gz",
+          "threadId": "01a080b1-f92c-7a02-966e-ab0bcc7dec0c"
+        },
+        {
+          "role": "sender",
+          "participantId": "synthetic-sender",
+          "threadId": null
+        },
+        {
+          "role": "receiver-b2",
+          "participantId": "codex-s5TbV0",
+          "threadId": "01a080b1-9217-7330-90c4-4874d57a824f"
+        },
+        {
+          "role": "unrelated-c1",
+          "participantId": "codex-G_EIMv",
+          "threadId": "01a080a9-d334-7ad1-b651-a973b647f571"
+        }
+      ],
+      "timestamps": {
+        "startedAt": "2026-09-08T11:06:10.691Z",
+        "idleSinceAt": null,
+        "preToolUseAt": null,
+        "queuedAt": null,
+        "stopAt": null,
+        "nextTurnAt": null,
+        "finishedAt": "2026-09-08T11:07:13.977Z"
+      },
+      "outcome": "passed",
+      "observations": [
+        {
+          "kind": "launch-arguments",
+          "at": "2026-09-08T11:07:13.977Z",
+          "actor": "receiver-b1",
+          "target": null,
+          "outcome": "unchanged"
+        },
+        {
+          "kind": "actual-cwd",
+          "at": "2026-09-08T11:07:13.977Z",
+          "actor": "receiver-b1",
+          "target": "receiver-b1",
+          "outcome": "matched"
+        }
+      ],
+      "observationCount": 2,
+      "assertionCount": 6,
+      "cleanup": {
+        "attempted": true,
+        "outcome": "passed",
+        "ownedProcesses": "stopped",
+        "temporaryState": "removed"
+      }
+    },
+    {
+      "schemaVersion": 1,
+      "source": "real-client-capture",
+      "client": "codex-cli",
+      "caseId": "P14",
+      "phase": "product",
+      "clientVersion": "0.153.4",
+      "platform": "darwin-arm64",
+      "packageSha256": "ebe370dc8452fd14f1441138aacfd4a13b0f85c3b94ba710cec3ec35837e3ccb",
+      "roles": [
+        {
+          "role": "daemon-a",
+          "participantId": null,
+          "threadId": null
+        },
+        {
+          "role": "receiver-b1",
+          "participantId": "codex-OtmDFW",
+          "threadId": "01a080b3-6269-7980-bcc7-07e46a460fe8"
+        },
+        {
+          "role": "sender",
+          "participantId": "synthetic-sender",
+          "threadId": null
+        },
+        {
+          "role": "receiver-b2",
+          "participantId": "codex-s5TbV0",
+          "threadId": "01a080b1-9217-7330-90c4-4874d57a824f"
+        },
+        {
+          "role": "unrelated-c1",
+          "participantId": "codex-G_EIMv",
+          "threadId": "01a080a9-d334-7ad1-b651-a973b647f571"
+        }
+      ],
+      "timestamps": {
+        "startedAt": "2026-09-08T11:07:32.613Z",
+        "idleSinceAt": null,
+        "preToolUseAt": null,
+        "queuedAt": null,
+        "stopAt": null,
+        "nextTurnAt": null,
+        "finishedAt": "2026-09-08T11:08:40.791Z"
+      },
+      "outcome": "passed",
+      "observations": [
+        {
+          "kind": "binding",
+          "at": "2026-09-08T11:08:40.791Z",
+          "actor": "receiver-b1",
+          "target": null,
+          "outcome": "retired"
+        },
+        {
+          "kind": "binding",
+          "at": "2026-09-08T11:08:40.791Z",
+          "actor": "receiver-b1",
+          "target": null,
+          "outcome": "fresh"
+        },
+        {
+          "kind": "actual-cwd",
+          "at": "2026-09-08T11:08:40.791Z",
+          "actor": "receiver-b1",
+          "target": "receiver-b1",
+          "outcome": "matched"
+        }
+      ],
+      "observationCount": 3,
+      "assertionCount": 16,
+      "cleanup": {
+        "attempted": true,
+        "outcome": "passed",
+        "ownedProcesses": "stopped",
+        "temporaryState": "removed"
+      }
+    },
+    {
+      "schemaVersion": 1,
+      "source": "real-client-capture",
+      "client": "codex-cli",
+      "caseId": "P18",
+      "phase": "product",
+      "clientVersion": "0.153.4",
+      "platform": "darwin-arm64",
+      "packageSha256": "ebe370dc8452fd14f1441138aacfd4a13b0f85c3b94ba710cec3ec35837e3ccb",
+      "roles": [
+        {
+          "role": "daemon-a",
+          "participantId": null,
+          "threadId": null
+        },
+        {
+          "role": "receiver-b1",
+          "participantId": "codex-rYIQTo",
+          "threadId": "01a080b4-6578-7c72-bf6b-4b7e62cd2815"
+        },
+        {
+          "role": "sender",
+          "participantId": "synthetic-sender",
+          "threadId": null
+        },
+        {
+          "role": "receiver-b2",
+          "participantId": "codex-s5TbV0",
+          "threadId": "01a080b1-9217-7330-90c4-4874d57a824f"
+        },
+        {
+          "role": "unrelated-c1",
+          "participantId": "codex-G_EIMv",
+          "threadId": "01a080a9-d334-7ad1-b651-a973b647f571"
+        }
+      ],
+      "timestamps": {
+        "startedAt": "2026-09-08T11:08:40.791Z",
+        "idleSinceAt": null,
+        "preToolUseAt": null,
+        "queuedAt": null,
+        "stopAt": null,
+        "nextTurnAt": null,
+        "finishedAt": "2026-09-08T11:08:43.518Z"
+      },
+      "outcome": "passed",
+      "observations": [
+        {
+          "kind": "artifact",
+          "at": "2026-09-08T11:08:43.518Z",
+          "actor": "daemon-a",
+          "target": null,
+          "outcome": "preserved"
+        },
+        {
+          "kind": "artifact",
+          "at": "2026-09-08T11:08:43.518Z",
+          "actor": "receiver-b1",
+          "target": null,
+          "outcome": "removed"
+        }
+      ],
+      "observationCount": 2,
+      "assertionCount": 18,
+      "cleanup": {
+        "attempted": true,
+        "outcome": "passed",
+        "ownedProcesses": "stopped",
+        "temporaryState": "removed"
+      }
+    },
+    {
+      "schemaVersion": 1,
+      "source": "real-client-capture",
+      "client": "codex-cli",
+      "caseId": "P20",
+      "phase": "product",
+      "clientVersion": "0.153.4",
+      "platform": "darwin-arm64",
+      "packageSha256": "ebe370dc8452fd14f1441138aacfd4a13b0f85c3b94ba710cec3ec35837e3ccb",
+      "roles": [
+        {
+          "role": "daemon-a",
+          "participantId": null,
+          "threadId": null
+        },
+        {
+          "role": "receiver-b1",
+          "participantId": "codex-xG7ZNA",
+          "threadId": "01a080b4-c431-71b2-9d92-78d24922bd87"
+        },
+        {
+          "role": "sender",
+          "participantId": "synthetic-sender",
+          "threadId": null
+        }
+      ],
+      "timestamps": {
+        "startedAt": "2026-09-08T11:09:23.099Z",
+        "idleSinceAt": null,
+        "preToolUseAt": null,
+        "queuedAt": null,
+        "stopAt": null,
+        "nextTurnAt": null,
+        "finishedAt": "2026-09-08T11:10:29.154Z"
+      },
+      "outcome": "passed",
+      "observations": [
+        {
+          "kind": "path",
+          "at": "2026-09-08T11:10:28.017Z",
+          "actor": "receiver-b1",
+          "target": null,
+          "outcome": "observed"
+        },
+        {
+          "kind": "instrumentation",
+          "at": "2026-09-08T11:10:28.017Z",
+          "actor": "receiver-b1",
+          "target": null,
+          "outcome": "absent"
+        },
+        {
+          "kind": "binding",
+          "at": "2026-09-08T11:10:28.017Z",
+          "actor": "receiver-b1",
+          "target": "receiver-b1",
+          "outcome": "matched"
+        },
+        {
+          "kind": "receipt",
+          "at": "2026-09-08T11:10:28.017Z",
+          "actor": "receiver-b1",
+          "target": null,
+          "outcome": "acknowledged"
+        }
+      ],
+      "observationCount": 4,
+      "assertionCount": 6,
+      "cleanup": {
+        "attempted": true,
+        "outcome": "passed",
+        "ownedProcesses": "stopped",
+        "temporaryState": "removed"
+      }
+    },
+    {
+      "schemaVersion": 1,
+      "source": "real-client-capture",
+      "client": "codex-cli",
+      "caseId": "P10",
+      "phase": "product",
+      "clientVersion": "0.153.4",
+      "platform": "darwin-arm64",
+      "packageSha256": "ebe370dc8452fd14f1441138aacfd4a13b0f85c3b94ba710cec3ec35837e3ccb",
+      "roles": [
+        {
+          "role": "daemon-a",
+          "participantId": null,
+          "threadId": null
+        },
+        {
+          "role": "receiver-b1",
+          "participantId": "codex-ScIBXg",
+          "threadId": "01a080b6-62d4-7902-99a6-532e6c0d9be7"
+        },
+        {
+          "role": "sender",
+          "participantId": "synthetic-sender",
+          "threadId": null
+        }
+      ],
+      "timestamps": {
+        "startedAt": "2026-09-08T11:11:09.403Z",
+        "idleSinceAt": null,
+        "preToolUseAt": null,
+        "queuedAt": null,
+        "stopAt": null,
+        "nextTurnAt": null,
+        "finishedAt": "2026-09-08T11:11:11.131Z"
+      },
+      "outcome": "passed",
+      "observations": [
+        {
+          "kind": "binding",
+          "at": "2026-09-08T11:11:09.775Z",
+          "actor": "receiver-b1",
+          "target": null,
+          "outcome": "absent"
+        },
+        {
+          "kind": "receipt",
+          "at": "2026-09-08T11:11:09.775Z",
+          "actor": "receiver-b1",
+          "target": null,
+          "outcome": "queued"
+        },
+        {
+          "kind": "receipt",
+          "at": "2026-09-08T11:11:09.775Z",
+          "actor": "receiver-b1",
+          "target": null,
+          "outcome": "retrieved"
+        }
+      ],
+      "observationCount": 3,
+      "assertionCount": 8,
+      "cleanup": {
+        "attempted": true,
+        "outcome": "passed",
+        "ownedProcesses": "stopped",
+        "temporaryState": "removed"
+      }
+    },
+    {
+      "schemaVersion": 1,
+      "source": "real-client-capture",
+      "client": "codex-cli",
+      "caseId": "P11",
+      "phase": "product",
+      "clientVersion": "0.153.4",
+      "platform": "darwin-arm64",
+      "packageSha256": "ebe370dc8452fd14f1441138aacfd4a13b0f85c3b94ba710cec3ec35837e3ccb",
+      "roles": [
+        {
+          "role": "daemon-a",
+          "participantId": null,
+          "threadId": null
+        },
+        {
+          "role": "receiver-b1",
+          "participantId": "codex-J8AWR_",
+          "threadId": "01a080b7-0594-7a42-ac24-a78836f8bb34"
+        },
+        {
+          "role": "sender",
+          "participantId": "synthetic-sender",
+          "threadId": null
+        }
+      ],
+      "timestamps": {
+        "startedAt": "2026-09-08T11:11:48.616Z",
+        "idleSinceAt": null,
+        "preToolUseAt": null,
+        "queuedAt": null,
+        "stopAt": null,
+        "nextTurnAt": null,
+        "finishedAt": "2026-09-08T11:12:10.929Z"
+      },
+      "outcome": "passed",
+      "observations": [
+        {
+          "kind": "daemon",
+          "at": "2026-09-08T11:12:09.744Z",
+          "actor": "daemon-a",
+          "target": null,
+          "outcome": "stopped"
+        },
+        {
+          "kind": "consent",
+          "at": "2026-09-08T11:12:09.744Z",
+          "actor": "receiver-b1",
+          "target": null,
+          "outcome": "preserved"
+        },
+        {
+          "kind": "receipt",
+          "at": "2026-09-08T11:12:09.744Z",
+          "actor": "receiver-b1",
+          "target": null,
+          "outcome": "queued"
+        },
+        {
+          "kind": "binding",
+          "at": "2026-09-08T11:12:09.744Z",
+          "actor": "receiver-b1",
+          "target": null,
+          "outcome": "fresh"
+        }
+      ],
+      "observationCount": 4,
+      "assertionCount": 9,
+      "cleanup": {
+        "attempted": true,
+        "outcome": "passed",
+        "ownedProcesses": "stopped",
+        "temporaryState": "removed"
+      }
+    },
+    {
+      "schemaVersion": 1,
+      "source": "real-client-capture",
+      "client": "codex-cli",
+      "caseId": "P09",
+      "phase": "product",
+      "clientVersion": "0.153.4",
+      "platform": "darwin-arm64",
+      "packageSha256": "ebe370dc8452fd14f1441138aacfd4a13b0f85c3b94ba710cec3ec35837e3ccb",
+      "roles": [
+        {
+          "role": "daemon-a",
+          "participantId": null,
+          "threadId": null
+        },
+        {
+          "role": "receiver-b1",
+          "participantId": "codex-rYIQTo",
+          "threadId": "01a080b4-6578-7c72-bf6b-4b7e62cd2815"
+        },
+        {
+          "role": "sender",
+          "participantId": "synthetic-sender",
+          "threadId": null
+        },
+        {
+          "role": "receiver-b2",
+          "participantId": "codex-s5TbV0",
+          "threadId": "01a080b1-9217-7330-90c4-4874d57a824f"
+        },
+        {
+          "role": "unrelated-c1",
+          "participantId": "codex-G_EIMv",
+          "threadId": "01a080a9-d334-7ad1-b651-a973b647f571"
+        }
+      ],
+      "timestamps": {
+        "startedAt": "2026-09-08T11:12:21.157Z",
+        "idleSinceAt": null,
+        "preToolUseAt": null,
+        "queuedAt": null,
+        "stopAt": null,
+        "nextTurnAt": null,
+        "finishedAt": "2026-09-08T11:13:05.260Z"
+      },
+      "outcome": "passed",
+      "observations": [
+        {
+          "kind": "policy",
+          "at": "2026-09-08T11:13:05.260Z",
+          "actor": "receiver-b1",
+          "target": null,
+          "outcome": "disabled"
+        },
+        {
+          "kind": "receipt",
+          "at": "2026-09-08T11:13:05.260Z",
+          "actor": "receiver-b1",
+          "target": null,
+          "outcome": "queued"
+        },
+        {
+          "kind": "binding",
+          "at": "2026-09-08T11:13:05.260Z",
+          "actor": "receiver-b1",
+          "target": null,
+          "outcome": "retired"
+        },
+        {
+          "kind": "daemon",
+          "at": "2026-09-08T11:13:05.260Z",
+          "actor": "daemon-a",
+          "target": null,
+          "outcome": "running"
+        }
+      ],
+      "observationCount": 4,
+      "assertionCount": 7,
+      "cleanup": {
+        "attempted": true,
+        "outcome": "passed",
+        "ownedProcesses": "stopped",
+        "temporaryState": "removed"
+      }
+    },
+    {
+      "schemaVersion": 1,
+      "source": "real-client-capture",
+      "client": "codex-cli",
+      "caseId": "P19",
+      "phase": "product",
+      "clientVersion": "0.153.4",
+      "platform": "darwin-arm64",
+      "packageSha256": "ebe370dc8452fd14f1441138aacfd4a13b0f85c3b94ba710cec3ec35837e3ccb",
+      "roles": [
+        {
+          "role": "daemon-a",
+          "participantId": null,
+          "threadId": null
+        },
+        {
+          "role": "receiver-b1",
+          "participantId": "codex-rYIQTo",
+          "threadId": "01a080b4-6578-7c72-bf6b-4b7e62cd2815"
+        },
+        {
+          "role": "sender",
+          "participantId": "synthetic-sender",
+          "threadId": null
+        },
+        {
+          "role": "receiver-b2",
+          "participantId": "codex-s5TbV0",
+          "threadId": "01a080b1-9217-7330-90c4-4874d57a824f"
+        },
+        {
+          "role": "unrelated-c1",
+          "participantId": "codex-G_EIMv",
+          "threadId": "01a080a9-d334-7ad1-b651-a973b647f571"
+        }
+      ],
+      "timestamps": {
+        "startedAt": "2026-09-08T11:13:15.493Z",
+        "idleSinceAt": null,
+        "preToolUseAt": null,
+        "queuedAt": null,
+        "stopAt": null,
+        "nextTurnAt": null,
+        "finishedAt": "2026-09-08T11:13:15.951Z"
+      },
+      "outcome": "passed",
+      "observations": [
+        {
+          "kind": "consent",
+          "at": "2026-09-08T11:13:15.951Z",
+          "actor": "receiver-b1",
+          "target": null,
+          "outcome": "removed"
+        },
+        {
+          "kind": "receipt",
+          "at": "2026-09-08T11:13:15.951Z",
+          "actor": "receiver-b1",
+          "target": null,
+          "outcome": "queued"
+        },
+        {
+          "kind": "daemon",
+          "at": "2026-09-08T11:13:15.951Z",
+          "actor": "daemon-a",
+          "target": null,
+          "outcome": "running"
+        }
+      ],
+      "observationCount": 3,
+      "assertionCount": 9,
+      "cleanup": {
+        "attempted": true,
+        "outcome": "passed",
+        "ownedProcesses": "stopped",
+        "temporaryState": "removed"
+      }
+    }
+  ]
+}

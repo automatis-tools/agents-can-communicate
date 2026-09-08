@@ -41,21 +41,26 @@ messages.
 
 ## I enabled live delivery but got fallback
 
-`--delivery actionable|all` is recipient policy, not a capability switch. Only Claude Code
-2.1.258 and newer on macOS arm64 can take the live path; everything else is next-turn or
-inbox by design. When Claude does fall back, it is almost always one of these:
+`--delivery actionable|all` records recipient intent; delivery also needs a
+supported platform, current probe and exact session binding. Under `actionable`,
+a `note` stays queued with `delivery_disabled`.
 
-- **An old terminal.** The launcher is put on `PATH` by a line in `.zshrc`, which only new
-  interactive shells read. `which claude` must point into `…/acc/bin`.
-- **A failure from the last quarter hour.** Claude caches a failed channel connection in
-  `~/.claude/mcp-needs-auth-cache.json` and skips reconnecting for about fifteen minutes.
-  Remove the `acc` entry there and start the session again.
-- **A note.** Under `actionable`, only messages that need acting on are pushed; a `note`
-  reports `delivery_disabled` on purpose.
-- **Codex.** Its live capability was withdrawn, and `acc doctor` says why.
+For Codex, use your ordinary launch command with 0.152.1 or newer on Apple Silicon
+macOS. Its LocalDaemon must already be running, and trusted hooks must establish
+the receiver's exact thread and workspace. Embedded sessions, an absent socket,
+ambiguous recipients or failed identity checks retain durable inbox access.
+`acc doctor` reports current eligibility. ACC preserves requested consent through
+a temporary daemon outage and does not start the daemon for you.
 
-The installer therefore keeps effective policy off and reports exact-certified next-turn
-or inbox fallback. This is expected, not a partially working live route.
+For Claude Code, open a fresh interactive zsh after installation so its launcher
+is on PATH, and accept its visible development-channel warning. A failed channel
+connection may remain in Claude's `~/.claude/mcp-needs-auth-cache.json` for about
+fifteen minutes; remove only the `acc` entry and restart if that is the cause.
+
+Closing a Codex terminal can leave its daemon thread loaded and eligible. Use
+`acc install --adapter codex --delivery off` to stop new ACC native offers.
+Already accepted queue entries remain with the vendor. Actual thread archive
+requires Codex's confirmation and produces `SessionEnd`.
 
 ## Codex plugin is listed but inactive
 

@@ -1,0 +1,42 @@
+{
+  "source": "actual-core-memory-store-barrier-tests",
+  "sourceCommit": "0aca9aeffef0af90baf49e9445bf925ae625172c",
+  "mutation": "remove final authoritative current-binding gate and restore obsolete snapshot offer",
+  "protectedFacts": [
+    "zero adapter calls",
+    "queued delivery outcome",
+    "queued durable receipt",
+    "zero offer-success events"
+  ],
+  "results": [
+    {
+      "file": "final-fix-red.log",
+      "sha256": "af67b91c0dacc4370da1f1499e2ee3a1ca547be05d743751df399084deff5ef0",
+      "tests": 30,
+      "passed": 4,
+      "failed": 26
+    },
+    {
+      "file": "final-fix-mutation.log",
+      "sha256": "af7b3fe65908a511c790f47bf8ca4b3821a5868c01eb40c22a15dac572b2294b",
+      "tests": 30,
+      "passed": 4,
+      "failed": 26
+    },
+    {
+      "file": "final-fix-green.log",
+      "sha256": "aeacfc1d4b8df0b0bde90020db6792aaa2709864ec273b82f5911858a5048be1",
+      "tests": 30,
+      "passed": 30,
+      "failed": 0
+    },
+    {
+      "file": "final-fix-focused.log",
+      "sha256": "c3c565ce54c2da5fc32f9581fbd20cb585b5d4a2631226e75f9ac965a3a5fcdf",
+      "tests": 114,
+      "passed": 114,
+      "failed": 0
+    }
+  ],
+  "scope": "deterministic core regression, not a real-client capture"
+}

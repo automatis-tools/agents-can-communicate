@@ -1,0 +1,27 @@
+{
+  "client": "codex-cli",
+  "version": "0.152.1",
+  "platform": "darwin-arm64",
+  "observedAt": "2026-09-08T09:42:03.910Z",
+  "capability": "native_delivery",
+  "result": "pass",
+  "fixture": "codex-cli-0.152.1-local-daemon-product",
+  "launchMode": "ordinary-command-with-installed-hooks",
+  "protocolContract": "codex-app-server-thread-queue-v1",
+  "idle": "offered",
+  "busy": "queued_after_turn",
+  "reply": "routed",
+  "duplicate": "same_message_id",
+  "fallback": "queued",
+  "packageSha256": "a6a38da5a36911baabfbef0ccf934847fcf7b51000197264c273d21430f7fea2",
+  "limitations": [
+    "Observed on darwin-arm64 with an already-running LocalDaemon and ordinary commands; ACC adds no launch arguments and owns no vendor daemon lifecycle.",
+    "Recorded recipient opt-in and exact current thread, canonical cwd, live process, stable version and protocol checks are required for every session.",
+    "A 120-second delivery lease can refresh on demand for the same non-retired endpoint; this does not renew the 24-hour presence expiry.",
+    "Unsupported or Embedded sessions and unreachable or rejected endpoints retain durable inbox delivery; accepted vendor queue entries cannot be withdrawn by policy off or uninstall.",
+    "A loaded daemon thread may execute opted-in messages after its TUI exits. TUI detachment is not SessionEnd; explicit thread archive or actual server teardown retires it.",
+    "Transport deduplication covers a pending queue entry only. Execution can repeat after queue consumption and acknowledgement loss.",
+    "The observed reply loop uses the installed acc reply CLI; native delivery.replyRoute remains false. No new lifecycle, guard or next-turn certification follows.",
+    "P16 is controlled endpoint fault injection. P18 uses an actual legacy npm artifact; its unrelated Claude shell artifact is not a real Claude capability capture."
+  ]
+}

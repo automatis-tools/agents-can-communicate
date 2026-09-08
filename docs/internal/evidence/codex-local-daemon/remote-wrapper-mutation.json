@@ -1,0 +1,19 @@
+{
+  "source": "controlled-installed-package-mutation",
+  "mutation": "remote-wrapper",
+  "originalPackageSha256": "131ded0a90a8a03131e72fe5ebac87be62a5e19617675da06685429deb90d456",
+  "expectedFailure": "ordinary launch must preserve receiver B in hooks, actual cwd and daemon metadata",
+  "startedAt": "2026-09-08T05:27:33.603Z",
+  "caught": true,
+  "mutantPackageSha256": "e14051dbd46a402f86ad003fee7fb24f09315b1596d505c7caf4cf3b448c21da",
+  "client": "codex-cli",
+  "clientVersion": "0.152.1",
+  "platform": "darwin-arm64",
+  "cleanup": {
+    "attempted": true,
+    "outcome": "passed",
+    "ownedProcesses": "stopped",
+    "temporaryState": "removed"
+  },
+  "finishedAt": "2026-09-08T05:28:42.436Z"
+}

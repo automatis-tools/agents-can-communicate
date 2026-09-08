@@ -133,6 +133,21 @@ test("the result and the manifest contract are deeply frozen", () => {
   assert.equal(Object.isFrozen(contract.activationKinds), true);
 });
 
+test("native policy source defaults to bootstrap environment and accepts installation records", () => {
+  const recorded = adapter().nativeDelivery;
+  assert.equal(recorded.policySource, "bootstrap-environment");
+  const withRecord = defineAdapter(manifest({ nativeDelivery: {
+    ...nativeDelivery, policySource: "installation-record" } }));
+  assert.equal(withRecord.nativeDelivery.policySource, "installation-record");
+});
+
+test("an invalid native policy source is rejected instead of falling back", () => {
+  for (const policySource of [null, "", "environment", "INSTALLATION-RECORD"]) {
+    assert.throws(() => defineAdapter(manifest({ nativeDelivery: {
+      ...nativeDelivery, policySource } })), /policySource/);
+  }
+});
+
 test("unknown manifest and probe keys are rejected", () => {
   assert.throws(() => defineAdapter(manifest({ nativeDelivery: { ...nativeDelivery, maximum: "9.9.9" } })),
     /unknown nativeDelivery field maximum/);

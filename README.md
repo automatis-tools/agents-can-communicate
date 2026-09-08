@@ -79,13 +79,17 @@ session can pick them up later. Delivery depends on the client:
 | Codex CLI, Claude Code, Gemini CLI, Kimi Code | At the next normal turn on verified versions and platforms; otherwise by checking its ACC inbox. |
 | Grok or another client connected through [MCP](docs/MCP.md) | By checking its ACC inbox. |
 
-**Claude Code can also reply while idle.** This optional mode is experimental and off by
-default. It supports Apple Silicon Macs with zsh and Claude Code 2.1.258 or newer, subject
-to compatibility checks. It can spend model tokens and requires accepting Claude's
-development-channel warning at startup. Messages arriving mid-turn wait for it to finish.
+**Codex and Claude Code can also reply while idle.** These optional modes are
+experimental, off by default, and can spend model tokens. On Apple Silicon Macs,
+Codex 0.152.1 or newer requires an already-running LocalDaemon and an exact session
+check; ACC preserves your ordinary launch command. Claude Code 2.1.258 or newer
+requires zsh and its development-channel warning at startup. Messages arriving
+mid-turn wait for it to finish.
 
-Each direction follows the receiving client's rules: Claude's reply won't start a new
-Codex turn. Codex can pick it up on a supported next turn or by checking its inbox.
+Each direction follows the receiving client's policy and current reachability.
+A Codex thread retained by LocalDaemon can receive opted-in messages after its
+terminal exits. Turn ACC delivery off to prevent new native offers; already accepted
+queue entries remain with the client.
 
 [Full compatibility details](docs/CAPABILITIES.md).
 

@@ -1,0 +1,17 @@
+{
+  "source": "real-client-capture",
+  "scope": "partial-P13-record-validation",
+  "clientVersion": "0.153.4",
+  "packageSha256": "a6a38da5a36911baabfbef0ccf934847fcf7b51000197264c273d21430f7fea2",
+  "sourceSha256": "a3547272d5b2f7c3ea71e883a0a5641da74ba9f31880d244b01025379f300e6b",
+  "expected": "pass",
+  "prerequisitePassed": true,
+  "validated": true,
+  "validationError": null,
+  "cleanup": {
+    "attempted": true,
+    "outcome": "passed",
+    "ownedProcesses": "stopped",
+    "temporaryState": "removed"
+  }
+}

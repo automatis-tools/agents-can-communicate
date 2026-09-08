@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "source": "controlled-real-transport-failure",
+  "client": "codex-cli",
+  "startedAt": "2026-09-08T05:25:45.195Z",
+  "productCertified": false,
+  "result": "passed",
+  "clientVersion": "0.152.1",
+  "platform": "darwin-arm64",
+  "packageSha256": "131ded0a90a8a03131e72fe5ebac87be62a5e19617675da06685429deb90d456",
+  "threadId": "01a07f7a-ca32-70f0-b8c1-5e8951015480",
+  "messageId": "message_Tm8qaTal7-k0HNs8c5n7mg",
+  "lostAcknowledgement": "injected-after-acceptance",
+  "initialOffer": "transport_error",
+  "durableReceiptBeforeSubmission": "queued",
+  "durableReceiptBeforeRetry": "retrieved",
+  "consumedBeforeRetry": true,
+  "retryAccepted": true,
+  "observedCommandExecutions": 2,
+  "limitation": "Queue idempotency applies while an entry remains pending; execution may repeat after consumption.",
+  "cleanup": {
+    "attempted": true,
+    "outcome": "passed",
+    "ownedProcesses": "stopped",
+    "temporaryState": "removed"
+  },
+  "finishedAt": "2026-09-08T05:28:38.158Z"
+}

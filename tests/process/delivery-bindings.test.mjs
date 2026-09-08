@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
-import { mkdir, mkdtemp, realpath, rm } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, readFile, realpath, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -18,19 +18,45 @@ import { createFakeIds } from "../helpers/memory-store.mjs";
 const run = promisify(execFile);
 const repo = path.resolve(import.meta.dirname, "..", "..");
 const acc = path.join(repo, "bin", "acc.mjs");
+const shellLiteral = value => `'${String(value).replaceAll("'", "'\"'\"'")}'`;
 
 async function machine(t) {
   const home = await realpath(await mkdtemp(path.join(tmpdir(), "acc-delivery-home-")));
   const dataHome = await realpath(await mkdtemp(path.join(tmpdir(), "acc-delivery-data-")));
   const project = path.join(home, "project");
-  await mkdir(project);
+  const codexHome = path.join(home, ".codex");
+  const bin = path.join(home, "bin");
+  const argvLog = path.join(home, "fake-codex-argv.log");
+  await Promise.all([mkdir(project), mkdir(codexHome, { recursive: true }), mkdir(bin)]);
+  await writeFile(path.join(codexHome, "config.toml"), 'model = "gpt-5"\n');
+  const codex = path.join(bin, "codex");
+  await writeFile(codex, `#!/bin/sh
+printf '%s|%s|%s\\n' "$CODEX_HOME" "$#" "$*" >> ${shellLiteral(argvLog)}
+printf '%s\\n' 'codex-cli 0.153.4'
+`);
+  await chmod(codex, 0o755);
   t.after(() => Promise.all([home, dataHome]
     .map(directory => rm(directory, { recursive: true, force: true }))));
-  const env = { ...process.env, HOME: home, ACC_DATA_HOME: dataHome,
-    ACC_NO_UPDATE_CHECK: "1", GIT_DIR: "", GIT_WORK_TREE: "" };
+  // The ACC process needs only this disposable fake client plus system shell
+  // tools. Do not inherit operator ACC, Codex, or Node environment state.
+  const env = { PATH: [bin, "/usr/bin", "/bin"].join(path.delimiter), HOME: home,
+    CODEX_HOME: codexHome, ACC_DATA_HOME: dataHome, ACC_NO_UPDATE_CHECK: "1",
+    ACC_PROBE_TIMEOUT_MS: "30000", GIT_DIR: "", GIT_WORK_TREE: "" };
   const command = (...args) => run(process.execPath, [acc, ...args, "--cwd", project, "--json"],
     { env });
-  return { command, dataHome, env, home, project };
+  const argv = async () => (await readFile(argvLog, "utf8")).trimEnd().split("\n")
+    .filter(Boolean).map(line => {
+      const [observedHome, argc, args] = line.split("|");
+      return { home: observedHome, argc: Number(argc), args };
+    });
+  return { argv, codexHome, command, dataHome, env, home, project };
+}
+
+async function assertOnlyVersionProbes(place) {
+  const calls = await place.argv();
+  assert.ok(calls.length > 0, "ACC never probed the isolated fake Codex executable");
+  assert.deepEqual(calls, calls.map(() => ({ home: place.codexHome, argc: 1, args: "--version" })),
+    "the dry run started a daemon or rewrote Codex launch arguments");
 }
 
 test("the executable reports a binding without exposing its endpoint", async t => {
@@ -56,16 +82,21 @@ test("the executable reports a binding without exposing its endpoint", async t =
   assert.equal(JSON.stringify(status).includes("never-print-this-endpoint"), false);
 });
 
-test("installed CLI carries requested delivery but real adapters remain fallback-only", async t => {
+test("requested Codex consent stays off without an isolated LocalDaemon session", async t => {
   const place = await machine(t);
-  const result = JSON.parse((await run(process.execPath, [acc, "install", "--adapter", "codex",
-    "--delivery", "actionable", "--home", place.home, "--dry-run", "--json"],
-  { env: place.env })).stdout).data;
+  const result = JSON.parse((await place.command("install", "--adapter", "codex",
+    "--delivery", "actionable", "--home", place.home, "--dry-run")).stdout).data;
   const [operation] = result.plan.operations;
 
   assert.equal(operation.livePolicy, "actionable");
   assert.equal(operation.effectiveLivePolicy, "off");
-  assert.match(operation.deliveryDiagnostic, /durable fallback/);
+  assert.equal(operation.clientVersion, "0.153.4");
+  assert.match(operation.deliveryDiagnostic, /recorded.*consent/i);
+  assert.match(operation.deliveryDiagnostic, /does not start, restart or stop.*daemon/i);
+  assert.match(operation.deliveryDiagnostic, /next-turn.*acc inbox/i);
+  await assertOnlyVersionProbes(place);
+  await assert.rejects(stat(path.join(place.codexHome, "app-server-control")), { code: "ENOENT" },
+    "the dry run created a LocalDaemon control directory");
 });
 
 test("filesystem composition records before an offer failure and keeps command success", async t => {

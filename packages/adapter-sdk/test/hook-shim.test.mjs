@@ -119,6 +119,16 @@ test("a path with a space in it survives being written into a shell script", asy
   assert.match((await here.fire(shim)).stdout, /ran /);
 });
 
+test("an optional data home is exported as a literal path to the hook runner", async t => {
+  const here = await place(t);
+  const dataHome = path.join(here.root, "data home ' $() `literal`");
+  const node = await here.script("node", 'printf "%s\\n" "$ACC_DATA_HOME"');
+  const shim = await writeHookShim({ dir: here.root, adapterId: "codex",
+    dataHome, node, runner: here.runner });
+
+  assert.equal((await here.fire(shim)).stdout, `${dataHome}\n`);
+});
+
 test("a linked binary that cannot run without node is not run", async t => {
   const here = await place(t);
   const shim = await writeHookShim({ dir: here.root, adapterId: "claude_code",

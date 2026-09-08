@@ -1,0 +1,1912 @@
+{
+  "generatedAt": "2026-09-08T11:14:02.939Z",
+  "note": "Historical attempts are retained individually. Passing selected cases or complete older harness receipts are not final-artifact certification.",
+  "attempts": [
+    {
+      "attempt": "transport-01521",
+      "receipt": "transport-01521/incomplete-evidence.json",
+      "receiptSha256": "0cd0dd17e325fb0597877b0fbe0b9bf1a9e6dd2ad29b452b7921c71b4281abf7",
+      "clientVersion": "0.152.1",
+      "phase": "transport",
+      "packageSha256": "2535dbf1feb5f9366c6022d4f599ea5125cb5ea28c93c49a76702acdb046ed5a",
+      "startedAt": "2026-09-08T04:12:32.323Z",
+      "finishedAt": "2026-09-08T04:13:07.287Z",
+      "fullMatrixValidated": false,
+      "passedCases": [],
+      "assertions": 0,
+      "cleanupOutcome": "passed",
+      "failure": null
+    },
+    {
+      "attempt": "transport-01521",
+      "receipt": "transport-01521/evidence.json",
+      "receiptSha256": "ce2532fa93f817795dc747a2d4e00329d93fa15df3a7ff150747664855ba535c",
+      "clientVersion": "0.152.1",
+      "phase": "transport",
+      "packageSha256": "2535dbf1feb5f9366c6022d4f599ea5125cb5ea28c93c49a76702acdb046ed5a",
+      "startedAt": "2026-09-08T04:14:28.607Z",
+      "finishedAt": "2026-09-08T04:16:16.865Z",
+      "fullMatrixValidated": false,
+      "passedCases": [
+        "T01",
+        "T02",
+        "T03",
+        "T04"
+      ],
+      "assertions": 14,
+      "cleanupOutcome": "passed",
+      "failure": null
+    },
+    {
+      "attempt": "transport-01534",
+      "receipt": "transport-01534/incomplete-evidence.json",
+      "receiptSha256": "7ba763675267a5eebbfb8a69cfeefb6900db8c2de60581b301b3c34415114845",
+      "clientVersion": "0.153.4",
+      "phase": "transport",
+      "packageSha256": "2535dbf1feb5f9366c6022d4f599ea5125cb5ea28c93c49a76702acdb046ed5a",
+      "startedAt": "2026-09-08T04:18:20.405Z",
+      "finishedAt": "2026-09-08T04:18:52.261Z",
+      "fullMatrixValidated": false,
+      "passedCases": [],
+      "assertions": 0,
+      "cleanupOutcome": "passed",
+      "failure": null
+    },
+    {
+      "attempt": "transport-01534-3",
+      "receipt": "transport-01534-3/incomplete-evidence.json",
+      "receiptSha256": "9abd07cc9c8b706e5b6b3727a146330646f210dab25886a17bbb978b0a5ed620",
+      "clientVersion": "0.153.4",
+      "phase": "transport",
+      "packageSha256": "2535dbf1feb5f9366c6022d4f599ea5125cb5ea28c93c49a76702acdb046ed5a",
+      "startedAt": "2026-09-08T04:24:38.173Z",
+      "finishedAt": "2026-09-08T04:28:15.910Z",
+      "fullMatrixValidated": false,
+      "passedCases": [
+        "T01",
+        "T02",
+        "T03",
+        "T04"
+      ],
+      "assertions": 14,
+      "cleanupOutcome": "failed",
+      "failure": null
+    },
+    {
+      "attempt": "product-01521-base-1",
+      "receipt": "product-01521-base-1/incomplete-evidence.json",
+      "receiptSha256": "dc5e03d8c245a0a77d49ca7e7bc16e5a13fb6b45aca39bec5de7376196817309",
+      "clientVersion": "0.152.1",
+      "phase": "product",
+      "packageSha256": "776222b2724436eb8b19877be1cfc1d95963ad53804f4b26fd040dab939cff2d",
+      "startedAt": "2026-09-08T04:34:48.181Z",
+      "finishedAt": "2026-09-08T04:35:20.479Z",
+      "fullMatrixValidated": false,
+      "passedCases": [],
+      "assertions": 0,
+      "cleanupOutcome": "passed",
+      "failure": null
+    },
+    {
+      "attempt": "product-01521-diagnostic-2",
+      "receipt": "product-01521-diagnostic-2/incomplete-evidence.json",
+      "receiptSha256": "2feb891640a8eccc5ed43ec6bf215099303be65d2e970f15c99f4f34c3e5ae35",
+      "clientVersion": "0.152.1",
+      "phase": "product",
+      "packageSha256": "776222b2724436eb8b19877be1cfc1d95963ad53804f4b26fd040dab939cff2d",
+      "startedAt": "2026-09-08T04:37:35.085Z",
+      "finishedAt": "2026-09-08T04:38:07.183Z",
+      "fullMatrixValidated": false,
+      "passedCases": [],
+      "assertions": 0,
+      "cleanupOutcome": "passed",
+      "failure": null
+    },
+    {
+      "attempt": "product-01521-diagnostic-3",
+      "receipt": "product-01521-diagnostic-3/incomplete-evidence.json",
+      "receiptSha256": "50f4560d1a438f51564e39e0038ab7ed87f824089fd107366dcfe23086482017",
+      "clientVersion": "0.152.1",
+      "phase": "product",
+      "packageSha256": "776222b2724436eb8b19877be1cfc1d95963ad53804f4b26fd040dab939cff2d",
+      "startedAt": "2026-09-08T04:39:28.735Z",
+      "finishedAt": "2026-09-08T04:39:59.781Z",
+      "fullMatrixValidated": false,
+      "passedCases": [],
+      "assertions": 0,
+      "cleanupOutcome": "passed",
+      "failure": null
+    },
+    {
+      "attempt": "product-01521-binding-diagnostic",
+      "receipt": "product-01521-binding-diagnostic/incomplete-evidence.json",
+      "receiptSha256": "8c4920e78661bd5076c04571282f24240110bf930ddb99f7ce7c97e46e4cc583",
+      "clientVersion": "0.152.1",
+      "phase": "product",
+      "packageSha256": "776222b2724436eb8b19877be1cfc1d95963ad53804f4b26fd040dab939cff2d",
+      "startedAt": "2026-09-08T04:41:00.461Z",
+      "finishedAt": "2026-09-08T04:41:22.458Z",
+      "fullMatrixValidated": false,
+      "passedCases": [],
+      "assertions": 0,
+      "cleanupOutcome": "passed",
+      "failure": null
+    },
+    {
+      "attempt": "product-01521-binding-diagnostic-2",
+      "receipt": "product-01521-binding-diagnostic-2/incomplete-evidence.json",
+      "receiptSha256": "2293d4490ee1a232e16a71b7433aa8548939a648338edd7c0c30b9c66761d7cd",
+      "clientVersion": "0.152.1",
+      "phase": "product",
+      "packageSha256": "776222b2724436eb8b19877be1cfc1d95963ad53804f4b26fd040dab939cff2d",
+      "startedAt": "2026-09-08T04:44:08.401Z",
+      "finishedAt": "2026-09-08T04:45:15.285Z",
+      "fullMatrixValidated": false,
+      "passedCases": [],
+      "assertions": 0,
+      "cleanupOutcome": "passed",
+      "failure": null
+    },
+    {
+      "attempt": "product-01521-base-2",
+      "receipt": "product-01521-base-2/incomplete-evidence.json",
+      "receiptSha256": "e8363be6b1507677eb7020a0fd8f89253378bb58ebbff1f7a68ce352039a6e8b",
+      "clientVersion": "0.152.1",
+      "phase": "product",
+      "packageSha256": "0de0a5e723b1939441e9e2ea2bf258e4553c139c8c18d1ce2fb3eb91b18e1a08",
+      "startedAt": "2026-09-08T04:47:16.772Z",
+      "finishedAt": "2026-09-08T04:48:22.830Z",
+      "fullMatrixValidated": false,
+      "passedCases": [
+        "P01"
+      ],
+      "assertions": 10,
+      "cleanupOutcome": "passed",
+      "failure": null
+    },
+    {
+      "attempt": "product-01521-base-3",
+      "receipt": "product-01521-base-3/incomplete-evidence.json",
+      "receiptSha256": "d278a942953c4bd851673002417cdbe6bae8f1b91a3166ae3e6e1ce1240612ab",
+      "clientVersion": "0.152.1",
+      "phase": "product",
+      "packageSha256": "0de0a5e723b1939441e9e2ea2bf258e4553c139c8c18d1ce2fb3eb91b18e1a08",
+      "startedAt": "2026-09-08T04:50:18.119Z",
+      "finishedAt": "2026-09-08T04:53:14.803Z",
+      "fullMatrixValidated": false,
+      "passedCases": [
+        "P01",
+        "P02"
+      ],
+      "assertions": 19,
+      "cleanupOutcome": "passed",
+      "failure": null
+    },
+    {
+      "attempt": "product-01521-cold-1",
+      "receipt": "product-01521-cold-1/incomplete-evidence.json",
+      "receiptSha256": "58e4d113f30a402b0d1a49869af9a752cded356ce1f218559b654d45d6329482",
+      "clientVersion": "0.152.1",
+      "phase": "product",
+      "packageSha256": "0de0a5e723b1939441e9e2ea2bf258e4553c139c8c18d1ce2fb3eb91b18e1a08",
+      "startedAt": "2026-09-08T04:54:03.946Z",
+      "finishedAt": "2026-09-08T04:58:27.872Z",
+      "fullMatrixValidated": false,
+      "passedCases": [
+        "P01",
+        "P03",
+        "P06",
+        "P04"
+      ],
+      "assertions": 38,
+      "cleanupOutcome": "passed",
+      "failure": null
+    },
+    {
+      "attempt": "transport-01534-final-1",
+      "receipt": "transport-01534-final-1/evidence.json",
+      "receiptSha256": "07613eb933d69eee868f7ce843dff40629340328555d6005eec42f8e300dfbdb",
+      "clientVersion": "0.153.4",
+      "phase": "transport",
+      "packageSha256": "e2e25b2c84d9ba389f41617be1c28e66da4653d93a2745d4cf9fa2a91582dc1b",
+      "startedAt": "2026-09-08T04:57:31.987Z",
+      "finishedAt": "2026-09-08T04:59:56.373Z",
+      "fullMatrixValidated": false,
+      "passedCases": [
+        "T01",
+        "T02",
+        "T03",
+        "T04"
+      ],
+      "assertions": 14,
+      "cleanupOutcome": "passed",
+      "failure": null
+    },
+    {
+      "attempt": "product-01521-cold-2",
+      "receipt": "product-01521-cold-2/incomplete-evidence.json",
+      "receiptSha256": "113d1d189fda08425fd74100e980e8474c2240b61f5c56de35214192c7753078",
+      "clientVersion": "0.152.1",
+      "phase": "product",
+      "packageSha256": "0de0a5e723b1939441e9e2ea2bf258e4553c139c8c18d1ce2fb3eb91b18e1a08",
+      "startedAt": "2026-09-08T05:00:59.953Z",
+      "finishedAt": "2026-09-08T05:05:03.657Z",
+      "fullMatrixValidated": false,
+      "passedCases": [
+        "P01",
+        "P03",
+        "P06",
+        "P04"
+      ],
+      "assertions": 38,
+      "cleanupOutcome": "passed",
+      "failure": null
+    },
+    {
+      "attempt": "product-01534-cold-1",
+      "receipt": "product-01534-cold-1/incomplete-evidence.json",
+      "receiptSha256": "6dda71bc154779636c221bc9efe9e4dd668a637a989fbd97af041071536a9f64",
+      "clientVersion": "0.153.4",
+      "phase": "product",
+      "packageSha256": "0de0a5e723b1939441e9e2ea2bf258e4553c139c8c18d1ce2fb3eb91b18e1a08",
+      "startedAt": "2026-09-08T05:01:02.204Z",
+      "finishedAt": "2026-09-08T05:05:35.655Z",
+      "fullMatrixValidated": false,
+      "passedCases": [
+        "P01",
+        "P03",
+        "P06",
+        "P04"
+      ],
+      "assertions": 38,
+      "cleanupOutcome": "passed",
+      "failure": null
+    },
+    {
+      "attempt": "product-01521-core-matrix-1",
+      "receipt": "product-01521-core-matrix-1/incomplete-evidence.json",
+      "receiptSha256": "9dd471b93ab1c16ada43163ba9bbe4e08bad25575ddc1118aa996ee598c6e5de",
+      "clientVersion": "0.152.1",
+      "phase": "product",
+      "packageSha256": "0de0a5e723b1939441e9e2ea2bf258e4553c139c8c18d1ce2fb3eb91b18e1a08",
+      "startedAt": "2026-09-08T05:08:57.763Z",
+      "finishedAt": "2026-09-08T05:15:23.987Z",
+      "fullMatrixValidated": false,
+      "passedCases": [
+        "P01",
+        "P03",
+        "P06",
+        "P04",
+        "P05",
+        "P07",
+        "P08",
+        "P15",
+        "P16",
+        "P17",
+        "P09",
+        "P19"
+      ],
+      "assertions": 115,
+      "cleanupOutcome": "passed",
+      "failure": null
+    },
+    {
+      "attempt": "product-01534-cold-2",
+      "receipt": "product-01534-cold-2/incomplete-evidence.json",
+      "receiptSha256": "f3b2d66c9de9dedbebbb23ef09f164ce0eef72b96cbae504b2464b0c9bbeeb1c",
+      "clientVersion": "0.153.4",
+      "phase": "product",
+      "packageSha256": "0de0a5e723b1939441e9e2ea2bf258e4553c139c8c18d1ce2fb3eb91b18e1a08",
+      "startedAt": "2026-09-08T05:09:05.551Z",
+      "finishedAt": "2026-09-08T05:13:23.537Z",
+      "fullMatrixValidated": false,
+      "passedCases": [
+        "P01",
+        "P03",
+        "P06",
+        "P04"
+      ],
+      "assertions": 38,
+      "cleanupOutcome": "passed",
+      "failure": null
+    },
+    {
+      "attempt": "product-01534-modes-1",
+      "receipt": "product-01534-modes-1/incomplete-evidence.json",
+      "receiptSha256": "39e76a840257fb970e00458c78a182096e1402e748a2bb58c359d92080a96fb8",
+      "clientVersion": "0.153.4",
+      "phase": "product",
+      "packageSha256": "0de0a5e723b1939441e9e2ea2bf258e4553c139c8c18d1ce2fb3eb91b18e1a08",
+      "startedAt": "2026-09-08T05:17:20.180Z",
+      "finishedAt": "2026-09-08T05:21:04.451Z",
+      "fullMatrixValidated": false,
+      "passedCases": [
+        "P01",
+        "P12",
+        "P13"
+      ],
+      "assertions": 18,
+      "cleanupOutcome": "passed",
+      "failure": null
+    },
+    {
+      "attempt": "product-01521-modes-1",
+      "receipt": "product-01521-modes-1/incomplete-evidence.json",
+      "receiptSha256": "ebffe6304ff9b8f783fc57fa025b9c0684eac64fec3bf360d884ea76029b818e",
+      "clientVersion": "0.152.1",
+      "phase": "product",
+      "packageSha256": "0de0a5e723b1939441e9e2ea2bf258e4553c139c8c18d1ce2fb3eb91b18e1a08",
+      "startedAt": "2026-09-08T05:17:22.408Z",
+      "finishedAt": "2026-09-08T05:20:54.512Z",
+      "fullMatrixValidated": false,
+      "passedCases": [
+        "P01",
+        "P12",
+        "P13"
+      ],
+      "assertions": 18,
+      "cleanupOutcome": "passed",
+      "failure": null
+    },
+    {
+      "attempt": "product-01534-modes-2",
+      "receipt": "product-01534-modes-2/incomplete-evidence.json",
+      "receiptSha256": "5ebebebe31ebdae5561fe071fc2687b39e6d24d1f71a35bb34def64c0b516c82",
+      "clientVersion": "0.153.4",
+      "phase": "product",
+      "packageSha256": "131ded0a90a8a03131e72fe5ebac87be62a5e19617675da06685429deb90d456",
+      "startedAt": "2026-09-08T05:22:19.968Z",
+      "finishedAt": "2026-09-08T05:23:25.064Z",
+      "fullMatrixValidated": false,
+      "passedCases": [
+        "P01"
+      ],
+      "assertions": 10,
+      "cleanupOutcome": "passed",
+      "failure": null
+    },
+    {
+      "attempt": "product-01521-modes-2",
+      "receipt": "product-01521-modes-2/incomplete-evidence.json",
+      "receiptSha256": "756e60641ea001d08745a0be20305381f8a3d9fe22ec07df32d8de5fcb798d7c",
+      "clientVersion": "0.152.1",
+      "phase": "product",
+      "packageSha256": "131ded0a90a8a03131e72fe5ebac87be62a5e19617675da06685429deb90d456",
+      "startedAt": "2026-09-08T05:22:22.348Z",
+      "finishedAt": "2026-09-08T05:23:45.130Z",
+      "fullMatrixValidated": false,
+      "passedCases": [
+        "P01"
+      ],
+      "assertions": 10,
+      "cleanupOutcome": "passed",
+      "failure": null
+    },
+    {
+      "attempt": "product-01534-full-1",
+      "receipt": "product-01534-full-1/incomplete-evidence.json",
+      "receiptSha256": "373167421cbbc4a3edabe9aef1487596fde639985aee12d498319979b4111284",
+      "clientVersion": "0.153.4",
+      "phase": "product",
+      "packageSha256": "131ded0a90a8a03131e72fe5ebac87be62a5e19617675da06685429deb90d456",
+      "startedAt": "2026-09-08T05:25:27.961Z",
+      "finishedAt": "2026-09-08T05:36:32.663Z",
+      "fullMatrixValidated": false,
+      "passedCases": [
+        "P01",
+        "P02",
+        "P03",
+        "P06",
+        "P04",
+        "P05",
+        "P07",
+        "P08",
+        "P15",
+        "P16",
+        "P17",
+        "P12",
+        "P13"
+      ],
+      "assertions": 116,
+      "cleanupOutcome": "passed",
+      "failure": null
+    },
+    {
+      "attempt": "product-01521-full-1",
+      "receipt": "product-01521-full-1/incomplete-evidence.json",
+      "receiptSha256": "be1a0463d747febc17ae4dd949b89a9f77cccb9fff376a59c210c6f72d923f63",
+      "clientVersion": "0.152.1",
+      "phase": "product",
+      "packageSha256": "131ded0a90a8a03131e72fe5ebac87be62a5e19617675da06685429deb90d456",
+      "startedAt": "2026-09-08T05:25:29.320Z",
+      "finishedAt": "2026-09-08T05:37:56.858Z",
+      "fullMatrixValidated": false,
+      "passedCases": [
+        "P01",
+        "P02",
+        "P03",
+        "P06",
+        "P04",
+        "P05",
+        "P07",
+        "P08",
+        "P15",
+        "P16",
+        "P17",
+        "P12",
+        "P13"
+      ],
+      "assertions": 116,
+      "cleanupOutcome": "passed",
+      "failure": null
+    },
+    {
+      "attempt": "product-01534-recovery-1",
+      "receipt": "product-01534-recovery-1/incomplete-evidence.json",
+      "receiptSha256": "3a652bd00a89135bb38fe1f8f8be27ac4a3497a7a0a5ffbb92c07117bcc6feda",
+      "clientVersion": "0.153.4",
+      "phase": "product",
+      "packageSha256": "131ded0a90a8a03131e72fe5ebac87be62a5e19617675da06685429deb90d456",
+      "startedAt": "2026-09-08T05:41:56.881Z",
+      "finishedAt": "2026-09-08T05:45:50.431Z",
+      "fullMatrixValidated": false,
+      "passedCases": [
+        "P01",
+        "P18",
+        "P20",
+        "P10",
+        "P11"
+      ],
+      "assertions": 51,
+      "cleanupOutcome": "passed",
+      "failure": null
+    },
+    {
+      "attempt": "product-01534-cd-diagnostic-1",
+      "receipt": "product-01534-cd-diagnostic-1/incomplete-evidence.json",
+      "receiptSha256": "3c8bc2171e6d2e144e06be2bab2b5c549c1b6db93e787a120d31476078baf041",
+      "clientVersion": "0.153.4",
+      "phase": "product",
+      "packageSha256": "131ded0a90a8a03131e72fe5ebac87be62a5e19617675da06685429deb90d456",
+      "startedAt": "2026-09-08T05:41:57.133Z",
+      "finishedAt": "2026-09-08T05:43:46.481Z",
+      "fullMatrixValidated": false,
+      "passedCases": [],
+      "assertions": 0,
+      "cleanupOutcome": "passed",
+      "failure": null
+    },
+    {
+      "attempt": "product-01521-recovery-1",
+      "receipt": "product-01521-recovery-1/incomplete-evidence.json",
+      "receiptSha256": "39777072199abf4c4b9b0a38d669de07c8cd79095717f6a45c896b2c71747069",
+      "clientVersion": "0.152.1",
+      "phase": "product",
+      "packageSha256": "131ded0a90a8a03131e72fe5ebac87be62a5e19617675da06685429deb90d456",
+      "startedAt": "2026-09-08T05:41:57.191Z",
+      "finishedAt": "2026-09-08T05:43:39.013Z",
+      "fullMatrixValidated": false,
+      "passedCases": [
+        "P01",
+        "P18"
+      ],
+      "assertions": 28,
+      "cleanupOutcome": "passed",
+      "failure": null
+    },
+    {
+      "attempt": "transport-01521-reviewed-2",
+      "receipt": "transport-01521-reviewed-2/evidence.json",
+      "receiptSha256": "911a8e451bd726aedfb2be9379ed521e4042b2c7a8be1f280349dbeabc101cf1",
+      "clientVersion": "0.152.1",
+      "phase": "transport",
+      "packageSha256": "bdd78a4c1978f05322e156737660a43150971beecdcdc45985afaa66faa349dc",
+      "startedAt": "2026-09-08T06:20:52.999Z",
+      "finishedAt": "2026-09-08T06:23:41.408Z",
+      "fullMatrixValidated": true,
+      "passedCases": [
+        "T01",
+        "T02",
+        "T03",
+        "T04"
+      ],
+      "assertions": 15,
+      "cleanupOutcome": "passed",
+      "failure": null
+    },
+    {
+      "attempt": "transport-01534-reviewed-2",
+      "receipt": "transport-01534-reviewed-2/incomplete-evidence.json",
+      "receiptSha256": "40f3a37c76367b8a45309376e0c2e02bf84cd03cc16000f68a393543179570ad",
+      "clientVersion": "0.153.4",
+      "phase": "transport",
+      "packageSha256": "bdd78a4c1978f05322e156737660a43150971beecdcdc45985afaa66faa349dc",
+      "startedAt": "2026-09-08T06:20:54.160Z",
+      "finishedAt": "2026-09-08T06:24:16.617Z",
+      "fullMatrixValidated": false,
+      "passedCases": [
+        "T01"
+      ],
+      "assertions": 4,
+      "cleanupOutcome": "passed",
+      "failure": {
+        "stage": "runner",
+        "error": "deadline: marker transport-idle.txt"
+      }
+    },
+    {
+      "attempt": "product-01521-full-2",
+      "receipt": "product-01521-full-2/incomplete-evidence.json",
+      "receiptSha256": "923cbaa9234f2104dcb0739b761a81302f06584646821536eb99316d99973e3d",
+      "clientVersion": "0.152.1",
+      "phase": "product",
+      "packageSha256": "9d39fb87a2c529f0c602ba13820ae281d2054302fc6c10d13583e8bcf18ba6bf",
+      "startedAt": "2026-09-08T06:24:55.932Z",
+      "finishedAt": "2026-09-08T06:33:05.833Z",
+      "fullMatrixValidated": false,
+      "passedCases": [
+        "P01",
+        "P02",
+        "P03",
+        "P06",
+        "P04",
+        "P05",
+        "P07"
+      ],
+      "assertions": 63,
+      "cleanupOutcome": "passed",
+      "failure": {
+        "stage": "runner",
+        "error": "The \"message\" argument must be one of type string or function. Received undefined"
+      }
+    },
+    {
+      "attempt": "product-01534-full-2",
+      "receipt": "product-01534-full-2/incomplete-evidence.json",
+      "receiptSha256": "f1f42c3cd4deeac4f9574b6df5d6abd27162b44d86d14556105fb5b69d37764e",
+      "clientVersion": "0.153.4",
+      "phase": "product",
+      "packageSha256": "9d39fb87a2c529f0c602ba13820ae281d2054302fc6c10d13583e8bcf18ba6bf",
+      "startedAt": "2026-09-08T06:24:58.828Z",
+      "finishedAt": "2026-09-08T06:33:46.892Z",
+      "fullMatrixValidated": false,
+      "passedCases": [
+        "P01",
+        "P02",
+        "P03",
+        "P06",
+        "P04",
+        "P05",
+        "P07"
+      ],
+      "assertions": 63,
+      "cleanupOutcome": "passed",
+      "failure": {
+        "stage": "runner",
+        "error": "The \"message\" argument must be one of type string or function. Received undefined"
+      }
+    },
+    {
+      "attempt": "transport-01534-reviewed-3",
+      "receipt": "transport-01534-reviewed-3/evidence.json",
+      "receiptSha256": "2fb31e3a8503582472b2589f2009e39e0d8a6b91f6c361682eaa3989eafef4c2",
+      "clientVersion": "0.153.4",
+      "phase": "transport",
+      "packageSha256": "bdd78a4c1978f05322e156737660a43150971beecdcdc45985afaa66faa349dc",
+      "startedAt": "2026-09-08T06:27:01.695Z",
+      "finishedAt": "2026-09-08T06:30:02.382Z",
+      "fullMatrixValidated": true,
+      "passedCases": [
+        "T01",
+        "T02",
+        "T03",
+        "T04"
+      ],
+      "assertions": 15,
+      "cleanupOutcome": "passed",
+      "failure": null
+    },
+    {
+      "attempt": "product-01534-policy-diagnostic-2",
+      "receipt": "product-01534-policy-diagnostic-2/incomplete-evidence.json",
+      "receiptSha256": "11eb8ddcf77cf6f4471acb400d76321de488e46efed97e90de8a8b6574ab52f2",
+      "clientVersion": "0.153.4",
+      "phase": "product",
+      "packageSha256": "9d39fb87a2c529f0c602ba13820ae281d2054302fc6c10d13583e8bcf18ba6bf",
+      "startedAt": "2026-09-08T06:38:54.859Z",
+      "finishedAt": "2026-09-08T06:38:56.195Z",
+      "fullMatrixValidated": false,
+      "passedCases": [],
+      "assertions": 0,
+      "cleanupOutcome": "passed",
+      "failure": {
+        "stage": "runner",
+        "error": "PTY control: KeyError"
+      }
+    },
+    {
+      "attempt": "product-01534-policy-diagnostic-3",
+      "receipt": "product-01534-policy-diagnostic-3/incomplete-evidence.json",
+      "receiptSha256": "b0b09c865ce3f60a8e3837dee7e2393306f9e72787dbd679b453050b2bc71da1",
+      "clientVersion": "0.153.4",
+      "phase": "product",
+      "packageSha256": "9d39fb87a2c529f0c602ba13820ae281d2054302fc6c10d13583e8bcf18ba6bf",
+      "startedAt": "2026-09-08T06:40:39.950Z",
+      "finishedAt": "2026-09-08T06:42:41.159Z",
+      "fullMatrixValidated": false,
+      "passedCases": [
+        "P01",
+        "P08"
+      ],
+      "assertions": 17,
+      "cleanupOutcome": "passed",
+      "failure": {
+        "stage": "runner",
+        "error": "requested partial diagnostic ended at P08; complete product matrix not certified"
+      }
+    },
+    {
+      "attempt": "product-01521-full-3",
+      "receipt": "product-01521-full-3/incomplete-evidence.json",
+      "receiptSha256": "c248c56f4aeb30c8e4a4c54570780c1d2dc121987edc80f49c60f2dbe0e43686",
+      "clientVersion": "0.152.1",
+      "phase": "product",
+      "packageSha256": "9d39fb87a2c529f0c602ba13820ae281d2054302fc6c10d13583e8bcf18ba6bf",
+      "startedAt": "2026-09-08T06:46:15.154Z",
+      "finishedAt": "2026-09-08T06:56:15.408Z",
+      "fullMatrixValidated": false,
+      "passedCases": [
+        "P01",
+        "P02",
+        "P03",
+        "P06",
+        "P04",
+        "P05",
+        "P07",
+        "P08"
+      ],
+      "assertions": 70,
+      "cleanupOutcome": "passed",
+      "failure": {
+        "stage": "runner",
+        "error": "scenario P15 assertion 2 failed: deep equality mismatch"
+      }
+    },
+    {
+      "attempt": "product-01534-policy-sequence-1",
+      "receipt": "product-01534-policy-sequence-1/incomplete-evidence.json",
+      "receiptSha256": "f9326323eb73dcce391c5eef74c0379ce5b6edac63d5b2000b049ca726651c09",
+      "clientVersion": "0.153.4",
+      "phase": "product",
+      "packageSha256": "9d39fb87a2c529f0c602ba13820ae281d2054302fc6c10d13583e8bcf18ba6bf",
+      "startedAt": "2026-09-08T06:46:17.102Z",
+      "finishedAt": "2026-09-08T06:54:21.324Z",
+      "fullMatrixValidated": false,
+      "passedCases": [
+        "P01",
+        "P02",
+        "P03",
+        "P06",
+        "P04",
+        "P05",
+        "P07"
+      ],
+      "assertions": 63,
+      "cleanupOutcome": "passed",
+      "failure": {
+        "stage": "runner",
+        "error": "scenario P08 assertion 5 failed: deep equality mismatch"
+      }
+    },
+    {
+      "attempt": "product-01534-busy-policy-diagnostic-1",
+      "receipt": "product-01534-busy-policy-diagnostic-1/incomplete-evidence.json",
+      "receiptSha256": "ba86787253cf5b3ec1e7fa39543108164e62424f859dd027ebb9cf3d19194726",
+      "clientVersion": "0.153.4",
+      "phase": "product",
+      "packageSha256": "9d39fb87a2c529f0c602ba13820ae281d2054302fc6c10d13583e8bcf18ba6bf",
+      "startedAt": "2026-09-08T06:57:26.123Z",
+      "finishedAt": "2026-09-08T07:00:00.253Z",
+      "fullMatrixValidated": false,
+      "passedCases": [
+        "P01",
+        "P05",
+        "P07",
+        "P08"
+      ],
+      "assertions": 33,
+      "cleanupOutcome": "passed",
+      "failure": {
+        "stage": "controlled-policy-diagnostic",
+        "error": "controlled partial policy diagnostic completed; not full certification"
+      }
+    },
+    {
+      "attempt": "product-01534-policy-peers-idle-state-1",
+      "receipt": "product-01534-policy-peers-idle-state-1/incomplete-evidence.json",
+      "receiptSha256": "72cbb6b049650fbdf1f444c0728185684f57b44aa6a47e7e6dd41c6a94a617de",
+      "clientVersion": "0.153.4",
+      "phase": "product",
+      "packageSha256": "9d39fb87a2c529f0c602ba13820ae281d2054302fc6c10d13583e8bcf18ba6bf",
+      "startedAt": "2026-09-08T07:02:21.912Z",
+      "finishedAt": "2026-09-08T07:11:35.900Z",
+      "fullMatrixValidated": false,
+      "passedCases": [
+        "P01",
+        "P02",
+        "P03",
+        "P06",
+        "P04",
+        "P05",
+        "P07",
+        "P08"
+      ],
+      "assertions": 70,
+      "cleanupOutcome": "passed",
+      "failure": {
+        "stage": "controlled-policy-diagnostic",
+        "error": "controlled partial policy diagnostic completed; not full certification"
+      }
+    },
+    {
+      "attempt": "product-01534-policy-peers-state-1",
+      "receipt": "product-01534-policy-peers-state-1/incomplete-evidence.json",
+      "receiptSha256": "a2605ebefc2fe8be4656bd5c7915bf49437c0499486c3f56d50eaffbbf01057e",
+      "clientVersion": "0.153.4",
+      "phase": "product",
+      "packageSha256": "9d39fb87a2c529f0c602ba13820ae281d2054302fc6c10d13583e8bcf18ba6bf",
+      "startedAt": "2026-09-08T07:02:22.745Z",
+      "finishedAt": "2026-09-08T07:08:15.675Z",
+      "fullMatrixValidated": false,
+      "passedCases": [
+        "P01",
+        "P02",
+        "P05",
+        "P07",
+        "P08"
+      ],
+      "assertions": 42,
+      "cleanupOutcome": "passed",
+      "failure": {
+        "stage": "controlled-policy-diagnostic",
+        "error": "controlled partial policy diagnostic completed; not full certification"
+      }
+    },
+    {
+      "attempt": "product-01521-policy-failure-state-1",
+      "receipt": "product-01521-policy-failure-state-1/incomplete-evidence.json",
+      "receiptSha256": "e18cf60e3620df131564f7cabfbf35081da3bcc0b2528b3cad00bbdb15cc0da1",
+      "clientVersion": "0.152.1",
+      "phase": "product",
+      "packageSha256": "9d39fb87a2c529f0c602ba13820ae281d2054302fc6c10d13583e8bcf18ba6bf",
+      "startedAt": "2026-09-08T07:12:53.822Z",
+      "finishedAt": "2026-09-08T07:21:43.171Z",
+      "fullMatrixValidated": false,
+      "passedCases": [
+        "P01",
+        "P02",
+        "P03",
+        "P06",
+        "P04",
+        "P05",
+        "P07",
+        "P08",
+        "P15"
+      ],
+      "assertions": 75,
+      "cleanupOutcome": "passed",
+      "failure": {
+        "stage": "controlled-policy-diagnostic",
+        "error": "controlled partial policy diagnostic completed; not full certification"
+      }
+    },
+    {
+      "attempt": "product-01534-policy-failure-state-1",
+      "receipt": "product-01534-policy-failure-state-1/incomplete-evidence.json",
+      "receiptSha256": "9bf424ada17b3206128440c66644464608c35a9614e3412b663c735253bf442f",
+      "clientVersion": "0.153.4",
+      "phase": "product",
+      "packageSha256": "9d39fb87a2c529f0c602ba13820ae281d2054302fc6c10d13583e8bcf18ba6bf",
+      "startedAt": "2026-09-08T07:13:06.849Z",
+      "finishedAt": "2026-09-08T07:19:33.577Z",
+      "fullMatrixValidated": false,
+      "passedCases": [
+        "P01",
+        "P02",
+        "P03",
+        "P06",
+        "P04",
+        "P05",
+        "P07"
+      ],
+      "assertions": 63,
+      "cleanupOutcome": "passed",
+      "failure": {
+        "stage": "controlled-policy-diagnostic",
+        "error": "scenario P08 assertion 5 failed: deep equality mismatch"
+      }
+    },
+    {
+      "attempt": "product-01534-policy-binding-failure-1",
+      "receipt": "product-01534-policy-binding-failure-1/incomplete-evidence.json",
+      "receiptSha256": "9248f1ee3acb946ca070d67b2d34962798ea13d6decb1f9d45d3b867aafee00c",
+      "clientVersion": "0.153.4",
+      "phase": "product",
+      "packageSha256": "9d39fb87a2c529f0c602ba13820ae281d2054302fc6c10d13583e8bcf18ba6bf",
+      "startedAt": "2026-09-08T07:21:55.292Z",
+      "finishedAt": "2026-09-08T07:28:17.444Z",
+      "fullMatrixValidated": false,
+      "passedCases": [
+        "P01",
+        "P02",
+        "P03",
+        "P06",
+        "P04",
+        "P05",
+        "P07"
+      ],
+      "assertions": 63,
+      "cleanupOutcome": "passed",
+      "failure": {
+        "stage": "controlled-policy-diagnostic",
+        "error": "scenario P08 assertion 5 failed: deep equality mismatch"
+      }
+    },
+    {
+      "attempt": "product-01534-session-changes-reviewed-1",
+      "receipt": "product-01534-session-changes-reviewed-1/incomplete-evidence.json",
+      "receiptSha256": "4c90015d6737fec1af63dc9a35c88647cd1247a7735ab133952d15e2d2638f4a",
+      "clientVersion": "0.153.4",
+      "phase": "product",
+      "packageSha256": "9d39fb87a2c529f0c602ba13820ae281d2054302fc6c10d13583e8bcf18ba6bf",
+      "startedAt": "2026-09-08T07:22:52.847Z",
+      "finishedAt": "2026-09-08T07:25:07.154Z",
+      "fullMatrixValidated": false,
+      "passedCases": [
+        "P01"
+      ],
+      "assertions": 10,
+      "cleanupOutcome": "passed",
+      "failure": {
+        "stage": "runner",
+        "error": "deadline: vendor ready receiver-b1"
+      }
+    },
+    {
+      "attempt": "product-01534-session-changes-ui-1",
+      "receipt": "product-01534-session-changes-ui-1/incomplete-evidence.json",
+      "receiptSha256": "2fadb93f26c70208d7f8e5a27c737d697f8e9aac358ad5a6d4c01c8d42ad8b0f",
+      "clientVersion": "0.153.4",
+      "phase": "product",
+      "packageSha256": "9d39fb87a2c529f0c602ba13820ae281d2054302fc6c10d13583e8bcf18ba6bf",
+      "startedAt": "2026-09-08T07:26:57.482Z",
+      "finishedAt": "2026-09-08T07:29:17.226Z",
+      "fullMatrixValidated": false,
+      "passedCases": [
+        "P01"
+      ],
+      "assertions": 10,
+      "cleanupOutcome": "passed",
+      "failure": {
+        "stage": "runner",
+        "error": "deadline: vendor ready receiver-b1"
+      }
+    },
+    {
+      "attempt": "product-01534-retirement-failure-1",
+      "receipt": "product-01534-retirement-failure-1/incomplete-evidence.json",
+      "receiptSha256": "a775524aafca65ac0f668567d96425f29ea2bf5acbbea774f099bc25cf806645",
+      "clientVersion": "0.153.4",
+      "phase": "product",
+      "packageSha256": "9d39fb87a2c529f0c602ba13820ae281d2054302fc6c10d13583e8bcf18ba6bf",
+      "startedAt": "2026-09-08T07:30:51.159Z",
+      "finishedAt": "2026-09-08T07:39:19.606Z",
+      "fullMatrixValidated": false,
+      "passedCases": [
+        "P01",
+        "P02",
+        "P03",
+        "P06",
+        "P04",
+        "P05",
+        "P07",
+        "P08",
+        "P15"
+      ],
+      "assertions": 75,
+      "cleanupOutcome": "passed",
+      "failure": {
+        "stage": "controlled-policy-diagnostic",
+        "error": "controlled partial policy diagnostic completed; not full certification"
+      }
+    },
+    {
+      "attempt": "product-01534-cwd-parser-diagnostic-1",
+      "receipt": "product-01534-cwd-parser-diagnostic-1/incomplete-evidence.json",
+      "receiptSha256": "a396dadb96e5963a7b48c1d641467ca33cf0a89527c1538cf59cdf4ce3ce84b9",
+      "clientVersion": "0.153.4",
+      "phase": "product",
+      "packageSha256": "9d39fb87a2c529f0c602ba13820ae281d2054302fc6c10d13583e8bcf18ba6bf",
+      "startedAt": "2026-09-08T07:33:27.976Z",
+      "finishedAt": "2026-09-08T07:35:34.302Z",
+      "fullMatrixValidated": false,
+      "passedCases": [
+        "P01"
+      ],
+      "assertions": 10,
+      "cleanupOutcome": "passed",
+      "failure": {
+        "stage": "controlled-cwd-diagnostic",
+        "error": "deadline: vendor ready receiver-b1"
+      }
+    },
+    {
+      "attempt": "product-01534-cwd-parser-fixed-1",
+      "receipt": "product-01534-cwd-parser-fixed-1/incomplete-evidence.json",
+      "receiptSha256": "b1160e504948a9495f220b9ca176cb89d97cc9ef256038f1e52643fdf21487e6",
+      "clientVersion": "0.153.4",
+      "phase": "product",
+      "packageSha256": "9d39fb87a2c529f0c602ba13820ae281d2054302fc6c10d13583e8bcf18ba6bf",
+      "startedAt": "2026-09-08T07:37:46.120Z",
+      "finishedAt": "2026-09-08T07:40:48.571Z",
+      "fullMatrixValidated": false,
+      "passedCases": [
+        "P01"
+      ],
+      "assertions": 10,
+      "cleanupOutcome": "passed",
+      "failure": {
+        "stage": "controlled-cwd-diagnostic",
+        "error": "deadline: real client SessionEnd"
+      }
+    },
+    {
+      "attempt": "product-01534-session-close-1",
+      "receipt": "product-01534-session-close-1/incomplete-evidence.json",
+      "receiptSha256": "2bc6740f2761b82b0f9b4257a0db7072b137aee5f6c1780d9b7a2e474dacdc79",
+      "clientVersion": "0.153.4",
+      "phase": "product",
+      "packageSha256": "9d39fb87a2c529f0c602ba13820ae281d2054302fc6c10d13583e8bcf18ba6bf",
+      "startedAt": "2026-09-08T07:43:03.152Z",
+      "finishedAt": "2026-09-08T07:43:39.478Z",
+      "fullMatrixValidated": false,
+      "passedCases": [
+        "P01"
+      ],
+      "assertions": 10,
+      "cleanupOutcome": "passed",
+      "failure": {
+        "stage": "controlled-close-diagnostic",
+        "error": "controlled partial close diagnostic; not full certification"
+      }
+    },
+    {
+      "attempt": "product-01521-detach-archive-1",
+      "receipt": "product-01521-detach-archive-1/incomplete-evidence.json",
+      "receiptSha256": "e21a8f1aa7760c4d99152892c4de45391e0ff25c15353795a8474583dd5e80b2",
+      "clientVersion": "0.152.1",
+      "phase": "product",
+      "packageSha256": "9d39fb87a2c529f0c602ba13820ae281d2054302fc6c10d13583e8bcf18ba6bf",
+      "startedAt": "2026-09-08T07:47:02.488Z",
+      "finishedAt": "2026-09-08T07:48:39.455Z",
+      "fullMatrixValidated": false,
+      "passedCases": [
+        "P01"
+      ],
+      "assertions": 10,
+      "cleanupOutcome": "passed",
+      "failure": {
+        "stage": "controlled-close-diagnostic",
+        "error": "a real generated SessionStart hook must identify the receiver"
+      }
+    },
+    {
+      "attempt": "product-01534-detach-archive-1",
+      "receipt": "product-01534-detach-archive-1/incomplete-evidence.json",
+      "receiptSha256": "052a909e1b162b8aaf48862e66de13eddbfac88501d67f59e298c2d65391c1e0",
+      "clientVersion": "0.153.4",
+      "phase": "product",
+      "packageSha256": "9d39fb87a2c529f0c602ba13820ae281d2054302fc6c10d13583e8bcf18ba6bf",
+      "startedAt": "2026-09-08T07:47:04.344Z",
+      "finishedAt": "2026-09-08T07:49:36.571Z",
+      "fullMatrixValidated": false,
+      "passedCases": [
+        "P01"
+      ],
+      "assertions": 10,
+      "cleanupOutcome": "passed",
+      "failure": {
+        "stage": "controlled-close-diagnostic",
+        "error": "a real generated SessionStart hook must identify the receiver"
+      }
+    },
+    {
+      "attempt": "product-01521-detach-archive-2",
+      "receipt": "product-01521-detach-archive-2/incomplete-evidence.json",
+      "receiptSha256": "bc0db10b92e98ec940f64adf94026cd8246787348bc105c90af0963618b6171b",
+      "clientVersion": "0.152.1",
+      "phase": "product",
+      "packageSha256": "9d39fb87a2c529f0c602ba13820ae281d2054302fc6c10d13583e8bcf18ba6bf",
+      "startedAt": "2026-09-08T07:51:51.534Z",
+      "finishedAt": "2026-09-08T07:54:52.728Z",
+      "fullMatrixValidated": false,
+      "passedCases": [
+        "P01"
+      ],
+      "assertions": 10,
+      "cleanupOutcome": "passed",
+      "failure": {
+        "stage": "controlled-close-diagnostic",
+        "error": "deadline: archive exits owned client"
+      }
+    },
+    {
+      "attempt": "product-01534-detach-archive-2",
+      "receipt": "product-01534-detach-archive-2/incomplete-evidence.json",
+      "receiptSha256": "cdb7cb529356356617b653062deafeb9a910981aa7b09490c199605e957012e4",
+      "clientVersion": "0.153.4",
+      "phase": "product",
+      "packageSha256": "9d39fb87a2c529f0c602ba13820ae281d2054302fc6c10d13583e8bcf18ba6bf",
+      "startedAt": "2026-09-08T07:51:52.432Z",
+      "finishedAt": "2026-09-08T07:55:28.126Z",
+      "fullMatrixValidated": false,
+      "passedCases": [
+        "P01"
+      ],
+      "assertions": 10,
+      "cleanupOutcome": "passed",
+      "failure": {
+        "stage": "controlled-close-diagnostic",
+        "error": "deadline: archive exits owned client"
+      }
+    },
+    {
+      "attempt": "product-01534-rpc-archive-1",
+      "receipt": "product-01534-rpc-archive-1/incomplete-evidence.json",
+      "receiptSha256": "18a3f461f67fb5183825d17d41f51b07b7619a5793e1e88f1e2a94a29b37200b",
+      "clientVersion": "0.153.4",
+      "phase": "product",
+      "packageSha256": "b8eb1bee2296746953b3929ef37b45434588264736f756ac9811f5b80107b300",
+      "startedAt": "2026-09-08T07:59:58.861Z",
+      "finishedAt": "2026-09-08T08:02:50.342Z",
+      "fullMatrixValidated": false,
+      "passedCases": [
+        "P01"
+      ],
+      "assertions": 10,
+      "cleanupOutcome": "passed",
+      "failure": {
+        "stage": "controlled-close-diagnostic",
+        "error": "deadline: vendor ready receiver-b1"
+      }
+    },
+    {
+      "attempt": "product-01521-rpc-archive-1",
+      "receipt": "product-01521-rpc-archive-1/incomplete-evidence.json",
+      "receiptSha256": "a9142e61d3b363e39ce9cf907ac482c84e3bf1641be8fbc82c64ee48543ffa67",
+      "clientVersion": "0.152.1",
+      "phase": "product",
+      "packageSha256": "b8eb1bee2296746953b3929ef37b45434588264736f756ac9811f5b80107b300",
+      "startedAt": "2026-09-08T08:00:26.998Z",
+      "finishedAt": "2026-09-08T08:02:54.786Z",
+      "fullMatrixValidated": false,
+      "passedCases": [
+        "P01"
+      ],
+      "assertions": 10,
+      "cleanupOutcome": "passed",
+      "failure": {
+        "stage": "controlled-close-diagnostic",
+        "error": "deadline: vendor ready receiver-b1"
+      }
+    },
+    {
+      "attempt": "product-01521-retirement-cold-1",
+      "receipt": "product-01521-retirement-cold-1/incomplete-evidence.json",
+      "receiptSha256": "de85b0ecadf7e8e0697c05a6c1f053cc4cfb86031e54c6cfa47b1bffc0dbbc0d",
+      "clientVersion": "0.152.1",
+      "phase": "product",
+      "packageSha256": "b8eb1bee2296746953b3929ef37b45434588264736f756ac9811f5b80107b300",
+      "startedAt": "2026-09-08T08:05:50.977Z",
+      "finishedAt": "2026-09-08T08:10:15.505Z",
+      "fullMatrixValidated": false,
+      "passedCases": [
+        "P01",
+        "P03",
+        "P06",
+        "P04"
+      ],
+      "assertions": 38,
+      "cleanupOutcome": "passed",
+      "failure": {
+        "stage": "runner",
+        "error": "requested partial diagnostic ended at P04; complete product matrix not certified"
+      }
+    },
+    {
+      "attempt": "product-01534-retirement-cold-1",
+      "receipt": "product-01534-retirement-cold-1/incomplete-evidence.json",
+      "receiptSha256": "b2e7673622ad78c9afa63f24744194cc34f1e674436fb346b1c2d1eed5d82ac0",
+      "clientVersion": "0.153.4",
+      "phase": "product",
+      "packageSha256": "b8eb1bee2296746953b3929ef37b45434588264736f756ac9811f5b80107b300",
+      "startedAt": "2026-09-08T08:05:55.509Z",
+      "finishedAt": "2026-09-08T08:10:55.667Z",
+      "fullMatrixValidated": false,
+      "passedCases": [
+        "P01",
+        "P03",
+        "P06",
+        "P04"
+      ],
+      "assertions": 38,
+      "cleanupOutcome": "passed",
+      "failure": {
+        "stage": "runner",
+        "error": "requested partial diagnostic ended at P04; complete product matrix not certified"
+      }
+    },
+    {
+      "attempt": "product-01521-retirement-full-1",
+      "receipt": "product-01521-retirement-full-1/incomplete-evidence.json",
+      "receiptSha256": "ae29977f0466987041863278fa20386452c133e3f3911ce237fb45c40d56dd0b",
+      "clientVersion": "0.152.1",
+      "phase": "product",
+      "packageSha256": "b8eb1bee2296746953b3929ef37b45434588264736f756ac9811f5b80107b300",
+      "startedAt": "2026-09-08T08:14:56.480Z",
+      "finishedAt": "2026-09-08T08:25:45.761Z",
+      "fullMatrixValidated": false,
+      "passedCases": [
+        "P01",
+        "P02",
+        "P03",
+        "P06",
+        "P04",
+        "P05",
+        "P07",
+        "P08",
+        "P15",
+        "P16",
+        "P17",
+        "P12",
+        "P13"
+      ],
+      "assertions": 116,
+      "cleanupOutcome": "passed",
+      "failure": {
+        "stage": "runner",
+        "error": "vendor /cd refused: destination-untrusted"
+      }
+    },
+    {
+      "attempt": "product-01534-retirement-full-1",
+      "receipt": "product-01534-retirement-full-1/incomplete-evidence.json",
+      "receiptSha256": "7d216505a500a9f6cbbd6e5ef7f3c463275b43663683e0a11d675ef54a935f18",
+      "clientVersion": "0.153.4",
+      "phase": "product",
+      "packageSha256": "b8eb1bee2296746953b3929ef37b45434588264736f756ac9811f5b80107b300",
+      "startedAt": "2026-09-08T08:15:01.602Z",
+      "finishedAt": "2026-09-08T08:26:21.496Z",
+      "fullMatrixValidated": false,
+      "passedCases": [
+        "P01",
+        "P02",
+        "P03",
+        "P06",
+        "P04",
+        "P05",
+        "P07",
+        "P08",
+        "P15",
+        "P16",
+        "P17",
+        "P12",
+        "P13"
+      ],
+      "assertions": 116,
+      "cleanupOutcome": "passed",
+      "failure": {
+        "stage": "runner",
+        "error": "vendor /cd refused: destination-untrusted"
+      }
+    },
+    {
+      "attempt": "product-01534-trust-lifecycle-1",
+      "receipt": "product-01534-trust-lifecycle-1/incomplete-evidence.json",
+      "receiptSha256": "a4d90a655289e3d6f07d56db373b0af1020ec264ed4b3a583d1a3b56a85d23ef",
+      "clientVersion": "0.153.4",
+      "phase": "product",
+      "packageSha256": "b8eb1bee2296746953b3929ef37b45434588264736f756ac9811f5b80107b300",
+      "startedAt": "2026-09-08T08:30:43.824Z",
+      "finishedAt": "2026-09-08T08:36:46.316Z",
+      "fullMatrixValidated": false,
+      "passedCases": [
+        "P01",
+        "P02",
+        "P08",
+        "P12",
+        "P13"
+      ],
+      "assertions": 34,
+      "cleanupOutcome": "passed",
+      "failure": {
+        "stage": "controlled-trust-diagnostic",
+        "error": "vendor /cd refused: destination-untrusted"
+      }
+    },
+    {
+      "attempt": "product-01521-archive-ui-1",
+      "receipt": "product-01521-archive-ui-1/incomplete-evidence.json",
+      "receiptSha256": "e8c3fabdac5f4b60edfeffaebdac51ac6cc9bacfe6bd00b4bfb32d970732405c",
+      "clientVersion": "0.152.1",
+      "phase": "product",
+      "packageSha256": "b8eb1bee2296746953b3929ef37b45434588264736f756ac9811f5b80107b300",
+      "startedAt": "2026-09-08T08:38:09.597Z",
+      "finishedAt": "2026-09-08T08:40:27.833Z",
+      "fullMatrixValidated": false,
+      "passedCases": [
+        "P01",
+        "P14"
+      ],
+      "assertions": 26,
+      "cleanupOutcome": "passed",
+      "failure": {
+        "stage": "runner",
+        "error": "requested partial diagnostic ended at P14; complete product matrix not certified"
+      }
+    },
+    {
+      "attempt": "product-01534-archive-ui-1",
+      "receipt": "product-01534-archive-ui-1/incomplete-evidence.json",
+      "receiptSha256": "e9fd0e85a2cfe0c3ab6ecf36728126601102a7d191fa8a6a9b8dff42a995f58e",
+      "clientVersion": "0.153.4",
+      "phase": "product",
+      "packageSha256": "b8eb1bee2296746953b3929ef37b45434588264736f756ac9811f5b80107b300",
+      "startedAt": "2026-09-08T08:38:14.247Z",
+      "finishedAt": "2026-09-08T08:41:07.513Z",
+      "fullMatrixValidated": false,
+      "passedCases": [
+        "P01",
+        "P14"
+      ],
+      "assertions": 26,
+      "cleanupOutcome": "passed",
+      "failure": {
+        "stage": "runner",
+        "error": "requested partial diagnostic ended at P14; complete product matrix not certified"
+      }
+    },
+    {
+      "attempt": "product-01534-trust-preservation-1",
+      "receipt": "product-01534-trust-preservation-1/incomplete-evidence.json",
+      "receiptSha256": "fc49ef7662131c457adc7bb0d4340e4c7d61d182dc0931d4b8f05f9da2e6c0df",
+      "clientVersion": "0.153.4",
+      "phase": "product",
+      "packageSha256": "1a903ae79414355e460b975b3f90fbdf4f46633366f147080f833e0f1ec1cc49",
+      "startedAt": "2026-09-08T08:53:10.724Z",
+      "finishedAt": "2026-09-08T08:56:45.205Z",
+      "fullMatrixValidated": false,
+      "passedCases": [
+        "P01",
+        "P02",
+        "P08"
+      ],
+      "assertions": 26,
+      "cleanupOutcome": "passed",
+      "failure": {
+        "stage": "controlled-trust-diagnostic",
+        "error": "controlled partial trust diagnostic; not full certification"
+      }
+    },
+    {
+      "attempt": "product-01521-trust-full-1",
+      "receipt": "product-01521-trust-full-1/incomplete-evidence.json",
+      "receiptSha256": "207555aadc66be41994cbe24e32dc3b639bb379e820b1e08c0a3a09dd44256a5",
+      "clientVersion": "0.152.1",
+      "phase": "product",
+      "packageSha256": "1a903ae79414355e460b975b3f90fbdf4f46633366f147080f833e0f1ec1cc49",
+      "startedAt": "2026-09-08T08:53:11.545Z",
+      "finishedAt": "2026-09-08T09:10:44.368Z",
+      "fullMatrixValidated": false,
+      "passedCases": [
+        "P01",
+        "P02",
+        "P03",
+        "P06",
+        "P04",
+        "P05",
+        "P07",
+        "P08",
+        "P15",
+        "P16",
+        "P17",
+        "P12",
+        "P13",
+        "P14",
+        "P18",
+        "P20",
+        "P10",
+        "P11",
+        "P09",
+        "P19"
+      ],
+      "assertions": 189,
+      "cleanupOutcome": "passed",
+      "failure": {
+        "stage": "evidence-validation",
+        "error": "receiver-b1 has participantId and threadId"
+      }
+    },
+    {
+      "attempt": "product-01534-config-full-1",
+      "receipt": "product-01534-config-full-1/incomplete-evidence.json",
+      "receiptSha256": "e2d7423f8defa2d4f13a5466b31f9017b956b5bd74df48787abfc4ccece31e65",
+      "clientVersion": "0.153.4",
+      "phase": "product",
+      "packageSha256": "a6a38da5a36911baabfbef0ccf934847fcf7b51000197264c273d21430f7fea2",
+      "startedAt": "2026-09-08T09:03:06.100Z",
+      "finishedAt": "2026-09-08T09:21:09.827Z",
+      "fullMatrixValidated": false,
+      "passedCases": [
+        "P01",
+        "P02",
+        "P03",
+        "P06",
+        "P04",
+        "P05",
+        "P07",
+        "P08",
+        "P15",
+        "P16",
+        "P17",
+        "P12",
+        "P13",
+        "P14",
+        "P18",
+        "P20",
+        "P10",
+        "P11",
+        "P09",
+        "P19"
+      ],
+      "assertions": 189,
+      "cleanupOutcome": "passed",
+      "failure": {
+        "stage": "evidence-validation",
+        "error": "receiver-b1 has participantId and threadId"
+      }
+    },
+    {
+      "attempt": "product-01521-config-full-1",
+      "receipt": "product-01521-config-full-1/incomplete-evidence.json",
+      "receiptSha256": "c86051ab950c38038c8b27f130aad21e0098846d7d91e98f8bfcd96bae55586b",
+      "clientVersion": "0.152.1",
+      "phase": "product",
+      "packageSha256": "a6a38da5a36911baabfbef0ccf934847fcf7b51000197264c273d21430f7fea2",
+      "startedAt": "2026-09-08T09:03:36.097Z",
+      "finishedAt": "2026-09-08T09:19:34.788Z",
+      "fullMatrixValidated": false,
+      "passedCases": [
+        "P01",
+        "P02",
+        "P03",
+        "P06",
+        "P04",
+        "P05",
+        "P07",
+        "P08",
+        "P15",
+        "P16",
+        "P17",
+        "P12",
+        "P13",
+        "P14",
+        "P18",
+        "P20",
+        "P10",
+        "P11",
+        "P09",
+        "P19"
+      ],
+      "assertions": 189,
+      "cleanupOutcome": "passed",
+      "failure": {
+        "stage": "evidence-validation",
+        "error": "receiver-b1 has participantId and threadId"
+      }
+    },
+    {
+      "attempt": "p13-record-mutant-01521-1",
+      "receipt": "p13-record-mutant-01521-1/incomplete-evidence.json",
+      "receiptSha256": "9bb8d23b967d66563e17c9ccbd203d1290952fa4e0210cbd2feb93b0fc0c84b7",
+      "clientVersion": "0.152.1",
+      "phase": "product",
+      "packageSha256": "a6a38da5a36911baabfbef0ccf934847fcf7b51000197264c273d21430f7fea2",
+      "startedAt": "2026-09-08T09:16:49.339Z",
+      "finishedAt": "2026-09-08T09:17:21.846Z",
+      "fullMatrixValidated": false,
+      "passedCases": [],
+      "assertions": 0,
+      "cleanupOutcome": "passed",
+      "failure": {
+        "stage": "scenario",
+        "error": "receiver-b1 must be identified before scenario snapshot"
+      }
+    },
+    {
+      "attempt": "product-01534-config-full-2",
+      "receipt": "product-01534-config-full-2/incomplete-evidence.json",
+      "receiptSha256": "67524111b89d1078eaac660c09dea5d9aee27c124096374029cbda538c59e3f2",
+      "clientVersion": "0.153.4",
+      "phase": "product",
+      "packageSha256": "a6a38da5a36911baabfbef0ccf934847fcf7b51000197264c273d21430f7fea2",
+      "startedAt": "2026-09-08T09:19:19.364Z",
+      "finishedAt": "2026-09-08T09:20:02.615Z",
+      "fullMatrixValidated": false,
+      "passedCases": [],
+      "assertions": 0,
+      "cleanupOutcome": "passed",
+      "failure": {
+        "stage": "runner",
+        "error": "receiver-b1 must be identified before scenario snapshot"
+      }
+    },
+    {
+      "attempt": "product-01521-config-full-2",
+      "receipt": "product-01521-config-full-2/incomplete-evidence.json",
+      "receiptSha256": "fa0b599ead8423bcbe04dce62342f64771f55b04b4e100b037e0b70f80911a17",
+      "clientVersion": "0.152.1",
+      "phase": "product",
+      "packageSha256": "a6a38da5a36911baabfbef0ccf934847fcf7b51000197264c273d21430f7fea2",
+      "startedAt": "2026-09-08T09:19:21.907Z",
+      "finishedAt": "2026-09-08T09:19:51.115Z",
+      "fullMatrixValidated": false,
+      "passedCases": [],
+      "assertions": 0,
+      "cleanupOutcome": "passed",
+      "failure": {
+        "stage": "runner",
+        "error": "receiver-b1 must be identified before scenario snapshot"
+      }
+    },
+    {
+      "attempt": "p13-record-positive-01534-1",
+      "receipt": "p13-record-positive-01534-1/incomplete-evidence.json",
+      "receiptSha256": "dfc1b22787cb96ee508a02b63662e532f5e883ce4a8508eb913f79121e5a10da",
+      "clientVersion": "0.153.4",
+      "phase": "product",
+      "packageSha256": "a6a38da5a36911baabfbef0ccf934847fcf7b51000197264c273d21430f7fea2",
+      "startedAt": "2026-09-08T09:19:49.602Z",
+      "finishedAt": "2026-09-08T09:20:25.647Z",
+      "fullMatrixValidated": false,
+      "passedCases": [],
+      "assertions": 0,
+      "cleanupOutcome": "passed",
+      "failure": {
+        "stage": "scenario",
+        "error": "receiver-b1 must be identified before scenario snapshot"
+      }
+    },
+    {
+      "attempt": "p13-record-positive-01534-2",
+      "receipt": "p13-record-positive-01534-2/incomplete-evidence.json",
+      "receiptSha256": "0d78f4502e7b3dc12b278c0e4693bca274648429f3e5fa35dae13a62916cbe3f",
+      "clientVersion": "0.153.4",
+      "phase": "product",
+      "packageSha256": "a6a38da5a36911baabfbef0ccf934847fcf7b51000197264c273d21430f7fea2",
+      "startedAt": "2026-09-08T09:24:41.013Z",
+      "finishedAt": "2026-09-08T09:26:42.905Z",
+      "fullMatrixValidated": false,
+      "passedCases": [
+        "P01",
+        "P13"
+      ],
+      "assertions": 16,
+      "cleanupOutcome": "passed",
+      "failure": {
+        "stage": "partial",
+        "error": "P01/P13 only; not full certification"
+      }
+    },
+    {
+      "attempt": "p13-record-mutant-01521-2",
+      "receipt": "p13-record-mutant-01521-2/incomplete-evidence.json",
+      "receiptSha256": "6a134d5909050b1ddd670bb9be314ef2f355d9bd304b004d43484c4ccc90c9a8",
+      "clientVersion": "0.152.1",
+      "phase": "product",
+      "packageSha256": "a6a38da5a36911baabfbef0ccf934847fcf7b51000197264c273d21430f7fea2",
+      "startedAt": "2026-09-08T09:24:42.823Z",
+      "finishedAt": "2026-09-08T09:25:42.218Z",
+      "fullMatrixValidated": false,
+      "passedCases": [
+        "P01"
+      ],
+      "assertions": 10,
+      "cleanupOutcome": "passed",
+      "failure": {
+        "stage": "scenario",
+        "error": "receiver-b1 must be identified before scenario snapshot"
+      }
+    },
+    {
+      "attempt": "product-01534-config-full-3",
+      "receipt": "product-01534-config-full-3/evidence.json",
+      "receiptSha256": "81ff85c16e7320df233d353267bf216dc2c40ee5b86ccbcc2e2fe754e2e99591",
+      "clientVersion": "0.153.4",
+      "phase": "product",
+      "packageSha256": "a6a38da5a36911baabfbef0ccf934847fcf7b51000197264c273d21430f7fea2",
+      "startedAt": "2026-09-08T09:25:43.036Z",
+      "finishedAt": "2026-09-08T09:42:02.609Z",
+      "fullMatrixValidated": true,
+      "passedCases": [
+        "P01",
+        "P02",
+        "P03",
+        "P06",
+        "P04",
+        "P05",
+        "P07",
+        "P08",
+        "P15",
+        "P16",
+        "P17",
+        "P12",
+        "P13",
+        "P14",
+        "P18",
+        "P20",
+        "P10",
+        "P11",
+        "P09",
+        "P19"
+      ],
+      "assertions": 189,
+      "cleanupOutcome": "passed",
+      "failure": null
+    },
+    {
+      "attempt": "product-01521-config-full-3",
+      "receipt": "product-01521-config-full-3/evidence.json",
+      "receiptSha256": "1a53d02db21a472ba7e8b37cca3d935826a3e1a17a8c17223dc56ecbebac1e21",
+      "clientVersion": "0.152.1",
+      "phase": "product",
+      "packageSha256": "a6a38da5a36911baabfbef0ccf934847fcf7b51000197264c273d21430f7fea2",
+      "startedAt": "2026-09-08T09:25:44.454Z",
+      "finishedAt": "2026-09-08T09:42:03.910Z",
+      "fullMatrixValidated": true,
+      "passedCases": [
+        "P01",
+        "P02",
+        "P03",
+        "P06",
+        "P04",
+        "P05",
+        "P07",
+        "P08",
+        "P15",
+        "P16",
+        "P17",
+        "P12",
+        "P13",
+        "P14",
+        "P18",
+        "P20",
+        "P10",
+        "P11",
+        "P09",
+        "P19"
+      ],
+      "assertions": 189,
+      "cleanupOutcome": "passed",
+      "failure": null
+    },
+    {
+      "attempt": "product-01534-config-cold-1",
+      "receipt": "product-01534-config-cold-1/incomplete-evidence.json",
+      "receiptSha256": "b15bcb6a9c7232c334a14139a43686a34242747846b3bbb420e4776f195f123c",
+      "clientVersion": "0.153.4",
+      "phase": "product",
+      "packageSha256": "a6a38da5a36911baabfbef0ccf934847fcf7b51000197264c273d21430f7fea2",
+      "startedAt": "2026-09-08T09:29:24.809Z",
+      "finishedAt": "2026-09-08T09:34:41.123Z",
+      "fullMatrixValidated": false,
+      "passedCases": [
+        "P01",
+        "P03",
+        "P06",
+        "P04"
+      ],
+      "assertions": 38,
+      "cleanupOutcome": "passed",
+      "failure": {
+        "stage": "runner",
+        "error": "requested partial diagnostic ended at P04; complete product matrix not certified"
+      }
+    },
+    {
+      "attempt": "product-01521-config-cold-1",
+      "receipt": "product-01521-config-cold-1/incomplete-evidence.json",
+      "receiptSha256": "6bfb4109bedaa56a2dcb0ae3ec89bee8d634ccd59e66ca83504d4376f9935f7d",
+      "clientVersion": "0.152.1",
+      "phase": "product",
+      "packageSha256": "a6a38da5a36911baabfbef0ccf934847fcf7b51000197264c273d21430f7fea2",
+      "startedAt": "2026-09-08T09:29:28.508Z",
+      "finishedAt": "2026-09-08T09:34:13.502Z",
+      "fullMatrixValidated": false,
+      "passedCases": [
+        "P01",
+        "P03",
+        "P06",
+        "P04"
+      ],
+      "assertions": 38,
+      "cleanupOutcome": "passed",
+      "failure": {
+        "stage": "runner",
+        "error": "requested partial diagnostic ended at P04; complete product matrix not certified"
+      }
+    },
+    {
+      "attempt": "product-01534-public-final-1",
+      "receipt": "product-01534-public-final-1/evidence.json",
+      "receiptSha256": "ab28aa69920fe739688c5ace77eccebfba0d6a1bc22df4f55c510cff9d24d8d7",
+      "clientVersion": "0.153.4",
+      "phase": "product",
+      "packageSha256": "8dc730105b9a80c8245a7fc63392c1f7ded423ac538b3146d7dc5a83fde4e058",
+      "startedAt": "2026-09-08T10:11:43.453Z",
+      "finishedAt": "2026-09-08T10:27:51.701Z",
+      "fullMatrixValidated": true,
+      "passedCases": [
+        "P01",
+        "P02",
+        "P03",
+        "P06",
+        "P04",
+        "P05",
+        "P07",
+        "P08",
+        "P15",
+        "P16",
+        "P17",
+        "P12",
+        "P13",
+        "P14",
+        "P18",
+        "P20",
+        "P10",
+        "P11",
+        "P09",
+        "P19"
+      ],
+      "assertions": 189,
+      "cleanupOutcome": "passed",
+      "failure": null
+    },
+    {
+      "attempt": "product-01521-public-final-1",
+      "receipt": "product-01521-public-final-1/evidence.json",
+      "receiptSha256": "806e32a18b7db022fc2499a9ed632333e3f81fceecf6dc1eb11007c7e38ff37e",
+      "clientVersion": "0.152.1",
+      "phase": "product",
+      "packageSha256": "8dc730105b9a80c8245a7fc63392c1f7ded423ac538b3146d7dc5a83fde4e058",
+      "startedAt": "2026-09-08T10:11:46.386Z",
+      "finishedAt": "2026-09-08T10:29:22.269Z",
+      "fullMatrixValidated": true,
+      "passedCases": [
+        "P01",
+        "P02",
+        "P03",
+        "P06",
+        "P04",
+        "P05",
+        "P07",
+        "P08",
+        "P15",
+        "P16",
+        "P17",
+        "P12",
+        "P13",
+        "P14",
+        "P18",
+        "P20",
+        "P10",
+        "P11",
+        "P09",
+        "P19"
+      ],
+      "assertions": 189,
+      "cleanupOutcome": "passed",
+      "failure": null
+    },
+    {
+      "attempt": "product-01534-router-full-1",
+      "receipt": "product-01534-router-full-1/evidence.json",
+      "receiptSha256": "8aad29c7bf32098d12f3acb8d63fa18246e5feaf3d106de9c6eb32c7f1a7d562",
+      "clientVersion": "0.153.4",
+      "phase": "product",
+      "packageSha256": "945f6178357b6424a219b59cc3b9c4688b322c9da07cadf2bc7205bf20770940",
+      "startedAt": "2026-09-08T10:31:03.301Z",
+      "finishedAt": "2026-09-08T10:45:35.663Z",
+      "fullMatrixValidated": true,
+      "passedCases": [
+        "P01",
+        "P02",
+        "P03",
+        "P06",
+        "P04",
+        "P05",
+        "P07",
+        "P08",
+        "P15",
+        "P16",
+        "P17",
+        "P12",
+        "P13",
+        "P14",
+        "P18",
+        "P20",
+        "P10",
+        "P11",
+        "P09",
+        "P19"
+      ],
+      "assertions": 189,
+      "cleanupOutcome": "passed",
+      "failure": null
+    },
+    {
+      "attempt": "product-01521-router-full-1",
+      "receipt": "product-01521-router-full-1/evidence.json",
+      "receiptSha256": "72eac209e0007c617c51038b0e780de4fafe4601753e525172b09b480337295e",
+      "clientVersion": "0.152.1",
+      "phase": "product",
+      "packageSha256": "945f6178357b6424a219b59cc3b9c4688b322c9da07cadf2bc7205bf20770940",
+      "startedAt": "2026-09-08T10:31:03.757Z",
+      "finishedAt": "2026-09-08T10:45:27.843Z",
+      "fullMatrixValidated": true,
+      "passedCases": [
+        "P01",
+        "P02",
+        "P03",
+        "P06",
+        "P04",
+        "P05",
+        "P07",
+        "P08",
+        "P15",
+        "P16",
+        "P17",
+        "P12",
+        "P13",
+        "P14",
+        "P18",
+        "P20",
+        "P10",
+        "P11",
+        "P09",
+        "P19"
+      ],
+      "assertions": 189,
+      "cleanupOutcome": "passed",
+      "failure": null
+    },
+    {
+      "attempt": "product-01521-router-cold-1",
+      "receipt": "product-01521-router-cold-1/incomplete-evidence.json",
+      "receiptSha256": "0cb1832d1c68f004f16b276e819cd55c5b2e6bac03f4ea48c23a17489b9a4fd6",
+      "clientVersion": "0.152.1",
+      "phase": "product",
+      "packageSha256": "945f6178357b6424a219b59cc3b9c4688b322c9da07cadf2bc7205bf20770940",
+      "startedAt": "2026-09-08T10:32:30.133Z",
+      "finishedAt": "2026-09-08T10:37:16.434Z",
+      "fullMatrixValidated": false,
+      "passedCases": [
+        "P01",
+        "P03",
+        "P06",
+        "P04"
+      ],
+      "assertions": 38,
+      "cleanupOutcome": "passed",
+      "failure": {
+        "stage": "runner",
+        "error": "requested partial diagnostic ended at P04; complete product matrix not certified"
+      }
+    },
+    {
+      "attempt": "product-01534-router-cold-1",
+      "receipt": "product-01534-router-cold-1/incomplete-evidence.json",
+      "receiptSha256": "8b20f38ce64322665a6f64f1639f1d4c0e19cb221c69d6969cbe023826ed94ef",
+      "clientVersion": "0.153.4",
+      "phase": "product",
+      "packageSha256": "945f6178357b6424a219b59cc3b9c4688b322c9da07cadf2bc7205bf20770940",
+      "startedAt": "2026-09-08T10:32:30.885Z",
+      "finishedAt": "2026-09-08T10:37:29.965Z",
+      "fullMatrixValidated": false,
+      "passedCases": [
+        "P01",
+        "P03",
+        "P06",
+        "P04"
+      ],
+      "assertions": 38,
+      "cleanupOutcome": "passed",
+      "failure": {
+        "stage": "runner",
+        "error": "requested partial diagnostic ended at P04; complete product matrix not certified"
+      }
+    },
+    {
+      "attempt": "product-01534-router-final-1",
+      "receipt": "product-01534-router-final-1/evidence.json",
+      "receiptSha256": "3d359b62b93085102911147861b569476bad576e27969ff0ab75c2ec0bec171b",
+      "clientVersion": "0.153.4",
+      "phase": "product",
+      "packageSha256": "ebe370dc8452fd14f1441138aacfd4a13b0f85c3b94ba710cec3ec35837e3ccb",
+      "startedAt": "2026-09-08T10:55:50.398Z",
+      "finishedAt": "2026-09-08T11:13:18.496Z",
+      "fullMatrixValidated": true,
+      "passedCases": [
+        "P01",
+        "P02",
+        "P03",
+        "P06",
+        "P04",
+        "P05",
+        "P07",
+        "P08",
+        "P15",
+        "P16",
+        "P17",
+        "P12",
+        "P13",
+        "P14",
+        "P18",
+        "P20",
+        "P10",
+        "P11",
+        "P09",
+        "P19"
+      ],
+      "assertions": 189,
+      "cleanupOutcome": "passed",
+      "failure": null
+    },
+    {
+      "attempt": "product-01521-router-final-1",
+      "receipt": "product-01521-router-final-1/evidence.json",
+      "receiptSha256": "daae4cd920a58817651db7bf3fd96124fc6672519275c348f2228a8760afd285",
+      "clientVersion": "0.152.1",
+      "phase": "product",
+      "packageSha256": "ebe370dc8452fd14f1441138aacfd4a13b0f85c3b94ba710cec3ec35837e3ccb",
+      "startedAt": "2026-09-08T10:55:54.501Z",
+      "finishedAt": "2026-09-08T11:12:26.719Z",
+      "fullMatrixValidated": true,
+      "passedCases": [
+        "P01",
+        "P02",
+        "P03",
+        "P06",
+        "P04",
+        "P05",
+        "P07",
+        "P08",
+        "P15",
+        "P16",
+        "P17",
+        "P12",
+        "P13",
+        "P14",
+        "P18",
+        "P20",
+        "P10",
+        "P11",
+        "P09",
+        "P19"
+      ],
+      "assertions": 189,
+      "cleanupOutcome": "passed",
+      "failure": null
+    }
+  ]
+}

@@ -1,3 +1,5 @@
+import { refreshExpiredBinding } from "./refresh-binding.mjs";
+
 const SAFE_ERRORS = new Set(["ambiguous_recipient_sessions", "delivery_disabled",
   "recipient_busy", "recipient_unavailable", "transport_error", "transport_rejected",
   "unsupported_client_version"]);
@@ -13,6 +15,7 @@ const adaptersById = adapters => adapters instanceof Map
 // transfers it. A note informs and waits for the next turn. Room messages
 // have no recipient and are never offered live.
 const ACTIONABLE = new Set(["question", "request", "answer", "decision", "handoff"]);
+const LIVE_POLICIES = new Set(["off", "actionable", "all"]);
 const permits = (policy, kind) => policy === "all"
   || (policy === "actionable" && ACTIONABLE.has(kind));
 
@@ -39,8 +42,21 @@ function safeTransport(value, opaqueEndpointRef) {
   return opaqueEndpointRef === "live-adapter" ? "native-live" : "live-adapter";
 }
 
-export function createDeliveryRouter({ service, adapters, clock }) {
+export function createDeliveryRouter({ service, adapters, clock, platform, readLivePolicy }) {
   const registry = adaptersById(adapters);
+
+  async function policyFor(adapter, binding) {
+    if (adapter?.nativeDelivery?.policySource !== "installation-record") {
+      return LIVE_POLICIES.has(binding.livePolicy) ? binding.livePolicy : "off";
+    }
+    if (typeof readLivePolicy !== "function") return "off";
+    try {
+      const policy = await readLivePolicy({ adapter, binding });
+      return LIVE_POLICIES.has(policy) ? policy : "off";
+    } catch {
+      return "off";
+    }
+  }
 
   async function recordFailure(binding, message, participantId, transport, safeErrorCode) {
     await service.recordOfferFailed({ messageId: message.messageId,
@@ -54,24 +70,29 @@ export function createDeliveryRouter({ service, adapters, clock }) {
     const receipt = await service.readReceipt({ messageId: message.messageId,
       recipientParticipantId: participantId });
     if (receipt.state !== "queued") return settled(receipt);
+    // Core keeps its existing 24-hour presence hard expiry. Refreshing an
+    // endpoint lease never sends a hook heartbeat: a daemon is reachability,
+    // not evidence that this particular session thread is still present.
     const liveSessions = await service.listLiveSessions({ participantId, now });
     if (liveSessions.length === 0) return durable(participantId, "recipient_unavailable");
     if (liveSessions.length > 1) {
       return durable(participantId, "ambiguous_recipient_sessions");
     }
     const [target] = liveSessions;
-    const bindings = (await service.listDeliveryBindings({ participantId, now }))
+    const bindings = (await service.listDeliveryBindings({
+      participantId, now, includeExpired: true }))
       .filter(binding => binding.sessionId === target.sessionId
         && binding.generation === target.generation);
     if (bindings.length === 0) return durable(participantId, "recipient_unavailable");
-    const permitted = bindings.filter(binding => binding.livePolicy !== "off"
-      && permits(binding.livePolicy, message.kind));
+    const evaluated = await Promise.all(bindings.map(async binding => {
+      const adapter = registry.get(binding.adapterId);
+      return { binding, adapter, policy: await policyFor(adapter, binding) };
+    }));
+    const permitted = evaluated.filter(({ policy }) => permits(policy, message.kind));
     if (permitted.length === 0) return durable(participantId, "delivery_disabled");
-    const reachable = permitted.filter(binding => binding.availableModes.includes("livePush"));
+    const reachable = permitted.filter(({ binding }) => binding.availableModes.includes("livePush"));
     if (reachable.length === 0) return durable(participantId, "recipient_unavailable");
-    const capable = reachable.map(binding => ({ binding,
-      adapter: registry.get(binding.adapterId) }))
-      .filter(({ binding, adapter }) => liveCapable(adapter, binding));
+    const capable = reachable.filter(({ binding, adapter }) => liveCapable(adapter, binding));
     if (capable.length === 0) {
       return durable(participantId, "unsupported_client_version");
     }
@@ -79,13 +100,53 @@ export function createDeliveryRouter({ service, adapters, clock }) {
       return durable(participantId, "ambiguous_recipient_sessions");
     }
 
-    const { binding, adapter } = capable[0];
+    let { binding } = capable[0];
+    const { adapter } = capable[0];
+    if (Date.parse(binding.leaseUntil) <= Date.parse(now)) {
+      const refreshed = await refreshExpiredBinding({ service, adapter, binding,
+        runtimeDir: service.store?.root, platform, clock });
+      if (!refreshed) return durable(participantId, "recipient_unavailable");
+      const current = (await service.listDeliveryBindings({
+        participantId, now: clock.now() })).filter(item => item.sessionId === binding.sessionId
+          && item.generation === binding.generation
+          && item.adapterId === binding.adapterId
+          && item.clientVersion === binding.clientVersion
+          && item.opaqueEndpointRef === binding.opaqueEndpointRef);
+      if (current.length !== 1) return durable(participantId, "recipient_unavailable");
+      [binding] = current;
+    }
+    const currentPolicy = await policyFor(adapter, binding);
+    if (!permits(currentPolicy, message.kind)) {
+      return durable(participantId, "delivery_disabled");
+    }
+    // A refresh RPC or policy read can overlap another session opening. The
+    // receiver must still be the sole live session when we hand off to transport.
+    const currentSessions = await service.listLiveSessions({ participantId, now: clock.now() });
+    if (currentSessions.length > 1) return durable(participantId, "ambiguous_recipient_sessions");
+    if (currentSessions.length !== 1 || currentSessions[0].sessionId !== binding.sessionId
+      || currentSessions[0].generation !== binding.generation) {
+      return durable(participantId, "recipient_unavailable");
+    }
+    // Consent and session reads can outlive retirement or a re-handshake in
+    // the same generation. Core filters retired, expired and stale-generation
+    // bindings; require the selected identity and live mode immediately before
+    // transport, with no further awaited policy/session work in between.
+    const currentBindings = (await service.listDeliveryBindings({
+      participantId, now: clock.now() })).filter(item => item.sessionId === binding.sessionId
+        && item.generation === binding.generation
+        && item.adapterId === binding.adapterId
+        && item.clientVersion === binding.clientVersion
+        && item.opaqueEndpointRef === binding.opaqueEndpointRef
+        && item.availableModes.includes("livePush")
+        && Date.parse(item.leaseUntil) > Date.parse(clock.now()));
+    if (currentBindings.length !== 1) return durable(participantId, "recipient_unavailable");
+    const currentBinding = { ...currentBindings[0], livePolicy: currentPolicy };
     let response;
     try {
       // The store root is this workspace's runtime dir; the adapter resolves its
       // opaque endpoint id under it. Passed as data, never as a leak into core:
       // the router does not read what the adapter does with it.
-      response = await adapter.offerMessage({ binding, message,
+      response = await adapter.offerMessage({ binding: currentBinding, message,
         runtimeDir: service.store?.root });
     } catch {
       await recordFailure(binding, message, participantId, "live-adapter", "transport_error");
