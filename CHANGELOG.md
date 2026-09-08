@@ -68,6 +68,15 @@ advancing the old recipient's receipt. Eleven fixture tests passed; restoring th
 original source failed three. The separate resolution note stayed queued for the exited
 reviewer. No ACC runtime or capability changed; compatibility notes record the limits.
 
+A longer-history continuation also completed: one fresh native Claude participant
+recovered the current handoff and late finding beyond the first 100 events in a
+synthetic 297-event history. It selected bodies from the full snapshot, corrected
+and committed the fixture, and preserved the old receipts. Eight fixture tests
+passed; the original source failed the iteration regression test. This is not a
+native cursor-traversal or arbitrary-history claim. No ACC runtime, maintained
+test or capability changed; compatibility notes describe the synthetic history
+and three intermediate tool errors whose causes were not retained.
+
 Earlier foreground review correction (archive `aa947539f5e0ae4d9491775e3ad809c7a5279f615f6a5769fd468f69c4d37fc2`):
 
 For an agreed review, all five installed skills now direct the agent to read inbox and

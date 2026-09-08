@@ -665,3 +665,37 @@ Delivery stayed off. This is one explicit continuation in a small fresh workspac
 not automatic client restart, unsaved-context recovery, arbitrary-history discovery or
 transfer of another participant's inbox. No ACC runtime, maintained test or capability
 changed. File samples do not exclude transient changes between observations.
+
+## Recovery beyond the first history page, 2026-09-07/08
+
+Claude Code 2.1.263 on macOS arm64 completed a separate continuation on the same
+installed archive (sha256 `170424207429240978ccda7e6a3bc60d17e3c8192576dcce32b7c1c755397a05`).
+Before launch, the harness seeded five explicitly synthetic manual CLI sessions,
+286 messages and 297 events through the public installed CLI, then closed those
+sessions. Historical handoffs described earlier states; the current handoff and
+late blocking request appeared at events 120 and 178. The newest handoff concerned
+unrelated work. A public cursor preflight returned pages of 100, 100 and 97 events.
+
+The fresh native participant received one continuation prompt without old message
+ids or finding bodies. It loaded the installed skill and found its own inbox empty.
+A full-sync invocation was followed by successful tool output containing the full
+current handoff, finding and reviewer-handoff bodies before observed edits. The
+model selected relevant context from the full snapshot; this does not demonstrate
+native cursor traversal or bounded-size body retrieval.
+
+It claimed both edited files, committed the correction, sent its own resolution
+note and completed its handoff. Eight fixture tests passed independently; restoring
+the old source failed one test containing the iteration regressions. Five separate
+old/corrected cases also confirmed the inherited-hole and custom-iterator defects.
+All old sessions, messages and receipts stayed unchanged. The original request
+remained queued for its original participant; the new note stayed queued for the
+closed synthetic reviewer, with no peer approval. The new room handoff had no
+recipients or receipts. Claims and hook bindings were gone after natural exit 0.
+
+This history deliberately used repetitive unrelated notes that identify their own
+scope. It does not establish discovery in arbitrary organic histories, conflicting
+business decisions, automatic restart or live delivery. Three intermediate native
+tool results reported errors; their text was not retained, so their causes cannot
+be classified from this capture. The final outcome and independent checks passed.
+No ACC runtime, maintained test or capability changed; delivery stayed off. Only
+Claude ran natively in this capture, and no native Codex settings were changed.
