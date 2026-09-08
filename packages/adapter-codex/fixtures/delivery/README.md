@@ -1,11 +1,14 @@
 # Codex native delivery captures
 
-Current `codex-cli-0.152.1-local-daemon-*` and
-`codex-cli-0.153.4-local-daemon-*` fixtures record ordinary LocalDaemon delivery
-through an installed npm package on darwin-arm64. Each product summary is paired
-with its full P01–P20 evidence file; transport summaries and T01–T04 evidence are
-separate. Selected provenance binds their exact hashes and the original remote
-workspace failure. A transport-only pass cannot replace product evidence.
+Selected `codex-cli-0.152.1-local-daemon-current-binding-product*` and
+`codex-cli-0.153.4-local-daemon-current-binding-product*` fixtures record ordinary
+LocalDaemon delivery through the installed npm package after the final router
+current-binding correction, on darwin-arm64. Each product summary is paired with
+its full P01–P20 evidence file. Separate transport summaries and T01–T04 evidence
+retain their original observations. Selected provenance binds exact hashes of the
+new product evidence, earlier positive product captures, transport captures and
+the original remote workspace failure. A transport-only pass cannot replace
+product evidence.
 
 The original remote failure is preserved as history. Later actual `pwd` checks
 showed that a new explicit `--remote` thread without `--cd` really executes in the

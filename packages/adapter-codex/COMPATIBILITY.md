@@ -10,8 +10,13 @@ Separate T01–T04 captures cover direct installed-adapter transport only.
 
 | Exact client | Installed product evidence | Transport evidence |
 |---|---|---|
-| 0.152.1 | [Product](fixtures/delivery/codex-cli-0.152.1-local-daemon-product.json) and [full matrix](fixtures/delivery/codex-cli-0.152.1-local-daemon-product-evidence.json) | [Transport](fixtures/delivery/codex-cli-0.152.1-local-daemon-transport.json) |
-| 0.153.4 | [Product](fixtures/delivery/codex-cli-0.153.4-local-daemon-product.json) and [full matrix](fixtures/delivery/codex-cli-0.153.4-local-daemon-product-evidence.json) | [Transport](fixtures/delivery/codex-cli-0.153.4-local-daemon-transport.json) |
+| 0.152.1 | [Product](fixtures/delivery/codex-cli-0.152.1-local-daemon-current-binding-product.json) and [full matrix](fixtures/delivery/codex-cli-0.152.1-local-daemon-current-binding-product-evidence.json) | [Transport](fixtures/delivery/codex-cli-0.152.1-local-daemon-transport.json) |
+| 0.153.4 | [Product](fixtures/delivery/codex-cli-0.153.4-local-daemon-current-binding-product.json) and [full matrix](fixtures/delivery/codex-cli-0.153.4-local-daemon-current-binding-product-evidence.json) | [Transport](fixtures/delivery/codex-cli-0.153.4-local-daemon-transport.json) |
+
+These selected product captures were repeated after the router’s final current-binding
+check was corrected. Earlier positive product captures and the original remote
+workspace failure remain unchanged in hashed provenance history. The retirement
+race itself is covered by separate deterministic router regression tests.
 
 Native `delivery.livePush` uses the darwin-arm64 minimum 0.152.1, current feature
 probe, recorded recipient consent, and exact thread, canonical cwd, live process,
