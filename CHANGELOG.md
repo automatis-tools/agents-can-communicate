@@ -33,7 +33,7 @@
 This combined candidate includes PR #116. The saved archive passed installed-package verification
 and the published-0.3.1 upgrade preflight; 248/248 source/archive/installed/managed files match.
 See [candidate evidence](docs/release-evidence/v0.4.0.md) for current validation status and limits.
-Validation in progress; this candidate is not ready for publication.
+Recorded local artifact checks completed; final review and publication approval remain separate.
 
 ## 0.3.1
 
