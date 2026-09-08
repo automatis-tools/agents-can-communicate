@@ -18,7 +18,6 @@ import { createFakeIds } from "../helpers/memory-store.mjs";
 const run = promisify(execFile);
 const repo = path.resolve(import.meta.dirname, "..", "..");
 const acc = path.join(repo, "bin", "acc.mjs");
-const capturedPlatform = `${process.platform}-${process.arch}` === "darwin-arm64";
 const shellLiteral = value => `'${String(value).replaceAll("'", "'\"'\"'")}'`;
 
 async function machine(t) {
@@ -83,9 +82,7 @@ test("the executable reports a binding without exposing its endpoint", async t =
   assert.equal(JSON.stringify(status).includes("never-print-this-endpoint"), false);
 });
 
-test("requested Codex consent stays off without an isolated LocalDaemon session", {
-  skip: capturedPlatform ? false : "Codex LocalDaemon capture is darwin-arm64 only",
-}, async t => {
+test("requested Codex consent stays off without an isolated LocalDaemon session", async t => {
   const place = await machine(t);
   const result = JSON.parse((await place.command("install", "--adapter", "codex",
     "--delivery", "actionable", "--home", place.home, "--dry-run")).stdout).data;
