@@ -10,7 +10,6 @@ import { openFilesystemStore } from "@agents-can-communicate/storage-filesystem"
 import { createFakeIds } from "../../../tests/helpers/memory-store.mjs";
 import { establishNativeBinding } from "../src/native-binding.mjs";
 
-const delay = ms => new Promise(resolve => { setTimeout(resolve, ms); });
 const clock = { now: () => new Date().toISOString() };
 
 async function fixture(t) {
@@ -66,15 +65,16 @@ function bind(adapter, service, session, timeoutMs) {
 
 test("a real writer released after the former quarter slice still permits rebinding", async t => {
   // This fails if retirement again divides the native budget into quarter-sized
-  // attempts: the lock lasts 150ms, longer than 100ms but shorter than 400ms.
+  // attempts: the 750ms gate exceeds a 500ms quarter slice. The 2000ms budget
+  // also leaves room for real holder publication/unlock and retirement I/O.
   const { service, session, store } = await fixture(t);
   const holder = holdBindingWriter(store, session.sessionId);
   await holder.ready;
   let binds = 0;
-  const timer = setTimeout(holder.release, 150);
+  const timer = setTimeout(holder.release, 750);
   try {
-    const outcome = await bind(nativeAdapter(() => { binds += 1; }), service, session, 400);
-    assert.equal(outcome.state, "active");
+    const outcome = await bind(nativeAdapter(() => { binds += 1; }), service, session, 2000);
+    assert.equal(outcome.state, "active", JSON.stringify(outcome));
     assert.equal(binds, 1);
     assert.equal((await store.ephemeral.get("deliveryBinding", session.sessionId)).opaqueEndpointRef,
       "endpoint_new");
@@ -92,18 +92,30 @@ test("an expired real writer deadline cannot retire the old endpoint after relea
   const holder = holdBindingWriter(store, session.sessionId);
   await holder.ready;
   let binds = 0;
+  const clears = [];
+  const observedService = { ...service, clearDeliveryBinding(input) {
+    const pending = service.clearDeliveryBinding(input);
+    clears.push(pending);
+    return pending;
+  } };
+  const adapter = nativeAdapter(() => { binds += 1; });
+  // Exercise the primary clear directly; an optional metadata-read timeout
+  // must not let a missing store deadline avoid retiring the old endpoint.
+  adapter.retireNativeSession = undefined;
   try {
-    const outcome = await bind(nativeAdapter(() => { binds += 1; }), service, session, 200);
+    const outcome = await bind(adapter, observedService, session, 200);
     assert.equal(outcome.state, "degraded");
     assert.equal(binds, 0);
+    assert.equal(clears.length, 1, "the real clear operation must have started");
     holder.release();
     await holder.held;
-    await delay(100);
+    await Promise.allSettled(clears);
     const binding = await store.ephemeral.get("deliveryBinding", session.sessionId);
     assert.equal(binding.opaqueEndpointRef, "endpoint_old");
     assert.equal(binding.retiredAt, null);
   } finally {
     holder.release();
     await holder.held;
+    await Promise.allSettled(clears);
   }
 });
