@@ -74,6 +74,11 @@ async function readTarText(tarball, entry) {
   return (await run("tar", ["-xzOf", tarball, `package/${entry}`])).stdout;
 }
 
+async function readTarBytes(tarball, entry) {
+  return (await run("tar", ["-xzOf", tarball, `package/${entry}`],
+    { encoding: "buffer" })).stdout;
+}
+
 function localMarkdownTargets(markdown, from) {
   const targets = [];
   for (const match of markdown.matchAll(/!?\[[^\]]*\]\(([^)\s]+)(?:\s+"[^"]*")?\)/g)) {
@@ -140,7 +145,8 @@ async function main() {
       fail("every shipped adapter must carry certification.json", certifications.join("\n"));
     }
     await verifyCertificationFixtureAllowlist(listed,
-      certification => readTarJson(tarball, certification))
+      certification => readTarJson(tarball, certification),
+      fixture => readTarBytes(tarball, fixture))
       .catch(error => fail(error.message));
     ok(`${listed.length} entries, none forbidden`);
     ok(`${certifications.length} certification manifest(s), exact evidence allowlist shipped`);

@@ -11,6 +11,8 @@ import { createGeminiCliAdapter } from "@agents-can-communicate/adapter-gemini-c
 import { createGrokAdapter } from "@agents-can-communicate/adapter-grok";
 import { createKimiAdapter } from "@agents-can-communicate/adapter-kimi";
 import { CAPABILITY_SHAPE } from "@agents-can-communicate/adapter-sdk";
+import { INSTALLED_HOOKS_LAUNCH_MODE, PASSING_LAUNCH_MODE, validateCapture }
+  from "../../scripts/spikes/delivery-capture.mjs";
 import { PASS_EXPECTATIONS } from "./certification-audit.mjs";
 
 const repoRoot = fileURLToPath(new URL("../..", import.meta.url));
@@ -105,10 +107,33 @@ for (const [packageName, createAdapter] of ADAPTERS) {
           // the exact protocol contract must be the ones the audit names.
           assert.equal(capture.hook_event_name ?? capture.hookEventName, undefined,
             `${item.fixture} is a delivery capture and carries no hook event`);
-          assert.equal(capture.launchMode, "ordinary-command-with-install-time-bootstrap",
+          const launchMode = expectedCapture.launchMode ?? PASSING_LAUNCH_MODE;
+          assert.equal(capture.launchMode, launchMode,
             `${item.fixture} was not captured through the ordinary command`);
           assert.equal(capture.protocolContract, expectedCapture.protocolContract,
             `${item.fixture} protocol contract differs from the independent audit`);
+          let productEvidence;
+          if (launchMode === INSTALLED_HOOKS_LAUNCH_MODE) {
+            assert.equal(packageName, "adapter-codex",
+              "installed-hooks native evidence is specific to Codex");
+            const reference = provenanceRecord.productEvidence;
+            assert.ok(reference, `${item.provenanceId} has no product evidence`);
+            assert.equal(typeof reference.fixture === "string"
+              && reference.fixture.startsWith("fixtures/")
+              && reference.fixture.endsWith(".json")
+              && !reference.fixture.includes("\\")
+              && path.posix.normalize(reference.fixture) === reference.fixture, true,
+              "product evidence must be package-local captured JSON");
+            assert.equal(packageJson.files.includes(reference.fixture), true,
+              `${reference.fixture} is absent from the exact package allowlist`);
+            const productPath = path.join(packageRoot, reference.fixture);
+            const productBytes = await readFile(productPath);
+            assert.equal(createHash("sha256").update(productBytes).digest("hex"), reference.sha256,
+              `${reference.fixture} differs from the audited product evidence digest`);
+            productEvidence = JSON.parse(productBytes.toString("utf8"));
+          }
+          assert.doesNotThrow(() => validateCapture(capture, { productEvidence }),
+            `${item.fixture} is not valid native delivery evidence`);
         } else if (item.result === "pass") {
           assert.equal(capture.hook_event_name ?? capture.hookEventName, expectedCapture.event,
             `${item.fixture} does not contain the certified hook event`);
