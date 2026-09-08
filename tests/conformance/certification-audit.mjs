@@ -32,8 +32,8 @@ const codexLocalDaemonLimitations = Object.freeze([
   "P16 is controlled endpoint fault injection. P18 uses an actual legacy npm artifact; its unrelated Claude shell artifact is not a real Claude capability capture.",
 ]);
 
-const codexNativeDelivery = (version, observedAt) => nativeDelivery("codex-cli", version,
-  observedAt, `fixtures/delivery/codex-cli-${version}-local-daemon-product.json`,
+const codexNativeDelivery = (version, observedAt, fixture) => nativeDelivery("codex-cli", version,
+  observedAt, fixture,
   "codex-app-server-thread-queue-v1", "offered", "queued_after_turn",
   codexLocalDaemonLimitations, ["delivery.livePush"])
   .map(entry => ({ ...entry, launchMode: "ordinary-command-with-installed-hooks" }));
@@ -104,8 +104,10 @@ export const PASS_EXPECTATIONS = Object.freeze({
     nextTurn("fixtures/UserPromptSubmit.json", "UserPromptSubmit",
       "delivery requires the next normal user turn"),
     ]),
-    ...codexNativeDelivery("0.152.1", "2026-09-08T09:42:03.910Z"),
-    ...codexNativeDelivery("0.153.4", "2026-09-08T09:42:02.609Z"),
+    ...codexNativeDelivery("0.152.1", "2026-09-08T10:45:27.843Z",
+      "fixtures/delivery/codex-cli-0.152.1-local-daemon-current-binding-product.json"),
+    ...codexNativeDelivery("0.153.4", "2026-09-08T10:45:35.663Z",
+      "fixtures/delivery/codex-cli-0.153.4-local-daemon-current-binding-product.json"),
   ],
   // Re-captured on the version this machine actually runs. 0.57.0 added folder
   // trust, which silently downgrades the approval mode and with it the toolset,
