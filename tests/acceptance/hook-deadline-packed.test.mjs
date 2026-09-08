@@ -121,7 +121,9 @@ test("installed hooks bound the whole invocation and cancel undecided writes", a
     assert.equal(result.timedOut, true);
     assert.equal(await packed.findBinding(id), null);
     assert.deepEqual((await packed.acc(["status"])).participants, before);
-    const retry = await invoke(id);
+    // This unblocked recovery is a positive control, not another forced expiry.
+    const retry = await invoke(id, { budgetMs: 5_000 });
+    assert.notEqual(retry.timedOut, true, "recovery exhausted its normal hook budget");
     assert.equal(retry.failed, undefined, retry.reason);
     await packed.acc(["heartbeat", "--session", retry.accSessionId, "--generation", retry.generation]);
   });
@@ -140,7 +142,8 @@ test("installed hooks bound the whole invocation and cancel undecided writes", a
     assert.equal(result.timedOut, true);
     assert.deepEqual((await packed.acc(["status"])).participants, before);
     assert.deepEqual(await packed.findBinding(id), pending);
-    const retry = await invoke(id);
+    const retry = await invoke(id, { budgetMs: 5_000 });
+    assert.notEqual(retry.timedOut, true, "recovery exhausted its normal hook budget");
     assert.equal(retry.failed, undefined, retry.reason);
     assert.notEqual(retry.generation, pending.generation);
     await packed.acc(["heartbeat", "--session", retry.accSessionId, "--generation", retry.generation]);
