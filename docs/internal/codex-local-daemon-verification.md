@@ -260,3 +260,29 @@ confirmation, exact `SessionEnd`, unloaded thread, retired binding and a queued
 actionable question before starting a fresh receiver. Its 16 focused tests and
 three exact mutations passed, with clean scoped review. The full matrix remains
 uncertified while the config-preservation fix and actual UI checks complete.
+
+
+## Config preservation and actual archive verification
+
+The isolated `product-01521-archive-ui-1` and
+`product-01534-archive-ui-1` runs passed P01/P14: 26 assertions per version,
+including the real archive confirmation, `SessionEnd`, retired binding, unloaded
+thread, queued actionable question and a newly bound ordinary receiver. Both
+verified cleanup. They deliberately selected a subset and exited incomplete;
+this supersedes the earlier unobserved UI-archive result without treating either
+as a full matrix pass.
+
+Commit `8fdc695` adds a Codex-local TOML ownership scanner. It preserves foreign
+tables and their raw bytes even inside ACC markers, and refuses ambiguous owned
+content before modifying plugin files. Both initial install/uninstall regressions
+failed against the old implementation. The corrected focused set passed 65 tests;
+restoring blind managed-region removal failed five of the 15 new tests. A scoped
+review found an additional inline-table preflight conflict, so this correction
+is not yet considered review-complete.
+
+The new public-disabled tarball, SHA-256
+`8b8fc8012c8f28f41755922ad08131ff1140c0352bab30d54b8d6b2b0395d634`,
+passed installed-package verification. The corresponding private runtime candidate
+is `1a903ae79414355e460b975b3f90fbdf4f46633366f147080f833e0f1ec1cc49`.
+New real trust-preservation and full-product runs are in progress on that artifact;
+no outcome is inferred from the focused tests or package check.
