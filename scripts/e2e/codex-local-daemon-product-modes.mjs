@@ -73,8 +73,11 @@ export async function productSessionChanges(h) {
     return (await withPeer(h, peer => peer.request("thread/loaded/list", {}))).data.find(id => !loadedBefore.has(id));
   },
   { timeoutMs: 20_000 });
-  await until("ordinary /cd new thread idle", async () =>
-    (await threadState(h, newThreadId)).status === "idle", { timeoutMs: 20_000 });
+  const { locateCodexThread } = await h.module("adapter-codex/src/app-server-client.mjs");
+  await until("ordinary /cd new thread idle", async () => {
+    const state = await withPeer(h, peer => locateCodexThread(peer, { threadId: newThreadId, cwd: h.C }));
+    return state.found && state.status === "idle";
+  }, { timeoutMs: 20_000 });
   const marker = path.join(h.C, "ordinary-cd.txt");
   await typePrompt(h, "receiver-b1", `Run only: pwd > ${shellLiteral(marker)}. Answer DONE and keep the session open.`);
   await waitMarker(h, "receiver-b1", marker, h.C);
