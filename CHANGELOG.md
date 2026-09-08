@@ -19,32 +19,21 @@
   servers and native client bindings, hold activation until they exit. Restart clients after
   integration changes and complete each client's activation or trust review; copied files
   alone do not prove hooks are active.
+- Codex live delivery can reuse an opted-in, already-loaded LocalDaemon thread without rewriting launch arguments. Exact receiver/workspace checks, safe binding refresh and wrapper migration preserve durable fallback and client-owned configuration.
+
 
 ### Candidate evidence
 
 | | |
 |---|---|
-| Status | Previous candidate superseded; combined 0.4.0 artifact validation pending |
+| Built from | `bf3ac01b0ed17611ff3f8a9929a63d793b801367` |
+| Tarball | `agents-can-communicate-0.4.0.tgz`, 327,454 bytes, 248 entries |
+| sha256 | `7ce5bc633b333ac34a738af7dae2fa5cdd444125bd94c3b51714d868379959b9` |
 
-The earlier source/archive digests in [historical candidate evidence](docs/release-evidence/v0.4.0.md)
-certify that earlier build only. Fresh combined-source and installed-artifact evidence is pending.
-
-Codex delivery now reuses an ordinary, already-loaded LocalDaemon thread without
-adding launch arguments or starting a daemon. Historical pre-integration
-installed-package matrices on Codex 0.152.1 and 0.153.4, macOS arm64, each passed 20 scenarios and 189
-assertions. Delivery verifies the exact receiver, workspace, process, version and
-socket; missing or unsupported endpoints retain durable inbox access. Opt-in is
-recorded separately from reachability, and expired live bindings can refresh
-without reviving retired generations. The router rechecks the authoritative
-current binding after its final policy and session reads; retirement or endpoint
-replacement during those reads cannot offer through the obsolete binding.
-
-The upgrade removes only unchanged ACC-owned Codex wrappers and preserves edited
-or unrelated shell artifacts. Reinstall and uninstall preserve client-owned TOML
-even when Codex inserts it inside ACC's configuration markers. Live delivery can
-spend tokens after the terminal detaches from a still-loaded thread; turning it
-off prevents new offers but cannot retract an already-accepted queue entry.
-Native replies remain uncertified; the observed reply loop uses `acc reply`.
+This combined candidate includes PR #116. The saved archive passed installed-package verification
+and the published-0.3.1 upgrade preflight; 248/248 source/archive/installed/managed files match.
+See [candidate evidence](docs/release-evidence/v0.4.0.md) for current validation status and limits.
+Validation in progress; this candidate is not ready for publication.
 
 ## 0.3.1
 
