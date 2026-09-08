@@ -58,7 +58,8 @@ function harness({ version = "2.1.258", probe } = {}) {
   const adapter = adapterWith(async () => { calls.probe += 1; return probe ? probe() : PROBE; });
   const check = (options = {}) => checkNativeBootstrap({ adapter, platform: "darwin-arm64",
     timeoutMs: 100, clock: { now: () => new Date(now).toISOString() },
-    readVersion: async () => { calls.version += 1; return version; }, ...options });
+    readVersion: async () => { calls.version += 1; return version; }, accVersion: "0.3.1",
+    ...options });
   return { adapter, calls, check, advance: ms => { now += ms; } };
 }
 
@@ -120,6 +121,51 @@ test("an unchanged executable reuses the cache without spawning again", async t 
   h.advance(SUPPORTED_TTL_MS + 1);
   await h.check({ realExecutable: here.link, dataHome: here.dataHome });
   assert.deepEqual(h.calls, { version: 2, probe: 2 });
+});
+
+test("the cache is reused only by the same known ACC runtime version", async t => {
+  const here = await place(t);
+  const h = harness();
+
+  await h.check({ realExecutable: here.link, dataHome: here.dataHome });
+  await h.check({ realExecutable: here.link, dataHome: here.dataHome });
+  assert.deepEqual(h.calls, { version: 1, probe: 1 });
+
+  await h.check({ realExecutable: here.link, dataHome: here.dataHome,
+    accVersion: "0.3.2" });
+  assert.deepEqual(h.calls, { version: 2, probe: 2 });
+  const record = JSON.parse(await readFile(cachePathFor(here.dataHome, "fixture"), "utf8"));
+  assert.equal(record.accVersion, "0.3.2");
+});
+
+test("an omitted ACC version uses the running installer's own version", async t => {
+  const here = await place(t);
+  const h = harness();
+  await h.check({ realExecutable: here.link, dataHome: here.dataHome,
+    accVersion: undefined });
+
+  const record = JSON.parse(await readFile(cachePathFor(here.dataHome, "fixture"), "utf8"));
+  const manifest = JSON.parse(await readFile(new URL("../package.json", import.meta.url), "utf8"));
+
+  assert.equal(record.accVersion, manifest.version);
+});
+
+test("legacy and unknown ACC runtime versions cannot reuse eligibility", async t => {
+  const here = await place(t);
+  const h = harness();
+  const file = cachePathFor(here.dataHome, "fixture");
+  await h.check({ realExecutable: here.link, dataHome: here.dataHome });
+  const legacy = JSON.parse(await readFile(file, "utf8"));
+  delete legacy.accVersion;
+  await writeFile(file, `${JSON.stringify(legacy)}\n`);
+
+  await h.check({ realExecutable: here.link, dataHome: here.dataHome });
+  await h.check({ realExecutable: here.link, dataHome: here.dataHome,
+    accVersion: null });
+  await h.check({ realExecutable: here.link, dataHome: here.dataHome,
+    accVersion: null });
+
+  assert.deepEqual(h.calls, { version: 4, probe: 4 });
 });
 
 test("replacing or upgrading the executable invalidates the cache", async t => {

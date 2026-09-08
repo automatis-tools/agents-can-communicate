@@ -71,6 +71,9 @@ test("the endpoint is private, session-scoped, and registered for the parent cli
     assert.equal(registration.clientPid, process.pid);
     assert.equal(registration.channelPid, channel.child.pid);
     assert.equal(path.dirname(registration.socketPath), channel.captureDir);
+    // Registration is published before its observation. Read the completed log
+    // after shutdown, rather than racing the child's next filesystem write.
+    await channel.close();
     assert.equal(events(channel, "endpoint_listening").length, 1);
   }));
 

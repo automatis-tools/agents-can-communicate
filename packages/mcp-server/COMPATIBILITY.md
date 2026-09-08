@@ -1,80 +1,91 @@
 # MCP compatibility
 
-Verified 2026-08-16 against the primary specification at
-<https://modelcontextprotocol.io/specification/>.
+Verified 2026-09-06 against the primary specifications and real installed clients.
 
-| Item | Value |
-|---|---|
-| Protocol revision | **2026-07-28** |
-| Transport | stdio, newline-delimited JSON-RPC 2.0 |
-| Transport implementation | dependency-free (see decision below) |
+| Interface | Supported revisions | Opening exchange |
+|---|---|---|
+| Initialized stdio | `2025-06-18`, `2025-11-25` | `initialize`, then `notifications/initialized` |
+| Per-request stdio | `2026-07-28` | request metadata; `server/discover` for discovery |
 
-## Transport decision
+## Observed client behavior
 
-Dependency-free JSON-RPC 2.0 over stdio, targeting revision `2026-07-28`. The official
-`@modelcontextprotocol/sdk` was considered and not adopted.
+The installed ACC 0.3.1 development candidate was tested on macOS arm64 with Node 26.5.1.
+Separate authenticated CLI processes launched its stdio binary; a transparent byte-forwarding
+observer recorded protocol metadata, without model transcripts or tool bodies.
 
-Reasons, in order of weight:
+| Client | Observed initialization | Actual model tool calls |
+|---|---|---|
+| Codex CLI 0.153.4 | `2025-06-18`, `codex-mcp-client` | `acc_status` and `acc_inbox` succeeded |
+| Claude Code 2.1.263 | `2025-11-25`, `claude-code` | `acc_status` and `acc_inbox` succeeded |
 
-1. AGENTS.md prefers Node built-ins and dependency-free code, and the repository currently
-   has zero runtime dependencies. This package is reached through `npx`, so every
-   dependency is install weight and supply-chain surface for a fallback adapter.
-2. The surface ACC needs is small and fully specified: `server/discover`, `tools/list`,
-   `tools/call`, `resources/list`, `resources/read`, plus newline-delimited framing. The
-   stdio binding is, in the specification's own words, "just newline-delimited JSON-RPC
-   over a byte stream".
-3. The cost is ours to carry: tracking future revisions is now this package's job. The
-   revision is pinned in code and asserted by tests, so a drift shows up as a failure
-   rather than as silent misbehaviour.
+Both successful smoke runs began at 2026-09-06 17:58 UTC and exited normally. Codex used
+invocation-local approval for the two ACC tools; Claude used an ACC tool allowlist.
+The workspace and ACC data directory were temporary. No native hook installation was used.
+This verifies the manual MCP surface on those versions, not native wake, injection,
+write guards, client lifecycle, other operating systems, or other client versions.
+The 2026 interface is covered by protocol tests; no real 2026 client was observed here.
 
-## Verified rules
+A subsequent live pair completed a review, clarification, linked answer, code correction,
+independent 7-test verification and structured handoffs through MCP. Both clients exited
+normally. A fresh third session recovered the author's handoff using `acc_sync` with full
+scope, without the previous conversation or project-file reads. Addressing a not-yet-known
+successor was refused; the author recovered by recording a workspace handoff instead.
+These were explicitly prompted workflows with polling, not spontaneous coordination or
+automatic checkpointing. Final messages left after a recipient stopped remained queued.
 
-- Messages are newline-delimited and **MUST NOT** contain embedded newlines.
-- The server **MUST NOT** write anything to stdout that is not a valid MCP message.
-  stderr is free for logging and the client **SHOULD NOT** treat it as an error signal.
-- The server **MUST NOT** write JSON-RPC *requests*. Server-to-client interaction is
-  carried in `InputRequiredResult` replies.
-- The server **SHOULD** exit promptly on stdin EOF. That is the only portable graceful
-  shutdown signal.
-- Every request carries `_meta["io.modelcontextprotocol/protocolVersion"]` (required) and
-  `_meta["io.modelcontextprotocol/clientCapabilities"]` (required);
-  `io.modelcontextprotocol/clientInfo` is optional. A request missing a required field
-  **MUST** be rejected with `-32602`.
-- Results **SHOULD** carry `_meta["io.modelcontextprotocol/serverInfo"]` and **MUST**
-  include a `resultType`.
-- Reserved error codes: `-32020` HeaderMismatch, `-32021` MissingRequiredClientCapability,
-  `-32022` UnsupportedProtocolVersion. `-32000`–`-32019` are legacy and must not be used;
-  `-32002` and `-32042` must not be emitted.
+The original server rejected both clients' initialization with `-32602` because it
+required 2026 metadata. After adding initialization, Claude rejected an inbox array
+in `structuredContent`. The compatibility boundary now handles both differences.
+The subprocess lifecycle tests exercise both revisions, and the installed-package
+acceptance test sends, retrieves and acknowledges linked replies between them. Restoring
+the original server or removing the array conversion makes these regression gates fail.
 
-## Why the session is not tied to `initialize`
+## Transport contract
 
-The obvious design — open one ACC session during the MCP `initialize` handshake and close it
-on stdin EOF — is invalid at revision 2026-07-28 on three counts:
+ACC uses dependency-free, newline-delimited JSON-RPC 2.0 over stdio. The supported
+surface is `initialize`, `ping`, `server/discover`, `tools/list`, `tools/call`,
+`resources/list`, and `resources/read`. Logs go to stderr; stdin EOF ends the process.
+No server-initiated requests or push notifications are implemented.
 
-1. `initialize` is the **legacy** era. Modern clients probe with `server/discover` and
-   receive a `DiscoverResult` listing `supportedVersions`.
-2. The protocol is explicitly stateless: *"Servers **MUST NOT** rely on prior requests over
-   the same connection to establish context (e.g. capabilities, protocol version, client
-   identity)"*, and *"an open connection, such as a STDIO process, is not a conversation or
-   session … a server must not treat connection or process identity as a proxy for
-   conversation or session continuity"*. Clients may restart the server freely, which under
-   the planned design would open a second ACC session and orphan the first.
-3. `clientInfo` is self-reported and the specification says implementations **SHOULD NOT**
-   rely on it for behaviour or security decisions, so it cannot supply participant
-   identity.
+For initialized clients:
 
-## Approved session model
+- A supported requested revision is echoed; an unknown revision negotiates `2025-11-25`.
+- Initialization validates `protocolVersion`, `capabilities` and `clientInfo` without
+  using self-reported client identity to select an ACC participant.
+- Normal requests follow `notifications/initialized`. Ping can be used during startup.
+- Results have the 2025 envelope. Nonobject results remain serialized JSON text, with
+  `structuredContent` omitted; object results also expose structured content.
 
-Config-derived session (user decision, 2026-08-16). The ACC session is derived from the
-server's own launch configuration — participant name and workspace root supplied when the
-MCP server is registered — never from prior requests, connection identity, or
-`clientInfo`. Presence is refreshed on each tool call. A restarted server process resolves
-to the same session rather than creating a second one.
+For per-request clients:
 
-This does not violate statelessness: the server infers nothing from earlier requests. Its
-identity comes from its own configuration, which is available on every request
-independently.
+- Every request supplies its own `_meta["io.modelcontextprotocol/protocolVersion"]`
+  and object `_meta["io.modelcontextprotocol/clientCapabilities"]`.
+- Missing or malformed metadata returns `-32602`; unsupported versions return `-32022`.
+- Results include `resultType: "complete"` and server information in `_meta`.
+- Structured content retains its original JSON type, including inbox arrays.
 
-Capabilities remain truthful: manual MCP tool polling is not `delivery.nextTurn`,
-`delivery.livePush`, or `delivery.replyRoute`; lifecycle, guards, and all three delivery
-modes stay false because MCP guarantees none of them.
+The two interfaces can coexist on one stream. A request containing either reserved
+metadata key must supply both valid fields; a preceding initialization cannot fill them.
+Initialization readiness belongs only to the 2025 transport interface.
+
+## ACC session model
+
+The ACC session is derived from the server's own participant and workspace launch
+configuration, as approved on 2026-08-16. It is never derived from `clientInfo`,
+initialization, or process identity. Presence is refreshed on tool calls. A restarted
+server resolves the same durable binding; EOF does not close that ACC session.
+
+As a receiver, generic MCP has no native binding, push/wake, or reply route:
+`delivery.nextTurn`, `delivery.livePush`, and `delivery.replyRoute` remain false, as do
+lifecycle, injection and guard capabilities. The installed MCP server separately records
+outgoing message/request/reply/handoff operations before routing them through eligible,
+opted-in recipient adapters. Inspect their delivery results; native acceptance does not
+establish model attention, a separate retrieval, or a reply.
+
+## Primary sources
+
+- [2025-06-18 lifecycle](https://modelcontextprotocol.io/specification/2025-06-18/basic/lifecycle)
+- [2025-11-25 lifecycle](https://modelcontextprotocol.io/specification/2025-11-25/basic/lifecycle)
+- [2025 tool results](https://modelcontextprotocol.io/specification/2025-11-25/server/tools)
+- [2026 versioning and dual-era compatibility](https://modelcontextprotocol.io/specification/2026-07-28/basic/versioning)
+- [2026 tool results](https://modelcontextprotocol.io/specification/2026-07-28/server/tools)

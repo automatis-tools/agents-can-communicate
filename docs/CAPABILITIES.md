@@ -53,12 +53,12 @@ The limitations belong next to the adapters they affect:
 
 | Adapter | Exact limitation and evidence |
 |---|---|
-| Codex | Exact 0.147.0 next-turn context requires plugin trust. LocalDaemon native delivery was captured through the installed package on 0.152.1 and 0.153.4, darwin-arm64; minimum 0.152.1, recorded opt-in, current feature probe and exact thread/cwd/process/version/protocol checks are required. Ordinary launch preserves the receiver workspace without ACC arguments or daemon ownership. Embedded or unreachable sessions keep their inbox. Native `replyRoute` remains false. |
+| Codex | Exact 0.147.0 next-turn context requires plugin trust. The observed stock 0.153.4 upgrade from ACC 0.3.1 to 0.4 required fresh review of five modified hook definitions; a subsequent restart retained all five active (activation evidence, not new event certification). LocalDaemon native delivery was captured through the installed package on 0.152.1 and 0.153.4, darwin-arm64; minimum 0.152.1, recorded opt-in, current feature probe and exact thread/cwd/process/version/protocol checks are required. Ordinary launch preserves the receiver workspace without ACC arguments or daemon ownership. Embedded or unreachable sessions keep their inbox. Native `replyRoute` remains false. |
 | Claude Code | 2.1.233 next-turn delivery waits for the next user prompt. A 2.1.258 Channel capture proved idle offer, busy queue-after-turn, explicit reply, duplicate suppression, and durable fallback, so `delivery.livePush` and `delivery.replyRoute` are live capabilities behind the native contract (experimental, off until opted in; Claude's development-channel warning is vendor-owned and visible). |
 | Gemini CLI | Only 0.57.0 has package-shipped next-turn certification. Its TUI has no captured external wake or queue interface and `--acp` changes launch ownership, so native delivery is fallback-only; live push and reply routing remain false. |
 | Grok | Documentation-shaped payloads do not count as real captures. The public leader surface exposed no proven addressed injection into an ordinary TUI session, so native delivery is `awaiting_compatibility_capture`; all capabilities remain false. |
 | Kimi Code | 0.36.1 has next-turn and guard evidence, plus a 60-second heartbeat. Its server/queue APIs do not prove a transparent binding to an independently opened session, so native delivery is fallback-only. |
-| Generic MCP | Tool polling is not next-turn injection, live push, or a native reply route. It has no write guard or client-lifecycle evidence. |
+| Generic MCP | As a receiver, tool polling is not next-turn injection, live push, or a native reply route. It has no write guard or client-lifecycle evidence. Outgoing messages may use an eligible recipient's opted-in native adapter. |
 
 `certification.json` beside each adapter is machine-readable. `COMPATIBILITY.md` records the
 captured client behavior, including what could not be observed.

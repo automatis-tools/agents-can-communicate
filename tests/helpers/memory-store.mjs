@@ -148,8 +148,12 @@ export function createMemoryStore({ clock, ids, workspaceId }) {
         return next;
       });
     },
-    async delete(kind, id) {
-      return withEphemeralWriter(async () => { volatile.delete(key(kind, id)); });
+    async delete(kind, id, guard = () => true) {
+      return withEphemeralWriter(async () => {
+        const current = volatile.get(key(kind, id)) ?? null;
+        if (current === null || !await guard(current)) return;
+        volatile.delete(key(kind, id));
+      });
     },
     async list(kind) {
       return [...volatile.entries()]

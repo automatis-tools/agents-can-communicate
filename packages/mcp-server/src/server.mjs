@@ -1,5 +1,3 @@
-import { createRequire } from "node:module";
-
 import { AccError, EXIT, GENERIC_MESSAGE_KINDS, VALID_OBLIGATIONS }
   from "@agents-can-communicate/protocol";
 import { clearSessionBinding, loadSessionBinding, storeSessionBinding }
@@ -7,52 +5,34 @@ import { clearSessionBinding, loadSessionBinding, storeSessionBinding }
 
 import { readResource } from "./resources.mjs";
 import { validateToolInput } from "./input-validator.mjs";
-import { MCP_CAPABILITIES, PUBLIC_TOOLS, RESOURCES } from "./tools.mjs";
+import { PUBLIC_TOOLS, RESOURCES } from "./tools.mjs";
+import { createProtocol } from "./protocol.mjs";
 
-export const PROTOCOL_VERSION = "2026-07-28";
-export const SUPPORTED_VERSIONS = Object.freeze([PROTOCOL_VERSION]);
-const PACKAGE_VERSION = createRequire(import.meta.url)("../package.json").version;
-const SERVER_INFO = Object.freeze({ name: "agents-can-communicate", version: PACKAGE_VERSION });
-
-const META = "io.modelcontextprotocol";
+export { PROTOCOL_VERSION, SUPPORTED_VERSIONS } from "./protocol.mjs";
 const HEARTBEAT_CADENCE_MS = 60_000;
-
-const complete = result => ({ resultType: "complete",
-  _meta: { [`${META}/serverInfo`]: SERVER_INFO }, ...result });
-
-function requireProtocolMeta(params) {
-  const meta = params?._meta ?? {};
-  const version = meta[`${META}/protocolVersion`];
-  const capabilities = meta[`${META}/clientCapabilities`];
-  // The revision requires both on every request and mandates -32602 when one is
-  // missing. No prior request may be used to supply them.
-  if (typeof version !== "string" || capabilities === undefined) {
-    throw Object.assign(new Error(
-      "each request requires _meta protocolVersion and clientCapabilities"),
-    { rpcCode: -32602 });
-  }
-  if (!SUPPORTED_VERSIONS.includes(version)) {
-    throw Object.assign(new Error(`unsupported protocol version: ${version}`),
-      { rpcCode: -32022, rpcData: { supported: [...SUPPORTED_VERSIONS] } });
-  }
-  return { version, capabilities };
-}
 
 /**
  * Resolve the ACC session for this server from its own launch configuration.
  *
- * Approved 2026-08-16. The protocol is stateless and forbids treating process or
+ * Approved 2026-08-16. The 2026 interface forbids treating process or
  * connection identity as session continuity, so the session cannot be anchored
  * to the stdio process. It is derived from the participant and workspace this
  * server was configured with - available identically on every request - and
  * persisted through a binding so a restarted process resolves to the same
  * session instead of creating a second participant.
  */
-async function resolveSession(context) {
+async function resolveSession(context, { forFinish = false } = {}) {
   const key = `mcp:${context.participantId}:${context.workspaceId}`;
   const existing = await loadSessionBinding({ runtimeDir: context.runtimeDir,
     harnessSessionId: key });
   if (existing !== null) {
+    if (forFinish) {
+      const current = await context.service.locateSession(existing.accSessionId, context.workspaceId);
+      // Core validates and closes this exact generation, including retries.
+      // A prior heartbeat could race another finish and reopen a different owner.
+      if (current !== null
+        && current.record.generation === existing.generation) return current.record;
+    }
     try {
       return await context.service.heartbeatSession({ sessionId: existing.accSessionId,
         generation: existing.generation, workspaceId: context.workspaceId });
@@ -131,7 +111,7 @@ function obligationFor(kind, explicit, addressed) {
  * agreeing to it.
  */
 async function callTool(name, args, context) {
-  const session = await resolveSession(context);
+  const session = await resolveSession(context, { forFinish: name === "acc_finish" });
   const owner = { sessionId: session.sessionId, generation: session.generation,
     workspaceId: context.workspaceId, descriptor: context.descriptor };
   const service = context.service;
@@ -141,7 +121,7 @@ async function callTool(name, args, context) {
       return service.collectStatus({});
     case "acc_sync":
       return service.sync({ ...owner, cursor: args.cursor ?? null,
-        scope: args.scope, limit: args.limit });
+        scope: args.scope, limit: args.limit, messageId: args.messageId, kind: args.kind, current: args.current });
     case "acc_work":
       if (args.clear === true) {
         await service.clearIntent({ ...owner });
@@ -164,11 +144,19 @@ async function callTool(name, args, context) {
       const routed = await recordAndOffer({ router: context.deliveryRouter, record: () =>
         service.sendMessage({ ...owner, clientMessageId: clientMessageId(args, service),
         toParticipantIds, subject: args.subject, body: args.body, kind,
-        obligation: obligationFor(kind, args.obligation, toParticipantIds.length > 0) }) });
+        supersedes: args.supersedes, withdraws: args.withdraws,
+        obligation: obligationFor(kind, args.obligation, toParticipantIds.length > 0
+          || args.supersedes !== undefined || args.withdraws !== undefined) }) });
       const message = routed.recorded;
       return { message, delivery: routed.delivery };
     }
     case "acc_inbox":
+      if (args.messageId === undefined) {
+        return service.listInbox({ ...owner, cursor: args.cursor, limit: args.limit });
+      }
+      if (args.cursor !== undefined || args.limit !== undefined) {
+        throw new AccError(EXIT.USAGE, "an exact inbox read cannot use cursor or limit");
+      }
       return service.readInbox({ ...owner, messageId: args.messageId });
     case "acc_reply": {
       const routed = await recordAndOffer({ router: context.deliveryRouter,
@@ -176,7 +164,8 @@ async function callTool(name, args, context) {
         record: () => service.replyToMessage({ ...owner, messageId: args.messageId,
           body: args.body, subject: args.subject,
           clientMessageId: clientMessageId(args, service) }) });
-      return { message: routed.recorded.reply, delivery: routed.delivery };
+      return { message: routed.recorded.reply, receipt: routed.recorded.receipt,
+        delivery: routed.delivery };
     }
     case "acc_request": {
       const routed = await recordAndOffer({ router: context.deliveryRouter,
@@ -204,27 +193,20 @@ async function callTool(name, args, context) {
 
 async function handle(message, context) {
   const { method, params } = message;
-  if (method === "server/discover") {
-    requireProtocolMeta(params);
-    return complete({ supportedVersions: [...SUPPORTED_VERSIONS], capabilities: {
-      tools: {}, resources: {} }, serverInfo: SERVER_INFO, accCapabilities: MCP_CAPABILITIES });
-  }
-  requireProtocolMeta(params);
   switch (method) {
     case "tools/list":
-      return complete({ tools: [...PUBLIC_TOOLS] });
+      return { tools: [...PUBLIC_TOOLS] };
     case "resources/list":
-      return complete({ resources: [...RESOURCES] });
+      return { resources: [...RESOURCES] };
     case "resources/read": {
-      // Snapshot and roster are observation-only. Inbox is a delivery boundary:
-      // resolve this configured participant's durable session and let the core
-      // inbox service record that the returned bodies were retrieved.
+      // Inbox discovery uses this configured participant's current owner but
+      // returns summaries only. Reading this resource never retrieves bodies.
       const resourceContext = params.uri === "acc://inbox"
         ? { ...context, session: await resolveSession(context) }
         : context;
       const value = await readResource(params.uri, resourceContext);
-      return complete({ contents: [{ uri: params.uri, mimeType: "application/json",
-        text: JSON.stringify(value, null, 2) }] });
+      return { contents: [{ uri: params.uri, mimeType: "application/json",
+        text: JSON.stringify(value, null, 2) }] };
     }
     case "tools/call": {
       try {
@@ -235,13 +217,13 @@ async function handle(message, context) {
         }
         validateToolInput(tool.inputSchema, args);
         const value = await callTool(params.name, args, context);
-        return complete({ content: [{ type: "text", text: JSON.stringify(value, null, 2) }],
-          structuredContent: value });
+        return { content: [{ type: "text", text: JSON.stringify(value, null, 2) }],
+          structuredContent: value };
       } catch (error) {
         // A failing operation is a tool result, not a transport failure: the
         // model must see it and be able to react.
-        return complete({ isError: true,
-          content: [{ type: "text", text: `${params.name}: ${error.message}` }] });
+        return { isError: true,
+          content: [{ type: "text", text: `${params.name}: ${error.message}` }] };
       }
     }
     default:
@@ -255,6 +237,7 @@ async function handle(message, context) {
  */
 export async function serve({ input, output, log, context }) {
   const write = value => output.write(`${JSON.stringify(value)}\n`);
+  const protocol = createProtocol();
   let buffer = "";
 
   for await (const chunk of input) {
@@ -269,13 +252,32 @@ export async function serve({ input, output, log, context }) {
       try {
         message = JSON.parse(line);
       } catch {
-        write({ jsonrpc: "2.0", error: { code: -32700, message: "parse error" } });
+        write({ jsonrpc: "2.0", id: null, error: { code: -32700, message: "parse error" } });
         continue;
       }
-      // Notifications get no reply, by rule.
-      if (message.id === undefined || message.id === null) continue;
+      // Validate the envelope before accessing fields or treating it as a notification.
+      const id = typeof message?.id === "string" || typeof message?.id === "number"
+        ? message.id : null;
+      if (message === null || typeof message !== "object" || Array.isArray(message)
+        || message.jsonrpc !== "2.0" || typeof message.method !== "string"
+        || (message.id !== undefined && message.id !== null
+          && typeof message.id !== "string" && typeof message.id !== "number")) {
+        write({ jsonrpc: "2.0", id, error: { code: -32600, message: "invalid request" } });
+        continue;
+      }
+      // Once the envelope is valid, notifications get no reply, even for invalid params.
+      if (message.id === undefined || message.id === null) {
+        protocol.notify(message);
+        continue;
+      }
+      if (message.params !== undefined
+        && (message.params === null || typeof message.params !== "object")) {
+        write({ jsonrpc: "2.0", id, error: { code: -32602, message: "invalid params" } });
+        continue;
+      }
       try {
-        write({ jsonrpc: "2.0", id: message.id, result: await handle(message, context) });
+        write({ jsonrpc: "2.0", id: message.id,
+          result: await protocol.request(message, () => handle(message, context)) });
       } catch (error) {
         log?.(`${message.method}: ${error.message}`);
         write({ jsonrpc: "2.0", id: message.id, error: {

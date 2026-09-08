@@ -307,6 +307,53 @@ test("one settled recipient does not suppress another recipient's queued offer",
   assert.deepEqual(calls, [other.sessionId]);
 });
 
+test("retrying an obsolete decision cannot live-offer its body; current changes carry lifecycle metadata", async () => {
+  const delivered = [];
+  const f = await fixture(async ({ binding, message }) => {
+    delivered.push(message);
+    return { accepted: true, transport: "codex-app-server", clientVersion: binding.clientVersion };
+  });
+  await publish(f.service, f.recipient);
+  const decision = (key, extra = {}) => f.service.sendMessage({ ...owner(f.sender),
+    clientMessageId: key, toParticipantIds: ["models"], kind: "decision",
+    obligation: "none", subject: key, body: key, ...extra });
+  const old = await decision("old");
+  const next = await decision("next", { supersedes: [old.messageId] });
+  assert.deepEqual(await f.router.offer(old), [{ recipientParticipantId: "models",
+    outcome: "queued", transport: "durable" }]);
+  assert.equal(delivered.length, 0);
+  await f.router.offer(next);
+  assert.equal(delivered.length, 1);
+  assert.equal(delivered[0].decisionStatus.state, "current");
+  assert.deepEqual(delivered[0].decisionChange, { action: "replace", messageIds: [old.messageId] });
+  assert.equal((await f.service.readReceipt({ messageId: old.messageId,
+    recipientParticipantId: "models" })).state, "queued");
+});
+
+test("a decision replaced during the first offer cannot be offered as current to the next recipient", async () => {
+  const delivered = [];
+  let f;
+  f = await fixture(async ({ binding, message }) => {
+    delivered.push(binding.sessionId);
+    if (delivered.length === 1) await f.service.sendMessage({ ...owner(f.sender),
+      clientMessageId: "replacement", toParticipantIds: [], kind: "decision", obligation: "none",
+      subject: "Updated", body: "New choice", supersedes: [message.messageId] });
+    return { accepted: true, transport: "codex-app-server", clientVersion: binding.clientVersion };
+  });
+  const other = await f.service.openSession({ workspaceId: WORKSPACE,
+    participantId: "other", harness: "fixture", heartbeatCadenceMs: 30_000 });
+  await publish(f.service, f.recipient);
+  await publish(f.service, other);
+  const old = await f.service.sendMessage({ ...owner(f.sender), clientMessageId: "old",
+    toParticipantIds: ["models", "other"], kind: "decision", obligation: "none",
+    subject: "Old", body: "Old choice" });
+  const outcomes = await f.router.offer(old);
+  assert.deepEqual(delivered, [f.recipient.sessionId]);
+  assert.deepEqual(outcomes.map(o => o.outcome), ["offered", "queued"]);
+  assert.equal((await f.service.readReceipt({ messageId: old.messageId,
+    recipientParticipantId: "other" })).state, "queued");
+});
+
 test("a second live recipient appearing during refresh keeps the message queued", async () => {
   let f;
   let offers = 0;

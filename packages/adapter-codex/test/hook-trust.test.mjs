@@ -25,8 +25,8 @@ import { createCodexAdapter } from "../src/adapter.mjs";
  * adapter(s) installed` and `codex plugin list` reported the plugin enabled. A
  * shell write walked through a guarded claim. Writing the exact same hashes back
  * - captured before the deletion, from an ACC three versions older - revived the
- * guard immediately, which is also how we know the record survives ACC upgrades
- * and is granted once, interactively, for good.
+ * guard immediately in that historical capture. It does not establish trust
+ * across arbitrary definition changes: current Codex compares exact hashes.
  *
  * So it is never ACC's to delete: it is the client's permission for ACC to run
  * at all, and nothing ACC can write puts it back.
@@ -66,9 +66,8 @@ test("uninstall leaves the client's trust in ACC's hooks alone", async t => {
     "the hash was rewritten rather than left as the client wrote it");
 });
 
-test("a reinstall over surviving trust is what makes the guard work again", async t => {
-  // The whole point of leaving it: install, uninstall, install again, and the
-  // hooks still run - no interactive step, because the record never left.
+test("a reinstall preserves saved trust while restoring ACC's registration", async t => {
+  // This measures preservation, not whether the client trusts today's hashes.
   const context = await home(t);
   const adapter = createCodexAdapter();
   await adapter.install(context);

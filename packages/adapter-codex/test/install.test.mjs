@@ -128,7 +128,7 @@ test("detect is read-only and reports registration honestly", async t => {
   await adapter.install(context);
   const after = await adapter.detect(context);
 
-  assert.match(after.diagnostics.join(" "), /registered/);
+  assert.match(after.diagnostics.join(" "), /plugin installed in the client's cache/);
   assert.deepEqual(await theirs(), EXISTING, "ACC edited the user's marketplace");
 });
 
@@ -523,7 +523,7 @@ test("injection is plain text, because this client wraps nothing", () => {
   // Emitting Claude Code's JSON envelope here would put the envelope itself
   // into the conversation, exactly as it would on Kimi Code.
   assert.deepEqual(injectOutcome("2 peers"),
-    { stdout: "2 peers\n", stderr: "", exitCode: 0 });
+    { stdout: "2 peers", stderr: "", exitCode: 0 });
   assert.deepEqual(injectOutcome(""), { stdout: "", stderr: "", exitCode: 0 });
 });
 
@@ -633,8 +633,9 @@ test("a config that sets its own sandbox is not written over", async t => {
   assert.equal((text.match(/\[sandbox_workspace_write\]/g) ?? []).length, 1,
     "the table is declared twice, which this client refuses to load at all");
   assert.match(text, /writable_roots = \["\/tmp\/theirs"\]/);
-  assert.match(result.diagnostics.join(" "),
-    /sets its own sandbox_workspace_write.*read the roster and record nothing/s);
+  assert.ok(result.needsAction.some(line => line.includes("writable_roots")
+    && line.includes(stateRoot) && line.includes(config)),
+  "the existing sandbox's access check was not exposed as an operator action");
 });
 
 test("uninstall takes the sandbox declaration back out", async t => {

@@ -32,8 +32,9 @@ acc work --summary "adding material fields" --mode edit \
 acc claim --resource 'file:packages/core/**' --reason "adding material fields"
 ```
 
-A claim makes overlap visible. It is `guarded` only when every relevant live client exposes
-a certified write guard; otherwise it is advisory. Claims do not prevent unrelated local
+A claim makes overlap visible. The shown command is advisory by default. To request
+guarded enforcement, add `--enforcement guarded`; every relevant live client must also
+expose a certified write guard, or workspace protection remains advisory. Claims do not prevent unrelated local
 processes from writing, and different files are not automatically in conflict.
 
 When Claude needs the model shape, it can address the Codex peer by client name:

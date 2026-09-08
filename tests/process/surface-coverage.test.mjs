@@ -51,7 +51,7 @@ const BY_CLI = Object.freeze({
   openSession: "attach", heartbeatSession: "heartbeat", closeSession: "detach",
   sync: "sync", setIntent: "work", clearIntent: "work", acquireClaim: "claim", releaseClaim: "release",
   forceReleaseClaim: "release", sendMessage: "message", acknowledgeMessage: "ack",
-  readInbox: "inbox", replyToMessage: "reply",
+  listInbox: "inbox", readInbox: "inbox", replyToMessage: "reply",
   finishSession: "finish", collectStatus: "status",
 });
 
@@ -117,11 +117,11 @@ test("an operation an agent needs is offered over MCP as well", async () => {
   // of it, since a model should not be running the installer.
   const names = new Set(PUBLIC_TOOLS.map(tool => tool.name));
   for (const operation of ["collectStatus", "sync", "setIntent", "acquireClaim",
-    "releaseClaim", "sendMessage", "readInbox", "replyToMessage", "acknowledgeMessage",
+    "releaseClaim", "sendMessage", "listInbox", "readInbox", "replyToMessage", "acknowledgeMessage",
     "finishSession"]) {
     const expected = { collectStatus: "acc_status", sync: "acc_sync", setIntent: "acc_work",
       acquireClaim: "acc_claim", releaseClaim: "acc_release", sendMessage: "acc_message",
-      acknowledgeMessage: "acc_ack", readInbox: "acc_inbox",
+      acknowledgeMessage: "acc_ack", listInbox: "acc_inbox", readInbox: "acc_inbox",
       replyToMessage: "acc_reply", finishSession: "acc_finish" }[operation];
     assert.equal(names.has(expected), true, `${operation} has no MCP tool`);
   }

@@ -1,3 +1,5 @@
+// Installation, removal, detection and planning share the exact marketplace,
+// cache and config paths below; keeping them together avoids divergent ownership.
 import { cp, mkdir, readdir, readFile, rm, rmdir, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -7,11 +9,12 @@ import { bakeSkillCommand, blankJson, blankText, removeIfEmpty, removeInstalledT
   tomlString, writeForeignJson, writeHookShim }
   from "@agents-can-communicate/adapter-sdk";
 import { AccError, EXIT } from "@agents-can-communicate/protocol";
-import { inspectConfig, readConfig, removeTomlBlock, writeTomlBlock } from "./config-block.mjs";
+import { inspectConfig, readConfig, removeTomlBlock, sandboxOwnership, writeTomlBlock } from "./config-block.mjs";
 
 // Kept cohesive above 300 lines because Codex plugin install, cache, config,
 // detection, and ownership share one client topology; splitting would duplicate
 // path authority and make install/uninstall symmetry harder to audit.
+
 
 const bundle = fileURLToPath(new URL("../plugin", import.meta.url));
 const PLUGIN_NAME = "agents-can-communicate";
@@ -28,6 +31,8 @@ const PLUGIN_NAME = "agents-can-communicate";
 // again to confirm a root of ACC's own is accepted and reported enabled.
 const MARKETPLACE = "acc-local";
 const QUALIFIED = `${PLUGIN_NAME}@${MARKETPLACE}`;
+const HOOK_REVIEW = "hook readiness unverified: open codex; check ACC is enabled in /plugins; in /hooks, review "
+  + "each ACC hook and enable/trust its current definition if needed, then restart the session";
 
 // A marketplace is a root holding `.agents/plugins/marketplace.json`, and every
 // `source.path` in that manifest - `./plugins/<name>` - is resolved by this
@@ -141,12 +146,20 @@ const entryFor = () => ({
 const sandboxTable = (stateRoot, theirs) => {
   if (typeof stateRoot !== "string" || stateRoot === "") return [];
   if (theirs) return [];
-  return ["", "[sandbox_workspace_write]",
+  return ["", "[sandbox_workspace_write]", sandboxOwnership(stateRoot),
     `writable_roots = [${tomlString(stateRoot)}]`];
 };
 
+const declaresSandbox = config => inspectConfig(config).sandbox;
+
+const sandboxReview = (config, file, stateRoot) =>
+  typeof stateRoot === "string" && stateRoot !== "" && inspectConfig(config, file).sandbox
+    ? [`verify sandbox_workspace_write.writable_roots in ${file} includes ${stateRoot}; `
+      + "your existing sandbox configuration was preserved"]
+    : [];
+
 export async function installCodexPlugin({ home, agentsHome = home,
-  codexHome = path.join(home, ".codex"), dataHome, stateRoot, runner, node }) {
+  codexHome = path.join(home, ".codex"), dataHome, stateRoot, runner, node, cli, preserveVersions = false }) {
   // Read before writing, so a manifest that will not parse is found before a
   // plugin tree is laid down that nothing will then be able to remove.
   const existing = await readJson(marketplacePath(agentsHome), { name: MARKETPLACE,
@@ -157,7 +170,8 @@ export async function installCodexPlugin({ home, agentsHome = home,
   // whatever its manifest calls itself - the id ACC enabled was one the client
   // never forms, and the plugin sat there listed and not installed.
   const config = configPath(codexHome);
-  const foreign = inspectConfig(await readConfig(config), config);
+  const before = await readConfig(config);
+  const foreign = inspectConfig(before, config);
   // Preflight before touching installed files: a duplicate table makes Codex
   // refuse the config, and ambiguous ownership must never delete client state.
   if (foreign.registration) {
@@ -172,7 +186,7 @@ export async function installCodexPlugin({ home, agentsHome = home,
   await cp(bundle, target, { recursive: true });
   // The skill ships with a placeholder where the command belongs: `acc` is
   // not on PATH everywhere, and an agent that cannot run it improvises.
-  await bakeSkillCommand({ root: target, node, dataHome });
+  await bakeSkillCommand({ root: target, node, cli, dataHome });
   const shim = await writeHookShim({ dir: target, adapterId: "codex",
     dataHome, runner, node });
   await writeJson(path.join(target, "hooks.json"),
@@ -209,7 +223,7 @@ export async function installCodexPlugin({ home, agentsHome = home,
   await cp(target, cached, { recursive: true });
   // One copy, the one just written - and only inside this plugin's own
   // directory. The marketplace cache root above it holds other people's plugins.
-  await keepOnlyVersion({ root: path.dirname(cached), version, io: { readdir, rm } });
+  if (!preserveVersions) await keepOnlyVersion({ root: path.dirname(cached), version, io: { readdir, rm } });
 
   // The plugin's own directory in the cache. Not the versioned one inside it,
   // which goes stale the moment the version changes - and not the marketplace
@@ -221,11 +235,9 @@ export async function installCodexPlugin({ home, agentsHome = home,
   // while ACC invented its own marketplace name and so had a root to itself.
   // make the record stale the moment the plugin version changes.
   return { ok: true, changes: [target, file, config, cachePath(codexHome)],
+    needsAction: [HOOK_REVIEW, ...sandboxReview(before, config, stateRoot)],
     diagnostics: ["hooks require explicit trust in Codex before they run",
-      ...(theirSandbox
-        ? [`this config sets its own sandbox_workspace_write; add ${stateRoot} to `
-          + "writable_roots, or an agent here can read the roster and record nothing"]
-        : [])] };
+      ...sandboxReview(before, config, stateRoot)] };
 }
 
 /** Remove each directory that is empty, in the order given. */
@@ -236,12 +248,22 @@ async function removeEmptyDirs(directories) {
 }
 
 
+export async function preflightCodexUninstall({ home, agentsHome = home,
+  codexHome = path.join(home, ".codex") }) {
+  const existing = await readJson(marketplacePath(agentsHome), null);
+  const before = await readFile(configPath(codexHome), "utf8").catch(error => {
+    if (error.code === "ENOENT") return "";
+    throw error;
+  });
+  return { existing, withoutOurs: inspectConfig(before, configPath(codexHome)).source };
+}
+
 export async function uninstallCodexPlugin({ home, agentsHome = home,
   codexHome = path.join(home, ".codex"), keep = [] }) {
   const file = marketplacePath(agentsHome);
-  const existing = await readJson(file, null);
+  // Direct adapter callers need the same check as the installer boundary.
+  const { existing, withoutOurs } = await preflightCodexUninstall({ home, agentsHome, codexHome });
   const changes = [];
-  inspectConfig(await readConfig(configPath(codexHome)), configPath(codexHome));
   if (existing !== null) {
     const kept = (existing.plugins ?? []).filter(entry => entry.name !== PLUGIN_NAME);
     if (kept.length !== (existing.plugins ?? []).length) changes.push(PLUGIN_NAME);
@@ -257,9 +279,9 @@ export async function uninstallCodexPlugin({ home, agentsHome = home,
   // `hook: SessionStart Completed` while executing nothing, and ACC's write
   // guard is silently off while `acc doctor` reports the adapter installed.
   //
-  // The record is granted once, by a person, and survives ACC upgrades - hashes
-  // captured under 0.1.6 still admitted 0.1.10's hooks. Nothing ACC writes can
-  // put it back. So it is not ACC's to remove.
+  // Those historical hashes admitted the historical hooks. Current Codex checks
+  // exact definitions, so preservation cannot establish present readiness. The
+  // decision remains the client's to keep or revise, never ACC's to remove.
   // The marketplace directory is ACC's too, so it goes rather than being left
   // behind empty.
   // A blank TOML config and an absent one are the same to this client, and a
@@ -290,54 +312,42 @@ export async function uninstallCodexPlugin({ home, agentsHome = home,
     marketplaceRoot(agentsHome),
     cacheRoot(codexHome),
   ]);
-  return { ok: true, changes, diagnostics: [] };
+  return { ok: true, changes, diagnostics: declaresSandbox(withoutOurs)
+    ? ["existing sandbox_workspace_write configuration was preserved; review any retained writable_roots after removal"]
+    : [] };
 }
 
 export async function detectCodex({ home, agentsHome = home,
-  codexHome = path.join(home, ".codex") }) {
+  codexHome = path.join(home, ".codex"), stateRoot }) {
   const marketplace = await readJson(marketplacePath(agentsHome), null);
   const published = (marketplace?.plugins ?? []).some(entry => entry.name === PLUGIN_NAME);
   const config = await readFile(configPath(codexHome), "utf8").catch(() => "");
   const registered = config.includes(`[marketplaces.${MARKETPLACE}]`);
-  const enabled = config.includes(`[plugins."${QUALIFIED}"]`);
+  const pluginEntry = config.includes(`[plugins."${QUALIFIED}"]`);
   const cached = await stat(cachePath(codexHome))
     .then(() => true).catch(() => false);
-  // The condition that decides whether ACC runs here at all, and the only one
-  // this client will not tell you about: with no trust record it runs no hook,
-  // prints `hook: SessionStart Completed`, and executes nothing. Everything else
-  // - published, registered, enabled, cached - can be true while the write guard
-  // is off. Only asked when something is wired: a warning about hooks that do
-  // not exist is how a real one gets ignored.
-  const untrusted = cached && !config.includes(`hooks.state."${QUALIFIED}:`);
+  // Saved trust is not readiness. Codex compares every current definition's
+  // hash and can disable a trusted hook. Even a commented or stale single record
+  // previously suppressed this check. Leave verification to Codex's /hooks;
+  // detection neither invents its hash algorithm nor starts a client service.
   return { ok: true, changes: [], diagnostics: [
     published ? "acc plugin published in the marketplace" : "acc plugin not registered",
-    registered && enabled
-      ? "marketplace registered and plugin enabled"
-      : "marketplace not registered with the client; no hook would run",
+    registered && pluginEntry
+      ? "marketplace and plugin entries found in config; activation not verified"
+      : "marketplace/plugin registration not verified from this config",
     // Publishing, registering and enabling are all necessary and still not
     // sufficient: hooks stay silent until the client copies the plugin into its
     // own cache. Only the client does that, so ACC names the command.
     cached
       ? "plugin installed in the client's cache"
       : `plugin not installed yet; run: codex plugin add ${QUALIFIED}`,
-    // The condition that decides whether ACC runs here at all, and the only one
-    // this client will not tell you about: with no trust record it runs no hook,
-    // prints `hook: SessionStart Completed`, and executes nothing. Everything
-    // else - published, registered, enabled, cached - can be true while the
-    // write guard is off. Said only when there is something to trust, because a
-    // warning on a machine with nothing wired is how a real one gets ignored.
-    ...(untrusted
-      ? ["hooks are not trusted, so this client reports them completed and runs "
-        + "nothing"]
+    ...(cached
+      ? ["hook readiness is unverified by ACC; Codex checks whether each current "
+        + "definition is enabled and trusted"]
       : []),
   ],
-  // Said as an action rather than an observation, because a person has to do it
-  // and no acc command can: the client grants this once, from its own prompt.
-  // A diagnostic alone would have stayed in `--json`, which is where the first
-  // version of this fix put it and where nobody would have read it.
-  needsAction: untrusted
-    ? ["start codex once and accept the hook trust prompt  "
-      + "# its hooks run nothing until then"]
+  needsAction: cached
+    ? [HOOK_REVIEW, ...sandboxReview(config, configPath(codexHome), stateRoot)]
     : [] };
 }
 

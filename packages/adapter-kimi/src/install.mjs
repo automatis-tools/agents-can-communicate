@@ -121,7 +121,7 @@ const registerPlugin = (registry, root) => {
     plugins: [...plugins, { id: PLUGIN_NAME, root, source: "local", enabled: true }] };
 };
 
-export async function installKimiPlugin({ home, runner = defaultRunner(), node }) {
+export async function installKimiPlugin({ home, runner = defaultRunner(), node, cli }) {
   // A hook whose command does not exist fails silently, on every event, for as
   // long as it stays installed: the client reports nothing and ACC simply never
   // sees a session. Writing that entry and hoping is worse than refusing.
@@ -139,7 +139,7 @@ export async function installKimiPlugin({ home, runner = defaultRunner(), node }
     version: await ownVersion(import.meta.url), io: { readFile, writeFile } });
   // The skill ships with a placeholder where the command belongs: `acc` is
   // not on PATH everywhere, and an agent that cannot run it improvises.
-  await bakeSkillCommand({ root: target, node });
+  await bakeSkillCommand({ root: target, node, cli });
 
   const file = configPath(home);
   const existing = await readText(file, "");

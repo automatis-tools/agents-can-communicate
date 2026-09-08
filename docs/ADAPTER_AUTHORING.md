@@ -28,6 +28,7 @@ export function createExampleAdapter() {
 
     detect, install, uninstall, doctor,
     planInstall,                      // what install would write
+    preflightUninstall,               // optional read-only removal validation
     normalizeHook,                    // client payload -> normalised event
     renderContext,                    // SyncResult -> text
     renderContextResult,              // text + ids of complete rendered groups
@@ -35,6 +36,11 @@ export function createExampleAdapter() {
   });
 }
 ```
+
+`preflightUninstall(context)` is optional and read-only. Throw to refuse unsafe
+removal before the installer deactivates native integration or deletes recorded
+artifacts. `uninstall` should retain its own validation for direct adapter callers;
+recorded artifact fingerprint checks still determine the `keep` paths it receives.
 
 `renderContextResult` is required wherever an adapter renders peer messages. It returns
 `{ text, offeredMessageIds, includedAttentionIds }`, and the [receipt
@@ -45,6 +51,12 @@ convenience API for adapters that don't need it. An adapter with only the older
 `renderContext()` gets pending bodies withheld and a visible `acc inbox` degradation warning
 instead: repeating an untracked body every turn would be quieter in code and dishonest about
 what was actually delivered.
+
+The hook also supplies `reminderMessageIds`, derived from this participant's `offered` or
+`retrieved` receipts with unresolved obligations. The standard projector combines those
+reply/acknowledgement attention items into counts after new bodies. A missing body alone
+is not evidence for compaction. Counts add no ids to `offeredMessageIds` or
+`includedAttentionIds`; complete inbox and status results remain available.
 
 `client.command` does double duty. `detect.mjs` uses it as the version-probe binary, and
 presence liveness separately walks the hook's process ancestry for the first ancestor whose

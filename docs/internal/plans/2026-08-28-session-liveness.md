@@ -8,7 +8,7 @@
 
 **Tech Stack:** Node 24, ESM, `node:test`, zero runtime dependencies, npm workspaces.
 
-**Spec:** `docs/superpowers/specs/2026-08-28-session-liveness-design.md`
+**Spec:** `docs/internal/specs/2026-08-28-session-liveness-design.md`
 
 ## Global Constraints
 

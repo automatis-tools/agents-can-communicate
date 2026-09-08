@@ -55,8 +55,15 @@ export async function trust(h, role) {
 }
 
 export async function typePrompt(h, role, text) {
-  await h.pty.request({ action: "send", role, text: `\x1b[200~${text}\x1b[201~` });
-  await delay(200);
+  assert.ok(typeof text === "string" && text.length > 0 &&
+    !/[\u0000-\u001f\u007f-\u009f\u2028\u2029]/u.test(text),
+    "manual prompts must be nonempty single-line text without terminal controls");
+  // Callers submit synthetic prompts only after the stock client is ready or idle.
+  await h.pty.request({ action: "send", role, text: "\x1b" });
+  await delay(500);
+  await h.pty.request({ action: "send", role, text: "\x15" });
+  await h.pty.request({ action: "send", role, text });
+  await delay(300);
   await h.pty.request({ action: "send", role, text: "\r" });
 }
 

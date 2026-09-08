@@ -12,6 +12,7 @@ import { LIVE_POLICIES, applyPlan, detectInstallation, livePolicyOf,
 import { AccError, EXIT } from "@agents-can-communicate/protocol";
 
 import { platformPaths } from "./platform-paths.mjs";
+import { installManaged, uninstallManaged } from "./managed-runtime/install.mjs";
 
 // Kept cohesive above 300 lines because this is the install command boundary:
 // detection, consent, planning, application, and reporting share one context
@@ -148,6 +149,9 @@ export function describeOutcome({ action, acted, failed = [], skipped = [],
   ...operations.filter(operation => operation.applied
     && typeof operation.deliveryDiagnostic === "string")
     .map(operation => `  ${operation.deliveryDiagnostic}`),
+  ...operations.filter(operation => operation.applied)
+    .flatMap(operation => (operation.needsAction ?? [])
+      .map(step => `  ${operation.adapterId}: ${step}`)),
   ...skipped.map(entry => `  skip ${entry.adapterId}: ${entry.reason}`),
   ...failed.map(entry => `  ${entry.adapterId}: ${entry.error}`),
   // Said once, where it is needed: the reader has just been shown a list of
@@ -333,7 +337,15 @@ export async function runInstallCommand({ options, runtime, action = "install" }
   const plan = planInstallation({ adapters, detected, context, action, recorded,
     accVersion, allowDowngrade: options.downgrade === true, requested,
     deliveryByAdapter: decided.deliveryByAdapter });
-  const result = await applyPlan({ plan, adapters, context, dataHome, dryRun, accVersion });
+  const apply = (paths = {}) => applyPlan({ plan, adapters, context: { ...context, ...paths },
+    dataHome, dryRun, accVersion, activation: { bootstrap: paths.bootstrap } });
+  const result = action === "install" && !dryRun && runtime.packageRoot
+    ? await installManaged({ packageRoot: runtime.packageRoot,
+      managerRoot: path.join(dataHome, "acc", "runtime"), dataHome, home, cwd: options.cwd ?? runtime.cwd,
+      targets: plan.operations.map(operation => operation.adapterId), env: runtime.env, apply })
+    : action === "uninstall" && !dryRun && runtime.managerRoot
+      ? await uninstallManaged({ managerRoot: runtime.managerRoot, apply })
+      : await apply();
 
   const acted = actedOn(result);
   if (dryRun) {

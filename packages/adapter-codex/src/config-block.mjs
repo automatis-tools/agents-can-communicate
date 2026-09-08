@@ -7,6 +7,9 @@ const unsafe = (reason = "unrecognized TOML declaration") => {
   throw new AccError(EXIT.CONFLICT, `cannot safely edit Codex config: ${reason}; `
     + "repair ambiguous TOML or ACC markers before retrying", { reason });
 };
+const ROOT = "# ACC sandbox writable_roots created with: ";
+export const sandboxOwnership = root => `${ROOT}${JSON.stringify(root)}`;
+
 const OWNED = new Map([
   [JSON.stringify(["marketplaces", "acc-local"]), ["source_type", "source"]],
   [JSON.stringify(["plugins", "agents-can-communicate@acc-local"]), ["enabled"]],
@@ -92,7 +95,45 @@ function declaration(code) {
   const array = header && code.startsWith("[[");
   const { keys, rest } = keyPath(header ? code.slice(array ? 2 : 1) : code);
   if (header ? rest !== (array ? "]]" : "]") : !rest.startsWith("=")) unsafe();
-  return { keys, header, array };
+  return { keys, header, array, value: header ? null : rest.slice(1).trim() };
+}
+
+// An unchanged, newly generated sandbox has value provenance. A legacy or
+// edited sandbox belongs to the client as a whole and remains byte-preserved.
+function ownsSandbox(body) {
+  const metadata = body.filter(item => !item.code && item.raw.trim().startsWith(ROOT));
+  const values = body.filter(item => item.code);
+  if (metadata.length !== 1 || values.length !== 1) return false;
+  const value = values[0].code.match(/^writable_roots\s*=\s*(\[.*\])$/);
+  if (!value) return false;
+  try {
+    const root = JSON.parse(metadata[0].raw.trim().slice(ROOT.length));
+    const roots = JSON.parse(value[1]);
+    return typeof root === "string" && Array.isArray(roots)
+      && roots.length === 1 && roots[0] === root;
+  } catch { return false; }
+}
+
+function assertRegistration(body, keys) {
+  const values = body.filter(item => item.code).map(item => declaration(item.code));
+  if (values.some(item => item.keys.length !== 1 || !keys.includes(item.keys[0]))) {
+    unsafe("unknown key in owned table");
+  }
+  const valid = { source_type: /^["']local["']$/, source: /^(?:"(?:[^"\\]|\\.)*"|'[^']*')$/,
+    enabled: /^(?:true|false)$/ };
+  if (values.length !== keys.length || keys.some(key => values.filter(item =>
+    item.keys.length === 1 && item.keys[0] === key && valid[key].test(item.value)).length !== 1)) {
+    unsafe("changed or incomplete owned registration");
+  }
+}
+
+function tableBody(entries, index) {
+  const body = [];
+  for (const item of entries.slice(index + 1)) {
+    if (item.code && declaration(item.code).header) break;
+    body.push(item);
+  }
+  return body;
 }
 
 /**
@@ -105,7 +146,8 @@ function declaration(code) {
 function inspect(source) {
   const kept = [], declarations = [];
   let inside = false, owned = null, table = [];
-  for (const { raw, code } of statements(source)) {
+  const entries = [...statements(source)];
+  for (const [index, { raw, code }] of entries.entries()) {
     if (!code && raw.trim() === BEGIN) {
       if (inside) unsafe("nested BEGIN marker");
       inside = true; continue;
@@ -115,14 +157,20 @@ function inspect(source) {
       inside = false; continue;
     }
     if (!code) {
-      if (!inside || !owned || raw.trim()) kept.push(raw);
+      if (!inside || !owned || (raw.trim() && !(table.length === 1
+        && table[0] === "sandbox_workspace_write" && raw.trim().startsWith(ROOT)))) kept.push(raw);
       continue;
     }
     const entry = declaration(code);
     if (entry.header) {
       table = entry.keys;
       owned = inside ? OWNED.get(JSON.stringify(table)) : null;
+      if (owned && table.length === 1 && table[0] === "sandbox_workspace_write"
+        && !ownsSandbox(tableBody(entries, index))) owned = null;
       if (owned && entry.array) unsafe("owned table declared as an array");
+      if (owned && table[0] !== "sandbox_workspace_write") {
+        assertRegistration(tableBody(entries, index), owned);
+      }
     } else if (owned) {
       // Markers are comments, so END does not close a TOML table. Removing its
       // header would attach any following foreign assignment to another table.

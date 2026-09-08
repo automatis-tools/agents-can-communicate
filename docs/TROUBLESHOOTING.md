@@ -24,6 +24,25 @@ requires plugin trust.
 ACC does not launch a missing session. Open it normally after fixing the installation or
 workspace path.
 
+## CLI says `caller_identity_unresolved`
+
+ACC cannot prove which session owns this shell command. A hook-created presence record
+and the client's native session ID are not shell credentials. Restarting hooks alone does
+not fix this CLI limitation.
+
+Use this session's ACC MCP tools if available. For a manual CLI workflow, open your own
+session with `acc attach --participant my-session --json`, retain the returned `sessionId`
+and `generation`, and pass both as `--session` and `--generation` on subsequent mutations
+and inbox reads. This creates separate manual presence; finish it with the same pair.
+An operator may explicitly configure `ACC_SESSION` and `ACC_GENERATION` instead.
+Neither a new manual session nor a generic MCP connection inherits the hook participant's
+inbox. Pending messages must be handled through the identity they address; if that
+identity is unavailable, report the limitation.
+
+Do not copy another session from `status`, read its binding, or guess a generation. Public
+`status` and `sync` still work. If ownership is unavailable, report the coordination
+limitation and continue the user's actual work.
+
 ## A message stays queued
 
 Queued means the durable message is safe; it does not mean the recipient model saw it. The
@@ -38,6 +57,12 @@ Certified next-turn delivery waits for that client's next normal prompt; it neve
 idle session. Grok, generic MCP, unknown client versions, and other platforms poll inbox. A
 reply acknowledges the original automatically; `acc ack` is for acknowledgement-only
 messages.
+
+A background inbox command is not evidence that the model will resume. If a reviewer
+ends its turn or exits before the request arrives, the review is still incomplete. For
+an agreed review in the current session, keep the turn active through bounded foreground
+waits and inbox checks; if the wait must end, report the pending review and leave a partial
+handoff. ACC does not restart an exited client.
 
 ## I enabled live delivery but got fallback
 
@@ -64,8 +89,14 @@ requires Codex's confirmation and produces `SessionEnd`.
 
 ## Codex plugin is listed but inactive
 
-Trust the plugin in Codex, then restart it. Until the client accepts that trust step, hooks
-do not run. `acc doctor` reports the installed cache copy and missing activation separately.
+Open `/plugins` in Codex and check ACC is enabled. Open `/hooks`, review each ACC hook,
+and enable/trust its current definition if needed; then restart the session. New or changed
+definitions need review, and a trusted hook can still be disabled.
+
+`acc doctor` reports installed files separately from hook readiness, which it leaves
+unverified. A saved trust record cannot prove current activation. If installation preserved
+your own sandbox configuration, doctor also names the ACC state directory whose access
+you should check in `sandbox_workspace_write.writable_roots`.
 
 ## Gemini does not guard a write
 
@@ -97,8 +128,8 @@ Exit code `5` names the overlapping claim and owner. Ask the owner or wait for r
 an explicit authority has decided to replace it:
 
 ```bash
-acc release --claim claim_x --authority "agreed with models" \
-  --reason "handing over the file"
+acc release --claim claim_x --authority human \
+  --reason "human approved the handover after agreement with the models"
 ```
 
 ## Protection says advisory
@@ -119,7 +150,29 @@ ACC removes only bytes that still match its install record. Anything edited by t
 reported and retained. Remove those leftovers manually if desired.
 
 Runtime state is outside the repository by design. `ACC_DATA_HOME` can relocate it, but ACC
-refuses a path inside any workspace root.
+refuses a path inside any workspace root. Relocate the whole data directory; a symlink for
+that directory is supported. Install rejects a symlink that moves only the internal
+`acc/runtime` tree, because runtime admission and the bootstrap cache need the same data home.
 
 Next: [Getting started](GETTING_STARTED.md) · [Capabilities](CAPABILITIES.md) ·
 [Configuration](CONFIGURATION.md)
+
+## An automatic update is pending
+
+Run `acc doctor` to see the update policy and pending notice. ACC process leases, including
+persistent MCP servers, require confirmed process exit. Native bindings clear on observed
+SessionEnd or confirmed process death; a vendor daemon may remain alive after SessionEnd.
+Unknown PIDs remain holds until lifecycle cleanup. Close the relevant client sessions and
+ACC processes; `finish`, presence TTL, and delivery off do not prove native end. ACC never
+manages the daemon or expires safety holds merely by elapsed time.
+
+Use `acc update` to retry a failed download or finish an interrupted integration refresh.
+A download failure keeps the working version. A partial integration refresh blocks
+workspace commands until recovery completes, while hooks let the client continue without
+ACC context. `acc update` names the failed adapter, cause, and known configuration paths;
+fix that problem and rerun it. Help and update recovery remain available. `ACC_NO_UPDATE_CHECK=1` prevents
+new downloads but permits manual activation of an already verified pending update.
+
+To stop automatic downloads, use `acc update --auto off`. To stay on the current release,
+use `acc update --pin <version>`. Neither setting converts workspace data for an older
+runtime. See the [upgrade guide](UPGRADING.md).

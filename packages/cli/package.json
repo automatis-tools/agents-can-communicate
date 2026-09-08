@@ -1,10 +1,12 @@
 {
   "name": "@agents-can-communicate/cli",
-  "version": "0.3.1",
+  "version": "0.4.0",
   "private": true,
   "type": "module",
   "exports": {
-    ".": "./src/index.mjs"
+    ".": "./src/index.mjs",
+    "./managed-entry": "./src/managed-runtime/entry.mjs",
+    "./managed-worker": "./src/managed-runtime/worker.mjs"
   },
   "files": [
     "src/"

@@ -105,7 +105,7 @@ export async function createMachine({ tarball, codex, phase, output, prepareTool
     await prepareTools({ toolDir: h.toolDir, npm, python });
     h.env = buildClientEnvironment({ inherited: process.env, codex, toolDir: h.toolDir,
       home: h.home, codexHome: h.codexHome });
-    h.accEnv = { ...h.env, ACC_DATA_HOME: h.dataHome, ACC_UPDATE_CHECK: "0" };
+    h.accEnv = { ...h.env, ACC_DATA_HOME: h.dataHome, ACC_UPDATE_CHECK: "0", ACC_NO_UPDATE_CHECK: "1" };
     for (const dir of [h.home, h.codexHome, h.dataHome, h.A, h.B, h.C, output]) await mkdir(dir, { recursive: true });
     const auth = path.join(os.homedir(), ".codex", "auth.json");
     await stat(auth); // Existence only; credentials are never read into the harness.
@@ -156,7 +156,7 @@ export async function createMachine({ tarball, codex, phase, output, prepareTool
     const cached = path.join(cache, versions[0]);
     h.installedSkill = path.join(cached, "skills", "acc", "SKILL.md");
     h.installedCommands = await verifyInstalledCommands({ hook: h.hookShim,
-      skill: h.installedSkill, packageRoot: h.packageRoot,
+      skill: h.installedSkill, packageRoot: h.packageRoot, dataHome: h.dataHome,
       hookManifest: path.join(cached, "hooks.json") });
     h.pty = createPtyDriver({ python });
     h.hookFile = path.join(root, "hooks.jsonl");

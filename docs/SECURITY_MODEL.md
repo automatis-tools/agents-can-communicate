@@ -42,7 +42,11 @@ own instruction hierarchy are the mitigation; ACC is not a model sandbox.
 ## Identity and ownership
 
 - Participant identity is the address; session identity is one current client opening.
-- Mutating calls prove their owner with the session generation.
+- Mutating CLI calls and inbox reads require an explicitly supplied session/generation
+  pair. The CLI never obtains a generation from a public ID, checkout, sole peer binding,
+  or inherited native environment value.
+- `ACC_SESSION`/`ACC_GENERATION` are operator-supplied credentials. They do not authenticate
+  a process or protect against intentional sharing under the same local OS account.
 - A stale process cannot renew or release records owned by a newer generation.
 - Inbox, reply, and acknowledgement validate the recipient's participant id.
 - One participant cannot advance another participant's receipt.
@@ -77,8 +81,9 @@ already accepted by the vendor queue cannot be withdrawn.
 
 ## Claims
 
-Claims are advisory unless every live participant exposes a certified guard for the
-relevant mutation path. Even guarded claims do not stop unrelated processes, runtime-built
+CLI claims default to advisory. Guarded enforcement must be requested explicitly and
+requires every live participant to expose a certified guard for the relevant mutation path.
+MCP claims remain advisory. Even guarded claims do not stop unrelated processes, runtime-built
 paths, or tool calls the client never presents to the hook. Force release requires explicit
 authority and records actor and reason.
 
@@ -94,14 +99,40 @@ from operating merely because its own state is unavailable.
 - Corrupt or incompatible store versions fail closed before mutation.
 - Client installers preserve unrelated settings and record content hashes.
 - Uninstall removes only bytes still matching what ACC wrote.
-- Tokens, credentials, and environment contents are never copied into ACC or project config.
+- Runtime credentials and private endpoints stay outside project config. Adapters do not
+  automatically collect client secrets or environment contents into peer messages.
+
+## Managed automatic updates
+
+A normal managed installation enables automatic updates. The latency-sensitive hook path
+does no network download; it may schedule a detached worker. That worker uses the configured
+npm registry/network and local npm executable, checks stable package identity/version and
+sha512 integrity against registry metadata, installs with lifecycle scripts disabled, and
+validates the staged runtime before activation. These checks retain the registry and package
+author as a software-supply trust boundary; they do not establish that package code is safe.
+
+ACC process leases hold activation until confirmed exit. Native bindings hold until observed
+SessionEnd cleanup or confirmed process death; unknown PIDs remain conservative holds.
+`acc finish`, presence TTL, and delivery off do not establish native lifecycle end. ACC does
+not manage the vendor daemon.
+
+A failed download leaves the active runtime available. A partial integration refresh retains
+the old active pointer but fences normal workspace admission in `activating`; it does not
+leave the previous runtime available for normal work. Fix the reported problem and run
+`acc update` to repair forward. Hooks continue to fail open while coordination is unavailable.
+
+`acc update --auto off` disables background updates; `--pin <version>` holds an exact stable
+version. `ACC_NO_UPDATE_CHECK=1` disables update networking and scheduling while allowing
+manual recovery of an already verified pending update. See [Upgrading](UPGRADING.md).
 
 ## Data collected
 
 ACC stores participant/session identity, presence, one-line intent, explicit claims,
 explicit messages and structured handoffs, per-recipient receipts, artifact references,
-and coordination events. It excludes complete prompts, assistant responses, raw
-transcripts, secrets, environment variables, and unrelated files.
+and coordination events. ACC does not automatically collect raw transcripts, full prompts
+or assistant responses, secrets, environment contents, or unrelated files. Explicit message
+bodies are caller-provided and preserved: ACC does not scan or scrub secrets from text a
+caller chooses to send. The sender remains responsible for that content.
 
 ## Threat scenarios
 

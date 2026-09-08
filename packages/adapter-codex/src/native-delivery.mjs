@@ -1,4 +1,5 @@
 import { realpath } from "node:fs/promises";
+import { decisionBody } from "@agents-can-communicate/adapter-sdk";
 
 import { MINIMUM_VERSION, PROTOCOL_CONTRACT, QUEUE_MODES, addCodexQueueMessage,
   canonicalCwd, controlSocketPath, locateCodexThread, openCodexAppServer,
@@ -147,7 +148,7 @@ function renderText(message) {
     `Subject: ${message.subject ?? ""}`,
   ];
   if (typeof message.inReplyTo === "string") lines.push(`In reply to: ${message.inReplyTo}`);
-  lines.push("", message.body ?? "");
+  lines.push("", decisionBody(message));
   return lines.join("\n");
 }
 

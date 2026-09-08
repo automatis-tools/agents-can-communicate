@@ -1,6 +1,6 @@
 import path from "node:path";
 import { readFile } from "node:fs/promises";
-import { run, until } from "./codex-local-daemon-machine.mjs";
+import { delay, run } from "./codex-local-daemon-machine.mjs";
 import { attachSender, identify, launch, queueState, receipt, sendMessage, threadState,
   waitMarker } from "./codex-local-daemon-actions.mjs";
 import { binding, events, exists, idle, settled, snapshot } from "./codex-local-daemon-product-state.mjs";
@@ -113,10 +113,10 @@ export async function productLongIdle(h) {
   s.record.timestamps.idleSinceAt = s.record.timestamps.startedAt;
   const old = await binding(h);
   const hooksBefore = (await h.hooks()).length;
-  await until("150 seconds without hook activity", async () => {
-    s.equal((await h.hooks()).length, hooksBefore, "no hook heartbeat during idle");
-    return Date.now() - Date.parse(s.record.timestamps.idleSinceAt) >= 150_000;
-  }, { timeoutMs: 155_000, intervalMs: 10_000 });
+  await delay(150_000);
+  s.check(Date.now() - Date.parse(s.record.timestamps.idleSinceAt) >= 150_000,
+    "at least 150 seconds elapsed without hook activity");
+  s.equal((await h.hooks()).length, hooksBefore, "no hook heartbeat during idle");
   s.check(Date.parse(old.leaseUntil) < Date.now() - 30_000, "original lease expired at least 30 seconds ago");
   const sent = await sendMessage(h, { id: "product_long_idle", marker: path.join(h.B, "long-idle.txt") });
   s.equal(sent.delivery[0].outcome, "offered");

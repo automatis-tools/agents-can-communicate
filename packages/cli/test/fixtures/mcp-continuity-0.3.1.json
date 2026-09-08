@@ -1,0 +1,39 @@
+{
+  "provenance": {
+    "packageVersion": "0.3.1",
+    "archiveSha256": "2de2aa9f55053baac078d181423984ee2e91660b7945ad8f8bbba7b2ddcbbb0a",
+    "node": "v24.4.0",
+    "note": "Published npm 0.3.1 acc-mcp, acc_status then EOF; records captured without edits."
+  },
+  "workspaceId": "workspace_6864393cf30a41f7b2f117bfaabc7084",
+  "filename": "03db8c246fbcfa5a901e82e154718646.json",
+  "binding": {
+    "schemaVersion": 1,
+    "harnessSessionId": "mcp:legacy_peer:workspace_6864393cf30a41f7b2f117bfaabc7084",
+    "accSessionId": "session_6hXkV11kKittih-Q-CmgxA",
+    "generation": "generation_o3Yp5aM8Hfku8U4eki_abA"
+  },
+  "session": {
+    "schemaVersion": 3,
+    "sessionId": "session_6hXkV11kKittih-Q-CmgxA",
+    "participantId": "legacy_peer",
+    "workspaceId": "workspace_6864393cf30a41f7b2f117bfaabc7084",
+    "generation": "generation_o3Yp5aM8Hfku8U4eki_abA",
+    "harness": "mcp",
+    "state": "open",
+    "parentSessionId": null,
+    "checkoutRoot": null,
+    "branch": null,
+    "pid": null,
+    "enforcement": "advisory",
+    "lifecycle": "manual",
+    "heartbeatCadenceMs": 60000,
+    "startedAt": "2026-09-08T08:33:29.247Z",
+    "heartbeatAt": "2026-09-08T08:33:29.247Z"
+  },
+  "protocol": {
+    "storeVersion": 6,
+    "workspaceId": "workspace_6864393cf30a41f7b2f117bfaabc7084",
+    "initialisedAt": "2026-09-08T08:33:29.207Z"
+  }
+}

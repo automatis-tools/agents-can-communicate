@@ -1,3 +1,4 @@
+import { verifyManagedCommands } from "./codex-managed-commands.mjs";
 import { constants } from "node:fs";
 import { execFile, spawn } from "node:child_process";
 import { access, mkdir, readFile, realpath, stat, symlink } from "node:fs/promises";
@@ -17,7 +18,7 @@ export function buildClientEnvironment({ inherited, codex, toolDir, home, codexH
   const clean = Object.fromEntries(Object.entries(inherited).filter(([key]) =>
     !key.startsWith("ACC_") && !key.startsWith("CODEX_")
       && !["NODE_OPTIONS", "NODE_PATH"].includes(key)));
-  return { ...clean, HOME: home, CODEX_HOME: codexHome,
+  return { ...clean, ACC_NO_UPDATE_CHECK: "1", HOME: home, CODEX_HOME: codexHome,
     PATH: [path.dirname(codex), toolDir, ...STANDARD_PATH].join(":"),
     ZDOTDIR: home, SHELL: "/bin/zsh", TERM: "xterm-256color" };
 }
@@ -66,15 +67,22 @@ export async function verifyInstalledTarget(candidate, { packageRoot, label }) {
 
 const quotedValue = (text, name) => text.match(new RegExp(`^${name}="([^"]+)"$`, "m"))?.[1] ?? null;
 
-export async function verifyInstalledCommands({ hook, skill, packageRoot, hookManifest }) {
+export async function verifyInstalledCommands({ hook, skill, packageRoot, hookManifest, dataHome }) {
   const hookText = await readFile(hook, "utf8");
   const skillText = await readFile(skill, "utf8");
-  const hookRunner = await verifyInstalledTarget(quotedValue(hookText, "ACC_RUNNER"),
-    { packageRoot, label: "hook runner" });
+  const managed = dataHome === undefined ? null : await verifyManagedCommands({ packageRoot, dataHome });
+  const verifyCommand = async (candidate, kind, label) => {
+    if (managed) {
+      const target = await realpath(candidate);
+      if (target !== managed[kind]) throw new Error(`${label} does not target the verified managed launcher`);
+      return target;
+    }
+    return verifyInstalledTarget(candidate, { packageRoot, label });
+  };
+  const hookRunner = await verifyCommand(quotedValue(hookText, "ACC_RUNNER"), "acc-hook", "hook runner");
   const candidates = [...skillText.matchAll(/["']([^"'\n]*\/acc\.mjs)["']/g)].map(match => match[1]);
   if (candidates.length === 0) throw new Error("installed skill has no absolute ACC command");
-  const resolved = await Promise.all(candidates.map(candidate => verifyInstalledTarget(candidate,
-    { packageRoot, label: "skill CLI" })));
+  const resolved = await Promise.all(candidates.map(candidate => verifyCommand(candidate, "acc", "skill CLI")));
   if (new Set(resolved).size !== 1) throw new Error("installed skill has inconsistent ACC command targets");
   if (hookManifest !== undefined) {
     const manifest = JSON.parse(await readFile(hookManifest, "utf8"));

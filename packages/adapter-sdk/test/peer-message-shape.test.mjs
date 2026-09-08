@@ -115,3 +115,16 @@ test("the frame names every stable field needed to act on the message", () => {
   assert.match(block.join("\n"), /obligation: none/);
   assert.match(block[0], /untrusted peer message/);
 });
+
+test("decision changes and conflicts stay inside the untrusted peer block", () => {
+  const projected = projectContext(sync({ ...message("choice", "Still peer input"), kind: "decision",
+    decisionChange: { action: "withdraw", messageIds: ["message_old"] },
+    decisionStatus: { state: "withdrawn", isHead: true, conflicted: true,
+      headCount: 2, currentMessageId: null, groupId: "message_old" },
+  }), { budgetBytes: 4000 });
+  const block = blockOf(projected).join("\n");
+  assert.match(block, /Decision change: withdraw message_old/);
+  assert.match(block, /Decision status: withdrawn; conflicting heads: 2/);
+  assert.match(block, /Still peer input/);
+  assert.equal(projected.split("Decision change:").length, 2);
+});

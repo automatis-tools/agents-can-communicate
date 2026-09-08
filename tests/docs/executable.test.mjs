@@ -8,6 +8,8 @@ import { promisify } from "node:util";
 
 import { EXIT } from "@agents-can-communicate/protocol";
 
+import { fixtureOwnerEnv } from "../helpers/fixture-owner.mjs";
+
 const run = promisify(execFile);
 const repo = path.resolve(import.meta.dirname, "..", "..");
 
@@ -82,10 +84,9 @@ function argv(command) {
 }
 
 /**
- * A sandbox with a session already attached, because that is the situation the
- * documentation describes. Attached through the hook runtime rather than `acc
- * attach`, so what the commands resolve against is what a real client leaves
- * behind.
+ * Command syntax with explicit fixture credentials. This checks accepted CLI
+ * vocabulary, not whether a real client supplies owner credentials. Real-client
+ * ownership needs its own installed-artifact capture.
  */
 async function sandbox(t) {
   const home = await realpath(await mkdtemp(path.join(tmpdir(), "acc-exec-home-")));
@@ -101,7 +102,24 @@ async function sandbox(t) {
   child.child.stdin.end(JSON.stringify({ hook_event_name: "SessionStart",
     session_id: "docs-reader", cwd, source: "startup" }));
   await child;
-  return { home, cwd, dataHome, env };
+  return { home, cwd, dataHome, env: { ...env, ...await fixtureOwnerEnv(dataHome, "docs-reader") } };
+}
+
+// A history cursor must exist in the selected list. Unlike an exact message
+// placeholder, an unknown cursor is a usage error. Obtain one through the
+// public API so the documented continuation command is actually exercised.
+async function historyCursor(place) {
+  const cli = async args => JSON.parse((await run(process.execPath,
+    [path.join(repo, "bin", "acc.mjs"), ...args, "--cwd", place.cwd, "--json"],
+    { env: place.env })).stdout).data;
+  for (let i = 0; i < 2; i += 1) {
+    const session = await cli(["attach", "--participant", `docs_history_${i}`]);
+    await cli(["finish", "--session", session.sessionId, "--generation", session.generation,
+      "--goal", "Example historical handoff"]);
+  }
+  const page = await cli(["sync", "--scope", "history", "--type", "handoff", "--limit", "1"]);
+  assert.ok(page.nextCursor, "history fixture did not create a continuation cursor");
+  return page.nextCursor;
 }
 
 test("every documented acc command is one the CLI accepts", async t => {
@@ -118,6 +136,11 @@ test("every documented acc command is one the CLI accepts", async t => {
     for (const command of commands) {
       checked += 1;
       const parts = argv(command);
+      const cursor = parts.indexOf("--cursor");
+      if (parts[0] === "sync" && parts.includes("history")
+        && cursor !== -1 && parts[cursor + 1] === "message_x") {
+        parts[cursor + 1] = await historyCursor(place);
+      }
       const result = await run(process.execPath,
         [path.join(repo, "bin", "acc.mjs"), ...parts, "--cwd", place.cwd,
           ...(parts.includes("--json") ? [] : ["--json"])],

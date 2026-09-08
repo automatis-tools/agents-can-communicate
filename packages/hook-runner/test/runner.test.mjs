@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtemp, realpath, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readdir, realpath, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -134,6 +134,53 @@ test("a heartbeat with no prior attach does not invent a session", async t => {
   assert.deepEqual(beat.sessions, []);
 });
 
+test("a genuine beforeTurn recovers when startup left no binding", async t => {
+  const place = await workspace(t);
+
+  const first = await run("kimi", event("beforeTurn"), place);
+  const second = await run("kimi", event("beforeTurn"), place);
+  const [owner] = first.sessions;
+
+  assert.equal(first.failed, undefined, first.reason);
+  assert.equal(typeof owner.sessionId, "string");
+  assert.match(first.stdout, new RegExp(`--session ${owner.sessionId}`));
+  assert.equal(second.accSessionId, undefined, "an ordinary turn should reuse its binding");
+  assert.match(second.stdout, new RegExp(`--session ${owner.sessionId}`));
+  assert.deepEqual(second.sessions.map(session => session.sessionId), [owner.sessionId]);
+});
+
+test("tool and unknown hooks with no binding never invent an owner", async t => {
+  const place = await workspace(t);
+
+  for (const kind of ["beforeTool", "afterTool", "unknown"]) {
+    const result = await run("kimi", event(kind, { sessionId: `missing-${kind}` }), place);
+    assert.equal(result.exitCode, 0);
+    assert.equal(result.accSessionId, undefined);
+    assert.deepEqual(result.sessions, []);
+  }
+});
+
+test("a corrupt binding remains an error when beforeTurn recovery is available", async t => {
+  const place = await workspace(t);
+  const started = await run("kimi", event("sessionStart"), place);
+  const bindings = path.join(started.service.store.root, "bindings");
+  const [name] = await readdir(bindings);
+  await writeFile(path.join(bindings, name), "{broken");
+  const before = await started.service.collectStatus({
+    workspaceId: started.service.store.workspaceId,
+  });
+
+  const result = await run("kimi", event("beforeTurn"), place);
+  const after = await started.service.collectStatus({
+    workspaceId: started.service.store.workspaceId,
+  });
+
+  assert.equal(result.exitCode, 0);
+  assert.equal(result.failed, true);
+  assert.match(result.reason, /binding.*valid JSON/);
+  assert.deepEqual(after.participants, before.participants);
+});
+
 test("beforeTool denies a write into another session's guarded claim", async t => {
   const place = await workspace(t);
   const peer = await run("kimi", event("sessionStart",
@@ -234,12 +281,14 @@ test("a path outside the workspace is not silently treated as inside it", async 
   assert.equal(allowed.decision, "allow");
 });
 
-test("beforeTurn injects peer context, and says nothing when alone", async t => {
+test("beforeTurn supplies its own arguments before peers appear", async t => {
   const place = await workspace(t);
-  await run("kimi", event("sessionStart"), place);
+  const started = await run("kimi", event("sessionStart"), place);
 
   const solo = await run("kimi", event("beforeTurn"), place);
-  assert.equal(solo.stdout, "", "a solo session narrated the absence of peers");
+  assert.ok(solo.stdout.includes(`--session ${started.accSessionId}`));
+  assert.ok(solo.stdout.includes(`--generation ${started.generation}`));
+  assert.equal(solo.stdout.trim().split("\n").length, 1);
 
   await run("kimi", event("sessionStart", { sessionId: "peer" }), place);
   const withPeer = await run("kimi", event("beforeTurn"), place);

@@ -13,7 +13,7 @@ import { parseArgs, positiveNumber } from "./args.mjs";
 // A usage error names what is missing rather than failing deeper in a service
 // with the argument already half-applied.
 const usage = message => new AccError(EXIT.USAGE, message);
-import { describeCommands, helpText } from "./help.mjs";
+import { commandHelpText, describeCommand, describeCommands, helpText } from "./help.mjs";
 import { runUpdateCommand } from "./update-command.mjs";
 import { runConfigCommand } from "./config-command.mjs";
 import { runInstallCommand } from "./install-command.mjs";
@@ -201,7 +201,9 @@ const HANDLERS = Object.freeze({
   sync: async ({ options, context }) => {
     const result = await context.service.sync({ sessionId: options.session,
       cursor: options.cursor ?? null, scope: options.scope,
+      messageId: options.message, kind: options.type, current: options.current,
       limit: options.limit ? positiveNumber(options.limit, "limit") : undefined });
+    if (result.scope === "history") return { data: result, text: JSON.stringify(result, null, 2) };
     // Solo zero-overhead: nothing to say means nothing printed, not a banner.
     const text = result.solo ? "" : `${result.attention.length} attention; `
       + `${result.roster.length} session(s); cursor ${result.cursor}`;
@@ -251,7 +253,9 @@ const HANDLERS = Object.freeze({
       context.service.sendMessage({ sessionId: options.session,
       generation: options.generation, clientMessageId: clientMessageId(options, context),
       toParticipantIds, kind,
-      obligation: obligationFor(kind, options.obligation, toParticipantIds.length > 0),
+      supersedes: options.supersedes, withdraws: options.withdraws,
+      obligation: obligationFor(kind, options.obligation, toParticipantIds.length > 0
+        || options.supersedes !== undefined || options.withdraws !== undefined),
       subject: options.subject, body: options.body, descriptor: context.descriptor }) });
     const message = routed.recorded;
     return { data: { message, delivery: routed.delivery },
@@ -259,6 +263,15 @@ const HANDLERS = Object.freeze({
   },
 
   inbox: async ({ options, context }) => {
+    if (options.message === undefined) {
+      const page = await context.service.listInbox({ sessionId: options.session,
+        generation: options.generation, cursor: options.cursor,
+        limit: options.limit === undefined ? undefined : positiveNumber(options.limit, "limit") });
+      return { data: page, text: JSON.stringify(page, null, 2) };
+    }
+    if (options.cursor !== undefined || options.limit !== undefined) {
+      throw usage("an exact inbox read cannot use --cursor or --limit");
+    }
     const messages = await context.service.readInbox({ sessionId: options.session,
       generation: options.generation, messageId: options.message });
     return { data: messages, text: messages.length === 0
@@ -272,8 +285,8 @@ const HANDLERS = Object.freeze({
       generation: options.generation, messageId: options.message, body: options.body,
       subject: options.subject, clientMessageId: clientMessageId(options, context) }) });
     const result = routed.recorded;
-    return { data: { message: result.reply, delivery: routed.delivery },
-      text: recordedText(result.reply, routed.delivery) };
+    return { data: { message: result.reply, receipt: result.receipt, delivery: routed.delivery },
+      text: `${recordedText(result.reply, routed.delivery)}; acknowledged ${result.receipt.messageId}` };
   },
 
   request: async ({ options, context }) => {
@@ -347,7 +360,7 @@ const HANDLERS = Object.freeze({
       ids: runtime.ids });
     if (result.subcommand === "validate") {
       return { data: result, text: result.present
-        ? `${result.file} is valid` : `no ${CONFIG_FILENAME}; defaults apply` };
+        ? `${result.file} is valid` : `no ${CONFIG_FILENAME} in selected directory; ancestors not checked` };
     }
     return { data: result,
       text: result.written ? `wrote ${result.file}` : `not written: ${result.file}` };
@@ -363,7 +376,13 @@ const HANDLERS = Object.freeze({
 
   update: async ({ options, runtime }) => runUpdateCommand({ options, runtime }),
 
-  help: async () => ({ data: { commands: describeCommands() }, text: helpText() }),
+  help: async ({ options }) => {
+    if (options.helpCommand === undefined) {
+      return { data: { commands: describeCommands() }, text: helpText() };
+    }
+    const data = describeCommand(options.helpCommand, options.subcommand);
+    return { data, text: commandHelpText(data) };
+  },
 
   version: async ({ runtime }) => {
     // Read by the composition root from the package manifest: `bin/` sits at
@@ -391,6 +410,9 @@ export async function main(argv, runtime) {
   let parsed;
   try {
     parsed = parseArgs(argv);
+    if (runtime.managementOnly && !["help", "version", "update"].includes(parsed.command)) {
+      throw new AccError(EXIT.DATA, "runtime unavailable; retry after the update or run acc update to recover");
+    }
     // `config` is the one command that must work on a workspace ACC cannot
     // open. Discovery validates the config too, so a broken one would fail
     // there first and `acc config validate` - the command a user runs to find

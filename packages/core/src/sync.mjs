@@ -2,10 +2,12 @@ import { AccError, EXIT } from "@agents-can-communicate/protocol";
 
 import { computeAttention } from "./attention.mjs";
 import { classifySessionPresence } from "./sessions.mjs";
+import { assertMessageId, messagePage } from "./message-pages.mjs";
+import { decisionView, isCurrentDecision } from "./decision-state.mjs";
 
 const DEFAULT_LIMIT = 100;
 const CURSOR = /^[0-9]{16}$/;
-const SCOPES = Object.freeze(["delta", "full"]);
+const SCOPES = Object.freeze(["delta", "full", "history"]);
 
 function assertScope(scope) {
   if (scope != null && !SCOPES.includes(scope)) {
@@ -25,9 +27,36 @@ function assertCursor(cursor) {
 export function createSyncService(ports, sessions) {
   const { store, clock, pidIsAlive } = ports;
 
+  async function history(input) {
+    const exact = input.messageId !== undefined;
+    if (input.current !== undefined && (typeof input.current !== "boolean"
+      || input.kind !== "decision" || exact)) {
+      throw new AccError(EXIT.USAGE, "current requires a decision history list, without message id");
+    }
+    if (exact && (input.cursor != null || input.limit !== undefined || input.kind !== undefined)) {
+      throw new AccError(EXIT.USAGE, "an exact history read cannot use cursor, limit, or type");
+    }
+    if (exact) assertMessageId(input.messageId);
+    const snapshot = await store.snapshot(input.workspaceId ?? store.workspaceId,
+      { kinds: ["message"] });
+    const messages = snapshot.messages.map(decisionView(snapshot.messages));
+    if (!exact) return messagePage(messages, input,
+      { include: message => input.current !== true || isCurrentDecision(message),
+        metadata: { scope: "history", view: "summary" } });
+    const message = messages.find(item => item.messageId === input.messageId);
+    if (message === undefined) {
+      throw new AccError(EXIT.DATA, "message is not in this workspace's history");
+    }
+    return { scope: "history", view: "message", items: [message], nextCursor: null };
+  }
+
   async function sync(input = {}) {
-    if (input.cursor != null) assertCursor(input.cursor);
     assertScope(input.scope);
+    if (input.scope === "history") return history(input);
+    if (input.messageId !== undefined || input.kind !== undefined || input.current !== undefined) {
+      throw new AccError(EXIT.USAGE, "message, type and current require history scope");
+    }
+    if (input.cursor != null) assertCursor(input.cursor);
     const workspaceId = input.workspaceId ?? store.workspaceId;
     const now = clock.now();
     const located = input.sessionId === undefined

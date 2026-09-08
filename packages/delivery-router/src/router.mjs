@@ -127,6 +127,14 @@ export function createDeliveryRouter({ service, adapters, clock, platform, readL
       || currentSessions[0].generation !== binding.generation) {
       return durable(participantId, "recipient_unavailable");
     }
+    // Every recipient gets a fresh decision snapshot after async lookup. A
+    // previous recipient may have replaced it while processing their offer.
+    // A send already in flight cannot be recalled by a later peer assertion.
+    if (message.kind === "decision") {
+      message = (await service.sync({ scope: "history", messageId: message.messageId })).items[0];
+      if (!message.decisionStatus.isHead) return settled(await service.readReceipt({
+        messageId: message.messageId, recipientParticipantId: participantId }));
+    }
     // Consent and session reads can outlive retirement or a re-handshake in
     // the same generation. Core filters retired, expired and stale-generation
     // bindings; require the selected identity and live mode immediately before
@@ -179,6 +187,13 @@ export function createDeliveryRouter({ service, adapters, clock, platform, readL
   async function offer(message) {
     if (!Array.isArray(message?.toParticipantIds) || message.toParticipantIds.length === 0) {
       return [];
+    }
+    if (message.kind === "decision") {
+      message = (await service.sync({ scope: "history", messageId: message.messageId })).items[0];
+      if (!message.decisionStatus.isHead) {
+        return Promise.all(message.toParticipantIds.map(async recipientParticipantId => settled(
+          await service.readReceipt({ messageId: message.messageId, recipientParticipantId }))));
+      }
     }
     const now = clock.now();
     const outcomes = [];

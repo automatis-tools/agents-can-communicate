@@ -6,7 +6,7 @@ as the same operating-system user on the same machine and resolve that same loca
 workspace.
 
 Create `acc.workspace.json` only for stable workspace identity, roots, or shared
-claim/context policy. It is optional project configuration that `acc config init` may write
+context budget. It is optional project configuration that `acc config init` may write
 at your request; runtime state remains in platform app data outside the repository. The
 file never defines agents, messages, execution state, or delivery endpoints. Project map:
 [README](index.md). Terms used below: [Glossary](GLOSSARY.md).
@@ -18,11 +18,8 @@ file never defines agents, messages, execution state, or delivery endpoints. Pro
   Matching ids never connect different machines or OS users.
 - **More than one root.** A monorepo whose apps live in separate directories, or a
   workspace that spans sibling checkouts.
-- **Shared policy.** Claim mode and context budget, agreed once and committed, rather than
-  each person's machine deciding.
-- **Stated expectations.** `requiredAdapters` records which harnesses this project expects
-  to be installed, so `acc doctor` can say what is missing rather than leaving a session
-  silently uncoordinated.
+- **Shared context budget.** Set the ceiling for supported injected turn context once for
+  the workspace.
 
 ### Define the file
 
@@ -39,10 +36,8 @@ link can point anywhere, including at a file the repository does not control.
   "displayName": "Example",
   "roots": ["."],
   "policy": {
-    "claimMode": "advisory",
     "contextBudgetBytes": 6000
-  },
-  "requiredAdapters": []
+  }
 }
 ```
 
@@ -52,10 +47,15 @@ link can point anywhere, including at a file the repository does not control.
 | `workspaceId` | Stable identity, portable id | required |
 | `displayName` | What peers see in a roster | the directory name |
 | `roots` | Directories in this workspace, relative to the config | `["."]` |
-| `policy.claimMode` | `advisory` or `guarded` | `advisory` |
+| `policy.claimMode` | Validated compatibility metadata (`advisory` or `guarded`); does not select claim enforcement | `advisory` |
 | `policy.contextBudgetBytes` | Ceiling on injected turn context, 1–64000 | `6000` |
-| `requiredAdapters` | Harnesses this project expects | `[]` |
+| `requiredAdapters` | Validated compatibility metadata; does not affect `acc doctor` diagnostics | `[]` |
 | `extensions` | Anything else, namespaced by whoever wrote it | `{}` |
+
+`policy.claimMode` and `requiredAdapters` are stored but have no claim or doctor effect in
+0.4. CLI claims default to advisory; request `--enforcement guarded` on each claim when
+appropriate, subject to every live participant's certified guard. MCP claims remain
+advisory. Do not use these metadata fields to configure protection or missing-client checks.
 
 Roots are refused if they are absolute or escape the workspace. An absolute root is one
 machine's layout committed to a shared repository, and `packages/../../elsewhere` reaches
@@ -98,17 +98,25 @@ Close them, or pass `--force` if you mean it — and restart them afterwards.
 <!-- test:illustration asks a person to confirm; there is nobody to ask in a test -->
 ```bash
 acc config init        # preview, then write after you agree
-acc config validate    # read-only; reports what applies
+acc config validate    # read-only; checks acc.workspace.json in the selected directory
 ```
+
+`init` and `validate` operate only on `acc.workspace.json` directly inside the selected
+`--cwd` directory (the current directory when omitted). Unlike ordinary workspace discovery,
+they do not walk upward. Pass `--cwd` with the directory containing the config you intend
+to inspect or create. A nested `init` can create a new config that shadows an ancestor;
+check the ancestor first.
 
 `init` shows the exact file it would write and waits. In a non-interactive run — a pipe, a
 CI job, an agent — there is nobody to ask, so it refuses unless you pass `--yes`. It never
 overwrites an existing config: a committed identity is shared by everyone on the project,
 and replacing it on a mistyped command would split one workspace into two.
 
-`validate` only reads. A command someone runs to find out what is wrong must not change the
-thing it is inspecting. With no config present it reports the defaults rather than failing,
-because not having one is a valid state.
+`validate` only reads. If that selected directory has no config, it reports
+`no acc.workspace.json in selected directory; ancestors not checked`.
+The JSON result returns default config metadata for that missing local file. Ordinary
+commands may still discover an ancestor config; this is not an effective-policy report.
+Run validation with `--cwd` set to that ancestor directory to check its file.
 
 ## Keep delivery consent user-owned
 
@@ -129,6 +137,13 @@ reports next-turn or inbox fallback. Each later session must also pass its own
 generation-bound handshake. A failed session handshake clears or refuses that binding and
 reports degraded reachability; it does not rewrite the installed consent.
 
+Codex LocalDaemon delivery separately requires macOS arm64, Codex 0.152.1 or newer, a
+current feature probe, and exact thread, canonical cwd, process, version and protocol
+checks. Its daemon must already be running; ACC never starts or stops it. Codex reads
+consent from the installation record, not a shell-shim variable. Unavailable or ineligible
+sessions retain durable inbox fallback. Use `acc install --adapter codex --delivery off`
+to stop new native offers; bypassing a shim does not disable that recorded opt-in.
+
 ## Override local paths and identity
 
 Nothing in `acc.workspace.json` says where state is stored, and nothing there can — that is
@@ -137,17 +152,17 @@ that resolves inside a workspace.
 
 | Variable | Purpose |
 |---|---|
-| `ACC_DATA_HOME` | Where session, claim, and message state is kept, instead of the platform default (`~/Library/Application Support/acc` on macOS; `~/.local/share/acc` on Linux, or wherever `XDG_DATA_HOME` points) |
-| `ACC_CONFIG_HOME` | The same override, for configuration state the platform would otherwise keep alongside `ACC_DATA_HOME` |
-| `ACC_CACHE_HOME` | The same override, for cache data the platform would otherwise keep under its own cache location |
+| `ACC_DATA_HOME` | Base directory under which ACC creates `acc/` for runtime and coordination state. Defaults: `~/Library/Application Support` on macOS; `~/.local/share` on Linux, or `XDG_DATA_HOME` |
+| `ACC_CONFIG_HOME` | Parsed and validated path override; no current configuration-storage consumer |
+| `ACC_CACHE_HOME` | Parsed and validated path override; no current cache-storage consumer |
 | `ACC_PARTICIPANT` | Which participant a session belongs to, when the client does not say |
 | `ACC_WORKSPACE_ROOT` | The project to work in, instead of discovering one from the working directory. Absolute, or it is refused |
-| `ACC_SESSION` · `ACC_GENERATION` | Which session a command acts as when it is not worked out automatically. A supplied generation proves the exact opening; with only a session id the CLI resolves the current generation and refuses ambiguity |
+| `ACC_SESSION` · `ACC_GENERATION` | Explicit CLI owner credentials, supplied together by the operator for this session. Hooks do not set them. A public session ID alone never resolves a generation; see [CLI ownership](CLI.md#coordinate-from-a-session) |
 | `ACC_MCP_PARTICIPANT` | Who `acc-mcp` takes part as. `mcp` by default |
 | `ACC_MCP_WORKSPACE` | The project `acc-mcp` joins. Without it the server takes the directory the client launched it in, which is rarely the project |
-| `ACC_NO_UPDATE_CHECK=1` | Never ask npm whether a newer ACC exists. `acc update` then says it is off, which is a different answer from "nothing is newer" |
+| `ACC_NO_UPDATE_CHECK=1` | Disables update networking and background scheduling; manual recovery of an already downloaded update remains available |
 | `ACC_PROBE_TIMEOUT_MS` | How long to wait for a client to print its version. Three seconds by default: generous on an idle machine, and not always enough on a busy one, where a client that overruns it is reported as not installed |
-| `ACC_NATIVE_DELIVERY_POLICY` | Set only by an ACC-owned shell shim to the consented live policy (`off`, `actionable`, or `all`) before it `exec`s the real client, so the session's hook knows a native transport was activated. Not for a person to set: an ordinary or `ACC_BYPASS=1` launch leaves it unset, and the hook treats missing or invalid values as `off` |
-| `ACC_BYPASS=1` | Runs the unmodified client through an ACC shim: no launch-time check, no native flags, and the reserved policy variable is unset. The escape hatch when you want the vendor command exactly as it was |
+| `ACC_NATIVE_DELIVERY_POLICY` | Owned shell-bootstrap consent, currently used by Claude Code. The shim sets `off`, `actionable`, or `all`; missing/invalid values mean off for that route. Codex instead reads recorded installation consent, even when this variable is absent |
+| `ACC_BYPASS=1` | Bypasses owned shell activation, currently Claude Code: no bootstrap check/native flags, and shim policy is unset. It does not disable Codex recorded opt-in; use `acc install --adapter codex --delivery off` for new Codex offers |
 | `ACC_BOOTSTRAP_DEBUG=1` | Lets the internal `acc-bootstrap` check write one safe diagnostic line to stderr. Off, it is silent, and it never writes to stdout |
 | `CODEX_HOME` | Codex's own home, honoured when locating the Codex App Server daemon's control socket for native delivery. Codex sets it; ACC only reads it |

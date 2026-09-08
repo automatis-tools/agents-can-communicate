@@ -12,6 +12,11 @@ Think of the coordination you expect from subagents, extended across the indepen
 sessions you open yourself — with different clients and models. You keep giving them
 ordinary tasks; they handle the conversations around their work.
 
+Active hooks supply each agent's own CLI arguments in coordination context; the installed
+skill tells the agent to use them. This path was observed in Claude Code 2.1.263 and
+Codex 0.153.4. Hooks must be enabled and trusted by the client. Without hook context, owner
+operations require an explicit pair or session-bound ACC MCP tools. See [CLI ownership](docs/CLI.md#coordinate-from-a-session).
+
 [Try it](#try-it) · [Supported clients](#when-messages-arrive) · [Documentation](docs/index.md)
 
 [![CI](https://github.com/automatis-tools/agents-can-communicate/actions/workflows/ci.yml/badge.svg)](https://github.com/automatis-tools/agents-can-communicate/actions/workflows/ci.yml)
@@ -40,6 +45,14 @@ Claude → Codex   I'll use that shape and keep my changes in the UI files.
 The agents identify who to talk to and what to agree on. Your prompts stay focused on
 the feature you want to build.
 
+The same setup supports a review and handoff. Ask one session to implement a change and
+request review of an identified revision: a commit when Git is available, or named files
+and version otherwise. Ask the other to return blocking defects or approval. The author
+can address the verdict before finishing, or leave a durable handoff so a later session
+can recover what is complete and what remains. See the
+[review request](docs/CLI.md#messages-and-requests) and [handoff](docs/CLI.md#handoff)
+commands behind that flow.
+
 Each session keeps its own conversation and instructions. Response timing depends on the
 receiving client: see [when messages arrive](#when-messages-arrive).
 
@@ -55,6 +68,9 @@ acc install
 
 The installer connects the clients it finds. Open a new terminal and restart your AI
 clients to load the integration. If you use Codex, accept its plugin trust prompt.
+ACC then keeps its runtime and skills updated in the background, waiting for active clients
+to exit before switching versions. [Update controls](docs/UPGRADING.md#automatic-updates-after-installation)
+include manual update, opt-out, and version pinning.
 
 Open two sessions in your project and give them ordinary tasks, as in the example above.
 On supported clients, ACC introduces peer awareness through the client's own integration;
@@ -100,7 +116,8 @@ queue entries remain with the client.
 - **Separate checkouts, one project.** Git worktrees share an ACC workspace.
   Plain project folders work too; Git is optional.
 - **Agree before editing.** Agents can reserve files and identify overlapping work.
-  Reservations are advisory unless the clients support enforcement.
+  CLI reservations default to advisory. `--enforcement guarded` requests enforcement,
+  which still requires certified guards from every live participant.
   [How reservations work](docs/CONCEPTS.md#intent-is-awareness-a-claim-commits).
 - **Local coordination.** Messages live in app data outside your project. ACC doesn't
   collect or share raw transcripts. Your clients use their usual model providers.

@@ -1,9 +1,18 @@
 import { assertMessageSemantics, MESSAGE_KINDS, OBLIGATIONS } from "./conversations.mjs";
+import { assertDecisionChange } from "./decision-changes.mjs";
 import { AccError, EXIT } from "./errors.mjs";
 import { id, invalid, listOf, nullable, oneOf, optional, plainObject, positiveInteger,
   resourceUri, sequence, text, timestamp } from "./fields.mjs";
 
 export const SCHEMA_VERSION = 3;
+
+// Shared with CLI help so advertised choices are the ones durable records accept.
+export const INTENT_MODES = Object.freeze(["observe", "explore", "edit", "review",
+  "coordinate", "wait"]);
+export const INTENT_STATES = Object.freeze(["active", "blocked", "waiting", "done"]);
+export const CLAIM_MODES = Object.freeze(["shared", "exclusive"]);
+export const CLAIM_ENFORCEMENTS = Object.freeze(["advisory", "guarded"]);
+export const HANDOFF_STATUSES = Object.freeze(["complete", "partial", "blocked"]);
 
 const line = text();
 const prose = text({ max: 4000, multiline: true });
@@ -47,7 +56,7 @@ const artifactRef = (value, field) => {
 };
 
 const handoffPayload = (value, field) => closedObject(value, field, {
-  status: oneOf("complete", "partial", "blocked"),
+  status: oneOf(...HANDOFF_STATUSES),
   completed: listOf(line),
   remaining: listOf(line),
   blockers: listOf(line),
@@ -90,19 +99,19 @@ const DURABLE_RECORDS = Object.freeze({
     heartbeatCadenceMs: positiveInteger, startedAt: timestamp, heartbeatAt: timestamp },
 
   intent: { sessionId: id, workspaceId: id, summary,
-    mode: oneOf("observe", "explore", "edit", "review", "coordinate", "wait"),
+    mode: oneOf(...INTENT_MODES),
     resourceHints: listOf(resourceUri),
-    state: oneOf("active", "blocked", "waiting", "done"), updatedAt: timestamp },
+    state: oneOf(...INTENT_STATES), updatedAt: timestamp },
 
   claim: { claimId: id, workspaceId: id, ownerSessionId: id, resource: resourceUri,
-    mode: oneOf("shared", "exclusive"), enforcement: oneOf("advisory", "guarded"),
+    mode: oneOf(...CLAIM_MODES), enforcement: oneOf(...CLAIM_ENFORCEMENTS),
     reason: line, acquiredAt: timestamp, expiresAt: timestamp, generation: id },
 
   message: { messageId: id, threadId: id, clientMessageId: id, workspaceId: id,
     fromParticipantId: id, fromSessionId: id, toParticipantIds: listOf(id),
     kind: oneOf(...MESSAGE_KINDS), obligation: oneOf(...OBLIGATIONS),
     subject: line, body: prose, inReplyTo: nullable(id), artifacts: listOf(artifactRef),
-    handoff: nullable(handoffPayload), sentAt: timestamp },
+    handoff: nullable(handoffPayload), decisionChange: optional(assertDecisionChange), sentAt: timestamp },
 
   receipt: { messageId: id, workspaceId: id, recipientParticipantId: id,
     state: receiptState, updatedAt: timestamp },

@@ -4,9 +4,16 @@ Install ACC, open the AI sessions you already use, and give them related work. S
 integrations make peers visible and teach each agent how to communicate. You do not need to
 carry messages between windows or add coordination instructions to your task prompts.
 
+Active hooks supply each agent's own CLI arguments in coordination context; the installed
+skill tells the agent to use them. This path was observed in Claude Code 2.1.263 and
+Codex 0.153.4. Hooks must be enabled and trusted by the client. Without hook context, owner
+operations require an explicit pair or session-bound ACC MCP tools. See [CLI ownership](CLI.md#coordinate-from-a-session).
+
 ## 1. Install once on this machine
 
 ACC requires macOS or Linux and Node.js 24 or newer.
+
+Already using 0.3.1? Follow the [upgrade guide](UPGRADING.md) before mixing versions.
 
 ```bash
 npm install -g agents-can-communicate
@@ -17,9 +24,21 @@ npm install -g agents-can-communicate
 acc install
 ```
 
+Installation also enables automatic updates. ACC downloads releases in the background and
+refreshes its runtime and skills when active clients have left. Use `acc update` for an
+immediate update, or `acc update --auto off` to disable background updates. See
+[update controls](UPGRADING.md#automatic-updates-after-installation).
+
 The installer connects only the supported clients it finds. Open a new terminal and
-restart any running clients so they load their integrations. Codex asks you to trust its
-plugin once.
+restart any running clients so they load their integrations. Follow the activation steps
+printed by the installer. In Codex, use `/plugins` to check ACC is enabled, then `/hooks`
+to review each ACC hook and enable/trust its current definition if needed. Restart the
+session after that review; changed hook definitions may require trust again.
+
+If the installer preserved your existing Codex sandbox settings, verify the named ACC
+state directory is in `sandbox_workspace_write.writable_roots` in the config it identifies.
+ACC keeps those user settings unchanged. Installed files alone do not establish that hooks
+are active; `acc doctor` leaves current readiness unverified and directs you to Codex.
 
 If you opt into Claude Code's experimental idle delivery, Claude also shows its own
 development-channel warning at every startup. The feature is off by default, can spend
@@ -45,6 +64,16 @@ The sessions may use different supported clients or two instances of the same cl
 Same-client addresses can be ambiguous when several instances are live; agents use the
 exact participant ids in the roster when needed. See [Concepts](CONCEPTS.md) for participant
 and session identity.
+
+A second repeatable pattern is review and handoff. Ask the implementing agent to request
+review of an identified revision (a commit when Git is available, or named files and
+version otherwise) and wait for the verdict. Ask the reviewer to return blocking defects
+or approval. If either session must stop, it can leave a durable handoff naming completed
+work, remaining work, and blockers. A later session can recover it from history. The
+underlying commands are [`acc request`](CLI.md#messages-and-requests), exact
+[`acc inbox --message`](CLI.md#inbox-reply-and-acknowledgement),
+[`acc reply`](CLI.md#inbox-reply-and-acknowledgement), and
+[`acc finish`](CLI.md#handoff).
 
 ## 3. Watch for useful coordination
 

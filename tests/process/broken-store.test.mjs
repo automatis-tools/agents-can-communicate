@@ -8,6 +8,8 @@ import { promisify } from "node:util";
 
 import { EXIT } from "@agents-can-communicate/protocol";
 
+import { fixtureOwnerEnv } from "../helpers/fixture-owner.mjs";
+
 const run = promisify(execFile);
 const repo = path.resolve(import.meta.dirname, "..", "..");
 const acc = path.join(repo, "bin", "acc.mjs");
@@ -34,7 +36,8 @@ async function broken(t) {
   await mkdir(project, { recursive: true });
   const env = { ...process.env, ACC_DATA_HOME: path.join(base, "data"),
     GIT_DIR: "", GIT_WORK_TREE: "" };
-  const cli = (...argv) => run(process.execPath, [acc, ...argv, "--cwd", project], { env });
+  const cli = async (...argv) => run(process.execPath, [acc, ...argv, "--cwd", project],
+    { env: { ...env, ...await fixtureOwnerEnv(env.ACC_DATA_HOME, "writer") } });
 
   for (const participant of ["writer", "reader"]) {
     const child = run(process.execPath, [hook, "codex"],
@@ -44,7 +47,7 @@ async function broken(t) {
     await child;
   }
   const status = JSON.parse((await cli("status", "--json")).stdout).data;
-  await cli("message", "--session", status.participants[0].sessionId,
+  await cli("message", "--session", status.participants.find(item => item.participantId === "writer").sessionId,
     "--to", "reader", "--subject", "hello", "--body", "world");
 
   const workspaces = path.join(base, "data", "acc", "workspaces");

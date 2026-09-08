@@ -154,7 +154,7 @@ test("filesystem: an update that expires before publication leaves the prior rec
     await delay(Math.max(1, deadlineAt - Date.now() + 20));
     return { ...current, opaqueEndpointRef: "endpoint_new" };
   }, { deadlineAt }), error => error.code === EXIT.CONFLICT
-    && /deadline expired before durable publication/.test(error.message));
+    && /deadline expired before (?:durable )?publication/.test(error.message));
   assert.equal(entered, true, "the deadline expired before the writer acquired the lock");
   assert.equal((await store.ephemeral.get("deliveryBinding", "session_a")).opaqueEndpointRef,
     "socket_a");

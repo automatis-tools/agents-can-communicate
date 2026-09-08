@@ -63,12 +63,27 @@ function messageGroups(messages) {
       `messageId: ${message.messageId}`,
       `sender: ${message.fromParticipantId} (session ${message.fromSessionId})`,
       `obligation: ${message.obligation}`,
+      ...decisionLines(message).map(escapePeerText),
       `subject: ${oneLine(escapePeerText(message.subject))}`,
       "body:",
       escapePeerText(message.body),
       FENCE,
     ],
   }));
+}
+
+function reminderGroups(attention) {
+  const replies = attention.filter(item => item.kind === "reply_required").length;
+  const acknowledgements = attention.length - replies;
+  const counts = [
+    replies === 0 ? null : `${replies} ${replies === 1 ? "reply" : "replies"}`,
+    acknowledgements === 0 ? null
+      : `${acknowledgements} acknowledgement${acknowledgements === 1 ? "" : "s"}`,
+  ].filter(Boolean);
+  // Counts preserve pending obligations without claiming that any individual
+  // item was shown, read, or resolved. The complete list remains in the inbox.
+  return counts.length === 0 ? [] : [{ kind: "reminder", truncatable: false,
+    lines: [`- Pending: ${counts.join(", ")}; \`acc inbox\`.`] }];
 }
 
 const groupBytes = group => group.lines.reduce((total, line) => total + bytes(line) + 1, 0);
@@ -89,7 +104,7 @@ function ambientHeader(count) {
 function recoveryNote(ids) {
   const first = ids[0];
   const rest = ids.length > 1 ? ` (+${ids.length - 1} more in \`acc inbox\`)` : "";
-  return `- read ${first}: \`acc inbox --message ${first}\`${rest}`;
+  return `- read: \`acc inbox --message ${first}\`${rest}`;
 }
 
 /**
@@ -105,13 +120,17 @@ export function projectContextResult(sync, { budgetBytes = DEFAULT_BUDGET_BYTES 
     .sort((left, right) => left.priority - right.priority
       || (left.sourceId ?? "").localeCompare(right.sourceId ?? ""));
   const leadsPeerBodies = item => item.priority <= 2 || item.kind === "claim_conflict";
-  const urgent = attention.filter(leadsPeerBodies);
-  const informational = attention.filter(item => !leadsPeerBodies(item));
+  const reminderMessageIds = new Set(sync.reminderMessageIds ?? []);
+  const isReminder = item => reminderMessageIds.has(item.sourceId)
+    && ["reply_required", "acknowledgement_required"].includes(item.kind);
+  const urgent = attention.filter(item => !isReminder(item) && leadsPeerBodies(item));
+  const informational = attention.filter(item => !isReminder(item) && !leadsPeerBodies(item));
   const messages = sync.messages ?? [];
   const liveOfferedMessageIds = new Set(sync.liveOfferedMessageIds ?? []);
   const groups = [
     ...attentionGroups(urgent, { truncatable: true, liveOfferedMessageIds }),
     ...messageGroups(messages),
+    ...reminderGroups(attention.filter(isReminder)),
     ...attentionGroups(informational, { truncatable: false }),
   ];
   const peers = peerCount(sync);
@@ -166,7 +185,9 @@ export function projectContextResult(sync, { budgetBytes = DEFAULT_BUDGET_BYTES 
       lines.length = 0;
       used = 0;
     }
-    const fitted = recoveryNote([...new Set(droppedMessages)]);
+    const withCount = recoveryNote([...new Set(droppedMessages)]);
+    const fitted = used + bytes(withCount) + 1 <= budgetBytes
+      ? withCount : recoveryNote(droppedMessages.slice(0, 1));
     // An incomplete id or command is not a recovery path. When a deliberately
     // tiny budget cannot hold the shortest truthful instruction, say nothing
     // and leave every omitted receipt queued for a later turn.
@@ -190,3 +211,4 @@ export function projectContextResult(sync, { budgetBytes = DEFAULT_BUDGET_BYTES 
 export function projectContext(sync, options) {
   return projectContextResult(sync, options).text;
 }
+import { decisionLines } from "./decision-text.mjs";

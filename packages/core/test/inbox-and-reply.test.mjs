@@ -102,6 +102,35 @@ test("exact inbox recovery at retrieved does not refresh time or append an event
   assert.equal(after.events.length, before.events.length);
 });
 
+for (const resolve of ["ack", "reply"]) {
+  test(`an exact read after ${resolve} preserves the acknowledged receipt and pending inbox`, async () => {
+    const { service, base, clock } = makeService();
+    const { sender, recipient } = await pair(service);
+    const request = await question(service, sender);
+    const input = { ...owner(recipient), messageId: request.messageId };
+    const receipt = resolve === "ack" ? await service.acknowledgeMessage(input)
+      : (await service.replyToMessage({ ...input,
+        clientMessageId: "client_verified_reply", body: "Use the durable receipt." })).receipt;
+    const before = await base.snapshot(WORKSPACE);
+    const events = await base.eventsSince(WORKSPACE, null, 100);
+    clock.advance(5_000);
+
+    const [inspected] = await service.readInbox(input);
+
+    assert.deepEqual(inspected.message, request);
+    assert.deepEqual(inspected.receipt, receipt);
+    assert.equal(inspected.receipt.state, "acknowledged");
+    assert.deepEqual(await service.readInbox(owner(recipient)), []);
+    assert.deepEqual(await base.snapshot(WORKSPACE), before);
+    assert.deepEqual(await base.eventsSince(WORKSPACE, null, 100), events);
+    // A completed receipt still belongs only to its recipient.
+    await assert.rejects(service.readInbox({ ...owner(sender), messageId: request.messageId }),
+      error => error.code === EXIT.CONFLICT);
+    await assert.rejects(service.readInbox({ ...input, generation: "generation_stale" }),
+      error => error.code === EXIT.CONFLICT);
+  });
+}
+
 test("repeated acknowledgement does not refresh time or append an event", async () => {
   const { service, base, clock } = makeService();
   const { sender, recipient } = await pair(service);

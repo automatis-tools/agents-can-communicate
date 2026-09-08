@@ -11,6 +11,7 @@ export function probeClientVersion(adapter, { timeoutMs = 1_000 } = {}) {
   return new Promise(resolve => {
     execFile(adapter.client.command, adapter.client.versionArgs ?? ["--version"], {
       timeout: timeoutMs,
+      killSignal: "SIGKILL",
       windowsHide: true,
     }, (error, stdout, stderr) => {
       if (error !== null) return resolve(null);

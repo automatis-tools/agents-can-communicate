@@ -21,6 +21,9 @@ const data = (message, details) => {
 };
 
 export function assertMessageSemantics(message) {
+  if (message.decisionChange !== undefined && message.kind !== "decision") {
+    data("only a decision can replace or withdraw decisions", { kind: message.kind });
+  }
   const room = message.toParticipantIds.length === 0;
   if (room && !["note", "decision", "handoff"].includes(message.kind)) {
     data(`a room message cannot have kind ${message.kind}`, { kind: message.kind });

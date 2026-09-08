@@ -74,10 +74,56 @@ inside the message so an uncertain caller can retry explicitly.
 
 An empty `toParticipantIds` creates a room record. At commit time, core resolves every
 known peer participant with an open session and creates a receipt for each. Participants
-that arrive later can inspect room history through a full sync but do not receive
+that arrive later can inspect room records through history sync but do not receive
 retroactive receipts. Those already-present recipients get the normal inbox and certified
 next-turn path; a successful next-turn write advances their room receipt to `offered`.
 Room records are never eligible for native live push.
+
+## Decision lifecycle
+
+A decision may additionally carry `decisionChange` with exactly two fields:
+`action` (`replace` or `withdraw`) and `messageIds` (1..16 unique portable IDs of
+existing decisions in the same workspace). Generic send inputs use `supersedes`
+or `withdraws`; the durable payload is built after transactional validation.
+The sorted target set participates in idempotency. The author may be any owned
+participant; attribution does not confer system authority.
+
+Targets and their receipts are immutable. Changes inherit target receipt recipients
+and target authors, excluding the changing author from inherited recipients. Extra
+explicit recipients are merged, sorted, and persisted in `toParticipantIds` before
+recording. This also notifies offline readers and makes live routing use the same set.
+No old receipt is acknowledged, deleted, or advanced by a lifecycle change.
+
+Explicit links form a graph. Within a connected group, terminal records are heads;
+multiple heads mean a conflict, even if their prose looks similar. A change may target
+an already replaced decision, creating a competing branch. Resolve branches by
+explicitly linking a new change to all their current heads. A withdrawal is itself
+a terminal record; superseding it explicitly records a new decision.
+
+Decision summaries and exact read copies expose `decisionStatus`:
+
+| Field | Meaning |
+|---|---|
+| `state` | `current` for a terminal choice; `withdrawn` for a terminal cancellation or history with only cancelled heads; otherwise `superseded` |
+| `isHead` | no recorded successor links to this record |
+| `conflicted` / `headCount` | whether the group has multiple terminal positions and their count |
+| `currentMessageId` | sole current head, or null if there is no unique head |
+| `groupId` | derived representative root ID for finding related heads; may change when groups are joined |
+
+This metadata is never persisted. `history` + kind `decision` + `current: true`
+lists heads, including withdrawals and conflicts, using the same summary budget.
+Ordinary inbox, bulk reads, automatic delivery and attention omit non-head decisions;
+exact inbox/history retain them. Timestamps and acknowledgements never choose a winner.
+A decision without an explicit successor may still be factually stale.
+
+Next-turn context and each native offer use a lifecycle snapshot; text already shown
+or in flight cannot be recalled. Changes get their own delivery receipts. Native
+transport carries the change/status inside its existing untrusted text envelope.
+
+The optional field preserves reading of existing schema-3 records by this build.
+Older ACC builds cannot interpret these semantics and may reject new records with
+unknown fields. Upgrade participating ACC installations together; this is not a
+forward-compatible promise or an automatic state migration.
 
 ## Kinds and obligations
 
@@ -155,13 +201,19 @@ leaves the receipt queued.
 
 ## Inbox, reply, and acknowledgement
 
-`inbox` returns unresolved messages owned by the calling participant and advances only
-that participant's receipt to `retrieved`. An exact message id is the recovery path after
-compaction or an over-budget projection.
+Without an id, public `inbox` lists bounded summary pages for unresolved messages owned
+by the calling participant, without changing receipts. An exact read returns the complete
+message and advances only that participant's receipt to `retrieved`. It is the narrow
+recovery and inspection path, including after compaction or acknowledgement. Reading an
+acknowledged message preserves its receipt, timestamp, and event history; it does not put
+the message back into the unresolved inbox. Ownership and current-generation checks still
+apply to every read.
 
 `reply` verifies that ownership, records an `answer` in the original thread, and advances
 the original receipt to `acknowledged` in one transaction. Only after that durable commit
 may the answer be offered to the original author. A transport error cannot roll back it.
+CLI and MCP reply results expose both facts: `message` and `delivery` describe the outgoing
+answer, while `receipt` describes the caller's acknowledgement of the original message.
 
 `ack` advances the caller's receipt without creating a reply. It exposes no state override;
 callers cannot claim that a transport offered or a participant retrieved a message.
@@ -199,8 +251,11 @@ its native reply route remains false.
 
 ## Attention and sync
 
-Bounded sync returns events after a cursor plus explicit attention. Full sync is a
-forensic workspace snapshot, not the normal way to recover one message. Attention is
+Default sync returns a bounded event page after a 16-digit cursor plus explicit attention.
+History sync returns read-only message summaries (20 items by default, at most 12,000
+formatted JSON bytes) and complete-message-id cursors, or one exact full message. Neither
+history mode changes receipts. Full sync adds an unbounded forensic workspace snapshot.
+Message discovery and exact-read contracts are in [CLI](CLI.md) and [MCP](MCP.md). Attention is
 limited to six explicit rules: `reply_required`, `acknowledgement_required`,
 `recipient_unavailable`, `claim_conflict`, `claim_contended`, and `claim_expired`.
 

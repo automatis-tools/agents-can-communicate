@@ -101,17 +101,29 @@ file ACC writes is an optional `acc.workspace.json` explicitly requested through
 `acc config init`.
 
 A lone session can remain ephemeral. Durable state materialises when a second live session
-appears or the first claim, message, or handoff is committed. This makes “silent when
-alone” an architectural behavior, not a UI preference.
+appears or the first claim, message, or handoff is committed. Solo presence therefore
+does not require durable workspace history. Native turn hooks still supply the session's
+own CLI arguments, so a peer joining later in the same turn does not require reattachment.
+Without relevant coordination context, that identity header is the only projected content.
 
 ## Inbox, attention, and projection
 
-Inbox reads only messages addressed to the calling participant and advances that
-participant's receipt to `retrieved`. Reply validates ownership, creates an `answer` in the
+Public inbox discovery uses core `listInbox`: bounded, read-only message summaries
+addressed to the current participant. Exact body reads use `readInbox` and advance only
+that participant's receipt to `retrieved`; the embedded core API still supports bulk
+retrieval. History sync reads message records without receipt changes, using the same
+summary pager or one exact id. Reply validates ownership, creates an `answer` in the
 same thread, and acknowledges the original atomically. No participant can advance another
 participant's receipt.
 
-Attention is computed from six explicit rules:
+Decision lifecycle is derived from immutable message links, without a new record kind
+or mutable decision store. Read copies carry bounded status; raw forensic snapshots stay
+unchanged. Non-head decisions leave pending inbox, bulk delivery, and attention while
+exact reads retain them. Replacement/withdrawal records inherit recipients before commit,
+so offline readers receive the change without a forged acknowledgement. See
+[the protocol contract](PROTOCOL.md#decision-lifecycle).
+
+Attention is computed from six explicit rules for current obligations:
 
 | Priority | Kind | Observable trigger |
 |---|---|---|
@@ -129,6 +141,14 @@ Adapters project peer bodies in an attributed untrusted frame. If a complete bod
 fit, the projection keeps the message id and points to `acc inbox --message <id>` instead
 of silently truncating it.
 
+For this participant's unresolved messages already `offered` or `retrieved`, the standard
+projector combines reply and acknowledgement reminders into a compact count after new
+message bodies. Queued obligations and claim conflicts remain individual attention items.
+All pending headers stay discoverable through `acc inbox` pages; owned `acc status` retains
+its complete attention list. Full bodies require an exact inbox read; projection
+does not acknowledge or delete records. Explicit decision links, rather than the
+projector or message age, retire old decision obligations.
+
 ## Hooks fail open
 
 Hook execution is bounded. If coordination state cannot be read or a decision cannot be
@@ -137,3 +157,34 @@ it, but a coordination tool must not be the reason a session stops working.
 
 Next: [Protocol](PROTOCOL.md) · [Capabilities](CAPABILITIES.md) ·
 [Security model](SECURITY_MODEL.md)
+
+## Managed runtime activation
+
+The CLI owns installation generations under `<dataHome>/acc/runtime`, outside workspaces.
+All five launch paths select a generation and publish an actual-process lease under one
+admission mutex before loading workspace-capable code. Immutable launcher modules and
+runtime directories preserve in-progress imports. Leases survive `main()` returning and
+are removed only after confirmed process death. Parsed help, version, and update recovery
+remain available when workspace admission is unavailable.
+
+An independent worker downloads npm packages with lifecycle scripts disabled, checks exact
+stable package identity and the discovered integrity, and health-checks the staged runtime.
+Installer detection and planning happen before exclusive admission. The worker then checks
+ACC process leases and native binding PIDs, records `activating`, applies every integration,
+and only publishes the new active pointer after all applications succeed. Partial refresh
+remains fenced and repairs forward, with the old active pointer retained but normal
+workspace admission unavailable until recovery completes. Native bindings cease holding
+after observed SessionEnd cleanup or confirmed process death; the vendor daemon may remain
+running. Unknown PIDs remain holds until lifecycle cleanup. Presence TTL, `acc finish`,
+and delivery off alone do not prove native lifecycle end. ACC never manages the daemon.
+
+Lock ownership never expires by age. Retained nonempty tombstones prevent delayed observers
+from reclaiming a successor. Under an acquired lock, maintenance removes historical
+bookkeeping only when no live or unknown contender could still reference it; a stopped
+contender postpones cleanup. Admission also removes confirmed-dead process leases. None of
+this metadata is agent conversation history or injected context.
+
+The first upgrade from an unmanaged binary still requires a restart. ACC cannot fence old
+direct binaries or external applications importing core. Native trust and client-side cache
+activation remain vendor responsibilities; refreshed files do not establish observed
+capabilities.

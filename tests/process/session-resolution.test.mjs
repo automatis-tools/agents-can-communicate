@@ -8,35 +8,25 @@ import { promisify } from "node:util";
 
 import { COMMANDS } from "@agents-can-communicate/cli";
 
+import { fixtureOwnerEnv } from "../helpers/fixture-owner.mjs";
+
 const run = promisify(execFile);
 const repo = path.resolve(import.meta.dirname, "..", "..");
 const acc = path.join(repo, "bin", "acc.mjs");
 const hook = path.join(repo, "bin", "acc-hook.mjs");
 
-/**
- * An agent has to be able to say who it is.
- *
- * Every mutating command acts as a session and proves it with that session's
- * generation. Both used to be required on the command line, and the shipped
- * skills told agents to pass `--session "$ACC_SESSION" --generation
- * "$ACC_GENERATION"` — two variables nothing in this system has ever set. The
- * generation is deliberately absent from `acc status` as well, being proof of
- * ownership rather than public information.
- *
- * So the whole documented workflow was unreachable: on all four native clients,
- * `work`, `claim`, `message`, `request`, `ack` and `finish` could not be
- * run by the agent they were written for. Only the MCP path worked, because that
- * server resolves its own session and never asks the model for one.
- *
- * These tests drive the real CLI through the real hook runtime, and pass no
- * identifiers at all — the way the skill now tells an agent to.
- */
+// Explicit CLI ownership through the real hook runtime. These fixtures do not
+// prove native clients supply credentials: their setup owns each hook payload
+// and deliberately passes its pair. Caller inference regressions are exercised
+// separately by caller-identity-packed and session-owner tests.
 async function stage(t, { participants }) {
   const root = await realpath(await mkdtemp(path.join(tmpdir(), "acc-resolve-")));
   t.after(() => rm(root, { recursive: true, force: true }));
   const project = path.join(root, "project");
   const env = { ...process.env, ACC_DATA_HOME: path.join(root, "data"),
     GIT_DIR: "", GIT_WORK_TREE: "" };
+  delete env.ACC_SESSION;
+  delete env.ACC_GENERATION;
   await run("git", ["init", "-q", "-b", "main", project], { env, cwd: root })
     .catch(async () => { await run("mkdir", ["-p", project]); });
 
@@ -49,56 +39,58 @@ async function stage(t, { participants }) {
   }
   const cli = (args, extra = {}) => run("node", [acc, ...args],
     { cwd: project, env: { ...env, ...extra } });
-  return { project, env, cli };
+  return { project, env, cli, owner: nativeId => fixtureOwnerEnv(env.ACC_DATA_HOME, nativeId) };
 }
 
-test("an agent that was told no identifiers can still publish intent", async t => {
-  const { cli } = await stage(t,
+test("an explicitly configured owner publishes intent without repeated CLI flags", async t => {
+  const { cli, owner } = await stage(t,
     { participants: [{ participant: "solo", harness: "codex", session: "h-1" }] });
 
-  // Exactly what the skill now says to run. Nothing here names a session.
-  const { stdout } = await cli(["work", "--summary", "porting the claim model"]);
+  const { stdout } = await cli(["work", "--summary", "porting the claim model"],
+    await owner("h-1"));
 
   assert.match(stdout, /intent: porting the claim model/);
 });
 
-test("the whole request loop runs with no identifiers on either side", async t => {
-  const { cli } = await stage(t, { participants: [
+test("the whole request loop preserves explicitly configured owners", async t => {
+  const { cli, owner } = await stage(t, { participants: [
     { participant: "graphics", harness: "claude_code", session: "gfx" },
     { participant: "physics", harness: "codex", session: "phy" }] });
 
   // Two live sessions in one checkout, so neither is resolvable by elimination.
-  // Each is recognised by the session id its own client exports.
+  // Fixture setup supplies each session's own pair.
   await cli(["request", "--to", "physics", "--title", "Tank sinks through mud",
     "--detail", "settle() adds mudDepth with nothing stopping it."],
-  { CLAUDE_CODE_SESSION_ID: "gfx" });
+  await owner("gfx"));
 
   const { stdout: waiting } = await cli(["inbox", "--json"],
-    { CLAUDE_CODE_SESSION_ID: "phy" });
-  const [request] = JSON.parse(waiting).data;
+    await owner("phy"));
+  const listed = JSON.parse(waiting).data;
+  const { stdout: exact } = await cli(["inbox", "--message",
+    listed.items[0].message.messageId, "--json"], await owner("phy"));
+  const [request] = JSON.parse(exact).data;
   assert.equal(request.message.subject, "Tank sinks through mud");
   const { stdout: replied } = await cli(["reply", "--message", request.message.messageId,
     "--body", "I will review the settling path."],
-    { CLAUDE_CODE_SESSION_ID: "phy" });
+    await owner("phy"));
   assert.match(replied, /^recorded message_/);
 });
 
-test("a session id from status is enough; the generation is looked up", async t => {
-  const { cli } = await stage(t,
+test("a public selector can name the caller's own explicitly configured session", async t => {
+  const { cli, owner } = await stage(t,
     { participants: [{ participant: "solo", harness: "codex", session: "h-1" }] });
   const { stdout } = await cli(["status", "--json"]);
   const { sessionId } = JSON.parse(stdout).data.participants[0];
 
-  // The half an agent can discover is the half it may use. Refusing this would
-  // teach that both halves are public, or that neither is usable.
+  // The explicit pair establishes ownership; the public selector does not.
   const { stdout: intent } = await cli(["work", "--session", sessionId,
-    "--summary", "reading the store"]);
+    "--summary", "reading the store"], await owner("h-1"));
 
   assert.match(intent, /intent: reading the store/);
 });
 
 test("two live sessions it cannot tell apart stop it rather than guessing", async t => {
-  const { cli } = await stage(t, { participants: [
+  const { cli, owner } = await stage(t, { participants: [
     { participant: "graphics", harness: "claude_code", session: "gfx" },
     { participant: "physics", harness: "codex", session: "phy" }] });
 
@@ -108,12 +100,12 @@ test("two live sessions it cannot tell apart stop it rather than guessing", asyn
     .then(() => null, error => error);
 
   assert.notEqual(failure, null, "it guessed instead of refusing");
-  assert.match(failure.stderr, /could not tell which of 2 live sessions/);
-  assert.match(failure.stderr, /graphics \(claude_code\)|physics \(codex\)/);
+  assert.match(failure.stderr, /could not tell which session/);
+  assert.match(failure.stderr, /own acc attach/);
 });
 
 test("a session that has closed is not mistaken for the caller", async t => {
-  const { project, env, cli } = await stage(t, { participants: [
+  const { project, env, cli, owner } = await stage(t, { participants: [
     { participant: "gone", harness: "codex", session: "old" },
     { participant: "here", harness: "claude_code", session: "new" }] });
 
@@ -122,9 +114,11 @@ test("a session that has closed is not mistaken for the caller", async t => {
     session_id: "old", cwd: project, reason: "exit" }));
   await child;
 
-  // One live session left, so elimination is unambiguous again. A stale binding
-  // that still counted would make this ambiguous forever.
-  const { stdout } = await cli(["work", "--summary", "carrying on alone"]);
+  const stale = await cli(["work", "--summary", "wrong survivor"],
+    { CLIENT_NATIVE_SESSION: "old" }).then(() => null, error => error);
+  assert.notEqual(stale, null, "the closed caller adopted the surviving peer");
+  const { stdout } = await cli(["work", "--summary", "carrying on alone"],
+    await owner("new"));
 
   assert.match(stdout, /intent: carrying on alone/);
 });
@@ -175,13 +169,14 @@ test("the list above is every command an agent can run", async () => {
     "a command exists that this gate does not exercise");
 });
 
-test("no agent-facing command refuses for want of an identity", async t => {
-  const { cli } = await stage(t,
+test("every agent-facing command accepts the explicitly configured owner", async t => {
+  const { cli, owner } = await stage(t,
     { participants: [{ participant: "solo", harness: "codex", session: "h-1" }] });
 
   const refused = [];
   for (const [command, args] of AGENT_FACING) {
-    const error = await cli([command, ...args]).then(() => null, failure => failure);
+    const error = await cli([command, ...args], await owner("h-1"))
+      .then(() => null, failure => failure);
     // Some of these legitimately fail on their own subject - `ack` names a
     // message that does not exist. What none of them may do is fail because the
     // caller could not say who it is.

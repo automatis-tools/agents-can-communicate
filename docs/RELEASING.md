@@ -1,7 +1,7 @@
 # Releasing
 
 Use this procedure to build one auditable npm artifact, verify that exact tarball, and keep
-its evidence tied to the commit that supplied its bytes. The package is currently `0.3.1`;
+its evidence tied to the commit that supplied its bytes. The package is currently `0.4.0`;
 the commands derive the version from `package.json` so the filename cannot drift.
 
 ```mermaid
@@ -18,8 +18,9 @@ graph LR
 
 ## Prepare candidate commit A
 
-Commit A must contain every file npm will pack and every release gate. Start from a clean,
-dedicated release worktree, update the version and candidate files, then run:
+Commit A must contain every file npm will pack and every release gate. Use a clean,
+dedicated release worktree; an existing clean isolated worktree is fine. Update the version
+and candidate files, then run:
 
 ```bash
 release_cache="$(mktemp -d "${TMPDIR:-/tmp}/acc-npm-cache.XXXXXX")"
@@ -62,7 +63,23 @@ env npm_config_cache="$release_cache" node scripts/verify-package.mjs "$tarball"
 symlinks, then exercises doctor, a non-Git workspace, client install/uninstall, bundled
 workspaces, certification evidence, and packed documentation links. It rejects tests,
 development probes, sockets, transcript-shaped data, runtime state, and unreferenced
-fixtures.
+fixtures. Keep `ACC_NO_UPDATE_CHECK=1` set for release checks so installing an integration
+cannot schedule a real registry update. The managed-update acceptance tests explicitly
+enable networking only against their isolated local registry and npm cache.
+
+The managed-update checks exercise actual installed archives: automatic enrollment and
+activation, a persistent MCP process holding the old version, integrity rejection, recovery
+from a failed integration refresh, and stable launchers after the initial package is gone.
+Run them before recording the candidate:
+
+```bash
+env npm_config_cache="$release_cache" node --test tests/acceptance/managed-*-packed.test.mjs
+```
+
+Repeat the published-version upgrade preflight with this exact tarball and isolated home,
+data, and project directories. Retain the source/archive/installed file comparison with the
+preflight evidence. Local-registry checks and direct process checks do not establish native
+client activation; capture that separately on supported real clients.
 
 When passed an existing tarball, the verifier intentionally prints `revision unknown`:
 the current checkout cannot prove which commit produced arbitrary supplied bytes. Record

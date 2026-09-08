@@ -33,17 +33,19 @@ const isLive = (claim, now) => Date.parse(claim.expiresAt) > Date.parse(now);
 export function createClaimService(ports, sessions) {
   const { store, clock, ids, pidIsAlive } = ports;
 
-  async function requireOwner(input, action) {
-    const existing = await sessions.locateSession(input.sessionId, input.workspaceId);
-    if (existing === null || existing.record.state !== "open") {
+  async function requireOwner(input, action, tx) {
+    const current = tx === undefined
+      ? (await sessions.locateSession(input.sessionId, input.workspaceId))?.record
+      : tx.get("session", input.sessionId);
+    if (current == null || current.state !== "open") {
       throw new AccError(EXIT.CONFLICT, `cannot ${action} from a session that is not open`,
         { sessionId: input.sessionId });
     }
-    if (existing.record.generation !== input.generation) {
+    if (current.generation !== input.generation) {
       throw new AccError(EXIT.CONFLICT, `cannot ${action} with a replaced session generation`,
         { sessionId: input.sessionId });
     }
-    return existing.record;
+    return current;
   }
 
   function conflictWith(existing, owner, now, snapshotSessions) {
@@ -83,6 +85,7 @@ export function createClaimService(ports, sessions) {
 
     let record = null;
     await store.transaction(async tx => {
+      await requireOwner(input, "claim", tx);
       const live = tx.list("claim", claim => isLive(claim, now));
       // This session's own claim on this resource, live or lapsed. Looking only
       // among the live ones left the expired record behind and made a fresh one
@@ -117,7 +120,7 @@ export function createClaimService(ports, sessions) {
         actorSessionId: session.sessionId, type: mine === undefined ? "claim.acquired"
           : "claim.renewed", occurredAt: now,
         payload: { claimId, resource, mode: record.mode } });
-    }, { kinds: ["claim"] });
+    }, { kinds: ["session", "claim"] });
     return record;
   }
 
@@ -128,6 +131,7 @@ export function createClaimService(ports, sessions) {
       .toISOString();
     let record = null;
     await store.transaction(async tx => {
+      await requireOwner(input, "renew", tx);
       const existing = tx.get("claim", input.claimId);
       if (existing === null || existing.ownerSessionId !== session.sessionId) {
         throw new AccError(EXIT.CONFLICT, "only the owning session generation may renew a claim",
@@ -138,7 +142,7 @@ export function createClaimService(ports, sessions) {
       tx.append({ schemaVersion: SCHEMA_VERSION, eventId: ids.next("event"),
         workspaceId: existing.workspaceId, actorSessionId: session.sessionId,
         type: "claim.renewed", occurredAt: now, payload: { claimId: input.claimId } });
-    }, { kinds: ["claim"] });
+    }, { kinds: ["session", "claim"] });
     return record;
   }
 
@@ -146,6 +150,7 @@ export function createClaimService(ports, sessions) {
     const session = await requireOwner(input, "release");
     const now = clock.now();
     await store.transaction(async tx => {
+      await requireOwner(input, "release", tx);
       const existing = tx.get("claim", input.claimId);
       if (existing === null) {
         throw new AccError(EXIT.CONFLICT, "the claim does not exist", { claimId: input.claimId });
@@ -167,7 +172,7 @@ export function createClaimService(ports, sessions) {
         type: owned ? "claim.released" : "claim.force_released", occurredAt: now,
         payload: { claimId: input.claimId, authority: authority ?? null,
           reason: reason ?? null, replacedGeneration: existing.generation } });
-    }, { kinds: ["claim"] });
+    }, { kinds: ["session", "claim"] });
   }
 
   return {

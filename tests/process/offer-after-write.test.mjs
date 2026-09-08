@@ -152,40 +152,47 @@ test("a rejected offer commit leaves that receipt queued", async t => {
 });
 
 test("an expired hook budget refuses to start an offer commit", async t => {
-  const { invoke, receipt } = await fixture(t);
-  const result = await invoke("beforeTurn", "recipient-session", { budgetMs: 1_000 });
-  await new Promise(resolve => setTimeout(resolve, 1_050));
-
-  await assert.rejects(result.commitOffers, /budget exhausted/);
-
+  const { invoke, receipt, message } = await fixture(t);
+  const result = await invoke("beforeTurn", "recipient-session", { budgetMs: 30_000 });
+  assert.equal(result.failed, undefined, result.reason);
+  assert.equal(result.timedOut, undefined, "offer preparation must finish before expiring its commit");
+  assert.ok(result.stdout.includes(message.body), "the prepared offer must contain the message body");
+  t.mock.method(Date, "now", () => result.deadlineAt);
+  try { await assert.rejects(result.commitOffers, /budget exhausted/); }
+  finally { t.mock.restoreAll(); }
   assert.equal((await receipt()).state, "queued");
 });
 
-test("a retrieved obligation is never described as live-offered", async t => {
+test("a retrieved obligation becomes a pending count without claiming a live offer", async t => {
   const { invoke, message, receipt, recipient } = await fixture(t);
   await recipient.service.readInbox({ sessionId: recipient.accSessionId,
     generation: recipient.generation, messageId: message.messageId });
   assert.equal((await receipt()).state, "retrieved");
+  const before = await receipt();
 
   const result = await invoke("beforeTurn", "recipient-session");
 
-  assert.match(result.stdout, new RegExp(message.messageId));
+  assert.match(result.stdout, /1 reply; `acc inbox`/);
+  assert.doesNotMatch(result.stdout, new RegExp(message.messageId));
   assert.doesNotMatch(result.stdout, /live-offered/);
   await result.commitOffers();
-  assert.equal((await receipt()).state, "retrieved");
+  assert.deepEqual(await receipt(), before);
 });
 
-test("an actually offered obligation becomes the compact recovery breadcrumb", async t => {
+test("an offered obligation becomes a pending count without another offer", async t => {
   const { invoke, message, receipt } = await fixture(t);
   const first = await invoke("beforeTurn", "recipient-session");
   await first.commitOffers();
   assert.equal((await receipt()).state, "offered");
+  const before = await receipt();
 
   const second = await invoke("beforeTurn", "recipient-session");
 
-  assert.match(second.stdout, new RegExp(`live-offered peer question remains unresolved; `
-    + `\`acc inbox --message ${message.messageId}\``));
+  assert.match(second.stdout, /1 reply; `acc inbox`/);
+  assert.doesNotMatch(second.stdout, new RegExp(message.messageId));
   assert.doesNotMatch(second.stdout, /Commit only after these bytes cross/);
+  await second.commitOffers();
+  assert.deepEqual(await receipt(), before);
 });
 
 test("one turn offers every fitting addressed and already-present room receipt once", async t => {

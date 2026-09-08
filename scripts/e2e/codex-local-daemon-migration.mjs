@@ -5,12 +5,13 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { execFile } from "node:child_process";
-import { mkdir, mkdtemp, readFile, realpath, rm, stat, symlink, writeFile }
+import { mkdir, mkdtemp, readFile, realpath, stat, symlink, writeFile }
   from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { parseArgs, promisify } from "node:util";
+import { ownMigrationCleanup } from "./codex-migration-cleanup.mjs";
 import { prepareOwnedTools, resolveExecutable } from "./codex-local-daemon-harness.mjs";
 
 const execute = promisify(execFile);
@@ -121,10 +122,10 @@ export function migrationEnvironments(baseEnv, place) {
   const daemonEnv = { ...clean, HOME: place.home, CODEX_HOME: place.codexHome,
     SHELL: "/bin/zsh" };
   return { daemonEnv, commandEnv: { ...daemonEnv, ACC_DATA_HOME: place.dataHome,
-    ACC_UPDATE_CHECK: "0", ACC_PROBE_TIMEOUT_MS: "30000" } };
+    ACC_UPDATE_CHECK: "0", ACC_NO_UPDATE_CHECK: "1", ACC_PROBE_TIMEOUT_MS: "30000" } };
 }
 
-async function runCase({ root, name, modify, legacyRoot, candidateRoot, codex, baseEnv }) {
+async function runCase({ root, name, modify, legacyRoot, candidateRoot, codex, baseEnv, ownedPids }) {
   const caseRoot = path.join(root, name);
   const home = path.join(caseRoot, "home");
   const place = { home, codexHome: path.join(caseRoot, "codex"),
@@ -144,6 +145,7 @@ async function runCase({ root, name, modify, legacyRoot, candidateRoot, codex, b
     await run(codex, ["app-server", "daemon", "start"], { cwd: place.project, env: daemonEnv });
     await until("legacy daemon socket", () => stat(socket).then(s => s.isSocket(), () => false));
     pid = await until("legacy daemon pid", () => daemonPid(socket));
+    ownedPids.add(pid);
     const legacyCli = path.join(legacyRoot, "bin", "acc.mjs");
     const candidateCli = path.join(candidateRoot, "bin", "acc.mjs");
     await command(legacyCli, ["install", "--adapter", "codex", "--delivery", "actionable"],
@@ -254,7 +256,11 @@ export async function runLegacyMigration({ legacyTarball, candidateTarball, code
   }
   const temporaryBase = os.tmpdir().startsWith("/var/") ? "/tmp" : os.tmpdir();
   const root = await realpath(await mkdtemp(path.join(temporaryBase, "acc-legacy-migration-")));
+  const ownedPids = new Set();
+  const cleanup = await ownMigrationCleanup(root, ownedPids);
   let removed = false;
+  let cleanupAttempted = false;
+  let failure;
   try {
     const inherited = Object.fromEntries(Object.entries(process.env)
       .filter(([key]) => !key.startsWith("ACC_") && !key.startsWith("CODEX_")
@@ -274,9 +280,10 @@ export async function runLegacyMigration({ legacyTarball, candidateTarball, code
       (await run(codex, ["--version"], { env: baseEnv })).trim())?.[1];
     assert.ok(clientVersion, "supplied Codex binary must report an exact stable version");
     const outcome = { unmodified: await runCase({ root, name: "unmodified", modify: false,
-      legacyRoot, candidateRoot, codex, baseEnv }), modified: await runCase({ root,
-      name: "modified", modify: true, legacyRoot, candidateRoot, codex, baseEnv }) };
-    await rm(root, { recursive: true, force: true });
+      legacyRoot, candidateRoot, codex, baseEnv, ownedPids }), modified: await runCase({ root,
+      name: "modified", modify: true, legacyRoot, candidateRoot, codex, baseEnv, ownedPids }) };
+    cleanupAttempted = true;
+    await cleanup();
     removed = true;
     const checked = assertMigrationOutcome({ schemaVersion: 1,
       observedAt: new Date().toISOString(), clientVersion,
@@ -288,8 +295,17 @@ export async function runLegacyMigration({ legacyTarball, candidateTarball, code
     await mkdir(path.dirname(output), { recursive: true });
     await writeFile(output, reportFor(checked));
     return checked;
+  } catch (error) {
+    failure = error;
+    throw error;
   } finally {
-    if (!removed) await rm(root, { recursive: true, force: true }).catch(() => null);
+    if (!removed && !cleanupAttempted) {
+      try { await cleanup(); }
+      catch (error) {
+        throw new AggregateError([failure, error].filter(Boolean),
+          `legacy migration failed and owned cleanup failed: ${error.message}`);
+      }
+    }
   }
 }
 

@@ -56,7 +56,7 @@ const withShim = (wiring, shim) => ({
     }))])),
 });
 
-export async function installGrokHooks({ grokHome, home, runner, node }) {
+export async function installGrokHooks({ grokHome, home, runner, cli, node }) {
   const root = grokHome ?? grokHomeOf({ home, grokHome });
   const template = await readJson(path.join(bundle, "hooks", "hooks.json"), { hooks: {} });
   const shim = await writeHookShim({ dir: path.join(root, "hooks"), adapterId: "grok",
@@ -66,7 +66,7 @@ export async function installGrokHooks({ grokHome, home, runner, node }) {
   await rm(skills, { recursive: true, force: true });
   await mkdir(path.dirname(skills), { recursive: true });
   await cp(path.join(bundle, "skills", "acc"), skills, { recursive: true });
-  await bakeSkillCommand({ root: skills, node });
+  await bakeSkillCommand({ root: skills, node, cli });
 
   await writeJson(hooksFile(root), withShim(template, shim));
   return { ok: true, changes: [hooksFile(root), shim, skills], diagnostics: [] };

@@ -4,7 +4,7 @@ import { createReadStream } from "node:fs";
 import { mkdir, readFile, realpath, rename, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 
-import { evaluateNativeEligibility } from "@agents-can-communicate/adapter-sdk";
+import { evaluateNativeEligibility, ownVersion } from "@agents-can-communicate/adapter-sdk";
 
 // The launch-time check behind an owned shell shim. It answers one closed
 // question - may this exact executable receive native delivery? - from the
@@ -13,9 +13,10 @@ import { evaluateNativeEligibility } from "@agents-can-communicate/adapter-sdk";
 // command untouched, and this module is what makes "cannot decide" cheap.
 //
 // The cache key is the executable's identity - resolved path, symlink target,
-// inode, size, mtime, and full sha256 - so an upgrade or replacement is a miss
-// and an unchanged binary skips the version spawn and the probe. A cached
-// failure is short-lived; a repaired client is never disabled for long.
+// inode, size, mtime, and full sha256 - plus platform and this ACC runtime's
+// version. A vendor upgrade, replacement, or changed certification contract is
+// therefore a miss. A cached failure is short-lived; a repaired client is
+// never disabled for long.
 
 export const BOOTSTRAP_CACHE_SCHEMA = 1;
 export const SUPPORTED_TTL_MS = 6 * 60 * 60 * 1_000;
@@ -86,7 +87,7 @@ const closedOutcome = (supported, reasonCode) => Object.freeze({ supported, reas
 
 export async function checkNativeBootstrap({ adapter, realExecutable, platform, dataHome,
   timeoutMs = DEFAULT_TIMEOUT_MS, clock = { now: () => new Date().toISOString() },
-  readVersion = defaultReadVersion }) {
+  readVersion = defaultReadVersion, accVersion }) {
   try {
     if (adapter?.nativeDelivery === undefined || typeof adapter.probeNativeDelivery !== "function") {
       return closedOutcome(false, "native_delivery_unsupported");
@@ -94,8 +95,12 @@ export async function checkNativeBootstrap({ adapter, realExecutable, platform, 
     const identity = await executableIdentity(realExecutable);
     const file = cachePathFor(dataHome, adapter.id);
     const now = Date.parse(clock.now());
+    const runtimeVersion = accVersion === undefined
+      ? await ownVersion(import.meta.url) : accVersion;
+    const runtimeVersionKnown = typeof runtimeVersion === "string" && runtimeVersion !== "";
     const cached = await loadCache(file);
     if (cached !== null && cached.adapterId === adapter.id && cached.platform === platform
+      && runtimeVersionKnown && cached.accVersion === runtimeVersion
       && sameIdentity(cached.identity, identity) && Date.parse(cached.expiresAt) > now) {
       return closedOutcome(cached.supported, cached.reasonCode);
     }
@@ -131,6 +136,7 @@ export async function checkNativeBootstrap({ adapter, realExecutable, platform, 
     // Never command output, never a message body.
     await saveCache(file, {
       schemaVersion: BOOTSTRAP_CACHE_SCHEMA, adapterId: adapter.id, platform, identity,
+      accVersion: runtimeVersionKnown ? runtimeVersion : null,
       clientVersion, supported, reasonCode: outcomeReason,
       protocolContract: supported ? eligibility.protocolContract : null,
       modes: supported ? [...eligibility.modes] : [],

@@ -12,10 +12,15 @@ const ADAPTER_IDS = Object.freeze(["claude_code", "codex", "gemini_cli", "grok",
 
 const operationIds = result => result.operations.map(operation => operation.adapterId);
 const readJson = file => readFile(file, "utf8").then(JSON.parse);
+// Scripted transport lifecycle with explicit fixture credentials; real-client
+// automatic ownership is not established by this test.
+const ownerEnv = (packed, peer) => packed.ownerEnv(peer.harnessSessionId);
 
 async function exchange(packed, { from, to, subject, body, answer, key }) {
   const traceStart = packed.commandTrace.length;
-  const sent = await packed.acc(["message", "--session", from.session.sessionId,
+  const fromAcc = async args => packed.acc(args, await ownerEnv(packed, from));
+  const toAcc = async args => packed.acc(args, await ownerEnv(packed, to));
+  const sent = await fromAcc(["message", "--session", from.session.sessionId,
     "--to", to.participantId, "--type", "question", "--subject", subject,
     "--body", body, "--client-message-id", `${key}-question`]);
   const question = sent.message;
@@ -30,14 +35,14 @@ async function exchange(packed, { from, to, subject, body, answer, key }) {
   assert.equal((await packed.receipt(from.session.sessionId, question.messageId,
     to.participantId)).state, "queued");
 
-  const inbox = await packed.acc(["inbox", "--session", to.session.sessionId,
+  const inbox = await toAcc(["inbox", "--session", to.session.sessionId,
     "--message", question.messageId]);
   assert.equal(inbox[0].message.messageId, question.messageId);
   assert.equal(inbox[0].message.body, body);
   assert.equal((await packed.receipt(from.session.sessionId, question.messageId,
     to.participantId)).state, "retrieved");
 
-  const replied = await packed.acc(["reply", "--session", to.session.sessionId,
+  const replied = await toAcc(["reply", "--session", to.session.sessionId,
     "--message", question.messageId, "--body", answer,
     "--client-message-id", `${key}-answer`]);
   const response = replied.message;
@@ -49,18 +54,18 @@ async function exchange(packed, { from, to, subject, body, answer, key }) {
 
   const answerProjection = await packed.beforeTurn(from);
   assert.equal(answerProjection.stdout.includes(answer), false);
-  const answerInbox = await packed.acc(["inbox", "--session", from.session.sessionId,
+  const answerInbox = await fromAcc(["inbox", "--session", from.session.sessionId,
     "--message", response.messageId]);
   assert.equal(answerInbox[0].message.messageId, response.messageId);
-  await packed.acc(["ack", "--session", from.session.sessionId,
+  await fromAcc(["ack", "--session", from.session.sessionId,
     "--message", response.messageId]);
   assert.equal((await packed.receipt(to.session.sessionId, response.messageId,
     from.participantId)).state, "acknowledged");
 
-  const sentAgain = await packed.acc(["message", "--session", from.session.sessionId,
+  const sentAgain = await fromAcc(["message", "--session", from.session.sessionId,
     "--to", to.participantId, "--type", "question", "--subject", subject,
     "--body", body, "--client-message-id", `${key}-question`]);
-  const replyAgain = await packed.acc(["reply", "--session", to.session.sessionId,
+  const replyAgain = await toAcc(["reply", "--session", to.session.sessionId,
     "--message", question.messageId, "--body", answer,
     "--client-message-id", `${key}-answer`]);
   assert.equal(sentAgain.message.messageId, question.messageId);
@@ -80,15 +85,16 @@ async function exchange(packed, { from, to, subject, body, answer, key }) {
   return { question, answer: response };
 }
 
-test("packed v0.3 completes cross-vendor fallback without human relay", {
+test("packed release completes scripted cross-vendor fallback with explicit owners", {
   timeout: 120_000,
   skip: process.platform === "win32"
-    ? "v0.3 supports macOS/Linux; its native captures and POSIX client probes do not certify Windows"
+    ? "ACC supports macOS/Linux; its native captures and POSIX client probes do not certify Windows"
     : false,
 }, async t => {
   const packed = await createPackedAcc(t);
-  assert.equal(packed.manifest.version, "0.3.1");
-  assert.equal((await packed.acc(["version"])).version, "0.3.1");
+  const expectedVersion = (await readJson(path.join(packed.repo, "package.json"))).version;
+  assert.equal(packed.manifest.version, expectedVersion);
+  assert.equal((await packed.acc(["version"])).version, expectedVersion);
   await packed.setClientVersions(CAPTURE_VERSIONS);
 
   const claude = { adapterId: "claude_code", participantId: "claude_peer",
@@ -118,9 +124,9 @@ test("packed v0.3 completes cross-vendor fallback without human relay", {
   assert.equal((await packed.acc(["status"])).deliveryBindings.length, 2);
 
   await packed.acc(["finish", "--session", claude.session.sessionId,
-    "--goal", "restart Claude", "--status", "complete"]);
+    "--goal", "restart Claude", "--status", "complete"], await ownerEnv(packed, claude));
   await packed.acc(["finish", "--session", codex.session.sessionId,
-    "--goal", "restart Codex", "--status", "complete"]);
+    "--goal", "restart Codex", "--status", "complete"], await ownerEnv(packed, codex));
   assert.notEqual(await packed.findBinding(claude.harnessSessionId), null,
     "the test did not retain a stale binding to challenge owner resolution");
 
@@ -136,7 +142,7 @@ test("packed v0.3 completes cross-vendor fallback without human relay", {
   assert.deepEqual((await packed.acc(["status"])).deliveryBindings, [],
     "closed generations kept their stale delivery endpoints reachable");
   assert.notEqual(await packed.accError(["work", "--session", claude.session.sessionId,
-    "--summary", "stale owner"]), null);
+    "--summary", "stale owner"], await ownerEnv(packed, claude)), null);
 
   await packed.publishBinding({ sessionId: newCodexBinding.accSessionId,
     generation: newCodexBinding.generation, adapterId: "codex",
@@ -144,7 +150,8 @@ test("packed v0.3 completes cross-vendor fallback without human relay", {
   const downgraded = await packed.acc(["message", "--session",
     restartedClaude.session.sessionId, "--to", restartedCodex.participantId,
     "--type", "question", "--subject", "No recorded consent",
-    "--body", "Can you still recover this?", "--client-message-id", "no-recorded-consent"]);
+    "--body", "Can you still recover this?", "--client-message-id", "no-recorded-consent"],
+  await ownerEnv(packed, restartedClaude));
   // Synthetic bindings describe a reachable generation but cannot manufacture
   // the receiver's installation-record consent. Codex therefore declines the
   // native offer, while the addressed durable inbox remains recoverable.
@@ -155,7 +162,8 @@ test("packed v0.3 completes cross-vendor fallback without human relay", {
   assert.equal((await packed.beforeTurn(restartedCodex)).stdout
     .includes("Can you still recover this?"), false);
   const recovered = await packed.acc(["inbox", "--session",
-    restartedCodex.session.sessionId, "--message", downgraded.message.messageId]);
+    restartedCodex.session.sessionId, "--message", downgraded.message.messageId],
+  await ownerEnv(packed, restartedCodex));
   assert.equal(recovered[0].message.messageId, downgraded.message.messageId);
   assert.equal((await packed.receipt(restartedClaude.session.sessionId,
     downgraded.message.messageId, restartedCodex.participantId)).state, "retrieved");
@@ -179,9 +187,13 @@ test("packed v0.3 completes cross-vendor fallback without human relay", {
   await writeFile(path.join(packed.clientHome, ".kimi-code", "config.toml"),
     'default_model = "k3"\n');
   const beforeInstall = await packed.snapshotClientFiles();
-  const installed = await packed.acc(["install", "--home", packed.clientHome]);
+  // This gate measures all-client installation and exact restoration, not
+  // cold-start latency. Match the process fixtures' probe budget: under load,
+  // the default 3s deadline can classify these real subprocess shims as absent.
+  const probeEnv = { ACC_PROBE_TIMEOUT_MS: "30000" };
+  const installed = await packed.acc(["install", "--home", packed.clientHome], probeEnv);
   assert.deepEqual(installed.failed, []);
-  assert.deepEqual(operationIds(installed), ADAPTER_IDS);
+  assert.deepEqual(operationIds(installed), ADAPTER_IDS, JSON.stringify(installed.skipped));
   assert.equal(installed.operations.every(operation => operation.applied), true);
   assert.notDeepEqual(await packed.snapshotClientFiles(), beforeInstall,
     "install did not change the client-home topology");
@@ -193,11 +205,11 @@ test("packed v0.3 completes cross-vendor fallback without human relay", {
     ".kimi-code/plugins/managed/agents-can-communicate/.kimi-plugin/plugin.json",
   ];
   for (const manifest of manifests) {
-    assert.equal((await readJson(path.join(packed.clientHome, manifest))).version, "0.3.1",
+    assert.equal((await readJson(path.join(packed.clientHome, manifest))).version, expectedVersion,
       `${manifest} was not stamped from the installed package`);
   }
 
-  const uninstalled = await packed.acc(["uninstall", "--home", packed.clientHome]);
+  const uninstalled = await packed.acc(["uninstall", "--home", packed.clientHome], probeEnv);
   assert.deepEqual(uninstalled.failed, []);
   assert.deepEqual(operationIds(uninstalled), ADAPTER_IDS);
   assert.equal(uninstalled.operations.every(operation => operation.applied), true);
@@ -207,7 +219,7 @@ test("packed v0.3 completes cross-vendor fallback without human relay", {
   assert.deepEqual(await packed.snapshotClientFiles(), beforeInstall,
     "first uninstall did not restore the exact pre-install topology");
 
-  const repeated = await packed.acc(["uninstall", "--home", packed.clientHome]);
+  const repeated = await packed.acc(["uninstall", "--home", packed.clientHome], probeEnv);
   assert.deepEqual(repeated.failed, []);
   assert.deepEqual(operationIds(repeated), ADAPTER_IDS);
   assert.equal(repeated.operations.every(operation => operation.applied), true);

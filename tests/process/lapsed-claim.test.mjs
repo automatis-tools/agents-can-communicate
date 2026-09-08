@@ -6,6 +6,8 @@ import path from "node:path";
 import test from "node:test";
 import { promisify } from "node:util";
 
+import { fixtureOwnerEnv } from "../helpers/fixture-owner.mjs";
+
 const run = promisify(execFile);
 const repo = path.resolve(import.meta.dirname, "..", "..");
 const acc = path.join(repo, "bin", "acc.mjs");
@@ -38,8 +40,8 @@ async function workspace(t) {
     { hook_event_name: "SessionStart", source: "startup" });
   const turn = participant => fire(participant,
     { hook_event_name: "UserPromptSubmit", prompt: "go" });
-  const cli = (...argv) => run(process.execPath, [acc, ...argv, "--cwd", project, "--json"],
-    { env });
+  const cli = async (...argv) => run(process.execPath, [acc, ...argv, "--cwd", project, "--json"],
+    { env: { ...env, ...await fixtureOwnerEnv(env.ACC_DATA_HOME, "holder") } });
   const sessionOf = async participant => JSON.parse((await cli("status")).stdout).data
     .participants.find(item => item.participantId === participant).sessionId;
   const lapse = () => new Promise(resolve => { setTimeout(resolve, 2100); });

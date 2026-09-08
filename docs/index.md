@@ -13,6 +13,8 @@ decides what its task requires.
 3. [Capabilities](CAPABILITIES.md) — check what your client and platform can actually do.
 4. [Troubleshooting](TROUBLESHOOTING.md) — diagnose missing peers, queued messages, and
    capability fallback.
+5. [Upgrading from 0.3.1](UPGRADING.md) — preserve history, refresh integrations, and
+   update scripts for the new inbox response.
 
 ## See it in context
 
@@ -47,6 +49,12 @@ decides what its task requires.
 - [Contributing](https://github.com/automatis-tools/agents-can-communicate/blob/main/AGENTS.md) — invariants and the mutation-proof gate.
 - [Design decisions](DESIGN_DECISIONS.md) — architectural decisions and reversals.
 - [Releasing](RELEASING.md) — packed-artifact verification.
+
+Dated planning/reference material under
+[`docs/internal/`](https://github.com/automatis-tools/agents-can-communicate/tree/main/docs/internal)
+and [`docs/superpowers/`](https://github.com/automatis-tools/agents-can-communicate/tree/main/docs/superpowers)
+is not current product documentation. Published release-evidence records retain their
+original source/artifact/capture provenance rather than certifying a later build.
 
 Runtime state and raw transcripts are not documentation artifacts and never belong in the
 repository.

@@ -7,6 +7,8 @@ import test from "node:test";
 
 import { EXIT } from "@agents-can-communicate/protocol";
 
+import { parseArgs } from "../src/args.mjs";
+import { commandHelpText, describeCommand } from "../src/help.mjs";
 import { checkDue, checkingIsOff, fetchLatest, isNewer, noticeUpdate }
   from "../src/update-check.mjs";
 import { runUpdateCommand, upgradeSteps } from "../src/update-command.mjs";
@@ -121,28 +123,33 @@ test("`acc update` says what it found, and remembers it", async t => {
     /"latest": "0.1.1"/);
 });
 
-test("a newer release is reported as two commands, because it is two", async t => {
+test("--check reports a newer release without running either update step", async t => {
   const dataHome = await machine(t);
-  const { text, data } = await runUpdateCommand({ options: {},
-    runtime: runtimeFor(dataHome, { latest: "0.2.0" }) });
+  const ran = [];
+  const { text, data } = await runUpdateCommand({ options: { check: true },
+    runtime: runtimeFor(dataHome, { latest: "0.2.0",
+      spawn: async (command, argv) => { ran.push([command, ...argv]); } }) });
 
   // `npm install -g` replaces the CLI and the hook runtime and leaves the
   // bundle inside each client exactly where it was.
   assert.deepEqual(data.steps, ["npm install --global agents-can-communicate@0.2.0",
     "acc install"]);
   assert.match(text, /acc 0\.2\.0 is available; you have 0\.1\.1/);
-  assert.match(text, /acc update --apply/);
+  assert.match(text, /run: acc update/);
+  assert.deepEqual(ran, []);
 });
 
-test("--apply runs both, and says what is left when one fails", async t => {
+test("plain update runs both steps, and says what is left when one fails", async t => {
   const dataHome = await machine(t);
   const ran = [];
-  const done = await runUpdateCommand({ options: { apply: true },
+  const done = await runUpdateCommand({ options: {},
     runtime: runtimeFor(dataHome, { latest: "0.2.0",
       spawn: async (command, argv) => { ran.push([command, ...argv].join(" ")); } }) });
 
   assert.deepEqual(ran, upgradeSteps("0.2.0").map(([one, argv]) => [one, ...argv].join(" ")));
-  assert.equal(done.text, "updated to 0.2.0");
+  assert.match(done.text, /^updated to 0\.2\.0/);
+  assert.match(done.text, /Restart all running agent clients/);
+  assert.equal(done.error, undefined);
 
   // A global install refused for want of permission is the ordinary failure,
   // and the rest of the work is printed so it can be finished by hand.
@@ -153,6 +160,48 @@ test("--apply runs both, and says what is left when one fails", async t => {
   assert.match(failed.text, /npm failed: EACCES/);
   assert.match(failed.text, /npm install --global agents-can-communicate@0\.2\.0/);
   assert.match(failed.text, /acc install/);
+  assert.equal(failed.error.code, EXIT.DATA);
+  assert.equal(failed.error.message, failed.text);
+});
+
+test("--apply remains an alias for applying the update", async t => {
+  const dataHome = await machine(t);
+  const ran = [];
+  await runUpdateCommand({ options: { apply: true },
+    runtime: runtimeFor(dataHome, { latest: "0.2.0",
+      spawn: async (command, argv) => { ran.push([command, ...argv].join(" ")); } }) });
+
+  assert.deepEqual(ran, [
+    "npm install --global agents-can-communicate@0.2.0",
+    "acc install",
+  ]);
+});
+
+test("conflicting update flags fail before version, network, cache, or child work", async t => {
+  const dataHome = await machine(t);
+  const called = [];
+  const runtime = runtimeFor(dataHome, {
+    version: "0.1.1",
+    latest: "0.2.0",
+    spawn: async () => { called.push("spawn"); },
+  });
+  runtime.version = async () => { called.push("version"); return "0.1.1"; };
+  runtime.fetch = async () => { called.push("fetch"); return answers("0.2.0")(); };
+
+  await assert.rejects(runUpdateCommand({ options: { check: true, apply: true }, runtime }),
+    error => error.code === EXIT.USAGE && error.message === "use either --check or --apply");
+  assert.deepEqual(called, []);
+  await assert.rejects(readFile(path.join(dataHome, "acc", "update-check.json")),
+    error => error.code === "ENOENT");
+});
+
+test("update parsing and help teach apply-by-default and read-only check", () => {
+  assert.deepEqual(parseArgs(["update"]).options, {});
+  assert.deepEqual(parseArgs(["update", "--apply"]).options, { apply: true });
+  assert.deepEqual(parseArgs(["update", "--check"]).options, { check: true });
+  const help = commandHelpText(describeCommand("update"));
+  assert.match(help, /Run acc update to install/);
+  assert.match(help, /Use acc update --check to only report/);
 });
 
 test("with the switch on, `acc update` asks nothing at all", async t => {

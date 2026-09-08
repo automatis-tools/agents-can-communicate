@@ -152,7 +152,7 @@ async function writeChannelMcp(target, { node, channel }) {
 }
 
 /** A plugin tree with the shim written and the skill's command baked in. */
-async function layOutPlugin(target, { runner, node, channel, live }) {
+async function layOutPlugin(target, { runner, node, cli, channel, live }) {
   await rm(target, { recursive: true, force: true });
   await cp(bundle, target, { recursive: true });
   // The bundle ships a placeholder .mcp.json; the real one is written only for a
@@ -161,7 +161,7 @@ async function layOutPlugin(target, { runner, node, channel, live }) {
   if (live) await writeChannelMcp(target, { node, channel });
   // The skill ships with a placeholder where the command belongs: `acc` is not
   // on PATH everywhere, and an agent that cannot run it improvises.
-  await bakeSkillCommand({ root: target, node });
+  await bakeSkillCommand({ root: target, node, cli });
   // The bundle's hooks.json names this script, and nothing else writes it.
   await writeHookShim({ dir: path.join(target, "hooks"), adapterId: "claude_code",
     runner, node });
@@ -172,7 +172,7 @@ async function layOutPlugin(target, { runner, node, channel, live }) {
     version: await pluginVersion(), io: { readFile, writeFile } });
 }
 
-export async function installClaudePlugin({ configDir, runner, node = process.execPath,
+export async function installClaudePlugin({ configDir, runner, cli, preserveVersions = false, node = process.execPath,
   channel = defaultChannel(), livePolicy = "off", now = new Date() }) {
   const live = livePolicy === "actionable" || livePolicy === "all";
   // Everything this will merge into, read before a byte is written. A settings
@@ -191,16 +191,16 @@ export async function installClaudePlugin({ configDir, runner, node = process.ex
   const source = sourceDir(configDir);
   const cached = cachePath(configDir, version);
 
-  await layOutPlugin(source, { runner, node, channel, live });
+  await layOutPlugin(source, { runner, node, cli, channel, live });
   await writeJson(marketplaceFile(configDir), marketplaceManifest());
   // The copy the client runs from. Written here rather than asking the user to
   // run `claude plugin install`, exactly as the Codex adapter does, because the
   // command's only effect is this copy plus the two registry entries below.
-  await layOutPlugin(cached, { runner, node, channel, live });
+  await layOutPlugin(cached, { runner, node, cli, channel, live });
   // One copy, the one just written. A client caches a plugin under its version,
   // so every upgrade would otherwise leave the previous release's tree beside
   // this one - invisible while the version never moved, three deep once it did.
-  await keepOnlyVersion({ root: path.dirname(cached), version,
+  if (!preserveVersions) await keepOnlyVersion({ root: path.dirname(cached), version,
     io: { readdir, rm } });
 
   await writeClientJson(knownMarketplacesPath(configDir), {

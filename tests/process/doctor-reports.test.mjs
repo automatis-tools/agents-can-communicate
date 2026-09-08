@@ -125,7 +125,7 @@ test("doctor mentions a newer release without asking the registry itself", async
 
   const text = await place.doctor({ ACC_NO_UPDATE_CHECK: "" });
 
-  assert.match(text, /acc update --apply {2}# 99\.0\.0 is on npm, you have \d+\.\d+\.\d+/);
+  assert.match(text, /acc update {2}# 99\.0\.0 is on npm, you have \d+\.\d+\.\d+/);
   // And with the switch on, the same machine says nothing about it.
   assert.doesNotMatch(await place.doctor(), /is on npm/);
 });

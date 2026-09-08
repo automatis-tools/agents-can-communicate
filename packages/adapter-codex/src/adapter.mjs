@@ -6,7 +6,8 @@ import certification from "../certification.json" with { type: "json" };
 import { PROTOCOL_CONTRACT } from "./app-server-client.mjs";
 import { allowOutcome, denyOutcome, injectOutcome, normalizeCodexHook }
   from "./hooks.mjs";
-import { planCodexInstall, detectCodex, installCodexPlugin, uninstallCodexPlugin } from "./install.mjs";
+import { planCodexInstall, detectCodex, installCodexPlugin, preflightCodexUninstall,
+  uninstallCodexPlugin } from "./install.mjs";
 // Public native wiring is enabled only with installed-product capture evidence.
 
 export const CODEX_VERSION = "0.147.0";
@@ -70,6 +71,7 @@ export function createCodexAdapter() {
     detect: context => detectCodex(context),
     install: context => installCodexPlugin({ ...context,
       livePolicy: context.livePolicy ?? "off" }),
+    preflightUninstall: context => preflightCodexUninstall(context),
     uninstall: context => uninstallCodexPlugin(context),
 
     doctor: async context => {
@@ -93,10 +95,8 @@ export function createCodexAdapter() {
           "write guards cover apply_patch and the shell writes ACC can read; a model "
             + "without apply_patch edits through the shell, where a redirection or an "
             + "mv is matched and a runtime opening the file is not",
-          // Was a standing sentence here, true and useless: it said the same
-          // thing on a machine whose hooks were trusted, on one whose were not,
-          // and on one with nothing installed. Detection reads the client's own
-          // record now and speaks only when it has something to report.
+          // Installed files and certification do not verify this user's current
+          // hook enablement/trust. Detection directs that check to the client.
         ],
       };
     },

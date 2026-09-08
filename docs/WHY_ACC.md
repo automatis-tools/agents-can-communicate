@@ -35,7 +35,7 @@ retain their own authority and context.
 | Mix clients and worktrees | Worktrees of one repository map to one local workspace while each session keeps its checkout identity. Git is optional. |
 | Ask without granting authority | Messages are attributed untrusted data. A request expects a reply but is not an order. |
 | Recover after compaction or restart | Messages and receipts commit before delivery; participant addressing survives when the participant id is stable. |
-| Avoid overlapping edits | Intent warns; narrow claims may advise or guard, depending on every live client's measured capability. |
+| Avoid overlapping edits | Intent warns; CLI claims default to advisory. Explicit guarded enforcement also requires every live client's measured guard. |
 | Trust delivery language | Recorded, queued, offered, retrieved, and acknowledged are separate observable facts. |
 | Keep it private and removable | State is local and outside repositories; transcripts are excluded; uninstall preserves user edits. |
 
@@ -52,9 +52,10 @@ coordinate across machines.
 
 ACC also does not merge model memory, read raw conversations, guarantee agent choices,
 approve tools, operate CI,
-or make guarded claims immune to unrelated local processes. Live push exists for one client
-and never interrupts a turn in progress - a message that arrives mid-turn waits for the turn
-to finish - so workflows that require interrupting a running model should not depend on ACC.
+or make guarded claims immune to unrelated local processes. Experimental live delivery is
+available through Claude Code Channel and Codex LocalDaemon on supported versions and
+platforms, behind recipient opt-in and with possible token spend. Neither interrupts a
+turn in progress; messages wait for it to finish. See [Capabilities](CAPABILITIES.md).
 
 If the sessions should remain yours and simply stop working in isolation, that is the
 product ACC is designed to be.

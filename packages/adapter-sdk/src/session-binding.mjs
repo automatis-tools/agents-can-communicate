@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { mkdir, readdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 
-import { AccError, EXIT } from "@agents-can-communicate/protocol";
+import { AccError, EXIT, assertPortableId } from "@agents-can-communicate/protocol";
 
 const SCHEMA_VERSION = 1;
 
@@ -23,11 +23,32 @@ const fileFor = (runtimeDir, harnessSessionId) => path.join(runtimeDir, "binding
  */
 const isPid = value => Number.isInteger(value) && value > 0;
 
+function assertIdentity(record, harnessSessionId) {
+  if (record?.schemaVersion !== SCHEMA_VERSION) {
+    throw new AccError(EXIT.DATA, "unknown session binding schemaVersion",
+      { schemaVersion: record?.schemaVersion });
+  }
+  assertPortableId(record.accSessionId, "binding session id");
+  assertPortableId(record.generation, "binding generation");
+  if (typeof record.harnessSessionId !== "string" || record.harnessSessionId === ""
+    || harnessSessionId !== undefined && record.harnessSessionId !== harnessSessionId) {
+    throw new AccError(EXIT.DATA, "session binding names a different or invalid harness session", {});
+  }
+}
+
+function assertBindingDeadline(deadlineAt) {
+  if (deadlineAt !== undefined && Date.now() >= deadlineAt) {
+    throw new AccError(EXIT.CONFLICT, "hook deadline expired before binding publication", {});
+  }
+}
+
 export async function storeSessionBinding({ runtimeDir, harnessSessionId, accSessionId,
-  generation, clientVersion, platform, clientPid }) {
+  generation, clientVersion, platform, clientPid, deadlineAt }) {
+  assertBindingDeadline(deadlineAt);
   const file = fileFor(runtimeDir, harnessSessionId);
-  await mkdir(path.dirname(file), { recursive: true });
   const record = { schemaVersion: SCHEMA_VERSION, harnessSessionId, accSessionId, generation };
+  assertIdentity(record);
+  await mkdir(path.dirname(file), { recursive: true });
   if (typeof clientVersion === "string" && clientVersion !== "") record.clientVersion = clientVersion;
   if (typeof platform === "string" && platform !== "") record.platform = platform;
   // The vendor process this session runs in, resolved once at SessionStart.
@@ -45,6 +66,7 @@ export async function storeSessionBinding({ runtimeDir, harnessSessionId, accSes
   await writeFile(temporary, `${JSON.stringify(record, null, 2)}\n`, "utf8");
   // Replace rather than append: re-attaching supersedes the old generation, and
   // two live bindings for one harness session would be worse than none.
+  assertBindingDeadline(deadlineAt);
   await rename(temporary, file);
 }
 
@@ -66,10 +88,7 @@ export async function loadSessionBinding({ runtimeDir, harnessSessionId }) {
     throw new AccError(EXIT.DATA, "session binding is not valid JSON",
       { file, cause: error.message });
   }
-  if (record?.schemaVersion !== SCHEMA_VERSION) {
-    throw new AccError(EXIT.DATA, "unknown session binding schemaVersion",
-      { file, schemaVersion: record?.schemaVersion });
-  }
+  assertIdentity(record, harnessSessionId);
   const binding = { accSessionId: record.accSessionId, generation: record.generation };
   if (typeof record.clientVersion === "string") binding.clientVersion = record.clientVersion;
   if (typeof record.platform === "string") binding.platform = record.platform;
@@ -77,7 +96,8 @@ export async function loadSessionBinding({ runtimeDir, harnessSessionId }) {
   return binding;
 }
 
-export async function clearSessionBinding({ runtimeDir, harnessSessionId }) {
+export async function clearSessionBinding({ runtimeDir, harnessSessionId, deadlineAt }) {
+  assertBindingDeadline(deadlineAt);
   await rm(fileFor(runtimeDir, harnessSessionId), { force: true });
 }
 
@@ -107,7 +127,7 @@ export async function listSessionBindings({ runtimeDir }) {
     if (!name.endsWith(".json")) continue;
     const record = await readFile(path.join(dir, name), "utf8")
       .then(JSON.parse).catch(() => null);
-    if (record?.schemaVersion !== SCHEMA_VERSION) continue;
+    try { assertIdentity(record); } catch { continue; }
     bindings.push({ harnessSessionId: record.harnessSessionId,
       accSessionId: record.accSessionId, generation: record.generation,
       ...(typeof record.clientVersion === "string"

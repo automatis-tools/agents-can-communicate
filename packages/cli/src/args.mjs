@@ -1,18 +1,19 @@
 import { AccError, EXIT } from "@agents-can-communicate/protocol";
 
-// Commands the model is offered stay few and high level; attach, heartbeat, and
-// detach exist for adapters and are deliberately not advertised as model tools.
+// Native adapters manage session lifecycle automatically. Manual CLI sessions
+// use attach, heartbeat, and detach; both paths are described in command help.
 //
 // `--session` and `--generation` are optional on every agent-facing command:
-// the CLI works out which session is calling it (see session-owner.mjs). They
-// stay accepted because an adapter, a script, or an agent holding a session id
-// from `acc status --json` has a reason to be explicit. They remain required on
-// attach, heartbeat and detach, which are the adapter's own lifecycle calls.
+// an operator may instead configure the explicit owner pair in the environment
+// (see session-owner.mjs). Public status/sync also work without an owner pair.
+// A public session id alone proves nothing. Heartbeat and detach always require
+// both arguments; attach creates and returns the pair.
 export const COMMANDS = Object.freeze({
   attach: { required: ["participant"], optional: ["harness", "cadence", "parent", "session"] },
   heartbeat: { required: ["session", "generation"], optional: [] },
   detach: { required: ["session", "generation"], optional: [] },
-  sync: { required: [], optional: ["session", "cursor", "limit", "scope"] },
+  sync: { required: [], optional: ["session", "generation", "cursor", "limit", "scope",
+    "message", "type"], flags: ["current"] },
   work: { required: [], optional: ["session", "generation", "summary", "mode",
     "state"], repeated: ["hint"], flags: ["clear"] },
   claim: { required: ["resource"],
@@ -25,8 +26,8 @@ export const COMMANDS = Object.freeze({
     optional: ["claim", "resource", "session", "generation", "authority", "reason"] },
   message: { required: ["subject", "body"],
     optional: ["session", "generation", "type", "obligation", "client-message-id"],
-    repeated: ["to"] },
-  inbox: { required: [], optional: ["session", "generation", "message"] },
+    repeated: ["to", "supersedes", "withdraws"] },
+  inbox: { required: [], optional: ["session", "generation", "message", "cursor", "limit"] },
   reply: { required: ["message", "body"],
     optional: ["session", "generation", "subject", "client-message-id"] },
   // Asking another agent to do something as a message with a reply obligation.
@@ -36,13 +37,13 @@ export const COMMANDS = Object.freeze({
   finish: { required: ["goal"], optional: ["session", "generation", "status", "to",
     "client-message-id"],
     repeated: ["completed", "remaining", "blocker"] },
-  status: { required: [], optional: ["participant"], flags: ["all"] },
+  status: { required: [], optional: ["session", "generation", "participant"], flags: ["all"] },
   doctor: { required: [], optional: ["home"], flags: ["repair"] },
   // The one command with a subcommand. Kept as an explicit list rather than a
   // free positional: `acc config delete` should fail at the parser, not deep
   // inside a handler that has already decided what to do.
-  config: { required: [], optional: [], flags: ["yes", "force"],
-    subcommands: ["init", "validate"] },
+  config: { required: [], optional: [], subcommands: ["init", "validate"],
+    subcommandOptions: { init: { flags: ["yes", "force"] }, validate: { flags: [] } } },
   // No `--yes`: neither of these ever asked, so the flag agreed to nothing. It
   // was accepted and read by nobody, which is a promise that a confirmation
   // exists to be skipped.
@@ -57,7 +58,7 @@ export const COMMANDS = Object.freeze({
   uninstall: { required: [], optional: ["home"], repeated: ["adapter"], flags: ["dry-run"] },
   // Asking npm whether there is a newer ACC. The one command that touches the
   // network, and never on the hook path.
-  update: { required: [], optional: [], flags: ["apply"] },
+  update: { required: [], optional: ["auto", "pin"], flags: ["check", "apply"] },
   // The two things a person types first after installing from a registry. The
   // CLI answered neither: `acc --version` and `acc --help` were both "unknown
   // command", and `acc` on its own asked for a command without naming one.
@@ -65,10 +66,8 @@ export const COMMANDS = Object.freeze({
   version: { required: [], optional: [] },
 });
 
-// Spelled as the commands they mean, and only in first position. A message body
-// legitimately begins with "--" - exchanging diffs is the point of this tool -
-// so reading them anywhere in the argv would make `acc message --body "--help"`
-// print the help instead of sending it.
+// Leading aliases select a command. Command-local help is recognized while
+// consuming options below, never by searching inside their values.
 const ALIASES = Object.freeze({ "--help": "help", "-h": "help",
   "--version": "version", "-v": "version", "-V": "version" });
 
@@ -80,26 +79,39 @@ function usage(message, details = {}) {
 
 const camel = name => name.replace(/-([a-z])/g, (_, letter) => letter.toUpperCase());
 
+export function commandSpec(name, subcommand) {
+  const spec = COMMANDS[name];
+  return { ...spec, ...spec.subcommandOptions?.[subcommand] };
+}
+
 export function parseArgs(argv) {
   if (!Array.isArray(argv) || argv.length === 0) {
     usage("a command is required - `acc help` lists them");
   }
   const [first, ...rest] = argv;
-  const command = ALIASES[first] ?? first;
-  const spec = COMMANDS[command];
-  if (spec === undefined) {
+  let command = Object.hasOwn(ALIASES, first) ? ALIASES[first] : first;
+  let helpRequested = false;
+  if (command === "help" && rest[0] !== undefined && !rest[0].startsWith("-")) {
+    command = rest.shift();
+    helpRequested = true;
+  }
+  let spec = COMMANDS[command];
+  if (!Object.hasOwn(COMMANDS, command)) {
     usage(`unknown command: ${command} - \`acc help\` lists them`, { command });
   }
 
   let tokens = rest;
   let subcommand;
   if (spec.subcommands !== undefined) {
-    [subcommand, ...tokens] = rest;
-    if (subcommand === undefined || !spec.subcommands.includes(subcommand)) {
+    if (rest[0] !== undefined && !rest[0].startsWith("-")) {
+      [subcommand, ...tokens] = rest;
+    }
+    if (subcommand !== undefined && !spec.subcommands.includes(subcommand)) {
       usage(`${command} requires one of: ${spec.subcommands.join(", ")}`,
         { command, subcommand: subcommand ?? null });
     }
   }
+  spec = commandSpec(command, subcommand);
 
   const repeated = new Set(spec.repeated ?? []);
   const flags = new Set([...(spec.flags ?? []), "json"]);
@@ -117,6 +129,12 @@ export function parseArgs(argv) {
 
   for (let index = 0; index < tokens.length; index += 1) {
     const token = tokens[index];
+    // A preceding value-taking option has already consumed its value. In
+    // particular, `--body --help` still sends the literal text "--help".
+    if (token === "--help" || token === "-h") {
+      helpRequested = true;
+      continue;
+    }
     if (!token.startsWith("--") || token.length === 2) usage(`unexpected argument: ${token}`);
     const separator = token.indexOf("=");
     const name = separator === -1 ? token.slice(2) : token.slice(2, separator);
@@ -146,6 +164,15 @@ export function parseArgs(argv) {
     else options[key] = value;
   }
 
+  if (helpRequested) {
+    return { command: "help", options: { helpCommand: command,
+      ...(subcommand === undefined ? {} : { subcommand }),
+      ...(options.json === true ? { json: true } : {}) } };
+  }
+  if (spec.subcommands !== undefined && subcommand === undefined) {
+    usage(`${command} requires one of: ${spec.subcommands.join(", ")}`,
+      { command, subcommand: null });
+  }
   for (const name of spec.required ?? []) {
     if (!Object.hasOwn(options, camel(name))) {
       usage(`${command} requires --${name}`, { command, option: name });

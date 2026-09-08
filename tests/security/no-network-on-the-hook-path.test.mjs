@@ -11,8 +11,8 @@ const repo = path.resolve(import.meta.dirname, "..", "..");
  * A hook runs on every turn of every session inside a five-second budget and
  * fails open, so a stalled socket there would cost every turn on the machine
  * something and report nothing - the failure would be invisible by design.
- * Checking npm for a newer ACC is a thing `acc update` does when a person asks,
- * and `acc doctor` reads what that remembered.
+ * Automatic update networking runs in a detached worker; the hook only schedules it.
+ * CLI update commands may explicitly wait for a check or download.
  *
  * Enforced structurally rather than by intention: the packages a hook loads may
  * not name a remote network module, call `fetch`, or import the one file that does.
@@ -38,12 +38,17 @@ const NATIVE_TRANSPORT = new Set(["channel.mjs", "native-delivery.mjs", "ws-json
 // Remote reachability is forbidden everywhere on the hook path. A local Unix
 // socket (node:net) is forbidden too, except in the named native-transport
 // files.
+const BOOTSTRAP_MODULES = ["entry.mjs", "state.mjs", "mutex.mjs", "leases.mjs", "schedule.mjs", "policy.mjs"];
+const bootstrap = path.join(repo, "packages", "cli", "src", "managed-runtime");
+
 const REMOTE = [
-  [/from\s+"node:(https?|tls|dgram|dns)"/, "imports a remote network module"],
   [/\bfetch\s*\(/, "calls fetch"],
   [/update-check\.mjs/, "imports the update check"],
 ];
-const LOCAL_SOCKET = [/from\s+"node:net"/, "imports node:net outside a native-transport file"];
+// Include side-effect imports and literal dynamic imports, with either quote
+// style. Matching only `from` let an imported worker escape the closed set.
+const dependencies = code => Array.from(code.matchAll(
+  /\b(?:from\s+|import\s*(?:\(\s*)?)["']([^"']+)["']/g), match => match[1]);
 // A native-transport file may open a Unix socket but must never name a host and
 // port or a remote module.
 const HOST_PORT = /createConnection\(\s*\{[^}]*\bport\b/;
@@ -71,13 +76,28 @@ test("nothing a turn runs can reach the network", async () => {
   const files = (await Promise.all(HOOK_PATH
     .map(workspace => sources(path.join(repo, "packages", workspace, "src")))))
     .flat()
-    .concat(path.join(repo, "bin", "acc-hook.mjs"));
+    .concat(path.join(repo, "bin", "acc-hook.mjs"),
+      path.join(repo, "bin", "entrypoints", "acc-hook.mjs"),
+      path.join(repo, "bin", "entrypoints", "hook-output.mjs"),
+      BOOTSTRAP_MODULES.map(name => path.join(bootstrap, name)));
 
   assert.equal(files.length > 20, true, "the scan found almost nothing, so it proves nothing");
 
   const offenders = [];
   for (const file of files) {
     const code = withoutComments(await readFile(file, "utf8"));
+    for (const dependency of dependencies(code)) {
+      if (path.dirname(file) === bootstrap && !dependency.startsWith("node:")
+        && !BOOTSTRAP_MODULES.some(name => dependency === `./${name}`)) {
+        offenders.push(`${path.relative(repo, file)} reaches outside the closed launcher module set`);
+      }
+      if (/^(?:node:)?(?:https?|tls|dgram|dns)$/.test(dependency)) {
+        offenders.push(`${path.relative(repo, file)} imports a remote network module`);
+      }
+      if (/^(?:node:)?net$/.test(dependency) && !NATIVE_TRANSPORT.has(path.basename(file))) {
+        offenders.push(`${path.relative(repo, file)} imports node:net outside a native-transport file`);
+      }
+    }
     for (const [pattern, what] of REMOTE) {
       if (pattern.test(code)) offenders.push(`${path.relative(repo, file)} ${what}`);
     }
@@ -87,7 +107,6 @@ test("nothing a turn runs can reach the network", async () => {
       }
       continue;
     }
-    if (LOCAL_SOCKET[0].test(code)) offenders.push(`${path.relative(repo, file)} ${LOCAL_SOCKET[1]}`);
   }
 
   assert.deepEqual(offenders, [],
@@ -96,7 +115,7 @@ test("nothing a turn runs can reach the network", async () => {
     + "bounded local-Unix-socket native-transport files");
 });
 
-test("the file that does reach the network is reached only by the CLI", async () => {
+test("the legacy update check is reached only by the CLI", async () => {
   // Guards the list above rather than the code: if the check moved somewhere
   // else, the scan would be looking in the wrong place and still pass.
   const users = [];

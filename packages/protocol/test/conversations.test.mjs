@@ -71,3 +71,20 @@ test("handoff payload exists only on handoff messages", () => {
   assert.equal(validateRecord("message", { ...MESSAGE, kind: "handoff",
     obligation: "acknowledge", handoff: HANDOFF }).handoff, HANDOFF);
 });
+
+test("decision changes are optional for old records and closed, bounded payloads for new records", () => {
+  const old = { ...MESSAGE, kind: "decision", obligation: "none" };
+  assert.equal(validateRecord("message", old), old);
+  const change = { action: "replace", messageIds: ["message_old"] };
+  assert.equal(validateRecord("message", { ...old, decisionChange: change }).decisionChange, change);
+  for (const decisionChange of [null, {}, { ...change, action: "edit" },
+    { ...change, unknown: true }, { ...change, messageIds: [] },
+    { ...change, messageIds: ["bad id"] },
+    { ...change, messageIds: ["message_old", "message_old"] },
+    { ...change, messageIds: Array.from({ length: 17 }, (_, i) => `message_${i}`) }]) {
+    assert.throws(() => validateRecord("message", { ...old, decisionChange }), e => e.code === EXIT.DATA);
+  }
+  assert.throws(() => validateRecord("message", { ...MESSAGE, decisionChange: change }), e => e.code === EXIT.DATA);
+  assert.throws(() => validateRecord("message", { ...old, decisionStatus: { state: "current" } }),
+    e => e.code === EXIT.DATA, "derived read status must not become durable state");
+});

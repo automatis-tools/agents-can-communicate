@@ -1,44 +1,39 @@
 # Changelog
 
-## Unreleased
+## Unreleased — 0.4.0 candidate
+
+- Independent peers now recover ordinary coordination, exact-revision review, correction,
+  and durable handoff flows across process exits, late replies, and new session owners.
+  Claim and lifecycle fixes keep ownership truthful during concurrent work and recovery.
+- Default CLI/MCP inbox listings and `acc://inbox` now return bounded, read-only
+  `{items, nextCursor}` summary pages. Callers that previously received every body and
+  advanced every receipt must select an id and use the explicit full read API.
+- Decisions can explicitly supersede or withdraw earlier decisions. History preserves every
+  branch and surfaces unresolved conflicts instead of choosing the newest timestamp.
+  ACC 0.4.0 reads 0.3.1 history, but 0.3.1 readers reject the new `decisionChange` field
+  after one is written, so participating installations must upgrade together. See
+  [Upgrading from 0.3.1](docs/UPGRADING.md) for the response-shape and data-compatibility
+  changes.
+- A normal `acc install` enables managed automatic updates, and plain `acc update`
+  downloads and applies an available stable release. Live ACC processes, including idle MCP
+  servers, hold activation until confirmed process exit. Native bindings hold until observed
+  client SessionEnd cleanup or confirmed process death; unknown PIDs remain holds. ACC does
+  not manage the vendor daemon. Restart clients after integration changes and complete each
+  client's activation or trust review; copied files alone do not prove hooks are active.
+- Codex live delivery can reuse an opted-in, already-loaded LocalDaemon thread without rewriting launch arguments. Exact receiver/workspace checks, safe binding refresh and wrapper migration preserve durable fallback and client-owned configuration.
+
+### Candidate evidence
 
 | | |
 |---|---|
-| Built from | `85f347d201df126b1f60cff96e1e6a5a14b0c8d8` |
-| Tarball | `agents-can-communicate-0.3.1.tgz`, 279,820 bytes, 213 entries |
-| sha256 | `ebe370dc8452fd14f1441138aacfd4a13b0f85c3b94ba710cec3ec35837e3ccb` |
+| Built from | `cc5b875787e0c6ece75a71e5a9acd8f36cc31d9b` |
+| Tarball | `agents-can-communicate-0.4.0.tgz`, 330,508 bytes, 248 entries |
+| sha256 | `76b96ca1a8ac6f8b2682e5e4e2fe878b57882752ab944cd4239ce16a6721c9a0` |
 
-Not published. A published record says what the registry serves and is not
-rewritten, so shipped code that changes after a release is measured here instead.
-
-Codex delivery now reuses an ordinary, already-loaded LocalDaemon thread without
-adding launch arguments or starting a daemon. Actual installed-package matrices
-on Codex 0.152.1 and 0.153.4, macOS arm64, each passed 20 scenarios and 189
-assertions. Delivery verifies the exact receiver, workspace, process, version and
-socket; missing or unsupported endpoints retain durable inbox access. Opt-in is
-recorded separately from reachability, and expired live bindings can refresh
-without reviving retired generations. The router rechecks the authoritative
-current binding after its final policy and session reads; retirement or endpoint
-replacement during those reads cannot offer through the obsolete binding.
-
-The upgrade removes only unchanged ACC-owned Codex wrappers and preserves edited
-or unrelated shell artifacts. Reinstall and uninstall preserve client-owned TOML
-even when Codex inserts it inside ACC's configuration markers. Live delivery can
-spend tokens after the terminal detaches from a still-loaded thread; turning it
-off prevents new offers but cannot retract an already-accepted queue entry.
-Native replies remain uncertified; the observed reply loop uses `acc reply`.
-
-The set that decides which commands need a session owner named three the CLI does
-not have. `task`, `workstream` and `decide` went with the orchestration surface
-they belonged to and stayed behind in `NEEDS_OWNER`, unreachable: the parser
-refuses an unknown command before anything asks who owns the session.
-
-Nothing ran differently, and that is the point. A frozen set of command names
-reads as an authoritative list, and this one had been wrong since those commands
-were removed - long enough for the names to be copied out of it as though they
-were real. `orchestration-is-absent` guards the public command table, the packed
-text, the MCP tools and the service operations; this set is not among them, which
-is how three names outlived what they named.
+This combined candidate includes PR #116. The saved archive passed installed-package verification
+and the published-0.3.1 upgrade preflight; 248/248 source/archive/installed/managed files match.
+See [candidate evidence](docs/release-evidence/v0.4.0.md) for current validation status and limits.
+Recorded local artifact checks completed; final review and publication approval remain separate.
 
 ## 0.3.1
 
