@@ -4,6 +4,20 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { delay, shellLiteral, until } from "./codex-local-daemon-machine.mjs";
 
+const DELIVERY_KINDS = new Set(["note", "question", "request", "decision"]);
+const DELIVERY_OUTCOMES = new Set(["queued", "offered", "retrieved", "acknowledged"]);
+const DELIVERY_ERROR_CODES = new Set(["ambiguous_recipient_sessions", "delivery_disabled",
+  "recipient_busy", "recipient_unavailable", "transport_error", "transport_rejected",
+  "unsupported_client_version"]);
+const closed = (values, value, fallback = "unknown") => values.has(value) ? value : fallback;
+
+export function closedDeliveryDiagnostic(kind, result) {
+  const delivery = Array.isArray(result?.delivery) ? result.delivery : [];
+  return { stage: "delivery-result", kind: closed(DELIVERY_KINDS, kind), count: delivery.length,
+    delivery: delivery.map(item => ({ outcome: closed(DELIVERY_OUTCOMES, item?.outcome),
+      errorCode: closed(DELIVERY_ERROR_CODES, item?.errorCode, item?.errorCode === undefined ? "none" : "unknown") })) };
+}
+
 export async function trust(h, role) {
   const status = await h.pty.request({ action: "status", role });
   const key = JSON.stringify({ ...status, terminalBytes: undefined });
@@ -161,7 +175,9 @@ export async function sendMessage(h, { id, marker, kind = "question", body, env 
         + "message's ID from the attributed frame. Reply only to this message, and keep the session open.",
     "--client-message-id", id, "--session", sender.sessionId, "--generation", sender.generation],
   env ? { env } : {});
-  return result.data ?? result;
+  const sent = result.data ?? result;
+  console.log(JSON.stringify(closedDeliveryDiagnostic(kind, sent)));
+  return sent;
 }
 
 export async function receipt(h, message) {

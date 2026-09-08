@@ -6,7 +6,8 @@ import path from "node:path";
 import test from "node:test";
 import { promisify } from "node:util";
 
-import { trust } from "../../scripts/e2e/codex-local-daemon-actions.mjs";
+import { closedDeliveryDiagnostic, sendMessage, trust }
+  from "../../scripts/e2e/codex-local-daemon-actions.mjs";
 import { buildClientEnvironment, createPtyDriver, prerequisiteChecks,
   verifyInstalledCommands, verifyInstalledTarget }
   from "../../scripts/e2e/codex-local-daemon-harness.mjs";
@@ -252,4 +253,32 @@ test("scenario equality emits closed mismatch reasons and retains named assertio
   assert.throws(() => named.equal("actual-sentinel", "expected-sentinel", "same Codex thread must reject A cwd"), error =>
     error?.message === "scenario T01 assertion 1 failed: same Codex thread must reject A cwd"
       && !error.message.includes("actual-sentinel") && !error.message.includes("expected-sentinel"));
+});
+
+test("installed send diagnostics retain only closed delivery outcomes", async t => {
+  const secret = "secret-body:/private/tmp/endpoint-token";
+  const result = { data: { message: { body: secret }, delivery: [
+    { outcome: "queued", errorCode: "recipient_busy", recipientParticipantId: secret, detail: secret },
+    { outcome: "invented-outcome", errorCode: secret, transport: secret },
+  ] } };
+  const rows = [];
+  const log = console.log;
+  console.log = value => rows.push(value);
+  t.after(() => { console.log = log; });
+  const h = { roles: { sender: { sessionId: "sender", generation: "1" },
+    "receiver-b1": { participantId: "receiver", sessionId: "receiver", generation: "1" } },
+  acc: async () => result };
+  assert.equal(await sendMessage(h, { id: "diagnostic", kind: "note", body: secret }), result.data);
+  assert.equal(rows.length, 1);
+  assert.deepEqual(JSON.parse(rows[0]), { stage: "delivery-result", kind: "note", count: 2,
+    delivery: [{ outcome: "queued", errorCode: "recipient_busy" },
+      { outcome: "unknown", errorCode: "unknown" }] });
+  assert.equal(rows[0].includes(secret), false);
+  const malformed = { data: { delivery: secret, failure: secret } };
+  h.acc = async () => malformed;
+  assert.equal(await sendMessage(h, { id: "malformed", kind: "note", body: secret }), malformed.data);
+  assert.deepEqual(JSON.parse(rows[1]), { stage: "delivery-result", kind: "note", count: 0, delivery: [] });
+  assert.equal(rows[1].includes(secret), false);
+  assert.deepEqual(closedDeliveryDiagnostic("bogus", { delivery: null }), {
+    stage: "delivery-result", kind: "unknown", count: 0, delivery: [] });
 });
