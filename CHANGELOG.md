@@ -12,14 +12,15 @@
 
 | Candidate | Value |
 |---|---|
-| Built from | `c389a18067caa260d6ae13b54c7adc2a07d74f76` |
-| Tarball | `agents-can-communicate-0.4.0.tgz`, 330,967 bytes, 248 files |
-| sha256 | `dd69e0fe812b6e9be5eb080f5b847ac8eb0ca7296570bb9295f5e4c9bcc58e47` |
+| Built from | `edcb4dc34a7a3f23e8ef500d433f9bbef78ac00f` |
+| Tarball | `agents-can-communicate-0.4.0.tgz`, 331,423 bytes, 248 files |
+| sha256 | `852444badb4efd9ac5c6cc24cf479374be16ac1565333edf545f081f852bedc0` |
 
 This is an unpublished development artifact with the existing package version;
-it must not replace the published 0.4.0 archive. Clean installation, package verification,
-and actual uninstall/reinstall preference checks passed on macOS arm64 with Node 24.4.0.
-See [reinstall candidate evidence](docs/release-evidence/unreleased-reinstall.md).
+it must not replace the published 0.4.0 archive. Package verification, installed-hook
+regressions, and a native Gemini 0.59.0 warning check passed on macOS arm64.
+See [hook diagnostic candidate evidence](docs/release-evidence/unreleased-hooks.md) and
+the earlier [reinstall candidate evidence](docs/release-evidence/unreleased-reinstall.md).
 
 ## 0.4.0 — 2026-09-08
 
