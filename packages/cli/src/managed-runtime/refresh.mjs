@@ -11,7 +11,7 @@ export async function prepareRefresh({ control, root, env = process.env }) {
   const adapters = ALL_ADAPTERS().filter(adapter => wanted.has(adapter.id));
   if (adapters.length !== wanted.size) throw new Error("candidate cannot refresh every installed integration");
   const context = { ...clientContext(control.home, path.join(dataHome, "acc"),
-    { env, shell: shellOf(env) }), ...stablePaths(root), preserveVersions: true };
+    { env, shell: shellOf(env), dataHome }), ...stablePaths(root), preserveVersions: true };
   const recorded = (await loadOwnership({ dataHome })).installs;
   const detected = await detectInstallation({ adapters, context, probeTimeoutMs: probeTimeout(env) });
   const deliveryByAdapter = Object.fromEntries(adapters.map(adapter => [adapter.id,
