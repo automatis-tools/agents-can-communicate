@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createPackedAcc } from "../../../tests/helpers/packed-acc.mjs";
 import { execFile } from "node:child_process";
 import { mkdtemp, readFile, realpath, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -115,13 +116,12 @@ test("the reference the help points at is one the reader can actually reach", as
     "the help names a document the installed package does not carry");
 });
 
-test("the version is the package's own, not one typed into the source", async () => {
-  // `bin/` sits at the same depth in the published package as it does here, so
-  // this relative read is the one thing that stays true in both layouts.
-  const manifest = JSON.parse(await readFile(path.join(repoRoot, "package.json"), "utf8"));
-  const source = await readFile(binary, "utf8");
-
-  assert.match(source, /\.\.\/package\.json/);
-  assert.equal(source.includes(manifest.version), false,
-    "the version is written into bin/acc.mjs, so the next bump will leave it behind");
+test("the installed binary reads its package version after a version change", async t => {
+  const f = await createPackedAcc(t);
+  const file = path.join(f.installed, "package.json");
+  const manifest = JSON.parse(await readFile(file, "utf8"));
+  const version = manifest.version === "127.128.129" ? "127.128.130" : "127.128.129";
+  await writeFile(file, JSON.stringify({ ...manifest, version }));
+  assert.equal((await f.acc(["version"])).version, version,
+    "the installed CLI returned a baked version instead of its own manifest");
 });

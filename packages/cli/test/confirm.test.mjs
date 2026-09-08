@@ -1,4 +1,9 @@
 import assert from "node:assert/strict";
+import { execFile } from "node:child_process";
+import { readFile } from "node:fs/promises";
+import path from "node:path";
+import { promisify } from "node:util";
+import { createPackedAcc } from "../../../tests/helpers/packed-acc.mjs";
 import { PassThrough } from "node:stream";
 import test from "node:test";
 
@@ -77,14 +82,28 @@ test("a build with no way to ask says so instead of answering for the reader", a
   assert.match(said.join(""), /without a way to ask/);
 });
 
-test("the binary hands the asking in", async () => {
-  const { readFile } = await import("node:fs/promises");
-  const { fileURLToPath } = await import("node:url");
-  // The port is wired at the composition root, and nothing else here would
-  // notice it being dropped: every test above supplies its own streams.
-  const source = await readFile(
-    fileURLToPath(new URL("../../../bin/acc.mjs", import.meta.url)), "utf8");
-
-  assert.match(source, /confirm:/, "the CLI is built without a confirmation port");
-  assert.match(source, /askConfirmation/);
+test("the installed binary asks and applies the reader's actual answer", async t => {
+  const f = await createPackedAcc(t);
+  const config = path.join(f.project, "acc.workspace.json");
+  for (const answer of ["n", "y"]) {
+    // A pipe supplies reproducible input; only stdout's TTY flag is supplied
+    // so the real executable enters its interactive confirmation path.
+    const pending = promisify(execFile)(process.execPath,
+      ["--import", "data:text/javascript,process.stdout.isTTY=true", f.accBin,
+        "config", "init", "--cwd", f.project],
+      { cwd: f.project, env: f.env, timeout: 10_000 });
+    let heard = "", answered = false;
+    pending.child.stdout.on("data", chunk => {
+      heard += chunk;
+      if (!answered && heard.includes("[y/N]")) {
+        answered = true;
+        pending.child.stdin.write(`${answer}\n`);
+      }
+    });
+    const result = await pending;
+    assert.equal(answered, true, "the installed CLI never asked for confirmation");
+    assert.ok(result.stdout.includes(config));
+    if (answer === "n") await assert.rejects(readFile(config), { code: "ENOENT" });
+    else assert.equal(JSON.parse(await readFile(config, "utf8")).schemaVersion, 1);
+  }
 });

@@ -58,7 +58,7 @@ const run = (place, args) => import("node:child_process").then(({ execFile }) =>
  */
 const CAPTURED_PLATFORM = process.platform === "darwin" && process.arch === "arm64";
 
-test("an eligible live install writes a channel .mcp.json pointing at packed binaries", {
+test("an eligible live install writes a channel .mcp.json pointing at managed launchers", {
   skip: CAPTURED_PLATFORM ? false : "native delivery is captured on darwin-arm64 only",
 }, async t => {
   const place = await machine(t);
@@ -77,7 +77,9 @@ test("an eligible live install writes a channel .mcp.json pointing at packed bin
     assert.equal(server.command, process.execPath);
     assert.match(server.args[0], /bin\/acc-claude-channel\.mjs$/);
     assert.equal(path.isAbsolute(server.args[0]), true);
-    assert.match(server.args[0], /agents-can-communicate.*bin\/acc-claude-channel\.mjs$/);
+    assert.equal(server.args[0], path.join(place.dataHome, "acc", "runtime", "bin",
+      "acc-claude-channel.mjs"));
+    await readFile(server.args[0]); // The configured launcher must actually exist.
   }
   // A shim was written for the ordinary `claude` command, carrying the flag.
   const shim = path.join(place.dataHome, "acc", "bin", "claude");
