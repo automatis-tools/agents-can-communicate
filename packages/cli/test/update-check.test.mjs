@@ -142,7 +142,9 @@ test("--apply runs both, and says what is left when one fails", async t => {
       spawn: async (command, argv) => { ran.push([command, ...argv].join(" ")); } }) });
 
   assert.deepEqual(ran, upgradeSteps("0.2.0").map(([one, argv]) => [one, ...argv].join(" ")));
-  assert.equal(done.text, "updated to 0.2.0");
+  assert.match(done.text, /^updated to 0\.2\.0/);
+  assert.match(done.text, /Restart all running agent clients/);
+  assert.equal(done.error, undefined);
 
   // A global install refused for want of permission is the ordinary failure,
   // and the rest of the work is printed so it can be finished by hand.
@@ -153,6 +155,8 @@ test("--apply runs both, and says what is left when one fails", async t => {
   assert.match(failed.text, /npm failed: EACCES/);
   assert.match(failed.text, /npm install --global agents-can-communicate@0\.2\.0/);
   assert.match(failed.text, /acc install/);
+  assert.equal(failed.error.code, EXIT.DATA);
+  assert.equal(failed.error.message, failed.text);
 });
 
 test("with the switch on, `acc update` asks nothing at all", async t => {

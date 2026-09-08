@@ -68,19 +68,27 @@ export async function runUpdateCommand({ options, runtime }) {
 
   const spawn = runtime.spawn ?? ((command, argv) => execFileAsync(command, argv, { env }));
   const done = [];
+  let installation = { stdout: "", stderr: "" };
   for (const [command, argv] of steps) {
     try {
-      await spawn(command, argv);
+      const output = await spawn(command, argv);
+      if (command === "acc") {
+        installation = { stdout: String(output?.stdout ?? "").trim(),
+          stderr: String(output?.stderr ?? "").trim() };
+      }
       done.push([command, ...argv].join(" "));
     } catch (error) {
       // Named rather than swallowed, and the rest of the commands are printed:
       // a global install refused for want of permission is the ordinary case,
       // and the person can finish it by hand from here.
+      const text = [`${command} failed: ${error.message}`, "", "finish it with:",
+        ...steps.slice(done.length).map(spell)].join("\n");
       return { data: { ...data, applied: done, failed: [command, ...argv].join(" ") },
-        text: [`${command} failed: ${error.message}`, "", "finish it with:",
-          ...steps.slice(done.length).map(spell)].join("\n"),
-        error: undefined };
+        text, error: new AccError(EXIT.DATA, text) };
     }
   }
-  return { data: { ...data, applied: done }, text: `updated to ${latest}` };
+  const activation = "Restart all running agent clients to load the updated ACC runtime and skills.";
+  return { data: { ...data, applied: done, installation, activation },
+    text: [`updated to ${latest}`, installation.stdout, installation.stderr, activation]
+      .filter(Boolean).join("\n\n") };
 }
