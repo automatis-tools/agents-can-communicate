@@ -1,5 +1,26 @@
 # Changelog
 
+## Unreleased
+
+- Installation offers to save Codex delivery consent even before a compatible local
+  service/session is available. It leaves activation gated by the live verification.
+- Install and doctor report delivery policy, missing setup, current channel state and
+  the actual fallback separately. Declining live delivery no longer promises uncertified
+  next-turn delivery. Doctor distinguishes existing Claude launch policy from current
+  Codex recorded consent and ignores hook-only bindings when reporting native delivery.
+
+| Development artifact | Value |
+|---|---|
+| Built from | `5503e2a867f23215c7e8fc8aa072ab4efd9b725f` |
+| Tarball | `agents-can-communicate-0.4.1.tgz`, 335,661 bytes, 251 files |
+| sha256 | `04ce871d1a79f47f4bac14795a7c26d9bfe627df08b57bd300534fe97990d064` |
+
+This unpublished development build retains the 0.4.1 manifest version. Its archive passed
+installed-package verification and all 251 files match the recorded source commit.
+On macOS arm64 with Node 24, all 1,943 executed tests passed (2 skipped). Syntax checks
+and the installed interactive consent/doctor/uninstall scenario passed; five intentional
+regression mutations were caught. No new client capability is certified by these fixes.
+
 ## 0.4.1 — release candidate
 
 - Grok install, doctor, and uninstall respect `GROK_HOME`, including paths with spaces;
