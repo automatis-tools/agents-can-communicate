@@ -24,11 +24,31 @@ requires plugin trust.
 ACC does not launch a missing session. Open it normally after fixing the installation or
 workspace path.
 
+## A hook says `workspace contains ACC runtime state`
+
+The current directory contains ACC's own state, so ACC cannot use it as a workspace.
+This commonly happens when a client starts in your home directory (`~`). The client
+continues normally, but ACC provides no coordination context there.
+
+Open a project directory and restart the client from it. A project inside your home
+works normally; Git is optional. If you intentionally need the broader directory as
+a workspace, configure `ACC_DATA_HOME` outside it for all participating clients.
+This changes the state location; it does not migrate existing history or integrations.
+
+For a generic `coordination unavailable` warning, run `acc status --json` from the
+same directory to see the detailed workspace error, and `acc doctor` to check the
+installation. Hook warnings deliberately omit arbitrary paths and error details.
+
 ## CLI says `caller_identity_unresolved`
 
 ACC cannot prove which session owns this shell command. A hook-created presence record
 and the client's native session ID are not shell credentials. Restarting hooks alone does
 not fix this CLI limitation.
+
+In Grok, run public `acc status --json` through the terminal tool first. With the
+updated integration, the ACC hook reminder arrives after that result and supplies
+the session's own CLI arguments. Restart Grok after refreshing its integration;
+a header returned with `finish` belongs to the session that just closed.
 
 Use this session's ACC MCP tools if available. For a manual CLI workflow, open your own
 session with `acc attach --participant my-session --json`, retain the returned `sessionId`
@@ -112,8 +132,12 @@ or start the session somewhere trusted.
 
 ## Grok shows no injected message
 
-Grok 1.0.13 discarded UserPromptSubmit context in the real capture. Its next-turn and guard
-capabilities remain false. Use `acc status` and `acc inbox`; do not wait for a banner.
+Grok discards UserPromptSubmit context. On the observed 1.0.24 client, run public
+`acc status --json` in its terminal first: the ACC hook reminder after the result
+supplies your own `--session` and `--generation` pair for subsequent inbox reads and
+mutations. Restart Grok after refreshing its installed hooks and skill. Its next-turn,
+live delivery, and guard capabilities remain false; peer messages require explicit inbox
+reads. If the header never arrives, report missing ownership rather than adopting a peer.
 
 ## Kimi sessions remain in history
 

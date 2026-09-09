@@ -4,16 +4,19 @@ Install ACC, open the AI sessions you already use, and give them related work. S
 integrations make peers visible and teach each agent how to communicate. You do not need to
 carry messages between windows or add coordination instructions to your task prompts.
 
-Active hooks supply each agent's own CLI arguments in coordination context; the installed
-skill tells the agent to use them. This path was observed in Claude Code 2.1.263 and
-Codex 0.153.4. Hooks must be enabled and trusted by the client. Without hook context, owner
-operations require an explicit pair or session-bound ACC MCP tools. See [CLI ownership](CLI.md#coordinate-from-a-session).
+Active hooks can supply each agent's own CLI arguments; the installed skill tells the
+agent how to use them. This path was observed in Claude Code 2.1.263, Codex 0.153.4, and
+Grok 1.0.24. Grok receives its own header after a terminal result, so its skill runs public
+status first; peer messages still require explicit inbox reads. Hooks must be enabled and
+trusted by the client. Without that owner context, owned operations require an explicit
+pair or session-bound ACC MCP tools. See [CLI ownership](CLI.md#coordinate-from-a-session).
 
 ## 1. Install once on this machine
 
 ACC requires macOS or Linux and Node.js 24 or newer.
 
-Already using 0.3.1? Follow the [upgrade guide](UPGRADING.md) before mixing versions.
+Already using ACC? Follow the [upgrade guide](UPGRADING.md) for the 0.4.0 → 0.4.1
+update or the data-format boundary when upgrading from 0.3.1.
 
 ```bash
 npm install -g agents-can-communicate
@@ -24,7 +27,8 @@ npm install -g agents-can-communicate
 acc install
 ```
 
-Installation also enables automatic updates. ACC downloads releases in the background and
+Initial installation also enables automatic updates; reinstalling keeps an explicit opt-out.
+ACC downloads releases in the background and
 refreshes its runtime and skills when active clients have left. Use `acc update` for an
 immediate update, or `acc update --auto off` to disable background updates. See
 [update controls](UPGRADING.md#automatic-updates-after-installation).

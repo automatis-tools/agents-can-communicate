@@ -8,12 +8,14 @@ import { promisify } from "node:util";
 const run = promisify(execFile);
 
 /** Two actual ACC archives; only the candidate's package versions are changed. */
-export async function createUpdateRegistry(t, fixture, version = "0.4.1") {
+export async function createUpdateRegistry(t, fixture, version = null) {
   const candidate = path.join(fixture.root, "candidate-source");
   const archiveDir = path.join(fixture.root, "candidate-archive");
   await cp(fixture.installed, candidate, { recursive: true });
   await mkdir(archiveDir);
   const rootManifest = JSON.parse(await readFile(path.join(candidate, "package.json"), "utf8"));
+  const [major, minor, patch] = rootManifest.version.split(".");
+  version ??= `${major}.${minor}.${Number.parseInt(patch, 10) + 1}`;
   for (const name of [null, ...rootManifest.bundleDependencies]) {
     const file = path.join(candidate, ...(name === null ? [] : ["node_modules", name]), "package.json");
     const manifest = JSON.parse(await readFile(file, "utf8"));

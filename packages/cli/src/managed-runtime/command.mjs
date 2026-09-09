@@ -32,6 +32,7 @@ export async function runManagedUpdate({ options, runtime }) {
         }
         return writeControl(root, { ...current,
           auto: options.auto === undefined ? current.auto : options.auto === "on", pin,
+          autoPreference: options.auto === undefined ? current.autoPreference ?? current.auto : options.auto === "on",
           pending: options.pin !== undefined && current.pending?.version !== pin ? null : current.pending,
           notice: null });
       });

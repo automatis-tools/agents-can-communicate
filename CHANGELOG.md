@@ -1,6 +1,36 @@
 # Changelog
 
-## Unreleased — 0.4.0 candidate
+## 0.4.1 — release candidate
+
+- Grok install, doctor, and uninstall respect `GROK_HOME`, including paths with spaces;
+  an empty or unset value keeps the default `~/.grok`.
+- Grok can obtain its own CLI session arguments through terminal-tool hook context.
+  A public status call supplies the pair for subsequent owned commands; peer bodies
+  still require inbox reads, and closed or missing owners are never adopted.
+- Hooks now explain when a workspace contains ACC's own state, as when a client
+  starts in `~`, and tell the user to restart in a project directory. Failures still
+  let the client continue and do not reflect arbitrary error details.
+- Reinstalling after a full uninstall restores the remembered automatic-update setting.
+  Explicit opt-outs remain off, and a partial uninstall failure keeps updates paused.
+  Existing 0.4.0 uninstall records cannot recover a lost preference; use
+  `acc update --auto on` once if updates should resume.
+- README and onboarding now cover current client activation, Grok ownership and inbox
+  limits, automatic-update controls, bounded context, and historical recovery.
+
+| Candidate | Value |
+|---|---|
+| Built from | `efee0d0818d561ceffcb30129e26eaff6c17a6d7` |
+| Tarball | `agents-can-communicate-0.4.1.tgz`, 333,744 bytes, 249 files |
+| sha256 | `6c306ca6b50014e8b00137a5907260dc08d4508ebb0086189d5d880f0cc539fe` |
+
+The exact archive passed package verification and the published-0.4.0 managed upgrade
+preflight; all 249 source/archive/installed/managed files match. Before the documentation
+refresh, a real Grok 1.0.24 session used byte-identical runtime and integration files for
+owned work, a note and a complete handoff.
+See [0.4.1 candidate evidence](docs/release-evidence/v0.4.1.md) for validation and limits.
+Publication remains a separate maintainer action.
+
+## 0.4.0 — 2026-09-08
 
 - Independent peers now recover ordinary coordination, exact-revision review, correction,
   and durable handoff flows across process exits, late replies, and new session owners.

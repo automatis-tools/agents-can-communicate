@@ -36,6 +36,7 @@ test("control roundtrip is private and refuses malformed or escaping runtime poi
   assert.equal((await stat(f.root)).mode & 0o777, 0o700);
   assert.equal((await stat(path.join(f.root, "control.json"))).mode & 0o777, 0o600);
   for (const bad of [{ ...f.control, phase: "guess" }, { ...f.control, auto: 1 },
+    { ...f.control, autoPreference: "on" },
     { ...f.control, active: { version: "0.4.0", root: f.parent } },
     { ...f.control, pending: { version: "0.5.0", root: f.parent } }]) {
     await assert.rejects(writeControl(f.root, bad), /control|generation/i);

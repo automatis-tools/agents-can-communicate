@@ -250,7 +250,9 @@ ordinary launch arguments. Its opt-in remains active when shim variables are abs
 bypassed; `acc install --adapter codex --delivery off` disables new native offers. ACC never
 starts or stops the vendor daemon. See [delivery consent](CONFIGURATION.md#keep-delivery-consent-user-owned).
 
-A normal `acc install` enables automatic updates. A background worker checks stable releases
+An initial `acc install` enables automatic updates. Reinstalling preserves an explicit
+`acc update --auto off` choice. A full uninstall pauses updates; reinstalling restores
+the remembered setting. A background worker checks stable releases
 at most once a day, downloads and verifies a separate runtime, then refreshes installed
 integrations and skills after ACC process leases and native binding holds clear. ACC leases
 require confirmed process exit; a native binding can clear on observed SessionEnd even

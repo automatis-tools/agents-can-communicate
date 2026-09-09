@@ -32,7 +32,8 @@ export const clientContext = (home, stateRoot, { shell = null, env = {}, dataHom
   codexHome: typeof env.CODEX_HOME === "string" && env.CODEX_HOME !== ""
     ? env.CODEX_HOME : path.join(home, ".codex"),
   kimiHome: path.join(home, ".kimi-code"),
-  grokHome: path.join(home, ".grok"),
+  grokHome: typeof env.GROK_HOME === "string" && env.GROK_HOME !== ""
+    ? env.GROK_HOME : path.join(home, ".grok"),
   // The user's login shell and PATH, for the optional native shell bootstrap:
   // which rc file could carry an ACC PATH block and which real executable a
   // shim would exec. Detection reads them; nothing here writes.

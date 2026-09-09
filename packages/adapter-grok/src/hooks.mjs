@@ -125,3 +125,12 @@ export function denyOutcome(reason) {
 export function injectOutcome(context) {
   return { stdout: `${JSON.stringify(injectResponse(context))}\n`, stderr: "", exitCode: 0 };
 }
+
+// Unlike UserPromptSubmit, configured PreToolUse context reaches the model
+// after the terminal result (native evidence in COMPATIBILITY.md). Only the pair travels
+// here; peer bodies still require explicit inbox reads. Nothing rewrites input.
+export function injectToolOwnerOutcome({ owner, tool }) {
+  if (!GROK_SHELL_TOOLS.includes(tool)) return null;
+  return { stdout: `${JSON.stringify({ hookSpecificOutput: {
+    hookEventName: "PreToolUse", additionalContext: owner } })}\n` };
+}

@@ -50,9 +50,13 @@ function tryWrite(stream, output) {
 export async function completeHookOutput(result,
   { stdout = process.stdout, stderr = process.stderr } = {}) {
   if (result.failed || result.timedOut) {
-    // Hook failures can include arbitrary payload or filesystem text. Report
-    // degradation without reflecting those details into the client's output.
-    tryWrite(stderr, "acc: coordination unavailable; hook continued without context\n");
+    // Only a known code selects static recovery advice. Arbitrary payload or
+    // filesystem error text must never become client-visible instructions.
+    const recovery = result.failureCode === "workspace_contains_runtime"
+      ? ": workspace contains ACC runtime state; open a project directory and restart the client"
+        + " (or set ACC_DATA_HOME outside the workspace)"
+      : "";
+    tryWrite(stderr, `acc: coordination unavailable${recovery}; hook continued without context\n`);
   }
   try {
     await writeOutput(stdout, result.stdout ?? "", { deadlineAt: result.deadlineAt });

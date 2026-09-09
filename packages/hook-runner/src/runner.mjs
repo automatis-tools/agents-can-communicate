@@ -7,7 +7,7 @@ import { clearSessionBinding, effectiveCapabilities, loadSessionBinding, storeSe
   from "@agents-can-communicate/adapter-sdk";
 import { createCoordinationService } from "@agents-can-communicate/core";
 import { readInstalledLivePolicy } from "@agents-can-communicate/installer";
-import { assertPortableId, createId } from "@agents-can-communicate/protocol";
+import { AccError, createId } from "@agents-can-communicate/protocol";
 import { openFilesystemStore } from "@agents-can-communicate/storage-filesystem";
 import { createGitProbe, discoverWorkspace, platformDataHome, runtimePaths }
   from "@agents-can-communicate/cli";
@@ -17,6 +17,7 @@ import { probeClientVersion as defaultProbeClientVersion } from "./client-versio
 import { establishNativeBinding, livePolicyFrom } from "./native-binding.mjs";
 import { readProcessTable as defaultReadProcessTable } from "./process-table.mjs";
 import { withSessionLifecycle } from "./session-lifecycle.mjs";
+import { appendToolOwner, ownerHeader, ownerOnlyOutcome } from "./owner-context.mjs";
 
 // Kept cohesive above 300 lines because every handler shares one fail-open
 // hook boundary, binding lifecycle, and client-specific outcome contract.
@@ -51,13 +52,6 @@ function fitDegradation(projection, visibleDegradation, messages, budgetBytes) {
   if (byteLength(recovery) <= budgetBytes) return recovery;
   if (byteLength(exactRecovery) <= budgetBytes) return exactRecovery;
   return projection;
-}
-
-function ownerOnlyOutcome(adapter, owner, budgetBytes) {
-  if (byteLength(owner) > budgetBytes) {
-    return { stdout: "", stderr: "acc: context budget cannot fit owner arguments; increase contextBudgetBytes" };
-  }
-  return { stdout: "", ...adapter.injectOutcome?.(owner) };
 }
 
 // Declared by this process on the session it opens, so peers can tell an idle
@@ -227,15 +221,13 @@ async function projectTurn({ binding, context, adapter, adapterId }) {
   // Only this hook's payload selected the binding. Supply its own pair as
   // trusted context, outside peer bodies, rather than exporting inheritable
   // credentials or teaching the CLI to guess from a public roster.
-  const owner = "ACC CLI (append): --session "
-    + assertPortableId(binding.accSessionId, "sessionId") + " --generation "
-    + assertPortableId(binding.generation, "generation");
+  const owner = ownerHeader(binding);
   const totalBudget = context.descriptor.policy?.contextBudgetBytes ?? 6_000;
   // A peer can join after this prompt has begun. The current turn must already
   // have its own arguments when it needs inbox/reply, without reattaching or
   // waiting for another user prompt. Solo emits identity, not a peer notice.
   if (sync.solo && messages.length === 0) {
-    return ownerOnlyOutcome(adapter, owner, totalBudget);
+    return ownerOnlyOutcome(text => adapter.injectOutcome?.(text), owner, totalBudget);
   }
 
   // The ceiling a team agreed on in `acc.workspace.json`, or the default when
@@ -282,7 +274,9 @@ async function projectTurn({ binding, context, adapter, adapterId }) {
     : fitDegradation(projection.text, visibleDegradation, messages, budgetBytes);
   // Own claims make sync non-solo but produce no peer context. They cannot
   // remove this turn's identity or consume a nonexistent body separator.
-  if (body === "" && messages.length === 0) return ownerOnlyOutcome(adapter, owner, totalBudget);
+  if (body === "" && messages.length === 0) {
+    return ownerOnlyOutcome(text => adapter.injectOutcome?.(text), owner, totalBudget);
+  }
   const projected = body === "" ? "" : ownerFits ? `${owner}\n${body}` : body;
   if (projected === "") {
     return { stdout: "", stderr: messages.length === 0 ? ""
@@ -575,9 +569,10 @@ export async function runHook({ adapterId, payload, adapters, dataHome, env,
       const binding = await loadSessionBinding({ runtimeDir: context.paths.root,
         harnessSessionId: event.sessionId });
       assertHookBudget(deadline);
-      return handler === undefined ? {} : handler({ event, context, adapter, adapterId,
+      const result = handler === undefined ? {} : await handler({ event, context, adapter, adapterId,
         binding, paths: context.paths,
         readProcessTable, probeClientVersion, platform, deadline });
+      return appendToolOwner(result, { event, binding, context, adapter });
     };
     const work = lifecycle
       ? withSessionLifecycle({ root: context.paths.root, sessionId: event.sessionId,
@@ -621,6 +616,8 @@ export async function runHook({ adapterId, payload, adapters, dataHome, env,
     return await Promise.race([execute(), budget]);
   } catch (error) {
     return { ...fallback, failed: true, reason: error.message,
+      ...(error instanceof AccError && error.details?.reasonCode === "workspace_contains_runtime"
+        ? { failureCode: "workspace_contains_runtime" } : {}),
       ...(Date.now() >= deadline ? { timedOut: true } : {}) };
   } finally {
     clearTimeout(timer);
