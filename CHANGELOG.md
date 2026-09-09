@@ -19,16 +19,18 @@
 
 | Development artifact | Value |
 |---|---|
-| Built from | `93cb614f1a663d7246b6451584f41356354ed253` |
-| Tarball | `agents-can-communicate-0.4.1.tgz`, 336,574 bytes, 251 files |
-| sha256 | `d594cefd629c7a50f4baf24188b211f0a430a269cdb7338d856229e082c3d0d5` |
+| Built from | `34b084a3a9608df36f9ca2b7ab894370df97d17f` |
+| Tarball | `agents-can-communicate-0.4.1.tgz`, 340,538 bytes, 255 files |
+| sha256 | `be2c9c8a8b9a105cbcd1b0ad4af2b9ca67162601c1775783babc78bdde99dc36` |
 
 This unpublished development build retains the 0.4.1 manifest version. Its archive passed
-installed-package verification and all 251 files match the recorded source commit.
-On macOS arm64 with Node 24, all 1,943 executed tests passed (2 skipped). Syntax checks
-and the installed Claude consent/doctor/off/uninstall scenario passed.
-The native startup check is documented in the Claude compatibility record; it is not
-a model delivery capture. No new client capability is certified by these fixes.
+installed-package verification and all 255 files match the recorded source commit.
+On macOS arm64 with Node 24, all 1,949 executed tests passed (2 skipped). Syntax checks
+passed for 474 files. Installed hooks, per-session doctor results and SessionEnd cleanup
+were exercised; delayed diagnostic I/O and nearly expired hook budgets retain normal output.
+The offer-rejection fixture deliberately expires its old startup budget before closing
+through the current service, so suite load cannot substitute a timeout for its assertion.
+No new client capability is certified by these diagnostics.
 
 ## 0.4.1 — release candidate
 
