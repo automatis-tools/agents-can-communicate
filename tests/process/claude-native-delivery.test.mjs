@@ -41,7 +41,8 @@ async function machine(t) {
 
 const acc = path.join(repo, "bin", "acc.mjs");
 const run = (place, args) => import("node:child_process").then(({ execFile }) =>
-  new Promise((resolve, reject) => execFile(process.execPath, [acc, ...args, "--cwd", place.project],
+  new Promise((resolve, reject) => execFile(process.execPath, [
+    ...(place.preload ? ["--import", place.preload] : []), acc, ...args, "--cwd", place.project],
     { env: place.env }, (error, stdout, stderr) =>
       error ? reject(Object.assign(error, { stdout, stderr })) : resolve({ stdout, stderr }))));
 
@@ -51,10 +52,10 @@ const run = (place, args) => import("node:child_process").then(({ execFile }) =>
  * assumed a capture, it passed on the author's laptop and failed on Linux CI -
  * which is how it was found, after the release had already gone out.
  *
- * So it is two tests rather than a skip. Where there is a capture, the install
- * wires the channel. Where there is none, it must say so and wire nothing at
- * all, which is the rule that actually matters - an uncaptured platform must
- * never be promoted to a native path - and it is only checkable off darwin.
+ * The eligible case uses the actual host platform. The unsupported case makes
+ * only its CLI subprocess report an uncaptured architecture, so every host
+ * checks that saved consent cannot wire an unverified native path. This is a
+ * platform-gate fixture, not native-client or operating-system certification.
  */
 const CAPTURED_PLATFORM = process.platform === "darwin" && process.arch === "arm64";
 
@@ -94,10 +95,10 @@ test("an eligible live install writes a channel .mcp.json pointing at managed la
   await assert.rejects(readFile(source), { code: "ENOENT" });
 });
 
-test("a platform with no capture is told so, and no channel is wired", {
-  skip: CAPTURED_PLATFORM ? "this platform has a passing capture" : false,
-}, async t => {
+test("a platform with no capture is told so, and no channel is wired", async t => {
   const place = await machine(t);
+  place.preload = path.join(place.home, "uncaptured-architecture.mjs");
+  await writeFile(place.preload, 'Object.defineProperty(process, "arch", { value: "uncaptured-fixture" });\n');
   const installed = await run(place, ["install", "--adapter", "claude_code", "--delivery",
     "actionable", "--home", place.home]);
 
@@ -106,10 +107,16 @@ test("a platform with no capture is told so, and no channel is wired", {
   // machine actually gets.
   assert.doesNotMatch(installed.stdout, /native delivery is wired/i,
     "an uncaptured platform was told a native path had been wired");
-  assert.match(installed.stdout, /native delivery is off/i,
-    "the downgrade was applied without saying so");
-  assert.match(installed.stdout, /acc inbox|next-turn/i,
-    "the downgrade did not name what is left");
+  assert.match(installed.stdout, /consent saved \(actionable\); not active/i,
+    "saved consent was not distinguished from an active channel");
+  assert.match(installed.stdout, /native delivery is not verified on this platform/i,
+    "the unavailable native channel was not explained");
+  assert.match(installed.stdout, /fallback: acc inbox/i,
+    "the uncaptured platform did not name its durable fallback");
+  const ownership = JSON.parse(await readFile(path.join(place.dataHome, "acc", "installs.json")));
+  const record = ownership.installs.find(entry => entry.adapterId === "claude_code");
+  assert.equal(record.deliveryPolicy, "actionable");
+  assert.equal(record.nativeActivation, undefined);
 
   // The claim and the artefact have to agree. A channel wired here would be a
   // native path on a platform nobody captured, which is the exact thing the
