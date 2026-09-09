@@ -2,7 +2,7 @@ import { defineAdapter, projectContext, projectContextResult }
   from "@agents-can-communicate/adapter-sdk";
 import certification from "../certification.json" with { type: "json" };
 
-import { denyOutcome, injectOutcome, normalizeGrokHook } from "./hooks.mjs";
+import { denyOutcome, injectOutcome, injectToolOwnerOutcome, normalizeGrokHook } from "./hooks.mjs";
 import { planGrokInstall, detectGrok, installGrokHooks, uninstallGrokHooks, grokHomeOf }
   from "./install.mjs";
 
@@ -48,14 +48,16 @@ export function createGrokAdapter() {
       return { ok: true, changes: [], diagnostics: [
         ...detected.diagnostics,
         `hook events observed on Grok ${GROK_VERSION} TUI`,
-        "UserPromptSubmit additionalContext is discarded; agents read acc status / inbox",
+        "UserPromptSubmit context is discarded; run terminal acc status first for own CLI arguments",
+        "terminal owner context observed on Grok 1.0.24; peer messages require inbox reads",
         "write and shell guards are wired but not yet captured denying a real call",
-        "install writes ~/.grok only; Claude Code is a separate adapter",
+        "install writes GROK_HOME (default ~/.grok); Claude Code is a separate adapter",
       ] };
     },
 
     denyOutcome,
     injectOutcome,
+    injectToolOwnerOutcome,
     normalizeHook: payload => normalizeGrokHook(payload),
     renderContext: (sync, options) => projectContext(sync, options),
     renderContextResult: (sync, options) => projectContextResult(sync, options),

@@ -42,6 +42,16 @@ removal before the installer deactivates native integration or deletes recorded
 artifacts. `uninstall` should retain its own validation for direct adapter callers;
 recorded artifact fingerprint checks still determine the `keep` paths it receives.
 
+`injectToolOwnerOutcome({ owner, tool })` is an optional identity-only hook callback.
+The runner calls it after an allowed `beforeTool` handler only when that hook's
+binding still names an open session with the same generation in this workspace.
+Return `null` for an unsupported tool, or `{ stdout, stderr? }` using the client's
+documented context envelope. The runner preserves the guard decision and the
+owner line's byte budget. The callback receives no peer bodies or raw tool input;
+it cannot create a session or advance receipts. Grok uses it to supply CLI owner
+arguments after a terminal result. This does not certify general context or peer
+delivery, and a tool such as `finish` can close the owner before the line arrives.
+
 `renderContextResult` is required wherever an adapter renders peer messages. It returns
 `{ text, offeredMessageIds, includedAttentionIds }`, and the [receipt
 lifecycle](PROTOCOL.md#receipt-lifecycle) advances only from those ids — never by searching
@@ -197,7 +207,7 @@ Measure them. Every client differs, and a wrong shape fails **silently**:
 | Codex | exit 2 + stderr | plain stdout (`developer` message) |
 | Claude Code | `hookSpecificOutput.permissionDecision` | same envelope |
 | Gemini CLI | `{"decision":"block"}` | `hookSpecificOutput` envelope |
-| Grok | `{"decision":"deny","reason"}` (documented; deny not yet captured) | UserPromptSubmit stdout discarded on 1.0.13 |
+| Grok | `{"decision":"deny","reason"}` (documented; deny not yet captured) | UserPromptSubmit stdout discarded; own identity only via PreToolUse after a terminal result, observed on 1.0.24 |
 | Kimi Code | `hookSpecificOutput.permissionDecision` | plain stdout |
 
 `denyOutcome(reason)` returns `{ stdout, stderr, exitCode }`, so the runtime never has to

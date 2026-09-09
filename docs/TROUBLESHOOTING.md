@@ -45,6 +45,11 @@ ACC cannot prove which session owns this shell command. A hook-created presence 
 and the client's native session ID are not shell credentials. Restarting hooks alone does
 not fix this CLI limitation.
 
+In Grok, run public `acc status --json` through the terminal tool first. With the
+updated integration, the ACC hook reminder arrives after that result and supplies
+the session's own CLI arguments. Restart Grok after refreshing its integration;
+a header returned with `finish` belongs to the session that just closed.
+
 Use this session's ACC MCP tools if available. For a manual CLI workflow, open your own
 session with `acc attach --participant my-session --json`, retain the returned `sessionId`
 and `generation`, and pass both as `--session` and `--generation` on subsequent mutations
@@ -127,8 +132,12 @@ or start the session somewhere trusted.
 
 ## Grok shows no injected message
 
-Grok 1.0.13 discarded UserPromptSubmit context in the real capture. Its next-turn and guard
-capabilities remain false. Use `acc status` and `acc inbox`; do not wait for a banner.
+Grok discards UserPromptSubmit context. On the observed 1.0.24 client, run public
+`acc status --json` in its terminal first: the ACC hook reminder after the result
+supplies your own `--session` and `--generation` pair for subsequent inbox reads and
+mutations. Restart Grok after refreshing its installed hooks and skill. Its next-turn,
+live delivery, and guard capabilities remain false; peer messages require explicit inbox
+reads. If the header never arrives, report missing ownership rather than adopting a peer.
 
 ## Kimi sessions remain in history
 

@@ -1,6 +1,7 @@
 # Grok compatibility
 
-Verified 2026-08-31 against the installed client and the published hook docs.
+The initial hook inventory below was verified 2026-08-31 against Grok 1.0.13.
+The later CLI ownership check used Grok 1.0.24; it does not recertify the older client.
 
 | Item | Value |
 |---|---|
@@ -14,7 +15,7 @@ Verified 2026-08-31 against the installed client and the published hook docs.
 
 Grok also scans Claude Code plugins. An ACC install that only wrote `~/.claude`
 made Grok look coordinated when Claude Code was present, and inert when it was
-not. This adapter writes only under `~/.grok`. Claude Code remains a separate
+not. This adapter writes only under `$GROK_HOME` (default `~/.grok`). Claude Code remains a separate
 adapter. Uninstalling Claude Code must not uninstall Grok, and the reverse.
 
 ## Integration surface
@@ -24,7 +25,7 @@ Hooks live in `$GROK_HOME/hooks/*.json` and are always trusted. Skills live in
 stay off until `[plugins].enabled` lists them, so ACC does **not** install as a
 Grok plugin.
 
-Install creates three owned paths:
+Install creates three owned paths under the selected Grok home (defaults shown):
 
 - `~/.grok/hooks/acc.json`
 - `~/.grok/hooks/acc-hook.sh`
@@ -74,7 +75,9 @@ watched blocking a `write` or `run_terminal_command` on this client, so
 
 **Inject.** UserPromptSubmit stdout / `additionalContext` is discarded on 1.0.13
 (published as a current limit). `context.beforeTurnInjection` is therefore
-false. Agents on this client read `acc status` / `acc inbox` via the skill.
+false. On the observed 1.0.24 client, the skill first runs public `acc status --json`,
+receives its own arguments
+from a terminal hook reminder, then uses the exact pair for `acc inbox` and mutations.
 
 PreToolUse `additionalContext` is documented as arriving *after* the call, which
 is not a write guard.
@@ -96,7 +99,7 @@ defaults to 600s.
 - `SessionStart` stdin (the hook was loaded; the log had no execution row)
 - SubagentStart / SubagentStop mapping
 - SessionHeartbeat (this client has none)
-- `GROK_HOME` relocated away from `~/.grok`
+- `GROK_HOME` relocated away from `~/.grok` during the original 1.0.13 capture
 
 ## Consequence for the plan
 
@@ -108,6 +111,41 @@ capability row.
 For message delivery this means polling and durable `acc inbox` only. Grok has
 no certified next-turn or live-push transport, including on the observed 1.0.13
 client, and installation must never report either one as active.
+
+## CLI ownership check (2026-09-08, macOS arm64)
+
+A locally packed development candidate was installed into an isolated home with the
+ordinary ACC installer, then loaded by **Grok 1.0.24 (`68e414c661e3`, stable)**.
+The binary SHA-256 was
+`4291021c1570a7c8610277a3d65490a5e54b50311e222c6b4614264f02a215b3`.
+The headless client used its documented `bypassPermissions` mode for disposable ACC
+commands; ordinary approval mode had cancelled the first command for lack of interactive
+input. ACC does not select or alter this permission mode.
+
+The installed skill ran public status, then used its own hook-provided session and
+generation for intent, a room note, and a complete handoff. Public ACC state attributed
+the note and handoff to the participant derived from that exact native Grok session;
+no manually attached or MCP replacement participant appeared. Both recorded messages
+survived exit, with zero live sessions or claims. Evidence retains client/version hashes,
+operation metadata, and deliberate ACC fixture messages, not raw client transcripts.
+
+Configured **PreToolUse** `additionalContext` arrives after the terminal result. ACC
+sends one complete own-identity line only; it does not rewrite the command, collect peer
+bodies, or advance delivery receipts. The first public status call is a bootstrap, not an
+owned mutation. A header alongside `finish` can already name a closed owner; every owned mutation or
+inbox read still validates the pair. A new genuine user turn supplies a fresh owner.
+
+Two independently launched Grok sessions also completed a request/reply exchange:
+each saw its own header, used only its own pair, explicitly read the message, and
+finished with a complete handoff. The request became `acknowledged`, the answer
+`retrieved`, and both owners closed. The [normalized capture](fixtures/cli-owner-grok-1.0.24.json)
+records these observations and the tested development archive hash.
+
+This proves the installed CLI ownership flow on the observed version and platform.
+It does not prove external wake, peer-message injection, subagent identity, a real guard
+refusal, or support on other client versions/platforms. All capability flags remain false.
+Install, doctor, and uninstall also exercise explicit, empty, and unset `GROK_HOME` through
+the packed CLI; relocating a profile never authorizes using another session's identity.
 
 ## Native delivery boundary (2026-09-02)
 

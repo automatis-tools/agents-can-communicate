@@ -1,0 +1,44 @@
+{
+  "schemaVersion": 1,
+  "kind": "normalized-installed-native-observations",
+  "capturedAt": "2026-09-09T00:45:48.161Z",
+  "platform": "darwin-arm64",
+  "client": "grok 1.0.24 (68e414c661e3) [stable]",
+  "clientBinarySha256": "4291021c1570a7c8610277a3d65490a5e54b50311e222c6b4614264f02a215b3",
+  "artifact": {
+    "version": "0.4.0",
+    "published": false,
+    "sha256": "973088843c04ea96a0f9dfa8deb520f92ebf39d85f957c5adbeb6877bfa92c44",
+    "sourceBase": "bf597470eb611244c95b63733837b587b1548ef9",
+    "workingTreeChanges": true
+  },
+  "permissionMode": "bypassPermissions",
+  "installation": "ordinary ACC install in isolated home; no replacement hooks, MCP identity, or manual attach",
+  "context": {
+    "event": "PreToolUse",
+    "tool": "run_terminal_command",
+    "timing": "after terminal result",
+    "contents": "one own-session CLI header only"
+  },
+  "observations": {
+    "nativeSessions": 2,
+    "loadedInstalledSkill": true,
+    "firstPublicStatus": true,
+    "ownHeaderReachedBothModels": true,
+    "distinctOwnerPairsUsed": true,
+    "ownedRequestAndReply": true,
+    "requestReceipt": "acknowledged",
+    "answerReceipt": "retrieved",
+    "completeHandoffs": 2,
+    "liveSessionsAfterExit": 0,
+    "claimsAfterExit": 0
+  },
+  "doesNotCertify": [
+    "peer-context injection",
+    "external wake",
+    "write or shell refusal",
+    "subagent identity",
+    "other versions or platforms"
+  ],
+  "privacy": "normalized event/operation facts and hashes only; no raw client transcript or credentials"
+}

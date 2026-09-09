@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Grok install, doctor, and uninstall respect `GROK_HOME`, including paths with spaces;
+  an empty or unset value keeps the default `~/.grok`.
+
+- Grok can obtain its own CLI session arguments through terminal-tool hook context.
+  A public status call supplies the pair for subsequent owned commands; peer bodies
+  still require inbox reads, and closed or missing owners are never adopted.
 - Hooks now explain when a workspace contains ACC's own state, as when a client
   starts in `~`, and tell the user to restart in a project directory. Failures still
   let the client continue and do not reflect arbitrary error details.

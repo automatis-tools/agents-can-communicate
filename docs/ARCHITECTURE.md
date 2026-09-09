@@ -104,6 +104,8 @@ A lone session can remain ephemeral. Durable state materialises when a second li
 appears or the first claim, message, or handoff is committed. Solo presence therefore
 does not require durable workspace history. Native turn hooks still supply the session's
 own CLI arguments, so a peer joining later in the same turn does not require reattachment.
+Grok instead receives that own header after a terminal tool result through PreToolUse;
+the first public status call makes it available for subsequent owned commands.
 Without relevant coordination context, that identity header is the only projected content.
 
 ## Inbox, attention, and projection
