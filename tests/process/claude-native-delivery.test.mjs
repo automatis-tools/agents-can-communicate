@@ -65,6 +65,12 @@ test("an eligible live install writes a channel .mcp.json pointing at managed la
   const installed = await run(place, ["install", "--adapter", "claude_code", "--delivery",
     "actionable", "--home", place.home]);
   assert.match(installed.stdout, /native delivery is wired/i);
+  assert.match(installed.stdout, /MCP connection does not verify inbound delivery/,
+    "install treated a configured Channel as proof Claude admitted its messages");
+  const doctor = await run(place, ["doctor", "--home", place.home]);
+  assert.match(doctor.stdout, /Channels.*startup/,
+    "doctor omitted the client-side Channel admission check");
+  assert.match(doctor.stdout, /MCP connection does not verify inbound delivery/);
   const source = path.join(place.home, ".claude", "plugins", "marketplaces", "acc-local",
     "agents-can-communicate", ".mcp.json");
   const versions = await readdir(path.join(place.home, ".claude", "plugins", "cache", "acc-local",

@@ -11,9 +11,9 @@ import { bindNativeSession, offerMessage, planNativeActivation, probeNativeDeliv
 export const CLAUDE_CODE_VERSION = "2.1.233";
 export const CLAUDE_CHANNEL_MINIMUM = "2.1.258";
 export const CLAUDE_DELIVERY_FALLBACK = Object.freeze({
-  diagnostic: "Claude Code native delivery is off: the 2.1.252 capture stopped at the "
-    + "development-channel security warning before the ACC MCP child started; messages "
-    + "stay durable for certified next-turn delivery or acc inbox",
+  diagnostic: "Claude Code native delivery requires client-side Channels activation; "
+    + "a successful bootstrap or connected ACC MCP server does not prove inbound delivery "
+    + "is enabled. Messages remain durable for certified next-turn delivery or acc inbox",
 });
 
 /**

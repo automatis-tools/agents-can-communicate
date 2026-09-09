@@ -8,6 +8,9 @@
   the actual fallback separately. Declining live delivery no longer promises uncertified
   next-turn delivery. Doctor distinguishes existing Claude launch policy from current
   Codex recorded consent and ignores hook-only bindings when reporting native delivery.
+- Claude install and doctor now ask users to check client-side Channels activation.
+  A connected MCP server and an active ACC transport do not verify that Claude admits
+  inbound messages. Historical capture failures are no longer presented as current state.
 
 | Development artifact | Value |
 |---|---|

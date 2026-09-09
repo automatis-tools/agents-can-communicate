@@ -110,9 +110,26 @@ manual` can also mean the current version has no certified session-end hook; it 
 prove that no hooks ran.
 
 For Claude Code, open a fresh interactive zsh after installation so its launcher
-is on PATH, and accept its visible development-channel warning. A failed channel
-connection may remain in Claude's `~/.claude/mcp-needs-auth-cache.json` for about
-fifteen minutes; remove only the `acc` entry and restart if that is the cause.
+is on PATH. Check Claude's **Channels startup notice for ACC**, and accept the
+development-channel warning when it appears. A successful bootstrap cache means the
+executable passed ACC's compatibility probe. `/mcp` showing `connected` and two tools
+means the MCP server connected. Even `runtime: active` in ACC's doctor JSON describes
+the local transport; none of these proves that Claude enabled inbound channel messages.
+
+If Claude says `--dangerously-load-development-channels ignored` or `Channels are not
+currently available`, it has not enabled that delivery path. On a fresh 2.1.266 test
+profile, the first launch showed those messages and the next launch showed the development
+warning; restarting once can recheck availability, but is not a guaranteed fix. If it
+remains unavailable, follow Claude's notice. Organization policy can also block Channels;
+an administrator must enable them where required. ACC does not override that policy.
+See [Claude's Channels documentation](https://code.claude.com/docs/en/channels).
+
+If `deliveryBindings` is empty, ACC has not bound a local transport either. Check the
+same running session's `ACC_NATIVE_DELIVERY_POLICY` (normally `actionable` after opting
+in), hook activation and workspace identity. A previously successful bootstrap cache
+does not establish the environment of the current launch. If Claude explicitly reports
+a cached MCP connection failure, reconnect the ACC server through `/mcp` and restart
+the session if needed.
 
 Closing a Codex terminal can leave its daemon thread loaded and eligible. Use
 `acc install --adapter codex --delivery off` to stop new ACC native offers.

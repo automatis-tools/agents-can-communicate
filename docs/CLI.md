@@ -253,6 +253,9 @@ starts or stops the vendor daemon. The install summary names each client's reque
 activation state and verified fallback. `doctor` separates protocol readiness, recorded
 consent and a live channel in the current workspace, with a next step for missing activation.
 A supported version or an installed plugin alone is not an active delivery channel.
+`runtime: active` means ACC has a reachable local transport binding. Claude can still
+block inbound Channels messages while its MCP server and tools remain connected;
+doctor therefore also names the client-side startup check.
 In doctor JSON, `nativeDelivery.activation` distinguishes missing launch setup from a
 recorded setup (or `not_required` for a pre-existing service). `policy` is the installed
 choice; `sessionPolicy` describes a native binding when one is visible. Existing Claude

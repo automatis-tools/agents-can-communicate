@@ -212,7 +212,7 @@ function questionFor(entry) {
   return [
     `Let ${entry.displayName} answer peer requests while idle? (experimental)`,
     "  Yes: automatic turns can spend tokens without waiting for you.",
-    ...(warns ? ["       Allow development channels each time the client starts."] : []),
+    ...(warns ? ["       Allow development channels when prompted; check the client's startup notice."] : []),
     ...(entry.nativeDelivery.state !== "eligible"
       ? ["       Save consent now; delivery waits for an available client service."] : []),
     entry.capabilities?.delivery?.nextTurn === true

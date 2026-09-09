@@ -14,7 +14,7 @@ test("eligibility, configuration, policy, and runtime are reported as distinct f
   assert.equal(describeNative(state({ configured: true, policy: "actionable", runtime: "waiting" })),
     "available; enabled (actionable); no live channel bound in this workspace");
   assert.equal(describeNative(state({ configured: true, policy: "all", runtime: "active",
-    modes: ["livePush", "replyRoute"] })), "available; enabled (all); active");
+    modes: ["livePush", "replyRoute"] })), "available; enabled (all); local transport active");
 });
 
 test("an unsupported or degraded client names its closed reason and never claims a session", () => {

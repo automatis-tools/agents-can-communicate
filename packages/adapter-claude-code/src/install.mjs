@@ -1,6 +1,9 @@
 import { cp, mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 
+// Kept together above 300 lines: source and cache publication, vendor registry
+// merges and their exact uninstall share one ownership transaction and helpers.
+
 import { AccError, EXIT } from "@agents-can-communicate/protocol";
 import { fileURLToPath } from "node:url";
 
@@ -19,6 +22,9 @@ const manifest = fileURLToPath(new URL("../plugin/.claude-plugin/plugin.json",
 const PLUGIN_NAME = "agents-can-communicate";
 const MARKETPLACE = "acc-local";
 const QUALIFIED = `${PLUGIN_NAME}@${MARKETPLACE}`;
+const CHANNEL_ACTIVATION_CHECK = "Check Claude's Channels startup notice for ACC; "
+  + "an MCP connection does not verify inbound delivery. If Channels are unavailable "
+  + "or blocked, resolve that client warning before expecting live messages.";
 
 /**
  * How this client actually installs a plugin.
@@ -244,6 +250,7 @@ export async function installClaudePlugin({ configDir, runner, cli, preserveVers
     changes: [source, cached, marketplaceFile(configDir),
       knownMarketplacesPath(configDir), installedPluginsPath(configDir), file,
       ...(live ? [mcpPath(source), mcpPath(cached)] : [])],
+    needsAction: live ? [CHANNEL_ACTIVATION_CHECK] : [],
     diagnostics: live
       ? ["native channel wired; Claude's experimental development-channel warning still applies"]
       : [] };
@@ -290,7 +297,10 @@ export async function detectClaude({ configDir }) {
   const registered = Object.hasOwn(
     (await readJson(installedPluginsPath(configDir), { plugins: {} })).plugins ?? {},
     QUALIFIED);
+  const channelConfigured = enabled && registered
+    && (await readJson(mcpPath(sourceDir(configDir)), null))?.mcpServers?.["acc-channel"] != null;
   return { ok: true, changes: [],
+    needsAction: channelConfigured ? [CHANNEL_ACTIVATION_CHECK] : [],
     diagnostics: [enabled && registered
       ? "acc plugin registered and enabled"
       : "acc plugin not registered"] };

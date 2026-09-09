@@ -303,7 +303,7 @@ test("an interactive install asks one default-No question per eligible client", 
     "each choice must identify its recipient");
   assert.match(first, /experimental/);
   assert.match(first, /automatic turns can spend tokens/);
-  assert.match(first, /Allow development channels each time the client starts/);
+  assert.match(first, /Allow development channels when prompted/);
   assert.match(first, /No:.*acc inbox/);
   assert.doesNotMatch(first, /messages still arrive, at the session.s next turn/);
   assert.doesNotMatch(first, /--captured|PATH|shim|launcher|plugin entry|\.zshrc/);

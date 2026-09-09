@@ -705,3 +705,29 @@ tool results reported errors; their text was not retained, so their causes canno
 be classified from this capture. The final outcome and independent checks passed.
 No ACC runtime, maintained test or capability changed; delivery stayed off. Only
 Claude ran natively in this capture, and no native Codex settings were changed.
+## Startup admission check, 2026-09-09 (no model delivery capture)
+
+Claude Code 2.1.266 on darwin-arm64 was launched through the ordinary ACC-generated
+shim in a disposable profile. ACC was installed from the development archive built
+from `5503e2a867f23215c7e8fc8aa072ab4efd9b725f`, SHA-256
+`04ce871d1a79f47f4bac14795a7c26d9bfe627df08b57bd300534fe97990d064`.
+The profile used a dummy API key and an unreachable localhost model endpoint; this
+exercise did not authenticate to a model or demonstrate a model receiving a message.
+
+On the first completed startup, bootstrap reported `supported: true`, `/mcp` showed
+the ACC Channel connected with two tools, and ACC published an `actionable` binding
+for the actual Claude PID. Claude nevertheless reported that it ignored the development
+flag because Channels were not currently available. On the next launch of that same
+profile, Claude displayed its development-channel warning. The cause of that change
+in vendor availability was not established; restarting is not a guaranteed remedy.
+
+A metadata-only witness on the second launch observed `actionable` in the MCP child
+and subsequent prompt hook. MCP initialization used protocol `2025-11-25`, client
+version `2.1.266`, roots/listChanged and elicitation capabilities; it did not report
+whether Claude admitted inbound Channel notifications. No raw conversation content
+was retained as evidence, and no capability certification is added by this check.
+
+This exposes a diagnostic limit: ACC's native binding verifies its local endpoint,
+not the vendor's inbound Channel gate. Install/doctor now name the separate client-side
+check, and doctor calls the observed state a local active transport. The remote report
+of an empty binding list remains unconfirmed; it was not reproduced by this local run.

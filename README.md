@@ -95,8 +95,10 @@ mutations. It adds no automatic peer-message injection or idle delivery. A reloc
 **Optional live delivery can start a turn in an idle Codex or Claude Code session.** It is
 experimental, off by default, and can spend model tokens. On Apple Silicon Macs, Codex
 0.152.1 or newer requires an already-running LocalDaemon and a verified session;
-Claude Code 2.1.258 or newer requires zsh and shows its development-channel warning at
-startup. Messages arriving mid-turn wait for the turn to finish. The receiving session's
+Claude Code 2.1.258 or newer requires zsh and client-side Channels activation; check its
+startup notice for ACC and accept the development warning when shown. An MCP connection
+alone does not verify inbound delivery. Messages arriving mid-turn wait for the turn to
+finish. The receiving session's
 opt-in policy and current reachability determine whether delivery can proceed.
 `acc install` reports each client's delivery state and can save Codex consent before its
 service is available. `acc doctor` distinguishes a disabled policy from an unavailable

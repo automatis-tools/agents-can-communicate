@@ -49,8 +49,11 @@ verified channel in the current session. Codex can save your choice even when it
 service is not running yet. Declining uses the reported fallback: `acc inbox`, or next-turn
 hooks only where the exact client version and platform are certified.
 
-If you opt into Claude Code's experimental idle delivery, Claude also shows its own
-development-channel warning at every startup. The feature is off by default, can spend
+If you opt into Claude Code's experimental idle delivery, check Claude's Channels startup
+notice for ACC and accept its development-channel warning when shown. If it reports Channels
+unavailable or blocked, a connected MCP server does not make inbound delivery work;
+see [troubleshooting](TROUBLESHOOTING.md#i-enabled-live-delivery-but-got-fallback).
+The feature is off by default, can spend
 model tokens, and currently requires Apple Silicon macOS, zsh, and Claude Code 2.1.258 or
 newer. You do not need it for durable messages or supported next-turn delivery.
 

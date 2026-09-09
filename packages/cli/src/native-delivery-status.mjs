@@ -9,7 +9,7 @@ export function describeNative(native, { clientVersion } = {}) {
     : `${native.eligibility === "unsupported" ? "unavailable" : "readiness unverified"}: `
       + describeNativeReason(native.reasonCode, { clientVersion, minimumVersion: native.minimumVersion });
   const runtime = native.runtime === "active"
-    ? `active${differs ? ` (session policy: ${native.sessionPolicy})` : ""}`
+    ? `local transport active${differs ? ` (session policy: ${native.sessionPolicy})` : ""}`
     : native.runtime === "degraded" ? "channel unreachable"
       : native.configured && native.runtime === "waiting"
         ? "no live channel bound in this workspace" : null;
