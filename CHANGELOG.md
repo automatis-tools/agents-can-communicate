@@ -14,16 +14,19 @@
   Explicit opt-outs remain off, and a partial uninstall failure keeps updates paused.
   Existing 0.4.0 uninstall records cannot recover a lost preference; use
   `acc update --auto on` once if updates should resume.
+- README and onboarding now cover current client activation, Grok ownership and inbox
+  limits, automatic-update controls, bounded context, and historical recovery.
 
 | Candidate | Value |
 |---|---|
-| Built from | `48ef369715f4069adcce82268ddd7fbb54ac9956` |
-| Tarball | `agents-can-communicate-0.4.1.tgz`, 333,326 bytes, 249 files |
-| sha256 | `7d5be2b10371ee021bd1f1885db1dd8f0a2bec50d8931e88f4cea0a4e60e03c4` |
+| Built from | `efee0d0818d561ceffcb30129e26eaff6c17a6d7` |
+| Tarball | `agents-can-communicate-0.4.1.tgz`, 333,744 bytes, 249 files |
+| sha256 | `6c306ca6b50014e8b00137a5907260dc08d4508ebb0086189d5d880f0cc539fe` |
 
 The exact archive passed package verification and the published-0.4.0 managed upgrade
-preflight; all 249 source/archive/installed/managed files match. A real Grok 1.0.24 session
-used the upgraded integration for owned work, a note and a complete handoff.
+preflight; all 249 source/archive/installed/managed files match. Before the documentation
+refresh, a real Grok 1.0.24 session used byte-identical runtime and integration files for
+owned work, a note and a complete handoff.
 See [0.4.1 candidate evidence](docs/release-evidence/v0.4.1.md) for validation and limits.
 Publication remains a separate maintainer action.
 
