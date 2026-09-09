@@ -1,12 +1,13 @@
-# Upgrading to 0.4.1
+# Upgrading to 0.4.2
 
-## From 0.4.0
+## From 0.4.1 or 0.4.0
 
-This patch keeps the existing workspace data format. It fixes Grok CLI ownership,
-relocated Grok profiles, automatic-update preferences after reinstall, and the warning
-when a client starts in a directory containing ACC's own state.
+This patch keeps the existing workspace data format. It makes installation and delivery
+diagnostics clearer, records the last native binding attempt per session, and restores
+hook participation after detaching a solo session without restarting the conversation.
+It also includes the 0.4.1 Grok, reinstall-preference and workspace-warning fixes.
 
-Close the participating clients and persistent ACC MCP processes, then run:
+Close participating clients and persistent ACC MCP processes, then run:
 
 ```bash
 acc update
@@ -14,17 +15,28 @@ acc version
 acc doctor
 ```
 
-After publication, `acc version` should report 0.4.1. A managed update refreshes the
-installed integrations and skills. Restart the clients and complete any hook/trust
-review they request. Existing managed installations activate the selected runtime
-through `acc update`; use the npm install steps below for pre-0.4 or unmanaged
-installations. When pinned to 0.4.0, select 0.4.1 or clear the pin first.
+After publication, `acc version` should report 0.4.2. If a pin keeps an older version,
+select 0.4.2 or clear it first. A managed update refreshes installed integrations and
+skills; use the npm instructions below for unmanaged or pre-0.4 installations. Start
+clients again and complete any hook/trust review they request.
 
-In Grok, the refreshed skill runs public status through the terminal before its first
-owned command. The hook reminder after that result supplies the session's own CLI
-arguments. Grok still reads peer messages explicitly through inbox; this patch does not
-add external wake or certify guards. Start clients in a project directory, rather than
-in a home directory containing ACC state.
+Run `acc doctor` in the project after the new clients have started (or submitted a normal
+turn). Its per-session lines now explain missing launch consent, an unidentified client
+process and a failed or timed-out handshake. `nativeDelivery.sessions[].lastAttempt` in
+`acc doctor --json` provides the same closed metadata and timestamp. Existing owners may
+have no attempt record until a new hook runs; missing metadata does not prove hooks are
+disabled. A previous successful handshake and a connected MCP server do not prove that
+Claude admitted inbound Channels messages. See [delivery troubleshooting](TROUBLESHOOTING.md#i-enabled-live-delivery-but-got-fallback).
+
+Upgrading preserves delivery consent. If doctor reports native delivery off and you want
+automatic peer requests, use `acc install --adapter codex --delivery actionable` (or the
+relevant adapter); this can spend model tokens. Codex can save that consent before its
+local service/session becomes available. ACC does not start the vendor daemon, and it
+keeps durable inbox access when no verified live channel is bound.
+
+In Grok, public status supplies the session's own CLI arguments through the next tool
+hook. Grok still uses explicit inbox reads; this patch adds no external wake or guards.
+Start clients in a project directory, rather than a home directory containing ACC state.
 
 ## From 0.3.1
 
@@ -47,7 +59,7 @@ restores access; deleting or editing the record is not a remedy.
 2. Install the released package, then refresh the client integrations:
 
    ```bash
-   npm install --global agents-can-communicate@0.4.1
+   npm install --global agents-can-communicate@0.4.2
    acc version
    acc install
    ```
@@ -97,7 +109,7 @@ acc update                    # download and apply, or report what is keeping it
 acc update --check            # check without installing or changing update settings
 acc update --auto off         # disable background updates
 acc update --auto on          # enable them again
-acc update --pin 0.4.1        # stay on this exact stable version
+acc update --pin 0.4.2        # stay on this exact stable version
 acc update --pin none         # follow stable releases again
 ```
 

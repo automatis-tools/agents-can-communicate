@@ -73,8 +73,8 @@ Run `acc doctor` from the project if a peer is missing. A directory containing A
 state, commonly your home directory, cannot be used as a workspace; start the client in a
 project directory. See [Troubleshooting](docs/TROUBLESHOOTING.md).
 
-Already using ACC? Follow the [upgrade guide](docs/UPGRADING.md), including the 0.4.0 →
-0.4.1 update and the data-format boundary when moving from 0.3.1.
+Already using ACC? Follow the [upgrade guide](docs/UPGRADING.md), including the 0.4.0/0.4.1 →
+0.4.2 update and the data-format boundary when moving from 0.3.1.
 
 ## When messages arrive
 

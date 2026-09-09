@@ -1,7 +1,10 @@
 # Changelog
 
-## Unreleased
+## 0.4.2 — release candidate
 
+- A genuine prompt restores ACC participation after detaching a solo session whose
+  ephemeral owner was removed. It retains the participant address, uses fresh session
+  credentials and refuses a replacement that appears during client probing.
 - Doctor reports the last native binding attempt for each current session, including
   absent delivery consent, an unidentified client process and handshake failures/timeouts.
   Diagnostics replace one small record per hook owner, stay outside repositories and
