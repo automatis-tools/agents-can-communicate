@@ -44,6 +44,11 @@ state directory is in `sandbox_workspace_write.writable_roots` in the config it 
 ACC keeps those user settings unchanged. Installed files alone do not establish that hooks
 are active; `acc doctor` leaves current readiness unverified and directs you to Codex.
 
+Read the delivery summary for each client. Live delivery needs an explicit opt-in and a
+verified channel in the current session. Codex can save your choice even when its local
+service is not running yet. Declining uses the reported fallback: `acc inbox`, or next-turn
+hooks only where the exact client version and platform are certified.
+
 If you opt into Claude Code's experimental idle delivery, Claude also shows its own
 development-channel warning at every startup. The feature is off by default, can spend
 model tokens, and currently requires Apple Silicon macOS, zsh, and Claude Code 2.1.258 or

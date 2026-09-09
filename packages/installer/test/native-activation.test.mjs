@@ -109,7 +109,7 @@ test("policies are explicit per adapter, and an ineligible client cannot be acti
       deliveryByAdapter: { other: "all" } });
     const otherOp = forced.operations.find(op => op.adapterId === "other");
     assert.equal(otherOp.effectiveLivePolicy, "off");
-    assert.match(otherOp.deliveryDiagnostic, /version_unavailable/);
+    assert.match(otherOp.deliveryDiagnostic, /client version could not be verified/);
   });
 
 test("apply activates, records owned bytes, and a second policy regenerates only the shim",

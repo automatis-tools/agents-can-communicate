@@ -6,6 +6,8 @@ import { effectiveCapabilities, evaluateNativeEligibility, validateNativeActivat
 
 import { resolveExecutable, shellOf, shimDirFor } from "./native-activation.mjs";
 
+import { describeDeliveryFallback, describeNativeReason } from "./delivery-diagnostics.mjs";
+
 const run = promisify(execFile);
 
 // Reasons the client itself will not change within an install: unsupported,
@@ -79,8 +81,14 @@ async function detectNative(adapter, entry, { context, platform, probeTimeoutMs,
     }
     if (facts.eligibility.eligible !== true) {
       const reasonCode = facts.eligibility.reasonCode ?? "feature_probe_failed";
+      // A stored policy can be consented to before a service/session exists.
+      // No activation is planned until the full probe passes; bootstrap-based
+      // clients still need their verified plan to disclose launch changes.
+      const consentAvailable = adapter.nativeDelivery.policySource === "installation-record"
+        && ["native_endpoint_unavailable", "native_session_unavailable"].includes(reasonCode);
       return STATIC_REASONS.has(reasonCode)
-        ? { ...unsupported(reasonCode), ...facts } : degraded(reasonCode, facts);
+        ? { ...unsupported(reasonCode), ...facts }
+        : { ...degraded(reasonCode, facts), consentAvailable };
     }
     let activationPlan;
     try {
@@ -151,15 +159,19 @@ export async function detectInstallation({ adapters, context, probe = spawnProbe
       } catch (error) {
         entry.error = entry.error ?? error.message;
       }
-      if (entry.nativeDelivery.state !== "eligible"
-        && typeof adapter.deliveryFallback?.diagnostic === "string") {
-        const nextTurnDowngraded = adapter.capabilities?.delivery?.nextTurn === true
-          && entry.capabilities?.delivery?.nextTurn !== true;
-        entry.deliveryDiagnostic = nextTurnDowngraded
-          ? `${adapter.displayName} ${entry.version ?? "unknown version"} has no certified `
-            + `next-turn delivery on ${platform}; ${adapter.deliveryFallback.diagnostic}`
-          : adapter.deliveryFallback.diagnostic;
-        entry.diagnostics.push(entry.deliveryDiagnostic);
+      if (entry.nativeDelivery.state !== "eligible") {
+        if (adapter.nativeDelivery !== undefined) {
+          entry.deliveryDiagnostic = `${adapter.displayName} native delivery: `
+            + `${describeNativeReason(entry.nativeDelivery.reasonCode)}; `
+            + `fallback: ${describeDeliveryFallback(entry)}`;
+        } else if (typeof adapter.deliveryFallback?.diagnostic === "string") {
+          const downgraded = adapter.capabilities?.delivery?.nextTurn === true
+            && entry.capabilities?.delivery?.nextTurn !== true;
+          entry.deliveryDiagnostic = (downgraded
+            ? `${adapter.displayName} ${entry.version ?? "unknown version"} has no certified `
+              + `next-turn delivery on ${platform}; ` : "") + adapter.deliveryFallback.diagnostic;
+        }
+        if (entry.deliveryDiagnostic !== null) entry.diagnostics.push(entry.deliveryDiagnostic);
       }
       return entry;
     }));

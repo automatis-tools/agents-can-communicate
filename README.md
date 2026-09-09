@@ -98,6 +98,9 @@ experimental, off by default, and can spend model tokens. On Apple Silicon Macs,
 Claude Code 2.1.258 or newer requires zsh and shows its development-channel warning at
 startup. Messages arriving mid-turn wait for the turn to finish. The receiving session's
 opt-in policy and current reachability determine whether delivery can proceed.
+`acc install` reports each client's delivery state and can save Codex consent before its
+service is available. `acc doctor` distinguishes a disabled policy from an unavailable
+service or a missing live channel in the current project.
 
 A Codex thread retained by LocalDaemon can receive opted-in messages after its terminal
 exits. Turning ACC delivery off prevents new native offers; already accepted queue entries

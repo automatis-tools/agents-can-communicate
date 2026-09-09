@@ -13,3 +13,5 @@ export { BLOCK_BEGIN, BLOCK_END, SHIM_MARKER, SHIM_POLICIES, SUPPORTED_SHELLS,
 export { LIVE_POLICIES, describeActivation, describeDeactivation, livePolicyOf, rcFileFor,
   resolveExecutable, shellOf, shimDirFor } from "./native-activation.mjs";
 export { readInstalledLivePolicy } from "./live-policy.mjs";
+export { describeDeliveryFallback, describeInstallDelivery, describeNativeReason }
+  from "./delivery-diagnostics.mjs";

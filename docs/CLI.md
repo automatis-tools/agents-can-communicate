@@ -239,8 +239,9 @@ external AI client. An addressed handoff requires acknowledgement; a room handof
 `--delivery off|actionable|all` is a per-client recipient policy request, not a capability
 switch, and the default is `off`. `--adapter` is repeatable to name several clients. An
 explicit `--delivery` applies uniformly and never prompts; omitting it on an interactive
-terminal asks one default-No question per eligible client, and on a non-interactive run or a
-`--dry-run` it keeps fresh clients off. A recorded opt-in is kept on upgrade. If the detected
+terminal asks one default-No question per supported client. Codex can save consent while
+its local service is unavailable or has no loaded session; this does not activate delivery.
+A non-interactive run or a `--dry-run` keeps fresh clients off. A recorded opt-in is kept on upgrade. If the detected
 client cannot receive native delivery - unsupported, below the captured minimum, a
 prerelease, known-bad, a wrong platform, or an unsupported shell - installation keeps the
 effective policy off and prints the reason. Claude Code shell activation writes an owned
@@ -248,7 +249,16 @@ zsh PATH block and a shim that `exec`s the real client; `ACC_BYPASS=1` bypasses 
 activation. Codex LocalDaemon delivery uses recorded installation consent without changing
 ordinary launch arguments. Its opt-in remains active when shim variables are absent or
 bypassed; `acc install --adapter codex --delivery off` disables new native offers. ACC never
-starts or stops the vendor daemon. See [delivery consent](CONFIGURATION.md#keep-delivery-consent-user-owned).
+starts or stops the vendor daemon. The install summary names each client's requested policy,
+activation state and verified fallback. `doctor` separates protocol readiness, recorded
+consent and a live channel in the current workspace, with a next step for missing activation.
+A supported version or an installed plugin alone is not an active delivery channel.
+In doctor JSON, `nativeDelivery.activation` distinguishes missing launch setup from a
+recorded setup (or `not_required` for a pre-existing service). `policy` is the installed
+choice; `sessionPolicy` describes a native binding when one is visible. Existing Claude
+sessions can retain their launch policy after a different choice is installed for new
+sessions; Codex checks current recorded consent before new offers.
+See [delivery consent](CONFIGURATION.md#keep-delivery-consent-user-owned).
 
 An initial `acc install` enables automatic updates. Reinstalling preserves an explicit
 `acc update --auto off` choice. A full uninstall pauses updates; reinstalling restores

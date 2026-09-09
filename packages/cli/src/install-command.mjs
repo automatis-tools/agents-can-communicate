@@ -148,8 +148,8 @@ export function describeOutcome({ action, acted, failed = [], skipped = [],
   ...operations.filter(operation => operation.applied)
     .flatMap(operation => describeChanges(operation, home)),
   ...operations.filter(operation => operation.applied
-    && typeof operation.deliveryDiagnostic === "string")
-    .map(operation => `  ${operation.deliveryDiagnostic}`),
+    && typeof (operation.deliverySummary ?? operation.deliveryDiagnostic) === "string")
+    .map(operation => `  ${operation.deliverySummary ?? operation.deliveryDiagnostic}`),
   ...operations.filter(operation => operation.applied)
     .flatMap(operation => (operation.needsAction ?? [])
       .map(step => `  ${operation.adapterId}: ${step}`)),
@@ -203,42 +203,21 @@ export function actedOn(result) {
 const isInteractive = runtime => typeof runtime.isInteractive === "function"
   && runtime.isInteractive() === true;
 
-/**
- * One default-No question per eligible client, asked only after detection has
- * finished and only when a person is at both ends of the terminal.
- *
- * Written for someone who has never heard of this project. It used to open with
- * "Enable native live delivery" over a list of internal artefact names, which
- * told a first-time reader neither what they would gain nor what it would cost -
- * and left out the part that matters most: saying yes makes their own `claude`
- * start with the vendor's `--dangerously-load-development-channels` flag. A
- * consent prompt that hides the loudest consequence is not consent.
- *
- * So the order is the reader's, not the installer's: what changes for them,
- * what it costs, what it touches, and that "no" costs them nothing.
- */
-function questionFor(entry, context, { onlyEligible = false } = {}) {
-  const bootstrap = entry.nativeDelivery.activationPlan.mechanisms
+// One default-No question per supported client. Disclose token use and any
+// repeated channel prompt; declining only promises a verified fallback.
+function questionFor(entry) {
+  const bootstrap = entry.nativeDelivery.activationPlan?.mechanisms
     .find(mechanism => mechanism.kind === "shell-bootstrap") ?? null;
-  // The presence of a flag is what makes this worth asking about at all: it is
-  // why the client will warn at every start from now on. Which flag it is, and
-  // that a shim adds it, are answers to a question nobody is asking here - the
-  // shim `exec`s and is gone, so nothing runs "through" acc afterwards either.
-  const flags = (bootstrap?.prefixArgs ?? []).filter(argument => argument.startsWith("--"));
-  void context;
-  // Why the default is No, and why only one client is being asked about, are
-  // the two questions the bare prompt provokes and never answered: a `[y/N]`
-  // reads as "not recommended" on its own, and a single question among four
-  // installed clients reads as an omission. Both have the same short answer.
-  const aside = ["experimental", ...(onlyEligible ? [`${entry.displayName} only`] : [])]
-    .join("; ");
+  const warns = (bootstrap?.prefixArgs ?? []).some(argument => argument.startsWith("--"));
   return [
-    `Let idle agents answer each other while you are away?  (${aside})`,
-    ...(flags.length === 0 || bootstrap === null
-      ? ["  Yes: they reply without waiting for you."]
-      : [`  Yes: they reply without waiting for you, and ${entry.displayName} asks you`,
-        "       to allow development channels every time it starts."]),
-    "  No:  messages still arrive, at the session's next turn.",
+    `Let ${entry.displayName} answer peer requests while idle? (experimental)`,
+    "  Yes: automatic turns can spend tokens without waiting for you.",
+    ...(warns ? ["       Allow development channels each time the client starts."] : []),
+    ...(entry.nativeDelivery.state !== "eligible"
+      ? ["       Save consent now; delivery waits for an available client service."] : []),
+    entry.capabilities?.delivery?.nextTurn === true
+      ? "  No:  use next-turn hooks (when enabled) or acc inbox."
+      : "  No:  read messages with acc inbox; automatic next-turn delivery is unavailable.",
   ].join("\n");
 }
 
@@ -250,22 +229,18 @@ function questionFor(entry, context, { onlyEligible = false } = {}) {
  * client is off unless a person answers yes here, and a dry run or a
  * non-interactive stdin/stdout makes no interactive choice at all.
  */
-export async function decideDelivery({ options, detected, recorded, runtime, dryRun, context }) {
+export async function decideDelivery({ options, detected, recorded, runtime, dryRun }) {
   const explicit = options.delivery;
   if (explicit !== undefined && !LIVE_POLICIES.includes(explicit)) {
     throw new AccError(EXIT.USAGE, `unknown delivery policy: ${explicit}`, { delivery: explicit });
   }
   const recordedById = new Map(recorded.map(install => [install.adapterId, install]));
-  // Whether this client is the only one that could be asked at all. When it is,
-  // the question says so, because otherwise being asked about one of four
-  // installed clients looks like the other three were forgotten.
-  const onlyEligible = detected
-    .filter(candidate => candidate.nativeDelivery?.state === "eligible").length === 1;
   const deliveryByAdapter = {};
   const asked = [];
   let withheld = 0;
   for (const entry of detected) {
-    const eligible = entry.nativeDelivery?.state === "eligible";
+    const eligible = entry.nativeDelivery?.state === "eligible"
+      || entry.nativeDelivery?.consentAvailable === true;
     const previous = livePolicyOf(recordedById.get(entry.adapterId));
     if (explicit !== undefined) {
       deliveryByAdapter[entry.adapterId] = explicit;
@@ -275,7 +250,7 @@ export async function decideDelivery({ options, detected, recorded, runtime, dry
       deliveryByAdapter[entry.adapterId] = "off";
       if (eligible) withheld += 1;
     } else {
-      const yes = await runtime.confirm(questionFor(entry, context, { onlyEligible }),
+      const yes = await runtime.confirm(questionFor(entry),
         { input: runtime.input, output: runtime.output }) === true;
       deliveryByAdapter[entry.adapterId] = yes ? "actionable" : "off";
       asked.push(entry.adapterId);
@@ -333,7 +308,7 @@ export async function runInstallCommand({ options, runtime, action = "install" }
   // Decided only after detection, from the operator's explicit answer, the
   // recorded consent, or a default of off; never from inference.
   const decided = action === "install"
-    ? await decideDelivery({ options, detected, recorded, runtime, dryRun, context })
+    ? await decideDelivery({ options, detected, recorded, runtime, dryRun })
     : { deliveryByAdapter: {}, asked: [], notes: [] };
   const plan = planInstallation({ adapters, detected, context, action, recorded,
     accVersion, allowDowngrade: options.downgrade === true, requested,

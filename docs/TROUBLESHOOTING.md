@@ -94,8 +94,20 @@ For Codex, use your ordinary launch command with 0.152.1 or newer on Apple Silic
 macOS. Its LocalDaemon must already be running, and trusted hooks must establish
 the receiver's exact thread and workspace. Embedded sessions, an absent socket,
 ambiguous recipients or failed identity checks retain durable inbox access.
-`acc doctor` reports current eligibility. ACC preserves requested consent through
-a temporary daemon outage and does not start the daemon for you.
+`acc doctor` reports readiness, consent and the current workspace's live channel separately.
+`native_endpoint_unavailable` means the local service endpoint is missing or is not a safe socket;
+`native_session_unavailable` means the service answered but has no loaded thread to probe.
+An interactive install can save consent in either case. ACC preserves it through a temporary
+outage and does not start the daemon for you.
+
+Check `acc doctor --json` and `acc status --json` while both clients are open. If policy is
+`off`, opt in with `acc install --adapter codex --delivery actionable` (or select another
+adapter). This can spend model tokens. If policy is enabled but runtime is `waiting` and
+`deliveryBindings` is empty, no live channel is bound in this workspace. Start a new client
+session, check its integration prompts and re-run doctor. A healthy store, online peers,
+or a connected MCP server does not by itself establish automatic delivery. `lifecycle:
+manual` can also mean the current version has no certified session-end hook; it does not
+prove that no hooks ran.
 
 For Claude Code, open a fresh interactive zsh after installation so its launcher
 is on PATH, and accept its visible development-channel warning. A failed channel
