@@ -62,3 +62,27 @@ test("an owner formatter failure remains a failed-open hook", async t => {
   assert.equal(result.decision, "allow");
   assert.equal(result.stdout, "");
 });
+
+test("a vanished owner cannot adopt a replacement created while the next turn probes", async t => {
+  const { hook, started } = await stage(t);
+  const service = started.service;
+  const participantId = started.sessions[0].participantId;
+  await service.closeSession({ sessionId: started.accSessionId, generation: started.generation });
+  assert.equal(await service.locateSession(started.accSessionId), null);
+  let replacement;
+  const result = await hook("user_prompt_submit", "native-owner", {
+    probeClientVersion: async () => {
+      replacement = await service.openSession({ workspaceId: service.store.workspaceId,
+        sessionId: started.accSessionId, generation: "generation_replacement", participantId,
+        harness: "grok", heartbeatCadenceMs: 60_000 });
+      return "1.0.24";
+    },
+  });
+  assert.ok(replacement, "the fixture did not replace the absent owner during the probe");
+  assert.equal(result.exitCode, 0);
+  assert.equal(result.failed, true);
+  assert.equal(result.stdout, "");
+  const status = await service.collectStatus({});
+  assert.equal(status.counts.live, 1, "the stale hook registered another session beside its replacement");
+  assert.deepEqual((await service.locateSession(started.accSessionId)).record, replacement);
+});

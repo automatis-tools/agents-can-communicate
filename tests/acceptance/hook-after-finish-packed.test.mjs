@@ -70,3 +70,45 @@ for (const adapterId of ["claude_code", "codex"]) {
     assert.equal(afterEnd.sessions.length, 3);
   });
 }
+
+for (const adapterId of ["claude_code", "codex"]) {
+  test(`${adapterId} resumes a detached solo conversation whose ephemeral owner is absent`, async t => {
+    const packed = await createPackedAcc(t);
+    const payload = { session_id: "solo-conversation", cwd: packed.project };
+    const hook = name => packed.hook(adapterId, { ...payload, hook_event_name: name,
+      prompt: "Continue after detach" });
+    await hook("SessionStart");
+    const first = ownerFlags((await hook("UserPromptSubmit")).stdout, adapterId);
+    const before = await packed.acc(["status"]);
+    assert.equal(before.materialised, false);
+    assert.equal(before.counts.live, 1);
+    const participantId = before.participants[0].participantId;
+
+    await packed.acc(["detach", ...first]);
+    const detached = await packed.acc(["status"]);
+    assert.equal(detached.materialised, false);
+    assert.deepEqual(detached.participants, []);
+    const oldBinding = await packed.findBinding(payload.session_id);
+    assert.equal(oldBinding.accSessionId, first[1]);
+    await packed.hook(adapterId, { ...payload, hook_event_name: "PreToolUse",
+      tool_name: "Bash", tool_input: { command: "true" } });
+    assert.deepEqual((await packed.acc(["status"])).participants, [],
+      "a tool hook revived a completed owner without a genuine user turn");
+    assert.deepEqual(await packed.findBinding(payload.session_id), oldBinding);
+
+    const fresh = ownerFlags((await hook("UserPromptSubmit")).stdout, adapterId);
+    assert.notEqual(fresh[1], first[1]);
+    assert.notEqual(fresh[3], first[3]);
+    const after = await packed.acc(["status"]);
+    assert.equal(after.materialised, false);
+    assert.equal(after.counts.live, 1);
+    assert.equal(after.participants[0].sessionId, fresh[1]);
+    assert.equal(after.participants[0].participantId, participantId);
+    await packed.acc(["work", ...fresh, "--summary", "continued with fresh ownership"]);
+    assert.equal((await packed.accError(["heartbeat", ...first]))?.code, 5);
+    assert.deepEqual(ownerFlags((await hook("UserPromptSubmit")).stdout, adapterId), fresh);
+    await hook("SessionEnd");
+    assert.equal(await packed.findBinding(payload.session_id), null);
+    assert.deepEqual((await packed.acc(["status"])).participants, []);
+  });
+}

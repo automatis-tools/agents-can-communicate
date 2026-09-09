@@ -339,12 +339,12 @@ const HANDLERS = {
       branch: context.descriptor.git?.branch ?? null,
     };
     if (event.kind === "beforeTurn" && binding !== null) {
-      // A real prompt may continue after finish closed this native owner's
-      // record. Recheck after the probes: a CLI replacement can run outside
-      // the native lifecycle lock. Never adopt that replacement's identity.
+      // A genuine prompt can resume after an ephemeral removal or a durable
+      // close. Recheck after probes: a CLI replacement can run outside the
+      // native lifecycle lock. Never adopt that replacement's identity.
       const previous = await context.service.locateSession(binding.accSessionId);
-      if (previous?.record.state !== "closed"
-        || previous.record.generation !== binding.generation) {
+      if (previous !== null && (previous.record.state !== "closed"
+        || previous.record.generation !== binding.generation)) {
         throw new Error("the completed hook owner changed during turn registration");
       }
     }
@@ -438,9 +438,11 @@ const HANDLERS = {
       return { ...turn, nativeBinding: started.nativeBinding };
     }
     const current = await context.service.locateSession(binding.accSessionId);
-    if (current?.record.state === "closed" && current.record.generation === binding.generation) {
-      // finish ends an ACC incarnation, not the native conversation. Only a
-      // genuine new user turn can start another one; tool hooks cannot. Reuse
+    if (current === null
+      || current.record.state === "closed" && current.record.generation === binding.generation) {
+      // A solo detach removes its ephemeral record; a durable close retains it.
+      // Both end the ACC incarnation while the native conversation may continue.
+      // Only a genuine user turn can start another one; tool hooks cannot. Reuse
       // the crash-safe opening path, retaining its full published client facts
       // and its single native handshake rather than binding a second time.
       const started = await HANDLERS.sessionStart(input);
