@@ -9,7 +9,6 @@
   absent delivery consent, an unidentified client process and handshake failures/timeouts.
   Diagnostics replace one small record per hook owner, stay outside repositories and
   agent context, and cannot establish current delivery from a previous handshake.
-
 - Installation offers to save Codex delivery consent even before a compatible local
   service/session is available. It leaves activation gated by the live verification.
 - Install and doctor report delivery policy, missing setup, current channel state and
@@ -20,20 +19,23 @@
   A connected MCP server and an active ACC transport do not verify that Claude admits
   inbound messages. Historical capture failures are no longer presented as current state.
 
-| Development artifact | Value |
+| Candidate artifact | Value |
 |---|---|
-| Built from | `34b084a3a9608df36f9ca2b7ab894370df97d17f` |
-| Tarball | `agents-can-communicate-0.4.1.tgz`, 340,538 bytes, 255 files |
-| sha256 | `be2c9c8a8b9a105cbcd1b0ad4af2b9ca67162601c1775783babc78bdde99dc36` |
+| Built from | `1a3249d2602a80d362cfcce412afeb548f378f51` |
+| Tarball | `agents-can-communicate-0.4.2.tgz`, 340,886 bytes, 255 files |
+| sha256 | `d509cd6a43c92e6fc0a5227a1a5499dfde0636385ede910f289a5c81c059a555` |
 
-This unpublished development build retains the 0.4.1 manifest version. Its archive passed
-installed-package verification and all 255 files match the recorded source commit.
-On macOS arm64 with Node 24, all 1,949 executed tests passed (2 skipped). Syntax checks
-passed for 474 files. Installed hooks, per-session doctor results and SessionEnd cleanup
-were exercised; delayed diagnostic I/O and nearly expired hook budgets retain normal output.
-The offer-rejection fixture deliberately expires its old startup budget before closing
-through the current service, so suite load cannot substitute a timeout for its assertion.
-No new client capability is certified by these diagnostics.
+This unpublished candidate passed exact installed-package verification and the managed
+upgrade from published 0.4.1 through `acc update`. All 255 source, archive, installed and
+active managed files match. Existing workspace bytes, client settings, delivery consent
+and update preferences were preserved. The upgraded hooks produce per-session diagnostics
+in both doctor text and JSON. All 23 managed-update checks and eight focused ownership
+checks passed on macOS arm64 / Node 24. Syntax checks passed for 474 files.
+
+The complete suite runs after the evidence commit, including the mandatory pre-push gate;
+its result is reported with the PR. No new client capability is certified. See the
+[candidate evidence](docs/release-evidence/v0.4.2.md) for mutations, native-client limits
+and the verified upgrade procedure.
 
 ## 0.4.1 — release candidate
 
