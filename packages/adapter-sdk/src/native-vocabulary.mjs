@@ -23,6 +23,7 @@ export const NATIVE_REASON_CODES = Object.freeze([
   "native_delivery_unsupported", "platform_not_captured", "version_unavailable",
   "prerelease_not_captured", "below_minimum_version", "known_bad_version",
   "feature_probe_failed", "probe_timeout", "probe_version_mismatch", "protocol_mismatch",
+  "native_endpoint_unavailable", "native_session_unavailable",
   "handshake_failed", "handshake_timeout", "handshake_version_mismatch",
   "session_generation_stale", "client_process_unknown", "unsupported_shell",
   // The current session's canonical workspace identity could not be verified.
