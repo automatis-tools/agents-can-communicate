@@ -18,15 +18,15 @@
 
 | Candidate | Value |
 |---|---|
-| Built from | `edcb4dc34a7a3f23e8ef500d433f9bbef78ac00f` |
-| Tarball | `agents-can-communicate-0.4.0.tgz`, 331,423 bytes, 248 files |
-| sha256 | `852444badb4efd9ac5c6cc24cf479374be16ac1565333edf545f081f852bedc0` |
+| Built from | `be03a1ae402739e971d0e43153754b86ecb8a90c` |
+| Tarball | `agents-can-communicate-0.4.0.tgz`, 332,987 bytes, 249 files |
+| sha256 | `ca1625b4b9e658e58e9d786bbbd82b9c6e2cac9f68a582adce766d65cfe01fc4` |
 
 This is an unpublished development artifact with the existing package version;
-it must not replace the published 0.4.0 archive. Package verification, installed-hook
-regressions, and a native Gemini 0.59.0 warning check passed on macOS arm64.
-See [hook diagnostic candidate evidence](docs/release-evidence/unreleased-hooks.md) and
-the earlier [reinstall candidate evidence](docs/release-evidence/unreleased-reinstall.md).
+it must not replace the published 0.4.0 archive. The exact-package verifier, managed
+update checks, published-0.3.1 upgrade preflight, and Grok 1.0.24 native ownership checks
+passed on macOS arm64. See [Grok candidate evidence](docs/release-evidence/unreleased-grok.md),
+which includes the earlier hook diagnostic and reinstall fixes.
 
 ## 0.4.0 — 2026-09-08
 
