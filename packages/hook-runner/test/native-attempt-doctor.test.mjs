@@ -193,22 +193,36 @@ test("slow diagnostic I/O cannot hold the hook process open or replace its owner
     import { runHook } from ${JSON.stringify(new URL("../src/runner.mjs", import.meta.url).href)};
     import { createClaudeCodeAdapter } from ${JSON.stringify(new URL(
       "../../adapter-claude-code/src/adapter.mjs", import.meta.url).href)};
+    import workers from "node:worker_threads";
+    import { syncBuiltinESMExports } from "node:module";
+    const Worker = workers.Worker;
+    let diagnosticWorkers = 0;
+    workers.Worker = class extends Worker {
+      constructor(...args) { diagnosticWorkers += 1; super(...args); }
+    };
+    syncBuiltinESMExports();
+    // Freeze logical budget time after normalization. CI scheduling must not
+    // turn ordinary hook work into a false accusation against optional I/O.
+    let budgetNow = Date.now();
+    Date.now = () => budgetNow;
     const original = createClaudeCodeAdapter();
-    const adapter = { ...original, normalizeHook: async payload => {
-      await new Promise(r => setTimeout(r, 1750));
+    const adapter = { ...original, normalizeHook: payload => {
+      budgetNow += 4251; // 749ms remain: below the diagnostic allocation threshold.
       return original.normalizeHook(payload);
     } };
     const result = await runHook({ adapterId: adapter.id, adapters: { [adapter.id]: adapter },
-      budgetMs: 2000, dataHome: process.env.ACC_DATA_HOME, env: process.env,
+      budgetMs: 5000, dataHome: process.env.ACC_DATA_HOME, env: process.env,
       payload: { hook_event_name: "UserPromptSubmit", session_id: "slow", cwd: process.cwd() } });
     process.stdout.write(JSON.stringify({ timedOut: result.timedOut, failed: result.failed,
-      stdout: result.stdout }));
+      diagnosticWorkers, stdout: result.stdout }));
   `);
   const nearDeadline = JSON.parse((await exec(process.execPath, ["--import", preload, driver], {
     cwd: path.join(m.home, "project"), timeout: 3000,
     env: { HOME: m.home, ACC_DATA_HOME: m.dataHome, ACC_NO_UPDATE_CHECK: "1", PATH: "",
       ACC_NATIVE_DELIVERY_POLICY: "off", GIT_DIR: "", GIT_WORK_TREE: "" },
   })).stdout);
+  assert.equal(nearDeadline.diagnosticWorkers, 0,
+    "optional diagnostic work was started without its reserved budget");
   assert.equal(nearDeadline.timedOut, undefined,
     "optional diagnostics consumed the remaining functional hook budget");
   assert.equal(nearDeadline.failed, undefined);
