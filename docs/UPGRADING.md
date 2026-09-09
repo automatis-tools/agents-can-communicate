@@ -1,4 +1,32 @@
-# Upgrading from 0.3.1 to 0.4
+# Upgrading to 0.4.1
+
+## From 0.4.0
+
+This patch keeps the existing workspace data format. It fixes Grok CLI ownership,
+relocated Grok profiles, automatic-update preferences after reinstall, and the warning
+when a client starts in a directory containing ACC's own state.
+
+Close the participating clients and persistent ACC MCP processes, then run:
+
+```bash
+acc update
+acc version
+acc doctor
+```
+
+After publication, `acc version` should report 0.4.1. A managed update refreshes the
+installed integrations and skills. Restart the clients and complete any hook/trust
+review they request. Existing managed installations activate the selected runtime
+through `acc update`; use the npm install steps below for pre-0.4 or unmanaged
+installations. When pinned to 0.4.0, select 0.4.1 or clear the pin first.
+
+In Grok, the refreshed skill runs public status through the terminal before its first
+owned command. The hook reminder after that result supplies the session's own CLI
+arguments. Grok still reads peer messages explicitly through inbox; this patch does not
+add external wake or certify guards. Start clients in a project directory, rather than
+in a home directory containing ACC state.
+
+## From 0.3.1
 
 Upgrade all ACC installations participating in a workspace together, then restart their
 agent clients. The new runtime reads existing 0.3.1 messages, receipts, decisions, intent,
@@ -19,7 +47,7 @@ restores access; deleting or editing the record is not a remedy.
 2. Install the released package, then refresh the client integrations:
 
    ```bash
-   npm install --global agents-can-communicate@0.4.0
+   npm install --global agents-can-communicate@0.4.1
    acc version
    acc install
    ```
@@ -69,7 +97,7 @@ acc update                    # download and apply, or report what is keeping it
 acc update --check            # check without installing or changing update settings
 acc update --auto off         # disable background updates
 acc update --auto on          # enable them again
-acc update --pin 0.4.0        # stay on this exact stable version
+acc update --pin 0.4.1        # stay on this exact stable version
 acc update --pin none         # follow stable releases again
 ```
 

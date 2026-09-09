@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.4.1 — release candidate
 
 - Grok install, doctor, and uninstall respect `GROK_HOME`, including paths with spaces;
   an empty or unset value keeps the default `~/.grok`.
@@ -16,17 +16,10 @@
   Existing 0.4.0 uninstall records cannot recover a lost preference; use
   `acc update --auto on` once if updates should resume.
 
-| Candidate | Value |
-|---|---|
-| Built from | `be03a1ae402739e971d0e43153754b86ecb8a90c` |
-| Tarball | `agents-can-communicate-0.4.0.tgz`, 332,987 bytes, 249 files |
-| sha256 | `ca1625b4b9e658e58e9d786bbbd82b9c6e2cac9f68a582adce766d65cfe01fc4` |
-
-This is an unpublished development artifact with the existing package version;
-it must not replace the published 0.4.0 archive. The exact-package verifier, managed
-update checks, published-0.3.1 upgrade preflight, and Grok 1.0.24 native ownership checks
-passed on macOS arm64. See [Grok candidate evidence](docs/release-evidence/unreleased-grok.md),
-which includes the earlier hook diagnostic and reinstall fixes.
+The 0.4.1 candidate is being rebuilt and verified from the final source commit.
+The preceding development checks are retained in
+[Grok candidate evidence](docs/release-evidence/unreleased-grok.md), including the
+hook diagnostic and reinstall fixes. Publication remains a separate maintainer action.
 
 ## 0.4.0 — 2026-09-08
 
