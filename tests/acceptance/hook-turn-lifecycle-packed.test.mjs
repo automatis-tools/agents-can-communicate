@@ -104,7 +104,7 @@ test("a genuine turn with no binding establishes its own fresh owner", async t =
   assert.equal(after.sessions.find(s => s.sessionId === binding.accSessionId).state, "open");
 });
 
-test("stale bindings and heartbeats cannot allocate owners", async t => {
+test("missing owners recover while stale generations and heartbeats cannot allocate owners", async t => {
   const f = await fixture(t);
   const { start, owner } = await f.prepare("closed");
   const runtimeDir = start.service.store.root;
@@ -120,6 +120,24 @@ test("stale bindings and heartbeats cannot allocate owners", async t => {
     const result = await f.invoke(state === "heartbeat" ? "heartbeat" : "beforeTurn", state,
       { probeClientVersion: async () => { probes += 1; return "1.0.0"; } });
     assert.equal(result.exitCode, 0);
+    if (state === "missing") {
+      const fresh = await f.packed.findBinding(state);
+      assert.equal(result.failed, undefined, result.reason);
+      assert.equal(probes, 1);
+      assert.notEqual(fresh.accSessionId, "session_not_created");
+      assert.notEqual(fresh.generation, "generation_stale");
+      assert.ok(result.stdout.includes(fresh.accSessionId));
+      assert.ok(result.stdout.includes(fresh.generation));
+      assert.equal(result.stdout.includes("generation_stale"), false);
+      await f.packed.acc(["heartbeat", "--session", fresh.accSessionId,
+        "--generation", fresh.generation]);
+      assert.equal((await f.packed.accError(["heartbeat", "--session", "session_not_created",
+        "--generation", "generation_stale"]))?.code, 5);
+      assert.deepEqual((await f.snapshot()).sessions.filter(s => s.sessionId !== fresh.accSessionId),
+        before.sessions);
+      await f.invoke("sessionEnd", state);
+      continue;
+    }
     assert.equal(result.stdout, "");
     assert.equal(probes, 0);
     assert.deepEqual((await f.snapshot()).sessions, before.sessions);

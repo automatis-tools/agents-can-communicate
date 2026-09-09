@@ -53,14 +53,27 @@ test("installed hook crash recovery preserves one exact owner", async t => {
     const id = "before-open";
     await crashHook(packed, { boundary: "before-open", payload: startPayload(id), participantId: id });
     const pending = await packed.findBinding(id);
-    // A header naming a session that never opened sends every subsequent CLI call to exit 5.
-    const turn = await packed.beforeTurn({ adapterId: "claude_code", harnessSessionId: id });
-    assert.doesNotMatch(turn.stdout, /ACC CLI|--generation/);
-    await start(id);
+    assert.ok(pending, "the crash did not retain the unpublished owner pair");
+    assert.deepEqual((await packed.acc(["status"])).participants, []);
+    const tool = await packed.hook("claude_code", { ...startPayload(id),
+      hook_event_name: "PreToolUse", tool_name: "Bash", tool_input: { command: "true" } });
+    assert.doesNotMatch(tool.stdout, /ACC CLI|--generation/);
+    assert.deepEqual(await packed.findBinding(id), pending);
+    assert.deepEqual((await packed.acc(["status"])).participants, []);
+    // A genuine prompt can recover, but may expose only a newly opened pair.
+    const turn = await packed.hook("claude_code", { ...startPayload(id),
+      hook_event_name: "UserPromptSubmit", prompt: "continue" }, { ACC_PARTICIPANT: id });
     const current = await packed.findBinding(id);
     assert.ok(current);
-    if (pending !== null) assert.notEqual(current.generation, pending.generation);
+    assert.notEqual(current.accSessionId, pending.accSessionId);
+    assert.notEqual(current.generation, pending.generation);
+    assert.ok(turn.stdout.includes(current.accSessionId));
+    assert.ok(turn.stdout.includes(current.generation));
+    assert.equal(turn.stdout.includes(pending.generation), false);
     await packed.acc(["heartbeat", ...flags(current)]);
+    assert.equal((await packed.accError(["heartbeat", ...flags(pending)]))?.code, 5);
+    await start(id);
+    assert.deepEqual(flags(await packed.findBinding(id)), flags(current));
     assert.equal((await packed.acc(["status"])).participants.filter(p => p.participantId === id).length, 1);
     await end(id);
   });
