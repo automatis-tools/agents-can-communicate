@@ -68,7 +68,13 @@ livePolicy · opaqueEndpointRef · leaseUntil
 
 Core validates identity and expiry but never interprets the opaque endpoint. That remains
 inside the owning adapter. `acc status` reports available modes, policy, reachability, and
-lease without exposing the endpoint.
+lease without exposing the endpoint. The hook runner also replaces one optional native
+attempt diagnostic beside its session-owner file: closed policy/process/handshake
+metadata with a timestamp, never vendor output. Doctor joins it only to the current open
+generation and reports it separately from transport and receipt facts. It is not journalled
+or projected into agent context; session restart replaces it and SessionEnd attempts bounded
+cleanup. Doctor ignores closed or superseded generations even if cleanup could not finish. Diagnostic disk I/O runs in an
+unreferenced worker, so a stalled write cannot hold the hook process open.
 
 ## Certified capability versus current reachability
 

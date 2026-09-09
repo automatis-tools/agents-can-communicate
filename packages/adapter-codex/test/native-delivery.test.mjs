@@ -18,7 +18,10 @@ test("a live queue probe succeeds without rewriting the vendor invocation", asyn
   assert.deepEqual(probe.modes, ["livePush", "idleWake", "busyQueue"]);
   assert.equal(probe.clientVersion, "0.152.1");
   h.state.loaded = [];
-  assert.equal((await native.probeNativeDelivery(h)).supported, false);
+  assert.equal((await native.probeNativeDelivery(h)).reasonCode, "native_session_unavailable");
+  const absent = await native.probeNativeDelivery({ env: { CODEX_HOME: path.join(h.root, "absent") } });
+  assert.equal(absent.reasonCode, "native_endpoint_unavailable");
+  assert.equal(absent.supported, false);
 });
 
 test("binding stores an opaque receiver address after checking the exact loaded thread", async t => {

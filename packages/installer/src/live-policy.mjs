@@ -10,12 +10,19 @@ export const livePolicyOf = install => {
     ? install.nativeActivation.livePolicy : "off";
 };
 
-export async function readInstalledLivePolicy({ dataHome, adapterId }) {
+export async function readInstalledLivePolicy(input) {
+  return (await readInstalledLivePolicyState(input)).policy;
+}
+
+export async function readInstalledLivePolicyState({ dataHome, adapterId }) {
   try {
     const record = await loadOwnership({ dataHome });
     const install = record.installs.find(entry => entry.adapterId === adapterId);
-    return livePolicyOf(install);
+    const raw = Object.hasOwn(install ?? {}, "deliveryPolicy")
+      ? install.deliveryPolicy : install?.nativeActivation?.livePolicy;
+    return { policy: livePolicyOf(install), policyStatus: raw === undefined ? "missing"
+      : !LIVE_POLICIES.includes(raw) ? "invalid" : raw === "off" ? "off" : "enabled" };
   } catch {
-    return "off";
+    return { policy: "off", policyStatus: "unavailable" };
   }
 }

@@ -35,7 +35,7 @@ export async function probeNativeDelivery({ timeoutMs = 750, env = process.env,
   const unsupported = (reasonCode, clientVersion = null) => ({ supported: false, clientVersion,
     protocolContract: PROTOCOL_CONTRACT, executableFingerprint: null, modes: [], reasonCode });
   const socketPath = controlSocketPath(env);
-  if (!await socketIsReady(socketPath)) return unsupported("feature_probe_failed");
+  if (!await socketIsReady(socketPath)) return unsupported("native_endpoint_unavailable");
   try {
     return await usingPeer(socketPath, timeoutMs, open, async peer => {
       const probe = await probeCodexQueue(peer);

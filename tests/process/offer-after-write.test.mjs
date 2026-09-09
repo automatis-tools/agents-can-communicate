@@ -143,8 +143,14 @@ test("committing the same prepared offers twice is idempotent", async t => {
 test("a rejected offer commit leaves that receipt queued", async t => {
   const { invoke, receipt, recipient } = await fixture(t);
   const result = await invoke("beforeTurn", "recipient-session");
-  await recipient.service.closeSession({ sessionId: recipient.accSessionId,
-    generation: recipient.generation });
+  // The startup hook's service is scoped to its five-second budget. Expire it
+  // deliberately: under suite load the old fixture accidentally exercised that
+  // timeout instead of closing the recipient and testing offer rejection.
+  t.mock.method(Date, "now", () => recipient.deadlineAt);
+  try {
+    await result.service.closeSession({ sessionId: recipient.accSessionId,
+      generation: recipient.generation });
+  } finally { t.mock.restoreAll(); }
 
   await assert.rejects(result.commitOffers, /target|generation|open session/);
 

@@ -94,13 +94,51 @@ For Codex, use your ordinary launch command with 0.152.1 or newer on Apple Silic
 macOS. Its LocalDaemon must already be running, and trusted hooks must establish
 the receiver's exact thread and workspace. Embedded sessions, an absent socket,
 ambiguous recipients or failed identity checks retain durable inbox access.
-`acc doctor` reports current eligibility. ACC preserves requested consent through
-a temporary daemon outage and does not start the daemon for you.
+`acc doctor` reports readiness, consent and the current workspace's live channel separately.
+`native_endpoint_unavailable` means the local service endpoint is missing or is not a safe socket;
+`native_session_unavailable` means the service answered but has no loaded thread to probe.
+An interactive install can save consent in either case. ACC preserves it through a temporary
+outage and does not start the daemon for you.
+
+Check `acc doctor --json` and `acc status --json` while both clients are open. If policy is
+`off`, opt in with `acc install --adapter codex --delivery actionable` (or select another
+adapter). This can spend model tokens. If policy is enabled but runtime is `waiting` and
+`deliveryBindings` is empty, no live channel is bound in this workspace. Start a new client
+session, check its integration prompts and re-run doctor. A healthy store, online peers,
+or a connected MCP server does not by itself establish automatic delivery. `lifecycle:
+manual` can also mean the current version has no certified session-end hook; it does not
+prove that no hooks ran.
 
 For Claude Code, open a fresh interactive zsh after installation so its launcher
-is on PATH, and accept its visible development-channel warning. A failed channel
-connection may remain in Claude's `~/.claude/mcp-needs-auth-cache.json` for about
-fifteen minutes; remove only the `acc` entry and restart if that is the cause.
+is on PATH. Check Claude's **Channels startup notice for ACC**, and accept the
+development-channel warning when it appears. A successful bootstrap cache means the
+executable passed ACC's compatibility probe. `/mcp` showing `connected` and two tools
+means the MCP server connected. Even `runtime: active` in ACC's doctor JSON describes
+the local transport; none of these proves that Claude enabled inbound channel messages.
+
+If Claude says `--dangerously-load-development-channels ignored` or `Channels are not
+currently available`, it has not enabled that delivery path. On a fresh 2.1.266 test
+profile, the first launch showed those messages and the next launch showed the development
+warning; restarting once can recheck availability, but is not a guaranteed fix. If it
+remains unavailable, follow Claude's notice. Organization policy can also block Channels;
+an administrator must enable them where required. ACC does not override that policy.
+See [Claude's Channels documentation](https://code.claude.com/docs/en/channels).
+
+If `deliveryBindings` is empty, ACC has not bound a local transport either. Read the
+per-session lines in `acc doctor`, or `nativeDelivery.sessions[].lastAttempt` in JSON:
+
+- An absent launch policy means that hook did not receive delivery consent, even if an
+  earlier bootstrap probe succeeded. For Claude, open a new terminal and client through
+  the installed launcher.
+- `client_process_unknown` means ACC could not identify the client process. A new client
+  session repeats that lookup.
+- `handshake_failed` or `handshake_timeout` means the session could not bind the local
+  channel. Check the client's integration/channel setup; the next ordinary turn retries.
+- No attempt observed can mean no native hook ran, an older runtime wrote the owner, or
+  diagnostic persistence failed. Check hook activation and the runtime versions in doctor.
+
+The timestamp describes the last attempt for that exact generation. A past successful
+handshake does not establish a currently reachable channel or client-side admission.
 
 Closing a Codex terminal can leave its daemon thread loaded and eligible. Use
 `acc install --adapter codex --delivery off` to stop new ACC native offers.

@@ -1,3 +1,5 @@
+import { describeInstallDelivery } from "./delivery-diagnostics.mjs";
+
 import { AccError, EXIT } from "@agents-can-communicate/protocol";
 
 import { LIVE_POLICIES, describeActivation, describeDeactivation, planActivationRetirements, rcFileFor, shimDirFor }
@@ -112,6 +114,8 @@ export function planInstallation({ adapters, detected, context, action = "instal
         ?? `${adapter.displayName ?? adapter.id} cannot receive native delivery `
           + `(${native?.reasonCode ?? "native_delivery_unsupported"}); durable fallback remains active`
       : null;
+    const deliverySummary = action === "install"
+      ? describeInstallDelivery(entry, delivery, effectiveLivePolicy) : null;
     const installContext = { ...context, requestedLivePolicy: delivery,
       livePolicy: effectiveLivePolicy };
     // A consented activation that this run keeps, activates, or takes back.
@@ -143,6 +147,7 @@ export function planInstallation({ adapters, detected, context, action = "instal
       livePolicy: delivery,
       effectiveLivePolicy,
       ...(deliveryDiagnostic === null ? {} : { deliveryDiagnostic }),
+      ...(deliverySummary === null ? {} : { deliverySummary }),
       ...(nativeActivation === null ? {} : { nativeActivation }),
       ...(deactivation === null ? {} : { deactivation }),
       artifacts,
@@ -151,7 +156,7 @@ export function planInstallation({ adapters, detected, context, action = "instal
       summary: [
         ...(entry.present ? [] : [`${adapter.displayName ?? adapter.id} is no longer on `
           + "this machine; removing what ACC recorded writing"]),
-        ...(deliveryDiagnostic === null ? [] : [deliveryDiagnostic]),
+        ...(deliverySummary === null ? [] : [deliverySummary]),
         ...artifacts.filter(a => a.kind === "tree")
           .map(a => `${action === "install" ? "create" : "remove"} ${a.path}`),
         ...artifacts.filter(a => a.kind === "merge")

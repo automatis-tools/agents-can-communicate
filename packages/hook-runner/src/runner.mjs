@@ -3,10 +3,9 @@ import { createHash, randomBytes } from "node:crypto";
 import { realpath } from "node:fs/promises";
 import path from "node:path";
 
-import { clearSessionBinding, effectiveCapabilities, loadSessionBinding, storeSessionBinding }
+import { clearNativeAttempt, clearSessionBinding, effectiveCapabilities, loadSessionBinding, storeSessionBinding }
   from "@agents-can-communicate/adapter-sdk";
 import { createCoordinationService } from "@agents-can-communicate/core";
-import { readInstalledLivePolicy } from "@agents-can-communicate/installer";
 import { AccError, createId } from "@agents-can-communicate/protocol";
 import { openFilesystemStore } from "@agents-can-communicate/storage-filesystem";
 import { createGitProbe, discoverWorkspace, platformDataHome, runtimePaths }
@@ -14,7 +13,7 @@ import { createGitProbe, discoverWorkspace, platformDataHome, runtimePaths }
 
 import { resolveClientPid } from "./client-pid.mjs";
 import { probeClientVersion as defaultProbeClientVersion } from "./client-version.mjs";
-import { establishNativeBinding, livePolicyFrom } from "./native-binding.mjs";
+import { bindNative, nativeDiagnosticDeadline } from "./native-attempt.mjs";
 import { readProcessTable as defaultReadProcessTable } from "./process-table.mjs";
 import { withSessionLifecycle } from "./session-lifecycle.mjs";
 import { appendToolOwner, ownerHeader, ownerOnlyOutcome } from "./owner-context.mjs";
@@ -305,22 +304,6 @@ async function projectTurn({ binding, context, adapter, adapterId }) {
     offerInputs: writableOffers };
 }
 
-// One bounded, fail-open native handshake for this exact session generation.
-// New adapters read durable consent from their installation record; legacy
-// adapters keep the environment exported by an owned shell bootstrap.
-async function bindNative({ adapter, event, hookBinding, clientVersion, platform, context, paths,
-  deadline }) {
-  assertHookBudget(deadline);
-  const livePolicy = adapter?.nativeDelivery?.policySource === "installation-record"
-    ? await readInstalledLivePolicy({ dataHome: context.dataHome, adapterId: adapter.id })
-    : livePolicyFrom(context.env);
-  assertHookBudget(deadline);
-  return establishNativeBinding({ adapter, event, hookBinding, clientVersion, platform,
-    livePolicy, service: context.service, runtimeDir: paths.root,
-    clock: context.service.clock, env: context.env,
-    timeoutMs: Math.max(1, Math.min(750, deadline - Date.now())) });
-}
-
 const HANDLERS = {
   async sessionStart({ event, context, adapter, adapterId, binding, paths,
     readProcessTable, probeClientVersion, platform, deadline }) {
@@ -356,12 +339,12 @@ const HANDLERS = {
       branch: context.descriptor.git?.branch ?? null,
     };
     if (event.kind === "beforeTurn" && binding !== null) {
-      // A real prompt may continue after finish closed this native owner's
-      // record. Recheck after the probes: a CLI replacement can run outside
-      // the native lifecycle lock. Never adopt that replacement's identity.
+      // A genuine prompt can resume after an ephemeral removal or a durable
+      // close. Recheck after probes: a CLI replacement can run outside the
+      // native lifecycle lock. Never adopt that replacement's identity.
       const previous = await context.service.locateSession(binding.accSessionId);
-      if (previous?.record.state !== "closed"
-        || previous.record.generation !== binding.generation) {
+      if (previous !== null && (previous.record.state !== "closed"
+        || previous.record.generation !== binding.generation)) {
         throw new Error("the completed hook owner changed during turn registration");
       }
     }
@@ -432,6 +415,11 @@ const HANDLERS = {
       await context.service.clearDeliveryBinding(owner);
     }
     await clearSessionBinding({ runtimeDir: paths.root, deadlineAt: deadline, harnessSessionId: event.sessionId });
+    const diagnosticDeadline = nativeDiagnosticDeadline(deadline);
+    if (diagnosticDeadline !== null) {
+      await clearNativeAttempt({ runtimeDir: paths.root, harnessSessionId: event.sessionId,
+        ...binding, deadlineAt: diagnosticDeadline });
+    }
     return {};
   },
 
@@ -450,9 +438,11 @@ const HANDLERS = {
       return { ...turn, nativeBinding: started.nativeBinding };
     }
     const current = await context.service.locateSession(binding.accSessionId);
-    if (current?.record.state === "closed" && current.record.generation === binding.generation) {
-      // finish ends an ACC incarnation, not the native conversation. Only a
-      // genuine new user turn can start another one; tool hooks cannot. Reuse
+    if (current === null
+      || current.record.state === "closed" && current.record.generation === binding.generation) {
+      // A solo detach removes its ephemeral record; a durable close retains it.
+      // Both end the ACC incarnation while the native conversation may continue.
+      // Only a genuine user turn can start another one; tool hooks cannot. Reuse
       // the crash-safe opening path, retaining its full published client facts
       // and its single native handshake rather than binding a second time.
       const started = await HANDLERS.sessionStart(input);

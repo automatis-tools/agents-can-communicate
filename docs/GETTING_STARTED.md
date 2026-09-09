@@ -15,7 +15,7 @@ pair or session-bound ACC MCP tools. See [CLI ownership](CLI.md#coordinate-from-
 
 ACC requires macOS or Linux and Node.js 24 or newer.
 
-Already using ACC? Follow the [upgrade guide](UPGRADING.md) for the 0.4.0 → 0.4.1
+Already using ACC? Follow the [upgrade guide](UPGRADING.md) for the 0.4.0/0.4.1 → 0.4.2
 update or the data-format boundary when upgrading from 0.3.1.
 
 ```bash
@@ -44,8 +44,16 @@ state directory is in `sandbox_workspace_write.writable_roots` in the config it 
 ACC keeps those user settings unchanged. Installed files alone do not establish that hooks
 are active; `acc doctor` leaves current readiness unverified and directs you to Codex.
 
-If you opt into Claude Code's experimental idle delivery, Claude also shows its own
-development-channel warning at every startup. The feature is off by default, can spend
+Read the delivery summary for each client. Live delivery needs an explicit opt-in and a
+verified channel in the current session. Codex can save your choice even when its local
+service is not running yet. Declining uses the reported fallback: `acc inbox`, or next-turn
+hooks only where the exact client version and platform are certified.
+
+If you opt into Claude Code's experimental idle delivery, check Claude's Channels startup
+notice for ACC and accept its development-channel warning when shown. If it reports Channels
+unavailable or blocked, a connected MCP server does not make inbound delivery work;
+see [troubleshooting](TROUBLESHOOTING.md#i-enabled-live-delivery-but-got-fallback).
+The feature is off by default, can spend
 model tokens, and currently requires Apple Silicon macOS, zsh, and Claude Code 2.1.258 or
 newer. You do not need it for durable messages or supported next-turn delivery.
 

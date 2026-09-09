@@ -34,18 +34,22 @@ test("managed refresh keeps generated Codex hooks and skills in the enrolled dat
   const skill = await readFile(path.join(plugin, "skills", "acc", "SKILL.md"), "utf8");
   const statusCommand = skill.match(/`([^`\n]+ status --json)`/)[1];
   for (const inherited of [undefined, path.join(f.root, "wrong-data")]) {
-    const env = { ...f.env, PATH: `${f.clientBin}:/usr/bin:/bin` };
+    // Shell and Node use absolute paths; keep unrelated host Git out of this
+    // non-Git data-home fixture and its finite hook budget.
+    const env = { ...f.env };
     delete env.ACC_DATA_HOME;
     delete env.XDG_DATA_HOME;
     if (inherited !== undefined) env.ACC_DATA_HOME = inherited;
     const wrongHome = inherited ?? platformDataHome({ platform: process.platform, env });
     const nativeId = `refresh-home-${inherited === undefined ? "absent" : "wrong"}`;
+    const startedAt = Date.now();
     const pending = run("/bin/sh", [shim, "session-start"], { cwd: f.project, env });
     pending.child.stdin.end(JSON.stringify({ hook_event_name: "SessionStart", session_id: nativeId,
       cwd: f.project, source: "startup" }));
-    await pending;
+    const output = await pending;
     const binding = await f.findBinding(nativeId);
-    assert.ok(binding, "regenerated hook must persist its binding in the enrolled data home");
+    assert.ok(binding, "regenerated hook must persist its binding in the enrolled data home: "
+      + JSON.stringify({ nativeId, elapsedMs: Date.now() - startedAt, ...output }));
     const status = JSON.parse((await run("/bin/sh", ["-c", statusCommand], { cwd: f.project, env })).stdout);
     assert.ok(status.data.participants.some(peer => peer.sessionId === binding.accSessionId),
       "regenerated skill must read the same hook workspace");

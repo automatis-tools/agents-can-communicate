@@ -65,7 +65,7 @@ export async function probeCodexQueue(peer, { threadId, minimum = MINIMUM_VERSIO
       const loaded = await pageAll(peer, "thread/loaded/list", {});
       threadId = loaded.find(id => typeof id === "string" && id !== "");
       if (threadId === undefined) return { supported: false, serverVersion,
-        reasonCode: "feature_probe_failed" };
+        reasonCode: "native_session_unavailable" };
     }
     queueEntries(await peer.request("thread/queue/list", { threadId }));
   } catch (error) {

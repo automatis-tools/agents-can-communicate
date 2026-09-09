@@ -6,7 +6,7 @@ import test from "node:test";
 
 import { applyPlan } from "../src/apply.mjs";
 import { loadOwnership, recordInstall } from "../src/ownership.mjs";
-import { livePolicyOf, readInstalledLivePolicy } from "../src/live-policy.mjs";
+import { livePolicyOf, readInstalledLivePolicy, readInstalledLivePolicyState } from "../src/live-policy.mjs";
 
 async function dataHome(t, name = "acc-live-policy-") {
   const root = await realpath(await mkdtemp(path.join(tmpdir(), name)));
@@ -53,6 +53,8 @@ test("apply records requested consent even when effective activation is off", as
 test("missing and unknown installation records read off", async t => {
   const missing = await dataHome(t, "acc-live-policy-missing-");
   assert.equal(await readInstalledLivePolicy({ dataHome: missing, adapterId: "codex" }), "off");
+  assert.deepEqual(await readInstalledLivePolicyState({ dataHome: missing, adapterId: "codex" }),
+    { policy: "off", policyStatus: "missing" });
 
   const unknown = await dataHome(t, "acc-live-policy-unknown-");
   const file = path.join(unknown, "acc", "installs.json");
@@ -69,5 +71,7 @@ test("a corrupt installation record reads off without changing its bytes", async
   await writeFile(file, bytes);
 
   assert.equal(await readInstalledLivePolicy({ dataHome: root, adapterId: "codex" }), "off");
+  assert.deepEqual(await readInstalledLivePolicyState({ dataHome: root, adapterId: "codex" }),
+    { policy: "off", policyStatus: "unavailable" });
   assert.deepEqual(await readFile(file), bytes);
 });

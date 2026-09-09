@@ -95,14 +95,13 @@ for (const policy of ["actionable", "all"]) {
 
     assert.equal(operation.livePolicy, policy);
     assert.equal(operation.effectiveLivePolicy, "off");
-    assert.match(operation.deliveryDiagnostic, /0\.152\.1/);
-    assert.match(operation.deliveryDiagnostic, /recorded.*consent/i);
-    assert.match(operation.deliveryDiagnostic, /does not start, restart or stop.*daemon/i);
-    assert.match(operation.deliveryDiagnostic, /next-turn.*acc inbox/);
+    assert.match(operation.deliveryDiagnostic, capturedPlatform
+      ? /local delivery service is unavailable/ : /not verified on this platform/);
+    assert.match(operation.deliveryDiagnostic, /fallback: acc inbox/);
 
     const installed = await place.command("install", "--adapter", "codex",
       "--delivery", policy, "--home", place.home);
-    assert.match(installed.stdout, /recorded.*consent/i,
+    assert.match(installed.stdout, /consent saved.*not active/i,
       "the human install report hid the native-delivery downgrade");
     const [record] = (await loadOwnership({ dataHome: place.dataHome })).installs;
     assert.equal(record.deliveryPolicy, policy,
@@ -127,10 +126,13 @@ test("doctor names unavailable fallback without withdrawing captured live delive
   await place.command("install", "--adapter", "codex", "--home", place.home);
 
   const human = (await place.command("doctor", "--home", place.home)).stdout;
-  assert.match(human, /0\.152\.1/);
-  assert.match(human, /recorded.*consent/i);
-  assert.match(human, /does not start, restart or stop.*daemon/i);
-  assert.match(human, /next-turn.*acc inbox/);
+  assert.match(human, /Codex CLI live delivery:.*off/);
+  assert.match(human, /fallback: acc inbox/);
+  if (capturedPlatform) {
+    assert.match(human, /local delivery service is unavailable/);
+    assert.match(human, /acc install --adapter codex --delivery actionable/);
+    assert.match(human, /ACC does not start or restart that service/);
+  }
   await assertOnlyVersionProbes(place);
 
   const body = JSON.parse((await place.command("doctor", "--home", place.home,
@@ -139,8 +141,9 @@ test("doctor names unavailable fallback without withdrawing captured live delive
   assert.equal(codex.capabilities.delivery.nextTurn, false);
   assert.equal(codex.capabilities.delivery.livePush, capturedPlatform);
   assert.equal(codex.capabilities.delivery.replyRoute, false);
-  assert.match(codex.deliveryDiagnostic, /recorded.*consent/i);
-  assert.match(codex.diagnostics.join(" "), /next-turn.*acc inbox/);
+  assert.match(codex.deliveryDiagnostic, /fallback: acc inbox/);
+  assert.equal(codex.nativeDelivery.reasonCode, capturedPlatform
+    ? "native_endpoint_unavailable" : "platform_not_captured");
   await assertOnlyVersionProbes(place);
 });
 

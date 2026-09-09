@@ -10,6 +10,10 @@ import { promisify } from "node:util";
 const run = promisify(execFile);
 const repo = path.resolve(import.meta.dirname, "..", "..");
 const acc = path.join(repo, "bin", "acc.mjs");
+const capturedPlatform = process.platform === "darwin" && process.arch === "arm64";
+const assertNativeReason = text => assert.match(text, capturedPlatform
+  ? /2\.1\.252.*2\.1\.258/ : /not verified on this platform/);
+
 
 async function machine(t) {
   const home = await realpath(await mkdtemp(path.join(tmpdir(), "acc-claude-home-")));
@@ -54,14 +58,12 @@ for (const policy of ["actionable", "all"]) {
 
     assert.equal(operation.livePolicy, policy);
     assert.equal(operation.effectiveLivePolicy, "off");
-    assert.match(operation.deliveryDiagnostic, /2\.1\.252/);
-    assert.match(operation.deliveryDiagnostic, /development-channel security warning/);
-    assert.match(operation.deliveryDiagnostic, /next-turn.*acc inbox/);
+    assertNativeReason(operation.deliveryDiagnostic);
+    assert.match(operation.deliveryDiagnostic, /fallback: acc inbox/);
 
     const installed = await place.command("install", "--adapter", "claude_code",
       "--delivery", policy, "--home", place.home);
-    assert.match(installed.stdout, /development-channel security warning/,
-      "the human install report hid the native-delivery downgrade");
+    assertNativeReason(installed.stdout);
     for (const tree of await place.pluginTrees()) {
       await assert.rejects(readFile(path.join(tree, ".mcp.json")), { code: "ENOENT" });
       assert.equal((await readFile(path.join(tree, "hooks", "hooks.json"), "utf8"))
@@ -79,17 +81,16 @@ test("doctor names the failed native capture and the durable fallback", async t 
   await place.command("install", "--adapter", "claude_code", "--home", place.home);
 
   const human = (await place.command("doctor", "--home", place.home)).stdout;
-  assert.match(human, /2\.1\.252/);
-  assert.match(human, /development-channel security warning/);
-  assert.match(human, /next-turn.*acc inbox/);
+  assertNativeReason(human);
+  assert.match(human, /fallback: acc inbox/);
 
   const body = JSON.parse((await place.command("doctor", "--home", place.home,
     "--json")).stdout).data;
   const claude = body.adapters.find(adapter => adapter.adapterId === "claude_code");
   assert.equal(claude.capabilities.delivery.livePush, false);
   assert.equal(claude.capabilities.delivery.replyRoute, false);
-  assert.match(claude.deliveryDiagnostic, /development-channel security warning/);
-  assert.match(claude.diagnostics.join(" "), /next-turn.*acc inbox/);
+  assertNativeReason(claude.deliveryDiagnostic);
+  assert.match(claude.diagnostics.join(" "), /fallback: acc inbox/);
 });
 
 test("delivery off removes only legacy ACC channel opt-ins", async t => {

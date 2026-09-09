@@ -23,3 +23,5 @@ export { formatJsonAs, jsonStyleOf, mergeOwnedConfig, mergeOwnedEntries, ownedEn
 export { clearSessionBinding, listSessionBindings, loadSessionBinding,
   storeSessionBinding }
   from "./session-binding.mjs";
+
+export { clearNativeAttempt, loadNativeAttempt, storeNativeAttempt } from "./native-attempt.mjs";

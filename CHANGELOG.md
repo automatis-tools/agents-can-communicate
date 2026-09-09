@@ -1,5 +1,42 @@
 # Changelog
 
+## 0.4.2 — release candidate
+
+- A genuine prompt restores ACC participation after detaching a solo session whose
+  ephemeral owner was removed. It retains the participant address, uses fresh session
+  credentials and refuses a replacement that appears during client probing.
+- Doctor reports the last native binding attempt for each current session, including
+  absent delivery consent, an unidentified client process and handshake failures/timeouts.
+  Diagnostics replace one small record per hook owner, stay outside repositories and
+  agent context, and cannot establish current delivery from a previous handshake.
+- Installation offers to save Codex delivery consent even before a compatible local
+  service/session is available. It leaves activation gated by the live verification.
+- Install and doctor report delivery policy, missing setup, current channel state and
+  the actual fallback separately. Declining live delivery no longer promises uncertified
+  next-turn delivery. Doctor distinguishes existing Claude launch policy from current
+  Codex recorded consent and ignores hook-only bindings when reporting native delivery.
+- Claude install and doctor now ask users to check client-side Channels activation.
+  A connected MCP server and an active ACC transport do not verify that Claude admits
+  inbound messages. Historical capture failures are no longer presented as current state.
+
+| Candidate artifact | Value |
+|---|---|
+| Built from | `7b082884f55e6ccc86d9e292c4dd647a6696352e` |
+| Tarball | `agents-can-communicate-0.4.2.tgz`, 340,886 bytes, 255 files |
+| sha256 | `d509cd6a43c92e6fc0a5227a1a5499dfde0636385ede910f289a5c81c059a555` |
+
+This unpublished candidate passed exact installed-package verification and the managed
+upgrade from published 0.4.1 through `acc update`. All 255 source, archive, installed and
+active managed files match. Existing workspace bytes, client settings, delivery consent
+and update preferences were preserved. The upgraded hooks produce per-session diagnostics
+in both doctor text and JSON. All 23 managed-update checks and eight focused ownership
+checks passed on macOS arm64 / Node 24. Syntax checks passed for 474 files.
+
+The complete suite runs after the evidence commit, including the mandatory pre-push gate;
+its result is reported with the PR. No new client capability is certified. See the
+[candidate evidence](docs/release-evidence/v0.4.2.md) for mutations, native-client limits
+and the verified upgrade procedure.
+
 ## 0.4.1 — release candidate
 
 - Grok install, doctor, and uninstall respect `GROK_HOME`, including paths with spaces;

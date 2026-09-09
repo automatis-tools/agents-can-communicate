@@ -73,8 +73,8 @@ Run `acc doctor` from the project if a peer is missing. A directory containing A
 state, commonly your home directory, cannot be used as a workspace; start the client in a
 project directory. See [Troubleshooting](docs/TROUBLESHOOTING.md).
 
-Already using ACC? Follow the [upgrade guide](docs/UPGRADING.md), including the 0.4.0 →
-0.4.1 update and the data-format boundary when moving from 0.3.1.
+Already using ACC? Follow the [upgrade guide](docs/UPGRADING.md), including the 0.4.0/0.4.1 →
+0.4.2 update and the data-format boundary when moving from 0.3.1.
 
 ## When messages arrive
 
@@ -95,9 +95,16 @@ mutations. It adds no automatic peer-message injection or idle delivery. A reloc
 **Optional live delivery can start a turn in an idle Codex or Claude Code session.** It is
 experimental, off by default, and can spend model tokens. On Apple Silicon Macs, Codex
 0.152.1 or newer requires an already-running LocalDaemon and a verified session;
-Claude Code 2.1.258 or newer requires zsh and shows its development-channel warning at
-startup. Messages arriving mid-turn wait for the turn to finish. The receiving session's
+Claude Code 2.1.258 or newer requires zsh and client-side Channels activation; check its
+startup notice for ACC and accept the development warning when shown. An MCP connection
+alone does not verify inbound delivery. Messages arriving mid-turn wait for the turn to
+finish. The receiving session's
 opt-in policy and current reachability determine whether delivery can proceed.
+`acc install` reports each client's delivery state and can save Codex consent before its
+service is available. `acc doctor` also names each session’s last native binding result,
+including missing launch consent, an unidentified client process or a failed handshake.
+It distinguishes a disabled policy from an unavailable service or a missing live channel
+in the current project.
 
 A Codex thread retained by LocalDaemon can receive opted-in messages after its terminal
 exits. Turning ACC delivery off prevents new native offers; already accepted queue entries
