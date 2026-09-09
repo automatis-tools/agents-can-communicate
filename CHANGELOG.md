@@ -14,15 +14,16 @@
 
 | Development artifact | Value |
 |---|---|
-| Built from | `5503e2a867f23215c7e8fc8aa072ab4efd9b725f` |
-| Tarball | `agents-can-communicate-0.4.1.tgz`, 335,661 bytes, 251 files |
-| sha256 | `04ce871d1a79f47f4bac14795a7c26d9bfe627df08b57bd300534fe97990d064` |
+| Built from | `93cb614f1a663d7246b6451584f41356354ed253` |
+| Tarball | `agents-can-communicate-0.4.1.tgz`, 336,574 bytes, 251 files |
+| sha256 | `d594cefd629c7a50f4baf24188b211f0a430a269cdb7338d856229e082c3d0d5` |
 
 This unpublished development build retains the 0.4.1 manifest version. Its archive passed
 installed-package verification and all 251 files match the recorded source commit.
 On macOS arm64 with Node 24, all 1,943 executed tests passed (2 skipped). Syntax checks
-and the installed interactive consent/doctor/uninstall scenario passed; five intentional
-regression mutations were caught. No new client capability is certified by these fixes.
+and the installed Claude consent/doctor/off/uninstall scenario passed.
+The native startup check is documented in the Claude compatibility record; it is not
+a model delivery capture. No new client capability is certified by these fixes.
 
 ## 0.4.1 — release candidate
 
