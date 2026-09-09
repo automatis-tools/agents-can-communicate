@@ -124,12 +124,21 @@ remains unavailable, follow Claude's notice. Organization policy can also block 
 an administrator must enable them where required. ACC does not override that policy.
 See [Claude's Channels documentation](https://code.claude.com/docs/en/channels).
 
-If `deliveryBindings` is empty, ACC has not bound a local transport either. Check the
-same running session's `ACC_NATIVE_DELIVERY_POLICY` (normally `actionable` after opting
-in), hook activation and workspace identity. A previously successful bootstrap cache
-does not establish the environment of the current launch. If Claude explicitly reports
-a cached MCP connection failure, reconnect the ACC server through `/mcp` and restart
-the session if needed.
+If `deliveryBindings` is empty, ACC has not bound a local transport either. Read the
+per-session lines in `acc doctor`, or `nativeDelivery.sessions[].lastAttempt` in JSON:
+
+- An absent launch policy means that hook did not receive delivery consent, even if an
+  earlier bootstrap probe succeeded. For Claude, open a new terminal and client through
+  the installed launcher.
+- `client_process_unknown` means ACC could not identify the client process. A new client
+  session repeats that lookup.
+- `handshake_failed` or `handshake_timeout` means the session could not bind the local
+  channel. Check the client's integration/channel setup; the next ordinary turn retries.
+- No attempt observed can mean no native hook ran, an older runtime wrote the owner, or
+  diagnostic persistence failed. Check hook activation and the runtime versions in doctor.
+
+The timestamp describes the last attempt for that exact generation. A past successful
+handshake does not establish a currently reachable channel or client-side admission.
 
 Closing a Codex terminal can leave its daemon thread loaded and eligible. Use
 `acc install --adapter codex --delivery off` to stop new ACC native offers.

@@ -3,10 +3,9 @@ import { createHash, randomBytes } from "node:crypto";
 import { realpath } from "node:fs/promises";
 import path from "node:path";
 
-import { clearSessionBinding, effectiveCapabilities, loadSessionBinding, storeSessionBinding }
+import { clearNativeAttempt, clearSessionBinding, effectiveCapabilities, loadSessionBinding, storeSessionBinding }
   from "@agents-can-communicate/adapter-sdk";
 import { createCoordinationService } from "@agents-can-communicate/core";
-import { readInstalledLivePolicy } from "@agents-can-communicate/installer";
 import { AccError, createId } from "@agents-can-communicate/protocol";
 import { openFilesystemStore } from "@agents-can-communicate/storage-filesystem";
 import { createGitProbe, discoverWorkspace, platformDataHome, runtimePaths }
@@ -14,7 +13,7 @@ import { createGitProbe, discoverWorkspace, platformDataHome, runtimePaths }
 
 import { resolveClientPid } from "./client-pid.mjs";
 import { probeClientVersion as defaultProbeClientVersion } from "./client-version.mjs";
-import { establishNativeBinding, livePolicyFrom } from "./native-binding.mjs";
+import { bindNative, nativeDiagnosticDeadline } from "./native-attempt.mjs";
 import { readProcessTable as defaultReadProcessTable } from "./process-table.mjs";
 import { withSessionLifecycle } from "./session-lifecycle.mjs";
 import { appendToolOwner, ownerHeader, ownerOnlyOutcome } from "./owner-context.mjs";
@@ -305,22 +304,6 @@ async function projectTurn({ binding, context, adapter, adapterId }) {
     offerInputs: writableOffers };
 }
 
-// One bounded, fail-open native handshake for this exact session generation.
-// New adapters read durable consent from their installation record; legacy
-// adapters keep the environment exported by an owned shell bootstrap.
-async function bindNative({ adapter, event, hookBinding, clientVersion, platform, context, paths,
-  deadline }) {
-  assertHookBudget(deadline);
-  const livePolicy = adapter?.nativeDelivery?.policySource === "installation-record"
-    ? await readInstalledLivePolicy({ dataHome: context.dataHome, adapterId: adapter.id })
-    : livePolicyFrom(context.env);
-  assertHookBudget(deadline);
-  return establishNativeBinding({ adapter, event, hookBinding, clientVersion, platform,
-    livePolicy, service: context.service, runtimeDir: paths.root,
-    clock: context.service.clock, env: context.env,
-    timeoutMs: Math.max(1, Math.min(750, deadline - Date.now())) });
-}
-
 const HANDLERS = {
   async sessionStart({ event, context, adapter, adapterId, binding, paths,
     readProcessTable, probeClientVersion, platform, deadline }) {
@@ -432,6 +415,11 @@ const HANDLERS = {
       await context.service.clearDeliveryBinding(owner);
     }
     await clearSessionBinding({ runtimeDir: paths.root, deadlineAt: deadline, harnessSessionId: event.sessionId });
+    const diagnosticDeadline = nativeDiagnosticDeadline(deadline);
+    if (diagnosticDeadline !== null) {
+      await clearNativeAttempt({ runtimeDir: paths.root, harnessSessionId: event.sessionId,
+        ...binding, deadlineAt: diagnosticDeadline });
+    }
     return {};
   },
 

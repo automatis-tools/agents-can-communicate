@@ -112,4 +112,22 @@ test("doctor asks to complete missing launch setup before asking for a new sessi
   assert.equal(after.nativeDelivery.activation, "recorded");
   assert.equal(after.nativeDelivery.runtime, "waiting");
   assert.ok(after.remediation.some(line => /new terminal/.test(line)));
+
+  // Execute the shipped hook in separate processes. No vendor process is in
+  // their ancestry, so enabled consent must explain the missing PID, while an
+  // ordinary environment reports its absent launch policy independently.
+  const payload = name => ({ hook_event_name: "SessionStart", session_id: name, cwd: p.project });
+  delete p.env.ACC_NATIVE_DELIVERY_POLICY;
+  await p.hook("claude_code", payload("no-consent"), { ACC_PARTICIPANT: "no-consent" });
+  await p.hook("claude_code", payload("no-client-pid"), {
+    ACC_PARTICIPANT: "no-client-pid", ACC_NATIVE_DELIVERY_POLICY: "actionable" });
+  const sessions = (await p.acc(["doctor"])).adapters.find(a => a.adapterId === "claude_code")
+    .nativeDelivery.sessions;
+  assert.equal(sessions.find(s => s.participantId === "no-consent").lastAttempt.policyStatus, "missing");
+  assert.equal(sessions.find(s => s.participantId === "no-client-pid").lastAttempt.reasonCode,
+    "client_process_unknown");
+  assert.match((await human(p, ["doctor"])).stdout, /client process could not be identified/);
+  await p.hook("claude_code", { ...payload("no-client-pid"), hook_event_name: "SessionEnd" });
+  assert.equal((await p.acc(["doctor"])).adapters.find(a => a.adapterId === "claude_code")
+    .nativeDelivery.sessions.length, 1);
 });

@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Doctor reports the last native binding attempt for each current session, including
+  absent delivery consent, an unidentified client process and handshake failures/timeouts.
+  Diagnostics replace one small record per hook owner, stay outside repositories and
+  agent context, and cannot establish current delivery from a previous handshake.
+
 - Installation offers to save Codex delivery consent even before a compatible local
   service/session is available. It leaves activation gated by the live verification.
 - Install and doctor report delivery policy, missing setup, current channel state and

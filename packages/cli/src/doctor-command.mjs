@@ -9,6 +9,8 @@ import { AccError, EXIT } from "@agents-can-communicate/protocol";
 import { describeNative, nativeRemediation, nativeState, updateNativeRuntime } from "./native-delivery-status.mjs";
 export { describeNative } from "./native-delivery-status.mjs";
 
+import { nativeSessionLines, updateNativeSessions } from "./native-session-diagnostics.mjs";
+
 import { ALL_ADAPTERS, clientContext, probeTimeout } from "./install-command.mjs";
 import { describePresence } from "./main.mjs";
 import { platformPaths } from "./platform-paths.mjs";
@@ -231,6 +233,7 @@ export async function runDoctor({ options, context, runtime }) {
   const service = context.service ?? await context.openService();
   const status = await service.collectStatus({});
   updateNativeRuntime(adapters, status.deliveryBindings);
+  await updateNativeSessions(adapters, { service, status, root, now: clock.now() });
   for (const adapter of adapters) {
     adapter.remediation.push(...nativeRemediation(adapter));
   }
@@ -269,6 +272,7 @@ export async function runDoctor({ options, context, runtime }) {
     .map(adapter => `  ${adapter.displayName} live delivery: `
       + `${describeNative(adapter.nativeDelivery, { clientVersion: adapter.version })}; `
       + `fallback: ${describeDeliveryFallback(adapter)}`),
+  ...nativeSessionLines(adapters),
   ...(manager === null ? [] : [`  automatic updates ${manager.auto ? "on" : "off"}; ACC ${manager.active.version}`
     + (manager.pin ? `; pinned to ${manager.pin}` : ""), ...(manager.notice ? [`  ${manager.notice}`] : [])]),
   ...data.remediation.map(line => `  ${line}`),

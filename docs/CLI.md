@@ -261,6 +261,13 @@ recorded setup (or `not_required` for a pre-existing service). `policy` is the i
 choice; `sessionPolicy` describes a native binding when one is visible. Existing Claude
 sessions can retain their launch policy after a different choice is installed for new
 sessions; Codex checks current recorded consent before new offers.
+`nativeDelivery.sessions` lists each current session's identity, present transport state
+and `lastAttempt`: timestamp, startup/turn event, effective policy and its source, whether
+that policy was missing/invalid/off, whether a client process was identified, and the closed
+handshake result/reason. `lastAttempt: null` means no usable attempt was observed for this
+generation; it does not prove hooks are disabled. A past successful handshake is separate
+from current transport reachability. ACC replaces this small diagnostic beside the
+hook-owner file outside the repository; it never adds attempt history to agent context.
 See [delivery consent](CONFIGURATION.md#keep-delivery-consent-user-owned).
 
 An initial `acc install` enables automatic updates. Reinstalling preserves an explicit

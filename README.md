@@ -101,8 +101,10 @@ alone does not verify inbound delivery. Messages arriving mid-turn wait for the 
 finish. The receiving session's
 opt-in policy and current reachability determine whether delivery can proceed.
 `acc install` reports each client's delivery state and can save Codex consent before its
-service is available. `acc doctor` distinguishes a disabled policy from an unavailable
-service or a missing live channel in the current project.
+service is available. `acc doctor` also names each session’s last native binding result,
+including missing launch consent, an unidentified client process or a failed handshake.
+It distinguishes a disabled policy from an unavailable service or a missing live channel
+in the current project.
 
 A Codex thread retained by LocalDaemon can receive opted-in messages after its terminal
 exits. Turning ACC delivery off prevents new native offers; already accepted queue entries
