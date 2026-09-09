@@ -1,13 +1,13 @@
 import { describeNativeReason } from "@agents-can-communicate/installer";
 
-export function describeNative(native) {
+export function describeNative(native, { clientVersion } = {}) {
   const differs = native.runtime === "active" && native.sessionPolicy
     && native.sessionPolicy !== native.policy;
   const enabled = (native.configured ? `enabled (${native.policy})` : "off")
     + (differs ? " for new sessions" : "");
   const availability = native.eligibility === "eligible" ? "available"
     : `${native.eligibility === "unsupported" ? "unavailable" : "readiness unverified"}: `
-      + describeNativeReason(native.reasonCode);
+      + describeNativeReason(native.reasonCode, { clientVersion, minimumVersion: native.minimumVersion });
   const runtime = native.runtime === "active"
     ? `active${differs ? ` (session policy: ${native.sessionPolicy})` : ""}`
     : native.runtime === "degraded" ? "channel unreachable"
@@ -58,6 +58,7 @@ export function nativeState(detected, recordedPolicy, { contract, activation } =
     : !configured ? "inactive" : "waiting";
   const setupRequired = contract?.activationKinds?.some(kind => kind !== "native-service") === true;
   return { eligibility, configured, policy, runtime, modes, reasonCode: native.reasonCode ?? null,
+    minimumVersion: native.eligibility?.minimumVersion ?? null,
     policySource: contract?.policySource ?? null,
     activation: !setupRequired ? "not_required"
       : activation?.mechanisms?.length > 0 ? "recorded" : "missing", sessionPolicy: null };

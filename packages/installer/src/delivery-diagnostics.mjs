@@ -16,7 +16,12 @@ const REASONS = Object.freeze({
   unsupported_shell: "automatic launch setup requires zsh",
 });
 
-export const describeNativeReason = reason => REASONS[reason] ?? reason ?? "readiness is unverified";
+export function describeNativeReason(reason, { clientVersion, minimumVersion } = {}) {
+  if (reason === "below_minimum_version" && clientVersion && minimumVersion) {
+    return `client ${clientVersion} needs version ${minimumVersion} or newer for native delivery`;
+  }
+  return REASONS[reason] ?? reason ?? "readiness is unverified";
+}
 export const describeDeliveryFallback = entry => entry.capabilities?.delivery?.nextTurn === true
   ? "next-turn hooks (when enabled) or acc inbox" : "acc inbox";
 
@@ -25,6 +30,7 @@ export function describeInstallDelivery(entry, policy, effectivePolicy) {
     ? `consent saved (${policy}); not active` : `enabled (${policy}); waiting for a verified session`;
   const reason = entry.nativeDelivery?.reasonCode;
   return `${entry.displayName ?? entry.adapterId} live delivery: ${state}`
-    + (reason ? `; ${describeNativeReason(reason)}` : "")
+    + (reason ? `; ${describeNativeReason(reason, { clientVersion: entry.version,
+      minimumVersion: entry.nativeDelivery?.eligibility?.minimumVersion })}` : "")
     + `; fallback: ${describeDeliveryFallback(entry)}`;
 }

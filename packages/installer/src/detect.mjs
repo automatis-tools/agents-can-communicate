@@ -162,7 +162,8 @@ export async function detectInstallation({ adapters, context, probe = spawnProbe
       if (entry.nativeDelivery.state !== "eligible") {
         if (adapter.nativeDelivery !== undefined) {
           entry.deliveryDiagnostic = `${adapter.displayName} native delivery: `
-            + `${describeNativeReason(entry.nativeDelivery.reasonCode)}; `
+            + `${describeNativeReason(entry.nativeDelivery.reasonCode, { clientVersion: entry.version,
+              minimumVersion: entry.nativeDelivery.eligibility?.minimumVersion })}; `
             + `fallback: ${describeDeliveryFallback(entry)}`;
         } else if (typeof adapter.deliveryFallback?.diagnostic === "string") {
           const downgraded = adapter.capabilities?.delivery?.nextTurn === true

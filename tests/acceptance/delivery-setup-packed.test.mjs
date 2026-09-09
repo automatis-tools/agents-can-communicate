@@ -31,7 +31,7 @@ test("installed delivery setup preserves opt-in before a Codex service exists an
     const questions = [];
     const result = await runInstallCommand({ options: { adapter: "codex" },
       runtime: { env: process.env, cwd: process.cwd(), platform: process.platform,
-        packageRoot: ${JSON.stringify(p.installed)}, version: async () => "0.4.1",
+        packageRoot: ${JSON.stringify(p.installed)}, version: async () => ${JSON.stringify(p.manifest.version)},
         isInteractive: () => true, confirm: async question => {
           questions.push(question); return true;
         } } });

@@ -266,7 +266,8 @@ export async function runDoctor({ options, context, runtime }) {
   // eligibility, the recorded policy, and the live runtime state. It never
   // claims that "active" means a model read anything.
   ...adapters.filter(adapter => adapter.present)
-    .map(adapter => `  ${adapter.displayName} live delivery: ${describeNative(adapter.nativeDelivery)}; `
+    .map(adapter => `  ${adapter.displayName} live delivery: `
+      + `${describeNative(adapter.nativeDelivery, { clientVersion: adapter.version })}; `
       + `fallback: ${describeDeliveryFallback(adapter)}`),
   ...(manager === null ? [] : [`  automatic updates ${manager.auto ? "on" : "off"}; ACC ${manager.active.version}`
     + (manager.pin ? `; pinned to ${manager.pin}` : ""), ...(manager.notice ? [`  ${manager.notice}`] : [])]),
