@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.4.4 — unreleased
+## 0.4.4 — release candidate
 
 - `acc update` can ask once to restart a verified Codex service on macOS arm64.
   A detached worker waits for idle work, refreshes integrations, restarts and verifies
@@ -15,6 +15,19 @@
   updater while preserving the integration-write fence.
 - Update and service-recovery limitations, first-hop bootstrap and client reconnection
   requirements are documented. Workspace data format and delivery defaults are unchanged.
+
+| Candidate artifact | Value |
+|---|---|
+| Built from | `59ef6d53406b0bd4a52459408fe9cd23aca034a6` |
+| Tarball | `agents-can-communicate-0.4.4.tgz`, 362,506 bytes, 269 files |
+| sha256 | `3ec046c2524c0bb35fe1d0b0f9fa07f03e53ab81e439ec80cdd48b0fce04196e` |
+
+The exact archive passed installed-package verification and an isolated upgrade from
+published 0.4.2 with 0.4.3 already pending. One real-terminal confirmation completed
+private Codex daemon maintenance after the requesting command exited. All 269 archive
+files matched the activated runtime. See [candidate evidence](docs/release-evidence/v0.4.4.md)
+for failure checks and limits. The full suite runs after this evidence commit through
+the mandatory pre-push gate. This candidate has not been tagged or published.
 
 ## 0.4.3 — release candidate
 
