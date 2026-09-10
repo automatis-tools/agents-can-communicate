@@ -131,7 +131,8 @@ test("doctor names unavailable fallback without withdrawing captured live delive
   if (capturedPlatform) {
     assert.match(human, /local delivery service is unavailable/);
     assert.match(human, /acc install --adapter codex --delivery actionable/);
-    assert.match(human, /ACC does not start or restart that service/);
+    assert.match(human, /codex app-server daemon start/);
+    assert.match(human, /ACC never starts or restarts the daemon/);
   }
   await assertOnlyVersionProbes(place);
 
