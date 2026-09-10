@@ -79,6 +79,13 @@ consent before offers. A loaded daemon thread can receive messages after its TUI
 exits. Delivery off and uninstall prevent new Codex submissions; a submission
 already accepted by the vendor queue cannot be withdrawn.
 
+On captured Codex/macOS configurations, live opt-in also grants outgoing access to ACC's
+state and local Unix sockets through a deny-by-default network proxy. Custom permission
+policies remain user-owned. Selection, proxy and grants are restored together only while
+unchanged; edited or newly referenced settings remain intact. See
+[Codex outgoing permissions](CONFIGURATION.md#codex-outgoing-permissions). Configuration
+readiness does not prove that an active session's overrides permit a live offer.
+
 ## Claims
 
 CLI claims default to advisory. Guarded enforcement must be requested explicitly and

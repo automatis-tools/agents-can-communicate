@@ -273,6 +273,8 @@ export async function runDoctor({ options, context, runtime }) {
       + `${describeNative(adapter.nativeDelivery, { clientVersion: adapter.version })}; `
       + `fallback: ${describeDeliveryFallback(adapter)}`),
   ...nativeSessionLines(adapters),
+  ...adapters.filter(adapter => adapter.present && adapter.outgoingDelivery)
+    .map(adapter => `  ${adapter.displayName} ${adapter.outgoingDelivery.diagnostic}`),
   ...(manager === null ? [] : [`  automatic updates ${manager.auto ? "on" : "off"}; ACC ${manager.active.version}`
     + (manager.pin ? `; pinned to ${manager.pin}` : ""), ...(manager.notice ? [`  ${manager.notice}`] : [])]),
   ...data.remediation.map(line => `  ${line}`),

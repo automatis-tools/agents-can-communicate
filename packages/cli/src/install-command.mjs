@@ -153,6 +153,8 @@ export function describeOutcome({ action, acted, failed = [], skipped = [],
   ...operations.filter(operation => operation.applied)
     .flatMap(operation => (operation.needsAction ?? [])
       .map(step => `  ${operation.adapterId}: ${step}`)),
+  ...operations.filter(operation => operation.applied)
+    .flatMap(operation => (operation.setupNotes ?? []).map(note => `  ${note}`)),
   ...skipped.map(entry => `  skip ${entry.adapterId}: ${entry.reason}`),
   ...failed.map(entry => `  ${entry.adapterId}: ${entry.error}`),
   // Said once, where it is needed: the reader has just been shown a list of
@@ -212,6 +214,7 @@ function questionFor(entry) {
   return [
     `Let ${entry.displayName} answer peer requests while idle? (experimental)`,
     "  Yes: automatic turns can spend tokens without waiting for you.",
+    ...(entry.outgoingDelivery?.setup ? [`       ${entry.outgoingDelivery.setup}`] : []),
     ...(warns ? ["       Allow development channels when prompted; check the client's startup notice."] : []),
     ...(entry.nativeDelivery.state !== "eligible"
       ? ["       Save consent now; delivery waits for an available client service."] : []),

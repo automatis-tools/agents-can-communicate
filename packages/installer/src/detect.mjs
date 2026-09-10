@@ -118,7 +118,7 @@ export async function detectInstallation({ adapters, context, probe = spawnProbe
     // deterministic rather than dependent on registry order.
     .sort((left, right) => left.id.localeCompare(right.id))
     .map(async adapter => {
-      const entry = { adapterId: adapter.id, displayName: adapter.displayName,
+      const entry = { adapterId: adapter.id, displayName: adapter.displayName, platform,
         present: false, version: null, versionOutput: null, installed: false,
         diagnostics: [], needsAction: [], capabilities: effectiveCapabilities(adapter),
         deliveryDiagnostic: null, error: null };
@@ -146,7 +146,10 @@ export async function detectInstallation({ adapters, context, probe = spawnProbe
           ? "native_delivery_unsupported" : "version_unavailable");
 
       try {
-        const detected = await adapter.detect(context);
+        const detected = await adapter.detect({ ...context, clientVersion: entry.version,
+          platform, nativeDelivery: entry.nativeDelivery });
+        if (detected.outgoingDelivery) entry.outgoingDelivery = detected.outgoingDelivery;
+        if (detected.nativeSetup) entry.nativeSetup = detected.nativeSetup;
         entry.diagnostics = [...(detected.diagnostics ?? [])];
         // What a person has to do, as opposed to what is true. Adapters that
         // have nothing to ask for say nothing.

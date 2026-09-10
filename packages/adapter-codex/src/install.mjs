@@ -9,7 +9,8 @@ import { bakeSkillCommand, blankJson, blankText, removeIfEmpty, removeInstalledT
   tomlString, writeForeignJson, writeHookShim }
   from "@agents-can-communicate/adapter-sdk";
 import { AccError, EXIT } from "@agents-can-communicate/protocol";
-import { inspectConfig, readConfig, removeTomlBlock, sandboxOwnership, writeTomlBlock } from "./config-block.mjs";
+import { inspectConfig, readConfig, sandboxOwnership, writeTomlBlock } from "./config-block.mjs";
+import { outgoingStatus, prepareLivePermissions, removeLivePermissions } from "./live-permissions.mjs";
 
 // Kept cohesive above 300 lines because Codex plugin install, cache, config,
 // detection, and ownership share one client topology; splitting would duplicate
@@ -159,7 +160,8 @@ const sandboxReview = (config, file, stateRoot) =>
     : [];
 
 export async function installCodexPlugin({ home, agentsHome = home,
-  codexHome = path.join(home, ".codex"), dataHome, stateRoot, runner, node, cli, preserveVersions = false }) {
+  codexHome = path.join(home, ".codex"), dataHome, stateRoot, runner, node, cli, preserveVersions = false,
+  requestedLivePolicy, livePolicy, clientVersion, platform }) {
   // Read before writing, so a manifest that will not parse is found before a
   // plugin tree is laid down that nothing will then be able to remove.
   const existing = await readJson(marketplacePath(agentsHome), { name: MARKETPLACE,
@@ -179,7 +181,10 @@ export async function installCodexPlugin({ home, agentsHome = home,
       `marketplace ${MARKETPLACE} or its plugin is already registered in this config; `
       + "remove it and install again", { config });
   }
-  const theirSandbox = foreign.sandbox;
+  const permissions = prepareLivePermissions(foreign.source, { home, codexHome, stateRoot,
+    file: config, requestedLivePolicy, livePolicy, clientVersion, platform });
+  const theirSandbox = permissions.skipLegacy || inspectConfig(permissions.source, config).sandbox;
+  const permissionActions = permissions.status?.state === "unverified" ? [permissions.status.diagnostic] : [];
 
   const target = pluginPath(agentsHome);
   await rm(target, { recursive: true, force: true });
@@ -207,7 +212,7 @@ export async function installCodexPlugin({ home, agentsHome = home,
     `[plugins.${tomlString(QUALIFIED)}]`,
     "enabled = true",
     ...sandboxTable(stateRoot, theirSandbox),
-  ]);
+  ], permissions.source);
 
   // The client runs the cached copy, so this has to happen after the shim and
   // the rewritten hooks.json are in place.
@@ -235,9 +240,11 @@ export async function installCodexPlugin({ home, agentsHome = home,
   // while ACC invented its own marketplace name and so had a root to itself.
   // make the record stale the moment the plugin version changes.
   return { ok: true, changes: [target, file, config, cachePath(codexHome)],
-    needsAction: [HOOK_REVIEW, ...sandboxReview(before, config, stateRoot)],
+    needsAction: [HOOK_REVIEW, ...permissionActions,
+      ...(permissions.skipLegacy ? [] : sandboxReview(before, config, stateRoot))],
     diagnostics: ["hooks require explicit trust in Codex before they run",
-      ...sandboxReview(before, config, stateRoot)] };
+      ...(permissions.status ? [permissions.status.diagnostic] : []),
+      ...(permissions.skipLegacy ? [] : sandboxReview(before, config, stateRoot))] };
 }
 
 /** Remove each directory that is empty, in the order given. */
@@ -255,21 +262,25 @@ export async function preflightCodexUninstall({ home, agentsHome = home,
     if (error.code === "ENOENT") return "";
     throw error;
   });
-  return { existing, withoutOurs: inspectConfig(before, configPath(codexHome)).source };
+  const permissions = removeLivePermissions(inspectConfig(before, configPath(codexHome)).source);
+  return { existing, before, withoutOurs: permissions.source, permissionState: permissions.state };
 }
 
 export async function uninstallCodexPlugin({ home, agentsHome = home,
   codexHome = path.join(home, ".codex"), keep = [] }) {
   const file = marketplacePath(agentsHome);
   // Direct adapter callers need the same check as the installer boundary.
-  const { existing, withoutOurs } = await preflightCodexUninstall({ home, agentsHome, codexHome });
+  const { existing, before, withoutOurs, permissionState } = await preflightCodexUninstall({ home, agentsHome, codexHome });
   const changes = [];
   if (existing !== null) {
     const kept = (existing.plugins ?? []).filter(entry => entry.name !== PLUGIN_NAME);
     if (kept.length !== (existing.plugins ?? []).length) changes.push(PLUGIN_NAME);
     await writeMarketplace(file, { ...existing, plugins: kept });
   }
-  if (await removeTomlBlock(configPath(codexHome))) changes.push(configPath(codexHome));
+  if (before !== withoutOurs) {
+    await writeFile(configPath(codexHome), withoutOurs);
+    changes.push(configPath(codexHome));
+  }
   // The client's `[hooks.state."<plugin>:…"]` tables stay. 0.1.9 removed them as
   // litter naming a plugin that was gone; that was wrong, and wrong in a way
   // worth writing down. The check behind it perturbed the record - a hook whose
@@ -312,13 +323,16 @@ export async function uninstallCodexPlugin({ home, agentsHome = home,
     marketplaceRoot(agentsHome),
     cacheRoot(codexHome),
   ]);
-  return { ok: true, changes, diagnostics: declaresSandbox(withoutOurs)
-    ? ["existing sandbox_workspace_write configuration was preserved; review any retained writable_roots after removal"]
-    : [] };
+  const permissionReview = permissionState === "customized"
+    ? ["customized native permissions were preserved together with their default selection and network proxy; review them in Codex config"] : [];
+  return { ok: true, changes, needsAction: permissionReview, diagnostics: [
+    ...(declaresSandbox(withoutOurs)
+      ? ["existing sandbox_workspace_write configuration was preserved; review any retained writable_roots after removal"] : []),
+    ...permissionReview] };
 }
 
 export async function detectCodex({ home, agentsHome = home,
-  codexHome = path.join(home, ".codex"), stateRoot }) {
+  codexHome = path.join(home, ".codex"), stateRoot, clientVersion, platform, nativeDelivery }) {
   const marketplace = await readJson(marketplacePath(agentsHome), null);
   const published = (marketplace?.plugins ?? []).some(entry => entry.name === PLUGIN_NAME);
   const config = await readFile(configPath(codexHome), "utf8").catch(() => "");
@@ -326,11 +340,17 @@ export async function detectCodex({ home, agentsHome = home,
   const pluginEntry = config.includes(`[plugins."${QUALIFIED}"]`);
   const cached = await stat(cachePath(codexHome))
     .then(() => true).catch(() => false);
+  const outgoingDelivery = outgoingStatus(config, { home, codexHome, stateRoot,
+    file: configPath(codexHome), clientVersion, platform });
   // Saved trust is not readiness. Codex compares every current definition's
   // hash and can disable a trusted hook. Even a commented or stale single record
   // previously suppressed this check. Leave verification to Codex's /hooks;
   // detection neither invents its hash algorithm nor starts a client service.
-  return { ok: true, changes: [], diagnostics: [
+  return { ok: true, changes: [], outgoingDelivery,
+    nativeSetup: nativeDelivery?.reasonCode === "native_endpoint_unavailable"
+      ? "Codex CLI: run codex app-server daemon start, then open a new Codex session; ACC never starts or restarts the daemon"
+      : null,
+    diagnostics: [
     published ? "acc plugin published in the marketplace" : "acc plugin not registered",
     registered && pluginEntry
       ? "marketplace and plugin entries found in config; activation not verified"
@@ -347,7 +367,8 @@ export async function detectCodex({ home, agentsHome = home,
       : []),
   ],
   needsAction: cached
-    ? [HOOK_REVIEW, ...sandboxReview(config, configPath(codexHome), stateRoot)]
+    ? [HOOK_REVIEW, ...sandboxReview(config, configPath(codexHome), stateRoot),
+      ...(outgoingDelivery.state === "unverified" ? [outgoingDelivery.diagnostic] : [])]
     : [] };
 }
 

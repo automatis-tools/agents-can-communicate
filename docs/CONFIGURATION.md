@@ -144,6 +144,31 @@ consent from the installation record, not a shell-shim variable. Unavailable or 
 sessions retain durable inbox fallback. Use `acc install --adapter codex --delivery off`
 to stop new native offers; bypassing a shim does not disable that recorded opt-in.
 
+### Codex outgoing permissions
+
+Receiving a native message and sending from the agent's sandbox are separate operations.
+On Codex 0.153.4 or newer on macOS arm64, live opt-in also configures outgoing access
+for default workspace permissions. This happens even when the daemon is not yet available.
+Installation, its preview, and the interactive consent question disclose this change.
+
+ACC selects a permission profile named `acc-workspace`, extending `:workspace`. It grants
+write access to the ACC state directory and allows only the local ACC channel directory
+(`/tmp/acc-ch-<uid>`) and the Codex home control socket. The profile enables networking
+through `features.network_proxy = true`, with no external domains allowed. The proxy and
+socket grants must stay together: enabling networking without the proxy changes its scope.
+
+An existing legacy workspace-write configuration is migrated only when its sole writable
+root is ACC's state directory. Custom permission/configuration profiles, additional roots,
+inline settings and uncaptured clients are preserved and reported as unverified. ACC does
+not merge arbitrary security policies or verify overrides in an already running session.
+For a custom policy, grant the same state and socket access through the proxy in the
+client's effective workspace profile; do not combine it with legacy sandbox settings.
+
+Restart Codex after changing permissions. Explicit delivery `off` or uninstall restores
+the previous configuration only while every generated permission component is unchanged.
+If any component was edited or another setting depends on it, ACC preserves the entire
+bundle and reports it for review. Plugin registration can still be removed independently.
+
 ## Override local paths and identity
 
 Nothing in `acc.workspace.json` says where state is stored, and nothing there can — that is

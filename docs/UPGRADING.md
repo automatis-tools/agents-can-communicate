@@ -1,11 +1,11 @@
-# Upgrading to 0.4.2
+# Upgrading to 0.4.3
 
-## From 0.4.1 or 0.4.0
+## From 0.4.2, 0.4.1 or 0.4.0
 
-This patch keeps the existing workspace data format. It makes installation and delivery
-diagnostics clearer, records the last native binding attempt per session, and restores
-hook participation after detaching a solo session without restarting the conversation.
-It also includes the 0.4.1 Grok, reinstall-preference and workspace-warning fixes.
+This patch keeps the existing workspace data format. It fixes outgoing native delivery
+from Codex's sandbox, separates permission failures from unavailable recipients, and
+shows outgoing setup alongside receiving-channel state in doctor. It also includes the
+previous 0.4.x delivery diagnostics, session recovery and client integration fixes.
 
 Close participating clients and persistent ACC MCP processes, then run:
 
@@ -15,10 +15,15 @@ acc version
 acc doctor
 ```
 
-After publication, `acc version` should report 0.4.2. If a pin keeps an older version,
-select 0.4.2 or clear it first. A managed update refreshes installed integrations and
+After publication, `acc version` should report 0.4.3. If a pin keeps an older version,
+select 0.4.3 or clear it first. A managed update refreshes installed integrations and
 skills; use the npm instructions below for unmanaged or pre-0.4 installations. Start
-clients again and complete any hook/trust review they request.
+clients again and complete any hook/trust review they request. With existing live consent,
+Codex 0.153.4 or newer on macOS arm64 receives local socket permissions when its workspace
+policy is default or contains only ACC's legacy state root. Custom policies are preserved
+and reported as unverified. See [outgoing permissions](CONFIGURATION.md#codex-outgoing-permissions).
+If doctor names a missing local service, run `codex app-server daemon start` before opening
+the new session.
 
 Run `acc doctor` in the project after the new clients have started (or submitted a normal
 turn). Its per-session lines now explain missing launch consent, an unidentified client
@@ -59,7 +64,7 @@ restores access; deleting or editing the record is not a remedy.
 2. Install the released package, then refresh the client integrations:
 
    ```bash
-   npm install --global agents-can-communicate@0.4.2
+   npm install --global agents-can-communicate@0.4.3
    acc version
    acc install
    ```
@@ -109,7 +114,7 @@ acc update                    # download and apply, or report what is keeping it
 acc update --check            # check without installing or changing update settings
 acc update --auto off         # disable background updates
 acc update --auto on          # enable them again
-acc update --pin 0.4.2        # stay on this exact stable version
+acc update --pin 0.4.3        # stay on this exact stable version
 acc update --pin none         # follow stable releases again
 ```
 
