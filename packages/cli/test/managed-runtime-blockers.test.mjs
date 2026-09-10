@@ -10,12 +10,13 @@ import { activatePending } from "../src/managed-runtime/activation.mjs";
 import { acquireRuntime } from "../src/managed-runtime/leases.mjs";
 import { readControl, writeControl } from "../src/managed-runtime/state.mjs";
 
-async function fixture(t) {
+async function fixture(t, { storeVersion } = {}) {
   const data = await realpath(await mkdtemp(path.join(tmpdir(), "acc-update-blockers-")));
   t.after(() => rm(data, { recursive: true, force: true }));
   const root = path.join(data, "acc", "runtime");
-  const active = { version: "0.4.2", root: path.join(root, "generations", "old") };
-  const pending = { version: "0.4.3", root: path.join(root, "generations", "new") };
+  const contract = storeVersion === undefined ? {} : { storeVersion };
+  const active = { version: "0.4.2", root: path.join(root, "generations", "old"), ...contract };
+  const pending = { version: "0.4.3", root: path.join(root, "generations", "new"), ...contract };
   await mkdir(active.root, { recursive: true });
   await mkdir(pending.root, { recursive: true });
   await writeControl(root, { schemaVersion: 1, active, pending, phase: "ready", auto: true,
@@ -108,4 +109,31 @@ test("doctor reports current blockers in JSON and human output instead of a stal
   assert.doesNotMatch(JSON.stringify(report), /generation_first|session_first/);
   await rm(path.join(f.bindings, "second.json"));
   assert.equal(JSON.parse(await run("--json")).data.update.blockers[0].nativeBindings, 1);
+});
+
+// A live process whose lease declares the same store contract as the pending
+// generation is not actually in activation's way: doctor must say so, both
+// in the machine-readable blocker list and in the human notice, rather than
+// naming a wait that activatePending itself would not honor.
+test("doctor does not report a blocker whose declared contract matches the pending generation", async t => {
+  const f = await fixture(t, { storeVersion: 6 });
+  await acquireRuntime(f.root, { kind: "acc-mcp" });
+  const home = path.join(f.data, "home"), project = path.join(f.data, "project");
+  await mkdir(home); await mkdir(project);
+  const entrypoints = path.join(f.active.root, "bin", "entrypoints");
+  await mkdir(entrypoints, { recursive: true });
+  await writeFile(path.join(entrypoints, "acc.mjs"),
+    `export { main } from ${JSON.stringify(new URL("../../../bin/entrypoints/acc.mjs", import.meta.url).href)};\n`);
+  const run = async (...args) => (await promisify(execFile)(process.execPath,
+    [fileURLToPath(new URL("../../../bin/acc.mjs", import.meta.url)), "doctor", "--cwd", project, ...args],
+    { cwd: home, env: { ...process.env, HOME: home, ACC_DATA_HOME: f.data, PATH: path.join(f.data, "empty-bin"),
+      ACC_NO_UPDATE_CHECK: "1", GIT_DIR: "", GIT_WORK_TREE: "" } })).stdout;
+  const report = JSON.parse(await run("--json"));
+  assert.equal(report.ok, true);
+  assert.equal(report.data.update.holds, 0);
+  assert.deepEqual(report.data.update.blockers, []);
+  assert.match(report.data.update.notice, /ACC 0\.4\.3 is ready; no active or unidentified processes are blocking activation/);
+  const human = await run();
+  assert.match(human, /no active or unidentified processes are blocking activation/);
+  assert.doesNotMatch(human, new RegExp(`PID ${process.pid}\\b`));
 });

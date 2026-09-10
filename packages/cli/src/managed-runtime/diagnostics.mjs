@@ -17,7 +17,8 @@ export async function runManagementDoctor({ runtime }) {
 }
 
 export async function managedUpdateDiagnostic(root, manager, running) {
-  const blockers = manager.pending ? await listActivationBlockers(root, { ignorePid: process.pid }) : null;
+  const blockers = manager.pending ? await listActivationBlockers(root, { ignorePid: process.pid,
+    incomingStoreVersion: manager.pending.storeVersion }) : null;
   const update = { checked: false, running, latest: manager.pending?.version ?? null,
     newer: manager.pending !== null, auto: manager.auto, pin: manager.pin,
     pending: manager.pending?.version ?? null, phase: manager.phase,

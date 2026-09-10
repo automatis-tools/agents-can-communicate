@@ -12,12 +12,13 @@ import { acquireRuntime } from "../src/managed-runtime/leases.mjs";
 import { managedUpdateDiagnostic } from "../src/managed-runtime/diagnostics.mjs";
 import { readControl, writeControl } from "../src/managed-runtime/state.mjs";
 
-async function fixture(t) {
+async function fixture(t, { storeVersion } = {}) {
   const data = await realpath(await mkdtemp(path.join(tmpdir(), "acc-maintenance-")));
   t.after(() => rm(data, { recursive: true, force: true }));
   const root = path.join(data, "acc", "runtime");
-  const active = { version: "0.4.3", root: path.join(root, "generations", "old") };
-  const pending = { version: "0.4.4", root: path.join(root, "generations", "new") };
+  const contract = storeVersion === undefined ? {} : { storeVersion };
+  const active = { version: "0.4.3", root: path.join(root, "generations", "old"), ...contract };
+  const pending = { version: "0.4.4", root: path.join(root, "generations", "new"), ...contract };
   await mkdir(active.root, { recursive: true }); await mkdir(pending.root, { recursive: true });
   // writeControl normalizes the runtime pointers (e.g. attaching storeVersion),
   // so the fixture tracks that normalized shape rather than its raw literal.
@@ -113,6 +114,19 @@ test("unrelated live ACC processes keep the fence even after daemon consent", as
   await execute(f, { pidIsAlive: pid => pid === 234567 ? unrelatedAlive : f.pidIsAlive(pid),
     pause: async () => { assert.ok(!f.calls.includes("stop")); unrelatedAlive = false; waited++; } });
   assert.equal(waited, 1);
+  assert.equal((await readMaintenance(f.root)).status, "completed");
+});
+
+// A live ACC lease that declares the same store contract as the generation
+// being activated is not a real obstacle: maintenance must restart the
+// service without waiting for it, the same way activatePending itself would
+// let it through.
+test("a live process sharing the pending generation's declared contract does not delay maintenance", async t => {
+  const f = await fixture(t, { storeVersion: 6 });
+  await approve(f);
+  await acquireRuntime(f.root, { pid: 234567, kind: "acc-mcp" });
+  await execute(f, { pidIsAlive: pid => pid === 234567 ? true : f.pidIsAlive(pid),
+    pause: async () => assert.fail("a matching declared contract must not wait for this process") });
   assert.equal((await readMaintenance(f.root)).status, "completed");
 });
 

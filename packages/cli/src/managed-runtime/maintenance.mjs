@@ -13,7 +13,12 @@ export function maintenanceContext(control, env) {
 }
 
 export async function inspectMaintenanceServices({ control, env = process.env, root, adapters = ALL_ADAPTERS() }) {
-  const blockers = await listActivationBlockers(root, { ignorePid: process.pid });
+  // Maintenance targets the pending generation when one exists (its contract
+  // is what activation will judge holds against), otherwise the active one:
+  // there is no incoming generation, only a stale daemon to bring in line
+  // with what is already running. Same fallback as this file's own `target`.
+  const blockers = await listActivationBlockers(root, { ignorePid: process.pid,
+    incomingStoreVersion: control.pending?.storeVersion ?? control.active.storeVersion });
   const services = [];
   for (const adapter of adapters.filter(a => control.targets.includes(a.id) && a.inspectMaintenance)) {
     const snapshot = await adapter.inspectMaintenance(maintenanceContext(control, env));
