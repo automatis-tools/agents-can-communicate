@@ -6,12 +6,11 @@
 // someone's session stops working. Unknown adapter, malformed payload, broken
 // store, missing binding - all of them end in "allow, exit 0".
 import { randomBytes } from "node:crypto";
-import path from "node:path";
 import { pathToFileURL } from "node:url";
 
 import { createId } from "@agents-can-communicate/protocol";
 import { runHook } from "@agents-can-communicate/hook-runner";
-import { resolvePinnedEntrypoint } from "@agents-can-communicate/cli";
+import { hookEntrypointFor, resolvePinnedGeneration } from "@agents-can-communicate/cli";
 
 import { createClaudeCodeAdapter } from "@agents-can-communicate/adapter-claude-code";
 import { createCodexAdapter } from "@agents-can-communicate/adapter-codex";
@@ -61,22 +60,33 @@ async function harnessSessionIdFor(adapterId, payload) {
 // tries it and reports failure rather than letting an import error or a
 // throwing `main` escape: the caller then runs the turn on the active
 // generation instead, exactly as if there had been no pin.
-async function delegateToPin({ managerRoot, packageRoot, adapterId, payload }) {
-  if (managerRoot === null || packageRoot === null) return false;
+//
+// `delegated` is the circuit breaker on chaining: a hook already running
+// because it was delegated to never looks for a pin of its own. Ordinary
+// resolution already stops itself after one hop - the generation a pin names
+// compares its own pin against the exact root it was just handed, so they
+// match and it returns null - but that self-termination leans on a single
+// pin record staying the value both reads saw. `delegated` does not: it
+// forbids a second hop outright, independent of anything a pin (rewritten
+// mid-resolution by another hook for the same session, or simply wrong)
+// could say. Unbounded delegation would be a hang, worse than any of the
+// failures this file already falls open from.
+async function delegateToPin({ managerRoot, packageRoot, adapterId, payload, delegated }) {
+  if (delegated || managerRoot === null || packageRoot === null) return false;
   const harnessSessionId = await harnessSessionIdFor(adapterId, payload);
   if (harnessSessionId === null) return false;
-  const pinned = await resolvePinnedEntrypoint({ root: managerRoot, harnessSessionId, active: packageRoot });
+  const pinned = await resolvePinnedGeneration({ root: managerRoot, harnessSessionId, active: packageRoot });
   if (pinned === null) return false;
   try {
-    const runtime = await import(pathToFileURL(path.join(pinned, "bin", "entrypoints", "acc-hook.mjs")).href);
-    await runtime.main({ managerRoot, packageRoot: pinned, payload });
+    const runtime = await import(pathToFileURL(hookEntrypointFor(pinned)).href);
+    await runtime.main({ managerRoot, packageRoot: pinned, payload, delegated: true });
     return true;
   } catch {
     return false;
   }
 }
 
-export async function main({ managerRoot = null, packageRoot = null, payload } = {}) {
+export async function main({ managerRoot = null, packageRoot = null, payload, delegated = false } = {}) {
   const [adapterId] = process.argv.slice(2);
 
   // A delegating caller already read stdin once for the whole process and
@@ -89,7 +99,7 @@ export async function main({ managerRoot = null, packageRoot = null, payload } =
     }
   }
 
-  if (await delegateToPin({ managerRoot, packageRoot, adapterId, payload })) return;
+  if (await delegateToPin({ managerRoot, packageRoot, adapterId, payload, delegated })) return;
 
   const result = await runHook({ adapterId, payload, adapters,
     runtime: { clock: { now: () => new Date().toISOString() },

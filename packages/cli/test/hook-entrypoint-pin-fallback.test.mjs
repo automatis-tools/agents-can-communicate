@@ -1,5 +1,5 @@
 // Exercises the real `bin/entrypoints/acc-hook.mjs` `main()`, not just
-// `resolvePinnedEntrypoint` in isolation: proves the hook actually delegates
+// `resolvePinnedGeneration` in isolation: proves the hook actually delegates
 // end to end, and - the rule that outranks the feature - proves a pinned
 // generation that exists on disk but will not import or run still leaves the
 // client with a normal, non-throwing exit rather than an error.
@@ -10,6 +10,7 @@ import path from "node:path";
 import test from "node:test";
 
 import { writePin } from "../src/managed-runtime/pins.mjs";
+import { canonicalManagerRoot } from "../src/managed-runtime/state.mjs";
 import { main } from "../../../bin/entrypoints/acc-hook.mjs";
 
 async function withArgv(args, fn) {
@@ -54,9 +55,10 @@ test("a pinned session's hook runs the pinned generation's own entrypoint", asyn
     () => main({ managerRoot, packageRoot: active, payload }));
 
   const written = JSON.parse(await readFile(marker, "utf8"));
-  assert.equal(written.packageRoot, pinned);
+  assert.equal(written.packageRoot, await canonicalManagerRoot(pinned));
   assert.equal(written.managerRoot, managerRoot);
   assert.deepEqual(written.payload, payload);
+  assert.equal(written.delegated, true);
   assert.equal(process.exitCode, 0);
   process.exitCode = 0;
 });
@@ -114,6 +116,48 @@ test("no managerRoot or packageRoot (unmanaged invocation) never attempts delega
     const payload = { hook_event_name: "Notification", session_id: "session-unmanaged", cwd: root };
     process.exitCode = undefined;
     await withArgv(["claude_code", "Notification"], () => main({ payload }));
+    assert.equal(process.exitCode, 0);
+    process.exitCode = 0;
+  });
+});
+
+// Finding 3: delegation is meant to stop after one hop, and today it does
+// because the generation a pin names compares its own pin against the exact
+// root it was just handed. That self-termination depends on the same pin
+// record answering the same way on both reads. `delegated` does not depend on
+// that: it forbids a second hop outright. This proves the guard itself, not
+// the coincidence - the pin below still names a different, importable
+// generation, so if the guard were missing this hook would delegate again and
+// that second generation's own `main` would run and leave its own mark.
+test("a hook already running because it was delegated to never delegates again", async () => {
+  await withDataHome(async () => {
+    const root = await mkdtemp(path.join(tmpdir(), "acc-hook-recursion-"));
+    const managerRoot = path.join(root, "runtime");
+    const active = path.join(managerRoot, "generations", "0.4.4-active");
+    const elsewhere = path.join(managerRoot, "generations", "0.4.9-elsewhere");
+    const marker = path.join(root, "elsewhere-ran.json");
+    await mkdir(path.join(elsewhere, "bin", "entrypoints"), { recursive: true });
+    await writeFile(path.join(elsewhere, "bin", "entrypoints", "acc-hook.mjs"),
+      "import { writeFile } from 'node:fs/promises';\n"
+      + `export async function main(args) {\n`
+      + `  await writeFile(${JSON.stringify(marker)}, JSON.stringify(args));\n`
+      + "  process.exitCode = 0;\n"
+      + "}\n");
+    // Keyed by the same harness session id this call itself will use: a
+    // delegated hook resolving its own pin (if the guard did not stop it
+    // first) would read exactly this record.
+    await writePin({ root: managerRoot, harnessSessionId: "session-recursive", runtimeRoot: elsewhere,
+      version: "0.4.9", storeVersion: 6, clientPid: process.pid });
+
+    const payload = { hook_event_name: "Notification", session_id: "session-recursive", cwd: root };
+    process.exitCode = undefined;
+    // `delegated: true` simulates this call already being the one hop a real
+    // delegation performs - as `acc-hook.mjs` itself would call it.
+    await withArgv(["claude_code", "Notification"],
+      () => main({ managerRoot, packageRoot: active, payload, delegated: true }));
+
+    await assert.rejects(() => readFile(marker, "utf8"), /ENOENT/,
+      "the second generation's main must never run");
     assert.equal(process.exitCode, 0);
     process.exitCode = 0;
   });
