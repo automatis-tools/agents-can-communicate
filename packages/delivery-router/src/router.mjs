@@ -1,4 +1,4 @@
-import { evaluateStatic as evaluateVersionContract } from "@agents-can-communicate/adapter-sdk";
+import { evaluateVersionContract } from "@agents-can-communicate/adapter-sdk";
 
 import { refreshExpiredBinding } from "./refresh-binding.mjs";
 

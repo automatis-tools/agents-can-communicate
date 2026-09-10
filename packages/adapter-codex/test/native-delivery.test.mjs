@@ -52,6 +52,22 @@ test("binding stores an opaque receiver address after checking the exact loaded 
   assert.ok(Date.parse(handshake.leaseUntil) > Date.now());
 });
 
+test("bind persists and returns the daemon's served version, not the caller's stale claim",
+  async t => {
+    const h = await nativeFixture(t);
+    // The hook's claimed clientVersion and the daemon's actually-served
+    // version genuinely differ here, both at or above CODEX_QUEUE_MINIMUM,
+    // so a bug that quietly persisted the claim instead of what verifyReceiver
+    // observed cannot hide behind them coincidentally matching.
+    h.state.version = "0.154.0";
+    const handshake = await native.bindNativeSession({ ...h, clientVersion: "0.152.5" });
+    assert.equal(handshake.supported, true);
+    assert.equal(handshake.clientVersion, "0.154.0");
+    const file = path.join(h.runtimeDir, "codex-native-endpoints", `${handshake.opaqueEndpointRef}.json`);
+    const endpoint = JSON.parse(await readFile(file, "utf8"));
+    assert.equal(endpoint.clientVersion, "0.154.0");
+  });
+
 test("sender environment cannot replace the bound receiver socket or thread", async t => {
   const h = await nativeFixture(t);
   const handshake = await native.bindNativeSession(h);
@@ -104,7 +120,11 @@ test("offer rechecks workspace, loaded state, and version after binding", async 
   // A daemon restarted onto a newer build still satisfies the captured
   // contract, so an in-place upgrade keeps serving the existing binding.
   h.state.version = "0.153.4";
-  assert.equal((await native.offerMessage({ ...h, binding: bindingOf(handshake), message })).accepted, true);
+  const upgraded = await native.offerMessage({ ...h, binding: bindingOf(handshake), message });
+  assert.equal(upgraded.accepted, true);
+  // The response reflects the daemon that actually served it, not the
+  // "0.152.1" recorded when this binding was first created.
+  assert.equal(upgraded.clientVersion, "0.153.4");
   assert.equal(h.calls.some(call => call.method === "thread/queue/add"), true);
   // A daemon that drops below the captured minimum stops serving it.
   h.state.version = "0.151.0";

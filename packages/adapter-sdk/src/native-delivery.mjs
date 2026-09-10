@@ -102,11 +102,23 @@ function knownBadHit(contract, version) {
     : compareStableVersions(version, entry.from) >= 0 && compareStableVersions(version, entry.to) <= 0));
 }
 
-// The static half of the rule: platform, minimum, prerelease, and denylist.
-// Exported so a consumer that only has a reported version and no probe or
-// handshake shape (the delivery router, judging an offer response) can judge
-// it against the captured contract without duplicating this logic.
-export function evaluateStatic(adapter, { clientVersion, platform }) {
+// Judges one reported client version against an adapter's captured
+// native-delivery contract: is the platform captured, is the version at or
+// above the captured minimum, and is it not on the denylist. Returns
+// { reasonCode, minimumVersion, protocolContract }; reasonCode is null when
+// the version satisfies the contract, otherwise one of
+// "native_delivery_unsupported", "platform_not_captured",
+// "version_unavailable", "prerelease_not_captured", "below_minimum_version",
+// or "known_bad_version".
+//
+// This is the static half of the rule only: it never contacts the client, so
+// passing here proves nothing about whether a live probe or handshake
+// actually confirms the protocol or delivery modes. A caller that needs that
+// layers a probe or handshake check on top (see evaluateNativeEligibility,
+// validateNativeHandshake below, and the delivery router's own offer check,
+// which uses this function alone because a response already carries no probe
+// or handshake shape to check further).
+export function evaluateVersionContract(adapter, { clientVersion, platform }) {
   const contract = adapter?.nativeDelivery;
   if (contract === undefined) {
     return { reasonCode: "native_delivery_unsupported", minimumVersion: null, protocolContract: null };
@@ -155,7 +167,7 @@ export function evaluateNativeEligibility(adapter, { clientVersion, platform, pr
   // Only the version is read here; the shape is validated where it always was,
   // so a malformed probe still returns a closed result rather than throwing.
   const serving = isText(probe?.clientVersion) ? probe.clientVersion : clientVersion;
-  const rule = evaluateStatic(adapter, { clientVersion: serving, platform });
+  const rule = evaluateVersionContract(adapter, { clientVersion: serving, platform });
   const base = { eligible: false, reasonCode: null, minimumVersion: rule.minimumVersion,
     protocolContract: rule.protocolContract, modes: [] };
   const closedResult = reasonCode => deepFreeze({ ...base, reasonCode });
@@ -204,7 +216,7 @@ export function validateNativeHandshake(adapter, { clientVersion, platform, hand
   // the version is read here; the shape is validated where it always was, so
   // a malformed handshake still returns a closed result rather than throwing.
   const serving = isText(handshake?.clientVersion) ? handshake.clientVersion : clientVersion;
-  const rule = evaluateStatic(adapter, { clientVersion: serving, platform });
+  const rule = evaluateVersionContract(adapter, { clientVersion: serving, platform });
   const base = { ok: false, reasonCode: null, protocolContract: rule.protocolContract, modes: [],
     opaqueEndpointRef: null, leaseUntil: null };
   const closedResult = reasonCode => deepFreeze({ ...base, reasonCode });
