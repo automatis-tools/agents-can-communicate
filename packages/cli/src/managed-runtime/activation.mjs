@@ -53,6 +53,44 @@ export async function listNativeHolds(root, { pidIsAlive = defaultPidIsAlive } =
   return holds;
 }
 
+/** Activation calls this under the admission mutex; diagnostics are a snapshot.
+ * The updater may ignore its own leases, never a native client's lifetime.
+ * Project only process facts: leases and bindings carry private owner tokens.
+ */
+export async function listActivationBlockers(root, { pidIsAlive = defaultPidIsAlive, ignorePid = null } = {}) {
+  const leases = (await listRuntimeHolds(root, { pidIsAlive })).filter(lease => lease.pid !== ignorePid);
+  const native = await listNativeHolds(root, { pidIsAlive });
+  const holds = [...leases.map(({ pid, kind }) => ({ pid, kind, nativeBindings: 0 })),
+    ...native.map(hold => ({ ...hold, nativeBindings: hold.reason === "unknown_workspace" ? 0 : 1 }))];
+  const byPid = new Map(), unidentified = [];
+  for (const hold of holds) {
+    const pid = hold.pid ?? null;
+    const nativeBindings = hold.nativeBindings;
+    if (pid === null) {
+      unidentified.push({ pid, kinds: [hold.kind], reason: hold.reason, nativeBindings });
+      continue;
+    }
+    const blocker = byPid.get(pid) ?? { pid, kinds: [], reason: "process_running", nativeBindings: 0 };
+    if (!blocker.kinds.includes(hold.kind)) blocker.kinds.push(hold.kind);
+    blocker.nativeBindings += nativeBindings;
+    byPid.set(pid, blocker);
+  }
+  return [...byPid.values()].sort((a, b) => a.pid - b.pid)
+    .map(blocker => ({ ...blocker, kinds: blocker.kinds.sort() })).concat(unidentified);
+}
+
+export function activationBlockerNotice(version, blockers) {
+  if (!blockers.length) return `ACC ${version} is ready; no active or unidentified processes are blocking activation.`;
+  const details = blockers.slice(0, 10).map(blocker => {
+    const facts = [blocker.kinds.map(safeText).join(", ")];
+    if (blocker.nativeBindings) facts.push(`${blocker.nativeBindings} native binding${blocker.nativeBindings === 1 ? "" : "s"}`);
+    if (blocker.pid === null) facts.push(blocker.reason.replaceAll("_", " "));
+    return `${blocker.pid === null ? "unidentified process" : `PID ${blocker.pid}`} (${facts.join("; ")})`;
+  });
+  return `ACC ${version} is ready; waiting for ${blockers.length} active or unidentified process(es): `
+    + details.join("; ") + (blockers.length > 10 ? `; and ${blockers.length - 10} more` : "") + ".";
+}
+
 async function prepareCandidate(control, root, env) {
   const file = path.join(control.pending.root, "node_modules", "@agents-can-communicate", "cli",
     "src", "managed-runtime", "refresh.mjs");
@@ -79,12 +117,11 @@ export async function activatePending(root, { prepare = prepareCandidate, env = 
   return withManagerLock(root, async () => {
     const current = await readControl(root);
     if (!current || recipe(current) !== recipe(before)) return { activated: false, reason: "state_changed" };
-    const holds = (await listRuntimeHolds(root, { pidIsAlive })).filter(lease => lease.pid !== ignorePid);
-    holds.push(...await listNativeHolds(root, { pidIsAlive }));
-    if (holds.length) {
-      const notice = `ACC ${current.pending.version} is ready; waiting for ${holds.length} active or unidentified process(es).`;
+    const blockers = await listActivationBlockers(root, { pidIsAlive, ignorePid });
+    if (blockers.length) {
+      const notice = activationBlockerNotice(current.pending.version, blockers);
       await writeControl(root, { ...current, notice });
-      return { activated: false, reason: "processes_active", holds: holds.length, notice };
+      return { activated: false, reason: "processes_active", holds: blockers.length, blockers, notice };
     }
     const activating = { ...current, phase: "activating", notice: "Finishing integration refresh." };
     await writeControl(root, activating);
