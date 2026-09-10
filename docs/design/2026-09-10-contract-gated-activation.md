@@ -125,6 +125,19 @@ server version and refreshes the binding's recorded version when the rule still 
 A restarted daemon usually loses the thread regardless, which `locateCodexThread`
 reports independently.
 
+The offer path carries a fourth check of the same shape. In
+`packages/delivery-router/src/router.mjs`, an accepted offer is rejected with
+`unsupported_client_version` when the version the adapter reports differs from the version
+recorded on the binding. That comparison becomes a contract check against the same captured
+minimum and denylist, reached through the binding's adapter rather than reimplemented. A
+version below the minimum, or on the denylist, is still refused exactly as today.
+
+This site is load-bearing rather than incidental. Left as an identity check, it rejects
+precisely the case the other three changes exist to allow: a service that restarted onto a
+different build while the binding still names the version captured when the session was bound.
+The defect would move one layer up and become silent, since the message would fall back to
+queued with every test still passing.
+
 `probe_version_mismatch` stays in the native vocabulary so recorded events remain
 readable. No path produces it after this change.
 
