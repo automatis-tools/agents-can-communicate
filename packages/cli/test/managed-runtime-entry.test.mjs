@@ -80,3 +80,30 @@ test("activation blocks runtime import and hooks still exit successfully", async
   assert.match(c.output().stderr, /coordination unavailable|update/i);
   assert.equal((await readdir(f.root)).includes("imported"), false);
 });
+
+// `selected` is read (as control.active.root) before admission is attempted,
+// and this fallback path never acquires a lease for it. If activation and a
+// reclaim pass both complete while this recovery import is in flight, the
+// generation it names can be gone: the read side must degrade gracefully
+// instead of crashing with a raw stack.
+test("a reclaimed generation degrades acc management-only recovery instead of crashing", async t => {
+  const f = await fixture(t);
+  await writeFile(path.join(f.managerRoot, "control.json"), JSON.stringify({ ...f.control,
+    phase: "activating", pending: f.runtime }));
+  await rm(f.runtime.root, { recursive: true, force: true });
+  const c = child(t, f, "acc");
+  const [code] = await c.done;
+  assert.equal(code, 4);
+  assert.match(c.output().stderr, /runtime unavailable/i);
+});
+
+test("a reclaimed generation degrades the claude channel to graceful unavailability instead of crashing", async t => {
+  const f = await fixture(t);
+  await writeFile(path.join(f.managerRoot, "control.json"), JSON.stringify({ ...f.control,
+    phase: "activating", pending: f.runtime }));
+  await rm(f.runtime.root, { recursive: true, force: true });
+  const c = child(t, f, "acc-claude-channel");
+  const [code] = await c.done;
+  assert.equal(code, 0);
+  assert.match(c.output().stderr, /coordination unavailable/i);
+});

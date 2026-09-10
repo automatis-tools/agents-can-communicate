@@ -124,16 +124,24 @@ export async function runEntry({ kind, packageRoot, managerRoot, managedRequired
     // Help and update recovery must remain reachable when state cannot admit a
     // workspace command. The CLI parser enforces this restricted path; merely
     // putting --help in a message value cannot bypass runtime admission.
+    // `selected` was read before this catch and, on this path, holds no
+    // lease or pin of its own - a generation reclaimed in the meantime makes
+    // this import fail with ENOENT. Degrade below like any other admission
+    // failure instead of crashing with a raw stack.
     if (kind === "acc" && selected) {
-      const runtime = await import(pathToFileURL(path.join(selected, "bin", "entrypoints", "acc.mjs")).href);
-      await runtime.main({ managerRoot: root ?? null, packageRoot: selected, managementOnly: true });
-      return;
+      try {
+        const runtime = await import(pathToFileURL(path.join(selected, "bin", "entrypoints", "acc.mjs")).href);
+        await runtime.main({ managerRoot: root ?? null, packageRoot: selected, managementOnly: true });
+        return;
+      } catch { /* Fall through to the same graceful unavailability below. */ }
     }
     unavailable(kind);
     if (kind === "acc-claude-channel" && selected) {
-      const { startInertChannel } = await import(pathToFileURL(path.join(selected,
-        "bin", "entrypoints", "claude-channel-stdio.mjs")).href);
-      startInertChannel();
+      try {
+        const { startInertChannel } = await import(pathToFileURL(path.join(selected,
+          "bin", "entrypoints", "claude-channel-stdio.mjs")).href);
+        startInertChannel();
+      } catch { /* The stderr notice above already fired either way. */ }
     }
     return;
   }

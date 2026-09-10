@@ -3,6 +3,8 @@ import { lstat, mkdir, mkdtemp, open, readFile, readdir, realpath, rename, rm }
   from "node:fs/promises";
 import path from "node:path";
 
+import { holdStagedGeneration } from "./staging.mjs";
+
 const NAME = "agents-can-communicate";
 const STABLE = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/;
 
@@ -134,7 +136,14 @@ export async function stageOwnGeneration({ packageRoot, managerRoot }) {
   await directory(generations);
   const target = path.join(generations, `${manifest.version}-${digest.slice(0, 24)}`);
   const result = { version: manifest.version, root: target, digest };
-  if (await existingMatches(target, files)) return result;
+  // A hold for the final path is durable before this returns a path that may
+  // already be sitting on disk unprotected from an earlier run: nothing else
+  // references a staged-but-unpublished generation, and reclaim must never
+  // see one without also seeing why it exists.
+  if (await existingMatches(target, files)) {
+    await holdStagedGeneration({ root, generationRoot: target });
+    return result;
+  }
   const staging = await mkdtemp(path.join(generations, ".staging-"));
   try {
     const directories = new Set([staging]);
@@ -153,6 +162,10 @@ export async function stageOwnGeneration({ packageRoot, managerRoot }) {
       const handle = await open(directory, "r");
       try { await handle.sync(); } finally { await handle.close(); }
     }
+    // Written before the rename that makes `target` visible under
+    // `generations`, so a concurrent reclaim pass can never observe the
+    // directory without also observing why it exists.
+    await holdStagedGeneration({ root, generationRoot: target });
     try {
       await rename(staging, target);
     } catch (error) {

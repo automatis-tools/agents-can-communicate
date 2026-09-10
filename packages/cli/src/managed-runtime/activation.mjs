@@ -7,6 +7,7 @@ import { readSessionRecord } from "@agents-can-communicate/storage-filesystem";
 import { listRuntimeHolds } from "./leases.mjs";
 import { confirmedDead, defaultPidIsAlive, withManagerLock } from "./mutex.mjs";
 import { reapPins } from "./pins.mjs";
+import { reapStagingHolds } from "./staging.mjs";
 import { canonicalManagerRoot, managedDirectory, readControl, readManagedJson, syncDirectory, writeControl } from "./state.mjs";
 
 /** The staged generation states its own contract in its manifest, so the
@@ -142,11 +143,13 @@ async function resolveCandidate(value) {
 }
 
 /** A generation is reclaimable only when nothing can still import from it:
- * not the active or pending control pointer, not a live runtime lease, and
- * not a live session pin. An unidentified holder - an unreadable lease, or a
- * pin that is missing, corrupt, or declares an unresolvable runtime root -
- * postpones the whole pass rather than being assumed dead, matching the rule
- * admission already applies to its own bookkeeping.
+ * not the active or pending control pointer, not a live runtime lease, not a
+ * live session pin, and not a live staging hold for a generation still being
+ * verified before publication. An unidentified holder - an unreadable lease,
+ * a pin or staging hold that is missing, corrupt, or declares an
+ * unresolvable root, or the absence of control.json itself - postpones the
+ * whole pass rather than being assumed dead, matching the rule admission
+ * already applies to its own bookkeeping.
  *
  * Takes its own manager lock, so a caller already holding one (activation)
  * must call this only after releasing it.
@@ -157,8 +160,13 @@ export async function reclaimGenerations({ root, active = null, pidIsAlive = def
     const generations = path.join(root, "generations");
     if (!await managedDirectory(generations)) return { removed: [] };
     const control = await readControl(root);
+    // No control at all is exactly as unknown as a corrupt one - which
+    // readControl already throws on, and every real caller of this function
+    // treats that throw as reason to postpone. Match that here explicitly:
+    // an absent control.json is not proof there is nothing to protect.
+    if (control === null) return { removed: [] };
     const referenced = new Set();
-    for (const candidate of [active, control?.active?.root, control?.pending?.root]) {
+    for (const candidate of [active, control.active.root, control.pending?.root]) {
       const resolved = await resolveCandidate(candidate);
       if (!resolved.ok) return { removed: [] };
       if (resolved.root) referenced.add(resolved.root);
@@ -188,9 +196,32 @@ export async function reclaimGenerations({ root, active = null, pidIsAlive = def
         referenced.add(resolved.root);
       }
     }
+    // Staging renames a fully-formed generation into place, then runs it as a
+    // spawned process to verify it, before any control pointer, lease, or pin
+    // can reference it. A live hold names exactly the generation that step
+    // is building; a staging process that exited without publishing leaves
+    // its hold behind, reaped the same way an abandoned pin is.
+    await reapStagingHolds({ root, pidIsAlive });
+    const staging = path.join(root, "staging");
+    if (await managedDirectory(staging)) {
+      for (const name of await readdir(staging)) {
+        if (!name.endsWith(".json")) continue;
+        const record = await readManagedJson(path.join(staging, name)).catch(() => null);
+        if (record === undefined) continue; // Concurrent hold release, not a holder.
+        if (!record || record.schemaVersion !== 1 || typeof record.generationRoot !== "string"
+          || record.generationRoot === "") return { removed: [] }; // Malformed hold: unknown holder.
+        const resolved = await resolveCandidate(record.generationRoot);
+        if (!resolved.ok) return { removed: [] };
+        referenced.add(resolved.root);
+      }
+    }
     const removed = [];
     for (const entry of await readdir(generations, { withFileTypes: true })) {
-      if (!entry.isDirectory()) continue;
+      // A dot-prefixed entry is always an in-flight staging temp (mkdtemp's
+      // own naming), never a published generation. Its own creator cleans it
+      // up; guessing whether it is still being written into is not this
+      // function's job, and deleting one mid-write would corrupt that write.
+      if (!entry.isDirectory() || entry.name.startsWith(".")) continue;
       const directory = path.join(generations, entry.name);
       if (referenced.has(directory)) continue;
       await rm(directory, { recursive: true, force: true });
