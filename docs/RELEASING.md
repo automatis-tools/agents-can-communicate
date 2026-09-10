@@ -1,7 +1,7 @@
 # Releasing
 
 Use this procedure to build one auditable npm artifact, verify that exact tarball, and keep
-its evidence tied to the commit that supplied its bytes. The package is currently `0.4.2`;
+its evidence tied to the commit that supplied its bytes. The package is currently `0.4.3`;
 the commands derive the version from `package.json` so the filename cannot drift.
 
 ```mermaid
