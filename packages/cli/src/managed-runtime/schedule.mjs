@@ -8,8 +8,10 @@ import { checkDue, networkDisabled } from "./policy.mjs";
 export async function scheduleWorker(root, control, { env = process.env } = {}) {
   if (!control?.auto || networkDisabled(env) || !control.pending && !checkDue(control)) return false;
   try {
-    const owner = await readManagedJson(path.join(root, "worker", "manager.lock", "owner.json"));
-    if (Number.isSafeInteger(owner?.pid) && !await confirmedDead(owner.pid)) return false;
+    for (const directory of [path.join(root, "worker"), path.join(root, "worker", "poller")]) {
+      const owner = await readManagedJson(path.join(directory, "manager.lock", "owner.json"));
+      if (Number.isSafeInteger(owner?.pid) && !await confirmedDead(owner.pid)) return false;
+    }
     const child = spawn(process.execPath,
       [path.join(control.active.root, "bin", "acc-update-worker.mjs"), root], {
         env, detached: true, stdio: "ignore", cwd: root,

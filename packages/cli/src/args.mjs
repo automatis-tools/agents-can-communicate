@@ -58,7 +58,7 @@ export const COMMANDS = Object.freeze({
   uninstall: { required: [], optional: ["home"], repeated: ["adapter"], flags: ["dry-run"] },
   // Asking npm whether there is a newer ACC. The one command that touches the
   // network, and never on the hook path.
-  update: { required: [], optional: ["auto", "pin"], flags: ["check", "apply"] },
+  update: { required: [], optional: ["auto", "pin"], flags: ["check", "apply", "yes"] },
   // The two things a person types first after installing from a registry. The
   // CLI answered neither: `acc --version` and `acc --help` were both "unknown
   // command", and `acc` on its own asked for a command without naming one.

@@ -18,6 +18,7 @@ import { runUpdateCommand } from "./update-command.mjs";
 import { runConfigCommand } from "./config-command.mjs";
 import { runInstallCommand } from "./install-command.mjs";
 import { runDoctor } from "./doctor-command.mjs";
+import { runManagementDoctor } from "./managed-runtime/diagnostics.mjs";
 import { createGitProbe } from "./git-probe.mjs";
 import { canonicalClaim } from "./claim-spelling.mjs";
 import { platformDataHome, runtimePaths } from "./runtime-paths.mjs";
@@ -412,7 +413,8 @@ export async function main(argv, runtime) {
   let parsed;
   try {
     parsed = parseArgs(argv);
-    if (runtime.managementOnly && !["help", "version", "update"].includes(parsed.command)) {
+    const managementDoctor = runtime.managementOnly && parsed.command === "doctor" && !parsed.options.repair;
+    if (runtime.managementOnly && !managementDoctor && !["help", "version", "update"].includes(parsed.command)) {
       throw new AccError(EXIT.DATA, "runtime unavailable; retry after the update or run acc update to recover");
     }
     // `config` is the one command that must work on a workspace ACC cannot
@@ -423,7 +425,7 @@ export async function main(argv, runtime) {
     // discovery cannot open the workspace - that is what a user is trying to
     // find out - install touches client configuration rather than ACC state,
     // and `help` has to answer in a directory that is no workspace at all.
-    const context = NO_WORKSPACE.includes(parsed.command)
+    const context = managementDoctor || NO_WORKSPACE.includes(parsed.command)
       ? null
       : parsed.command === "doctor"
         ? await openDiagnosticContext(parsed.options, runtime)
@@ -434,7 +436,7 @@ export async function main(argv, runtime) {
     const options = context === null ? parsed.options
       : await resolveOwner({ command: parsed.command, options: parsed.options,
         context, env: runtime.env });
-    const { data, text, error: outcome } = await HANDLERS[parsed.command](
+    const { data, text, error: outcome } = await (managementDoctor ? runManagementDoctor : HANDLERS[parsed.command])(
       { options, context, runtime });
     // A handler may have done real work and still failed: `acc install` writes
     // for the clients it could and reports the one it could not. The data is

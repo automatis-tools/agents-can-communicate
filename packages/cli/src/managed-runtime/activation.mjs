@@ -95,7 +95,7 @@ async function prepareCandidate(control, root, env) {
   const file = path.join(control.pending.root, "node_modules", "@agents-can-communicate", "cli",
     "src", "managed-runtime", "refresh.mjs");
   const { prepareRefresh } = await import(pathToFileURL(file).href);
-  return prepareRefresh({ control, root, env });
+  return prepareRefresh({ control, root, env, callerProtocol: 2 });
 }
 // JSON parser diagnostics may quote private config bytes. Keep the cause and
 // known artifact paths, never the offending input or terminal control bytes.
@@ -109,7 +109,7 @@ const recipe = c => JSON.stringify([c.active, c.pending, c.home, c.targets, c.au
 
 /** Detection is outside the fence; every integration write and commit stays inside it. */
 export async function activatePending(root, { prepare = prepareCandidate, env = process.env,
-  pidIsAlive = defaultPidIsAlive, ignorePid = null } = {}) {
+  pidIsAlive = defaultPidIsAlive, ignorePid = null, beforeActivation = null } = {}) {
   root = await canonicalManagerRoot(root);
   const before = await readControl(root);
   if (!before?.pending) return { activated: false, reason: "no_pending_update" };
@@ -117,6 +117,7 @@ export async function activatePending(root, { prepare = prepareCandidate, env = 
   return withManagerLock(root, async () => {
     const current = await readControl(root);
     if (!current || recipe(current) !== recipe(before)) return { activated: false, reason: "state_changed" };
+    if (beforeActivation) await beforeActivation(current);
     const blockers = await listActivationBlockers(root, { pidIsAlive, ignorePid });
     if (blockers.length) {
       const notice = activationBlockerNotice(current.pending.version, blockers);

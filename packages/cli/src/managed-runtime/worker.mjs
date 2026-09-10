@@ -2,6 +2,8 @@ import { activatePending } from "./activation.mjs";
 import { downloadRelease, fetchRelease, newerVersion } from "./download.mjs";
 import { withManagerLock } from "./mutex.mjs";
 import { readControl, writeControl } from "./state.mjs";
+import { MAINTENANCE_ACTIVE, maintenanceNotice, maintenanceReport, readMaintenance } from "./maintenance-state.mjs";
+import { requestMaintenance } from "./maintenance.mjs";
 
 import { checkDue, networkDisabled } from "./policy.mjs";
 export { CHECK_INTERVAL_MS, networkDisabled } from "./policy.mjs";
@@ -14,6 +16,14 @@ export async function performUpdate(root, { force = false, check = false, env = 
   if (initial === null) throw new Error("ACC is not enrolled; run acc install first");
   const data = { running: initial.active.version, auto: initial.auto, pin: initial.pin,
     pending: initial.pending?.version ?? null, notice: initial.notice };
+  const maintenance = await readMaintenance(root);
+  if (MAINTENANCE_ACTIVE.includes(maintenance?.status)) {
+    if (check) return { ...data, checked: false, reason: "maintenance_pending",
+      maintenance: maintenanceReport(maintenance), notice: maintenanceNotice(maintenance) };
+    const response = await requestMaintenance({ root, control: initial, options: {},
+      runtime: { env, packageRoot: initial.pending?.root ?? initial.active.root, isInteractive: () => false } });
+    return { ...data, checked: false, ...response.data, notice: response.text };
+  }
   if (!force && !check && !initial.auto) return { ...data, checked: false, reason: "auto_off" };
   // Recovery is local; the hard no-network override must not strand a partial refresh.
   if (initial.pending && !check && (force || !networkDisabled(env))) {
@@ -42,16 +52,18 @@ export async function performUpdate(root, { force = false, check = false, env = 
   return { ...checked, pending: generation.version, ...await activate(root, { env, ignorePid }) };
 }
 
-/** A single detached worker may wait cheaply for native clients to exit. */
+/** One poller may wait; the update lock stays available between its passes. */
 export async function runWorker(root, { force = false, env = process.env, wait = false, ignorePid = null } = {}) {
-  return withManagerLock(`${root}/worker`, async () => {
+  const poll = async () => {
     for (;;) {
-      const result = await performUpdate(root, { force, env, ignorePid });
+      const result = await withManagerLock(`${root}/worker`,
+        () => performUpdate(root, { force, env, ignorePid }), { timeoutMs: 100 });
       if (!wait || result.reason !== "processes_active") return result;
       await new Promise(resolve => setTimeout(resolve, 60_000));
       if (!(await readControl(root))?.auto || networkDisabled(env)) return result;
     }
-  }, { timeoutMs: 100 });
+  };
+  return wait ? withManagerLock(`${root}/worker/poller`, poll, { timeoutMs: 100 }) : poll();
 }
 
 export async function recordWorkerFailure(root, error) {
