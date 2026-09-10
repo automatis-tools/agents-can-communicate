@@ -61,30 +61,49 @@ export async function listNativeHolds(root, { pidIsAlive = defaultPidIsAlive } =
   return holds;
 }
 
+/** Unknown on either side cannot be compared, and an uncomparable contract
+ * stays a hold. Equal contracts coexist by the store's own rule. */
+export const blocksActivation = (hold, incomingStoreVersion) =>
+  !Number.isSafeInteger(incomingStoreVersion) || !Number.isSafeInteger(hold.storeVersion)
+    || hold.storeVersion !== incomingStoreVersion;
+
 /** Activation calls this under the admission mutex; diagnostics are a snapshot.
  * The updater may ignore its own leases, never a native client's lifetime.
  * Project only process facts: leases and bindings carry private owner tokens.
+ * A hold blocks only when its declared contract differs from the incoming
+ * generation's, or when either side declares none.
  */
-export async function listActivationBlockers(root, { pidIsAlive = defaultPidIsAlive, ignorePid = null } = {}) {
+export async function listActivationBlockers(root, { pidIsAlive = defaultPidIsAlive,
+  ignorePid = null, incomingStoreVersion = null } = {}) {
   const leases = (await listRuntimeHolds(root, { pidIsAlive })).filter(lease => lease.pid !== ignorePid);
   const native = await listNativeHolds(root, { pidIsAlive });
-  const holds = [...leases.map(({ pid, kind }) => ({ pid, kind, nativeBindings: 0 })),
-    ...native.map(hold => ({ ...hold, nativeBindings: hold.reason === "unknown_workspace" ? 0 : 1 }))];
+  const holds = [
+    ...leases.map(({ pid, kind, runtime }) => ({ pid, kind, nativeBindings: 0,
+      storeVersion: runtime?.storeVersion ?? null })),
+    ...native.map(hold => ({ ...hold, nativeBindings: hold.reason === "unknown_workspace" ? 0 : 1,
+      storeVersion: hold.storeVersion ?? null })),
+  ];
   const byPid = new Map(), unidentified = [];
   for (const hold of holds) {
     const pid = hold.pid ?? null;
     const nativeBindings = hold.nativeBindings;
     if (pid === null) {
-      unidentified.push({ pid, kinds: [hold.kind], reason: hold.reason, nativeBindings });
+      unidentified.push({ pid, kinds: [hold.kind], reason: hold.reason, nativeBindings,
+        storeVersion: hold.storeVersion });
       continue;
     }
-    const blocker = byPid.get(pid) ?? { pid, kinds: [], reason: "process_running", nativeBindings: 0 };
+    const blocker = byPid.get(pid) ?? { pid, kinds: [], reason: "process_running",
+      nativeBindings: 0, storeVersion: hold.storeVersion };
     if (!blocker.kinds.includes(hold.kind)) blocker.kinds.push(hold.kind);
     blocker.nativeBindings += nativeBindings;
+    // One process can publish several holds. The narrowest contract wins, and
+    // an unknown one makes the whole process uncomparable.
+    if (!Number.isSafeInteger(hold.storeVersion)) blocker.storeVersion = null;
     byPid.set(pid, blocker);
   }
   return [...byPid.values()].sort((a, b) => a.pid - b.pid)
-    .map(blocker => ({ ...blocker, kinds: blocker.kinds.sort() })).concat(unidentified);
+    .map(blocker => ({ ...blocker, kinds: blocker.kinds.sort() })).concat(unidentified)
+    .filter(blocker => blocksActivation(blocker, incomingStoreVersion));
 }
 
 export function activationBlockerNotice(version, blockers) {
@@ -92,6 +111,8 @@ export function activationBlockerNotice(version, blockers) {
   const details = blockers.slice(0, 10).map(blocker => {
     const facts = [blocker.kinds.map(safeText).join(", ")];
     if (blocker.nativeBindings) facts.push(`${blocker.nativeBindings} native binding${blocker.nativeBindings === 1 ? "" : "s"}`);
+    facts.push(Number.isSafeInteger(blocker.storeVersion)
+      ? `store contract ${blocker.storeVersion}` : "contract unknown");
     if (blocker.pid === null) facts.push(blocker.reason.replaceAll("_", " "));
     return `${blocker.pid === null ? "unidentified process" : `PID ${blocker.pid}`} (${facts.join("; ")})`;
   });
@@ -126,7 +147,8 @@ export async function activatePending(root, { prepare = prepareCandidate, env = 
     const current = await readControl(root);
     if (!current || recipe(current) !== recipe(before)) return { activated: false, reason: "state_changed" };
     if (beforeActivation) await beforeActivation(current);
-    const blockers = await listActivationBlockers(root, { pidIsAlive, ignorePid });
+    const blockers = await listActivationBlockers(root, { pidIsAlive, ignorePid,
+      incomingStoreVersion: current.pending.storeVersion });
     if (blockers.length) {
       const notice = activationBlockerNotice(current.pending.version, blockers);
       await writeControl(root, { ...current, notice });
