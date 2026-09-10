@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
 
-import { retireManagedHolds } from "../src/managed-runtime/retire.mjs";
+import { isOwnedRuntimeRoot, retireManagedHolds } from "../src/managed-runtime/retire.mjs";
 
 const layout = async () => {
   const home = await mkdtemp(path.join(tmpdir(), "acc-retire-"));
@@ -81,4 +81,16 @@ test("a binding naming the generations directory itself, not a generation inside
     storeVersion: 6, runtimeRoot: path.join(root, "generations") }));
   await retireManagedHolds({ root, workspaces });
   assert.deepEqual(await readdir(bindings), ["dddd.json"]);
+});
+
+test("a runtimeRoot on a different Windows drive than generations is not owned", () => {
+  // path.relative returns an absolute path (the literal second argument) when
+  // the two roots sit on different Windows drives; POSIX path.relative can
+  // never produce that, so this is driven through path.win32 explicitly
+  // rather than through the ambient, host-platform path module.
+  const generations = "C:\\Users\\acc\\generations";
+  const runtimeRoot = "D:\\other\\generations\\0.4.4-c";
+  assert.equal(path.win32.relative(generations, runtimeRoot), runtimeRoot,
+    "test setup assumption: cross-drive relative degrades to the literal absolute path");
+  assert.equal(isOwnedRuntimeRoot(generations, runtimeRoot, path.win32), false);
 });

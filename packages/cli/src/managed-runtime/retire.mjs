@@ -3,6 +3,22 @@ import path from "node:path";
 
 import { managedDirectory, readManagedJson, syncDirectory } from "./state.mjs";
 
+// A relative runtimeRoot resolves against the caller's cwd, not this manager's
+// own root, so it can never be owned regardless of where acc uninstall runs
+// from. The generations directory itself is a container, not a generation, so
+// an exact match (empty relative) is foreign too. On Windows, path.relative
+// returns an absolute path when the two roots sit on different drives, which
+// is foreign by construction. This matches every case validateRuntime
+// (state.mjs) applies to a control pointer. pathImpl is injectable only so a
+// test can pin the cross-drive case through path.win32 without depending on
+// the host OS; production code always uses the real, platform-native path.
+export function isOwnedRuntimeRoot(generations, runtimeRoot, pathImpl = path) {
+  if (typeof runtimeRoot !== "string" || !pathImpl.isAbsolute(runtimeRoot)) return false;
+  const relative = pathImpl.relative(generations, runtimeRoot);
+  return relative !== "" && relative !== ".." && !relative.startsWith(`..${pathImpl.sep}`)
+    && !pathImpl.isAbsolute(relative);
+}
+
 /** Uninstall owns what it published. A binding naming a generation under this
  * manager is ours; one naming a foreign root, or none at all, is not, and a
  * client process is never signalled or terminated to clear a record. */
@@ -19,18 +35,7 @@ export async function retireManagedHolds({ root, workspaces }) {
         if (!name.endsWith(".json")) continue;
         const file = path.join(directory, name);
         const record = await readManagedJson(file).catch(() => null);
-        const runtimeRoot = record?.runtimeRoot;
-        // path.relative silently resolves a non-absolute second argument against
-        // the caller's cwd, so a relative runtimeRoot must never reach it - that
-        // would make ownership depend on where acc uninstall happened to run
-        // from. The generations directory itself is a container, not a
-        // generation, so an exact match (empty relative) is foreign too. Same
-        // rule validateRuntime in state.mjs applies to a control pointer.
-        const relative = typeof runtimeRoot === "string" && path.isAbsolute(runtimeRoot)
-          ? path.relative(generations, runtimeRoot) : null;
-        const owned = relative !== null && relative !== "" && relative !== ".."
-          && !relative.startsWith(`..${path.sep}`);
-        if (!owned) continue;
+        if (!isOwnedRuntimeRoot(generations, record?.runtimeRoot)) continue;
         await rm(file, { force: true });
         counts.bindings += 1;
         removed = true;
