@@ -159,6 +159,16 @@ export async function reclaimGenerations({ root, active = null, pidIsAlive = def
   return withManagerLock(root, async () => {
     const generations = path.join(root, "generations");
     if (!await managedDirectory(generations)) return { removed: [] };
+    // Candidates are captured before any holder is read, not after. A hold
+    // (or a control pointer) that lands later either names a directory this
+    // snapshot never saw - so it was never a deletion candidate regardless -
+    // or was already durable before this snapshot was taken, which, since
+    // every writer here writes its hold before the rename that creates the
+    // directory, guarantees it is already visible to every holder read
+    // below. Reading candidates last is exactly the window that left a
+    // staged-but-unpublished generation deletable; reading them first closes
+    // it for good, not just for the writer order this codebase happens to use.
+    const candidates = await readdir(generations, { withFileTypes: true });
     const control = await readControl(root);
     // No control at all is exactly as unknown as a corrupt one - which
     // readControl already throws on, and every real caller of this function
@@ -216,7 +226,7 @@ export async function reclaimGenerations({ root, active = null, pidIsAlive = def
       }
     }
     const removed = [];
-    for (const entry of await readdir(generations, { withFileTypes: true })) {
+    for (const entry of candidates) {
       // A dot-prefixed entry is always an in-flight staging temp (mkdtemp's
       // own naming), never a published generation. Its own creator cleans it
       // up; guessing whether it is still being written into is not this

@@ -7,7 +7,7 @@ import test from "node:test";
 import { activatePending, reclaimGenerations } from "../src/managed-runtime/activation.mjs";
 import { stageOwnGeneration } from "../src/managed-runtime/generation.mjs";
 import { writePin } from "../src/managed-runtime/pins.mjs";
-import { holdStagedGeneration } from "../src/managed-runtime/staging.mjs";
+import { holdStagedGeneration, reapStagingHolds, releaseStagingHold } from "../src/managed-runtime/staging.mjs";
 import { writeControl, writeManagedJson } from "../src/managed-runtime/state.mjs";
 
 // Every scenario below runs against a real, written control.json: an absent
@@ -224,4 +224,120 @@ test("a generation staged but not yet published is not deleted out from under th
   const result = await reclaimGenerations({ root: managerRoot, active: null, pidIsAlive: () => true });
   assert.deepEqual(result.removed, []);
   assert.equal(await readFile(path.join(staged.root, "bin", "acc.mjs"), "utf8"), "console.log('staged');\n");
+  // Once the caller (a real installer/updater) is done with this attempt -
+  // published or abandoned - it releases the hold; nothing else protects an
+  // abandoned candidate after that, so it becomes reclaimable again.
+  await releaseStagingHold(staged.hold);
+  const after = await reclaimGenerations({ root: managerRoot, active: null, pidIsAlive: () => true });
+  assert.deepEqual(after.removed, [path.basename(staged.root)]);
+});
+
+test("stageOwnGeneration's fast path (already matching, no rename) still returns a hold that protects the generation", async () => {
+  const root = await mkdtemp(path.join(tmpdir(), "acc-retain-faststage-"));
+  const managerRoot = path.join(root, "manager");
+  const packageRoot = path.join(root, "source");
+  await mkdir(path.join(packageRoot, "bin"), { recursive: true });
+  const manifest = { name: "agents-can-communicate", version: "0.4.6", files: ["bin/"], bundleDependencies: [] };
+  await writeFile(path.join(packageRoot, "package.json"), JSON.stringify(manifest));
+  await writeFile(path.join(packageRoot, "bin", "acc.mjs"), "console.log('fast');\n");
+  const publishedRoot = path.join(managerRoot, "generations", "0.1.0-published");
+  await mkdir(publishedRoot, { recursive: true });
+  await fixtureControl(managerRoot, { active: publishedRoot });
+  const first = await stageOwnGeneration({ packageRoot, managerRoot });
+  await releaseStagingHold(first.hold);
+  // Second call hits existingMatches and returns without ever renaming
+  // anything; it must still have registered its own hold for the window
+  // between that check and whatever the caller does next.
+  const second = await stageOwnGeneration({ packageRoot, managerRoot });
+  assert.equal(second.root, first.root);
+  assert.equal(typeof second.hold, "string");
+  assert.notEqual(second.hold, first.hold);
+  const result = await reclaimGenerations({ root: managerRoot, active: null, pidIsAlive: () => true });
+  assert.deepEqual(result.removed, []);
+  assert.equal((await readdir(path.join(managerRoot, "generations"))).includes(path.basename(second.root)), true);
+});
+
+test("an abandoned staging temp is swept once its owner is confirmed dead", async () => {
+  const root = await mkdtemp(path.join(tmpdir(), "acc-retain-abandoned-"));
+  const activeRoot = path.join(root, "generations", "0.4.0-active");
+  await mkdir(activeRoot, { recursive: true });
+  await fixtureControl(root, { active: activeRoot });
+  const generationsDir = path.join(root, "generations");
+  const stagingTemp = path.join(generationsDir, ".staging-orphaned");
+  await mkdir(stagingTemp, { recursive: true });
+  await writeFile(path.join(stagingTemp, "partial.txt"), "crashed mid-write");
+  const hold = await holdStagedGeneration({ root, generationRoot: path.join(generationsDir, "0.4.9-abandoned"),
+    stagingRoot: stagingTemp, pid: 999999 });
+  await reclaimGenerations({ root, active: null, pidIsAlive: () => false });
+  // The generations sweep never touches a dot-prefixed entry, dead owner or
+  // not; only reapStagingHolds's own link between a hold and its temp
+  // recovers the space, and only once the owner is confirmed dead.
+  await assert.rejects(readFile(path.join(stagingTemp, "partial.txt")), { code: "ENOENT" });
+  await assert.rejects(readFile(hold), { code: "ENOENT" });
+});
+
+test("a live staging temp survives both reclaim and reap", async () => {
+  const root = await mkdtemp(path.join(tmpdir(), "acc-retain-livetemp-"));
+  const activeRoot = path.join(root, "generations", "0.4.0-active");
+  await mkdir(activeRoot, { recursive: true });
+  await fixtureControl(root, { active: activeRoot });
+  const generationsDir = path.join(root, "generations");
+  const stagingTemp = path.join(generationsDir, ".staging-inflight");
+  await mkdir(stagingTemp, { recursive: true });
+  await writeFile(path.join(stagingTemp, "partial.txt"), "still being written");
+  const hold = await holdStagedGeneration({ root, generationRoot: path.join(generationsDir, "0.4.9-inflight"),
+    stagingRoot: stagingTemp, pid: process.pid });
+  await reclaimGenerations({ root, active: null, pidIsAlive: () => true });
+  await reapStagingHolds({ root, pidIsAlive: () => true });
+  assert.equal(await readFile(path.join(stagingTemp, "partial.txt"), "utf8"), "still being written");
+  assert.equal(JSON.parse(await readFile(hold, "utf8")).stagingRoot, stagingTemp);
+});
+
+// Finding 1 (round 2): reclaimGenerations used to read every holder before
+// taking its own snapshot of `generations/`. A staging hold that lands after
+// the holder reads, whose rename lands before the final directory listing,
+// was still deleted - the reviewer's own reproduction found this in 127 of
+// 801 sampled interleavings against the fixed-but-still-misordered code.
+// This drives the real writer sequence (hold, then rename) concurrently with
+// the real reclaimGenerations, jittering both sides across many trials so
+// the two race genuinely rather than deterministically taking turns.
+// This construction was tuned empirically against a temporarily reverted
+// copy of reclaimGenerations (candidates read moved back to the end): with
+// no decoys and small jitter it essentially never landed the race, because
+// withManagerLock's own acquisition (mkdir/write/sync/rename/sync/compact)
+// dominates the wall-clock time and the gap between "holders read" and
+// "candidates read" is under a millisecond on an otherwise-empty root. A
+// batch of harmless decoy staging holds - each one real work for the
+// staging-holds read to process - widens that gap to several milliseconds,
+// and jittering the writer's start across that same span reliably lands the
+// race: 10 of 70 trials deleted the racing generation against the reverted
+// order (documented, not re-verified on every run - see the task report for
+// the exact numbers from both sides).
+test("a staging hold racing reclaim never loses, across many jittered interleavings", async () => {
+  const TRIALS = 70;
+  const DECOYS = 40;
+  const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+  for (let trial = 0; trial < TRIALS; trial++) {
+    const root = await mkdtemp(path.join(tmpdir(), `acc-retain-race-${trial}-`));
+    const activeRoot = path.join(root, "generations", "0.4.0-active");
+    await mkdir(activeRoot, { recursive: true });
+    await fixtureControl(root, { active: activeRoot });
+    for (let decoy = 0; decoy < DECOYS; decoy++) {
+      const decoyRoot = path.join(root, "generations", `decoy-${decoy}`);
+      await mkdir(decoyRoot, { recursive: true });
+      await holdStagedGeneration({ root, generationRoot: decoyRoot, pid: process.pid });
+    }
+    const targetName = "0.4.9-racing";
+    const target = path.join(root, "generations", targetName);
+    const writer = (async () => {
+      await sleep(8 + Math.random() * 15);
+      await holdStagedGeneration({ root, generationRoot: target, pid: process.pid });
+      await mkdir(target, { recursive: true }); // stands in for stageOwnGeneration's rename
+    })();
+    const reclaim = reclaimGenerations({ root, active: null, pidIsAlive: () => true });
+    await Promise.all([writer, reclaim]);
+    const survivors = await readdir(path.join(root, "generations"));
+    assert.ok(survivors.includes(targetName),
+      `trial ${trial}: the racing generation was deleted while its hold was landing`);
+  }
 });

@@ -7,6 +7,7 @@ import { stageOwnGeneration } from "./generation.mjs";
 import { verifyGeneration } from "./install.mjs";
 import { confirmedDead, withManagerLock } from "./mutex.mjs";
 import { readControl, readManagedJson, writeControl } from "./state.mjs";
+import { releaseStagingHold } from "./staging.mjs";
 
 /** A newly installed global CLI can supersede an older pending release locally.
  * No workspace code or integration is admitted until normal activation passes.
@@ -19,16 +20,22 @@ export async function stageNewerManagementRuntime(root, { packageRoot, env }) {
     || manifest.accManagedUpdateProtocol !== 2 || before.pin && before.pin !== manifest.version
     || !newerVersion(manifest.version, before.pending?.version ?? before.active.version)) return false;
   const candidate = await stageOwnGeneration({ packageRoot, managerRoot: root });
-  await verifyGeneration(candidate, { env });
-  return withManagerLock(root, async () => {
-    const current = await readControl(root);
-    if (current.phase !== "ready" || current.pin !== before.pin
-      || JSON.stringify([current.active, current.pending]) !== JSON.stringify([before.active, before.pending])) return false;
-    await writeControl(root, { ...current, pending: { root: candidate.root,
-      version: candidate.version, storeVersion: await declaredStoreVersion(candidate.root) },
-      notice: `ACC ${candidate.version} is verified and ready to activate.` });
-    return true;
-  });
+  // See installManaged for why this releases only after the publish attempt
+  // - success or not - has fully resolved.
+  try {
+    await verifyGeneration(candidate, { env });
+    return await withManagerLock(root, async () => {
+      const current = await readControl(root);
+      if (current.phase !== "ready" || current.pin !== before.pin
+        || JSON.stringify([current.active, current.pending]) !== JSON.stringify([before.active, before.pending])) return false;
+      await writeControl(root, { ...current, pending: { root: candidate.root,
+        version: candidate.version, storeVersion: await declaredStoreVersion(candidate.root) },
+        notice: `ACC ${candidate.version} is verified and ready to activate.` });
+      return true;
+    });
+  } finally {
+    await releaseStagingHold(candidate.hold);
+  }
 }
 
 async function inspectWorker(pid) {

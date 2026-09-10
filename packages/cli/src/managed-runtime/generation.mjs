@@ -3,7 +3,7 @@ import { lstat, mkdir, mkdtemp, open, readFile, readdir, realpath, rename, rm }
   from "node:fs/promises";
 import path from "node:path";
 
-import { holdStagedGeneration } from "./staging.mjs";
+import { attachStagingTemp, holdStagedGeneration, releaseStagingHold } from "./staging.mjs";
 
 const NAME = "agents-can-communicate";
 const STABLE = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/;
@@ -136,45 +136,51 @@ export async function stageOwnGeneration({ packageRoot, managerRoot }) {
   await directory(generations);
   const target = path.join(generations, `${manifest.version}-${digest.slice(0, 24)}`);
   const result = { version: manifest.version, root: target, digest };
-  // A hold for the final path is durable before this returns a path that may
-  // already be sitting on disk unprotected from an earlier run: nothing else
-  // references a staged-but-unpublished generation, and reclaim must never
-  // see one without also seeing why it exists.
-  if (await existingMatches(target, files)) {
-    await holdStagedGeneration({ root, generationRoot: target });
-    return result;
-  }
-  const staging = await mkdtemp(path.join(generations, ".staging-"));
+  // Held before the check that may return `target` unchanged (it can already
+  // be sitting on disk unprotected from an earlier run) and, on the staging
+  // path below, before the rename that makes a freshly built `target`
+  // visible at all: reclaim must never observe the directory without also
+  // observing why it exists. The caller now owns this hold - see its own
+  // `hold` on the returned value - and must release it on every exit from
+  // its own attempt, once the generation is either published or abandoned.
+  // A hold this function itself never hands off (because it throws instead
+  // of returning) is released here, in its own catch, rather than left for
+  // a confirmed-dead reap to eventually find.
+  const hold = await holdStagedGeneration({ root, generationRoot: target });
   try {
-    const directories = new Set([staging]);
-    for (const [name, file] of files) {
-      const destination = path.join(staging, name);
-      await mkdir(path.dirname(destination), { recursive: true });
-      for (let parent = path.dirname(destination); parent !== staging; parent = path.dirname(parent)) directories.add(parent);
-      const handle = await open(destination, "wx", file.mode);
-      try {
-        await handle.writeFile(file.bytes);
-        await handle.chmod(file.mode);
-        await handle.sync();
-      } finally { await handle.close(); }
-    }
-    for (const directory of [...directories].sort((a, b) => b.length - a.length)) {
-      const handle = await open(directory, "r");
-      try { await handle.sync(); } finally { await handle.close(); }
-    }
-    // Written before the rename that makes `target` visible under
-    // `generations`, so a concurrent reclaim pass can never observe the
-    // directory without also observing why it exists.
-    await holdStagedGeneration({ root, generationRoot: target });
+    if (await existingMatches(target, files)) return { ...result, hold };
+    const staging = await mkdtemp(path.join(generations, ".staging-"));
     try {
-      await rename(staging, target);
-    } catch (error) {
-      if (!["EEXIST", "ENOTEMPTY"].includes(error.code) || !await existingMatches(target, files)) throw error;
+      await attachStagingTemp(hold, staging);
+      const directories = new Set([staging]);
+      for (const [name, file] of files) {
+        const destination = path.join(staging, name);
+        await mkdir(path.dirname(destination), { recursive: true });
+        for (let parent = path.dirname(destination); parent !== staging; parent = path.dirname(parent)) directories.add(parent);
+        const handle = await open(destination, "wx", file.mode);
+        try {
+          await handle.writeFile(file.bytes);
+          await handle.chmod(file.mode);
+          await handle.sync();
+        } finally { await handle.close(); }
+      }
+      for (const directory of [...directories].sort((a, b) => b.length - a.length)) {
+        const handle = await open(directory, "r");
+        try { await handle.sync(); } finally { await handle.close(); }
+      }
+      try {
+        await rename(staging, target);
+      } catch (error) {
+        if (!["EEXIST", "ENOTEMPTY"].includes(error.code) || !await existingMatches(target, files)) throw error;
+      }
+      const handle = await open(generations, "r");
+      try { await handle.sync(); } finally { await handle.close(); }
+      return { ...result, hold };
+    } finally {
+      await rm(staging, { recursive: true, force: true });
     }
-    const handle = await open(generations, "r");
-    try { await handle.sync(); } finally { await handle.close(); }
-    return result;
-  } finally {
-    await rm(staging, { recursive: true, force: true });
+  } catch (error) {
+    await releaseStagingHold(hold);
+    throw error;
   }
 }
