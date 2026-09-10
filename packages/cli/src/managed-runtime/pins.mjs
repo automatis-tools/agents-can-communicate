@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { readdir, rm } from "node:fs/promises";
+import { access, readdir, rm } from "node:fs/promises";
 import path from "node:path";
 
 import { confirmedDead, defaultPidIsAlive } from "./mutex.mjs";
@@ -29,6 +29,21 @@ export async function readPin({ root, harnessSessionId }) {
 
 export async function clearPin({ root, harnessSessionId }) {
   await rm(fileFor(root, harnessSessionId), { force: true });
+}
+
+/** Returns the pinned generation root when a hook should delegate to it, and
+ * null when it should stay on the active generation. Resolution never throws:
+ * a hook that cannot resolve a pin must still let the client proceed, so
+ * every reason to say no - no pin, an already-active pin, a pinned generation
+ * missing its own hook entrypoint, a store that will not read - collapses to
+ * the same null. */
+export async function resolvePinnedEntrypoint({ root, harnessSessionId, active }) {
+  try {
+    const pin = await readPin({ root, harnessSessionId });
+    if (pin === null || pin.runtimeRoot === active) return null;
+    await access(path.join(pin.runtimeRoot, "bin", "entrypoints", "acc-hook.mjs"));
+    return pin.runtimeRoot;
+  } catch { return null; }
 }
 
 /** A client that exits without SessionEnd leaves its pin behind. Admission
