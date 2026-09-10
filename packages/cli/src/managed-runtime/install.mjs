@@ -10,6 +10,7 @@ import { writeLaunchers } from "./launchers.mjs";
 import { canonicalManagerRoot, readControl, writeControl } from "./state.mjs";
 import { scheduleWorker } from "./schedule.mjs";
 import { withManagerLock } from "./mutex.mjs";
+import { retireManagedHolds } from "./retire.mjs";
 
 const exec = promisify(execFile);
 export async function verifyGeneration(runtime, { env = process.env } = {}) {
@@ -71,6 +72,11 @@ export async function uninstallManaged({ managerRoot, apply }) {
     const removed = new Set(result.operations.filter(operation => operation.applied)
       .map(operation => operation.adapterId));
     const targets = control.targets.filter(id => !removed.has(id));
+    // Holds this install published must stop blocking a later activation. The
+    // client processes keep running; only the records ACC owns are retired.
+    if (targets.length === 0) {
+      await retireManagedHolds({ root, workspaces: path.join(path.dirname(root), "workspaces") });
+    }
     await writeControl(root, { ...control, targets,
       autoPreference: control.autoPreference ?? control.auto,
       auto: targets.length > 0 && result.failed.length === 0 && control.auto,
