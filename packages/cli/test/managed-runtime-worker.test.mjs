@@ -70,8 +70,11 @@ test("a background poll releases the update lock while waiting for clients", asy
   const modules = path.join(pending.root, "node_modules", "@agents-can-communicate", "cli", "src", "managed-runtime");
   await mkdir(modules, { recursive: true });
   const marker = path.join(f.root, "prepared");
+  // A file is visible before writeFile finishes; expose that publication window.
   await writeFile(path.join(modules, "refresh.mjs"), `import { writeFile } from 'node:fs/promises';
-    export async function prepareRefresh() { await writeFile(${JSON.stringify(marker)}, 'ready');
+    export async function prepareRefresh() { await writeFile(${JSON.stringify(marker)}, '');
+      await new Promise(resolve => setTimeout(resolve, 100));
+      await writeFile(${JSON.stringify(marker)}, 'ready');
       return async () => ({ failed: [] }); }`);
   await writeControl(f.root, { ...await readControl(f.root), pending });
   await acquireRuntime(f.root, { kind: "acc-mcp" });
@@ -80,7 +83,8 @@ test("a background poll releases the update lock while waiting for clients", asy
   const child = spawn(process.execPath, ["--input-type=module", "-e", source], { stdio: "ignore" });
   const exited = once(child, "exit");
   t.after(async () => { if (child.exitCode === null) child.kill("SIGKILL"); await exited; });
-  for (let attempt = 0; attempt < 100 && !await readFile(marker).catch(() => false); attempt++) {
+  for (let attempt = 0; attempt < 100
+    && await readFile(marker, "utf8").catch(() => null) !== "ready"; attempt++) {
     await new Promise(resolve => setTimeout(resolve, 10));
   }
   assert.equal(await readFile(marker, "utf8"), "ready");
