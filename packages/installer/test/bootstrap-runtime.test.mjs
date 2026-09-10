@@ -79,8 +79,12 @@ test("old, prerelease, known-bad, wrong-protocol, timed-out, throwing, and malfo
   async t => {
     const here = await place(t);
     const cases = [
-      [{ version: "2.1.100" }, "below_minimum_version"],
-      [{ version: "2.2.0-beta.1" }, "prerelease_not_captured"],
+      // The rule is judged by the version the probe reports, so the served
+      // version is lowered along with the detected one in each case below.
+      [{ version: "2.1.100", probe: () => ({ ...PROBE, clientVersion: "2.1.100" }) },
+        "below_minimum_version"],
+      [{ version: "2.2.0-beta.1", probe: () => ({ ...PROBE, clientVersion: "2.2.0-beta.1" }) },
+        "prerelease_not_captured"],
       [{ version: "2.1.300", probe: () => ({ ...PROBE, clientVersion: "2.1.300" }) },
         "known_bad_version"],
       [{ probe: () => ({ ...PROBE, protocolContract: "fixture-native-v2" }) }, "protocol_mismatch"],

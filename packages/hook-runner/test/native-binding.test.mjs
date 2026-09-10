@@ -139,8 +139,8 @@ test("every failure clears the old binding, publishes nothing, and returns a clo
         "handshake_failed", "degraded"],
       [async () => ({ ...HANDSHAKE, supported: false, modes: [], opaqueEndpointRef: null,
         leaseUntil: null, reasonCode: "handshake_timeout" }), "handshake_timeout", "degraded"],
-      [async () => ({ ...HANDSHAKE, clientVersion: "2.1.259" }), "handshake_version_mismatch",
-        "degraded"],
+      [async () => ({ ...HANDSHAKE, clientVersion: "2.1.100" }), "below_minimum_version",
+        "unsupported"],
       [async () => ({ ...HANDSHAKE, protocolContract: "fixture-native-v2" }), "protocol_mismatch",
         "degraded"],
       [async () => ({ ...HANDSHAKE, transcript: "x" }), "handshake_failed", "degraded"],
@@ -155,6 +155,19 @@ test("every failure clears the old binding, publishes nothing, and returns a clo
     }
   });
 
+test("a handshake reporting a different but eligible version activates, judged by that version",
+  async () => {
+    // The vendor service can update itself while the CLI's detected binary
+    // stays put. The handshake names the version that will actually serve,
+    // so a newer-but-still-eligible report is not a reason to degrade.
+    const service = fakeService();
+    const result = await establish(nativeAdapter(async () => ({ ...HANDSHAKE,
+      clientVersion: "2.1.259" })), service);
+    assert.deepEqual(result, { state: "active", reasonCode: null,
+      modes: ["livePush", "idleWake", "busyQueue", "replyRoute"] });
+    assert.equal(service.calls.some(([name]) => name === "publish"), true);
+  });
+
 test("a stale generation at publish time is reported, and the old binding is cleared", async () => {
   const service = fakeService({ publishError: new AccError(EXIT.CONFLICT, "stale") });
   const result = await establish(nativeAdapter(), service);
@@ -164,7 +177,10 @@ test("a stale generation at publish time is reported, and the old binding is cle
 
 test("a client the static rule refuses is unsupported, not retried as degraded", async () => {
   const service = fakeService();
-  const older = await establish(nativeAdapter(), service, { clientVersion: "2.1.100" });
+  // The rule is judged by the version the handshake reports, so the fixture's
+  // served version is lowered along with the detected one.
+  const older = await establish(nativeAdapter(async () => ({ ...HANDSHAKE, clientVersion: "2.1.100" })),
+    service, { clientVersion: "2.1.100" });
   assert.deepEqual(older, { state: "unsupported", reasonCode: "below_minimum_version", modes: [] });
   const elsewhere = await establish(nativeAdapter(), service, { platform: "linux-x64" });
   assert.equal(elsewhere.reasonCode, "platform_not_captured");

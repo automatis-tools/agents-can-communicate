@@ -147,7 +147,12 @@ function validateNativeProbe(probe) {
 }
 
 export function evaluateNativeEligibility(adapter, { clientVersion, platform, probe }) {
-  const rule = evaluateStatic(adapter, { clientVersion, platform });
+  // The probe names the process that will serve the delivery. Judging the
+  // detected binary instead refuses a service that satisfies the contract.
+  // Only the version is read here; the shape is validated where it always was,
+  // so a malformed probe still returns a closed result rather than throwing.
+  const serving = isText(probe?.clientVersion) ? probe.clientVersion : clientVersion;
+  const rule = evaluateStatic(adapter, { clientVersion: serving, platform });
   const base = { eligible: false, reasonCode: null, minimumVersion: rule.minimumVersion,
     protocolContract: rule.protocolContract, modes: [] };
   const closedResult = reasonCode => deepFreeze({ ...base, reasonCode });
@@ -155,7 +160,6 @@ export function evaluateNativeEligibility(adapter, { clientVersion, platform, pr
   if (probe === null || probe === undefined) return closedResult("feature_probe_failed");
   const facts = validateNativeProbe(probe);
   if (facts.supported !== true) return closedResult(facts.reasonCode ?? "feature_probe_failed");
-  if (facts.clientVersion !== clientVersion) return closedResult("probe_version_mismatch");
   if (facts.protocolContract !== rule.protocolContract) return closedResult("protocol_mismatch");
   const modes = orderedModes(facts.modes);
   if (!modes.includes("livePush")) return closedResult("feature_probe_failed");
@@ -192,7 +196,12 @@ function validateNativeHandshakeShape(handshake) {
 // The per-session half: the same static rule again, then the adapter's live
 // handshake facts. The launch-time executable fingerprint stays probe-only.
 export function validateNativeHandshake(adapter, { clientVersion, platform, handshake }) {
-  const rule = evaluateStatic(adapter, { clientVersion, platform });
+  // Same rationale as the probe: the handshake names the session that will
+  // actually serve, so the static rule is judged against that version. Only
+  // the version is read here; the shape is validated where it always was, so
+  // a malformed handshake still returns a closed result rather than throwing.
+  const serving = isText(handshake?.clientVersion) ? handshake.clientVersion : clientVersion;
+  const rule = evaluateStatic(adapter, { clientVersion: serving, platform });
   const base = { ok: false, reasonCode: null, protocolContract: rule.protocolContract, modes: [],
     opaqueEndpointRef: null, leaseUntil: null };
   const closedResult = reasonCode => deepFreeze({ ...base, reasonCode });
@@ -200,7 +209,6 @@ export function validateNativeHandshake(adapter, { clientVersion, platform, hand
   if (handshake === null || handshake === undefined) return closedResult("handshake_failed");
   const facts = validateNativeHandshakeShape(handshake);
   if (facts.supported !== true) return closedResult(facts.reasonCode ?? "handshake_failed");
-  if (facts.clientVersion !== clientVersion) return closedResult("handshake_version_mismatch");
   if (facts.protocolContract !== rule.protocolContract) return closedResult("protocol_mismatch");
   const modes = orderedModes(facts.modes);
   if (!modes.includes("livePush")) return closedResult("handshake_failed");
