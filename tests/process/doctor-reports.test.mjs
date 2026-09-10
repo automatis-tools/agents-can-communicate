@@ -40,7 +40,7 @@ async function machine(t) {
   // and every test here failed on a machine that had it.
   const env = { ...process.env, PATH: `${bin}${path.delimiter}${process.env.PATH}`,
     HOME: home, ACC_DATA_HOME: dataHome, ACC_PROBE_TIMEOUT_MS: "30000",
-    GIT_DIR: "", GIT_WORK_TREE: "" };
+    ACC_NO_UPDATE_CHECK: "1", GIT_DIR: "", GIT_WORK_TREE: "" };
 
   // Nothing here asks the registry: the check is switched off, except where a
   // test seeds an answer that is still fresh so none is needed.

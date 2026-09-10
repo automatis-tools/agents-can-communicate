@@ -3,7 +3,7 @@ import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { scheduleWorker } from "./schedule.mjs";
 import { acquireRuntime } from "./leases.mjs";
-import { canonicalManagerRoot, readControl } from "./state.mjs";
+import { canonicalManagerRoot, readControl, readManagedJson } from "./state.mjs";
 
 export const ENTRY_KINDS = Object.freeze([
   "acc", "acc-hook", "acc-mcp", "acc-bootstrap", "acc-claude-channel",
@@ -53,6 +53,31 @@ function unavailable(kind) {
   }
 }
 
+const stableVersion = value => typeof value === "string" && /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.test(value);
+function newerVersion(left, right) {
+  if (!stableVersion(left) || !stableVersion(right)) return false;
+  const a = left.split(".").map(BigInt), b = right.split(".").map(BigInt);
+  for (let index = 0; index < 3; index++) if (a[index] !== b[index]) return a[index] > b[index];
+  return false;
+}
+
+/** Pending means downloaded and verified. Older packages do not advertise this
+ * management-only protocol; never load them speculatively for workspace work.
+ */
+async function updateImplementation(packageRoot, control) {
+  let selected = null;
+  for (const candidate of [{ root: packageRoot }, control.pending].filter(candidate => candidate?.root)) {
+    try {
+      const manifest = await readManagedJson(path.join(candidate.root, "package.json"));
+      if (manifest?.name !== "agents-can-communicate" || manifest.accManagedUpdateProtocol !== 2
+        || candidate.version !== undefined && manifest.version !== candidate.version
+        || !newerVersion(manifest.version, selected?.version ?? control.active.version)) continue;
+      selected = { root: candidate.root, version: manifest.version };
+    } catch { /* Unreadable alternatives leave the active implementation available. */ }
+  }
+  return selected?.root ?? null;
+}
+
 /** The lease lasts until OS process death, including callbacks after main returns. */
 export async function runEntry({ kind, packageRoot, managerRoot, managedRequired = false }) {
   if (!ENTRY_KINDS.includes(kind)) throw new Error("unknown ACC entry point");
@@ -66,6 +91,7 @@ export async function runEntry({ kind, packageRoot, managerRoot, managedRequired
   }
   let selected = packageRoot;
   let managed = null;
+  let managementOnly = false;
   let root;
   try {
     const requestedDataHome = bootstrapOptions === null ? null : await canonicalManagerRoot(bootstrapOptions.dataHome);
@@ -81,12 +107,18 @@ export async function runEntry({ kind, packageRoot, managerRoot, managedRequired
     if (control !== null) {
       selected = control.active.root;
       managed = root;
-      const lease = await acquireRuntime(root, { pid: process.pid, kind });
-      selected = lease.runtime.root;
-      managed = root;
-      const quiet = kind === "acc" && ["update", "install", "uninstall", "help", "version",
-        "--help", "-h", "--version", "-v", "-V"].includes(process.argv[2]);
-      if (!quiet) await scheduleWorker(root, control);
+      const update = kind === "acc" && ["update", "doctor"].includes(process.argv[2])
+        ? await updateImplementation(packageRoot, control) : null;
+      if (update !== null) {
+        selected = update;
+        managementOnly = true;
+      } else {
+        const lease = await acquireRuntime(root, { pid: process.pid, kind });
+        selected = lease.runtime.root;
+        const quiet = kind === "acc" && ["update", "install", "uninstall", "help", "version",
+          "--help", "-h", "--version", "-v", "-V"].includes(process.argv[2]);
+        if (!quiet) await scheduleWorker(root, control);
+      }
     } else if (managedRequired) throw new Error("managed runtime is not initialized");
   } catch {
     // Help and update recovery must remain reachable when state cannot admit a
@@ -106,5 +138,5 @@ export async function runEntry({ kind, packageRoot, managerRoot, managedRequired
     return;
   }
   const runtime = await import(pathToFileURL(path.join(selected, "bin", "entrypoints", `${kind}.mjs`)).href);
-  await runtime.main({ managerRoot: managed, packageRoot: selected });
+  await runtime.main({ managerRoot: managed, packageRoot: selected, ...(managementOnly ? { managementOnly } : {}) });
 }

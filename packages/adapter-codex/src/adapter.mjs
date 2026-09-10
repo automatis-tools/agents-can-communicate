@@ -2,6 +2,8 @@ import { defineAdapter, projectContext, projectContextResult }
   from "@agents-can-communicate/adapter-sdk";
 import { probeNativeDelivery, planNativeActivation, bindNativeSession, refreshNativeSession, retireNativeSession, offerMessage } from "./native-delivery.mjs";
 import certification from "../certification.json" with { type: "json" };
+import { createCodexMaintenance } from "./maintenance.mjs";
+export { sameMaintenanceIdentity } from "./maintenance.mjs";
 
 import { PROTOCOL_CONTRACT } from "./app-server-client.mjs";
 import { allowOutcome, denyOutcome, injectOutcome, normalizeCodexHook }
@@ -16,8 +18,9 @@ export const CODEX_DELIVERY_FALLBACK = Object.freeze({
   diagnostic: "Codex native delivery requires codex-cli 0.152.1 or newer on darwin-arm64, "
     + "recorded recipient consent and a reachable LocalDaemon session with exact thread, cwd, "
     + "process, version and protocol verification. Embedded or unreachable sessions retain "
-    + "durable messages. ACC does not start, restart or stop the vendor daemon and adds no "
-    + "launch arguments; fallback is exact-certified next-turn delivery or acc inbox",
+    + "durable messages. Native delivery does not start, restart or stop the vendor daemon and adds no "
+    + "launch arguments; fallback is exact-certified next-turn delivery or acc inbox. "
+    + "Explicitly confirmed acc update maintenance has a separate daemon restart check",
 });
 
 /**
@@ -61,6 +64,7 @@ export function createCodexAdapter() {
     },
     probeNativeDelivery, planNativeActivation, bindNativeSession,
     refreshNativeSession, retireNativeSession, offerMessage,
+    ...createCodexMaintenance(),
     startSession: async () => ({ ok: true, changes: [], diagnostics: [] }),
     endSession: async () => ({ ok: true, changes: [], diagnostics: [] }),
     guardWrite: async () => ({ ok: true, changes: [], diagnostics: [] }),

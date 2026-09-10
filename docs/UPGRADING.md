@@ -1,13 +1,14 @@
-# Upgrading to 0.4.3
+# Upgrading to 0.4.4
 
-## From 0.4.2, 0.4.1 or 0.4.0
+## From 0.4.3, 0.4.2, 0.4.1 or 0.4.0
 
-This patch keeps the existing workspace data format. It fixes outgoing native delivery
-from Codex's sandbox, separates permission failures from unavailable recipients, and
-shows outgoing setup alongside receiving-channel state in doctor. It also includes the
-previous 0.4.x delivery diagnostics, session recovery and client integration fixes.
+This patch keeps the existing workspace data format. It adds confirmed service maintenance
+to the updater, preserves native delivery setup when readiness probes are unavailable,
+and names the actual processes blocking activation. It includes the previous 0.4.x
+outgoing sandbox permissions, delivery diagnostics, session recovery and integration fixes.
 
-Close participating clients and persistent ACC MCP processes, then run:
+Run the update command; it can offer a confirmed restart for an eligible Codex service.
+Other active clients and persistent ACC MCP processes still need to finish before activation:
 
 ```bash
 acc update
@@ -15,8 +16,8 @@ acc version
 acc doctor
 ```
 
-After publication, `acc version` should report 0.4.3. If a pin keeps an older version,
-select 0.4.3 or clear it first. A managed update refreshes installed integrations and
+After publication, `acc version` should report 0.4.4. If a pin keeps an older version,
+select 0.4.4 or clear it first. A managed update refreshes installed integrations and
 skills; use the npm instructions below for unmanaged or pre-0.4 installations. Start
 clients again and complete any hook/trust review they request. With existing live consent,
 Codex 0.153.4 or newer on macOS arm64 receives local socket permissions when its workspace
@@ -36,12 +37,51 @@ Claude admitted inbound Channels messages. See [delivery troubleshooting](TROUBL
 Upgrading preserves delivery consent. If doctor reports native delivery off and you want
 automatic peer requests, use `acc install --adapter codex --delivery actionable` (or the
 relevant adapter); this can spend model tokens. Codex can save that consent before its
-local service/session becomes available. ACC does not start the vendor daemon, and it
+local service/session becomes available. Installation does not start the vendor daemon; ACC
 keeps durable inbox access when no verified live channel is bound.
 
 In Grok, public status supplies the session's own CLI arguments through the next tool
 hook. Grok still uses explicit inbox reads; this patch adds no external wake or guards.
 Start clients in a project directory, rather than a home directory containing ACC state.
+
+## Confirmed client service maintenance
+
+On macOS arm64, `acc update` can ask once to restart a verified Codex service that blocks
+activation or runs a different version from the installed CLI. The captured maintenance
+contract uses Codex CLI 0.154.0 and its `pid` backend, with compatible commands and protocol
+checked again at runtime. The installed CLI and managed executable must already match;
+ACC does not replace vendor binaries or install an operating-system service.
+
+After confirmation, a detached ACC worker waits up to 15 minutes for idle Codex turns,
+empty queues and other ACC processes to exit. It rechecks the approved candidate, settings,
+PID/start time, executable, socket ownership and versions before stopping the service.
+It refreshes integrations, starts the service again and verifies the result. If refreshing
+integrations fails, it still restores the service and reports the incomplete update.
+A later update worker can resume an already approved recovery without another question.
+`acc doctor --json` exposes `update.maintenance`; ordinary `acc doctor` describes its state.
+A current launcher can use the newer management reader while the old runtime is active.
+When admission is blocked, doctor returns an update-only report without inspecting the
+workspace or repairing it. Older launchers gain this reader after activation, or through
+the one-time launcher bootstrap described below.
+
+Open clients disconnect. Resume them afterward and complete any client-owned hook trust
+review. Codex has no atomic idle-check-and-stop operation: a new turn arriving during the
+final check can be interrupted. ACC does not promise that client UIs reconnect themselves
+or that an interrupted turn continues automatically. Unknown ownership, incompatible
+service layouts and unrelated active processes remain visible blockers.
+
+For an unattended command, `acc update --yes` explicitly consents to the same restart.
+`acc update --check` stays read-only. Background discovery never grants restart consent.
+Changing the candidate or pin before the stop cancels that approval; idle-wait expiration
+also leaves the service untouched. Delivery consent and automatic-update opt-outs survive
+an update even when a native service or feature probe is temporarily unavailable.
+
+An old installation can already be stuck with both a pre-0.4.4 pending runtime and the
+old updater that waits indefinitely. That code cannot discover this fix. Bootstrap the
+new launcher once with `npm install --global agents-can-communicate@0.4.4`, then run
+`acc update`. The new launcher stages its verified runtime and retires only an exactly
+identified obsolete ACC background updater while no integrations are being written.
+This does not terminate an unrelated client or bypass its lifetime hold.
 
 ## From 0.3.1
 
@@ -64,7 +104,7 @@ restores access; deleting or editing the record is not a remedy.
 2. Install the released package, then refresh the client integrations:
 
    ```bash
-   npm install --global agents-can-communicate@0.4.3
+   npm install --global agents-can-communicate@0.4.4
    acc version
    acc install
    ```
@@ -104,7 +144,8 @@ confirmed process exit. Native bindings hold until observed client SessionEnd cl
 confirmed process death; the vendor daemon can remain running after that lifecycle event.
 Unknown PIDs remain conservative holds until lifecycle cleanup. `acc finish`, presence TTL,
 and delivery off alone do not prove native end. Close the relevant client sessions and
-persistent ACC processes to release holds; ACC does not manage the vendor daemon.
+persistent ACC processes to release holds, or accept the eligible Codex service maintenance
+offer in `acc update`. Background updates never request fresh restart consent.
 Hooks never wait for a network download. If integration refresh temporarily prevents
 coordination, a hook lets the client continue; its next genuine user turn can restore a
 missing binding.
@@ -114,7 +155,7 @@ acc update                    # download and apply, or report what is keeping it
 acc update --check            # check without installing or changing update settings
 acc update --auto off         # disable background updates
 acc update --auto on          # enable them again
-acc update --pin 0.4.3        # stay on this exact stable version
+acc update --pin 0.4.4        # stay on this exact stable version
 acc update --pin none         # follow stable releases again
 ```
 

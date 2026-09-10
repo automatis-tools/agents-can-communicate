@@ -1,10 +1,15 @@
 import assert from "node:assert/strict";
-import { mkdir, mkdtemp, realpath, rm } from "node:fs/promises";
+import { spawn } from "node:child_process";
+import { once } from "node:events";
+import { mkdir, mkdtemp, readFile, realpath, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { tmpdir } from "node:os";
 import test from "node:test";
 import { performUpdate } from "../src/managed-runtime/worker.mjs";
 import { readControl, writeControl } from "../src/managed-runtime/state.mjs";
+import { acquireRuntime } from "../src/managed-runtime/leases.mjs";
+import { withManagerLock } from "../src/managed-runtime/mutex.mjs";
+import { scheduleWorker } from "../src/managed-runtime/schedule.mjs";
 
 async function fixture(t, changes = {}) {
   const root = await realpath(await mkdtemp(path.join(tmpdir(), "acc-worker-")));
@@ -57,4 +62,66 @@ test("failed downloads keep the working runtime and concurrent opt-out prevents 
   } });
   assert.equal(g.calls.some(([name]) => name === "activate"), false);
   assert.equal((await readControl(g.root)).pending, null);
+});
+
+test("a background poll releases the update lock while waiting for clients", async t => {
+  const f = await fixture(t);
+  const pending = { version: "0.4.1", root: path.join(f.root, "generations", "new") };
+  const modules = path.join(pending.root, "node_modules", "@agents-can-communicate", "cli", "src", "managed-runtime");
+  await mkdir(modules, { recursive: true });
+  const marker = path.join(f.root, "prepared");
+  // A file is visible before writeFile finishes; expose that publication window.
+  await writeFile(path.join(modules, "refresh.mjs"), `import { writeFile } from 'node:fs/promises';
+    export async function prepareRefresh() { await writeFile(${JSON.stringify(marker)}, '');
+      await new Promise(resolve => setTimeout(resolve, 100));
+      await writeFile(${JSON.stringify(marker)}, 'ready');
+      return async () => ({ failed: [] }); }`);
+  await writeControl(f.root, { ...await readControl(f.root), pending });
+  await acquireRuntime(f.root, { kind: "acc-mcp" });
+  const source = `import { runWorker } from ${JSON.stringify(new URL("../src/managed-runtime/worker.mjs", import.meta.url).href)};
+    await runWorker(${JSON.stringify(f.root)}, { wait: true, env: {} });`;
+  const child = spawn(process.execPath, ["--input-type=module", "-e", source], { stdio: "ignore" });
+  const exited = once(child, "exit");
+  t.after(async () => { if (child.exitCode === null) child.kill("SIGKILL"); await exited; });
+  for (let attempt = 0; attempt < 100
+    && await readFile(marker, "utf8").catch(() => null) !== "ready"; attempt++) {
+    await new Promise(resolve => setTimeout(resolve, 10));
+  }
+  assert.equal(await readFile(marker, "utf8"), "ready");
+  assert.equal(await withManagerLock(path.join(f.root, "worker"), async () => "foreground admitted",
+    { timeoutMs: 500 }), "foreground admitted");
+  assert.equal(await scheduleWorker(f.root, await readControl(f.root), { env: {} }), false,
+    "the existing idle poller prevents duplicate background workers");
+});
+
+test("an active maintenance job pauses ordinary update work without changing control", async t => {
+  for (const status of ["waiting", "stopping", "refreshing", "restarting", "recovery"]) {
+    const f = await fixture(t);
+    await writeFile(path.join(f.root, "maintenance.json"), JSON.stringify({ schemaVersion: 1, status,
+      id: "11111111-1111-1111-1111-111111111111", recipe: "fixture", deadline: Date.now() + 60_000,
+      callerPid: process.pid, workerPid: process.pid, workerRoot: f.active.root, target: f.active, attempted: [],
+      services: [{ adapterId: "codex", snapshot: { pid: process.pid } }] }));
+    const original = await readControl(f.root);
+    const result = await performUpdate(f.root, { ...f.ports, force: true });
+    assert.equal(result.reason, "maintenance_pending");
+    assert.deepEqual(await readControl(f.root), original);
+    assert.deepEqual(f.calls, []);
+  }
+});
+
+test("read-only update check reports an approved job without restarting its missing worker", async t => {
+  const f = await fixture(t);
+  await mkdir(path.join(f.active.root, "bin"), { recursive: true });
+  await writeFile(path.join(f.active.root, "bin", "acc-maintenance-worker.mjs"), "process.exit(0);\n");
+  const file = path.join(f.root, "maintenance.json");
+  const bytes = JSON.stringify({ schemaVersion: 1, status: "recovery",
+    id: "11111111-1111-1111-1111-111111111111", recipe: "fixture", deadline: Date.now() + 60_000,
+    callerPid: process.pid, workerPid: null, workerRoot: f.active.root, target: f.active, attempted: ["codex"],
+    services: [{ adapterId: "codex", snapshot: { pid: process.pid } }] });
+  await writeFile(file, bytes);
+  const result = await performUpdate(f.root, { ...f.ports, check: true });
+  assert.equal(result.reason, "maintenance_pending");
+  assert.equal(result.maintenance.status, "recovery");
+  assert.equal(await readFile(file, "utf8"), bytes, "--check must leave the missing worker untouched");
+  assert.deepEqual(f.calls, []);
 });

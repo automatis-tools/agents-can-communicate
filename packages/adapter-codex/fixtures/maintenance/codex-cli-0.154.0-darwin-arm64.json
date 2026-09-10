@@ -1,0 +1,474 @@
+{
+  "schemaVersion": 1,
+  "capturedAt": "2026-09-10",
+  "platform": "darwin-arm64",
+  "cliVersion": "0.154.0",
+  "backend": "pid",
+  "scope": "Explicit update maintenance only; no new native message delivery or hook capability.",
+  "provenance": {
+    "source": "Installed standalone Codex0.154.0 and retained0.153.4; fresh private CODEX_HOME. No authentication, model call, user thread mutation, transcript capture, or real daemon restart.",
+    "normalization": "Operator installation and private temporary home paths replaced with placeholders. Metadata values and command outcomes retained.",
+    "captures": [
+      {
+        "name": "adapter-lifecycle.json",
+        "sha256": "521e3eed0d4f453d772ecd87d241a8565f0173b1f7e9bc19bb8dddecdb9ac502"
+      },
+      {
+        "name": "version-migration.json",
+        "sha256": "e364b7cc2aadaf026d4ab4a655f2c579beafa3d4c51b70f515afa5440cfb846c"
+      },
+      {
+        "name": "detached-lifecycle.json",
+        "sha256": "1cfad003d69172fe285fdb250fff9ff065cdf38e33464c4057b36ff1718366d7"
+      },
+      {
+        "name": "real-adapter-inspection-read-only.json",
+        "sha256": "3f61cb75350be9925b83c9458d4aa9e11212492a7490c625130484286e35bc50"
+      },
+      {
+        "name": "restart-does-not-update-managed.json",
+        "sha256": "19b86e754ac49e94a54b12eef407d23cf9b776cfd45bb738af45fb5cc99d2221"
+      }
+    ]
+  },
+  "adapterLifecycle": {
+    "capturedAt": "2026-09-10T06:37:28.182Z",
+    "privateHome": "<private-codex-home>",
+    "operations": [
+      {
+        "method": "inspectMaintenance",
+        "result": {
+          "serviceId": "codex-app-server",
+          "state": "ready",
+          "reasonCode": null,
+          "pid": 17893,
+          "processStartTime": "Thu Sep 10 02:37:28 2026",
+          "codexHome": "<private-codex-home>",
+          "cliPath": "<installed-codex-home>/packages/standalone/releases/0.154.0-aarch64-apple-darwin/bin/codex",
+          "cliVersion": "0.154.0",
+          "serverVersion": "0.154.0",
+          "managedPath": "<private-codex-home>/packages/standalone/current/codex",
+          "managedVersion": "0.154.0",
+          "socketPath": "<private-codex-home>/app-server-control/app-server-control.sock",
+          "busyThreads": 0,
+          "queuedRequests": 0
+        }
+      },
+      {
+        "method": "stopForMaintenance",
+        "result": {
+          "ok": true,
+          "reasonCode": null
+        }
+      },
+      {
+        "method": "startAfterMaintenance",
+        "result": {
+          "ok": true,
+          "reasonCode": null,
+          "snapshot": {
+            "serviceId": "codex-app-server",
+            "state": "ready",
+            "reasonCode": null,
+            "pid": 18246,
+            "processStartTime": "Thu Sep 10 02:37:30 2026",
+            "codexHome": "<private-codex-home>",
+            "cliPath": "<installed-codex-home>/packages/standalone/releases/0.154.0-aarch64-apple-darwin/bin/codex",
+            "cliVersion": "0.154.0",
+            "serverVersion": "0.154.0",
+            "managedPath": "<private-codex-home>/packages/standalone/current/codex",
+            "managedVersion": "0.154.0",
+            "socketPath": "<private-codex-home>/app-server-control/app-server-control.sock",
+            "busyThreads": 0,
+            "queuedRequests": 0
+          }
+        }
+      },
+      {
+        "method": "startAfterMaintenance-idempotent",
+        "result": {
+          "ok": true,
+          "reasonCode": null,
+          "snapshot": {
+            "serviceId": "codex-app-server",
+            "state": "ready",
+            "reasonCode": null,
+            "pid": 18246,
+            "processStartTime": "Thu Sep 10 02:37:30 2026",
+            "codexHome": "<private-codex-home>",
+            "cliPath": "<installed-codex-home>/packages/standalone/releases/0.154.0-aarch64-apple-darwin/bin/codex",
+            "cliVersion": "0.154.0",
+            "serverVersion": "0.154.0",
+            "managedPath": "<private-codex-home>/packages/standalone/current/codex",
+            "managedVersion": "0.154.0",
+            "socketPath": "<private-codex-home>/app-server-control/app-server-control.sock",
+            "busyThreads": 0,
+            "queuedRequests": 0
+          }
+        }
+      }
+    ],
+    "initialStart": {
+      "status": 0,
+      "stdout": "{\"status\":\"started\",\"backend\":\"pid\",\"pid\":17893,\"managedCodexPath\":\"<private-codex-home>/packages/standalone/current/codex\",\"managedCodexVersion\":\"0.154.0\",\"socketPath\":\"<private-codex-home>/app-server-control/app-server-control.sock\",\"cliVersion\":\"0.154.0\",\"appServerVersion\":\"0.154.0\"}\n",
+      "stderr": ""
+    },
+    "cleanupStop": {
+      "status": 0,
+      "stdout": "{\"status\":\"stopped\",\"backend\":\"pid\",\"managedCodexPath\":\"<private-codex-home>/packages/standalone/current/codex\",\"managedCodexVersion\":\"0.154.0\",\"socketPath\":\"<private-codex-home>/app-server-control/app-server-control.sock\",\"cliVersion\":\"0.154.0\"}\n",
+      "stderr": ""
+    },
+    "pidFileAbsent": true,
+    "socketAbsent": true,
+    "privateHomeRemoved": true
+  },
+  "oldDaemonReadOnlyInspection": {
+    "capturedAt": "2026-09-10T06:40:47.859Z",
+    "snapshot": {
+      "serviceId": "codex-app-server",
+      "state": "busy",
+      "reasonCode": "service_busy",
+      "pid": 30290,
+      "processStartTime": "Wed Sep  9 19:32:59 2026",
+      "codexHome": "<installed-codex-home>",
+      "cliPath": "<installed-codex-home>/packages/standalone/releases/0.154.0-aarch64-apple-darwin/bin/codex",
+      "cliVersion": "0.154.0",
+      "serverVersion": "0.153.4",
+      "managedPath": "<installed-codex-home>/packages/standalone/current/bin/codex",
+      "managedVersion": "0.154.0",
+      "socketPath": "<installed-codex-home>/app-server-control/app-server-control.sock",
+      "busyThreads": 6,
+      "queuedRequests": 0
+    }
+  },
+  "cliVersionTransition": {
+    "oldBinary": "<installed-codex-home>/packages/standalone/releases/0.153.4-aarch64-apple-darwin/bin/codex",
+    "managed": "<private-codex-home>/packages/standalone/current/codex",
+    "commands": [
+      {
+        "label": "start-old-managed-with-current-cli",
+        "args": [
+          "app-server",
+          "daemon",
+          "start"
+        ],
+        "status": 0,
+        "signal": null,
+        "stdout": "{\"status\":\"started\",\"backend\":\"pid\",\"pid\":95123,\"managedCodexPath\":\"<private-codex-home>/packages/standalone/current/codex\",\"managedCodexVersion\":\"0.153.4\",\"socketPath\":\"<private-codex-home>/app-server-control/app-server-control.sock\",\"cliVersion\":\"0.154.0\",\"appServerVersion\":\"0.153.4\"}\n",
+        "stderr": ""
+      },
+      {
+        "label": "version-cli-new-server-old",
+        "args": [
+          "app-server",
+          "daemon",
+          "version"
+        ],
+        "status": 0,
+        "signal": null,
+        "stdout": "{\"status\":\"running\",\"backend\":\"pid\",\"managedCodexPath\":\"<private-codex-home>/packages/standalone/current/codex\",\"managedCodexVersion\":\"0.153.4\",\"socketPath\":\"<private-codex-home>/app-server-control/app-server-control.sock\",\"cliVersion\":\"0.154.0\",\"appServerVersion\":\"0.153.4\"}\n",
+        "stderr": ""
+      },
+      {
+        "label": "stop-old-daemon-with-current-cli",
+        "args": [
+          "app-server",
+          "daemon",
+          "stop"
+        ],
+        "status": 0,
+        "signal": null,
+        "stdout": "{\"status\":\"stopped\",\"backend\":\"pid\",\"managedCodexPath\":\"<private-codex-home>/packages/standalone/current/codex\",\"managedCodexVersion\":\"0.153.4\",\"socketPath\":\"<private-codex-home>/app-server-control/app-server-control.sock\",\"cliVersion\":\"0.154.0\"}\n",
+        "stderr": ""
+      },
+      {
+        "label": "start-updated-managed-with-current-cli",
+        "args": [
+          "app-server",
+          "daemon",
+          "start"
+        ],
+        "status": 0,
+        "signal": null,
+        "stdout": "{\"status\":\"started\",\"backend\":\"pid\",\"pid\":95197,\"managedCodexPath\":\"<private-codex-home>/packages/standalone/current/codex\",\"managedCodexVersion\":\"0.154.0\",\"socketPath\":\"<private-codex-home>/app-server-control/app-server-control.sock\",\"cliVersion\":\"0.154.0\",\"appServerVersion\":\"0.154.0\"}\n",
+        "stderr": ""
+      },
+      {
+        "label": "version-cli-new-server-new",
+        "args": [
+          "app-server",
+          "daemon",
+          "version"
+        ],
+        "status": 0,
+        "signal": null,
+        "stdout": "{\"status\":\"running\",\"backend\":\"pid\",\"managedCodexPath\":\"<private-codex-home>/packages/standalone/current/codex\",\"managedCodexVersion\":\"0.154.0\",\"socketPath\":\"<private-codex-home>/app-server-control/app-server-control.sock\",\"cliVersion\":\"0.154.0\",\"appServerVersion\":\"0.154.0\"}\n",
+        "stderr": ""
+      },
+      {
+        "label": "cleanup-stop",
+        "args": [
+          "app-server",
+          "daemon",
+          "stop"
+        ],
+        "status": 0,
+        "signal": null,
+        "stdout": "{\"status\":\"stopped\",\"backend\":\"pid\",\"managedCodexPath\":\"<private-codex-home>/packages/standalone/current/codex\",\"managedCodexVersion\":\"0.154.0\",\"socketPath\":\"<private-codex-home>/app-server-control/app-server-control.sock\",\"cliVersion\":\"0.154.0\"}\n",
+        "stderr": ""
+      },
+      {
+        "label": "cleanup-version",
+        "args": [
+          "app-server",
+          "daemon",
+          "version"
+        ],
+        "status": 1,
+        "signal": null,
+        "stdout": "",
+        "stderr": "Error: failed to connect to <private-codex-home>/app-server-control/app-server-control.sock\n\nCaused by:\n    No such file or directory (os error 2)\n"
+      }
+    ],
+    "identities": [
+      {
+        "label": "old-daemon",
+        "pidRecord": {
+          "pid": 95123,
+          "processStartTime": "Thu Sep 10 02:19:16 2026"
+        },
+        "psStatus": 0,
+        "psStdout": "95123     1 Thu Sep 10 02:19:16 2026     <private-codex-home>/packages/standalone/current/codex app-server --listen unix://\n"
+      },
+      {
+        "label": "new-daemon",
+        "pidRecord": {
+          "pid": 95197,
+          "processStartTime": "Thu Sep 10 02:19:18 2026"
+        },
+        "psStatus": 0,
+        "psStdout": "95197     1 Thu Sep 10 02:19:18 2026     <private-codex-home>/packages/standalone/current/codex app-server --listen unix://\n"
+      }
+    ],
+    "complete": true
+  },
+  "detachedLifecycle": {
+    "workerPid": 92968,
+    "initialParentPid": 1,
+    "launcherPid": 92959,
+    "beganAt": "2026-09-10T06:18:14.426Z",
+    "commands": [
+      {
+        "label": "detached-start",
+        "args": [
+          "app-server",
+          "daemon",
+          "start"
+        ],
+        "status": 0,
+        "signal": null,
+        "stdout": "{\"status\":\"started\",\"backend\":\"pid\",\"pid\":92970,\"managedCodexPath\":\"<private-codex-home>/packages/standalone/current/codex\",\"managedCodexVersion\":\"0.154.0\",\"socketPath\":\"<private-codex-home>/app-server-control/app-server-control.sock\",\"cliVersion\":\"0.154.0\",\"appServerVersion\":\"0.154.0\"}\n",
+        "stderr": ""
+      },
+      {
+        "label": "detached-version-before-restart",
+        "args": [
+          "app-server",
+          "daemon",
+          "version"
+        ],
+        "status": 0,
+        "signal": null,
+        "stdout": "{\"status\":\"running\",\"backend\":\"pid\",\"managedCodexPath\":\"<private-codex-home>/packages/standalone/current/codex\",\"managedCodexVersion\":\"0.154.0\",\"socketPath\":\"<private-codex-home>/app-server-control/app-server-control.sock\",\"cliVersion\":\"0.154.0\",\"appServerVersion\":\"0.154.0\"}\n",
+        "stderr": ""
+      },
+      {
+        "label": "detached-restart",
+        "args": [
+          "app-server",
+          "daemon",
+          "restart"
+        ],
+        "status": 0,
+        "signal": null,
+        "stdout": "{\"status\":\"restarted\",\"backend\":\"pid\",\"pid\":93034,\"managedCodexPath\":\"<private-codex-home>/packages/standalone/current/codex\",\"managedCodexVersion\":\"0.154.0\",\"socketPath\":\"<private-codex-home>/app-server-control/app-server-control.sock\",\"cliVersion\":\"0.154.0\",\"appServerVersion\":\"0.154.0\"}\n",
+        "stderr": ""
+      },
+      {
+        "label": "detached-version-after-restart",
+        "args": [
+          "app-server",
+          "daemon",
+          "version"
+        ],
+        "status": 0,
+        "signal": null,
+        "stdout": "{\"status\":\"running\",\"backend\":\"pid\",\"managedCodexPath\":\"<private-codex-home>/packages/standalone/current/codex\",\"managedCodexVersion\":\"0.154.0\",\"socketPath\":\"<private-codex-home>/app-server-control/app-server-control.sock\",\"cliVersion\":\"0.154.0\",\"appServerVersion\":\"0.154.0\"}\n",
+        "stderr": ""
+      },
+      {
+        "label": "detached-stop",
+        "args": [
+          "app-server",
+          "daemon",
+          "stop"
+        ],
+        "status": 0,
+        "signal": null,
+        "stdout": "{\"status\":\"stopped\",\"backend\":\"pid\",\"managedCodexPath\":\"<private-codex-home>/packages/standalone/current/codex\",\"managedCodexVersion\":\"0.154.0\",\"socketPath\":\"<private-codex-home>/app-server-control/app-server-control.sock\",\"cliVersion\":\"0.154.0\"}\n",
+        "stderr": ""
+      },
+      {
+        "label": "detached-version-after-stop",
+        "args": [
+          "app-server",
+          "daemon",
+          "version"
+        ],
+        "status": 1,
+        "signal": null,
+        "stdout": "",
+        "stderr": "Error: failed to connect to <private-codex-home>/app-server-control/app-server-control.sock\n\nCaused by:\n    No such file or directory (os error 2)\n"
+      }
+    ],
+    "pidRecords": [
+      {
+        "label": "before-restart",
+        "pid": 92970,
+        "processStartTime": "Thu Sep 10 02:18:14 2026"
+      },
+      {
+        "label": "after-restart",
+        "pid": 93034,
+        "processStartTime": "Thu Sep 10 02:18:15 2026"
+      }
+    ],
+    "parentPidBeforeCommands": 1,
+    "parentPidAfterCommands": 1,
+    "finishedAt": "2026-09-10T06:18:15.591Z",
+    "completed": true
+  },
+  "restartDoesNotUpdateManagedBinary": {
+    "capturedAt": "2026-09-10T06:28:36.794Z",
+    "privateHome": "<private-codex-home>",
+    "fixtureSource": "<installed-codex-home>/packages/standalone/releases/0.153.4-aarch64-apple-darwin/bin/codex",
+    "cli": "<installed-codex-cli>",
+    "commands": [
+      {
+        "label": "managed-before",
+        "binary": "<private-codex-home>/packages/standalone/current/codex",
+        "args": [
+          "--version"
+        ],
+        "status": 0,
+        "signal": null,
+        "stdout": "codex-cli 0.153.4\n",
+        "stderr": ""
+      },
+      {
+        "label": "start",
+        "binary": "<installed-codex-cli>",
+        "args": [
+          "app-server",
+          "daemon",
+          "start"
+        ],
+        "status": 0,
+        "signal": null,
+        "stdout": "{\"status\":\"started\",\"backend\":\"pid\",\"pid\":5384,\"managedCodexPath\":\"<private-codex-home>/packages/standalone/current/codex\",\"managedCodexVersion\":\"0.153.4\",\"socketPath\":\"<private-codex-home>/app-server-control/app-server-control.sock\",\"cliVersion\":\"0.154.0\",\"appServerVersion\":\"0.153.4\"}\n",
+        "stderr": ""
+      },
+      {
+        "label": "restart",
+        "binary": "<installed-codex-cli>",
+        "args": [
+          "app-server",
+          "daemon",
+          "restart"
+        ],
+        "status": 0,
+        "signal": null,
+        "stdout": "{\"status\":\"restarted\",\"backend\":\"pid\",\"pid\":5436,\"managedCodexPath\":\"<private-codex-home>/packages/standalone/current/codex\",\"managedCodexVersion\":\"0.153.4\",\"socketPath\":\"<private-codex-home>/app-server-control/app-server-control.sock\",\"cliVersion\":\"0.154.0\",\"appServerVersion\":\"0.153.4\"}\n",
+        "stderr": ""
+      },
+      {
+        "label": "version-after-restart",
+        "binary": "<installed-codex-cli>",
+        "args": [
+          "app-server",
+          "daemon",
+          "version"
+        ],
+        "status": 0,
+        "signal": null,
+        "stdout": "{\"status\":\"running\",\"backend\":\"pid\",\"managedCodexPath\":\"<private-codex-home>/packages/standalone/current/codex\",\"managedCodexVersion\":\"0.153.4\",\"socketPath\":\"<private-codex-home>/app-server-control/app-server-control.sock\",\"cliVersion\":\"0.154.0\",\"appServerVersion\":\"0.153.4\"}\n",
+        "stderr": ""
+      },
+      {
+        "label": "managed-after",
+        "binary": "<private-codex-home>/packages/standalone/current/codex",
+        "args": [
+          "--version"
+        ],
+        "status": 0,
+        "signal": null,
+        "stdout": "codex-cli 0.153.4\n",
+        "stderr": ""
+      },
+      {
+        "label": "stop-private",
+        "binary": "<installed-codex-cli>",
+        "args": [
+          "app-server",
+          "daemon",
+          "stop"
+        ],
+        "status": 0,
+        "signal": null,
+        "stdout": "{\"status\":\"stopped\",\"backend\":\"pid\",\"managedCodexPath\":\"<private-codex-home>/packages/standalone/current/codex\",\"managedCodexVersion\":\"0.153.4\",\"socketPath\":\"<private-codex-home>/app-server-control/app-server-control.sock\",\"cliVersion\":\"0.154.0\"}\n",
+        "stderr": ""
+      },
+      {
+        "label": "version-after-stop",
+        "binary": "<installed-codex-cli>",
+        "args": [
+          "app-server",
+          "daemon",
+          "version"
+        ],
+        "status": 1,
+        "signal": null,
+        "stdout": "",
+        "stderr": "Error: failed to connect to <private-codex-home>/app-server-control/app-server-control.sock\n\nCaused by:\n    No such file or directory (os error 2)\n"
+      }
+    ],
+    "privatePids": [
+      5384,
+      5436
+    ],
+    "cleanupProcesses": [
+      {
+        "pid": 5384,
+        "status": 1,
+        "stdout": "",
+        "stderr": ""
+      },
+      {
+        "pid": 5436,
+        "status": 1,
+        "stdout": "",
+        "stderr": ""
+      }
+    ],
+    "pidFileAbsent": true,
+    "socketAbsent": true,
+    "privateHomeRemoved": true,
+    "finishedAt": "2026-09-10T06:28:38.736Z"
+  },
+  "limitations": [
+    "No vendor atomic drain or admission fence in generated0.154.0 CLI/schema.",
+    "No active-turn survival or UI reconnect guarantee.",
+    "No launchd, Linux, Windows, bootstrap, configuration edits, binary copying by ACC, or authentication.",
+    "Private binary copies were fixture setup only; production maintenance calls supported CLI stop/start."
+  ]
+}

@@ -4,8 +4,13 @@ import { withManagerLock } from "./mutex.mjs";
 import { scheduleWorker } from "./schedule.mjs";
 import { readControl, writeControl } from "./state.mjs";
 import { performUpdate, runWorker } from "./worker.mjs";
+import { requestMaintenance } from "./maintenance.mjs";
+import { retireLegacyUpdateWorker, stageNewerManagementRuntime } from "./management-recovery.mjs";
 
 export function validateUpdateOptions(options) {
+  if (options.yes && (options.check || options.auto !== undefined || options.pin !== undefined)) {
+    throw new AccError(EXIT.USAGE, "--yes only consents to client maintenance during acc update");
+  }
   if (options.auto !== undefined && !["on", "off"].includes(options.auto)) {
     throw new AccError(EXIT.USAGE, "--auto expects on or off");
   }
@@ -40,9 +45,15 @@ export async function runManagedUpdate({ options, runtime }) {
       return { data: { auto: control.auto, pin: control.pin, running: control.active.version },
         text: `Automatic updates ${control.auto ? "on" : "off"}. ${control.pin ? `Pinned to ${control.pin}.` : "Following stable releases."}` };
     }
+    if (!options.check) await stageNewerManagementRuntime(root, runtime);
     const result = options.check
       ? await performUpdate(root, { check: true, env })
       : await runWorker(root, { force: true, env, ignorePid: process.pid });
+    if (!options.check && (result.reason === "processes_active" || result.reason === "maintenance_pending"
+      || result.activated || result.checked && !result.newer)) {
+      const maintenance = await requestMaintenance({ root, control: await readControl(root), options, runtime });
+      if (maintenance) return maintenance;
+    }
     const text = result.activated ? `Updated ACC to ${result.version}; integrations refreshed.`
       : result.notice && result.reason === "processes_active" ? result.notice
         : result.reason === "refresh_failed" ? [result.notice,
@@ -57,6 +68,10 @@ export async function runManagedUpdate({ options, runtime }) {
       ...(result.reason === "refresh_failed" ? { error: new AccError(EXIT.DATA, text) } : {}) };
   } catch (error) {
     if (/manager lock held/.test(error.message)) {
+      if (!options.check && options.auto === undefined && options.pin === undefined && !runtime.legacyWorkerRetried
+        && await retireLegacyUpdateWorker(root).catch(() => false)) {
+        return runManagedUpdate({ options, runtime: { ...runtime, legacyWorkerRetried: true } });
+      }
       return { data: { inProgress: true }, text: "An update is already in progress; ACC will activate it when running clients exit." };
     }
     throw error instanceof AccError ? error : new AccError(EXIT.DATA, error.message);

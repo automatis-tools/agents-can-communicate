@@ -1,5 +1,40 @@
 # Codex compatibility
 
+## Explicit update maintenance (2026-09-10)
+
+The separate update-maintenance ports were exercised with installed Codex CLI
+0.154.0 on darwin-arm64 using the `pid` backend and a fresh private `CODEX_HOME`.
+The adapter inspected the actual daemon, stopped it through `app-server daemon
+stop`, proved process death, started it through the supported `start` command,
+and verified the restarted server. A repeated start check returned the restored
+instance without another lifecycle command. A detached worker also completed
+start/restart/stop after its launcher exited. See the
+[metadata capture](fixtures/maintenance/codex-cli-0.154.0-darwin-arm64.json).
+
+CLI 0.154.0 successfully stopped a private 0.153.4 server and started the installed
+0.154.0 executable. Neither `start` nor `restart` upgraded an older managed binary
+automatically. Maintenance therefore requires matching installed CLI and managed
+versions; ACC does not copy binaries, run bootstrap, or modify Codex configuration.
+The captured modern executable path is `current/bin/codex`; the legacy
+`current/codex` process alias is accepted only when it resolves to the same file.
+
+Inspection verifies the vendor PID/start-time record against process metadata,
+the captured executable invocation, ownership of the exact control socket, CLI
+version output, and the live protocol handshake. Only loaded-thread IDs,
+metadata-only `thread/read` with `includeTurns:false`, and pending queue counts
+are used; persisted results contain identity fields and counts, never thread
+content. Active work or queued input postpones stopping. Stop repeats inspection
+against the approved identity, and unknown process death keeps maintenance open.
+Unsupported platforms, backends, binary versions, and malformed metadata refuse
+the operation. This does not broaden native delivery or hook capabilities.
+
+No atomic drain or maintenance admission fence appeared in the generated 0.154.0
+API schema or lifecycle help. Checks are observations, so they do not prove that
+a new turn cannot begin between observation and stopping. Active-turn survival,
+UI reconnection, other operating systems, and launchd were not captured. The real
+user daemon was inspected read-only and remained running; every private daemon
+and temporary home was cleaned up.
+
 ## Observed ACC 0.3.1 to 0.4 hook activation
 
 On stock Codex 0.153.4, the 0.4 hook-command quoting change modified all five ACC hook
@@ -30,7 +65,7 @@ race itself is covered by separate deterministic router regression tests.
 
 Native `delivery.livePush` uses the darwin-arm64 minimum 0.152.1, current feature
 probe, recorded recipient consent, and exact thread, canonical cwd, live process,
-stable version and protocol checks. ACC adds no client arguments and does not
+stable version and protocol checks. Native delivery adds no client arguments and does not
 start, restart or stop a vendor daemon. Unsupported platforms, older clients,
 Embedded sessions, unavailable sockets and failed identity checks keep the durable
 inbox. Ordinary hook capabilities remain limited to their exact 0.147.0 capture.

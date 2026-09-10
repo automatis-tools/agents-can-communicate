@@ -139,7 +139,8 @@ reports degraded reachability; it does not rewrite the installed consent.
 
 Codex LocalDaemon delivery separately requires macOS arm64, Codex 0.152.1 or newer, a
 current feature probe, and exact thread, canonical cwd, process, version and protocol
-checks. Its daemon must already be running; ACC never starts or stops it. Codex reads
+checks. Its daemon must already be running; installation and delivery do not start or stop it.
+Explicit update maintenance can restart a verified service after separate confirmation. Codex reads
 consent from the installation record, not a shell-shim variable. Unavailable or ineligible
 sessions retain durable inbox fallback. Use `acc install --adapter codex --delivery off`
 to stop new native offers; bypassing a shim does not disable that recorded opt-in.

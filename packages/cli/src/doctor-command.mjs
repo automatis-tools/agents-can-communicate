@@ -15,6 +15,7 @@ import { ALL_ADAPTERS, clientContext, probeTimeout } from "./install-command.mjs
 import { describePresence } from "./main.mjs";
 import { platformPaths } from "./platform-paths.mjs";
 import { noticeUpdate } from "./update-check.mjs";
+import { managedUpdateDiagnostic } from "./managed-runtime/diagnostics.mjs";
 import { readControl } from "./managed-runtime/state.mjs";
 import { diagnoseFilesystemStore, repairFilesystemStore }
   from "@agents-can-communicate/storage-filesystem";
@@ -207,9 +208,7 @@ export async function runDoctor({ options, context, runtime }) {
   const update = manager === null
     ? await noticeUpdate({ dataHome, running, env: runtime?.env ?? {},
       now: Date.parse(clock.now()), get: runtime?.fetch, io: { readFile, writeFile, mkdir } })
-    : { checked: false, running, latest: manager.pending?.version ?? null,
-      newer: manager.pending !== null, auto: manager.auto, pin: manager.pin,
-      pending: manager.pending?.version ?? null, phase: manager.phase, notice: manager.notice };
+    : await managedUpdateDiagnostic(runtime.managerRoot, manager, running);
 
   // Before the store is read for anything else. `collectStatus` reads every
   // record, so on the store this command exists to describe it threw first and
@@ -276,7 +275,7 @@ export async function runDoctor({ options, context, runtime }) {
   ...adapters.filter(adapter => adapter.present && adapter.outgoingDelivery)
     .map(adapter => `  ${adapter.displayName} ${adapter.outgoingDelivery.diagnostic}`),
   ...(manager === null ? [] : [`  automatic updates ${manager.auto ? "on" : "off"}; ACC ${manager.active.version}`
-    + (manager.pin ? `; pinned to ${manager.pin}` : ""), ...(manager.notice ? [`  ${manager.notice}`] : [])]),
+    + (manager.pin ? `; pinned to ${manager.pin}` : ""), ...(update.notice ? [`  ${update.notice}`] : [])]),
   ...data.remediation.map(line => `  ${line}`),
   // `0 of 4` is a true line that reads as a broken machine, and on an
   // MCP-only one it would read that way on every run forever. The server needs

@@ -15,8 +15,10 @@ flowchart LR
   T -->|reply or acknowledge| C
 ```
 
-ACC never starts, resumes, interrupts, supervises, or terminates the target client. A
-transport that requires owning that lifecycle is outside the product boundary.
+Message delivery never starts, resumes, interrupts, supervises, or terminates the target
+client. A transport that requires owning that lifecycle is outside the product boundary.
+Separately, explicit update maintenance can restart a verified client service after the
+user confirms the disconnection; it does not launch or assign agent tasks.
 
 ## Packages and dependency direction
 
@@ -90,8 +92,8 @@ turn.
 Claude Code Channel has installed-client evidence on 2.1.258 and 2.1.260; Codex
 LocalDaemon has it on 0.152.1 and 0.153.4. Both use a captured platform minimum,
 current probe and exact session handshake. Codex preserves the ordinary client
-launch and verifies its registered thread and workspace; ACC owns no vendor daemon
-lifecycle. Gemini CLI and Kimi Code have exact-version next-turn evidence only;
+launch and verifies its registered thread and workspace; native delivery owns no vendor
+daemon lifecycle. Gemini CLI and Kimi Code have exact-version next-turn evidence only;
 Grok and generic MCP use inbox polling.
 
 ## Storage and workspace identity
@@ -184,7 +186,12 @@ remains fenced and repairs forward, with the old active pointer retained but nor
 workspace admission unavailable until recovery completes. Native bindings cease holding
 after observed SessionEnd cleanup or confirmed process death; the vendor daemon may remain
 running. Unknown PIDs remain holds until lifecycle cleanup. Presence TTL, `acc finish`,
-and delivery off alone do not prove native lifecycle end. ACC never manages the daemon.
+and delivery off alone do not prove native lifecycle end. Normal background updates never
+restart a vendor daemon. An explicitly approved maintenance job can do so through the
+adapter lifecycle port: it waits for idle work, validates exact process identity, stops
+the service under the admission fence, refreshes integrations, and restores and verifies
+the service even after a refresh failure. Checkpoints and the detached worker live outside
+repositories. Approved crash recovery never blindly repeats a stop.
 
 Lock ownership never expires by age. Retained nonempty tombstones prevent delayed observers
 from reclaiming a successor. Under an acquired lock, maintenance removes historical

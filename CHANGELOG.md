@@ -1,5 +1,35 @@
 # Changelog
 
+## 0.4.4 — release candidate
+
+- `acc update` can ask once to restart a verified Codex service on macOS arm64.
+  A detached worker waits for idle work, refreshes integrations, restarts and verifies
+  the service, and records progress for `acc doctor`. `--yes` provides explicit
+  noninteractive consent; background checks never grant that permission.
+- Native delivery consent and existing activation setup survive updates when a service
+  or feature probe is unavailable. Effective capability still reports degradation.
+- Update diagnostics group bindings and leases by actual PID, name concrete blockers,
+  and refresh stale pending notices. Unknown process ownership remains a hold.
+- Background update workers release their update lock between polls. New management
+  entry points can recover older pending runtimes and retire a verified obsolete ACC
+  updater while preserving the integration-write fence.
+- Update and service-recovery limitations, first-hop bootstrap and client reconnection
+  requirements are documented. Workspace data format and delivery defaults are unchanged.
+
+| Candidate artifact | Value |
+|---|---|
+| Built from | `1731a3b8285147bb74e297b9775a7e2b47983a85` |
+| Tarball | `agents-can-communicate-0.4.4.tgz`, 362,506 bytes, 269 files |
+| sha256 | `3ec046c2524c0bb35fe1d0b0f9fa07f03e53ab81e439ec80cdd48b0fce04196e` |
+
+The exact archive passed installed-package verification and an isolated upgrade from
+published 0.4.2 with 0.4.3 already pending. One real-terminal confirmation completed
+private Codex daemon maintenance after the requesting command exited. All 269 archive
+files matched the activated runtime. See [candidate evidence](docs/release-evidence/v0.4.4.md)
+for failure checks and limits. The final full suite passed with 2,017 passes, zero
+failures and one environment-dependent skip. The mandatory pre-push gate repeats
+release checks. This candidate has not been tagged or published.
+
 ## 0.4.3 — release candidate
 
 - Live opt-in configures Codex outgoing socket access on macOS arm64 with Codex

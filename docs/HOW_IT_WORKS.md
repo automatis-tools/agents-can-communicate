@@ -112,7 +112,8 @@ All recipients have the same durable record, but adapters expose different accel
   to an independently opened thread. It is experimental, off by default, and can
   spend tokens. Messages wait for a running turn to finish; a daemon-retained
   thread can receive them after its terminal exits. ACC adds no launch arguments
-  and does not manage the vendor daemon.
+  and does not manage the vendor daemon during message delivery. Separately,
+  [confirmed update maintenance](UPGRADING.md#confirmed-client-service-maintenance) can restart it.
 
 Grok, generic MCP, unsupported versions and uncaptured platforms use inbox polling.
 [Capabilities](CAPABILITIES.md) lists evidence and fallback.

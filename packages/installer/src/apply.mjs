@@ -37,7 +37,7 @@ export async function applyPlan({ plan, adapters, context, dataHome, dryRun = fa
         const installContext = { ...context,
           clientVersion: operation.clientVersion, platform: operation.platform,
           requestedLivePolicy: operation.livePolicy ?? "off",
-          livePolicy: operation.effectiveLivePolicy ?? "off" };
+          livePolicy: operation.configuredLivePolicy ?? operation.effectiveLivePolicy ?? "off" };
         const outcome = await adapter.install(installContext);
         // A consented activation is applied after the adapter's own wiring, in
         // a fixed order; an explicit off takes a recorded one back first so the
@@ -50,7 +50,7 @@ export async function applyPlan({ plan, adapters, context, dataHome, dryRun = fa
           notes.push(...describeTeardown(report));
           retainedMechanisms = report.retainedMechanisms;
         }
-        let native = null;
+        let native = operation.retainedNativeActivation ?? null;
         let appendedRcBlock = false;
         if (operation.nativeActivation !== undefined) {
           const applied = await applyNativeActivation({ adapter,

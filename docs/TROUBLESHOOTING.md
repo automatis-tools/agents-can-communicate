@@ -240,8 +240,11 @@ Run `acc doctor` to see the update policy and pending notice. ACC process leases
 persistent MCP servers, require confirmed process exit. Native bindings clear on observed
 SessionEnd or confirmed process death; a vendor daemon may remain alive after SessionEnd.
 Unknown PIDs remain holds until lifecycle cleanup. Close the relevant client sessions and
-ACC processes; `finish`, presence TTL, and delivery off do not prove native end. ACC never
-manages the daemon or expires safety holds merely by elapsed time.
+ACC processes; `finish`, presence TTL, and delivery off do not prove native end.
+`acc update` can offer a confirmed restart of an eligible Codex service. Unknown or
+unrelated holds still require lifecycle cleanup or confirmed process exit; safety holds
+do not expire merely by elapsed time. See
+[maintenance and recovery](UPGRADING.md#confirmed-client-service-maintenance).
 
 Use `acc update` to retry a failed download or finish an interrupted integration refresh.
 A download failure keeps the working version. A partial integration refresh blocks

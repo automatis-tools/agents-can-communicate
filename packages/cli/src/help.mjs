@@ -106,6 +106,8 @@ const NOTES = Object.freeze({
     "Use acc update --check to only report whether a newer release exists.",
     "An initial acc install enables automatic updates; reinstalling preserves your choice. Activation waits for active clients and ACC processes.",
     "--auto on|off changes automatic updates; --pin VERSION holds an exact stable version; --pin none follows stable releases.",
+    "An eligible Codex service restart asks once; a detached worker waits for idle work and verifies completion. Open clients disconnect; acc doctor reports progress.",
+    "--yes explicitly consents to that restart without a prompt; --check never schedules maintenance.",
     "--apply remains accepted as a compatibility alias for acc update."],
 });
 
