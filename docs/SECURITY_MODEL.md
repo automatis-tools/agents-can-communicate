@@ -24,9 +24,10 @@ graph LR
   H["human authority"] --> C
 ```
 
-ACC does not read raw transcripts, relay permission approvals, or start target clients. A
-native delivery path may only offer an attributed peer envelope to an already-running,
-user-owned session.
+ACC does not read raw transcripts or relay permission approvals. A native delivery path
+may only offer an attributed peer envelope to an already-running, user-owned session.
+Confirmed update maintenance is a separate service restart operation; a peer message or
+live-delivery opt-in does not authorize it.
 
 ## Peer-content boundary
 
@@ -122,8 +123,14 @@ author as a software-supply trust boundary; they do not establish that package c
 
 ACC process leases hold activation until confirmed exit. Native bindings hold until observed
 SessionEnd cleanup or confirmed process death; unknown PIDs remain conservative holds.
-`acc finish`, presence TTL, and delivery off do not establish native lifecycle end. ACC does
-not manage the vendor daemon.
+`acc finish`, presence TTL, and delivery off do not establish native lifecycle end.
+Normal installation and message delivery do not manage vendor services. Explicit
+`acc update` maintenance requires one separate confirmation (or `--yes`) for the recorded
+candidate and verified service identity. The detached worker retains that approval for
+recovery, rechecks PID/start time, executable, socket, versions and idle state, and preserves
+unrelated or unidentified process holds. The vendor exposes no atomic turn-drain operation:
+a turn arriving between the final check and stop can be interrupted. See
+[confirmed maintenance](UPGRADING.md#confirmed-client-service-maintenance).
 
 A failed download leaves the active runtime available. A partial integration refresh retains
 the old active pointer but fences normal workspace admission in `activating`; it does not

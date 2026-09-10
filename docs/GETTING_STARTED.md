@@ -15,7 +15,7 @@ pair or session-bound ACC MCP tools. See [CLI ownership](CLI.md#coordinate-from-
 
 ACC requires macOS or Linux and Node.js 24 or newer.
 
-Already using ACC? Follow the [upgrade guide](UPGRADING.md) for the 0.4.x → 0.4.3
+Already using ACC? Follow the [upgrade guide](UPGRADING.md) for the 0.4.x → 0.4.4
 update or the data-format boundary when upgrading from 0.3.1.
 
 ```bash
@@ -30,7 +30,9 @@ acc install
 Initial installation also enables automatic updates; reinstalling keeps an explicit opt-out.
 ACC downloads releases in the background and
 refreshes its runtime and skills when active clients have left. Use `acc update` for an
-immediate update, or `acc update --auto off` to disable background updates. See
+immediate update; an eligible Codex service restart asks for one confirmation. ACC then
+handles maintenance and reports progress in `acc doctor`; clients disconnect and can be
+resumed afterward. Use `acc update --auto off` to disable background updates. See
 [update controls](UPGRADING.md#automatic-updates-after-installation).
 
 The installer connects only the supported clients it finds. Open a new terminal and

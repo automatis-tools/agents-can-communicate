@@ -46,7 +46,7 @@ actionable before two sessions collide.
 ## Choose another layer when
 
 Choose a managed runtime if you want the system to create agents, assign execution state,
-select models, spend token budgets, or control process lifecycle. Choose a tracker when
+select models, spend token budgets, or control ongoing agent execution. Choose a tracker when
 you need organizational planning. Choose a hosted service when participants must
 coordinate across machines.
 

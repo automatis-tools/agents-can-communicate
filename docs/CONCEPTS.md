@@ -14,7 +14,8 @@ settings, clients, and checkouts. Neither is automatically in charge. Claude can
 for the endpoint shape; Codex can answer or decline under its own instructions.
 
 This resembles coordination among subagents, but the sessions were opened independently by
-the user. ACC never launches, assigns, supervises, or closes them.
+the user. ACC does not launch, assign or supervise their work. Separately, an explicit
+update can ask to restart a client service; this disconnects clients and requires user consent.
 
 ## Workspace, participant, and session
 

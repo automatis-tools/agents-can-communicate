@@ -232,7 +232,7 @@ external AI client. An addressed handoff requires acknowledgement; a room handof
 | `acc doctor` | `--home`, `--repair` |
 | `acc config init` | `--yes`, `--force` |
 | `acc config validate` | — |
-| `acc update` | `--check`, `--auto on\|off`, `--pin VERSION\|none`, `--apply` (alias) |
+| `acc update` | `--check`, `--auto on\|off`, `--pin VERSION\|none`, `--yes`, `--apply` (alias) |
 | `acc help` | — |
 | `acc version` | — |
 
@@ -248,8 +248,8 @@ effective policy off and prints the reason. Claude Code shell activation writes 
 zsh PATH block and a shim that `exec`s the real client; `ACC_BYPASS=1` bypasses that
 activation. Codex LocalDaemon delivery uses recorded installation consent without changing
 ordinary launch arguments. Its opt-in remains active when shim variables are absent or
-bypassed; `acc install --adapter codex --delivery off` disables new native offers. ACC never
-starts or stops the vendor daemon. The install summary names each client's requested policy,
+bypassed; `acc install --adapter codex --delivery off` disables new native offers. Installation
+and message delivery do not start or stop the vendor daemon. The install summary names each client's requested policy,
 activation state and verified fallback. `doctor` separates protocol readiness, recorded
 consent and a live channel in the current workspace, with a next step for missing activation.
 A supported version or an installed plugin alone is not an active delivery channel.
@@ -281,8 +281,13 @@ holds. `finish`, presence TTL, and delivery off are not observed native end. Hoo
 wait for network work. `ACC_NO_UPDATE_CHECK=1` disables update networking and background
 scheduling.
 
-`acc update` requests the update immediately; it reports a pending update when a running or
-unidentified client prevents activation. `--check` only checks and cannot be combined with
+`acc update` requests the update immediately. If a verified Codex service blocks activation
+or runs an older version than the installed CLI, it asks once to restart that service.
+After confirmation, a detached worker waits for idle work and other ACC processes, refreshes
+integrations, restarts the service and verifies the result. Open clients disconnect; use
+`acc doctor` for progress and resume the clients afterward. `--yes` supplies explicit
+noninteractive restart consent. Without consent, or with unknown ownership, the update
+remains pending. See [maintenance limits and recovery](UPGRADING.md#confirmed-client-service-maintenance). `--check` only checks and cannot be combined with
 settings changes. `--auto off` disables background updates, and `--auto on` enables them.
 `--pin 0.4.0` holds an exact stable version; `--pin none` follows stable releases. A pin
 cannot downgrade the active runtime. The old `--apply` flag remains accepted.
@@ -290,7 +295,9 @@ cannot downgrade the active runtime. The old `--apply` flag remains accepted.
 Failed downloads keep the working runtime. A failed integration refresh exits with code
 `4`, names the failed adapter and configuration error, and keeps workspace admission closed.
 Fix the reported configuration problem, then run `acc update` to finish it. `acc doctor`
-reports the update policy and pending notice. Native clients may still require hook trust
+reports the update policy and pending notice. During blocked activation, a current launcher
+returns `scope: update` and `workspaceInspection: unavailable_during_update` without opening
+workspace state; `doctor --repair` remains blocked. Native clients may still require hook trust
 or activation review. See [Upgrading](UPGRADING.md) for the initial 0.3.1 transition and
 recovery details.
 

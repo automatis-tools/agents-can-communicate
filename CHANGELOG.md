@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.4.4 — unreleased
+
+- `acc update` can ask once to restart a verified Codex service on macOS arm64.
+  A detached worker waits for idle work, refreshes integrations, restarts and verifies
+  the service, and records progress for `acc doctor`. `--yes` provides explicit
+  noninteractive consent; background checks never grant that permission.
+- Native delivery consent and existing activation setup survive updates when a service
+  or feature probe is unavailable. Effective capability still reports degradation.
+- Update diagnostics group bindings and leases by actual PID, name concrete blockers,
+  and refresh stale pending notices. Unknown process ownership remains a hold.
+- Background update workers release their update lock between polls. New management
+  entry points can recover older pending runtimes and retire a verified obsolete ACC
+  updater while preserving the integration-write fence.
+- Update and service-recovery limitations, first-hop bootstrap and client reconnection
+  requirements are documented. Workspace data format and delivery defaults are unchanged.
+
 ## 0.4.3 — release candidate
 
 - Live opt-in configures Codex outgoing socket access on macOS arm64 with Codex
