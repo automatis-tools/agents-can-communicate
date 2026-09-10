@@ -1,12 +1,13 @@
 import { createHash } from "node:crypto";
-import { readdir } from "node:fs/promises";
+import { readdir, rm } from "node:fs/promises";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { assertPortableId } from "@agents-can-communicate/protocol";
 import { readSessionRecord } from "@agents-can-communicate/storage-filesystem";
 import { listRuntimeHolds } from "./leases.mjs";
 import { confirmedDead, defaultPidIsAlive, withManagerLock } from "./mutex.mjs";
-import { canonicalManagerRoot, managedDirectory, readControl, readManagedJson, writeControl } from "./state.mjs";
+import { reapPins } from "./pins.mjs";
+import { canonicalManagerRoot, managedDirectory, readControl, readManagedJson, syncDirectory, writeControl } from "./state.mjs";
 
 /** The staged generation states its own contract in its manifest, so the
  * manager never imports code from a generation it has not activated. */
@@ -125,6 +126,81 @@ export function activationBlockerNotice(version, blockers) {
     + details.join("; ") + (blockers.length > 10 ? `; and ${blockers.length - 10} more` : "") + ".";
 }
 
+/** A candidate reference that is simply absent (no pending update, no
+ * explicit active override) is normal. One that is present but cannot be
+ * resolved to a real filesystem path is unknown - possibly corrupt data -
+ * and must postpone the whole pass rather than be silently ignored. Every
+ * candidate is resolved the same way a `generations/<name>` entry is, so a
+ * symlinked data home can never make a live reference look unrelated to the
+ * directory it actually names.
+ */
+async function resolveCandidate(value) {
+  if (value === null || value === undefined) return { ok: true, root: null };
+  if (typeof value !== "string" || value === "") return { ok: false };
+  try { return { ok: true, root: await canonicalManagerRoot(value) }; }
+  catch { return { ok: false }; }
+}
+
+/** A generation is reclaimable only when nothing can still import from it:
+ * not the active or pending control pointer, not a live runtime lease, and
+ * not a live session pin. An unidentified holder - an unreadable lease, or a
+ * pin that is missing, corrupt, or declares an unresolvable runtime root -
+ * postpones the whole pass rather than being assumed dead, matching the rule
+ * admission already applies to its own bookkeeping.
+ *
+ * Takes its own manager lock, so a caller already holding one (activation)
+ * must call this only after releasing it.
+ */
+export async function reclaimGenerations({ root, active = null, pidIsAlive = defaultPidIsAlive } = {}) {
+  root = await canonicalManagerRoot(root);
+  return withManagerLock(root, async () => {
+    const generations = path.join(root, "generations");
+    if (!await managedDirectory(generations)) return { removed: [] };
+    const control = await readControl(root);
+    const referenced = new Set();
+    for (const candidate of [active, control?.active?.root, control?.pending?.root]) {
+      const resolved = await resolveCandidate(candidate);
+      if (!resolved.ok) return { removed: [] };
+      if (resolved.root) referenced.add(resolved.root);
+    }
+    let holds;
+    try { holds = await listRuntimeHolds(root, { pidIsAlive }); }
+    catch { return { removed: [] }; } // An unreadable lease is an unknown holder.
+    for (const lease of holds) {
+      const resolved = await resolveCandidate(lease.runtime?.root);
+      if (!resolved.ok) return { removed: [] };
+      if (resolved.root) referenced.add(resolved.root);
+    }
+    // A client that exits without a clean session end leaves its pin behind;
+    // reap confirmed-dead ones before treating every remaining pin as live,
+    // the same way admission already reaps confirmed-dead leases.
+    await reapPins({ root, pidIsAlive });
+    const pins = path.join(root, "pins");
+    if (await managedDirectory(pins)) {
+      for (const name of await readdir(pins)) {
+        if (!name.endsWith(".json")) continue;
+        const record = await readManagedJson(path.join(pins, name)).catch(() => null);
+        if (record === undefined) continue; // Concurrent pin removal, not a holder.
+        if (!record || record.schemaVersion !== 1 || typeof record.runtimeRoot !== "string"
+          || record.runtimeRoot === "") return { removed: [] }; // Malformed pin: unknown holder.
+        const resolved = await resolveCandidate(record.runtimeRoot);
+        if (!resolved.ok) return { removed: [] };
+        referenced.add(resolved.root);
+      }
+    }
+    const removed = [];
+    for (const entry of await readdir(generations, { withFileTypes: true })) {
+      if (!entry.isDirectory()) continue;
+      const directory = path.join(generations, entry.name);
+      if (referenced.has(directory)) continue;
+      await rm(directory, { recursive: true, force: true });
+      removed.push(entry.name);
+    }
+    if (removed.length) await syncDirectory(generations);
+    return { removed };
+  }, { pidIsAlive });
+}
+
 async function prepareCandidate(control, root, env) {
   const file = path.join(control.pending.root, "node_modules", "@agents-can-communicate", "cli",
     "src", "managed-runtime", "refresh.mjs");
@@ -148,7 +224,8 @@ export async function activatePending(root, { prepare = prepareCandidate, env = 
   const before = await readControl(root);
   if (!before?.pending) return { activated: false, reason: "no_pending_update" };
   const apply = await prepare(before, root, env);
-  return withManagerLock(root, async () => {
+  let activatedRoot = null;
+  const outcome = await withManagerLock(root, async () => {
     const current = await readControl(root);
     if (!current || recipe(current) !== recipe(before)) return { activated: false, reason: "state_changed" };
     if (beforeActivation) await beforeActivation(current);
@@ -178,6 +255,17 @@ export async function activatePending(root, { prepare = prepareCandidate, env = 
     }
     await writeControl(root, { ...activating, active: current.pending, pending: null,
       phase: "ready", notice: `ACC ${current.pending.version} is active.` });
+    activatedRoot = current.pending.root;
     return { activated: true, version: current.pending.version, installation: result };
   });
+  // Reclaim only after the fence has released and the new pointer is durable:
+  // reclaimGenerations takes its own manager lock, so calling it while still
+  // inside this one would deadlock, and a reclaim failure here must never
+  // turn an already-completed activation into a reported failure - it can
+  // always run again on the next activation.
+  if (outcome.activated) {
+    try { await reclaimGenerations({ root, active: activatedRoot, pidIsAlive }); }
+    catch { /* Best effort; never fails an activation that already succeeded. */ }
+  }
+  return outcome;
 }
