@@ -1,7 +1,8 @@
 import { retireNativeBinding } from "./native-retirement.mjs";
 import { createHash, randomBytes } from "node:crypto";
-import { realpath } from "node:fs/promises";
+import { readFile, realpath } from "node:fs/promises";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 import { clearNativeAttempt, clearSessionBinding, effectiveCapabilities, loadSessionBinding, storeSessionBinding }
   from "@agents-can-communicate/adapter-sdk";
@@ -178,6 +179,27 @@ export function participantFor(adapterId, harnessSessionId, env = {}) {
   return `${adapterId}-${suffix}`;
 }
 
+// The runtime generation this module ships as part of, found by walking up
+// from its own file for the nearest ancestor manifest that declares a store
+// contract. A workspace package's own manifest (this one's included) carries a
+// `version` but never `accStoreVersion` - only the generation's root manifest
+// does - so this cannot stop at the first `package.json` the way a version
+// lookup could. Answers null facts rather than throwing: a binding published
+// without a readable contract is exactly today's unknown-hold behaviour.
+async function runtimeFacts(fromUrl) {
+  let directory = path.dirname(fileURLToPath(fromUrl));
+  for (;;) {
+    const manifest = await readFile(path.join(directory, "package.json"), "utf8")
+      .then(JSON.parse).catch(() => null);
+    if (Number.isSafeInteger(manifest?.accStoreVersion)) {
+      return { storeVersion: manifest.accStoreVersion, runtimeRoot: directory };
+    }
+    const parent = path.dirname(directory);
+    if (parent === directory) return { storeVersion: null, runtimeRoot: null };
+    directory = parent;
+  }
+}
+
 async function openContext({ cwd, dataHome, runtime, env, deadline }) {
   assertHookBudget(deadline);
   const descriptor = await discoverWorkspace({ cwd, env: env ?? {},
@@ -312,7 +334,8 @@ const HANDLERS = {
     // keep only the generation identity needed for a successful resume.
     if (binding !== null) {
       await storeSessionBinding({ runtimeDir: paths.root, deadlineAt: deadline, harnessSessionId: event.sessionId,
-        accSessionId: binding.accSessionId, generation: binding.generation });
+        accSessionId: binding.accSessionId, generation: binding.generation,
+        ...(await runtimeFacts(import.meta.url)) });
     }
     const clientVersion = await probeClientVersion(adapter,
       { timeoutMs: Math.max(1, Math.min(1_000, deadline - Date.now())) });
@@ -358,7 +381,7 @@ const HANDLERS = {
         const hookBinding = { accSessionId: resumed.sessionId, generation: resumed.generation,
           ...clientFacts, clientPid };
         await storeSessionBinding({ runtimeDir: paths.root, deadlineAt: deadline, harnessSessionId: event.sessionId,
-          ...hookBinding });
+          ...hookBinding, ...(await runtimeFacts(import.meta.url)) });
         return { accSessionId: resumed.sessionId, generation: resumed.generation,
           ...clientFacts, capabilities, nativeBinding: await native(hookBinding) };
       }
@@ -369,7 +392,8 @@ const HANDLERS = {
     const opening = { sessionId: context.service.ids.next("session"),
       generation: context.service.ids.next("generation") };
     await storeSessionBinding({ runtimeDir: paths.root, deadlineAt: deadline, harnessSessionId: event.sessionId,
-      accSessionId: opening.sessionId, generation: opening.generation });
+      accSessionId: opening.sessionId, generation: opening.generation,
+      ...(await runtimeFacts(import.meta.url)) });
     const session = await context.service.openSession({
       ...opening,
       workspaceId: context.descriptor.id,
@@ -388,7 +412,7 @@ const HANDLERS = {
     const hookBinding = { accSessionId: session.sessionId, generation: session.generation,
       ...clientFacts, clientPid };
     await storeSessionBinding({ runtimeDir: paths.root, deadlineAt: deadline, harnessSessionId: event.sessionId,
-      ...hookBinding });
+      ...hookBinding, ...(await runtimeFacts(import.meta.url)) });
     return { accSessionId: session.sessionId, generation: session.generation,
       ...clientFacts, capabilities, nativeBinding: await native(hookBinding) };
   },
