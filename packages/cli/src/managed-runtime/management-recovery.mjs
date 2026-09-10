@@ -1,6 +1,7 @@
 import { execFile } from "node:child_process";
 import path from "node:path";
 import { promisify } from "node:util";
+import { declaredStoreVersion } from "./activation.mjs";
 import { newerVersion } from "./download.mjs";
 import { stageOwnGeneration } from "./generation.mjs";
 import { verifyGeneration } from "./install.mjs";
@@ -23,7 +24,8 @@ export async function stageNewerManagementRuntime(root, { packageRoot, env }) {
     const current = await readControl(root);
     if (current.phase !== "ready" || current.pin !== before.pin
       || JSON.stringify([current.active, current.pending]) !== JSON.stringify([before.active, before.pending])) return false;
-    await writeControl(root, { ...current, pending: { root: candidate.root, version: candidate.version },
+    await writeControl(root, { ...current, pending: { root: candidate.root,
+      version: candidate.version, storeVersion: await declaredStoreVersion(candidate.root) },
       notice: `ACC ${candidate.version} is verified and ready to activate.` });
     return true;
   });

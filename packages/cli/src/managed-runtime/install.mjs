@@ -3,6 +3,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
+import { declaredStoreVersion } from "./activation.mjs";
 import { validateManagedLocation } from "./location.mjs";
 import { stageOwnGeneration } from "./generation.mjs";
 import { writeLaunchers } from "./launchers.mjs";
@@ -36,7 +37,8 @@ export async function installManaged({ packageRoot, managerRoot, dataHome, home,
     if (previous !== null && previous.active.root !== candidate.root) {
       throw new Error("install from the active managed runtime; use acc update to switch versions");
     }
-    const runtime = { version: candidate.version, root: candidate.root };
+    const runtime = { version: candidate.version, root: candidate.root,
+      storeVersion: await declaredStoreVersion(candidate.root) };
     const autoPreference = previous?.autoPreference ?? previous?.auto ?? true;
     // Full removal pauses workers without revoking the user's choice. Keep a
     // partial-removal pause until explicit opt-in; this install may omit its failed target.

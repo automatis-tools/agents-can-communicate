@@ -8,6 +8,14 @@ import { listRuntimeHolds } from "./leases.mjs";
 import { confirmedDead, defaultPidIsAlive, withManagerLock } from "./mutex.mjs";
 import { canonicalManagerRoot, managedDirectory, readControl, readManagedJson, writeControl } from "./state.mjs";
 
+/** The staged generation states its own contract in its manifest, so the
+ * manager never imports code from a generation it has not activated. */
+export async function declaredStoreVersion(generationRoot) {
+  const manifest = await readManagedJson(path.join(generationRoot, "package.json")).catch(() => null);
+  return Number.isSafeInteger(manifest?.accStoreVersion) && manifest.accStoreVersion > 0
+    ? manifest.accStoreVersion : null;
+}
+
 // Both 0.3.1 and current MCP write this exact continuity record, without
 // native client facts. A foreign harness id may look like an MCP key: require
 // its canonical file and a validated matching MCP owner before exempting it.

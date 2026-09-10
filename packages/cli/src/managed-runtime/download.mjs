@@ -2,6 +2,7 @@ import { execFile } from "node:child_process";
 import { access, mkdtemp, readFile, realpath, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { promisify } from "node:util";
+import { declaredStoreVersion } from "./activation.mjs";
 import { stageOwnGeneration } from "./generation.mjs";
 import { verifyGeneration } from "./install.mjs";
 import { managedDirectory } from "./state.mjs";
@@ -66,6 +67,7 @@ export async function downloadRelease(root, release, { env = process.env } = {})
     await access(path.join(packageRoot, "bin", "acc-update-worker.mjs"));
     const generation = await stageOwnGeneration({ packageRoot, managerRoot: root });
     await verifyGeneration(generation, { env });
-    return { version: generation.version, root: generation.root };
+    return { version: generation.version, root: generation.root,
+      storeVersion: await declaredStoreVersion(generation.root) };
   } finally { await rm(temporary, { recursive: true, force: true }); }
 }
