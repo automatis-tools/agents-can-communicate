@@ -1,8 +1,8 @@
 import { randomBytes, timingSafeEqual } from "node:crypto";
 import { chmodSync, existsSync, mkdirSync, statSync, unlinkSync, writeFileSync } from "node:fs";
 import net from "node:net";
-import os from "node:os";
 import path from "node:path";
+import { channelSocketDirectory } from "@agents-can-communicate/adapter-sdk";
 
 // The production ACC Channel: a stdio MCP server Claude Code spawns, plus a
 // session-scoped Unix endpoint the delivery router reaches. One envelope on the
@@ -39,8 +39,6 @@ const shortId = () => `endpoint_${randomBytes(16).toString("hex")}`;
 // while the registration - discoverable by the hook-resolved pid - stays under
 // the workspace. The registration records the socket's absolute path, so the
 // two are decoupled.
-const defaultSocketDir = () => path.join(os.tmpdir(),
-  `acc-ch-${typeof process.getuid === "function" ? process.getuid() : "u"}`);
 
 /**
  * Compose a Channel over an endpoint directory and injected ACC callbacks.
@@ -49,7 +47,7 @@ const defaultSocketDir = () => path.join(os.tmpdir(),
  * ones backed by the real conversation service; a test supplies fakes. Neither
  * the socket path nor the nonce leaves through a return value or a log line.
  */
-export function createAccChannel({ endpointDir, socketDir = defaultSocketDir(), clientPid,
+export function createAccChannel({ endpointDir, socketDir = channelSocketDirectory(), clientPid,
   protocolContract = PROTOCOL_CONTRACT, modes = CHANNEL_MODES, leaseMs = 60_000, routeReply,
   routeAck, refreshBinding = null, observe = () => {},
   clock = () => new Date().toISOString(), write, now = Date.now }) {

@@ -25,3 +25,4 @@ export { clearSessionBinding, listSessionBindings, loadSessionBinding,
   from "./session-binding.mjs";
 
 export { clearNativeAttempt, loadNativeAttempt, storeNativeAttempt } from "./native-attempt.mjs";
+export { channelSocketDirectory } from "./channel-directory.mjs";
