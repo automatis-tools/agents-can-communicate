@@ -56,3 +56,29 @@ test("a binding published by another manager is left alone", async () => {
   await retireManagedHolds({ root, workspaces });
   assert.deepEqual(await readdir(bindings), ["bbbb.json"]);
 });
+
+test("a binding naming a relative runtimeRoot is left alone regardless of the caller's cwd", async () => {
+  const { root, workspaces, bindings } = await layout();
+  const owned = path.join(root, "generations", "0.4.4-c");
+  // Chosen so that resolving it against process.cwd() reconstructs the exact
+  // in-bounds generation path: if ownership were decided without requiring an
+  // absolute runtimeRoot, this would be misclassified as owned purely because
+  // of where the test happens to run from.
+  const relative = path.relative(process.cwd(), owned);
+  await writeFile(path.join(bindings, "cccc.json"), JSON.stringify({ schemaVersion: 1,
+    harnessSessionId: "h3", accSessionId: "session_c", generation: "generation_c",
+    clientVersion: "2.1.267", platform: "darwin-arm64", clientPid: process.pid,
+    storeVersion: 6, runtimeRoot: relative }));
+  await retireManagedHolds({ root, workspaces });
+  assert.deepEqual(await readdir(bindings), ["cccc.json"]);
+});
+
+test("a binding naming the generations directory itself, not a generation inside it, is left alone", async () => {
+  const { root, workspaces, bindings } = await layout();
+  await writeFile(path.join(bindings, "dddd.json"), JSON.stringify({ schemaVersion: 1,
+    harnessSessionId: "h4", accSessionId: "session_d", generation: "generation_d",
+    clientVersion: "2.1.267", platform: "darwin-arm64", clientPid: process.pid,
+    storeVersion: 6, runtimeRoot: path.join(root, "generations") }));
+  await retireManagedHolds({ root, workspaces });
+  assert.deepEqual(await readdir(bindings), ["dddd.json"]);
+});

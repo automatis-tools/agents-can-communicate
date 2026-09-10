@@ -19,8 +19,17 @@ export async function retireManagedHolds({ root, workspaces }) {
         if (!name.endsWith(".json")) continue;
         const file = path.join(directory, name);
         const record = await readManagedJson(file).catch(() => null);
-        const owned = typeof record?.runtimeRoot === "string"
-          && !path.relative(generations, record.runtimeRoot).startsWith("..");
+        const runtimeRoot = record?.runtimeRoot;
+        // path.relative silently resolves a non-absolute second argument against
+        // the caller's cwd, so a relative runtimeRoot must never reach it - that
+        // would make ownership depend on where acc uninstall happened to run
+        // from. The generations directory itself is a container, not a
+        // generation, so an exact match (empty relative) is foreign too. Same
+        // rule validateRuntime in state.mjs applies to a control pointer.
+        const relative = typeof runtimeRoot === "string" && path.isAbsolute(runtimeRoot)
+          ? path.relative(generations, runtimeRoot) : null;
+        const owned = relative !== null && relative !== "" && relative !== ".."
+          && !relative.startsWith(`..${path.sep}`);
         if (!owned) continue;
         await rm(file, { force: true });
         counts.bindings += 1;
