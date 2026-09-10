@@ -199,6 +199,10 @@ peer body into diagnostics.
 Receipt `offered` is committed only after the transport accepts bytes. A failed attempt
 leaves the receipt queued.
 
+`transport_permission_denied` means the sender's OS or sandbox refused local transport
+access (`EPERM` or `EACCES`). It is distinct from `recipient_unavailable` and remains a
+failed offer with a queued receipt; raw OS error strings are not persisted.
+
 ## Inbox, reply, and acknowledgement
 
 Without an id, public `inbox` lists bounded summary pages for unresolved messages owned

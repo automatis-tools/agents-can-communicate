@@ -133,6 +133,7 @@ export async function offerMessage({ binding, message, runtimeDir, timeoutMs = 5
       return { accepted: true, transport: "codex-app-server", clientVersion: endpoint.clientVersion };
     });
   } catch (error) {
+    if (["EPERM", "EACCES"].includes(error?.code)) return rejected("transport_permission_denied");
     const reason = safeReason(error);
     return rejected(reason === "request_timeout" ? "transport_error"
       : reason === "vendor_error" ? "transport_rejected" : "recipient_unavailable");

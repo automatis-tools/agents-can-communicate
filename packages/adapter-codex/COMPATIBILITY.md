@@ -914,3 +914,25 @@ Delivery stayed off. This is one explicit continuation in a small fresh workspac
 not automatic client restart, unsaved-context recovery, arbitrary-history discovery or
 transfer of another participant's inbox. No ACC runtime, maintained test or capability
 changed. File samples do not exclude transient changes between observations.
+
+## Outgoing sandbox permissions, 2026-09-09
+
+On macOS arm64, ordinary Codex CLI 0.153.4 and Claude Code 2.1.267 sessions exposed
+an asymmetry in installed ACC 0.4.2: Claude's request reached Codex through the
+LocalDaemon queue, but Codex's shell reply could not connect to the Claude channel.
+The OS returned EPERM while both receiving bindings remained active. The former
+`recipient_unavailable` diagnosis concealed this sender-side permission failure.
+
+A workspace permission profile granting ACC state writes and its local Unix sockets,
+with the network proxy enabled and no external domains allowed, resolved that failure.
+A fresh ordinary Claude → Codex → Claude round trip then produced both synthetic
+markers and two successful native offers, without inbox polling or additional prompts.
+The same Codex sandbox allowed the ACC socket and denied an unrelated Unix socket and
+localhost TCP connection. Raw model transcripts were not retained.
+
+Automatic outgoing permission setup is limited to Codex 0.153.4 or newer on this
+platform. The installer preserves custom policies and reports them as unverified;
+configuration readiness never establishes an active session's effective permissions.
+This does not expand the certified hook versions or establish native replyRoute.
+The patch also uses a stable short macOS channel directory across different TMPDIR
+values and retains permission failures as a distinct safe offer code.

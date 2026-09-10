@@ -137,7 +137,9 @@ function recordedText(message, delivery) {
   const diagnostics = delivery.map(item => item.outcome === "offered"
     ? `live offered to ${item.recipientParticipantId} via ${item.transport}`
     : item.outcome === "queued"
-      ? `live offer unavailable (${item.errorCode ?? "durable_fallback"})`
+      ? item.errorCode === "transport_permission_denied"
+        ? "live offer blocked by sender permissions; message remains queued; run acc doctor in the sending session"
+        : `live offer unavailable (${item.errorCode ?? "durable_fallback"})`
       : `delivery already ${item.outcome}`);
   return [`recorded ${message.messageId}`, ...diagnostics].join("; ");
 }

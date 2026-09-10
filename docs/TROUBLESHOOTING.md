@@ -100,6 +100,20 @@ ambiguous recipients or failed identity checks retain durable inbox access.
 An interactive install can save consent in either case. ACC preserves it through a temporary
 outage and does not start the daemon for you.
 
+On a supported Codex CLI, a missing daemon can be started with
+`codex app-server daemon start`; open a new Codex session afterward. Doctor includes this
+command when it detects the missing endpoint.
+
+If a reply stays queued with `transport_permission_denied`, the sender's permissions
+blocked local transport. This is distinct from an unavailable recipient. The message was
+recorded successfully; the error does not mean it was read or acknowledged.
+On Codex 0.153.4 or newer on macOS arm64, rerun `acc install --adapter codex` with existing
+live consent (or add `--delivery actionable` to opt in), then start a new session.
+Doctor's `outgoingDelivery` reports the installed permission configuration separately
+from `nativeDelivery.runtime`: an active receiving channel does not establish outgoing
+access. Custom policies and active-session overrides remain unverified; inspect the config
+path doctor names and follow [outgoing permissions](CONFIGURATION.md#codex-outgoing-permissions).
+
 Check `acc doctor --json` and `acc status --json` while both clients are open. If policy is
 `off`, opt in with `acc install --adapter codex --delivery actionable` (or select another
 adapter). This can spend model tokens. If policy is enabled but runtime is `waiting` and
@@ -153,8 +167,9 @@ definitions need review, and a trusted hook can still be disabled.
 
 `acc doctor` reports installed files separately from hook readiness, which it leaves
 unverified. A saved trust record cannot prove current activation. If installation preserved
-your own sandbox configuration, doctor also names the ACC state directory whose access
-you should check in `sandbox_workspace_write.writable_roots`.
+your own legacy sandbox configuration, doctor also names the ACC state directory whose
+access you should check in `sandbox_workspace_write.writable_roots`. Live delivery requires
+local socket permissions as well; a writable state directory alone is insufficient.
 
 ## Gemini does not guard a write
 

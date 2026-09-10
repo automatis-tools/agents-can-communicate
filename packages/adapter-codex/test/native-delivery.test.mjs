@@ -11,6 +11,17 @@ const message = { messageId: "message_1", kind: "question", subject: "Synthetic"
 const bindingOf = handshake => ({ opaqueEndpointRef: handshake.opaqueEndpointRef,
   clientVersion: handshake.clientVersion });
 
+test("sender socket permission failures are distinct from a missing Codex receiver", async t => {
+  const h = await nativeFixture(t);
+  const handshake = await native.bindNativeSession(h);
+  for (const code of ["EPERM", "EACCES"]) {
+    const result = await native.offerMessage({ ...h, binding: bindingOf(handshake), message,
+      open: () => { throw Object.assign(new Error("private transport detail"), { code }); } });
+    assert.equal(result.safeErrorCode, "transport_permission_denied");
+    assert.equal(JSON.stringify(result).includes("private transport detail"), false);
+  }
+});
+
 test("a live queue probe succeeds without rewriting the vendor invocation", async t => {
   const h = await nativeFixture(t);
   const probe = await native.probeNativeDelivery(h);

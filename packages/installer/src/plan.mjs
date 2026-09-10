@@ -117,7 +117,9 @@ export function planInstallation({ adapters, detected, context, action = "instal
     const deliverySummary = action === "install"
       ? describeInstallDelivery(entry, delivery, effectiveLivePolicy) : null;
     const installContext = { ...context, requestedLivePolicy: delivery,
-      livePolicy: effectiveLivePolicy };
+      livePolicy: effectiveLivePolicy, clientVersion: entry.version, platform: entry.platform };
+    const setupNotes = action === "install" && delivery !== "off"
+      ? [entry.outgoingDelivery?.setup, entry.nativeSetup].filter(note => typeof note === "string") : [];
     // A consented activation that this run keeps, activates, or takes back.
     // Only an explicit off or an uninstall removes one; an absent record never
     // creates one.
@@ -139,6 +141,7 @@ export function planInstallation({ adapters, detected, context, action = "instal
       displayName: adapter.displayName,
       action,
       clientVersion: entry.version ?? record?.version ?? null,
+      platform: entry.platform ?? context?.platform,
       // "Remove these files for a client that is not here" is a different thing
       // to approve than an ordinary uninstall, so it is said rather than left
       // to be inferred from a client version that is null.
@@ -148,6 +151,7 @@ export function planInstallation({ adapters, detected, context, action = "instal
       effectiveLivePolicy,
       ...(deliveryDiagnostic === null ? {} : { deliveryDiagnostic }),
       ...(deliverySummary === null ? {} : { deliverySummary }),
+      ...(setupNotes.length ? { setupNotes } : {}),
       ...(nativeActivation === null ? {} : { nativeActivation }),
       ...(deactivation === null ? {} : { deactivation }),
       artifacts,
@@ -157,6 +161,7 @@ export function planInstallation({ adapters, detected, context, action = "instal
         ...(entry.present ? [] : [`${adapter.displayName ?? adapter.id} is no longer on `
           + "this machine; removing what ACC recorded writing"]),
         ...(deliverySummary === null ? [] : [deliverySummary]),
+        ...setupNotes,
         ...artifacts.filter(a => a.kind === "tree")
           .map(a => `${action === "install" ? "create" : "remove"} ${a.path}`),
         ...artifacts.filter(a => a.kind === "merge")

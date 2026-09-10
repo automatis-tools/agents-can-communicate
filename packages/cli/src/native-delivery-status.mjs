@@ -32,7 +32,7 @@ export function nativeRemediation(entry) {
       + "then run acc doctor here");
   }
   if (native.reasonCode === "native_endpoint_unavailable") {
-    steps.push(`${entry.displayName}: check the client's local delivery service setup; `
+    steps.push(entry.nativeSetup ?? `${entry.displayName}: check the client's local delivery service setup; `
       + "ACC does not start or restart that service");
   } else if (native.reasonCode === "native_session_unavailable") {
     steps.push(`${entry.displayName}: open a session connected to the client's local delivery service`);

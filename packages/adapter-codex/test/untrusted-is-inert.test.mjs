@@ -63,10 +63,10 @@ test("the thing a person must do is said where a person reads it", async t => {
 
   const actions = await actionsOf(context);
 
-  assert.equal(actions.length, 1, `no action was asked for: ${JSON.stringify(actions)}`);
-  assert.match(actions[0], /codex/);
-  assert.match(actions[0], /trust/i);
-  assert.match(actions[0], /\/hooks/);
+  const hookAction = actions.find(line => /\/hooks/.test(line));
+  assert.ok(hookAction, `no hook review was asked for: ${JSON.stringify(actions)}`);
+  assert.match(hookAction, /codex/);
+  assert.match(hookAction, /trust/i);
 });
 
 test("a plugin registration cannot establish that the client enabled it", async t => {

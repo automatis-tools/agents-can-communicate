@@ -206,7 +206,9 @@ function sendEnvelope({ record, message, binding, connect, timeoutMs, rejected }
     const finish = value => { if (settled) return; settled = true; clearTimeout(timer);
       socket.destroy(); resolve(value); };
     const timer = setTimeout(() => finish(rejected("transport_error")), timeoutMs);
-    socket.once("error", () => finish(rejected("recipient_unavailable")));
+    socket.once("error", error => finish(rejected(
+      ["EPERM", "EACCES"].includes(error.code)
+        ? "transport_permission_denied" : "recipient_unavailable")));
     socket.once("connect", () => {
       socket.write(`${JSON.stringify(envelope)}\n`);
       let buffer = "";

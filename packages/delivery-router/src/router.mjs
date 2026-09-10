@@ -1,7 +1,7 @@
 import { refreshExpiredBinding } from "./refresh-binding.mjs";
 
 const SAFE_ERRORS = new Set(["ambiguous_recipient_sessions", "delivery_disabled",
-  "recipient_busy", "recipient_unavailable", "transport_error", "transport_rejected",
+  "recipient_busy", "recipient_unavailable", "transport_error", "transport_rejected", "transport_permission_denied",
   "unsupported_client_version"]);
 const NAMED_LIVE_TRANSPORTS = new Set(["claude-channel", "codex-app-server"]);
 

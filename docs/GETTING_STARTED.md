@@ -15,7 +15,7 @@ pair or session-bound ACC MCP tools. See [CLI ownership](CLI.md#coordinate-from-
 
 ACC requires macOS or Linux and Node.js 24 or newer.
 
-Already using ACC? Follow the [upgrade guide](UPGRADING.md) for the 0.4.0/0.4.1 → 0.4.2
+Already using ACC? Follow the [upgrade guide](UPGRADING.md) for the 0.4.x → 0.4.3
 update or the data-format boundary when upgrading from 0.3.1.
 
 ```bash
@@ -39,8 +39,12 @@ printed by the installer. In Codex, use `/plugins` to check ACC is enabled, then
 to review each ACC hook and enable/trust its current definition if needed. Restart the
 session after that review; changed hook definitions may require trust again.
 
-If the installer preserved your existing Codex sandbox settings, verify the named ACC
-state directory is in `sandbox_workspace_write.writable_roots` in the config it identifies.
+For Codex live delivery, follow the outgoing-permission and local-service instructions
+from install/doctor, then start a new session. Default workspace permissions can be
+configured automatically on Codex 0.153.4 or newer on macOS arm64. Custom settings are
+preserved; see [outgoing permissions](CONFIGURATION.md#codex-outgoing-permissions).
+With legacy sandbox settings, the named ACC state directory must also be in
+`sandbox_workspace_write.writable_roots` in the config the installer identifies.
 ACC keeps those user settings unchanged. Installed files alone do not establish that hooks
 are active; `acc doctor` leaves current readiness unverified and directs you to Codex.
 

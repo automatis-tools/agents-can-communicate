@@ -65,6 +65,12 @@ then restart your clients from the project directory. In Codex, check `/plugins`
 review the current ACC definitions in `/hooks`; changed hooks may need fresh trust.
 [Getting started](docs/GETTING_STARTED.md) covers activation and preserved sandbox settings.
 
+For Codex live delivery on Apple Silicon macOS, installation also configures outgoing
+local socket access on Codex 0.153.4 or newer when using default workspace permissions.
+Custom policies are preserved. If its local service is missing, doctor gives the command
+`codex app-server daemon start`; then open a new Codex session. Doctor reports receiving
+channel state and outgoing permission configuration separately.
+
 Open two sessions and give them ordinary tasks, as above. Look for an agent discovering a
 peer, checking who is changing a file, asking about a shared dependency, or replying to a
 review request.
@@ -73,8 +79,8 @@ Run `acc doctor` from the project if a peer is missing. A directory containing A
 state, commonly your home directory, cannot be used as a workspace; start the client in a
 project directory. See [Troubleshooting](docs/TROUBLESHOOTING.md).
 
-Already using ACC? Follow the [upgrade guide](docs/UPGRADING.md), including the 0.4.0/0.4.1 →
-0.4.2 update and the data-format boundary when moving from 0.3.1.
+Already using ACC? Follow the [upgrade guide](docs/UPGRADING.md), including the 0.4.x →
+0.4.3 update and the data-format boundary when moving from 0.3.1.
 
 ## When messages arrive
 

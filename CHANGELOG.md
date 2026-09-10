@@ -1,5 +1,37 @@
 # Changelog
 
+## 0.4.3 — release candidate
+
+- Live opt-in configures Codex outgoing socket access on macOS arm64 with Codex
+  0.153.4 or newer, including before its local daemon becomes available. Default
+  workspace permissions and ACC-only legacy roots are migrated; custom policies
+  remain untouched and visibly unverified.
+- Permission selection, proxy and local grants are owned and restored together.
+  Reinstall is stable; off/uninstall preserves edited components and dependent
+  settings without reparenting foreign TOML declarations.
+- Install previews and consent disclose the outgoing permission setup. Doctor reports
+  outgoing configuration separately from receiving-channel state and gives the
+  supported command for a missing Codex daemon.
+- EPERM/EACCES in either native transport remain `transport_permission_denied`
+  through router and durable offer events. CLI explains the sender-side block;
+  the recorded message remains queued. macOS channel paths no longer vary with TMPDIR.
+- README, onboarding, configuration, troubleshooting and upgrade documentation are updated.
+
+| Candidate artifact | Value |
+|---|---|
+| Built from | `7583e437651c93285650f6bcf983d677b850393f` |
+| Tarball | `agents-can-communicate-0.4.3.tgz`, 347,612 bytes, 259 files |
+| sha256 | `eeea525e9b15f25b09d5ec08e6754574b684e447bebe5798b264b088b9a2fa8d` |
+
+The exact archive passed installed-package verification, all 23 managed-update
+checks, and an upgrade from published 0.4.2. All 259 source, archive, installed and
+active managed files match. A fresh Claude 2.1.267 → Codex 0.154.0 → Claude live
+round trip passed with installer-generated permissions and two native offers.
+The real Codex sandbox allowed ACC sockets and denied unrelated Unix/TCP endpoints.
+See [candidate evidence](docs/release-evidence/v0.4.3.md) for setup and limitations.
+The full suite runs after this evidence commit through the mandatory pre-push gate.
+This candidate has not been tagged or published.
+
 ## 0.4.2 — release candidate
 
 - A genuine prompt restores ACC participation after detaching a solo session whose

@@ -35,6 +35,7 @@ export async function applyPlan({ plan, adapters, context, dataHome, dryRun = fa
         const createdDirectories = await missingArtifactParents({ home: context.home,
           artifacts: operation.artifacts });
         const installContext = { ...context,
+          clientVersion: operation.clientVersion, platform: operation.platform,
           requestedLivePolicy: operation.livePolicy ?? "off",
           livePolicy: operation.effectiveLivePolicy ?? "off" };
         const outcome = await adapter.install(installContext);
@@ -103,6 +104,7 @@ export async function applyPlan({ plan, adapters, context, dataHome, dryRun = fa
           retainedNativeActivation: retainedMechanisms.length === 0 ? null
             : { ...operation.deactivation, mechanisms: retainedMechanisms } });
         results.operations.push({ ...operation, applied: true,
+          needsAction: outcome.needsAction ?? [],
           changes: outcome.changes ?? [], removed: owned.removed, kept: owned.kept,
           removedDirectories: directories.removed, keptDirectories: directories.kept,
           missingDirectories: directories.missing,

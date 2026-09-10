@@ -10,6 +10,7 @@ export const SAFE_OFFER_ERROR_CODES = Object.freeze([
   "recipient_unavailable",
   "transport_error",
   "transport_rejected",
+  "transport_permission_denied",
   "unsupported_client_version",
 ]);
 
