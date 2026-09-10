@@ -96,9 +96,13 @@ export async function listActivationBlockers(root, { pidIsAlive = defaultPidIsAl
       nativeBindings: 0, storeVersion: hold.storeVersion };
     if (!blocker.kinds.includes(hold.kind)) blocker.kinds.push(hold.kind);
     blocker.nativeBindings += nativeBindings;
-    // One process can publish several holds. The narrowest contract wins, and
-    // an unknown one makes the whole process uncomparable.
-    if (!Number.isSafeInteger(hold.storeVersion)) blocker.storeVersion = null;
+    // One process can publish several holds. Only an unbroken run of holds
+    // declaring the same contract may keep it for the whole process; an
+    // unknown contract, or one that differs from what has already
+    // accumulated, collapses the process to uncomparable for good.
+    if (!Number.isSafeInteger(hold.storeVersion) || hold.storeVersion !== blocker.storeVersion) {
+      blocker.storeVersion = null;
+    }
     byPid.set(pid, blocker);
   }
   return [...byPid.values()].sort((a, b) => a.pid - b.pid)

@@ -75,8 +75,11 @@ export async function runMaintenance(root, { jobId, env = process.env, adapters 
             // holds against the pending generation's contract when one is
             // being activated, otherwise against the generation already
             // running, since there is no incoming generation to compare to.
+            // Pick the whole generation record, not a per-field fallback, so
+            // a pending generation declaring no contract of its own is
+            // judged as "none" rather than silently borrowing active's.
             const blockers = await listActivationBlockers(root, { pidIsAlive,
-              incomingStoreVersion: current.pending?.storeVersion ?? current.active.storeVersion });
+              incomingStoreVersion: (current.pending ?? current.active).storeVersion });
             const others = blockers.filter(b => b.pid !== expected.pid || b.kinds.some(kind => kind !== "native"));
             if (others.length) throw deferred({ reason: "other_processes", processes: others.length });
             const snapshot = await adapter.inspectMaintenance(context);
