@@ -2,18 +2,18 @@
 
 ## Unreleased
 
-- Store contract declaration. The manager can now learn which shared-store contract a 
-  staged generation speaks without importing that generation's code. A top-level package 
+- Store contract declaration. The manager can now learn which shared-store contract a
+  staged generation speaks without importing that generation's code. A top-level package
   manifest field `accStoreVersion` declares the contract, read before activation.
 
 | Candidate artifact | Value |
 |---|---|
-| Built from | `98343551733256d18f0637b132f413a2c0d8a885` |
+| Built from | `c6a0e23a663d7afac1fc9afa3d11d121ca4e2e05` |
 | Tarball | `agents-can-communicate-0.4.4.tgz`, 362,513 bytes, 269 files |
 | sha256 | `687be512b22cd7d484e306009b131db99f9e84b6769f63ab90b24bb0fc1b2204` |
 
-The exact archive passed installed-package verification. The full suite passed with 
-2,020 passes, zero failures and one environment-dependent skip. This candidate has not 
+The exact archive passed installed-package verification. The full suite passed with
+2,020 passes, zero failures and one environment-dependent skip. This candidate has not
 been tagged or published.
 
 ## 0.4.4 — release candidate
