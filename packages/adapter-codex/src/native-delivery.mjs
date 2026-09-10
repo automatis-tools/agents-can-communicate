@@ -1,9 +1,10 @@
 import { realpath } from "node:fs/promises";
 import { decisionBody } from "@agents-can-communicate/adapter-sdk";
 
-import { MINIMUM_VERSION, PROTOCOL_CONTRACT, QUEUE_MODES, addCodexQueueMessage,
-  canonicalCwd, controlSocketPath, locateCodexThread, openCodexAppServer,
-  parseStableVersion, probeCodexQueue, safeReason, serverVersionOf } from "./app-server-client.mjs";
+import { CODEX_QUEUE_MINIMUM, MINIMUM_VERSION, PROTOCOL_CONTRACT, QUEUE_MODES,
+  addCodexQueueMessage, canonicalCwd, compareStableVersions, controlSocketPath,
+  locateCodexThread, openCodexAppServer, parseStableVersion, probeCodexQueue,
+  safeReason, serverVersionOf } from "./app-server-client.mjs";
 import { newEndpointId, readNativeEndpoint, removeNativeEndpoint, socketIsReady,
   writeNativeEndpoint } from "./native-endpoint.mjs";
 
@@ -62,11 +63,23 @@ export function planNativeActivation({ detection }) {
   ] };
 }
 
-async function verifyReceiver(peer, endpoint) {
-  const probe = await probeCodexQueue(peer, { threadId: endpoint.threadId });
-  if (!probe.supported) return probe.reasonCode === "probe_timeout" ? "handshake_timeout" : "protocol_mismatch";
-  if (probe.serverVersion !== endpoint.clientVersion) return "handshake_version_mismatch";
-  const located = await locateCodexThread(peer, { threadId: endpoint.threadId, cwd: endpoint.cwd });
+// A daemon that restarted onto a newer build still satisfies the captured
+// contract. The thread it may have lost is reported separately by
+// locateCodexThread, so refusing on the version alone only hides the real reason.
+export async function verifyReceiver(peer, endpoint, { probe = probeCodexQueue,
+  locate = locateCodexThread } = {}) {
+  const result = await probe(peer, { threadId: endpoint.threadId });
+  if (!result.supported) {
+    return result.reasonCode === "probe_timeout" ? "handshake_timeout" : "protocol_mismatch";
+  }
+  if (compareStableVersions(result.serverVersion, CODEX_QUEUE_MINIMUM) < 0) {
+    return "handshake_version_mismatch";
+  }
+  // The daemon may have restarted onto a different build since the binding
+  // was last written; record what actually answered so later reads of it
+  // reflect the serving process rather than a stale bind-time snapshot.
+  endpoint.clientVersion = result.serverVersion;
+  const located = await locate(peer, { threadId: endpoint.threadId, cwd: endpoint.cwd });
   return located.found ? null : located.reasonCode === "cwd_mismatch"
     ? "workspace_identity_unavailable" : "handshake_failed";
 }

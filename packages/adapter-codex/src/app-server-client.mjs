@@ -12,6 +12,10 @@ import { openWebSocketPeer } from "./ws-json-rpc.mjs";
 
 export const PROTOCOL_CONTRACT = "codex-app-server-thread-queue-v1";
 export const MINIMUM_VERSION = "0.152.1";
+// The captured native-delivery contract's floor. Shared with MINIMUM_VERSION
+// today, but named separately: this is the version a binding was verified
+// against, not the probe's own support floor.
+export const CODEX_QUEUE_MINIMUM = MINIMUM_VERSION;
 export const QUEUE_MODES = Object.freeze(["livePush", "idleWake", "busyQueue"]);
 const CLIENT_INFO = Object.freeze({ name: "agents-can-communicate", version: "0.2.0" });
 const STABLE_VERSION = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/;
