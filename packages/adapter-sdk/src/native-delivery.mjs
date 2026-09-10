@@ -103,7 +103,10 @@ function knownBadHit(contract, version) {
 }
 
 // The static half of the rule: platform, minimum, prerelease, and denylist.
-function evaluateStatic(adapter, { clientVersion, platform }) {
+// Exported so a consumer that only has a reported version and no probe or
+// handshake shape (the delivery router, judging an offer response) can judge
+// it against the captured contract without duplicating this logic.
+export function evaluateStatic(adapter, { clientVersion, platform }) {
   const contract = adapter?.nativeDelivery;
   if (contract === undefined) {
     return { reasonCode: "native_delivery_unsupported", minimumVersion: null, protocolContract: null };

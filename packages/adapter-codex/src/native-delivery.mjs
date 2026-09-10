@@ -65,23 +65,26 @@ export function planNativeActivation({ detection }) {
 
 // A daemon that restarted onto a newer build still satisfies the captured
 // contract. The thread it may have lost is reported separately by
-// locateCodexThread, so refusing on the version alone only hides the real reason.
+// locateCodexThread, so refusing on the version alone only hides the real
+// reason. Returns the version that actually answered as `servingVersion`
+// (null when refused) instead of mutating the endpoint it was handed, so a
+// caller can decide what to persist on the one path that owns persistence,
+// after its own validation has already run.
 export async function verifyReceiver(peer, endpoint, { probe = probeCodexQueue,
   locate = locateCodexThread } = {}) {
   const result = await probe(peer, { threadId: endpoint.threadId });
   if (!result.supported) {
-    return result.reasonCode === "probe_timeout" ? "handshake_timeout" : "protocol_mismatch";
+    return { reasonCode: result.reasonCode === "probe_timeout" ? "handshake_timeout" : "protocol_mismatch",
+      servingVersion: null };
   }
   if (compareStableVersions(result.serverVersion, CODEX_QUEUE_MINIMUM) < 0) {
-    return "handshake_version_mismatch";
+    return { reasonCode: "handshake_version_mismatch", servingVersion: null };
   }
-  // The daemon may have restarted onto a different build since the binding
-  // was last written; record what actually answered so later reads of it
-  // reflect the serving process rather than a stale bind-time snapshot.
-  endpoint.clientVersion = result.serverVersion;
   const located = await locate(peer, { threadId: endpoint.threadId, cwd: endpoint.cwd });
-  return located.found ? null : located.reasonCode === "cwd_mismatch"
-    ? "workspace_identity_unavailable" : "handshake_failed";
+  return located.found
+    ? { reasonCode: null, servingVersion: result.serverVersion }
+    : { reasonCode: located.reasonCode === "cwd_mismatch" ? "workspace_identity_unavailable" : "handshake_failed",
+        servingVersion: null };
 }
 
 export async function bindNativeSession({ event, clientPid, clientVersion, runtimeDir,
@@ -99,10 +102,15 @@ export async function bindNativeSession({ event, clientPid, clientVersion, runti
       const endpoint = { schemaVersion: 1, endpointId: newEndpointId(), socketPath,
         threadId: event.sessionId, cwd, clientVersion, protocolContract: PROTOCOL_CONTRACT,
         leaseUntil: new Date(now() + LEASE_MS).toISOString() };
-      const reason = await verifyReceiver(peer, endpoint);
-      if (reason !== null) return rejected(reason);
-      await writeNativeEndpoint({ runtimeDir, record: endpoint });
-      return handshake(endpoint, now);
+      const { reasonCode, servingVersion } = await verifyReceiver(peer, endpoint);
+      if (reasonCode !== null) return rejected(reasonCode);
+      // The daemon may have restarted onto a different build since the
+      // caller's claimed clientVersion was captured; persist what actually
+      // answered so the binding and its later reads reflect the serving
+      // process, not the caller's claim.
+      const verified = { ...endpoint, clientVersion: servingVersion };
+      await writeNativeEndpoint({ runtimeDir, record: verified });
+      return handshake(verified, now);
     });
   } catch (error) {
     return rejected(error?.code === "ETIMEDOUT" ? "handshake_timeout" : "handshake_failed");
@@ -122,8 +130,9 @@ export async function refreshNativeSession({ binding, runtimeDir, timeoutMs = 75
   if (endpoint === null) return rejected("handshake_failed");
   try {
     return await usingPeer(endpoint.socketPath, timeoutMs, open, async peer => {
-      const reason = await verifyReceiver(peer, endpoint);
-      return reason === null ? handshake(endpoint, now) : rejected(reason);
+      const { reasonCode, servingVersion } = await verifyReceiver(peer, endpoint);
+      return reasonCode === null
+        ? handshake({ ...endpoint, clientVersion: servingVersion }, now) : rejected(reasonCode);
     });
   } catch (error) {
     return rejected(error?.code === "ETIMEDOUT" ? "handshake_timeout" : "handshake_failed");
@@ -138,12 +147,12 @@ export async function offerMessage({ binding, message, runtimeDir, timeoutMs = 5
   if (endpoint === null) return rejected("recipient_unavailable");
   try {
     return await usingPeer(endpoint.socketPath, timeoutMs, open, async peer => {
-      const reason = await verifyReceiver(peer, endpoint);
-      if (reason !== null) return rejected(reason === "handshake_timeout" ? "transport_error"
-        : reason === "handshake_version_mismatch" ? "unsupported_client_version" : "recipient_unavailable");
+      const { reasonCode, servingVersion } = await verifyReceiver(peer, endpoint);
+      if (reasonCode !== null) return rejected(reasonCode === "handshake_timeout" ? "transport_error"
+        : reasonCode === "handshake_version_mismatch" ? "unsupported_client_version" : "recipient_unavailable");
       await addCodexQueueMessage(peer, { threadId: endpoint.threadId,
         messageId: message.messageId, text: renderText(message) });
-      return { accepted: true, transport: "codex-app-server", clientVersion: endpoint.clientVersion };
+      return { accepted: true, transport: "codex-app-server", clientVersion: servingVersion };
     });
   } catch (error) {
     if (["EPERM", "EACCES"].includes(error?.code)) return rejected("transport_permission_denied");

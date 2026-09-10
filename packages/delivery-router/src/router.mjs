@@ -1,3 +1,5 @@
+import { evaluateStatic as evaluateVersionContract } from "@agents-can-communicate/adapter-sdk";
+
 import { refreshExpiredBinding } from "./refresh-binding.mjs";
 
 const SAFE_ERRORS = new Set(["ambiguous_recipient_sessions", "delivery_disabled",
@@ -167,7 +169,12 @@ export function createDeliveryRouter({ service, adapters, clock, platform, readL
       await recordFailure(binding, message, participantId, transport, code);
       return durable(participantId, code);
     }
-    if (response.clientVersion !== binding.clientVersion) {
+    // Compatibility was already decided at bind time; a serving version that
+    // still satisfies the adapter's captured contract keeps offering, even
+    // when it differs from the value recorded when the binding was created.
+    // Only a version below the captured minimum or on the denylist refuses.
+    const versionRule = evaluateVersionContract(adapter, { clientVersion: response.clientVersion, platform });
+    if (versionRule.reasonCode !== null) {
       await recordFailure(binding, message, participantId, transport,
         "unsupported_client_version");
       return durable(participantId, "unsupported_client_version");

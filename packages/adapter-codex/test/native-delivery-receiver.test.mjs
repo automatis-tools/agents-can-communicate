@@ -13,7 +13,11 @@ test("a service upgraded above the minimum keeps serving an existing binding", a
     probe: async () => ({ supported: true, serverVersion: "0.154.0", reasonCode: null }),
     locate: async () => ({ found: true }),
   });
-  assert.equal(result, null);
+  assert.equal(result.reasonCode, null);
+  // The version that actually answered is returned, not assumed: a caller
+  // records this instead of the endpoint it passed in ever being mutated.
+  assert.equal(result.servingVersion, "0.154.0");
+  assert.equal(endpoint.clientVersion, "0.153.4");
 });
 
 test("a service downgraded below the minimum stops serving it", async () => {
@@ -21,5 +25,6 @@ test("a service downgraded below the minimum stops serving it", async () => {
     probe: async () => ({ supported: true, serverVersion: "0.151.0", reasonCode: null }),
     locate: async () => ({ found: true }),
   });
-  assert.equal(result, "handshake_version_mismatch");
+  assert.equal(result.reasonCode, "handshake_version_mismatch");
+  assert.equal(result.servingVersion, null);
 });

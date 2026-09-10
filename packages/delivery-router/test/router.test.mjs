@@ -297,13 +297,31 @@ test("a newer binding version admitted by the handshake is offered without re-ce
     assert.equal((await receipt(f.store, message.messageId)).state, "offered");
   });
 
-test("an offer whose reported client version differs from the binding stays queued", async () => {
+test("an offer whose reported client version fails the captured contract stays queued", async () => {
+  const belowMinimum = certifiedAdapter(async () => ({ accepted: true,
+    transport: "codex-app-server", clientVersion: "1.2.2" }));
+  const denylisted = { ...certifiedAdapter(async () => ({ accepted: true,
+    transport: "codex-app-server", clientVersion: "1.2.5" })),
+    nativeDelivery: { ...certifiedAdapter().nativeDelivery,
+      knownBad: [{ version: "1.2.5", reasonCode: "known_bad_version" }] } };
+  for (const [name, adapter] of [["below the captured minimum", belowMinimum],
+    ["on the captured denylist", denylisted]]) {
+    const f = await fixture({ adapter });
+    await publish(f.service, f.sessions[0]);
+    const message = await send(f.service, f.sender, "question", `drift_${name.replace(/\W+/g, "_")}`);
+    assert.deepEqual(await f.router.offer(message), durable("unsupported_client_version"), name);
+    assert.equal((await receipt(f.store, message.messageId)).state, "queued", name);
+  }
+});
+
+test("an offer whose reported client version differs from the binding but still "
+  + "satisfies the captured contract is offered", async () => {
   const f = await fixture({ adapter: certifiedAdapter(async () => ({ accepted: true,
     transport: "codex-app-server", clientVersion: "1.2.4" })) });
   await publish(f.service, f.sessions[0]);
-  const message = await send(f.service, f.sender, "question", "drift");
-  assert.deepEqual(await f.router.offer(message), durable("unsupported_client_version"));
-  assert.equal((await receipt(f.store, message.messageId)).state, "queued");
+  const message = await send(f.service, f.sender, "question", "drift_upgraded");
+  assert.equal((await f.router.offer(message))[0].outcome, "offered");
+  assert.equal((await receipt(f.store, message.messageId)).state, "offered");
 });
 
 const POLICY_MATRIX = [
