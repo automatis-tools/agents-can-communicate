@@ -18,6 +18,21 @@ const runNpm = (args, options = {}) => (isWindows
 
 const parsed = stdout => JSON.parse(stdout).data;
 
+/** A packed fixture installs its own ACC and points it at its own data home,
+ * so every ACC_* the caller exported describes their machine rather than this
+ * test. ACC_SESSION and ACC_GENERATION are their real credentials, and a
+ * policy override such as ACC_NATIVE_DELIVERY_POLICY silently changes the
+ * behaviour under test: a leaked one bound a session natively during setup and
+ * the turn-lifecycle suite then saw two handshakes where it asserts one.
+ * Scrub the inherited namespace, then apply what the fixture sets on purpose.
+ * A fixture that wants a value still supplies it through extraEnv.
+ */
+export function isolatedEnv(inherited, own) {
+  const env = { ...inherited };
+  for (const key of Object.keys(env)) if (key.startsWith("ACC_")) delete env[key];
+  return { ...env, ...own };
+}
+
 async function runWithInput(command, args, options, input) {
   const pending = run(command, args, options);
   pending.child.stdin.end(input);
@@ -84,13 +99,8 @@ export async function createPackedAcc(t) {
   const accBin = path.join(installed, "bin", "acc.mjs");
   const hookBin = path.join(installed, "bin", "acc-hook.mjs");
   const mcpBin = path.join(installed, "bin", "acc-mcp.mjs");
-  const env = { ...process.env, ACC_NO_UPDATE_CHECK: "1", ACC_DATA_HOME: dataHome, HOME: clientHome,
-    PATH: clientBin,
-    GIT_DIR: "", GIT_WORK_TREE: "" };
-  // The caller's real credentials do not belong to this isolated runtime.
-  // A fixture may explicitly supply its own pair through extraEnv.
-  delete env.ACC_SESSION;
-  delete env.ACC_GENERATION;
+  const env = isolatedEnv(process.env, { ACC_NO_UPDATE_CHECK: "1", ACC_DATA_HOME: dataHome,
+    HOME: clientHome, PATH: clientBin, GIT_DIR: "", GIT_WORK_TREE: "" });
 
   const commandTrace = [];
   const acc = async (args, extraEnv = {}) => {
