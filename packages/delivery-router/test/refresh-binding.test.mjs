@@ -98,7 +98,10 @@ test("a valid refresh extends the existing binding and caps its lease at 120 sec
 test("refresh refuses invalid identity, platform, and lease handshakes", async () => {
   for (const [name, platform, result] of [
     ["endpoint", PLATFORM, handshake({ opaqueEndpointRef: "endpoint:other" })],
-    ["version", PLATFORM, handshake({ clientVersion: "1.2.4" })],
+    // The rule is judged by the version the handshake reports, so a refusal
+    // needs a served version below the captured minimum, not merely a
+    // different one.
+    ["version", PLATFORM, handshake({ clientVersion: "1.2.2" })],
     ["platform", "uncaptured-platform", handshake()],
     ["past lease", PLATFORM, handshake({ leaseUntil: NOW })],
   ]) {
@@ -114,6 +117,14 @@ test("refresh refuses invalid identity, platform, and lease handshakes", async (
       runtimeDir: f.store.root, platform, clock: f.clock }), false, name);
     assert.equal(refreshCalls, 0, name);
   }
+});
+
+test("a refresh handshake reporting a different but eligible version still succeeds", async () => {
+  const f = await fixture();
+  const adapter = adapterWith(async () => handshake({ clientVersion: "1.2.9" }));
+
+  assert.equal(await refreshExpiredBinding({ service: f.service, adapter, binding: f.binding,
+    runtimeDir: f.store.root, platform: PLATFORM, clock: f.clock }), true);
 });
 
 test("missing refresh support leaves the expired binding untouched", async () => {
