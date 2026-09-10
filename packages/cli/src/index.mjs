@@ -12,4 +12,5 @@ export { platformPaths } from "./platform-paths.mjs";
 // A pin names the generation a session started with, kept beside its binding
 // so a hook can be made to keep loading that generation once a newer one
 // activates.
-export { clearPin, readPin, reapPins, writePin } from "./managed-runtime/pins.mjs";
+export { clearPin, hookEntrypointFor, readPin, reapPins, resolvePinnedGeneration, writePin }
+  from "./managed-runtime/pins.mjs";
