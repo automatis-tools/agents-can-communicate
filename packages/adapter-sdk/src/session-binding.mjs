@@ -43,7 +43,7 @@ function assertBindingDeadline(deadlineAt) {
 }
 
 export async function storeSessionBinding({ runtimeDir, harnessSessionId, accSessionId,
-  generation, clientVersion, platform, clientPid, deadlineAt }) {
+  generation, clientVersion, platform, clientPid, deadlineAt, storeVersion, runtimeRoot }) {
   assertBindingDeadline(deadlineAt);
   const file = fileFor(runtimeDir, harnessSessionId);
   const record = { schemaVersion: SCHEMA_VERSION, harnessSessionId, accSessionId, generation };
@@ -61,6 +61,21 @@ export async function storeSessionBinding({ runtimeDir, harnessSessionId, accSes
         { clientPid });
     }
     record.clientPid = clientPid;
+  }
+  // Runtime facts, kept separate from `generation`, which names the ACC session
+  // generation and must not be overloaded with a runtime identity.
+  if (storeVersion !== undefined && storeVersion !== null) {
+    if (!Number.isSafeInteger(storeVersion) || storeVersion <= 0) {
+      throw new AccError(EXIT.USAGE, "session binding storeVersion must be a positive integer",
+        { storeVersion });
+    }
+    record.storeVersion = storeVersion;
+  }
+  if (runtimeRoot !== undefined && runtimeRoot !== null) {
+    if (typeof runtimeRoot !== "string" || runtimeRoot === "") {
+      throw new AccError(EXIT.USAGE, "session binding runtimeRoot must be a non-empty string", {});
+    }
+    record.runtimeRoot = runtimeRoot;
   }
   const temporary = `${file}.${process.pid}.tmp`;
   await writeFile(temporary, `${JSON.stringify(record, null, 2)}\n`, "utf8");

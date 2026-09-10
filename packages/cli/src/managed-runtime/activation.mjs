@@ -55,7 +55,8 @@ export async function listNativeHolds(root, { pidIsAlive = defaultPidIsAlive } =
       const pid = record?.schemaVersion === 1 && Number.isSafeInteger(record.clientPid)
         && record.clientPid > 0 ? record.clientPid : null;
       if (pid !== null && await confirmedDead(pid, pidIsAlive)) continue;
-      holds.push({ kind: "native", pid, reason: pid === null ? "unknown_client_pid" : "client_running" });
+      holds.push({ kind: "native", pid, reason: pid === null ? "unknown_client_pid" : "client_running",
+        storeVersion: Number.isSafeInteger(record?.storeVersion) ? record.storeVersion : null });
     }
   }
   return holds;
