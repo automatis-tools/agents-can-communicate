@@ -2,6 +2,7 @@ import { activatePending } from "./activation.mjs";
 import { downloadRelease, fetchRelease, newerVersion } from "./download.mjs";
 import { withManagerLock } from "./mutex.mjs";
 import { readControl, writeControl } from "./state.mjs";
+import { releaseStagingHold } from "./staging.mjs";
 import { MAINTENANCE_ACTIVE, maintenanceNotice, maintenanceReport, readMaintenance } from "./maintenance-state.mjs";
 import { requestMaintenance } from "./maintenance.mjs";
 
@@ -40,14 +41,23 @@ export async function performUpdate(root, { force = false, check = false, env = 
   const checked = { ...data, checked: true, latest: release.version, newer };
   if (check || !newer) return checked;
   const generation = await download(root, release, { env });
-  const published = await withManagerLock(root, async () => {
-    const current = await readControl(root);
-    if (current.phase !== "ready" || current.active.root !== initial.active.root
-      || current.pin !== initial.pin || !force && !current.auto) return false;
-    await writeControl(root, { ...current, pending: generation,
-      notice: `ACC ${generation.version} is downloaded and verified.` });
-    return true;
-  });
+  // generation.hold has protected this candidate since it was staged;
+  // release it once this publish attempt resolves either way - published,
+  // its own control pointer takes over protecting it, and abandoned
+  // (state_changed) it is no longer wanted at all.
+  let published;
+  try {
+    published = await withManagerLock(root, async () => {
+      const current = await readControl(root);
+      if (current.phase !== "ready" || current.active.root !== initial.active.root
+        || current.pin !== initial.pin || !force && !current.auto) return false;
+      await writeControl(root, { ...current, pending: generation,
+        notice: `ACC ${generation.version} is downloaded and verified.` });
+      return true;
+    });
+  } finally {
+    await releaseStagingHold(generation.hold);
+  }
   if (!published) return { ...checked, reason: "state_changed" };
   return { ...checked, pending: generation.version, ...await activate(root, { env, ignorePid }) };
 }

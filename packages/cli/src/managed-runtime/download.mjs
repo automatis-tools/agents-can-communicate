@@ -6,6 +6,7 @@ import { declaredStoreVersion } from "./activation.mjs";
 import { stageOwnGeneration } from "./generation.mjs";
 import { verifyGeneration } from "./install.mjs";
 import { managedDirectory } from "./state.mjs";
+import { releaseStagingHold } from "./staging.mjs";
 import { ENTRY_KINDS } from "./entry.mjs";
 
 const NAME = "agents-can-communicate";
@@ -66,8 +67,20 @@ export async function downloadRelease(root, release, { env = process.env } = {})
     for (const name of ENTRY_KINDS) await access(path.join(packageRoot, "bin", "entrypoints", `${name}.mjs`));
     await access(path.join(packageRoot, "bin", "acc-update-worker.mjs"));
     const generation = await stageOwnGeneration({ packageRoot, managerRoot: root });
-    await verifyGeneration(generation, { env });
-    return { version: generation.version, root: generation.root,
-      storeVersion: await declaredStoreVersion(generation.root) };
+    // A failed verify, or any other failure before this function actually
+    // returns, means this candidate is abandoned here, so release its hold
+    // now - declaredStoreVersion included, so a future change to it (or any
+    // other exception in this region) cannot silently leak the hold instead
+    // of releasing it. Only a clean return hands the hold on to the caller
+    // (worker.mjs), since publication happens later there, and it is
+    // responsible for releasing it once that publish attempt resolves.
+    try {
+      await verifyGeneration(generation, { env });
+      return { version: generation.version, root: generation.root,
+        storeVersion: await declaredStoreVersion(generation.root), hold: generation.hold };
+    } catch (error) {
+      await releaseStagingHold(generation.hold);
+      throw error;
+    }
   } finally { await rm(temporary, { recursive: true, force: true }); }
 }
