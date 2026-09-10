@@ -16,12 +16,9 @@ export async function prepareRefresh({ control, root, env = process.env }) {
   const detected = await detectInstallation({ adapters, context, probeTimeoutMs: probeTimeout(env) });
   const deliveryByAdapter = Object.fromEntries(adapters.map(adapter => [adapter.id,
     livePolicyOf(recorded.find(record => record.adapterId === adapter.id))]));
-  // An unavailable probe cannot silently revoke an existing native opt-in.
-  for (const detection of detected) {
-    if (deliveryByAdapter[detection.adapterId] !== "off" && detection.nativeDelivery?.state !== "eligible") {
-      throw new Error("native integration could not be verified; update remains pending");
-    }
-  }
+  // Refresh configuration even when the client's service is temporarily absent.
+  // The installer preserves consent and existing activation; readiness stays a
+  // separate, current probe result rather than an update prerequisite.
   const plan = planInstallation({ adapters, detected, context, recorded,
     accVersion: control.pending.version, requested: control.targets, deliveryByAdapter });
   if (plan.skipped.length || plan.operations.length !== wanted.size) {

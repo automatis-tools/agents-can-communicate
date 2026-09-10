@@ -108,6 +108,10 @@ export function planInstallation({ adapters, detected, context, action = "instal
     const liveDeliverySupported = native?.state === "eligible"
       && native.activationPlan?.eligible === true;
     const effectiveLivePolicy = liveDeliverySupported ? delivery : "off";
+    const previous = recordedById.get(entry.adapterId)?.nativeActivation ?? null;
+    const retainedActivation = action === "install" && delivery !== "off"
+      && !liveDeliverySupported && previous?.livePolicy === delivery ? previous : null;
+    const configuredLivePolicy = retainedActivation ? delivery : effectiveLivePolicy;
     const deliveryDiagnostic = action === "install" && delivery !== "off"
       && !liveDeliverySupported
       ? entry.deliveryDiagnostic ?? adapter.deliveryFallback?.diagnostic
@@ -117,20 +121,21 @@ export function planInstallation({ adapters, detected, context, action = "instal
     const deliverySummary = action === "install"
       ? describeInstallDelivery(entry, delivery, effectiveLivePolicy) : null;
     const installContext = { ...context, requestedLivePolicy: delivery,
-      livePolicy: effectiveLivePolicy, clientVersion: entry.version, platform: entry.platform };
+      livePolicy: configuredLivePolicy, clientVersion: entry.version, platform: entry.platform };
     const setupNotes = action === "install" && delivery !== "off"
       ? [entry.outgoingDelivery?.setup, entry.nativeSetup].filter(note => typeof note === "string") : [];
     // A consented activation that this run keeps, activates, or takes back.
     // Only an explicit off or an uninstall removes one; an absent record never
     // creates one.
-    const previous = recordedById.get(entry.adapterId)?.nativeActivation ?? null;
     const nativeActivation = action === "install" && effectiveLivePolicy !== "off"
       ? { livePolicy: effectiveLivePolicy, protocolContract: native.eligibility.protocolContract,
         shell: context?.shell ?? null, rcFile: rcFileFor(context?.home, context?.shell),
         shimDir: typeof context?.stateRoot === "string" ? shimDirFor(context.stateRoot) : null,
         mechanisms: native.activationPlan.mechanisms }
       : null;
-    const retirements = planActivationRetirements({ previous, desired: nativeActivation });
+    // A failed readiness probe is not revocation. Keep existing guarded launch
+    // setup without applying service commands or claiming it is available.
+    const retirements = retainedActivation ? [] : planActivationRetirements({ previous, desired: nativeActivation });
     const deactivation = retirements.length > 0 ? { ...previous, mechanisms: retirements } : null;
     const artifacts = (record?.artifacts ?? adapter.planInstall(installContext))
       .map(artifact => ({ path: artifact.path, kind: artifact.kind ?? "file" }))
@@ -149,6 +154,7 @@ export function planInstallation({ adapters, detected, context, action = "instal
       alreadyInstalled: entry.installed === true,
       livePolicy: delivery,
       effectiveLivePolicy,
+      ...(retainedActivation ? { configuredLivePolicy, retainedNativeActivation: retainedActivation } : {}),
       ...(deliveryDiagnostic === null ? {} : { deliveryDiagnostic }),
       ...(deliverySummary === null ? {} : { deliverySummary }),
       ...(setupNotes.length ? { setupNotes } : {}),
@@ -161,6 +167,7 @@ export function planInstallation({ adapters, detected, context, action = "instal
         ...(entry.present ? [] : [`${adapter.displayName ?? adapter.id} is no longer on `
           + "this machine; removing what ACC recorded writing"]),
         ...(deliverySummary === null ? [] : [deliverySummary]),
+        ...(retainedActivation ? ["keep existing native delivery setup; current readiness is unverified"] : []),
         ...setupNotes,
         ...artifacts.filter(a => a.kind === "tree")
           .map(a => `${action === "install" ? "create" : "remove"} ${a.path}`),
