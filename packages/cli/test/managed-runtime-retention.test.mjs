@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdir, mkdtemp, readFile, readdir, realpath, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, readdir, realpath, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -8,7 +8,8 @@ import { activatePending, reclaimGenerations } from "../src/managed-runtime/acti
 import { stageOwnGeneration } from "../src/managed-runtime/generation.mjs";
 import { stageNewerManagementRuntime } from "../src/managed-runtime/management-recovery.mjs";
 import { writePin } from "../src/managed-runtime/pins.mjs";
-import { holdStagedGeneration, reapStagingHolds, releaseStagingHold } from "../src/managed-runtime/staging.mjs";
+import { attachStagingTemp, holdStagedGeneration, reapStagingHolds, releaseStagingHold }
+  from "../src/managed-runtime/staging.mjs";
 import { readControl, writeControl, writeManagedJson } from "../src/managed-runtime/state.mjs";
 
 // Every scenario below runs against a real, written control.json: an absent
@@ -327,65 +328,46 @@ test("a live staging temp survives both reclaim and reap", async () => {
   assert.equal(JSON.parse(await readFile(hold, "utf8")).stagingRoot, stagingTemp);
 });
 
-// Finding 1 (round 2): reclaimGenerations used to read every holder before
-// taking its own snapshot of `generations/`. A staging hold that lands after
-// the holder reads, whose rename lands before the final directory listing,
-// was still deleted. The primary proof this cannot happen is structural and
-// fully deterministic: the deletion loop must iterate the SAME snapshot that
-// was captured before any holder was read, and that snapshot must be taken
-// exactly once. (A runtime call-order assertion via mocking readdir was
-// tried first and does not work here: node:fs/promises's named exports are
-// non-configurable, so node:test's mock.method refuses to redefine `readdir`
-// - confirmed empirically, "Cannot redefine property: readdir" - and
-// mock.module cannot retroactively rebind a consumer, like activation.mjs,
-// that already resolved its own `readdir` binding via a static import before
-// any test body runs. Reading the source is the deterministic alternative
-// that remains available without adding a test-only injection seam to
-// shipped code.)
-test("reclaimGenerations captures generations before any holder is read, exactly once (structural, deterministic)", async () => {
-  const source = await readFile(new URL("../src/managed-runtime/activation.mjs", import.meta.url), "utf8");
-  const start = source.indexOf("export async function reclaimGenerations");
-  assert.ok(start >= 0, "reclaimGenerations must still be exported from activation.mjs");
-  // Brace-matched to the actual function body, not a "next export" heuristic
-  // - robust to whatever helper functions surround reclaimGenerations in the
-  // file. Parens are counted first to skip past the destructured parameter
-  // list's own `{ ... }` (and its `= {}` default) before brace-matching the
-  // body itself.
-  let parenDepth = 0, bodyOpen = source.indexOf("(", start);
-  for (; bodyOpen < source.length; bodyOpen++) {
-    if (source[bodyOpen] === "(") parenDepth++;
-    else if (source[bodyOpen] === ")" && --parenDepth === 0) { bodyOpen++; break; }
-  }
-  let braceDepth = 0, end = source.indexOf("{", bodyOpen);
-  for (; end < source.length; end++) {
-    if (source[end] === "{") braceDepth++;
-    else if (source[end] === "}" && --braceDepth === 0) { end++; break; }
-  }
-  const body = source.slice(start, end);
-  const generationsRead = body.indexOf("readdir(generations,");
-  const pinsRead = body.indexOf("readdir(pins)");
-  const stagingRead = body.indexOf("readdir(staging)");
-  assert.ok(generationsRead >= 0, "reclaimGenerations must read the generations directory");
-  assert.ok(pinsRead >= 0, "reclaimGenerations must read the pins directory");
-  assert.ok(stagingRead >= 0, "reclaimGenerations must read the staging directory");
-  assert.ok(generationsRead < pinsRead,
-    "the generations snapshot must be captured before pins are read, not after");
-  assert.ok(generationsRead < stagingRead,
-    "the generations snapshot must be captured before staging holds are read, not after");
-  // A second readdir(generations...) call - e.g. one re-added right before
-  // the deletion loop - would silently reopen the exact window this pins,
-  // even with the first one still present earlier in the function.
-  assert.equal(body.split("readdir(generations,").length - 1, 1,
-    "reclaimGenerations must read the generations directory exactly once");
+test("attachStagingTemp records the temp path onto a live hold", async () => {
+  const root = await mkdtemp(path.join(tmpdir(), "acc-retain-attach-live-"));
+  const hold = await holdStagedGeneration({ root, generationRoot: path.join(root, "generations", "0.4.9-x"),
+    pid: process.pid });
+  const stagingTemp = path.join(root, "generations", ".staging-abc");
+  await attachStagingTemp(hold, stagingTemp);
+  assert.equal(JSON.parse(await readFile(hold, "utf8")).stagingRoot, stagingTemp);
 });
 
-// Kept alongside the deterministic test above because it proves something
-// the structural check cannot: that the snapshot is actually used correctly
-// to protect a real, concurrently-created generation, not just read in the
-// right position. Trimmed from round 3's 70 trials to 30 (roughly 12s here,
-// matching review guidance) now that the structural test carries the primary
-// burden of proof; 30 trials at the same measured ~14% per-trial failure
-// rate against the reverted order still gives better than 99% detection.
+// Round 4 (must fix 1): attachStagingTemp used to do an unguarded
+// read-modify-write. If the hold vanished between holdStagedGeneration
+// returning it and this call (readManagedJson returns undefined on ENOENT,
+// not a throw), `{ ...undefined, stagingRoot }` wrote `{ stagingRoot }`
+// alone - no schemaVersion, no generationRoot, no pid - which
+// reclaimGenerations reads as a malformed hold forever and reapStagingHolds
+// can never reap (no valid pid to confirm dead). No concurrent window needs
+// manufacturing to prove the guard: attachStagingTemp takes the file path
+// directly, so removing it first reproduces the exact precondition.
+test("attachStagingTemp does nothing when the hold it would attach to is already gone", async () => {
+  const root = await mkdtemp(path.join(tmpdir(), "acc-retain-attach-gone-"));
+  const hold = await holdStagedGeneration({ root, generationRoot: path.join(root, "generations", "0.4.9-y"),
+    pid: process.pid });
+  await rm(hold, { force: true });
+  await attachStagingTemp(hold, path.join(root, "generations", ".staging-def"));
+  assert.deepEqual(await readdir(path.join(root, "staging")), []);
+});
+
+// A structural, source-text version of this test (comparing the index of
+// the literal string "readdir(generations," against the reads of pins and
+// staging) was tried in round 4 and removed in round 5: it does not pin the
+// property it claims to. Reintroducing the exact reordering defect but
+// spelling the reread as `readdir(path.join(root, "generations"), { ... })`
+// instead of via the `generations` variable left the structural test
+// passing - it only ever compared literal substrings, so a cosmetically
+// different spelling of the identical bug was invisible to it - while this
+// sampled test still caught the real, running defect. A test that a
+// same-behavior rewording defeats is not proof of the invariant; only the
+// test below, which drives the actual function against real concurrent
+// writes, is. See the task report for the full account of why the
+// deterministic route was tried and abandoned.
 // This drives the real writer sequence (hold, then rename) concurrently with
 // the real reclaimGenerations, jittering both sides across many trials so
 // the two race genuinely rather than deterministically taking turns.
@@ -397,12 +379,21 @@ test("reclaimGenerations captures generations before any holder is read, exactly
 // is under a millisecond on an otherwise-empty root. A batch of harmless
 // decoy staging holds - each one real work for the staging-holds read to
 // process - widens that gap to several milliseconds, and jittering the
-// writer's start across that same span reliably lands the race: 10 of 70
-// trials deleted the racing generation against the reverted order in round
-// 3's measurement (see the task report for the exact numbers from both
-// sides).
+// writer's start across that same span reliably lands the race.
+//
+// The per-trial failure rate against the reverted order has been measured
+// three times, at three different trial counts, and disagreed each time:
+// 16/60 (~27%), 10/70 (~14%), and most recently a dedicated 200-trial
+// calibration run gave 6/200 (~3%) - the true rate is evidently low enough,
+// and noisy enough at small sample sizes, that a trial count picked to be
+// "comfortably high" against a 14% assumption (round 3's 70) is not safe:
+// at the measured 3% rate, 70 trials only detects the defect ~88% of the
+// time. TRIALS is set from that 200-trial measurement directly, not from an
+// earlier, noisier one: at p=3%, 200 trials detects ~99.75% of the time
+// (1 - 0.97^200); this file's own run below is additional, independent
+// evidence on top of that calibration run, not a replacement for it.
 test("a staging hold racing reclaim never loses, across many jittered interleavings", async () => {
-  const TRIALS = 30;
+  const TRIALS = 200;
   const DECOYS = 40;
   const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
   for (let trial = 0; trial < TRIALS; trial++) {
