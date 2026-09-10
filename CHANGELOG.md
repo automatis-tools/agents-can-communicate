@@ -26,8 +26,9 @@ The exact archive passed installed-package verification and an isolated upgrade 
 published 0.4.2 with 0.4.3 already pending. One real-terminal confirmation completed
 private Codex daemon maintenance after the requesting command exited. All 269 archive
 files matched the activated runtime. See [candidate evidence](docs/release-evidence/v0.4.4.md)
-for failure checks and limits. The full suite runs after this evidence commit through
-the mandatory pre-push gate. This candidate has not been tagged or published.
+for failure checks and limits. The final full suite passed with 2,017 passes, zero
+failures and one environment-dependent skip. The mandatory pre-push gate repeats
+release checks. This candidate has not been tagged or published.
 
 ## 0.4.3 — release candidate
 

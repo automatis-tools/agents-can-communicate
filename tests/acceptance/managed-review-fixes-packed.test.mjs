@@ -153,7 +153,12 @@ test("packed manual update explains a failed integration and repairs forward aft
   const partial = await stateOf(f);
   assert.equal(partial.phase, "activating");
   assert.deepEqual(partial.active, before.active);
-  assert.equal((await f.accError(["doctor"])).code, 4);
+  const diagnosis = await f.acc(["doctor"]);
+  assert.equal(diagnosis.scope, "update");
+  assert.equal(diagnosis.workspaceInspection, "unavailable_during_update");
+  assert.equal(diagnosis.update.phase, "activating");
+  assert.match(diagnosis.update.notice, /incomplete.*acc update/);
+  assert.equal((await f.accError(["doctor", "--repair"])).code, 4);
   await writeFile(settings, original);
   const fixed = await f.acc(["update"], { ACC_NO_UPDATE_CHECK: "1" });
   assert.equal(fixed.activated, true);
