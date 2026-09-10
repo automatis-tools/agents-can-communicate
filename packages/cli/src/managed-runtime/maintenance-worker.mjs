@@ -71,7 +71,15 @@ export async function runMaintenance(root, { jobId, env = process.env, adapters 
         result = await withManagerLock(`${root}/worker`, async () => {
           const beforeActivation = async current => {
             if (maintenanceRecipe(current) !== job.recipe) throw refused("update_state_changed");
-            const blockers = await listActivationBlockers(root, { pidIsAlive });
+            // Same fallback as maintenance.mjs's own target: judge other
+            // holds against the pending generation's contract when one is
+            // being activated, otherwise against the generation already
+            // running, since there is no incoming generation to compare to.
+            // Pick the whole generation record, not a per-field fallback, so
+            // a pending generation declaring no contract of its own is
+            // judged as "none" rather than silently borrowing active's.
+            const blockers = await listActivationBlockers(root, { pidIsAlive,
+              incomingStoreVersion: (current.pending ?? current.active).storeVersion });
             const others = blockers.filter(b => b.pid !== expected.pid || b.kinds.some(kind => kind !== "native"));
             if (others.length) throw deferred({ reason: "other_processes", processes: others.length });
             const snapshot = await adapter.inspectMaintenance(context);
