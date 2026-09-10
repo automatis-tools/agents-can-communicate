@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { mkdtemp, mkdir, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -50,18 +50,29 @@ test("no pin falls back to the active generation", async () => {
 // sides of a test can never exercise that gap - both derivations have to be
 // built independently, the way production actually builds them, for a
 // symlinked data home to matter.
+//
+// The symlink has to be the test's own, not borrowed from the host: relying
+// on `/tmp` itself being a symlink (true on macOS via /private/tmp, false on
+// a plain Linux /tmp) makes the fixture's self-check a fact about the CI
+// runner rather than about the code, and fails on Linux for a reason that
+// has nothing to do with the fix. A real directory plus a symlink this test
+// creates and uses as the data home makes the divergence exist everywhere.
 test("a pin written under the runner's raw data-home root is found by the hook's canonicalised root", async () => {
-  const dataHome = await mkdtemp(path.join(tmpdir(), "acc-datahome-"));
+  const container = await mkdtemp(path.join(tmpdir(), "acc-datahome-"));
+  const base = path.join(container, "real");
+  const dataHome = path.join(container, "link");
+  await mkdir(base, { recursive: true });
+  await symlink(base, dataHome);
+
   // Mirrors packages/hook-runner/src/runner.mjs's managerRootFor: a plain
-  // join off the data home, never realpath'd.
+  // join off the data home, never realpath'd - built through the symlink.
   const writeRoot = path.join(dataHome, "acc", "runtime");
   // Mirrors managed-runtime/entry.mjs: every hook is handed a canonicalised
   // manager root.
   const readRoot = await canonicalManagerRoot(path.join(dataHome, "acc", "runtime"));
-  // This assertion is the fixture's own self-check: on a host where `tmpdir()`
-  // does not involve a symlink, this test would pass by accident and prove
-  // nothing. On macOS /tmp -> /private/tmp makes the two roots genuinely
-  // different strings for the exact same directory.
+  // This assertion is the fixture's own self-check: it fails only if the
+  // symlink above stopped mattering, never because of what the host's own
+  // tmp directory happens to be.
   assert.notEqual(writeRoot, readRoot);
 
   const pinned = path.join(writeRoot, "generations", "0.4.2-abc");
