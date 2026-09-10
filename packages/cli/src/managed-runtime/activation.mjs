@@ -163,11 +163,23 @@ export async function reclaimGenerations({ root, active = null, pidIsAlive = def
     // (or a control pointer) that lands later either names a directory this
     // snapshot never saw - so it was never a deletion candidate regardless -
     // or was already durable before this snapshot was taken, which, since
-    // every writer here writes its hold before the rename that creates the
-    // directory, guarantees it is already visible to every holder read
+    // every writer here writes its hold before the rename that *creates*
+    // the directory, guarantees it is already visible to every holder read
     // below. Reading candidates last is exactly the window that left a
     // staged-but-unpublished generation deletable; reading them first closes
     // it for good, not just for the writer order this codebase happens to use.
+    //
+    // That guarantee is specifically about a directory the rename path
+    // creates. stageOwnGeneration's fast path (existingMatches) instead
+    // *adopts* a directory that already existed - from an earlier run,
+    // possibly one whose own hold is long gone - and only then writes this
+    // attempt's own hold for it. Such a directory can already be in this
+    // snapshot with no hold covering it yet, so a reclaim pass whose staging
+    // read happens to run before that adopting hold lands can still remove
+    // it. This is bounded, not open-ended: it can only affect a generation
+    // that is at that moment unreferenced by control, lease, and pin alike -
+    // the same shape as any other orphan - and it predates this reordering
+    // fix rather than being introduced by it.
     const candidates = await readdir(generations, { withFileTypes: true });
     const control = await readControl(root);
     // No control at all is exactly as unknown as a corrupt one - which

@@ -6,9 +6,10 @@ import test from "node:test";
 
 import { activatePending, reclaimGenerations } from "../src/managed-runtime/activation.mjs";
 import { stageOwnGeneration } from "../src/managed-runtime/generation.mjs";
+import { stageNewerManagementRuntime } from "../src/managed-runtime/management-recovery.mjs";
 import { writePin } from "../src/managed-runtime/pins.mjs";
 import { holdStagedGeneration, reapStagingHolds, releaseStagingHold } from "../src/managed-runtime/staging.mjs";
-import { writeControl, writeManagedJson } from "../src/managed-runtime/state.mjs";
+import { readControl, writeControl, writeManagedJson } from "../src/managed-runtime/state.mjs";
 
 // Every scenario below runs against a real, written control.json: an absent
 // one now postpones the whole pass (Finding 4), so a test that wants to
@@ -232,6 +233,39 @@ test("a generation staged but not yet published is not deleted out from under th
   assert.deepEqual(after.removed, [path.basename(staged.root)]);
 });
 
+// Round 3 added explicit release wiring at every real staging call site
+// (installManaged, stageNewerManagementRuntime, downloadRelease/worker.mjs),
+// but nothing exercised any of them: a caller silently forgetting to
+// release would pass every other test in this file. This drives a real
+// production call site - stageNewerManagementRuntime, the simplest of the
+// four (no scheduleWorker, no apply callback) - through an actual staging,
+// verification (a real spawned subprocess, matching verifyGeneration's own
+// contract), and publish, and asserts the hold is gone afterward.
+test("stageNewerManagementRuntime releases its staging hold once the attempt resolves", async () => {
+  const root = await mkdtemp(path.join(tmpdir(), "acc-retain-recovery-release-"));
+  const managerRoot = path.join(root, "manager");
+  const packageRoot = path.join(root, "source");
+  await mkdir(path.join(packageRoot, "bin"), { recursive: true });
+  const activeRoot = path.join(managerRoot, "generations", "0.4.0-active");
+  await mkdir(activeRoot, { recursive: true });
+  await writeControl(managerRoot, { schemaVersion: 1, active: { version: "0.4.0", root: activeRoot },
+    pending: null, phase: "ready", auto: true, pin: null, checkedAt: null, home: root,
+    targets: [], notice: null });
+  const manifest = { name: "agents-can-communicate", version: "0.4.8", files: ["bin/"],
+    bundleDependencies: [], accManagedUpdateProtocol: 2 };
+  await writeFile(path.join(packageRoot, "package.json"), JSON.stringify(manifest));
+  // A real subprocess verifyGeneration actually spawns and checks the
+  // output of, not a mock: `acc <root>/bin/acc.mjs version --json`.
+  await writeFile(path.join(packageRoot, "bin", "acc.mjs"),
+    "if (process.argv[2] === 'version' && process.argv[3] === '--json') "
+    + "console.log(JSON.stringify({ data: { version: '0.4.8' } }));\n");
+  const staged = await stageNewerManagementRuntime(managerRoot, { packageRoot, env: {} });
+  assert.equal(staged, true);
+  assert.equal((await readControl(managerRoot)).pending.version, "0.4.8");
+  const stagingDir = path.join(managerRoot, "staging");
+  assert.deepEqual(await readdir(stagingDir).catch(() => []), []);
+});
+
 test("stageOwnGeneration's fast path (already matching, no rename) still returns a hold that protects the generation", async () => {
   const root = await mkdtemp(path.join(tmpdir(), "acc-retain-faststage-"));
   const managerRoot = path.join(root, "manager");
@@ -296,25 +330,79 @@ test("a live staging temp survives both reclaim and reap", async () => {
 // Finding 1 (round 2): reclaimGenerations used to read every holder before
 // taking its own snapshot of `generations/`. A staging hold that lands after
 // the holder reads, whose rename lands before the final directory listing,
-// was still deleted - the reviewer's own reproduction found this in 127 of
-// 801 sampled interleavings against the fixed-but-still-misordered code.
+// was still deleted. The primary proof this cannot happen is structural and
+// fully deterministic: the deletion loop must iterate the SAME snapshot that
+// was captured before any holder was read, and that snapshot must be taken
+// exactly once. (A runtime call-order assertion via mocking readdir was
+// tried first and does not work here: node:fs/promises's named exports are
+// non-configurable, so node:test's mock.method refuses to redefine `readdir`
+// - confirmed empirically, "Cannot redefine property: readdir" - and
+// mock.module cannot retroactively rebind a consumer, like activation.mjs,
+// that already resolved its own `readdir` binding via a static import before
+// any test body runs. Reading the source is the deterministic alternative
+// that remains available without adding a test-only injection seam to
+// shipped code.)
+test("reclaimGenerations captures generations before any holder is read, exactly once (structural, deterministic)", async () => {
+  const source = await readFile(new URL("../src/managed-runtime/activation.mjs", import.meta.url), "utf8");
+  const start = source.indexOf("export async function reclaimGenerations");
+  assert.ok(start >= 0, "reclaimGenerations must still be exported from activation.mjs");
+  // Brace-matched to the actual function body, not a "next export" heuristic
+  // - robust to whatever helper functions surround reclaimGenerations in the
+  // file. Parens are counted first to skip past the destructured parameter
+  // list's own `{ ... }` (and its `= {}` default) before brace-matching the
+  // body itself.
+  let parenDepth = 0, bodyOpen = source.indexOf("(", start);
+  for (; bodyOpen < source.length; bodyOpen++) {
+    if (source[bodyOpen] === "(") parenDepth++;
+    else if (source[bodyOpen] === ")" && --parenDepth === 0) { bodyOpen++; break; }
+  }
+  let braceDepth = 0, end = source.indexOf("{", bodyOpen);
+  for (; end < source.length; end++) {
+    if (source[end] === "{") braceDepth++;
+    else if (source[end] === "}" && --braceDepth === 0) { end++; break; }
+  }
+  const body = source.slice(start, end);
+  const generationsRead = body.indexOf("readdir(generations,");
+  const pinsRead = body.indexOf("readdir(pins)");
+  const stagingRead = body.indexOf("readdir(staging)");
+  assert.ok(generationsRead >= 0, "reclaimGenerations must read the generations directory");
+  assert.ok(pinsRead >= 0, "reclaimGenerations must read the pins directory");
+  assert.ok(stagingRead >= 0, "reclaimGenerations must read the staging directory");
+  assert.ok(generationsRead < pinsRead,
+    "the generations snapshot must be captured before pins are read, not after");
+  assert.ok(generationsRead < stagingRead,
+    "the generations snapshot must be captured before staging holds are read, not after");
+  // A second readdir(generations...) call - e.g. one re-added right before
+  // the deletion loop - would silently reopen the exact window this pins,
+  // even with the first one still present earlier in the function.
+  assert.equal(body.split("readdir(generations,").length - 1, 1,
+    "reclaimGenerations must read the generations directory exactly once");
+});
+
+// Kept alongside the deterministic test above because it proves something
+// the structural check cannot: that the snapshot is actually used correctly
+// to protect a real, concurrently-created generation, not just read in the
+// right position. Trimmed from round 3's 70 trials to 30 (roughly 12s here,
+// matching review guidance) now that the structural test carries the primary
+// burden of proof; 30 trials at the same measured ~14% per-trial failure
+// rate against the reverted order still gives better than 99% detection.
 // This drives the real writer sequence (hold, then rename) concurrently with
 // the real reclaimGenerations, jittering both sides across many trials so
 // the two race genuinely rather than deterministically taking turns.
-// This construction was tuned empirically against a temporarily reverted
-// copy of reclaimGenerations (candidates read moved back to the end): with
-// no decoys and small jitter it essentially never landed the race, because
-// withManagerLock's own acquisition (mkdir/write/sync/rename/sync/compact)
-// dominates the wall-clock time and the gap between "holders read" and
-// "candidates read" is under a millisecond on an otherwise-empty root. A
-// batch of harmless decoy staging holds - each one real work for the
-// staging-holds read to process - widens that gap to several milliseconds,
-// and jittering the writer's start across that same span reliably lands the
-// race: 10 of 70 trials deleted the racing generation against the reverted
-// order (documented, not re-verified on every run - see the task report for
-// the exact numbers from both sides).
+// Tuned empirically against a temporarily reverted copy of reclaimGenerations
+// (candidates read moved back to the end): with no decoys and small jitter
+// it essentially never landed the race, because withManagerLock's own
+// acquisition (mkdir/write/sync/rename/sync/compact) dominates the
+// wall-clock time and the gap between "holders read" and "candidates read"
+// is under a millisecond on an otherwise-empty root. A batch of harmless
+// decoy staging holds - each one real work for the staging-holds read to
+// process - widens that gap to several milliseconds, and jittering the
+// writer's start across that same span reliably lands the race: 10 of 70
+// trials deleted the racing generation against the reverted order in round
+// 3's measurement (see the task report for the exact numbers from both
+// sides).
 test("a staging hold racing reclaim never loses, across many jittered interleavings", async () => {
-  const TRIALS = 70;
+  const TRIALS = 30;
   const DECOYS = 40;
   const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
   for (let trial = 0; trial < TRIALS; trial++) {

@@ -31,9 +31,19 @@ export async function holdStagedGeneration({ root, generationRoot, stagingRoot =
 /** Once mkdtemp names the actual in-flight temp, attach it to the same
  * record a live hold already protects: a dead owner's abandoned temp is
  * only ever found by way of this link, since reclaim never otherwise looks
- * at a dot-prefixed generations entry. */
+ * at a dot-prefixed generations entry.
+ *
+ * If the hold has already vanished (readManagedJson returns undefined on
+ * ENOENT), do nothing rather than write `{ stagingRoot }` alone: spreading
+ * an `undefined` record silently produces exactly the schemaVersion-less,
+ * generationRoot-less, pid-less fragment reclaimGenerations reads as a
+ * malformed hold - and reapStagingHolds can never reap it either, since it
+ * has no valid pid to confirm dead. Manufacturing that record would be a
+ * self-inflicted, permanent block on reclamation, not a corruption that
+ * needed an external cause. */
 export async function attachStagingTemp(file, stagingRoot) {
   const record = await readManagedJson(file);
+  if (record === undefined) return;
   await writeManagedJson(file, { ...record, stagingRoot });
 }
 
