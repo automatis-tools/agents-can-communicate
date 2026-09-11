@@ -75,8 +75,17 @@ export async function establishNativeBinding({ adapter, event, hookBinding, clie
     if (!(lease > now)) return outcome("degraded", "handshake_failed");
     const ceiling = now + 2 * heartbeatCadenceMs;
     const leaseUntil = lease > ceiling ? new Date(ceiling).toISOString() : verdict.leaseUntil;
+    // The binding's clientVersion is the version this binding's live pushes
+    // will be served by, as the handshake reported it and the contract
+    // admitted it - not the version `--version` printed. The two differ
+    // whenever a client's background service has updated under its CLI, and
+    // that is the case native delivery exists to survive. Publishing the
+    // detected CLI version instead made the binding disagree with the
+    // adapter's own endpoint record, which since 0.5.0 carries the serving
+    // version, and every send fell back to durable. The detected CLI version
+    // is not lost: the session-owner record beside this one still carries it.
     await service.publishDeliveryBinding({
-      sessionId, generation, adapterId: adapter.id, clientVersion,
+      sessionId, generation, adapterId: adapter.id, clientVersion: verdict.clientVersion,
       availableModes: [...verdict.modes], livePolicy: policy,
       opaqueEndpointRef: verdict.opaqueEndpointRef, leaseUntil,
     });

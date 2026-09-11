@@ -68,6 +68,35 @@ test("bind persists and returns the daemon's served version, not the caller's st
     assert.equal(endpoint.clientVersion, "0.154.0");
   });
 
+test("the endpoint reference alone resolves the receiver; a stored version never gates it",
+  async t => {
+    const h = await nativeFixture(t);
+    const handshake = await native.bindNativeSession(h);
+    assert.equal(handshake.supported, true);
+    // A binding that names this exact endpoint but records a different
+    // version. That is what a binding published by an older generation looks
+    // like during an in-place update, when the hook code still running in one
+    // session records the detected CLI while this adapter records what the
+    // daemon serves. The endpoint id settles identity; the live check settles
+    // compatibility. A stored snapshot decides neither, and refusing on it
+    // was what turned every send in exactly that case into a durable
+    // fallback.
+    const stale = { opaqueEndpointRef: handshake.opaqueEndpointRef, clientVersion: "0.154.0" };
+    const offer = await native.offerMessage({ ...h, binding: stale, message });
+    assert.equal(offer.accepted, true);
+    assert.equal(offer.clientVersion, "0.152.1", "the version that answered decides, and is reported");
+    assert.equal(h.state.queue.length, 1);
+    // Refusal still comes from the live rule: a daemon below the captured
+    // minimum is refused no matter what either record remembers.
+    h.state.version = "0.151.0";
+    const refused = await native.offerMessage({ ...h,
+      binding: { ...stale, clientVersion: "0.151.0" },
+      message: { ...message, messageId: "message_2" } });
+    assert.equal(refused.accepted, false);
+    assert.equal(refused.safeErrorCode, "unsupported_client_version");
+    assert.equal(h.state.queue.length, 1);
+  });
+
 test("sender environment cannot replace the bound receiver socket or thread", async t => {
   const h = await nativeFixture(t);
   const handshake = await native.bindNativeSession(h);

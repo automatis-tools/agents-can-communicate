@@ -74,8 +74,15 @@ export async function verifyReceiver(peer, endpoint, { probe = probeCodexQueue,
   locate = locateCodexThread } = {}) {
   const result = await probe(peer, { threadId: endpoint.threadId });
   if (!result.supported) {
-    return { reasonCode: result.reasonCode === "probe_timeout" ? "handshake_timeout" : "protocol_mismatch",
-      servingVersion: null };
+    // probeCodexQueue applies the same floor and answers first, so a daemon
+    // serving below the minimum arrives here as a refused probe rather than
+    // reaching the explicit check below. Reporting that as a protocol
+    // mismatch named the wrong condition everywhere it surfaced - doctor,
+    // the offer's safe error code, the recorded failure - and left the
+    // version answer this function already knows how to give unreachable.
+    return { reasonCode: result.reasonCode === "probe_timeout" ? "handshake_timeout"
+      : result.reasonCode === "below_minimum_version" ? "handshake_version_mismatch"
+        : "protocol_mismatch", servingVersion: null };
   }
   if (compareStableVersions(result.serverVersion, CODEX_QUEUE_MINIMUM) < 0) {
     return { reasonCode: "handshake_version_mismatch", servingVersion: null };
@@ -117,10 +124,26 @@ export async function bindNativeSession({ event, clientPid, clientVersion, runti
   }
 }
 
+// Resolving the binding's opaque reference is the whole of the identity check:
+// the endpoint id is 128 random bits minted per bind, readNativeEndpoint
+// re-checks that the record it read carries that exact id, and no two bindings
+// can name the same record.
+//
+// The two records' clientVersion snapshots used to be compared here as well.
+// That was never identity - the id already settles that - it was a third
+// version rule, and the only one applied to a stored snapshot rather than to
+// the process now answering. It is deliberately gone. It cannot refuse
+// anything verifyReceiver does not refuse better two lines on, against the
+// version that actually answers, with the thread and cwd, before anything is
+// queued; and against the snapshot it could only ever be vacuous, because a
+// record is written solely from a serving version that already cleared
+// CODEX_QUEUE_MINIMUM. What it did do was fire on the case 0.5.0 exists to
+// support: the endpoint records what the daemon serves, the binding recorded
+// what `codex --version` printed, and a daemon that had updated under its CLI
+// was refused here on that difference alone.
 async function receiverFor(binding, runtimeDir) {
   const endpoint = await readNativeEndpoint({ runtimeDir, endpointId: binding?.opaqueEndpointRef });
-  return endpoint?.clientVersion === binding?.clientVersion
-    && await socketIsReady(endpoint?.socketPath) ? endpoint : null;
+  return endpoint !== null && await socketIsReady(endpoint.socketPath) ? endpoint : null;
 }
 
 export async function refreshNativeSession({ binding, runtimeDir, timeoutMs = 750,

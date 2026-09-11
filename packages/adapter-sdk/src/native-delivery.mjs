@@ -221,6 +221,15 @@ function validateNativeHandshakeShape(handshake) {
 
 // The per-session half: the same static rule again, then the adapter's live
 // handshake facts. The launch-time executable fingerprint stays probe-only.
+//
+// An admitted verdict reports the version it admitted as `clientVersion`. That
+// is the whole point of returning it: the caller publishes a binding, and the
+// binding must record the version the admission actually rests on - the one
+// that will serve - rather than the caller's own detected-CLI claim. 0.5.0
+// judged the serving version here and left the caller publishing its claim, so
+// the two records disagreed on every machine where a daemon had updated under
+// its CLI, which is exactly the case the release exists to support. A refused
+// verdict admits nothing and carries null.
 export function validateNativeHandshake(adapter, { clientVersion, platform, handshake }) {
   // Same rationale as the probe: the handshake names the session that will
   // actually serve, so the static rule is judged against that version. Only
@@ -228,7 +237,8 @@ export function validateNativeHandshake(adapter, { clientVersion, platform, hand
   // a malformed handshake still returns a closed result rather than throwing.
   const serving = isText(handshake?.clientVersion) ? handshake.clientVersion : clientVersion;
   const rule = evaluateVersionContract(adapter, { clientVersion: serving, platform });
-  const base = { ok: false, reasonCode: null, protocolContract: rule.protocolContract, modes: [],
+  const base = { ok: false, reasonCode: null, clientVersion: null,
+    protocolContract: rule.protocolContract, modes: [],
     opaqueEndpointRef: null, leaseUntil: null };
   const closedResult = reasonCode => deepFreeze({ ...base, reasonCode });
   if (rule.reasonCode !== null) return closedResult(rule.reasonCode);
@@ -238,6 +248,9 @@ export function validateNativeHandshake(adapter, { clientVersion, platform, hand
   if (facts.protocolContract !== rule.protocolContract) return closedResult("protocol_mismatch");
   const modes = orderedModes(facts.modes);
   if (!modes.includes("livePush")) return closedResult("handshake_failed");
-  return deepFreeze({ ok: true, reasonCode: null, protocolContract: rule.protocolContract, modes,
+  // `serving` is a text version whenever the rule admitted it: every other
+  // shape leaves evaluateVersionContract at "version_unavailable" above.
+  return deepFreeze({ ok: true, reasonCode: null, clientVersion: serving,
+    protocolContract: rule.protocolContract, modes,
     opaqueEndpointRef: facts.opaqueEndpointRef, leaseUntil: facts.leaseUntil });
 }

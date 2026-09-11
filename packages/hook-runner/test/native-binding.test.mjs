@@ -168,6 +168,22 @@ test("a handshake reporting a different but eligible version activates, judged b
     assert.equal(service.calls.some(([name]) => name === "publish"), true);
   });
 
+test("the published binding carries the version that will serve, not the detected binary",
+  async () => {
+    // 2.1.258 is what `--version` printed and 2.1.259 is what answered the
+    // handshake. Both satisfy the contract, so activation says nothing about
+    // which one was recorded - only the published record does. The adapter
+    // writes its own endpoint record from the serving version, and every
+    // later read joins the two; publishing the detected version here left
+    // them naming different versions and turned every live send into a
+    // durable fallback.
+    const service = fakeService();
+    await establish(nativeAdapter(async () => ({ ...HANDSHAKE, clientVersion: "2.1.259" })),
+      service, { clientVersion: "2.1.258" });
+    const [, published] = service.calls.find(([name]) => name === "publish");
+    assert.equal(published.clientVersion, "2.1.259");
+  });
+
 test("a stale generation at publish time is reported, and the old binding is cleared", async () => {
   const service = fakeService({ publishError: new AccError(EXIT.CONFLICT, "stale") });
   const result = await establish(nativeAdapter(), service);
