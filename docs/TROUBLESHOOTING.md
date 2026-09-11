@@ -236,11 +236,15 @@ Next: [Getting started](GETTING_STARTED.md) Â· [Capabilities](CAPABILITIES.md) Â
 
 ## An automatic update is pending
 
-Run `acc doctor` to see the update policy and pending notice. ACC process leases, including
-persistent MCP servers, require confirmed process exit. Native bindings clear on observed
-SessionEnd or confirmed process death; a vendor daemon may remain alive after SessionEnd.
-Unknown PIDs remain holds until lifecycle cleanup. Close the relevant client sessions and
-ACC processes; `finish`, presence TTL, and delivery off do not prove native end.
+Run `acc doctor` to see the update policy and pending notice. A hold keeps an update
+pending only while the store contract it declares differs from the incoming version's or
+is unknown; records written before 0.5.0 declare none, so the first update after upgrading
+still waits for all of them. `acc update` names each remaining hold with its process and
+its declared contract. ACC process leases, including persistent MCP servers, end on
+confirmed process exit. Native bindings clear on observed SessionEnd or confirmed process
+death; a vendor daemon may remain alive after SessionEnd. Unknown PIDs remain holds until
+lifecycle cleanup. Close the client sessions and ACC processes the notice names;
+`finish`, presence TTL, and delivery off do not prove native end.
 `acc update` can offer a confirmed restart of an eligible Codex service. Unknown or
 unrelated holds still require lifecycle cleanup or confirmed process exit; safety holds
 do not expire merely by elapsed time. See

@@ -286,8 +286,9 @@ scheduling.
 `acc update` requests the update immediately. If a verified Codex service holds a native
 binding that blocks activation, or serves a version its captured native-delivery contract
 refuses, it asks once to restart that service.
-After confirmation, a detached worker waits for idle work and other ACC processes, refreshes
-integrations, restarts the service and verifies the result. Open clients disconnect; use
+After confirmation, a detached worker waits for idle work and for any ACC process whose
+declared store contract still holds the update, refreshes integrations, restarts the
+service and verifies the result. Open clients disconnect; use
 `acc doctor` for progress and resume the clients afterward. `--yes` supplies explicit
 noninteractive restart consent. Without consent, or with unknown ownership, the update
 remains pending. See [maintenance limits and recovery](UPGRADING.md#confirmed-client-service-maintenance). `--check` only checks and cannot be combined with

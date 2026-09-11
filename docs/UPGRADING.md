@@ -104,7 +104,10 @@ checked again at runtime. The installed CLI and managed executable must already 
 ACC does not replace vendor binaries or install an operating-system service.
 
 After confirmation, a detached ACC worker waits up to 15 minutes for idle Codex turns,
-empty queues and other ACC processes to exit. It rechecks the approved candidate, settings,
+empty queues, the requesting command to exit, and any other ACC process still holding the
+update. It judges those holds by the same contract rule the activation path uses, so a
+process declaring the incoming version's store contract does not delay the restart, and
+one declaring a differing or unknown contract does. It rechecks the approved candidate, settings,
 PID/start time, executable, socket ownership and versions before stopping the service.
 It refreshes integrations, starts the service again and verifies the result. If refreshing
 integrations fails, it still restores the service and reports the incomplete update.

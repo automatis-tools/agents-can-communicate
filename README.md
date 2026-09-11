@@ -141,8 +141,10 @@ One npm package. ACC needs no separate account, model API key, or hosted service
 ## Update or remove ACC
 
 Initial installation enables automatic updates. ACC downloads stable releases in the
-background and waits for active clients and ACC processes to exit before switching the
-runtime and refreshing integrations. When a verified Codex service needs a restart,
+background, then switches the runtime and refreshes integrations once nothing blocks. A
+live client or ACC process blocks only while the store contract it declares differs from
+the incoming version's or is unknown; one declaring a matching contract keeps running
+through the switch. When a verified Codex service needs a restart,
 `acc update` asks once, then completes maintenance in a separate process. Open clients
 disconnect; `acc doctor` reports progress and the result. See [update and recovery details](docs/UPGRADING.md#confirmed-client-service-maintenance).
 Restart or resume clients afterward and complete any requested hook or plugin trust review.

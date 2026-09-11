@@ -106,7 +106,7 @@ export async function requestMaintenance({ root, control, options, runtime, serv
     const approved = await runtime.confirm?.(`Restart ${names} to finish updating ACC? Open clients will disconnect; ACC will wait for idle turns, refresh integrations, restart the service and verify it. A turn started during the final restart check can be interrupted.`,
       { input: runtime.input, output: runtime.output });
     if (approved !== true) return { data: { reason: "maintenance_declined" },
-      text: "Client restart declined; the update remains pending until running clients exit." };
+      text: "Client restart declined; the update remains pending until the holds blocking it clear." };
   }
   return withManagerLock(root, async () => {
     const current = await readControl(root), previous = await readMaintenance(root);
