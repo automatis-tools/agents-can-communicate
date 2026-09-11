@@ -123,13 +123,20 @@ export function evaluateVersionContract(adapter, { clientVersion, platform }) {
   if (contract === undefined) {
     return { reasonCode: "native_delivery_unsupported", minimumVersion: null, protocolContract: null };
   }
-  const minimumVersion = typeof platform === "string"
-    ? (contract.minimumByPlatform[platform] ?? null) : null;
-  if (minimumVersion === null) {
-    return { reasonCode: "platform_not_captured", minimumVersion: null, protocolContract: null };
-  }
-  const anchor = contract.anchors.find(item => item.platform === platform
-    && item.version === minimumVersion);
+  const uncaptured = { reasonCode: "platform_not_captured", minimumVersion: null,
+    protocolContract: null };
+  // validateNativeDeliveryContract guarantees a minimum map and a matching
+  // anchor, but this function is also handed adapter objects that never went
+  // through it. A declaration missing either half has captured nothing for
+  // this platform, which is a closed answer - not a TypeError raised deep
+  // inside a delivery offer, far from the declaration that caused it. Every
+  // other entry point below already answers malformed input this way.
+  if (typeof platform !== "string" || !isPlainObject(contract.minimumByPlatform)) return uncaptured;
+  const minimumVersion = contract.minimumByPlatform[platform] ?? null;
+  if (minimumVersion === null) return uncaptured;
+  const anchor = (Array.isArray(contract.anchors) ? contract.anchors : [])
+    .find(item => item.platform === platform && item.version === minimumVersion);
+  if (anchor === undefined) return uncaptured;
   const facts = { minimumVersion, protocolContract: anchor.protocolContract };
   if (!isText(clientVersion)) return { ...facts, reasonCode: "version_unavailable" };
   if (parseStableVersion(clientVersion) === null) {

@@ -31,8 +31,16 @@ function certifiedAdapter(offerMessage = async ({ binding }) => ({
   };
 }
 
+// An adapter whose native-delivery declaration names no capture for the
+// platform the router judges against: the shape a partial declaration leaves
+// behind, and the only way to reach the router's uncaptured fallback.
+const uncapturedAdapter = offerMessage => {
+  const adapter = certifiedAdapter(offerMessage);
+  return { ...adapter, nativeDelivery: { policySource: "installation-record" } };
+};
+
 async function fixture({ adapter = certifiedAdapter(), secondRecipientSession = false,
-  readLivePolicy } = {}) {
+  omitPlatform = false, readLivePolicy } = {}) {
   const clock = createFakeClock(NOW);
   const ids = createFakeIds();
   const store = createMemoryStore({ clock, ids, workspaceId: WORKSPACE });
@@ -47,8 +55,8 @@ async function fixture({ adapter = certifiedAdapter(), secondRecipientSession = 
   if (secondRecipientSession) sessions.push(await service.openSession({
     workspaceId: WORKSPACE, participantId: "models", sessionId: "session_models_two",
     harness: "fixture", heartbeatCadenceMs: 30_000 }));
-  const router = createDeliveryRouter({ service,
-    adapters: { fixture_adapter: adapter }, clock, platform: PLATFORM, readLivePolicy });
+  const router = createDeliveryRouter({ service, adapters: { fixture_adapter: adapter }, clock,
+    ...(omitPlatform ? {} : { platform: PLATFORM }), readLivePolicy });
   return { adapter, clock, router, sender, service, sessions, store };
 }
 
@@ -323,6 +331,46 @@ test("an offer whose reported client version differs from the binding but still 
   assert.equal((await f.router.offer(message))[0].outcome, "offered");
   assert.equal((await receipt(f.store, message.messageId)).state, "offered");
 });
+
+// The contract is captured per platform, so a router handed no platform used
+// to judge every offer against "no capture for undefined" and refuse it. The
+// fixture minimum is captured for the host platform, which is what the default
+// resolves to. Reporting a version above the minimum but different from the
+// bound one is what separates the default from the uncaptured fallback below:
+// only a real capture admits the drift.
+test("a router given no platform judges against the captured contract for the host it runs on",
+  async () => {
+    const f = await fixture({ omitPlatform: true,
+      adapter: certifiedAdapter(async () => ({ accepted: true,
+        transport: "codex-app-server", clientVersion: "1.2.4" })) });
+    await publish(f.service, f.sessions[0]);
+    const message = await send(f.service, f.sender, "question", "default_platform");
+    assert.deepEqual(await f.router.offer(message), [{ recipientParticipantId: "models",
+      outcome: "offered", transport: "codex-app-server" }]);
+    assert.equal((await receipt(f.store, message.messageId)).state, "offered");
+  });
+
+// An adapter that captured nothing for this platform keeps the pre-contract
+// rule instead of being refused: the reported version is compared against the
+// binding's. Refusing here would let a partial declaration disable live
+// delivery for an adapter that worked before the contract gate existed.
+test("an adapter with no captured contract falls back to the version recorded on the binding",
+  async () => {
+    for (const [name, reported, expected] of [
+      ["the reported version is the bound one", "1.2.3", "offered"],
+      ["the reported version drifted from the bound one", "1.2.4", "queued"],
+    ]) {
+      const f = await fixture({ adapter: uncapturedAdapter(async () => ({ accepted: true,
+        transport: "codex-app-server", clientVersion: reported })),
+      readLivePolicy: async () => "actionable" });
+      await publish(f.service, f.sessions[0]);
+      const message = await send(f.service, f.sender, "question", `uncaptured_${reported}`);
+      const [outcome] = await f.router.offer(message);
+      assert.equal(outcome.outcome, expected, name);
+      if (expected === "queued") assert.equal(outcome.errorCode, "unsupported_client_version", name);
+      assert.equal((await receipt(f.store, message.messageId)).state, expected, name);
+    }
+  });
 
 const POLICY_MATRIX = [
   ["question", "offered", "offered"], ["request", "offered", "offered"],

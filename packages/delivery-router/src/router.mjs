@@ -21,6 +21,20 @@ const LIVE_POLICIES = new Set(["off", "actionable", "all"]);
 const permits = (policy, kind) => policy === "all"
   || (policy === "actionable" && ACTIONABLE.has(kind));
 
+// A native-delivery contract is captured per platform, and the only platform a
+// router can judge an offer against is the one it is running on - which is why
+// both entrypoints pass exactly this value. Leaving the parameter optional made
+// its absence silently disable every live offer: `undefined` reached the
+// contract check as "platform_not_captured" and the offer was refused as an
+// unsupported client version. Default it here instead, so a router that is
+// handed nothing behaves as the host it runs on. Injection stays available for
+// callers that need to judge against another platform.
+const HOST_PLATFORM = `${process.platform}-${process.arch}`;
+
+// The two reason codes that mean "there is nothing to judge this version
+// against", as opposed to a capture that judged it and refused.
+const UNCAPTURED = new Set(["native_delivery_unsupported", "platform_not_captured"]);
+
 // Compatibility was decided twice already - at bootstrap by the probe and at
 // SessionStart by the generation-bound handshake that published this binding.
 // The router validates binding identity and the adapter's answer; it does not
@@ -44,7 +58,8 @@ function safeTransport(value, opaqueEndpointRef) {
   return opaqueEndpointRef === "live-adapter" ? "native-live" : "live-adapter";
 }
 
-export function createDeliveryRouter({ service, adapters, clock, platform, readLivePolicy }) {
+export function createDeliveryRouter({ service, adapters, clock, platform = HOST_PLATFORM,
+  readLivePolicy }) {
   const registry = adaptersById(adapters);
 
   async function policyFor(adapter, binding) {
@@ -173,8 +188,20 @@ export function createDeliveryRouter({ service, adapters, clock, platform, readL
     // still satisfies the adapter's captured contract keeps offering, even
     // when it differs from the value recorded when the binding was created.
     // Only a version below the captured minimum or on the denylist refuses.
+    //
+    // An adapter that captured nothing for this platform has no contract to
+    // judge against, so it keeps the rule it had before the contract gate
+    // existed: the version that answered must be the one the binding
+    // recorded. A capture buys the newer, more permissive rule; the absence of
+    // one buys the old rule, never a refusal - a partial declaration must not
+    // silently disable live delivery. In production this is unreachable,
+    // because a native binding exists only after eligibility passed, which
+    // requires a captured minimum for this very platform.
     const versionRule = evaluateVersionContract(adapter, { clientVersion: response.clientVersion, platform });
-    if (versionRule.reasonCode !== null) {
+    const admitted = UNCAPTURED.has(versionRule.reasonCode)
+      ? response.clientVersion === binding.clientVersion
+      : versionRule.reasonCode === null;
+    if (!admitted) {
       await recordFailure(binding, message, participantId, transport,
         "unsupported_client_version");
       return durable(participantId, "unsupported_client_version");
