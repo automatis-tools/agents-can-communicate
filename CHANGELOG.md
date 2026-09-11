@@ -1,5 +1,29 @@
 # Changelog
 
+## 0.5.1 — release candidate
+
+- Codex permission ownership survives the client writing its own tables. ACC appends its
+  permission block at end of file and records the TOML table that encloses it, then tells
+  the user to trust ACC's hooks in Codex — and Codex writes each trusted hook as a new
+  `hooks.state` table above that block, changing the enclosing table. ACC read its own
+  documented setup step as a third-party edit: `acc doctor` reported working sender
+  permissions as unverified and advised a reinstall that could not repair them, and
+  `acc uninstall` would have left the block behind for manual review. The enclosing table
+  is now compared only for a block whose first declaration is a bare assignment, because
+  only such an assignment takes its meaning from the table above it; a block that opens
+  with its own header states its full path and is unaffected by what precedes it. Live
+  delivery itself was never broken by this — only the reporting and the clean removal.
+- Tests no longer leave their fixtures behind. `node:test` exposes cleanup through
+  `t.after`, which a test declared without its context cannot reach, and seven files took
+  a bare `mkdtemp` instead; the reclamation race test alone built 200 fixture trees per
+  run. A full suite left gigabytes in the system temp directory, invisible to CI because
+  its runners are discarded. Disposable roots now come from one shared helper that
+  registers their removal, and the race test clears each trial as it goes so its peak
+  usage is one fixture rather than two hundred. One further fixture escaped for a
+  different reason: its cleanup rebuilt the directory name from the prefix it asked for,
+  which never matches the random suffix `mkdtempSync` actually appends, so every run
+  removed a path that did not exist and kept the one that did.
+
 ## 0.5.0 — release candidate
 
 - Activation of a new managed runtime generation no longer waits for every live process

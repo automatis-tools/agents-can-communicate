@@ -11,6 +11,19 @@ const marker = (source, prefix) => source.startsWith(prefix) ? source.slice(pref
 // Permission selection, proxy and network grants form one ownership unit. If
 // any component changes, none can be removed independently: enabled networking
 // without its proxy has a different security meaning to Codex.
+//
+// A block records the table it was written inside, but that table only carries
+// meaning for a block whose first declaration is a bare assignment: such an
+// assignment belongs to whatever table precedes it, so a moved block would
+// silently mean something else. A block that opens with its own header states
+// its full path and is unaffected by what sits above it.
+//
+// The distinction is not theoretical. ACC appends the profile block at end of
+// file and then tells the user to trust ACC's hooks in Codex - and Codex writes
+// those trust entries as new `hooks.state` tables above the block. Comparing
+// the enclosing table unconditionally turned ACC's own documented setup step
+// into `customized`: doctor then reported working permissions as unverified,
+// install refused to repair them, and uninstall would not remove them.
 export function inspectPermissions(source) {
   const blocks = [];
   let open = null, metadata = null;
@@ -21,7 +34,8 @@ export function inspectPermissions(source) {
       if (open || !/^[a-z]+$/.test(start) || blocks.some(block => block.id === start)) {
         unsafe("duplicate or nested native permission marker");
       }
-      open = { id: start, start: entry.start, table: entry.table, contentStart: entry.end };
+      open = { id: start, start: entry.start, table: entry.table, contentStart: entry.end,
+        opens: null };
     } else if (comment.startsWith(META)) {
       if (!open || open.id !== "selection" || metadata !== null || entry.start !== open.contentStart) {
         unsafe("misplaced permission metadata");
@@ -29,6 +43,8 @@ export function inspectPermissions(source) {
       try { metadata = JSON.parse(comment.slice(META.length)); }
       catch { unsafe("invalid permission metadata"); }
       open.contentStart = entry.end;
+    } else if (open && entry.code && open.opens === null) {
+      open.opens = entry.header ? "table" : "assignment";
     } else if (end !== null) {
       if (!open || open.id !== end) unsafe("unmatched native permission marker");
       blocks.push({ ...open, end: entry.end, body: source.slice(open.contentStart, entry.start) });
@@ -45,7 +61,8 @@ export function inspectPermissions(source) {
     if (!record || Object.keys(record).sort().join() !== "before,hash,id,table"
       || typeof record.before !== "string" || record.hash !== hash(block.body, record)
       || (block.id === "selection" && block.table.length !== 0)
-      || JSON.stringify(block.table) !== JSON.stringify(record.table)) {
+      || (block.opens === "assignment"
+        && JSON.stringify(block.table) !== JSON.stringify(record.table))) {
       return { source, state: "customized" };
     }
   }

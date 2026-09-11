@@ -1,14 +1,14 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { mkdir, mkdtemp, readdir, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { mkdir, readdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import test from "node:test";
 
 import { isOwnedRuntimeRoot, retireManagedHolds } from "../src/managed-runtime/retire.mjs";
+import { fixtureRoot } from "../../../tests/helpers/temp-workspace.mjs";
 
-const layout = async () => {
-  const home = await mkdtemp(path.join(tmpdir(), "acc-retire-"));
+const layout = async t => {
+  const home = await fixtureRoot(t, "acc-retire-");
   const root = path.join(home, "runtime");
   const workspaces = path.join(home, "workspaces");
   const bindings = path.join(workspaces, "workspace_a", "bindings");
@@ -21,11 +21,10 @@ const layout = async () => {
   return { root, workspaces, bindings };
 };
 
-// Task 7 (packages/cli/src/managed-runtime/pins.mjs, exporting writePin) has not
-// landed in this worktree's base. retireManagedHolds does not import pins.mjs
-// itself, it only clears *.json files under root/pins directly, so this fixture
-// writes a pin record in exactly the shape Task 7's writePin brief specifies
-// without depending on that module.
+// retireManagedHolds never imports pins.mjs; it clears *.json under root/pins
+// directly. This fixture writes the same record shape writePin produces, so a
+// change in how pins are written cannot quietly make this test pass or fail for
+// a reason that has nothing to do with retirement.
 const writePinFixture = async ({ root, harnessSessionId, runtimeRoot, version, storeVersion,
   clientPid }) => {
   const directory = path.join(root, "pins");
@@ -36,8 +35,8 @@ const writePinFixture = async ({ root, harnessSessionId, runtimeRoot, version, s
     storeVersion, clientPid, createdAt: new Date().toISOString() }));
 };
 
-test("uninstall retires the bindings and pins this manager published", async () => {
-  const { root, workspaces, bindings } = await layout();
+test("uninstall retires the bindings and pins this manager published", async t => {
+  const { root, workspaces, bindings } = await layout(t);
   await writePinFixture({ root, harnessSessionId: "h1",
     runtimeRoot: path.join(root, "generations", "0.4.4-c"), version: "0.4.4",
     storeVersion: 6, clientPid: process.pid });
@@ -47,8 +46,8 @@ test("uninstall retires the bindings and pins this manager published", async () 
   assert.deepEqual(await readdir(path.join(root, "pins")), []);
 });
 
-test("a binding published by another manager is left alone", async () => {
-  const { root, workspaces, bindings } = await layout();
+test("a binding published by another manager is left alone", async t => {
+  const { root, workspaces, bindings } = await layout(t);
   await writeFile(path.join(bindings, "bbbb.json"), JSON.stringify({ schemaVersion: 1,
     harnessSessionId: "h2", accSessionId: "session_b", generation: "generation_b",
     clientVersion: "2.1.267", platform: "darwin-arm64", clientPid: process.pid,
@@ -57,8 +56,8 @@ test("a binding published by another manager is left alone", async () => {
   assert.deepEqual(await readdir(bindings), ["bbbb.json"]);
 });
 
-test("a binding naming a relative runtimeRoot is left alone regardless of the caller's cwd", async () => {
-  const { root, workspaces, bindings } = await layout();
+test("a binding naming a relative runtimeRoot is left alone regardless of the caller's cwd", async t => {
+  const { root, workspaces, bindings } = await layout(t);
   const owned = path.join(root, "generations", "0.4.4-c");
   // Chosen so that resolving it against process.cwd() reconstructs the exact
   // in-bounds generation path: if ownership were decided without requiring an
@@ -73,8 +72,8 @@ test("a binding naming a relative runtimeRoot is left alone regardless of the ca
   assert.deepEqual(await readdir(bindings), ["cccc.json"]);
 });
 
-test("a binding naming the generations directory itself, not a generation inside it, is left alone", async () => {
-  const { root, workspaces, bindings } = await layout();
+test("a binding naming the generations directory itself, not a generation inside it, is left alone", async t => {
+  const { root, workspaces, bindings } = await layout(t);
   await writeFile(path.join(bindings, "dddd.json"), JSON.stringify({ schemaVersion: 1,
     harnessSessionId: "h4", accSessionId: "session_d", generation: "generation_d",
     clientVersion: "2.1.267", platform: "darwin-arm64", clientPid: process.pid,

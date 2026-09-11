@@ -236,8 +236,11 @@ test("the channel refuses a capture directory it cannot trust", async () => {
   const inRepo = mkdtempSync(path.join(path.dirname(channelScript), "acc-capture-"));
   const loose = mkdtempSync(path.join(os.tmpdir(), "acc-channel-loose-"));
   chmodSync(loose, 0o755);
+  // mkdtempSync appends a random suffix, so only the value it returns names the
+  // directory that exists. Created here, with the others, so the finally below
+  // removes the real path rather than rebuilding a prefix that never existed.
+  const long = mkdtempSync(path.join(os.tmpdir(), `acc-channel-${"long-".repeat(20)}`));
   try {
-    const long = mkdtempSync(path.join(os.tmpdir(), `acc-channel-${"long-".repeat(20)}`));
     for (const [dir, pattern] of [
       [inRepo, /must be outside the repository/],
       [loose, /private user-owned directory/],
@@ -253,7 +256,7 @@ test("the channel refuses a capture directory it cannot trust", async () => {
   } finally {
     rmSync(inRepo, { recursive: true, force: true });
     rmSync(loose, { recursive: true, force: true });
-    rmSync(path.join(os.tmpdir(), `acc-channel-${"long-".repeat(20)}`), { recursive: true, force: true });
+    rmSync(long, { recursive: true, force: true });
   }
 });
 

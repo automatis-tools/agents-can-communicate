@@ -11,6 +11,7 @@ import { writePin } from "../src/managed-runtime/pins.mjs";
 import { attachStagingTemp, holdStagedGeneration, reapStagingHolds, releaseStagingHold }
   from "../src/managed-runtime/staging.mjs";
 import { readControl, writeControl, writeManagedJson } from "../src/managed-runtime/state.mjs";
+import { fixtureRoot } from "../../../tests/helpers/temp-workspace.mjs";
 
 // Every scenario below runs against a real, written control.json: an absent
 // one now postpones the whole pass (Finding 4), so a test that wants to
@@ -30,8 +31,8 @@ async function writeLease(root, name, runtimeRoot) {
     createdAt: new Date().toISOString() });
 }
 
-test("an unreferenced generation is removed and a pinned one is kept", async () => {
-  const root = await mkdtemp(path.join(tmpdir(), "acc-retain-"));
+test("an unreferenced generation is removed and a pinned one is kept", async t => {
+  const root = await fixtureRoot(t, "acc-retain-");
   for (const name of ["0.4.0-a", "0.4.2-b", "0.4.4-c"]) {
     await mkdir(path.join(root, "generations", name), { recursive: true });
   }
@@ -44,8 +45,8 @@ test("an unreferenced generation is removed and a pinned one is kept", async () 
   assert.deepEqual((await readdir(path.join(root, "generations"))).sort(), ["0.4.2-b", "0.4.4-c"]);
 });
 
-test("a generation held only by a live pin survives reclamation", async () => {
-  const root = await mkdtemp(path.join(tmpdir(), "acc-retain-livepin-"));
+test("a generation held only by a live pin survives reclamation", async t => {
+  const root = await fixtureRoot(t, "acc-retain-livepin-");
   for (const name of ["0.3.9-orphan", "0.4.0-pinned-only", "0.4.1-active"]) {
     await mkdir(path.join(root, "generations", name), { recursive: true });
   }
@@ -60,8 +61,8 @@ test("a generation held only by a live pin survives reclamation", async () => {
     ["0.4.0-pinned-only", "0.4.1-active"]);
 });
 
-test("a pin whose client is confirmed dead does not save its generation", async () => {
-  const root = await mkdtemp(path.join(tmpdir(), "acc-retain-deadpin-"));
+test("a pin whose client is confirmed dead does not save its generation", async t => {
+  const root = await fixtureRoot(t, "acc-retain-deadpin-");
   for (const name of ["0.4.0-dead-pin-only", "0.4.1-active"]) {
     await mkdir(path.join(root, "generations", name), { recursive: true });
   }
@@ -75,8 +76,8 @@ test("a pin whose client is confirmed dead does not save its generation", async 
   assert.deepEqual(await readdir(path.join(root, "generations")), ["0.4.1-active"]);
 });
 
-test("a pin that cannot be read is an unknown holder and reclaim removes nothing", async () => {
-  const root = await mkdtemp(path.join(tmpdir(), "acc-retain-badpin-"));
+test("a pin that cannot be read is an unknown holder and reclaim removes nothing", async t => {
+  const root = await fixtureRoot(t, "acc-retain-badpin-");
   await mkdir(path.join(root, "generations", "0.4.0-would-be-orphan"), { recursive: true });
   await mkdir(path.join(root, "generations", "0.4.1-active"), { recursive: true });
   await fixtureControl(root, { active: path.join(root, "generations", "0.4.1-active") });
@@ -89,8 +90,8 @@ test("a pin that cannot be read is an unknown holder and reclaim removes nothing
     ["0.4.0-would-be-orphan", "0.4.1-active"]);
 });
 
-test("an unreadable lease is an unknown holder and reclaim removes nothing", async () => {
-  const root = await mkdtemp(path.join(tmpdir(), "acc-retain-badlease-"));
+test("an unreadable lease is an unknown holder and reclaim removes nothing", async t => {
+  const root = await fixtureRoot(t, "acc-retain-badlease-");
   await mkdir(path.join(root, "generations", "0.4.0-would-be-orphan"), { recursive: true });
   await mkdir(path.join(root, "generations", "0.4.1-active"), { recursive: true });
   await fixtureControl(root, { active: path.join(root, "generations", "0.4.1-active") });
@@ -103,8 +104,8 @@ test("an unreadable lease is an unknown holder and reclaim removes nothing", asy
     ["0.4.0-would-be-orphan", "0.4.1-active"]);
 });
 
-test("control's own active and pending pointers protect their generations without an explicit active override", async () => {
-  const root = await mkdtemp(path.join(tmpdir(), "acc-retain-control-"));
+test("control's own active and pending pointers protect their generations without an explicit active override", async t => {
+  const root = await fixtureRoot(t, "acc-retain-control-");
   for (const name of ["0.3.0-orphan", "0.4.0-active-from-control", "0.4.1-pending-from-control"]) {
     await mkdir(path.join(root, "generations", name), { recursive: true });
   }
@@ -116,8 +117,8 @@ test("control's own active and pending pointers protect their generations withou
     ["0.4.0-active-from-control", "0.4.1-pending-from-control"]);
 });
 
-test("a generation held only by a live runtime lease survives reclamation", async () => {
-  const root = await mkdtemp(path.join(tmpdir(), "acc-retain-livelease-"));
+test("a generation held only by a live runtime lease survives reclamation", async t => {
+  const root = await fixtureRoot(t, "acc-retain-livelease-");
   for (const name of ["0.3.9-orphan", "0.4.0-leased-only", "0.4.1-active"]) {
     await mkdir(path.join(root, "generations", name), { recursive: true });
   }
@@ -129,8 +130,8 @@ test("a generation held only by a live runtime lease survives reclamation", asyn
     ["0.4.0-leased-only", "0.4.1-active"]);
 });
 
-test("activatePending reclaims the superseded generation once the new one is active", async () => {
-  const dataHome = await realpath(await mkdtemp(path.join(tmpdir(), "acc-retain-wiring-")));
+test("activatePending reclaims the superseded generation once the new one is active", async t => {
+  const dataHome = await realpath(await fixtureRoot(t, "acc-retain-wiring-"));
   const root = path.join(dataHome, "acc", "runtime");
   const active = { version: "0.4.0", root: path.join(root, "generations", "old-gen") };
   const pending = { version: "0.4.1", root: path.join(root, "generations", "new-gen") };
@@ -143,16 +144,16 @@ test("activatePending reclaims the superseded generation once the new one is act
   assert.deepEqual((await readdir(path.join(root, "generations"))).sort(), ["new-gen"]);
 });
 
-test("a manager root with generations but no control.json is an unknown state and reclaim removes nothing", async () => {
-  const root = await mkdtemp(path.join(tmpdir(), "acc-retain-nocontrol-"));
+test("a manager root with generations but no control.json is an unknown state and reclaim removes nothing", async t => {
+  const root = await fixtureRoot(t, "acc-retain-nocontrol-");
   await mkdir(path.join(root, "generations", "0.4.0-orphan"), { recursive: true });
   const result = await reclaimGenerations({ root, active: null, pidIsAlive: () => true });
   assert.deepEqual(result.removed, []);
   assert.deepEqual(await readdir(path.join(root, "generations")), ["0.4.0-orphan"]);
 });
 
-test("a generation held only by a live staging hold survives reclamation", async () => {
-  const root = await mkdtemp(path.join(tmpdir(), "acc-retain-staginghold-"));
+test("a generation held only by a live staging hold survives reclamation", async t => {
+  const root = await fixtureRoot(t, "acc-retain-staginghold-");
   for (const name of ["0.3.9-orphan", "0.4.5-staged-only", "0.4.0-active"]) {
     await mkdir(path.join(root, "generations", name), { recursive: true });
   }
@@ -165,8 +166,8 @@ test("a generation held only by a live staging hold survives reclamation", async
     ["0.4.0-active", "0.4.5-staged-only"]);
 });
 
-test("a staging hold whose process is confirmed dead does not save its generation", async () => {
-  const root = await mkdtemp(path.join(tmpdir(), "acc-retain-deadstaging-"));
+test("a staging hold whose process is confirmed dead does not save its generation", async t => {
+  const root = await fixtureRoot(t, "acc-retain-deadstaging-");
   for (const name of ["0.4.5-abandoned", "0.4.0-active"]) {
     await mkdir(path.join(root, "generations", name), { recursive: true });
   }
@@ -178,8 +179,8 @@ test("a staging hold whose process is confirmed dead does not save its generatio
   assert.deepEqual(await readdir(path.join(root, "generations")), ["0.4.0-active"]);
 });
 
-test("a staging hold that cannot be read is an unknown holder and reclaim removes nothing", async () => {
-  const root = await mkdtemp(path.join(tmpdir(), "acc-retain-badstaging-"));
+test("a staging hold that cannot be read is an unknown holder and reclaim removes nothing", async t => {
+  const root = await fixtureRoot(t, "acc-retain-badstaging-");
   await mkdir(path.join(root, "generations", "0.4.0-would-be-orphan"), { recursive: true });
   await mkdir(path.join(root, "generations", "0.4.1-active"), { recursive: true });
   await fixtureControl(root, { active: path.join(root, "generations", "0.4.1-active") });
@@ -192,8 +193,8 @@ test("a staging hold that cannot be read is an unknown holder and reclaim remove
     ["0.4.0-would-be-orphan", "0.4.1-active"]);
 });
 
-test("an in-flight staging temp is never touched by reclaim", async () => {
-  const root = await mkdtemp(path.join(tmpdir(), "acc-retain-stagingtemp-"));
+test("an in-flight staging temp is never touched by reclaim", async t => {
+  const root = await fixtureRoot(t, "acc-retain-stagingtemp-");
   const activeRoot = path.join(root, "generations", "0.4.0-active");
   await mkdir(activeRoot, { recursive: true });
   const stagingTemp = path.join(root, "generations", ".staging-abc123");
@@ -205,8 +206,8 @@ test("an in-flight staging temp is never touched by reclaim", async () => {
   assert.equal(await readFile(path.join(stagingTemp, "partial.txt"), "utf8"), "still being written");
 });
 
-test("a generation staged but not yet published is not deleted out from under the process staging it", async () => {
-  const root = await mkdtemp(path.join(tmpdir(), "acc-retain-realstaging-"));
+test("a generation staged but not yet published is not deleted out from under the process staging it", async t => {
+  const root = await fixtureRoot(t, "acc-retain-realstaging-");
   const managerRoot = path.join(root, "manager");
   const packageRoot = path.join(root, "source");
   await mkdir(path.join(packageRoot, "bin"), { recursive: true });
@@ -242,8 +243,8 @@ test("a generation staged but not yet published is not deleted out from under th
 // four (no scheduleWorker, no apply callback) - through an actual staging,
 // verification (a real spawned subprocess, matching verifyGeneration's own
 // contract), and publish, and asserts the hold is gone afterward.
-test("stageNewerManagementRuntime releases its staging hold once the attempt resolves", async () => {
-  const root = await mkdtemp(path.join(tmpdir(), "acc-retain-recovery-release-"));
+test("stageNewerManagementRuntime releases its staging hold once the attempt resolves", async t => {
+  const root = await fixtureRoot(t, "acc-retain-recovery-release-");
   const managerRoot = path.join(root, "manager");
   const packageRoot = path.join(root, "source");
   await mkdir(path.join(packageRoot, "bin"), { recursive: true });
@@ -267,8 +268,8 @@ test("stageNewerManagementRuntime releases its staging hold once the attempt res
   assert.deepEqual(await readdir(stagingDir).catch(() => []), []);
 });
 
-test("stageOwnGeneration's fast path (already matching, no rename) still returns a hold that protects the generation", async () => {
-  const root = await mkdtemp(path.join(tmpdir(), "acc-retain-faststage-"));
+test("stageOwnGeneration's fast path (already matching, no rename) still returns a hold that protects the generation", async t => {
+  const root = await fixtureRoot(t, "acc-retain-faststage-");
   const managerRoot = path.join(root, "manager");
   const packageRoot = path.join(root, "source");
   await mkdir(path.join(packageRoot, "bin"), { recursive: true });
@@ -292,8 +293,8 @@ test("stageOwnGeneration's fast path (already matching, no rename) still returns
   assert.equal((await readdir(path.join(managerRoot, "generations"))).includes(path.basename(second.root)), true);
 });
 
-test("an abandoned staging temp is swept once its owner is confirmed dead", async () => {
-  const root = await mkdtemp(path.join(tmpdir(), "acc-retain-abandoned-"));
+test("an abandoned staging temp is swept once its owner is confirmed dead", async t => {
+  const root = await fixtureRoot(t, "acc-retain-abandoned-");
   const activeRoot = path.join(root, "generations", "0.4.0-active");
   await mkdir(activeRoot, { recursive: true });
   await fixtureControl(root, { active: activeRoot });
@@ -311,8 +312,8 @@ test("an abandoned staging temp is swept once its owner is confirmed dead", asyn
   await assert.rejects(readFile(hold), { code: "ENOENT" });
 });
 
-test("a live staging temp survives both reclaim and reap", async () => {
-  const root = await mkdtemp(path.join(tmpdir(), "acc-retain-livetemp-"));
+test("a live staging temp survives both reclaim and reap", async t => {
+  const root = await fixtureRoot(t, "acc-retain-livetemp-");
   const activeRoot = path.join(root, "generations", "0.4.0-active");
   await mkdir(activeRoot, { recursive: true });
   await fixtureControl(root, { active: activeRoot });
@@ -328,8 +329,8 @@ test("a live staging temp survives both reclaim and reap", async () => {
   assert.equal(JSON.parse(await readFile(hold, "utf8")).stagingRoot, stagingTemp);
 });
 
-test("attachStagingTemp records the temp path onto a live hold", async () => {
-  const root = await mkdtemp(path.join(tmpdir(), "acc-retain-attach-live-"));
+test("attachStagingTemp records the temp path onto a live hold", async t => {
+  const root = await fixtureRoot(t, "acc-retain-attach-live-");
   const hold = await holdStagedGeneration({ root, generationRoot: path.join(root, "generations", "0.4.9-x"),
     pid: process.pid });
   const stagingTemp = path.join(root, "generations", ".staging-abc");
@@ -346,8 +347,8 @@ test("attachStagingTemp records the temp path onto a live hold", async () => {
 // can never reap (no valid pid to confirm dead). No concurrent window needs
 // manufacturing to prove the guard: attachStagingTemp takes the file path
 // directly, so removing it first reproduces the exact precondition.
-test("attachStagingTemp does nothing when the hold it would attach to is already gone", async () => {
-  const root = await mkdtemp(path.join(tmpdir(), "acc-retain-attach-gone-"));
+test("attachStagingTemp does nothing when the hold it would attach to is already gone", async t => {
+  const root = await fixtureRoot(t, "acc-retain-attach-gone-");
   const hold = await holdStagedGeneration({ root, generationRoot: path.join(root, "generations", "0.4.9-y"),
     pid: process.pid });
   await rm(hold, { force: true });
@@ -397,26 +398,33 @@ test("a staging hold racing reclaim never loses, across many jittered interleavi
   const DECOYS = 40;
   const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
   for (let trial = 0; trial < TRIALS; trial++) {
+    // Each trial builds 41 generations plus their holds. Deferring cleanup to
+    // the end of the test would hold all 200 trials at once, so a trial clears
+    // its own fixture and peak usage stays at one.
     const root = await mkdtemp(path.join(tmpdir(), `acc-retain-race-${trial}-`));
-    const activeRoot = path.join(root, "generations", "0.4.0-active");
-    await mkdir(activeRoot, { recursive: true });
-    await fixtureControl(root, { active: activeRoot });
-    for (let decoy = 0; decoy < DECOYS; decoy++) {
-      const decoyRoot = path.join(root, "generations", `decoy-${decoy}`);
-      await mkdir(decoyRoot, { recursive: true });
-      await holdStagedGeneration({ root, generationRoot: decoyRoot, pid: process.pid });
+    try {
+      const activeRoot = path.join(root, "generations", "0.4.0-active");
+      await mkdir(activeRoot, { recursive: true });
+      await fixtureControl(root, { active: activeRoot });
+      for (let decoy = 0; decoy < DECOYS; decoy++) {
+        const decoyRoot = path.join(root, "generations", `decoy-${decoy}`);
+        await mkdir(decoyRoot, { recursive: true });
+        await holdStagedGeneration({ root, generationRoot: decoyRoot, pid: process.pid });
+      }
+      const targetName = "0.4.9-racing";
+      const target = path.join(root, "generations", targetName);
+      const writer = (async () => {
+        await sleep(8 + Math.random() * 15);
+        await holdStagedGeneration({ root, generationRoot: target, pid: process.pid });
+        await mkdir(target, { recursive: true }); // stands in for stageOwnGeneration's rename
+      })();
+      const reclaim = reclaimGenerations({ root, active: null, pidIsAlive: () => true });
+      await Promise.all([writer, reclaim]);
+      const survivors = await readdir(path.join(root, "generations"));
+      assert.ok(survivors.includes(targetName),
+        `trial ${trial}: the racing generation was deleted while its hold was landing`);
+    } finally {
+      await rm(root, { recursive: true, force: true });
     }
-    const targetName = "0.4.9-racing";
-    const target = path.join(root, "generations", targetName);
-    const writer = (async () => {
-      await sleep(8 + Math.random() * 15);
-      await holdStagedGeneration({ root, generationRoot: target, pid: process.pid });
-      await mkdir(target, { recursive: true }); // stands in for stageOwnGeneration's rename
-    })();
-    const reclaim = reclaimGenerations({ root, active: null, pidIsAlive: () => true });
-    await Promise.all([writer, reclaim]);
-    const survivors = await readdir(path.join(root, "generations"));
-    assert.ok(survivors.includes(targetName),
-      `trial ${trial}: the racing generation was deleted while its hold was landing`);
   }
 });

@@ -84,3 +84,40 @@ test("restoring legacy tables cannot reparent a new foreign assignment", () => {
   assert.equal(removeLivePermissions(edited).state, "customized");
   assert.equal(removeLivePermissions(edited).source, edited);
 });
+
+// ACC appends its profile block at end of file and then tells the user to trust
+// ACC's hooks in Codex. Codex writes each trusted hook as a new `hooks.state`
+// table, and those land above the appended block, changing the table that
+// encloses it. Comparing that table unconditionally turned ACC's own documented
+// setup step into `customized`: doctor reported working permissions as
+// unverified, install refused to repair them, uninstall would not remove them.
+test("a client writing new tables above the appended block keeps ACC's ownership", () => {
+  const before = 'model = "mine"\n[features]\nother = true\n';
+  const source = prepareLivePermissions(before, context).source;
+  const trust = '[hooks.state."agents-can-communicate@acc-local:hooks.json:stop:0:0"]\n'
+    + 'trusted_hash = "sha256:abc"\n';
+  const marker = "# ACC native permissions begin profile";
+  const edited = source.replace(marker, trust + marker);
+
+  assert.notEqual(source.indexOf(marker), -1, "the profile block must exist to move");
+  assert.equal(removeLivePermissions(edited).state, "owned");
+  const restored = removeLivePermissions(edited).source;
+  assert.doesNotMatch(restored, /ACC native permissions/);
+  assert.match(restored, /agents-can-communicate@acc-local/);
+  assert.equal(restored, before + trust);
+});
+
+// The relaxation is only sound for a block that opens with its own header. A
+// block whose first declaration is a bare assignment belongs to whatever table
+// precedes it, so moving it changes what the assignment configures.
+test("a block opening with a bare assignment still depends on its enclosing table", () => {
+  const source = prepareLivePermissions('model = "mine"\n[features]\nother = true\n', context).source;
+  const proxy = "# ACC native permissions begin proxy";
+  const body = source.slice(source.indexOf(proxy));
+  assert.match(body.split("\n")[1], /^network_proxy = true$/,
+    "this test is only meaningful while the proxy block opens with a bare assignment");
+
+  const edited = source.replace(proxy, '[unrelated]\nkey = 1\n' + proxy);
+  assert.equal(removeLivePermissions(edited).state, "customized");
+  assert.equal(removeLivePermissions(edited).source, edited);
+});
