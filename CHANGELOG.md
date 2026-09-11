@@ -14,7 +14,9 @@
   records a pin naming its generation root, version, store contract, client PID and
   creation time; hooks resolve through that pin and keep loading the pinned generation's
   code after the active pointer moves on. `SessionEnd` and the same confirmed-dead-PID
-  sweep that reaps stale leases remove abandoned pins.
+  sweep that reaps stale leases remove abandoned pins. A pin whose declared store contract
+  differs from the running generation's, or declares none, is not followed: those hooks run
+  the active generation instead, the same fallback a missing or unreadable pin already got.
 - Native delivery eligibility is judged against the version that will actually serve,
   not the binary ACC detected. The minimum-version floor, prerelease refusal and denylist
   now apply to the reported serving version on the capability probe, the session
@@ -22,23 +24,32 @@
   path, so a service that restarted onto a different build no longer turns delivery off
   by version identity alone. A version below the minimum reports `below_minimum_version`
   naming that version instead of a generic probe failure.
-- `acc uninstall` retires the binding records, pins and runtime leases its own install
-  produced instead of leaving them to block the next install. Clearing those holds also
-  restores the maintenance path that inspects targeted adapters, so a subsequent install
-  and update proceed with nothing left over from the previous one.
+- `acc uninstall` retires the binding records and pins its own install produced instead
+  of leaving them to block the next install, when the removal leaves no client installed.
+  Runtime leases are deliberately left alone: a lease also protects the generation its
+  process is executing from against reclamation, so retiring one would let the directory
+  a live process is running from be deleted. Uninstalling also empties `control.targets`,
+  so nothing remains for the maintenance path to inspect until the next install
+  repopulates it, and a subsequent install and update proceed with nothing left over from
+  the previous one.
+- A restart of a client's background service is offered only when the version that service
+  is actually running fails the adapter's captured native-delivery contract, or when it
+  still holds a native binding. A Codex CLI that updated while its daemon kept serving the
+  previous build no longer produces a restart prompt that would disconnect open clients.
 - A generation directory is removed once no pin and no lease references it, under the
   manager lock, and only when no live or unknown holder could still reference it, instead
   of accumulating indefinitely.
 
 | Candidate artifact | Value |
 |---|---|
-| Built from | `ea56a99a9b1baae40a1dbaa4c98e67f908114af1` |
-| Tarball | `agents-can-communicate-0.5.0.tgz`, 375,435 bytes, 272 files |
-| sha256 | `184a472ac9a65540364dde4f42ddb3318759b9b6d79802c308c229bf924eb2da` |
+| Built from | `40b16ad453143d90d8eddaea124f126e0ce54fad` |
+| Tarball | `agents-can-communicate-0.5.0.tgz`, 378,076 bytes, 272 files |
+| sha256 | `a97029a91d1cc23273945e83e914a063a71ccc92d6e4791456e1862401fe3e21` |
 
-The exact archive passed installed-package verification. The full suite passed with
-2,089 tests, 2,088 passes, zero failures and one environment-dependent skip. This
-candidate has not been tagged or published.
+The exact archive passed installed-package verification and all 27 packed managed-runtime
+checks, covering install, bootstrap, reinstall, update, degraded update and diagnostics.
+The full suite passed with 2,097 tests, 2,096 passes, zero failures and one
+environment-dependent skip. This candidate has not been tagged or published.
 
 ## 0.4.4 — release candidate
 
