@@ -14,10 +14,15 @@ function invalidDirectory(message, directory, root, cause) {
   });
 }
 
+function isWithin(root, directory) {
+  const relative = path.relative(root, directory);
+  return !path.isAbsolute(relative) && relative !== ".."
+    && !relative.startsWith(`..${path.sep}`);
+}
+
 function relativeWithin(root, directory) {
   const relative = path.relative(root, directory);
-  if (relative === "" || (!path.isAbsolute(relative)
-    && relative !== ".." && !relative.startsWith(`..${path.sep}`))) return relative;
+  if (relative === "" || isWithin(root, directory)) return relative;
   throw invalidDirectory("managed directory escapes the store root", directory, root);
 }
 
@@ -63,8 +68,20 @@ async function inspectManagedDirectory(rootPath, directoryPath, create) {
   for (const segment of relative.split(path.sep).filter(Boolean)) {
     current = path.join(current, segment);
     details = await inspectRealDirectory(current, root, create);
-    const expected = path.join(canonicalRoot, path.relative(root, current));
-    if (await realpath(current) !== expected) {
+    // realpath answers with the name the directory carries *now*, which is not
+    // always the name that was asked for: on Darwin it resolves by opening the
+    // path and asking the kernel for that vnode's current path, so a directory
+    // renamed between those two steps comes back under its new name. Renaming
+    // managed directories is ordinary here - the writer lock is granted,
+    // reclaimed and released entirely by rename - so demanding the exact name
+    // back reported an escape for an in-store move, intermittently and only
+    // under load. What this check exists for, and all it exists for, is the
+    // property stated at the top of this file: a symlinked ancestor must not
+    // redirect a read or a publication outside the store. Judge that -
+    // containment in the canonical root - rather than the name, which the
+    // store itself changes.
+    const resolved = await realpath(current);
+    if (resolved === canonicalRoot || !isWithin(canonicalRoot, resolved)) {
       throw invalidDirectory("managed directory escapes the canonical store root", current, root);
     }
   }

@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdir, mkdtemp, open, rm, writeFile } from "node:fs/promises";
+import { lstat, mkdir, mkdtemp, open, rename, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -159,6 +159,87 @@ test("a directory swapped under the owner read is retried, not fatal", async t =
     pidIsAlive: () => true }, async () => { ran = true; });
 
   assert.equal(ran, true);
+});
+
+/**
+ * A lock moving is not an escape either.
+ *
+ * The same guard judges *where* a managed directory is, by comparing what
+ * realpath answers against the canonical store root. It used to demand the
+ * exact path it asked about. On Darwin realpath resolves by opening the path
+ * and asking the kernel for that vnode's current path, so a directory renamed
+ * in between answers under its new name - and this lock is renamed for a
+ * living: takeStaleOwnership moves it to writer.reclaimed-<hash>.lock,
+ * releaseCanonical to writer.released-<hash>.lock, and a candidate is renamed
+ * onto it to acquire it. Both names are inside paths.locks, so nothing has
+ * escaped anything; the read failed with "managed directory escapes the
+ * canonical store root" and took the whole write down with it.
+ *
+ * Sampled, because the window is between two steps inside one libc call and
+ * cannot be interleaved from here: about one read in a thousand on this
+ * machine, none at all on Linux, whose realpath resolves lexically. It is
+ * bounded by iterations and by wall time so a slow machine pays no more than
+ * a fast one, and it cannot fail spuriously - only an escape verdict fails it.
+ */
+test("a lock renamed aside under an owner read is a move, not an escape", async t => {
+  const { root, paths } = await store(t);
+  const { readJsonIfPresent } = await import("../src/atomic-json.mjs");
+  const directory = path.join(paths.locks, "writer.lock");
+  const aside = path.join(paths.locks, "writer.reclaimed-fixture.lock");
+  const owner = path.join(directory, "owner.json");
+  await mkdir(directory);
+  await writeFile(owner, JSON.stringify({ pid: 999999, token: "other", acquiredAt: clock.now() }));
+
+  let churning = true;
+  const churn = (async () => {
+    while (churning) {
+      await rename(directory, aside).catch(() => null);
+      await rename(aside, directory).catch(() => null);
+    }
+  })();
+
+  const counts = { read: 0, absent: 0, moved: 0, escaped: 0 };
+  let sample = null;
+  const deadline = Date.now() + 3_000;
+  try {
+    for (let attempt = 0; attempt < 20_000 && Date.now() < deadline; attempt += 1) {
+      try {
+        if (await readJsonIfPresent(owner, root) === null) counts.absent += 1;
+        else counts.read += 1;
+      } catch (error) {
+        if (/escapes the canonical store root/.test(error.message)) {
+          counts.escaped += 1;
+          sample ??= error.details;
+        } else if (/parent directory changed/.test(error.message)) counts.moved += 1;
+        else throw error;
+      }
+    }
+  } finally {
+    churning = false;
+    await churn;
+  }
+
+  assert.ok(counts.read + counts.absent > 0, `the read loop never ran: ${JSON.stringify(counts)}`);
+  assert.equal(counts.escaped, 0,
+    `a rename inside the store was called an escape: ${JSON.stringify({ counts, sample })}`);
+});
+
+// The same rule seen without a race: where the filesystem keeps one directory
+// under names that differ only in case, both names are that directory, and the
+// guard that compares names rather than locations refused one of them.
+test("a managed directory reached by another of its own names is not an escape", async t => {
+  const { root, paths } = await store(t);
+  const { assertManagedDirectory } = await import("../src/safe-directory.mjs");
+  const spelled = path.join(root, path.basename(paths.locks).toUpperCase());
+  const insensitive = await lstat(spelled).then(found => found.isDirectory(), () => false);
+  if (!insensitive) {
+    t.skip("this filesystem distinguishes case, so the directory has only one name");
+    return;
+  }
+
+  const inspected = await assertManagedDirectory(root, spelled);
+  assert.equal(inspected.directory, spelled);
+  assert.equal(inspected.stat.isDirectory(), true);
 });
 
 test("the guard still refuses a record whose parent was swapped", async t => {
