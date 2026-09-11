@@ -1,5 +1,49 @@
 # Changelog
 
+## 0.5.2 — release candidate
+
+- The skill says which commands its credentials belong to. The rule read "append
+  them to the CLI examples below", which gave an agent no way to know that a command
+  acting on the installation rather than as a participant refuses the pair. Observed on
+  a real Codex session: it appended them to such a command, lost the call to `unknown
+  option`, and reran it without them. The rule is now stated through what the arguments
+  mean — they name the participant calling — and says that such a refusal is about the
+  command rather than about the credentials. No machine-level command is named, because
+  a skill that taught those would have models running the installer.
+- An agent no longer re-fetches a message it was handed whole. "Fetch the selected
+  message before acting on its contents" read as a rule, while the exception — an
+  injected peer block is already the complete body — sat eight lines lower and read as
+  an aside. The same Codex session applied the rule to a message that had arrived in
+  full. Both now sit together: a header carries no body, so fetch the one you chose;
+  a message that reached you with its body attached is complete.
+- Each adapter installs one shim and the skill's examples name it. The examples carried
+  the whole invocation — a data home, an interpreter and a script, up to 186 bytes
+  repeated twenty-three times — because the command must run where `acc` is not on
+  PATH and an agent that cannot run it improvises records by hand. One absolute path
+  says the same thing: the shim holds the pinning, tries the pinned pair first and then
+  the same fallbacks the hook shim uses, and unlike a hook it exits non-zero and says
+  what is missing, because an agent told nothing went wrong is the case that produced
+  hand-written store records in the first place. The shim is per adapter rather than per
+  machine: one client pins a data home because its sandbox scrubs the environment, and
+  another deliberately leaves it unset so an operator's own value still wins. On this
+  machine the Codex skill loses 690 tokens and the Claude Code skill 262.
+
+| Candidate artifact | Value |
+|---|---|
+| Built from | `797f9348f9b7e2f43ab7ad48e5d3e4aea552354f` |
+| Tarball | `agents-can-communicate-0.5.2.tgz`, 383,868 bytes, 272 files |
+| sha256 | `30ca8feff644ab612c249cf68a4ccae5c87632d931823e82f7467c1a936c9578` |
+
+The exact archive passed installed-package verification and all 27 packed managed-runtime
+checks, covering install, bootstrap, reinstall, update, degraded update and diagnostics.
+The full suite passed with 2,124 tests, 2,123 passes, zero failures and one skip, which
+is the uninstall case that requires Gemini CLI to be absent and it is installed on the
+capture machine.
+
+Both wording defects were found by reading the transcript of a live Codex session that
+had been asked, over ACC, to check its own diagnostics. See
+`docs/release-evidence/v0.5.2.md`.
+
 ## 0.5.1 — release candidate
 
 - Codex permission ownership survives the client writing its own tables. ACC appends its

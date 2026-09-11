@@ -87,7 +87,7 @@ test("the installed extension carries a stamped manifest and coordination skill"
   const target = path.join(context.home, ".gemini", "extensions", "agents-can-communicate");
 
   assert.deepEqual((await readdir(target)).sort(),
-    ["gemini-extension.json", "hooks", "skills"]);
+    ["acc-cli.sh", "gemini-extension.json", "hooks", "skills"]);
   const manifest = JSON.parse(await readFile(
     path.join(target, "gemini-extension.json"), "utf8"));
   assert.equal(manifest.name, "agents-can-communicate");

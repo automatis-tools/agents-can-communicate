@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 
 import { assertRunner, bakeSkillCommand, blankText, defaultRunner, removeIfEmpty,
   ownVersion, stampPluginVersion,
-  removeInstalledTree, runnerExists, writeForeignJson }
+  removeInstalledTree, runnerExists, writeCliShim, writeForeignJson }
   from "@agents-can-communicate/adapter-sdk";
 
 const bundle = fileURLToPath(new URL("../plugin", import.meta.url));
@@ -139,7 +139,8 @@ export async function installKimiPlugin({ home, runner = defaultRunner(), node, 
     version: await ownVersion(import.meta.url), io: { readFile, writeFile } });
   // The skill ships with a placeholder where the command belongs: `acc` is
   // not on PATH everywhere, and an agent that cannot run it improvises.
-  await bakeSkillCommand({ root: target, node, cli });
+  const cliShim = await writeCliShim({ dir: target, cli, node });
+  await bakeSkillCommand({ root: target, cliShim });
 
   const file = configPath(home);
   const existing = await readText(file, "");

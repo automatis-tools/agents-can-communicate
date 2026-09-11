@@ -146,7 +146,7 @@ test("the plugin bundle carries a Kimi manifest and the coordination skill", asy
   await createKimiAdapter().install(context);
   const target = path.join(context.home, "plugins", "managed", "agents-can-communicate");
 
-  assert.deepEqual((await readdir(target)).sort(), [".kimi-plugin", "skills"]);
+  assert.deepEqual((await readdir(target)).sort(), [".kimi-plugin", "acc-cli.sh", "skills"]);
   const manifest = JSON.parse(await readFile(
     path.join(target, ".kimi-plugin", "plugin.json"), "utf8"));
   assert.equal(manifest.sessionStart.skill, "acc");

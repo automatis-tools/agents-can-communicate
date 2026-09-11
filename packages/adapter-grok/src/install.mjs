@@ -3,7 +3,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { AccError, EXIT } from "@agents-can-communicate/protocol";
-import { bakeSkillCommand, removeInstalledTree, writeHookShim }
+import { bakeSkillCommand, removeInstalledTree, writeCliShim, writeHookShim }
   from "@agents-can-communicate/adapter-sdk";
 
 const bundle = fileURLToPath(new URL("../plugin", import.meta.url));
@@ -66,7 +66,8 @@ export async function installGrokHooks({ grokHome, home, runner, cli, node }) {
   await rm(skills, { recursive: true, force: true });
   await mkdir(path.dirname(skills), { recursive: true });
   await cp(path.join(bundle, "skills", "acc"), skills, { recursive: true });
-  await bakeSkillCommand({ root: skills, node, cli });
+  const cliShim = await writeCliShim({ dir: skills, cli, node });
+  await bakeSkillCommand({ root: skills, cliShim });
 
   await writeJson(hooksFile(root), withShim(template, shim));
   return { ok: true, changes: [hooksFile(root), shim, skills], diagnostics: [] };

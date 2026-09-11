@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
-import { mkdir, mkdtemp, readFile, readdir, realpath, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, readdir, realpath, rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -54,7 +54,12 @@ for (const [adapter, relative] of ADAPTERS) {
 
     assert.equal(text.includes("{{ACC}}"), false,
       "the skill still tells the agent to run a placeholder");
-    assert.match(text, /acc\.mjs/, "the skill carries no path to the CLI at all");
+    // One absolute path per example instead of a data home, an interpreter and
+    // a script: the shim holds the pinning, so nothing here is found on PATH.
+    const [, shim] = /"([^"]*acc-cli\.sh)"/.exec(text) ?? [];
+    assert.equal(typeof shim, "string", "the skill carries no path to the CLI at all");
+    assert.equal(((await stat(shim)).mode & 0o111) !== 0, true,
+      "the skill names a command the agent cannot execute");
   });
 }
 
@@ -62,14 +67,14 @@ test("the command baked into the skill actually runs", async t => {
   const { home, skill } = await installed(t, "kimi", ADAPTERS[0][1]);
   const text = await readFile(skill, "utf8");
 
-  // Taken from the file rather than reconstructed: the point is that what an
-  // agent copies out of the skill is what works.
-  const [, node, cli] = /"([^"]*node[^"]*)" "([^"]*acc\.mjs)"/.exec(text) ?? [];
-  assert.equal(typeof node, "string", `no runnable command in:\n${text.slice(0, 400)}`);
+  // Taken from the file rather than reconstructed, and run as written: the
+  // point is that what an agent copies out of the skill is what works.
+  const [, shim] = /"([^"]*acc-cli\.sh)"/.exec(text) ?? [];
+  assert.equal(typeof shim, "string", `no runnable command in:\n${text.slice(0, 400)}`);
 
   const project = path.join(home, "project");
   await mkdir(project, { recursive: true });
-  const { stdout } = await run(node, [cli, "status", "--cwd", project, "--json"],
+  const { stdout } = await run(shim, ["status", "--cwd", project, "--json"],
     { env: { ...process.env, ACC_DATA_HOME: path.join(home, "data"),
       GIT_DIR: "", GIT_WORK_TREE: "" } });
 

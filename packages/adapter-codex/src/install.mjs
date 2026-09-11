@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 
 import { bakeSkillCommand, blankJson, blankText, removeIfEmpty, removeInstalledTree,
   keepOnlyVersion, ownVersion, stampPluginVersion,
-  tomlString, writeForeignJson, writeHookShim }
+  tomlString, writeCliShim, writeForeignJson, writeHookShim }
   from "@agents-can-communicate/adapter-sdk";
 import { AccError, EXIT } from "@agents-can-communicate/protocol";
 import { inspectConfig, readConfig, sandboxOwnership, writeTomlBlock } from "./config-block.mjs";
@@ -190,8 +190,10 @@ export async function installCodexPlugin({ home, agentsHome = home,
   await rm(target, { recursive: true, force: true });
   await cp(bundle, target, { recursive: true });
   // The skill ships with a placeholder where the command belongs: `acc` is
-  // not on PATH everywhere, and an agent that cannot run it improvises.
-  await bakeSkillCommand({ root: target, node, cli, dataHome });
+  // not on PATH everywhere, and an agent that cannot run it improvises. The
+  // shim carries the pinning so each example can name one path.
+  const cliShim = await writeCliShim({ dir: target, cli, node, dataHome });
+  await bakeSkillCommand({ root: target, cliShim });
   const shim = await writeHookShim({ dir: target, adapterId: "codex",
     dataHome, runner, node });
   await writeJson(path.join(target, "hooks.json"),

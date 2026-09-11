@@ -48,7 +48,13 @@ test("install writes only under .grok and leaves Claude Code alone", async t => 
   await stat(shimPath(grokHome));
   const skill = await readFile(path.join(skillPath(grokHome), "SKILL.md"), "utf8");
   assert.equal(skill.includes("{{ACC}}"), false, "skill still has the placeholder");
-  assert.match(skill, /\/usr\/bin\/node/);
+  // The examples name one shim rather than repeating an interpreter and a
+  // script in each; the interpreter is still pinned, one level down, so a
+  // machine without `node` on PATH still runs the command the skill teaches.
+  const cliShim = path.join(skillPath(grokHome), "acc-cli.sh");
+  assert.match(skill, new RegExp(cliShim.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+  assert.doesNotMatch(skill, /\/usr\/bin\/node/, "the skill still repeats the interpreter");
+  assert.match(await readFile(cliShim, "utf8"), /\/usr\/bin\/node/);
 });
 
 test("install is idempotent and uninstall restores the user's files", async t => {
