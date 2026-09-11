@@ -6,7 +6,7 @@ import path from "node:path";
 import test from "node:test";
 import { promisify } from "node:util";
 
-import { writeHookShim } from "../src/hook-shim.mjs";
+import { writeCliShim, writeHookShim } from "../src/hook-shim.mjs";
 
 const run = promisify(execFile);
 
@@ -144,4 +144,103 @@ test("a linked binary that cannot run without node is not run", async t => {
 
   assert.equal(finished.code ?? 0, 0, "a hook that could not start took the turn with it");
   assert.match(finished.stderr, /acc install/);
+});
+
+/**
+ * The shim the skill's examples name.
+ *
+ * It exists so each example can carry one absolute path instead of a data home,
+ * an interpreter and a script repeated twenty-three times. The pinning is the
+ * same as the hook shim's and for the same reason, but the failure is not: a
+ * hook that cannot run must not stop somebody's session, while this runs
+ * because an agent asked to coordinate. An agent told nothing went wrong reads
+ * the store and writes records by hand.
+ */
+async function cliPlace(t) {
+  const here = await place(t);
+  const cli = path.join(here.root, "acc.mjs");
+  await writeFile(cli, "// stands in for the CLI\n");
+  const invoke = (shim, PATH = "/usr/bin:/bin") =>
+    run("sh", [shim, "status", "--json"], { env: { PATH } }).catch(error => error);
+  return { ...here, cli, invoke };
+}
+
+test("the pinned pair runs the CLI, and the agent's own arguments reach it", async t => {
+  const here = await cliPlace(t);
+  const node = await here.script("node", 'echo "ran $*"');
+  const shim = await writeCliShim({ dir: here.root, cli: here.cli, node });
+
+  const { stdout } = await here.invoke(shim);
+
+  assert.match(stdout, new RegExp(here.cli.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+  assert.match(stdout, /status --json/, "the agent's own arguments were dropped");
+});
+
+test("a node that has moved still reaches the CLI", async t => {
+  const here = await cliPlace(t);
+  const shim = await writeCliShim({ dir: here.root, cli: here.cli,
+    node: path.join(here.root, "gone", "node") });
+  const node = await here.script("node", 'echo "current node ran $*"');
+
+  const { stdout } = await here.invoke(shim, `${path.dirname(node)}:/usr/bin:/bin`);
+
+  assert.match(stdout, /current node ran/);
+  assert.match(stdout, /status --json/);
+});
+
+test("when the CLI moved too, the command npm links is asked for", async t => {
+  const here = await cliPlace(t);
+  const shim = await writeCliShim({ dir: here.root, cli: here.cli,
+    node: path.join(here.root, "gone", "node") });
+  await rm(here.cli);
+  const linked = await here.script("acc", 'echo "acc ran $*"');
+
+  const { stdout } = await here.invoke(shim, `${path.dirname(linked)}:/usr/bin:/bin`);
+
+  assert.match(stdout, /acc ran status --json/);
+});
+
+test("with nothing left to run, an agent is told rather than left to improvise", async t => {
+  const here = await cliPlace(t);
+  const missing = path.join(here.root, "gone", "node");
+  const shim = await writeCliShim({ dir: here.root, cli: here.cli, node: missing });
+  await rm(here.cli);
+
+  const finished = await here.invoke(shim);
+
+  // The one place this must differ from the hook shim. Coordination that
+  // silently reports success is worse than coordination that stops: the model
+  // carries on believing the record it asked for exists.
+  assert.notEqual(finished.code ?? 0, 0, "a CLI that ran nothing reported success");
+  assert.match(finished.stderr, new RegExp(missing.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")),
+    "the reader is not told which path is missing");
+  assert.match(finished.stderr, /acc install/, "the reader is not told what to do");
+});
+
+test("a data home is exported only when the adapter pins one", async t => {
+  const here = await cliPlace(t);
+  const dataHome = path.join(here.root, "data home ' $() `literal`");
+  const node = await here.script("node", 'printf "[%s]\\n" "$ACC_DATA_HOME"');
+
+  const pinned = await writeCliShim({ dir: here.root, cli: here.cli, node, dataHome });
+  assert.equal((await here.invoke(pinned)).stdout, `[${dataHome}]\n`);
+
+  // One client leaves it unset on purpose so an operator's own value still wins.
+  const free = await writeCliShim({ dir: here.root, cli: here.cli, node,
+    name: "acc-cli-free.sh" });
+  assert.equal((await here.invoke(free)).stdout, "[]\n");
+});
+
+test("a CLI path with a space in it survives being written into a shell script", async t => {
+  const here = await cliPlace(t);
+  const awkward = path.join(here.root, "a directory with spaces");
+  await mkdir(awkward, { recursive: true });
+  const cli = path.join(awkward, "acc.mjs");
+  await writeFile(cli, "// stands in for the CLI\n");
+  const node = await here.script("node", 'echo "ran $*"');
+
+  const shim = await writeCliShim({ dir: here.root, cli, node });
+
+  assert.match((await here.invoke(shim)).stdout,
+    new RegExp(cli.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
 });

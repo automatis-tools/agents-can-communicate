@@ -12,7 +12,7 @@ import { acccreatedFile, bakeSkillCommand, blankJson, defaultBootstrap, defaultC
   keepOnlyVersion, ownVersion, stampPluginVersion,
   removeIfEmpty,
   removeInstalledTree,
-  removeOwnedEntries, writeForeignJson, writeHookShim }
+  removeOwnedEntries, writeCliShim, writeForeignJson, writeHookShim }
   from "@agents-can-communicate/adapter-sdk";
 
 const bundle = fileURLToPath(new URL("../plugin", import.meta.url));
@@ -166,8 +166,11 @@ async function layOutPlugin(target, { runner, node, cli, channel, live }) {
   await rm(mcpPath(target), { force: true });
   if (live) await writeChannelMcp(target, { node, channel });
   // The skill ships with a placeholder where the command belongs: `acc` is not
-  // on PATH everywhere, and an agent that cannot run it improvises.
-  await bakeSkillCommand({ root: target, node, cli });
+  // on PATH everywhere, and an agent that cannot run it improvises. The shim
+  // carries the pinning so each example can name one path. No data home is
+  // pinned here: an operator's own ACC_DATA_HOME still wins for this client.
+  const cliShim = await writeCliShim({ dir: target, cli, node });
+  await bakeSkillCommand({ root: target, cliShim });
   // The bundle's hooks.json names this script, and nothing else writes it.
   await writeHookShim({ dir: path.join(target, "hooks"), adapterId: "claude_code",
     runner, node });

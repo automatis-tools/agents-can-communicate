@@ -63,7 +63,7 @@ test("install places the plugin and registers it in the marketplace", async t =>
 
   assert.equal(result.ok, true);
   assert.deepEqual((await readdir(plugin)).sort(),
-    [".codex-plugin", "acc-hook.sh", "hooks.json", "skills"].sort());
+    [".codex-plugin", "acc-cli.sh", "acc-hook.sh", "hooks.json", "skills"].sort());
   const manifest = JSON.parse(await readFile(
     path.join(plugin, ".codex-plugin", "plugin.json"), "utf8"));
   assert.equal(manifest.hooks, "./hooks.json");
@@ -436,7 +436,7 @@ test("install finishes the job the client's own command would have done", async 
   const cached = path.join(context.codexHome, "plugins", "cache", "acc-local",
     "agents-can-communicate", await pluginVersion(CODEX_PLUGIN));
   assert.deepEqual((await readdir(cached)).sort(),
-    [".codex-plugin", "acc-hook.sh", "hooks.json", "skills"].sort());
+    [".codex-plugin", "acc-cli.sh", "acc-hook.sh", "hooks.json", "skills"].sort());
 });
 
 test("the cached copy carries the same absolute hook command", async t => {

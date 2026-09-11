@@ -116,3 +116,21 @@ test("the skills stay in step with each other", async () => {
       `${other.file} has drifted from ${first.file}`);
   }
 });
+
+test("each skill keeps an agent from spending a call it cannot need", async () => {
+  for (const { file, text } of await skills()) {
+    // The credential rule was scoped to "the CLI examples below", which gave a
+    // model no way to know that a command acting on the installation refuses
+    // the pair. Observed on a real Codex session: it appended them to such a
+    // command, lost the call to `unknown option`, and reran it without them.
+    assert.match(text, /refusal says nothing about your credentials/i,
+      `${file} lets a refused credential read as a broken identity`);
+
+    // "fetch before acting" read as a rule while its exception - a message
+    // delivered with its body is already whole - sat eight lines lower and read
+    // as an aside. Observed on the same session: it re-fetched a message it had
+    // just been handed in full.
+    assert.match(text, /fetching it again buys nothing/i,
+      `${file} sends an agent to re-fetch a body it already holds`);
+  }
+});

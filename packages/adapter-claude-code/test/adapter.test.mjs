@@ -46,10 +46,10 @@ test("install registers the plugin and preserves the user's own hook", async t =
   // and the cache copy it actually runs.
   assert.deepEqual(await readdir(path.join(context.configDir, "plugins",
     "marketplaces", "acc-local", "agents-can-communicate")),
-  [".claude-plugin", "hooks", "skills"].sort());
+  [".claude-plugin", "acc-cli.sh", "hooks", "skills"].sort());
   assert.deepEqual(await readdir(path.join(context.configDir, "plugins", "cache",
     "acc-local", "agents-can-communicate", await pluginVersion(CLAUDE_PLUGIN))),
-  [".claude-plugin", "hooks", "skills"].sort());
+  [".claude-plugin", "acc-cli.sh", "hooks", "skills"].sort());
 
   // Registered the way the client registers plugins, measured from its own
   // commands. `accPlugins` was ACC's invention and loaded nothing.
