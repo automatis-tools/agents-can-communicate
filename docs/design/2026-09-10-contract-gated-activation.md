@@ -173,10 +173,23 @@ Leaving it as an identity check would keep producing the exact complaint this wo
 from. It takes the same substitution: a serving version that satisfies the adapter's
 captured contract, judged by `evaluateVersionContract` against the host platform, is not
 a reason to offer a restart. A version that does not satisfy it — below the minimum, on
-the denylist, a prerelease, or unreadable — still is, and so is a serving version the
-adapter captured no contract for, because "cannot be judged" is not "satisfies". The
+the denylist, a prerelease, or unreadable — still is. The
 other half of the condition, a native binding hold naming the service's PID, is
 untouched: a genuinely stale or unbound service is still offered a restart.
+
+An earlier draft of this section also offered a restart for a serving version the adapter
+captured no contract for, on the grounds that "cannot be judged" is not "satisfies". That
+was wrong, and it shipped as a regression: every shipped adapter captures `darwin-arm64`
+alone, so on Linux and on an Intel Mac the contract answers `platform_not_captured` for
+every service, and ACC offered to restart a daemon that was serving exactly the version
+its CLI was running — the interruption this work exists to remove, on every machine but
+one. `platform_not_captured` and `native_delivery_unsupported` are not verdicts on a
+version; with no opinion to act on, the decision falls back to the comparison that
+governed before this branch, the served version against the CLI's. The grouping is the
+router's, with one difference of membership rather than of principle:
+`native_delivery_unsupported` is unreachable at the router behind `liveCapable` and is
+reachable here, because an adapter may implement `inspectMaintenance` without declaring
+native delivery at all.
 
 `packages/adapter-codex/src/maintenance.mjs` compares `serverVersion` with the approved
 `cliVersion` twice inside `startAfterMaintenance`, and both stay. They answer a different

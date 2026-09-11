@@ -26,14 +26,31 @@ export function maintenanceContext(control, env) {
  *
  * A restart is still offered whenever the serving version does *not* satisfy
  * that contract: below the captured minimum, on the denylist, a prerelease, or
- * unreadable. It is also offered, unchanged, when the adapter declares no
- * contract for this platform at all, because "cannot be judged" is not
- * "satisfies". Only a version the contract actually accepts stops being a
+ * unreadable. Only a version the contract actually accepts stops being a
  * reason on its own - and the native-binding blocker it is OR-ed with is
- * untouched, so a genuinely stale or unbound service is still selected. */
-const servingVersionIsContrary = (adapter, snapshot) =>
-  evaluateVersionContract(adapter, { clientVersion: snapshot.serverVersion,
-    platform: HOST_PLATFORM }).reasonCode !== null;
+ * untouched, so a genuinely stale or unbound service is still selected.
+ *
+ * The contract answers two different questions with one field, and reading
+ * every non-null code as a refusal conflated them. "platform_not_captured" and
+ * "native_delivery_unsupported" are not verdicts on any version: the first is
+ * a complete, valid declaration that records nothing for the platform this
+ * process runs on, and the second is an adapter that declares no native
+ * delivery at all. Every shipped adapter captures darwin-arm64 alone, so on
+ * Linux and on an Intel Mac the first of those is the ordinary answer - and it
+ * made every ready daemon a restart candidate, including one already serving
+ * exactly the version its CLI is running. That is the complaint this work
+ * began from, reproduced on every machine but one. With no opinion to act on,
+ * the decision falls back to the comparison that governed before this branch:
+ * the served version against the CLI's. */
+const UNCAPTURED = new Set(["platform_not_captured", "native_delivery_unsupported"]);
+
+const servingVersionIsContrary = (adapter, snapshot) => {
+  const { reasonCode } = evaluateVersionContract(adapter,
+    { clientVersion: snapshot.serverVersion, platform: HOST_PLATFORM });
+  if (reasonCode === null) return false;
+  if (!UNCAPTURED.has(reasonCode)) return true;
+  return snapshot.serverVersion !== snapshot.cliVersion;
+};
 
 export async function inspectMaintenanceServices({ control, env = process.env, root, adapters = ALL_ADAPTERS() }) {
   // Maintenance targets the pending generation when one exists (its contract
