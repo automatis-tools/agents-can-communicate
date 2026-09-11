@@ -267,11 +267,13 @@ test("a declaration that is not a contract answers with a reason code rather tha
 test("the session handshake rechecks the static rule and publishes only adapter facts", () => {
   const ok = validateNativeHandshake(adapter(), { clientVersion: "2.1.259", platform: "darwin-arm64",
     handshake: handshake({ clientVersion: "2.1.259" }) });
-  assert.deepEqual(ok, { ok: true, reasonCode: null, protocolContract: "fixture-native-v1",
+  assert.deepEqual(ok, { ok: true, reasonCode: null, clientVersion: "2.1.259",
+    protocolContract: "fixture-native-v1",
     modes: ["livePush", "idleWake", "busyQueue", "replyRoute"],
     opaqueEndpointRef: "adapter-owned-endpoint-id", leaseUntil: "2026-09-02T12:01:00.000Z" });
   assert.equal(Object.isFrozen(ok), true);
-  const closed = reasonCode => ({ ok: false, reasonCode, protocolContract: "fixture-native-v1",
+  const closed = reasonCode => ({ ok: false, reasonCode, clientVersion: null,
+    protocolContract: "fixture-native-v1",
     modes: [], opaqueEndpointRef: null, leaseUntil: null });
   const check = (clientVersion, patch, platform = "darwin-arm64") => validateNativeHandshake(adapter(),
     { clientVersion, platform, handshake: handshake({ clientVersion, ...patch }) });
@@ -285,10 +287,20 @@ test("the session handshake rechecks the static rule and publishes only adapter 
     leaseUntil: null, reasonCode: "handshake_timeout", clientVersion: null }),
   closed("handshake_timeout"));
   // The handshake names the session that will actually serve; a build newer
-  // than the detected binary is admitted by that version, not refused for it.
+  // than the detected binary is admitted by that version, not refused for it -
+  // and the verdict reports that version, because it is the one the admission
+  // rests on and the one a caller must record on the binding it publishes.
+  // Reporting the detected 2.1.258 here would put a version on the binding
+  // that nothing ever verified.
   assert.deepEqual(check("2.1.258", { clientVersion: "2.1.260" }), { ok: true, reasonCode: null,
+    clientVersion: "2.1.260",
     protocolContract: "fixture-native-v1", modes: ["livePush", "idleWake", "busyQueue", "replyRoute"],
     opaqueEndpointRef: "adapter-owned-endpoint-id", leaseUntil: "2026-09-02T12:01:00.000Z" });
+  // A handshake that names no version at all is judged by the detected one, so
+  // that is what the verdict admitted and what it reports.
+  assert.equal(validateNativeHandshake(adapter(), { clientVersion: "2.1.258",
+    platform: "darwin-arm64", handshake: handshake({ clientVersion: null }) }).clientVersion,
+  "2.1.258");
   // The rule is applied to the serving version, so a serving version below
   // the minimum is refused even when the detected binary is newer.
   assert.deepEqual(check("2.1.999", { clientVersion: "2.1.257" }), closed("below_minimum_version"));

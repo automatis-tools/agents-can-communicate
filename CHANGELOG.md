@@ -22,8 +22,24 @@
   now apply to the reported serving version on the capability probe, the session
   handshake, the Codex receiver's own version check, and the delivery router's offer
   path, so a service that restarted onto a different build no longer turns delivery off
-  by version identity alone. A version below the minimum reports `below_minimum_version`
-  naming that version instead of a generic probe failure.
+  by version identity alone. The delivery binding a session publishes records that same
+  serving version, so the record the router reads and the receiver record the adapter
+  keeps name one version rather than two, and the Codex receiver resolves a binding by
+  its opaque endpoint reference alone — the last comparison of two stored version
+  snapshots is gone. Without that, a client whose background service had updated under
+  its CLI published one version and recorded another, and every send fell back to
+  durable on the difference. A version below the minimum reports `below_minimum_version`
+  naming that version instead of a generic probe failure, and a service that drops below
+  it while a binding is open is reported as a version mismatch rather than as a protocol
+  mismatch.
+- `acc doctor` reports what can be delivered rather than what was bound. A binding that
+  looks live is re-verified through its own adapter — bounded, read-only, renewing no
+  lease and writing no record — so a session whose receiver can no longer take a push
+  reads as degraded and names both the condition and something to do about it, instead
+  of the lease alone answering `local transport active`. The client's own line stops
+  claiming an active transport when none of its bound sessions can take one. A receiver
+  serving a different version than its binding recorded is named rather than hidden, and
+  a client with nothing to re-verify is reported exactly as before.
 - `acc uninstall` retires the binding records and pins its own install produced instead
   of leaving them to block the next install, when the removal leaves no client installed.
   Runtime leases are deliberately left alone: a lease also protects the generation its
@@ -53,13 +69,13 @@
 
 | Candidate artifact | Value |
 |---|---|
-| Built from | `9fef5d2cbcab35fdae91d1c532be91bd30a9abf7` |
-| Tarball | `agents-can-communicate-0.5.0.tgz`, 379,955 bytes, 272 files |
-| sha256 | `231916c18ff3e0e4b1422e9ca9404b8cf15c0edfb6b97bd1efeccb27fdfd5e9a` |
+| Built from | `99737db899d92b2d26bea2016571cf1878b4c84a` |
+| Tarball | `agents-can-communicate-0.5.0.tgz`, 382,589 bytes, 272 files |
+| sha256 | `8be810cf1f85eca96c63f79325c13ace80cfa5e34b7bc999b09abe1ea03bf62b` |
 
 The exact archive passed installed-package verification and all 27 packed managed-runtime
 checks, covering install, bootstrap, reinstall, update, degraded update and diagnostics.
-The full suite passed with 2,106 tests, 2,105 passes, zero failures and one skip, which is
+The full suite passed with 2,115 tests, 2,114 passes, zero failures and one skip, which is
 a machine fact rather than a result: the Gemini CLI is installed on the release machine, so
 the case that requires it to be absent cannot run there. This candidate has not been tagged
 or published.

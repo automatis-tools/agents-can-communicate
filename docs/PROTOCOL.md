@@ -238,6 +238,13 @@ sessionId · generation · adapterId · clientVersion · availableModes
 livePolicy · opaqueEndpointRef · leaseUntil
 ```
 
+`clientVersion` is the version that answered the handshake and was admitted by the
+adapter's captured contract — the process that will serve this binding's live pushes,
+which is not always the version the client's own executable reports. A background
+service that updated under its CLI serves the updated build, and the binding names that
+build. The version the executable reported is recorded separately, beside the session's
+owner record.
+
 The recipient owns `livePolicy` because native push may start a model turn:
 
 - `off`: inbox and normal next-turn paths only;

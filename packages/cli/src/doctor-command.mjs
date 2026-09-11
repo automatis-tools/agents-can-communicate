@@ -232,7 +232,13 @@ export async function runDoctor({ options, context, runtime }) {
   const service = context.service ?? await context.openService();
   const status = await service.collectStatus({});
   updateNativeRuntime(adapters, status.deliveryBindings);
-  await updateNativeSessions(adapters, { service, status, root, now: clock.now() });
+  // The runtime state above is read from the binding records alone. The
+  // session pass then asks each adapter whether the receiver those records
+  // name can still take a push, and downgrades anything that only looked
+  // active. It needs the adapter objects to ask, which the diagnostic entries
+  // do not carry.
+  await updateNativeSessions(adapters, { service, status, root, now: clock.now(),
+    registry: ALL_ADAPTERS() });
   for (const adapter of adapters) {
     adapter.remediation.push(...nativeRemediation(adapter));
   }
