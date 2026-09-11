@@ -1,11 +1,12 @@
-import { lstat, mkdir, realpath } from "node:fs/promises";
+import { lstat, mkdir, realpath, stat } from "node:fs/promises";
 import path from "node:path";
 
 import { AccError, EXIT } from "@agents-can-communicate/protocol";
 
 // Ported from the reconciled prototype without semantic change. Every managed
 // path is validated segment by segment against the canonical root, so a
-// symlinked ancestor cannot redirect a read or a publication outside the store.
+// symlinked ancestor cannot redirect a read or a publication - neither outside
+// the store, nor to another directory inside it.
 function invalidDirectory(message, directory, root, cause) {
   return new AccError(EXIT.DATA, message, {
     directory,
@@ -14,15 +15,10 @@ function invalidDirectory(message, directory, root, cause) {
   });
 }
 
-function isWithin(root, directory) {
-  const relative = path.relative(root, directory);
-  return !path.isAbsolute(relative) && relative !== ".."
-    && !relative.startsWith(`..${path.sep}`);
-}
-
 function relativeWithin(root, directory) {
   const relative = path.relative(root, directory);
-  if (relative === "" || isWithin(root, directory)) return relative;
+  if (relative === "" || (!path.isAbsolute(relative)
+    && relative !== ".." && !relative.startsWith(`..${path.sep}`))) return relative;
   throw invalidDirectory("managed directory escapes the store root", directory, root);
 }
 
@@ -65,6 +61,10 @@ async function inspectManagedDirectory(rootPath, directoryPath, create) {
   let details = await inspectRealDirectory(root, root, create);
   const canonicalRoot = await realpath(root);
   let current = root;
+  // The canonical location of the directory validated so far. Every segment
+  // has to be a child of it, which carries containment in the canonical root
+  // down the whole walk by induction.
+  let canonicalParent = canonicalRoot;
   for (const segment of relative.split(path.sep).filter(Boolean)) {
     current = path.join(current, segment);
     details = await inspectRealDirectory(current, root, create);
@@ -75,17 +75,34 @@ async function inspectManagedDirectory(rootPath, directoryPath, create) {
     // managed directories is ordinary here - the writer lock is granted,
     // reclaimed and released entirely by rename - so demanding the exact name
     // back reported an escape for an in-store move, intermittently and only
-    // under load. What this check exists for, and all it exists for, is the
-    // property stated at the top of this file: a symlinked ancestor must not
-    // redirect a read or a publication outside the store. Judge that -
-    // containment in the canonical root - rather than the name, which the
-    // store itself changes.
+    // under load, and took real writes down with it.
+    //
+    // What a move cannot change is where the directory lives. An ancestor
+    // replaced by a symlink after it was checked resolves somewhere else
+    // entirely, so the parent is the thing to hold fixed: this segment must be
+    // a child of the directory the previous one validated. Moving the leaf is
+    // then the only disagreement left, and that one is settled by identity -
+    // a moved directory is the same vnode under another name, while a sibling
+    // swapped in under this name is not. ENOENT on the re-stat means it moved
+    // again between the two calls, which cannot redirect anything: whatever
+    // the caller opens through this path next fails the same way.
     const resolved = await realpath(current);
-    if (resolved === canonicalRoot || !isWithin(canonicalRoot, resolved)) {
+    if (path.dirname(resolved) !== canonicalParent
+      || (path.basename(resolved) !== segment
+        && !await stillTheSameDirectory(details, resolved, current, root))) {
       throw invalidDirectory("managed directory escapes the canonical store root", current, root);
     }
+    canonicalParent = resolved;
   }
   return { directory, stat: details };
+}
+
+async function stillTheSameDirectory(details, resolved, current, root) {
+  const served = await stat(resolved).then(found => found, error => {
+    if (error.code === "ENOENT") return null;
+    throw invalidDirectory("cannot inspect managed directory", current, root, error.message);
+  });
+  return served === null || (served.dev === details.dev && served.ino === details.ino);
 }
 
 export async function assertManagedDirectory(rootPath, directoryPath) {

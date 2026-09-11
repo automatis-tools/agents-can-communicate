@@ -5,8 +5,8 @@ import { EXIT } from "@agents-can-communicate/protocol";
 
 import { defineAdapter } from "../src/capabilities.mjs";
 import { NATIVE_ACTIVATION_KINDS, NATIVE_BINDING_MODES, compareStableVersions,
-  evaluateNativeEligibility, validateNativeActivationPlan, validateNativeDeliveryContract,
-  validateNativeHandshake } from "../src/native-delivery.mjs";
+  evaluateNativeEligibility, evaluateVersionContract, validateNativeActivationPlan,
+  validateNativeDeliveryContract, validateNativeHandshake } from "../src/native-delivery.mjs";
 
 // Kept cohesive above 300 lines because every case exercises one closed
 // contract (manifest, probe, handshake, activation plan) against the same
@@ -235,6 +235,33 @@ test("a regular adapter without a native contract keeps live delivery off", () =
     platform: "darwin-arm64", probe: probe() }), { eligible: false,
     reasonCode: "native_delivery_unsupported", minimumVersion: null, protocolContract: null,
     modes: [] });
+});
+
+// The contract check is also handed adapter objects that never went through
+// defineAdapter - a registry entry assembled by hand, a fixture. Every shape
+// that is not a contract has to come back as a reason code, because the callers
+// are a delivery offer and a restart decision, and a TypeError raised inside
+// either surfaces far from the declaration that caused it. A null declaration
+// used to do exactly that: it is not `undefined`, so it fell through to
+// `contract.minimumByPlatform` and threw.
+test("a declaration that is not a contract answers with a reason code rather than throwing", () => {
+  const closed = reasonCode => ({ reasonCode, minimumVersion: null, protocolContract: null });
+  const judge = nativeDelivery => evaluateVersionContract({ nativeDelivery },
+    { clientVersion: "2.1.258", platform: "darwin-arm64" });
+
+  for (const missing of [undefined, null]) {
+    assert.deepEqual(judge(missing), closed("native_delivery_unsupported"), String(missing));
+  }
+  assert.deepEqual(evaluateVersionContract(null,
+    { clientVersion: "2.1.258", platform: "darwin-arm64" }),
+  closed("native_delivery_unsupported"), "no adapter at all");
+
+  // Present, but with nothing captured for this platform to judge against.
+  for (const partial of ["x", 5, true, [], {}, { minimumByPlatform: {} },
+    { minimumByPlatform: { "darwin-arm64": "2.1.258" } },
+    { minimumByPlatform: { "darwin-arm64": "2.1.258" }, anchors: [] }]) {
+    assert.deepEqual(judge(partial), closed("platform_not_captured"), JSON.stringify(partial));
+  }
 });
 
 test("the session handshake rechecks the static rule and publishes only adapter facts", () => {

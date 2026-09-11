@@ -120,7 +120,11 @@ function knownBadHit(contract, version) {
 // or handshake shape to check further).
 export function evaluateVersionContract(adapter, { clientVersion, platform }) {
   const contract = adapter?.nativeDelivery;
-  if (contract === undefined) {
+  // `== null` rather than `=== undefined`: a null declaration is as much "no
+  // contract" as a missing one, and reading `contract.minimumByPlatform` off it
+  // threw the very TypeError the guard below exists to prevent. defineAdapter
+  // cannot produce that shape; a hand-built registry entry can.
+  if (contract == null) {
     return { reasonCode: "native_delivery_unsupported", minimumVersion: null, protocolContract: null };
   }
   const uncaptured = { reasonCode: "platform_not_captured", minimumVersion: null,

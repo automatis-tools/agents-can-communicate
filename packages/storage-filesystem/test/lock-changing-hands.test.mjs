@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
-import { lstat, mkdir, mkdtemp, open, rename, rm, writeFile } from "node:fs/promises";
+import { lstat, mkdir, mkdtemp, open, rename, rm, stat, symlink, unlink, writeFile }
+  from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -226,21 +227,104 @@ test("a lock renamed aside under an owner read is a move, not an escape", async 
 
 // The same rule seen without a race: where the filesystem keeps one directory
 // under names that differ only in case, both names are that directory, and the
-// guard that compares names rather than locations refused one of them.
+// guard that compared names rather than identity refused one of them. This runs
+// everywhere rather than skipping, so the suite's skip count does not depend on
+// which filesystem it lands on: where case is significant the second name names
+// nothing, and saying so is a real assertion about that machine.
 test("a managed directory reached by another of its own names is not an escape", async t => {
   const { root, paths } = await store(t);
   const { assertManagedDirectory } = await import("../src/safe-directory.mjs");
   const spelled = path.join(root, path.basename(paths.locks).toUpperCase());
   const insensitive = await lstat(spelled).then(found => found.isDirectory(), () => false);
+
   if (!insensitive) {
-    t.skip("this filesystem distinguishes case, so the directory has only one name");
+    await assert.rejects(assertManagedDirectory(root, spelled), { code: "ENOENT" },
+      "this filesystem distinguishes case, so that name must simply not exist");
     return;
   }
-
   const inspected = await assertManagedDirectory(root, spelled);
   assert.equal(inspected.directory, spelled);
   assert.equal(inspected.stat.isDirectory(), true);
 });
+
+/**
+ * Inside the store is not the same as where the name says.
+ *
+ * Judging only containment in the canonical root let a directory be served
+ * from somewhere else inside the store: an ancestor replaced by a symlink
+ * after it had been checked resolves the rest of the walk into another
+ * directory, and both halves of `withRegularNoFollow`'s parent identity check
+ * agree with each other because both resolve through the same symlink.
+ * Measured at 9 to 11 admissions per 2.5 seconds of this race, each one
+ * serving the decoy's directory for the target's path.
+ *
+ * What a rename cannot change is which directory a segment lives in, so the
+ * parent is the thing held fixed: each segment must resolve to a child of the
+ * directory the previous segment validated. Sampled for the same reason as the
+ * test above - the window is between two calls inside one walk and cannot be
+ * interleaved from here - but it cannot fail spuriously: only an admitted
+ * redirect fails it, and the run asserts it exercised the race rather than
+ * passing on an empty one.
+ */
+test("an ancestor swapped for a symlink cannot serve another directory in the store",
+  async t => {
+    const { root } = await store(t);
+    const { assertManagedDirectory } = await import("../src/safe-directory.mjs");
+    const depth = ["l1", "l2", "l3"];
+    const asked = path.join(root, "target");
+    const parked = path.join(root, "target.parked");
+    const decoy = path.join(root, "decoy");
+    for (const base of [asked, decoy]) await mkdir(path.join(base, ...depth), { recursive: true });
+    const leaf = path.join(asked, ...depth);
+    const decoyLeaf = await stat(path.join(decoy, ...depth));
+    const turn = () => new Promise(resolve => { setImmediate(resolve); });
+
+    let flips = 0;
+    let churning = true;
+    const churn = (async () => {
+      while (churning) {
+        try {
+          await rename(asked, parked);
+          await symlink(decoy, asked);
+          flips += 1;
+          for (let i = 0; i < 6; i += 1) await turn();
+          await unlink(asked);
+          await rename(parked, asked);
+          await new Promise(resolve => { setTimeout(resolve, 2); });
+        } catch { /* losing the race against ourselves is expected */ }
+      }
+    })();
+
+    const counts = { admitted: 0, redirected: 0, absent: 0, escaped: 0, notReal: 0, other: 0 };
+    const deadline = Date.now() + 2_500;
+    const reader = async () => {
+      while (Date.now() < deadline) {
+        try {
+          const found = await assertManagedDirectory(root, leaf);
+          if (found.stat.dev === decoyLeaf.dev && found.stat.ino === decoyLeaf.ino) {
+            counts.redirected += 1;
+          } else counts.admitted += 1;
+        } catch (error) {
+          const message = error.message ?? "";
+          if (error.code === "ENOENT") counts.absent += 1;
+          else if (/escapes the canonical store root/.test(message)) counts.escaped += 1;
+          else if (/is not a real directory/.test(message)) counts.notReal += 1;
+          else counts.other += 1;
+        }
+      }
+    };
+    try {
+      await Promise.all(Array.from({ length: 16 }, reader));
+    } finally {
+      churning = false;
+      await churn;
+    }
+
+    const report = JSON.stringify({ flips, ...counts });
+    assert.equal(counts.redirected, 0, `another directory in the store was served: ${report}`);
+    assert.ok(flips > 0 && counts.admitted > 0 && counts.notReal > 0,
+      `the race never ran, so nothing was proven: ${report}`);
+  });
 
 test("the guard still refuses a record whose parent was swapped", async t => {
   // The protection this is scoped away from must remain everywhere else.
