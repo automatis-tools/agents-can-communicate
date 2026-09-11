@@ -28,6 +28,22 @@
   another deliberately leaves it unset so an operator's own value still wins. On this
   machine the Codex skill loses 690 tokens and the Claude Code skill 262.
 
+| Candidate artifact | Value |
+|---|---|
+| Built from | `797f9348f9b7e2f43ab7ad48e5d3e4aea552354f` |
+| Tarball | `agents-can-communicate-0.5.2.tgz`, 383,868 bytes, 272 files |
+| sha256 | `30ca8feff644ab612c249cf68a4ccae5c87632d931823e82f7467c1a936c9578` |
+
+The exact archive passed installed-package verification and all 27 packed managed-runtime
+checks, covering install, bootstrap, reinstall, update, degraded update and diagnostics.
+The full suite passed with 2,124 tests, 2,123 passes, zero failures and one skip, which
+is the uninstall case that requires Gemini CLI to be absent and it is installed on the
+capture machine.
+
+Both wording defects were found by reading the transcript of a live Codex session that
+had been asked, over ACC, to check its own diagnostics. See
+`docs/release-evidence/v0.5.2.md`.
+
 ## 0.5.1 — release candidate
 
 - Codex permission ownership survives the client writing its own tables. ACC appends its
