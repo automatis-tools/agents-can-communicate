@@ -14,6 +14,7 @@ import { STORE_VERSION } from "@agents-can-communicate/storage-filesystem";
 import { writePin } from "../src/managed-runtime/pins.mjs";
 import { canonicalManagerRoot } from "../src/managed-runtime/state.mjs";
 import { main } from "../../../bin/entrypoints/acc-hook.mjs";
+import { fixtureRoot } from "../../../tests/helpers/temp-workspace.mjs";
 
 async function withArgv(args, fn) {
   const original = process.argv;
@@ -36,8 +37,8 @@ async function withDataHome(fn) {
   }
 }
 
-test("a pinned session's hook runs the pinned generation's own entrypoint", async () => {
-  const root = await mkdtemp(path.join(tmpdir(), "acc-hook-pin-"));
+test("a pinned session's hook runs the pinned generation's own entrypoint", async t => {
+  const root = await fixtureRoot(t, "acc-hook-pin-");
   const managerRoot = path.join(root, "runtime");
   const pinned = path.join(managerRoot, "generations", "0.4.2-pinned");
   const active = path.join(managerRoot, "generations", "0.4.4-active");
@@ -65,9 +66,9 @@ test("a pinned session's hook runs the pinned generation's own entrypoint", asyn
   process.exitCode = 0;
 });
 
-test("a pinned generation that will not import falls back to the active generation without failing the client", async () => {
+test("a pinned generation that will not import falls back to the active generation without failing the client", async t => {
   await withDataHome(async () => {
-    const root = await mkdtemp(path.join(tmpdir(), "acc-hook-pin-broken-"));
+    const root = await fixtureRoot(t, "acc-hook-pin-broken-");
     const managerRoot = path.join(root, "runtime");
     const pinned = path.join(managerRoot, "generations", "0.4.2-broken");
     const active = path.join(managerRoot, "generations", "0.4.4-active");
@@ -90,9 +91,9 @@ test("a pinned generation that will not import falls back to the active generati
   });
 });
 
-test("a pinned generation whose entrypoint imports but whose main throws also falls back", async () => {
+test("a pinned generation whose entrypoint imports but whose main throws also falls back", async t => {
   await withDataHome(async () => {
-    const root = await mkdtemp(path.join(tmpdir(), "acc-hook-pin-throws-"));
+    const root = await fixtureRoot(t, "acc-hook-pin-throws-");
     const managerRoot = path.join(root, "runtime");
     const pinned = path.join(managerRoot, "generations", "0.4.2-throws");
     const active = path.join(managerRoot, "generations", "0.4.4-active");
@@ -112,9 +113,9 @@ test("a pinned generation whose entrypoint imports but whose main throws also fa
   });
 });
 
-test("no managerRoot or packageRoot (unmanaged invocation) never attempts delegation", async () => {
+test("no managerRoot or packageRoot (unmanaged invocation) never attempts delegation", async t => {
   await withDataHome(async () => {
-    const root = await mkdtemp(path.join(tmpdir(), "acc-hook-unmanaged-"));
+    const root = await fixtureRoot(t, "acc-hook-unmanaged-");
     const payload = { hook_event_name: "Notification", session_id: "session-unmanaged", cwd: root };
     process.exitCode = undefined;
     await withArgv(["claude_code", "Notification"], () => main({ payload }));
@@ -131,9 +132,9 @@ test("no managerRoot or packageRoot (unmanaged invocation) never attempts delega
 // the coincidence - the pin below still names a different, importable
 // generation, so if the guard were missing this hook would delegate again and
 // that second generation's own `main` would run and leave its own mark.
-test("a hook already running because it was delegated to never delegates again", async () => {
+test("a hook already running because it was delegated to never delegates again", async t => {
   await withDataHome(async () => {
-    const root = await mkdtemp(path.join(tmpdir(), "acc-hook-recursion-"));
+    const root = await fixtureRoot(t, "acc-hook-recursion-");
     const managerRoot = path.join(root, "runtime");
     const active = path.join(managerRoot, "generations", "0.4.4-active");
     const elsewhere = path.join(managerRoot, "generations", "0.4.9-elsewhere");
@@ -172,9 +173,9 @@ test("a hook already running because it was delegated to never delegates again",
 // value only, the contract its pin declares. The marker is the non-vacuousness
 // evidence: with a matching contract the first test asserts it is written, so
 // its absence here can only come from the gate, not from a broken fixture.
-test("a pinned generation declaring another store contract is never imported, and the client still proceeds", async () => {
+test("a pinned generation declaring another store contract is never imported, and the client still proceeds", async t => {
   await withDataHome(async () => {
-    const root = await mkdtemp(path.join(tmpdir(), "acc-hook-pin-contract-"));
+    const root = await fixtureRoot(t, "acc-hook-pin-contract-");
     const managerRoot = path.join(root, "runtime");
     const pinned = path.join(managerRoot, "generations", "0.4.2-other-contract");
     const active = path.join(managerRoot, "generations", "0.4.4-active");

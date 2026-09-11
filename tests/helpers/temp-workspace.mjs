@@ -28,3 +28,14 @@ export async function withTempRuntime(run) {
     }
   });
 }
+
+// node:test offers cleanup only through `t.after`, which is reachable from the
+// test's own context, so a disposable root has to be created with `t` in hand.
+// Tests that reached for a bare `mkdtemp` instead left their trees behind: one
+// file alone created 220 roots per run. CI never noticed, because its runners
+// are discarded; a developer's temp directory grew by gigabytes across runs.
+export async function fixtureRoot(t, prefix) {
+  const created = await mkdtemp(join(tmpdir(), prefix));
+  t.after(() => rm(created, { recursive: true, force: true }));
+  return created;
+}

@@ -1,7 +1,6 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { mkdtemp, mkdir, symlink, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { mkdir, symlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 import test from "node:test";
 
@@ -9,9 +8,10 @@ import { STORE_VERSION } from "@agents-can-communicate/storage-filesystem";
 
 import { resolvePinnedGeneration, writePin } from "../src/managed-runtime/pins.mjs";
 import { canonicalManagerRoot } from "../src/managed-runtime/state.mjs";
+import { fixtureRoot } from "../../../tests/helpers/temp-workspace.mjs";
 
-test("a session pinned to another generation resolves that entrypoint", async () => {
-  const root = await mkdtemp(path.join(tmpdir(), "acc-delegate-"));
+test("a session pinned to another generation resolves that entrypoint", async t => {
+  const root = await fixtureRoot(t, "acc-delegate-");
   const pinned = path.join(root, "generations", "0.4.2-abc");
   await mkdir(path.join(pinned, "bin", "entrypoints"), { recursive: true });
   await writeFile(path.join(pinned, "bin", "entrypoints", "acc-hook.mjs"), "export const main = () => {};");
@@ -22,8 +22,8 @@ test("a session pinned to another generation resolves that entrypoint", async ()
     await canonicalManagerRoot(pinned));
 });
 
-test("a session pinned to the active generation does not delegate", async () => {
-  const root = await mkdtemp(path.join(tmpdir(), "acc-delegate-"));
+test("a session pinned to the active generation does not delegate", async t => {
+  const root = await fixtureRoot(t, "acc-delegate-");
   const active = path.join(root, "generations", "0.4.4-def");
   await mkdir(path.join(active, "bin", "entrypoints"), { recursive: true });
   await writeFile(path.join(active, "bin", "entrypoints", "acc-hook.mjs"), "export const main = () => {};");
@@ -32,16 +32,16 @@ test("a session pinned to the active generation does not delegate", async () => 
   assert.equal(await resolvePinnedGeneration({ root, harnessSessionId: "h2", active }), null);
 });
 
-test("a pinned generation removed from disk falls back to the active one", async () => {
-  const root = await mkdtemp(path.join(tmpdir(), "acc-delegate-"));
+test("a pinned generation removed from disk falls back to the active one", async t => {
+  const root = await fixtureRoot(t, "acc-delegate-");
   await writePin({ root, harnessSessionId: "h3", runtimeRoot: path.join(root, "generations", "gone"),
     version: "0.4.2", storeVersion: STORE_VERSION, clientPid: process.pid });
   const active = path.join(root, "generations", "0.4.4-def");
   assert.equal(await resolvePinnedGeneration({ root, harnessSessionId: "h3", active }), null);
 });
 
-test("no pin falls back to the active generation", async () => {
-  const root = await mkdtemp(path.join(tmpdir(), "acc-delegate-"));
+test("no pin falls back to the active generation", async t => {
+  const root = await fixtureRoot(t, "acc-delegate-");
   assert.equal(await resolvePinnedGeneration({ root, harnessSessionId: "absent",
     active: path.join(root, "generations", "0.4.4-def") }), null);
 });
@@ -59,8 +59,8 @@ test("no pin falls back to the active generation", async () => {
 // runner rather than about the code, and fails on Linux for a reason that
 // has nothing to do with the fix. A real directory plus a symlink this test
 // creates and uses as the data home makes the divergence exist everywhere.
-test("a pin written under the runner's raw data-home root is found by the hook's canonicalised root", async () => {
-  const container = await mkdtemp(path.join(tmpdir(), "acc-datahome-"));
+test("a pin written under the runner's raw data-home root is found by the hook's canonicalised root", async t => {
+  const container = await fixtureRoot(t, "acc-datahome-");
   const base = path.join(container, "real");
   const dataHome = path.join(container, "link");
   await mkdir(base, { recursive: true });
@@ -96,9 +96,9 @@ test("a pin written under the runner's raw data-home root is found by the hook's
 // run is that checkout). A later managed hook must refuse to import it, the
 // same way validateRuntime already refuses a control record's generation
 // pointer that lands outside <root>/generations.
-test("a pin naming a generation outside the manager's own generations directory is refused", async () => {
-  const root = await mkdtemp(path.join(tmpdir(), "acc-delegate-"));
-  const outside = await mkdtemp(path.join(tmpdir(), "acc-outside-"));
+test("a pin naming a generation outside the manager's own generations directory is refused", async t => {
+  const root = await fixtureRoot(t, "acc-delegate-");
+  const outside = await fixtureRoot(t, "acc-outside-");
   await mkdir(path.join(outside, "bin", "entrypoints"), { recursive: true });
   // A real, importable entrypoint - proves refusal comes from containment,
   // not merely from the file being unreachable.
@@ -112,8 +112,8 @@ test("a pin naming a generation outside the manager's own generations directory 
 // Minor: covers the resolve level directly rather than leaning on Task 7's
 // readPin tests alone - every failure path this task owns should be pinned by
 // a test at the level this task added.
-test("an unreadable pin record falls back to the active generation", async () => {
-  const root = await mkdtemp(path.join(tmpdir(), "acc-delegate-"));
+test("an unreadable pin record falls back to the active generation", async t => {
+  const root = await fixtureRoot(t, "acc-delegate-");
   const canonicalRoot = await canonicalManagerRoot(root);
   await mkdir(path.join(canonicalRoot, "pins"), { recursive: true });
   const file = path.join(canonicalRoot, "pins",
@@ -138,9 +138,9 @@ test("an unreadable pin record falls back to the active generation", async () =>
 // and differ in exactly one value, the pin's declared contract. The first is
 // the control and must delegate; if the gate were removed the others would
 // answer the same way and the test would fail.
-test("a pin declaring a store contract other than this generation's is not delegated to", async () => {
+test("a pin declaring a store contract other than this generation's is not delegated to", async t => {
   const fixture = async (harnessSessionId, storeVersion) => {
-    const root = await mkdtemp(path.join(tmpdir(), "acc-delegate-contract-"));
+    const root = await fixtureRoot(t, "acc-delegate-contract-");
     const pinned = path.join(root, "generations", "0.4.2-abc");
     await mkdir(path.join(pinned, "bin", "entrypoints"), { recursive: true });
     await writeFile(path.join(pinned, "bin", "entrypoints", "acc-hook.mjs"),
@@ -169,8 +169,8 @@ test("a pin declaring a store contract other than this generation's is not deleg
 // root manifest declares none, carries null. Unknown cannot be proved equal,
 // and this function's answer to every pin it cannot honour is the active
 // generation.
-test("a pin declaring no store contract at all is not delegated to", async () => {
-  const root = await mkdtemp(path.join(tmpdir(), "acc-delegate-nocontract-"));
+test("a pin declaring no store contract at all is not delegated to", async t => {
+  const root = await fixtureRoot(t, "acc-delegate-nocontract-");
   const pinned = path.join(root, "generations", "0.4.2-abc");
   await mkdir(path.join(pinned, "bin", "entrypoints"), { recursive: true });
   await writeFile(path.join(pinned, "bin", "entrypoints", "acc-hook.mjs"), "export const main = () => {};");

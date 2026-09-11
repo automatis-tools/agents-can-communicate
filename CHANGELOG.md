@@ -1,5 +1,46 @@
 # Changelog
 
+## 0.5.1 — release candidate
+
+- Codex permission ownership survives the client writing its own tables. ACC appends its
+  permission block at end of file and records the TOML table that encloses it, then tells
+  the user to trust ACC's hooks in Codex — and Codex writes each trusted hook as a new
+  `hooks.state` table above that block, changing the enclosing table. ACC read its own
+  documented setup step as a third-party edit: `acc doctor` reported working sender
+  permissions as unverified and advised a reinstall that could not repair them, and
+  `acc uninstall` would have left the block behind for manual review. The enclosing table
+  is now compared only for a block whose first declaration is a bare assignment, because
+  only such an assignment takes its meaning from the table above it; a block that opens
+  with its own header states its full path and is unaffected by what precedes it. Live
+  delivery itself was never broken by this — only the reporting and the clean removal.
+- Tests no longer leave their fixtures behind. `node:test` exposes cleanup through
+  `t.after`, which a test declared without its context cannot reach, and seven files took
+  a bare `mkdtemp` instead; the reclamation race test alone built 200 fixture trees per
+  run. A full suite left gigabytes in the system temp directory, invisible to CI because
+  its runners are discarded. Disposable roots now come from one shared helper that
+  registers their removal, and the race test clears each trial as it goes so its peak
+  usage is one fixture rather than two hundred. One further fixture escaped for a
+  different reason: its cleanup rebuilt the directory name from the prefix it asked for,
+  which never matches the random suffix `mkdtempSync` actually appends, so every run
+  removed a path that did not exist and kept the one that did.
+
+| Candidate artifact | Value |
+|---|---|
+| Built from | `f438cf8de8f2daac16fe975413df1491f3f1f4ae` |
+| Tarball | `agents-can-communicate-0.5.1.tgz`, 382,983 bytes, 272 files |
+| sha256 | `ac2d466cafbb5d92f29c6d659b20c80575ef8baae478e2637452669aee2b1027` |
+
+The exact archive passed installed-package verification and all 27 packed managed-runtime
+checks, covering install, bootstrap, reinstall, update, degraded update and diagnostics.
+The full suite passed with 2,117 tests, 2,116 passes, zero failures and one skip, which
+is the uninstall case that requires Gemini CLI to be absent and it is installed on the
+capture machine.
+
+Live delivery between Claude Code 2.1.268 and Codex CLI 0.154.0 was captured on a machine
+wiped of every ACC trace beforehand, installing from the public registry. Both directions
+were served natively — `claude-channel` and `codex-app-server` — and the peer-to-peer leg
+took seven seconds from request to answer. See `docs/release-evidence/v0.5.1.md`.
+
 ## 0.5.0 — release candidate
 
 - Activation of a new managed runtime generation no longer waits for every live process
