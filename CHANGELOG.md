@@ -1,20 +1,44 @@
 # Changelog
 
-## Unreleased
+## 0.5.0 — release candidate
 
-- Store contract declaration. The manager can now learn which shared-store contract a
-  staged generation speaks without importing that generation's code. A top-level package
-  manifest field `accStoreVersion` declares the contract, read before activation.
+- Activation of a new managed runtime generation no longer waits for every live process
+  to exit. It waits only for holds — runtime leases and native binding records — whose
+  declared store contract differs from the incoming generation's, or is unknown; a hold
+  that declares a matching contract no longer blocks. Runtime leases and binding records
+  now carry that declared contract, and the wait notice names each blocking hold's
+  contract alongside its process. Records written before this change declare no contract
+  and still hold, so the first update after this ships still waits for every process;
+  later updates do not.
+- A session finishes on the generation it started with. The first ACC code in a session
+  records a pin naming its generation root, version, store contract, client PID and
+  creation time; hooks resolve through that pin and keep loading the pinned generation's
+  code after the active pointer moves on. `SessionEnd` and the same confirmed-dead-PID
+  sweep that reaps stale leases remove abandoned pins.
+- Native delivery eligibility is judged against the version that will actually serve,
+  not the binary ACC detected. The minimum-version floor, prerelease refusal and denylist
+  now apply to the reported serving version on the capability probe, the session
+  handshake, the Codex receiver's own version check, and the delivery router's offer
+  path, so a service that restarted onto a different build no longer turns delivery off
+  by version identity alone. A version below the minimum reports `below_minimum_version`
+  naming that version instead of a generic probe failure.
+- `acc uninstall` retires the binding records, pins and runtime leases its own install
+  produced instead of leaving them to block the next install. Clearing those holds also
+  restores the maintenance path that inspects targeted adapters, so a subsequent install
+  and update proceed with nothing left over from the previous one.
+- A generation directory is removed once no pin and no lease references it, under the
+  manager lock, and only when no live or unknown holder could still reference it, instead
+  of accumulating indefinitely.
 
 | Candidate artifact | Value |
 |---|---|
-| Built from | `c6a0e23a663d7afac1fc9afa3d11d121ca4e2e05` |
-| Tarball | `agents-can-communicate-0.4.4.tgz`, 362,513 bytes, 269 files |
-| sha256 | `687be512b22cd7d484e306009b131db99f9e84b6769f63ab90b24bb0fc1b2204` |
+| Built from | `ea56a99a9b1baae40a1dbaa4c98e67f908114af1` |
+| Tarball | `agents-can-communicate-0.5.0.tgz`, 375,435 bytes, 272 files |
+| sha256 | `184a472ac9a65540364dde4f42ddb3318759b9b6d79802c308c229bf924eb2da` |
 
 The exact archive passed installed-package verification. The full suite passed with
-2,020 passes, zero failures and one environment-dependent skip. This candidate has not
-been tagged or published.
+2,089 tests, 2,088 passes, zero failures and one environment-dependent skip. This
+candidate has not been tagged or published.
 
 ## 0.4.4 — release candidate
 
