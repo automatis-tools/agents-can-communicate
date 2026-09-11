@@ -39,16 +39,23 @@
 - A generation directory is removed once no pin and no lease references it, under the
   manager lock, and only when no live or unknown holder could still reference it, instead
   of accumulating indefinitely.
+- A store read no longer fails on macOS because a managed directory was renamed while it
+  was being read. The containment check judges where a directory resolves to rather than
+  what it is called: `realpath` there answers with the name a directory carries at the
+  moment it replies, so an ordinary writer-lock handover — the lock is granted, reclaimed
+  and released entirely by rename — could report `managed directory escapes the canonical
+  store root` and take the write with it. A directory that resolves outside the store is
+  still refused, as is one that is a symlink rather than a real directory.
 
 | Candidate artifact | Value |
 |---|---|
-| Built from | `6967ebcfdcbf4655b5ac50106e76e65856f7fdea` |
-| Tarball | `agents-can-communicate-0.5.0.tgz`, 378,317 bytes, 272 files |
-| sha256 | `390dc77cef3440ae509c4315e017fe0cdc031b1a959812405ce5c9c5af592e7b` |
+| Built from | `bd33728fa46adc618c08958658bc6b5e97004d1c` |
+| Tarball | `agents-can-communicate-0.5.0.tgz`, 379,048 bytes, 272 files |
+| sha256 | `74158a7093e1927ed8d41ed56ecbaee81b896cfaccaaec4eda737ba50c2925d2` |
 
 The exact archive passed installed-package verification and all 27 packed managed-runtime
 checks, covering install, bootstrap, reinstall, update, degraded update and diagnostics.
-The full suite passed with 2,097 tests, 2,096 passes, zero failures and one
+The full suite passed with 2,103 tests, 2,102 passes, zero failures and one
 environment-dependent skip. This candidate has not been tagged or published.
 
 ## 0.4.4 — release candidate
