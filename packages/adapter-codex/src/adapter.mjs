@@ -5,15 +5,17 @@ import certification from "../certification.json" with { type: "json" };
 import { createCodexMaintenance } from "./maintenance.mjs";
 export { sameMaintenanceIdentity } from "./maintenance.mjs";
 
-import { PROTOCOL_CONTRACT } from "./app-server-client.mjs";
+import { CODEX_QUEUE_MINIMUM, PROTOCOL_CONTRACT } from "./app-server-client.mjs";
 import { allowOutcome, denyOutcome, injectOutcome, normalizeCodexHook }
   from "./hooks.mjs";
 import { planCodexInstall, detectCodex, installCodexPlugin, preflightCodexUninstall,
   uninstallCodexPlugin } from "./install.mjs";
 // Public native wiring is enabled only with installed-product capture evidence.
 
+// Re-exported so existing importers of CODEX_QUEUE_MINIMUM keep resolving; the
+// value now lives in app-server-client.mjs alongside the other version rules.
+export { CODEX_QUEUE_MINIMUM };
 export const CODEX_VERSION = "0.147.0";
-export const CODEX_QUEUE_MINIMUM = "0.152.1";
 export const CODEX_DELIVERY_FALLBACK = Object.freeze({
   diagnostic: "Codex native delivery requires codex-cli 0.152.1 or newer on darwin-arm64, "
     + "recorded recipient consent and a reachable LocalDaemon session with exact thread, cwd, "

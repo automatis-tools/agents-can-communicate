@@ -9,3 +9,8 @@ export { discoverWorkspace } from "./workspace-discovery.mjs";
 export { createGitProbe, hermeticEnv } from "./git-probe.mjs";
 export { platformDataHome, runtimePaths } from "./runtime-paths.mjs";
 export { platformPaths } from "./platform-paths.mjs";
+// A pin names the generation a session started with, kept beside its binding
+// so a hook can be made to keep loading that generation once a newer one
+// activates.
+export { clearPin, hookEntrypointFor, readPin, reapPins, resolvePinnedGeneration, writePin }
+  from "./managed-runtime/pins.mjs";

@@ -20,7 +20,9 @@ async function fixture(t) {
 
 async function initialize(f) {
   await mkdir(f.control.active.root, { recursive: true });
-  await writeControl(f.root, f.control);
+  // writeControl normalizes runtime pointers (e.g. attaching storeVersion), so
+  // the fixture tracks that normalized shape rather than its raw literal.
+  f.control = await writeControl(f.root, f.control);
 }
 
 test("absent control read leaves the manager uninitialized", async t => {

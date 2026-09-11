@@ -18,9 +18,11 @@ async function fixture(t) {
   const active = { version: "0.4.0", root: path.join(root, "generations", "old") };
   const pending = { version: "0.4.1", root: path.join(root, "generations", "new") };
   await mkdir(active.root, { recursive: true }); await mkdir(pending.root, { recursive: true });
-  await writeControl(root, { schemaVersion: 1, active, pending, phase: "ready", auto: true,
+  // writeControl normalizes the runtime pointers (e.g. attaching storeVersion),
+  // so the fixture tracks that normalized shape rather than its raw literals.
+  const control = await writeControl(root, { schemaVersion: 1, active, pending, phase: "ready", auto: true,
     pin: null, checkedAt: null, home: path.join(dataHome, "home"), targets: [], notice: null });
-  return { root, dataHome, active, pending };
+  return { root, dataHome, active: control.active, pending: control.pending };
 }
 async function binding(f, value) {
   const dir = path.join(f.dataHome, "acc", "workspaces", "project", "bindings");

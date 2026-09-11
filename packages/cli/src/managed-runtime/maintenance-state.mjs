@@ -50,7 +50,7 @@ export function maintenanceNotice(job) {
       : job.waiting?.reason === "other_processes" ? `${job.waiting.processes} other or unidentified process(es) to exit`
         : job.waiting?.reason === "caller_exit" ? "the requesting command to exit"
           : job.waiting?.reason === "update_worker" ? "another ACC updater"
-            : "idle clients and other ACC processes to exit";
+            : "idle client work and any ACC process still holding this update";
     return `ACC ${version} update maintenance is scheduled; waiting for ${waiting}. Open clients will disconnect during restart. Check acc doctor for progress.`;
   }
   return `ACC ${version} update maintenance: ${job.status}. Check acc doctor for the result.`;

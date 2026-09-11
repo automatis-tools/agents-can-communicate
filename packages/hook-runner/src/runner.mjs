@@ -1,14 +1,15 @@
 import { retireNativeBinding } from "./native-retirement.mjs";
 import { createHash, randomBytes } from "node:crypto";
-import { realpath } from "node:fs/promises";
+import { readFile, realpath } from "node:fs/promises";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 import { clearNativeAttempt, clearSessionBinding, effectiveCapabilities, loadSessionBinding, storeSessionBinding }
   from "@agents-can-communicate/adapter-sdk";
 import { createCoordinationService } from "@agents-can-communicate/core";
 import { AccError, createId } from "@agents-can-communicate/protocol";
 import { openFilesystemStore } from "@agents-can-communicate/storage-filesystem";
-import { createGitProbe, discoverWorkspace, platformDataHome, runtimePaths }
+import { clearPin, createGitProbe, discoverWorkspace, platformDataHome, runtimePaths, writePin }
   from "@agents-can-communicate/cli";
 
 import { resolveClientPid } from "./client-pid.mjs";
@@ -178,6 +179,38 @@ export function participantFor(adapterId, harnessSessionId, env = {}) {
   return `${adapterId}-${suffix}`;
 }
 
+// The runtime generation this module ships as part of, found by walking up
+// from its own file for the nearest ancestor manifest that declares a store
+// contract. A workspace package's own manifest (this one's included) carries a
+// `version` but never `accStoreVersion` - only the generation's root manifest
+// does - so this cannot stop at the first `package.json` the way a version
+// lookup could. Answers null facts rather than throwing: a binding published
+// without a readable contract is exactly today's unknown-hold behaviour.
+//
+// `version` rides along from the same manifest read, for a pin (below) to name
+// the generation it names by, distinct from `storeVersion`'s contract number.
+async function runtimeFacts(fromUrl) {
+  let directory = path.dirname(fileURLToPath(fromUrl));
+  for (;;) {
+    const manifest = await readFile(path.join(directory, "package.json"), "utf8")
+      .then(JSON.parse).catch(() => null);
+    if (Number.isSafeInteger(manifest?.accStoreVersion)) {
+      return { storeVersion: manifest.accStoreVersion, runtimeRoot: directory,
+        version: typeof manifest.version === "string" ? manifest.version : null };
+    }
+    const parent = path.dirname(directory);
+    if (parent === directory) return { storeVersion: null, runtimeRoot: null, version: null };
+    directory = parent;
+  }
+}
+
+// Where a pin lives: the managed runtime's own root, sibling of `generations`
+// and `leases`, never this workspace's store. The hook entry point that will
+// read a pin (a later task) has not resolved a workspace yet when it needs to
+// - it only has the data home - so a pin keyed under `paths.root` would be
+// unreachable from there.
+const managerRootFor = dataHome => path.join(dataHome, "acc", "runtime");
+
 async function openContext({ cwd, dataHome, runtime, env, deadline }) {
   assertHookBudget(deadline);
   const descriptor = await discoverWorkspace({ cwd, env: env ?? {},
@@ -307,12 +340,18 @@ async function projectTurn({ binding, context, adapter, adapterId }) {
 const HANDLERS = {
   async sessionStart({ event, context, adapter, adapterId, binding, paths,
     readProcessTable, probeClientVersion, platform, deadline }) {
+    // Where this session's pin lives, resolved once and reused at every write
+    // below. Beside `paths.root`, never inside it: see `managerRootFor`.
+    const pinRoot = managerRootFor(context.dataHome);
     // A repeated start refreshes the client's version/platform. Remove the old
     // certified facts before any probe, PID lookup, resume, or open can fail;
     // keep only the generation identity needed for a successful resume.
     if (binding !== null) {
+      const facts = await runtimeFacts(import.meta.url);
       await storeSessionBinding({ runtimeDir: paths.root, deadlineAt: deadline, harnessSessionId: event.sessionId,
-        accSessionId: binding.accSessionId, generation: binding.generation });
+        accSessionId: binding.accSessionId, generation: binding.generation, ...facts });
+      await writePin({ root: pinRoot, harnessSessionId: event.sessionId, runtimeRoot: facts.runtimeRoot,
+        version: facts.version, storeVersion: facts.storeVersion });
     }
     const clientVersion = await probeClientVersion(adapter,
       { timeoutMs: Math.max(1, Math.min(1_000, deadline - Date.now())) });
@@ -357,8 +396,11 @@ const HANDLERS = {
       if (resumed !== null) {
         const hookBinding = { accSessionId: resumed.sessionId, generation: resumed.generation,
           ...clientFacts, clientPid };
+        const facts = await runtimeFacts(import.meta.url);
         await storeSessionBinding({ runtimeDir: paths.root, deadlineAt: deadline, harnessSessionId: event.sessionId,
-          ...hookBinding });
+          ...hookBinding, ...facts });
+        await writePin({ root: pinRoot, harnessSessionId: event.sessionId, runtimeRoot: facts.runtimeRoot,
+          version: facts.version, storeVersion: facts.storeVersion, clientPid });
         return { accSessionId: resumed.sessionId, generation: resumed.generation,
           ...clientFacts, capabilities, nativeBinding: await native(hookBinding) };
       }
@@ -368,8 +410,11 @@ const HANDLERS = {
     // happened (or it was closed), a retry allocates a NEW pair, never revives it.
     const opening = { sessionId: context.service.ids.next("session"),
       generation: context.service.ids.next("generation") };
+    const openingFacts = await runtimeFacts(import.meta.url);
     await storeSessionBinding({ runtimeDir: paths.root, deadlineAt: deadline, harnessSessionId: event.sessionId,
-      accSessionId: opening.sessionId, generation: opening.generation });
+      accSessionId: opening.sessionId, generation: opening.generation, ...openingFacts });
+    await writePin({ root: pinRoot, harnessSessionId: event.sessionId, runtimeRoot: openingFacts.runtimeRoot,
+      version: openingFacts.version, storeVersion: openingFacts.storeVersion, clientPid });
     const session = await context.service.openSession({
       ...opening,
       workspaceId: context.descriptor.id,
@@ -387,8 +432,11 @@ const HANDLERS = {
     });
     const hookBinding = { accSessionId: session.sessionId, generation: session.generation,
       ...clientFacts, clientPid };
+    const openedFacts = await runtimeFacts(import.meta.url);
     await storeSessionBinding({ runtimeDir: paths.root, deadlineAt: deadline, harnessSessionId: event.sessionId,
-      ...hookBinding });
+      ...hookBinding, ...openedFacts });
+    await writePin({ root: pinRoot, harnessSessionId: event.sessionId, runtimeRoot: openedFacts.runtimeRoot,
+      version: openedFacts.version, storeVersion: openedFacts.storeVersion, clientPid });
     return { accSessionId: session.sessionId, generation: session.generation,
       ...clientFacts, capabilities, nativeBinding: await native(hookBinding) };
   },
@@ -415,6 +463,7 @@ const HANDLERS = {
       await context.service.clearDeliveryBinding(owner);
     }
     await clearSessionBinding({ runtimeDir: paths.root, deadlineAt: deadline, harnessSessionId: event.sessionId });
+    await clearPin({ root: managerRootFor(context.dataHome), harnessSessionId: event.sessionId });
     const diagnosticDeadline = nativeDiagnosticDeadline(deadline);
     if (diagnosticDeadline !== null) {
       await clearNativeAttempt({ runtimeDir: paths.root, harnessSessionId: event.sessionId,

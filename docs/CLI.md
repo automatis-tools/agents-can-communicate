@@ -274,17 +274,21 @@ An initial `acc install` enables automatic updates. Reinstalling preserves an ex
 `acc update --auto off` choice. A full uninstall pauses updates; reinstalling restores
 the remembered setting. A background worker checks stable releases
 at most once a day, downloads and verifies a separate runtime, then refreshes installed
-integrations and skills after ACC process leases and native binding holds clear. ACC leases
-require confirmed process exit; a native binding can clear on observed SessionEnd even
-while its vendor daemon remains alive, or on confirmed process death. Unknown PIDs remain
-holds. `finish`, presence TTL, and delivery off are not observed native end. Hooks do not
+integrations and skills once no hold blocks. A runtime lease or native binding blocks only
+while the store contract it declares differs from the incoming version's, or while it
+declares none; records written before 0.5.0 declare none, so the first update after
+upgrading still waits for them. ACC leases end on confirmed process exit; a native binding
+can clear on observed SessionEnd even while its vendor daemon remains alive, or on
+confirmed process death. Unknown PIDs remain holds. `finish`, presence TTL, and delivery off are not observed native end. Hooks do not
 wait for network work. `ACC_NO_UPDATE_CHECK=1` disables update networking and background
 scheduling.
 
-`acc update` requests the update immediately. If a verified Codex service blocks activation
-or runs an older version than the installed CLI, it asks once to restart that service.
-After confirmation, a detached worker waits for idle work and other ACC processes, refreshes
-integrations, restarts the service and verifies the result. Open clients disconnect; use
+`acc update` requests the update immediately. If a verified Codex service holds a native
+binding that blocks activation, or serves a version its captured native-delivery contract
+refuses, it asks once to restart that service.
+After confirmation, a detached worker waits for idle work and for any ACC process whose
+declared store contract still holds the update, refreshes integrations, restarts the
+service and verifies the result. Open clients disconnect; use
 `acc doctor` for progress and resume the clients afterward. `--yes` supplies explicit
 noninteractive restart consent. Without consent, or with unknown ownership, the update
 remains pending. See [maintenance limits and recovery](UPGRADING.md#confirmed-client-service-maintenance). `--check` only checks and cannot be combined with

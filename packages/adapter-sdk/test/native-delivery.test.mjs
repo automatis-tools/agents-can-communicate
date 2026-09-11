@@ -5,8 +5,8 @@ import { EXIT } from "@agents-can-communicate/protocol";
 
 import { defineAdapter } from "../src/capabilities.mjs";
 import { NATIVE_ACTIVATION_KINDS, NATIVE_BINDING_MODES, compareStableVersions,
-  evaluateNativeEligibility, validateNativeActivationPlan, validateNativeDeliveryContract,
-  validateNativeHandshake } from "../src/native-delivery.mjs";
+  evaluateNativeEligibility, evaluateVersionContract, validateNativeActivationPlan,
+  validateNativeDeliveryContract, validateNativeHandshake } from "../src/native-delivery.mjs";
 
 // Kept cohesive above 300 lines because every case exercises one closed
 // contract (manifest, probe, handshake, activation plan) against the same
@@ -101,15 +101,40 @@ test("unsupported, timed-out, mismatched, and wrong-protocol probes fail closed"
     protocolContract: "fixture-native-v1", modes: [] });
   assert.deepEqual(evaluate("2.1.258", { probe: probe({ supported: false, modes: [],
     reasonCode: "feature_probe_failed" }) }), closed("feature_probe_failed"));
+  // The probe reports no version at all; the rule falls back to the detected
+  // one (2.1.258, which passes) before the probe's own timeout closes it.
   assert.deepEqual(evaluate("2.1.258", { probe: probe({ supported: false, modes: [],
     reasonCode: "probe_timeout", clientVersion: null }) }), closed("probe_timeout"));
   assert.deepEqual(evaluate("2.1.258", { probe: null }), closed("feature_probe_failed"));
-  assert.deepEqual(evaluate("2.1.258", { probe: probe({ clientVersion: "2.1.259" }) }),
-    closed("probe_version_mismatch"));
   assert.deepEqual(evaluate("2.1.258", { probe: probe({ protocolContract: "fixture-native-v2" }) }),
     closed("protocol_mismatch"));
   assert.deepEqual(evaluate("2.1.258", { probe: probe({ modes: ["idleWake"] }) }),
     closed("feature_probe_failed"));
+});
+
+test("eligibility follows the version that will serve, not the detected binary", () => {
+  // The service reports a different build from the CLI ACC detected. Both are
+  // above the captured minimum, so the delivery is eligible.
+  assert.deepEqual(evaluate("2.1.258", { probe: probe({ clientVersion: "2.1.259" }) }), ELIGIBLE);
+  // The rule is applied to the serving version, so a serving version below the
+  // minimum is refused and named, even when the detected binary is newer.
+  assert.deepEqual(evaluate("2.1.999", { probe: probe({ clientVersion: "2.1.257" }) }),
+    { eligible: false, reasonCode: "below_minimum_version", minimumVersion: "2.1.258",
+      protocolContract: "fixture-native-v1", modes: [] });
+  // A denylisted serving version stays refused.
+  assert.deepEqual(evaluate("2.1.303", { probe: probe({ clientVersion: "2.1.310" }) }),
+    { eligible: false, reasonCode: "known_bad_version", minimumVersion: "2.1.258",
+      protocolContract: "fixture-native-v1", modes: [] });
+});
+
+test("a malformed probe cannot throw once the detected version already fails the static rule", () => {
+  // The probe reports no version (so the rule falls back to the detected one)
+  // and carries an unknown field that would fail probe shape validation. The
+  // detected version is already below the minimum, so the rule closes before
+  // the probe is ever validated, and the malformed shape never surfaces.
+  assert.deepEqual(evaluate("2.1.100", { probe: probe({ clientVersion: null, transcript: "leak" }) }),
+    { eligible: false, reasonCode: "below_minimum_version", minimumVersion: "2.1.258",
+      protocolContract: "fixture-native-v1", modes: [] });
 });
 
 test("modes are the ordered intersection of probe modes and the closed vocabulary", () => {
@@ -212,6 +237,33 @@ test("a regular adapter without a native contract keeps live delivery off", () =
     modes: [] });
 });
 
+// The contract check is also handed adapter objects that never went through
+// defineAdapter - a registry entry assembled by hand, a fixture. Every shape
+// that is not a contract has to come back as a reason code, because the callers
+// are a delivery offer and a restart decision, and a TypeError raised inside
+// either surfaces far from the declaration that caused it. A null declaration
+// used to do exactly that: it is not `undefined`, so it fell through to
+// `contract.minimumByPlatform` and threw.
+test("a declaration that is not a contract answers with a reason code rather than throwing", () => {
+  const closed = reasonCode => ({ reasonCode, minimumVersion: null, protocolContract: null });
+  const judge = nativeDelivery => evaluateVersionContract({ nativeDelivery },
+    { clientVersion: "2.1.258", platform: "darwin-arm64" });
+
+  for (const missing of [undefined, null]) {
+    assert.deepEqual(judge(missing), closed("native_delivery_unsupported"), String(missing));
+  }
+  assert.deepEqual(evaluateVersionContract(null,
+    { clientVersion: "2.1.258", platform: "darwin-arm64" }),
+  closed("native_delivery_unsupported"), "no adapter at all");
+
+  // Present, but with nothing captured for this platform to judge against.
+  for (const partial of ["x", 5, true, [], {}, { minimumByPlatform: {} },
+    { minimumByPlatform: { "darwin-arm64": "2.1.258" } },
+    { minimumByPlatform: { "darwin-arm64": "2.1.258" }, anchors: [] }]) {
+    assert.deepEqual(judge(partial), closed("platform_not_captured"), JSON.stringify(partial));
+  }
+});
+
 test("the session handshake rechecks the static rule and publishes only adapter facts", () => {
   const ok = validateNativeHandshake(adapter(), { clientVersion: "2.1.259", platform: "darwin-arm64",
     handshake: handshake({ clientVersion: "2.1.259" }) });
@@ -227,7 +279,19 @@ test("the session handshake rechecks the static rule and publishes only adapter 
   assert.deepEqual(check("2.1.301", {}), closed("known_bad_version"));
   assert.deepEqual(check("2.1.258", { supported: false, modes: [], opaqueEndpointRef: null,
     leaseUntil: null, reasonCode: "handshake_timeout" }), closed("handshake_timeout"));
-  assert.deepEqual(check("2.1.258", { clientVersion: "2.1.260" }), closed("handshake_version_mismatch"));
+  // The handshake reports no version at all; the rule falls back to the
+  // detected one (2.1.258, which passes) before the timeout closes it.
+  assert.deepEqual(check("2.1.258", { supported: false, modes: [], opaqueEndpointRef: null,
+    leaseUntil: null, reasonCode: "handshake_timeout", clientVersion: null }),
+  closed("handshake_timeout"));
+  // The handshake names the session that will actually serve; a build newer
+  // than the detected binary is admitted by that version, not refused for it.
+  assert.deepEqual(check("2.1.258", { clientVersion: "2.1.260" }), { ok: true, reasonCode: null,
+    protocolContract: "fixture-native-v1", modes: ["livePush", "idleWake", "busyQueue", "replyRoute"],
+    opaqueEndpointRef: "adapter-owned-endpoint-id", leaseUntil: "2026-09-02T12:01:00.000Z" });
+  // The rule is applied to the serving version, so a serving version below
+  // the minimum is refused even when the detected binary is newer.
+  assert.deepEqual(check("2.1.999", { clientVersion: "2.1.257" }), closed("below_minimum_version"));
   assert.deepEqual(check("2.1.258", { protocolContract: "fixture-native-v2" }), closed("protocol_mismatch"));
   assert.deepEqual(check("2.1.258", { modes: ["idleWake"] }), closed("handshake_failed"));
   assert.deepEqual(check("2.1.258", {}, "linux-x64"), { ...closed("platform_not_captured"),

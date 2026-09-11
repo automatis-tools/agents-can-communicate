@@ -102,19 +102,45 @@ function knownBadHit(contract, version) {
     : compareStableVersions(version, entry.from) >= 0 && compareStableVersions(version, entry.to) <= 0));
 }
 
-// The static half of the rule: platform, minimum, prerelease, and denylist.
-function evaluateStatic(adapter, { clientVersion, platform }) {
+// Judges one reported client version against an adapter's captured
+// native-delivery contract: is the platform captured, is the version at or
+// above the captured minimum, and is it not on the denylist. Returns
+// { reasonCode, minimumVersion, protocolContract }; reasonCode is null when
+// the version satisfies the contract, otherwise one of
+// "native_delivery_unsupported", "platform_not_captured",
+// "version_unavailable", "prerelease_not_captured", "below_minimum_version",
+// or "known_bad_version".
+//
+// This is the static half of the rule only: it never contacts the client, so
+// passing here proves nothing about whether a live probe or handshake
+// actually confirms the protocol or delivery modes. A caller that needs that
+// layers a probe or handshake check on top (see evaluateNativeEligibility,
+// validateNativeHandshake below, and the delivery router's own offer check,
+// which uses this function alone because a response already carries no probe
+// or handshake shape to check further).
+export function evaluateVersionContract(adapter, { clientVersion, platform }) {
   const contract = adapter?.nativeDelivery;
-  if (contract === undefined) {
+  // `== null` rather than `=== undefined`: a null declaration is as much "no
+  // contract" as a missing one, and reading `contract.minimumByPlatform` off it
+  // threw the very TypeError the guard below exists to prevent. defineAdapter
+  // cannot produce that shape; a hand-built registry entry can.
+  if (contract == null) {
     return { reasonCode: "native_delivery_unsupported", minimumVersion: null, protocolContract: null };
   }
-  const minimumVersion = typeof platform === "string"
-    ? (contract.minimumByPlatform[platform] ?? null) : null;
-  if (minimumVersion === null) {
-    return { reasonCode: "platform_not_captured", minimumVersion: null, protocolContract: null };
-  }
-  const anchor = contract.anchors.find(item => item.platform === platform
-    && item.version === minimumVersion);
+  const uncaptured = { reasonCode: "platform_not_captured", minimumVersion: null,
+    protocolContract: null };
+  // validateNativeDeliveryContract guarantees a minimum map and a matching
+  // anchor, but this function is also handed adapter objects that never went
+  // through it. A declaration missing either half has captured nothing for
+  // this platform, which is a closed answer - not a TypeError raised deep
+  // inside a delivery offer, far from the declaration that caused it. Every
+  // other entry point below already answers malformed input this way.
+  if (typeof platform !== "string" || !isPlainObject(contract.minimumByPlatform)) return uncaptured;
+  const minimumVersion = contract.minimumByPlatform[platform] ?? null;
+  if (minimumVersion === null) return uncaptured;
+  const anchor = (Array.isArray(contract.anchors) ? contract.anchors : [])
+    .find(item => item.platform === platform && item.version === minimumVersion);
+  if (anchor === undefined) return uncaptured;
   const facts = { minimumVersion, protocolContract: anchor.protocolContract };
   if (!isText(clientVersion)) return { ...facts, reasonCode: "version_unavailable" };
   if (parseStableVersion(clientVersion) === null) {
@@ -147,7 +173,12 @@ function validateNativeProbe(probe) {
 }
 
 export function evaluateNativeEligibility(adapter, { clientVersion, platform, probe }) {
-  const rule = evaluateStatic(adapter, { clientVersion, platform });
+  // The probe names the process that will serve the delivery. Judging the
+  // detected binary instead refuses a service that satisfies the contract.
+  // Only the version is read here; the shape is validated where it always was,
+  // so a malformed probe still returns a closed result rather than throwing.
+  const serving = isText(probe?.clientVersion) ? probe.clientVersion : clientVersion;
+  const rule = evaluateVersionContract(adapter, { clientVersion: serving, platform });
   const base = { eligible: false, reasonCode: null, minimumVersion: rule.minimumVersion,
     protocolContract: rule.protocolContract, modes: [] };
   const closedResult = reasonCode => deepFreeze({ ...base, reasonCode });
@@ -155,7 +186,6 @@ export function evaluateNativeEligibility(adapter, { clientVersion, platform, pr
   if (probe === null || probe === undefined) return closedResult("feature_probe_failed");
   const facts = validateNativeProbe(probe);
   if (facts.supported !== true) return closedResult(facts.reasonCode ?? "feature_probe_failed");
-  if (facts.clientVersion !== clientVersion) return closedResult("probe_version_mismatch");
   if (facts.protocolContract !== rule.protocolContract) return closedResult("protocol_mismatch");
   const modes = orderedModes(facts.modes);
   if (!modes.includes("livePush")) return closedResult("feature_probe_failed");
@@ -192,7 +222,12 @@ function validateNativeHandshakeShape(handshake) {
 // The per-session half: the same static rule again, then the adapter's live
 // handshake facts. The launch-time executable fingerprint stays probe-only.
 export function validateNativeHandshake(adapter, { clientVersion, platform, handshake }) {
-  const rule = evaluateStatic(adapter, { clientVersion, platform });
+  // Same rationale as the probe: the handshake names the session that will
+  // actually serve, so the static rule is judged against that version. Only
+  // the version is read here; the shape is validated where it always was, so
+  // a malformed handshake still returns a closed result rather than throwing.
+  const serving = isText(handshake?.clientVersion) ? handshake.clientVersion : clientVersion;
+  const rule = evaluateVersionContract(adapter, { clientVersion: serving, platform });
   const base = { ok: false, reasonCode: null, protocolContract: rule.protocolContract, modes: [],
     opaqueEndpointRef: null, leaseUntil: null };
   const closedResult = reasonCode => deepFreeze({ ...base, reasonCode });
@@ -200,7 +235,6 @@ export function validateNativeHandshake(adapter, { clientVersion, platform, hand
   if (handshake === null || handshake === undefined) return closedResult("handshake_failed");
   const facts = validateNativeHandshakeShape(handshake);
   if (facts.supported !== true) return closedResult(facts.reasonCode ?? "handshake_failed");
-  if (facts.clientVersion !== clientVersion) return closedResult("handshake_version_mismatch");
   if (facts.protocolContract !== rule.protocolContract) return closedResult("protocol_mismatch");
   const modes = orderedModes(facts.modes);
   if (!modes.includes("livePush")) return closedResult("handshake_failed");

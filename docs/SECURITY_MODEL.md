@@ -121,8 +121,10 @@ sha512 integrity against registry metadata, installs with lifecycle scripts disa
 validates the staged runtime before activation. These checks retain the registry and package
 author as a software-supply trust boundary; they do not establish that package code is safe.
 
-ACC process leases hold activation until confirmed exit. Native bindings hold until observed
-SessionEnd cleanup or confirmed process death; unknown PIDs remain conservative holds.
+ACC process leases and native bindings record the store contract they speak, and hold
+activation while that contract differs from the incoming version's or is absent. A lease
+ends on confirmed exit, a native binding on observed SessionEnd cleanup or confirmed process
+death; unknown PIDs and undeclared contracts remain conservative holds.
 `acc finish`, presence TTL, and delivery off do not establish native lifecycle end.
 Normal installation and message delivery do not manage vendor services. Explicit
 `acc update` maintenance requires one separate confirmation (or `--yes`) for the recorded

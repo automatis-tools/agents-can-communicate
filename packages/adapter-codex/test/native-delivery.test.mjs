@@ -52,6 +52,22 @@ test("binding stores an opaque receiver address after checking the exact loaded 
   assert.ok(Date.parse(handshake.leaseUntil) > Date.now());
 });
 
+test("bind persists and returns the daemon's served version, not the caller's stale claim",
+  async t => {
+    const h = await nativeFixture(t);
+    // The hook's claimed clientVersion and the daemon's actually-served
+    // version genuinely differ here, both at or above CODEX_QUEUE_MINIMUM,
+    // so a bug that quietly persisted the claim instead of what verifyReceiver
+    // observed cannot hide behind them coincidentally matching.
+    h.state.version = "0.154.0";
+    const handshake = await native.bindNativeSession({ ...h, clientVersion: "0.152.5" });
+    assert.equal(handshake.supported, true);
+    assert.equal(handshake.clientVersion, "0.154.0");
+    const file = path.join(h.runtimeDir, "codex-native-endpoints", `${handshake.opaqueEndpointRef}.json`);
+    const endpoint = JSON.parse(await readFile(file, "utf8"));
+    assert.equal(endpoint.clientVersion, "0.154.0");
+  });
+
 test("sender environment cannot replace the bound receiver socket or thread", async t => {
   const h = await nativeFixture(t);
   const handshake = await native.bindNativeSession(h);
@@ -70,15 +86,21 @@ test("sender environment cannot replace the bound receiver socket or thread", as
   assert.equal(h.state.queue.length, 1);
 });
 
-test("missing event cwd, wrong identity, PID and server version never bind", async t => {
+test("missing event cwd, wrong identity, PID and a daemon below the minimum never bind", async t => {
   const h = await nativeFixture(t);
   for (const changed of [{ event: { sessionId: THREAD } },
     { event: { sessionId: "absent", cwd: h.cwd } }, { clientPid: null },
-    { clientVersion: "0.153.4" }, { clientVersion: null }]) {
+    { clientVersion: null }]) {
     const result = await native.bindNativeSession({ ...h, ...changed });
     assert.equal(result.supported, false);
     assert.equal(result.opaqueEndpointRef, null);
   }
+  // The daemon itself, not the caller's claimed clientVersion, is what is
+  // judged: a serving version below the captured minimum never binds.
+  h.state.version = "0.151.0";
+  const belowMinimum = await native.bindNativeSession(h);
+  assert.equal(belowMinimum.supported, false);
+  assert.equal(belowMinimum.opaqueEndpointRef, null);
   assert.equal(h.state.queue.length, 0);
 });
 
@@ -94,9 +116,19 @@ test("offer rechecks workspace, loaded state, and version after binding", async 
   h.state.loaded = [];
   assert.equal((await native.offerMessage({ ...h, binding: bindingOf(handshake), message })).accepted, false);
   h.state.loaded = [THREAD];
-  h.state.version = "0.153.4";
-  assert.equal((await native.offerMessage({ ...h, binding: bindingOf(handshake), message })).accepted, false);
   assert.equal(h.calls.some(call => call.method === "thread/queue/add"), false);
+  // A daemon restarted onto a newer build still satisfies the captured
+  // contract, so an in-place upgrade keeps serving the existing binding.
+  h.state.version = "0.153.4";
+  const upgraded = await native.offerMessage({ ...h, binding: bindingOf(handshake), message });
+  assert.equal(upgraded.accepted, true);
+  // The response reflects the daemon that actually served it, not the
+  // "0.152.1" recorded when this binding was first created.
+  assert.equal(upgraded.clientVersion, "0.153.4");
+  assert.equal(h.calls.some(call => call.method === "thread/queue/add"), true);
+  // A daemon that drops below the captured minimum stops serving it.
+  h.state.version = "0.151.0";
+  assert.equal((await native.offerMessage({ ...h, binding: bindingOf(handshake), message })).accepted, false);
 });
 
 test("an expired observation can be refreshed only after new receiver verification", async t => {

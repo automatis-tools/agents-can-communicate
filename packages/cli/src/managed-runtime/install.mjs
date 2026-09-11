@@ -3,12 +3,15 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
+import { declaredStoreVersion } from "./activation.mjs";
 import { validateManagedLocation } from "./location.mjs";
 import { stageOwnGeneration } from "./generation.mjs";
 import { writeLaunchers } from "./launchers.mjs";
 import { canonicalManagerRoot, readControl, writeControl } from "./state.mjs";
 import { scheduleWorker } from "./schedule.mjs";
+import { releaseStagingHold } from "./staging.mjs";
 import { withManagerLock } from "./mutex.mjs";
+import { retireManagedHolds } from "./retire.mjs";
 
 const exec = promisify(execFile);
 export async function verifyGeneration(runtime, { env = process.env } = {}) {
@@ -27,35 +30,44 @@ export async function verifyGeneration(runtime, { env = process.env } = {}) {
 export async function installManaged({ packageRoot, managerRoot, dataHome, home, targets, env, apply, cwd }) {
   const root = await validateManagedLocation({ managerRoot, dataHome, home, cwd, env });
   const candidate = await stageOwnGeneration({ packageRoot, managerRoot: root });
-  await verifyGeneration(candidate, { env });
-  return withManagerLock(root, async () => {
-    const previous = await readControl(root);
-    if (previous !== null && previous.home !== home) {
-      throw new Error("this ACC data home manages another client home; use a separate ACC_DATA_HOME");
-    }
-    if (previous !== null && previous.active.root !== candidate.root) {
-      throw new Error("install from the active managed runtime; use acc update to switch versions");
-    }
-    const runtime = { version: candidate.version, root: candidate.root };
-    const autoPreference = previous?.autoPreference ?? previous?.auto ?? true;
-    // Full removal pauses workers without revoking the user's choice. Keep a
-    // partial-removal pause until explicit opt-in; this install may omit its failed target.
-    const auto = previous?.targets.length ? previous.auto : autoPreference;
-    const control = { schemaVersion: 1, active: runtime, pending: runtime, phase: "activating",
-      auto, autoPreference, pin: previous?.pin ?? null,
-      checkedAt: previous?.checkedAt ?? null, home,
-      targets: [...new Set([...(previous?.targets ?? []), ...targets])], notice: null };
-    await writeControl(root, control);
-    const paths = await writeLaunchers(root, runtime.root);
-    const result = await apply({ ...paths, preserveVersions: true });
-    if (result.failed.length === 0) {
-      const ready = await writeControl(root, { ...control, phase: "ready", pending: null });
-      await scheduleWorker(root, ready, { env });
-    } else {
-      await writeControl(root, { ...control, notice: "Integration refresh is incomplete; run acc update to recover." });
-    }
-    return result;
-  });
+  // The hold candidate.hold carries survives verification and publication;
+  // release it on every exit from this attempt, once the generation is
+  // either published (independently protected by the control pointer this
+  // writes below) or abandoned (any throw between here and there).
+  try {
+    await verifyGeneration(candidate, { env });
+    return await withManagerLock(root, async () => {
+      const previous = await readControl(root);
+      if (previous !== null && previous.home !== home) {
+        throw new Error("this ACC data home manages another client home; use a separate ACC_DATA_HOME");
+      }
+      if (previous !== null && previous.active.root !== candidate.root) {
+        throw new Error("install from the active managed runtime; use acc update to switch versions");
+      }
+      const runtime = { version: candidate.version, root: candidate.root,
+        storeVersion: await declaredStoreVersion(candidate.root) };
+      const autoPreference = previous?.autoPreference ?? previous?.auto ?? true;
+      // Full removal pauses workers without revoking the user's choice. Keep a
+      // partial-removal pause until explicit opt-in; this install may omit its failed target.
+      const auto = previous?.targets.length ? previous.auto : autoPreference;
+      const control = { schemaVersion: 1, active: runtime, pending: runtime, phase: "activating",
+        auto, autoPreference, pin: previous?.pin ?? null,
+        checkedAt: previous?.checkedAt ?? null, home,
+        targets: [...new Set([...(previous?.targets ?? []), ...targets])], notice: null };
+      await writeControl(root, control);
+      const paths = await writeLaunchers(root, runtime.root);
+      const result = await apply({ ...paths, preserveVersions: true });
+      if (result.failed.length === 0) {
+        const ready = await writeControl(root, { ...control, phase: "ready", pending: null });
+        await scheduleWorker(root, ready, { env });
+      } else {
+        await writeControl(root, { ...control, notice: "Integration refresh is incomplete; run acc update to recover." });
+      }
+      return result;
+    });
+  } finally {
+    await releaseStagingHold(candidate.hold);
+  }
 }
 
 /** Removal updates enrollment under the same fence, so an updater cannot reinstall it. */
@@ -69,6 +81,11 @@ export async function uninstallManaged({ managerRoot, apply }) {
     const removed = new Set(result.operations.filter(operation => operation.applied)
       .map(operation => operation.adapterId));
     const targets = control.targets.filter(id => !removed.has(id));
+    // Holds this install published must stop blocking a later activation. The
+    // client processes keep running; only the records ACC owns are retired.
+    if (targets.length === 0) {
+      await retireManagedHolds({ root, workspaces: path.join(path.dirname(root), "workspaces") });
+    }
     await writeControl(root, { ...control, targets,
       autoPreference: control.autoPreference ?? control.auto,
       auto: targets.length > 0 && result.failed.length === 0 && control.auto,

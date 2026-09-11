@@ -6,6 +6,11 @@ import test from "node:test";
 
 import { stageOwnGeneration } from "../src/managed-runtime/generation.mjs";
 
+// `hold` is a fresh, per-call staging-hold handle (see managed-runtime-
+// retention.test.mjs for its lifecycle); it is expected to differ between
+// two calls that otherwise stage the identical, already-matching generation.
+const stable = ({ hold, ...rest }) => rest;
+
 async function fixture(t) {
   const root = await mkdtemp(path.join(tmpdir(), "acc-generation-"));
   t.after(() => rm(root, { recursive: true, force: true }));
@@ -31,6 +36,8 @@ test("managed generation contains runnable declared files and bundled workspace 
   const f = await fixture(t);
   const first = await stageOwnGeneration(f);
   assert.equal(first.version, "0.4.0");
+  assert.equal(typeof first.hold, "string");
+  assert.notEqual(first.hold, "");
   assert.equal(await readFile(path.join(first.root, "bin", "acc.mjs"), "utf8"), "console.log('version A');\n");
   assert.equal(await readFile(path.join(first.root, "node_modules", "@agents-can-communicate", "example", "src", "index.mjs"), "utf8"), "export const value = 17;\n");
   const files = await readdir(first.root, { recursive: true });
@@ -42,7 +49,7 @@ test("managed generation contains runnable declared files and bundled workspace 
 test("staging a new build never overwrites an existing generation and detects tampering", async t => {
   const f = await fixture(t);
   const first = await stageOwnGeneration(f);
-  assert.deepEqual(await stageOwnGeneration(f), first);
+  assert.deepEqual(stable(await stageOwnGeneration(f)), stable(first));
   await writeFile(path.join(f.packageRoot, "bin", "acc.mjs"), "console.log('version B');\n");
   const second = await stageOwnGeneration(f);
   assert.notEqual(second.root, first.root);
@@ -66,7 +73,7 @@ test("generation reuse preserves executable modes under a private installation u
   const previous = process.umask(0o077);
   try { first = await stageOwnGeneration(f); }
   finally { process.umask(previous); }
-  assert.deepEqual(await stageOwnGeneration(f), first);
+  assert.deepEqual(stable(await stageOwnGeneration(f)), stable(first));
 });
 
 test("a symlinked parent cannot put runtime state inside the source package", async t => {

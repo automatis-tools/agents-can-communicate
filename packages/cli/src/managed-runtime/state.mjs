@@ -77,6 +77,13 @@ const nullableString = value => value === null || nonempty(value);
 export async function validateRuntime(root, runtime) {
   if (!runtime || !nonempty(runtime.version) || typeof runtime.root !== "string"
     || !path.isAbsolute(runtime.root)) throw new Error("invalid control generation");
+  // Absent means a pointer written before the contract field existed. Present
+  // but malformed is a corrupt record, and reading it as unknown would let an
+  // incompatible generation past the gate.
+  if (runtime.storeVersion !== undefined && runtime.storeVersion !== null
+    && (!Number.isSafeInteger(runtime.storeVersion) || runtime.storeVersion <= 0)) {
+    throw new Error("invalid control generation");
+  }
   const generations = path.join(root, "generations");
   const resolved = await canonicalManagerRoot(runtime.root);
   const relative = path.relative(generations, resolved);
@@ -88,7 +95,7 @@ export async function validateRuntime(root, runtime) {
   if (await managedDirectory(generations)) {
     if (await realpath(generations) !== generations) throw new Error("invalid control generations directory");
   }
-  return { version: runtime.version, root: resolved };
+  return { version: runtime.version, root: resolved, storeVersion: runtime.storeVersion ?? null };
 }
 
 async function validateControl(root, value) {

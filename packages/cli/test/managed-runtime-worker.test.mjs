@@ -16,10 +16,12 @@ async function fixture(t, changes = {}) {
   t.after(() => rm(root, { recursive: true, force: true }));
   const active = { version: "0.4.0", root: path.join(root, "generations", "old") };
   await mkdir(active.root, { recursive: true });
-  await writeControl(root, { schemaVersion: 1, active, pending: null, phase: "ready", auto: true,
+  // writeControl normalizes the runtime pointer (e.g. attaching storeVersion),
+  // so the fixture tracks that normalized shape rather than its raw literal.
+  const control = await writeControl(root, { schemaVersion: 1, active, pending: null, phase: "ready", auto: true,
     pin: null, checkedAt: null, home: root, targets: [], notice: null, ...changes });
   const calls = [];
-  return { root, active, calls, ports: {
+  return { root, active: control.active, calls, ports: {
     env: {}, discover: async options => { calls.push(["discover", options.pin]); return { version: "0.4.1" }; },
     download: async () => { calls.push(["download"]); return { version: "0.4.1", root: path.join(root, "generations", "new") }; },
     activate: async () => { calls.push(["activate"]); return { activated: false, reason: "processes_active" }; },

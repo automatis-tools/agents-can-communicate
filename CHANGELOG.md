@@ -1,5 +1,69 @@
 # Changelog
 
+## 0.5.0 — release candidate
+
+- Activation of a new managed runtime generation no longer waits for every live process
+  to exit. It waits only for holds — runtime leases and native binding records — whose
+  declared store contract differs from the incoming generation's, or is unknown; a hold
+  that declares a matching contract no longer blocks. Runtime leases and binding records
+  now carry that declared contract, and the wait notice names each blocking hold's
+  contract alongside its process. Records written before this change declare no contract
+  and still hold, so the first update after this ships still waits for every process;
+  later updates do not.
+- A session finishes on the generation it started with. The first ACC code in a session
+  records a pin naming its generation root, version, store contract, client PID and
+  creation time; hooks resolve through that pin and keep loading the pinned generation's
+  code after the active pointer moves on. `SessionEnd` and the same confirmed-dead-PID
+  sweep that reaps stale leases remove abandoned pins. A pin whose declared store contract
+  differs from the running generation's, or declares none, is not followed: those hooks run
+  the active generation instead, the same fallback a missing or unreadable pin already got.
+- Native delivery eligibility is judged against the version that will actually serve,
+  not the binary ACC detected. The minimum-version floor, prerelease refusal and denylist
+  now apply to the reported serving version on the capability probe, the session
+  handshake, the Codex receiver's own version check, and the delivery router's offer
+  path, so a service that restarted onto a different build no longer turns delivery off
+  by version identity alone. A version below the minimum reports `below_minimum_version`
+  naming that version instead of a generic probe failure.
+- `acc uninstall` retires the binding records and pins its own install produced instead
+  of leaving them to block the next install, when the removal leaves no client installed.
+  Runtime leases are deliberately left alone: a lease also protects the generation its
+  process is executing from against reclamation, so retiring one would let the directory
+  a live process is running from be deleted. Uninstalling also empties `control.targets`,
+  so nothing remains for the maintenance path to inspect until the next install
+  repopulates it, and a subsequent install and update proceed with nothing left over from
+  the previous one.
+- A restart of a client's background service is offered when the version that service is
+  actually running fails the adapter's captured native-delivery contract, or when the
+  service still holds a native binding. Where the adapter has no verdict to give — its
+  contract captured nothing for this platform, which is every machine but macOS arm64, or
+  it declares no native delivery at all — the served version is compared with the CLI's, as
+  it was before. A Codex CLI that updated while its daemon kept serving the previous build
+  no longer produces a restart prompt that would disconnect open clients.
+- A generation directory is removed once no pin and no lease references it, under the
+  manager lock, and only when no live or unknown holder could still reference it, instead
+  of accumulating indefinitely.
+- A store read no longer fails on macOS because a managed directory was renamed while it
+  was being read. `realpath` there answers with the name a directory carries at the moment
+  it replies, so an ordinary writer-lock handover — the lock is granted, reclaimed and
+  released entirely by rename — could report `managed directory escapes the canonical store
+  root` and take the write with it. Each segment of a managed path must now resolve to a
+  child of the directory the previous segment validated, and a segment answering to a
+  different name must still be the same directory. A path that resolves outside the store,
+  or into another directory inside it, or through a symlinked ancestor, is refused.
+
+| Candidate artifact | Value |
+|---|---|
+| Built from | `9fef5d2cbcab35fdae91d1c532be91bd30a9abf7` |
+| Tarball | `agents-can-communicate-0.5.0.tgz`, 379,955 bytes, 272 files |
+| sha256 | `231916c18ff3e0e4b1422e9ca9404b8cf15c0edfb6b97bd1efeccb27fdfd5e9a` |
+
+The exact archive passed installed-package verification and all 27 packed managed-runtime
+checks, covering install, bootstrap, reinstall, update, degraded update and diagnostics.
+The full suite passed with 2,106 tests, 2,105 passes, zero failures and one skip, which is
+a machine fact rather than a result: the Gemini CLI is installed on the release machine, so
+the case that requires it to be absent cannot run there. This candidate has not been tagged
+or published.
+
 ## 0.4.4 — release candidate
 
 - `acc update` can ask once to restart a verified Codex service on macOS arm64.
