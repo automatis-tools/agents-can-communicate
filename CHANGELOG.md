@@ -34,32 +34,35 @@
   the previous one.
 - A restart of a client's background service is offered when the version that service is
   actually running fails the adapter's captured native-delivery contract, or when the
-  service still holds a native binding. Where the contract has captured nothing for this
-  platform — every machine but macOS arm64 — it has no verdict to give, so the served
-  version is compared with the CLI's, as it was before. A Codex CLI that updated while its
-  daemon kept serving the previous build no longer produces a restart prompt that would
-  disconnect open clients.
+  service still holds a native binding. Where the adapter has no verdict to give — its
+  contract captured nothing for this platform, which is every machine but macOS arm64, or
+  it declares no native delivery at all — the served version is compared with the CLI's, as
+  it was before. A Codex CLI that updated while its daemon kept serving the previous build
+  no longer produces a restart prompt that would disconnect open clients.
 - A generation directory is removed once no pin and no lease references it, under the
   manager lock, and only when no live or unknown holder could still reference it, instead
   of accumulating indefinitely.
 - A store read no longer fails on macOS because a managed directory was renamed while it
-  was being read. The containment check judges where a directory resolves to rather than
-  what it is called: `realpath` there answers with the name a directory carries at the
-  moment it replies, so an ordinary writer-lock handover — the lock is granted, reclaimed
-  and released entirely by rename — could report `managed directory escapes the canonical
-  store root` and take the write with it. A directory that resolves outside the store is
-  still refused, as is one that is a symlink rather than a real directory.
+  was being read. `realpath` there answers with the name a directory carries at the moment
+  it replies, so an ordinary writer-lock handover — the lock is granted, reclaimed and
+  released entirely by rename — could report `managed directory escapes the canonical store
+  root` and take the write with it. Each segment of a managed path must now resolve to a
+  child of the directory the previous segment validated, and a segment answering to a
+  different name must still be the same directory. A path that resolves outside the store,
+  or into another directory inside it, or through a symlinked ancestor, is refused.
 
 | Candidate artifact | Value |
 |---|---|
-| Built from | `004cb92ed2cf481179c8ddf5c9d4c788f05ad502` |
-| Tarball | `agents-can-communicate-0.5.0.tgz`, 379,432 bytes, 272 files |
-| sha256 | `1b1aa42720f21c9edbeb77394016fc107a8fbbbf8ca88ab59845fa4345e8d2af` |
+| Built from | `9fef5d2cbcab35fdae91d1c532be91bd30a9abf7` |
+| Tarball | `agents-can-communicate-0.5.0.tgz`, 379,955 bytes, 272 files |
+| sha256 | `231916c18ff3e0e4b1422e9ca9404b8cf15c0edfb6b97bd1efeccb27fdfd5e9a` |
 
 The exact archive passed installed-package verification and all 27 packed managed-runtime
 checks, covering install, bootstrap, reinstall, update, degraded update and diagnostics.
-The full suite passed with 2,104 tests, 2,103 passes, zero failures and one
-environment-dependent skip. This candidate has not been tagged or published.
+The full suite passed with 2,106 tests, 2,105 passes, zero failures and one skip, which is
+a machine fact rather than a result: the Gemini CLI is installed on the release machine, so
+the case that requires it to be absent cannot run there. This candidate has not been tagged
+or published.
 
 ## 0.4.4 — release candidate
 
