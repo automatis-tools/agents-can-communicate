@@ -42,9 +42,9 @@
 
 | Candidate artifact | Value |
 |---|---|
-| Built from | `40b16ad453143d90d8eddaea124f126e0ce54fad` |
-| Tarball | `agents-can-communicate-0.5.0.tgz`, 378,076 bytes, 272 files |
-| sha256 | `a97029a91d1cc23273945e83e914a063a71ccc92d6e4791456e1862401fe3e21` |
+| Built from | `6967ebcfdcbf4655b5ac50106e76e65856f7fdea` |
+| Tarball | `agents-can-communicate-0.5.0.tgz`, 378,317 bytes, 272 files |
+| sha256 | `390dc77cef3440ae509c4315e017fe0cdc031b1a959812405ce5c9c5af592e7b` |
 
 The exact archive passed installed-package verification and all 27 packed managed-runtime
 checks, covering install, bootstrap, reinstall, update, degraded update and diagnostics.
