@@ -31,6 +31,20 @@ const permits = (policy, kind) => policy === "all"
 // callers that need to judge against another platform.
 const HOST_PLATFORM = `${process.platform}-${process.arch}`;
 
+// evaluateVersionContract answers two different questions with one field.
+// "below_minimum_version", "known_bad_version", "version_unavailable" and
+// "prerelease_not_captured" are a capture reading the reported version and
+// refusing it. "platform_not_captured" is the opposite: a complete, valid
+// declaration that records nothing for the platform this router runs on. That
+// is not a malformed adapter, it is the ordinary shape of every shipped
+// adapter away from darwin-arm64 - the only platform any of them has captured
+// - so reading it as a refusal disables live delivery on Linux entirely.
+//
+// "native_delivery_unsupported" is absent deliberately: liveCapable already
+// required a nativeDelivery declaration before an offer was attempted, so the
+// contract check is never handed an adapter without one.
+const UNCAPTURED_PLATFORM = "platform_not_captured";
+
 // Compatibility was decided twice already - at bootstrap by the probe and at
 // SessionStart by the generation-bound handshake that published this binding.
 // The router validates binding identity and the adapter's answer; it does not
@@ -184,12 +198,18 @@ export function createDeliveryRouter({ service, adapters, clock, platform = HOST
     // still satisfies the adapter's captured contract keeps offering, even
     // when it differs from the value recorded when the binding was created.
     // Only a version below the captured minimum or on the denylist refuses.
-    // An adapter whose declaration captured nothing for this platform has no
-    // contract to judge against and is refused like any other failure: every
-    // adapter is built by defineAdapter, which rejects a partial declaration
-    // outright, so there is no shipped adapter for a softer rule to rescue.
+    // When the contract captured nothing for this platform there is no
+    // minimum to judge against, so the offer keeps the rule this path had
+    // before the contract gate existed: the version that answered must be the
+    // one the binding recorded. defineAdapter rejecting a partial declaration
+    // does not make this unreachable - a complete, valid contract that names
+    // only darwin-arm64 says nothing about linux-x64, and that is every
+    // shipped adapter on Linux.
     const versionRule = evaluateVersionContract(adapter, { clientVersion: response.clientVersion, platform });
-    if (versionRule.reasonCode !== null) {
+    const admitted = versionRule.reasonCode === null
+      || (versionRule.reasonCode === UNCAPTURED_PLATFORM
+        && response.clientVersion === binding.clientVersion);
+    if (!admitted) {
       await recordFailure(binding, message, participantId, transport,
         "unsupported_client_version");
       return durable(participantId, "unsupported_client_version");

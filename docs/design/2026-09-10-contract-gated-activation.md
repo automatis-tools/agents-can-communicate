@@ -151,6 +151,20 @@ different build while the binding still names the version captured when the sess
 The defect would move one layer up and become silent, since the message would fall back to
 queued with every test still passing.
 
+The substitution has to keep one distinction the contract's reason codes blur together.
+`below_minimum_version`, `known_bad_version`, `prerelease_not_captured` and
+`version_unavailable` are a capture reading the reported version and refusing it, and each
+refuses the offer. `platform_not_captured` is a different answer: the declaration is
+complete and valid, and simply records nothing for the platform the router is running on.
+Every shipped adapter has captured `darwin-arm64` alone, so that is the ordinary state of
+this check on Linux and on an Intel Mac — not a malformed adapter, and not something
+`defineAdapter` can rule out, because it validates the declaration and not the host. Read
+as a refusal it disabled every live offer on those machines, which is how it reached CI.
+With no capture to judge against, the offer keeps the rule this path had before the
+contract gate: the version that answered must be the one the binding recorded.
+`native_delivery_unsupported` is not in either group because `liveCapable` has already
+required a native declaration before the check runs.
+
 A fifth site compares the same two versions, and it is the one that acts on the answer.
 `inspectMaintenanceServices` in `packages/cli/src/managed-runtime/maintenance.mjs`
 selects a service for a restart offer when `snapshot.serverVersion !== snapshot.cliVersion`,
