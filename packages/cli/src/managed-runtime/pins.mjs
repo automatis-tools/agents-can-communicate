@@ -2,6 +2,8 @@ import { createHash } from "node:crypto";
 import { access, readdir, rm } from "node:fs/promises";
 import path from "node:path";
 
+import { STORE_VERSION } from "@agents-can-communicate/storage-filesystem";
+
 import { confirmedDead, defaultPidIsAlive } from "./mutex.mjs";
 import { canonicalManagerRoot, managedDirectory, readManagedJson, syncDirectory, validateRuntime,
   writeManagedJson } from "./state.mjs";
@@ -58,22 +60,43 @@ export async function clearPin({ root, harnessSessionId }) {
  * throws: a hook that cannot resolve a pin must still let the client
  * proceed, so every reason to say no - no pin, an already-active pin, a
  * pinned generation outside the manager's own `generations` directory, one
- * missing its own hook entrypoint, a store that will not read - collapses to
- * the same null.
+ * missing its own hook entrypoint, a pin declaring a store contract this
+ * generation does not speak, a store that will not read - collapses to the
+ * same null.
  *
  * Containment reuses `validateRuntime`, the same rule a control record's own
  * generation pointer is held to, rather than trusting a pin's `runtimeRoot`
  * on its word: a pin can be written by an unmanaged hook run sharing a data
  * home (a development checkout is its own nearest `accStoreVersion`
  * manifest), and importing whatever such a pin names would run this
- * process's code from outside the runtime it was admitted into. */
+ * process's code from outside the runtime it was admitted into.
+ *
+ * The contract gate is the one check that is not about the pin being
+ * resolvable. A pin is deliberately not an activation hold, so a harness that
+ * lives only in hooks - no native binding, no long-lived channel process -
+ * holds nothing between turns and cannot keep an activation waiting. When
+ * that activation moves to a generation declaring a different
+ * `STORE_VERSION`, the pin survives it, and delegating to the generation it
+ * names would run code whose contract the store refuses by strict equality:
+ * the session would throw `unknown store version` on every hook and fall open
+ * for the rest of its life, silently uncoordinated, while its pin held the
+ * dead generation against reclamation. `STORE_VERSION` here is this
+ * generation's own declared contract - this module is loaded from the active
+ * generation, and its root manifest's `accStoreVersion` is asserted equal to
+ * this constant - so comparing against it compares the pin with the
+ * generation that would otherwise serve. Anything but proven equality (a
+ * differing contract, or a pin that declares none) falls back to the active
+ * generation, which is this function's answer to every other pin it cannot
+ * honour. That keeps the design's stated limit intact: a `STORE_VERSION`
+ * change still requires every live process to exit. */
 export async function resolvePinnedGeneration({ root, harnessSessionId, active }) {
   try {
     const canonicalRoot = await canonicalManagerRoot(root);
     const pin = await readPin({ root: canonicalRoot, harnessSessionId });
     if (pin === null) return null;
-    const { root: resolved } = await validateRuntime(canonicalRoot,
+    const { root: resolved, storeVersion } = await validateRuntime(canonicalRoot,
       { version: pin.version, root: pin.runtimeRoot, storeVersion: pin.storeVersion });
+    if (storeVersion !== STORE_VERSION) return null;
     const canonicalActive = typeof active === "string" ? await canonicalManagerRoot(active) : active;
     if (resolved === canonicalActive) return null;
     await access(hookEntrypointFor(resolved));

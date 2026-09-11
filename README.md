@@ -80,7 +80,7 @@ state, commonly your home directory, cannot be used as a workspace; start the cl
 project directory. See [Troubleshooting](docs/TROUBLESHOOTING.md).
 
 Already using ACC? Follow the [upgrade guide](docs/UPGRADING.md), including the 0.4.x →
-0.4.4 update and the data-format boundary when moving from 0.3.1.
+0.5.0 update and the data-format boundary when moving from 0.3.1.
 
 ## When messages arrive
 

@@ -5,7 +5,7 @@ import path from "node:path";
 import test from "node:test";
 import { activatePending } from "../src/managed-runtime/activation.mjs";
 import { runManagedUpdate } from "../src/managed-runtime/command.mjs";
-import { requestMaintenance } from "../src/managed-runtime/maintenance.mjs";
+import { inspectMaintenanceServices, requestMaintenance } from "../src/managed-runtime/maintenance.mjs";
 import { runMaintenance } from "../src/managed-runtime/maintenance-worker.mjs";
 import { readMaintenance } from "../src/managed-runtime/maintenance-state.mjs";
 import { acquireRuntime } from "../src/managed-runtime/leases.mjs";
@@ -194,4 +194,84 @@ test("successful ACC activation still offers maintenance for a stale unbound dae
   assert.equal((await readControl(f.root)).active.version, "0.4.4");
   assert.equal(result.data.reason, "maintenance_pending");
   assert.deepEqual(f.calls, ["confirm", "spawn"]);
+});
+
+// Final review, Finding 4: this branch removed the CLI-versus-service identity
+// comparison from the four places that decide delivery and left the fifth -
+// the one that decides whether to interrupt the user with a restart offer.
+// These cover the replacement rule at `inspectMaintenanceServices`, the only
+// place that reads it.
+const HOST_PLATFORM = `${process.platform}-${process.arch}`;
+const capturedContract = (minimum, knownBad = []) => ({
+  minimumByPlatform: { [HOST_PLATFORM]: minimum },
+  anchors: [{ platform: HOST_PLATFORM, version: minimum, protocolContract: "fixture/1" }],
+  knownBad, activationKinds: ["native-service"], policySource: "installation-record",
+});
+const inspect = (f, snapshot, nativeDelivery) => inspectMaintenanceServices({ root: f.root,
+  control: f.control, env: {},
+  adapters: [{ id: "fixture", displayName: "Fixture Client",
+    ...(nativeDelivery === undefined ? {} : { nativeDelivery }),
+    inspectMaintenance: async () => snapshot }] })
+  .then(services => services.map(entry => entry.snapshot.serverVersion));
+
+// A pid no binding record names, so the native-binding half of the condition
+// is false in every direction and only the version rule can select a service.
+const UNBOUND_PID = 999_999;
+
+test("a daemon serving a version the adapter's captured contract accepts is not a reason to restart it", async t => {
+  const f = await fixture(t);
+  const contract = capturedContract("0.150.0");
+  // Every field but `serverVersion` is shared between the three calls below,
+  // including the CLI version they all differ from: what changes the answer is
+  // the contract verdict on the serving version, nothing else. The two
+  // refused versions are the controls - if the rule had simply been deleted
+  // rather than replaced, they would come back empty and this test would fail.
+  const daemon = { ...f.service, pid: UNBOUND_PID, cliVersion: "0.154.0" };
+
+  assert.deepEqual(await inspect(f, { ...daemon, serverVersion: "0.149.0" }, contract), ["0.149.0"],
+    "control: a serving version below the captured minimum is still offered a restart");
+  assert.deepEqual(await inspect(f, { ...daemon, serverVersion: "0.153.0" },
+    capturedContract("0.150.0", [{ version: "0.153.0" }])), ["0.153.0"],
+  "control: a denylisted serving version is still offered a restart");
+
+  // The complaint the whole branch began from: a Codex CLI that updated while
+  // its daemon kept running the previous build. Both above the minimum, both
+  // accepted by the contract, and the user is no longer told that finishing
+  // the update requires disconnecting every open client.
+  assert.deepEqual(await inspect(f, { ...daemon, serverVersion: "0.153.0" }, contract), []);
+});
+
+test("a service that satisfies the contract is still offered a restart while it holds a native binding", async t => {
+  const f = await fixture(t);
+  // The stale-or-unbound case the version rule must never silence. This pid
+  // is genuinely alive - it is this test process - so listNativeHolds cannot
+  // reap the binding as confirmed dead, and the hold blocks activation because
+  // the record declares no store contract.
+  const bindings = path.join(path.dirname(f.root), "workspaces", "project", "bindings");
+  await mkdir(bindings, { recursive: true });
+  await writeFile(path.join(bindings, "native.json"),
+    JSON.stringify({ schemaVersion: 1, clientPid: process.pid }));
+  const daemon = { ...f.service, pid: process.pid, cliVersion: "0.154.0", serverVersion: "0.153.0" };
+
+  assert.deepEqual(await inspect(f, daemon, capturedContract("0.150.0")), ["0.153.0"]);
+  // And the same daemon with no binding naming it is not selected, which is
+  // what proves the line above came from the binding rather than the version.
+  assert.deepEqual(await inspect(f, { ...daemon, pid: UNBOUND_PID },
+    capturedContract("0.150.0")), []);
+});
+
+test("a serving version that cannot be judged at all still offers a restart", async t => {
+  const f = await fixture(t);
+  const daemon = { ...f.service, pid: UNBOUND_PID, cliVersion: "0.154.0", serverVersion: "0.153.0" };
+  // No native-delivery declaration: nothing captured, so nothing the serving
+  // version can be said to satisfy.
+  assert.deepEqual(await inspect(f, daemon, undefined), ["0.153.0"]);
+  // Captured, but for another platform only.
+  assert.deepEqual(await inspect(f, daemon, { minimumByPlatform: { "aix-mips": "0.150.0" },
+    anchors: [{ platform: "aix-mips", version: "0.150.0", protocolContract: "fixture/1" }],
+    knownBad: [], activationKinds: ["native-service"], policySource: "installation-record" }),
+  ["0.153.0"]);
+  // A daemon that reports no version at all.
+  assert.deepEqual(await inspect(f, { ...daemon, serverVersion: null },
+    capturedContract("0.150.0")), [null]);
 });

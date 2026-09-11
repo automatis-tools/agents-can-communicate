@@ -103,7 +103,20 @@ before workspace-capable code loads, and the harness session id arrives in the h
 payload on stdin, which `entry.mjs` does not read. The hook therefore starts on the
 active generation, reads its payload, and delegates to the pinned generation's hook
 entrypoint when the pin names a different generation that still exists on disk. The
-extra process spawn is paid only by sessions that outlived an activation.
+delegation is a dynamic `import()` of that entrypoint inside the same process, not a
+second spawn, and even that is paid only by sessions that outlived an activation.
+
+A pin is not an activation hold, and that asymmetry has to be closed at the point of
+delegation. A harness that lives only in hooks — no native binding, no long-lived
+channel process — holds nothing between turns, so an activation to a generation
+declaring a different `STORE_VERSION` proceeds past it, correctly, because nothing is
+blocking. The pin survives that activation. Delegating into the generation it names
+would then run code the store refuses by strict equality: `unknown store version` on
+every hook, falling open for the rest of that session's life while the pin held a dead
+generation against reclamation. Resolution therefore refuses any pin whose declared
+`storeVersion` is not equal to the resolving generation's own, absent contracts
+included, and falls back to the active generation — the answer every other unresolvable
+pin already gets.
 
 ### Native delivery eligibility
 
@@ -138,19 +151,58 @@ different build while the binding still names the version captured when the sess
 The defect would move one layer up and become silent, since the message would fall back to
 queued with every test still passing.
 
+A fifth site compares the same two versions, and it is the one that acts on the answer.
+`inspectMaintenanceServices` in `packages/cli/src/managed-runtime/maintenance.mjs`
+selects a service for a restart offer when `snapshot.serverVersion !== snapshot.cliVersion`,
+and that offer interrupts the user with a prompt that disconnects every open client.
+Leaving it as an identity check would keep producing the exact complaint this work began
+from. It takes the same substitution: a serving version that satisfies the adapter's
+captured contract, judged by `evaluateVersionContract` against the host platform, is not
+a reason to offer a restart. A version that does not satisfy it — below the minimum, on
+the denylist, a prerelease, or unreadable — still is, and so is a serving version the
+adapter captured no contract for, because "cannot be judged" is not "satisfies". The
+other half of the condition, a native binding hold naming the service's PID, is
+untouched: a genuinely stale or unbound service is still offered a restart.
+
+`packages/adapter-codex/src/maintenance.mjs` compares `serverVersion` with the approved
+`cliVersion` twice inside `startAfterMaintenance`, and both stay. They answer a different
+question: after ACC has itself stopped the daemon and started it again from a named CLI
+path, did that restart actually produce the daemon the approval described? That is
+verification of an action ACC performed under a captured identity, not a decision about
+whether a version is eligible to serve.
+
 `probe_version_mismatch` stays in the native vocabulary so recorded events remain
 readable. No path produces it after this change.
 
 ### Uninstall retires its own holds
 
 `acc uninstall` retires the binding records and pins belonging to the installs it
-removes, and marks the runtime leases of the ACC processes it orphaned so they stop
-holding activation. It does not signal or terminate client processes. An orphaned
-channel process keeps running; the existing `startInertChannel` path already covers a
-channel that cannot admit a workspace.
+removes. It does not signal or terminate client processes. An orphaned channel process
+keeps running; the existing `startInertChannel` path already covers a channel that
+cannot admit a workspace.
 
-This also removes the `control.targets` trap. After an uninstall there are no holds
-left for maintenance to clear, so a subsequent install and update proceed without one.
+Runtime leases are deliberately not retired, and the asymmetry is not an oversight. A
+lease does double duty: it blocks activation, and it is also the record that protects
+the generation a live process is executing from — `reclaimGenerations` treats every
+live lease's `runtime.root` as a reference. Retiring the lease of a process that is
+still running would let the next reclaim delete the directory that process is importing
+from. A binding and a pin carry no such duty: a binding records a client's delivery
+state, and a pin only names the generation a session prefers, which a hook already
+falls back from when it cannot be honoured. Retiring those two is therefore safe and
+retiring a lease is not. A live ACC process keeps holding activation across an
+uninstall and stops holding it when it exits, which is the pre-existing behaviour.
+
+Retirement is all-or-nothing. `uninstallManaged` retires only when the removal leaves
+`control.targets` empty, because a binding record names the generation that published
+it and no adapter id. There is no way to select the holds belonging to the one adapter
+being removed, and retiring all of them would strip a client that is still installed of
+its coordination. A partial uninstall therefore retires nothing.
+
+This also removes the `control.targets` trap, though not by restoring anything: an
+uninstall empties that list, so `inspectMaintenanceServices` has no adapter to inspect
+until the next install repopulates it. What matters is that by then there are no
+bindings or pins left over for maintenance to clear, so a subsequent install and update
+proceed without one.
 
 ### Generation retention
 
@@ -173,6 +225,7 @@ written to events keep their meaning and stay in the vocabulary.
 | Pin missing or unreadable | Active generation, as today |
 | Pinned generation absent from disk | Active generation, diagnostic recorded |
 | Pinned entrypoint fails to import | Hook continues on the active generation |
+| Pin declares a different or absent `storeVersion` | Active generation, never delegated to |
 | Hold declares no `storeVersion` | Conservative hold, current wait notice |
 | Declared `storeVersion` differs | Current behaviour, wait for process exit |
 | Probe reports no version | Current reason codes, unchanged |
@@ -189,8 +242,11 @@ the detected binary version is eligible; a serving version below the minimum rep
 `known_bad_version`; a protocol contract mismatch is unchanged.
 
 Unit coverage for activation: holds with matching, differing and absent `storeVersion`;
-the notice text for each. Unit coverage for pin resolution: present, absent, stale, and
-a pinned generation removed from disk.
+the notice text for each. Unit coverage for pin resolution: present, absent, stale, a
+pinned generation removed from disk, and a pin declaring a differing or absent store
+contract. Unit coverage for the restart offer: a serving version the captured contract
+accepts is not selected, one below the minimum or on the denylist still is, and a
+service holding a native binding is selected regardless of its version.
 
 Acceptance coverage in the existing packed style: activation while a live session holds
 the previous generation, asserting the live session's hook loads the pinned generation
@@ -205,7 +261,10 @@ Claude round trip completed across an activation without closing any session.
 ## Limits
 
 A `STORE_VERSION` change still requires every live process to exit. That is the case
-the gate exists for, and this design does not weaken it.
+the gate exists for, and this design does not weaken it. Pin resolution refusing a
+differing contract is what keeps that true through the one route around the gate: a
+hooks-only session holds nothing, so it cannot make the activation wait, and its
+surviving pin must not carry the old contract's code into the turns that follow.
 
 Pinning is stronger than the store contract requires. With contracts compared, a hook
 from a newer generation and a channel from an older one are already compatible in the

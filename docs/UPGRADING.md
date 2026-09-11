@@ -1,14 +1,14 @@
-# Upgrading to 0.4.4
+# Upgrading to 0.5.0
 
-## From 0.4.3, 0.4.2, 0.4.1 or 0.4.0
+## From 0.4.4, 0.4.3, 0.4.2, 0.4.1 or 0.4.0
 
-This patch keeps the existing workspace data format. It adds confirmed service maintenance
-to the updater, preserves native delivery setup when readiness probes are unavailable,
-and names the actual processes blocking activation. It includes the previous 0.4.x
-outgoing sandbox permissions, delivery diagnostics, session recovery and integration fixes.
-
-Run the update command; it can offer a confirmed restart for an eligible Codex service.
-Other active clients and persistent ACC MCP processes still need to finish before activation:
+This release keeps the existing workspace data format. It changes when an update is
+allowed to take effect: activation is gated on the store contract a running process
+declares rather than on which version it happens to be, sessions finish on the generation
+they started with, unreferenced generation directories are reclaimed, and `acc uninstall`
+retires the holds its own install published. It carries the previous 0.4.x confirmed
+service maintenance, outgoing sandbox permissions, delivery diagnostics, session recovery
+and integration fixes.
 
 ```bash
 acc update
@@ -16,8 +16,8 @@ acc version
 acc doctor
 ```
 
-After publication, `acc version` should report 0.4.4. If a pin keeps an older version,
-select 0.4.4 or clear it first. A managed update refreshes installed integrations and
+After publication, `acc version` should report 0.5.0. If a pin keeps an older version,
+select 0.5.0 or clear it first. A managed update refreshes installed integrations and
 skills; use the npm instructions below for unmanaged or pre-0.4 installations. Start
 clients again and complete any hook/trust review they request. With existing live consent,
 Codex 0.153.4 or newer on macOS arm64 receives local socket permissions when its workspace
@@ -44,11 +44,62 @@ In Grok, public status supplies the session's own CLI arguments through the next
 hook. Grok still uses explicit inbox reads; this patch adds no external wake or guards.
 Start clients in a project directory, rather than a home directory containing ACC state.
 
+## What still waits for a process to exit, and what no longer does
+
+Earlier releases held a verified update until every live ACC process and every native
+client binding was gone. Each of those holds now states the store contract it speaks, and
+only two kinds keep an update pending:
+
+- A hold whose declared store contract differs from the incoming version's. This is the
+  case the gate exists for, and a release that changes the store contract still needs
+  every live process to exit.
+- A hold that declares no contract, which includes every record written by a release
+  before this one. Unknown cannot be compared, so it stays a conservative wait.
+
+A hold declaring the same store contract as the incoming version proceeds. Several open
+Claude Code sessions, a Codex daemon and an idle ACC MCP server no longer have to be
+closed together to move between releases that share a contract.
+
+The first update after installing this release still waits for every process, because the
+holds it has to judge were written before the contract field existed. Close the relevant
+clients and persistent ACC processes once, or accept the eligible Codex service
+maintenance offer described below. Updates after that do not need it.
+
+`acc update` names each remaining hold with its process and its declared contract, so a
+wait now states its reason rather than only the PID. `acc doctor` reports the same
+pending notice.
+
+A session that is open while an activation completes keeps running the generation it
+started with, including its hooks, until it ends; it does not get half of one version and
+half of another. A session whose pin names a generation with a different store contract
+runs the active generation instead, which is the same behaviour as having no pin.
+
+A restart offer for a client's background service is now made only when the version that
+service is actually running fails that client's captured contract, or when it still holds
+a native binding. A Codex CLI that updated while its daemon kept serving the previous
+build is an ordinary state, and it no longer produces a prompt to disconnect open clients.
+
+Generation directories that nothing references are removed after an activation instead of
+accumulating. A directory is kept while any control pointer, live runtime lease, live
+session pin or in-flight staging hold names it, and an unreadable holder postpones the
+whole sweep rather than being assumed dead.
+
+`acc uninstall` retires the binding records and session pins its own install published,
+so they stop holding a later activation, when the removal leaves no client installed. It
+never signals or terminates a client process. Removing one client while another stays
+installed retires nothing, because a binding record names the generation that published
+it and no client id. Runtime leases are left in place on purpose: a lease is also what
+protects the generation a running process is executing from, and clearing it would let
+that directory be reclaimed out from under the process. A live ACC process therefore
+keeps holding activation across an uninstall until it exits.
+
 ## Confirmed client service maintenance
 
-On macOS arm64, `acc update` can ask once to restart a verified Codex service that blocks
-activation or runs a different version from the installed CLI. The captured maintenance
-contract uses Codex CLI 0.154.0 and its `pid` backend, with compatible commands and protocol
+On macOS arm64, `acc update` can ask once to restart a verified Codex service that holds a
+native binding blocking activation, or that is serving a version outside the captured
+native-delivery contract. A serving version that satisfies that contract is left alone,
+even when the installed CLI has moved to a newer build. The captured maintenance contract
+uses Codex CLI 0.154.0 and its `pid` backend, with compatible commands and protocol
 checked again at runtime. The installed CLI and managed executable must already match;
 ACC does not replace vendor binaries or install an operating-system service.
 
@@ -78,7 +129,7 @@ an update even when a native service or feature probe is temporarily unavailable
 
 An old installation can already be stuck with both a pre-0.4.4 pending runtime and the
 old updater that waits indefinitely. That code cannot discover this fix. Bootstrap the
-new launcher once with `npm install --global agents-can-communicate@0.4.4`, then run
+new launcher once with `npm install --global agents-can-communicate@0.5.0`, then run
 `acc update`. The new launcher stages its verified runtime and retires only an exactly
 identified obsolete ACC background updater while no integrations are being written.
 This does not terminate an unrelated client or bypass its lifetime hold.
@@ -104,7 +155,7 @@ restores access; deleting or editing the record is not a remedy.
 2. Install the released package, then refresh the client integrations:
 
    ```bash
-   npm install --global agents-can-communicate@0.4.4
+   npm install --global agents-can-communicate@0.5.0
    acc version
    acc install
    ```
@@ -139,13 +190,15 @@ an independent background process, normally at most once a day, downloads and ve
 separate runtime copy, and refreshes the installed integrations and skills before switching.
 The global npm package provides a launcher; the active runtime lives under ACC's data home.
 
-Running ACC processes, including idle MCP servers, hold the current version until
-confirmed process exit. Native bindings hold until observed client SessionEnd cleanup or
-confirmed process death; the vendor daemon can remain running after that lifecycle event.
-Unknown PIDs remain conservative holds until lifecycle cleanup. `acc finish`, presence TTL,
-and delivery off alone do not prove native end. Close the relevant client sessions and
-persistent ACC processes to release holds, or accept the eligible Codex service maintenance
-offer in `acc update`. Background updates never request fresh restart consent.
+Running ACC processes, including idle MCP servers, still publish a hold for as long as they
+live, and native bindings still hold until observed client SessionEnd cleanup or confirmed
+process death; the vendor daemon can remain running after that lifecycle event. What
+changed is which of those holds keeps an update pending: only one whose declared store
+contract differs from the incoming version's, or that declares none at all. Unknown PIDs
+remain conservative holds until lifecycle cleanup. `acc finish`, presence TTL, and delivery
+off alone still do not prove native end. When a hold does block, close the relevant client
+sessions and persistent ACC processes to release it, or accept the eligible Codex service
+maintenance offer in `acc update`. Background updates never request fresh restart consent.
 Hooks never wait for a network download. If integration refresh temporarily prevents
 coordination, a hook lets the client continue; its next genuine user turn can restore a
 missing binding.
@@ -155,7 +208,7 @@ acc update                    # download and apply, or report what is keeping it
 acc update --check            # check without installing or changing update settings
 acc update --auto off         # disable background updates
 acc update --auto on          # enable them again
-acc update --pin 0.4.4        # stay on this exact stable version
+acc update --pin 0.5.0        # stay on this exact stable version
 acc update --pin none         # follow stable releases again
 ```
 
@@ -173,9 +226,11 @@ lifecycle scripts. `acc doctor` reports the automatic-update policy and pending 
 A failed download or verification keeps the active runtime. An interrupted integration
 refresh keeps workspace admission closed until `acc update` finishes the refresh. It does
 not roll workspace history back. A failed refresh exits with code `4` and reports the adapter
-and configuration problem to fix before retrying; a verified update waiting for live clients
-remains pending. Previous runtime and plugin cache versions are
-retained so existing launch paths survive the change.
+and configuration problem to fix before retrying; a verified update waiting for a blocking
+hold remains pending. A previous runtime version is retained for as long as anything can
+still reach it — a control pointer, a live ACC process, or an open session pinned to it —
+so existing launch paths survive the change; once nothing references it, its directory is
+reclaimed after the next activation instead of accumulating.
 
 Client trust is still controlled by the client. Follow any reported activation or hook
 review steps; copied files do not prove the client has activated them. The initial

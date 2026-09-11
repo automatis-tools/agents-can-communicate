@@ -5,6 +5,8 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
 
+import { STORE_VERSION } from "@agents-can-communicate/storage-filesystem";
+
 import { resolvePinnedGeneration, writePin } from "../src/managed-runtime/pins.mjs";
 import { canonicalManagerRoot } from "../src/managed-runtime/state.mjs";
 
@@ -14,7 +16,7 @@ test("a session pinned to another generation resolves that entrypoint", async ()
   await mkdir(path.join(pinned, "bin", "entrypoints"), { recursive: true });
   await writeFile(path.join(pinned, "bin", "entrypoints", "acc-hook.mjs"), "export const main = () => {};");
   await writePin({ root, harnessSessionId: "h1", runtimeRoot: pinned, version: "0.4.2",
-    storeVersion: 6, clientPid: process.pid });
+    storeVersion: STORE_VERSION, clientPid: process.pid });
   const active = path.join(root, "generations", "0.4.4-def");
   assert.equal(await resolvePinnedGeneration({ root, harnessSessionId: "h1", active }),
     await canonicalManagerRoot(pinned));
@@ -26,14 +28,14 @@ test("a session pinned to the active generation does not delegate", async () => 
   await mkdir(path.join(active, "bin", "entrypoints"), { recursive: true });
   await writeFile(path.join(active, "bin", "entrypoints", "acc-hook.mjs"), "export const main = () => {};");
   await writePin({ root, harnessSessionId: "h2", runtimeRoot: active, version: "0.4.4",
-    storeVersion: 6, clientPid: process.pid });
+    storeVersion: STORE_VERSION, clientPid: process.pid });
   assert.equal(await resolvePinnedGeneration({ root, harnessSessionId: "h2", active }), null);
 });
 
 test("a pinned generation removed from disk falls back to the active one", async () => {
   const root = await mkdtemp(path.join(tmpdir(), "acc-delegate-"));
   await writePin({ root, harnessSessionId: "h3", runtimeRoot: path.join(root, "generations", "gone"),
-    version: "0.4.2", storeVersion: 6, clientPid: process.pid });
+    version: "0.4.2", storeVersion: STORE_VERSION, clientPid: process.pid });
   const active = path.join(root, "generations", "0.4.4-def");
   assert.equal(await resolvePinnedGeneration({ root, harnessSessionId: "h3", active }), null);
 });
@@ -79,7 +81,7 @@ test("a pin written under the runner's raw data-home root is found by the hook's
   await mkdir(path.join(pinned, "bin", "entrypoints"), { recursive: true });
   await writeFile(path.join(pinned, "bin", "entrypoints", "acc-hook.mjs"), "export const main = () => {};");
   await writePin({ root: writeRoot, harnessSessionId: "h-symlinked", runtimeRoot: pinned,
-    version: "0.4.2", storeVersion: 6, clientPid: process.pid });
+    version: "0.4.2", storeVersion: STORE_VERSION, clientPid: process.pid });
 
   const active = path.join(readRoot, "generations", "0.4.4-active");
   assert.equal(await resolvePinnedGeneration({ root: readRoot, harnessSessionId: "h-symlinked", active }),
@@ -102,7 +104,7 @@ test("a pin naming a generation outside the manager's own generations directory 
   // not merely from the file being unreachable.
   await writeFile(path.join(outside, "bin", "entrypoints", "acc-hook.mjs"), "export const main = () => {};");
   await writePin({ root, harnessSessionId: "h-outside", runtimeRoot: outside, version: "9.9.9",
-    storeVersion: 6, clientPid: process.pid });
+    storeVersion: STORE_VERSION, clientPid: process.pid });
   const active = path.join(root, "generations", "0.4.4-def");
   assert.equal(await resolvePinnedGeneration({ root, harnessSessionId: "h-outside", active }), null);
 });
@@ -119,4 +121,61 @@ test("an unreadable pin record falls back to the active generation", async () =>
   await writeFile(file, "{ this is not valid json");
   const active = path.join(root, "generations", "0.4.4-def");
   assert.equal(await resolvePinnedGeneration({ root, harnessSessionId: "h-corrupt", active }), null);
+});
+
+// Final review, Finding 1: a pin is deliberately not an activation hold, so a
+// harness that lives only in hooks holds nothing between turns and cannot keep
+// an activation waiting. An activation to a generation declaring a different
+// STORE_VERSION therefore proceeds - correctly - but the pin survives it, and
+// delegating into the generation it names would run code the store refuses by
+// strict equality: `unknown store version` on every hook, falling open for the
+// rest of the session's life while the pin held the dead generation against
+// reclamation.
+//
+// Non-vacuousness is proved inside the test rather than asserted about it: the
+// three halves build byte-identical fixtures - same manager root shape, same
+// contained generation directory, same importable entrypoint, same live PID -
+// and differ in exactly one value, the pin's declared contract. The first is
+// the control and must delegate; if the gate were removed the others would
+// answer the same way and the test would fail.
+test("a pin declaring a store contract other than this generation's is not delegated to", async () => {
+  const fixture = async (harnessSessionId, storeVersion) => {
+    const root = await mkdtemp(path.join(tmpdir(), "acc-delegate-contract-"));
+    const pinned = path.join(root, "generations", "0.4.2-abc");
+    await mkdir(path.join(pinned, "bin", "entrypoints"), { recursive: true });
+    await writeFile(path.join(pinned, "bin", "entrypoints", "acc-hook.mjs"),
+      "export const main = () => {};");
+    await writePin({ root, harnessSessionId, runtimeRoot: pinned, version: "0.4.2",
+      storeVersion, clientPid: process.pid });
+    return { root, pinned, active: path.join(root, "generations", "0.4.4-def") };
+  };
+
+  const matching = await fixture("h-contract-same", STORE_VERSION);
+  assert.equal(await resolvePinnedGeneration({ root: matching.root,
+    harnessSessionId: "h-contract-same", active: matching.active }),
+  await canonicalManagerRoot(matching.pinned),
+  "control: an otherwise identical pin declaring this generation's contract must delegate");
+
+  const newer = await fixture("h-contract-newer", STORE_VERSION + 1);
+  assert.equal(await resolvePinnedGeneration({ root: newer.root,
+    harnessSessionId: "h-contract-newer", active: newer.active }), null);
+
+  const older = await fixture("h-contract-older", STORE_VERSION - 1);
+  assert.equal(await resolvePinnedGeneration({ root: older.root,
+    harnessSessionId: "h-contract-older", active: older.active }), null);
+});
+
+// A pin written before the contract field existed, or by a generation whose
+// root manifest declares none, carries null. Unknown cannot be proved equal,
+// and this function's answer to every pin it cannot honour is the active
+// generation.
+test("a pin declaring no store contract at all is not delegated to", async () => {
+  const root = await mkdtemp(path.join(tmpdir(), "acc-delegate-nocontract-"));
+  const pinned = path.join(root, "generations", "0.4.2-abc");
+  await mkdir(path.join(pinned, "bin", "entrypoints"), { recursive: true });
+  await writeFile(path.join(pinned, "bin", "entrypoints", "acc-hook.mjs"), "export const main = () => {};");
+  await writePin({ root, harnessSessionId: "h-contract-absent", runtimeRoot: pinned,
+    version: "0.4.2", storeVersion: null, clientPid: process.pid });
+  const active = path.join(root, "generations", "0.4.4-def");
+  assert.equal(await resolvePinnedGeneration({ root, harnessSessionId: "h-contract-absent", active }), null);
 });

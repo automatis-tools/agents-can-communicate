@@ -1,6 +1,7 @@
 import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import path from "node:path";
+import { evaluateVersionContract } from "@agents-can-communicate/adapter-sdk";
 import { ALL_ADAPTERS } from "../install-command.mjs";
 import { listActivationBlockers } from "./activation.mjs";
 import { confirmedDead, withManagerLock } from "./mutex.mjs";
@@ -8,9 +9,31 @@ import { readControl, readManagedJson } from "./state.mjs";
 import { MAINTENANCE_ACTIVE, maintenanceNotice, maintenanceRecipe, maintenanceReport,
   readMaintenance, writeMaintenance } from "./maintenance-state.mjs";
 
+const HOST_PLATFORM = `${process.platform}-${process.arch}`;
+
 export function maintenanceContext(control, env) {
-  return { home: control.home, env, platform: `${process.platform}-${process.arch}` };
+  return { home: control.home, env, platform: HOST_PLATFORM };
 }
+
+/** The fifth site that used to compare a service's serving version with the
+ * CLI's, and the only one that acts on the answer by interrupting the user.
+ * The other four now judge the serving version against the adapter's captured
+ * native-delivery contract, and this one has to say the same thing: a Codex
+ * daemon still running the previous build while its CLI has updated is the
+ * ordinary state this release stops treating as a fault, and telling that user
+ * a restart is required - disconnecting every open client - is the complaint
+ * the work began from.
+ *
+ * A restart is still offered whenever the serving version does *not* satisfy
+ * that contract: below the captured minimum, on the denylist, a prerelease, or
+ * unreadable. It is also offered, unchanged, when the adapter declares no
+ * contract for this platform at all, because "cannot be judged" is not
+ * "satisfies". Only a version the contract actually accepts stops being a
+ * reason on its own - and the native-binding blocker it is OR-ed with is
+ * untouched, so a genuinely stale or unbound service is still selected. */
+const servingVersionIsContrary = (adapter, snapshot) =>
+  evaluateVersionContract(adapter, { clientVersion: snapshot.serverVersion,
+    platform: HOST_PLATFORM }).reasonCode !== null;
 
 export async function inspectMaintenanceServices({ control, env = process.env, root, adapters = ALL_ADAPTERS() }) {
   // Maintenance targets the pending generation when one exists (its contract
@@ -26,7 +49,7 @@ export async function inspectMaintenanceServices({ control, env = process.env, r
   for (const adapter of adapters.filter(a => control.targets.includes(a.id) && a.inspectMaintenance)) {
     const snapshot = await adapter.inspectMaintenance(maintenanceContext(control, env));
     if (!snapshot || !["ready", "busy"].includes(snapshot.state)) continue;
-    if (snapshot.serverVersion !== snapshot.cliVersion
+    if (servingVersionIsContrary(adapter, snapshot)
       || blockers.some(b => b.pid === snapshot.pid && b.kinds.includes("native"))) {
       services.push({ adapterId: adapter.id, snapshot });
     }

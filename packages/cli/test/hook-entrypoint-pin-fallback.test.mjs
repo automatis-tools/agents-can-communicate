@@ -9,6 +9,8 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
 
+import { STORE_VERSION } from "@agents-can-communicate/storage-filesystem";
+
 import { writePin } from "../src/managed-runtime/pins.mjs";
 import { canonicalManagerRoot } from "../src/managed-runtime/state.mjs";
 import { main } from "../../../bin/entrypoints/acc-hook.mjs";
@@ -48,7 +50,7 @@ test("a pinned session's hook runs the pinned generation's own entrypoint", asyn
     + "  process.exitCode = 0;\n"
     + "}\n");
   await writePin({ root: managerRoot, harnessSessionId: "session-pinned", runtimeRoot: pinned,
-    version: "0.4.2", storeVersion: 6, clientPid: process.pid });
+    version: "0.4.2", storeVersion: STORE_VERSION, clientPid: process.pid });
 
   const payload = { hook_event_name: "Notification", session_id: "session-pinned", cwd: root };
   await withArgv(["claude_code", "Notification"],
@@ -74,7 +76,7 @@ test("a pinned generation that will not import falls back to the active generati
     // the dynamic `import()` itself, not only around calling `main`.
     await writeFile(path.join(pinned, "bin", "entrypoints", "acc-hook.mjs"), "export const main = (\n");
     await writePin({ root: managerRoot, harnessSessionId: "session-broken", runtimeRoot: pinned,
-      version: "0.4.2", storeVersion: 6, clientPid: process.pid });
+      version: "0.4.2", storeVersion: STORE_VERSION, clientPid: process.pid });
 
     const payload = { hook_event_name: "Notification", session_id: "session-broken", cwd: root };
     process.exitCode = undefined;
@@ -98,7 +100,7 @@ test("a pinned generation whose entrypoint imports but whose main throws also fa
     await writeFile(path.join(pinned, "bin", "entrypoints", "acc-hook.mjs"),
       "export async function main() { throw new Error('pinned generation is broken'); }\n");
     await writePin({ root: managerRoot, harnessSessionId: "session-throws", runtimeRoot: pinned,
-      version: "0.4.2", storeVersion: 6, clientPid: process.pid });
+      version: "0.4.2", storeVersion: STORE_VERSION, clientPid: process.pid });
 
     const payload = { hook_event_name: "Notification", session_id: "session-throws", cwd: root };
     process.exitCode = undefined;
@@ -147,7 +149,7 @@ test("a hook already running because it was delegated to never delegates again",
     // delegated hook resolving its own pin (if the guard did not stop it
     // first) would read exactly this record.
     await writePin({ root: managerRoot, harnessSessionId: "session-recursive", runtimeRoot: elsewhere,
-      version: "0.4.9", storeVersion: 6, clientPid: process.pid });
+      version: "0.4.9", storeVersion: STORE_VERSION, clientPid: process.pid });
 
     const payload = { hook_event_name: "Notification", session_id: "session-recursive", cwd: root };
     process.exitCode = undefined;
@@ -158,6 +160,43 @@ test("a hook already running because it was delegated to never delegates again",
 
     await assert.rejects(() => readFile(marker, "utf8"), /ENOENT/,
       "the second generation's main must never run");
+    assert.equal(process.exitCode, 0);
+    process.exitCode = 0;
+  });
+});
+
+// Final review, Finding 1, at the level that actually runs: the resolver test
+// proves the decision, this proves the hook honours it. The pinned generation
+// here is fully working - the same marker-writing entrypoint the first test in
+// this file delegates into successfully - and differs from that fixture in one
+// value only, the contract its pin declares. The marker is the non-vacuousness
+// evidence: with a matching contract the first test asserts it is written, so
+// its absence here can only come from the gate, not from a broken fixture.
+test("a pinned generation declaring another store contract is never imported, and the client still proceeds", async () => {
+  await withDataHome(async () => {
+    const root = await mkdtemp(path.join(tmpdir(), "acc-hook-pin-contract-"));
+    const managerRoot = path.join(root, "runtime");
+    const pinned = path.join(managerRoot, "generations", "0.4.2-other-contract");
+    const active = path.join(managerRoot, "generations", "0.4.4-active");
+    const marker = path.join(root, "delegated.json");
+    await mkdir(path.join(pinned, "bin", "entrypoints"), { recursive: true });
+    await writeFile(path.join(pinned, "bin", "entrypoints", "acc-hook.mjs"),
+      "import { writeFile } from 'node:fs/promises';\n"
+      + "export async function main(args) {\n"
+      + `  await writeFile(${JSON.stringify(marker)}, JSON.stringify(args));\n`
+      + "  process.exitCode = 0;\n"
+      + "}\n");
+    await writePin({ root: managerRoot, harnessSessionId: "session-other-contract",
+      runtimeRoot: pinned, version: "0.4.2", storeVersion: STORE_VERSION + 1,
+      clientPid: process.pid });
+
+    const payload = { hook_event_name: "Notification", session_id: "session-other-contract", cwd: root };
+    process.exitCode = undefined;
+    await withArgv(["claude_code", "Notification"],
+      () => main({ managerRoot, packageRoot: active, payload }));
+
+    await assert.rejects(() => readFile(marker, "utf8"), /ENOENT/,
+      "the old-contract generation's main must never run");
     assert.equal(process.exitCode, 0);
     process.exitCode = 0;
   });

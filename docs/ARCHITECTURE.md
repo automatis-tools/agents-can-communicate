@@ -174,14 +174,19 @@ The CLI owns installation generations under `<dataHome>/acc/runtime`, outside wo
 All five launch paths select a generation and publish an actual-process lease under one
 admission mutex before loading workspace-capable code. Immutable launcher modules and
 runtime directories preserve in-progress imports. Leases survive `main()` returning and
-are removed only after confirmed process death. Parsed help, version, and update recovery
-remain available when workspace admission is unavailable.
+are removed only after confirmed process death. A session is also pinned to the generation
+it started with: its hooks delegate to that generation while the pin declares the same
+store contract this one does, and run the active generation otherwise. A generation
+directory is reclaimed once no control pointer, live lease, live pin or staging hold names
+it. Parsed help, version, and update recovery remain available when workspace admission is
+unavailable.
 
 An independent worker downloads npm packages with lifecycle scripts disabled, checks exact
 stable package identity and the discovered integrity, and health-checks the staged runtime.
 Installer detection and planning happen before exclusive admission. The worker then checks
-ACC process leases and native binding PIDs, records `activating`, applies every integration,
-and only publishes the new active pointer after all applications succeed. Partial refresh
+ACC process leases and native binding PIDs and waits only for those whose declared store
+contract differs from the incoming generation's or is absent, records `activating`, applies
+every integration, and only publishes the new active pointer after all applications succeed. Partial refresh
 remains fenced and repairs forward, with the old active pointer retained but normal
 workspace admission unavailable until recovery completes. Native bindings cease holding
 after observed SessionEnd cleanup or confirmed process death; the vendor daemon may remain

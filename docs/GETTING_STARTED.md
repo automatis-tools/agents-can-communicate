@@ -15,7 +15,7 @@ pair or session-bound ACC MCP tools. See [CLI ownership](CLI.md#coordinate-from-
 
 ACC requires macOS or Linux and Node.js 24 or newer.
 
-Already using ACC? Follow the [upgrade guide](UPGRADING.md) for the 0.4.x → 0.4.4
+Already using ACC? Follow the [upgrade guide](UPGRADING.md) for the 0.4.x → 0.5.0
 update or the data-format boundary when upgrading from 0.3.1.
 
 ```bash
