@@ -24,6 +24,23 @@
   which never matches the random suffix `mkdtempSync` actually appends, so every run
   removed a path that did not exist and kept the one that did.
 
+| Candidate artifact | Value |
+|---|---|
+| Built from | `f438cf8de8f2daac16fe975413df1491f3f1f4ae` |
+| Tarball | `agents-can-communicate-0.5.1.tgz`, 382,983 bytes, 272 files |
+| sha256 | `ac2d466cafbb5d92f29c6d659b20c80575ef8baae478e2637452669aee2b1027` |
+
+The exact archive passed installed-package verification and all 27 packed managed-runtime
+checks, covering install, bootstrap, reinstall, update, degraded update and diagnostics.
+The full suite passed with 2,117 tests, 2,116 passes, zero failures and one skip, which
+is the uninstall case that requires Gemini CLI to be absent and it is installed on the
+capture machine.
+
+Live delivery between Claude Code 2.1.268 and Codex CLI 0.154.0 was captured on a machine
+wiped of every ACC trace beforehand, installing from the public registry. Both directions
+were served natively — `claude-channel` and `codex-app-server` — and the peer-to-peer leg
+took seven seconds from request to answer. See `docs/release-evidence/v0.5.1.md`.
+
 ## 0.5.0 — release candidate
 
 - Activation of a new managed runtime generation no longer waits for every live process
