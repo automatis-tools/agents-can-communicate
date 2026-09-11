@@ -32,10 +32,13 @@
   so nothing remains for the maintenance path to inspect until the next install
   repopulates it, and a subsequent install and update proceed with nothing left over from
   the previous one.
-- A restart of a client's background service is offered only when the version that service
-  is actually running fails the adapter's captured native-delivery contract, or when it
-  still holds a native binding. A Codex CLI that updated while its daemon kept serving the
-  previous build no longer produces a restart prompt that would disconnect open clients.
+- A restart of a client's background service is offered when the version that service is
+  actually running fails the adapter's captured native-delivery contract, or when the
+  service still holds a native binding. Where the contract has captured nothing for this
+  platform — every machine but macOS arm64 — it has no verdict to give, so the served
+  version is compared with the CLI's, as it was before. A Codex CLI that updated while its
+  daemon kept serving the previous build no longer produces a restart prompt that would
+  disconnect open clients.
 - A generation directory is removed once no pin and no lease references it, under the
   manager lock, and only when no live or unknown holder could still reference it, instead
   of accumulating indefinitely.
@@ -49,13 +52,13 @@
 
 | Candidate artifact | Value |
 |---|---|
-| Built from | `bd33728fa46adc618c08958658bc6b5e97004d1c` |
-| Tarball | `agents-can-communicate-0.5.0.tgz`, 379,048 bytes, 272 files |
-| sha256 | `74158a7093e1927ed8d41ed56ecbaee81b896cfaccaaec4eda737ba50c2925d2` |
+| Built from | `004cb92ed2cf481179c8ddf5c9d4c788f05ad502` |
+| Tarball | `agents-can-communicate-0.5.0.tgz`, 379,432 bytes, 272 files |
+| sha256 | `1b1aa42720f21c9edbeb77394016fc107a8fbbbf8ca88ab59845fa4345e8d2af` |
 
 The exact archive passed installed-package verification and all 27 packed managed-runtime
 checks, covering install, bootstrap, reinstall, update, degraded update and diagnostics.
-The full suite passed with 2,103 tests, 2,102 passes, zero failures and one
+The full suite passed with 2,104 tests, 2,103 passes, zero failures and one
 environment-dependent skip. This candidate has not been tagged or published.
 
 ## 0.4.4 — release candidate
