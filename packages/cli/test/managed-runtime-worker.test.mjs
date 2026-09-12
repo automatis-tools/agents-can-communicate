@@ -66,30 +66,35 @@ test("failed downloads keep the working runtime and concurrent opt-out prevents 
   assert.equal((await readControl(g.root)).pending, null);
 });
 
-test("a background poll releases the update lock while waiting for clients", async t => {
+test("a background poll releases the update lock while waiting for clients", { timeout: 15_000 }, async t => {
   const f = await fixture(t);
   const pending = { version: "0.4.1", root: path.join(f.root, "generations", "new") };
   const modules = path.join(pending.root, "node_modules", "@agents-can-communicate", "cli", "src", "managed-runtime");
   await mkdir(modules, { recursive: true });
-  const marker = path.join(f.root, "prepared");
-  // A file is visible before writeFile finishes; expose that publication window.
-  await writeFile(path.join(modules, "refresh.mjs"), `import { writeFile } from 'node:fs/promises';
-    export async function prepareRefresh() { await writeFile(${JSON.stringify(marker)}, '');
-      await new Promise(resolve => setTimeout(resolve, 100));
-      await writeFile(${JSON.stringify(marker)}, 'ready');
-      return async () => ({ failed: [] }); }`);
+  await writeFile(path.join(modules, "refresh.mjs"),
+    "export async function prepareRefresh() { return async () => ({ failed: [] }); }");
   await writeControl(f.root, { ...await readControl(f.root), pending });
   await acquireRuntime(f.root, { kind: "acc-mcp" });
+  // Preparation finishes before the activation pass and its durable writes.
+  // Observe the actual idle interval without shortening it or changing locks.
   const source = `import { runWorker } from ${JSON.stringify(new URL("../src/managed-runtime/worker.mjs", import.meta.url).href)};
+    const sleep = globalThis.setTimeout;
+    globalThis.setTimeout = (callback, delay, ...args) => {
+      if (delay === 60_000) process.send('waiting-for-clients');
+      return sleep(callback, delay, ...args);
+    };
     await runWorker(${JSON.stringify(f.root)}, { wait: true, env: {} });`;
-  const child = spawn(process.execPath, ["--input-type=module", "-e", source], { stdio: "ignore" });
+  const child = spawn(process.execPath, ["--input-type=module", "-e", source],
+    { stdio: ["ignore", "ignore", "pipe", "ipc"] });
+  let stderr = "";
+  child.stderr.on("data", chunk => { stderr += chunk; });
   const exited = once(child, "exit");
   t.after(async () => { if (child.exitCode === null) child.kill("SIGKILL"); await exited; });
-  for (let attempt = 0; attempt < 100
-    && await readFile(marker, "utf8").catch(() => null) !== "ready"; attempt++) {
-    await new Promise(resolve => setTimeout(resolve, 10));
-  }
-  assert.equal(await readFile(marker, "utf8"), "ready");
+  const [phase] = await Promise.race([
+    once(child, "message", { signal: t.signal }),
+    exited.then(([code, signal]) => { throw new Error(`worker exited before waiting (${code ?? signal}): ${stderr}`); }),
+  ]);
+  assert.equal(phase, "waiting-for-clients");
   assert.equal(await withManagerLock(path.join(f.root, "worker"), async () => "foreground admitted",
     { timeoutMs: 500 }), "foreground admitted");
   assert.equal(await scheduleWorker(f.root, await readControl(f.root), { env: {} }), false,
