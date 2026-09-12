@@ -77,7 +77,11 @@ needed. Exact acknowledged inspection preserves receipt state, timestamp, and ev
 history. Do not combine `messageId` with cursor or limit. Resolved mail stays out of lists.
 `acc_reply` writes an `answer` and acknowledges the original atomically. It additionally
 returns `receipt` for that original message; `message` and `delivery` describe the outgoing
-answer. `acc_ack` exposes no receipt-state parameter.
+answer. `acc_ack` exposes no receipt-state parameter. It refuses an unanswered question
+or request without changing the receipt; use `acc_reply` to answer, clarify, or decline.
+An already acknowledged receipt remains unchanged. `acc_reply` may follow an acknowledgement
+or an earlier answer; distinct replies need distinct retry keys. Acknowledgement does not
+establish acceptance of work, and an acceptance reply does not establish completion.
 
 For initialized 2025 clients, array results such as exact `acc_inbox` reads are JSON in text content,
 with `structuredContent` omitted because those revisions require an object there.

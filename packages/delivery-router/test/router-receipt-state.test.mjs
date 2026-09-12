@@ -252,8 +252,8 @@ test("sequential offered, retrieved, and acknowledged receipts skip native trans
     outcome: "retrieved", transport: "durable" }]);
 
   const acknowledged = await send(f, "acknowledged");
-  await f.service.acknowledgeMessage({ ...owner(f.recipient),
-    messageId: acknowledged.messageId });
+  await f.service.replyToMessage({ ...owner(f.recipient),
+    messageId: acknowledged.messageId, clientMessageId: "reply_settled", body: "Answered." });
   assert.deepEqual(await f.router.offer(acknowledged), [{ recipientParticipantId: "models",
     outcome: "acknowledged", transport: "durable" }]);
 
@@ -268,8 +268,8 @@ for (const state of ["retrieved", "acknowledged"]) {
       const offerMessage = async ({ binding, message }) => {
         if (state === "retrieved") await f.service.readInbox({ ...owner(f.recipient),
           messageId: message.messageId });
-        else await f.service.acknowledgeMessage({ ...owner(f.recipient),
-          messageId: message.messageId });
+        else await f.service.replyToMessage({ ...owner(f.recipient),
+          messageId: message.messageId, clientMessageId: "reply_racing", body: "Answered." });
         return { accepted: true, transport: "codex-app-server",
           clientVersion: binding.clientVersion };
       };
@@ -298,7 +298,8 @@ test("one settled recipient does not suppress another recipient's queued offer",
   await publish(f.service, f.recipient);
   await publish(f.service, other);
   const message = await send(f, "isolated", ["models", "other"]);
-  await f.service.acknowledgeMessage({ ...owner(f.recipient), messageId: message.messageId });
+  await f.service.replyToMessage({ ...owner(f.recipient), messageId: message.messageId,
+    clientMessageId: "reply_isolated", body: "Answered." });
 
   assert.deepEqual(await f.router.offer(message), [
     { recipientParticipantId: "models", outcome: "acknowledged", transport: "durable" },

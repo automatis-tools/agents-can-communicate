@@ -181,7 +181,14 @@ Use the original message id to inspect acknowledgement; the outgoing reply belon
 its recipient's inbox. Resolved messages stay out of the ordinary inbox.
 
 Reply creates an `answer` in the same thread and acknowledges the original atomically.
-`ack` acknowledges without writing an answer and has no state override.
+`ack` acknowledges without writing an answer and has no state override. For an unanswered
+question or request, it exits `5` without changing the receipt: use `reply` to answer,
+clarify, or decline. An already acknowledged receipt remains an idempotent no-op.
+
+You can `reply` after `ack` or an earlier answer without changing the original receipt
+timestamp. Use a new `--client-message-id` for a distinct reply, and the same key and
+content for a retry. Acknowledgement is not acceptance of work; an acceptance reply names
+the scope and next step, while a later result reports what was actually verified.
 
 ### Historical recovery
 
@@ -222,6 +229,10 @@ acc finish --goal "document receipt semantics" --status partial \
 Status is `complete`, `partial`, or `blocked`. `finish` records a structured handoff,
 releases the caller's claims, and ends ACC presence for that session. It never closes the
 external AI client. An addressed handoff requires acknowledgement; a room handoff does not.
+Use `complete` when the original goal is done; `partial` does not instruct the peer to
+continue. Distinguish authorized next steps from excluded backlog. If agreement is needed
+before leaving, request the concrete continuation and obtain a substantive reply before
+`finish`; a reply sent after `finish` may wait durably for the sender to return.
 
 ## Install, diagnose, and update
 

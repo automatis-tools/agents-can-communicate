@@ -110,6 +110,12 @@ export function createInboxService(ports, sessions) {
     const now = clock.now();
     return store.transaction(async tx => {
       await requireOpen(input, "acknowledge a message", tx);
+      const { message, receipt } = requireOwnedReceipt(tx, session, input.messageId);
+      if (message.obligation === "reply" && receipt.state !== "acknowledged") {
+        throw new AccError(EXIT.CONFLICT,
+          "this message requires a reply; use reply to answer, clarify, or decline",
+          { messageId: input.messageId, obligation: message.obligation });
+      }
       return advanceOwned(tx, session, input.messageId, "acknowledged", now).receipt;
     }, { kinds: ["session", "message", "receipt"] });
   }
@@ -120,14 +126,8 @@ export function createInboxService(ports, sessions) {
     const replyId = ids.next("message");
     return store.transaction(tx => {
       const original = requireOwnedReceipt(tx, session, input.messageId);
-      const matchingReply = tx.list("message", message =>
-        message.workspaceId === session.workspaceId
-        && message.fromParticipantId === session.participantId
-        && message.clientMessageId === input.clientMessageId).at(0);
-      if (original.receipt.state === "acknowledged" && matchingReply === undefined) {
-        throw new AccError(EXIT.CONFLICT, "that message is already resolved",
-          { messageId: input.messageId });
-      }
+      // A receipt settles delivery, not the conversation. Distinct replies may
+      // follow an ack or an earlier answer; recording still enforces retry keys.
       const recorded = recordMessageInTransaction({ tx, session, now, messageId: replyId, ids,
         action: "reply to a message", input: {
           clientMessageId: input.clientMessageId,

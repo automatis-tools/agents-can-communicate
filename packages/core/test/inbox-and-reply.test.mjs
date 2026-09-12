@@ -106,7 +106,8 @@ for (const resolve of ["ack", "reply"]) {
   test(`an exact read after ${resolve} preserves the acknowledged receipt and pending inbox`, async () => {
     const { service, base, clock } = makeService();
     const { sender, recipient } = await pair(service);
-    const request = await question(service, sender);
+    const request = await question(service, sender, resolve === "ack"
+      ? { kind: "note", obligation: "none" } : {});
     const input = { ...owner(recipient), messageId: request.messageId };
     const receipt = resolve === "ack" ? await service.acknowledgeMessage(input)
       : (await service.replyToMessage({ ...input,
@@ -134,7 +135,7 @@ for (const resolve of ["ack", "reply"]) {
 test("repeated acknowledgement does not refresh time or append an event", async () => {
   const { service, base, clock } = makeService();
   const { sender, recipient } = await pair(service);
-  const request = await question(service, sender);
+  const request = await question(service, sender, { kind: "decision", obligation: "acknowledge" });
   const input = { ...owner(recipient), messageId: request.messageId };
   const first = await service.acknowledgeMessage(input);
   const before = await base.eventsSince(WORKSPACE, null, 100);

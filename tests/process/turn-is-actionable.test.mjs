@@ -89,9 +89,10 @@ async function workspace(t, { budgetBytes }) {
   };
   const inbox = messageId => service.readInbox({ sessionId: reader.accSessionId,
     generation: reader.generation, ...(messageId === undefined ? {} : { messageId }) });
-  const acknowledge = messageId => service.acknowledgeMessage({
-    sessionId: reader.accSessionId, generation: reader.generation, messageId });
-  return { root, env, send, turn, inbox, acknowledge };
+  const reply = messageId => service.replyToMessage({
+    sessionId: reader.accSessionId, generation: reader.generation, messageId,
+    clientMessageId: `reply_${messageId}`, body: "Clamp inward." });
+  return { root, env, send, turn, inbox, reply };
 }
 
 test("a message addressed to you arrives with the id that answers it", async t => {
@@ -105,8 +106,9 @@ test("a message addressed to you arrives with the id that answers it", async t =
   assert.equal(typeof messageId, "string",
     `the reader cannot name what was addressed to it:\n${shown}`);
   // The id is worth showing only if it is the one the command takes.
-  const receipt = await place.acknowledge(messageId);
+  const { receipt, reply } = await place.reply(messageId);
   assert.equal(receipt.state, "acknowledged");
+  assert.equal(reply.inReplyTo, messageId);
 });
 
 test("what the budget withheld comes with the way to read it", async t => {

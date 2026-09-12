@@ -128,6 +128,7 @@ export const PUBLIC_TOOLS = Object.freeze([
     name: "acc_reply",
     description: `Reply to one addressed message and acknowledge the original in the same `
       + `operation. The reply is attributed and linked with inReplyTo. `
+      + `May follow an acknowledgement or an earlier answer; a distinct reply needs a new retry key. `
       + `Returns message and delivery for the outgoing reply, plus receipt for the original. `
       + `${OUTGOING} ${MUTATION_POLL}`,
     inputSchema: object({
@@ -152,16 +153,18 @@ export const PUBLIC_TOOLS = Object.freeze([
   },
   {
     name: "acc_ack",
-    description: `Answer a message that asked for an acknowledgement, so it stops `
-      + `demanding one. ${MUTATION_POLL}`,
+    description: `Acknowledge receipt without accepting work or writing an answer. `
+      + `An unanswered question/request requires acc_reply; acc_ack refuses without changing its receipt. `
+      + `Acknowledgement does not prevent a later reply. ${MUTATION_POLL}`,
     inputSchema: object({
-      messageId: string("The message being answered."),
+      messageId: string("The message being acknowledged."),
     }, ["messageId"]),
   },
   {
     name: "acc_finish",
     description: `Record a handoff describing what was completed and what remains, and `
-      + `release the claims this session owns. Call it while still working, not after: `
+      + `release the claims this session owns and close its ACC presence. `
+      + `Status describes the original goal, not peer acceptance. Call it while still working, not after: `
       + `nothing else writes the summary for you. ${OUTGOING} ${MUTATION_POLL}`,
     inputSchema: object({
       goal: string("What this stretch of work was for."),
@@ -169,7 +172,7 @@ export const PUBLIC_TOOLS = Object.freeze([
       completed: stringList("What was finished."),
       remaining: stringList("What is left."),
       blockers: stringList("What is in the way."),
-      toParticipantId: string("Participant taking over, if any."),
+      toParticipantId: string("Intended recipient, if any; sending does not establish acceptance."),
       clientMessageId: string("Retry key; supply before sending if needed after a lost response. Omit to generate one returned in message."),
     }, ["goal"]),
   },

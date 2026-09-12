@@ -93,6 +93,13 @@ underlying commands are [`acc request`](CLI.md#messages-and-requests), exact
 [`acc reply`](CLI.md#inbox-reply-and-acknowledgement), and
 [`acc finish`](CLI.md#handoff).
 
+For a continuation, tell the receiving agent which work it may take and any limits.
+It checks the relevant artifacts, replies with its accepted scope and first step, then
+continues within those limits. A completed original goal plus excluded follow-ups is
+not an automatic new assignment. Acknowledging the context alone does not mean the peer
+accepted work; if that agreement matters before the sender leaves, obtain it before
+`finish`, which closes the sender's ACC presence.
+
 ## 3. Watch for useful coordination
 
 Look for an agent discovering a peer, publishing the files it expects to change, noticing a

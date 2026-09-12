@@ -59,8 +59,9 @@ test("offer success is atomic and idempotent after every stronger receipt state"
     if (state === "offered") await offer(f, message);
     if (state === "retrieved") await f.service.readInbox({ ...owner(f.recipient),
       messageId: message.messageId });
-    if (state === "acknowledged") await f.service.acknowledgeMessage({
-      ...owner(f.recipient), messageId: message.messageId });
+    if (state === "acknowledged") await f.service.replyToMessage({
+      ...owner(f.recipient), messageId: message.messageId,
+      clientMessageId: `reply_${message.messageId}`, body: "Answered." });
     const beforeReceipt = await f.service.readReceipt({ messageId: message.messageId,
       recipientParticipantId: "recipient" });
     const beforeEvents = await offerEvents(f);
@@ -84,8 +85,9 @@ test("settled receipts still reject every invalid generation-bound target withou
         if (state === "offered") await offer(f, message);
         if (state === "retrieved") await f.service.readInbox({ ...owner(f.recipient),
           messageId: message.messageId });
-        if (state === "acknowledged") await f.service.acknowledgeMessage({
-          ...owner(f.recipient), messageId: message.messageId });
+        if (state === "acknowledged") await f.service.replyToMessage({
+          ...owner(f.recipient), messageId: message.messageId,
+          clientMessageId: `reply_${message.messageId}`, body: "Answered." });
 
         let targetSessionId = f.recipient.sessionId;
         let targetGeneration = f.recipient.generation;

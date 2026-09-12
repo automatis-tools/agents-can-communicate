@@ -36,8 +36,8 @@ test("reminders require this participant's offered or retrieved unresolved oblig
       transport: "next-turn", adapterId: "fixture", clientVersion: "1.0.0" });
     if (state === "retrieved") await service.readInbox({ ...owner(recipient),
       messageId: message.messageId });
-    if (state === "acknowledged") await service.acknowledgeMessage({ ...owner(recipient),
-      messageId: message.messageId });
+    if (state === "acknowledged") await service.replyToMessage({ ...owner(recipient),
+      messageId: message.messageId, clientMessageId: `reply_${label}`, body: "Answered." });
     if (["offered", "retrieved"].includes(label)) expected.push(message.messageId);
     if (["queued", "other-read-first"].includes(label)) queued.push(message.messageId);
   }
