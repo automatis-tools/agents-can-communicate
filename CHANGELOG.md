@@ -1,5 +1,29 @@
 # Changelog
 
+## 0.5.3 — release candidate
+
+- Bare `ack` refuses unanswered questions and requests with exit 5. Use `reply`
+  to answer, clarify, or decline. Existing acknowledged receipts remain valid.
+- Recipients can reply after acknowledgement and send later results after an
+  earlier answer. Retry keys still prevent duplicate sends and conflicting reuse.
+- All five skills distinguish receipt, scoped acceptance, and execution. They
+  require an authorized next step or a question about missing continuation scope.
+  Context-only transfers do not assign work. A completed original goal remains
+  `complete`; `partial` is not a command to continue.
+
+| Candidate artifact | Value |
+|---|---|
+| Built from | `9b02386d0e5a45f696862bec5250b659358f3d45` |
+| Tarball | `agents-can-communicate-0.5.3.tgz`, 386,345 bytes, 272 files |
+| sha256 | `44076680198d9b6118af9dfc5333eee2d2bd7313aae4465351acd6200d70d08b` |
+
+The exact archive passed clean installation verification and an isolated upgrade
+from published 0.5.2. All 272 source, archive, installed, and managed files matched.
+All 27 packed managed-runtime checks passed. Native model continuation remains
+unverified for this archive; no capability claim changed. See
+`docs/release-evidence/v0.5.3.md` for provenance, checks, and limitations.
+The candidate has not been tagged or published.
+
 ## Unreleased — handoff acceptance
 
 - A bare acknowledgement can no longer silently resolve an unanswered question
