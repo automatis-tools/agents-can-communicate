@@ -14,7 +14,7 @@ import { LIVE_POLICIES, describeActivation, describeDeactivation, planActivation
  */
 export function planInstallation({ adapters, detected, context, action = "install",
   recorded = [], accVersion = null, allowDowngrade = false, requested = [],
-  deliveryByAdapter = {} }) {
+  deliveryByAdapter = {}, deliveryDecisionByAdapter = {}, allowServiceSetup = false }) {
   if (!["install", "uninstall"].includes(action)) {
     throw new AccError(EXIT.USAGE, `unknown installation action: ${action}`, { action });
   }
@@ -104,6 +104,9 @@ export function planInstallation({ adapters, detected, context, action = "instal
     // and so what will be removed. Asking the adapter instead would describe an
     // install for a machine this one no longer is.
     const delivery = deliveryByAdapter[entry.adapterId] ?? "off";
+    const deliveryDecision = deliveryDecisionByAdapter[entry.adapterId]
+      ?? recordedById.get(entry.adapterId)?.deliveryDecision
+      ?? { source: "legacy-unknown", completeSetup: false };
     const native = entry.nativeDelivery ?? null;
     const liveDeliverySupported = native?.state === "eligible"
       && native.activationPlan?.eligible === true;
@@ -154,6 +157,7 @@ export function planInstallation({ adapters, detected, context, action = "instal
       alreadyInstalled: entry.installed === true,
       livePolicy: delivery,
       effectiveLivePolicy,
+      ...(action === "install" ? { deliveryDecision } : {}),
       ...(retainedActivation ? { configuredLivePolicy, retainedNativeActivation: retainedActivation } : {}),
       ...(deliveryDiagnostic === null ? {} : { deliveryDiagnostic }),
       ...(deliverySummary === null ? {} : { deliverySummary }),

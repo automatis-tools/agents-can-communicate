@@ -68,7 +68,8 @@ export async function applyPlan({ plan, adapters, context, dataHome, dryRun = fa
         await recordInstall({ dataHome, adapterId: adapter.id,
           version: operation.clientVersion ?? null, accVersion,
           artifacts: operation.artifacts, createdDirectories,
-          deliveryPolicy: operation.livePolicy, nativeActivation: native });
+          deliveryPolicy: operation.livePolicy, deliveryDecision: operation.deliveryDecision,
+          nativeActivation: native });
         results.operations.push({ ...operation, applied: true, appendedRcBlock,
           needsAction: outcome.needsAction ?? [],
           changes: outcome.changes ?? [], diagnostics: [
