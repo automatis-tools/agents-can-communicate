@@ -17,9 +17,18 @@ const legacyDecision = () => ({ source: "legacy-unknown", completeSetup: false }
 
 function validDecision(record) {
   const decision = record?.deliveryDecision;
-  return decision !== null && typeof decision === "object"
+  if (!(decision !== null && typeof decision === "object"
     && DECISION_SOURCES.has(decision.source)
-    && typeof decision.completeSetup === "boolean";
+    && typeof decision.completeSetup === "boolean")) return false;
+
+  const enabled = livePolicyOf(record) !== "off";
+  if (decision.source === "interactive-accepted") return decision.completeSetup && enabled;
+  if (decision.source === "interactive-declined") return !decision.completeSetup && !enabled;
+  if (decision.source === "explicit-option") return decision.completeSetup === enabled;
+  if (["noninteractive-default", "unsupported-default"].includes(decision.source)) {
+    return !decision.completeSetup && !enabled;
+  }
+  return decision.completeSetup === false;
 }
 
 function decisionOf(record) {

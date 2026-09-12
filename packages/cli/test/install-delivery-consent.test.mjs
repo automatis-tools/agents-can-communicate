@@ -192,6 +192,66 @@ test("invalid and missing legacy provenance is normalized without changing polic
   assert.deepEqual(result.asked, []);
 });
 
+test("source, setup value, and recorded policy must describe one coherent decision", async () => {
+  const incoherent = [
+    { source: "interactive-accepted", completeSetup: false, policy: "actionable" },
+    { source: "interactive-accepted", completeSetup: true, policy: "off" },
+    { source: "interactive-declined", completeSetup: true, policy: "off" },
+    { source: "interactive-declined", completeSetup: false, policy: "all" },
+    { source: "explicit-option", completeSetup: true, policy: "off" },
+    { source: "explicit-option", completeSetup: false, policy: "actionable" },
+    { source: "noninteractive-default", completeSetup: true, policy: "off" },
+    { source: "noninteractive-default", completeSetup: false, policy: "all" },
+    { source: "unsupported-default", completeSetup: true, policy: "off" },
+    { source: "unsupported-default", completeSetup: false, policy: "actionable" },
+    { source: "legacy-unknown", completeSetup: true, policy: "all" },
+  ];
+
+  for (const entry of incoherent) {
+    const result = await decide({
+      detected: [CODEX],
+      recorded: [{ adapterId: "codex", deliveryPolicy: entry.policy,
+        deliveryDecision: { source: entry.source, completeSetup: entry.completeSetup } }],
+      runtime: { isInteractive: () => false, confirm: neverConfirm },
+    });
+    assert.equal(result.deliveryByAdapter.codex, entry.policy, entry.source);
+    assert.deepEqual(result.deliveryDecisionByAdapter.codex,
+      { source: "legacy-unknown", completeSetup: false }, entry.source);
+    assert.deepEqual(result.asked, [], entry.source);
+  }
+});
+
+test("incoherent non-off decisions still receive one expanded interactive choice", async () => {
+  const entries = [
+    { ...CLAUDE, nativeServiceSetup: { state: "needed" } },
+    { ...CODEX, nativeServiceSetup: { state: "blocked" } },
+    { ...eligible("fixture", "Fixture", "fixture"),
+      nativeServiceSetup: { state: "needed" } },
+  ];
+  const recorded = [
+    { adapterId: "claude_code", deliveryPolicy: "all",
+      deliveryDecision: { source: "noninteractive-default", completeSetup: true } },
+    { adapterId: "codex", deliveryPolicy: "actionable",
+      deliveryDecision: { source: "interactive-declined", completeSetup: true } },
+    { adapterId: "fixture", deliveryPolicy: "actionable",
+      deliveryDecision: { source: "explicit-option", completeSetup: false } },
+  ];
+  let confirms = 0;
+  const result = await decide({ detected: entries, recorded,
+    runtime: { isInteractive: () => true,
+      confirm: async () => { confirms += 1; return true; } } });
+
+  assert.equal(confirms, 1);
+  assert.deepEqual(result.asked, ["claude_code", "codex", "fixture"]);
+  assert.deepEqual(result.deliveryByAdapter,
+    { claude_code: "all", codex: "actionable", fixture: "actionable" });
+  assert.deepEqual(result.deliveryDecisionByAdapter, {
+    claude_code: { source: "interactive-accepted", completeSetup: true },
+    codex: { source: "interactive-accepted", completeSetup: true },
+    fixture: { source: "interactive-accepted", completeSetup: true },
+  });
+});
+
 test("one answer expands setup for legacy opted-in clients that need service work", async () => {
   const detected = [
     { ...CLAUDE, nativeServiceSetup: { state: "needed" } },
