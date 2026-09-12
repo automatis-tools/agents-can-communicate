@@ -1,5 +1,13 @@
 import { describeNativeReason } from "@agents-can-communicate/installer";
 
+export function describeDeliveryDecision(decision) {
+  if (decision?.source === "interactive-declined") return "declined during interactive setup";
+  if (decision?.source === "explicit-option") return "disabled by explicit option";
+  if (decision?.source === "noninteractive-default") return "defaulted off in a noninteractive run";
+  if (decision?.source === "unsupported-default") return "defaulted off because delivery was unsupported";
+  return "origin unknown (legacy install)";
+}
+
 export function describeNative(native, { clientVersion } = {}) {
   const differs = native.runtime === "active" && native.sessionPolicy
     && native.sessionPolicy !== native.policy;
@@ -20,24 +28,33 @@ export function nativeRemediation(entry) {
   const native = entry.nativeDelivery;
   if (!(entry.present || entry.installed) || native.eligibility === "unsupported") return [];
   const steps = [];
+  const service = entry.nativeServiceSetup;
   if (!native.configured && native.runtime !== "active") {
     steps.push(`acc install --adapter ${entry.adapterId} --delivery actionable`
       + "  # opt in to automatic peer requests; may spend tokens");
   } else if (native.configured && native.activation === "missing") {
     steps.push(`acc install --adapter ${entry.adapterId}`
       + "  # complete the missing native launch setup from a supported shell");
-  } else if (native.configured && native.runtime !== "active") {
+  } else if (native.configured && native.runtime !== "active"
+    && !["needed", "blocked"].includes(service?.state)) {
     steps.push(`${entry.displayName}: no verified live channel in this workspace; `
       + "open a new terminal, start a new client session and check its integration/channel prompts; "
       + "then run acc doctor here");
   }
   if (native.reasonCode === "native_endpoint_unavailable") {
-    steps.push(entry.nativeSetup ?? `${entry.displayName}: check the client's local delivery service setup; `
-      + "ACC does not start or restart that service");
-  } else if (native.reasonCode === "native_session_unavailable") {
+    if (service?.state === "blocked") steps.push(service.diagnostic);
+    else if (service?.state === "needed" && native.configured) {
+      steps.push(entry.deliveryDecision?.completeSetup === true
+        ? `acc install --adapter ${entry.adapterId}  # prepare the missing supported local service`
+        : `acc install --adapter ${entry.adapterId} --delivery actionable`
+          + "  # approve complete automatic peer-request setup");
+    } else if (service?.state !== "needed" && service?.state !== "ready") {
+      steps.push(entry.nativeSetup ?? `${entry.displayName}: check the client's local delivery service setup`);
+    }
+  } else if (native.reasonCode === "native_session_unavailable" && native.runtime !== "active") {
     steps.push(`${entry.displayName}: open a session connected to the client's local delivery service`);
   }
-  return steps;
+  return [...new Set(steps)];
 }
 
 // One closed native-delivery report per adapter, built only from detection,

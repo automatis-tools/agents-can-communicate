@@ -18,7 +18,9 @@ const diagnostics = {
   maintenance_cli_unsupported: "Codex cold service preparation requires codex-cli 0.154.0 or newer with daemon commands; update the vendor installation, then retry acc install",
 };
 function report(state, reasonCode, facts = {}) {
-  return { ...facts, state, reasonCode, diagnostic: state === "ready" ? sessionNeeded
+  return { ...facts, state, reasonCode, diagnostic: state === "ready"
+    ? reasonCode === "native_session_unavailable" ? sessionNeeded
+      : "Codex service infrastructure is ready; current session binding is reported separately"
     : diagnostics[reasonCode] ?? `Codex service preparation could not verify ${reasonCode}; inspect the vendor service and retry acc install` };
 }
 
@@ -72,7 +74,7 @@ export function createCodexServiceSetup({ run = runMaintenanceCommand, probe = p
       failMaintenance("service_identity_changed");
     }
     await verifyMaintenanceProcess(pid, paths, run);
-    return report("ready", "native_session_unavailable", { ...facts, ...pid });
+    return report("ready", native.reasonCode ?? null, { ...facts, ...pid });
   }
   async function inspect(context, { strict = false } = {}) {
     try {
@@ -82,7 +84,7 @@ export function createCodexServiceSetup({ run = runMaintenanceCommand, probe = p
         const native = await probe({ env: paths.options.env, timeoutMs: 1_500 });
         // Preserve the existing delivery support matrix: a healthy older
         // service needs no new managed-install or cold-start prerequisite.
-        if (native.supported) return report("ready", "native_session_unavailable");
+        if (native.supported) return report("ready", native.reasonCode ?? null);
       }
       const facts = await installed(paths);
       if (!await info(paths.socketPath) && !await info(paths.pidPath)) {

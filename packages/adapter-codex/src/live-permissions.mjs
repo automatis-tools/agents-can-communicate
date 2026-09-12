@@ -26,6 +26,28 @@ const configured = (source, context) => {
     && sockets(context).every(socket => literal(value(["permissions", profile, "network", "unix_sockets", socket])) === "allow");
 };
 
+const hasCustomPolicy = (source, context) => {
+  const ownership = inspectPermissions(source);
+  if (ownership.state === "customized") return true;
+  if (ownership.state === "owned") return false;
+  const entries = scanConfig(source);
+  const find = keys => entries.filter(entry => equal(entry.keys, keys));
+  const modes = find(["sandbox_mode"]), defaults = find(["default_permissions"]);
+  const legacy = entries.filter(entry => entry.keys[0] === "sandbox_workspace_write");
+  const features = entries.filter(entry => entry.keys[0] === "features");
+  const featureTable = find(["features"]);
+  const proxies = find(["features", "network_proxy"]);
+  return entries.some(entry => ["permissions", "profile", "profiles"].includes(entry.keys[0]))
+    || modes.length > 1 || defaults.length > 1
+    || modes.some(entry => entry.header || literal(entry.value) !== "workspace-write")
+    || defaults.some(entry => entry.header || literal(entry.value) !== ":workspace")
+    || (legacy.length > 0 && (legacy.length !== 2 || !legacy[0].header || legacy[0].array
+      || !equal(legacy[1].keys, ["sandbox_workspace_write", "writable_roots"])
+      || JSON.stringify(literal(legacy[1].value)) !== JSON.stringify([context.stateRoot])))
+    || (features.length > 0 && (featureTable.length !== 1 || !featureTable[0].header || featureTable[0].array))
+    || proxies.length > 1 || proxies.some(entry => entry.header || !["true", "false"].includes(entry.value));
+};
+
 // Match the channel's per-user temporary directory and Codex's actual home.
 // Grants cover only ACC's local channel namespace, never arbitrary Unix sockets.
 const sockets = context => [channelSocketDirectory(),
@@ -33,8 +55,9 @@ const sockets = context => [channelSocketDirectory(),
 
 export function outgoingStatus(source, context) {
   const state = inspectPermissions(source).state;
+  const custom = hasCustomPolicy(source, context);
   const ready = state === "owned" && supported(context) && configured(source, context);
-  const reasonCode = state === "customized" ? "permission_configuration_modified"
+  const reasonCode = custom ? "permission_configuration_modified"
     : !supported(context) ? "permission_configuration_uncaptured"
       : ready ? null : "sender_permissions_unverified";
   return { state: reasonCode === null ? "configured" : "unverified", reasonCode,
@@ -47,14 +70,24 @@ export function outgoingStatus(source, context) {
       : `outgoing live delivery: sender permissions unverified in ${context.file}; `
         + (reasonCode === "permission_configuration_uncaptured"
           ? `automatic setup requires Codex ${MINIMUM} or newer on darwin-arm64`
-          : "existing permissions were preserved; run acc install --adapter codex, then start a new session; "
-            + "custom permission policies must allow ACC state and local sockets through the network proxy") };
+          : custom
+            ? "custom permission policy was preserved; manually allow ACC state and local sockets "
+              + "through the network proxy in the effective workspace profile"
+            : "ACC outgoing grants are absent; run acc install --adapter codex --delivery actionable, "
+              + "then start a new session") };
 }
 
 export function prepareLivePermissions(source, context) {
   const owned = inspectPermissions(source);
   const requested = (context.requestedLivePolicy ?? context.livePolicy ?? "off") !== "off";
   if (owned.state === "customized") return { source, skipLegacy: true, status: outgoingStatus(source, context) };
+  // Incoming automatic requests and outgoing local access are separate choices.
+  // Once ACC owns a valid outgoing profile, turning incoming requests off must
+  // not revoke the already approved ability to use ACC from the sandbox. A
+  // fresh off install still creates no grants because it has no owned unit.
+  if (!requested && owned.state === "owned") {
+    return { source, skipLegacy: true, status: outgoingStatus(source, context) };
+  }
   if (!requested) return { source: owned.source, skipLegacy: hasPermissions(scanConfig(owned.source)) };
   if (!supported(context) || !context.stateRoot) {
     return { source, skipLegacy: hasPermissions(scanConfig(source)), status: outgoingStatus(source, context) };
@@ -70,15 +103,7 @@ export function prepareLivePermissions(source, context) {
   const features = entries.filter(entry => entry.keys[0] === "features");
   const featureTable = find(["features"]);
   const proxies = find(["features", "network_proxy"]);
-  const customized = entries.some(entry => ["permissions", "profile", "profiles"].includes(entry.keys[0]))
-    || modes.length > 1 || defaults.length > 1
-    || modes.some(entry => entry.header || literal(entry.value) !== "workspace-write")
-    || defaults.some(entry => entry.header || literal(entry.value) !== ":workspace")
-    || (legacy.length > 0 && (legacy.length !== 2 || !legacy[0].header || legacy[0].array
-      || !equal(legacy[1].keys, ["sandbox_workspace_write", "writable_roots"])
-      || JSON.stringify(literal(legacy[1].value)) !== JSON.stringify([context.stateRoot])))
-    || (features.length > 0 && (featureTable.length !== 1 || !featureTable[0].header || featureTable[0].array))
-    || proxies.length > 1 || proxies.some(entry => entry.header || !["true", "false"].includes(entry.value));
+  const customized = hasCustomPolicy(source, context);
   if (customized) return { source, skipLegacy: hasPermissions(entries), status: outgoingStatus(source, context) };
   const edits = [{ id: "selection", start: 0, end: 0, body: `default_permissions = "${PROFILE}"\n` }];
   for (const [id, values] of [["mode", modes], ["default", defaults]]) {

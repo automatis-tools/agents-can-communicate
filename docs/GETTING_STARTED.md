@@ -55,6 +55,14 @@ verified channel in the current session. Codex can save your choice even when it
 service is not running yet. Declining uses the reported fallback: `acc inbox`, or next-turn
 hooks only where the exact client version and platform are certified.
 
+An interactive install asks one default-No question for all selected clients that need a
+choice. Use `--delivery actionable|all` for explicit noninteractive consent. Use
+`--delivery off` to disable incoming automatic requests. A dry run does not ask, write
+configuration, or start a service. When supported Codex service preparation succeeds, it
+means the infrastructure is ready. Start a Codex session and complete the client's hook and
+trust review to establish a session-bound channel. If the managed standalone prerequisite
+is missing, install reports that prerequisite instead of claiming readiness.
+
 If you opt into Claude Code's experimental idle delivery, check Claude's Channels startup
 notice for ACC and accept its development-channel warning when shown. If it reports Channels
 unavailable or blocked, a connected MCP server does not make inbound delivery work;
@@ -127,9 +135,10 @@ durable inbox instead.
 
 Codex LocalDaemon and Claude Code Channel offer optional native delivery on
 Apple Silicon macOS. They are experimental, can spend tokens, and queue messages
-until a running turn finishes. Codex requires 0.152.1 or newer, an already-running
-LocalDaemon, recorded opt-in and a verified session; start it with your normal
-command. A loaded daemon thread can receive messages after its terminal exits.
+until a running turn finishes. Codex requires 0.152.1 or newer, LocalDaemon infrastructure,
+recorded opt-in, and a verified session. Supported explicit setup can prepare a missing
+service. Start the client with your normal command. A loaded daemon thread can receive
+messages after its terminal exits.
 [Capabilities](CAPABILITIES.md) explains policy, versions and fallback.
 
 Delivery evidence is deliberately narrow: `queued -> offered -> retrieved -> acknowledged`.

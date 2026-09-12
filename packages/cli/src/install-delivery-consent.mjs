@@ -31,7 +31,7 @@ function validDecision(record) {
   return decision.completeSetup === false;
 }
 
-function decisionOf(record) {
+export function decisionOf(record) {
   return validDecision(record)
     ? { source: record.deliveryDecision.source,
       completeSetup: record.deliveryDecision.completeSetup }

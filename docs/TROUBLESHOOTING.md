@@ -91,24 +91,24 @@ supported platform, current probe and exact session binding. Under `actionable`,
 a `note` stays queued with `delivery_disabled`.
 
 For Codex, use your ordinary launch command with 0.152.1 or newer on Apple Silicon
-macOS. Its LocalDaemon must already be running, and trusted hooks must establish
+macOS. Its LocalDaemon infrastructure and trusted hooks must establish
 the receiver's exact thread and workspace. Embedded sessions, an absent socket,
 ambiguous recipients or failed identity checks retain durable inbox access.
 `acc doctor` reports readiness, consent and the current workspace's live channel separately.
 `native_endpoint_unavailable` means the local service endpoint is missing or is not a safe socket;
 `native_session_unavailable` means the service answered but has no loaded thread to probe.
 An interactive install can save consent in either case. ACC preserves it through a temporary
-outage and does not start the daemon for you.
-
-On a supported Codex CLI, a missing daemon can be started with
-`codex app-server daemon start`; open a new Codex session afterward. Doctor includes this
-command when it detects the missing endpoint.
+outage. On Codex 0.154.0 or newer, an explicit install with complete consent can prepare a
+missing service when the managed standalone installation is present. If that prerequisite
+is missing or unsafe, doctor names the vendor action and does not claim readiness. A ready
+service is infrastructure only. Open a new Codex session afterward and complete the
+client-owned hook and trust review.
 
 If a reply stays queued with `transport_permission_denied`, the sender's permissions
 blocked local transport. This is distinct from an unavailable recipient. The message was
 recorded successfully; the error does not mean it was read or acknowledged.
 On Codex 0.153.4 or newer on macOS arm64, rerun `acc install --adapter codex` with existing
-live consent (or add `--delivery actionable` to opt in), then start a new session.
+live consent. Add `--delivery actionable` when new consent is required, then start a new session.
 Doctor's `outgoingDelivery` reports the installed permission configuration separately
 from `nativeDelivery.runtime`: an active receiving channel does not establish outgoing
 access. Custom policies and active-session overrides remain unverified; inspect the config

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { prepareLivePermissions, removeLivePermissions } from "../src/live-permissions.mjs";
+import { outgoingStatus, prepareLivePermissions, removeLivePermissions } from "../src/live-permissions.mjs";
 
 const context = { home: "/users/test", codexHome: "/users/test/.codex", stateRoot: "/users/test/data/acc",
   file: "/users/test/.codex/config.toml", requestedLivePolicy: "actionable", livePolicy: "off",
@@ -50,6 +50,20 @@ test("custom legacy and inline policies remain user owned", () => {
     assert.equal(prepared.status.state, "unverified");
     assert.equal(prepared.source, before);
   }
+});
+
+test("outgoing diagnostics distinguish absent grants from a preserved custom policy", () => {
+  const absent = outgoingStatus('model = "mine"\n', context);
+  const custom = outgoingStatus('default_permissions = "team"\n[permissions.team]\n'
+    + 'extends = ":workspace"\n', context);
+
+  assert.equal(absent.reasonCode, "sender_permissions_unverified");
+  assert.match(absent.diagnostic, /ACC outgoing grants are absent/);
+  assert.match(absent.diagnostic, /--delivery actionable/);
+  assert.equal(custom.reasonCode, "permission_configuration_modified");
+  assert.match(custom.diagnostic, /custom permission policy was preserved/);
+  assert.match(custom.diagnostic, /manually allow/);
+  assert.doesNotMatch(custom.diagnostic, /run acc install/);
 });
 
 test("edited restoration metadata cannot insert settings on removal", () => {

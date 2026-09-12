@@ -45,6 +45,8 @@ test("older healthy native delivery needs no new cold-start prerequisite or upgr
   await rm(f.managedPath);
   const ready = await f.inspectNativeServiceSetup(f.context);
   assert.equal(ready.state, "ready");
+  assert.equal(ready.reasonCode, null,
+    "a loaded service must not be diagnosed as missing a session");
   assert.doesNotMatch(ready.diagnostic, /upgrade|update|install.sh/);
   assert.equal((await apply(f, ready)).state, "ready");
   assert.equal(f.starts.length, 0);

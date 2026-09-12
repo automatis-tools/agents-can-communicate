@@ -23,8 +23,9 @@ clients again and complete any hook/trust review they request. With existing liv
 Codex 0.153.4 or newer on macOS arm64 receives local socket permissions when its workspace
 policy is default or contains only ACC's legacy state root. Custom policies are preserved
 and reported as unverified. See [outgoing permissions](CONFIGURATION.md#codex-outgoing-permissions).
-If doctor names a missing local service, run `codex app-server daemon start` before opening
-the new session.
+If doctor names a missing local service, follow its prerequisite or explicit install action
+before opening the new session. A supported explicit install can prepare the service. It
+does not make a session-bound channel ready.
 
 Run `acc doctor` in the project after the new clients have started (or submitted a normal
 turn). Its per-session lines now explain missing launch consent, an unidentified client
@@ -37,8 +38,10 @@ Claude admitted inbound Channels messages. See [delivery troubleshooting](TROUBL
 Upgrading preserves delivery consent. If doctor reports native delivery off and you want
 automatic peer requests, use `acc install --adapter codex --delivery actionable` (or the
 relevant adapter); this can spend model tokens. Codex can save that consent before its
-local service/session becomes available. Installation does not start the vendor daemon; ACC
-keeps durable inbox access when no verified live channel is bound.
+local service/session becomes available. Ordinary installation keeps durable inbox access
+when no verified live channel is bound. Explicit complete setup can prepare a definitely
+absent supported service. Automatic refresh, delivery off, dry runs, and uninstall do not
+start or stop that shared service.
 
 In Grok, public status supplies the session's own CLI arguments through the next tool
 hook. Grok still uses explicit inbox reads; this patch adds no external wake or guards.

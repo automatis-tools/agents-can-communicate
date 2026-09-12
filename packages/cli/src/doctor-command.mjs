@@ -6,12 +6,12 @@ import { describeDeliveryFallback, detectInstallation, livePolicyOf, loadOwnersh
   from "@agents-can-communicate/installer";
 import { AccError, EXIT } from "@agents-can-communicate/protocol";
 
-import { describeNative, nativeRemediation, nativeState, updateNativeRuntime } from "./native-delivery-status.mjs";
+import { describeDeliveryDecision, describeNative, nativeRemediation, nativeState,
+  updateNativeRuntime } from "./native-delivery-status.mjs";
 export { describeNative } from "./native-delivery-status.mjs";
-
 import { nativeSessionLines, updateNativeSessions } from "./native-session-diagnostics.mjs";
-
 import { ALL_ADAPTERS, clientContext, probeTimeout } from "./install-command.mjs";
+import { decisionOf } from "./install-delivery-consent.mjs";
 import { describePresence } from "./main.mjs";
 import { platformPaths } from "./platform-paths.mjs";
 import { noticeUpdate } from "./update-check.mjs";
@@ -173,7 +173,9 @@ export async function diagnoseAdapters({ options, runtime, detect = detectInstal
     // is the acc that copied the skills and manifests into it. They diverge after
     // an npm upgrade with no `acc install`, and reporting both is what makes the
     // divergence legible rather than hidden behind a single reassuring number.
-    return { ...entry, stale, wired, bundleVersion, owned: { modified: owned.modified,
+    return { ...entry, stale, wired, bundleVersion,
+      deliveryDecision: installed === undefined ? null : decisionOf(installed),
+      owned: { modified: owned.modified,
       missing: owned.missing, intact: owned.intact.length },
       nativeDelivery: nativeState(entry.nativeDelivery, livePolicyOf(installed), {
         contract: adapters.find(adapter => adapter.id === entry.adapterId)?.nativeDelivery,
@@ -241,6 +243,7 @@ export async function runDoctor({ options, context, runtime }) {
     registry: ALL_ADAPTERS() });
   for (const adapter of adapters) {
     adapter.remediation.push(...nativeRemediation(adapter));
+    adapter.remediation = [...new Set(adapter.remediation)];
   }
 
   const data = {
@@ -276,9 +279,11 @@ export async function runDoctor({ options, context, runtime }) {
   ...adapters.filter(adapter => adapter.present)
     .map(adapter => `  ${adapter.displayName} live delivery: `
       + `${describeNative(adapter.nativeDelivery, { clientVersion: adapter.version })}; `
+      + `${adapter.nativeDelivery.policy === "off" && adapter.deliveryDecision !== null
+        ? `decision: ${describeDeliveryDecision(adapter.deliveryDecision)}; ` : ""}`
       + `fallback: ${describeDeliveryFallback(adapter)}`),
   ...nativeSessionLines(adapters),
-  ...adapters.filter(adapter => adapter.present && adapter.outgoingDelivery)
+  ...adapters.filter(adapter => adapter.present && adapter.outgoingDelivery?.state === "configured")
     .map(adapter => `  ${adapter.displayName} ${adapter.outgoingDelivery.diagnostic}`),
   ...(manager === null ? [] : [`  automatic updates ${manager.auto ? "on" : "off"}; ACC ${manager.active.version}`
     + (manager.pin ? `; pinned to ${manager.pin}` : ""), ...(update.notice ? [`  ${update.notice}`] : [])]),

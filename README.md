@@ -67,9 +67,11 @@ review the current ACC definitions in `/hooks`; changed hooks may need fresh tru
 
 For Codex live delivery on Apple Silicon macOS, installation also configures outgoing
 local socket access on Codex 0.153.4 or newer when using default workspace permissions.
-Custom policies are preserved. If its local service is missing, doctor gives the command
-`codex app-server daemon start`; then open a new Codex session. Doctor reports receiving
-channel state and outgoing permission configuration separately.
+Custom policies are preserved. One default-No choice covers all selected clients that need
+live-delivery consent. On Codex 0.154.0 or newer, an accepted choice can start a missing
+service when the managed standalone installation is present. The client still owns session
+startup, hook trust, and Claude Channels approval. Doctor reports service infrastructure,
+session binding, and outgoing permissions separately.
 
 Open two sessions and give them ordinary tasks, as above. Look for an agent discovering a
 peer, checking who is changing a file, asking about a shared dependency, or replying to a
@@ -100,14 +102,15 @@ mutations. It adds no automatic peer-message injection or idle delivery. A reloc
 
 **Optional live delivery can start a turn in an idle Codex or Claude Code session.** It is
 experimental, off by default, and can spend model tokens. On Apple Silicon Macs, Codex
-0.152.1 or newer requires an already-running LocalDaemon and a verified session;
+0.152.1 or newer requires LocalDaemon infrastructure and a verified session;
 Claude Code 2.1.258 or newer requires zsh and client-side Channels activation; check its
 startup notice for ACC and accept the development warning when shown. An MCP connection
 alone does not verify inbound delivery. Messages arriving mid-turn wait for the turn to
 finish. The receiving session's
 opt-in policy and current reachability determine whether delivery can proceed.
 `acc install` reports each client's delivery state and can save Codex consent before its
-service is available. `acc doctor` also names each session’s last native binding result,
+service is available. Use `--delivery actionable|all` for explicit automation and
+`--delivery off` to disable incoming automatic requests. `acc doctor` also names each session’s last native binding result,
 including missing launch consent, an unidentified client process or a failed handshake.
 It distinguishes a disabled policy from an unavailable service or a missing live channel
 in the current project.

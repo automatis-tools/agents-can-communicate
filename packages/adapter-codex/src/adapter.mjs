@@ -21,7 +21,7 @@ export const CODEX_DELIVERY_FALLBACK = Object.freeze({
   diagnostic: "Codex native delivery requires codex-cli 0.152.1 or newer on darwin-arm64, "
     + "recorded recipient consent and a reachable LocalDaemon session with exact thread, cwd, "
     + "process, version and protocol verification. Embedded or unreachable sessions retain "
-    + "durable messages. Native delivery does not start, restart or stop the vendor daemon and adds no "
+    + "durable messages. Message delivery does not start, restart or stop the vendor daemon and adds no "
     + "launch arguments; fallback is exact-certified next-turn delivery or acc inbox. "
     + "Explicit install with complete setup consent can prepare a missing supported service; "
     + "explicitly confirmed acc update maintenance has a separate daemon restart check",

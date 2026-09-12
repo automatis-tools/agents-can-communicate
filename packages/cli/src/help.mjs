@@ -76,6 +76,9 @@ const CHOICES = Object.freeze({
 });
 
 const NOTES = Object.freeze({
+  install: ["Without --delivery, one default-No question covers all selected clients that need a decision.",
+    "--delivery actionable|all gives explicit complete-setup consent; --delivery off disables incoming automatic requests.",
+    "A dry run does not prompt, write configuration, or start a service. Service readiness does not establish a session binding."],
   attach: ["Native hooks already manage their own session. Attach only for a manual CLI session.",
     "Keep the returned session and generation together for subsequent calls.",
     "--cadence is a positive interval in milliseconds."],
