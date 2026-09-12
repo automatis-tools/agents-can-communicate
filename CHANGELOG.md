@@ -1,5 +1,31 @@
 # Changelog
 
+## Unreleased — handoff acceptance
+
+- A bare acknowledgement can no longer silently resolve an unanswered question
+  or request. It refuses without changing the receipt, inbox, or attention and
+  asks the recipient to answer, clarify, or decline with `reply`.
+- A recipient can reply after acknowledging a handoff, and send later results
+  after an earlier answer. Distinct replies have distinct retry keys; retries
+  and existing acknowledged receipts remain idempotent.
+- All five skills distinguish receipt from scoped acceptance and execution.
+  Incoming work requires a concrete authorized next step or a question about
+  missing scope. Context-only transfers do not assign a backlog. Sender status
+  describes the original goal honestly; `partial` is not a continuation signal.
+
+| Development validation artifact | Value |
+|---|---|
+| Built from | `1c383bd100e884d7b1100de1dd2c6bd6f41f6027` |
+| Tarball | `agents-can-communicate-0.5.2.tgz`, 386,345 bytes, 272 files |
+| sha256 | `0e08924e9fbe0043f5a32cd146f619b4f03c146167f9b0c539fe98b031874921` |
+
+This is an unpublished development build; the package version has not changed.
+The exact archive passed clean installed-package verification. Mutation checks
+cover the core contract and packed CLI/MCP. Five final synthetic skill samples
+showed the intended scoped response, not executed work in real clients. No
+transport or native-client capability claim changed. See
+`docs/internal/evidence/handoff-acceptance/validation.md` for checks and limits.
+
 ## 0.5.2 — release candidate
 
 - The skill says which commands its credentials belong to. The rule read "append
