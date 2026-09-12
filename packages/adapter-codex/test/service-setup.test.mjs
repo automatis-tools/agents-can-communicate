@@ -139,3 +139,20 @@ test("a ready service that disappears becomes blocked without inventing cold-sta
   assert.equal(result.started, false);
   assert.equal(f.starts.length, 0);
 });
+
+for (const loadedData of [[null], [123], [{}], [""], ["valid-thread", null]]) {
+  test(`malformed loaded-thread metadata ${JSON.stringify(loadedData)} fails preparation after start`, async t => {
+    const f = await serviceFixture(t);
+    const plan = await f.inspectNativeServiceSetup(f.context);
+    assert.equal(plan.state, "needed");
+    f.state.loadedData = loadedData;
+    const result = await apply(f, plan);
+    assert.equal(result.state, "failed");
+    assert.equal(result.reasonCode, "daemon_protocol_unverified");
+    assert.equal(result.started, true);
+    assert.equal(f.starts.length, 1);
+    assert.ok(f.requests.includes("initialize"));
+    assert.ok(f.requests.includes("thread/loaded/list"));
+    assert.equal(f.requests.includes("thread/queue/list"), false);
+  });
+}

@@ -26,7 +26,7 @@ export async function serviceFixture(t, { missing = true, ...options } = {}) {
     if (method === "initialize") return { userAgent: `codex/${f.state.serverVersion} (Mac OS)` };
     if (method === "thread/loaded/list") {
       if (f.state.protocolFails) throw new Error("protocol mismatch");
-      return { data: f.state.threads.map(thread => thread.id), nextCursor: null };
+      return { data: f.state.loadedData ?? f.state.threads.map(thread => thread.id), nextCursor: null };
     }
     if (method === "thread/queue/list") return { data: [], nextCursor: null };
     throw new Error(`Unexpected metadata RPC: ${method}`);
