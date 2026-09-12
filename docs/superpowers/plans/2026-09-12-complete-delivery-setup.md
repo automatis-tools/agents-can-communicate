@@ -52,7 +52,7 @@ assert.deepEqual(result.deliveryDecisionByAdapter.codex,
   { source: "interactive-accepted", completeSetup: true });
 ```
 
-Add cases for No, default/noninteractive, dry run, explicit actionable/all/off, preserved non-off, unsupported client, legacy non-off needing setup accepted/declined, and reinstall after complete consent. Assertions must check counts, policies, decision values, and absence of side effects; avoid only checking prompt wording.
+Add cases for No, default/noninteractive, dry run, explicit actionable/all/off, preserved non-off, unsupported client, legacy non-off needing setup accepted/declined, and reinstall after complete consent. An eligible interactive install after noninteractive-default or unsupported-default must still offer a choice; deliberate declined/explicit off remains retained. Assertions must check counts, policies, decision values, and absence of side effects; avoid only checking prompt wording.
 
 - [ ] **Step 2: Run the focused tests and record the precise red assertion.** Run `node --test packages/cli/test/install-delivery-consent.test.mjs`. Verify the old implementation produces two prompts or missing provenance, not a fixture/import failure.
 
@@ -80,14 +80,17 @@ Define `decisionOf(record)` locally to normalize known sources and default missi
 - Create `packages/adapter-codex/src/service-setup.mjs` and focused tests in `packages/adapter-codex/test/service-setup.test.mjs` (split behavioral groups if needed).
 - Modify `packages/adapter-codex/src/adapter.mjs`, `maintenance-host.mjs`, and `native-delivery.mjs` only where necessary to share verified host checks and correct lifecycle comments.
 - Modify `packages/installer/src/detect.mjs`, `plan.mjs`, and `apply.mjs`; create `packages/installer/src/service-setup.mjs` if orchestration merits a separate module.
+- Modify `packages/cli/src/install-command.mjs` if needed so a failed setup's human error retains the completed adapter details and remaining actions, as JSON already does.
 - Add installer service-setup tests with fake adapter ports, and append real observations to `packages/adapter-codex/COMPATIBILITY.md` with a new fixture under its existing fixture convention.
 
 **Interfaces:**
 - Adapter `inspectNativeServiceSetup(context)` returns `{state, reasonCode, diagnostic, ...pinnedFacts}`. `state` is ready/needed/blocked/unsupported. It performs read-only version, filesystem, identity, and native protocol probes.
 - Adapter `prepareNativeServiceSetup({context, plan})` returns `{state: "ready"|"failed"|"blocked", started: boolean, reasonCode, diagnostic}`. Inject process/filesystem/protocol dependencies through a factory for tests, following maintenance host conventions.
-- Detection records `entry.nativeServiceSetup` independently of native delivery eligibility. Failures yield a safe blocked diagnostic without hiding other adapters.
+- Detection records `entry.nativeServiceSetup` independently of native delivery eligibility. Bound the inspection with the existing detection probe timeout; failures/timeouts yield a safe blocked diagnostic without hiding other adapters.
 - Plan copies `nativeServiceSetup` into an operation only if explicit `allowServiceSetup`, requested policy non-off, and `deliveryDecision.completeSetup === true`; it shows the action in summaries. Automatic refresh defaults false.
 - Apply records adapter install and consent before trying service preparation. Record setup result if useful for diagnostics, but never use a historical success as live readiness. Preparation failure adds to `result.failed` while retaining the applied operation and ownership; blocked prerequisites become needsAction. Other adapters continue.
+- A successful preparation replaces the stale pre-install missing-service summary with a service-ready/session-needed result. It must not claim a bound session or keep telling the user to start the service that just passed verification.
+- On attempted setup failure, verify the actual CLI's nonzero human output as well as JSON: `main` throws the handler error and does not print its normal text, so the error message must carry partial-success details and next actions.
 
 - [ ] **Step 1: Add failing service and installer tests.** Verify definite absence starts the pinned executable once with exact HOME/CODEX_HOME, then verifies the real protocol; a healthy service starts zero times. For orchestration use a fake adapter whose install writes an owned file and whose setup fails:
 
@@ -113,7 +116,7 @@ await run(plan.cliPath, ["app-server", "daemon", "start"], {
 });
 ```
 
-Require bounded post-start service identity and `probeNativeDelivery` verification. An empty service is ready infrastructure, not a bound session. Never remove stale metadata or stop/restart on this path. Reuse a raced healthy service only after checks. Report missing managed installation with the existing vendor-supported action, avoiding false success. Preserve install ownership if service work fails. Do not grant new hooks/delivery capabilities.
+Require bounded post-start service identity and `probeNativeDelivery` verification. An empty service is ready infrastructure, not a bound session: accept `native_session_unavailable` only with verified owned PID/socket, matching server version, and a successful metadata handshake; retain the session-needed diagnostic. Other failed protocol probes fail setup. Never remove stale metadata or stop/restart on this path. Reuse a raced healthy service only after checks. Report missing managed installation with the existing vendor-supported action, avoiding false success. Preserve install ownership if service work fails. Do not grant new hooks/delivery capabilities.
 
 - [ ] **Step 4: Run focused adapter/installer tests and verify mutations.** Suppress the native protocol verification and show its test fails; suppress the allowServiceSetup gate and show refresh/no-consent coverage fails. Restore and record green. Capture a real supported cold start in a private HOME/CODEX_HOME using an explicitly described managed-install fixture, verify service identity and native probe, stop only the fixture process, and append evidence. The controller provides the independent capture artifact path; inspect it rather than guessing.
 - [ ] **Step 5: Commit** with `feat: prepare supported Codex service after setup consent`.
@@ -129,6 +132,7 @@ Require bounded post-start service identity and `probeNativeDelivery` verificati
 **Interfaces:**
 - Consume stored `deliveryDecision` from Task 1 and detected `nativeServiceSetup`/operation preparation outcomes from Task 2.
 - `doctor` includes decision source for off without inventing one for legacy records. It emits each outgoing permission remediation once and uses current probes for readiness.
+- Remediation that requires new consent must name `acc install --adapter codex --delivery actionable`; plain reinstall retains a deliberately declined/explicit off decision and cannot promise to enable it. Custom policies receive their specific manual configuration explanation.
 - Permission preparation retains already owned valid ACC grants when requested incoming policy is off; fresh off creates none, custom/modified ownership remains protected, uninstall restores previous bytes.
 
 - [ ] **Step 1: Add failing diagnostics and permission assertions.** After an approved install, disable incoming delivery and check the ACC outgoing grants still exist; uninstall and check exact original bytes. Fresh off must leave an empty/default config without live grants. Custom permissions must remain byte-identical. For doctor assert one outgoing remediation and distinct absent-vs-custom explanations, with known/unknown off origins.

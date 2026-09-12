@@ -75,6 +75,11 @@ implementation uses the captured darwin-arm64 PID backend, Codex >=0.154.0, and
 matching existing CLI and managed standalone versions. The installer executes
 the pinned CLI with the pinned HOME and CODEX_HOME and a bounded timeout.
 
+A verified empty service may return `native_session_unavailable` from the queue
+probe. Accept that as infrastructure-ready only after the owned service identity,
+matching server version, and metadata handshake pass; retain the session-needed
+diagnostic. Other failed protocol probes are setup failures.
+
 A real CLI capture in a fresh CODEX_HOME shows daemon start fails without the
 managed standalone installation. ACC will diagnose this prerequisite and provide
 the vendor installation action; it will not silently download or copy Codex.
