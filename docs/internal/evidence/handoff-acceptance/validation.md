@@ -22,6 +22,10 @@ and the existing certification evidence allowlist. The verifier correctly report
 revision unknown for a supplied archive; the clean-tree pack above supplies its
 source provenance. No existing capability claim was changed.
 
+The core inbox module and all five skill templates were also read directly from
+the retained archive and compared byte-for-byte with the source; all matched.
+Every historical CHANGELOG section from v0.5.2 onward is byte-identical to base.
+
 ## Contract tests and mutations
 
 Before implementation, the new ten core tests and first two installed CLI tests
@@ -53,6 +57,13 @@ skip. The first post-change full run had 2,137 tests and three failures: an old
 MCP fixture that acknowledged a question, an invalid example recipient alias,
 and stale artifact provenance. The fixture and alias were corrected and rerun;
 the new Unreleased artifact record resolves provenance without rewriting history.
+
+Final gates on committed source and evidence (`41a8f79`): `npm run check` passed
+for 520 files; `npm test` ran 2,137 tests with 2,136 passes, zero failures, and
+one skip in 412,924.949 ms. The skip is the uninstall case requiring Gemini CLI
+to be absent; Gemini CLI is installed on this machine. The three recorded-candidate
+tests also passed separately. Subsequent edits only record these results in this
+file and CHANGELOG; no packed source changed.
 
 ## Synthetic skill exercise
 

@@ -26,6 +26,9 @@ showed the intended scoped response, not executed work in real clients. No
 transport or native-client capability claim changed. See
 `docs/internal/evidence/handoff-acceptance/validation.md` for checks and limits.
 
+Final syntax checks passed for 520 files. The full suite passed with 2,137 tests,
+2,136 passes, zero failures, and one expected Gemini-uninstall skip.
+
 ## 0.5.2 — release candidate
 
 - The skill says which commands its credentials belong to. The rule read "append
