@@ -24,6 +24,9 @@ unverified for this archive; no capability claim changed. See
 `docs/release-evidence/v0.5.3.md` for provenance, checks, and limitations.
 The candidate has not been tagged or published.
 
+Final syntax checks passed for 520 files. The full 0.5.3 suite passed with
+2,137 tests, 2,136 passes, zero failures, and one expected Gemini-uninstall skip.
+
 ## Unreleased — handoff acceptance
 
 - A bare acknowledgement can no longer silently resolve an unanswered question
