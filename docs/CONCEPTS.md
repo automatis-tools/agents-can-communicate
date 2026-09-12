@@ -128,6 +128,13 @@ A **handoff** records what an agent says it completed, what remains, and any blo
 the session ends. It can help a later session resume without copying a transcript. Like
 every peer message, it is attributed data to verify, not an authoritative completion claim.
 
+Receiving context is not accepting work. For a continuation, the receiving agent checks
+the relevant artifacts and its own user's scope, replies with the concrete work it takes
+and its first step, then begins that authorized step. If the original goal is done and
+the follow-ups have no agreed scope, it asks for that missing choice rather than treating
+the backlog as an assignment. A context-only transfer can end with acknowledgement.
+`finish` closes the sender's ACC presence without waiting for this agreement.
+
 ## Where data lives
 
 Presence, intent, claims, messages, receipts, events, and handoffs live in platform app data
