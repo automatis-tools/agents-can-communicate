@@ -2,6 +2,7 @@ import { defineAdapter, projectContext, projectContextResult }
   from "@agents-can-communicate/adapter-sdk";
 import { probeNativeDelivery, planNativeActivation, bindNativeSession, refreshNativeSession, retireNativeSession, offerMessage } from "./native-delivery.mjs";
 import certification from "../certification.json" with { type: "json" };
+import { createCodexServiceSetup } from "./service-setup.mjs";
 import { createCodexMaintenance } from "./maintenance.mjs";
 export { sameMaintenanceIdentity } from "./maintenance.mjs";
 
@@ -22,7 +23,8 @@ export const CODEX_DELIVERY_FALLBACK = Object.freeze({
     + "process, version and protocol verification. Embedded or unreachable sessions retain "
     + "durable messages. Native delivery does not start, restart or stop the vendor daemon and adds no "
     + "launch arguments; fallback is exact-certified next-turn delivery or acc inbox. "
-    + "Explicitly confirmed acc update maintenance has a separate daemon restart check",
+    + "Explicit install with complete setup consent can prepare a missing supported service; "
+    + "explicitly confirmed acc update maintenance has a separate daemon restart check",
 });
 
 /**
@@ -67,6 +69,7 @@ export function createCodexAdapter() {
     probeNativeDelivery, planNativeActivation, bindNativeSession,
     refreshNativeSession, retireNativeSession, offerMessage,
     ...createCodexMaintenance(),
+    ...createCodexServiceSetup(),
     startSession: async () => ({ ok: true, changes: [], diagnostics: [] }),
     endSession: async () => ({ ok: true, changes: [], diagnostics: [] }),
     guardWrite: async () => ({ ok: true, changes: [], diagnostics: [] }),

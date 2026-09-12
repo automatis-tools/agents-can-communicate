@@ -350,7 +350,7 @@ export async function detectCodex({ home, agentsHome = home,
   // detection neither invents its hash algorithm nor starts a client service.
   return { ok: true, changes: [], outgoingDelivery,
     nativeSetup: nativeDelivery?.reasonCode === "native_endpoint_unavailable"
-      ? "Codex CLI: run codex app-server daemon start, then open a new Codex session; ACC never starts or restarts the daemon"
+      ? "Codex CLI: run codex app-server daemon start, then open a new Codex session; explicit ACC install with complete setup consent can prepare a missing supported service"
       : null,
     diagnostics: [
     published ? "acc plugin published in the marketplace" : "acc plugin not registered",

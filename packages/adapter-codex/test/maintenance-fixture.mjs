@@ -81,5 +81,5 @@ export async function maintenanceFixture(t, { binLayout = false } = {}) {
     throw new Error(`Unexpected maintenance RPC: ${method}`);
   } });
   return { ...createCodexMaintenance({ run, open }), context, state, commands, requests,
-    root, cliPath, managedPath, codexHome, socketPath, pidPath, writePid, stop, start };
+    root, cliPath, managedPath, codexHome, socketPath, pidPath, writePid, stop, start, run, open };
 }

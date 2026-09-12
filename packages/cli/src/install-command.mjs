@@ -183,10 +183,11 @@ export function describeOutcome({ action, acted, failed = [], skipped = [],
  * what a malformed `~/.claude/settings.json` produced: the adapter refused,
  * correctly, and the script that ran the installer was told it had worked.
  */
-export function failureOf({ action, acted, failed = [] }) {
+export function failureOf({ action, acted, failed = [], operations = [], skipped = [], home }) {
   if (failed.length === 0) return null;
   return new AccError(EXIT.DATA,
-    describeOutcome({ action, acted, failed }), { failed });
+    [describeOutcome({ action, acted, failed, operations, skipped, home }),
+      ...reloadAdvice(operations)].join("\n"), { failed });
 }
 
 /**
@@ -281,5 +282,6 @@ export async function runInstallCommand({ options, runtime, action = "install" }
   text: [describeOutcome({ action, acted, failed: result.failed,
     skipped: plan.skipped, operations: result.operations, home }),
   ...reloadAdvice(result.operations)].join("\n"),
-  error: failureOf({ action, acted, failed: result.failed }) };
+  error: failureOf({ action, acted, failed: result.failed, operations: result.operations,
+    skipped: plan.skipped, home }) };
 }

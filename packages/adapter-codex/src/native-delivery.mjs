@@ -51,7 +51,8 @@ export async function probeNativeDelivery({ timeoutMs = 750, env = process.env,
 }
 
 // Ordinary Codex chooses its own cwd and launch mode; ACC only reuses a
-// verified pre-existing service and never starts a daemon or rewrites argv.
+// verified service here and never rewrites argv. Explicit installer service
+// preparation has its own consent and identity checks in service-setup.mjs.
 export function planNativeActivation({ detection }) {
   const realExecutable = detection?.realExecutable;
   if (typeof realExecutable !== "string" || realExecutable === "") {

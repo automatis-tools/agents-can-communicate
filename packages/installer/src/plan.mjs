@@ -125,8 +125,10 @@ export function planInstallation({ adapters, detected, context, action = "instal
       ? describeInstallDelivery(entry, delivery, effectiveLivePolicy) : null;
     const installContext = { ...context, requestedLivePolicy: delivery,
       livePolicy: configuredLivePolicy, clientVersion: entry.version, platform: entry.platform };
+    const nativeServiceSetup = action === "install" && allowServiceSetup && delivery !== "off"
+      && deliveryDecision.completeSetup === true ? entry.nativeServiceSetup : undefined;
     const setupNotes = action === "install" && delivery !== "off"
-      ? [entry.outgoingDelivery?.setup, entry.nativeSetup].filter(note => typeof note === "string") : [];
+      ? [entry.outgoingDelivery?.setup, nativeServiceSetup ? null : entry.nativeSetup].filter(note => typeof note === "string") : [];
     // A consented activation that this run keeps, activates, or takes back.
     // Only an explicit off or an uninstall removes one; an absent record never
     // creates one.
@@ -163,6 +165,7 @@ export function planInstallation({ adapters, detected, context, action = "instal
       ...(deliverySummary === null ? {} : { deliverySummary }),
       ...(setupNotes.length ? { setupNotes } : {}),
       ...(nativeActivation === null ? {} : { nativeActivation }),
+      ...(nativeServiceSetup ? { nativeServiceSetup } : {}),
       ...(deactivation === null ? {} : { deactivation }),
       artifacts,
       // Said in the operator's terms, not in paths: which files ACC creates
@@ -173,6 +176,7 @@ export function planInstallation({ adapters, detected, context, action = "instal
         ...(deliverySummary === null ? [] : [deliverySummary]),
         ...(retainedActivation ? ["keep existing native delivery setup; current readiness is unverified"] : []),
         ...setupNotes,
+        ...(nativeServiceSetup ? [nativeServiceSetup.diagnostic] : []),
         ...artifacts.filter(a => a.kind === "tree")
           .map(a => `${action === "install" ? "create" : "remove"} ${a.path}`),
         ...artifacts.filter(a => a.kind === "merge")

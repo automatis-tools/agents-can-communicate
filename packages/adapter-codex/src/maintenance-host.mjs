@@ -17,7 +17,7 @@ export const managedExecutablePaths = codexHome => ["bin/codex", "codex"].map(na
 
 export function runMaintenanceCommand(command, args, options) {
   return new Promise(resolve => execFile(command, args,
-    { ...options, timeout: 20_000, maxBuffer: 131_072, windowsHide: true },
+    { timeout: 20_000, ...options, maxBuffer: 131_072, windowsHide: true },
     (error, stdout, stderr) => resolve({ status: error ?
       (typeof error.code === "number" ? error.code : null) : 0, stdout, stderr })));
 }

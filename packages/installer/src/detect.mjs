@@ -145,6 +145,17 @@ export async function detectInstallation({ adapters, context, probe = spawnProbe
         : unsupported(adapter.nativeDelivery === undefined
           ? "native_delivery_unsupported" : "version_unavailable");
 
+      if (entry.present && typeof adapter.inspectNativeServiceSetup === "function") {
+        try {
+          entry.nativeServiceSetup = await withTimeout(Promise.resolve().then(() =>
+            adapter.inspectNativeServiceSetup({ ...context, platform, clientVersion: entry.version })),
+          probeTimeoutMs, `${adapter.id} service setup probe`);
+        } catch {
+          entry.nativeServiceSetup = { state: "blocked", reasonCode: "service_inspection_failed",
+            diagnostic: `${adapter.displayName} service preparation could not be inspected; check the vendor service and retry install` };
+        }
+      }
+
       try {
         const detected = await adapter.detect({ ...context, clientVersion: entry.version,
           platform, nativeDelivery: entry.nativeDelivery });

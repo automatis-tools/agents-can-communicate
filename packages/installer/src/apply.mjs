@@ -1,3 +1,4 @@
+import { applyServiceSetup } from "./service-setup.mjs";
 import { applyNativeActivation, deactivateNative } from "./native-activation.mjs";
 import { finalizeRemoval, missingArtifactParents, recordInstall,
   removeEmptyOwnedDirectories, removeOwnedArtifacts } from "./ownership.mjs";
@@ -78,6 +79,8 @@ export async function applyPlan({ plan, adapters, context, dataHome, dryRun = fa
             ...(outcome.diagnostics ?? []),
             ...notes,
           ] });
+        await applyServiceSetup({ adapter, context: installContext,
+          operation: results.operations.at(-1), results });
       } else {
         // Config ownership can veto removal. Ask before teardown or recorded
         // artifact deletion; an adapter-local check would run after those writes.
@@ -132,7 +135,7 @@ function describeTeardown(report) {
   for (const service of report.services) {
     lines.push(service.outcome === "stopped" ? `stopped the ${service.serviceId} service`
       : `retained the ${service.serviceId} service (${service.outcome === "retained_pre_existing"
-        ? "it existed before ACC" : "no vendor teardown exists"})`);
+        ? "it was reused at activation" : "no vendor teardown exists"})`);
   }
   return lines;
 }

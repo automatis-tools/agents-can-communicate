@@ -971,3 +971,37 @@ configuration readiness never establishes an active session's effective permissi
 This does not expand the certified hook versions or establish native replyRoute.
 The patch also uses a stable short macOS channel directory across different TMPDIR
 values and retains permission failures as a distinct safe offer code.
+
+## Explicit cold service preparation — 0.154.0, 2026-09-12
+
+A standalone Codex CLI 0.154.0 on darwin-arm64 was exercised in disposable HOME
+and CODEX_HOME directories. An empty home failed twice with the vendor's explicit
+managed-standalone prerequisite and created no PID or socket. ACC reports that
+prerequisite and the vendor installation action; it does not install Codex.
+
+A separate fixture linked `packages/standalone/current` to an existing installed
+standalone release. This was fixture preparation only. With that prerequisite,
+`app-server daemon start` returned `started` on the PID backend. The existing ACC
+maintenance helpers verified CLI/managed/server versions, the owned PID and start
+time, the expected managed executable invocation, socket ownership, and a
+metadata-only App Server handshake. A second start returned `alreadyRunning` and
+preserved the same PID/start-time identity. The fixture was stopped with the
+vendor command; process death, PID/socket removal, and private-home cleanup were
+verified. No real user service or configuration was changed.
+
+The empty service completed `initialize` and returned zero loaded threads.
+`probeNativeDelivery` returned `native_session_unavailable`: this establishes
+service infrastructure, not a bound recipient or completed message delivery. No
+model session, authentication, transcript, hook activation, sandbox permission,
+interactive launch/cwd behavior, reboot persistence, or new capability was tested
+or claimed. The restricted-shell attempt could not run `ps`; its failed child
+was subsequently verified dead. Successful capture required process inspection.
+
+Evidence: [derived cold-service fixture](fixtures/setup/codex-cli-0.154.0-cold-service.json),
+SHA-256 `8db78398cf5197938fdc8cda5f8c46f00bfc72701784543c34760ff73e092718`.
+The fixture retains source paths/hashes, capture times, exact transformation and
+path-placeholder meanings, prerequisite failure, restricted-shell failure, and
+cleanup provenance. It is an independently captured vendor lifecycle using the
+existing maintenance checks, not a capture of the new installed ACC setup path.
+The new path is covered separately by injected process/protocol and temporary
+filesystem tests; installed-artifact validation remains a separate release gate.
