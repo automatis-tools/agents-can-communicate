@@ -13,7 +13,7 @@
 
 | Candidate artifact | Value |
 |---|---|
-| Built from | `9b02386d0e5a45f696862bec5250b659358f3d45` |
+| Built from | `cbf0aa189dd57cc81226cd3d0ae93c2716d37afa` |
 | Tarball | `agents-can-communicate-0.5.3.tgz`, 386,345 bytes, 272 files |
 | sha256 | `44076680198d9b6118af9dfc5333eee2d2bd7313aae4465351acd6200d70d08b` |
 
@@ -24,8 +24,15 @@ unverified for this archive; no capability claim changed. See
 `docs/release-evidence/v0.5.3.md` for provenance, checks, and limitations.
 The candidate has not been tagged or published.
 
-Final syntax checks passed for 520 files. The full 0.5.3 suite passed with
+Initial local syntax checks passed for 520 files. The full 0.5.3 suite passed with
 2,137 tests, 2,136 passes, zero failures, and one expected Gemini-uninstall skip.
+
+The first PR CI run exposed a timing race in the worker-poll test on Ubuntu.
+The corrected test observes the actual idle interval before checking lock admission;
+a mutation that holds the lock during that interval fails. The refreshed source
+commit above produces an archive byte-identical to the initial candidate. Its
+clean-install verifier and published-0.5.2 upgrade preflight passed again. See the
+CI follow-up in `docs/release-evidence/v0.5.3.md` for the capture boundaries.
 
 ## Unreleased — handoff acceptance
 
