@@ -136,7 +136,7 @@ test("the MCP client sees the peer's claim, so it can choose to respect it", asy
  * searching its nested snapshot. Discovery now lists addressed headers; an
  * exact read returns the body and moves its own receipt to `retrieved`.
  */
-async function mailed(t, { kind = "question" } = {}) {
+async function mailed(t, { kind = "question", obligation } = {}) {
   const place = await workspace(t);
   const client = connectMcp({ ...place, participant: "mcp_reader" });
   t.after(() => client.close());
@@ -151,7 +151,7 @@ async function mailed(t, { kind = "question" } = {}) {
   await cli(place, ["message", "--session", sender.sessionId,
     "--generation", sender.generation, "--to", "mcp_reader",
     "--subject", "which way should the hull clamp?", "--body", "Blocking me.",
-    "--type", kind]);
+    "--type", kind, ...(obligation === undefined ? [] : ["--obligation", obligation])]);
   const receipts = async () => (await cli(place, ["sync", "--session", sender.sessionId,
     "--scope", "full"])).snapshot.receipts.map(receipt => receipt.state);
   return { place, call, sender, receipts };
@@ -193,7 +193,7 @@ test("the sender stops being told its message is undelivered", async t => {
 });
 
 test("being shown something is still not agreeing to it", async t => {
-  const { call, receipts } = await mailed(t);
+  const { call, receipts } = await mailed(t, { kind: "decision", obligation: "acknowledge" });
   const inbox = await call("acc_inbox");
   const [item] = await call("acc_inbox", { messageId: inbox.items[0].message.messageId });
   const message = item.message;

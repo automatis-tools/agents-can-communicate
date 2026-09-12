@@ -218,9 +218,17 @@ the original receipt to `acknowledged` in one transaction. Only after that durab
 may the answer be offered to the original author. A transport error cannot roll back it.
 CLI and MCP reply results expose both facts: `message` and `delivery` describe the outgoing
 answer, while `receipt` describes the caller's acknowledgement of the original message.
+An acknowledged receipt does not close the conversation: a recipient may send a first
+reply after `ack`, or a distinct follow-up after an earlier answer. The original receipt
+and timestamp remain unchanged. Each distinct reply uses its own `clientMessageId`;
+an equivalent retry returns the prior answer, and conflicting reuse is refused.
 
-`ack` advances the caller's receipt without creating a reply. It exposes no state override;
-callers cannot claim that a transport offered or a participant retrieved a message.
+`ack` advances the caller's receipt without creating a reply for obligations `none` and
+`acknowledge`. An unresolved `reply` obligation is refused with exit `5`, directing the
+recipient to answer, clarify, or decline using `reply`; receipt, inbox and attention stay
+unchanged. Repeating `ack` on an already acknowledged receipt is an idempotent no-op,
+including historical receipts. It exposes no state override; callers cannot claim that
+a transport offered or a participant retrieved a message.
 
 ## Handoff
 
@@ -228,6 +236,12 @@ callers cannot claim that a transport offered or a participant retrieved a messa
 `blockers`, and `verification`, releases the sender session's claims, and ends its ACC
 presence. An addressed handoff requires acknowledgement. A room handoff does not. Neither
 form closes or otherwise controls the external AI client.
+
+Status describes the sender's original goal, not whether the recipient should start work.
+All addressed statuses require only acknowledgement. Receipt, acceptance of a concrete
+scope, and evidence of execution are distinct facts; the latter two belong in explicit
+peer replies, not new receipt states. `finish` does not wait for an acceptance reply. A
+reply to the closed sender remains durable and may wait for a later eligible session.
 
 ## Delivery binding and recipient policy
 
