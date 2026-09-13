@@ -6,7 +6,9 @@
   "exports": {
     ".": "./src/runner.mjs",
     "./client-pid": "./src/client-pid.mjs",
-    "./process-table": "./src/process-table.mjs"
+    "./process-table": "./src/process-table.mjs",
+    "./native-binding": "./src/native-binding.mjs",
+    "./session-lifecycle": "./src/session-lifecycle.mjs"
   },
   "files": [
     "src/"

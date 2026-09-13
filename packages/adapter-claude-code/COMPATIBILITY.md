@@ -769,3 +769,46 @@ matching verification text. No user prompt or inbox read intervened. The receivi
 session acknowledged the reply at `2026-09-13T06:44:27.099Z`. This completes the
 observed live round trip for these already initialized clients, including model
 attention after a busy turn. The cold-start limitation above remains unverified.
+
+## Channel startup without an initial user prompt, 2026-09-13
+
+On published ACC 0.5.7, a normal Claude Code 2.1.270 session recorded
+`SessionStart: handshake_failed` at `16:03:15.765Z`. Its own MCP endpoint opened
+at `16:03:18.350Z` and kept renewing, but the router had no delivery binding.
+A later user turn bound it. The subsequent Channel round trip worked; startup
+without that turn did not. Endpoint readiness and initial binding were separate
+operations, and the ready process could only renew an existing binding.
+
+A temporary installed plugin then ran the corrected production entrypoints from
+an unpublished development archive, still labelled 0.5.7, SHA-256
+`8526ced0fcda0e4469d96f9c7304aeaca4b42caa283eddeca4bcfd3c8e75178b`.
+The archive was built on `fix/claude-channel-startup` from base
+`43cc58bb07026648f292be895949b7c240558be2`, before this documentation update.
+This is not the published 0.5.7 artifact. The installed activation module matched
+the working source. Claude Code 2.1.270 on darwin-arm64 was launched through the
+ordinary ACC bootstrap; the local development-channel notice was accepted.
+
+The test submitted no user prompt. A metadata-only hook observer recorded
+`SessionStart` at `16:54:58.397Z`. Before any `UserPromptSubmit`, doctor reported
+the new session's native transport active. Question `message_7g5uW7zJXw5uaeJS3_2kEw`
+was sent at `16:56:02.222Z` and accepted through `claude-channel`. The resulting
+Channel turn triggered `UserPromptSubmit` at `16:56:05.538Z`, after delivery.
+Claude used MCP `acc_reply`: answer `message_ck0UPGyKrFn4oPO40cIAhA` was recorded
+at `16:56:18.252Z` with client key
+`channel-reply-message_7g5uW7zJXw5uaeJS3_2kEw`. Its Codex receipt became `offered`
+at `16:56:23.150Z`. The receiving Codex turn was still busy; its subsequent
+automatic model turn was not observed at this capture point. No inbox body read
+or user prompt was used to obtain the reply.
+
+The temporary Claude and MCP processes were confirmed absent afterward, and the
+temporary plugin and marketplace were removed. The PTY shutdown acknowledgement
+timed out, so process absence was checked separately; no SessionEnd capture is
+claimed. No raw vendor transcript was retained. This observation proves the
+initial Channel activation and MCP reply for this client, not universal startup
+timing or a new exact-version capability certification.
+
+The installed-package regression reproduces the late ordering by completing
+SessionStart before starting MCP. Removing the ready-process activation restores
+`queued / recipient_unavailable`. Separate mutations verify the lifecycle lock
+and current installation consent. An interrupted-close regression also verifies
+that journal recovery prevents a late Channel from republishing a closed session.

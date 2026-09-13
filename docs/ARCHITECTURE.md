@@ -78,6 +78,13 @@ or projected into agent context; session restart replaces it and SessionEnd atte
 cleanup. Doctor ignores closed or superseded generations even if cleanup could not finish. Diagnostic disk I/O runs in an
 unreferenced worker, so a stalled write cannot hold the hook process open.
 
+Claude's MCP process can become ready after the bounded SessionStart handshake
+has ended. Once its endpoint listens, the Channel completes the same validated
+binding without a user prompt. It acquires the session lifecycle lock, recovers
+any committed journal, and rechecks its exact owner and current consent before
+publication. The optional diagnostic records `channelReady`; MCP remains responsive
+if registration fails. This does not create a session or revive a closed one.
+
 ## Certified capability versus current reachability
 
 Ordinary hook capabilities say an exact client version on an exact platform passed a

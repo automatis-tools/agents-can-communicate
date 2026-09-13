@@ -25,6 +25,7 @@ import { createAccChannel, endpointDir, routeAck, routeReply }
   from "@agents-can-communicate/adapter-claude-code/channel";
 
 import { pump, startInertChannel } from "./claude-channel-stdio.mjs";
+import { activateClaudeChannel } from "./claude-channel-binding.mjs";
 
 const clock = { now: () => new Date().toISOString() };
 const ids = { next: kind => createId(kind, randomBytes) };
@@ -70,7 +71,8 @@ export async function resolveSession({ runtimeDir, service, env, ownClientPid,
   const matched = mine.filter(binding => exported.has(binding.harnessSessionId));
   const chosen = mine.length === 1 ? mine[0] : matched.length === 1 ? matched[0] : null;
   return chosen === null ? null
-    : { sessionId: chosen.accSessionId, generation: chosen.generation, clientPid: chosen.clientPid };
+    : { sessionId: chosen.accSessionId, generation: chosen.generation, clientPid: chosen.clientPid,
+      harnessSessionId: chosen.harnessSessionId };
 }
 
 /** The client process this Channel was spawned by, or null when nobody knows. */
@@ -151,6 +153,11 @@ async function compose() {
   });
   await channel.listen();
   pump(channel.handleLine, () => { channel.close(); process.exit(0); });
+  // Serve MCP immediately; a slow or failed ACC binding must not stop the
+  // client connecting. The listening endpoint lets an in-flight hook finish
+  // before this owner acquires the same lifecycle lock and completes startup.
+  await activateClaudeChannel({ session, service, runtimeDir: paths.root, dataHome,
+    env: process.env }).catch(() => {});
   return channel;
 }
 
