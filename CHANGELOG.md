@@ -2,24 +2,27 @@
 
 ## 0.5.8 — release candidate
 
-- Make the README shorter and easier to try: model handoffs, independent review,
-  shared-API coordination, and one concrete first handoff.
-- Add a compact diagram of independent sessions and model handoffs, with labels
-  that remain readable when a renderer falls back to black text.
-- Keep the ordinary-task prompt guard on the existing Getting Started example.
-  A deliberate coordination instruction in that example makes the check fail.
+- Register Claude Channel when its endpoint becomes ready, even if SessionStart
+  ran first. Supported sessions can receive messages without an initial user prompt.
+- Check current delivery consent and exact session ownership under the lifecycle
+  lock; recover interrupted closes before registration. MCP stays responsive if
+  activation fails.
+- Shorten the README around concrete workflows and a first handoff. Add a compact
+  coordination/handoff diagram with labels that survive black-text fallback.
+- Preserve the ordinary-task prompt check on the existing Getting Started example.
 
 | Candidate artifact | Value |
 |---|---|
-| Built from | `7fb2a3eb17098d9f0f70a0262e885fb88013a92d` |
-| Tarball | `agents-can-communicate-0.5.8.tgz`, 395,085 bytes, 278 files |
-| sha256 | `0931a9376ea3b22f7e5da3cc48a05c0f1dd17abf64306b1066e73f3f5e4da732` |
+| Built from | `760bfc04492588c51843ed9bff92805c6ed8223e` |
+| Tarball | `agents-can-communicate-0.5.8.tgz`, 396,374 bytes, 279 files |
+| sha256 | `9c144aa0cb2251bec68cd24e7aa7e1a65b7cadbeee798ac99cd21e9ad9e01456` |
 
 The exact archive passed clean installation and an isolated upgrade from published
-0.5.7. All 278 source, archive and installed files matched, and both saved delivery
-decisions were preserved. All 28 managed archive checks passed. Runtime code is
-byte-identical to 0.5.7; this release adds no client capability certification.
-See [0.5.8 release evidence](docs/release-evidence/v0.5.8.md) for scope and provenance.
+0.5.7. All 279 source, archive and installed files matched; both saved delivery
+choices survived. All 37 managed/startup checks passed. Its runtime code matches
+the real Claude Code 2.1.270/macOS arm64 cold-start installation byte for byte;
+the native capture retains its original development-archive provenance.
+See [0.5.8 release evidence](docs/release-evidence/v0.5.8.md) for checks and limits.
 
 ## 0.5.7 — release candidate
 
