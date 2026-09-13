@@ -1,24 +1,25 @@
 # Changelog
 
-## Unreleased — concise README
+## 0.5.8 — release candidate
 
-- Present model handoffs, independent review and shared-API coordination in a
-  shorter README, with one handoff to try and links to detailed client support.
-- Show independent sessions and model handoffs in one compact README diagram.
-  Keep labels readable when a renderer falls back to black text.
-- Keep the ordinary-task prompt check on the existing Getting Started example.
+- Make the README shorter and easier to try: model handoffs, independent review,
+  shared-API coordination, and one concrete first handoff.
+- Add a compact diagram of independent sessions and model handoffs, with labels
+  that remain readable when a renderer falls back to black text.
+- Keep the ordinary-task prompt guard on the existing Getting Started example.
   A deliberate coordination instruction in that example makes the check fail.
 
-| Development validation artifact | Value |
+| Candidate artifact | Value |
 |---|---|
-| Built from | `0f9f0956ff2b8d643e360e3f997381f350c68607` |
-| Tarball | `agents-can-communicate-0.5.7.tgz`, 395,085 bytes, 278 files |
-| sha256 | `89bf84285b01f02958bdb4b0c0e2c7248d48a92700ef5c7ad97102bd6ab8ec3a` |
+| Built from | `7fb2a3eb17098d9f0f70a0262e885fb88013a92d` |
+| Tarball | `agents-can-communicate-0.5.8.tgz`, 395,085 bytes, 278 files |
+| sha256 | `0931a9376ea3b22f7e5da3cc48a05c0f1dd17abf64306b1066e73f3f5e4da732` |
 
-This documentation-development archive passed clean installation verification:
-packed documentation links, bundled certification evidence, doctor, a non-Git
-workspace, and integration install/uninstall. It is distinct from the published
-0.5.7 archive below and establishes no new real-client capability evidence.
+The exact archive passed clean installation and an isolated upgrade from published
+0.5.7. All 278 source, archive and installed files matched, and both saved delivery
+decisions were preserved. All 28 managed archive checks passed. Runtime code is
+byte-identical to 0.5.7; this release adds no client capability certification.
+See [0.5.8 release evidence](docs/release-evidence/v0.5.8.md) for scope and provenance.
 
 ## 0.5.7 — release candidate
 
