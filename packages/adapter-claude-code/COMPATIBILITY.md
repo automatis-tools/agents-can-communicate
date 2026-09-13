@@ -762,3 +762,10 @@ not proof of cold-start delivery. Codex accepted the answer while its turn was
 active; a subsequent automatic model turn was not observed during this capture.
 The temporary Claude process, plugin and marketplace were removed afterward.
 No new capability certification or version guarantee is added by this observation.
+
+Follow-up in the same exchange: after the receiving Codex turn ended, the native
+peer message automatically started a new model turn with that exact reply ID and
+matching verification text. No user prompt or inbox read intervened. The receiving
+session acknowledged the reply at `2026-09-13T06:44:27.099Z`. This completes the
+observed live round trip for these already initialized clients, including model
+attention after a busy turn. The cold-start limitation above remains unverified.
