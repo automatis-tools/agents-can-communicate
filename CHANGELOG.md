@@ -1,5 +1,23 @@
 # Changelog
 
+## Unreleased — concise README
+
+- Present model handoffs, independent review and shared-API coordination in a
+  shorter README, with one handoff to try and links to detailed client support.
+- Keep the ordinary-task prompt check on the existing Getting Started example.
+  A deliberate coordination instruction in that example makes the check fail.
+
+| Development validation artifact | Value |
+|---|---|
+| Built from | `60eb0ed8c639cc4d019b9adaf9b0108777842378` |
+| Tarball | `agents-can-communicate-0.5.7.tgz`, 394,693 bytes, 278 files |
+| sha256 | `87b915e5b3ccd6c12d4c48d95264d9d5aaf21528649527e0a5da579e41b013b7` |
+
+This documentation-development archive passed clean installation verification:
+packed documentation links, bundled certification evidence, doctor, a non-Git
+workspace, and integration install/uninstall. It is distinct from the published
+0.5.7 archive below and establishes no new real-client capability evidence.
+
 ## 0.5.7 — release candidate
 
 - Deliver answers from Claude Channel's `acc_reply` through the live delivery
