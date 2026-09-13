@@ -1,5 +1,35 @@
 # Changelog
 
+## 0.5.4 — release candidate
+
+- One install confirmation covers selected clients that need a decision. ACC
+  records its source and preserves deliberate choices on reinstall.
+- An approved explicit install can start and verify a missing supported Codex
+  service. Preview, refusal, doctor, hooks, and automatic updates do not start it.
+- Doctor separates saved consent, service readiness, and session bindings, and
+  gives distinct instructions for missing grants and custom permission policies.
+- Disabling incoming requests retains approved ACC-owned outgoing grants.
+  Uninstall restores the owned configuration changes.
+- macOS test fixtures respect the Unix socket path limit and observe actual
+  process exit before classifying a PTY launch failure.
+
+| Candidate artifact | Value |
+|---|---|
+| Built from | `4f50baf1ec17e00edc792bf3cd6e0f6c217386da` |
+| Tarball | `agents-can-communicate-0.5.4.tgz`, 391,998 bytes, 275 files |
+| sha256 | `05fa280269780b9f05cfccaa26a9787d4b8556d2e0b3b73b27e5e3827f645589` |
+
+The exact archive passed clean installation verification and an isolated upgrade
+from published 0.5.3. All 275 source, archive, installed, and managed files matched.
+All 27 packed managed-runtime checks passed on Node 24.4.0. Real Codex 0.154.0
+on macOS arm64 passed isolated service setup, repeat install, incoming-off grant
+retention, uninstall restoration, and cleanup with this archive.
+
+Automatic service preparation requires an existing matching managed standalone
+installation. Client trust and a new session may still be required. Service
+readiness does not establish message delivery or active sandbox access. See
+[0.5.4 release evidence](docs/release-evidence/v0.5.4.md) for provenance and limits.
+
 ## Unreleased — complete delivery setup
 
 - One install confirmation covers selected clients that need a decision. ACC
