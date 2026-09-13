@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { constants } from "node:fs";
 import { lstat, mkdir, open, realpath, rename, rm } from "node:fs/promises";
 import path from "node:path";
+import { collectFile, fingerprint } from "./generation-files.mjs";
 
 /** Resolve existing ancestors without creating an uninitialized manager. */
 export async function canonicalManagerRoot(root) {
@@ -74,6 +75,25 @@ export async function writeManagedJson(file, value) {
 const nonempty = value => typeof value === "string" && value.length > 0;
 const nullableString = value => value === null || nonempty(value);
 
+/** Older updaters dropped the contract while publishing a newer generation.
+ * Recover only from that exact, unchanged generation, never from the active
+ * version or a loose manifest. Explicit lease declarations remain historical
+ * facts. Missing or damaged files leave an unknown hold without failing hooks.
+ */
+async function recoverStoreVersion(generations, runtime) {
+  if (path.dirname(runtime.root) !== generations
+    || !/^\d+\.\d+\.\d+-[a-f0-9]{24}$/.test(path.basename(runtime.root))) return null;
+  try {
+    const files = new Map();
+    await collectFile(runtime.root, "", files);
+    if (path.basename(runtime.root) !== `${runtime.version}-${fingerprint(files).slice(0, 24)}`) return null;
+    const manifest = JSON.parse(files.get("package.json")?.bytes.toString("utf8"));
+    return manifest.name === "agents-can-communicate" && manifest.version === runtime.version
+      && Number.isSafeInteger(manifest.accStoreVersion) && manifest.accStoreVersion > 0
+      ? manifest.accStoreVersion : null;
+  } catch { return null; }
+}
+
 export async function validateRuntime(root, runtime) {
   if (!runtime || !nonempty(runtime.version) || typeof runtime.root !== "string"
     || !path.isAbsolute(runtime.root)) throw new Error("invalid control generation");
@@ -95,7 +115,9 @@ export async function validateRuntime(root, runtime) {
   if (await managedDirectory(generations)) {
     if (await realpath(generations) !== generations) throw new Error("invalid control generations directory");
   }
-  return { version: runtime.version, root: resolved, storeVersion: runtime.storeVersion ?? null };
+  const normalized = { version: runtime.version, root: resolved, storeVersion: runtime.storeVersion ?? null };
+  normalized.storeVersion ??= await recoverStoreVersion(generations, normalized);
+  return normalized;
 }
 
 async function validateControl(root, value) {

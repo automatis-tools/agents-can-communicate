@@ -174,7 +174,12 @@ The CLI owns installation generations under `<dataHome>/acc/runtime`, outside wo
 All five launch paths select a generation and publish an actual-process lease under one
 admission mutex before loading workspace-capable code. Immutable launcher modules and
 runtime directories preserve in-progress imports. Leases survive `main()` returning and
-are removed only after confirmed process death. A session is also pinned to the generation
+are removed only after confirmed process death. Older updaters can omit the store contract
+when publishing a newer generation. The reader recovers missing contracts only from the
+referenced generation, after checking its package identity and content hash, including file
+modes. It preserves explicit declarations and does not rewrite live leases. Missing or
+changed generation files and unknown native bindings remain unverified holds.
+A session is also pinned to the generation
 it started with: its hooks delegate to that generation while the pin declares the same
 store contract this one does, and run the active generation otherwise. A generation
 directory is reclaimed once no control pointer, live lease, live pin or staging hold names

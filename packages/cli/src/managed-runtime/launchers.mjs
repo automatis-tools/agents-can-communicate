@@ -4,7 +4,7 @@ import path from "node:path";
 import { ENTRY_KINDS } from "./entry.mjs";
 import { managedDirectory, syncDirectory } from "./state.mjs";
 
-const MODULES = ["entry.mjs", "state.mjs", "mutex.mjs", "leases.mjs", "schedule.mjs", "policy.mjs"];
+const MODULES = ["entry.mjs", "state.mjs", "generation-files.mjs", "mutex.mjs", "leases.mjs", "schedule.mjs", "policy.mjs"];
 async function durableFile(file, bytes, mode = 0o600) {
   const handle = await open(file, "wx", mode);
   try { await handle.writeFile(bytes); await handle.sync(); }
