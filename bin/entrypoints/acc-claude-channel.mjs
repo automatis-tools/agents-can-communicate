@@ -11,11 +11,14 @@ import { randomBytes } from "node:crypto";
 import { createClaudeCodeAdapter } from "@agents-can-communicate/adapter-claude-code";
 import { listSessionBindings } from "@agents-can-communicate/adapter-sdk";
 import { createCoordinationService } from "@agents-can-communicate/core";
+import { createDeliveryRouter } from "@agents-can-communicate/delivery-router";
+import { readInstalledLivePolicy } from "@agents-can-communicate/installer";
+import { recordAndOffer } from "@agents-can-communicate/mcp-server";
 import { resolveClientPid } from "@agents-can-communicate/hook-runner/client-pid";
 import { readProcessTable } from "@agents-can-communicate/hook-runner/process-table";
 import { createId } from "@agents-can-communicate/protocol";
 import { openFilesystemStore } from "@agents-can-communicate/storage-filesystem";
-import { createGitProbe, discoverWorkspace, platformDataHome, runtimePaths }
+import { ALL_ADAPTERS, createGitProbe, discoverWorkspace, platformDataHome, runtimePaths }
   from "@agents-can-communicate/cli";
 
 import { createAccChannel, endpointDir, routeAck, routeReply }
@@ -105,8 +108,8 @@ export async function resolveWithin({ resolve, deadline, intervalMs = BINDING_PO
 async function compose() {
   const descriptor = await discoverWorkspace({ cwd: process.cwd(), env: process.env,
     gitProbe: createGitProbe() });
-  const paths = runtimePaths({ dataHome: platformDataHome({ platform: process.platform,
-    env: process.env }), workspaceId: descriptor.id, workspaceRoots: descriptor.roots });
+  const dataHome = platformDataHome({ platform: process.platform, env: process.env });
+  const paths = runtimePaths({ dataHome, workspaceId: descriptor.id, workspaceRoots: descriptor.roots });
   const store = await openFilesystemStore({ root: paths.root, clock, ids,
     workspaceId: descriptor.id });
   const service = createCoordinationService({ store, clock, ids });
@@ -126,11 +129,18 @@ async function compose() {
     return startInertChannel({ write });
   }
 
+  const deliveryRouter = createDeliveryRouter({ service, adapters: ALL_ADAPTERS(), clock,
+    readLivePolicy: ({ adapter }) => readInstalledLivePolicy({ dataHome, adapterId: adapter.id }) });
   const channel = createAccChannel({
     endpointDir: endpointDir(paths.root),
     clientPid: session.clientPid,
     write,
-    routeReply: ({ messageId, body }) => routeReply({ service, session, messageId, body }),
+    // The Channel tool records through its own bound session, then uses the
+    // same durable-first offer as ordinary MCP. A successful reply record alone
+    // does not deliver it to the peer, and a failed offer must not lose it.
+    routeReply: ({ messageId, body }) => recordAndOffer({ router: deliveryRouter,
+      selectMessage: value => value.reply,
+      record: () => routeReply({ service, session, messageId, body }) }),
     routeAck: ({ messageId }) => routeAck({ service, session, messageId }),
     // This process is the only party that knows the endpoint is still being
     // served, and Claude publishes no heartbeat, so nothing else would move

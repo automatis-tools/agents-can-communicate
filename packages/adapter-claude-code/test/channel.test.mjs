@@ -152,7 +152,7 @@ test("acc_reply and acc_ack route through the injected service and are observed"
     await nextLine(socket);
     await channel.handleLine(JSON.stringify({ jsonrpc: "2.0", id: 5, method: "tools/call",
       params: { name: "acc_reply", arguments: { messageId: "message_a", body: SECRET_REPLY } } }));
-    assert.deepEqual(outbound.find(item => item.id === 5).result, { content: [{ type: "text", text: "sent" }] });
+    assert.deepEqual(outbound.find(item => item.id === 5).result, { content: [{ type: "text", text: "recorded" }] });
     assert.deepEqual(replies, [{ messageId: "message_a", body: SECRET_REPLY }]);
     await channel.handleLine(JSON.stringify({ jsonrpc: "2.0", id: 6, method: "tools/call",
       params: { name: "acc_ack", arguments: { messageId: "message_a" } } }));
