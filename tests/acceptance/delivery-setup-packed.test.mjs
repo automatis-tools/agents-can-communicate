@@ -25,7 +25,13 @@ const terminal = async (p, args, answer) => {
   });
   child.stderr.on("data", chunk => { stderr += chunk; });
   const [code] = await new Promise((resolve, reject) => {
-    child.once("error", reject); child.once("close", (...result) => resolve(result));
+    const timeout = setTimeout(() => {
+      child.stdin.destroy();
+      child.kill("SIGKILL");
+      reject(new Error(`terminal install timed out\nstdout:\n${stdout}\nstderr:\n${stderr}`));
+    }, 20_000);
+    child.once("error", error => { clearTimeout(timeout); reject(error); });
+    child.once("close", (...result) => { clearTimeout(timeout); resolve(result); });
   });
   if (code !== 0) throw new Error(`terminal install exited ${code}: ${stderr}`);
   return { stdout, stderr };
@@ -72,7 +78,11 @@ test("packed CLI asks once for two clients and preserves complete setup decision
   const accepted = await terminal(p, selected, "y");
   assert.equal((accepted.stdout.match(/\[y\/N\]/g) ?? []).length, 1);
   assert.match(accepted.stdout, /Claude Code, Codex CLI/);
-  assert.match(accepted.stdout, /managed standalone installation/);
+  const blocked = (await p.acc(["doctor"])).adapters.find(entry => entry.adapterId === "codex");
+  assert.equal(blocked.nativeServiceSetup.state, "blocked");
+  assert.equal(blocked.nativeServiceSetup.reasonCode, "managed_install_missing");
+  assert.ok(blocked.remediation.some(step => /managed standalone installation/.test(step)));
+  assert.notEqual(blocked.nativeServiceSetup.state, "ready");
   const ownership = JSON.parse(await readFile(path.join(p.dataHome, "acc", "installs.json")));
   assert.deepEqual(Object.fromEntries(ownership.installs.map(entry => [entry.adapterId,
     [entry.deliveryPolicy, entry.deliveryDecision]])), {
