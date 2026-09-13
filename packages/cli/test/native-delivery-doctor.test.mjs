@@ -2,7 +2,8 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { describeNative } from "../src/doctor-command.mjs";
-import { updateNativeRuntime } from "../src/native-delivery-status.mjs";
+import { describeDeliveryDecision, nativeRemediation, updateNativeRuntime }
+  from "../src/native-delivery-status.mjs";
 
 // The closed native-delivery state model doctor reports, exercised directly so
 // every combination is held to one shape without a client on the machine.
@@ -28,6 +29,50 @@ test("an unsupported or degraded client names its closed reason and never claims
   assert.equal(describeNative(state({ eligibility: "eligible", configured: true,
     policy: "actionable", runtime: "active" })).includes("read"), false,
   "the line must never suggest a model read the message");
+});
+
+test("off decision provenance is readable without inventing a legacy answer", () => {
+  assert.equal(describeDeliveryDecision({ source: "interactive-declined", completeSetup: false }),
+    "declined during interactive setup");
+  assert.equal(describeDeliveryDecision({ source: "explicit-option", completeSetup: false }),
+    "disabled by explicit option");
+  assert.equal(describeDeliveryDecision({ source: "legacy-unknown", completeSetup: false }),
+    "origin unknown (legacy install)");
+});
+
+test("service remediation uses current structured readiness and names consent explicitly", () => {
+  const base = { adapterId: "codex", displayName: "Codex CLI", present: true, installed: true,
+    nativeSetup: "run codex app-server daemon start", nativeDelivery: state({
+      eligibility: "eligible", reasonCode: "native_endpoint_unavailable" }),
+    deliveryDecision: { source: "interactive-declined", completeSetup: false },
+    nativeServiceSetup: { state: "needed", diagnostic: "ACC can prepare the service" } };
+  const off = nativeRemediation(base);
+  assert.equal(off.filter(line => line.includes("--delivery actionable")).length, 1);
+  assert.doesNotMatch(off.join("\n"), /daemon start/);
+
+  const blocked = nativeRemediation({ ...base,
+    nativeDelivery: state({ configured: true, policy: "actionable",
+      reasonCode: "native_endpoint_unavailable" }),
+    deliveryDecision: { source: "explicit-option", completeSetup: true },
+    nativeServiceSetup: { state: "blocked",
+      diagnostic: "Install the managed Codex standalone prerequisite" } });
+  assert.deepEqual(blocked, ["Install the managed Codex standalone prerequisite"]);
+
+  const ready = nativeRemediation({ ...base,
+    nativeDelivery: state({ configured: true, policy: "actionable",
+      reasonCode: "native_session_unavailable" }),
+    deliveryDecision: { source: "explicit-option", completeSetup: true },
+    nativeServiceSetup: { state: "ready", diagnostic: "Service infrastructure is ready" } });
+  assert.equal(ready.filter(line => /open a session/.test(line)).length, 1);
+  assert.doesNotMatch(ready.join("\n"), /daemon start|acc install/);
+
+  const active = nativeRemediation({ ...base,
+    nativeDelivery: state({ configured: true, policy: "actionable", runtime: "active",
+      reasonCode: "native_session_unavailable" }),
+    deliveryDecision: { source: "explicit-option", completeSetup: true },
+    nativeServiceSetup: { state: "ready", reasonCode: null,
+      diagnostic: "Service infrastructure is ready" } });
+  assert.deepEqual(active, [], "an active binding must not receive a permanent new-session action");
 });
 
 

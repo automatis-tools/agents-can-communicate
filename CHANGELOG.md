@@ -1,5 +1,37 @@
 # Changelog
 
+## Unreleased — complete delivery setup
+
+- One install confirmation covers selected clients that need a decision. ACC
+  records its source and preserves deliberate choices on reinstall.
+- An approved explicit install can start and verify a missing supported Codex
+  service. Preview, refusal, doctor, hooks, and automatic updates do not start it.
+- Doctor distinguishes saved consent, service readiness, and session bindings.
+  Missing grants and custom permission policies have separate instructions.
+- Disabling incoming requests retains already approved ACC-owned outgoing grants.
+  Uninstall still restores the owned configuration changes.
+
+| Development validation artifact | Value |
+|---|---|
+| Built from | `70d308b85ab36e62ff38aced4c418fcea399705d` |
+| Tarball | `agents-can-communicate-0.5.3.tgz`, 391,998 bytes, 275 files |
+| sha256 | `006cb5750bfe014c6f8a7ea363b204582a619c887a291802950496c035c04aef` |
+
+This unpublished development build retains the 0.5.3 manifest version. The archive
+passed clean installed-package verification. Its bytes match the actual Codex
+0.154.0 darwin-arm64 setup capture at `b0b9759`, including repeat-install identity,
+incoming-off grant retention, and uninstall restoration. See the
+[compatibility observations](packages/adapter-codex/COMPATIBILITY.md) for capture
+provenance and limitations. The existing managed standalone installation remains
+a prerequisite. Service readiness does not establish client trust, a bound
+recipient, active sandbox access, message delivery, or login/reboot persistence.
+
+Final syntax checks passed for 533 files. The full suite passed with 2,204 tests,
+2,203 passes, zero failures, and one existing Gemini-uninstall skip. The final
+whole-branch review had no findings. See
+[development validation](docs/internal/evidence/complete-delivery-setup.md) for
+mutation evidence, final gates, and capture limits.
+
 ## 0.5.3 — release candidate
 
 - Bare `ack` refuses unanswered questions and requests with exit 5. Use `reply`

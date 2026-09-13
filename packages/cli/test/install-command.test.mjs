@@ -287,27 +287,25 @@ test("a dry run with delivery omitted previews off and says no choice was made",
   assert.deepEqual(decided.asked, []);
 });
 
-test("an interactive install asks one default-No question per eligible client", async () => {
+test("an interactive install asks one default-No question for all eligible clients", async () => {
   const questions = [];
-  const answers = [true, false];
   const runtime = { isInteractive: () => true, input: "in", output: "out",
-    confirm: async (question, io) => { questions.push([question, io]); return answers.shift(); } };
+    confirm: async (question, io) => { questions.push([question, io]); return true; } };
   const decided = await decide({ runtime });
-  assert.deepEqual(decided.deliveryByAdapter, { claude_code: "actionable", codex: "off", grok: "off" });
+  assert.deepEqual(decided.deliveryByAdapter,
+    { claude_code: "actionable", codex: "actionable", grok: "off" });
   assert.deepEqual(decided.asked, ["claude_code", "codex"]);
-  assert.equal(questions.length, 2, "the ineligible client is reported, not asked");
+  assert.equal(questions.length, 1, "the eligible clients did not share one decision");
   const [first, io] = questions[0];
 
-  assert.match(first, /^Let Claude Code answer peer requests while idle/);
-  assert.match(questions[1][0], /^Let Codex answer peer requests while idle/,
-    "each choice must identify its recipient");
+  assert.match(first, /^Complete automatic peer-request setup for Claude Code, Codex/);
   assert.match(first, /experimental/);
   assert.match(first, /automatic turns can spend tokens/);
-  assert.match(first, /Allow development channels when prompted/);
+  assert.match(first, /local permission grants/);
+  assert.match(first, /Channels/);
   assert.match(first, /No:.*acc inbox/);
   assert.doesNotMatch(first, /messages still arrive, at the session.s next turn/);
   assert.doesNotMatch(first, /--captured|PATH|shim|launcher|plugin entry|\.zshrc/);
-  assert.ok(first.split("\n").length <= 4);
   assert.deepEqual(io, { input: "in", output: "out" });
 });
 
@@ -319,7 +317,7 @@ test("the question names its recipient even when only one client is supported", 
       confirm: async question => { questions.push(question); return false; } } });
 
   assert.equal(questions.length, 1);
-  assert.match(questions[0], /^Let Claude Code answer/);
+  assert.match(questions[0], /^Complete automatic peer-request setup for Claude Code/);
 });
 
 test("a recorded opt-in is kept on upgrade without a new question", async () => {

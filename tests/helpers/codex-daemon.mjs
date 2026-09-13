@@ -15,14 +15,9 @@ const shortTmp = () => (process.platform === "win32" ? tmpdir() : "/tmp");
 
 // A fake daemon at the real control-socket path under a temp CODEX_HOME, so the
 // adapter's own socket discovery and WebSocket client are exercised end to end.
-export async function controlledCodexDaemon(t, { cwd }) {
-  const home = await realpath(await mkdtemp(path.join(shortTmp(), "acc-cx-nd-")));
-  await mkdir(path.join(home, "app-server-control"), { recursive: true });
-  const socketPath = path.join(home, "app-server-control", "app-server-control.sock");
-  assert.ok(Buffer.byteLength(socketPath) < 104,
-    `socket path is too long for this platform: ${socketPath}`);
+export async function startCodexDaemonServer({ socketPath, cwd, version = "0.152.1" }) {
   const server = http.createServer((request, response) => response.writeHead(404).end());
-  const state = { queue: [], loaded: ["other", THREAD], cwd, version: "0.152.1", calls: [] };
+  const state = { queue: [], loaded: ["other", THREAD], cwd, version, calls: [] };
   const sockets = new Set();
   server.on("upgrade", (request, socket) => {
     sockets.add(socket);
@@ -55,8 +50,18 @@ export async function controlledCodexDaemon(t, { cwd }) {
     });
   });
   await new Promise(resolve => server.listen(socketPath, resolve));
-  t.after(async () => { for (const s of sockets) s.destroy();
-    await new Promise(done => server.close(done)); await rm(home, { recursive: true, force: true }); });
-  return { env: { CODEX_HOME: home }, state, home };
+  const close = async () => { for (const socket of sockets) socket.destroy();
+    await new Promise(done => server.close(done)); };
+  return { state, close };
 }
 
+export async function controlledCodexDaemon(t, { cwd }) {
+  const home = await realpath(await mkdtemp(path.join(shortTmp(), "acc-cx-nd-")));
+  await mkdir(path.join(home, "app-server-control"), { recursive: true });
+  const socketPath = path.join(home, "app-server-control", "app-server-control.sock");
+  assert.ok(Buffer.byteLength(socketPath) < 104,
+    `socket path is too long for this platform: ${socketPath}`);
+  const daemon = await startCodexDaemonServer({ socketPath, cwd });
+  t.after(async () => { await daemon.close(); await rm(home, { recursive: true, force: true }); });
+  return { env: { CODEX_HOME: home }, state: daemon.state, home };
+}

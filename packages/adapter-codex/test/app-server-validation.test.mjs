@@ -109,3 +109,17 @@ test("malformed listed entries never masquerade as zero matches for metadata fal
     assert.equal(readCount, 0, JSON.stringify(data));
   }
 });
+
+test("loaded-thread metadata must be valid before distinguishing empty service from queue support", async () => {
+  for (const data of [[null], [123], [{}], [""], [THREAD, null]]) {
+    const result = await probeCodexQueue(peerFor({
+      "thread/loaded/list": { data, nextCursor: null },
+      "thread/queue/list": { data: [], nextCursor: null },
+    }));
+    assert.equal(result.supported, false, JSON.stringify(data));
+    assert.equal(result.reasonCode, "protocol_mismatch", JSON.stringify(data));
+  }
+  const empty = await probeCodexQueue(peerFor({ "thread/loaded/list": { data: [], nextCursor: null } }));
+  assert.equal(empty.supported, false);
+  assert.equal(empty.reasonCode, "native_session_unavailable");
+});

@@ -1,0 +1,251 @@
+{
+  "schemaVersion": 1,
+  "kind": "derived-packed-acc-codex-service-setup-evidence",
+  "capturedAt": "2026-09-13T00:00:31.071Z",
+  "finishedAt": "2026-09-13T00:00:35.805Z",
+  "platform": "darwin-arm64",
+  "codexVersion": "0.154.0",
+  "scope": "Actual packed ACC explicit setup with a real Codex daemon in a disposable managed-install fixture; no models or authentication.",
+  "build": {
+    "kind": "development-build",
+    "sourceCommit": "b0b9759730f3adbe7c482fe3b7a844b2453e95ff",
+    "packageManifestVersion": "0.5.3",
+    "archiveSha256": "006cb5750bfe014c6f8a7ea363b204582a619c887a291802950496c035c04aef",
+    "releaseAttribution": "The package manifest still reads 0.5.3. This capture identifies a development build at the recorded source commit and archive hash; it is not evidence for the published ACC 0.5.3 release."
+  },
+  "provenance": {
+    "derived": true,
+    "source": {
+      "path": "/private/tmp/acc-packed-service-final-evidence.json",
+      "sha256": "926ed1f7daafcdf247cf7049b7e0c559d7bdd85d28bd15035dd7976a0b7aa26d"
+    },
+    "captureScript": {
+      "path": "/private/tmp/acc-packed-service-final.mjs",
+      "sha256": "1defb9782986183c8f6b73586e30db4afef9bde14caf87274acf13c1304ade85",
+      "currentBytesMatchRecordedHash": true
+    },
+    "transformation": [
+      "Selected closed observations from this completed final capture only; earlier captures remain separate and unchanged.",
+      "Omitted full install operations/plans, doctor reports, configuration text, artifact paths, and human output dumps. Retained the requested setup, consent, service identity, and cleanup metadata.",
+      "Normalized string occurrences of source.fixtureRoot to <private-fixture-root> and dirname(dirname(source.executable)) to <installed-codex-release>. PIDs, start times, timestamps, version/status values, and hashes were preserved.",
+      "Added explicitly labeled assertion summaries from the matching completed capture script: dry-run PID/socket absence, recorded actionable policy, incoming-off grant/identity preservation, identity-preserving repeat/uninstall, uninstall grant removal, and stop/death/fixture removal.",
+      "Parsed the vendor stop JSON. The stop command and successful command completion facts are identified as capture-script observations because the source stores its output separately from the command list."
+    ],
+    "substitutions": [
+      {
+        "sourceField": "fixtureRoot",
+        "replacement": "<private-fixture-root>"
+      },
+      {
+        "sourceExpression": "dirname(dirname(executable))",
+        "replacement": "<installed-codex-release>"
+      }
+    ]
+  },
+  "fixture": {
+    "preparation": "Symlink existing standalone release into private managed-current; fixture preparation only, not ACC behavior.",
+    "home": "<private-fixture-root>/home",
+    "codexHome": "<private-fixture-root>/home/.codex",
+    "managedReleaseSymlink": "<private-fixture-root>/home/.codex/packages/standalone/current",
+    "symlinkTarget": "<installed-codex-release>",
+    "actualVendorExecutable": "<installed-codex-release>/bin/codex",
+    "isolation": "The matching capture script used private HOME, CODEX_HOME, ACC_DATA_HOME, TMPDIR and XDG directories, with no model session or authentication.",
+    "productionBoundary": "The managed standalone symlink was fixture preparation. ACC did not install, copy, or link the vendor binary as part of setup."
+  },
+  "dryRun": {
+    "command": {
+      "command": "packed acc",
+      "args": [
+        "install",
+        "--adapter",
+        "codex",
+        "--delivery",
+        "actionable",
+        "--dry-run"
+      ]
+    },
+    "previewNamedDaemonStart": true,
+    "assertionsFromCompletedCaptureScript": {
+      "pidFileAbsent": true,
+      "socketAbsent": true
+    }
+  },
+  "explicitInstall": {
+    "command": {
+      "command": "packed acc",
+      "args": [
+        "install",
+        "--adapter",
+        "codex",
+        "--delivery",
+        "actionable",
+        "--json"
+      ]
+    },
+    "ok": true,
+    "adapterId": "codex",
+    "applied": true,
+    "failedOperationCount": 0,
+    "requestedLivePolicy": "actionable",
+    "effectiveLivePolicy": "off",
+    "deliveryDecision": {
+      "source": "explicit-option",
+      "completeSetup": true
+    },
+    "serviceSetup": {
+      "state": "ready",
+      "reasonCode": "native_session_unavailable",
+      "started": true,
+      "pid": 86419,
+      "processStartTime": "Sat Sep 12 20:00:32 2026",
+      "cliVersion": "0.154.0",
+      "managedVersion": "0.154.0",
+      "cliIdentity": "16777233:145949418:222655232:1788992227003.6335:1789002979771.3167",
+      "managedIdentity": "16777233:145949418:222655232:1788992227003.6335:1789002979771.3167"
+    },
+    "savedDecision": {
+      "source": "explicit-option",
+      "completeSetup": true
+    },
+    "savedPolicyAssertionFromCompletedCaptureScript": "actionable",
+    "outgoingGrantsPresent": true,
+    "outgoingConfiguration": {
+      "state": "configured",
+      "reasonCode": null
+    }
+  },
+  "firstVerifiedIdentity": {
+    "serviceId": "codex-app-server",
+    "state": "ready",
+    "reasonCode": null,
+    "pid": 86419,
+    "processStartTime": "Sat Sep 12 20:00:32 2026",
+    "codexHome": "<private-fixture-root>/home/.codex",
+    "cliPath": "<installed-codex-release>/bin/codex",
+    "cliVersion": "0.154.0",
+    "serverVersion": "0.154.0",
+    "managedPath": "<private-fixture-root>/home/.codex/packages/standalone/current/bin/codex",
+    "managedVersion": "0.154.0",
+    "socketPath": "<private-fixture-root>/home/.codex/app-server-control/app-server-control.sock",
+    "busyThreads": 0,
+    "queuedRequests": 0
+  },
+  "doctorClosedResult": {
+    "command": {
+      "command": "packed acc",
+      "args": [
+        "doctor",
+        "--json"
+      ]
+    },
+    "ok": true,
+    "eligibility": "degraded",
+    "configured": true,
+    "policy": "actionable",
+    "runtime": "waiting",
+    "reasonCode": "native_session_unavailable",
+    "modes": [],
+    "sessionCount": 0
+  },
+  "repeatedInstall": {
+    "command": {
+      "command": "packed acc",
+      "args": [
+        "install",
+        "--adapter",
+        "codex"
+      ]
+    },
+    "verifiedIdentity": {
+      "serviceId": "codex-app-server",
+      "state": "ready",
+      "reasonCode": null,
+      "pid": 86419,
+      "processStartTime": "Sat Sep 12 20:00:32 2026",
+      "codexHome": "<private-fixture-root>/home/.codex",
+      "cliPath": "<installed-codex-release>/bin/codex",
+      "cliVersion": "0.154.0",
+      "serverVersion": "0.154.0",
+      "managedPath": "<private-fixture-root>/home/.codex/packages/standalone/current/bin/codex",
+      "managedVersion": "0.154.0",
+      "socketPath": "<private-fixture-root>/home/.codex/app-server-control/app-server-control.sock",
+      "busyThreads": 0,
+      "queuedRequests": 0
+    },
+    "sameInstance": true,
+    "identityComparison": "The completed capture script asserted sameMaintenanceIdentity(firstIdentity, repeatIdentity); the selected identity fields also compare equal during derivation."
+  },
+  "incomingOff": {
+    "command": {
+      "command": "packed acc",
+      "args": [
+        "install",
+        "--adapter",
+        "codex",
+        "--delivery",
+        "off"
+      ]
+    },
+    "policy": "off",
+    "decision": {
+      "source": "explicit-option",
+      "completeSetup": false
+    },
+    "outgoingGrantsRetained": true,
+    "sameServiceIdentity": true,
+    "assertionDetailsFromCompletedCaptureScript": {
+      "permissionProfileDeclarationRetained": "[permissions.acc-workspace]",
+      "defaultSelectionRetained": "default_permissions = \"acc-workspace\"",
+      "identityCheck": "sameMaintenanceIdentity(firstIdentity, offIdentity) passed"
+    }
+  },
+  "uninstall": {
+    "command": {
+      "command": "packed acc",
+      "args": [
+        "uninstall",
+        "--adapter",
+        "codex"
+      ]
+    },
+    "retainedVendorService": true,
+    "removedOwnedOutgoingGrants": true,
+    "configurationAssertionFromCompletedCaptureScript": "Removed config contains no acc-workspace reference, or config file is absent",
+    "identityAssertionFromCompletedCaptureScript": "sameMaintenanceIdentity(firstIdentity, afterUninstall) passed"
+  },
+  "cleanup": {
+    "commandFromCaptureScript": {
+      "command": "<installed-codex-release>/bin/codex",
+      "args": [
+        "app-server",
+        "daemon",
+        "stop"
+      ]
+    },
+    "successfulExecFileCompletionFromCaptureScript": true,
+    "vendorResult": {
+      "status": "stopped",
+      "backend": "pid",
+      "managedCodexPath": "<private-fixture-root>/home/.codex/packages/standalone/current/bin/codex",
+      "managedCodexVersion": "0.154.0",
+      "socketPath": "<private-fixture-root>/home/.codex/app-server-control/app-server-control.sock",
+      "cliVersion": "0.154.0"
+    },
+    "stderr": "",
+    "observedPid": 86419,
+    "assertionsFromCompletedCaptureScript": {
+      "processKillZeroError": "ESRCH",
+      "pidFileAbsent": true,
+      "socketAbsent": true,
+      "fixtureRemoved": true
+    },
+    "summary": "Exact observed PID dead, socket and PID metadata absent; fixture removed.",
+    "completed": true
+  },
+  "limitations": [
+    "This verifies the explicit packed ACC setup path against one Codex 0.154.0 darwin-arm64 PID service with a fixture-managed installation.",
+    "Outgoing grants were checked as configuration; no active model sandbox was used to prove effective access.",
+    "Zero busy threads and queued requests were observed. Doctor reported zero sessions and native_session_unavailable; service preparation is not live recipient readiness.",
+    "No hook activation, model session, message delivery, authentication, bootstrap, remote control, login/reboot persistence, or real user service/configuration changes were exercised."
+  ]
+}

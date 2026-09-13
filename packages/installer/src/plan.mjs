@@ -14,7 +14,7 @@ import { LIVE_POLICIES, describeActivation, describeDeactivation, planActivation
  */
 export function planInstallation({ adapters, detected, context, action = "install",
   recorded = [], accVersion = null, allowDowngrade = false, requested = [],
-  deliveryByAdapter = {} }) {
+  deliveryByAdapter = {}, deliveryDecisionByAdapter = {}, allowServiceSetup = false }) {
   if (!["install", "uninstall"].includes(action)) {
     throw new AccError(EXIT.USAGE, `unknown installation action: ${action}`, { action });
   }
@@ -104,6 +104,9 @@ export function planInstallation({ adapters, detected, context, action = "instal
     // and so what will be removed. Asking the adapter instead would describe an
     // install for a machine this one no longer is.
     const delivery = deliveryByAdapter[entry.adapterId] ?? "off";
+    const deliveryDecision = deliveryDecisionByAdapter[entry.adapterId]
+      ?? recordedById.get(entry.adapterId)?.deliveryDecision
+      ?? { source: "legacy-unknown", completeSetup: false };
     const native = entry.nativeDelivery ?? null;
     const liveDeliverySupported = native?.state === "eligible"
       && native.activationPlan?.eligible === true;
@@ -122,8 +125,10 @@ export function planInstallation({ adapters, detected, context, action = "instal
       ? describeInstallDelivery(entry, delivery, effectiveLivePolicy) : null;
     const installContext = { ...context, requestedLivePolicy: delivery,
       livePolicy: configuredLivePolicy, clientVersion: entry.version, platform: entry.platform };
+    const nativeServiceSetup = action === "install" && allowServiceSetup && delivery !== "off"
+      && deliveryDecision.completeSetup === true ? entry.nativeServiceSetup : undefined;
     const setupNotes = action === "install" && delivery !== "off"
-      ? [entry.outgoingDelivery?.setup, entry.nativeSetup].filter(note => typeof note === "string") : [];
+      ? [entry.outgoingDelivery?.setup, nativeServiceSetup ? null : entry.nativeSetup].filter(note => typeof note === "string") : [];
     // A consented activation that this run keeps, activates, or takes back.
     // Only an explicit off or an uninstall removes one; an absent record never
     // creates one.
@@ -154,11 +159,13 @@ export function planInstallation({ adapters, detected, context, action = "instal
       alreadyInstalled: entry.installed === true,
       livePolicy: delivery,
       effectiveLivePolicy,
+      ...(action === "install" ? { deliveryDecision } : {}),
       ...(retainedActivation ? { configuredLivePolicy, retainedNativeActivation: retainedActivation } : {}),
       ...(deliveryDiagnostic === null ? {} : { deliveryDiagnostic }),
       ...(deliverySummary === null ? {} : { deliverySummary }),
       ...(setupNotes.length ? { setupNotes } : {}),
       ...(nativeActivation === null ? {} : { nativeActivation }),
+      ...(nativeServiceSetup ? { nativeServiceSetup } : {}),
       ...(deactivation === null ? {} : { deactivation }),
       artifacts,
       // Said in the operator's terms, not in paths: which files ACC creates
@@ -169,6 +176,7 @@ export function planInstallation({ adapters, detected, context, action = "instal
         ...(deliverySummary === null ? [] : [deliverySummary]),
         ...(retainedActivation ? ["keep existing native delivery setup; current readiness is unverified"] : []),
         ...setupNotes,
+        ...(nativeServiceSetup ? [nativeServiceSetup.diagnostic] : []),
         ...artifacts.filter(a => a.kind === "tree")
           .map(a => `${action === "install" ? "create" : "remove"} ${a.path}`),
         ...artifacts.filter(a => a.kind === "merge")

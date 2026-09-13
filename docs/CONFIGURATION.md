@@ -139,7 +139,9 @@ reports degraded reachability; it does not rewrite the installed consent.
 
 Codex LocalDaemon delivery separately requires macOS arm64, Codex 0.152.1 or newer, a
 current feature probe, and exact thread, canonical cwd, process, version and protocol
-checks. Its daemon must already be running; installation and delivery do not start or stop it.
+checks. Explicit complete setup can prepare a definitely absent service on Codex 0.154.0
+or newer when the managed standalone installation is present. Message delivery does not
+start or stop it.
 Explicit update maintenance can restart a verified service after separate confirmation. Codex reads
 consent from the installation record, not a shell-shim variable. Unavailable or ineligible
 sessions retain durable inbox fallback. Use `acc install --adapter codex --delivery off`
@@ -165,8 +167,10 @@ not merge arbitrary security policies or verify overrides in an already running 
 For a custom policy, grant the same state and socket access through the proxy in the
 client's effective workspace profile; do not combine it with legacy sandbox settings.
 
-Restart Codex after changing permissions. Explicit delivery `off` or uninstall restores
-the previous configuration only while every generated permission component is unchanged.
+Restart Codex after changing permissions. Disabling incoming delivery retains unchanged
+ACC-owned outgoing grants that you approved earlier. A fresh `--delivery off` install does
+not add live socket grants. Uninstall restores the previous configuration only while every
+generated permission component is unchanged.
 If any component was edited or another setting depends on it, ACC preserves the entire
 bundle and reports it for review. Plugin registration can still be removed independently.
 

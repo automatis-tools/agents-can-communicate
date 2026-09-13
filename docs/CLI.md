@@ -250,7 +250,7 @@ before leaving, request the concrete continuation and obtain a substantive reply
 `--delivery off|actionable|all` is a per-client recipient policy request, not a capability
 switch, and the default is `off`. `--adapter` is repeatable to name several clients. An
 explicit `--delivery` applies uniformly and never prompts; omitting it on an interactive
-terminal asks one default-No question per supported client. Codex can save consent while
+terminal asks one default-No question for all selected clients that need a decision. Codex can save consent while
 its local service is unavailable or has no loaded session; this does not activate delivery.
 A non-interactive run or a `--dry-run` keeps fresh clients off. A recorded opt-in is kept on upgrade. If the detected
 client cannot receive native delivery - unsupported, below the captured minimum, a
@@ -259,8 +259,10 @@ effective policy off and prints the reason. Claude Code shell activation writes 
 zsh PATH block and a shim that `exec`s the real client; `ACC_BYPASS=1` bypasses that
 activation. Codex LocalDaemon delivery uses recorded installation consent without changing
 ordinary launch arguments. Its opt-in remains active when shim variables are absent or
-bypassed; `acc install --adapter codex --delivery off` disables new native offers. Installation
-and message delivery do not start or stop the vendor daemon. The install summary names each client's requested policy,
+bypassed; `acc install --adapter codex --delivery off` disables new native offers. On a
+supported explicit install, complete consent can prepare a missing Codex service from an
+existing managed standalone installation. Dry runs, delivery off, automatic refresh, and
+message delivery do not start it. Uninstall does not stop the shared vendor daemon. The install summary names each client's requested policy,
 activation state and verified fallback. `doctor` separates protocol readiness, recorded
 consent and a live channel in the current workspace, with a next step for missing activation.
 A supported version or an installed plugin alone is not an active delivery channel.
@@ -269,7 +271,8 @@ block inbound Channels messages while its MCP server and tools remain connected;
 doctor therefore also names the client-side startup check.
 In doctor JSON, `nativeDelivery.activation` distinguishes missing launch setup from a
 recorded setup (or `not_required` for a pre-existing service). `policy` is the installed
-choice; `sessionPolicy` describes a native binding when one is visible. Existing Claude
+choice. `deliveryDecision` gives its known source and reports legacy provenance as unknown.
+`nativeServiceSetup` reports service infrastructure separately. `sessionPolicy` describes a native binding when one is visible. Existing Claude
 sessions can retain their launch policy after a different choice is installed for new
 sessions; Codex checks current recorded consent before new offers.
 `nativeDelivery.sessions` lists each current session's identity, present transport state

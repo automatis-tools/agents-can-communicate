@@ -67,7 +67,8 @@ export async function probeCodexQueue(peer, { threadId, minimum = MINIMUM_VERSIO
   try {
     if (threadId === undefined) {
       const loaded = await pageAll(peer, "thread/loaded/list", {});
-      threadId = loaded.find(id => typeof id === "string" && id !== "");
+      if (loaded.some(id => typeof id !== "string" || id === "")) throw protocolError();
+      threadId = loaded[0];
       if (threadId === undefined) return { supported: false, serverVersion,
         reasonCode: "native_session_unavailable" };
     }

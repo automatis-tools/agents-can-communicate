@@ -214,7 +214,7 @@ test("a native service is started only when absent and torn down only when ACC c
     adapters: [preExisting], context: here.context, dataHome: here.dataHome, activation: { exec } });
     assert.deepEqual(commands, []);
     assert.match(removal.operations[0].diagnostics.join("\n"),
-      /retained the vendor-daemon service \(it existed before ACC\)/);
+      /retained the vendor-daemon service \(it was reused at activation\)/);
   });
 
 test("a refused shell step fails the operation and writes no shell bytes", async t => {

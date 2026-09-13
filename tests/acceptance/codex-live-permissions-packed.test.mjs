@@ -28,10 +28,16 @@ test("installed live setup discloses permissions, diagnoses them, and reverses o
   const doctor = await packed.acc(["doctor", "--home", packed.clientHome]);
   assert.equal(doctor.adapters.find(entry => entry.adapterId === "codex").outgoingDelivery.state, "configured");
   assert.match((await human(["doctor"])).stdout, /outgoing live delivery: local socket permissions configured/);
-  assert.match((await human(["doctor"])).stdout, /codex app-server daemon start/);
-  assert.ok(doctor.remediation.some(line => line.includes("codex app-server daemon start")));
+  assert.match((await human(["doctor"])).stdout, /managed standalone installation/);
+  assert.ok(doctor.remediation.some(line => line.includes("managed standalone installation")));
+  assert.equal((await human(["doctor"])).stdout.split("sender permissions unverified").length - 1, 0);
+  await human(["install", "--adapter", "codex", "--delivery", "off"]);
+  assert.match(await readFile(config, "utf8"), /default_permissions = "acc-workspace"/);
   await writeFile(config, generated.replace("network_proxy = true", "network_proxy = false"));
-  assert.match((await human(["doctor"])).stdout, /outgoing live delivery: sender permissions unverified/);
+  const modifiedDoctor = (await human(["doctor"])).stdout;
+  assert.match(modifiedDoctor, /outgoing live delivery: sender permissions unverified/);
+  assert.match(modifiedDoctor, /custom permission policy was preserved; manually allow/);
+  assert.equal(modifiedDoctor.split("sender permissions unverified").length - 1, 1);
   assert.match((await human(["uninstall", "--adapter", "codex"])).stdout, /customized native permissions were preserved/);
   assert.match(await readFile(config, "utf8"), /default_permissions = "acc-workspace"/);
   // Restore the unchanged generated file to verify recorded reinstall/removal.

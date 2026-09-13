@@ -971,3 +971,77 @@ configuration readiness never establishes an active session's effective permissi
 This does not expand the certified hook versions or establish native replyRoute.
 The patch also uses a stable short macOS channel directory across different TMPDIR
 values and retains permission failures as a distinct safe offer code.
+
+## Explicit cold service preparation — 0.154.0, 2026-09-12
+
+A standalone Codex CLI 0.154.0 on darwin-arm64 was exercised in disposable HOME
+and CODEX_HOME directories. An empty home failed twice with the vendor's explicit
+managed-standalone prerequisite and created no PID or socket. ACC reports that
+prerequisite and the vendor installation action; it does not install Codex.
+
+A separate fixture linked `packages/standalone/current` to an existing installed
+standalone release. This was fixture preparation only. With that prerequisite,
+`app-server daemon start` returned `started` on the PID backend. The existing ACC
+maintenance helpers verified CLI/managed/server versions, the owned PID and start
+time, the expected managed executable invocation, socket ownership, and a
+metadata-only App Server handshake. A second start returned `alreadyRunning` and
+preserved the same PID/start-time identity. The fixture was stopped with the
+vendor command; process death, PID/socket removal, and private-home cleanup were
+verified. No real user service or configuration was changed.
+
+The empty service completed `initialize` and returned zero loaded threads.
+`probeNativeDelivery` returned `native_session_unavailable`: this establishes
+service infrastructure, not a bound recipient or completed message delivery. No
+model session, authentication, transcript, hook activation, sandbox permission,
+interactive launch/cwd behavior, reboot persistence, or new capability was tested
+or claimed. The restricted-shell attempt could not run `ps`; its failed child
+was subsequently verified dead. Successful capture required process inspection.
+
+Evidence: [derived cold-service fixture](fixtures/setup/codex-cli-0.154.0-cold-service.json),
+SHA-256 `8db78398cf5197938fdc8cda5f8c46f00bfc72701784543c34760ff73e092718`.
+The fixture retains source paths/hashes, capture times, exact transformation and
+path-placeholder meanings, prerequisite failure, restricted-shell failure, and
+cleanup provenance. It is an independently captured vendor lifecycle using the
+existing maintenance checks, not a capture of the new installed ACC setup path.
+The new path is covered separately by injected process/protocol and temporary
+filesystem tests; installed-artifact validation remains a separate release gate.
+
+## Explicit setup through a packed development build — 2026-09-12
+
+The packed ACC development build at source commit
+`b0b9759730f3adbe7c482fe3b7a844b2453e95ff` was exercised against installed Codex
+0.154.0 on darwin-arm64. Its manifest still reports 0.5.3; this is not a capture
+of the published ACC 0.5.3 release. The packed archive SHA-256 is
+`006cb5750bfe014c6f8a7ea363b204582a619c887a291802950496c035c04aef`.
+
+In a disposable HOME/CODEX_HOME, a fixture-only symlink supplied the preinstalled
+managed standalone release. ACC did not install or copy Codex. The explicit
+`acc install --adapter codex --delivery actionable --dry-run` preview named the
+daemon start without creating a PID/socket. The actual packed install then saved
+the setup decision and actionable policy, wrote outgoing permission configuration,
+and started a verified PID service. The captured CLI, managed binary and server
+versions were 0.154.0; verified workload counts were zero.
+
+A repeated packed install preserved the same PID/start-time identity. Disabling
+incoming delivery with `acc install --adapter codex --delivery off` saved policy
+`off` while retaining the previously approved owned outgoing profile/default
+selection and the same verified daemon. Packed uninstall removed the owned outgoing
+profile references and retained that vendor daemon. Fixture cleanup then stopped
+it through the vendor CLI, confirmed the exact PID was dead and PID/socket
+metadata absent, and removed the private fixture. The capture completed at
+`2026-09-13T00:00:35.805Z`.
+
+Doctor reported configured outgoing permissions and a service awaiting a session
+(`native_session_unavailable`). No active sandbox permission check, hook
+activation, model session, message delivery, authentication, bootstrap, remote
+control, or login/reboot persistence was exercised. This capture establishes
+explicit setup behavior and service identity, not live recipient readiness.
+
+The derived [fixture](fixtures/setup/acc-development-complete-delivery-setup.json)
+has SHA-256 `19025fe9571940dd8604f9cc6d157305d6169e9f4f2f6ad89e85bc64641cf9f7`.
+It records the source capture SHA-256
+`926ed1f7daafcdf247cf7049b7e0c559d7bdd85d28bd15035dd7976a0b7aa26d`, capture-script SHA-256
+`1defb9782986183c8f6b73586e30db4afef9bde14caf87274acf13c1304ade85`, and exact path substitutions.
+The source is this completed final capture only. Original source and script bytes
+remain unchanged; their temporary paths identify capture provenance, not permanent
+publication links.

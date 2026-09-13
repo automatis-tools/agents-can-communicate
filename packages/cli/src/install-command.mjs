@@ -6,13 +6,16 @@ import { createCodexAdapter } from "@agents-can-communicate/adapter-codex";
 import { createGeminiCliAdapter } from "@agents-can-communicate/adapter-gemini-cli";
 import { createGrokAdapter } from "@agents-can-communicate/adapter-grok";
 import { createKimiAdapter } from "@agents-can-communicate/adapter-kimi";
-import { LIVE_POLICIES, applyPlan, detectInstallation, livePolicyOf,
+import { applyPlan, detectInstallation,
   loadOwnership, planInstallation, rcFileFor, shellOf, shimDirFor }
   from "@agents-can-communicate/installer";
 import { AccError, EXIT } from "@agents-can-communicate/protocol";
 
 import { platformPaths } from "./platform-paths.mjs";
 import { installManaged, uninstallManaged } from "./managed-runtime/install.mjs";
+import { decideDelivery } from "./install-delivery-consent.mjs";
+
+export { decideDelivery } from "./install-delivery-consent.mjs";
 
 // Kept cohesive above 300 lines because this is the install command boundary:
 // detection, consent, planning, application, and reporting share one context
@@ -180,10 +183,11 @@ export function describeOutcome({ action, acted, failed = [], skipped = [],
  * what a malformed `~/.claude/settings.json` produced: the adapter refused,
  * correctly, and the script that ran the installer was told it had worked.
  */
-export function failureOf({ action, acted, failed = [] }) {
+export function failureOf({ action, acted, failed = [], operations = [], skipped = [], home }) {
   if (failed.length === 0) return null;
   return new AccError(EXIT.DATA,
-    describeOutcome({ action, acted, failed }), { failed });
+    [describeOutcome({ action, acted, failed, operations, skipped, home }),
+      ...reloadAdvice(operations)].join("\n"), { failed });
 }
 
 /**
@@ -200,70 +204,6 @@ export function actedOn(result) {
     && (result.action === "install"
       || (operation.removed?.length ?? 0) + (operation.removedDirectories?.length ?? 0)
         + (operation.changes?.length ?? 0) > 0)).length;
-}
-
-const isInteractive = runtime => typeof runtime.isInteractive === "function"
-  && runtime.isInteractive() === true;
-
-// One default-No question per supported client. Disclose token use and any
-// repeated channel prompt; declining only promises a verified fallback.
-function questionFor(entry) {
-  const bootstrap = entry.nativeDelivery.activationPlan?.mechanisms
-    .find(mechanism => mechanism.kind === "shell-bootstrap") ?? null;
-  const warns = (bootstrap?.prefixArgs ?? []).some(argument => argument.startsWith("--"));
-  return [
-    `Let ${entry.displayName} answer peer requests while idle? (experimental)`,
-    "  Yes: automatic turns can spend tokens without waiting for you.",
-    ...(entry.outgoingDelivery?.setup ? [`       ${entry.outgoingDelivery.setup}`] : []),
-    ...(warns ? ["       Allow development channels when prompted; check the client's startup notice."] : []),
-    ...(entry.nativeDelivery.state !== "eligible"
-      ? ["       Save consent now; delivery waits for an available client service."] : []),
-    entry.capabilities?.delivery?.nextTurn === true
-      ? "  No:  use next-turn hooks (when enabled) or acc inbox."
-      : "  No:  read messages with acc inbox; automatic next-turn delivery is unavailable.",
-  ].join("\n");
-}
-
-/**
- * Which live policy each selected client gets.
- *
- * An explicit --delivery applies uniformly and never prompts. Otherwise a
- * recorded opt-in is kept as it was consented to, a fresh or never-activated
- * client is off unless a person answers yes here, and a dry run or a
- * non-interactive stdin/stdout makes no interactive choice at all.
- */
-export async function decideDelivery({ options, detected, recorded, runtime, dryRun }) {
-  const explicit = options.delivery;
-  if (explicit !== undefined && !LIVE_POLICIES.includes(explicit)) {
-    throw new AccError(EXIT.USAGE, `unknown delivery policy: ${explicit}`, { delivery: explicit });
-  }
-  const recordedById = new Map(recorded.map(install => [install.adapterId, install]));
-  const deliveryByAdapter = {};
-  const asked = [];
-  let withheld = 0;
-  for (const entry of detected) {
-    const eligible = entry.nativeDelivery?.state === "eligible"
-      || entry.nativeDelivery?.consentAvailable === true;
-    const previous = livePolicyOf(recordedById.get(entry.adapterId));
-    if (explicit !== undefined) {
-      deliveryByAdapter[entry.adapterId] = explicit;
-    } else if (previous !== "off") {
-      deliveryByAdapter[entry.adapterId] = previous;
-    } else if (!eligible || dryRun || !isInteractive(runtime)) {
-      deliveryByAdapter[entry.adapterId] = "off";
-      if (eligible) withheld += 1;
-    } else {
-      const yes = await runtime.confirm(questionFor(entry),
-        { input: runtime.input, output: runtime.output }) === true;
-      deliveryByAdapter[entry.adapterId] = yes ? "actionable" : "off";
-      asked.push(entry.adapterId);
-    }
-  }
-  const notes = explicit === undefined && dryRun && withheld > 0
-    ? ["interactive choices were not made: this preview keeps native delivery off for "
-      + `${withheld} eligible client(s) without a recorded opt-in`]
-    : [];
-  return { deliveryByAdapter, asked, notes };
 }
 
 // Said once, after the first PATH block is written: a running shell and a
@@ -315,7 +255,9 @@ export async function runInstallCommand({ options, runtime, action = "install" }
     : { deliveryByAdapter: {}, asked: [], notes: [] };
   const plan = planInstallation({ adapters, detected, context, action, recorded,
     accVersion, allowDowngrade: options.downgrade === true, requested,
-    deliveryByAdapter: decided.deliveryByAdapter });
+    deliveryByAdapter: decided.deliveryByAdapter,
+    deliveryDecisionByAdapter: decided.deliveryDecisionByAdapter,
+    allowServiceSetup: action === "install" });
   const apply = (paths = {}) => applyPlan({ plan, adapters, context: { ...context, ...paths },
     dataHome, dryRun, accVersion, activation: { bootstrap: paths.bootstrap } });
   const result = action === "install" && !dryRun && runtime.packageRoot
@@ -328,16 +270,18 @@ export async function runInstallCommand({ options, runtime, action = "install" }
 
   const acted = actedOn(result);
   if (dryRun) {
-    return { data: { ...result, plan, dataHome, deliveryByAdapter: decided.deliveryByAdapter },
+    return { data: { ...result, plan, dataHome, deliveryByAdapter: decided.deliveryByAdapter,
+      deliveryDecisionByAdapter: decided.deliveryDecisionByAdapter },
       text: [`would ${action}:`, ...plan.operations.flatMap(operation => operation.summary),
         ...plan.skipped.map(entry => `skip ${entry.adapterId}: ${entry.reason}`),
         ...decided.notes].join("\n") };
   }
 
   return { data: { ...result, plan, dataHome, deliveryByAdapter: decided.deliveryByAdapter,
-    asked: decided.asked },
+    deliveryDecisionByAdapter: decided.deliveryDecisionByAdapter, asked: decided.asked },
   text: [describeOutcome({ action, acted, failed: result.failed,
     skipped: plan.skipped, operations: result.operations, home }),
   ...reloadAdvice(result.operations)].join("\n"),
-  error: failureOf({ action, acted, failed: result.failed }) };
+  error: failureOf({ action, acted, failed: result.failed, operations: result.operations,
+    skipped: plan.skipped, home }) };
 }

@@ -1,0 +1,372 @@
+{
+  "schemaVersion": 1,
+  "kind": "derived-codex-service-setup-evidence",
+  "capturedAt": "2026-09-12T22:49:37.450Z",
+  "finishedAt": "2026-09-12T22:49:38.550Z",
+  "platform": "darwin-arm64",
+  "cliVersion": "0.154.0",
+  "scope": "Installed vendor cold service lifecycle with existing repository maintenance verification helpers; this is not an installed ACC setup-path or message-delivery capture.",
+  "provenance": {
+    "derived": true,
+    "source": {
+      "name": "acc-cold-start-managed-evidence.json",
+      "path": "/private/tmp/acc-cold-start-managed-evidence.json",
+      "sha256": "d2c46d68e13d0c75f6403fffc87ac63deb29fd13a68ffaefaf54caeea7fd03f5"
+    },
+    "transformation": [
+      "Parsed the source JSON and retained its successful lifecycle observations. Restored repeat-start command/cwd and version/cleanup command results from the full capture.",
+      "Replaced disposable root paths and the installed standalone release path with distinct placeholders in copied observations. Timestamps, PIDs, process start times, version strings, statuses, stdout/stderr semantics, and identity outcomes were otherwise preserved.",
+      "Omitted the exhaustive createdFiles array of 164 entries; replaced it with its exact observed entry count and factual path-category note. The count includes fixture-created roots and the managed-release symlink.",
+      "Added bounded prerequisite and sandbox-failure summaries from the separately hashed original captures; did not rerun any service or modify original captures."
+    ],
+    "pathPlaceholders": [
+      {
+        "placeholder": "<private-success-root>",
+        "meaning": "Distinct disposable fixture root; original path is preserved in the hashed sources."
+      },
+      {
+        "placeholder": "<private-empty-home-root>",
+        "meaning": "Distinct disposable fixture root; original path is preserved in the hashed sources."
+      },
+      {
+        "placeholder": "<private-sandbox-root>",
+        "meaning": "Distinct disposable fixture root; original path is preserved in the hashed sources."
+      },
+      {
+        "placeholder": "<installed-codex-release>",
+        "meaning": "Actual standalone release directory resolved before changing HOME/PATH; original path is preserved in the hashed sources."
+      }
+    ],
+    "references": [
+      {
+        "role": "capture",
+        "name": "acc-cold-start-managed-capture.json",
+        "path": "/private/tmp/acc-cold-start-managed-capture.json",
+        "sha256": "79558df12392368c6ccaa26da00cc01e742223224d7c16e7039b6723f75c646d"
+      },
+      {
+        "role": "script",
+        "name": "acc-cold-start-managed-capture.mjs",
+        "path": "/private/tmp/acc-cold-start-managed-capture.mjs",
+        "sha256": "00805363051d50742f682d0de9015f1b78f532b04964a8a9fb688708d06bcdff"
+      },
+      {
+        "role": "emptyHome",
+        "name": "acc-cold-start-capture.json",
+        "path": "/private/tmp/acc-cold-start-capture.json",
+        "sha256": "c387ea0e68063f2e13c8cfa247e1f564db621054a9dfc3b1f8d879847d077315"
+      },
+      {
+        "role": "sandbox",
+        "name": "acc-cold-start-managed-sandbox-failure.json",
+        "path": "/private/tmp/acc-cold-start-managed-sandbox-failure.json",
+        "sha256": "2cc6f6d38f0eb619d2fe63422d64dd86e890c78cc65c4b93b80b302be92f43ee"
+      }
+    ]
+  },
+  "successfulCapture": {
+    "schemaVersion": 1,
+    "capturedAt": "2026-09-12T22:49:37.450Z",
+    "finishedAt": "2026-09-12T22:49:38.550Z",
+    "platform": "darwin-arm64",
+    "cliVersion": "codex-cli 0.154.0",
+    "scope": "Cold service lifecycle only in a disposable home with fixture-managed binary; no models, authentication, bootstrap, launchctl, remote control, user configuration, or existing service access.",
+    "fixtureSetup": {
+      "kind": "symlink",
+      "path": "<private-success-root>/cx/packages/standalone/current",
+      "target": "<installed-codex-release>",
+      "purpose": "Fixture-only managed standalone install. Production ACC must not copy, symlink, or install Codex silently."
+    },
+    "environment": {
+      "HOME": "<private-success-root>/home",
+      "CODEX_HOME": "<private-success-root>/cx",
+      "cwd": "<private-success-root>/workspace",
+      "authentication": "none",
+      "execution": "process inspection allowed; separate sandbox failure retained"
+    },
+    "firstStart": {
+      "command": "<installed-codex-release>/bin/codex",
+      "args": [
+        "app-server",
+        "daemon",
+        "start"
+      ],
+      "cwd": "<private-success-root>/workspace",
+      "exit": 0,
+      "result": {
+        "status": "started",
+        "backend": "pid",
+        "pid": 13504,
+        "managedCodexPath": "<private-success-root>/cx/packages/standalone/current/bin/codex",
+        "managedCodexVersion": "0.154.0",
+        "socketPath": "<private-success-root>/cx/app-server-control/app-server-control.sock",
+        "cliVersion": "0.154.0",
+        "appServerVersion": "0.154.0"
+      }
+    },
+    "firstInspection": {
+      "serviceId": "codex-app-server",
+      "state": "ready",
+      "reasonCode": null,
+      "pid": 13504,
+      "processStartTime": "Sat Sep 12 18:49:37 2026",
+      "codexHome": "<private-success-root>/cx",
+      "cliPath": "<installed-codex-release>/bin/codex",
+      "cliVersion": "0.154.0",
+      "serverVersion": "0.154.0",
+      "managedPath": "<private-success-root>/cx/packages/standalone/current/bin/codex",
+      "managedVersion": "0.154.0",
+      "socketPath": "<private-success-root>/cx/app-server-control/app-server-control.sock",
+      "busyThreads": 0,
+      "queuedRequests": 0
+    },
+    "socket": {
+      "isSocket": true,
+      "uid": 501,
+      "mode": 384
+    },
+    "process": "Sat Sep 12 18:49:37 2026     <private-success-root>/cx/packages/standalone/current/bin/codex app-server --listen unix://",
+    "socketOwnership": "p13504\nf7\nn->0xa9995a6fcd1ea15e\nf8\nn->0xbe959f23d7835552\nf9\nn->0xa9995a6fcd1ea15e\nf30\nn<private-success-root>/cx/app-server-control/app-server-control.sock\nf35\nn->0xb16d3f08658fc096",
+    "processCwd": "p13504\nfcwd\nn<private-success-root>/workspace",
+    "handshakeVersion": "0.154.0",
+    "loadedThreads": {
+      "count": 0,
+      "nextCursor": null
+    },
+    "queueProbeWithoutSession": {
+      "supported": false,
+      "serverVersion": "0.154.0",
+      "reasonCode": "native_session_unavailable"
+    },
+    "repeatStart": {
+      "command": "<installed-codex-release>/bin/codex",
+      "args": [
+        "app-server",
+        "daemon",
+        "start"
+      ],
+      "cwd": "<private-success-root>/workspace",
+      "exit": 0,
+      "result": {
+        "status": "alreadyRunning",
+        "backend": "pid",
+        "managedCodexPath": "<private-success-root>/cx/packages/standalone/current/bin/codex",
+        "managedCodexVersion": "0.154.0",
+        "socketPath": "<private-success-root>/cx/app-server-control/app-server-control.sock",
+        "cliVersion": "0.154.0",
+        "appServerVersion": "0.154.0"
+      }
+    },
+    "secondInspection": {
+      "serviceId": "codex-app-server",
+      "state": "ready",
+      "reasonCode": null,
+      "pid": 13504,
+      "processStartTime": "Sat Sep 12 18:49:37 2026",
+      "codexHome": "<private-success-root>/cx",
+      "cliPath": "<installed-codex-release>/bin/codex",
+      "cliVersion": "0.154.0",
+      "serverVersion": "0.154.0",
+      "managedPath": "<private-success-root>/cx/packages/standalone/current/bin/codex",
+      "managedVersion": "0.154.0",
+      "socketPath": "<private-success-root>/cx/app-server-control/app-server-control.sock",
+      "busyThreads": 0,
+      "queuedRequests": 0
+    },
+    "sameInstanceAfterRepeat": true,
+    "cleanup": {
+      "command": "<installed-codex-release>/bin/codex",
+      "args": [
+        "app-server",
+        "daemon",
+        "stop"
+      ],
+      "cwd": "<private-success-root>/workspace",
+      "stopExit": 0,
+      "stopResult": {
+        "status": "stopped",
+        "backend": "pid",
+        "managedCodexPath": "<private-success-root>/cx/packages/standalone/current/bin/codex",
+        "managedCodexVersion": "0.154.0",
+        "socketPath": "<private-success-root>/cx/app-server-control/app-server-control.sock",
+        "cliVersion": "0.154.0"
+      },
+      "processAfterStopExit": 1,
+      "pidFileAbsent": true,
+      "socketAbsent": true,
+      "privateHomeRemoved": true,
+      "verified": true,
+      "processAfterStop": {
+        "label": "cleanup-process",
+        "command": "/bin/ps",
+        "args": [
+          "-p",
+          "13504",
+          "-o",
+          "lstart=,command="
+        ],
+        "cwd": "<private-success-root>/workspace",
+        "status": 1,
+        "signal": null,
+        "stdout": "",
+        "stderr": ""
+      },
+      "versionAfterStop": {
+        "label": "after-cleanup-version",
+        "command": "<installed-codex-release>/bin/codex",
+        "args": [
+          "app-server",
+          "daemon",
+          "version"
+        ],
+        "cwd": "<private-success-root>/workspace",
+        "status": 1,
+        "signal": null,
+        "stdout": "",
+        "stderr": "Error: failed to connect to <private-success-root>/cx/app-server-control/app-server-control.sock\n\nCaused by:\n    No such file or directory (os error 2)\n"
+      }
+    },
+    "versionAfterStart": {
+      "label": "after-start-version",
+      "command": "<installed-codex-release>/bin/codex",
+      "args": [
+        "app-server",
+        "daemon",
+        "version"
+      ],
+      "cwd": "<private-success-root>/workspace",
+      "status": 0,
+      "signal": null,
+      "stdout": "{\"status\":\"running\",\"backend\":\"pid\",\"managedCodexPath\":\"<private-success-root>/cx/packages/standalone/current/bin/codex\",\"managedCodexVersion\":\"0.154.0\",\"socketPath\":\"<private-success-root>/cx/app-server-control/app-server-control.sock\",\"cliVersion\":\"0.154.0\",\"appServerVersion\":\"0.154.0\"}\n",
+      "stderr": ""
+    },
+    "createdPathInventory": {
+      "observedEntryCount": 164,
+      "note": "The pre-cleanup inventory includes fixture-created roots and the managed-release symlink. Other observed categories include daemon/control metadata and logs, runtime SQLite files, installation metadata, system skills, plugin-sync temporary directories, and argument-wrapper temporary paths. The inventory retained names and types only; the separate PID-file metadata observation is preserved above.",
+      "exhaustiveNamesRetainedIn": "acc-cold-start-managed-capture.json"
+    }
+  },
+  "emptyHomePrerequisite": {
+    "capturedAt": "2026-09-12T22:43:01.065Z",
+    "finishedAt": "2026-09-12T22:43:01.129Z",
+    "platform": "darwin-arm64",
+    "cliVersion": "codex-cli 0.154.0",
+    "environment": {
+      "HOME": "<private-empty-home-root>/home",
+      "CODEX_HOME": "<private-empty-home-root>/cx",
+      "cwd": "<private-empty-home-root>/workspace"
+    },
+    "managedBinaryInstalledByTest": false,
+    "firstStart": {
+      "label": "cold-start",
+      "command": "<installed-codex-release>/bin/codex",
+      "args": [
+        "app-server",
+        "daemon",
+        "start"
+      ],
+      "cwd": "<private-empty-home-root>/workspace",
+      "status": 1,
+      "signal": null,
+      "stdout": "",
+      "stderr": "Error: managed standalone Codex install not found at <private-empty-home-root>/cx/packages/standalone/current/codex\n\nThis command requires the standalone install managed by the Codex installer, because the daemon starts and updates app-server from that fixed path.\n\nInstall it with:\n  curl -fsSL https://chatgpt.com/codex/install.sh | sh\n\nThen rerun the command you just tried.\n"
+    },
+    "repeatStart": {
+      "label": "repeat-start",
+      "command": "<installed-codex-release>/bin/codex",
+      "args": [
+        "app-server",
+        "daemon",
+        "start"
+      ],
+      "cwd": "<private-empty-home-root>/workspace",
+      "status": 1,
+      "signal": null,
+      "stdout": "",
+      "stderr": "Error: managed standalone Codex install not found at <private-empty-home-root>/cx/packages/standalone/current/codex\n\nThis command requires the standalone install managed by the Codex installer, because the daemon starts and updates app-server from that fixed path.\n\nInstall it with:\n  curl -fsSL https://chatgpt.com/codex/install.sh | sh\n\nThen rerun the command you just tried.\n"
+    },
+    "observations": [
+      {
+        "label": "before",
+        "socketExists": false,
+        "pidExists": false
+      },
+      {
+        "label": "after-cold-start",
+        "socketExists": false,
+        "pidExists": false
+      },
+      {
+        "label": "after-repeat-start",
+        "socketExists": false,
+        "pidExists": false
+      },
+      {
+        "label": "before-cleanup",
+        "socketExists": false,
+        "pidExists": false
+      },
+      {
+        "label": "after-cleanup",
+        "socketExists": false,
+        "pidExists": false
+      }
+    ],
+    "cleanup": {
+      "verified": true,
+      "privateHomeRemoved": true
+    },
+    "conclusion": "A fresh CODEX_HOME without a managed standalone binary could not start the daemon. Both attempts exited 1 with the vendor prerequisite error; no PID/socket was observed. ACC must report the prerequisite rather than silently install or link Codex."
+  },
+  "processInspectionLimitation": {
+    "capturedAt": "2026-09-12T22:48:37.393Z",
+    "finishedAt": "2026-09-12T22:48:37.515Z",
+    "platform": "darwin-arm64",
+    "cliVersion": "codex-cli 0.154.0",
+    "fixtureSetup": {
+      "kind": "symlink",
+      "path": "<private-sandbox-root>/cx/packages/standalone/current",
+      "target": "<installed-codex-release>",
+      "purpose": "Fixture-only managed standalone install. Production ACC must not copy, symlink, or install Codex silently."
+    },
+    "firstStart": {
+      "label": "cold-start",
+      "command": "<installed-codex-release>/bin/codex",
+      "args": [
+        "app-server",
+        "daemon",
+        "start"
+      ],
+      "cwd": "<private-sandbox-root>/workspace",
+      "status": 1,
+      "signal": null,
+      "stdout": "",
+      "stderr": "Error: failed to record pid-managed app-server process 3052 startup\n\nCaused by:\n    0: failed to invoke ps for pid-managed app server\n    1: Operation not permitted (os error 1)\n"
+    },
+    "pidFileAbsent": true,
+    "socketAbsent": true,
+    "privateHomeRemoved": true,
+    "attemptedChildVerification": {
+      "pid": 3052,
+      "command": "/bin/ps",
+      "args": [
+        "-p",
+        "3052",
+        "-o",
+        "pid=,lstart=,command="
+      ],
+      "status": 1,
+      "stdout": "",
+      "stderr": "",
+      "sandbox": "escalated",
+      "result": "confirmed dead"
+    },
+    "conclusion": "The restricted shell sandbox prevented the vendor startup command from invoking ps (EPERM). The reported private child PID was subsequently confirmed dead with process inspection allowed. The successful capture also ran with process inspection allowed; success from a restrictive model shell is not established."
+  },
+  "limitations": [
+    "No model sessions, authentication, hook activation, message delivery, or normal interactive launch/cwd behavior was exercised.",
+    "No bootstrap, launchctl, remote-control mode, login/reboot persistence, or real user service/config access occurred.",
+    "The managed-release symlink was private fixture preparation, not a production ACC install operation.",
+    "A prepared empty service answered metadata APIs but the native queue probe remained native_session_unavailable; no recipient session readiness is claimed."
+  ]
+}

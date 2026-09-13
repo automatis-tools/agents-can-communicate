@@ -54,6 +54,20 @@ test("recording twice for one adapter replaces rather than accumulates", async t
   assert.deepEqual(record.installs[0].artifacts.map(a => a.path), [second]);
 });
 
+test("recording maintenance data retains an existing delivery decision", async t => {
+  const { dataHome } = await place(t);
+  const decision = { source: "explicit-option", completeSetup: true };
+  await recordInstall({ dataHome, adapterId: "codex", version: "0.154.0",
+    artifacts: [], deliveryPolicy: "actionable", deliveryDecision: decision });
+
+  await recordInstall({ dataHome, adapterId: "codex", version: "0.155.0",
+    artifacts: [], deliveryPolicy: "actionable" });
+
+  const install = (await loadOwnership({ dataHome })).installs[0];
+  assert.equal(install.version, "0.155.0");
+  assert.deepEqual(install.deliveryDecision, decision);
+});
+
 test("what was written is remembered by content, not just by name", async t => {
   const { dataHome, target } = await place(t);
   const file = await write(path.join(target, "hooks.json"), "{}\n");

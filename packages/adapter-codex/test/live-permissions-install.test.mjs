@@ -53,13 +53,30 @@ test("reinstall is stable and uninstall restores pre-existing default configurat
   assert.equal(await f.read(), before);
 });
 
-test("explicit off restores the previous policy without leaving proxy or profile grants", async t => {
-  const f = await fixture(t);
+test("explicit off retains previously approved ACC outgoing grants and uninstall restores bytes", async t => {
+  const before = 'model = "user-model"\n';
+  const f = await fixture(t, before);
   await f.adapter.install(f.context);
   assert.match(await f.read(), /default_permissions = "acc-workspace"/);
   await f.adapter.install({ ...f.context, requestedLivePolicy: "off", livePolicy: "off" });
-  assert.doesNotMatch(await f.read(), /default_permissions|network_proxy|permissions\.acc-workspace/);
-  assert.match(await f.read(), /\[sandbox_workspace_write\]/);
+  assert.match(await f.read(), /default_permissions = "acc-workspace"/);
+  assert.match(await f.read(), /network_proxy = true/);
+  await f.adapter.uninstall(f.context);
+  assert.equal(await f.read(), before);
+});
+
+test("fresh off creates no live socket grants", async t => {
+  const f = await fixture(t);
+  await f.adapter.install({ ...f.context, requestedLivePolicy: "off", livePolicy: "off" });
+  assert.doesNotMatch(await f.read(), /acc-workspace|network_proxy|unix_sockets/);
+});
+
+test("off keeps a foreign custom permission policy byte-identical", async t => {
+  const before = 'default_permissions = "team"\n[permissions.team]\nextends = ":workspace"\n';
+  const f = await fixture(t, before);
+  await f.adapter.install({ ...f.context, requestedLivePolicy: "off", livePolicy: "off" });
+  assert.ok((await f.read()).startsWith(before));
+  assert.equal((await f.read()).slice(0, before.length), before);
 });
 
 test("an ACC-only legacy sandbox is migrated and restored without losing its bytes", async t => {
