@@ -238,8 +238,9 @@ Next: [Getting started](GETTING_STARTED.md) Â· [Capabilities](CAPABILITIES.md) Â
 
 Run `acc doctor` to see the update policy and pending notice. A hold keeps an update
 pending only while the store contract it declares differs from the incoming version's or
-is unknown; records written before 0.5.0 declare none, so the first update after upgrading
-still waits for all of them. `acc update` names each remaining hold with its process and
+is unknown. ACC can recover a missing contract from the process's unchanged managed
+generation when that generation declares one. A generation that predates the declaration
+still needs its processes to exit. `acc update` names each remaining hold with its process and
 its declared contract. ACC process leases, including persistent MCP servers, end on
 confirmed process exit. Native bindings clear on observed SessionEnd or confirmed process
 death; a vendor daemon may remain alive after SessionEnd. Unknown PIDs remain holds until
@@ -249,6 +250,21 @@ lifecycle cleanup. Close the client sessions and ACC processes the notice names;
 unrelated holds still require lifecycle cleanup or confirmed process exit; safety holds
 do not expire merely by elapsed time. See
 [maintenance and recovery](UPGRADING.md#confirmed-client-service-maintenance).
+
+If ACC 0.5.3 or 0.5.4 reports `acc-claude-channel; contract unknown` after an earlier
+0.4.x upgrade, its active pointer may have lost the contract field. This can affect newly
+opened Channels too. A pending old updater retries its downloaded release without looking
+for a newer fix. Install the current global CLI, then use that CLI to complete the update:
+
+```bash
+npm install -g agents-can-communicate@latest
+acc update
+acc doctor
+```
+
+The new reader can activate a compatible release while those Channels remain open.
+It still waits for different contracts, unknown native bindings, or generation files it
+cannot verify. See [legacy contract recovery](UPGRADING.md#recover-missing-runtime-contracts).
 
 Use `acc update` to retry a failed download or finish an interrupted integration refresh.
 A download failure keeps the working version. A partial integration refresh blocks

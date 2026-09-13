@@ -1,5 +1,33 @@
 # Changelog
 
+## 0.5.5 — release candidate
+
+- Recover missing runtime store contracts left by older updaters. Compatible
+  Channels can keep running while the new release activates.
+- Verify the referenced generation's identity, content hash and file modes
+  before recovering metadata. Preserve explicit conflicting contracts, unknown
+  native bindings and immutable live lease records.
+- Include the recovery dependency in generated launchers and document recovery
+  through a new global CLI when an old pending updater cannot discover the fix.
+
+| Candidate artifact | Value |
+|---|---|
+| Built from | `d77d605d2035d0df5f1aa1404772155e41a29a4e` |
+| Tarball | `agents-can-communicate-0.5.5.tgz`, 393,293 bytes, 276 files |
+| sha256 | `494b53ff1f2a780983ef96b9d0db93e5a97342cbe88fbbaeca4b9c644a0ee2f3` |
+
+The exact archive passed clean installation verification and recovery from the
+published `0.4.4 → 0.5.3 → pending 0.5.4` chain. Both original Channels stayed alive
+and answered after 0.5.5 activated. All 276 source, archive, installed and managed
+files matched. All 28 packed managed-runtime checks passed on Node 24.4.0.
+Eight deliberate mutations failed the recovery and launcher verification gates.
+The final repack includes corrected verification tools and is byte-identical to
+the archive used for the captured upgrade.
+
+An already pending old updater needs `npm install -g agents-can-communicate@latest`,
+then `acc update`, to load the new management reader. Truly unknown or different
+contracts still block. See [0.5.5 release evidence](docs/release-evidence/v0.5.5.md).
+
 ## 0.5.4 — release candidate
 
 - One install confirmation covers selected clients that need a decision. ACC

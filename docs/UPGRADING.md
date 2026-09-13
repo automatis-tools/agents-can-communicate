@@ -1,5 +1,31 @@
 # Upgrading to 0.5.0
 
+## Recover missing runtime contracts
+
+ACC 0.5.5 fixes an upgrade defect that can leave 0.5.3 or 0.5.4 waiting for
+`acc-claude-channel` processes with `contract unknown`. The 0.4.x updater can activate
+a newer generation without copying its store contract into the active pointer. Channels
+started afterward copy that incomplete pointer even though their runtime declares a contract.
+
+For an installation already waiting on an older pending release, run:
+
+```bash
+npm install -g agents-can-communicate@latest
+acc update
+acc version
+acc doctor
+```
+
+The global CLI supplies the new management reader before runtime activation. This step is
+needed because the older updater retries its pending release before checking npm for another
+version. If a version pin selects an older release, clear it or select 0.5.5 first.
+
+The reader verifies the referenced generation's package identity, complete contents and
+file modes before recovering a missing contract. Compatible Channels can keep running on
+their original generation during activation. Explicit differing contracts and unknown
+native bindings still block. A generation without a contract, missing files, or changed
+contents remains unknown. ACC does not terminate these processes or edit their lease records.
+
 ## From 0.4.4, 0.4.3, 0.4.2, 0.4.1 or 0.4.0
 
 This release keeps the existing workspace data format. It changes when an update is
@@ -56,17 +82,17 @@ only two kinds keep an update pending:
 - A hold whose declared store contract differs from the incoming version's. This is the
   case the gate exists for, and a release that changes the store contract still needs
   every live process to exit.
-- A hold that declares no contract, which includes every record written by a release
-  before this one. Unknown cannot be compared, so it stays a conservative wait.
+- A hold with no verifiable contract. Older native bindings and generations that predate
+  the declaration remain unknown. A missing field can be recovered when the referenced
+  managed generation declares its contract and passes integrity verification.
 
 A hold declaring the same store contract as the incoming version proceeds. Several open
 Claude Code sessions, a Codex daemon and an idle ACC MCP server no longer have to be
 closed together to move between releases that share a contract.
 
-The first update after installing this release still waits for every process, because the
-holds it has to judge were written before the contract field existed. Close the relevant
-clients and persistent ACC processes once, or accept the eligible Codex service
-maintenance offer described below. Updates after that do not need it.
+Processes still running a generation from before the contract field existed must exit once.
+Close the relevant clients and persistent ACC processes, or accept the eligible Codex service
+maintenance offer described below. Later compatible runtimes do not require that restart.
 
 `acc update` names each remaining hold with its process and its declared contract, so a
 wait now states its reason rather than only the PID. `acc doctor` reports the same

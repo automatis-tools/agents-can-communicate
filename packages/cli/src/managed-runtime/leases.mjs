@@ -49,11 +49,11 @@ export async function listRuntimeHolds(root, { pidIsAlive = defaultPidIsAlive } 
       || typeof lease.token !== "string" || name !== `${lease.token}.json`
       || typeof lease.kind !== "string" || !lease.kind
       || !Number.isFinite(Date.parse(lease.createdAt))) throw new Error("invalid runtime lease");
-    await validateRuntime(root, lease.runtime);
+    const runtime = await validateRuntime(root, lease.runtime);
     if (await confirmedDead(lease.pid, pidIsAlive)) {
       await rm(file, { force: true });
       removed = true;
-    } else holds.push(lease);
+    } else holds.push({ ...lease, runtime });
   }
   if (removed) await syncDirectory(directory);
   return holds;
