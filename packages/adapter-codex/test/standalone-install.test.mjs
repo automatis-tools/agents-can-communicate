@@ -4,6 +4,10 @@ import { lstat, readFile } from "node:fs/promises";
 import path from "node:path";
 import test from "node:test";
 import { CODEX_INSTALLER, installCodexStandalone } from "../src/standalone-install.mjs";
+import { downloadVerifiedInstaller } from "../../installer/src/verified-download.mjs";
+
+const install = (plan, { fetch, ...options }) => installCodexStandalone(plan,
+  { ...options, download: source => downloadVerifiedInstaller(source, { fetch }) });
 
 const script = "#!/bin/sh\n# inert vendor script fixture\n";
 const source = { ...CODEX_INSTALLER, sha256: createHash("sha256").update(script).digest("hex") };
@@ -11,7 +15,7 @@ const plan = { home: "/selected/home", codexHome: "/selected/codex", cliVersion:
 
 test("verified installer runs once with selected homes, pinned version and private PATH", async () => {
   const calls = []; let file, execution;
-  await installCodexStandalone(plan, {
+  await install(plan, {
     source, env: { HOME: "/wrong/home", CODEX_HOME: "/wrong/codex", PATH: "/wrong/bin",
       CODEX_RELEASE: "latest", CODEX_NON_INTERACTIVE: "false", CODEX_INSTALL_DIR: "/wrong/install" },
     fetch: async (url, options) => {
@@ -49,7 +53,7 @@ for (const [name, response, reasonCode] of [
   ["HTTP failure", () => new Response("failure", { status: 503 }), "prerequisite_download_failed"],
 ]) test(`${name} never executes a downloaded script`, async () => {
   let calls = 0;
-  await assert.rejects(installCodexStandalone(plan, { source, fetch: async () => response(),
+  await assert.rejects(install(plan, { source, fetch: async () => response(),
     beforeInstall: async () => { calls += 1; }, run: async () => { calls += 1; return { status: 0 }; } }),
   { reasonCode });
   assert.equal(calls, 0);
@@ -57,7 +61,7 @@ for (const [name, response, reasonCode] of [
 
 test("a changed plan after download prevents execution", async () => {
   let ran = false;
-  await assert.rejects(installCodexStandalone(plan, { source, fetch: async () => new Response(script),
+  await assert.rejects(install(plan, { source, fetch: async () => new Response(script),
     beforeInstall: async () => { throw Object.assign(new Error("changed"), { reasonCode: "service_identity_changed" }); },
     run: async () => { ran = true; return { status: 0 }; } }), { reasonCode: "service_identity_changed" });
   assert.equal(ran, false);
@@ -65,7 +69,7 @@ test("a changed plan after download prevents execution", async () => {
 
 test("vendor failure is reported without raw output and removes the temporary script", async () => {
   let file;
-  await assert.rejects(installCodexStandalone(plan, { source, fetch: async () => new Response(script),
+  await assert.rejects(install(plan, { source, fetch: async () => new Response(script),
     beforeInstall: async () => {}, run: async (_command, args) => {
       file = args[0]; return { status: 1, stderr: "PRIVATE VENDOR OUTPUT" };
     } }), error => error.reasonCode === "prerequisite_install_failed" && !error.message.includes("PRIVATE"));

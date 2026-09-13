@@ -1,4 +1,3 @@
-import { createHash } from "node:crypto";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -11,27 +10,12 @@ export const CODEX_INSTALLER = Object.freeze({
   sha256: "ba92dd27e5c06f0d3bbc58bfa4b9cfb6599cd2742fbb1f92a2765e6c07dedb5a",
 });
 
-async function downloadInstaller(fetch, source) {
-  const response = await fetch(source.url, { redirect: "error", signal: AbortSignal.timeout(30_000) });
-  if (!response.ok || !response.body) failMaintenance("prerequisite_download_failed");
-  const chunks = []; let size = 0;
-  for await (const chunk of response.body) {
-    size += chunk.byteLength;
-    if (size > 131_072) failMaintenance("prerequisite_download_failed");
-    chunks.push(Buffer.from(chunk));
-  }
-  const script = Buffer.concat(chunks);
-  if (createHash("sha256").update(script).digest("hex") !== source.sha256) {
-    failMaintenance("prerequisite_integrity_failed");
-  }
-  return script;
-}
-
 export async function installCodexStandalone(plan, { env, beforeInstall,
-  fetch = globalThis.fetch, run = runMaintenanceCommand, source = CODEX_INSTALLER } = {}) {
+  download, run = runMaintenanceCommand, source = CODEX_INSTALLER } = {}) {
   let directory;
   try {
-    const script = await downloadInstaller(fetch, source);
+    if (typeof download !== "function") failMaintenance("prerequisite_download_unavailable");
+    const script = await download(source);
     directory = await mkdtemp(path.join(os.tmpdir(), "acc-codex-installer-"));
     const file = path.join(directory, "install.sh");
     await writeFile(file, script, { mode: 0o600, flag: "wx" });

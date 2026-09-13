@@ -122,7 +122,7 @@ export function createCodexServiceSetup({ run = runMaintenanceCommand, probe = p
       return report(reason.endsWith("_unsupported") ? "unsupported" : "blocked", reason);
     }
   }
-  async function preparePrerequisite(context, plan, consent) {
+  async function preparePrerequisite(context, plan, consent, download) {
     let attempted = false;
     try {
       if (consent !== true) failMaintenance("prerequisite_consent_required");
@@ -136,7 +136,7 @@ export function createCodexServiceSetup({ run = runMaintenanceCommand, probe = p
       };
       await beforeInstall();
       attempted = true;
-      await installStandalone(plan, { env: context?.env ?? process.env, beforeInstall });
+      await installStandalone(plan, { env: context?.env ?? process.env, beforeInstall, download });
       const next = await inspect(context, { strict: true });
       if (!["needed", "ready"].includes(next.state) || next.requiresInstall
         || !same(plan, next, prerequisiteKeys)) failMaintenance("service_identity_changed");
@@ -147,8 +147,8 @@ export function createCodexServiceSetup({ run = runMaintenanceCommand, probe = p
         started: false, installedPrerequisite: false };
     }
   }
-  async function prepareNativeServiceSetup({ context, plan, installPrerequisites } = {}) {
-    if (plan?.requiresInstall === true) return preparePrerequisite(context, plan, installPrerequisites);
+  async function prepareNativeServiceSetup({ context, plan, installPrerequisites, download } = {}) {
+    if (plan?.requiresInstall === true) return preparePrerequisite(context, plan, installPrerequisites, download);
     let started = false;
     try {
       if (plan?.state === "ready") {

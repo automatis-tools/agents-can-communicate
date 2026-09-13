@@ -57,7 +57,11 @@ export async function installManaged({ packageRoot, managerRoot, dataHome, home,
       await writeControl(root, control);
       const paths = await writeLaunchers(root, runtime.root);
       const result = await apply({ ...paths, preserveVersions: true });
-      if (result.failed.length === 0) {
+      // Service readiness is separate from integration installation. Its failure
+      // must not fence a fully installed runtime or make the durable inbox unusable.
+      const integrationFailed = result.failed.some(failure => failure.stage !== "service-setup"
+        || !result.operations?.some(operation => operation.adapterId === failure.adapterId && operation.applied === true));
+      if (!integrationFailed) {
         const ready = await writeControl(root, { ...control, phase: "ready", pending: null });
         await scheduleWorker(root, ready, { env });
       } else {
