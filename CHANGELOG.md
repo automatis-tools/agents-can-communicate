@@ -1,5 +1,28 @@
 # Changelog
 
+## Unreleased — Claude Channel live replies
+
+- Offer answers from the Claude Channel's `acc_reply` tool through the same
+  delivery router used by ordinary MCP. Previously the tool only recorded the
+  answer, so an available Codex recipient received no live delivery attempt.
+- Read the recipient's current consent from the selected ACC data home. Keep
+  failed or disabled offers queued, preserve retry identity, and report the
+  recorded answer and actual delivery outcome instead of an unconditional `sent`.
+- Test the installed Channel entrypoint, MCP reply, durable records, consent,
+  and Codex transport together. Removing the offer call makes the test fail on
+  the exact regression: the reply stays `queued` instead of `offered`.
+
+| Development validation artifact | Value |
+|---|---|
+| Built from | `7173fd59100c805454f7115b9d5e1b46dabe168c` |
+| Tarball | `agents-can-communicate-0.5.6.tgz`, 396,613 bytes, 278 files |
+| sha256 | `9fed94ab27b4c40aaeac856670df7661caeb41dc92279503adfb1d0d196356ce` |
+
+This unpublished development build retains the 0.5.6 manifest version and passed
+clean installed-package verification. The regression fixture controls the vendor
+boundaries; it does not establish real-client activation or an automatic model turn.
+Published 0.5.6 provenance below remains unchanged.
+
 ## 0.5.6 — release candidate
 
 - Complete supported Codex setup when its managed standalone package is missing.
