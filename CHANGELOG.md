@@ -12,7 +12,7 @@
 
 | Candidate artifact | Value |
 |---|---|
-| Built from | `1315024b2e1366011fdaa8b15d2653d9044428cc` |
+| Built from | `d77d605d2035d0df5f1aa1404772155e41a29a4e` |
 | Tarball | `agents-can-communicate-0.5.5.tgz`, 393,293 bytes, 276 files |
 | sha256 | `494b53ff1f2a780983ef96b9d0db93e5a97342cbe88fbbaeca4b9c644a0ee2f3` |
 
@@ -20,7 +20,9 @@ The exact archive passed clean installation verification and recovery from the
 published `0.4.4 → 0.5.3 → pending 0.5.4` chain. Both original Channels stayed alive
 and answered after 0.5.5 activated. All 276 source, archive, installed and managed
 files matched. All 28 packed managed-runtime checks passed on Node 24.4.0.
-Six deliberate mutations failed the new regression gates.
+Eight deliberate mutations failed the recovery and launcher verification gates.
+The final repack includes corrected verification tools and is byte-identical to
+the archive used for the captured upgrade.
 
 An already pending old updater needs `npm install -g agents-can-communicate@latest`,
 then `acc update`, to load the new management reader. Truly unknown or different
