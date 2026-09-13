@@ -58,10 +58,13 @@ hooks only where the exact client version and platform are certified.
 An interactive install asks one default-No question for all selected clients that need a
 choice. Use `--delivery actionable|all` for explicit noninteractive consent. Use
 `--delivery off` to disable incoming automatic requests. A dry run does not ask, write
-configuration, or start a service. When supported Codex service preparation succeeds, it
+configuration, download Codex, or start a service. On macOS arm64 with Codex 0.154.0 or newer,
+the choice includes downloading a missing standalone package from OpenAI. ACC selects the
+matching version and keeps your existing npm or Homebrew command and shell profiles.
+When supported Codex service preparation succeeds, it
 means the infrastructure is ready. Start a Codex session and complete the client's hook and
-trust review to establish a session-bound channel. If the managed standalone prerequisite
-is missing, install reports that prerequisite instead of claiming readiness.
+trust review to establish a session-bound channel. An incomplete existing standalone
+installation or unsupported CLI version still needs the vendor action named by install.
 
 If you opt into Claude Code's experimental idle delivery, check Claude's Channels startup
 notice for ACC and accept its development-channel warning when shown. If it reports Channels

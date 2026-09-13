@@ -6,7 +6,12 @@ export async function applyServiceSetup({ adapter, context, operation, results }
   let setup = plan;
   if (["needed", "ready"].includes(plan.state)) {
     try {
-      setup = await adapter.prepareNativeServiceSetup({ context, plan });
+      setup = await adapter.prepareNativeServiceSetup({ context, plan,
+        installPrerequisites: operation.deliveryDecision.installPrerequisites === true,
+        download: async source => {
+          const { downloadVerifiedInstaller } = await import("./verified-download.mjs");
+          return downloadVerifiedInstaller(source);
+        } });
       if (!setup || !["ready", "failed", "blocked"].includes(setup.state)) throw new Error("invalid setup result");
     } catch {
       setup = { state: "failed", started: false, reasonCode: "service_setup_failed",
@@ -24,7 +29,7 @@ export async function applyServiceSetup({ adapter, context, operation, results }
   } else {
     operation.needsAction.push(setup.diagnostic);
     if (setup.state === "failed") results.failed.push({ adapterId: operation.adapterId,
-      error: setup.diagnostic, reasonCode: setup.reasonCode });
+      error: setup.diagnostic, reasonCode: setup.reasonCode, stage: "service-setup" });
   }
   operation.diagnostics.push(setup.diagnostic);
 }

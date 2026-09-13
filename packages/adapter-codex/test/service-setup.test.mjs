@@ -63,13 +63,14 @@ for (const [field, value, reason] of [
   assert.equal(f.starts.length, 0);
 });
 
-test("unsupported platform and missing managed install provide action without start", async t => {
+test("unsupported platform and incomplete managed install provide action without start", async t => {
   const f = await serviceFixture(t);
   assert.equal((await f.inspectNativeServiceSetup({ ...f.context, platform: "linux-x64" })).state, "unsupported");
   await rm(f.managedPath);
   const result = await f.inspectNativeServiceSetup(f.context);
   assert.equal(result.state, "blocked");
-  assert.match(result.diagnostic, /https:\/\/chatgpt.com\/codex\/install.sh/);
+  assert.equal(result.reasonCode, "managed_install_incomplete");
+  assert.match(result.diagnostic, /official Codex installer/);
   assert.equal(f.starts.length, 0);
 });
 

@@ -139,9 +139,11 @@ reports degraded reachability; it does not rewrite the installed consent.
 
 Codex LocalDaemon delivery separately requires macOS arm64, Codex 0.152.1 or newer, a
 current feature probe, and exact thread, canonical cwd, process, version and protocol
-checks. Explicit complete setup can prepare a definitely absent service on Codex 0.154.0
-or newer when the managed standalone installation is present. Message delivery does not
-start or stop it.
+checks. On Codex 0.154.0 or newer, explicit complete setup can download a missing matching
+standalone package and prepare a definitely absent service. The setup choice names the
+download. Existing service-start consent alone does not permit it. Codex files remain
+under the selected `CODEX_HOME`; the existing CLI command and shell profiles are preserved.
+Message delivery does not install Codex, start it, or stop it.
 Explicit update maintenance can restart a verified service after separate confirmation. Codex reads
 consent from the installation record, not a shell-shim variable. Unavailable or ineligible
 sessions retain durable inbox fallback. Use `acc install --adapter codex --delivery off`

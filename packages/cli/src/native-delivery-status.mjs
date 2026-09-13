@@ -36,15 +36,18 @@ export function nativeRemediation(entry) {
     steps.push(`acc install --adapter ${entry.adapterId}`
       + "  # complete the missing native launch setup from a supported shell");
   } else if (native.configured && native.runtime !== "active"
-    && !["needed", "blocked"].includes(service?.state)) {
+    && !["needed", "blocked", "unsupported"].includes(service?.state)) {
     steps.push(`${entry.displayName}: no verified live channel in this workspace; `
       + "open a new terminal, start a new client session and check its integration/channel prompts; "
       + "then run acc doctor here");
   }
   if (native.reasonCode === "native_endpoint_unavailable") {
-    if (service?.state === "blocked") steps.push(service.diagnostic);
+    if (["blocked", "unsupported"].includes(service?.state)) steps.push(service.diagnostic);
     else if (service?.state === "needed" && native.configured) {
-      steps.push(entry.deliveryDecision?.completeSetup === true
+      steps.push(service.requiresInstall && entry.deliveryDecision?.installPrerequisites === false
+        ? `acc install --adapter ${entry.adapterId} --delivery ${native.policy === "all" ? "all" : "actionable"}`
+          + "  # allow the official Codex download and complete service setup"
+        : entry.deliveryDecision?.completeSetup === true
         ? `acc install --adapter ${entry.adapterId}  # prepare the missing supported local service`
         : `acc install --adapter ${entry.adapterId} --delivery actionable`
           + "  # approve complete automatic peer-request setup");

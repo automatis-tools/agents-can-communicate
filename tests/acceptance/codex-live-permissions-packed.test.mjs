@@ -28,8 +28,11 @@ test("installed live setup discloses permissions, diagnoses them, and reverses o
   const doctor = await packed.acc(["doctor", "--home", packed.clientHome]);
   assert.equal(doctor.adapters.find(entry => entry.adapterId === "codex").outgoingDelivery.state, "configured");
   assert.match((await human(["doctor"])).stdout, /outgoing live delivery: local socket permissions configured/);
-  assert.match((await human(["doctor"])).stdout, /managed standalone installation/);
-  assert.ok(doctor.remediation.some(line => line.includes("managed standalone installation")));
+  const service = doctor.adapters.find(entry => entry.adapterId === "codex").nativeServiceSetup;
+  assert.equal(service.state, "unsupported");
+  assert.equal(service.reasonCode, "maintenance_cli_unsupported");
+  assert.match((await human(["doctor"])).stdout, /requires codex-cli 0\.154\.0 or newer/);
+  assert.ok(doctor.remediation.some(line => line.includes("requires codex-cli 0.154.0 or newer")));
   assert.equal((await human(["doctor"])).stdout.split("sender permissions unverified").length - 1, 0);
   await human(["install", "--adapter", "codex", "--delivery", "off"]);
   assert.match(await readFile(config, "utf8"), /default_permissions = "acc-workspace"/);

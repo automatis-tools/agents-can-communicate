@@ -22,13 +22,27 @@ export function runMaintenanceCommand(command, args, options) {
       (typeof error.code === "number" ? error.code : null) : 0, stdout, stderr })));
 }
 
+async function canonicalFuturePath(file) {
+  const missing = []; let current = file;
+  while (true) {
+    try { return path.join(await realpath(current), ...missing); }
+    catch (error) {
+      if (error.code !== "ENOENT") throw error;
+      // A dangling symlink is an existing unknown destination, not a missing directory.
+      if (await metadataExists(current)) failMaintenance("invalid_service_home");
+      const parent = path.dirname(current);
+      if (parent === current) throw error;
+      missing.unshift(path.basename(current)); current = parent;
+    }
+  }
+}
+
 export async function maintenanceContext(context = {}) {
   const env = context.env ?? process.env;
   const home = context.home ?? env.HOME ?? os.homedir();
   let codexHome = env.CODEX_HOME ?? path.join(home, ".codex");
   if (!absolute(home) || !absolute(codexHome)) failMaintenance("invalid_service_home");
-  try { codexHome = await realpath(codexHome); }
-  catch (error) { if (error.code !== "ENOENT") throw error; }
+  codexHome = await canonicalFuturePath(codexHome);
   const [binPath, legacyPath] = managedExecutablePaths(codexHome);
   const managedPath = await metadataExists(binPath) ? binPath : legacyPath;
   return { codexHome, socketPath: path.join(codexHome, "app-server-control/app-server-control.sock"),
@@ -59,7 +73,7 @@ async function resolveCli(pathEnv) {
 const cliVersion = response => response.status === 0
   ? /^codex-cli (\d+\.\d+\.\d+)\s*$/.exec(response.stdout)?.[1] ?? null : null;
 
-export async function probeMaintenanceInstall(paths, run) {
+export async function probeMaintenanceCli(paths, run) {
   const cliPath = await resolveCli(paths.options.env.PATH);
   const version = cliVersion(await run(cliPath, ["--version"], paths.options));
   if (!parseStableVersion(version) || compareStableVersions(version, MINIMUM_MAINTENANCE_CLI) < 0) {
@@ -68,6 +82,11 @@ export async function probeMaintenanceInstall(paths, run) {
   const help = await run(cliPath, ["app-server", "daemon", "--help"], paths.options);
   if (help.status !== 0 || ["start", "stop", "version"].some(command =>
     !new RegExp(`^\\s+${command}\\s+`, "m").test(help.stdout))) failMaintenance("maintenance_cli_unsupported");
+  return { cliPath, cliVersion: version };
+}
+
+export async function probeMaintenanceInstall(paths, run) {
+  const { cliPath, cliVersion: version } = await probeMaintenanceCli(paths, run);
   const managedVersion = cliVersion(await run(paths.managedPath, ["--version"], paths.options));
   if (managedVersion !== version) failMaintenance("managed_binary_mismatch");
   return { cliPath, cliVersion: version, managedVersion };

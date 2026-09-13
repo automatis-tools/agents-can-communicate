@@ -44,6 +44,7 @@ const bootstrap = path.join(repo, "packages", "cli", "src", "managed-runtime");
 const REMOTE = [
   [/\bfetch\s*\(/, "calls fetch"],
   [/update-check\.mjs/, "imports the update check"],
+  [/verified-download\.mjs/, "imports the explicit installer's network port"],
 ];
 // Include side-effect imports and literal dynamic imports, with either quote
 // style. Matching only `from` let an imported worker escape the closed set.

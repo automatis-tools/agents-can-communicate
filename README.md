@@ -68,8 +68,9 @@ review the current ACC definitions in `/hooks`; changed hooks may need fresh tru
 For Codex live delivery on Apple Silicon macOS, installation also configures outgoing
 local socket access on Codex 0.153.4 or newer when using default workspace permissions.
 Custom policies are preserved. One default-No choice covers all selected clients that need
-live-delivery consent. On Codex 0.154.0 or newer, an accepted choice can start a missing
-service when the managed standalone installation is present. The client still owns session
+live-delivery consent. On Codex 0.154.0 or newer, the choice includes downloading a missing
+standalone package from OpenAI and starting its local service. ACC installs the matching
+version and preserves your existing `codex` command and shell profiles. The client still owns session
 startup, hook trust, and Claude Channels approval. Doctor reports service infrastructure,
 session binding, and outgoing permissions separately.
 

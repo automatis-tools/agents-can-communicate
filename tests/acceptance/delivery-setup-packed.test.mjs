@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFile, spawn } from "node:child_process";
-import { chmod, mkdir, readFile, symlink, writeFile } from "node:fs/promises";
+import { chmod, mkdir, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { promisify } from "node:util";
 import { pathToFileURL } from "node:url";
@@ -12,7 +12,7 @@ const run = promisify(execFile);
 const captured = process.platform === "darwin" && process.arch === "arm64";
 const human = (p, args) => run(process.execPath, [p.accBin, ...args],
   { cwd: p.project, env: p.env });
-const terminal = async (p, args, answer) => {
+const terminal = async (p, args, answer, { expectedCode = 0 } = {}) => {
   const child = spawn(process.execPath, ["--import",
     "data:text/javascript,process.stdin.isTTY=true;process.stdout.isTTY=true",
     p.accBin, ...args], { cwd: p.project, env: p.env, stdio: ["pipe", "pipe", "pipe"] });
@@ -33,7 +33,7 @@ const terminal = async (p, args, answer) => {
     child.once("error", error => { clearTimeout(timeout); reject(error); });
     child.once("close", (...result) => { clearTimeout(timeout); resolve(result); });
   });
-  if (code !== 0) throw new Error(`terminal install exited ${code}: ${stderr}`);
+  if (code !== expectedCode) throw new Error(`terminal install exited ${code}: ${stderr}`);
   return { stdout, stderr };
 };
 const enableClaudeChannelProbe = async p => {
@@ -68,34 +68,49 @@ test("packed CLI asks once for two clients and preserves complete setup decision
   p.env.SHELL = "/bin/zsh";
   await p.setClientVersions({ claude: "2.1.266", codex: "0.154.0" });
   await enableClaudeChannelProbe(p);
-  const commandLog = path.join(p.root, "codex-commands.log");
-  const codex = path.join(p.clientBin, "codex");
-  await writeFile(codex, `#!/bin/sh\nprintf '%s\\n' "$*" >> '${commandLog}'\nprintf 'codex-cli 0.154.0\\n'\n`);
-  await chmod(codex, 0o755);
+  const commandLog = await enableManagedCodex(p);
+  await rm(path.join(p.env.CODEX_HOME, "packages/standalone"), { recursive: true });
+  const downloads = path.join(p.root, "downloads.log"), preload = path.join(p.root, "download-failure.mjs");
+  await writeFile(preload, `import { appendFileSync } from "node:fs";
+    globalThis.fetch = async url => {
+      appendFileSync(${JSON.stringify(downloads)}, String(url) + "\\n");
+      return new Response("fixture unavailable", { status: 503 });
+    };`);
+  p.env.NODE_OPTIONS = `--import=${pathToFileURL(preload).href}`;
   const selected = ["install", "--adapter", "claude_code", "--adapter", "codex",
     "--home", p.clientHome];
 
-  const accepted = await terminal(p, selected, "y");
+  await human(p, [...selected, "--dry-run"]);
+  await assert.rejects(readFile(downloads), { code: "ENOENT" });
+  const accepted = await terminal(p, selected, "y", { expectedCode: 4 });
   assert.equal((accepted.stdout.match(/\[y\/N\]/g) ?? []).length, 1);
   assert.match(accepted.stdout, /Claude Code, Codex CLI/);
-  const blocked = (await p.acc(["doctor"])).adapters.find(entry => entry.adapterId === "codex");
-  assert.equal(blocked.nativeServiceSetup.state, "blocked");
+  assert.match(accepted.stdout, /Download the official Codex 0\.154\.0/);
+  assert.match(accepted.stdout + accepted.stderr, /Could not download the official Codex installer/);
+  const doctor = await p.acc(["doctor"]);
+  assert.ok(Array.isArray(doctor.adapters), JSON.stringify(doctor));
+  assert.ok(Array.isArray((await p.acc(["status"])).participants));
+  const blocked = doctor.adapters.find(entry => entry.adapterId === "codex");
+  assert.equal(blocked.nativeServiceSetup.state, "needed");
   assert.equal(blocked.nativeServiceSetup.reasonCode, "managed_install_missing");
-  assert.ok(blocked.remediation.some(step => /managed standalone installation/.test(step)));
+  assert.ok(blocked.remediation.some(step => /acc install --adapter codex/.test(step)));
   assert.notEqual(blocked.nativeServiceSetup.state, "ready");
   const ownership = JSON.parse(await readFile(path.join(p.dataHome, "acc", "installs.json")));
   assert.deepEqual(Object.fromEntries(ownership.installs.map(entry => [entry.adapterId,
     [entry.deliveryPolicy, entry.deliveryDecision]])), {
     claude_code: ["actionable", { source: "interactive-accepted", completeSetup: true }],
-    codex: ["actionable", { source: "interactive-accepted", completeSetup: true }],
+    codex: ["actionable", { source: "interactive-accepted", completeSetup: true, installPrerequisites: true }],
   });
+  assert.deepEqual((await readFile(downloads, "utf8")).trim().split("\n"),
+    ["https://raw.githubusercontent.com/openai/codex/rust-v0.154.0/scripts/install/install.sh"]);
   assert.doesNotMatch(await readFile(commandLog, "utf8"), /app-server daemon start/);
   assert.match(await readFile(path.join(p.env.CODEX_HOME, "config.toml"), "utf8"), /acc-workspace/);
 
-  const repeat = await terminal(p, selected, "n");
+  const repeat = await terminal(p, selected, "n", { expectedCode: 4 });
   assert.equal((repeat.stdout.match(/\[y\/N\]/g) ?? []).length, 0);
   const repeated = JSON.parse(await readFile(path.join(p.dataHome, "acc", "installs.json")));
   assert.ok(repeated.installs.every(entry => entry.deliveryDecision.completeSetup === true));
+  assert.equal((await readFile(downloads, "utf8")).trim().split("\n").length, 2);
 });
 
 test("packed CLI refusal, explicit automation, and dry run keep their distinct effects", {
