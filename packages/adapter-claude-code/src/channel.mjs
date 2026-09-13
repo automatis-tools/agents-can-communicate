@@ -196,11 +196,17 @@ export function createAccChannel({ endpointDir, socketDir = channelSocketDirecto
     if (!nonEmpty(args.messageId)) throw new Error(`${name} requires messageId`);
     if (name === "acc_reply" && !nonEmpty(args.body)) throw new Error("acc_reply requires body");
     if (!seen.has(args.messageId)) throw new Error(`${args.messageId} has no delivered message`);
-    if (name === "acc_reply") await routeReply({ messageId: args.messageId, body: args.body });
-    else await routeAck({ messageId: args.messageId });
+    const routed = name === "acc_reply"
+      ? await routeReply({ messageId: args.messageId, body: args.body })
+      : await routeAck({ messageId: args.messageId });
     observe({ event: name === "acc_reply" ? "reply_routed" : "ack_routed", at: clock(),
       messageId: args.messageId });
-    return { content: [{ type: "text", text: "sent" }] };
+    if (name === "acc_reply" && routed?.recorded?.reply) {
+      const structuredContent = { status: "recorded", messageId: routed.recorded.reply.messageId,
+        delivery: routed.delivery };
+      return { content: [{ type: "text", text: JSON.stringify(structuredContent) }], structuredContent };
+    }
+    return { content: [{ type: "text", text: name === "acc_reply" ? "recorded" : "acknowledged" }] };
   }
 
   function channelTools() {

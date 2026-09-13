@@ -731,3 +731,41 @@ This exposes a diagnostic limit: ACC's native binding verifies its local endpoin
 not the vendor's inbound Channel gate. Install/doctor now name the separate client-side
 check, and doctor calls the observed state a local active transport. The remote report
 of an empty binding list remains unconfirmed; it was not reproduced by this local run.
+
+## Channel MCP reply to Codex transport, 2026-09-13
+
+A real 0.5.6 exchange exposed a missing composition step: the Channel's `acc_reply`
+recorded an answer and acknowledged its question, but never called the delivery
+router. The answer remained queued until an explicit inbox read. The CLI reply
+path already offered its answers; that did not cover the Channel tool.
+
+The development archive built from `7173fd59100c805454f7115b9d5e1b46dabe168c`,
+SHA-256 `9fed94ab27b4c40aaeac856670df7661caeb41dc92279503adfb1d0d196356ce`,
+was privately installed with the 0.5.6 manifest version. Its unchanged Channel
+entrypoint ran under a temporary installed test plugin in Claude Code 2.1.270 on
+darwin-arm64, launched through the ordinary ACC bootstrap. The plugin supplied
+session-only hooks and the candidate MCP command; it did not replace the user's
+normal ACC installation. Both changed production modules matched the archive.
+
+The fresh test question `message_JQ0b8u_niPJDU9DZSb3X0A` was offered through
+`claude-channel` at `2026-09-13T06:31:09.797Z`. Claude called the Channel reply tool:
+answer `message_mgYZRPXcCAyUmgoB6xBo8A` was recorded at `06:31:18.005Z` with
+client key `channel-reply-message_JQ0b8u_niPJDU9DZSb3X0A`. Its body matched the
+requested verification text. At `06:31:21.640Z`, `message.offer_succeeded` recorded
+`codex-app-server`, serving version 0.153.4, and the exact original Codex session.
+No inbox read was used to retrieve that answer. Evidence retains message identities,
+delivery facts and a body-match boolean, without a vendor transcript.
+
+Limits: the test's startup handshake failed; a subsequent ordinary prompt hook
+bound the already running Channel before the successful fresh question. This is
+not proof of cold-start delivery. Codex accepted the answer while its turn was
+active; a subsequent automatic model turn was not observed during this capture.
+The temporary Claude process, plugin and marketplace were removed afterward.
+No new capability certification or version guarantee is added by this observation.
+
+Follow-up in the same exchange: after the receiving Codex turn ended, the native
+peer message automatically started a new model turn with that exact reply ID and
+matching verification text. No user prompt or inbox read intervened. The receiving
+session acknowledged the reply at `2026-09-13T06:44:27.099Z`. This completes the
+observed live round trip for these already initialized clients, including model
+attention after a busy turn. The cold-start limitation above remains unverified.
