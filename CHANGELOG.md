@@ -14,16 +14,17 @@
 
 | Development validation artifact | Value |
 |---|---|
-| Built from | `e0437764df60de111913529b6e37174970355df8` |
+| Built from | `3944887a887232d8652dbf57194619f7a23ac10f` |
 | Tarball | `agents-can-communicate-0.5.6.tgz`, 396,613 bytes, 278 files |
 | sha256 | `9fed94ab27b4c40aaeac856670df7661caeb41dc92279503adfb1d0d196356ce` |
 
 This unpublished development build retains the 0.5.6 manifest version and passed
 clean installed-package verification. The regression fixture controls the vendor
 boundaries. A separate [real-client capture](packages/adapter-claude-code/COMPATIBILITY.md#channel-mcp-reply-to-codex-transport-2026-09-13)
-with the same archive observed Claude's MCP reply reach the original Codex session's
-native transport. Cold-start delivery and a subsequent automatic Codex model turn
-were not established by that capture. Published 0.5.6 provenance below remains unchanged.
+with the same archive observed Claude's MCP reply reach the original Codex session
+and automatically start its next model turn after the active turn ended, without
+an inbox read or user prompt. Cold-start delivery remains unverified. Published
+0.5.6 provenance below remains unchanged.
 
 ## 0.5.6 — release candidate
 
