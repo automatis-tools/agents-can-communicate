@@ -9,18 +9,21 @@
   accepted and declined choices, and give an explicit command to change a refusal.
 - Keep a missing `CODEX_HOME` stable through symlinked parent directories. Verify
   the installer checksum and recheck service and executable identities before use.
+- Keep ACC usable after a prerequisite download or service-start failure. Report
+  unsupported Codex versions directly and load remote download code only during
+  explicit installation.
 
 | Candidate artifact | Value |
 |---|---|
-| Built from | `e6a2b42f83df799e8c1662c4c383130290af3f40` |
-| Tarball | `agents-can-communicate-0.5.6.tgz`, 396,007 bytes, 277 files |
-| sha256 | `62ea521f2500161cdd748f827a47bb7f5f228b3cc30a94fc60b7f6c53262b530` |
+| Built from | `0dc88c55d9d592fcddad88b85f49cc550fc90f48` |
+| Tarball | `agents-can-communicate-0.5.6.tgz`, 396,369 bytes, 278 files |
+| sha256 | `2f9a19c1f854c39d9f9ba11bbd88474fc684db9afd9c37a92b13396dba44e4b7` |
 
 The exact archive passed clean installation verification, all 28 packed managed-runtime
 checks, and upgrade from the published 0.5.5 artifact. Real npm Codex 0.154.0 on macOS
 arm64 acquired its missing standalone package and started a verified private service.
-Repeat install retained that service. All 277 source, archive and installed files matched.
-Eight deliberate mutations failed the new verification gates. See
+Repeat install retained that service. All 278 source, archive and installed files matched.
+Fifteen deliberate mutations failed the new verification gates. See
 [0.5.6 release evidence](docs/release-evidence/v0.5.6.md) for scope and limitations.
 
 ## 0.5.5 — release candidate
