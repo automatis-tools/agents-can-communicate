@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.5.8 — release candidate
+
+- Make the README shorter and easier to try: model handoffs, independent review,
+  shared-API coordination, and one concrete first handoff.
+- Add a compact diagram of independent sessions and model handoffs, with labels
+  that remain readable when a renderer falls back to black text.
+- Keep the ordinary-task prompt guard on the existing Getting Started example.
+  A deliberate coordination instruction in that example makes the check fail.
+
+| Candidate artifact | Value |
+|---|---|
+| Built from | `7fb2a3eb17098d9f0f70a0262e885fb88013a92d` |
+| Tarball | `agents-can-communicate-0.5.8.tgz`, 395,085 bytes, 278 files |
+| sha256 | `0931a9376ea3b22f7e5da3cc48a05c0f1dd17abf64306b1066e73f3f5e4da732` |
+
+The exact archive passed clean installation and an isolated upgrade from published
+0.5.7. All 278 source, archive and installed files matched, and both saved delivery
+decisions were preserved. All 28 managed archive checks passed. Runtime code is
+byte-identical to 0.5.7; this release adds no client capability certification.
+See [0.5.8 release evidence](docs/release-evidence/v0.5.8.md) for scope and provenance.
+
 ## 0.5.7 — release candidate
 
 - Deliver answers from Claude Channel's `acc_reply` through the live delivery

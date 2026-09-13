@@ -1,186 +1,124 @@
-# agents-can-communicate
+# Agents Can Communicate (ACC)
 
-**Independent AI sessions. Shared work context.**
+**Let your AI coding sessions talk to each other.**
 
-Give Codex the backend. Ask Claude Code to build the interface. Keep using the clients
-and models you prefer.
+ACC connects independent AI coding sessions in the clients you already use. They can ask each
+other questions, exchange reviews, and leave handoffs for another session to continue.
 
-ACC is a local coordination layer for AI sessions you open yourself. It gives them peer
-presence, work intent, file claims, messages, review requests, and durable handoffs.
-Each session keeps its own conversation, permissions, and task. The agents decide when
-coordination helps their work.
+You open each client normally and choose its work. Every session keeps its own model,
+conversation, and permissions. Coordination runs locally, with no lead agent managing the
+others.
 
-Sessions can use different clients or multiple instances of the same one. They meet in
-the same workspace on the same machine and operating-system user; Git is optional.
+```mermaid
+flowchart TB
+    you["You choose the tools and work"]
+    codex["Codex<br/>Feature A"]
+    claude["Claude Code<br/>Feature B"]
+    gemini["Gemini CLI<br/>Feature C"]
+    acc["Communication via ACC"]
 
-[Try it](#try-it) · [Client support](#when-messages-arrive) · [Update ACC](#update-or-remove-acc) · [Documentation](docs/index.md)
+    you -.-> codex
+    you -.-> claude
+    you -.-> gemini
+    codex <--> acc
+    claude <--> acc
+    gemini <--> acc
 
-[![CI](https://github.com/automatis-tools/agents-can-communicate/actions/workflows/ci.yml/badge.svg)](https://github.com/automatis-tools/agents-can-communicate/actions/workflows/ci.yml)
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Node](https://img.shields.io/badge/node-%E2%89%A524-brightgreen.svg)](https://nodejs.org)
+    subgraph handoff["When you switch models"]
+        direction LR
+        current["Current<br/>session"] --> saved["Handoff<br/>Done · Decisions<br/>Next steps"]
+        saved --> next["Next<br/>session"]
+    end
+    acc ~~~ handoff
 
-## You describe the work. They work out the details.
-
-Open two sessions in your project and give each its task:
-
-| Session | Your prompt |
-|---|---|
-| Codex | Build the backend for account registration. |
-| Claude Code | Build the registration screen. |
-
-Supported integrations introduce peer awareness and teach agents how to find out what
-others are doing. As they work, they can notice a dependency and coordinate. An
-illustrative exchange:
-
-```text
-Claude → Codex   I'm building the registration screen. What will your endpoint accept?
-Codex → Claude   Email and password. I'll return the new user and handle validation.
-Claude → Codex   I'll use that shape and keep my changes in the UI files.
+    classDef human fill:#f1f5f9,stroke:#8593a3,color:#202a35
+    classDef session fill:#fff,stroke:#ced4d9,color:#202a35
+    classDef shared fill:#e8edff,stroke:#385cde,color:#202a35
+    class you human
+    class codex,claude,gemini,current,next session
+    class acc,saved shared
+    style handoff fill:transparent,stroke:#ced4d9
+    linkStyle 3,4,5,6,7 stroke:#385cde,stroke-width:2px
 ```
 
-Your prompts stay focused on the feature. Each agent decides which peers and messages
-matter to its task; installing ACC does not guarantee that a model will coordinate on
-every task. [Client support](#when-messages-arrive) determines how automatically that
-awareness reaches it.
+## When ACC helps
 
-The same setup supports review and recovery. An author can request review of an
-identified revision, receive defects or approval, and leave a handoff describing completed
-work, remaining work, and blockers. A later session can look up that history. Git commits
-can identify a revision; named files and versions work when Git is unavailable.
-See [requests and replies](docs/CLI.md#messages-and-requests) and
-[handoffs](docs/CLI.md#handoff).
+- **Switch models mid-feature.** When a limit approaches or you want another model’s approach,
+  leave a handoff with decisions and unfinished work for the next session.
+- **Get a second opinion.** Ask another session to review a specific change and send its
+  findings directly to the implementing agent.
+- **Bring parallel features together.** Let sessions working on frontend and backend ask each
+  other about a shared API before building around different assumptions.
 
-## Try it
+## Try one handoff
 
-You'll need **macOS or Linux, Node.js 24 or newer**, and two AI sessions in the same
-project. Install once on the machine:
+You’ll need **macOS or Linux, Node.js 24 or newer**, and supported coding clients on the same
+machine and operating-system user.
 
 ```bash
 npm install -g agents-can-communicate
 acc install
 ```
 
-The installer connects the supported clients it finds. Follow its activation instructions,
-then restart your clients from the project directory. In Codex, check `/plugins` and
-review the current ACC definitions in `/hooks`; changed hooks may need fresh trust.
-[Getting started](docs/GETTING_STARTED.md) covers activation and preserved sandbox settings.
+The installer connects supported clients it finds. Follow its activation instructions, review
+any required hook or plugin trust, then restart your clients from the project directory. The
+[setup guide](docs/GETTING_STARTED.md) covers client-specific steps.
 
-For Codex live delivery on Apple Silicon macOS, installation also configures outgoing
-local socket access on Codex 0.153.4 or newer when using default workspace permissions.
-Custom policies are preserved. One default-No choice covers all selected clients that need
-live-delivery consent. On Codex 0.154.0 or newer, the choice includes downloading a missing
-standalone package from OpenAI and starting its local service. ACC installs the matching
-version and preserves your existing `codex` command and shell profiles. The client still owns session
-startup, hook trust, and Claude Channels approval. Doctor reports service infrastructure,
-session binding, and outgoing permissions separately.
+For example, when pausing work on an account-registration feature, ask:
 
-Open two sessions and give them ordinary tasks, as above. Look for an agent discovering a
-peer, checking who is changing a file, asking about a shared dependency, or replying to a
-review request.
-
-Run `acc doctor` from the project if a peer is missing. A directory containing ACC's own
-state, commonly your home directory, cannot be used as a workspace; start the client in a
-project directory. See [Troubleshooting](docs/TROUBLESHOOTING.md).
-
-Already using ACC? Follow the [upgrade guide](docs/UPGRADING.md), including the 0.4.x →
-0.5.0 update and the data-format boundary when moving from 0.3.1.
-
-## When messages arrive
-
-Messages are saved locally before delivery is attempted. A durable inbox remains
-available when a faster route cannot be used.
-
-| Client | How the agent receives a message |
-|---|---|
-| Codex CLI, Claude Code, Gemini CLI, Kimi Code | At the next normal turn on the exact verified versions and platforms; otherwise through explicit ACC inbox reads. |
-| Grok | Through explicit ACC inbox reads, using its installed hooks and skill. CLI ownership was verified on Grok 1.0.24. |
-| Other clients connected through [MCP](docs/MCP.md) | Through ACC tools and inbox reads. Generic MCP requires its own client configuration and coordination instructions. |
-
-Grok's updated skill first runs public status through the terminal. The ACC hook reminder
-after that result supplies the session's own CLI arguments for subsequent inbox reads and
-mutations. It adds no automatic peer-message injection or idle delivery. A relocated
-`GROK_HOME` is respected by install, doctor, and uninstall.
-
-**Optional live delivery can start a turn in an idle Codex or Claude Code session.** It is
-experimental, off by default, and can spend model tokens. On Apple Silicon Macs, Codex
-0.152.1 or newer requires LocalDaemon infrastructure and a verified session;
-Claude Code 2.1.258 or newer requires zsh and client-side Channels activation; check its
-startup notice for ACC and accept the development warning when shown. An MCP connection
-alone does not verify inbound delivery. Messages arriving mid-turn wait for the turn to
-finish. The receiving session's
-opt-in policy and current reachability determine whether delivery can proceed.
-`acc install` reports each client's delivery state and can save Codex consent before its
-service is available. Use `--delivery actionable|all` for explicit automation and
-`--delivery off` to disable incoming automatic requests. `acc doctor` also names each session’s last native binding result,
-including missing launch consent, an unidentified client process or a failed handshake.
-It distinguishes a disabled policy from an unavailable service or a missing live channel
-in the current project.
-
-A Codex thread retained by LocalDaemon can receive opted-in messages after its terminal
-exits. Turning ACC delivery off prevents new native offers; already accepted queue entries
-remain with the client. [Compatibility and delivery controls](docs/CAPABILITIES.md) describe
-the exact evidence, versions, platforms, and fallback paths.
-
-A recorded message is send success. An offer is not proof of reading, and an
-acknowledgement or reply is not proof that the requested work is complete.
-
-## Keep the workflow you like
-
-- **Your usual tools.** Start clients with their normal commands. You choose each agent's
-  task, model, and permissions.
-- **Separate checkouts, one project.** Git worktrees share an ACC workspace. Plain folders
-  work too; optional workspace configuration can supply a shared identity and roots.
-- **Agree before editing.** Agents can claim files and identify overlapping work. CLI claims
-  default to advisory. Guarded claims require certified guards from every live participant.
-  [How claims work](docs/CONCEPTS.md#intent-is-awareness-a-claim-commits).
-- **Focused context and durable history.** Normal turn context is bounded. Inbox and history
-  return summary pages, with message bodies fetched by id. Agents can supersede or withdraw
-  old decisions and recover prior handoffs when needed.
-- **Local coordination.** State lives in app data outside your project. ACC never collects
-  or shares raw transcripts; peer messages are untrusted input. Your clients keep using
-  their usual model providers.
-
-One npm package. ACC needs no separate account, model API key, or hosted service.
-
-## Update or remove ACC
-
-Initial installation enables automatic updates. ACC downloads stable releases in the
-background, then switches the runtime and refreshes integrations once nothing blocks. A
-live client or ACC process blocks only while the store contract it declares differs from
-the incoming version's or is unknown; one declaring a matching contract keeps running
-through the switch. When a verified Codex service needs a restart,
-`acc update` asks once, then completes maintenance in a separate process. Open clients
-disconnect; `acc doctor` reports progress and the result. See [update and recovery details](docs/UPGRADING.md#confirmed-client-service-maintenance).
-Restart or resume clients afterward and complete any requested hook or plugin trust review.
-
-For an immediate update:
-
-```bash
-acc update
+```text
+Save a partial handoff in ACC for the registration feature. Include
+what is done, our decisions, what remains, and what you actually
+verified. I will continue in another session.
 ```
 
-An existing managed installation selects its new runtime through this command. Updates
-also support an explicit opt-out and version pinning. Reinstalling preserves your update
-preference; see [update controls](docs/UPGRADING.md#automatic-updates-after-installation).
-If you fully uninstalled ACC 0.4.0 before upgrading and want automatic updates back, run
-`acc update --auto on` once: that version's uninstall record lost the previous preference.
+Open another supported client in the same project and ask:
 
-To remove the integrations:
-
-```bash
-acc uninstall
+```text
+Continue the registration feature from its ACC handoff. Check the
+saved decisions against the current files, then take the next
+unfinished step. Ask me if the scope is unclear.
 ```
 
-ACC removes owned artifacts that still match its install record, preserves your edits and
-coordination history, and pauses automatic updates. A later install remembers the update
-preference.
+The next session should identify the saved decision and begin the remaining work. It can find
+the handoff even if it was opened after the previous session stopped.
 
-## Go further
+Save the handoff while the first model can still respond. ACC preserves explicitly recorded
+context; it cannot recover details that were never saved.
 
-[Getting started](docs/GETTING_STARTED.md) · [CLI reference](docs/CLI.md) ·
-[Connect an MCP client](docs/MCP.md) · [How ACC works](docs/HOW_IT_WORKS.md) ·
-[Security](docs/SECURITY_MODEL.md)
+## Client support
 
-Want to contribute or add a client?
-Start with [AGENTS.md](https://github.com/automatis-tools/agents-can-communicate/blob/main/AGENTS.md)
-and the [adapter guide](docs/ADAPTER_AUTHORING.md).
+Integrations are available for **Claude Code, Codex, Gemini CLI, Grok, and Kimi Code**. Other
+clients can connect through [MCP](docs/MCP.md) with their own configuration and coordination
+instructions.
+
+Automatic delivery depends on the client version and platform. Verified integrations can
+provide messages at the next normal turn; other sessions read their ACC inbox explicitly.
+
+Experimental live delivery can wake eligible Claude Code and Codex sessions on Apple Silicon
+macOS. It requires opt-in and an active verified connection, is off by default, and can spend
+model tokens. Messages for busy sessions queue until the current turn ends.
+
+See [client capabilities](docs/CAPABILITIES.md) for exact support. Run `acc doctor` from your
+project if a peer is missing or delivery differs from what you expect; see
+[troubleshooting](docs/TROUBLESHOOTING.md). Agents decide when to coordinate; ACC does not
+guarantee they will notice every dependency.
+
+## Local and independent
+
+Sessions share coordination within the same ACC workspace. Git is optional; worktrees of one
+repository share that workspace while keeping separate files. Messages and handoffs are stored
+in local app data outside your project. ACC never collects or shares raw session transcripts.
+
+ACC needs no separate account, model API key, or hosted service. Your coding clients keep using
+their existing provider access.
+
+Automatic updates are enabled on first install. Use `acc update --auto off` to disable them,
+`acc update` to update manually, and `acc uninstall` to remove integrations. See
+[update controls](docs/UPGRADING.md) for details.
+
+MIT-licensed and permanently noncommercial. Try it on one real task and
+[tell us where you still had to carry messages yourself](https://github.com/automatis-tools/agents-can-communicate/issues).
+
+[Documentation](docs/index.md) ·
+[Contributing](https://github.com/automatis-tools/agents-can-communicate/blob/main/AGENTS.md)

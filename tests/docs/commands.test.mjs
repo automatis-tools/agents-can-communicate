@@ -99,12 +99,13 @@ test("public docs describe the communication product that actually ships", async
   }
 
   const readme = entries.find(entry => entry.file === "README.md").source;
-  const prompts = [...readme.matchAll(/^\| (?:Codex|Claude Code) \| ([^|]+) \|$/gm)]
+  const gettingStarted = entries.find(entry => entry.file === "docs/GETTING_STARTED.md").source;
+  const prompts = [...gettingStarted.matchAll(/^\| (?:Codex|Claude Code) \| ([^|]+) \|$/gm)]
     .map(match => match[1].trim());
-  assert.equal(prompts.length >= 2, true, "README no longer gives two ordinary task prompts");
+  assert.equal(prompts.length >= 2, true, "getting started no longer gives two ordinary task prompts");
   for (const prompt of prompts) {
     assert.doesNotMatch(prompt, /\b(?:ACC|inbox|peer|session|coordinate)\b/i,
-      `README turns an ordinary task prompt into coordination setup: ${prompt}`);
+      `getting started turns an ordinary task prompt into coordination setup: ${prompt}`);
   }
   for (const target of ["docs/GETTING_STARTED.md", "docs/CAPABILITIES.md",
     "docs/TROUBLESHOOTING.md"]) {
