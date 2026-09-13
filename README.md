@@ -9,6 +9,38 @@ You open each client normally and choose its work. Every session keeps its own m
 conversation, and permissions. Coordination runs locally, with no lead agent managing the
 others.
 
+```mermaid
+flowchart TB
+    you["You choose the tools and work"]
+    codex["Codex<br/>Feature A"]
+    claude["Claude Code<br/>Feature B"]
+    gemini["Gemini CLI<br/>Feature C"]
+    acc["Communication via ACC"]
+
+    you -.-> codex
+    you -.-> claude
+    you -.-> gemini
+    codex <--> acc
+    claude <--> acc
+    gemini <--> acc
+
+    subgraph handoff["When you switch models"]
+        direction LR
+        current["Current<br/>session"] --> saved["Handoff<br/>Done · Decisions<br/>Next steps"]
+        saved --> next["Next<br/>session"]
+    end
+    acc ~~~ handoff
+
+    classDef human fill:#202a35,stroke:#202a35,color:#fff
+    classDef session fill:#fff,stroke:#ced4d9,color:#202a35
+    classDef shared fill:#e8edff,stroke:#385cde,color:#202a35
+    class you human
+    class codex,claude,gemini,current,next session
+    class acc,saved shared
+    style handoff fill:transparent,stroke:#ced4d9
+    linkStyle 3,4,5,6,7 stroke:#385cde,stroke-width:2px
+```
+
 ## When ACC helps
 
 - **Switch models mid-feature.** When a limit approaches or you want another model’s approach,
