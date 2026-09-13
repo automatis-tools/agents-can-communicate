@@ -2,17 +2,24 @@ import { lstat, realpath } from "node:fs/promises";
 import path from "node:path";
 import { socketIsReady } from "./native-endpoint.mjs";
 import { probeNativeDelivery } from "./native-delivery.mjs";
-import { failMaintenance, maintenanceContext, probeMaintenanceInstall,
+import { installCodexStandalone } from "./standalone-install.mjs";
+import { failMaintenance, maintenanceContext, probeMaintenanceCli, probeMaintenanceInstall,
   readMaintenancePid, runMaintenanceCommand, verifyMaintenanceProcess } from "./maintenance-host.mjs";
 
 const keys = ["home", "codexHome", "cliPath", "cliVersion", "managedPath", "managedVersion",
   "managedRealPath", "cliIdentity", "managedIdentity", "socketPath", "pidPath", "platform"];
+const prerequisiteKeys = ["home", "codexHome", "cliPath", "cliVersion", "cliIdentity", "socketPath", "pidPath", "platform"];
 const same = (a, b, fields = keys) => fields.every(key => a?.[key] === b?.[key]);
 const own = info => typeof process.getuid !== "function" || info.uid === process.getuid();
 const sessionNeeded = "Codex service ready; open a new Codex session to establish its delivery binding and review client hooks and permissions";
 const diagnostics = {
   native_endpoint_unavailable: "Prepare the missing Codex service with codex app-server daemon start, then open a new Codex session",
-  managed_install_missing: "Codex service requires the managed standalone installation; install it with curl -fsSL https://chatgpt.com/codex/install.sh | sh using the selected HOME and CODEX_HOME, then retry acc install",
+  managed_install_missing: "Codex service needs its standalone package; run acc install to download the matching official Codex release and prepare the service",
+  managed_install_incomplete: "Codex standalone installation is incomplete; repair it with the official Codex installer, then retry acc install",
+  prerequisite_consent_required: "Codex standalone download was not approved. Run acc install --adapter codex --delivery actionable to allow the download and automatic peer requests",
+  prerequisite_download_failed: "Could not download the official Codex installer; check your connection and retry acc install",
+  prerequisite_integrity_failed: "The Codex installer checksum did not match the reviewed version; no installer was run",
+  prerequisite_install_failed: "The official Codex installation did not complete; check connectivity and the selected Codex home, then retry acc install",
   managed_binary_mismatch: "Codex CLI and managed standalone versions differ; repair the vendor installation, then retry acc install",
   maintenance_platform_unsupported: "Codex service preparation is captured only on darwin-arm64; configure the vendor service manually",
   maintenance_cli_unsupported: "Codex cold service preparation requires codex-cli 0.154.0 or newer with daemon commands; update the vendor installation, then retry acc install",
@@ -25,7 +32,8 @@ function report(state, reasonCode, facts = {}) {
 }
 
 export function createCodexServiceSetup({ run = runMaintenanceCommand, probe = probeNativeDelivery,
-  fs = { lstat, realpath }, contextPaths = maintenanceContext } = {}) {
+  fs = { lstat, realpath }, contextPaths = maintenanceContext,
+  installStandalone = installCodexStandalone } = {}) {
   async function info(file) {
     try { return await fs.lstat(file); }
     catch (error) { if (error.code === "ENOENT") return null; throw error; }
@@ -53,6 +61,22 @@ export function createCodexServiceSetup({ run = runMaintenanceCommand, probe = p
       managedPath: paths.managedPath, managedRealPath: managed.resolved,
       cliIdentity: cli.identity, managedIdentity: managed.identity,
       socketPath: paths.socketPath, pidPath: paths.pidPath, platform: paths.platform, ...installation };
+  }
+  async function missingPrerequisite(paths) {
+    for (const name of ["packages", "packages/standalone", "packages/standalone/bin", "packages/standalone/releases"]) {
+      const stat = await info(path.join(paths.codexHome, name));
+      if (stat && (!stat.isDirectory() || stat.isSymbolicLink() || !own(stat) || (stat.mode & 0o022))) {
+        failMaintenance("unsafe_service_directory");
+      }
+    }
+    if (await info(path.join(paths.codexHome, "packages/standalone/current"))) failMaintenance("managed_install_incomplete");
+    if (await info(paths.pidPath) || await info(paths.socketPath)) failMaintenance("daemon_identity_unavailable");
+    const installation = await probeMaintenanceCli({ ...paths,
+      options: { ...paths.options, cwd: paths.options.env.HOME } }, run);
+    const cli = await executableIdentity(installation.cliPath);
+    return report("needed", "managed_install_missing", { requiresInstall: true,
+      home: paths.options.env.HOME, codexHome: paths.codexHome, cliIdentity: cli.identity,
+      socketPath: paths.socketPath, pidPath: paths.pidPath, platform: paths.platform, ...installation });
   }
   async function verify(paths, facts) {
     if (!await socketIsReady(paths.socketPath)) failMaintenance("daemon_socket_unproven");
@@ -86,6 +110,8 @@ export function createCodexServiceSetup({ run = runMaintenanceCommand, probe = p
         // service needs no new managed-install or cold-start prerequisite.
         if (native.supported) return report("ready", native.reasonCode ?? null);
       }
+      await safeDirectories(paths);
+      if (!await info(paths.managedPath)) return await missingPrerequisite(paths);
       const facts = await installed(paths);
       if (!await info(paths.socketPath) && !await info(paths.pidPath)) {
         return report("needed", "native_endpoint_unavailable", facts);
@@ -96,7 +122,33 @@ export function createCodexServiceSetup({ run = runMaintenanceCommand, probe = p
       return report(reason.endsWith("_unsupported") ? "unsupported" : "blocked", reason);
     }
   }
-  async function prepareNativeServiceSetup({ context, plan } = {}) {
+  async function preparePrerequisite(context, plan, consent) {
+    let attempted = false;
+    try {
+      if (consent !== true) failMaintenance("prerequisite_consent_required");
+      if (plan.state !== "needed" || !prerequisiteKeys.every(key => typeof plan[key] === "string")) {
+        failMaintenance("invalid_service_setup_plan");
+      }
+      const beforeInstall = async () => {
+        const current = await inspect(context, { strict: true });
+        if (current.state !== "needed" || current.requiresInstall !== true
+          || !same(plan, current, prerequisiteKeys)) failMaintenance("service_identity_changed");
+      };
+      await beforeInstall();
+      attempted = true;
+      await installStandalone(plan, { env: context?.env ?? process.env, beforeInstall });
+      const next = await inspect(context, { strict: true });
+      if (!["needed", "ready"].includes(next.state) || next.requiresInstall
+        || !same(plan, next, prerequisiteKeys)) failMaintenance("service_identity_changed");
+      const result = await prepareNativeServiceSetup({ context, plan: next });
+      return { ...result, installedPrerequisite: true };
+    } catch (error) {
+      return { ...report(attempted ? "failed" : "blocked", error.reasonCode ?? "prerequisite_install_failed"),
+        started: false, installedPrerequisite: false };
+    }
+  }
+  async function prepareNativeServiceSetup({ context, plan, installPrerequisites } = {}) {
+    if (plan?.requiresInstall === true) return preparePrerequisite(context, plan, installPrerequisites);
     let started = false;
     try {
       if (plan?.state === "ready") {

@@ -1,5 +1,28 @@
 # Codex compatibility
 
+## Missing service prerequisite (2026-09-13)
+
+A development ACC archive was installed with real npm Codex 0.154.0 on
+darwin-arm64 in a fresh private home. No managed standalone package was present.
+Explicit setup downloaded the official matching package, started its PID-backed
+service, and verified initialize plus an empty loaded-thread list. Repeat install
+retained the same PID and start time. The npm command and shell profiles stayed
+unchanged, and cleanup stopped the private service. See the
+[development capture](fixtures/setup/codex-cli-0.154.0-npm-prerequisite.json).
+
+The download uses the SHA-256-pinned official 0.154.0 installer. Its selected
+release matches the existing stable CLI version, with a 0.154.0 minimum.
+Noninteractive installation keeps its command links under the selected
+`CODEX_HOME/packages/standalone/bin`. A child-only PATH prevents shell-profile
+changes. Existing incomplete installations require vendor repair.
+
+The installer serializes its own writes. ACC checks identities before invoking
+it and verifies the result before starting a service. These checks cannot prevent
+a separate vendor update between inspection and installation. This capture does
+not establish hook trust, authenticated model execution, or a recipient binding.
+Homebrew preservation is implemented but was not exercised with a real Homebrew
+installation. Earlier captures below retain their original prerequisites.
+
 ## Explicit update maintenance (2026-09-10)
 
 The separate update-maintenance ports were exercised with installed Codex CLI

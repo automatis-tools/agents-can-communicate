@@ -83,3 +83,18 @@ test("blocked prerequisite becomes needsAction without losing adapter installati
   assert.equal(result.failed.length, 0);
   assert.deepEqual(f.calls, ["install"]);
 });
+
+test("saved prerequisite consent reaches setup and survives failure", async t => {
+  const f = await fixture(t);
+  f.args.deliveryDecisionByAdapter.service_fixture.installPrerequisites = true;
+  let observed;
+  f.adapter.prepareNativeServiceSetup = async input => {
+    observed = input.installPrerequisites;
+    assert.equal((await loadOwnership(f)).installs[0].deliveryDecision.installPrerequisites, true);
+    return { state: "failed", started: false, reasonCode: "prerequisite_download_failed", diagnostic: "Retry download" };
+  };
+  const result = await applyPlan({ ...f, plan: planInstallation(f.args), adapters: [f.adapter] });
+  assert.equal(observed, true);
+  assert.equal(result.failed[0].reasonCode, "prerequisite_download_failed");
+  assert.equal((await loadOwnership(f)).installs[0].deliveryDecision.installPrerequisites, true);
+});

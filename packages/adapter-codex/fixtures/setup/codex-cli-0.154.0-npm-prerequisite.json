@@ -1,0 +1,49 @@
+{
+  "schemaVersion": 1,
+  "capturedAt": "2026-09-13T04:11:44.230Z",
+  "platform": "darwin-arm64",
+  "scope": "Development packed ACC, real npm Codex 0.154.0, absent standalone package, no auth or model sessions.",
+  "source": {
+    "baseCommit": "d7698aaca40e39d30d9286a50568fad8a85a5254",
+    "dirty": true
+  },
+  "artifact": {
+    "kind": "development archive before release preparation",
+    "version": "0.5.5",
+    "sha256": "5b24407eb93b73461c186f87a5af512da993ca9f265794d979d8776b7777071c"
+  },
+  "client": {
+    "distribution": "npm",
+    "version": "0.154.0"
+  },
+  "installer": {
+    "url": "https://raw.githubusercontent.com/openai/codex/rust-v0.154.0/scripts/install/install.sh",
+    "sha256": "ba92dd27e5c06f0d3bbc58bfa4b9cfb6599cd2742fbb1f92a2765e6c07dedb5a"
+  },
+  "captureScriptSha256": "f52328fc1f0e03cb6faf04ab5d2ac4d6f8a52e740caa5d6ae656ee47fea7d1f2",
+  "observations": [
+    "preview did not download or start",
+    "npm Codex acquired matching standalone and verified a started service",
+    "repeat retained service identity without installation or start",
+    "npm command and shell profiles unchanged"
+  ],
+  "savedDecision": {
+    "source": "explicit-option",
+    "completeSetup": true,
+    "installPrerequisites": true
+  },
+  "service": {
+    "version": "0.154.0",
+    "backend": "pid",
+    "state": "ready",
+    "reasonCode": "native_session_unavailable"
+  },
+  "cleanup": {
+    "status": "stopped"
+  },
+  "limitations": [
+    "No authentication, model turn, hook activation, or live recipient binding was exercised.",
+    "Only npm Codex 0.154.0 on darwin-arm64 was captured.",
+    "The vendor installer serializes writes but ACC cannot prevent a separate vendor update between its last inspection and those writes."
+  ]
+}

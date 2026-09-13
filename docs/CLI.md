@@ -260,9 +260,18 @@ zsh PATH block and a shim that `exec`s the real client; `ACC_BYPASS=1` bypasses 
 activation. Codex LocalDaemon delivery uses recorded installation consent without changing
 ordinary launch arguments. Its opt-in remains active when shim variables are absent or
 bypassed; `acc install --adapter codex --delivery off` disables new native offers. On a
-supported explicit install, complete consent can prepare a missing Codex service from an
-existing managed standalone installation. Dry runs, delivery off, automatic refresh, and
-message delivery do not start it. Uninstall does not stop the shared vendor daemon. The install summary names each client's requested policy,
+supported explicit install, complete consent can prepare a missing Codex service. On macOS
+arm64 with Codex 0.154.0 or newer, the same choice includes downloading a missing standalone
+package from OpenAI. ACC selects the installed CLI version and verifies the official
+installer's pinned checksum. The installer uses the selected `HOME` and `CODEX_HOME`.
+Your existing npm or Homebrew command and shell profiles remain unchanged.
+An older consent that covered service start receives one expanded choice for the download.
+An accepted or declined answer persists. To change a declined answer, use
+`acc install --adapter codex --delivery actionable` (or `all` for that policy).
+Explicit `--delivery actionable|all` also approves a required download on supported clients.
+Dry runs, delivery off, doctor, automatic refresh, and message delivery do not download
+Codex or start its service. Uninstall does not remove Codex or stop the shared vendor daemon.
+The install summary names each client's requested policy,
 activation state and verified fallback. `doctor` separates protocol readiness, recorded
 consent and a live channel in the current workspace, with a next step for missing activation.
 A supported version or an installed plugin alone is not an active delivery channel.

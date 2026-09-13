@@ -44,7 +44,10 @@ export function nativeRemediation(entry) {
   if (native.reasonCode === "native_endpoint_unavailable") {
     if (service?.state === "blocked") steps.push(service.diagnostic);
     else if (service?.state === "needed" && native.configured) {
-      steps.push(entry.deliveryDecision?.completeSetup === true
+      steps.push(service.requiresInstall && entry.deliveryDecision?.installPrerequisites === false
+        ? `acc install --adapter ${entry.adapterId} --delivery ${native.policy === "all" ? "all" : "actionable"}`
+          + "  # allow the official Codex download and complete service setup"
+        : entry.deliveryDecision?.completeSetup === true
         ? `acc install --adapter ${entry.adapterId}  # prepare the missing supported local service`
         : `acc install --adapter ${entry.adapterId} --delivery actionable`
           + "  # approve complete automatic peer-request setup");

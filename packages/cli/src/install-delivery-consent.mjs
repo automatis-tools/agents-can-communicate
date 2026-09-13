@@ -20,6 +20,9 @@ function validDecision(record) {
   if (!(decision !== null && typeof decision === "object"
     && DECISION_SOURCES.has(decision.source)
     && typeof decision.completeSetup === "boolean")) return false;
+  if (Object.hasOwn(decision, "installPrerequisites")
+    && (typeof decision.installPrerequisites !== "boolean"
+      || (decision.installPrerequisites && !decision.completeSetup))) return false;
 
   const enabled = livePolicyOf(record) !== "off";
   if (decision.source === "interactive-accepted") return decision.completeSetup && enabled;
@@ -34,7 +37,9 @@ function validDecision(record) {
 export function decisionOf(record) {
   return validDecision(record)
     ? { source: record.deliveryDecision.source,
-      completeSetup: record.deliveryDecision.completeSetup }
+      completeSetup: record.deliveryDecision.completeSetup,
+      ...(Object.hasOwn(record.deliveryDecision, "installPrerequisites")
+        ? { installPrerequisites: record.deliveryDecision.installPrerequisites } : {}) }
     : legacyDecision();
 }
 
@@ -43,6 +48,7 @@ const isEligible = entry => entry.nativeDelivery?.state === "eligible"
 
 const needsExpandedSetup = entry => ["needed", "blocked"]
   .includes(entry.nativeServiceSetup?.state);
+const needsPrerequisite = entry => entry.nativeServiceSetup?.requiresInstall === true;
 
 const isInteractive = runtime => typeof runtime.isInteractive === "function"
   && runtime.isInteractive() === true;
@@ -60,6 +66,8 @@ function questionFor(entries) {
     "       Configure the required local permission grants.",
     ...(entries.some(entry => entry.adapterId === "codex")
       ? ["       Start a missing supported Codex service."] : []),
+    ...entries.filter(needsPrerequisite).map(entry =>
+      `       Download the official Codex ${entry.nativeServiceSetup.cliVersion} standalone package for its service; retain your existing codex command.`),
     ...setup.map(note => `       ${note}`),
     ...(channels ? ["       Allow Claude Code development Channels when prompted at startup."] : []),
     "  No: keep current delivery policies and use available next-turn hooks or acc inbox.",
@@ -88,6 +96,7 @@ export async function decideDelivery({ options, detected, recorded, runtime, dry
       deliveryByAdapter[entry.adapterId] = explicit;
       deliveryDecisionByAdapter[entry.adapterId] = {
         source: "explicit-option", completeSetup: explicit !== "off",
+        ...(needsPrerequisite(entry) ? { installPrerequisites: explicit !== "off" } : {}),
       };
       continue;
     }
@@ -107,9 +116,12 @@ export async function decideDelivery({ options, detected, recorded, runtime, dry
     const alreadyDecided = validDecision(record)
       && DELIBERATE_SOURCES.has(record.deliveryDecision.source);
     const expandsLegacyOptIn = previous !== "off" && needsExpandedSetup(entry)
-      && !decisionOf(record).completeSetup;
+      && !decisionOf(record).completeSetup
+      && !(needsPrerequisite(entry) && decisionOf(record).installPrerequisites === false);
     const freshDecision = previous === "off" && !alreadyDecided;
-    if (!freshDecision && !expandsLegacyOptIn) {
+    const expandsPrerequisite = previous !== "off" && needsPrerequisite(entry)
+      && !Object.hasOwn(decisionOf(record), "installPrerequisites");
+    if (!freshDecision && !expandsLegacyOptIn && !expandsPrerequisite) {
       deliveryDecisionByAdapter[entry.adapterId] ??= legacyDecision();
       continue;
     }
@@ -141,6 +153,9 @@ export async function decideDelivery({ options, detected, recorded, runtime, dry
         : previous === "off"
           ? { source: "interactive-declined", completeSetup: false }
           : decisionOf(record);
+      if (needsPrerequisite(entry)) {
+        deliveryDecisionByAdapter[entry.adapterId].installPrerequisites = yes;
+      }
     }
   }
 
