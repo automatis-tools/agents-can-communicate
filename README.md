@@ -31,7 +31,7 @@ flowchart TB
     end
     acc ~~~ handoff
 
-    classDef human fill:#202a35,stroke:#202a35,color:#fff
+    classDef human fill:#f1f5f9,stroke:#8593a3,color:#202a35
     classDef session fill:#fff,stroke:#ced4d9,color:#202a35
     classDef shared fill:#e8edff,stroke:#385cde,color:#202a35
     class you human
