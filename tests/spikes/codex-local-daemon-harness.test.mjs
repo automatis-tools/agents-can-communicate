@@ -13,7 +13,7 @@ import { buildClientEnvironment, createPtyDriver, prerequisiteChecks,
   from "../../scripts/e2e/codex-local-daemon-harness.mjs";
 import { migrationEnvironments }
   from "../../scripts/e2e/codex-local-daemon-migration.mjs";
-import { createMachine }
+import { createMachine, until }
   from "../../scripts/e2e/codex-local-daemon-machine.mjs";
 import { scenario }
   from "../../scripts/e2e/codex-local-daemon-observations.mjs";
@@ -136,17 +136,25 @@ test("unexpected argument text is a launch error only when the vendor exits", as
   const py = await python();
   const pty = createPtyDriver({ python: py });
   t.after(() => pty.close().catch(() => null));
-  const h = { pty, roles: { active: {}, exited: {} }, debugStatus: false };
-  await pty.request({ action: "launch", role: "active",
-    argv: [py, "-c", "import time; print('unexpected argument', flush=True); time.sleep(30)"],
+  const h = { pty, roles: { receiver: {} }, debugStatus: false };
+  const program = ["import os,sys,tty", "tty.setraw(sys.stdin.fileno())",
+    "print('unexpected argument', flush=True)", "os.read(sys.stdin.fileno(), 1)",
+    "print('unexpected argument', flush=True)", "sys.exit(2)"].join(";");
+  await pty.request({ action: "launch", role: "receiver", argv: [py, "-c", program],
     cwd: os.tmpdir(), env: process.env });
-  await new Promise(resolve => setTimeout(resolve, 150));
-  assert.equal((await trust(h, "active")).invalidArgs, true);
-  await pty.request({ action: "launch", role: "exited",
-    argv: [py, "-c", "import sys; print('unexpected argument', flush=True); sys.exit(2)"],
-    cwd: os.tmpdir(), env: process.env });
-  await new Promise(resolve => setTimeout(resolve, 150));
-  await assert.rejects(trust(h, "exited"), /vendor rejected launch arguments/);
+  const status = () => pty.request({ action: "status", role: "receiver" });
+  const deadline = { timeoutMs: 5_000, intervalMs: 20 };
+  await until("live vendor argument text", async () => (await status()).invalidArgs, deadline);
+  const active = await trust(h, "receiver");
+  assert.equal(active.invalidArgs, true);
+  assert.equal(active.exit, null);
+  // Release exit only after observing the live case; send clears the captured screen.
+  await pty.request({ action: "send", role: "receiver", text: "x" });
+  await until("vendor argument rejection and exit", async () => {
+    const observed = await status();
+    return observed.invalidArgs && observed.exit === 2;
+  }, deadline);
+  await assert.rejects(trust(h, "receiver"), /vendor rejected launch arguments/);
 });
 
 test("migration keeps ACC variables out of the daemon and in installed commands", () => {

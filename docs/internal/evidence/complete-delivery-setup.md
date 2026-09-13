@@ -99,3 +99,34 @@ full validation used `npm_config_offline=false`, a private npm cache, no audit/f
 and `ACC_NO_UPDATE_CHECK=1`. Two further initial failures identified the stale
 doctor assertion and the need for a new Unreleased artifact record; both were
 resolved without rewriting historical release evidence.
+
+## PR 127 macOS CI follow-up
+
+CI run `34728972060` failed two tests on macOS with Node 24.20.0.
+The Linux suite, both package jobs, and lint passed.
+
+The packed service fixture placed its socket under the runner's long `TMPDIR`.
+That path exceeded the macOS Unix socket limit. The original test reproduced
+`daemon_start_failed` with a deliberately long local `TMPDIR`. A separate
+150-byte socket bind returned `EINVAL`. The corrected fixture uses a short,
+unique, canonical Codex home and checks the socket path length before launch.
+It removes that home after stopping its daemon. The packed installation still
+uses the ambient temporary directory.
+
+The PTY test assumed that its child exited within 150 milliseconds. A controlled
+child reproduced the same missing-rejection failure while its observed exit was
+still `null`. The corrected test holds the child until it verifies the live case.
+It then releases the child and observes both its output and exit before checking
+the specific rejection. The production harness is unchanged.
+
+| Mutation in a private copy | Observed failure |
+|---|---|
+| Restore the nested Codex home under a long `TMPDIR` | Socket path length assertion failed |
+| Reject argument text before the child exits | Live-child assertion received the argument rejection |
+| Remove the argument-error classification | Final assertion received a generic exit error |
+
+Local macOS validation used Node 24.4.0. Both affected test files passed all
+14 tests. The packed test also passed with the long `TMPDIR`. Dependency
+installation, syntax checks, packing, and package verification passed. The
+archive SHA-256 remains `006cb5750bfe014c6f8a7ea363b204582a619c887a291802950496c035c04aef`.
+Logs and the detailed PTY report are under `/private/tmp/acc-pr127-*`.

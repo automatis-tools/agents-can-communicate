@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
-import { chmod, mkdir, readFile, symlink, writeFile } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, readFile, realpath, rm, symlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 import test from "node:test";
 import { pathToFileURL } from "node:url";
@@ -14,11 +14,29 @@ test("packed install successfully prepares and verifies a supported Codex servic
   skip: !captured,
 }, async t => {
   const p = await createPackedAcc(t);
-  const codexHome = path.join(p.clientHome, ".codex");
+  // macOS CI's TMPDIR can exceed the 104-byte Unix socket path limit.
+  // Keep the packed install in that environment, but give its daemon a short home.
+  const codexHome = await realpath(await mkdtemp("/tmp/acc-cx-setup-"));
   const managedDir = path.join(codexHome, "packages", "standalone", "current", "bin");
   const managed = path.join(managedDir, "codex");
   const socketPath = path.join(codexHome, "app-server-control", "app-server-control.sock");
   const pidPath = path.join(codexHome, "app-server-daemon", "app-server.pid");
+  t.after(async () => {
+    try {
+      const pid = await readFile(pidPath, "utf8").then(JSON.parse).then(value => value.pid)
+        .catch(() => null);
+      if (!Number.isSafeInteger(pid)) return;
+      try { process.kill(pid, "SIGTERM"); } catch { return; }
+      for (let attempt = 0; attempt < 40; attempt += 1) {
+        await new Promise(resolve => setTimeout(resolve, 25));
+        try { process.kill(pid, 0); } catch { return; }
+      }
+      assert.fail(`fixture daemon ${pid} did not exit`);
+    } finally {
+      await rm(codexHome, { recursive: true, force: true });
+    }
+  });
+  assert.ok(Buffer.byteLength(socketPath) < 104, `Unix socket path is too long: ${socketPath}`);
   const readyPath = path.join(p.root, "daemon-ready");
   const versionPath = path.join(p.root, "daemon-version.json");
   const commandLog = path.join(p.root, "codex-commands.log");
@@ -70,18 +88,6 @@ esac
   await symlink(cli, managed);
   p.env.CODEX_HOME = codexHome;
   p.env.SHELL = "/bin/zsh";
-  t.after(async () => {
-    const pid = await readFile(pidPath, "utf8").then(JSON.parse).then(value => value.pid)
-      .catch(() => null);
-    if (!Number.isSafeInteger(pid)) return;
-    try { process.kill(pid, "SIGTERM"); } catch { return; }
-    for (let attempt = 0; attempt < 40; attempt += 1) {
-      await new Promise(resolve => setTimeout(resolve, 25));
-      try { process.kill(pid, 0); } catch { return; }
-    }
-    assert.fail(`fixture daemon ${pid} did not exit`);
-  });
-
   const result = await p.acc(["install", "--adapter", "codex", "--delivery", "actionable"]);
   const [operation] = result.operations;
   assert.equal(operation.nativeServiceSetup.state, "ready");
