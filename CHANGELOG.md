@@ -1,5 +1,28 @@
 # Changelog
 
+## 0.5.6 — release candidate
+
+- Complete supported Codex setup when its managed standalone package is missing.
+  The single setup choice includes the official download, matching CLI version,
+  and verified local service start. Existing npm commands and shell profiles stay intact.
+- Record download consent separately from older service-start consent. Preserve
+  accepted and declined choices, and give an explicit command to change a refusal.
+- Keep a missing `CODEX_HOME` stable through symlinked parent directories. Verify
+  the installer checksum and recheck service and executable identities before use.
+
+| Candidate artifact | Value |
+|---|---|
+| Built from | `e6a2b42f83df799e8c1662c4c383130290af3f40` |
+| Tarball | `agents-can-communicate-0.5.6.tgz`, 396,007 bytes, 277 files |
+| sha256 | `62ea521f2500161cdd748f827a47bb7f5f228b3cc30a94fc60b7f6c53262b530` |
+
+The exact archive passed clean installation verification, all 28 packed managed-runtime
+checks, and upgrade from the published 0.5.5 artifact. Real npm Codex 0.154.0 on macOS
+arm64 acquired its missing standalone package and started a verified private service.
+Repeat install retained that service. All 277 source, archive and installed files matched.
+Eight deliberate mutations failed the new verification gates. See
+[0.5.6 release evidence](docs/release-evidence/v0.5.6.md) for scope and limitations.
+
 ## 0.5.5 — release candidate
 
 - Recover missing runtime store contracts left by older updaters. Compatible
