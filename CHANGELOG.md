@@ -1,30 +1,31 @@
 # Changelog
 
-## Unreleased — Claude Channel live replies
+## 0.5.7 — release candidate
 
-- Offer answers from the Claude Channel's `acc_reply` tool through the same
-  delivery router used by ordinary MCP. Previously the tool only recorded the
-  answer, so an available Codex recipient received no live delivery attempt.
-- Read the recipient's current consent from the selected ACC data home. Keep
-  failed or disabled offers queued, preserve retry identity, and report the
-  recorded answer and actual delivery outcome instead of an unconditional `sent`.
-- Test the installed Channel entrypoint, MCP reply, durable records, consent,
-  and Codex transport together. Removing the offer call makes the test fail on
-  the exact regression: the reply stays `queued` instead of `offered`.
+- Deliver answers from Claude Channel's `acc_reply` through the live delivery
+  router. Previously the tool recorded the answer but made no live delivery attempt.
+- Respect the recipient's current delivery consent. Preserve queued answers when
+  delivery is disabled or unavailable, and retain message identity across retries.
+- Report the recorded answer and actual delivery outcome from the MCP tool.
+- Add an installed-artifact regression for the full Channel reply route, including
+  consent, retries, failed delivery and acknowledgement-only messages.
 
-| Development validation artifact | Value |
+| Candidate artifact | Value |
 |---|---|
-| Built from | `3944887a887232d8652dbf57194619f7a23ac10f` |
-| Tarball | `agents-can-communicate-0.5.6.tgz`, 396,613 bytes, 278 files |
-| sha256 | `9fed94ab27b4c40aaeac856670df7661caeb41dc92279503adfb1d0d196356ce` |
+| Built from | `f52e8e4ed1dabcf413104986e7d63a5ecaef8ef2` |
+| Tarball | `agents-can-communicate-0.5.7.tgz`, 396,613 bytes, 278 files |
+| sha256 | `a515bb01e76a2912a16ddc89358dc1d60c149e7c8c1c0186cf837a83e91bfb18` |
 
-This unpublished development build retains the 0.5.6 manifest version and passed
-clean installed-package verification. The regression fixture controls the vendor
-boundaries. A separate [real-client capture](packages/adapter-claude-code/COMPATIBILITY.md#channel-mcp-reply-to-codex-transport-2026-09-13)
-with the same archive observed Claude's MCP reply reach the original Codex session
-and automatically start its next model turn after the active turn ended, without
-an inbox read or user prompt. Cold-start delivery remains unverified. Published
-0.5.6 provenance below remains unchanged.
+The exact archive passed clean installation verification and upgrade from published
+0.5.6. Both delivery decisions survived, and all 278 source, archive and installed
+files matched. All 28 managed archive checks and the Channel reply regression passed
+with the repository's four-file concurrency limit. A deliberate removal of the
+live-offer callback makes the reply regression fail.
+
+A real Claude reply automatically started the next turn of its original Codex peer.
+That capture retains its original development-artifact provenance. This release's
+archive differs only in manifest versions. Cold-start delivery remains unverified.
+See [0.5.7 release evidence](docs/release-evidence/v0.5.7.md) for the capture and limits.
 
 ## 0.5.6 — release candidate
 
