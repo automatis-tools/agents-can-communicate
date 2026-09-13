@@ -26,6 +26,12 @@ provenance and limitations. The existing managed standalone installation remains
 a prerequisite. Service readiness does not establish client trust, a bound
 recipient, active sandbox access, message delivery, or login/reboot persistence.
 
+Final syntax checks passed for 533 files. The full suite passed with 2,204 tests,
+2,203 passes, zero failures, and one existing Gemini-uninstall skip. The final
+whole-branch review had no findings. See
+[development validation](docs/internal/evidence/complete-delivery-setup.md) for
+mutation evidence, final gates, and capture limits.
+
 ## 0.5.3 — release candidate
 
 - Bare `ack` refuses unanswered questions and requests with exit 5. Use `reply`

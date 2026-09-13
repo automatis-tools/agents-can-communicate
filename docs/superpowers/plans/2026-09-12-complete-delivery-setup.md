@@ -1,6 +1,6 @@
 # Complete Delivery Setup Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Complete supported local delivery setup after one installation choice and explain incomplete setup accurately.
 
@@ -39,7 +39,7 @@
 - `recordInstall` accepts/stores optional `deliveryDecision`, retaining it on maintenance refresh. `runInstallCommand` passes `allowServiceSetup: true` only for the explicit install path.
 - Task 2 detection adds `entry.nativeServiceSetup` with state `ready`, `needed`, `blocked`, or `unsupported`. Treat `needed` or `blocked` as reasons to ask an existing non-off client for expanded complete-setup consent when absent; do not ask that client if consent is already recorded.
 
-- [ ] **Step 1: Add failing behavioral tests.** Reuse the existing detected-entry fixtures. Two eligible clients must invoke confirm once and share its response:
+- [x] **Step 1: Add failing behavioral tests.** Reuse the existing detected-entry fixtures. Two eligible clients must invoke confirm once and share its response:
 
 ```js
 const questions = [];
@@ -54,9 +54,9 @@ assert.deepEqual(result.deliveryDecisionByAdapter.codex,
 
 Add cases for No, default/noninteractive, dry run, explicit actionable/all/off, preserved non-off, unsupported client, legacy non-off needing setup accepted/declined, and reinstall after complete consent. An eligible interactive install after noninteractive-default or unsupported-default must still offer a choice; deliberate declined/explicit off remains retained. Assertions must check counts, policies, decision values, and absence of side effects; avoid only checking prompt wording.
 
-- [ ] **Step 2: Run the focused tests and record the precise red assertion.** Run `node --test packages/cli/test/install-delivery-consent.test.mjs`. Verify the old implementation produces two prompts or missing provenance, not a fixture/import failure.
+- [x] **Step 2: Run the focused tests and record the precise red assertion.** Run `node --test packages/cli/test/install-delivery-consent.test.mjs`. Verify the old implementation produces two prompts or missing provenance, not a fixture/import failure.
 
-- [ ] **Step 3: Implement the decision and persistence path.** Collect eligible undecided clients and legacy opted-in clients needing expanded service setup. Invoke confirm once for the set, naming every client and describing token use, local grants, startup, and existing Channels requirements. The decision update is:
+- [x] **Step 3: Implement the decision and persistence path.** Collect eligible undecided clients and legacy opted-in clients needing expanded service setup. Invoke confirm once for the set, naming every client and describing token use, local grants, startup, and existing Channels requirements. The decision update is:
 
 ```js
 for (const entry of candidates) {
@@ -71,8 +71,8 @@ for (const entry of candidates) {
 
 Define `decisionOf(record)` locally to normalize known sources and default missing/invalid values to `{source: "legacy-unknown", completeSetup: false}`. Explicit options set source explicit-option and completeSetup to policy !== off. Fresh noninteractive and unsupported defaults get their named sources; retained decisions are not overwritten. Dry run does not store decisions. Keep default-No confirmation handling.
 
-- [ ] **Step 4: Run focused CLI and installer tests.** Include existing confirm/install/ownership/plan/refresh coverage. Show a mutation removing one persistence assignment fails a new round-trip assertion. Restore it and record green.
-- [ ] **Step 5: Commit** with `feat: unify delivery setup consent and retain its source`.
+- [x] **Step 4: Run focused CLI and installer tests.** Include existing confirm/install/ownership/plan/refresh coverage. Show a mutation removing one persistence assignment fails a new round-trip assertion. Restore it and record green.
+- [x] **Step 5: Commit** with `feat: unify delivery setup consent and retain its source`.
 
 ### Task 2: Prepare a missing supported Codex service during explicit install
 
@@ -92,7 +92,7 @@ Define `decisionOf(record)` locally to normalize known sources and default missi
 - A successful preparation replaces the stale pre-install missing-service summary with a service-ready/session-needed result. It must not claim a bound session or keep telling the user to start the service that just passed verification.
 - On attempted setup failure, verify the actual CLI's nonzero human output as well as JSON: `main` throws the handler error and does not print its normal text, so the error message must carry partial-success details and next actions.
 
-- [ ] **Step 1: Add failing service and installer tests.** Verify definite absence starts the pinned executable once with exact HOME/CODEX_HOME, then verifies the real protocol; a healthy service starts zero times. For orchestration use a fake adapter whose install writes an owned file and whose setup fails:
+- [x] **Step 1: Add failing service and installer tests.** Verify definite absence starts the pinned executable once with exact HOME/CODEX_HOME, then verifies the real protocol; a healthy service starts zero times. For orchestration use a fake adapter whose install writes an owned file and whose setup fails:
 
 ```js
 const result = await applyPlan({ plan, adapters: [adapter], context, dataHome });
@@ -106,8 +106,8 @@ assert.deepEqual(calls, ["install", "prepare"]);
 
 Cover off, dry run, no complete consent, automatic-refresh plan, unsupported platform/version, missing/mismatched managed install, unsafe/stale endpoint or PID, changed executable/home between plan and apply, start timeout/nonzero, protocol verification failure, and a healthy service racing the plan. Test absence checks with actual temp filesystem entries where possible; no model request.
 
-- [ ] **Step 2: Run new focused tests and capture red** caused by absent setup behavior. Do not count import errors as red proof.
-- [ ] **Step 3: Implement the adapter operation and installer integration.** Reuse `maintenanceContext`/`probeMaintenanceInstall` and identity helpers without pretending cold start has an approved old PID. Validate pinned home/executable and definite absence again immediately before starting. The only new mutating command is equivalent to:
+- [x] **Step 2: Run new focused tests and capture red** caused by absent setup behavior. Do not count import errors as red proof.
+- [x] **Step 3: Implement the adapter operation and installer integration.** Reuse `maintenanceContext`/`probeMaintenanceInstall` and identity helpers without pretending cold start has an approved old PID. Validate pinned home/executable and definite absence again immediately before starting. The only new mutating command is equivalent to:
 
 ```js
 await run(plan.cliPath, ["app-server", "daemon", "start"], {
@@ -118,8 +118,8 @@ await run(plan.cliPath, ["app-server", "daemon", "start"], {
 
 Require bounded post-start service identity and `probeNativeDelivery` verification. An empty service is ready infrastructure, not a bound session: accept `native_session_unavailable` only with verified owned PID/socket, matching server version, and a successful metadata handshake; retain the session-needed diagnostic. Other failed protocol probes fail setup. Never remove stale metadata or stop/restart on this path. Reuse a raced healthy service only after checks. Report missing managed installation with the existing vendor-supported action, avoiding false success. Preserve install ownership if service work fails. Do not grant new hooks/delivery capabilities.
 
-- [ ] **Step 4: Run focused adapter/installer tests and verify mutations.** Suppress the native protocol verification and show its test fails; suppress the allowServiceSetup gate and show refresh/no-consent coverage fails. Restore and record green. Capture a real supported cold start in a private HOME/CODEX_HOME using an explicitly described managed-install fixture, verify service identity and native probe, stop only the fixture process, and append evidence. The controller provides the independent capture artifact path; inspect it rather than guessing.
-- [ ] **Step 5: Commit** with `feat: prepare supported Codex service after setup consent`.
+- [x] **Step 4: Run focused adapter/installer tests and verify mutations.** Suppress the native protocol verification and show its test fails; suppress the allowServiceSetup gate and show refresh/no-consent coverage fails. Restore and record green. Capture a real supported cold start in a private HOME/CODEX_HOME using an explicitly described managed-install fixture, verify service identity and native probe, stop only the fixture process, and append evidence. The controller provides the independent capture artifact path; inspect it rather than guessing.
+- [x] **Step 5: Commit** with `feat: prepare supported Codex service after setup consent`.
 
 ### Task 3: Diagnose incomplete setup and prove the packed onboarding flow
 
@@ -135,7 +135,7 @@ Require bounded post-start service identity and `probeNativeDelivery` verificati
 - Remediation that requires new consent must name `acc install --adapter codex --delivery actionable`; plain reinstall retains a deliberately declined/explicit off decision and cannot promise to enable it. Custom policies receive their specific manual configuration explanation.
 - Permission preparation retains already owned valid ACC grants when requested incoming policy is off; fresh off creates none, custom/modified ownership remains protected, uninstall restores previous bytes.
 
-- [ ] **Step 1: Add failing diagnostics and permission assertions.** After an approved install, disable incoming delivery and check the ACC outgoing grants still exist; uninstall and check exact original bytes. Fresh off must leave an empty/default config without live grants. Custom permissions must remain byte-identical. For doctor assert one outgoing remediation and distinct absent-vs-custom explanations, with known/unknown off origins.
+- [x] **Step 1: Add failing diagnostics and permission assertions.** After an approved install, disable incoming delivery and check the ACC outgoing grants still exist; uninstall and check exact original bytes. Fresh off must leave an empty/default config without live grants. Custom permissions must remain byte-identical. For doctor assert one outgoing remediation and distinct absent-vs-custom explanations, with known/unknown off origins.
 
 ```js
 assert.equal(report.data.installs.find(x => x.adapterId === "codex")
@@ -146,13 +146,13 @@ assert.match(await readFile(configPath, "utf8"), /acc-workspace/);
 
 Adapt the doctor assertion to its actual public JSON structure; do not add a redundant `installs` field merely for this example.
 
-- [ ] **Step 2: Run the changed tests before production edits** and capture failing behavioral assertions, then implement minimal diagnostics and permission retention.
-- [ ] **Step 3: Exercise the packed CLI with one real confirmation interaction.** Reuse `createPackedAcc`, private homes, existing fake client protocol fixtures, and TTY input/output setup. With Claude and Codex selected, one yes must save actionable plus complete consent for both and show the supported preparation result. A missing managed prerequisite must be needsAction; it must not falsely say ready. Add No, explicit noninteractive actionable, dry run, and repeat-install coverage. Observe actual ownership/configuration/command log side effects, not just summary text. Prove the one-prompt and no-start guards with exact mutations and restore them.
-- [ ] **Step 4: Update current docs** to describe one choice, explicit automation flags, custom permission preservation, supported service prerequisites, client-owned startup/trust actions, and infrastructure-ready versus session-bound. State that disabling incoming requests retains already approved outgoing grants. Do not imply universal reboot persistence or hook availability.
-- [ ] **Step 5: Run relevant focused and packed tests**, inspect the final diff, and commit with `fix: explain incomplete delivery setup and preserve outgoing grants`.
+- [x] **Step 2: Run the changed tests before production edits** and capture failing behavioral assertions, then implement minimal diagnostics and permission retention.
+- [x] **Step 3: Exercise the packed CLI with one real confirmation interaction.** Reuse `createPackedAcc`, private homes, existing fake client protocol fixtures, and TTY input/output setup. With Claude and Codex selected, one yes must save actionable plus complete consent for both and show the supported preparation result. A missing managed prerequisite must be needsAction; it must not falsely say ready. Add No, explicit noninteractive actionable, dry run, and repeat-install coverage. Observe actual ownership/configuration/command log side effects, not just summary text. Prove the one-prompt and no-start guards with exact mutations and restore them.
+- [x] **Step 4: Update current docs** to describe one choice, explicit automation flags, custom permission preservation, supported service prerequisites, client-owned startup/trust actions, and infrastructure-ready versus session-bound. State that disabling incoming requests retains already approved outgoing grants. Do not imply universal reboot persistence or hook availability.
+- [x] **Step 5: Run relevant focused and packed tests**, inspect the final diff, and commit with `fix: explain incomplete delivery setup and preserve outgoing grants`.
 
 ## Final verification
 
-- [ ] Run `npm ci`, `npm run check`, `npm test`, then `npm pack && node scripts/verify-package.mjs` from the worktree. For sandbox-safe npm use `npm_config_cache=/private/tmp/acc-onboarding-npm-cache npm_config_offline=true npm_config_audit=false npm_config_fund=false`; use `ACC_NO_UPDATE_CHECK=1` when tests otherwise initiate the background updater.
-- [ ] Review the whole branch against the spec, AGENTS.md, actual-client evidence, and packed behavior. Fix critical/important findings and run their covering checks.
-- [ ] Confirm a clean worktree and focused commits. Retain the branch for the user; do not push, merge, publish, or alter the real client installation.
+- [x] Run `npm ci`, `npm run check`, `npm test`, then `npm pack && node scripts/verify-package.mjs` from the worktree. Use `npm_config_cache=/private/tmp/acc-onboarding-npm-cache npm_config_audit=false npm_config_fund=false`. Dependency installation can use `npm_config_offline=true`; the full suite needs `npm_config_offline=false` for its private localhost update registries. Use `ACC_NO_UPDATE_CHECK=1` when tests otherwise initiate the background updater.
+- [x] Review the whole branch against the spec, AGENTS.md, actual-client evidence, and packed behavior. Fix critical/important findings and run their covering checks.
+- [x] Confirm a clean worktree and focused commits. Retain the branch for the user; do not push, merge, publish, or alter the real client installation.
