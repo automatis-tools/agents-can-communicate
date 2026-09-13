@@ -5,14 +5,15 @@
 - Present model handoffs, independent review and shared-API coordination in a
   shorter README, with one handoff to try and links to detailed client support.
 - Show independent sessions and model handoffs in one compact README diagram.
+  Keep labels readable when a renderer falls back to black text.
 - Keep the ordinary-task prompt check on the existing Getting Started example.
   A deliberate coordination instruction in that example makes the check fail.
 
 | Development validation artifact | Value |
 |---|---|
-| Built from | `814bb330d583d9175461837371aae20650c1c81a` |
-| Tarball | `agents-can-communicate-0.5.7.tgz`, 395,079 bytes, 278 files |
-| sha256 | `ac3a144314983fa13b9c22b39975e2f79d1d2303889c00620bb73b65c4272ac1` |
+| Built from | `0f9f0956ff2b8d643e360e3f997381f350c68607` |
+| Tarball | `agents-can-communicate-0.5.7.tgz`, 395,085 bytes, 278 files |
+| sha256 | `89bf84285b01f02958bdb4b0c0e2c7248d48a92700ef5c7ad97102bd6ab8ec3a` |
 
 This documentation-development archive passed clean installation verification:
 packed documentation links, bundled certification evidence, doctor, a non-Git
