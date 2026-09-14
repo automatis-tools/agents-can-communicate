@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased — first-try feedback in Discussions
+
+- Point the README's first-try feedback link to GitHub Discussions (Show and tell)
+  and keep issues for bug reports.
+
 ## 0.5.8 — release candidate
 
 - Register Claude Channel when its endpoint becomes ready, even if SessionStart
