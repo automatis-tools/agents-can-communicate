@@ -118,7 +118,8 @@ Automatic updates are enabled on first install. Use `acc update --auto off` to d
 [update controls](docs/UPGRADING.md) for details.
 
 MIT-licensed and permanently noncommercial. Try it on one real task and
-[tell us where you still had to carry messages yourself](https://github.com/automatis-tools/agents-can-communicate/issues).
+[tell us where you still had to carry messages yourself](https://github.com/automatis-tools/agents-can-communicate/discussions/categories/show-and-tell).
+Report bugs in [issues](https://github.com/automatis-tools/agents-can-communicate/issues).
 
 [Documentation](docs/index.md) ·
 [Contributing](https://github.com/automatis-tools/agents-can-communicate/blob/main/AGENTS.md)
