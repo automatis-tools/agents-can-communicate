@@ -5,6 +5,17 @@
 - Point the README's first-try feedback link to GitHub Discussions (Show and tell)
   and keep issues for bug reports.
 
+| Development validation artifact | Value |
+|---|---|
+| Built from | `07867ba4a10befacd2ff9fd2d89f61e54c11027c` |
+| Tarball | `agents-can-communicate-0.5.8.tgz`, 396,406 bytes, 279 files |
+| sha256 | `1ea6c20d7ea4a497b7003c49ce551f0d46fd6a1fc9a14545e56d090d67481909` |
+
+This unpublished development build retains the 0.5.8 manifest version; only the
+packed README changed since the 0.5.8 candidate. The archive passed clean
+installed-package verification: tarball contents, packed Markdown links, doctor,
+a workspace without Git, and install/uninstall restoration.
+
 ## 0.5.8 — release candidate
 
 - Register Claude Channel when its endpoint becomes ready, even if SessionStart
