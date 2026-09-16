@@ -15,7 +15,7 @@ export { BEGIN, END, removeTomlBlock, renderBlock, stripBlock, tomlString, write
 export { projectContext, projectContextResult } from "./context-projector.mjs";
 export { decisionBody, decisionLines } from "./decision-text.mjs";
 export { shellWriteTargets } from "./shell-writes.mjs";
-export { keepOnlyVersion, ownVersion, stampPluginVersion } from "./own-version.mjs";
+export { keepVersions, ownVersion, stampPluginVersion } from "./own-version.mjs";
 export { editJson, readJson } from "./json-text.mjs";
 export { formatJsonAs, jsonStyleOf, mergeOwnedConfig, mergeOwnedEntries, ownedEntries, ownedKeys,
   acccreatedFile, removeIfEmpty, removeOwnedConfig, removeOwnedEntries, writeForeignJson,
