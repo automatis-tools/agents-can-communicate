@@ -1,5 +1,31 @@
 # Changelog
 
+## Unreleased — plugin cache retention
+
+- Keep two copies of the plugin in a client's versioned cache: the version an
+  update writes and the one it moves off. Managed installs and background
+  refreshes previously asked the adapters to keep every version they found, so
+  nine releases left nine copies in both the Codex and Claude Code caches.
+- Hold the outgoing copy because these clients pin one versioned install path
+  per plugin and read it once per session. A session open across an update keeps
+  firing its hooks from that copy until it restarts.
+- Pin the retention rule with tests at the helper, at both adapters that version
+  their cache, and end to end through a background refresh. Nothing covered this
+  behaviour before, in either direction.
+
+| Development validation artifact | Value |
+|---|---|
+| Built from | `027c5801e250868e6984adc1015500d1a46b82f5` |
+| Tarball | `agents-can-communicate-0.5.8.tgz`, 396,954 bytes, 279 files |
+| sha256 | `30701fbf7900b51d041f1e3c9dab6c4af58992a43d94d8c8e44735ac4e11d0a3` |
+
+This development archive passed clean installation verification: 279 packed
+entries with none forbidden, five certification manifests, packed documentation
+links, bundled workspaces at 0.5.8, doctor across five adapters, a non-Git
+workspace, and integration install/uninstall with the client home restored. It
+is distinct from the published 0.5.8 archive below and establishes no new
+real-client capability evidence.
+
 ## 0.5.8 — release candidate
 
 - Register Claude Channel when its endpoint becomes ready, even if SessionStart

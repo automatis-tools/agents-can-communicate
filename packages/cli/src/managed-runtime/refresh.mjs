@@ -12,8 +12,13 @@ export async function prepareRefresh({ control, root, env = process.env, callerP
   const wanted = new Set(control.targets);
   const adapters = ALL_ADAPTERS().filter(adapter => wanted.has(adapter.id));
   if (adapters.length !== wanted.size) throw new Error("candidate cannot refresh every installed integration");
+  // The version this refresh is moving off. Clients that cache a plugin under
+  // its version record one path per plugin and read it once per session, so a
+  // session open across the update keeps running from the outgoing copy until it
+  // restarts. Naming it here keeps that copy; everything older than it goes.
   const context = { ...clientContext(control.home, path.join(dataHome, "acc"),
-    { env, shell: shellOf(env), dataHome }), ...stablePaths(root), preserveVersions: true };
+    { env, shell: shellOf(env), dataHome }), ...stablePaths(root),
+  keepPreviousVersion: control.active.version };
   const recorded = (await loadOwnership({ dataHome })).installs;
   const detected = await detectInstallation({ adapters, context, probeTimeoutMs: probeTimeout(env) });
   const deliveryByAdapter = Object.fromEntries(adapters.map(adapter => [adapter.id,
