@@ -57,23 +57,31 @@ export async function stampPluginVersion({ file, version, io }) {
 }
 
 /**
- * Leave one copy of a versioned plugin, the one just written.
+ * Leave the named copies of a versioned plugin and remove the rest.
  *
  * These clients cache a plugin under its version. Until the version tracked the
  * package it never changed, every install landed in the same directory and
  * overwrote itself, and nothing accumulated. Once it started moving, the first
  * upgrade left three copies of ACC in a home that should hold one.
  *
+ * `keep` is a list rather than the single version just written, because these
+ * clients pin one `installPath` per plugin and a session reads it once. A
+ * session already open when an upgrade lands still holds the path it started
+ * with, so an upgrade names the version it moved off as well as the one it
+ * wrote, and that session keeps firing hooks until it is restarted. An install
+ * with nothing to hold passes a null, which is dropped here.
+ *
  * Scoped to the plugin's own directory. The marketplace cache root above it
  * holds every plugin installed from that marketplace, and removing that root
  * once took a plugin the user had installed themselves - so a sibling here is
  * an older ACC, and a sibling one level up is somebody else's.
  */
-export async function keepOnlyVersion({ root, version, io }) {
+export async function keepVersions({ root, keep, io }) {
+  const wanted = new Set(keep.filter(version => typeof version === "string" && version !== ""));
   const entries = await io.readdir(root, { withFileTypes: true }).catch(() => []);
   const removed = [];
   for (const entry of entries) {
-    if (!entry.isDirectory() || entry.name === version) continue;
+    if (!entry.isDirectory() || wanted.has(entry.name)) continue;
     await io.rm(path.join(root, entry.name), { recursive: true, force: true });
     removed.push(entry.name);
   }

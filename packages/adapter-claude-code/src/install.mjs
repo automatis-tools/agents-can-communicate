@@ -9,7 +9,7 @@ import { fileURLToPath } from "node:url";
 
 import { acccreatedFile, bakeSkillCommand, blankJson, defaultBootstrap, defaultChannel,
   mergeOwnedEntries, ownedEntries,
-  keepOnlyVersion, ownVersion, stampPluginVersion,
+  keepVersions, ownVersion, stampPluginVersion,
   removeIfEmpty,
   removeInstalledTree,
   removeOwnedEntries, writeCliShim, writeForeignJson, writeHookShim }
@@ -181,7 +181,7 @@ async function layOutPlugin(target, { runner, node, cli, channel, live }) {
     version: await pluginVersion(), io: { readFile, writeFile } });
 }
 
-export async function installClaudePlugin({ configDir, runner, cli, preserveVersions = false, node = process.execPath,
+export async function installClaudePlugin({ configDir, runner, cli, keepPreviousVersion = null, node = process.execPath,
   channel = defaultChannel(), livePolicy = "off", now = new Date() }) {
   const live = livePolicy === "actionable" || livePolicy === "all";
   // Everything this will merge into, read before a byte is written. A settings
@@ -206,10 +206,13 @@ export async function installClaudePlugin({ configDir, runner, cli, preserveVers
   // run `claude plugin install`, exactly as the Codex adapter does, because the
   // command's only effect is this copy plus the two registry entries below.
   await layOutPlugin(cached, { runner, node, cli, channel, live });
-  // One copy, the one just written. A client caches a plugin under its version,
-  // so every upgrade would otherwise leave the previous release's tree beside
-  // this one - invisible while the version never moved, three deep once it did.
-  if (!preserveVersions) await keepOnlyVersion({ root: path.dirname(cached), version,
+  // The copy just written, plus the one an upgrade moved off. A client caches a
+  // plugin under its version, so every upgrade would otherwise leave the previous
+  // release's tree beside this one - invisible while the version never moved,
+  // three deep once it did. The one it moved off stays because a session open
+  // across the upgrade still runs hooks from the path it recorded at start;
+  // anything older than that holds no session and is litter.
+  await keepVersions({ root: path.dirname(cached), keep: [version, keepPreviousVersion],
     io: { readdir, rm } });
 
   await writeClientJson(knownMarketplacesPath(configDir), {
