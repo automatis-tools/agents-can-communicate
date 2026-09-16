@@ -56,7 +56,12 @@ export async function installManaged({ packageRoot, managerRoot, dataHome, home,
         targets: [...new Set([...(previous?.targets ?? []), ...targets])], notice: null };
       await writeControl(root, control);
       const paths = await writeLaunchers(root, runtime.root);
-      const result = await apply({ ...paths, preserveVersions: true });
+      // The guard above admits only an install from the active generation, so
+      // this names the version being written and the adapters keep one copy.
+      // It is read from the pointer rather than assumed, so a future relaxation
+      // of that guard keeps the outgoing copy instead of silently removing it.
+      const result = await apply({ ...paths,
+        keepPreviousVersion: previous?.active.version ?? null });
       // Service readiness is separate from integration installation. Its failure
       // must not fence a fully installed runtime or make the durable inbox unusable.
       const integrationFailed = result.failed.some(failure => failure.stage !== "service-setup"

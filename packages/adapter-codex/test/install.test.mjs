@@ -681,3 +681,36 @@ test("every spelling of that table counts as the user's", async t => {
       `declared twice for:\n${declaration}`);
   }
 });
+
+/**
+ * What an upgrade leaves in the cache.
+ *
+ * This client pins one `installPath` per plugin and a session reads it once, so
+ * the directory an upgrade moves off is still the one every open session fires
+ * its hooks from. An upgrade names it; anything older than it is litter.
+ */
+test("an upgrade keeps the version it wrote and the one it moved off", async t => {
+  const { context } = await realFixture(t);
+  const version = await pluginVersion(CODEX_PLUGIN);
+  const cache = path.join(context.codexHome, "plugins", "cache", "acc-local",
+    "agents-can-communicate");
+  for (const old of ["0.0.1", "0.0.2"]) {
+    await mkdir(path.join(cache, old), { recursive: true });
+  }
+
+  await createCodexAdapter().install({ ...context, keepPreviousVersion: "0.0.2" });
+
+  assert.deepEqual((await readdir(cache)).sort(), ["0.0.2", version].sort());
+});
+
+test("an install with no previous version to hold leaves one copy", async t => {
+  const { context } = await realFixture(t);
+  const version = await pluginVersion(CODEX_PLUGIN);
+  const cache = path.join(context.codexHome, "plugins", "cache", "acc-local",
+    "agents-can-communicate");
+  await mkdir(path.join(cache, "0.0.1"), { recursive: true });
+
+  await createCodexAdapter().install({ ...context, keepPreviousVersion: null });
+
+  assert.deepEqual(await readdir(cache), [version]);
+});

@@ -5,7 +5,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { bakeSkillCommand, blankJson, blankText, removeIfEmpty, removeInstalledTree,
-  keepOnlyVersion, ownVersion, stampPluginVersion,
+  keepVersions, ownVersion, stampPluginVersion,
   tomlString, writeCliShim, writeForeignJson, writeHookShim }
   from "@agents-can-communicate/adapter-sdk";
 import { AccError, EXIT } from "@agents-can-communicate/protocol";
@@ -160,7 +160,7 @@ const sandboxReview = (config, file, stateRoot) =>
     : [];
 
 export async function installCodexPlugin({ home, agentsHome = home,
-  codexHome = path.join(home, ".codex"), dataHome, stateRoot, runner, node, cli, preserveVersions = false,
+  codexHome = path.join(home, ".codex"), dataHome, stateRoot, runner, node, cli, keepPreviousVersion = null,
   requestedLivePolicy, livePolicy, clientVersion, platform }) {
   // Read before writing, so a manifest that will not parse is found before a
   // plugin tree is laid down that nothing will then be able to remove.
@@ -228,9 +228,13 @@ export async function installCodexPlugin({ home, agentsHome = home,
   const cached = cachedVersionPath(codexHome, version);
   await rm(cached, { recursive: true, force: true });
   await cp(target, cached, { recursive: true });
-  // One copy, the one just written - and only inside this plugin's own
-  // directory. The marketplace cache root above it holds other people's plugins.
-  if (!preserveVersions) await keepOnlyVersion({ root: path.dirname(cached), version, io: { readdir, rm } });
+  // The copy just written, plus the one an upgrade moved off - and only inside
+  // this plugin's own directory. The marketplace cache root above it holds other
+  // people's plugins. A session open across the upgrade still fires its hooks
+  // from the path it started with, so removing that one now would silence it
+  // until restart; anything older than it holds no session and is litter.
+  await keepVersions({ root: path.dirname(cached), keep: [version, keepPreviousVersion],
+    io: { readdir, rm } });
 
   // The plugin's own directory in the cache. Not the versioned one inside it,
   // which goes stale the moment the version changes - and not the marketplace

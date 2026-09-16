@@ -273,3 +273,36 @@ test("the client's own registries come back byte for byte", async t => {
   const after = await Promise.all(registries.map(file => readFile(file, "utf8")));
   assert.deepEqual(after, before, "a borrowed registry came back changed");
 });
+
+/**
+ * What an upgrade leaves in the cache.
+ *
+ * This client records one versioned `installPath` per plugin and a session reads
+ * it once, so the directory an upgrade moves off is still the one every open
+ * session runs its hooks from. An upgrade names it; anything older is litter.
+ */
+test("an upgrade keeps the version it wrote and the one it moved off", async t => {
+  const { context } = await fixture(t);
+  const version = await pluginVersion(CLAUDE_PLUGIN);
+  const cache = path.join(context.configDir, "plugins", "cache", "acc-local",
+    "agents-can-communicate");
+  for (const old of ["0.0.1", "0.0.2"]) {
+    await mkdir(path.join(cache, old), { recursive: true });
+  }
+
+  await createClaudeCodeAdapter().install({ ...context, keepPreviousVersion: "0.0.2" });
+
+  assert.deepEqual((await readdir(cache)).sort(), ["0.0.2", version].sort());
+});
+
+test("an install with no previous version to hold leaves one copy", async t => {
+  const { context } = await fixture(t);
+  const version = await pluginVersion(CLAUDE_PLUGIN);
+  const cache = path.join(context.configDir, "plugins", "cache", "acc-local",
+    "agents-can-communicate");
+  await mkdir(path.join(cache, "0.0.1"), { recursive: true });
+
+  await createClaudeCodeAdapter().install({ ...context, keepPreviousVersion: null });
+
+  assert.deepEqual(await readdir(cache), [version]);
+});
