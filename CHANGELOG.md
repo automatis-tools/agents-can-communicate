@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased — plugin cache retention
+## 0.5.9 — release candidate
 
 - Keep two copies of the plugin in a client's versioned cache: the version an
   update writes and the one it moves off. Managed installs and background
@@ -13,18 +13,20 @@
   their cache, and end to end through a background refresh. Nothing covered this
   behaviour before, in either direction.
 
-| Development validation artifact | Value |
+| Candidate artifact | Value |
 |---|---|
-| Built from | `027c5801e250868e6984adc1015500d1a46b82f5` |
-| Tarball | `agents-can-communicate-0.5.8.tgz`, 396,954 bytes, 279 files |
-| sha256 | `30701fbf7900b51d041f1e3c9dab6c4af58992a43d94d8c8e44735ac4e11d0a3` |
+| Built from | `33d7f358e51234ea26fe8f8891aa242a182561e5` |
+| Tarball | `agents-can-communicate-0.5.9.tgz`, 396,954 bytes, 279 files |
+| sha256 | `bce564ea69700f1f26ef418a51c78929db24e08c23d132b5c0a2e728c2a38ee1` |
 
-This development archive passed clean installation verification: 279 packed
-entries with none forbidden, five certification manifests, packed documentation
-links, bundled workspaces at 0.5.8, doctor across five adapters, a non-Git
-workspace, and integration install/uninstall with the client home restored. It
-is distinct from the published 0.5.8 archive below and establishes no new
-real-client capability evidence.
+The exact archive passed clean installation and an isolated upgrade from published
+0.5.8. The active runtime became 0.5.9 with phase `ready`, both saved delivery
+choices survived, and each versioned plugin cache held exactly the new version and
+the one the update moved off. All 28 managed-update checks passed. Against
+published 0.5.8 the archive has 257 identical files, 16 version-only manifests and
+six changed code files, with none added or removed. It certifies no new native
+client capability. See [0.5.9 release evidence](docs/release-evidence/v0.5.9.md)
+for checks and limits.
 
 ## 0.5.8 — release candidate
 
