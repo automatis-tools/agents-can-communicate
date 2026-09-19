@@ -4,6 +4,7 @@ import path from "node:path";
 import test from "node:test";
 
 import { COMMANDS } from "@agents-can-communicate/cli";
+import { commandPrefix } from "../../packages/cli/src/managed-runtime/command-prefix.mjs";
 import { ATTENTION_PRIORITY, createCoordinationService }
   from "@agents-can-communicate/core";
 import * as coreApi from "@agents-can-communicate/core";
@@ -158,8 +159,9 @@ test("every attention rule is documented, and the documentation invents none", a
 
 test("the CLI reference documents every command, and invents none", async () => {
   const reference = await readFile(path.join(repo, "docs", "CLI.md"), "utf8");
-  const documented = new Set([...reference.matchAll(/`acc ([a-z-]+)/g)]
-    .map(match => match[1]));
+  const documented = new Set([...reference.matchAll(/`acc ([^`\n]+)`/g)]
+    .map(match => commandPrefix(match[1].split(/\s+/)).command)
+    .filter(command => command !== undefined && !command.startsWith("<")));
 
   for (const command of Object.keys(COMMANDS)) {
     assert.equal(documented.has(command), true, `acc ${command} is not documented`);

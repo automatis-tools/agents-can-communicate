@@ -21,7 +21,7 @@ test("native harness verifies managed launchers and their exact installed genera
   // The generated immutable modules must also match this installed artifact.
   const moduleRoot = path.join(packageRoot, "node_modules", "@agents-can-communicate", "cli", "src", "managed-runtime");
   await mkdir(moduleRoot, { recursive: true });
-  for (const name of ["entry", "state", "generation-files", "mutex", "leases", "schedule", "policy"]) {
+  for (const name of ["entry", "command-prefix", "state", "generation-files", "mutex", "leases", "schedule", "policy"]) {
     await cp(new URL(`../../packages/cli/src/managed-runtime/${name}.mjs`, import.meta.url),
       path.join(moduleRoot, `${name}.mjs`));
   }
@@ -36,11 +36,13 @@ test("native harness verifies managed launchers and their exact installed genera
   assert.equal(verified.hookRunner, commands.runner);
   assert.equal(verified.skillCli, commands.cli);
   const [launcherId] = await readdir(path.join(managerRoot, "launchers"));
-  const recoveryModule = path.join(managerRoot, "launchers", launcherId, "generation-files.mjs");
-  const recoveryBytes = await readFile(recoveryModule);
-  await writeFile(recoveryModule, "// changed recovery module\n");
-  await assert.rejects(verifyInstalledCommands(input), /launcher module bytes differ/);
-  await writeFile(recoveryModule, recoveryBytes);
+  for (const module of ["generation-files.mjs", "command-prefix.mjs"]) {
+    const recoveryModule = path.join(managerRoot, "launchers", launcherId, module);
+    const recoveryBytes = await readFile(recoveryModule);
+    await writeFile(recoveryModule, "// changed launcher module\n");
+    await assert.rejects(verifyInstalledCommands(input), /launcher module bytes differ/);
+    await writeFile(recoveryModule, recoveryBytes);
+  }
   const original = await readFile(path.join(active.root, "bin", "acc.mjs"));
   await writeFile(path.join(active.root, "bin", "acc.mjs"), "// different artifact\n");
   await assert.rejects(verifyInstalledCommands(input), /generation.*bytes/);
