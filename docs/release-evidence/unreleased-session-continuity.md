@@ -35,7 +35,23 @@ module. The focused parser, management entry, owner and skill checks passed all
 42 tests. The owner budget and installed continuity checks passed all 20 tests.
 Syntax checking passed all 552 tracked JavaScript modules.
 
-Final full-suite result: pending.
+Final `npm test`: 2,273 tests discovered, 2,272 passed, zero failed, one skipped
+(462.0 seconds). The skipped test requires an absent Gemini CLI; Gemini is installed
+on this machine. This full run followed correction of five old gate assumptions:
+empty SessionStart output after optional probe timeouts, command-first documentation
+scanning, and the launcher module inventories in security and native evidence checks.
+All 14 affected checks passed separately before the complete rerun.
+
+Mutation checks rejected a remote import in the new launcher module, an invented
+command after a leading global option, and removal of owner restoration after a
+probe timeout. The native evidence test also corrupts the new immutable launcher
+module and requires verification to fail.
+
+A separate demonstration installed this exact archive into disposable parent and
+nested Git repositories with a linked worktree. It confirmed distinct parent/nested
+workspaces, shared nested-repository/worktree identity, unchanged owner arguments
+after the compact event, an inbox read from the other worktree, and a reply that
+acknowledged the original message. All five checks passed.
 
 ## Real-client observation
 
