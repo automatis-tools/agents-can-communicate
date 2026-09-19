@@ -38,7 +38,8 @@ const NATIVE_TRANSPORT = new Set(["channel.mjs", "native-delivery.mjs", "ws-json
 // Remote reachability is forbidden everywhere on the hook path. A local Unix
 // socket (node:net) is forbidden too, except in the named native-transport
 // files.
-const BOOTSTRAP_MODULES = ["entry.mjs", "state.mjs", "generation-files.mjs", "mutex.mjs", "leases.mjs", "schedule.mjs", "policy.mjs"];
+const BOOTSTRAP_MODULES = ["entry.mjs", "command-prefix.mjs", "state.mjs", "generation-files.mjs",
+    "mutex.mjs", "leases.mjs", "schedule.mjs", "policy.mjs"];
 const bootstrap = path.join(repo, "packages", "cli", "src", "managed-runtime");
 
 const REMOTE = [
