@@ -3,7 +3,7 @@ import { defineAdapter, projectContext, projectContextResult }
 import certification from "../certification.json" with { type: "json" };
 
 import { PROTOCOL_CONTRACT } from "./channel.mjs";
-import { denyOutcome, injectOutcome, normalizeClaudeHook } from "./hooks.mjs";
+import { denyOutcome, injectOutcome, injectStartOwnerOutcome, normalizeClaudeHook } from "./hooks.mjs";
 import { planClaudeInstall, detectClaude, installClaudePlugin, uninstallClaudePlugin } from "./install.mjs";
 import { bindNativeSession, offerMessage, planNativeActivation, probeNativeDelivery, routeReply }
   from "./native-delivery.mjs";
@@ -99,6 +99,7 @@ export function createClaudeCodeAdapter() {
 
     denyOutcome,
     injectOutcome,
+    injectStartOwnerOutcome,
     normalizeHook: payload => normalizeClaudeHook(payload),
     renderContext: (sync, options) => projectContext(sync, options),
     renderContextResult: (sync, options) => projectContextResult(sync, options),

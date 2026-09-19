@@ -10,7 +10,7 @@ function ownerFlags(result) {
   const envelope = JSON.parse(result.stdout);
   assert.equal(envelope.hookSpecificOutput.hookEventName, "PreToolUse");
   const context = envelope.hookSpecificOutput.additionalContext;
-  const match = /^ACC CLI \(append\): --session (\S+) --generation (\S+)$/.exec(context);
+  const match = /^ACC CLI \(append\): --session (\S+) --generation (\S+) --cwd .+$/.exec(context);
   assert.ok(match, "tool context must contain only the complete owner line");
   assert.equal(envelope.hookSpecificOutput.updatedInput, undefined, "hook rewrote the command");
   return ["--session", match[1], "--generation", match[2]];

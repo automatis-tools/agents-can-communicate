@@ -17,7 +17,7 @@ import { probeClientVersion as defaultProbeClientVersion } from "./client-versio
 import { bindNative, nativeDiagnosticDeadline } from "./native-attempt.mjs";
 import { readProcessTable as defaultReadProcessTable } from "./process-table.mjs";
 import { withSessionLifecycle } from "./session-lifecycle.mjs";
-import { appendToolOwner, ownerHeader, ownerOnlyOutcome } from "./owner-context.mjs";
+import { appendStartOwner, appendToolOwner, ownerHeader, ownerOnlyOutcome } from "./owner-context.mjs";
 
 // Kept cohesive above 300 lines because every handler shares one fail-open
 // hook boundary, binding lifecycle, and client-specific outcome contract.
@@ -224,7 +224,8 @@ async function openContext({ cwd, dataHome, runtime, env, deadline }) {
   });
   const store = await openFilesystemStore({ root: paths.root, clock: runtime.clock,
     ids: runtime.ids, workspaceId: descriptor.id, deadlineAt: deadline });
-  return { descriptor, paths, dataHome: resolvedDataHome, env: env ?? {}, realpath: runtime.realpath ?? realpath,
+  return { descriptor, paths, workspaceCwd: path.resolve(env?.ACC_WORKSPACE_ROOT || cwd),
+    dataHome: resolvedDataHome, env: env ?? {}, realpath: runtime.realpath ?? realpath,
     service: createCoordinationService({ store, clock: runtime.clock, ids: runtime.ids }) };
 }
 
@@ -253,7 +254,7 @@ async function projectTurn({ binding, context, adapter, adapterId }) {
   // Only this hook's payload selected the binding. Supply its own pair as
   // trusted context, outside peer bodies, rather than exporting inheritable
   // credentials or teaching the CLI to guess from a public roster.
-  const owner = ownerHeader(binding);
+  const owner = ownerHeader(binding, context.workspaceCwd);
   const totalBudget = context.descriptor.policy?.contextBudgetBytes ?? 6_000;
   // A peer can join after this prompt has begun. The current turn must already
   // have its own arguments when it needs inbox/reply, without reattaching or
@@ -611,7 +612,8 @@ export async function runHook({ adapterId, payload, adapters, dataHome, env,
       const result = handler === undefined ? {} : await handler({ event, context, adapter, adapterId,
         binding, paths: context.paths,
         readProcessTable, probeClientVersion, platform, deadline });
-      return appendToolOwner(result, { event, binding, context, adapter });
+      return appendToolOwner(appendStartOwner(result, { event, context, adapter }),
+        { event, binding, context, adapter });
     };
     const work = lifecycle
       ? withSessionLifecycle({ root: context.paths.root, sessionId: event.sessionId,

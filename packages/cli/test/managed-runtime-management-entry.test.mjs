@@ -71,10 +71,22 @@ test("candidate management dispatch requires matching package identity and the a
 
 test("update and help appearing as argument values never bypass active workspace admission", async t => {
   const f = await fixture(t);
-  for (const args of [["status"], ["message", "--body", "update"], ["message", "--body", "--help"]]) {
+  for (const args of [["status"], ["--cwd", "update", "status"], ["--json", "message", "--body", "update"], ["message", "--body", "update"], ["message", "--body", "--help"]]) {
     const result = await f.run(args);
     assert.equal(result.label, "active");
     assert.notEqual(result.options.managementOnly, true);
   }
   assert.equal((await readdir(path.join(f.root, "leases"))).some(name => name.endsWith(".json")), true);
 });
+
+for (const command of ["update", "doctor"]) {
+  test(`leading globals keep ${command} recovery on the current management implementation`, async t => {
+    const f = await fixture(t);
+    for (const args of [["--json", command], ["--cwd", "update", command],
+      ["--workspace=--help", command]]) {
+      assert.equal((await f.run(args)).label, "installed");
+    }
+    await writeControl(f.root, { ...f.control, phase: "activating" });
+    assert.equal((await f.run(["--json", command], f.active.root)).label, "pending");
+  });
+}

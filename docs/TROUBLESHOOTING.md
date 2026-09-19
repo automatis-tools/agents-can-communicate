@@ -24,6 +24,26 @@ requires plugin trust.
 ACC does not launch a missing session. Open it normally after fixing the installation or
 workspace path.
 
+Nested repositories have different Git common directories. A parent repository and a
+nested app therefore resolve to separate ACC workspaces; the app and its own worktrees
+share one. Use the hook header's complete arguments, including `--cwd`, when a shell
+moves between them. To intentionally share a room across repositories, use an explicit
+workspace configuration or `ACC_WORKSPACE_ROOT` consistently for all clients. Choosing
+a shared workspace does not merge histories or move messages between participant IDs.
+
+## The owner arguments disappeared after compaction
+
+Claude Code's `SessionStart` restores the original session's owner header after
+compaction. Use its complete `--session`, `--generation`, and `--cwd` arguments.
+The hook retains the generation outside the model context; compaction does not require
+manual attachment or a new participant. An older installed integration may need updating.
+
+If the header is unavailable, use this session's ACC MCP tools when they own the
+addressed participant, or report the limitation and continue the user's work. Do not
+create a replacement participant just to recover context: it cannot inherit another
+participant's inbox. `caller_workspace_mismatch` means the named session is absent from
+the selected workspace; check the original directory before concluding there are no peers.
+
 ## A hook says `workspace contains ACC runtime state`
 
 The current directory contains ACC's own state, so ACC cannot use it as a workspace.

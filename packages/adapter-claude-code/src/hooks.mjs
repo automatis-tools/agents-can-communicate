@@ -109,3 +109,8 @@ export function denyOutcome(reason) {
 export function injectOutcome(context) {
   return { stdout: `${JSON.stringify(injectResponse(context))}\n`, stderr: "", exitCode: 0 };
 }
+
+export function injectStartOwnerOutcome(context) {
+  return { stdout: `${JSON.stringify({ hookSpecificOutput: {
+    hookEventName: "SessionStart", additionalContext: context } })}\n`, stderr: "", exitCode: 0 };
+}

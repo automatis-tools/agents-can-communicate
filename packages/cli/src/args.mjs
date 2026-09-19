@@ -1,4 +1,5 @@
 import { AccError, EXIT } from "@agents-can-communicate/protocol";
+import { commandPrefix, GLOBAL_OPTIONS } from "./managed-runtime/command-prefix.mjs";
 
 // Native adapters manage session lifecycle automatically. Manual CLI sessions
 // use attach, heartbeat, and detach; both paths are described in command help.
@@ -71,7 +72,7 @@ export const COMMANDS = Object.freeze({
 const ALIASES = Object.freeze({ "--help": "help", "-h": "help",
   "--version": "version", "-v": "version", "-V": "version" });
 
-const GLOBAL = Object.freeze(["json", "workspace", "cwd"]);
+const GLOBAL = GLOBAL_OPTIONS;
 
 function usage(message, details = {}) {
   throw new AccError(EXIT.USAGE, message, details);
@@ -88,7 +89,9 @@ export function parseArgs(argv) {
   if (!Array.isArray(argv) || argv.length === 0) {
     usage("a command is required - `acc help` lists them");
   }
-  const [first, ...rest] = argv;
+  const { command: first, leading, rest, error } = commandPrefix(argv);
+  if (error !== undefined) usage(error);
+  if (first === undefined) usage("a command is required - `acc help` lists them");
   let command = Object.hasOwn(ALIASES, first) ? ALIASES[first] : first;
   let helpRequested = false;
   if (command === "help" && rest[0] !== undefined && !rest[0].startsWith("-")) {
@@ -112,6 +115,7 @@ export function parseArgs(argv) {
     }
   }
   spec = commandSpec(command, subcommand);
+  tokens = [...leading, ...tokens];
 
   const repeated = new Set(spec.repeated ?? []);
   const flags = new Set([...(spec.flags ?? []), "json"]);
