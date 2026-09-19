@@ -1,5 +1,26 @@
 # Changelog
 
+## Unreleased — session ownership continuity
+
+- Restore Claude Code's own CLI arguments at SessionStart, including compaction,
+  and keep the workspace directory in every hook owner header.
+- Reject a session selector absent from the selected workspace instead of
+  returning a misleading empty status. Keep public observations available.
+- Accept global options before commands, including managed update/doctor recovery.
+- Exercise the installed artifact after shell directory changes and synthetic
+  compaction. Observe exact owner arguments in a real Claude Code 2.1.278 startup.
+
+| Candidate artifact | Value |
+|---|---|
+| Built from | `4adbac5c38167f75b78d624db6cf7d7ef8b6c3ce` |
+| Tarball | `agents-can-communicate-0.5.9.tgz`, 398,941 bytes, 280 files |
+| sha256 | `d18905f8ada5fb66d6f77b70b0c4015870986bbf64d2369e6f8ad9af47807105` |
+
+This is an unpublished development artifact retaining the current package version,
+not the published 0.5.9 archive. Clean package verification passed. See
+[continuity evidence](docs/release-evidence/unreleased-session-continuity.md)
+for regression checks, the real-client observation, and its limits.
+
 ## 0.5.9 — release candidate
 
 - Keep two copies of the plugin in a client's versioned cache: the version an
