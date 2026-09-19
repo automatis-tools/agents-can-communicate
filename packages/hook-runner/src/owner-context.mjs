@@ -1,8 +1,10 @@
 import { assertPortableId } from "@agents-can-communicate/protocol";
 
-export const ownerHeader = binding => "ACC CLI (append): --session "
+const shellQuote = value => `'${value.replaceAll("'", "'\\''")}'`;
+
+export const ownerHeader = (binding, cwd) => "ACC CLI (append): --session "
   + assertPortableId(binding.accSessionId, "sessionId") + " --generation "
-  + assertPortableId(binding.generation, "generation");
+  + assertPortableId(binding.generation, "generation") + " --cwd " + shellQuote(cwd);
 
 export function ownerOnlyOutcome(inject, owner, budgetBytes) {
   if (Buffer.byteLength(owner, "utf8") > budgetBytes) {
@@ -20,11 +22,20 @@ export async function appendToolOwner(result, { event, binding, context, adapter
   const current = await context.service.locateSession(binding.accSessionId, context.descriptor.id);
   if (current?.record.state !== "open" || current.record.generation !== binding.generation) return result;
 
-  const owner = ownerHeader(binding);
+  const owner = ownerHeader(binding, context.workspaceCwd);
   const injected = adapter.injectToolOwnerOutcome({ owner, tool: event.tool });
   if (injected === null) return result;
   const fitted = ownerOnlyOutcome(() => injected, owner,
     context.descriptor.policy?.contextBudgetBytes ?? 6_000);
   return { ...result, stdout: fitted.stdout,
     stderr: [result.stderr, fitted.stderr].filter(Boolean).join("\n") };
+}
+
+// SessionStart can also be a context reset. Return the binding just resumed by
+// the hook; never require the model to remember it or attach another session.
+export function appendStartOwner(result, { event, context, adapter }) {
+  if (event.kind !== "sessionStart" || result.accSessionId === undefined
+    || typeof adapter.injectStartOwnerOutcome !== "function") return result;
+  return { ...result, ...ownerOnlyOutcome(text => adapter.injectStartOwnerOutcome(text),
+    ownerHeader(result, context.workspaceCwd), context.descriptor.policy?.contextBudgetBytes ?? 6_000) };
 }

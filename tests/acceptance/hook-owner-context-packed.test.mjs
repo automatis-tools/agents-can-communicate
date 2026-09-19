@@ -8,7 +8,7 @@ import { createPackedAcc } from "../helpers/packed-acc.mjs";
 // These are process/packaging contracts, not evidence that a model uses the
 // context. The real-client observation is recorded separately in COMPATIBILITY.
 function ownerFlags(context) {
-  const match = /^ACC CLI \(append\): --session (\S+) --generation (\S+)$/m.exec(context);
+  const match = /^ACC CLI \(append\): --session (\S+) --generation (\S+) --cwd .+$/m.exec(context);
   assert.ok(match, `the hook gave its session no usable owner arguments:\n${context}`);
   return ["--session", match[1], "--generation", match[2]];
 }
@@ -88,10 +88,10 @@ test("the installed hook provides its own pair for intent, claim and addressed r
   assert.equal(done.message.fromSessionId, reader.sessionId);
 });
 
-test("200 bytes retain both complete owner arguments and an executable inbox recovery", async t => {
-  const { packed, question, turn } = await stage(t, 200);
+test("300 bytes retain both complete owner arguments and an executable inbox recovery", async t => {
+  const { packed, question, turn } = await stage(t, 300);
   const { context } = await turn();
-  assert.ok(Buffer.byteLength(context) <= 200);
+  assert.ok(Buffer.byteLength(context) <= 300);
   const flags = ownerFlags(context);
   assert.match(context, new RegExp(`acc inbox --message ${question.message.messageId}`));
   const [item] = await packed.acc(["inbox", ...flags, "--message", question.message.messageId]);
@@ -109,17 +109,17 @@ test("a budget smaller than the pair keeps recovery truthful and reports the mis
 });
 
 test("an ambient turn reserves the owner line before truncating the peer notice", async t => {
-  const { turn } = await stage(t, 120, false);
+  const { turn } = await stage(t, 220, false);
   const flags = ownerFlags((await turn()).context);
   const { context } = await turn();
-  assert.ok(Buffer.byteLength(context) <= 120, context);
+  assert.ok(Buffer.byteLength(context) <= 220, context);
   assert.deepEqual(ownerFlags(context), flags);
 });
 
 test("a pair that fits alone cannot silently displace pending-message recovery", async t => {
-  const { question, turn } = await stage(t, 150);
+  const { question, turn } = await stage(t, 220);
   const { context, stderr } = await turn();
-  assert.ok(Buffer.byteLength(context) <= 150);
+  assert.ok(Buffer.byteLength(context) <= 220);
   assert.match(context, new RegExp(`acc inbox --message ${question.message.messageId}`));
   assert.match(stderr, /budget.*owner arguments/i);
 });

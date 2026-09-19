@@ -118,7 +118,10 @@ file ACC writes is an optional `acc.workspace.json` explicitly requested through
 A lone session can remain ephemeral. Durable state materialises when a second live session
 appears or the first claim, message, or handoff is committed. Solo presence therefore
 does not require durable workspace history. Native turn hooks still supply the session's
-own CLI arguments, so a peer joining later in the same turn does not require reattachment.
+own CLI arguments and workspace directory, so a peer joining later in the same turn
+does not require reattachment and a changed shell directory cannot silently select another
+workspace. Claude SessionStart also restores this owner header after compaction; it
+does not project peer bodies or advance their receipts.
 Grok instead receives that own header after a terminal tool result through PreToolUse;
 the first public status call makes it available for subsequent owned commands.
 Without relevant coordination context, that identity header is the only projected content.

@@ -15,6 +15,23 @@ const unresolved = command => new AccError(EXIT.USAGE,
   + "session IDs and a shared checkout do not establish CLI ownership.",
   { command, reasonCode: "caller_identity_unresolved" });
 
+async function observationOwner(options, context) {
+  if (options.session === undefined) return null;
+  const existing = await context.service.locateSession(options.session);
+  if (existing === null) {
+    throw new AccError(EXIT.CONFLICT,
+      "the selected session is absent from this workspace; use --cwd from the ACC hook header "
+      + "or the directory where your manual session attached. Do not attach a replacement to recover context.",
+      { reasonCode: "caller_workspace_mismatch", sessionId: options.session,
+        workspaceId: context.descriptor.id });
+  }
+  if (options.generation !== undefined && existing.record.generation !== options.generation) {
+    throw new AccError(EXIT.CONFLICT, "cannot observe as a replaced session generation",
+      { reasonCode: "caller_generation_mismatch", sessionId: options.session });
+  }
+  return existing.record;
+}
+
 /**
  * Accept caller-supplied credentials; never discover credentials from peers.
  *
@@ -30,22 +47,26 @@ export async function resolveOwner({ command, options, context, env = {} }) {
   const explicit = options.session !== undefined && options.generation !== undefined;
   const configured = typeof env.ACC_SESSION === "string" && typeof env.ACC_GENERATION === "string";
   if (!explicit && !configured) {
-    if (soft) return options;
+    if (soft) {
+      await observationOwner(options, context);
+      return options;
+    }
     throw unresolved(command);
   }
 
   const owner = explicit ? options : { session: env.ACC_SESSION, generation: env.ACC_GENERATION };
   if (options.session !== undefined && options.session !== owner.session) {
     // A public observation scope is allowed; it does not request credentials.
-    if (soft) return options;
+    if (soft) {
+      await observationOwner(options, context);
+      return options;
+    }
     throw unresolved(command);
   }
   // A supplied generation must reach the core unchanged so stale calls fail.
   const resolved = { ...options, session: owner.session,
     generation: options.generation ?? owner.generation };
-  if (command === "status" && options.participant === undefined) {
-    const { participants } = await context.service.collectStatus({});
-    resolved.participant = participants.find(item => item.sessionId === owner.session)?.participantId;
-  }
+  const observed = soft ? await observationOwner(resolved, context) : null;
+  if (command === "status" && options.participant === undefined) resolved.participant = observed.participantId;
   return resolved;
 }

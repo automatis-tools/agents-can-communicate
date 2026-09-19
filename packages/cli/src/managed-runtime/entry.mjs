@@ -4,6 +4,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { scheduleWorker } from "./schedule.mjs";
 import { acquireRuntime } from "./leases.mjs";
 import { canonicalManagerRoot, readControl, readManagedJson } from "./state.mjs";
+import { commandPrefix } from "./command-prefix.mjs";
 
 export const ENTRY_KINDS = Object.freeze([
   "acc", "acc-hook", "acc-mcp", "acc-bootstrap", "acc-claude-channel",
@@ -81,6 +82,7 @@ async function updateImplementation(packageRoot, control) {
 /** The lease lasts until OS process death, including callbacks after main returns. */
 export async function runEntry({ kind, packageRoot, managerRoot, managedRequired = false }) {
   if (!ENTRY_KINDS.includes(kind)) throw new Error("unknown ACC entry point");
+  const command = kind === "acc" ? commandPrefix(process.argv.slice(2)).command : null;
   const bootstrapOptions = kind === "acc-bootstrap" ? parseBootstrapOptions(process.argv.slice(2)) : null;
   if (kind === "acc-bootstrap" && bootstrapOptions === null) {
     if (process.env.ACC_BOOTSTRAP_DEBUG === "1") {
@@ -107,7 +109,7 @@ export async function runEntry({ kind, packageRoot, managerRoot, managedRequired
     if (control !== null) {
       selected = control.active.root;
       managed = root;
-      const update = kind === "acc" && ["update", "doctor"].includes(process.argv[2])
+      const update = kind === "acc" && ["update", "doctor"].includes(command)
         ? await updateImplementation(packageRoot, control) : null;
       if (update !== null) {
         selected = update;
@@ -116,7 +118,7 @@ export async function runEntry({ kind, packageRoot, managerRoot, managedRequired
         const lease = await acquireRuntime(root, { pid: process.pid, kind });
         selected = lease.runtime.root;
         const quiet = kind === "acc" && ["update", "install", "uninstall", "help", "version",
-          "--help", "-h", "--version", "-v", "-V"].includes(process.argv[2]);
+          "--help", "-h", "--version", "-v", "-V"].includes(command);
         if (!quiet) await scheduleWorker(root, control);
       }
     } else if (managedRequired) throw new Error("managed runtime is not initialized");
