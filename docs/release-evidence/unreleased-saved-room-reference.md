@@ -19,7 +19,13 @@ The exact saved archive passed `scripts/verify-package.mjs`: clean installation,
 doctor, no-Git workspace operations, bundled versions, certification allowlist,
 packed Markdown links, and install/uninstall byte restoration. Syntax checks
 passed in 555 files. The 29 focused room, owner-continuity, and context-budget
-checks passed with no skips. The full suite follows this artifact record.
+checks passed with no skips. The recorded-candidate gate passed all three checks.
+
+The final unrestricted `npm test` run completed 2,288 tests: 2,287 passed, zero
+failed, and one skipped in 506 seconds. The skip is the existing absent-Gemini
+uninstall case because Gemini is installed on this machine. Local Unix socket
+and process-inspection access was enabled for this full run. No source changed
+while the gate ran.
 
 ## Regression and mutation evidence
 
