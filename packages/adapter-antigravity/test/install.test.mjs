@@ -57,14 +57,29 @@ const missing = async file => {
   }
 };
 
-test("the registration location has no default and must be chosen", async t => {
+test("global is the default registration location", async t => {
+  // Decided in issue #178: the machine-wide file, which is the one that always
+  // loads and the one ACC already uses for Gemini CLI, Claude Code and Kimi.
+  const { home, context } = await fixture(t);
+
+  await installAntigravity({ ...context, probeHooks: async () => ({ hooks: [{ name: "acc",
+    enabled: true, actions: ACC_REGISTERED_EVENTS.map(event => ({ event })) }] }) });
+
+  assert.equal(await missing(globalHooksPath(home)), false);
+  assert.deepEqual([...HOOK_LOCATIONS], ["global", "workspace"]);
+});
+
+test("a location that is not one of the two is refused, never replaced", async t => {
   const { context } = await fixture(t);
 
-  await assert.rejects(() => installAntigravity(context),
-    error => error.code === EXIT.USAGE
-      && /global|workspace/.test(error.message),
-    "an unchosen location must refuse rather than pick one");
-  assert.deepEqual([...HOOK_LOCATIONS], ["global", "workspace"]);
+  // Quietly falling back to the default would answer a different question from
+  // the one the operator asked, which is the failure this whole client teaches.
+  for (const asked of ["both", "Global", "", "gobal"]) {
+    await assert.rejects(
+      () => installAntigravity({ ...context, antigravityHookLocation: asked }),
+      error => error.code === EXIT.USAGE && /global|workspace/.test(error.message),
+      `${JSON.stringify(asked)} was accepted as a location`);
+  }
 });
 
 test("install writes the namespaced schema, which is the only one that loads", async t => {

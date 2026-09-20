@@ -11,10 +11,10 @@ import { planInstallation } from "../src/plan.mjs";
 import { recordInstall } from "../src/ownership.mjs";
 
 // An adapter can know, without writing anything, that it cannot be installed
-// right now - Antigravity CLI cannot, until somebody chooses between a
-// machine-wide and a per-workspace hook registration (issue #178). A refusal
-// that throws takes the whole command down with it and stops the other clients
-// being wired; a skip names the reason and installs the rest.
+// as asked - Antigravity CLI cannot register hooks anywhere but the two places
+// this client reads, so a mistyped ACC_ANTIGRAVITY_HOOKS has no valid answer. A
+// refusal that throws takes the whole command down with it and stops the other
+// clients being wired; a skip names the reason and installs the rest.
 const antigravity = () => createAntigravityAdapter();
 const entryFor = (adapter, extra = {}) => ({ adapterId: adapter.id,
   displayName: adapter.displayName, present: true, version: "1.2.7", installed: false,
@@ -28,12 +28,13 @@ async function machine(t) {
   return { home, dataHome, context: { home, dataHome } };
 }
 
-test("detection reports the choice an install is waiting on", async t => {
+test("detection reports a location this client cannot register in", async t => {
   const { context } = await machine(t);
   const adapter = antigravity();
 
   const [entry] = await detectInstallation({ adapters: [adapter],
-    context: { ...context, probeHooks: async () => ({ hooks: [] }) },
+    context: { ...context, antigravityHookLocation: "both",
+      probeHooks: async () => ({ hooks: [] }) },
     probe: async () => "1.2.7", probeTimeoutMs: 1_000 });
 
   assert.equal(typeof entry.blocked?.reason, "string");
@@ -71,14 +72,17 @@ test("a blocked adapter that ACC already installed can still be removed", async 
   assert.equal(plan.operations.length, 1);
 });
 
-test("nothing is blocked once a location is named", async t => {
-  const { context } = await machine(t);
+test("nothing is blocked by the default, or by either location named", async t => {
   const adapter = antigravity();
 
-  const [entry] = await detectInstallation({ adapters: [adapter],
-    context: { ...context, antigravityHookLocation: "global",
-      probeHooks: async () => ({ hooks: [] }) },
-    probe: async () => "1.2.7", probeTimeoutMs: 1_000 });
+  for (const location of [undefined, "global", "workspace"]) {
+    const { context } = await machine(t);
+    const [entry] = await detectInstallation({ adapters: [adapter],
+      context: { ...context, antigravityWorkspace: context.home,
+        ...(location === undefined ? {} : { antigravityHookLocation: location }),
+        probeHooks: async () => ({ hooks: [] }) },
+      probe: async () => "1.2.7", probeTimeoutMs: 1_000 });
 
-  assert.equal(entry.blocked, undefined);
+    assert.equal(entry.blocked, undefined, `${location ?? "the default"} was blocked`);
+  }
 });
