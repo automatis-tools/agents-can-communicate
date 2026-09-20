@@ -11,9 +11,14 @@ import { runtimePaths } from "./runtime-paths.mjs";
 // Routing only, never session credentials. Unlike a runtime-generation pin,
 // this survives client exit: resuming the same native conversation keeps its
 // room. Adapter + native id distinguish independent conversations.
-export async function resolveHookWorkspace({ adapterId, event, dataHome, env = {},
+export async function resolveHookWorkspace({ adapterId, event, room, cwd, dataHome, env = {},
   gitProbe, clock, deadlineAt }) {
-  const key = createHash("sha256").update(JSON.stringify([adapterId, event.sessionId])).digest("hex");
+  const identityKey = (adapter, native) => createHash("sha256")
+    .update(JSON.stringify([adapter, native])).digest("hex");
+  if (room !== undefined && !/^[a-f0-9]{64}$/.test(room)) {
+    throw new AccError(EXIT.USAGE, "invalid native room reference");
+  }
+  const key = room ?? identityKey(adapterId, event.sessionId);
   const directory = path.join(await canonicalManagerRoot(path.join(dataHome, "acc")), "native-workspaces");
   const file = path.join(directory, `${key}.json`);
   const deadline = () => {
@@ -23,8 +28,9 @@ export async function resolveHookWorkspace({ adapterId, event, dataHome, env = {
     if (!await managedDirectory(directory)) return null;
     const record = await readManagedJson(file);
     if (record === undefined) return null;
-    if (record?.schemaVersion !== 1 || record.adapterId !== adapterId
-      || record.nativeSessionId !== event.sessionId || typeof record.cwd !== "string"
+    if (record?.schemaVersion !== 1 || typeof record.adapterId !== "string"
+      || typeof record.nativeSessionId !== "string"
+      || identityKey(record.adapterId, record.nativeSessionId) !== key || typeof record.cwd !== "string"
       || !path.isAbsolute(record.cwd) || !["config", "git", "directory"].includes(record.source)
       || record.source === "git" && [record.git?.commonDir, record.git?.worktreeRoot]
         .some(value => typeof value !== "string" || !path.isAbsolute(value))) {
@@ -71,10 +77,15 @@ export async function resolveHookWorkspace({ adapterId, event, dataHome, env = {
       }
     }
     deadline();
-    return { descriptor: current, workspaceCwd };
+    return { descriptor: current, workspaceCwd,
+      ...(record !== null ? { workspaceRef: `acc://${key}` } : {}) };
   };
 
   const existing = await read();
+  if (room !== undefined) {
+    if (existing === null) throw new AccError(EXIT.DATA, "the native room reference no longer exists");
+    event = { kind: "observe", sessionId: existing.nativeSessionId, cwd: cwd ?? existing.cwd };
+  }
   if (existing !== null) return discover(existing);
   const context = await discover(null);
   if (!["sessionStart", "beforeTurn"].includes(event.kind)) return context;
@@ -93,6 +104,15 @@ export async function resolveHookWorkspace({ adapterId, event, dataHome, env = {
           commonDir: await realpath(context.descriptor.git.commonDir),
           worktreeRoot: await realpath(context.descriptor.git.worktreeRoot),
         } } : {}) });
-      return context;
+      return { ...context, workspaceRef: `acc://${key}` };
     });
+}
+
+// An acc:// reference names one validated record in ACC's own data home.
+// Ordinary --workspace configs retain their strict relative-root schema.
+// A routing reference selects a room; it never establishes CLI owner identity.
+export async function resolveSavedHookWorkspace({ reference, ...options }) {
+  if (typeof reference !== "string") return null;
+  if (!reference.startsWith("acc://")) return null;
+  return resolveHookWorkspace({ ...options, room: reference.slice(6) });
 }

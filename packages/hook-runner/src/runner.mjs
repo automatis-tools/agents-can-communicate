@@ -214,7 +214,7 @@ const managerRootFor = dataHome => path.join(dataHome, "acc", "runtime");
 async function openContext({ event, adapterId, dataHome, runtime, env, deadline }) {
   assertHookBudget(deadline);
   const resolvedDataHome = dataHome ?? platformDataHome({ env: env ?? {} });
-  const { descriptor, workspaceCwd } = await resolveHookWorkspace({ adapterId, event,
+  const { descriptor, workspaceCwd, workspaceRef } = await resolveHookWorkspace({ adapterId, event,
     dataHome: resolvedDataHome, env: env ?? {}, clock: runtime.clock, deadlineAt: deadline,
     gitProbe: createGitProbe({ deadlineAt: deadline }) });
   assertHookBudget(deadline);
@@ -225,7 +225,7 @@ async function openContext({ event, adapterId, dataHome, runtime, env, deadline 
   });
   const store = await openFilesystemStore({ root: paths.root, clock: runtime.clock,
     ids: runtime.ids, workspaceId: descriptor.id, deadlineAt: deadline });
-  return { descriptor, paths, workspaceCwd,
+  return { descriptor, paths, workspaceCwd, workspaceRef,
     dataHome: resolvedDataHome, env: env ?? {}, realpath: runtime.realpath ?? realpath,
     service: createCoordinationService({ store, clock: runtime.clock, ids: runtime.ids }) };
 }
@@ -255,7 +255,7 @@ async function projectTurn({ binding, context, adapter, adapterId }) {
   // Only this hook's payload selected the binding. Supply its own pair as
   // trusted context, outside peer bodies, rather than exporting inheritable
   // credentials or teaching the CLI to guess from a public roster.
-  const owner = ownerHeader(binding, context.workspaceCwd);
+  const owner = ownerHeader(binding, context.workspaceCwd, context.workspaceRef);
   const totalBudget = context.descriptor.policy?.contextBudgetBytes ?? 6_000;
   // A peer can join after this prompt has begun. The current turn must already
   // have its own arguments when it needs inbox/reply, without reattaching or

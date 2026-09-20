@@ -16,7 +16,7 @@ by itself supplies identity for later use; continue the user's ordinary work.
 ## Use your own CLI credentials
 
 When this turn's ACC hook supplies `ACC CLI (append):`, append those exact
-`--session`, `--generation`, and `--cwd` arguments to every command in this skill,
+`--session`, `--generation`, `--cwd`, and `--workspace` arguments to every command in this skill,
 including `status` when you need your own attention. They name the participant
 that is calling, so a command acting on the installation rather than as a
 participant refuses them, and that refusal says nothing about your credentials.
@@ -30,6 +30,8 @@ an operator may explicitly configure both for a manually owned CLI session.
 A native client ID or a session visible in status is not proof of ownership.
 Keep the header’s `--cwd` even after changing the shell directory; it selects the
 workspace that owns this session. Compaction does not require a new participant.
+Keep the complete header, including its `--workspace acc://...` room reference;
+cwd alone cannot preserve the room when Git discovery changes.
 If the owner header is missing, follow the recovery below instead of attaching
 a replacement: a different participant does not inherit the original inbox.
 

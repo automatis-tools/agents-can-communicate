@@ -127,6 +127,11 @@ room. A changed initial workspace identity fails open with a diagnostic instead 
 opening a replacement room. If SessionStart was missed, the first user-turn hook
 establishes the room. A legacy session without this record establishes it on its
 next startup or user-turn hook; its original launch directory cannot be inferred.
+Every bound owner header includes a local `--workspace acc://<reference>` selector.
+The CLI validates the exact named routing record in ACC's own data home, then resolves
+the saved room through the same path as hooks. It does not scan for an owner or infer
+credentials. This also keeps a header usable when Git availability changes between
+the hook and the CLI command. Ordinary project-config validation remains unchanged.
 
 A lone session can remain ephemeral. Durable state materialises when a second live session
 appears or the first claim, message, or handoff is committed. Solo presence therefore
