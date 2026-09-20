@@ -1,5 +1,24 @@
 # Changelog
 
+## Unreleased — saved room selectors for native CLI commands
+
+- Include a saved room reference in every native owner header. CLI commands retain
+  the launch room even if Git discovery changes after the hook supplied the header.
+- Validate the exact local routing record without inferring session credentials;
+  retain existing validation for ordinary workspace configuration files.
+- Preserve complete owner arguments and pending-message recovery within the hook
+  context budget. Document all four arguments in the five bundled ACC skills.
+
+| Candidate artifact | Value |
+|---|---|
+| Built from | `686c3303f4e60de6c561a7d44647617ae8778c19` |
+| Tarball | `agents-can-communicate-0.5.9.tgz`, 402,272 bytes, 281 files |
+| sha256 | `f54b899e0d074be2e2d722096a643ee5ede8fa40514d547dd0b4d3533382195e` |
+
+This unpublished development archive passed clean installation verification. See
+[saved room evidence](docs/release-evidence/unreleased-saved-room-reference.md)
+for regression checks and limits. Earlier records retain their original provenance.
+
 ## Unreleased — native session workspace continuity
 
 - Keep each native conversation in the room selected at startup, even when later
