@@ -1,0 +1,9 @@
+{
+  "artifactDirectoryPath": "<redacted: conversation artifact directory>",
+  "conversationId": "00000000-0000-4000-8000-000000000000",
+  "modelName": "gemini-3.8-flash-high",
+  "transcriptPath": "<redacted: conversation transcript>",
+  "workspacePaths": [
+    "/tmp/example-workspace"
+  ]
+}
