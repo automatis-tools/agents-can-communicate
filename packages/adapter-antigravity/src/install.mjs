@@ -53,9 +53,32 @@ export const workspaceHooksPath = workspace => path.join(workspace, ".agents", "
 const importedPluginPath = home => path.join(home, ".gemini", "antigravity-cli", "plugins",
   "agents-can-communicate");
 const shimDir = home => path.join(home, ".gemini", "config", "acc");
-// One marker per registration location, so a global and a workspace install on
-// the same machine cannot claim each other's file.
-const createdMarker = (home, file) => path.join(shimDir(home),
+/**
+ * Where "ACC created this file" is recorded.
+ *
+ * In ACC's own data home, not in the client's tree and not in the shim
+ * directory. Two reasons, one of which cost a real uninstall:
+ *
+ * - This client reads every top-level key of `hooks.json` as an integration
+ *   namespace, and one it cannot read drops the whole file. A marker inside the
+ *   file registers nothing at all, valid namespaces included
+ *   (`fixtures/hooks-readback-foreign-key-1.2.7.json`).
+ * - The installer removes every recorded artifact *before* it calls
+ *   `uninstall`, and the shim directory is a recorded artifact. A marker kept
+ *   there is already gone by the time uninstall reads it, so a `hooks.json` ACC
+ *   created is judged to be the user's and left behind. Observed on a real
+ *   machine: `acc uninstall` reported success and left `{}` in
+ *   `~/.gemini/config/hooks.json`.
+ *
+ * One marker per registration location, so a global and a workspace install on
+ * the same machine cannot claim each other's file. The shim directory remains
+ * the fallback for a direct adapter caller with no data home, which is how the
+ * adapter is used outside the installer.
+ */
+const createdMarkerDir = ({ dataHome, home }) => typeof dataHome === "string" && dataHome !== ""
+  ? path.join(dataHome, "acc", "adapter-antigravity")
+  : shimDir(home);
+const createdMarker = (context, file) => path.join(createdMarkerDir(context),
   `created-${Buffer.from(file).toString("base64url")}`);
 
 function usage(message, details = {}) {
@@ -211,7 +234,10 @@ export async function installAntigravity(context) {
   // as a namespace, and one it cannot read drops the whole file. A marker
   // written the way the Gemini CLI adapter writes its own registered nothing at
   // all, valid namespace included: fixtures/hooks-readback-foreign-key-1.2.7.json.
-  if (found === null) await writeFile(createdMarker(home, file), `${file}\n`);
+  if (found === null) {
+    await mkdir(createdMarkerDir(context), { recursive: true });
+    await writeFile(createdMarker(context, file), `${file}\n`);
+  }
   const changes = [shimDir(home), file];
 
   const diagnostics = [];
@@ -268,8 +294,10 @@ export async function uninstallAntigravity(context) {
     const next = { ...existing };
     delete next[ACC_NAMESPACE];
     await writeForeignJson(file, next, { readFile, writeFile, mkdir });
-    await removeIfEmpty(file, { readFile, rm, isEmpty: blankJson(),
-      created: await exists(createdMarker(home, file)) });
+    const marker = createdMarker(context, file);
+    const created = await exists(marker);
+    await removeIfEmpty(file, { readFile, rm, isEmpty: blankJson(), created });
+    if (created) await rm(marker, { force: true });
     changes.push(file);
   }
   if (!keep.includes(shimDir(home))) await rm(shimDir(home), { recursive: true, force: true });
@@ -341,7 +369,15 @@ export async function doctorAntigravity(context) {
       + "and PostToolUse are accepted into the file and silently dropped, so this client has "
       + "no tool guard and no session end",
     "Stop continuation is a bounded nudge, not a gate: this adapter continues a turn at most "
-      + "once and fails open, and the client caps consecutive continuations itself (1.1.9)"];
+      + "once and fails open, and the client caps consecutive continuations itself (1.1.9)",
+    // The one failure a healthy registration can still produce, and the reason
+    // this line exists at all: the hook runs, finds no project in the payload,
+    // fails open, and this client does not show hook stderr. Nothing else on
+    // the machine would ever tell the operator.
+    "hooks only attach a session when the Antigravity session has an open workspace: an "
+      + "ordinary `agy -p` in a project directory sends an empty workspacePaths, and the "
+      + "hook then has no project to join. Open the project as an Antigravity workspace, "
+      + "or pass it with --add-dir"];
   if (locationOf(context) === "workspace") {
     diagnostics.push("registered per workspace; a session opened anywhere else loads nothing");
   }

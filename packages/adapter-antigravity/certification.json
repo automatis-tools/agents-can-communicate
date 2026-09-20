@@ -1,8 +1,11 @@
 {
   "evidence": [
     {
-      "client": "antigravity-cli", "version": "1.2.7", "platform": "darwin-arm64",
-      "observedAt": "2026-09-20", "capability": "lifecycle.sessionStart",
+      "client": "antigravity-cli",
+      "version": "1.2.7",
+      "platform": "darwin-arm64",
+      "observedAt": "2026-09-20",
+      "capability": "lifecycle.sessionStart",
       "fixture": "fixtures/SessionStart-1.2.7.json",
       "provenance": "fixtures/certification-provenance.json",
       "provenanceId": "session-start-1-2-7",
@@ -11,13 +14,17 @@
       "authorityLevel": "advisory",
       "limitations": [
         "captured in print mode only",
-        "no hook_event_name field; the event is known only from the command argument"
+        "no hook_event_name field; the event is known only from the command argument",
+        "hooks attach only when the Antigravity session has an open workspace; an ordinary print-mode turn sends an empty workspacePaths and no session is created. This capture used --add-dir"
       ],
       "result": "pass"
     },
     {
-      "client": "antigravity-cli", "version": "1.2.7", "platform": "darwin-arm64",
-      "observedAt": "2026-09-20", "capability": "context.beforeTurnInjection",
+      "client": "antigravity-cli",
+      "version": "1.2.7",
+      "platform": "darwin-arm64",
+      "observedAt": "2026-09-20",
+      "capability": "context.beforeTurnInjection",
       "fixture": "fixtures/PreInvocation-1.2.7.json",
       "provenance": "fixtures/certification-provenance.json",
       "provenanceId": "pre-invocation-1-2-7",
@@ -26,13 +33,17 @@
       "authorityLevel": "context",
       "limitations": [
         "requires the injectSteps ephemeralMessage envelope",
-        "userMessage and toolCall injection types were not exercised"
+        "userMessage and toolCall injection types were not exercised",
+        "hooks attach only when the Antigravity session has an open workspace; an ordinary print-mode turn sends an empty workspacePaths and no session is created. This capture used --add-dir"
       ],
       "result": "pass"
     },
     {
-      "client": "antigravity-cli", "version": "1.2.7", "platform": "darwin-arm64",
-      "observedAt": "2026-09-20", "capability": "delivery.nextTurn",
+      "client": "antigravity-cli",
+      "version": "1.2.7",
+      "platform": "darwin-arm64",
+      "observedAt": "2026-09-20",
+      "capability": "delivery.nextTurn",
       "fixture": "fixtures/PreInvocation-1.2.7.json",
       "provenance": "fixtures/certification-provenance.json",
       "provenanceId": "pre-invocation-1-2-7",
@@ -45,7 +56,8 @@
         "the continuation ceiling's own value was not captured, and neither was what the model is told when it is reached",
         "captured on darwin-arm64 in print mode only; Linux, Windows and interactive sessions were not observed",
         "agy agentapi send-message was not exercised and no agentapi binary exists under ~/.gemini/antigravity-cli/bin",
-        "reply routing back to ACC was not observed"
+        "reply routing back to ACC was not observed",
+        "hooks attach only when the Antigravity session has an open workspace; an ordinary print-mode turn sends an empty workspacePaths and no session is created. This capture used --add-dir"
       ],
       "result": "pass"
     }

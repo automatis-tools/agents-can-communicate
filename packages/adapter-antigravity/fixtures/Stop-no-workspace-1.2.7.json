@@ -1,0 +1,11 @@
+{
+  "artifactDirectoryPath": "<redacted: ~/.gemini/antigravity-cli/brain/<conversationId>>",
+  "conversationId": "00000000-0000-4000-8000-000000000000",
+  "error": "",
+  "executionNum": 0,
+  "fullyIdle": true,
+  "modelName": "gemini-3.8-flash-high",
+  "terminationReason": "NO_TOOL_CALL",
+  "transcriptPath": "<redacted: conversation transcript>",
+  "workspacePaths": []
+}

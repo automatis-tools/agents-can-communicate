@@ -37,7 +37,12 @@ async function fixture(t, { location } = {}) {
     source: location === "workspace" ? workspaceHooksPath(workspace) : globalHooksPath(home),
     actions: ACC_REGISTERED_EVENTS.map(event => ({ event, type: "command",
       command: "sh /shim/acc-hook.sh " + event, timeout_seconds: 10 })) }] });
-  const context = { home, antigravityWorkspace: workspace,
+  // ACC's own state directory, as the installer supplies it. The bookkeeping
+  // that says "ACC created this file" lives here rather than in the client's
+  // tree: the installer deletes every recorded artifact before calling
+  // uninstall, so anything kept beside the shim is already gone by then.
+  const dataHome = path.join(home, "acc-data");
+  const context = { home, dataHome, antigravityWorkspace: workspace,
     ...(location === undefined ? {} : { antigravityHookLocation: location }), probeHooks };
   const geminiTree = async () => ({
     settings: await readFile(path.join(home, ".gemini", "settings.json"), "utf8"),
@@ -286,4 +291,36 @@ test("uninstall removes an ACC registration from either location", async t => {
     assert.equal(await missing(workspaceHooksPath(workspace)), true,
       `${location}: workspace left behind`);
   }
+});
+
+test("doctor names the registered-but-no-workspace state a global install can reach", async t => {
+  const { context } = await fixture(t, { location: "global" });
+  await installAntigravity(context);
+
+  const report = await doctorAntigravity(context);
+
+  // A global registration runs the hook in every session, including one with no
+  // open workspace - where the payload carries no project path and ACC attaches
+  // nothing. The hook fails open and this client does not surface hook stderr,
+  // so `acc doctor` is the only place the operator can be told.
+  assert.equal(report.diagnostics.some(line =>
+    /--add-dir/.test(line) && /workspace/.test(line)), true,
+  "a registration that runs but cannot attach must be named somewhere");
+});
+
+test("a file ACC created is removed even after the installer deleted the shim first", async t => {
+  const { home, context } = await fixture(t, { location: "global" });
+  await installAntigravity(context);
+
+  // What really happens on `acc uninstall`: the installer removes every
+  // recorded artifact before calling the adapter, and the shim directory is one
+  // of them. An uninstall that reads its own bookkeeping out of that directory
+  // finds nothing and keeps the file. Found on a real machine - `acc uninstall`
+  // left `{}` behind in the user's ~/.gemini/config.
+  await rm(path.join(home, ".gemini", "config", "acc"), { recursive: true, force: true });
+
+  await uninstallAntigravity({ ...context, keep: [] });
+
+  assert.equal(await missing(globalHooksPath(home)), true,
+    "uninstall left behind a file that only existed because ACC created it");
 });

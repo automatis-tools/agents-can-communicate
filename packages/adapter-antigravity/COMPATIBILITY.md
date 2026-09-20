@@ -126,6 +126,18 @@ The namespace collision above bears on this: if both are ever written with the n
 global one wins and the workspace one is discarded whole. The two cannot be combined as a
 belt-and-braces install.
 
+The **open workspace requirement** below qualifies this choice. A global registration runs in
+every Antigravity session, including the ones that have no open workspace and therefore give
+the hook no project to join; those turns do nothing and say nothing. A workspace registration
+only loads where a workspace exists, so it never reaches that state — at the cost of loading
+nowhere else. Global remains the default because it is the one that cannot be silently absent;
+`acc doctor` names the no-workspace case.
+
+ACC's own bookkeeping — which `hooks.json` files ACC created and may therefore delete — lives
+in ACC's data home, never in the client's tree. A marker inside `hooks.json` drops the whole
+file, and a marker beside the shim is deleted by the installer before `uninstall` runs; both
+were observed.
+
 ### Supported events
 
 Each event was registered alone, and then together, and the effective set read back from
@@ -159,6 +171,63 @@ Consequences for ACC:
   `acc finish`. A session can linger in the roster after its client has exited. That is a stated
   limitation rather than a quiet one - inferring an end from `Stop` would retire a session that
   is merely between turns, and `fullyIdle` says nothing about whether the process is still alive.
+
+## The open workspace requirement
+
+**`workspacePaths` is empty unless the session has an open workspace, and an ordinary
+`agy -p` in a project directory does not have one.** Everything in this document above was
+captured with `--add-dir`, which populates it; the first real turn through an installed ACC
+found the ordinary case and registered nothing at all.
+
+```
+$ cd ~/project && agy -p "..."          # workspacePaths: []   -> ACC attaches nothing
+$ cd ~/project && agy -p "..." --add-dir ~/project
+                                         # workspacePaths: ["/…/project"] -> ACC attaches
+```
+
+Fixtures: `fixtures/SessionStart-no-workspace-1.2.7.json`,
+`fixtures/Stop-no-workspace-1.2.7.json`.
+
+Nothing else in the payload can stand in for it:
+
+- `transcriptPath` and `artifactDirectoryPath` both point inside
+  `~/.gemini/antigravity-cli/brain/<conversationId>/`. That is the client's own state and it
+  is per conversation, so adopting it would give every conversation a private ACC workspace
+  and two agents in one project would never see each other.
+- **The hook process does not inherit the client's directory.** Its working directory is the
+  directory of the `hooks.json` it was registered from — `~/.gemini/config` for a global
+  registration, captured in `fixtures/hook-process-environment-1.2.7.json`. A turn started in
+  `~/project` runs its hook in `~/.gemini/config`.
+
+So the adapter refuses, and refuses by name with `reasonCode: "antigravity_no_open_workspace"`.
+This client does not surface hook stderr, so a fail-open refusal here is invisible — which is
+exactly the issue #176 appearance of "everything is installed and nothing happens". `acc doctor`
+carries the line instead.
+
+This is independent of where the hooks are registered. Registration decides whether the hook
+*runs*; an open workspace decides whether ACC can identify a *project*. A global registration
+runs in every session and does nothing in those that have no workspace; a workspace
+registration only loads when there is one, so whenever it runs it works.
+
+## Verified end to end on a real machine
+
+2026-09-20, Antigravity CLI 1.2.7, macOS arm64, through the installed `acc` CLI rather than
+through a harness:
+
+| Step | Result |
+|---|---|
+| `acc install --adapter antigravity` | wrote `~/.gemini/config/hooks.json`; real `agy -p "/hooks"` reported `acc` with SessionStart, PreInvocation and Stop |
+| `acc doctor` | `present: true`, `version: 1.2.7`, `installed: true`, read back from the client |
+| a real turn with `--add-dir` | ACC attached: participant `antigravity-…`, `lifecycle: manual`, `enforcement: advisory` |
+| a real turn without `--add-dir` | no session; `workspacePaths` was empty |
+| `PreInvocation` injection | the model reproduced the injected ACC owner header verbatim |
+| a peer message, then one more turn | the model replied with the peer's probe token, so a peer body reaches the model |
+| receipts afterwards | the delivered message advanced to `offered`; one addressed to a session that never ran again stayed `queued` |
+| `acc uninstall --adapter antigravity` | `hooks.json` and the shim directory removed; `agy` reported an empty hook list; `~/.gemini/settings.json` and `~/.gemini/extensions/agents-can-communicate` byte-identical |
+
+That round trip also found the bookkeeping bug described under **Locations**: the installer
+removes recorded artifacts before calling `uninstall`, so the "ACC created this file" marker
+cannot live beside the shim.
 
 ## Payload envelope
 
@@ -273,7 +342,12 @@ From the vendor changelog, not from capture:
 - Whether `agentapi send-message` reaches an idle session.
 - Reply routing back to ACC.
 - The continuation ceiling's actual value, and what the model is told when it is reached.
-- Interactive-session behaviour. Everything above was captured in print mode.
+- Interactive-session behaviour. Everything above was captured in print mode. In particular,
+  whether a folder opened in the Antigravity TUI populates `workspacePaths` - it almost
+  certainly does, since that is what an open workspace is, but it has not been observed, and a
+  global registration's usefulness rests on it.
+- Whether `--continue` reliably keeps one conversation id. Two successive `-c` runs produced
+  different ACC sessions, so a print-mode conversation is not a stable participant.
 - Whether a hook command whose path contains a space *runs*; it registers and reads back
   verbatim, but no turn was spent on executing one.
 - Which of two same-named namespaces wins on load order rather than on location: the one capture
