@@ -130,7 +130,16 @@ test("every packaged certification reference resolves inside its adapter", async
   const certifications = entries.filter(entry =>
     /^node_modules\/@agents-can-communicate\/adapter-[^/]+\/certification\.json$/.test(entry));
 
-  assert.equal(certifications.length, 5);
+  // One per packaged adapter, counted from the tarball rather than written
+  // down: a literal here goes stale the moment a client is added, and the
+  // failure it produces says nothing about what is actually missing.
+  const packagedAdapters = [...new Set(entries
+    .map(entry => /^node_modules\/@agents-can-communicate\/(adapter-[^/]+)\//.exec(entry)?.[1])
+    .filter(name => name !== undefined && name !== "adapter-sdk"))];
+  assert.equal(packagedAdapters.length > 0, true, "no adapters were packaged at all");
+  assert.deepEqual(certifications
+    .map(entry => /(adapter-[^/]+)/.exec(entry)[1]).sort(), packagedAdapters.sort(),
+  "a packaged adapter ships no certification, or a certification ships without its adapter");
   for (const certification of certifications) {
     const manifest = JSON.parse((await run("tar",
       ["-xzOf", tarball, `package/${certification}`])).stdout);

@@ -582,6 +582,13 @@ const HANDLERS = {
  * only thing this function refuses to do is fail closed.
  */
 export async function runHook({ adapterId, payload, adapters, dataHome, env,
+  // The arguments the client's hook command carried, after the adapter id.
+  // Most clients name the event inside the payload and their adapters ignore
+  // this; Antigravity CLI sends no `hook_event_name` at all, and two of its
+  // four events hand over byte-identical envelopes - so for that client the
+  // registered command's own argument is the only thing that knows which hook
+  // ran. Passed to every adapter, read by the ones that need it.
+  args = [],
   runtime = defaultRuntime(), budgetMs = DEFAULT_BUDGET_MS,
   readProcessTable = defaultReadProcessTable,
   probeClientVersion = defaultProbeClientVersion,
@@ -594,7 +601,7 @@ export async function runHook({ adapterId, payload, adapters, dataHome, env,
     const adapter = adapters?.[adapterId];
     if (adapter === undefined) throw new Error(`no adapter named ${adapterId}`);
 
-    const event = await adapter.normalizeHook(payload);
+    const event = await adapter.normalizeHook(payload, { args });
     const context = await openContext({ event, adapterId, dataHome, runtime, env, deadline });
     const handler = HANDLERS[event.kind];
     const lifecycle = ["sessionStart", "sessionEnd", "beforeTurn"].includes(event.kind);

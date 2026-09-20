@@ -1,0 +1,10 @@
+{
+  "note": "A valid `acc` namespace beside one extra top-level key - the `acc:createdFile` marker ACC writes into the Gemini CLI settings file. The whole file registered nothing: a single key this client cannot read as a namespace drops every namespace in the file with it. Paths redacted; every other byte is verbatim.",
+  "wrote": {
+    "acc": {
+      "SessionStart": [{ "type": "command", "command": "sh <workspace>/probe.sh SessionStart", "timeout": 10 }]
+    },
+    "acc:createdFile": true
+  },
+  "hooks": []
+}

@@ -27,17 +27,17 @@ assuming that a newer or differently packaged client behaves like a captured one
 
 Passing evidence currently ships for these exact versions on `darwin-arm64`:
 
-| Capability | Codex 0.147.0 | Claude Code 2.1.233 | Gemini CLI 0.57.0 | Grok 1.0.13 | Kimi 0.36.1 |
-|---|---:|---:|---:|---:|---:|
-| `lifecycle.sessionStart` | yes | yes | yes | no | yes |
-| `lifecycle.sessionEnd` | yes | yes | yes | no | no |
-| `lifecycle.heartbeat` | no | no | no | no | yes |
-| `context.beforeTurnInjection` | yes | yes | yes | no | yes |
-| `guards.beforeWrite` | yes | yes | yes | no | yes |
-| `guards.beforeShell` | no | yes | yes | no | yes |
-| `delivery.nextTurn` | yes | yes | yes | no | yes |
-| `delivery.livePush` | no | no | no | no | no |
-| `delivery.replyRoute` | no | no | no | no | no |
+| Capability | Antigravity 1.2.7 | Codex 0.147.0 | Claude Code 2.1.233 | Gemini CLI 0.57.0 | Grok 1.0.13 | Kimi 0.36.1 |
+|---|---:|---:|---:|---:|---:|---:|
+| `lifecycle.sessionStart` | yes | yes | yes | yes | no | yes |
+| `lifecycle.sessionEnd` | no | yes | yes | yes | no | no |
+| `lifecycle.heartbeat` | no | no | no | no | no | yes |
+| `context.beforeTurnInjection` | yes | yes | yes | yes | no | yes |
+| `guards.beforeWrite` | no | yes | yes | yes | no | yes |
+| `guards.beforeShell` | no | no | yes | yes | no | yes |
+| `delivery.nextTurn` | yes | yes | yes | yes | no | yes |
+| `delivery.livePush` | no | no | no | no | no | no |
+| `delivery.replyRoute` | no | no | no | no | no | no |
 
 Every other capability in the closed shape defaults to false, including session resume,
 child sessions, startup or safe-point injection, and before-read guards.
@@ -53,6 +53,7 @@ The limitations belong next to the adapters they affect:
 
 | Adapter | Exact limitation and evidence |
 |---|---|
+| Antigravity CLI | 1.2.7 on darwin-arm64, captured in print mode. Only `SessionStart`, `PreInvocation`, `PostInvocation` and `Stop` load; `SessionEnd`, `PreToolUse` and `PostToolUse` are accepted into the config file and silently dropped, so there is no tool guard and no session-end deregistration - a session goes offline by presence age or an explicit `acc finish`. Payloads carry no `hook_event_name`, so each registered command passes its own event name. The end-of-turn `Stop` continuation reaches the model and is a bounded nudge, not a gate: ACC continues a turn at most once and fails open, and the client caps consecutive continuations itself (vendor 1.1.9). `agy agentapi send-message` is uncaptured, so live push and reply routing are false. A write that parses can register nothing, so install and doctor read `agy -p "/hooks"` back instead of trusting the file. |
 | Codex | Exact 0.147.0 next-turn context requires plugin trust. The observed stock 0.153.4 upgrade from ACC 0.3.1 to 0.4 required fresh review of five modified hook definitions; a subsequent restart retained all five active (activation evidence, not new event certification). LocalDaemon native delivery was captured through the installed package on 0.152.1 and 0.153.4, darwin-arm64; minimum 0.152.1, recorded opt-in, current feature probe and exact thread/cwd/process/version/protocol checks are required. Ordinary launch preserves the receiver workspace without ACC arguments or daemon ownership. Embedded or unreachable sessions keep their inbox. Native `replyRoute` remains false. |
 | Claude Code | 2.1.233 next-turn delivery waits for the next user prompt. A 2.1.258 Channel capture proved idle offer, busy queue-after-turn, explicit reply, duplicate suppression, and durable fallback, so `delivery.livePush` and `delivery.replyRoute` are live capabilities behind the native contract (experimental, off until opted in; Claude's development-channel warning is vendor-owned and visible). |
 | Gemini CLI | Only 0.57.0 has package-shipped next-turn certification. Its TUI has no captured external wake or queue interface and `--acp` changes launch ownership, so native delivery is fallback-only; live push and reply routing remain false. |

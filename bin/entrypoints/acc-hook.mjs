@@ -12,6 +12,7 @@ import { createId } from "@agents-can-communicate/protocol";
 import { runHook } from "@agents-can-communicate/hook-runner";
 import { hookEntrypointFor, resolvePinnedGeneration } from "@agents-can-communicate/cli";
 
+import { createAntigravityAdapter } from "@agents-can-communicate/adapter-antigravity";
 import { createClaudeCodeAdapter } from "@agents-can-communicate/adapter-claude-code";
 import { createCodexAdapter } from "@agents-can-communicate/adapter-codex";
 import { createGeminiCliAdapter } from "@agents-can-communicate/adapter-gemini-cli";
@@ -19,6 +20,9 @@ import { createGrokAdapter } from "@agents-can-communicate/adapter-grok";
 import { createKimiAdapter } from "@agents-can-communicate/adapter-kimi";
 
 const adapters = {
+  // Registered like any other client. Its hook commands carry an extra
+  // argument - the event name - because this client's payload has none.
+  antigravity: createAntigravityAdapter(),
   claude_code: createClaudeCodeAdapter(),
   codex: createCodexAdapter(),
   gemini_cli: createGeminiCliAdapter(),
@@ -46,9 +50,9 @@ import { completeHookOutput } from "./hook-output.mjs";
 // a hook that has no pin to look up pays nothing beyond it. Any adapter or
 // payload that will not yield a session id simply has no pin to find, same as
 // today's no-pin behaviour.
-async function harnessSessionIdFor(adapterId, payload) {
+async function harnessSessionIdFor(adapterId, payload, args) {
   try {
-    const event = await adapters[adapterId]?.normalizeHook(payload);
+    const event = await adapters[adapterId]?.normalizeHook(payload, { args });
     return typeof event?.sessionId === "string" ? event.sessionId : null;
   } catch {
     return null;
@@ -71,9 +75,9 @@ async function harnessSessionIdFor(adapterId, payload) {
 // mid-resolution by another hook for the same session, or simply wrong)
 // could say. Unbounded delegation would be a hang, worse than any of the
 // failures this file already falls open from.
-async function delegateToPin({ managerRoot, packageRoot, adapterId, payload, delegated }) {
+async function delegateToPin({ managerRoot, packageRoot, adapterId, payload, args, delegated }) {
   if (delegated || managerRoot === null || packageRoot === null) return false;
-  const harnessSessionId = await harnessSessionIdFor(adapterId, payload);
+  const harnessSessionId = await harnessSessionIdFor(adapterId, payload, args);
   if (harnessSessionId === null) return false;
   const pinned = await resolvePinnedGeneration({ root: managerRoot, harnessSessionId, active: packageRoot });
   if (pinned === null) return false;
@@ -87,7 +91,7 @@ async function delegateToPin({ managerRoot, packageRoot, adapterId, payload, del
 }
 
 export async function main({ managerRoot = null, packageRoot = null, payload, delegated = false } = {}) {
-  const [adapterId] = process.argv.slice(2);
+  const [adapterId, ...args] = process.argv.slice(2);
 
   // A delegating caller already read stdin once for the whole process and
   // hands its parsed payload down; only the outermost call reads it here.
@@ -99,9 +103,9 @@ export async function main({ managerRoot = null, packageRoot = null, payload, de
     }
   }
 
-  if (await delegateToPin({ managerRoot, packageRoot, adapterId, payload, delegated })) return;
+  if (await delegateToPin({ managerRoot, packageRoot, adapterId, payload, args, delegated })) return;
 
-  const result = await runHook({ adapterId, payload, adapters,
+  const result = await runHook({ adapterId, payload, args, adapters,
     runtime: { clock: { now: () => new Date().toISOString() },
       ids: { next: kind => createId(kind, randomBytes) } },
     env: process.env });

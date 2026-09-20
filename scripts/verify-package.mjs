@@ -143,8 +143,17 @@ async function main() {
     }
     const certifications = listed.filter(entry =>
       /^node_modules\/@agents-can-communicate\/adapter-[^/]+\/certification\.json$/.test(entry));
-    if (certifications.length !== 5) {
-      fail("every shipped adapter must carry certification.json", certifications.join("\n"));
+    // Counted from the tarball, never written down. A literal goes stale the
+    // moment a client is added, and it then fails on the one change that is
+    // correct while saying nothing about which adapter is actually missing one.
+    const shippedAdapters = [...new Set(listed
+      .map(entry => /^node_modules\/@agents-can-communicate\/(adapter-[^/]+)\//.exec(entry)?.[1])
+      .filter(name => name !== undefined && name !== "adapter-sdk"))].sort();
+    const certified = certifications.map(entry => /(adapter-[^/]+)/.exec(entry)[1]).sort();
+    if (shippedAdapters.length === 0
+      || JSON.stringify(certified) !== JSON.stringify(shippedAdapters)) {
+      fail("every shipped adapter must carry certification.json",
+        `shipped: ${shippedAdapters.join(", ")}\ncertified: ${certified.join(", ")}`);
     }
     await verifyCertificationFixtureAllowlist(listed,
       certification => readTarJson(tarball, certification),

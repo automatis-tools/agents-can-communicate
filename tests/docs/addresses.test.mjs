@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 
 import { createClaudeCodeAdapter } from "@agents-can-communicate/adapter-claude-code";
 import { createCodexAdapter } from "@agents-can-communicate/adapter-codex";
+import { createAntigravityAdapter } from "@agents-can-communicate/adapter-antigravity";
 import { createGeminiCliAdapter } from "@agents-can-communicate/adapter-gemini-cli";
 import { createGrokAdapter } from "@agents-can-communicate/adapter-grok";
 import { createKimiAdapter } from "@agents-can-communicate/adapter-kimi";
@@ -26,8 +27,9 @@ import { createKimiAdapter } from "@agents-can-communicate/adapter-kimi";
  */
 const repo = fileURLToPath(new URL("../..", import.meta.url));
 
-const ADAPTER_IDS = new Set([createClaudeCodeAdapter(), createCodexAdapter(),
-  createGeminiCliAdapter(), createGrokAdapter(), createKimiAdapter()].map(a => a.id));
+const ADAPTER_IDS = new Set([createAntigravityAdapter(), createClaudeCodeAdapter(),
+  createCodexAdapter(), createGeminiCliAdapter(), createGrokAdapter(),
+  createKimiAdapter()].map(a => a.id));
 
 // A participant id as an adapter writes one: `<adapter>-<suffix>`. Documentation
 // may also show an angle-bracket placeholder, which no reader mistakes for a name.
