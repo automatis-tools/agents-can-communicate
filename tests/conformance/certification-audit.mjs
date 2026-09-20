@@ -55,12 +55,18 @@ export const PASS_EXPECTATIONS = Object.freeze({
       "event-observed", "fires when a session starts",
       "fires before the first model invocation", "advisory",
       ["captured in print mode only",
-        "no hook_event_name field; the event is known only from the command argument"]),
+        "no hook_event_name field; the event is known only from the command argument",
+        "hooks attach only when the Antigravity session has an open workspace; an ordinary"
+        + " print-mode turn sends an empty workspacePaths and no session is created. This"
+        + " capture used --add-dir"]),
     row("context.beforeTurnInjection", "fixtures/PreInvocation-1.2.7.json", "PreInvocation",
       null, "model-visible", "waits for the next invocation",
       "does not interrupt an in-progress invocation", "context",
       ["requires the injectSteps ephemeralMessage envelope",
-        "userMessage and toolCall injection types were not exercised"]),
+        "userMessage and toolCall injection types were not exercised",
+        "hooks attach only when the Antigravity session has an open workspace; an ordinary"
+        + " print-mode turn sends an empty workspacePaths and no session is created. This"
+        + " capture used --add-dir"]),
     row("delivery.nextTurn", "fixtures/PreInvocation-1.2.7.json", "PreInvocation", null,
       "model-visible", "offers complete peer messages at the next invocation",
       "does not interrupt an in-progress invocation", "context", [
@@ -75,6 +81,9 @@ export const PASS_EXPECTATIONS = Object.freeze({
         "agy agentapi send-message was not exercised and no agentapi binary exists under"
         + " ~/.gemini/antigravity-cli/bin",
         "reply routing back to ACC was not observed",
+        "hooks attach only when the Antigravity session has an open workspace; an ordinary"
+        + " print-mode turn sends an empty workspacePaths and no session is created. This"
+        + " capture used --add-dir",
       ]),
   ]), "2026-09-20"),
   "adapter-claude-code": withFacts("claude-code", "2.1.233", [

@@ -113,6 +113,8 @@ test("evidence the tarball does not ship is still kept in the repository", async
   // looking unused.
   const shipped = JSON.parse(await readFile(new URL("../package.json", import.meta.url))).files;
   for (const name of ["PostInvocation-1.2.7", "Stop-1.2.7", "Stop-continued-1.2.7",
+    "SessionStart-no-workspace-1.2.7", "Stop-no-workspace-1.2.7",
+    "hook-process-environment-1.2.7",
     "hooks-readback-empty-1.2.7", "hooks-readback-registered-1.2.7",
     "hooks-readback-dropped-1.2.7", "hooks-readback-gemini-shape-1.2.7",
     "hooks-readback-foreign-key-1.2.7", "hooks-readback-namespace-collision-1.2.7"]) {

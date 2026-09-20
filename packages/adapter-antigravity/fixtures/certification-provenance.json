@@ -20,7 +20,8 @@
             "authority": "advisory",
             "limitations": [
               "captured in print mode only",
-              "no hook_event_name field; the event is known only from the command argument"
+              "no hook_event_name field; the event is known only from the command argument",
+              "hooks attach only when the Antigravity session has an open workspace; an ordinary print-mode turn sends an empty workspacePaths and no session is created. This capture used --add-dir"
             ]
           }
         }
@@ -47,7 +48,8 @@
             "authority": "context",
             "limitations": [
               "requires the injectSteps ephemeralMessage envelope",
-              "userMessage and toolCall injection types were not exercised"
+              "userMessage and toolCall injection types were not exercised",
+              "hooks attach only when the Antigravity session has an open workspace; an ordinary print-mode turn sends an empty workspacePaths and no session is created. This capture used --add-dir"
             ]
           }
         },
@@ -65,7 +67,8 @@
               "the continuation ceiling's own value was not captured, and neither was what the model is told when it is reached",
               "captured on darwin-arm64 in print mode only; Linux, Windows and interactive sessions were not observed",
               "agy agentapi send-message was not exercised and no agentapi binary exists under ~/.gemini/antigravity-cli/bin",
-              "reply routing back to ACC was not observed"
+              "reply routing back to ACC was not observed",
+              "hooks attach only when the Antigravity session has an open workspace; an ordinary print-mode turn sends an empty workspacePaths and no session is created. This capture used --add-dir"
             ]
           }
         }

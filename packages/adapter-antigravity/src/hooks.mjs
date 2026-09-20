@@ -89,7 +89,30 @@ export function normalizeAntigravityHook(payload, { args = [] } = {}) {
   // The only working directory this client offers. `workspacePaths` is an array
   // because a session can hold several; the first is the one the conversation
   // was opened against, and ACC's workspace identity needs exactly one.
-  const cwd = Array.isArray(payload.workspacePaths) ? payload.workspacePaths[0] : undefined;
+  //
+  // It is empty whenever the session has no open workspace, which an ordinary
+  // `agy -p` in a project directory is: captured on 1.2.7 as
+  // `fixtures/SessionStart-no-workspace-1.2.7.json`. Nothing else in the
+  // payload can stand in for it. `transcriptPath` and `artifactDirectoryPath`
+  // both point inside `~/.gemini/antigravity-cli/brain/<conversationId>/`,
+  // which is the client's own state and is per conversation - adopting it would
+  // give every conversation a private ACC workspace and two agents in one
+  // project would never see each other. Nor does the hook process inherit the
+  // client's directory: its working directory is the directory of the
+  // hooks.json it was registered from, `~/.gemini/config` for a global
+  // registration (`fixtures/hook-process-environment-1.2.7.json`).
+  //
+  // So this refuses, and it refuses *by name*. A hook that fails open is
+  // invisible by design, and an anonymous refusal here is indistinguishable
+  // from ACC not being installed - which is the state issue #176 describes.
+  const paths = payload.workspacePaths;
+  if (Array.isArray(paths) && paths.length === 0) {
+    data("this Antigravity session has no open workspace, so the hook was given no "
+      + "project directory and ACC cannot tell which workspace to join; open the project "
+      + "as an Antigravity workspace, or pass it with --add-dir",
+    { event, reasonCode: "antigravity_no_open_workspace" });
+  }
+  const cwd = Array.isArray(paths) ? paths[0] : undefined;
   if (typeof cwd !== "string" || cwd === "") {
     data("hook payload has no workspace path", { event, received: Object.keys(payload) });
   }

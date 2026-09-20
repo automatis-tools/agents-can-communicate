@@ -102,3 +102,35 @@ test("a Stop outcome never fails the hook", () => {
   assert.equal(released.exitCode, 0);
   assert.equal(released.stdout, "", "permitting shutdown must print nothing at all");
 });
+
+test("a turn with no open workspace is refused by name, not as a generic bad payload", async () => {
+  // Captured from an ordinary `agy -p` turn: workspacePaths is empty unless the
+  // session has an open workspace. The original fixtures were taken with
+  // --add-dir, which populates it, so this case was invisible until a real turn
+  // ran. There is nothing else in the payload that names the user's project -
+  // transcriptPath and artifactDirectoryPath both point inside the client's own
+  // brain directory, one per conversation - and the hook process does not
+  // inherit the client's directory either. Refusing is right; refusing
+  // anonymously is what made it look like nothing was installed.
+  const payload = await captured("SessionStart-no-workspace-1.2.7");
+  assert.deepEqual(payload.workspacePaths, []);
+
+  assert.throws(() => normalizeAntigravityHook(payload, { args: ["SessionStart"] }),
+    error => error.code === EXIT.DATA
+      && error.details?.reasonCode === "antigravity_no_open_workspace"
+      && /--add-dir|open workspace/.test(error.message),
+    "an empty workspacePaths must be reported as its own cause");
+});
+
+test("the conversation's own brain directory is never used as a workspace", async () => {
+  // It is inside ~/.gemini, it is per-conversation, and adopting it would give
+  // every conversation a private ACC workspace inside the client's state - so
+  // two agents in the same project would never see each other.
+  const payload = await captured("SessionStart-no-workspace-1.2.7");
+  try {
+    const event = normalizeAntigravityHook(payload, { args: ["SessionStart"] });
+    assert.fail(`normalised to ${event.cwd} instead of refusing`);
+  } catch (error) {
+    assert.equal(error.code, EXIT.DATA);
+  }
+});

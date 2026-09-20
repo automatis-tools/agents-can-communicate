@@ -1,0 +1,7 @@
+{
+  "note": "What the hook process itself sees, captured from an ordinary `agy -p` turn started in a project directory with the hooks registered globally. The hook does NOT inherit the directory the client was started in: its working directory is the directory of the hooks.json it was registered from. So when workspacePaths is empty there is nothing in the payload or the environment that names the user's project.",
+  "clientStartedIn": "<project>",
+  "hookWorkingDirectory": "<home>/.gemini/config",
+  "hookWorkingDirectoryIs": "the directory holding the hooks.json this action was registered from",
+  "payloadWorkspacePaths": []
+}
