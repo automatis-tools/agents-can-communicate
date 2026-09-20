@@ -24,6 +24,7 @@ import { canonicalClaim } from "./claim-spelling.mjs";
 import { platformDataHome, runtimePaths } from "./runtime-paths.mjs";
 import { resolveOwner } from "./session-owner.mjs";
 import { discoverWorkspace } from "./workspace-discovery.mjs";
+import { resolveSavedHookWorkspace } from "./hook-workspace.mjs";
 
 const DEFAULT_CADENCE_MS = 30_000;
 
@@ -68,14 +69,17 @@ async function claimOn(options, context) {
  * looking is safe.
  */
 async function locateContext(options, runtime) {
-  const descriptor = await discoverWorkspace({
+  const dataHome = runtime.dataHome ?? platformDataHome({ platform: runtime.platform,
+    env: runtime.env });
+  const discovery = {
     cwd: options.cwd ?? runtime.cwd,
     env: runtime.env,
     gitProbe: runtime.gitProbe ?? createGitProbe(),
     explicitConfig: options.workspace,
-  });
-  const dataHome = runtime.dataHome ?? platformDataHome({ platform: runtime.platform,
-    env: runtime.env });
+  };
+  const saved = await resolveSavedHookWorkspace({ ...discovery, dataHome,
+    reference: options.workspace });
+  const descriptor = saved?.descriptor ?? await discoverWorkspace(discovery);
   const paths = runtimePaths({
     dataHome,
     workspaceId: descriptor.id,

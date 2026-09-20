@@ -1,0 +1,32 @@
+{
+  "observedAt": "2026-09-19T16:29:45.459Z",
+  "client": "claude-code",
+  "version": "2.1.278",
+  "platform": "darwin-arm64",
+  "launch": "real vendor binary, isolated command hook, no UserPromptSubmit hook, no session persistence",
+  "event": "SessionStart",
+  "source": "startup",
+  "checks": {
+    "exactSession": true,
+    "exactGeneration": true,
+    "sessionArgument": true,
+    "generationArgument": true,
+    "workspaceArgument": true
+  },
+  "limitations": [
+    "This capture observes startup context, not real auto-compaction.",
+    "The repeated compact event and same-owner inbox recovery are tested with the installed ACC artifact.",
+    "No peer message projection, live delivery, or broader startupInjection capability is certified."
+  ],
+  "labelEchoed": false,
+  "notes": [
+    "The model returned the exact CLI arguments while omitting the display label ACC CLI (append):; a whole-header string matcher therefore failed."
+  ],
+  "sourceBase": "ecb1f93",
+  "sourceFiles": {
+    "packages/hook-runner/src/owner-context.mjs": "62893f7858fe9ba1956ffe797a668b79b53538cd6d9767d522412ac416415aaa",
+    "packages/hook-runner/src/runner.mjs": "bf716d7f059e93b8df7eef86265ff70b56ec6fb5eb75db0ac6e552cd4767ba62",
+    "packages/adapter-claude-code/src/adapter.mjs": "62243072bf12b4add4add38d25f7c41024e88ab6c9c7baa457eae449b3aa08dc",
+    "packages/adapter-claude-code/src/hooks.mjs": "dab55fa461d6dfec8262ab4b9017a41c6041b920ed2a20dbc6b76e5b0642b506"
+  }
+}

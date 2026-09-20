@@ -49,7 +49,8 @@ export async function verifyManagedCommands({ packageRoot, dataHome }) {
   }
   const modules = new Map();
   const hash = createHash("sha256");
-  for (const name of ["entry.mjs", "state.mjs", "generation-files.mjs", "mutex.mjs", "leases.mjs", "schedule.mjs", "policy.mjs"]) {
+  for (const name of ["entry.mjs", "command-prefix.mjs", "state.mjs", "generation-files.mjs",
+    "mutex.mjs", "leases.mjs", "schedule.mjs", "policy.mjs"]) {
     const bytes = await readFile(path.join(packageRoot, "node_modules", "@agents-can-communicate",
       "cli", "src", "managed-runtime", name));
     modules.set(name, bytes); hash.update(name).update(bytes);

@@ -4,7 +4,12 @@ Use `acc` to install and diagnose integrations, or to inspect the same communica
 operations that installed skills use on an agent's behalf. Setup commands are for a
 person; communication commands are the smaller agent-facing vocabulary. Every command
 accepts `--json` and `--cwd <path>`. `--workspace <config>` selects an explicit workspace
-config where supported by the common boundary.
+config where supported by the common boundary. These three global options work before
+or after the command: `acc --cwd /project status` and `acc status --cwd /project`
+select the same workspace. A native hook also supplies `--workspace acc://<reference>`
+to select its saved room directly. This reference is local to ACC's data home, is
+not a network URL, and does not establish session ownership. Ordinary config paths
+retain their existing validation.
 
 <!-- test:command -->
 ```bash
@@ -44,7 +49,15 @@ option value remains data: `--body --help` sends the literal body `--help`.
 Owner flags are `--session` and `--generation`; both are needed. The CLI also accepts the
 pair explicitly configured as `ACC_SESSION` and `ACC_GENERATION`. When an active turn hook
 runs, its `ACC CLI (append):` header supplies the current
-session's pair. The installed skill tells the agent to append it to its own commands,
+session's pair, a shell-quoted `--cwd`, and its saved `--workspace` room reference.
+Append the complete header even after changing the shell directory. Claude Code also
+restores this header on `SessionStart`, including compaction, without requiring another prompt.
+Native hooks retain the initial room even when later hook payloads have another
+`cwd`, including a nested Git repository. The header continues to name that initial
+directory and room even if Git later becomes available or unavailable. Standalone CLI
+commands without these arguments still discover their workspace from their own cwd;
+the CLI does not guess a native caller's identity.
+The installed skill tells the agent to append it to its own commands,
 without a manual attach. Hooks do not export credentials to child processes. Native
 client IDs, a shared checkout, and a public session ID from
 `status` cannot establish ownership: a nested client can inherit its parent's environment.
@@ -54,7 +67,7 @@ it to peers or child agents. A later hook after a session restart can supply a n
 the old generation remains invalid. Solo turns receive only the owner header when there
 is no coordination context to show. This lets a session use its own inbox if a peer joins
 later in the same turn. The header alone is not a peer notice or a request to coordinate.
-If the context budget cannot hold the complete pair, the hook reports that limitation
+If the context budget cannot hold the complete header, the hook reports that limitation
 on stderr and keeps any recovery text within budget. Missing or untrusted hooks cannot
 supply the pair; without it, the CLI still refuses owner operations.
 
@@ -68,6 +81,11 @@ Without a pair, mutations and `inbox` fail with exit `2` and
 `caller_identity_unresolved`. `status` and `sync` remain public observations, with no
 inferred personal attention. Session-bound [MCP tools](MCP.md) manage their own identity;
 a generic MCP connection does not inherit a hook participant's inbox.
+
+An explicit session selector absent from the selected workspace produces exit `5`
+with `caller_workspace_mismatch`, rather than a successful empty status. Restore the
+complete header or the manual attachment directory. A supplied generation must also
+match. This diagnostic does not search other workspaces or recover credentials.
 
 ### Presence and intent
 

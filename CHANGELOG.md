@@ -1,5 +1,68 @@
 # Changelog
 
+## Unreleased — saved room selectors for native CLI commands
+
+- Include a saved room reference in every native owner header. CLI commands retain
+  the launch room even if Git discovery changes after the hook supplied the header.
+- Validate the exact local routing record without inferring session credentials;
+  retain existing validation for ordinary workspace configuration files.
+- Preserve complete owner arguments and pending-message recovery within the hook
+  context budget. Document all four arguments in the five bundled ACC skills.
+
+| Candidate artifact | Value |
+|---|---|
+| Built from | `686c3303f4e60de6c561a7d44647617ae8778c19` |
+| Tarball | `agents-can-communicate-0.5.9.tgz`, 402,272 bytes, 281 files |
+| sha256 | `f54b899e0d074be2e2d722096a643ee5ede8fa40514d547dd0b4d3533382195e` |
+
+This unpublished development archive passed clean installation verification. See
+[saved room evidence](docs/release-evidence/unreleased-saved-room-reference.md)
+for regression checks and limits. Earlier records retain their original provenance.
+
+## Unreleased — native session workspace continuity
+
+- Keep each native conversation in the room selected at startup, even when later
+  hooks run from nested Git repositories, plain subdirectories, or other worktrees.
+- Preserve the original owner, inbox and claims through cwd changes and compaction;
+  route SessionEnd and native conversation resume to the original room.
+- Preserve room and claim coordinates when Git becomes unavailable or available.
+  Keep native routing records outside repositories, including symlinked data homes.
+- Clarify the difference between moving an existing session and launching a new
+  session directly in a nested repository in all five bundled ACC skills.
+
+| Candidate artifact | Value |
+|---|---|
+| Built from | `40d207505f31f6a8d740a22a5c743ef2c9f94724` |
+| Tarball | `agents-can-communicate-0.5.9.tgz`, 401,444 bytes, 281 files |
+| sha256 | `013e2005932b37c51c5bcc43d71e03286254ed9c100ac66cd85909be9f10f4b0` |
+
+This unpublished development artifact retains the current package version. Its exact
+archive passed clean installation verification. See
+[workspace continuity evidence](docs/release-evidence/unreleased-workspace-continuity.md)
+for regression checks, mutation results and limits. Prior candidate records below
+retain their original provenance.
+
+## Unreleased — session ownership continuity
+
+- Restore Claude Code's own CLI arguments at SessionStart, including compaction,
+  and keep the workspace directory in every hook owner header.
+- Reject a session selector absent from the selected workspace instead of
+  returning a misleading empty status. Keep public observations available.
+- Accept global options before commands, including managed update/doctor recovery.
+- Exercise the installed artifact after shell directory changes and synthetic
+  compaction. Observe exact owner arguments in a real Claude Code 2.1.278 startup.
+
+| Candidate artifact | Value |
+|---|---|
+| Built from | `4adbac5c38167f75b78d624db6cf7d7ef8b6c3ce` |
+| Tarball | `agents-can-communicate-0.5.9.tgz`, 398,941 bytes, 280 files |
+| sha256 | `d18905f8ada5fb66d6f77b70b0c4015870986bbf64d2369e6f8ad9af47807105` |
+
+This is an unpublished development artifact retaining the current package version,
+not the published 0.5.9 archive. Clean package verification passed. See
+[continuity evidence](docs/release-evidence/unreleased-session-continuity.md)
+for regression checks, the real-client observation, and its limits.
+
 ## 0.5.9 — release candidate
 
 - Keep two copies of the plugin in a client's versioned cache: the version an

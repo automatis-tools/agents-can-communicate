@@ -812,3 +812,28 @@ SessionStart before starting MCP. Removing the ready-process activation restores
 `queued / recipient_unavailable`. Separate mutations verify the lifecycle lock
 and current installation consent. An interrupted-close regression also verifies
 that journal recovery prevents a late Channel from republishing a closed session.
+
+## SessionStart owner context — 2026-09-19
+
+A real Claude Code 2.1.278 process on macOS arm64 received the exact owner
+`--session`, `--generation`, and shell-quoted `--cwd` arguments through a
+SessionStart command hook. The probe used the vendor binary, an isolated ACC
+data directory and settings file, no UserPromptSubmit hook, no tools, no MCP
+servers, and no session persistence. The prompt supplied no owner credentials.
+The model returned the arguments and omitted the display label; exact argument
+checks passed, while a whole-header label comparison failed. Retained metadata
+and source hashes are in `tests/fixtures/claude-start-owner-2.1.278.json`.
+
+The installed-package regression separately repeats SessionStart with source
+`compact`, keeps the same session and generation, and lists the original
+participant's pending inbox from another shell directory. Its receipt remains
+queued: identity restoration does not offer peer messages. This is a synthetic
+compact event, not a captured real auto-compaction. No broader startup peer
+projection, live delivery, or new capability boolean is certified here.
+
+The subsequent installed-package regression also changes hook payload `cwd` after
+startup: a plain parent directory contains separate web and API repositories, and
+the web repository has an external linked worktree. Claude retains its original
+owner and room through turns, a synthetic compact SessionStart, and SessionEnd from
+those locations; a Codex peer launched in the parent stays in the same room. These
+are executable hook fixtures, not a new real-client delivery certification.

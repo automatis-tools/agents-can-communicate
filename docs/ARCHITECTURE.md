@@ -115,10 +115,31 @@ its checkout and branch. Runtime state never lands inside those roots; the only 
 file ACC writes is an optional `acc.workspace.json` explicitly requested through
 `acc config init`.
 
+Native hooks persist the initial workspace directory and id, keyed by adapter and
+native session id, under the platform data home's `acc/native-workspaces`. This
+record carries routing only, never owner credentials. Subsequent hooks resolve the
+saved directory before loading the workspace-local owner binding; their payload's
+current cwd still resolves relative file targets. A nested repository cannot change
+the room or bypass its claims. A linked worktree of the original repository keeps
+repository-relative claim paths. Room publication is serialized before session
+opening, and the record survives SessionEnd so native conversation resume keeps the
+room. A changed initial workspace identity fails open with a diagnostic instead of
+opening a replacement room. If SessionStart was missed, the first user-turn hook
+establishes the room. A legacy session without this record establishes it on its
+next startup or user-turn hook; its original launch directory cannot be inferred.
+Every bound owner header includes a local `--workspace acc://<reference>` selector.
+The CLI validates the exact named routing record in ACC's own data home, then resolves
+the saved room through the same path as hooks. It does not scan for an owner or infer
+credentials. This also keeps a header usable when Git availability changes between
+the hook and the CLI command. Ordinary project-config validation remains unchanged.
+
 A lone session can remain ephemeral. Durable state materialises when a second live session
 appears or the first claim, message, or handoff is committed. Solo presence therefore
 does not require durable workspace history. Native turn hooks still supply the session's
-own CLI arguments, so a peer joining later in the same turn does not require reattachment.
+own CLI arguments and workspace directory, so a peer joining later in the same turn
+does not require reattachment and a changed shell directory cannot silently select another
+workspace. Claude SessionStart also restores this owner header after compaction; it
+does not project peer bodies or advance their receipts.
 Grok instead receives that own header after a terminal tool result through PreToolUse;
 the first public status call makes it available for subsequent owned commands.
 Without relevant coordination context, that identity header is the only projected content.

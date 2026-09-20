@@ -94,7 +94,7 @@ test(`an installed hook preserves a prior backlog with client ${clientVersion}`,
   assert.deepEqual(oldReceipts(after), oldReceipts(before));
   assert.equal(after.receipts.find(item => item.messageId === fresh.message.messageId).state,
     certified ? "offered" : "queued", "withheld bodies and reminders must not advance receipts");
-  const flags = /^ACC CLI \(append\): (--session \S+ --generation \S+)$/m.exec(first)[1]
+  const flags = /^ACC CLI \(append\): (--session \S+ --generation \S+) --cwd .+$/m.exec(first)[1]
     .split(" ");
   const status = await packed.acc(["status", ...flags]);
   assert.equal(status.attention.filter(item => ["reply_required", "acknowledgement_required"]

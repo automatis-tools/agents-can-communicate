@@ -8,7 +8,7 @@ import { createPackedAcc } from "../helpers/packed-acc.mjs";
 function ownerFlags(stdout, adapterId) {
   const context = adapterId === "codex" ? stdout : stdout.trim() === "" ? ""
     : JSON.parse(stdout).hookSpecificOutput?.additionalContext ?? "";
-  const match = /^ACC CLI \(append\): --session (\S+) --generation (\S+)$/m.exec(context);
+  const match = /^ACC CLI \(append\): --session (\S+) --generation (\S+) --cwd .+$/m.exec(context);
   assert.ok(match, "the next user turn must supply usable owner arguments");
   return ["--session", match[1], "--generation", match[2]];
 }

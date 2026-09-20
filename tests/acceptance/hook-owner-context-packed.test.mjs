@@ -8,10 +8,20 @@ import { createPackedAcc } from "../helpers/packed-acc.mjs";
 // These are process/packaging contracts, not evidence that a model uses the
 // context. The real-client observation is recorded separately in COMPATIBILITY.
 function ownerFlags(context) {
-  const match = /^ACC CLI \(append\): --session (\S+) --generation (\S+)$/m.exec(context);
+  const match = /^ACC CLI \(append\): --session (\S+) --generation (\S+) --cwd .+$/m.exec(context);
   assert.ok(match, `the hook gave its session no usable owner arguments:\n${context}`);
-  return ["--session", match[1], "--generation", match[2]];
+  const room = /--workspace '(acc:\/\/[a-f0-9]{64})'/.exec(match[0]);
+  assert.ok(room, "the hook omitted its saved room reference");
+  return ["--session", match[1], "--generation", match[2], "--workspace", room[1]];
 }
+
+async function setBudget(packed, bytes) {
+  const file = path.join(packed.project, "acc.workspace.json");
+  const config = JSON.parse(await readFile(file, "utf8"));
+  config.policy.contextBudgetBytes = bytes;
+  await writeFile(file, JSON.stringify(config));
+}
+const ownerBytes = context => Buffer.byteLength(context.split("\n")[0]);
 
 for (const adapterId of ["claude_code", "codex"]) {
   test(`${adapterId} can answer a peer that joins after its turn started`, async t => {
@@ -88,10 +98,13 @@ test("the installed hook provides its own pair for intent, claim and addressed r
   assert.equal(done.message.fromSessionId, reader.sessionId);
 });
 
-test("200 bytes retain both complete owner arguments and an executable inbox recovery", async t => {
-  const { packed, question, turn } = await stage(t, 200);
+test("a tight budget retains complete owner arguments and executable inbox recovery", async t => {
+  const { packed, question, turn } = await stage(t);
+  const recovery = `ACC: read pending peer message: \`acc inbox --message ${question.message.messageId}\``;
+  const budget = ownerBytes((await turn()).context) + 1 + Buffer.byteLength(recovery);
+  await setBudget(packed, budget);
   const { context } = await turn();
-  assert.ok(Buffer.byteLength(context) <= 200);
+  assert.ok(Buffer.byteLength(context) <= budget);
   const flags = ownerFlags(context);
   assert.match(context, new RegExp(`acc inbox --message ${question.message.messageId}`));
   const [item] = await packed.acc(["inbox", ...flags, "--message", question.message.messageId]);
@@ -109,17 +122,22 @@ test("a budget smaller than the pair keeps recovery truthful and reports the mis
 });
 
 test("an ambient turn reserves the owner line before truncating the peer notice", async t => {
-  const { turn } = await stage(t, 120, false);
-  const flags = ownerFlags((await turn()).context);
+  const { packed, turn } = await stage(t, 6_000, false);
+  const first = (await turn()).context;
+  const flags = ownerFlags(first);
+  const budget = ownerBytes(first) + 2;
+  await setBudget(packed, budget);
   const { context } = await turn();
-  assert.ok(Buffer.byteLength(context) <= 120, context);
+  assert.ok(Buffer.byteLength(context) <= budget, context);
   assert.deepEqual(ownerFlags(context), flags);
 });
 
 test("a pair that fits alone cannot silently displace pending-message recovery", async t => {
-  const { question, turn } = await stage(t, 150);
+  const { packed, question, turn } = await stage(t);
+  const budget = ownerBytes((await turn()).context) + 1;
+  await setBudget(packed, budget);
   const { context, stderr } = await turn();
-  assert.ok(Buffer.byteLength(context) <= 150);
+  assert.ok(Buffer.byteLength(context) <= budget);
   assert.match(context, new RegExp(`acc inbox --message ${question.message.messageId}`));
   assert.match(stderr, /budget.*owner arguments/i);
 });
