@@ -109,3 +109,33 @@ test("installed native hooks keep their launch room across nested Git repositori
   const history = await packed.acc(["sync", "--session", codex.sessionId, "--scope", "full"]);
   assert.equal(history.snapshot.sessions.find(s => s.sessionId === claude.sessionId).state, "closed");
 });
+
+test("the installed owner header still selects its room after git init changes discovery", async t => {
+  const packed = await createPackedAcc(t);
+  const owner = await packed.start({ adapterId: "claude_code", participantId: "reader",
+    harnessSessionId: "native-reader" });
+  const sender = await packed.acc(["attach", "--participant", "sender"]);
+  const request = await packed.acc(["request", "--session", sender.sessionId,
+    "--generation", sender.generation, "--to", "reader", "--title", "Keep original room"]);
+  const initial = await packed.hook("claude_code", { hook_event_name: "SessionStart",
+    session_id: "native-reader", cwd: packed.project });
+  const suffix = ownerLine(initial.stdout);
+  await run("git", ["init", "--quiet"], { cwd: packed.project, env: hermeticEnv() });
+  const extraEnv = { PATH: `${packed.env.PATH}${path.delimiter}${process.env.PATH}` };
+  const turn = await packed.hook("claude_code", { hook_event_name: "UserPromptSubmit",
+    session_id: "native-reader", cwd: packed.project }, extraEnv);
+  assert.equal(ownerLine(turn.stdout), suffix);
+  const status = JSON.parse((await run("/bin/sh", ["-c",
+    '"$TEST_NODE" "$TEST_ACC" status --json ' + suffix], { cwd: packed.project,
+    env: { ...packed.env, ...extraEnv, TEST_NODE: process.execPath, TEST_ACC: packed.accBin } })).stdout).data;
+  assert.ok(status.participants.some(p => p.sessionId === owner.sessionId));
+  const inbox = JSON.parse((await run("/bin/sh", ["-c",
+    '"$TEST_NODE" "$TEST_ACC" inbox --json ' + suffix], { cwd: packed.project,
+    env: { ...packed.env, ...extraEnv, TEST_NODE: process.execPath, TEST_ACC: packed.accBin } })).stdout).data;
+  assert.equal(inbox.items[0].message.messageId, request.message.messageId);
+  const roomOnly = suffix.replace(/^--session \S+ --generation \S+ /, "");
+  await assert.rejects(run("/bin/sh", ["-c",
+    '"$TEST_NODE" "$TEST_ACC" inbox --json ' + roomOnly], { cwd: packed.project,
+    env: { ...packed.env, ...extraEnv, TEST_NODE: process.execPath, TEST_ACC: packed.accBin } }),
+  error => JSON.parse(error.stdout).error.details.reasonCode === "caller_identity_unresolved");
+});

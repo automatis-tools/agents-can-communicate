@@ -27,7 +27,8 @@ workspace path.
 Native sessions launched from the same parent directory keep that room when their
 agents enter different subdirectories or nested repositories. Hooks retain the launch
 directory across compaction and native conversation resume. Use the hook header's
-complete arguments, including `--cwd`, for CLI commands after a shell changes directory.
+complete arguments, including `--cwd` and `--workspace`, after a shell changes directory.
+The `acc://` workspace reference selects the saved room even if Git discovery changes.
 
 Separate sessions launched directly in different repositories still select different
 initial rooms; a repository and its own worktrees share one. To give those separate
@@ -40,7 +41,7 @@ directory before that hook, or start a fresh native conversation there.
 ## The owner arguments disappeared after compaction
 
 Claude Code's `SessionStart` restores the original session's owner header after
-compaction. Use its complete `--session`, `--generation`, and `--cwd` arguments.
+compaction. Use its complete `--session`, `--generation`, `--cwd`, and `--workspace` arguments.
 The hook retains the generation outside the model context; compaction does not require
 manual attachment or a new participant. An older installed integration may need updating.
 

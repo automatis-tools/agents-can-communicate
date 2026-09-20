@@ -2,9 +2,10 @@ import { assertPortableId } from "@agents-can-communicate/protocol";
 
 const shellQuote = value => `'${value.replaceAll("'", "'\\''")}'`;
 
-export const ownerHeader = (binding, cwd) => "ACC CLI (append): --session "
+export const ownerHeader = (binding, cwd, workspaceRef) => "ACC CLI (append): --session "
   + assertPortableId(binding.accSessionId, "sessionId") + " --generation "
-  + assertPortableId(binding.generation, "generation") + " --cwd " + shellQuote(cwd);
+  + assertPortableId(binding.generation, "generation") + " --cwd " + shellQuote(cwd)
+  + (workspaceRef === undefined ? "" : " --workspace " + shellQuote(workspaceRef));
 
 export function ownerOnlyOutcome(inject, owner, budgetBytes) {
   if (Buffer.byteLength(owner, "utf8") > budgetBytes) {
@@ -22,7 +23,7 @@ export async function appendToolOwner(result, { event, binding, context, adapter
   const current = await context.service.locateSession(binding.accSessionId, context.descriptor.id);
   if (current?.record.state !== "open" || current.record.generation !== binding.generation) return result;
 
-  const owner = ownerHeader(binding, context.workspaceCwd);
+  const owner = ownerHeader(binding, context.workspaceCwd, context.workspaceRef);
   const injected = adapter.injectToolOwnerOutcome({ owner, tool: event.tool });
   if (injected === null) return result;
   const fitted = ownerOnlyOutcome(() => injected, owner,
@@ -37,5 +38,6 @@ export function appendStartOwner(result, { event, context, adapter }) {
   if (event.kind !== "sessionStart" || result.accSessionId === undefined
     || typeof adapter.injectStartOwnerOutcome !== "function") return result;
   return { ...result, ...ownerOnlyOutcome(text => adapter.injectStartOwnerOutcome(text),
-    ownerHeader(result, context.workspaceCwd), context.descriptor.policy?.contextBudgetBytes ?? 6_000) };
+    ownerHeader(result, context.workspaceCwd, context.workspaceRef),
+    context.descriptor.policy?.contextBudgetBytes ?? 6_000) };
 }
