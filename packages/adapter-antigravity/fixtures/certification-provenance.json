@@ -1,0 +1,139 @@
+{
+  "schemaVersion": 1,
+  "captures": [
+    {
+      "client": "antigravity-cli",
+      "version": "1.2.7",
+      "platform": "darwin-arm64",
+      "observedAt": "2026-09-20",
+      "id": "session-start-1-2-7",
+      "event": "SessionStart",
+      "fixture": "fixtures/SessionStart-1.2.7.json",
+      "claims": [
+        {
+          "capability": "lifecycle.sessionStart",
+          "result": "pass",
+          "outcome": {
+            "kind": "event-observed",
+            "idle": "fires when a session starts",
+            "busy": "fires before the first model invocation",
+            "authority": "advisory",
+            "limitations": [
+              "captured in print mode only",
+              "no hook_event_name field; the event is known only from the command argument"
+            ]
+          }
+        }
+      ],
+      "sha256": "b6c1eaaf4efc1d103757402c904e0154973d5bd25b6706928356087db1cafa90",
+      "tool": null
+    },
+    {
+      "client": "antigravity-cli",
+      "version": "1.2.7",
+      "platform": "darwin-arm64",
+      "observedAt": "2026-09-20",
+      "id": "pre-invocation-1-2-7",
+      "event": "PreInvocation",
+      "fixture": "fixtures/PreInvocation-1.2.7.json",
+      "claims": [
+        {
+          "capability": "context.beforeTurnInjection",
+          "result": "pass",
+          "outcome": {
+            "kind": "model-visible",
+            "idle": "waits for the next invocation",
+            "busy": "does not interrupt an in-progress invocation",
+            "authority": "context",
+            "limitations": [
+              "requires the injectSteps ephemeralMessage envelope",
+              "userMessage and toolCall injection types were not exercised"
+            ]
+          }
+        }
+      ],
+      "sha256": "4543fa62b5668ad4aef6a34e6a5a3263c0c7cbf53b710339accca70721c7cad9",
+      "tool": null
+    },
+    {
+      "client": "antigravity-cli",
+      "version": "1.2.7",
+      "platform": "darwin-arm64",
+      "observedAt": "2026-09-20",
+      "id": "post-invocation-1-2-7",
+      "event": "PostInvocation",
+      "fixture": "fixtures/PostInvocation-1.2.7.json",
+      "claims": [
+        {
+          "capability": "lifecycle.postInvocation",
+          "result": "pass",
+          "outcome": {
+            "kind": "event-observed",
+            "idle": "does not fire",
+            "busy": "fires after each invocation",
+            "authority": "advisory",
+            "limitations": [
+              "envelope is byte-identical to PreInvocation for the same invocation"
+            ]
+          }
+        }
+      ],
+      "sha256": "4543fa62b5668ad4aef6a34e6a5a3263c0c7cbf53b710339accca70721c7cad9",
+      "tool": null
+    },
+    {
+      "client": "antigravity-cli",
+      "version": "1.2.7",
+      "platform": "darwin-arm64",
+      "observedAt": "2026-09-20",
+      "id": "stop-continue-1-2-7",
+      "event": "Stop",
+      "fixture": "fixtures/Stop-1.2.7.json",
+      "claims": [
+        {
+          "capability": "delivery.endOfTurnContinuation",
+          "result": "pass",
+          "outcome": {
+            "kind": "model-visible",
+            "idle": "fires with fullyIdle true",
+            "busy": "fires once per execution before the turn ends",
+            "authority": "bounded-blocking",
+            "limitations": [
+              "decision must be the exact string continue; any other value permits shutdown",
+              "vendor 1.1.9 caps consecutive continuations, so a turn cannot be held open indefinitely",
+              "the ceiling value was not captured"
+            ]
+          }
+        }
+      ],
+      "sha256": "f8ad528f27afa6306d63d1da295001170f9e1afbe5bf52be452d988d6c8d2431",
+      "tool": null
+    },
+    {
+      "client": "antigravity-cli",
+      "version": "1.2.7",
+      "platform": "darwin-arm64",
+      "observedAt": "2026-09-20",
+      "id": "stop-allow-1-2-7",
+      "event": "Stop",
+      "fixture": "fixtures/Stop-continued-1.2.7.json",
+      "claims": [
+        {
+          "capability": "delivery.endOfTurnContinuation",
+          "result": "pass",
+          "outcome": {
+            "kind": "event-observed",
+            "idle": "fires with fullyIdle true",
+            "busy": "second execution after a continuation",
+            "authority": "bounded-blocking",
+            "limitations": [
+              "executionNum increments across a continuation"
+            ]
+          }
+        }
+      ],
+      "sha256": "240c53e86e77c31a45ef12bfe4dd84732b4dfbb66faa3167c8c03c0034884d03",
+      "tool": null
+    }
+  ]
+}
