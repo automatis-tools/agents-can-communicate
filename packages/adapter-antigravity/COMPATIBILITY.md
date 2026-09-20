@@ -91,17 +91,29 @@ Three of those are new findings, and each one changed the adapter:
   including the events the global one does not carry. A machine can therefore hold a correct
   workspace registration that never runs.
 
+The adapter's own configuration was round-tripped against the live client on 2026-09-20:
+`installAntigravity` wrote a workspace registration, real `agy -p "/hooks" --output-format
+json` reported `SessionStart, PreInvocation, Stop` with that file as its `source`,
+`doctorAntigravity` read the same back, and after `uninstallAntigravity` the client reported
+an empty list. The probe, the parse and the removal are the real ones; only the model was
+never asked for a turn.
+
 A command quoted for a path containing a space - `sh "<dir with space>/probe.sh" SessionStart` -
 loads and is read back verbatim. Whether it *executes* correctly with a space in the path was
 not captured; that needs a real turn.
 
 ### Where ACC registers
 
-Open, and deliberately unanswered in code: issue #178. The adapter takes the location as an
-input, implements both, and refuses an install that was not told which - `ACC_ANTIGRAVITY_HOOKS`
-is `global` or `workspace`, and there is no default. An install with no answer skips this client
-by name and says what the choice is, rather than picking a machine-wide behaviour or a silent
-no-op on the operator's behalf.
+**Global, `~/.gemini/config/hooks.json`** — decided in issue #178. It is the location that
+always loads, and it is where ACC already registers for every other client that keeps hooks in
+the user's home. A workspace registration is available with `ACC_ANTIGRAVITY_HOOKS=workspace`;
+it is not the default because a workspace file in a folder nobody opened as a workspace
+registers nothing and reports nothing, and a default that silently does nothing is worse than
+one that is broader than a given project needs.
+
+A value that is neither is refused by name and that client is skipped, rather than being
+replaced by the default. An operator who asked for `workspace` and got the machine-wide file
+would have no way of finding out except by reading the file.
 
 | | Global `~/.gemini/config/hooks.json` | Workspace `<project>/.agents/hooks.json` |
 |---|---|---|

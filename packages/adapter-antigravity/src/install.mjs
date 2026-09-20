@@ -27,15 +27,23 @@ export const ACC_NAMESPACE = "acc";
 export const ACC_REGISTERED_EVENTS = Object.freeze(["SessionStart", "PreInvocation", "Stop"]);
 
 /**
- * Where a registration can go.
+ * Where a registration can go, and which one is used when nobody says.
  *
- * There is no default, and the absence is the point. Global always loads and
- * applies to every Antigravity session on the machine; workspace is scoped to
- * one project and does nothing at all unless that project is an open workspace.
- * Choosing for the operator would pick a machine-wide behaviour or a silent
- * no-op on their behalf. Issue #178.
+ * Global, decided in issue #178. It always loads, and it is where ACC already
+ * registers for every other client that keeps hooks in the user's home. The
+ * alternative is scoped to one project and does nothing at all unless that
+ * project is an open Antigravity workspace - and a default that silently
+ * registers nothing is worse than one that is broader than a given project
+ * needs. `ACC_ANTIGRAVITY_HOOKS=workspace` selects the other one.
+ *
+ * A value that is neither is refused rather than replaced by this default. On
+ * this client, quietly answering a different question from the one that was
+ * asked is the failure mode every other note in this package is about.
  */
 export const HOOK_LOCATIONS = Object.freeze(["global", "workspace"]);
+export const DEFAULT_HOOK_LOCATION = "global";
+
+const locationOf = context => context?.antigravityHookLocation ?? DEFAULT_HOOK_LOCATION;
 
 export const globalHooksPath = home => path.join(home, ".gemini", "config", "hooks.json");
 export const workspaceHooksPath = workspace => path.join(workspace, ".agents", "hooks.json");
@@ -60,18 +68,20 @@ function usage(message, details = {}) {
  * Both locations are implemented and both are tested. Which one is used is an
  * input, never an assumption.
  */
-export function hooksPathFor({ home, antigravityWorkspace, antigravityHookLocation }) {
-  if (!HOOK_LOCATIONS.includes(antigravityHookLocation)) {
-    usage("Antigravity hook registration needs a location: global "
+export function hooksPathFor(context) {
+  const { home, antigravityWorkspace } = context;
+  const location = locationOf(context);
+  if (!HOOK_LOCATIONS.includes(location)) {
+    usage(`${JSON.stringify(location)} is not an Antigravity hook location: use global `
       + `(${globalHooksPath(String(home))}, always loads, applies to every session on this `
       + "machine) or workspace (<project>/.agents/hooks.json, scoped to one project and "
       + "inert unless that project is an open Antigravity workspace)",
-    { location: antigravityHookLocation ?? null, known: [...HOOK_LOCATIONS] });
+    { location: location ?? null, known: [...HOOK_LOCATIONS] });
   }
-  if (antigravityHookLocation === "global") return globalHooksPath(home);
+  if (location === "global") return globalHooksPath(home);
   if (typeof antigravityWorkspace !== "string" || antigravityWorkspace === "") {
     usage("a workspace registration needs the project directory to write it into",
-      { location: antigravityHookLocation });
+      { location });
   }
   return workspaceHooksPath(antigravityWorkspace);
 }
@@ -205,7 +215,7 @@ export async function installAntigravity(context) {
   const changes = [shimDir(home), file];
 
   const diagnostics = [];
-  if (context.antigravityHookLocation === "workspace") {
+  if (locationOf(context) === "workspace") {
     diagnostics.push("a workspace registration loads only while this project is an open "
       + `Antigravity workspace; in print mode pass --add-dir ${context.antigravityWorkspace}`);
   }
@@ -275,15 +285,22 @@ export async function uninstallAntigravity(context) {
  * complete copy of the ACC integration while ACC is invisible to the client.
  * "The files are there" has to stop being read as "it is installed".
  */
+/**
+ * Whether this install can proceed as asked.
+ *
+ * Only an unrecognised location blocks it. Unset is not unrecognised - that is
+ * the default, `global`. A misspelling is, and it is named rather than silently
+ * replaced: an operator who asked for `workspace` and got the machine-wide file
+ * has no way of finding out except by reading the file.
+ */
 export function locationChoice(context) {
-  return HOOK_LOCATIONS.includes(context?.antigravityHookLocation)
-    ? null
-    : { reason: "Antigravity CLI hook registration has no location yet: set "
-      + "ACC_ANTIGRAVITY_HOOKS=global to write "
-      + `${globalHooksPath(String(context?.home ?? "~"))}, which always loads and applies `
-      + "to every Antigravity session on this machine, or ACC_ANTIGRAVITY_HOOKS=workspace "
-      + "to write <project>/.agents/hooks.json, which is scoped to one project and loads "
-      + "only while that project is an open Antigravity workspace" };
+  const location = locationOf(context);
+  return HOOK_LOCATIONS.includes(location) ? null
+    : { reason: `ACC_ANTIGRAVITY_HOOKS is ${JSON.stringify(location)}, which is not a place `
+      + "this client reads hooks from: use global "
+      + `(${globalHooksPath(String(context?.home ?? "~"))}, always loads, applies to every `
+      + "Antigravity session on this machine) or workspace (<project>/.agents/hooks.json, "
+      + "scoped to one project and loaded only while it is an open Antigravity workspace)" };
 }
 
 export async function detectAntigravity(context) {
@@ -325,7 +342,7 @@ export async function doctorAntigravity(context) {
       + "no tool guard and no session end",
     "Stop continuation is a bounded nudge, not a gate: this adapter continues a turn at most "
       + "once and fails open, and the client caps consecutive continuations itself (1.1.9)"];
-  if (context.antigravityHookLocation === "workspace") {
+  if (locationOf(context) === "workspace") {
     diagnostics.push("registered per workspace; a session opened anywhere else loads nothing");
   }
   return { ok: true, changes: [], diagnostics };

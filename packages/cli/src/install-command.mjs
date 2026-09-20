@@ -48,12 +48,14 @@ export const clientContext = (home, stateRoot,
   // uses, and reads none of the same files. Two locations load - the
   // machine-wide `~/.gemini/config/hooks.json` and a project's own
   // `.agents/hooks.json`, the second only while that project is an open
-  // workspace - and which one ACC should write is open (issue #178). So this
-  // carries the project the command ran in, and a location only when one was
-  // asked for by name. An install that was not told refuses; it does not pick.
+  // workspace. Global is the default (issue #178), because a workspace
+  // registration in a folder nobody opened as one registers nothing and says
+  // nothing. ACC_ANTIGRAVITY_HOOKS is carried through exactly as it was set,
+  // wrong values included, so the adapter can refuse one by name rather than
+  // quietly installing somewhere else.
   antigravityWorkspace: cwd,
-  ...(["global", "workspace"].includes(env.ACC_ANTIGRAVITY_HOOKS)
-    ? { antigravityHookLocation: env.ACC_ANTIGRAVITY_HOOKS } : {}),
+  antigravityHookLocation: typeof env.ACC_ANTIGRAVITY_HOOKS === "string"
+    && env.ACC_ANTIGRAVITY_HOOKS !== "" ? env.ACC_ANTIGRAVITY_HOOKS : "global",
   // Where ACC keeps its own state, for the client that has to be told. Codex
   // sandboxes the commands a model runs to the workspace, and ACC's state is
   // outside every workspace on purpose - so an agent there could read the

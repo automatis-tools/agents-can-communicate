@@ -26,22 +26,20 @@ test("the Codex home respects an explicit CODEX_HOME and otherwise follows the s
     env: { CODEX_HOME: "" } }).codexHome, "/supplied/home/.codex");
 });
 
-test("the Antigravity hook location is an input, never a default", () => {
-  // Global always loads and applies to every Antigravity session on the
-  // machine; workspace is scoped to one project and registers nothing unless
-  // that project is an open workspace. Issue #178 is which one ACC should pick,
-  // and until it is answered the context carries no answer at all - so an
-  // install that was not told refuses rather than choosing on the operator's
-  // behalf.
+test("the Antigravity hook location defaults to global and honours an override", () => {
+  // Issue #178: the machine-wide file. It always loads, where a workspace
+  // registration does nothing at all unless the project is an open Antigravity
+  // workspace - and a default that silently registers nothing is worse than one
+  // that is broader than a given project needs.
   assert.equal(clientContext("/supplied/home", "/state", { env: {} })
-    .antigravityHookLocation, undefined);
-  assert.equal(clientContext("/supplied/home", "/state",
-    { env: { ACC_ANTIGRAVITY_HOOKS: "global" } }).antigravityHookLocation, "global");
+    .antigravityHookLocation, "global");
   assert.equal(clientContext("/supplied/home", "/state",
     { env: { ACC_ANTIGRAVITY_HOOKS: "workspace" } }).antigravityHookLocation, "workspace");
-  // Anything else is not one of the two locations that exist.
+  // Carried through exactly as asked, wrong values included, so the adapter can
+  // refuse them by name. Substituting the default here would answer a question
+  // the operator did not ask.
   assert.equal(clientContext("/supplied/home", "/state",
-    { env: { ACC_ANTIGRAVITY_HOOKS: "both" } }).antigravityHookLocation, undefined);
+    { env: { ACC_ANTIGRAVITY_HOOKS: "both" } }).antigravityHookLocation, "both");
 });
 
 test("a workspace registration is written into the project the command ran in", () => {
