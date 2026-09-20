@@ -1,5 +1,28 @@
 # Changelog
 
+## 0.5.10 — release candidate
+
+- Keep a native session in the ACC room selected at launch when the agent moves
+  through subdirectories, nested Git repositories, or worktrees. Sessions launched
+  from the same parent stay together through compaction and conversation resume.
+- Restore Claude Code owner context on SessionStart. Include a saved room selector
+  in every native owner header so CLI commands retain the room across Git discovery
+  changes, and report a wrong-workspace session instead of an empty status.
+- Accept global CLI options before or after the command, including managed update
+  and doctor entry points. Document the complete owner arguments in all five skills.
+
+| Candidate artifact | Value |
+|---|---|
+| Built from | `b577f5790b9655be0055be14655c8c7203ab560d` |
+| Tarball | `agents-can-communicate-0.5.10.tgz`, 402,274 bytes, 281 files |
+| sha256 | `56fc37184ab120a801dd84a0f30b2f467ae55feda445559251c1747ba47e6044` |
+
+The exact archive passed clean installation and an isolated upgrade from published
+0.5.9. All 281 source, archive and installed files matched; both delivery choices
+survived and the active runtime became 0.5.10. All 28 managed-update checks passed.
+See [0.5.10 release evidence](docs/release-evidence/v0.5.10.md) for verification and
+limits. Earlier development records below retain their original provenance.
+
 ## Unreleased — saved room selectors for native CLI commands
 
 - Include a saved room reference in every native owner header. CLI commands retain
