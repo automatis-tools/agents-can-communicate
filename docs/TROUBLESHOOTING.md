@@ -24,6 +24,33 @@ requires plugin trust.
 ACC does not launch a missing session. Open it normally after fixing the installation or
 workspace path.
 
+Native sessions launched from the same parent directory keep that room when their
+agents enter different subdirectories or nested repositories. Hooks retain the launch
+directory across compaction and native conversation resume. Use the hook header's
+complete arguments, including `--cwd` and `--workspace`, after a shell changes directory.
+The `acc://` workspace reference selects the saved room even if Git discovery changes.
+
+Separate sessions launched directly in different repositories still select different
+initial rooms; a repository and its own worktrees share one. To give those separate
+launches a common room, use an explicit workspace configuration or `ACC_WORKSPACE_ROOT`
+at startup. This does not merge histories or move messages between participant IDs.
+Existing sessions from an older integration have no saved launch directory: their next
+startup or user-turn hook establishes it. Return such a session to its original
+directory before that hook, or start a fresh native conversation there.
+
+## The owner arguments disappeared after compaction
+
+Claude Code's `SessionStart` restores the original session's owner header after
+compaction. Use its complete `--session`, `--generation`, `--cwd`, and `--workspace` arguments.
+The hook retains the generation outside the model context; compaction does not require
+manual attachment or a new participant. An older installed integration may need updating.
+
+If the header is unavailable, use this session's ACC MCP tools when they own the
+addressed participant, or report the limitation and continue the user's work. Do not
+create a replacement participant just to recover context: it cannot inherit another
+participant's inbox. `caller_workspace_mismatch` means the named session is absent from
+the selected workspace; check the original directory before concluding there are no peers.
+
 ## A hook says `workspace contains ACC runtime state`
 
 The current directory contains ACC's own state, so ACC cannot use it as a workspace.

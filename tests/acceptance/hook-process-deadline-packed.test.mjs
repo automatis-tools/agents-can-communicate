@@ -61,11 +61,11 @@ test(`the installed hook bounds its ${command} probe when it ignores SIGTERM`, {
   assert.ok(probePids.length > 0, `the stalled ${command} probe never ran`);
   assert.equal(watchdogFired, false, `the hook needed its 8-second watchdog (${elapsedMs}ms)`);
   assert.deepEqual(result, [0, null]);
-  assert.equal(stdout, "");
   assert.ok(Buffer.byteLength(stderr) <= 512);
   const binding = await packed.findBinding(sessionId);
   const roster = (await packed.acc(["status"])).participants;
   if (command === "git") {
+    assert.equal(stdout, "");
     assert.ok(elapsedMs < 7_000, `the default 5-second hook budget took ${elapsedMs}ms`);
     assert.match(stderr, /coordination.*unavailable/i);
     assert.equal(binding, null);
@@ -73,6 +73,11 @@ test(`the installed hook bounds its ${command} probe when it ignores SIGTERM`, {
   } else {
     assert.ok(elapsedMs < 4_000, `the 1-second probe cap took ${elapsedMs}ms`);
     assert.ok(binding, "an optional probe timeout prevented advisory participation");
+    assert.notEqual(stdout, "", "optional probe timeout must retain restored owner context");
+    const context = JSON.parse(stdout).hookSpecificOutput;
+    assert.equal(context.hookEventName, "SessionStart");
+    assert.match(context.additionalContext,
+      new RegExp(`^ACC CLI \\(append\\): --session ${binding.accSessionId} --generation ${binding.generation} --cwd `));
     assert.equal(binding.clientVersion, undefined);
     assert.equal(binding.clientPid, undefined);
     assert.equal(roster.length, 1);

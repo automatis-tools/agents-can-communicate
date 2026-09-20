@@ -156,7 +156,7 @@ export function commandHelpText(command) {
   const globals = ["--json", "--help", "-h"];
   if (!["install", "uninstall", "update", "help", "version"].includes(name)) {
     globals.push("--cwd <path>");
-    if (name !== "config" || subcommand !== "validate") globals.push("--workspace <config>");
+    if (name !== "config" || subcommand !== "validate") globals.push("--workspace <config|acc://reference>");
   }
   lines.push(`Global: ${globals.join(", ")}`, "", ...notes,
     `Full reference: ${DOCS}`);
