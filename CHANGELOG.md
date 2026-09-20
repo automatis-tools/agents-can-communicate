@@ -1,5 +1,28 @@
 # Changelog
 
+## Unreleased — native session workspace continuity
+
+- Keep each native conversation in the room selected at startup, even when later
+  hooks run from nested Git repositories, plain subdirectories, or other worktrees.
+- Preserve the original owner, inbox and claims through cwd changes and compaction;
+  route SessionEnd and native conversation resume to the original room.
+- Preserve room and claim coordinates when Git becomes unavailable or available.
+  Keep native routing records outside repositories, including symlinked data homes.
+- Clarify the difference between moving an existing session and launching a new
+  session directly in a nested repository in all five bundled ACC skills.
+
+| Candidate artifact | Value |
+|---|---|
+| Built from | `40d207505f31f6a8d740a22a5c743ef2c9f94724` |
+| Tarball | `agents-can-communicate-0.5.9.tgz`, 401,444 bytes, 281 files |
+| sha256 | `013e2005932b37c51c5bcc43d71e03286254ed9c100ac66cd85909be9f10f4b0` |
+
+This unpublished development artifact retains the current package version. Its exact
+archive passed clean installation verification. See
+[workspace continuity evidence](docs/release-evidence/unreleased-workspace-continuity.md)
+for regression checks, mutation results and limits. Prior candidate records below
+retain their original provenance.
+
 ## Unreleased — session ownership continuity
 
 - Restore Claude Code's own CLI arguments at SessionStart, including compaction,
