@@ -9,7 +9,7 @@ import { clearNativeAttempt, clearSessionBinding, effectiveCapabilities, loadSes
 import { createCoordinationService } from "@agents-can-communicate/core";
 import { AccError, createId } from "@agents-can-communicate/protocol";
 import { openFilesystemStore } from "@agents-can-communicate/storage-filesystem";
-import { clearPin, createGitProbe, discoverWorkspace, platformDataHome, runtimePaths, writePin }
+import { clearPin, createGitProbe, resolveHookWorkspace, platformDataHome, runtimePaths, writePin }
   from "@agents-can-communicate/cli";
 
 import { resolveClientPid } from "./client-pid.mjs";
@@ -211,12 +211,13 @@ async function runtimeFacts(fromUrl) {
 // unreachable from there.
 const managerRootFor = dataHome => path.join(dataHome, "acc", "runtime");
 
-async function openContext({ cwd, dataHome, runtime, env, deadline }) {
-  assertHookBudget(deadline);
-  const descriptor = await discoverWorkspace({ cwd, env: env ?? {},
-    gitProbe: createGitProbe({ deadlineAt: deadline }) });
+async function openContext({ event, adapterId, dataHome, runtime, env, deadline }) {
   assertHookBudget(deadline);
   const resolvedDataHome = dataHome ?? platformDataHome({ env: env ?? {} });
+  const { descriptor, workspaceCwd } = await resolveHookWorkspace({ adapterId, event,
+    dataHome: resolvedDataHome, env: env ?? {}, clock: runtime.clock, deadlineAt: deadline,
+    gitProbe: createGitProbe({ deadlineAt: deadline }) });
+  assertHookBudget(deadline);
   const paths = runtimePaths({
     dataHome: resolvedDataHome,
     workspaceId: descriptor.id,
@@ -224,7 +225,7 @@ async function openContext({ cwd, dataHome, runtime, env, deadline }) {
   });
   const store = await openFilesystemStore({ root: paths.root, clock: runtime.clock,
     ids: runtime.ids, workspaceId: descriptor.id, deadlineAt: deadline });
-  return { descriptor, paths, workspaceCwd: path.resolve(env?.ACC_WORKSPACE_ROOT || cwd),
+  return { descriptor, paths, workspaceCwd,
     dataHome: resolvedDataHome, env: env ?? {}, realpath: runtime.realpath ?? realpath,
     service: createCoordinationService({ store, clock: runtime.clock, ids: runtime.ids }) };
 }
@@ -594,7 +595,7 @@ export async function runHook({ adapterId, payload, adapters, dataHome, env,
     if (adapter === undefined) throw new Error(`no adapter named ${adapterId}`);
 
     const event = await adapter.normalizeHook(payload);
-    const context = await openContext({ cwd: event.cwd, dataHome, runtime, env, deadline });
+    const context = await openContext({ event, adapterId, dataHome, runtime, env, deadline });
     const handler = HANDLERS[event.kind];
     const lifecycle = ["sessionStart", "sessionEnd", "beforeTurn"].includes(event.kind);
     const invoke = async () => {

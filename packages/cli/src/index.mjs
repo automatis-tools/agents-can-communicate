@@ -6,6 +6,7 @@ export { askConfirmation } from "./confirm.mjs";
 // which binary decides it runs at all.
 export { ALL_ADAPTERS, clientContext } from "./install-command.mjs";
 export { discoverWorkspace } from "./workspace-discovery.mjs";
+export { resolveHookWorkspace } from "./hook-workspace.mjs";
 export { createGitProbe, hermeticEnv } from "./git-probe.mjs";
 export { platformDataHome, runtimePaths } from "./runtime-paths.mjs";
 export { platformPaths } from "./platform-paths.mjs";

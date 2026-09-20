@@ -284,8 +284,12 @@ History uses the same 20-item/12,000-byte summary pages. Continue with
 cursor, limit, type, or current. Lifecycle metadata reports explicit decision changes;
 verify the selected handoff or decision against the present work.
 
-One workspace spans a repository's worktrees. A parent repository and a nested
-repository are separate workspaces unless explicitly configured to share one.
+The first SessionStart (or first user-turn hook if startup was missed) selects a
+native session's room. Later hooks keep it across cwd changes, nested repositories,
+compaction, and native conversation resume. Sessions launched from the same parent
+directory stay together. A new session launched directly in a nested repository
+selects that repository's room unless configured otherwise. One repository's
+worktrees share a room. CLI commands still need the full trusted owner header.
 Status carries checkout and branch
 when you genuinely need ownership information; those details are intentionally
 not repeated in every hook injection.

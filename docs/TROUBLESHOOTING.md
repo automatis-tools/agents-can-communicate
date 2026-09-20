@@ -24,12 +24,18 @@ requires plugin trust.
 ACC does not launch a missing session. Open it normally after fixing the installation or
 workspace path.
 
-Nested repositories have different Git common directories. A parent repository and a
-nested app therefore resolve to separate ACC workspaces; the app and its own worktrees
-share one. Use the hook header's complete arguments, including `--cwd`, when a shell
-moves between them. To intentionally share a room across repositories, use an explicit
-workspace configuration or `ACC_WORKSPACE_ROOT` consistently for all clients. Choosing
-a shared workspace does not merge histories or move messages between participant IDs.
+Native sessions launched from the same parent directory keep that room when their
+agents enter different subdirectories or nested repositories. Hooks retain the launch
+directory across compaction and native conversation resume. Use the hook header's
+complete arguments, including `--cwd`, for CLI commands after a shell changes directory.
+
+Separate sessions launched directly in different repositories still select different
+initial rooms; a repository and its own worktrees share one. To give those separate
+launches a common room, use an explicit workspace configuration or `ACC_WORKSPACE_ROOT`
+at startup. This does not merge histories or move messages between participant IDs.
+Existing sessions from an older integration have no saved launch directory: their next
+startup or user-turn hook establishes it. Return such a session to its original
+directory before that hook, or start a fresh native conversation there.
 
 ## The owner arguments disappeared after compaction
 

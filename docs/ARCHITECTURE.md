@@ -115,6 +115,19 @@ its checkout and branch. Runtime state never lands inside those roots; the only 
 file ACC writes is an optional `acc.workspace.json` explicitly requested through
 `acc config init`.
 
+Native hooks persist the initial workspace directory and id, keyed by adapter and
+native session id, under the platform data home's `acc/native-workspaces`. This
+record carries routing only, never owner credentials. Subsequent hooks resolve the
+saved directory before loading the workspace-local owner binding; their payload's
+current cwd still resolves relative file targets. A nested repository cannot change
+the room or bypass its claims. A linked worktree of the original repository keeps
+repository-relative claim paths. Room publication is serialized before session
+opening, and the record survives SessionEnd so native conversation resume keeps the
+room. A changed initial workspace identity fails open with a diagnostic instead of
+opening a replacement room. If SessionStart was missed, the first user-turn hook
+establishes the room. A legacy session without this record establishes it on its
+next startup or user-turn hook; its original launch directory cannot be inferred.
+
 A lone session can remain ephemeral. Durable state materialises when a second live session
 appears or the first claim, message, or handoff is committed. Solo presence therefore
 does not require durable workspace history. Native turn hooks still supply the session's

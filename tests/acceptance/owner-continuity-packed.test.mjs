@@ -5,6 +5,7 @@ import path from "node:path";
 import test from "node:test";
 import { promisify } from "node:util";
 import { createPackedAcc } from "../helpers/packed-acc.mjs";
+import { hermeticEnv } from "../../packages/cli/src/git-probe.mjs";
 
 const run = promisify(execFile);
 const ownerLine = stdout => {
@@ -64,4 +65,47 @@ test("owned status rejects a different workspace instead of reporting an empty r
   assert.equal(result.ok, false, "owned status silently dropped the unknown owner");
   assert.equal(result.error.details.reasonCode, "caller_workspace_mismatch");
   assert.match(result.error.message, /--cwd/);
+});
+
+test("installed native hooks keep their launch room across nested Git repositories and compaction", async t => {
+  const packed = await createPackedAcc(t);
+  const web = path.join(packed.project, "web");
+  const api = path.join(packed.project, "api");
+  const linked = path.join(packed.root, "web-worktree");
+  for (const cwd of [web, api]) {
+    await mkdir(cwd);
+    await run("git", ["init", "--quiet"], { cwd, env: hermeticEnv() });
+  }
+  await run("git", ["-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid",
+    "commit", "--allow-empty", "-m", "fixture"], { cwd: web, env: hermeticEnv() });
+  await run("git", ["worktree", "add", "-b", "linked", linked], { cwd: web, env: hermeticEnv() });
+  const extraEnv = { PATH: `${packed.env.PATH}${path.delimiter}${process.env.PATH}` };
+  const hook = (adapterId, name, sessionId, cwd) => packed.hook(adapterId,
+    { hook_event_name: name, session_id: sessionId, cwd }, extraEnv);
+  const claude = await packed.start({ adapterId: "claude_code", participantId: "reader",
+    harnessSessionId: "native-reader" });
+  const codex = await packed.start({ adapterId: "codex", participantId: "sender",
+    harnessSessionId: "native-sender" });
+  const claudeOwner = await packed.ownerEnv("native-reader");
+  const request = await packed.acc(["request", "--to", "reader", "--title", "Parent room question"],
+    await packed.ownerEnv("native-sender"));
+  for (const cwd of [web, api, linked]) {
+    const turn = await hook("claude_code", "UserPromptSubmit", "native-reader", cwd);
+    const status = await shellCli(packed, ownerLine(turn.stdout), cwd);
+    assert.deepEqual(status.participants.map(p => p.sessionId).sort(),
+      [claude.sessionId, codex.sessionId].sort());
+    assert.ok(ownerLine(turn.stdout).includes(`--cwd '${packed.project}'`));
+  }
+  await hook("codex", "UserPromptSubmit", "native-sender", api);
+  const compact = await packed.hook("claude_code", { hook_event_name: "SessionStart",
+    session_id: "native-reader", source: "compact", cwd: linked }, extraEnv);
+  const suffix = ownerLine(compact.stdout);
+  assert.ok(suffix.includes(`--session ${claude.sessionId} --generation ${claudeOwner.ACC_GENERATION}`));
+  const inbox = JSON.parse((await run("/bin/sh", ["-c",
+    '"$TEST_NODE" "$TEST_ACC" inbox --json ' + suffix], { cwd: api,
+    env: { ...packed.env, TEST_NODE: process.execPath, TEST_ACC: packed.accBin } })).stdout).data;
+  assert.equal(inbox.items[0].message.messageId, request.message.messageId);
+  await hook("claude_code", "SessionEnd", "native-reader", web);
+  const history = await packed.acc(["sync", "--session", codex.sessionId, "--scope", "full"]);
+  assert.equal(history.snapshot.sessions.find(s => s.sessionId === claude.sessionId).state, "closed");
 });

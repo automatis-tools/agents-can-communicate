@@ -49,6 +49,10 @@ runs, its `ACC CLI (append):` header supplies the current
 session's pair and a shell-quoted `--cwd` selecting its workspace. Append all three
 arguments even after changing the shell directory. Claude Code also restores this
 header on `SessionStart`, including compaction, without requiring another prompt.
+Native hooks retain the initial room even when later hook payloads have another
+`cwd`, including a nested Git repository. The header continues to name that initial
+directory. Standalone CLI commands without these arguments still discover their
+workspace from their own cwd; the CLI does not guess a native caller's identity.
 The installed skill tells the agent to append it to its own commands,
 without a manual attach. Hooks do not export credentials to child processes. Native
 client IDs, a shared checkout, and a public session ID from
