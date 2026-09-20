@@ -830,3 +830,10 @@ participant's pending inbox from another shell directory. Its receipt remains
 queued: identity restoration does not offer peer messages. This is a synthetic
 compact event, not a captured real auto-compaction. No broader startup peer
 projection, live delivery, or new capability boolean is certified here.
+
+The subsequent installed-package regression also changes hook payload `cwd` after
+startup: a plain parent directory contains separate web and API repositories, and
+the web repository has an external linked worktree. Claude retains its original
+owner and room through turns, a synthetic compact SessionStart, and SessionEnd from
+those locations; a Codex peer launched in the parent stays in the same room. These
+are executable hook fixtures, not a new real-client delivery certification.

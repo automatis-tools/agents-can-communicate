@@ -24,6 +24,13 @@ scoped to one machine and operating-system user. Git worktrees of one repository
 the same ACC workspace, but their checkout files remain separate. In a plain directory, the
 directory supplies identity unless optional configuration says otherwise. Git is optional.
 
+A native session keeps the room selected at startup. Moving into subdirectories,
+nested repositories, or other checkouts does not move that conversation to another
+room. Sessions launched from the same parent directory therefore stay together as
+their agents work in different child repositories. A separate session launched in
+a child repository selects its own initial room. Compaction and resuming the same
+native conversation retain its original room.
+
 A **participant** is the address for communication. A stable participant id can recover
 messages sent before a restart. A **session** is one current opening of that participant,
 with a generation token preventing an old process from changing its replacement's state.
