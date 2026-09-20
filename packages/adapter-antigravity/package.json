@@ -1,0 +1,16 @@
+{
+  "name": "@agents-can-communicate/adapter-antigravity",
+  "version": "0.5.10",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/adapter.mjs"
+  },
+  "files": [
+    "certification.json",
+    "fixtures/certification-provenance.json",
+    "fixtures/SessionStart-1.2.7.json",
+    "fixtures/PreInvocation-1.2.7.json",
+    "src/"
+  ]
+}

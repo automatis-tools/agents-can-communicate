@@ -20,11 +20,21 @@ import { detectInstallation } from "@agents-can-communicate/installer";
  */
 const HOME = path.join(path.sep, "home", "dana");
 
+// The project `acc install` was run in. One client registers its hooks per
+// workspace rather than per home, so an artifact can legitimately sit outside
+// the home - but only this directory, and only because the operator chose it.
+const PROJECT = path.join(HOME, "work", "project");
+
 test("no adapter writes at the top of the user's home", () => {
-  const context = clientContext(HOME);
+  const context = clientContext(HOME, undefined, { cwd: PROJECT });
 
   for (const adapter of ALL_ADAPTERS()) {
     for (const artifact of adapter.planInstall(context)) {
+      // A hook registered per workspace lives in the operator's own project,
+      // which is theirs to lay out and is not a client's configuration
+      // directory. The rules below are about the home; the next test is about
+      // the project, and between them every artifact is accounted for.
+      if (!path.relative(PROJECT, artifact.path).startsWith("..")) continue;
       const relative = path.relative(HOME, artifact.path);
       assert.equal(relative.startsWith(".."), false,
         `${adapter.id} plans ${artifact.path}, which is outside the home entirely`);
@@ -36,6 +46,28 @@ test("no adapter writes at the top of the user's home", () => {
       assert.equal(relative.split(path.sep)[0].startsWith("."), true,
         `${adapter.id} writes into ${relative.split(path.sep)[0]}/, `
         + "which is not a client's own directory");
+    }
+  }
+});
+
+test("an artifact outside the home is the project, and nothing else", () => {
+  // Antigravity CLI can register hooks in `<project>/.agents/hooks.json`, which
+  // is outside the home whenever the project is. That is the only reason an
+  // artifact may leave the home, and it has to be the directory the command ran
+  // in rather than anywhere else on the disk.
+  const elsewhere = path.join(path.sep, "srv", "checkout");
+  const context = clientContext(HOME, undefined, { cwd: elsewhere });
+
+  for (const adapter of ALL_ADAPTERS()) {
+    for (const artifact of adapter.planInstall(context)) {
+      if (!path.relative(HOME, artifact.path).startsWith("..")) continue;
+      const inProject = path.relative(elsewhere, artifact.path);
+      assert.equal(inProject.startsWith(".."), false,
+        `${adapter.id} plans ${artifact.path}, which is neither in the home nor in `
+        + "the project this command was run in");
+      assert.equal(inProject.split(path.sep)[0].startsWith("."), true,
+        `${adapter.id} plans ${inProject} in the project, which is not a dotted `
+        + "directory a client owns");
     }
   }
 });

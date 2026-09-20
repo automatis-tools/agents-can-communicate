@@ -198,6 +198,13 @@ return normalizedEvent({
 Refuse an unrecognised payload. Inventing a session attaches the wrong one, or a new one
 every hook, and looks like it is working.
 
+`normalizeHook(payload, { args })` also receives the arguments the client's hook command
+carried after the adapter id. Most clients name the event inside the payload and ignore this.
+Antigravity CLI does not send one at all, and its `PreInvocation` and `PostInvocation` hand
+over byte-identical envelopes - so for that client the registered command's own argument is
+the only thing that knows which hook ran, and its install writes the event name into each
+command. `args` is always an array; an adapter that does not need it may take one parameter.
+
 ## Measure response contracts
 
 Measure them. Every client differs, and a wrong shape fails **silently**:
@@ -207,6 +214,7 @@ Measure them. Every client differs, and a wrong shape fails **silently**:
 | Codex | exit 2 + stderr | plain stdout (`developer` message) |
 | Claude Code | `hookSpecificOutput.permissionDecision` | same envelope |
 | Gemini CLI | `{"decision":"block"}` | `hookSpecificOutput` envelope |
+| Antigravity CLI | no tool event loads, so a deny is unreachable | `{"injectSteps":[{"ephemeralMessage"}]}` from `PreInvocation` |
 | Grok | `{"decision":"deny","reason"}` (documented; deny not yet captured) | UserPromptSubmit stdout discarded; own identity only via PreToolUse after a terminal result, observed on 1.0.24 |
 | Kimi Code | `hookSpecificOutput.permissionDecision` | plain stdout |
 

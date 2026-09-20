@@ -1,0 +1,12 @@
+{
+  "note": "The same read-back for the Gemini CLI hook shape ACC writes today - a flat event map whose entries carry matcher and a nested hooks array. The file parsed, the write succeeded, and nothing loaded. This is the capture behind the rule that a successful write proves nothing.",
+  "wrote": {
+    "SessionStart": [
+      {
+        "matcher": "*",
+        "hooks": [{ "name": "acc-sessionStart", "type": "command", "command": "sh <workspace>/probe.sh sessionStart" }]
+      }
+    ]
+  },
+  "hooks": []
+}

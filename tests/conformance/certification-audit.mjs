@@ -38,7 +38,45 @@ const codexNativeDelivery = (version, observedAt, fixture) => nativeDelivery("co
   codexLocalDaemonLimitations, ["delivery.livePush"])
   .map(entry => ({ ...entry, launchMode: "ordinary-command-with-installed-hooks" }));
 
+// A payload with no event name in it. Antigravity CLI sends no
+// `hook_event_name`, and two of its four events carry byte-identical envelopes,
+// so the fixture cannot name its own event and the provenance record is what
+// says which hook ran. `eventInPayload: false` makes the conformance check
+// assert the absence rather than skip the field.
+const noEventField = entries => entries.map(entry => ({ ...entry, eventInPayload: false }));
+
 export const PASS_EXPECTATIONS = Object.freeze({
+  // Captured on the one version this client has been measured on. Three
+  // capabilities, and the list of what is missing is longer than the list of
+  // what is here: no tool event loads, so no guard; no SessionEnd, so no
+  // lifecycle deregistration; no captured live push.
+  "adapter-antigravity": withFacts("antigravity-cli", "1.2.7", noEventField([
+    row("lifecycle.sessionStart", "fixtures/SessionStart-1.2.7.json", "SessionStart", null,
+      "event-observed", "fires when a session starts",
+      "fires before the first model invocation", "advisory",
+      ["captured in print mode only",
+        "no hook_event_name field; the event is known only from the command argument"]),
+    row("context.beforeTurnInjection", "fixtures/PreInvocation-1.2.7.json", "PreInvocation",
+      null, "model-visible", "waits for the next invocation",
+      "does not interrupt an in-progress invocation", "context",
+      ["requires the injectSteps ephemeralMessage envelope",
+        "userMessage and toolCall injection types were not exercised"]),
+    row("delivery.nextTurn", "fixtures/PreInvocation-1.2.7.json", "PreInvocation", null,
+      "model-visible", "offers complete peer messages at the next invocation",
+      "does not interrupt an in-progress invocation", "context", [
+        "delivery requires the next invocation; there is no live push and no reply route",
+        "the end-of-turn Stop continuation carries its reason to the model and is a bounded"
+        + " nudge, not a gate: this adapter continues one turn at most once and the client"
+        + " caps consecutive continuations itself (vendor 1.1.9)",
+        "the continuation ceiling's own value was not captured, and neither was what the"
+        + " model is told when it is reached",
+        "captured on darwin-arm64 in print mode only; Linux, Windows and interactive"
+        + " sessions were not observed",
+        "agy agentapi send-message was not exercised and no agentapi binary exists under"
+        + " ~/.gemini/antigravity-cli/bin",
+        "reply routing back to ACC was not observed",
+      ]),
+  ]), "2026-09-20"),
   "adapter-claude-code": withFacts("claude-code", "2.1.233", [
     row("lifecycle.sessionStart", "fixtures/SessionStart.json", "SessionStart", null,
       "event-observed", "fires when a session starts", "fires before the first model turn",

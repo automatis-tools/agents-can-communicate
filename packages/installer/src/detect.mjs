@@ -159,6 +159,10 @@ export async function detectInstallation({ adapters, context, probe = spawnProbe
       try {
         const detected = await adapter.detect({ ...context, clientVersion: entry.version,
           platform, nativeDelivery: entry.nativeDelivery });
+        // An adapter that knows it cannot be installed right now says so here,
+        // rather than by throwing out of install and taking every other client
+        // on the machine down with it.
+        if (detected.blocked) entry.blocked = detected.blocked;
         if (detected.outgoingDelivery) entry.outgoingDelivery = detected.outgoingDelivery;
         if (detected.nativeSetup) entry.nativeSetup = detected.nativeSetup;
         entry.diagnostics = [...(detected.diagnostics ?? [])];

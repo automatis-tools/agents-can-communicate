@@ -1,6 +1,7 @@
 import { homedir } from "node:os";
 import path from "node:path";
 
+import { createAntigravityAdapter } from "@agents-can-communicate/adapter-antigravity";
 import { createClaudeCodeAdapter } from "@agents-can-communicate/adapter-claude-code";
 import { createCodexAdapter } from "@agents-can-communicate/adapter-codex";
 import { createGeminiCliAdapter } from "@agents-can-communicate/adapter-gemini-cli";
@@ -27,7 +28,8 @@ export { decideDelivery } from "./install-delivery-consent.mjs";
 // Each client keeps its own directory under the user's home, and an adapter
 // pointed at the home itself writes beside them rather than inside them. That
 // install reports success and the client never reads a byte of it.
-export const clientContext = (home, stateRoot, { shell = null, env = {}, dataHome } = {}) => ({
+export const clientContext = (home, stateRoot,
+  { shell = null, env = {}, dataHome, cwd = process.cwd() } = {}) => ({
   home,
   ...(dataHome === undefined ? {} : { dataHome }),
   configDir: path.join(home, ".claude"),
@@ -42,6 +44,16 @@ export const clientContext = (home, stateRoot, { shell = null, env = {}, dataHom
   // shim would exec. Detection reads them; nothing here writes.
   shell,
   env,
+  // Antigravity CLI keeps its hooks in the `~/.gemini` tree Gemini CLI also
+  // uses, and reads none of the same files. Two locations load - the
+  // machine-wide `~/.gemini/config/hooks.json` and a project's own
+  // `.agents/hooks.json`, the second only while that project is an open
+  // workspace - and which one ACC should write is open (issue #178). So this
+  // carries the project the command ran in, and a location only when one was
+  // asked for by name. An install that was not told refuses; it does not pick.
+  antigravityWorkspace: cwd,
+  ...(["global", "workspace"].includes(env.ACC_ANTIGRAVITY_HOOKS)
+    ? { antigravityHookLocation: env.ACC_ANTIGRAVITY_HOOKS } : {}),
   // Where ACC keeps its own state, for the client that has to be told. Codex
   // sandboxes the commands a model runs to the workspace, and ACC's state is
   // outside every workspace on purpose - so an agent there could read the
@@ -50,8 +62,8 @@ export const clientContext = (home, stateRoot, { shell = null, env = {}, dataHom
   stateRoot,
 });
 
-export const ALL_ADAPTERS = () => [createClaudeCodeAdapter(), createCodexAdapter(),
-  createGeminiCliAdapter(), createGrokAdapter(), createKimiAdapter()];
+export const ALL_ADAPTERS = () => [createAntigravityAdapter(), createClaudeCodeAdapter(),
+  createCodexAdapter(), createGeminiCliAdapter(), createGrokAdapter(), createKimiAdapter()];
 
 /**
  * How long to wait for a client to say its version.

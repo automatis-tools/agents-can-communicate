@@ -50,6 +50,24 @@
               "userMessage and toolCall injection types were not exercised"
             ]
           }
+        },
+        {
+          "capability": "delivery.nextTurn",
+          "result": "pass",
+          "outcome": {
+            "kind": "model-visible",
+            "idle": "offers complete peer messages at the next invocation",
+            "busy": "does not interrupt an in-progress invocation",
+            "authority": "context",
+            "limitations": [
+              "delivery requires the next invocation; there is no live push and no reply route",
+              "the end-of-turn Stop continuation carries its reason to the model and is a bounded nudge, not a gate: this adapter continues one turn at most once and the client caps consecutive continuations itself (vendor 1.1.9)",
+              "the continuation ceiling's own value was not captured, and neither was what the model is told when it is reached",
+              "captured on darwin-arm64 in print mode only; Linux, Windows and interactive sessions were not observed",
+              "agy agentapi send-message was not exercised and no agentapi binary exists under ~/.gemini/antigravity-cli/bin",
+              "reply routing back to ACC was not observed"
+            ]
+          }
         }
       ],
       "sha256": "4543fa62b5668ad4aef6a34e6a5a3263c0c7cbf53b710339accca70721c7cad9",

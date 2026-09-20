@@ -1,0 +1,53 @@
+{
+  "evidence": [
+    {
+      "client": "antigravity-cli", "version": "1.2.7", "platform": "darwin-arm64",
+      "observedAt": "2026-09-20", "capability": "lifecycle.sessionStart",
+      "fixture": "fixtures/SessionStart-1.2.7.json",
+      "provenance": "fixtures/certification-provenance.json",
+      "provenanceId": "session-start-1-2-7",
+      "idleBehavior": "fires when a session starts",
+      "busyBehavior": "fires before the first model invocation",
+      "authorityLevel": "advisory",
+      "limitations": [
+        "captured in print mode only",
+        "no hook_event_name field; the event is known only from the command argument"
+      ],
+      "result": "pass"
+    },
+    {
+      "client": "antigravity-cli", "version": "1.2.7", "platform": "darwin-arm64",
+      "observedAt": "2026-09-20", "capability": "context.beforeTurnInjection",
+      "fixture": "fixtures/PreInvocation-1.2.7.json",
+      "provenance": "fixtures/certification-provenance.json",
+      "provenanceId": "pre-invocation-1-2-7",
+      "idleBehavior": "waits for the next invocation",
+      "busyBehavior": "does not interrupt an in-progress invocation",
+      "authorityLevel": "context",
+      "limitations": [
+        "requires the injectSteps ephemeralMessage envelope",
+        "userMessage and toolCall injection types were not exercised"
+      ],
+      "result": "pass"
+    },
+    {
+      "client": "antigravity-cli", "version": "1.2.7", "platform": "darwin-arm64",
+      "observedAt": "2026-09-20", "capability": "delivery.nextTurn",
+      "fixture": "fixtures/PreInvocation-1.2.7.json",
+      "provenance": "fixtures/certification-provenance.json",
+      "provenanceId": "pre-invocation-1-2-7",
+      "idleBehavior": "offers complete peer messages at the next invocation",
+      "busyBehavior": "does not interrupt an in-progress invocation",
+      "authorityLevel": "context",
+      "limitations": [
+        "delivery requires the next invocation; there is no live push and no reply route",
+        "the end-of-turn Stop continuation carries its reason to the model and is a bounded nudge, not a gate: this adapter continues one turn at most once and the client caps consecutive continuations itself (vendor 1.1.9)",
+        "the continuation ceiling's own value was not captured, and neither was what the model is told when it is reached",
+        "captured on darwin-arm64 in print mode only; Linux, Windows and interactive sessions were not observed",
+        "agy agentapi send-message was not exercised and no agentapi binary exists under ~/.gemini/antigravity-cli/bin",
+        "reply routing back to ACC was not observed"
+      ],
+      "result": "pass"
+    }
+  ]
+}

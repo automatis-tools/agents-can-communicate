@@ -1,7 +1,12 @@
 # Antigravity CLI compatibility
 
-Investigation notes for issue #174. Nothing here is certified yet: no adapter ships from this
-package. Every line below is either observed on a live install or labelled as not observed.
+Investigation notes for issue #174, and the evidence this package's adapter rests on. Every
+line below is either observed on a live install or labelled as not observed.
+
+Three capabilities are certified from these captures - `lifecycle.sessionStart`,
+`context.beforeTurnInjection` and `delivery.nextTurn`. Everything else in the fourteen-entry
+capability shape is false, and most of it is false because the event it would need does not
+exist on this client rather than because nobody tried.
 
 Capture host: macOS arm64, Antigravity CLI **1.2.7**, installed from the official installer to
 `~/.local/bin/agy` (189,658,880 bytes). Model served during the capture: `gemini-3.8-flash-high`.
@@ -41,6 +46,74 @@ its working directory. In print mode it loaded only when the directory was passe
 `--add-dir`. An adapter that writes `.agents/hooks.json` into a project must therefore also make
 sure the project is opened as a workspace, or fall back to the global config.
 
+### Reading a registration back
+
+`agy -p "/hooks" --output-format json` answers without starting a turn or spending quota, and
+its `command.data` is the effective hook list:
+
+```json
+{ "hooks": [ { "name": "acc", "enabled": true,
+  "source": "<workspace>/.agents/hooks.json",
+  "actions": [ { "event": "SessionStart", "type": "command",
+    "command": "sh \"<path>/acc-hook.sh\" SessionStart", "timeout_seconds": 10 } ] } ] }
+```
+
+The namespace key becomes `name`; `source` names the file it was loaded from; `timeout` is
+read back as `timeout_seconds`. This is the only thing on the machine that can tell a working
+registration from an inert one, which is why install and doctor both read it rather than
+trusting the file they wrote. Six answers were captured, and four of them are failures that
+look identical on disk to a success:
+
+| What was written | Effective hook list | Fixture |
+|---|---|---|
+| Nothing at all | `[]` | `fixtures/hooks-readback-empty-1.2.7.json` |
+| The namespaced shape, three supported events | all three, with `source` | `fixtures/hooks-readback-registered-1.2.7.json` |
+| The namespaced shape, plus `SessionEnd` and `PreToolUse` | **only the supported event** | `fixtures/hooks-readback-dropped-1.2.7.json` |
+| The Gemini CLI shape ACC writes today | `[]` | `fixtures/hooks-readback-gemini-shape-1.2.7.json` |
+| A valid namespace **plus one extra top-level key** | `[]` | `fixtures/hooks-readback-foreign-key-1.2.7.json` |
+| The same namespace name in both locations | **only the global one, whole** | `fixtures/hooks-readback-namespace-collision-1.2.7.json` |
+
+Three of those are new findings, and each one changed the adapter:
+
+- **One unrecognised top-level key drops the whole file.** Every top-level key is read as an
+  integration namespace, and a key whose value is not an event map takes every valid namespace
+  in the file down with it. The marker the Gemini CLI adapter writes into `settings.json` -
+  `"acc:createdFile": true` - registered *nothing at all* here, valid `acc` namespace included.
+  So this adapter records "ACC created this file" beside its shim rather than inside the
+  client's file, and writes nothing into that file but namespaces.
+- **An unsupported event is dropped per action, not per file.** A namespace carrying
+  `SessionStart`, `SessionEnd` and `PreToolUse` loads, with only `SessionStart` in it. A
+  partially registered install is therefore indistinguishable from a complete one without the
+  read-back.
+- **Two locations with the same namespace name do not merge.** Global and workspace configs
+  merge when their namespaces differ - each appears separately with its own `source`. Give both
+  the name `acc` and only the global one survives; the workspace one is discarded entirely,
+  including the events the global one does not carry. A machine can therefore hold a correct
+  workspace registration that never runs.
+
+A command quoted for a path containing a space - `sh "<dir with space>/probe.sh" SessionStart` -
+loads and is read back verbatim. Whether it *executes* correctly with a space in the path was
+not captured; that needs a real turn.
+
+### Where ACC registers
+
+Open, and deliberately unanswered in code: issue #178. The adapter takes the location as an
+input, implements both, and refuses an install that was not told which - `ACC_ANTIGRAVITY_HOOKS`
+is `global` or `workspace`, and there is no default. An install with no answer skips this client
+by name and says what the choice is, rather than picking a machine-wide behaviour or a silent
+no-op on the operator's behalf.
+
+| | Global `~/.gemini/config/hooks.json` | Workspace `<project>/.agents/hooks.json` |
+|---|---|---|
+| Loads | always | only while that project is an open workspace |
+| Scope | every Antigravity session on the machine, in any directory | one project |
+| Fails as | ACC hooks run in projects that never asked for them | registers nothing, silently, with a file that looks correct |
+| Uninstall | one file | one file per project ever installed into |
+
+The namespace collision above bears on this: if both are ever written with the name `acc`, the
+global one wins and the workspace one is discarded whole. The two cannot be combined as a
+belt-and-braces install.
+
 ### Supported events
 
 Each event was registered alone, and then together, and the effective set read back from
@@ -68,7 +141,12 @@ Consequences for ACC:
 - **No tool guard.** There is no `guards.beforeWrite` equivalent. A claim cannot be enforced at
   write time on this client the way it is on Gemini CLI.
 - **No session end.** Participant deregistration cannot ride on a lifecycle event; it has to come
-  from the user, or be inferred.
+  from the user, or be inferred. What this adapter does about it: nothing automatic, and it says
+  so. `lifecycle.sessionEnd` is false, which makes the session's lifecycle `manual` in its own
+  participant record, so a session here goes offline by presence age or by an explicit
+  `acc finish`. A session can linger in the roster after its client has exited. That is a stated
+  limitation rather than a quiet one - inferring an end from `Stop` would retire a session that
+  is merely between turns, and `fullyIdle` says nothing about whether the process is still alive.
 
 ## Payload envelope
 
@@ -120,6 +198,14 @@ hooks that always block hanging the agent forever; after a configurable number o
 continuations, the hook can no longer block and the turn ends normally". An adapter must impose
 its own ceiling and fail open, and must not present a blocked turn as a guarantee that a peer
 will be answered.
+
+This adapter's ceiling is **one continuation per turn**, counted from the `executionNum` the
+client itself supplies - `Stop-1.2.7.json` carries `0` and `Stop-continued-1.2.7.json` carries
+`1`, so the counter is the client's rather than state ACC would have to keep between two
+short-lived hook processes. `stopResponse` returns `{}` - which permits shutdown - for every
+input that is not a non-empty reason below that ceiling, so a hook error, an expired budget and
+an unreachable store all end in a turn that finishes normally. Nothing in the sender-facing
+story says a peer will answer because a receiver's turn was continued.
 
 ### Live push — not observed
 
@@ -176,3 +262,10 @@ From the vendor changelog, not from capture:
 - Reply routing back to ACC.
 - The continuation ceiling's actual value, and what the model is told when it is reached.
 - Interactive-session behaviour. Everything above was captured in print mode.
+- Whether a hook command whose path contains a space *runs*; it registers and reads back
+  verbatim, but no turn was spent on executing one.
+- Which of two same-named namespaces wins on load order rather than on location: the one capture
+  had the global file winning, and a workspace-first ordering was not constructed.
+- Whether a `PostInvocation` registration costs anything measurable. It is not registered,
+  because its envelope is byte-identical to `PreInvocation`'s and there is nothing ACC would do
+  there twice.

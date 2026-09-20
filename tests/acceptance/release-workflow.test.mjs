@@ -5,6 +5,7 @@ import test from "node:test";
 
 import { createClaudeCodeAdapter } from "@agents-can-communicate/adapter-claude-code";
 import { createCodexAdapter } from "@agents-can-communicate/adapter-codex";
+import { createAntigravityAdapter } from "@agents-can-communicate/adapter-antigravity";
 import { createGeminiCliAdapter } from "@agents-can-communicate/adapter-gemini-cli";
 import { createGrokAdapter } from "@agents-can-communicate/adapter-grok";
 import { createKimiAdapter } from "@agents-can-communicate/adapter-kimi";
@@ -23,8 +24,8 @@ const NATIVE_PROCESS_TEST = Object.freeze({
 
 test("a shipped livePush capability has a capture, a matching anchor, and an acceptance test",
   async () => {
-    for (const create of [createClaudeCodeAdapter, createCodexAdapter, createGeminiCliAdapter,
-      createGrokAdapter, createKimiAdapter]) {
+    for (const create of [createAntigravityAdapter, createClaudeCodeAdapter, createCodexAdapter,
+      createGeminiCliAdapter, createGrokAdapter, createKimiAdapter]) {
       const adapter = create();
       if (adapter.capabilities.delivery?.livePush !== true) {
         assert.equal(adapter.nativeDelivery, undefined,

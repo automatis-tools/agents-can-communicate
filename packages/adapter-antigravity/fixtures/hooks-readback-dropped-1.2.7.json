@@ -1,0 +1,25 @@
+{
+  "note": "The same read-back for a namespaced config that also registered SessionEnd and PreToolUse. Both were accepted into the file and neither appears here: this client drops an unsupported event per action, silently, inside an otherwise valid namespace. Paths redacted as above; every other byte is verbatim.",
+  "wrote": {
+    "acc": {
+      "SessionStart": [{ "type": "command", "command": "sh <workspace>/probe.sh SessionStart", "timeout": 10 }],
+      "SessionEnd": [{ "type": "command", "command": "sh <workspace>/probe.sh SessionEnd", "timeout": 10 }],
+      "PreToolUse": [{ "type": "command", "command": "sh <workspace>/probe.sh PreToolUse", "timeout": 10 }]
+    }
+  },
+  "hooks": [
+    {
+      "name": "acc",
+      "enabled": true,
+      "source": "<workspace>/.agents/hooks.json",
+      "actions": [
+        {
+          "event": "SessionStart",
+          "type": "command",
+          "command": "sh <workspace>/probe.sh SessionStart",
+          "timeout_seconds": 10
+        }
+      ]
+    }
+  ]
+}

@@ -26,6 +26,31 @@ test("the Codex home respects an explicit CODEX_HOME and otherwise follows the s
     env: { CODEX_HOME: "" } }).codexHome, "/supplied/home/.codex");
 });
 
+test("the Antigravity hook location is an input, never a default", () => {
+  // Global always loads and applies to every Antigravity session on the
+  // machine; workspace is scoped to one project and registers nothing unless
+  // that project is an open workspace. Issue #178 is which one ACC should pick,
+  // and until it is answered the context carries no answer at all - so an
+  // install that was not told refuses rather than choosing on the operator's
+  // behalf.
+  assert.equal(clientContext("/supplied/home", "/state", { env: {} })
+    .antigravityHookLocation, undefined);
+  assert.equal(clientContext("/supplied/home", "/state",
+    { env: { ACC_ANTIGRAVITY_HOOKS: "global" } }).antigravityHookLocation, "global");
+  assert.equal(clientContext("/supplied/home", "/state",
+    { env: { ACC_ANTIGRAVITY_HOOKS: "workspace" } }).antigravityHookLocation, "workspace");
+  // Anything else is not one of the two locations that exist.
+  assert.equal(clientContext("/supplied/home", "/state",
+    { env: { ACC_ANTIGRAVITY_HOOKS: "both" } }).antigravityHookLocation, undefined);
+});
+
+test("a workspace registration is written into the project the command ran in", () => {
+  assert.equal(clientContext("/supplied/home", "/state", { env: {}, cwd: "/work/project" })
+    .antigravityWorkspace, "/work/project");
+  assert.equal(typeof clientContext("/supplied/home", "/state", { env: {} })
+    .antigravityWorkspace, "string");
+});
+
 /**
  * The command's own wiring.
  *
