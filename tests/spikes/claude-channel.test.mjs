@@ -94,6 +94,9 @@ test("a capture client's envelope becomes exactly one Channel notification",
     assert.match(offered.params.content, /untrusted/);
     assert.equal(offered.params.content.includes(SECRET_BODY), true);
     assert.equal(offered.params.content.includes(SECRET_SUBJECT), true);
+    // Stdio can reach the parent before the child appends its observation.
+    // Shutdown completes that write before we inspect the final capture log.
+    await channel.close();
     assert.equal(events(channel, "notification_accepted").length, 1);
     assert.deepEqual(events(channel, "notification_accepted")[0].messageId, "message_capture");
   }));
