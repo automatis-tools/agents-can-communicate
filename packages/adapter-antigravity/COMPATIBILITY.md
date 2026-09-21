@@ -385,6 +385,36 @@ cost, all observed rather than assumed:
 - **System framing.** The pushed text reaches the model as a `SYSTEM_MESSAGE`, as a `Stop`
   reason does; the untrusted-peer fence is what marks peer text as data.
 
+### Where the endpoint lives, and how a push behaves
+
+Captured the same day (`fixtures/live-push-surfaces-1.2.7.json`), variable names only:
+
+| Process | `ANTIGRAVITY_*` it inherits |
+|---|---|
+| A hook | `CONVERSATION_ID` only |
+| An MCP server the client spawns | **none** — not even the conversation id |
+| The agent's tool shell | `CONVERSATION_ID`, `LS_ADDRESS`, `CSRF_TOKEN` |
+| A process started from that shell | the same, plus seven more |
+
+The MCP client (protocol `2025-11-25`, `antigravity-client`) declares only `elicitation` and
+`roots` — no sampling and no channel-like capability — so an MCP server can neither reach the
+endpoint nor put text in front of the model; `elicitation` asks the human. A plugin inside a
+workspace, `<workspace>/.agents/plugins/<name>/mcp_config.json`, does load. The agent's own
+toolset includes `send_message`, `manage_inbox`, `schedule` and `wait`: this client has a
+first-party inbox between conversations, and `agentapi send-message` writes into it.
+
+A background process the agent started from its shell — approved once at the TUI prompt —
+kept running after the turn ended, and after the client exited (detached, its parent became
+`launchd`). Using the endpoint it inherited:
+
+- **idle:** the session woke at once and answered, with no user input;
+- **busy:** a push sent mid-generation was held until the running answer finished
+  uninterrupted, then presented and answered — ten seconds after it was sent;
+- **client exited:** `rpc error: code = Unavailable`.
+
+The model sees a push as `<SYSTEM_MESSAGE>[Message] … sender=<conversation>
+priority=MESSAGE_PRIORITY_HIGH content=…`; the `--title` is not shown.
+
 None of it is built. What already reaches a running session without any credential is the next
 invocation's `PreInvocation` and the end-of-turn `Stop` continuation.
 
@@ -496,8 +526,6 @@ From the vendor changelog, not from capture:
 
 - Any behaviour on Linux or Windows.
 - `userMessage` and `toolCall` injection types.
-- Whether `agentapi send-message` into a *busy* session queues until the turn ends or
-  interrupts it. Only an idle session was pushed into.
 - How long the endpoint stays valid: across a TUI restart, after `/clear`, or while the
   session waits at a permission prompt.
 - Reply routing back to ACC.
