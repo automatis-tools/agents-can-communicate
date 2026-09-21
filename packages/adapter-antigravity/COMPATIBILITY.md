@@ -3,8 +3,10 @@
 Investigation notes for issue #174, and the evidence this package's adapter rests on. Every
 line below is either observed on a live install or labelled as not observed.
 
-Three capabilities are certified from these captures - `lifecycle.sessionStart`,
-`context.beforeTurnInjection` and `delivery.nextTurn`. Everything else in the fourteen-entry
+Four capabilities are certified from these captures - `lifecycle.sessionStart`,
+`context.beforeTurnInjection` and `delivery.nextTurn` from 2026-09-20, and
+`delivery.livePush` from 2026-09-21, through a relay the agent starts in its own shell (see
+**Live push — certified through a relay the agent starts**). Everything else in the fourteen-entry
 capability shape is false, and most of it is false because the event it would need does not
 exist on this client rather than because nobody tried.
 
@@ -133,8 +135,9 @@ every Antigravity session, including the ones that have no open workspace and th
 the hook no project to join; those turns do nothing and say nothing. A workspace registration
 only loads where a workspace exists, so it never reaches that state — at the cost of loading
 nowhere else. Global remains the default because it is the one that cannot be silently absent, and the
-interactive TUI — the ordinary way to use this client — always has a workspace, so the
-no-workspace case is confined to print mode without `--add-dir`. `acc doctor` names it.
+interactive TUI — the ordinary way to use this client — has a workspace, so the no-workspace
+case is print mode without `--add-dir`, plus the first TUI session in a folder trusted at that
+same launch (below). `acc doctor` names both.
 
 ACC's own bookkeeping — which `hooks.json` files ACC created and may therefore delete — lives
 in ACC's data home, never in the client's tree. A marker inside `hooks.json` drops the whole
@@ -216,6 +219,14 @@ attached a participant that stayed `online` while the TUI was open
 (`fixtures/PreInvocation-tui-1.2.7.json`). The empty array is therefore a print-mode case:
 `agy -p` without `--add-dir`. The hook's working directory was `~/.gemini/config` in the TUI
 too, so the payload remains the only source of the project.
+
+**Except the first session in a folder trusted at that launch.** Opened in a folder the client
+had not trusted before, answered "Yes, I trust this folder", and started with `--add-dir .`,
+the TUI handed `SessionStart`, `PreInvocation` and `Stop` an empty `workspacePaths` for the
+whole session, so ACC attached nothing and never asked for the relay. It reproduced in three
+fresh folders; the next launch in the now-trusted folder named the project and worked
+(`fixtures/hooks-first-trust-no-workspace-1.2.7.json`). Nothing ACC can do fixes that session;
+starting the TUI again does.
 
 This is independent of where the hooks are registered. Registration decides whether the hook
 *runs*; an open workspace decides whether ACC can identify a *project*. A global registration
@@ -359,7 +370,7 @@ session (`fixtures/agentapi-reachability-1.2.7.json`):
 - **Hooks are given neither.** `SessionStart`, `PreInvocation` and `Stop` all received exactly
   one `ANTIGRAVITY_*` variable, `ANTIGRAVITY_CONVERSATION_ID`, recorded by name only.
 
-So ACC's hooks cannot push into a running session, and `delivery.livePush` stays false.
+So ACC's hooks cannot push into a running session themselves.
 
 **The agent's own tool shell can, and it wakes an idle session.** Captured on 2026-09-21 with
 the operator performing the token step himself (`fixtures/agentapi-live-push-1.2.7.json`):
@@ -415,12 +426,59 @@ kept running after the turn ended, and after the client exited (detached, its pa
 The model sees a push as `<SYSTEM_MESSAGE>[Message] … sender=<conversation>
 priority=MESSAGE_PRIORITY_HIGH content=…`; the `--title` is not shown.
 
-None of it is built. What already reaches a running session without any credential is the next
-invocation's `PreInvocation` and the end-of-turn `Stop` continuation.
+ACC builds live delivery on that last surface: see the next section.
+
+### Live push — certified through a relay the agent starts
+
+Certified 2026-09-21 on 1.2.7, darwin-arm64, TUI only, as `delivery.livePush` with contract
+`antigravity-agentapi-relay-v1`. Evidence:
+`fixtures/delivery/antigravity-cli-1.2.7-relay-product.json` and its product evidence, run
+through a private candidate (SHA-256 `fa1dab632b9ec5cef0e391b3779816eb479beaaee6c6197b0b166a24b0cf2887`)
+built from this branch and installed into an isolated ACC data home.
+
+How it works, in the order the capture exercised it:
+
+- With the live policy on and no relay for the conversation, the first `PreInvocation` carries
+  one line, once per conversation: `ACC: live delivery is on but not running in this
+  conversation. To let peers reach you while idle, run once: sh "<home>/.gemini/config/acc/acc-relay.sh" start`.
+- The agent ran it through `run_command`; the operator approved it once at the client's
+  permission prompt. `start` found the ACC session by conversation id, detached a relay with
+  the endpoint removed from its environment, handed the endpoint over stdin, and printed
+  `ACC: live delivery is running for this conversation.` The relay's parent is `launchd`.
+- The relay listens on a nonce-guarded socket, registers itself with no endpoint in the
+  record, and publishes its own delivery binding. `acc doctor` then reported the session
+  "local transport active; receiver verified".
+
+The five branches:
+
+| Branch | Observed |
+|---|---|
+| idle | a question to the idle session was pushed and the session woke with no user input, as a `SYSTEM_MESSAGE`, then answered |
+| busy | a question accepted while the model streamed a 5,288-word answer was held 25 seconds and presented only after that answer completed |
+| reply | the agent answered with the installed `acc reply` (approved at the prompt); the answer reached the sender and the question was acknowledged |
+| duplicate | the same client message id sent twice kept one message id; the second send took the durable path, and the relay pushed once |
+| fallback | after the client exited the relay retired itself in about five seconds, and a later message stayed queued in the inbox |
+
+Also observed, and part of the certification's limitations:
+
+- A message accepted while the turn waited on a tool permission was presented at that turn's
+  **next model invocation**, after the tool returned, not after the turn — the same boundary
+  `PreInvocation` uses. It took three sends to observe the busy branch cleanly; the second
+  arrived after the answer had already finished and showed an idle wake instead.
+- `ANTIGRAVITY_AGENTAPI_EXE` in the agent's shell names `agy` — the same file the relay runs
+  from the `PATH` it inherited.
+- `agy agentapi` reports failures as JSON on stdout with exit status 1 and an empty stderr
+  (`fixtures/agentapi-error-answers-1.2.7.json`).
+- The router records a relay push with transport `live-adapter`.
+
+Not claimed: print mode (it ends with its turn and needs no relay), the first session in a
+newly trusted folder (no workspace, so no ACC session to relay for), any other version or
+platform, and a native reply route.
 
 ### Reply routing — not observed
 
-`delivery.replyRoute` stays false.
+`delivery.replyRoute` stays false. The relay capture's replies went through the ordinary
+`acc reply` CLI, approved at the permission prompt; no native route back to ACC exists.
 
 ## MCP registration
 
@@ -526,13 +584,15 @@ From the vendor changelog, not from capture:
 
 - Any behaviour on Linux or Windows.
 - `userMessage` and `toolCall` injection types.
-- How long the endpoint stays valid: across a TUI restart, after `/clear`, or while the
-  session waits at a permission prompt.
-- Reply routing back to ACC.
+- How long the endpoint stays valid across a TUI restart or after `/clear`. While the session
+  waits at a permission prompt it stays valid: a push accepted then was presented at the turn's
+  next invocation.
+- A native reply route back to ACC; replies were observed only through `acc reply`.
 - The client's own continuation ceiling, and what the model is told when that is reached. What
   it is told on a continuation is observed: see **Stop continuation** above.
-- Interactive-session behaviour beyond one TUI turn. The TUI was driven once, with a harness
-  whose keystrokes arrived as `.`; the model was never asked to act on a peer message there.
+- Interactive sessions longer than the relay capture's one conversation of about a dozen turns.
+  The earlier harness's keystrokes arrived as `.`; the relay capture's harness delivered typed
+  prompts intact, and the model answered every pushed question there.
 - Whether a mid-turn injection changes what the model does in the rest of that turn.
 - Whether `--continue` reliably keeps one conversation id. Two successive `-c` runs produced
   different ACC sessions, so a print-mode conversation is not a stable participant.

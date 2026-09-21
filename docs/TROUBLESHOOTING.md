@@ -229,6 +229,9 @@ Open the project as an Antigravity workspace, or pass it explicitly:
 agy -p "..." --add-dir /path/to/project
 ```
 
+The first TUI session in a folder you trusted at that same launch has no workspace either,
+even with `--add-dir`; start the TUI again once the folder is trusted.
+
 `acc doctor` names this state. Nothing else in the payload can substitute for it:
 `transcriptPath` and `artifactDirectoryPath` both point inside the client's own
 per-conversation directory, and the hook process does not inherit the directory the client
@@ -267,6 +270,21 @@ because it cannot ask for approval; the client says so on stderr. The TUI asks i
 ACC does not grant itself that permission. To let headless agents answer, allow the ACC
 command yourself under `permissions.allow` in the client's settings, in the `command(...)`
 form its message names.
+
+## Antigravity never wakes while idle
+
+Live delivery needs four things, and `acc doctor` shows each:
+
+- the live policy is on: `acc install --adapter antigravity --delivery actionable` (or `all`);
+- the session is interactive - print mode ends with its turn and never runs a relay;
+- the session attached to ACC at all (see the section above);
+- the agent started the relay. ACC's context asks once per conversation; if the command was
+  declined, or never approved at the permission prompt, nothing asks again. Ask the agent to
+  run `sh "~/.gemini/config/acc/acc-relay.sh" start`, or start a new conversation.
+
+`acc doctor` reports how many relays are running and, per session, whether a live transport is
+active. A relay ends with its client; nothing is left running after the TUI exits or after
+`acc uninstall`.
 
 ## Grok shows no injected message
 
