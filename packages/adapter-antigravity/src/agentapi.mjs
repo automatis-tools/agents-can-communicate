@@ -1,4 +1,6 @@
 import { execFile } from "node:child_process";
+import { accessSync, constants, statSync } from "node:fs";
+import path from "node:path";
 
 /**
  * The one way ACC talks to a running Antigravity session: `agy agentapi`, run as
@@ -72,4 +74,25 @@ export function createAgentApi({ endpoint, baseEnv = process.env, run: runner = 
     sendMessage: text => call(["send-message", "--title", TITLE, endpoint.conversationId, text]),
     conversationMetadata: () => call(["get-conversation-metadata", endpoint.conversationId]),
   };
+}
+
+/**
+ * The agy the relay runs. The agent's shell names the client's own binary in
+ * ANTIGRAVITY_AGENTAPI_EXE - captured as the same file as the agy on its PATH -
+ * and preferring it keeps a push working for a client started by a full path
+ * that is not on the PATH. Only an absolute, executable file named agy is
+ * taken, because the relay calls it as `agy agentapi ...`; anything else falls
+ * back to the PATH.
+ */
+export function agentApiCommand(env) {
+  const named = env?.ANTIGRAVITY_AGENTAPI_EXE;
+  if (typeof named !== "string" || !path.isAbsolute(named) || path.basename(named) !== "agy") {
+    return "agy";
+  }
+  try {
+    accessSync(named, constants.X_OK);
+    return statSync(named).isFile() ? named : "agy";
+  } catch {
+    return "agy";
+  }
 }
