@@ -1,0 +1,7 @@
+#!/usr/bin/env node
+import { fileURLToPath } from "node:url";
+import { invokedDirectly, runEntry } from "@agents-can-communicate/cli/managed-entry";
+
+if (invokedDirectly(import.meta.url)) await runEntry({
+  kind: "acc-antigravity-relay", packageRoot: fileURLToPath(new URL("..", import.meta.url)),
+});
