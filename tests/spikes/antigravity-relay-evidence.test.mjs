@@ -53,7 +53,7 @@ test("the run refuses fields it does not know, and bodies have nowhere to go", (
 
 test("observations come from ACC's own results, not from what the operator hoped", () => {
   const delivery = { data: { message: { messageId: "message_a01" }, delivery: [
-    { recipientParticipantId: "agy-1", outcome: "offered", transport: "antigravity-relay" }] } };
+    { recipientParticipantId: "agy-1", outcome: "offered", transport: "live-adapter" }] } };
   const relayLog = [
     JSON.stringify({ at: at(1), event: "pushed", messageId: "message_a01" }),
     JSON.stringify({ at: at(1), event: "pushed", messageId: "message_other" }),
