@@ -99,8 +99,10 @@ an empty list. The probe, the parse and the removal are the real ones; only the 
 never asked for a turn.
 
 A command quoted for a path containing a space - `sh "<dir with space>/probe.sh" SessionStart` -
-loads and is read back verbatim. Whether it *executes* correctly with a space in the path was
-not captured; that needs a real turn.
+loads, is read back verbatim, and runs: in a real turn the script ran from a directory with
+spaces in it and received the event name as its first argument, which is the argument this
+adapter reads the event from (`fixtures/hook-command-space-path-1.2.7.json`). A home directory
+with a space in it is therefore not a reason for ACC's hooks to fail here.
 
 ### Where ACC registers
 
@@ -465,8 +467,6 @@ From the vendor changelog, not from capture:
 - Whether a mid-turn injection changes what the model does in the rest of that turn.
 - Whether `--continue` reliably keeps one conversation id. Two successive `-c` runs produced
   different ACC sessions, so a print-mode conversation is not a stable participant.
-- Whether a hook command whose path contains a space *runs*; it registers and reads back
-  verbatim, but no turn was spent on executing one.
 - Which of two same-named namespaces wins on load order rather than on location: the one capture
   had the global file winning, and a workspace-first ordering was not constructed.
 - Whether a `PostInvocation` registration costs anything measurable. It is not registered,

@@ -1,0 +1,10 @@
+{
+  "note": "A workspace registration, loaded with --add-dir, whose commands have exactly the shape ACC writes - sh \"<absolute path>\" <Event> - with spaces in both the workspace and the script's directory. One print-mode turn. The script appended its first argument and its own path to a log. <tmp> redacts the capture directory; the rest is verbatim.",
+  "registered": { "acc": {
+    "SessionStart": [ { "type": "command", "command": "sh \"<tmp>/agy space probe/dir with space/acc-hook.sh\" SessionStart", "timeout": 10 } ],
+    "PreInvocation": [ { "type": "command", "command": "sh \"<tmp>/agy space probe/dir with space/acc-hook.sh\" PreInvocation", "timeout": 10 } ] } },
+  "ran": [
+    "ran as SessionStart from <tmp>/agy space probe/dir with space/acc-hook.sh",
+    "ran as PreInvocation from <tmp>/agy space probe/dir with space/acc-hook.sh"
+  ]
+}
