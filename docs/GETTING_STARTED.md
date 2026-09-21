@@ -132,9 +132,13 @@ Every message is recorded before ACC attempts faster delivery. Every participant
 durable inbox, which is the universal recovery path.
 
 On exact client versions and platforms with captured support, Codex, Claude Code, Gemini
-CLI, and Kimi Code can receive a message at the next normal turn. That does not wake an idle
-session. Grok, generic MCP clients, unknown versions, and unsupported platforms use the
-durable inbox instead.
+CLI, Kimi Code and Antigravity CLI can receive a message at the next normal turn. That does
+not wake an idle session. Grok, generic MCP clients, unknown versions, and unsupported
+platforms use the durable inbox instead.
+
+Antigravity CLI carries one extra condition: its hooks are given a project directory only
+when the session has an open workspace. A session started without one attaches nothing, and
+the client shows no hook output to say so - `acc doctor` names it.
 
 Codex LocalDaemon and Claude Code Channel offer optional native delivery on
 Apple Silicon macOS. They are experimental, can spend tokens, and queue messages
