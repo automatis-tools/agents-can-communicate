@@ -25,6 +25,7 @@ const RUN_FIELDS = ["schemaVersion", "source", "client", "phase", "clientVersion
 const SCENARIO_FIELDS = ["caseId", "outcome", "startedAt", "finishedAt", "messageId", "observations"];
 const OBSERVATION_FIELDS = ["kind", "at", "outcome"];
 const CLEANUP_FIELDS = ["attempted", "outcome", "ownedProcesses", "temporaryState"];
+const LIVE_TRANSPORTS = Object.freeze(["live-adapter", "antigravity-relay"]);
 const IDENTIFIER = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
 const MESSAGE_ID = /^message_[A-Za-z0-9_-]{1,120}$/;
 const VERSION = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/;
@@ -106,7 +107,9 @@ export function observationsFrom({ caseId, delivery, relayLog = "", messageId, o
   const entry = (delivery?.data ?? delivery)?.delivery?.find(item => item.outcome !== undefined);
   if (entry !== undefined && ["A01", "A02", "A05"].includes(caseId)) {
     observations.push({ kind: "delivery", at,
-      outcome: entry.outcome === "offered" && entry.transport === "antigravity-relay" ? "offered"
+      // The router names a native adapter push "live-adapter" unless the
+      // transport is one of its named ones; a durable offer is never a wake.
+      outcome: entry.outcome === "offered" && LIVE_TRANSPORTS.includes(entry.transport) ? "offered"
         : entry.outcome === "queued" ? "queued" : "other" });
   }
   const events = String(relayLog).split("\n").filter(Boolean).map(line => {
