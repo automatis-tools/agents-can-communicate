@@ -78,8 +78,8 @@ export const PASS_EXPECTATIONS = Object.freeze({
         + " model is told when it is reached",
         "captured on darwin-arm64 in print mode only; Linux, Windows and interactive"
         + " sessions were not observed",
-        "agy agentapi send-message was not exercised and no agentapi binary exists under"
-        + " ~/.gemini/antigravity-cli/bin",
+        "agy agentapi send-message needs the running session's language-server address and"
+        + " CSRF token, and hooks are given neither, so ACC has no live push",
         "reply routing back to ACC was not observed",
         "hooks attach only when the Antigravity session has an open workspace; an ordinary"
         + " print-mode turn sends an empty workspacePaths and no session is created. This"

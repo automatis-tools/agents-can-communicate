@@ -341,14 +341,30 @@ input that is not a non-empty reason below that ceiling, so a hook error, an exp
 an unreachable store all end in a turn that finishes normally. Nothing in the sender-facing
 story says a peer will answer because a receiver's turn was continued.
 
-### Live push — not observed
+### Live push — not reachable from ACC's hooks
 
 `agy agentapi` exists as a hidden subcommand — it is absent from `agy --help` — exposing
-`get-conversation-metadata`, `new-conversation` and `send-message <recipient_id> <content>`. No
-`agentapi` binary exists on disk under `~/.gemini/antigravity-cli/bin/`, which holds only
-`webm_encoder`; a separate wrapper script at that path has been reported elsewhere and is not
-present on this install. Whether `send-message` wakes an idle session has not been captured.
-`delivery.livePush` stays false.
+`get-conversation-metadata`, `new-conversation` and `send-message <recipient_id> <content>`,
+where the recipient is a conversation id: the same `conversationId` every hook payload carries.
+No `agentapi` binary exists on disk under `~/.gemini/antigravity-cli/bin/`; the subcommand is
+part of `agy` itself.
+
+It is a client of the running session's own language server. Captured against an idle TUI
+session (`fixtures/agentapi-reachability-1.2.7.json`):
+
+- From outside the session it refuses at once: `ANTIGRAVITY_LS_ADDRESS is not set`.
+- The session listens on two random local ports. Pointed at one, `agentapi` gets a transport
+  error; pointed at the other, `Unauthenticated desc = missing CSRF token`. The token lives in
+  `ANTIGRAVITY_CSRF_TOKEN`.
+- **Hooks are given neither.** `SessionStart`, `PreInvocation` and `Stop` all received exactly
+  one `ANTIGRAVITY_*` variable, `ANTIGRAVITY_CONVERSATION_ID`, recorded by name only.
+
+So ACC's hooks cannot push into a running session, and `delivery.livePush` stays false. The
+one path left would run through the agent's own tool shell — if that shell carries the address
+and token, which was not checked — and would mean ACC recording a live session credential that
+lets anything holding it drive the user's agent. That is a security decision, not a missing
+feature, and it is not taken here. What does reach a session quickly is already wired: the
+next invocation's `PreInvocation`, and the end-of-turn `Stop` continuation.
 
 ### Reply routing — not observed
 
@@ -458,7 +474,9 @@ From the vendor changelog, not from capture:
 
 - Any behaviour on Linux or Windows.
 - `userMessage` and `toolCall` injection types.
-- Whether `agentapi send-message` reaches an idle session.
+- Whether the agent's own tool shell carries `ANTIGRAVITY_LS_ADDRESS` and
+  `ANTIGRAVITY_CSRF_TOKEN`, and so whether `agentapi send-message` could wake an idle session
+  from there. Hooks carry neither.
 - Reply routing back to ACC.
 - The client's own continuation ceiling, and what the model is told when that is reached. What
   it is told on a continuation is observed: see **Stop continuation** above.
