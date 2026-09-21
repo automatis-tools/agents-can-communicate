@@ -121,6 +121,20 @@ the false value and can never enable it.
 shape for the installed client. Only an exact passing version/platform match remains true.
 Unreadable, unknown, or mismatched clients degrade every uncertified row to false.
 
+An adapter for a client that ships often may declare a floor per platform:
+
+```js
+certificationFloor: { "darwin-arm64": "1.2.7" },
+```
+
+A stable version at or above the floor, on that platform, is then judged by the floor
+version's evidence for any capability it has no capture of its own for. A later capture
+wins for its own version, capability by capability - a recorded failure turns that
+capability off for that version and leaves the rest on the floor. Earlier versions,
+prereleases and other platforms stay uncertified, and `defineAdapter` refuses a floor
+that names a version with no passing evidence on its platform. Antigravity CLI declares
+one; every other adapter certifies exact versions only.
+
 The backing methods for delivery are `renderContextResult()` for `nextTurn`,
 `offerMessage()` for `livePush`, and `routeReply()` for `replyRoute`.
 

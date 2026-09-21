@@ -6,7 +6,9 @@ line below is either observed on a live install or labelled as not observed.
 Four capabilities are certified from these captures - `lifecycle.sessionStart`,
 `context.beforeTurnInjection` and `delivery.nextTurn` from 2026-09-20, and
 `delivery.livePush` from 2026-09-21, through a relay the agent starts in its own shell (see
-**Live push — certified through a relay the agent starts**). Everything else in the fourteen-entry
+**Live push — certified through a relay the agent starts**). The adapter declares 1.2.7 as a
+certification floor on darwin-arm64: later stable releases are judged by these captures until
+one of their own records otherwise. Everything else in the fourteen-entry
 capability shape is false, and most of it is false because the event it would need does not
 exist on this client rather than because nobody tried.
 
@@ -570,6 +572,11 @@ report that ACC "is already present" on an Antigravity install has to be checked
 and not against `agy plugin list`, which does not list the imported copy at all.
 
 ## Version floors to consider
+
+ACC's own floor is 1.2.7 on darwin-arm64 - the first captured version - declared as the
+adapter's `certificationFloor`. Earlier versions stay uncertified; later ones are judged
+by the 1.2.7 captures. A capture of a later release that records a regression takes
+precedence for that release.
 
 From the vendor changelog, not from capture:
 

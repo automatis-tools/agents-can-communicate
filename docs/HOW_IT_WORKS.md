@@ -115,7 +115,7 @@ All recipients have the same durable record, but adapters expose different accel
   and does not manage the vendor daemon during message delivery. Separately,
   [confirmed update maintenance](UPGRADING.md#confirmed-client-service-maintenance) can restart it.
 
-- **Optional Antigravity CLI relay:** on Apple Silicon macOS with 1.2.7, the session
+- **Optional Antigravity CLI relay:** on Apple Silicon macOS with 1.2.7 or later, the session
   endpoint exists only in the agent's own shell, so ACC's context asks the agent once per
   conversation to start a relay; the user approves that command. The relay keeps the endpoint
   in memory, wakes an idle session with a fenced peer message, holds one for a busy session,
