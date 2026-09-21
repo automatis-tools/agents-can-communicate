@@ -1,0 +1,20 @@
+{
+  "note": "What it would take for ACC to push into a running Antigravity session through the hidden `agy agentapi` subcommand, captured on 1.2.7 against an idle TUI session held open under a private PTY. No credential value was ever written: environment variables were recorded by name only.",
+  "help": {
+    "commands": ["get-conversation-metadata <conversation_id>", "new-conversation [--model=...] [--title=...] [--profile=...] <prompt>", "send-message [--title=<title>] <recipient_id> <content>"],
+    "sendMessage": "Send messages to another conversation or yourself. The recipient is a conversation id - the conversationId every hook payload carries."
+  },
+  "fromOutsideTheSession": [
+    { "env": "none", "answer": { "error": "ANTIGRAVITY_LS_ADDRESS is not set" } },
+    { "env": "ANTIGRAVITY_LS_ADDRESS=127.0.0.1:<first listening port>", "answer": { "error": "rpc error: code = Unavailable desc = connection error: desc = \"error reading server preface: EOF\"" } },
+    { "env": "ANTIGRAVITY_LS_ADDRESS=127.0.0.1:<second listening port>", "answer": { "error": "rpc error: code = Unauthenticated desc = missing CSRF token" } }
+  ],
+  "credentialVariable": "ANTIGRAVITY_CSRF_TOKEN (named in the binary)",
+  "hookEnvironment": {
+    "SessionStart": ["ANTIGRAVITY_CONVERSATION_ID"],
+    "PreInvocation": ["ANTIGRAVITY_CONVERSATION_ID"],
+    "Stop": ["ANTIGRAVITY_CONVERSATION_ID"]
+  },
+  "idleSessionAfterwards": "two steps, one user input: nothing arrived, because nothing could be sent",
+  "conclusion": "agentapi talks to the session's own language server, which listens on random local ports and refuses a caller without the session's CSRF token. Hooks are given neither the address nor the token, so ACC's hooks cannot reach it; delivery.livePush stays false. The only path left would run through the agent's own tool shell and would mean ACC storing a live session credential."
+}
