@@ -145,7 +145,9 @@ Apple Silicon macOS. They are experimental, can spend tokens, and queue messages
 until a running turn finishes. Codex requires 0.152.1 or newer, LocalDaemon infrastructure,
 recorded opt-in, and a verified session. Supported explicit setup can prepare a missing
 service. Start the client with your normal command. A loaded daemon thread can receive
-messages after its terminal exits.
+messages after its terminal exits. Antigravity CLI 1.2.7 has one too: with delivery enabled,
+ACC's context asks the agent once per conversation to start a relay from its own shell, and
+you approve that command at the client's prompt.
 [Capabilities](CAPABILITIES.md) explains policy, versions and fallback.
 
 Delivery evidence is deliberately narrow: `queued -> offered -> retrieved -> acknowledged`.
