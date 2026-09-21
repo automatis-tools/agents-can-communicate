@@ -232,7 +232,10 @@ async function openContext({ event, adapterId, dataHome, runtime, env, deadline 
 
 // What this turn is shown and which complete groups it may commit as
 // offered. Runs after the heartbeat and the bounded native retry.
-async function projectTurn({ binding, context, adapter, adapterId }) {
+// `render` is how the projected text reaches this client: before a turn it is
+// the adapter's context envelope, at the end of one it is a continuation.
+async function projectTurn({ binding, context, adapter, adapterId,
+  render = text => adapter.injectOutcome?.(text) }) {
   const sync = await context.service.sync({ sessionId: binding.accSessionId,
     cursor: null, scope: "delta" });
 
@@ -332,7 +335,7 @@ async function projectTurn({ binding, context, adapter, adapterId }) {
   // The entry point owns the transport boundary. This handler only prepares
   // offer inputs; recording them here would claim delivery before stdout's
   // callback proves that the bytes crossed.
-  const outcome = { stdout: "", ...adapter.injectOutcome?.(projected) };
+  const outcome = { stdout: "", ...render(projected) };
   const writableOffers = outcome.stdout === "" ? [] : offerInputs;
   return { ...outcome,
     stderr: [outcome.stderr, ownerWarning, degradation].filter(Boolean).join("\n"),
@@ -515,6 +518,32 @@ const HANDLERS = {
     return nativeBinding === undefined ? turn : { ...turn, nativeBinding };
   },
 
+  /**
+   * The end of a turn, for a client that can hold one open.
+   *
+   * A peer message that arrives while the model is producing its last answer
+   * has no next invocation to ride on, and would otherwise wait for the next
+   * user prompt - which can be hours. A client whose end-of-turn hook can
+   * continue the turn (`continueTurnOutcome`) gets that message now instead.
+   *
+   * Only for peer bodies the projector actually offers. Continuing a turn costs
+   * the operator a model invocation, so an owner header, an attention count or
+   * a degradation notice is never a reason to. The adapter owns the shape and
+   * the ceiling, and reads its own counter from the payload handed back to it;
+   * when it declines, it prints nothing, no offer is recorded, and the body
+   * stays queued for the next invocation. Every failure ends the turn normally.
+   */
+  async turnEnd(input) {
+    const { binding, context, adapter, payload } = input;
+    if (typeof adapter.continueTurnOutcome !== "function" || binding === null) return {};
+    const current = await context.service.locateSession(binding.accSessionId);
+    if (current === null || current.record.state !== "open"
+      || current.record.generation !== binding.generation) return {};
+    const turn = await projectTurn({ ...input,
+      render: text => adapter.continueTurnOutcome({ reason: text, payload }) });
+    return (turn.offerInputs ?? []).length === 0 ? {} : turn;
+  },
+
   async beforeTool({ binding, context, event, adapter }) {
     if (binding === null) return { decision: "allow" };
     if (event.targets.length === 0) {
@@ -617,8 +646,10 @@ export async function runHook({ adapterId, payload, adapters, dataHome, env,
       const binding = await loadSessionBinding({ runtimeDir: context.paths.root,
         harnessSessionId: event.sessionId });
       assertHookBudget(deadline);
+      // The raw payload goes to a handler only to be handed back to the adapter
+      // that produced it; nothing in core reads it.
       const result = handler === undefined ? {} : await handler({ event, context, adapter, adapterId,
-        binding, paths: context.paths,
+        binding, paths: context.paths, payload,
         readProcessTable, probeClientVersion, platform, deadline });
       return appendToolOwner(appendStartOwner(result, { event, context, adapter }),
         { event, binding, context, adapter });

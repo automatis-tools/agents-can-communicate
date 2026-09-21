@@ -119,7 +119,7 @@ test("evidence the tarball does not ship is still kept in the repository", async
     "hook-process-environment-1.2.7", "PreInvocation-tui-1.2.7",
     "tui-transcript-injection-1.2.7", "skills-readback-1.2.7",
     "plugin-name-collision-1.2.7", "plugin-install-lifecycle-1.2.7",
-    "headless-reply-attempt-1.2.7",
+    "headless-reply-attempt-1.2.7", "stop-continuation-live-1.2.7",
     "hooks-readback-empty-1.2.7", "hooks-readback-registered-1.2.7",
     "hooks-readback-dropped-1.2.7", "hooks-readback-gemini-shape-1.2.7",
     "hooks-readback-foreign-key-1.2.7", "hooks-readback-namespace-collision-1.2.7"]) {
@@ -129,4 +129,23 @@ test("evidence the tarball does not ship is still kept in the repository", async
     assert.equal(shipped.includes(`fixtures/${name}.json`), false,
       `fixtures/${name}.json is published but no certification entry references it`);
   }
+});
+
+test("the adapter continues a turn from the captured Stop payload, once", async () => {
+  const adapter = createAntigravityAdapter();
+  const first = JSON.parse(await readFile(
+    new URL("../fixtures/Stop-1.2.7.json", import.meta.url), "utf8"));
+  const second = JSON.parse(await readFile(
+    new URL("../fixtures/Stop-continued-1.2.7.json", import.meta.url), "utf8"));
+
+  // executionNum is the client's own count across a continuation - 0, then 1 -
+  // so the ceiling needs no state kept between two short-lived hook processes.
+  const held = adapter.continueTurnOutcome({ reason: "a peer asked", payload: first });
+  assert.deepEqual(JSON.parse(held.stdout), { decision: "continue", reason: "a peer asked" });
+  assert.equal(held.exitCode, 0);
+
+  const released = adapter.continueTurnOutcome({ reason: "a peer asked", payload: second });
+  assert.equal(released.stdout, "", "the adapter must stop asking before the client's cap does");
+  assert.equal(adapter.continueTurnOutcome({ reason: "x", payload: undefined }).stdout, "",
+    "no payload is not a reason to hold the turn");
 });
