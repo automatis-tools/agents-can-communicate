@@ -16,7 +16,8 @@ test("only what a capture in this package shows is declared true", () => {
   const adapter = createAntigravityAdapter();
 
   assert.deepEqual(trueOnes(adapter.capabilities),
-    ["context.beforeTurnInjection", "delivery.nextTurn", "lifecycle.sessionStart"]);
+    ["context.beforeTurnInjection", "delivery.livePush", "delivery.nextTurn",
+      "lifecycle.sessionStart"]);
 });
 
 test("the capabilities this client does not have stay false", () => {
@@ -30,9 +31,8 @@ test("the capabilities this client does not have stay false", () => {
   // SessionEnd is accepted into the config and never fires.
   assert.equal(capabilities.lifecycle.sessionEnd, false);
   assert.equal(capabilities.lifecycle.heartbeat, false);
-  // agy agentapi send-message is a hidden subcommand with no captured
-  // behaviour and no binary on disk.
-  assert.equal(capabilities.delivery.livePush, false);
+  // The agent answers a pushed message with the ordinary acc reply; no native
+  // reply route was captured.
   assert.equal(capabilities.delivery.replyRoute, false);
 });
 
@@ -40,7 +40,8 @@ test("a client that is not the captured one is certified for nothing", () => {
   const adapter = createAntigravityAdapter();
 
   assert.deepEqual(trueOnes(effectiveCapabilities(adapter, CERTIFIED)),
-    ["context.beforeTurnInjection", "delivery.nextTurn", "lifecycle.sessionStart"]);
+    ["context.beforeTurnInjection", "delivery.livePush", "delivery.nextTurn",
+      "lifecycle.sessionStart"]);
   for (const facts of [{ clientVersion: "1.2.6", platform: "darwin-arm64" },
     { clientVersion: ANTIGRAVITY_CLI_VERSION, platform: "linux-x64" },
     { clientVersion: "unknown", platform: "darwin-arm64" }, {}]) {
@@ -121,7 +122,6 @@ test("evidence the tarball does not ship is still kept in the repository", async
     "plugin-name-collision-1.2.7", "plugin-install-lifecycle-1.2.7",
     "headless-reply-attempt-1.2.7", "stop-continuation-live-1.2.7",
     "hook-command-space-path-1.2.7", "agentapi-reachability-1.2.7",
-    "agentapi-live-push-1.2.7", "live-push-surfaces-1.2.7",
     "hooks-readback-empty-1.2.7", "hooks-readback-registered-1.2.7",
     "hooks-readback-dropped-1.2.7", "hooks-readback-gemini-shape-1.2.7",
     "hooks-readback-foreign-key-1.2.7", "hooks-readback-namespace-collision-1.2.7"]) {
@@ -131,6 +131,22 @@ test("evidence the tarball does not ship is still kept in the repository", async
     assert.equal(shipped.includes(`fixtures/${name}.json`), false,
       `fixtures/${name}.json is published but no certification entry references it`);
   }
+});
+
+test("the relay certification ships the transport history it stands on", async () => {
+  // Live push is certified from the installed relay's product run; the earlier
+  // agentapi captures it builds on travel with it as historical evidence, so
+  // the tarball can be audited without the repository.
+  const shipped = JSON.parse(await readFile(new URL("../package.json", import.meta.url))).files;
+  const provenance = JSON.parse(await readFile(
+    new URL("../fixtures/certification-provenance.json", import.meta.url), "utf8"));
+  const relay = provenance.captures.find(record => record.id === "native-delivery-1-2-7-relay-product");
+  for (const { fixture } of [relay.productEvidence, ...relay.historicalFixtures]) {
+    assert.equal(shipped.includes(fixture), true, `${fixture} is not shipped`);
+  }
+  assert.deepEqual(relay.historicalFixtures.map(item => item.fixture).sort(), [
+    "fixtures/agentapi-error-answers-1.2.7.json", "fixtures/agentapi-live-push-1.2.7.json",
+    "fixtures/hooks-first-trust-no-workspace-1.2.7.json", "fixtures/live-push-surfaces-1.2.7.json"]);
 });
 
 test("the adapter continues a turn from the captured Stop payload, once", async () => {

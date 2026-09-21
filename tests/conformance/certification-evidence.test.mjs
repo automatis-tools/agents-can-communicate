@@ -12,7 +12,7 @@ import { createGeminiCliAdapter } from "@agents-can-communicate/adapter-gemini-c
 import { createGrokAdapter } from "@agents-can-communicate/adapter-grok";
 import { createKimiAdapter } from "@agents-can-communicate/adapter-kimi";
 import { CAPABILITY_SHAPE } from "@agents-can-communicate/adapter-sdk";
-import { INSTALLED_HOOKS_LAUNCH_MODE, PASSING_LAUNCH_MODE, validateCapture }
+import { INSTALLED_HOOKS_LAUNCH_MODE, INSTALLED_PRODUCT_EVIDENCE, PASSING_LAUNCH_MODE, validateCapture }
   from "../../scripts/spikes/delivery-capture.mjs";
 import { PASS_EXPECTATIONS } from "./certification-audit.mjs";
 
@@ -116,8 +116,8 @@ for (const [packageName, createAdapter] of ADAPTERS) {
             `${item.fixture} protocol contract differs from the independent audit`);
           let productEvidence;
           if (launchMode === INSTALLED_HOOKS_LAUNCH_MODE) {
-            assert.equal(packageName, "adapter-codex",
-              "installed-hooks native evidence is specific to Codex");
+            assert.equal(Object.hasOwn(INSTALLED_PRODUCT_EVIDENCE, item.client), true,
+              "installed-hooks native evidence needs a product matrix of its client's own");
             const reference = provenanceRecord.productEvidence;
             assert.ok(reference, `${item.provenanceId} has no product evidence`);
             assert.equal(typeof reference.fixture === "string"

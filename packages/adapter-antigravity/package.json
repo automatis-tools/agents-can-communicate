@@ -17,6 +17,12 @@
     "fixtures/SessionStart-1.2.7.json",
     "fixtures/PreInvocation-1.2.7.json",
     "src/",
-    "plugin/"
+    "plugin/",
+    "fixtures/delivery/antigravity-cli-1.2.7-relay-product.json",
+    "fixtures/delivery/antigravity-cli-1.2.7-relay-product-evidence.json",
+    "fixtures/agentapi-live-push-1.2.7.json",
+    "fixtures/live-push-surfaces-1.2.7.json",
+    "fixtures/agentapi-error-answers-1.2.7.json",
+    "fixtures/hooks-first-trust-no-workspace-1.2.7.json"
   ]
 }

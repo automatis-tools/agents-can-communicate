@@ -647,7 +647,9 @@ export async function doctorAntigravity(context) {
     "hooks only attach a session when the Antigravity session has an open workspace: the "
       + "TUI started in a project directory has one, but a print-mode `agy -p` there sends an "
       + "empty workspacePaths and the hook has no project to join. Open the project as an "
-      + "Antigravity workspace, or pass it with --add-dir"];
+      + "Antigravity workspace, or pass it with --add-dir. The first TUI session in a folder "
+      + "trusted at that same launch sends none either, even with --add-dir: start the TUI "
+      + "again once the folder is trusted"];
   if (locationOf(context) === "workspace") {
     diagnostics.push("registered per workspace; a session opened anywhere else loads nothing");
   }
