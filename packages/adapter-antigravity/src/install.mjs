@@ -374,10 +374,10 @@ export async function doctorAntigravity(context) {
     // this line exists at all: the hook runs, finds no project in the payload,
     // fails open, and this client does not show hook stderr. Nothing else on
     // the machine would ever tell the operator.
-    "hooks only attach a session when the Antigravity session has an open workspace: an "
-      + "ordinary `agy -p` in a project directory sends an empty workspacePaths, and the "
-      + "hook then has no project to join. Open the project as an Antigravity workspace, "
-      + "or pass it with --add-dir"];
+    "hooks only attach a session when the Antigravity session has an open workspace: the "
+      + "TUI started in a project directory has one, but a print-mode `agy -p` there sends an "
+      + "empty workspacePaths and the hook has no project to join. Open the project as an "
+      + "Antigravity workspace, or pass it with --add-dir"];
   if (locationOf(context) === "workspace") {
     diagnostics.push("registered per workspace; a session opened anywhere else loads nothing");
   }

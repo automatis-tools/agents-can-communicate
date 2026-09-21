@@ -218,7 +218,8 @@ or start the session somewhere trusted.
 
 The most likely cause is that the session has no open workspace. Antigravity CLI gives its
 hooks a project directory only through `workspacePaths`, and that array is empty unless the
-session has one - an ordinary `agy -p "..."` started in a project directory does not. The
+session has one. The interactive TUI started in a project directory has one; a print-mode
+`agy -p "..."` started in the same directory does not. The
 hook then has no workspace to join, fails open as every ACC hook must, and this client shows
 no hook output, so nothing anywhere says why.
 

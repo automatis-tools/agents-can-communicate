@@ -130,8 +130,9 @@ The **open workspace requirement** below qualifies this choice. A global registr
 every Antigravity session, including the ones that have no open workspace and therefore give
 the hook no project to join; those turns do nothing and say nothing. A workspace registration
 only loads where a workspace exists, so it never reaches that state — at the cost of loading
-nowhere else. Global remains the default because it is the one that cannot be silently absent;
-`acc doctor` names the no-workspace case.
+nowhere else. Global remains the default because it is the one that cannot be silently absent, and the
+interactive TUI — the ordinary way to use this client — always has a workspace, so the
+no-workspace case is confined to print mode without `--add-dir`. `acc doctor` names it.
 
 ACC's own bookkeeping — which `hooks.json` files ACC created and may therefore delete — lives
 in ACC's data home, never in the client's tree. A marker inside `hooks.json` drops the whole
@@ -204,6 +205,13 @@ This client does not surface hook stderr, so a fail-open refusal here is invisib
 exactly the issue #176 appearance of "everything is installed and nothing happens". `acc doctor`
 carries the line instead.
 
+**The TUI does have one.** Started the ordinary interactive way — `agy` in a project directory,
+no `--add-dir` — every hook in the turn received `workspacePaths` naming that directory, and ACC
+attached a participant that stayed `online` while the TUI was open
+(`fixtures/PreInvocation-tui-1.2.7.json`). The empty array is therefore a print-mode case:
+`agy -p` without `--add-dir`. The hook's working directory was `~/.gemini/config` in the TUI
+too, so the payload remains the only source of the project.
+
 This is independent of where the hooks are registered. Registration decides whether the hook
 *runs*; an open workspace decides whether ACC can identify a *project*. A global registration
 runs in every session and does nothing in those that have no workspace; a workspace
@@ -224,6 +232,30 @@ through a harness:
 | a peer message, then one more turn | the model replied with the peer's probe token, so a peer body reaches the model |
 | receipts afterwards | the delivered message advanced to `offered`; one addressed to a session that never ran again stayed `queued` |
 | `acc uninstall --adapter antigravity` | `hooks.json` and the shim directory removed; `agy` reported an empty hook list; `~/.gemini/settings.json` and `~/.gemini/extensions/agents-can-communicate` byte-identical |
+
+The same install was then driven through the interactive TUI, in a Terminal window, with no
+`--add-dir`:
+
+| Step | Result |
+|---|---|
+| `agy` opened in the project directory | `workspacePaths` named the project at every hook |
+| ACC | participant attached, `presence: online` for as long as the TUI stayed open |
+| one user turn | `PreInvocation` fired three times — once per model invocation, one per tool-call round |
+| a peer message queued while that turn was running | appeared in the client's own transcript as a `SYSTEM_SDK` `EPHEMERAL_MESSAGE` at the **next invocation of the same turn**, after a tool call; receipt `offered` |
+
+Fixture: `fixtures/tui-transcript-injection-1.2.7.json`. The capture harness's keystrokes
+reached the TUI as a single `.`, so the model was never asked to repeat the token and did not;
+the transcript is the evidence that the body was placed in its context, and the model's next
+planner step referred to the injected ACC details.
+
+### Mid-turn delivery — observed, not certified
+
+Because `PreInvocation` runs before every model invocation, not once per user prompt, a peer
+message that arrives while an agentic turn is in progress is offered at the next tool-call
+boundary of that turn. That is the behaviour `context.safePointInjection` describes. It is
+**not declared**: the certification here was scoped to session start, before-turn injection
+and next-turn delivery, and a single capture with a mangled prompt is thin evidence for a
+fourth capability. It is the strongest candidate this client offers for one.
 
 That round trip also found the bookkeeping bug described under **Locations**: the installer
 removes recorded artifacts before calling `uninstall`, so the "ACC created this file" marker
@@ -342,10 +374,9 @@ From the vendor changelog, not from capture:
 - Whether `agentapi send-message` reaches an idle session.
 - Reply routing back to ACC.
 - The continuation ceiling's actual value, and what the model is told when it is reached.
-- Interactive-session behaviour. Everything above was captured in print mode. In particular,
-  whether a folder opened in the Antigravity TUI populates `workspacePaths` - it almost
-  certainly does, since that is what an open workspace is, but it has not been observed, and a
-  global registration's usefulness rests on it.
+- Interactive-session behaviour beyond one TUI turn. The TUI was driven once, with a harness
+  whose keystrokes arrived as `.`; the model was never asked to act on a peer message there.
+- Whether a mid-turn injection changes what the model does in the rest of that turn.
 - Whether `--continue` reliably keeps one conversation id. Two successive `-c` runs produced
   different ACC sessions, so a print-mode conversation is not a stable participant.
 - Whether a hook command whose path contains a space *runs*; it registers and reads back
