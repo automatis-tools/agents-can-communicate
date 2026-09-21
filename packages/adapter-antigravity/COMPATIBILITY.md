@@ -168,10 +168,13 @@ Consequences for ACC:
 - **No session end.** Participant deregistration cannot ride on a lifecycle event; it has to come
   from the user, or be inferred. What this adapter does about it: nothing automatic, and it says
   so. `lifecycle.sessionEnd` is false, which makes the session's lifecycle `manual` in its own
-  participant record, so a session here goes offline by presence age or by an explicit
-  `acc finish`. A session can linger in the roster after its client has exited. That is a stated
-  limitation rather than a quiet one - inferring an end from `Stop` would retire a session that
-  is merely between turns, and `fullyIdle` says nothing about whether the process is still alive.
+  participant record: the record stays `open` until an explicit `acc finish`. What keeps it from
+  lingering in the roster is presence, not lifecycle. The hook records the pid of the `agy`
+  process it runs under, and once that process exits the participant stops being listed —
+  observed for print-mode turns and for a TUI ended by signal. Messages addressed to it still
+  queue durably and are offered if the same conversation is resumed. Inferring an end from
+  `Stop` would retire a session that is merely between turns, and `fullyIdle` says nothing
+  about whether the process is still alive, so neither is used.
 
 ## The open workspace requirement
 
@@ -378,6 +381,22 @@ through `agy plugin uninstall acc`, and removes the manifest when ACC's install 
 exists and nothing but `null` is left in it. Both the plugin directory and the manifest are
 declared to the installer as delegated, so the installer never deletes them ahead of the
 client's own command.
+
+**It reaches the model, and the model uses it.** In a print-mode conversation resumed with
+`--conversation`, the model's first tool call in answer to the injected owner header alone was
+`view_file` on `~/.gemini/config/plugins/acc/skills/acc/SKILL.md` — ACC's plugin, not the
+imported copy. Given a peer question with a reply obligation that needed no tools, its first
+call was exactly the reply the skill teaches: ACC's own shim, the right message id, the right
+answer, and the owner arguments from the injected header. That same command line, run by hand,
+recorded the reply. Fixture: `fixtures/headless-reply-attempt-1.2.7.json`.
+
+**Headless mode cannot run it.** Print mode auto-denies any tool needing the `command`
+permission, because it cannot prompt, and says so on stderr: *add an allow-rule under
+`permissions.allow` in settings.json (e.g. `command(<target>)`)*. In the TUI the same call
+raises the ordinary approval prompt. The adapter adds no allow rule: no other ACC adapter grants
+itself command permission, and whether an agent may run ACC without asking is the operator's
+decision. A headless agent therefore receives peer messages and knows the exact command to
+answer them, and cannot send it until the operator allows it.
 
 Why it cannot lean on the imported copy: all 23 commands in its skill run
 `~/.gemini/extensions/agents-can-communicate/acc-cli.sh`, the Gemini CLI extension's shim. It

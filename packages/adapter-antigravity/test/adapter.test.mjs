@@ -119,6 +119,7 @@ test("evidence the tarball does not ship is still kept in the repository", async
     "hook-process-environment-1.2.7", "PreInvocation-tui-1.2.7",
     "tui-transcript-injection-1.2.7", "skills-readback-1.2.7",
     "plugin-name-collision-1.2.7", "plugin-install-lifecycle-1.2.7",
+    "headless-reply-attempt-1.2.7",
     "hooks-readback-empty-1.2.7", "hooks-readback-registered-1.2.7",
     "hooks-readback-dropped-1.2.7", "hooks-readback-gemini-shape-1.2.7",
     "hooks-readback-foreign-key-1.2.7", "hooks-readback-namespace-collision-1.2.7"]) {
