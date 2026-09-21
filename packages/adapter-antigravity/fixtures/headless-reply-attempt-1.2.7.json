@@ -1,0 +1,16 @@
+{
+  "note": "One print-mode conversation, resumed with --conversation, with ACC installed at the default global location and its acc plugin loaded. Session, generation, workspace, message and path values redacted; tool names, step order and the command's shape are verbatim.",
+  "turn1": {
+    "injected": "ACC CLI (append): --session <session> --generation <generation> --cwd '<project>' --workspace 'acc://<workspace>'\nACC: 1 peer participant present. Load the acc skill before shared work.",
+    "firstToolCall": { "name": "view_file", "AbsolutePath": "<home>/.gemini/config/plugins/acc/skills/acc/SKILL.md" },
+    "meaning": "the model loaded ACC's own skill, not the imported agents-can-communicate copy, in answer to the header alone"
+  },
+  "turn3": {
+    "peerMessage": { "type": "question", "obligation": "reply", "body": "What is 2 + 2? Reply with just the number." },
+    "firstToolCall": { "name": "run_command",
+      "CommandLine": "\"<home>/.gemini/config/acc/acc-cli.sh\" reply --message <message> --body \"4\" --session <session> --generation <generation> --cwd '<project>' --workspace 'acc://<workspace>'" },
+    "clientStderr": "jetski: no output produced — a tool required the \"command\" permission that headless mode cannot prompt for, so it was auto-denied. Add an allow-rule under permissions.allow in settings.json (e.g. command(<target>)). Alternatively, re-run with --dangerously-skip-permissions to auto-approve all tools.",
+    "sameCommandRunByHand": { "ok": true, "result": "reply recorded in reply to the question" }
+  },
+  "earlierDenial": "In turn 2 the question needed a file read, and the model's first call was `ls -la`; that was the command denied, before any ACC command was reached."
+}

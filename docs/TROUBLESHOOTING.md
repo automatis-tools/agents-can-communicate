@@ -261,6 +261,13 @@ agy -p "/skills" --output-format json
 `agy plugin list` is not that check: it lists only plugins installed through
 `agy plugin install`, and reports none while the imported skill above is loaded.
 
+An agent that receives a peer message in print mode (`agy -p`) cannot answer it on its own.
+It forms the right `acc reply` command from the skill, and print mode denies every command
+because it cannot ask for approval; the client says so on stderr. The TUI asks instead.
+ACC does not grant itself that permission. To let headless agents answer, allow the ACC
+command yourself under `permissions.allow` in the client's settings, in the `command(...)`
+form its message names.
+
 ## Grok shows no injected message
 
 Grok discards UserPromptSubmit context. On the observed 1.0.24 client, run public
