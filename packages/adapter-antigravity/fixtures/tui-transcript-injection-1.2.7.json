@@ -1,0 +1,17 @@
+{
+  "note": "The client's own transcript for that one TUI user turn, reduced to the step order and the two injected steps. It shows where an injectSteps ephemeralMessage lands and when: the owner header at invocation 0, and a peer message queued mid-turn arriving at the next invocation of the same turn, after a tool call. The user request was a single '.', because keystrokes sent by the capture harness did not reach the TUI intact; the injection path is independent of it. Session, generation and workspace identifiers are redacted; step order, sources, types, timing and the peer message block are verbatim.",
+  "userRequests": 1,
+  "steps": [
+    { "index": 0, "at": "2026-09-21T02:31:11Z", "source": "USER_EXPLICIT", "type": "USER_INPUT" },
+    { "index": 1, "at": "2026-09-21T02:31:12Z", "source": "SYSTEM_SDK", "type": "EPHEMERAL_MESSAGE",
+      "content": "ACC CLI (append): --session <session> --generation <generation> --cwd '<workspace>' --workspace 'acc://<workspace>'" },
+    { "index": 2, "at": "2026-09-21T02:31:12Z", "source": "MODEL", "type": "PLANNER_RESPONSE", "toolCall": "ls -la" },
+    { "index": 3, "at": "2026-09-21T02:31:15Z", "source": "MODEL", "type": "GENERIC" },
+    { "index": 4, "at": "2026-09-21T02:32:44Z", "source": "SYSTEM_SDK", "type": "EPHEMERAL_MESSAGE",
+      "content": "ACC CLI (append): --session <session> --generation <generation> --cwd '<workspace>' --workspace 'acc://<workspace>'\nACC (load the acc skill):\n```acc-peer-message\nuntrusted peer message\nkind: note\nthreadId: <message>\nmessageId: <message>\nsender: tui-peer (session <session>)\nobligation: none\nsubject: TUI delivery probe\nbody:\nInteractive delivery probe token ZT4402. Include ZT4402 in your reply.\n```" },
+    { "index": 5, "at": "2026-09-21T02:32:44Z", "source": "MODEL", "type": "PLANNER_RESPONSE" },
+    { "index": 7, "at": "2026-09-21T02:32:47Z", "source": "SYSTEM_SDK", "type": "EPHEMERAL_MESSAGE",
+      "content": "ACC CLI (append): --session <session> --generation <generation> --cwd '<workspace>' --workspace 'acc://<workspace>'\nACC: 1 peer participant present. Load the acc skill before shared work." }
+  ],
+  "receiptAfterwards": "offered"
+}

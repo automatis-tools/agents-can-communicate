@@ -134,3 +134,22 @@ test("the conversation's own brain directory is never used as a workspace", asyn
     assert.equal(error.code, EXIT.DATA);
   }
 });
+
+test("a turn in the TUI names its project, at every invocation of the turn", async () => {
+  // The ordinary interactive case: the Antigravity TUI started in a project
+  // directory with no --add-dir. workspacePaths is populated, so it is only a
+  // print-mode `agy -p` without a workspace that leaves the hook nothing. And
+  // PreInvocation fires once per model invocation - three here within one user
+  // turn - which is why a peer message queued mid-turn is offered at the next
+  // invocation rather than at the next prompt.
+  const { payloads } = await captured("PreInvocation-tui-1.2.7");
+  assert.deepEqual(payloads.map(payload => payload.invocationNum), [0, 1, 2]);
+
+  for (const payload of payloads) {
+    const event = normalizeAntigravityHook(payload, { args: ["PreInvocation"] });
+    assert.equal(event.kind, "beforeTurn");
+    assert.equal(event.cwd, payload.workspacePaths[0]);
+    // One conversation, one ACC session, across every invocation of the turn.
+    assert.equal(event.sessionId, payloads[0].conversationId);
+  }
+});
