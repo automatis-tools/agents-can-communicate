@@ -97,7 +97,7 @@ exposes and whether its lease is current, while recipient policy says whether it
 turn.
 
 Claude Code Channel has installed-client evidence on 2.1.258 and 2.1.260; Codex
-LocalDaemon has it on 0.152.1 and 0.153.4; Antigravity CLI has it on 1.2.7 through a relay
+LocalDaemon has it on 0.152.1 and 0.153.4; Antigravity CLI has it on 1.2.7 and later through a relay
 the agent starts in its own shell. All three use a captured platform minimum,
 current probe and exact session handshake. Codex preserves the ordinary client
 launch and verifies its registered thread and workspace; native delivery owns no vendor
