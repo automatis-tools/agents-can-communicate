@@ -2,7 +2,7 @@ import { defineAdapter, projectContext, projectContextResult }
   from "@agents-can-communicate/adapter-sdk";
 import certification from "../certification.json" with { type: "json" };
 
-import { denyOutcome, injectOutcome, normalizeAntigravityHook } from "./hooks.mjs";
+import { denyOutcome, injectOutcome, normalizeAntigravityHook, stopOutcome } from "./hooks.mjs";
 import { detectAntigravity, doctorAntigravity, installAntigravity, planAntigravityInstall,
   preflightAntigravityUninstall, uninstallAntigravity } from "./install.mjs";
 
@@ -79,6 +79,12 @@ export function createAntigravityAdapter() {
 
     denyOutcome,
     injectOutcome,
+    // How the hook runner holds a turn open when a peer message arrived while
+    // the model was producing its last answer. The count it is bounded by is
+    // the client's own `executionNum`, read from the Stop payload the runner
+    // hands back: 0 on the first Stop of a turn, 1 after one continuation.
+    continueTurnOutcome: ({ reason, payload }) => stopOutcome({ reason,
+      executionNum: payload?.executionNum }),
     // The event name is the second argument, because this client's payload does
     // not carry one and two of its four events are byte-identical.
     normalizeHook: (payload, options) => normalizeAntigravityHook(payload, options),

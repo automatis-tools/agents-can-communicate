@@ -307,13 +307,29 @@ Returning
 ```
 
 from `Stop` did not end the turn. A second invocation ran, and the model reproduced the token
-carried in `reason`, so the reason reaches the model as prompt text.
+carried in `reason`, so the reason reaches the model — as a system-framed message, observed
+later (see below).
 
 **It is a bounded nudge, not a gate.** The vendor changelog for 1.1.9 records a fix for "stop
 hooks that always block hanging the agent forever; after a configurable number of consecutive
 continuations, the hook can no longer block and the turn ends normally". An adapter must impose
 its own ceiling and fail open, and must not present a blocked turn as a guarantee that a peer
 will be answered.
+
+**Wired and observed end to end.** The hook runner's `turnEnd` handler continues a turn only
+when the projector offers a peer body that no invocation has shown yet — never for an owner
+header, an attention count or a degradation notice, because a continuation costs the operator
+a model invocation. On a live 1.2.7 turn, a peer question sent after the turn's only
+`PreInvocation` was delivered in that same turn: the client's transcript records a
+`SYSTEM_MESSAGE` reading `Stop hook blocked termination: …` with the peer message in it, the
+continued model loaded ACC's skill and formed the exact reply, and the receipt advanced to
+`offered`. Without the continuation it would have waited for the next user prompt. Fixture:
+`fixtures/stop-continuation-live-1.2.7.json`.
+
+**The reason is presented with system framing.** The client wraps it in
+`<SYSTEM_MESSAGE>` and prefixes it `Stop hook blocked termination:` — not user text, as earlier
+notes here assumed. Peer text therefore reaches the model inside a system-framed block, and the
+`acc-peer-message` fence marking it untrusted is the only thing telling the model it is data.
 
 This adapter's ceiling is **one continuation per turn**, counted from the `executionNum` the
 client itself supplies - `Stop-1.2.7.json` carries `0` and `Stop-continued-1.2.7.json` carries
@@ -442,7 +458,8 @@ From the vendor changelog, not from capture:
 - `userMessage` and `toolCall` injection types.
 - Whether `agentapi send-message` reaches an idle session.
 - Reply routing back to ACC.
-- The continuation ceiling's actual value, and what the model is told when it is reached.
+- The client's own continuation ceiling, and what the model is told when that is reached. What
+  it is told on a continuation is observed: see **Stop continuation** above.
 - Interactive-session behaviour beyond one TUI turn. The TUI was driven once, with a harness
   whose keystrokes arrived as `.`; the model was never asked to act on a peer message there.
 - Whether a mid-turn injection changes what the model does in the rest of that turn.

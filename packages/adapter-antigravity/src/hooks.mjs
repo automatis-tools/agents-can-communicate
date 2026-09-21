@@ -147,9 +147,13 @@ export function injectResponse(context) {
  * Whether to hold this turn open, and why.
  *
  * `continue` is the exact string; any other value, including `block` and
- * `stop`, permits shutdown. The `reason` reaches the model as prompt text - the
- * model reproduced a token carried in it - so this is a delivery path as well
- * as a decision.
+ * `stop`, permits shutdown. The `reason` reaches the model - the model
+ * reproduced a token carried in it - so this is a delivery path as well as a
+ * decision. It arrives inside a `<SYSTEM_MESSAGE>` prefixed
+ * `Stop hook blocked termination:`, so a peer body carried here sits in a
+ * system-framed block, and the untrusted-peer fence the projector draws around
+ * it is what tells the model it is data
+ * (`fixtures/stop-continuation-live-1.2.7.json`).
  *
  * Everything that is not a good reason below the ceiling releases the turn.
  * That is deliberate and it is the whole fail-open rule in one expression: a

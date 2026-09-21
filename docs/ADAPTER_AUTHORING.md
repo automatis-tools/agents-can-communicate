@@ -52,6 +52,17 @@ it cannot create a session or advance receipts. Grok uses it to supply CLI owner
 arguments after a terminal result. This does not certify general context or peer
 delivery, and a tool such as `finish` can close the owner before the line arrives.
 
+`continueTurnOutcome({ reason, payload })` is optional. A client whose end-of-turn hook can
+hold a turn open implements it, and the runner's `turnEnd` handler calls it with the projected
+peer context when - and only when - a peer body no invocation has shown yet is waiting. It
+returns `{ stdout, stderr?, exitCode? }` in the client's own continuation shape, and prints
+nothing to let the turn end. `payload` is the raw hook payload handed back unread, so the
+adapter can apply its own ceiling from a counter the client supplies; nothing in core reads it.
+An empty `stdout` records no offer, so the body stays queued for the next invocation. A
+continuation costs the operator a model invocation, which is why an owner header or an
+attention count is never a reason to call it. Antigravity CLI uses it for `Stop`, bounded to
+one continuation per turn by the client's own `executionNum`.
+
 `renderContextResult` is required wherever an adapter renders peer messages. It returns
 `{ text, offeredMessageIds, includedAttentionIds }`, and the [receipt
 lifecycle](PROTOCOL.md#receipt-lifecycle) advances only from those ids — never by searching
