@@ -4,7 +4,12 @@
   "private": true,
   "type": "module",
   "exports": {
-    ".": "./src/adapter.mjs"
+    ".": "./src/adapter.mjs",
+    "./agentapi": "./src/agentapi.mjs",
+    "./native-delivery": "./src/native-delivery.mjs",
+    "./relay": "./src/relay.mjs",
+    "./relay-endpoint": "./src/relay-endpoint.mjs",
+    "./relay-start": "./src/relay-start.mjs"
   },
   "files": [
     "certification.json",
