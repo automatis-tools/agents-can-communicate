@@ -97,6 +97,13 @@ test("the tarball carries the workspaces where imports can find them", async t =
       + "extension/gemini-extension.json"])).stdout);
   assert.equal(geminiExtension.version, intendedVersion,
     "the embedded Gemini extension drifted from the release version");
+  const antigravityPlugin = JSON.parse((await run("tar", ["-xzOf", tarball,
+    "package/node_modules/@agents-can-communicate/adapter-antigravity/"
+      + "plugin/plugin.json"])).stdout);
+  assert.equal(antigravityPlugin.version, intendedVersion,
+    "the embedded Antigravity plugin drifted from the release version");
+  assert.equal(antigravityPlugin.name, "acc",
+    "a plugin named agents-can-communicate is shadowed by this client's own imported copy");
 });
 
 test("nothing private, local, or irrelevant is published", async t => {

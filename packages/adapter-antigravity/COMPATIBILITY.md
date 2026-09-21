@@ -344,6 +344,54 @@ legacy location. The 1.0.3 changelog entry describes the migration between them,
 legacy file is expected rather than a sign of a second active configuration. Detection must not
 infer the install from either path.
 
+## Skills and plugins
+
+Captured through `agy -p "/skills" --output-format json`, which answers without a turn and is
+the only read-back that says which skills loaded.
+
+- **Two discovery roots load globally**: `~/.gemini/config/skills/<name>/SKILL.md` as `<name>`,
+  and `~/.gemini/config/plugins/<plugin>/skills/<skill>/SKILL.md` as `<plugin>:<skill>`.
+- **So does the import directory**, which the vendor's own customization guide does not list:
+  the auto-imported copy under `~/.gemini/antigravity-cli/plugins/agents-can-communicate/`
+  loads as `agents-can-communicate:acc`, model-invocable.
+- **`agy plugin list` is not a read-back.** It lists only plugins installed through
+  `agy plugin install`, and printed `No imported plugins.` while that imported skill was
+  loaded.
+- **`agy plugin install <dir>`** copies the whole directory to `~/.gemini/config/plugins/<name>/`
+  and records it in `~/.gemini/config/import_manifest.json`. It needs no signed-in account.
+  Installing again overwrites.
+- **`agy plugin uninstall <name>`** removes the directory and leaves the manifest behind holding
+  `{"imports": null}` — a file that did not exist before the first install. It does not touch
+  the imported copy.
+- **A same-named plugin is shadowed by the imported copy.** A plugin named
+  `agents-can-communicate` installed beside the import was silently hidden; `/skills` listed
+  only the imported one. A plugin named `acc` loads beside it as `acc:acc`.
+
+Fixtures: `fixtures/skills-readback-1.2.7.json`, `fixtures/plugin-name-collision-1.2.7.json`,
+`fixtures/plugin-install-lifecycle-1.2.7.json`.
+
+What the adapter does with this: it installs its own plugin, named `acc`, through
+`agy plugin install`, carrying the same ACC skill every other client ships, with the command
+baked to ACC's own CLI shim in `~/.gemini/config/acc/`. It then requires `/skills` to list
+`acc:acc` from that directory, and fails the install when it does not. Uninstall goes back
+through `agy plugin uninstall acc`, and removes the manifest when ACC's install is why it
+exists and nothing but `null` is left in it. Both the plugin directory and the manifest are
+declared to the installer as delegated, so the installer never deletes them ahead of the
+client's own command.
+
+Why it cannot lean on the imported copy: all 23 commands in its skill run
+`~/.gemini/extensions/agents-can-communicate/acc-cli.sh`, the Gemini CLI extension's shim. It
+works exactly as long as Gemini CLI is wired, and not on a machine that never had it.
+
+Why it matters: the owner header ACC injects tells the model to load the acc skill. With no
+skill it can use, a TUI session given only that header went looking for `acc` itself —
+`which acc; find ~/.gemini -name "*acc*"; find ~/.claude …` — and stopped at a permission
+prompt, which was declined.
+
+`agy` is always run with `HOME` set to the home being installed into. It honours it, and it
+also writes its own state into whatever home it is given (`.gemini/antigravity-cli/`,
+`Library/Caches`), so detection does not run it at all for a client the installer did not find.
+
 ## Plugin import
 
 On first authenticated run, AGY copied the ACC Gemini CLI extension from `~/.gemini/extensions/`
@@ -351,10 +399,12 @@ into `~/.gemini/antigravity-cli/plugins/agents-can-communicate/`, byte for byte,
 `plugin.json` carrying only name, version and description. `agy plugin list` still reports "No
 imported plugins" and `agy mcp list` reports "No MCP servers configured".
 
-So a machine can hold a complete copy of the ACC integration while ACC is invisible to the
-client: the files are there, the hook names are Gemini CLI's, and nothing is registered. Any
+So a machine can hold a complete copy of the ACC integration while ACC's hooks are invisible
+to the client: the files are there, the hook names are Gemini CLI's, and no hook is
+registered. Its skill, however, does load — see **Skills and plugins** above. Any
 report that ACC "is already present" on an Antigravity install has to be checked against
-`agy plugin list`, `agy mcp list` and `agy -p "/hooks"`, not against the presence of files.
+`agy -p "/hooks"`, `agy -p "/skills"` and `agy mcp list`, not against the presence of files -
+and not against `agy plugin list`, which does not list the imported copy at all.
 
 ## Version floors to consider
 

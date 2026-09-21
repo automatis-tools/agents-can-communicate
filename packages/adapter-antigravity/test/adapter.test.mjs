@@ -5,6 +5,7 @@ import test from "node:test";
 import { CAPABILITY_SHAPE, effectiveCapabilities } from "@agents-can-communicate/adapter-sdk";
 
 import { ANTIGRAVITY_CLI_VERSION, createAntigravityAdapter } from "../src/adapter.mjs";
+import { fakeAgy } from "./fake-agy.mjs";
 
 const CERTIFIED = { clientVersion: ANTIGRAVITY_CLI_VERSION, platform: "darwin-arm64" };
 const trueOnes = capabilities => Object.entries(CAPABILITY_SHAPE)
@@ -98,7 +99,8 @@ test("doctor names the state where files exist and nothing is registered", async
   const adapter = createAntigravityAdapter();
 
   const report = await adapter.doctor({ home: "/nonexistent-home",
-    antigravityHookLocation: "global", probeHooks: async () => ({ hooks: [] }) });
+    antigravityHookLocation: "global", probeHooks: async () => ({ hooks: [] }),
+    runAgy: fakeAgy().run });
 
   assert.equal(report.diagnostics.some(line => /not registered/.test(line)), true);
   assert.equal(report.diagnostics.some(line => /no tool guard|no session end/.test(line)), true);
@@ -115,7 +117,8 @@ test("evidence the tarball does not ship is still kept in the repository", async
   for (const name of ["PostInvocation-1.2.7", "Stop-1.2.7", "Stop-continued-1.2.7",
     "SessionStart-no-workspace-1.2.7", "Stop-no-workspace-1.2.7",
     "hook-process-environment-1.2.7", "PreInvocation-tui-1.2.7",
-    "tui-transcript-injection-1.2.7",
+    "tui-transcript-injection-1.2.7", "skills-readback-1.2.7",
+    "plugin-name-collision-1.2.7", "plugin-install-lifecycle-1.2.7",
     "hooks-readback-empty-1.2.7", "hooks-readback-registered-1.2.7",
     "hooks-readback-dropped-1.2.7", "hooks-readback-gemini-shape-1.2.7",
     "hooks-readback-foreign-key-1.2.7", "hooks-readback-namespace-collision-1.2.7"]) {

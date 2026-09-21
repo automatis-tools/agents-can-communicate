@@ -11,6 +11,7 @@
     "fixtures/certification-provenance.json",
     "fixtures/SessionStart-1.2.7.json",
     "fixtures/PreInvocation-1.2.7.json",
-    "src/"
+    "src/",
+    "plugin/"
   ]
 }
