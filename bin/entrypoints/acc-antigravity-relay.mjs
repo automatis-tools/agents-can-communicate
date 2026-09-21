@@ -7,7 +7,7 @@ import { randomBytes } from "node:crypto";
 import { appendFile } from "node:fs/promises";
 import path from "node:path";
 
-import { createAgentApi } from "@agents-can-communicate/adapter-antigravity/agentapi";
+import { agentApiCommand, createAgentApi } from "@agents-can-communicate/adapter-antigravity/agentapi";
 import { createRelay } from "@agents-can-communicate/adapter-antigravity/relay";
 import { listRegistrations, newRelayId, relayDir } from "@agents-can-communicate/adapter-antigravity/relay-endpoint";
 import { findConversation, startRelay } from "@agents-can-communicate/adapter-antigravity/relay-start";
@@ -102,7 +102,8 @@ async function run() {
   const relay = createRelay({ runtimeDir, conversationId, agyPid, isAlive: alive, endpointId,
     clientVersion: bound.clientVersion,
     observe: logger(path.join(relayDir(runtimeDir), `${endpointId}.log`)),
-    api: createAgentApi({ endpoint: payload, baseEnv: process.env }),
+    api: createAgentApi({ endpoint: payload, baseEnv: process.env,
+      command: agentApiCommand(process.env) }),
     // The conversation can reopen under a new ACC generation while this relay
     // keeps serving it, so renew whichever binding is current, never a copy.
     refreshBinding: async leaseUntil => {

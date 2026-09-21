@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
-import { ENDPOINT_VARIABLES, childEnv, classifyAnswer, createAgentApi, endpointFrom }
+import { ENDPOINT_VARIABLES, agentApiCommand, childEnv, classifyAnswer, createAgentApi, endpointFrom }
   from "../src/agentapi.mjs";
 
 const CONVERSATION = "3ed65ea5-31f2-4ddf-b6c7-e3c85a9a3c29";
@@ -77,4 +77,28 @@ test("failures are read from stdout, where agy prints them", async () => {
   const [unset, closed] = answers.map(answer => classifyAnswer(JSON.stringify(answer.stdout), "c"));
   assert.deepEqual(unset, { ok: false, reasonCode: "transport_error" });
   assert.deepEqual(closed, { ok: false, reasonCode: "recipient_unavailable" });
+});
+
+test("the relay runs the agy the client names, and falls back to the PATH", async t => {
+  // Captured: in the agent's shell ANTIGRAVITY_AGENTAPI_EXE names the same agy
+  // binary the client runs. Preferring it keeps a push working for a client
+  // started by a full path that is not on the PATH.
+  const { chmod, mkdtemp, rm, writeFile } = await import("node:fs/promises");
+  const { tmpdir } = await import("node:os");
+  const path = (await import("node:path")).default;
+  const dir = await mkdtemp(path.join(tmpdir(), "acc-agy-exe-"));
+  t.after(() => rm(dir, { recursive: true, force: true }));
+  const agy = path.join(dir, "agy");
+  await writeFile(agy, "#!/bin/sh\n");
+  await chmod(agy, 0o755);
+  const other = path.join(dir, "agentapi");
+  await writeFile(other, "#!/bin/sh\n");
+  await chmod(other, 0o755);
+  const plain = path.join(dir, "not-executable", "agy");
+
+  assert.equal(agentApiCommand({ ANTIGRAVITY_AGENTAPI_EXE: agy }), agy);
+  for (const env of [{}, { ANTIGRAVITY_AGENTAPI_EXE: "agy" }, { ANTIGRAVITY_AGENTAPI_EXE: other },
+    { ANTIGRAVITY_AGENTAPI_EXE: plain }, { ANTIGRAVITY_AGENTAPI_EXE: "" }]) {
+    assert.equal(agentApiCommand(env), "agy", JSON.stringify(env));
+  }
 });
