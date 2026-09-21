@@ -3,6 +3,7 @@ import { AccError, EXIT, assertPortableId } from "@agents-can-communicate/protoc
 import { CAPABILITY_SHAPE, freezeCapabilities, validateCertification }
   from "./certification.mjs";
 import { validateNativeDeliveryContract } from "./native-delivery.mjs";
+import { parseStableVersion } from "./native-vocabulary.mjs";
 
 // The capability surface, documented in docs/ADAPTER_AUTHORING.md and measured
 // per client in docs/CAPABILITIES.md. False is the default for every
@@ -115,6 +116,11 @@ export function defineAdapter(manifest) {
         { evidenceClient: item.client, client });
     }
   }
+  const floor = {};
+  if (manifest.certificationFloor !== undefined) {
+    floor.certificationFloor = validateCertificationFloor(manifest.certificationFloor,
+      { certification, client: manifest.client.certificationName ?? manifest.client.command });
+  }
   const native = {};
   for (const method of ["refreshNativeSession", "retireNativeSession", "nativeActivationHint"]) {
     if (manifest[method] !== undefined && typeof manifest[method] !== "function") {
@@ -134,7 +140,37 @@ export function defineAdapter(manifest) {
   return Object.freeze({
     ...manifest,
     certification,
+    ...floor,
     ...native,
     capabilities: assertCapabilities(manifest.capabilities, manifest, certification),
   });
+}
+
+const FLOOR_PLATFORM = /^(?:darwin|linux|win32)-(?:arm64|x64)$/;
+
+/**
+ * An optional per-platform floor: later stable versions are judged by this
+ * version's evidence until a capture of their own says otherwise. It can only
+ * name a version that has passing evidence on that platform, so a floor never
+ * certifies anything nobody captured.
+ */
+function validateCertificationFloor(value, { certification, client }) {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) {
+    usage("certificationFloor must map a platform to a stable version");
+  }
+  for (const [platform, version] of Object.entries(value)) {
+    if (!FLOOR_PLATFORM.test(platform)) {
+      usage(`certificationFloor names an unknown platform ${platform}`, { platform });
+    }
+    if (parseStableVersion(version) === null) {
+      usage(`certificationFloor ${platform} must be a stable version`, { platform, version });
+    }
+    const proven = certification.evidence.some(item => item.result === "pass"
+      && item.client === client && item.version === version && item.platform === platform);
+    if (!proven) {
+      usage(`certificationFloor ${version} on ${platform} has no passing evidence`,
+        { platform, version });
+    }
+  }
+  return Object.freeze({ ...value });
 }

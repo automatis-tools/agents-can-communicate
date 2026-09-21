@@ -9,9 +9,10 @@ import { bindNativeSession, nativeActivationHint, offerMessage, planNativeActiva
   probeNativeDelivery, refreshNativeSession } from "./native-delivery.mjs";
 import { PROTOCOL_CONTRACT } from "./relay-endpoint.mjs";
 
-// The one version this client has been captured on. There is no earlier tier:
-// this package's first capture is 1.2.7, and a version that has not been
-// measured is certified for nothing.
+// The version this client has been captured on, and the floor of what is
+// certified: nothing earlier was measured, and later releases - this client
+// ships every few days - are judged by this capture until one of their own
+// says otherwise.
 export const ANTIGRAVITY_CLI_VERSION = "1.2.7";
 
 /**
@@ -64,6 +65,7 @@ export function createAntigravityAdapter() {
     client: { command: "agy", certificationName: "antigravity-cli",
       versionArgs: ["--version"] },
     certification,
+    certificationFloor: { "darwin-arm64": ANTIGRAVITY_CLI_VERSION },
     capabilities: {
       lifecycle: { sessionStart: true },
       context: { beforeTurnInjection: true },
@@ -83,9 +85,9 @@ export function createAntigravityAdapter() {
     probeNativeDelivery, planNativeActivation, bindNativeSession, refreshNativeSession,
     offerMessage,
     deliveryFallback: { diagnostic:
-      `Antigravity CLI next-turn and live delivery are certified only for ${ANTIGRAVITY_CLI_VERSION} `
-      + "on darwin-arm64; live delivery also needs the agent to start ACC's relay once per "
-      + "conversation, and every other case keeps durable acc inbox access" },
+      `Antigravity CLI next-turn and live delivery are certified for ${ANTIGRAVITY_CLI_VERSION} and `
+      + "later stable releases on darwin-arm64; live delivery also needs the agent to start "
+      + "ACC's relay once per conversation, and every other case keeps durable acc inbox access" },
 
     startSession: async () => ({ ok: true, changes: [], diagnostics: [] }),
 

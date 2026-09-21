@@ -7,7 +7,6 @@ import { CAPABILITY_SHAPE, effectiveCapabilities } from "@agents-can-communicate
 import { ANTIGRAVITY_CLI_VERSION, createAntigravityAdapter } from "../src/adapter.mjs";
 import { fakeAgy } from "./fake-agy.mjs";
 
-const CERTIFIED = { clientVersion: ANTIGRAVITY_CLI_VERSION, platform: "darwin-arm64" };
 const trueOnes = capabilities => Object.entries(CAPABILITY_SHAPE)
   .flatMap(([group, names]) => names.filter(name => capabilities[group][name] === true)
     .map(name => `${group}.${name}`)).sort();
@@ -36,14 +35,23 @@ test("the capabilities this client does not have stay false", () => {
   assert.equal(capabilities.delivery.replyRoute, false);
 });
 
-test("a client that is not the captured one is certified for nothing", () => {
+test("1.2.7 and every later stable release on darwin-arm64 are certified; nothing else is", () => {
+  // Decided 2026-09-21: this client ships every few days, so its captured
+  // version is a floor rather than the only version. A later capture that
+  // records a regression still wins for that version and capability.
   const adapter = createAntigravityAdapter();
+  const captured = ["context.beforeTurnInjection", "delivery.livePush", "delivery.nextTurn",
+    "lifecycle.sessionStart"];
 
-  assert.deepEqual(trueOnes(effectiveCapabilities(adapter, CERTIFIED)),
-    ["context.beforeTurnInjection", "delivery.livePush", "delivery.nextTurn",
-      "lifecycle.sessionStart"]);
+  assert.deepEqual(adapter.certificationFloor, { "darwin-arm64": ANTIGRAVITY_CLI_VERSION });
+  for (const clientVersion of [ANTIGRAVITY_CLI_VERSION, "1.2.8", "1.3.0"]) {
+    assert.deepEqual(trueOnes(effectiveCapabilities(adapter, { clientVersion,
+      platform: "darwin-arm64" })), captured, clientVersion);
+  }
   for (const facts of [{ clientVersion: "1.2.6", platform: "darwin-arm64" },
+    { clientVersion: "1.2.8-beta.1", platform: "darwin-arm64" },
     { clientVersion: ANTIGRAVITY_CLI_VERSION, platform: "linux-x64" },
+    { clientVersion: ANTIGRAVITY_CLI_VERSION, platform: "darwin-x64" },
     { clientVersion: "unknown", platform: "darwin-arm64" }, {}]) {
     assert.deepEqual(trueOnes(effectiveCapabilities(adapter, facts)), [],
       `${JSON.stringify(facts)} is not the client that was captured`);
