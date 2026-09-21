@@ -5,6 +5,7 @@ import certification from "../certification.json" with { type: "json" };
 import { denyOutcome, injectOutcome, normalizeAntigravityHook, stopOutcome } from "./hooks.mjs";
 import { detectAntigravity, doctorAntigravity, installAntigravity, planAntigravityInstall,
   preflightAntigravityUninstall, uninstallAntigravity } from "./install.mjs";
+import { nativeActivationHint } from "./native-delivery.mjs";
 
 // The one version this client has been captured on. There is no earlier tier:
 // this package's first capture is 1.2.7, and a version that has not been
@@ -85,6 +86,11 @@ export function createAntigravityAdapter() {
     // hands back: 0 on the first Stop of a turn, 1 after one continuation.
     continueTurnOutcome: ({ reason, payload }) => stopOutcome({ reason,
       executionNum: payload?.executionNum }),
+    // The one line that asks the agent to start live delivery for its
+    // conversation. The runner asks for it only when the native binding is
+    // degraded, which needs a native contract: until one is certified every
+    // binding here is unsupported and this is never called.
+    nativeActivationHint,
     // The event name is the second argument, because this client's payload does
     // not carry one and two of its four events are byte-identical.
     normalizeHook: (payload, options) => normalizeAntigravityHook(payload, options),

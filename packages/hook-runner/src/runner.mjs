@@ -14,7 +14,7 @@ import { clearPin, createGitProbe, resolveHookWorkspace, platformDataHome, runti
 
 import { resolveClientPid } from "./client-pid.mjs";
 import { probeClientVersion as defaultProbeClientVersion } from "./client-version.mjs";
-import { bindNative, nativeDiagnosticDeadline } from "./native-attempt.mjs";
+import { bindNative, nativeActivationHintFor, nativeDiagnosticDeadline } from "./native-attempt.mjs";
 import { readProcessTable as defaultReadProcessTable } from "./process-table.mjs";
 import { withSessionLifecycle } from "./session-lifecycle.mjs";
 import { appendStartOwner, appendToolOwner, ownerHeader, ownerOnlyOutcome } from "./owner-context.mjs";
@@ -235,7 +235,7 @@ async function openContext({ event, adapterId, dataHome, runtime, env, deadline 
 // `render` is how the projected text reaches this client: before a turn it is
 // the adapter's context envelope, at the end of one it is a continuation.
 async function projectTurn({ binding, context, adapter, adapterId,
-  render = text => adapter.injectOutcome?.(text) }) {
+  render = text => adapter.injectOutcome?.(text), activationHint = null }) {
   const sync = await context.service.sync({ sessionId: binding.accSessionId,
     cursor: null, scope: "delta" });
 
@@ -258,8 +258,14 @@ async function projectTurn({ binding, context, adapter, adapterId,
   // Only this hook's payload selected the binding. Supply its own pair as
   // trusted context, outside peer bodies, rather than exporting inheritable
   // credentials or teaching the CLI to guess from a public roster.
-  const owner = ownerHeader(binding, context.workspaceCwd, context.workspaceRef);
   const totalBudget = context.descriptor.policy?.contextBudgetBytes ?? 6_000;
+  // An adapter's one-line ask rides with the owner line, which every projected
+  // turn carries - and only when both fit in half the budget, so peer bodies
+  // always keep the rest.
+  const header = ownerHeader(binding, context.workspaceCwd, context.workspaceRef);
+  const owner = activationHint === null
+    || byteLength(header) + 1 + byteLength(activationHint) > totalBudget / 2
+    ? header : `${header}\n${activationHint}`;
   // A peer can join after this prompt has begun. The current turn must already
   // have its own arguments when it needs inbox/reply, without reattaching or
   // waiting for another user prompt. Solo emits identity, not a peer notice.
@@ -488,7 +494,9 @@ const HANDLERS = {
       const started = await HANDLERS.sessionStart(input);
       const fresh = await loadSessionBinding({ runtimeDir: paths.root,
         harnessSessionId: event.sessionId });
-      const turn = await projectTurn({ ...input, binding: fresh });
+      const activationHint = await nativeActivationHintFor({ adapter, event,
+        nativeBinding: started.nativeBinding, binding: fresh, context, paths, deadline });
+      const turn = await projectTurn({ ...input, binding: fresh, activationHint });
       return { ...turn, nativeBinding: started.nativeBinding };
     }
     const current = await context.service.locateSession(binding.accSessionId);
@@ -502,7 +510,9 @@ const HANDLERS = {
       const started = await HANDLERS.sessionStart(input);
       const fresh = await loadSessionBinding({ runtimeDir: paths.root,
         harnessSessionId: event.sessionId });
-      const turn = await projectTurn({ ...input, binding: fresh });
+      const activationHint = await nativeActivationHintFor({ adapter, event,
+        nativeBinding: started.nativeBinding, binding: fresh, context, paths, deadline });
+      const turn = await projectTurn({ ...input, binding: fresh, activationHint });
       return { ...turn, nativeBinding: started.nativeBinding };
     }
     // A turn is the clearest sign a session is alive. Never a reason to fail:
@@ -514,7 +524,9 @@ const HANDLERS = {
     const nativeBinding = await bindNative({ adapter, event, hookBinding: binding,
       clientVersion: binding.clientVersion, platform: binding.platform, context, paths,
       deadline });
-    const turn = await projectTurn(input);
+    const activationHint = await nativeActivationHintFor({ adapter, event, nativeBinding,
+      binding, context, paths, deadline });
+    const turn = await projectTurn({ ...input, activationHint });
     return nativeBinding === undefined ? turn : { ...turn, nativeBinding };
   },
 

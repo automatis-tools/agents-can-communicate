@@ -41,3 +41,34 @@ export async function bindNative({ adapter, event, hookBinding, clientVersion, p
   }
   return result;
 }
+
+const HINT_MAX_BYTES = 512;
+const HINT_MAX_MS = 250;
+
+/**
+ * One line an adapter asks the agent to act on, when the agent itself can fix
+ * a degraded native binding - Antigravity's relay is started from the agent's
+ * own shell, and nothing else can start it. Bounded and fail-open: a slow or
+ * failing adapter costs the turn nothing, and anything but one short line is
+ * dropped rather than trusted into model context.
+ */
+export async function nativeActivationHintFor({ adapter, event, nativeBinding, binding, context,
+  paths, deadline }) {
+  if (typeof adapter?.nativeActivationHint !== "function" || nativeBinding?.state !== "degraded") return null;
+  const budget = Math.min(HINT_MAX_MS, deadline - Date.now() - HINT_MAX_MS);
+  if (budget <= 0) return null;
+  let timer = null;
+  try {
+    const line = await Promise.race([
+      Promise.resolve(adapter.nativeActivationHint({ event, nativeBinding, runtimeDir: paths.root,
+        clientPid: binding?.clientPid, env: context.env })),
+      new Promise(resolve => { timer = setTimeout(resolve, budget, null); }),
+    ]);
+    return typeof line === "string" && line !== "" && !/[\r\n]/.test(line)
+      && Buffer.byteLength(line, "utf8") <= HINT_MAX_BYTES ? line : null;
+  } catch {
+    return null;
+  } finally {
+    if (timer !== null) clearTimeout(timer);
+  }
+}
