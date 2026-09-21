@@ -5,11 +5,10 @@ import path from "node:path";
 import test from "node:test";
 import { promisify } from "node:util";
 
-import { bindNativeSession, offerMessage, planNativeActivation, probeNativeDelivery,
-  refreshNativeSession } from "@agents-can-communicate/adapter-antigravity/native-delivery";
+import { createAntigravityAdapter } from "@agents-can-communicate/adapter-antigravity";
 import { createRelay } from "@agents-can-communicate/adapter-antigravity/relay";
 import { listRegistrations } from "@agents-can-communicate/adapter-antigravity/relay-endpoint";
-import { defineAdapter, loadNativeAttempt, storeSessionBinding } from "@agents-can-communicate/adapter-sdk";
+import { loadNativeAttempt, storeSessionBinding } from "@agents-can-communicate/adapter-sdk";
 import { createCoordinationService } from "@agents-can-communicate/core";
 import { establishNativeBinding } from "@agents-can-communicate/hook-runner/native-binding";
 import { recordInstall } from "@agents-can-communicate/installer";
@@ -19,31 +18,6 @@ import { activateAntigravityRelay } from "../../bin/entrypoints/antigravity-rela
 import { createFakeIds } from "../helpers/memory-store.mjs";
 
 const CONVERSATION = "3ed65ea5-31f2-4ddf-b6c7-e3c85a9a3c29";
-const noop = async () => ({ ok: true, changes: [], diagnostics: [] });
-
-// The shipped adapter declares no native contract until a real capture
-// certifies one. This fixture wraps the adapter's real native methods in that
-// contract, so the composition is proven before the capture exists.
-function relayAdapter() {
-  return defineAdapter({ id: "antigravity", displayName: "Antigravity CLI",
-    client: { command: "agy", certificationName: "antigravity-cli", versionArgs: ["--version"] },
-    capabilities: { delivery: { livePush: true } },
-    certification: { evidence: [{ client: "antigravity-cli", version: "1.2.7",
-      platform: "darwin-arm64", observedAt: "2026-09-21T00:00:00.000Z",
-      capability: "delivery.livePush", fixture: "fixtures/delivery/antigravity-cli-1.2.7.json",
-      provenance: "fixtures/certification-provenance.json", provenanceId: "fixture",
-      idleBehavior: "offered", busyBehavior: "queued_after_turn", authorityLevel: "experimental",
-      limitations: ["test fixture"], result: "pass" }] },
-    nativeDelivery: { minimumByPlatform: { "darwin-arm64": "1.2.7" },
-      anchors: [{ platform: "darwin-arm64", version: "1.2.7",
-        protocolContract: "antigravity-agentapi-relay-v1" }],
-      knownBad: [], activationKinds: ["native-config"], policySource: "installation-record" },
-    detect: noop, install: noop, uninstall: noop, doctor: noop,
-    normalizeHook: () => ({ kind: "beforeTurn", sessionId: CONVERSATION, cwd: "/tmp" }),
-    renderContext: () => "",
-    probeNativeDelivery, planNativeActivation, bindNativeSession, refreshNativeSession, offerMessage,
-  });
-}
 
 async function fixture(t, { installedPolicy = "actionable" } = {}) {
   const root = await realpath(await mkdtemp("/tmp/acc-agr-"));
@@ -70,7 +44,7 @@ async function fixture(t, { installedPolicy = "actionable" } = {}) {
       conversationMetadata: async () => ({ ok: true, reasonCode: null }) } });
   await relay.listen();
   t.after(async () => { await relay.close("test_end"); await rm(root, { recursive: true, force: true }); });
-  const adapter = relayAdapter();
+  const adapter = createAntigravityAdapter();
   const activate = () => activateAntigravityRelay({ session, service, runtimeDir, dataHome, adapter });
   const bindings = () => service.listDeliveryBindings({ participantId: "antigravity", now: clock.now() });
   const turn = () => establishNativeBinding({ adapter,

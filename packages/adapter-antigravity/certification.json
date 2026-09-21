@@ -60,6 +60,32 @@
         "hooks attach only when the Antigravity session has an open workspace; an ordinary print-mode turn sends an empty workspacePaths and no session is created. This capture used --add-dir"
       ],
       "result": "pass"
+    },
+    {
+      "client": "antigravity-cli",
+      "version": "1.2.7",
+      "platform": "darwin-arm64",
+      "observedAt": "2026-09-21T19:29:23.548Z",
+      "capability": "delivery.livePush",
+      "fixture": "fixtures/delivery/antigravity-cli-1.2.7-relay-product.json",
+      "idleBehavior": "offered",
+      "provenance": "fixtures/certification-provenance.json",
+      "provenanceId": "native-delivery-1-2-7-relay-product",
+      "busyBehavior": "queued_after_turn",
+      "authorityLevel": "experimental",
+      "limitations": [
+        "Observed on darwin-arm64 with Antigravity CLI 1.2.7 in the TUI, model Gemini 3.8 Flash, through a private candidate built from this branch and installed into an isolated ACC data home; print mode ends with its turn and runs no relay.",
+        "The agent started the relay once for the conversation through run_command, after ACC's one-time context line named the command; the operator approved that command and each acc reply once at the client's permission prompt. ACC writes no permission rule.",
+        "The relay holds the session's language-server address and CSRF token in memory only; ACC's registration carries a nonce and a socket path, never the endpoint. ANTIGRAVITY_AGENTAPI_EXE named the same agy the relay runs.",
+        "An idle session woke with no user input. A message accepted while the model was streaming a long text answer was presented only after that answer completed. A message accepted while a turn waited on a tool permission was presented at that turn's next model invocation, after the tool returned, rather than after the turn.",
+        "The busy branch took three sends: the first landed at a tool boundary as above, the second arrived after the answer had already finished and so showed an idle wake; the third, timed against the running stream, is the one recorded.",
+        "The model receives each push as a SYSTEM_MESSAGE; the send-message title is not shown to it.",
+        "The observed reply loop uses the installed acc reply CLI; native delivery.replyRoute remains false. The router reports a relay push as transport live-adapter.",
+        "A repeated logical message kept its message id, took the durable path on the second send, and was pushed and answered once.",
+        "Antigravity runs no SessionEnd: the relay retired itself about five seconds after its agy exited, and a later message stayed queued in the durable inbox.",
+        "The first TUI session in a folder trusted at that launch hands every hook an empty workspacePaths even with --add-dir, so that session gets no ACC context and no relay prompt; the next launch in the now-trusted folder does."
+      ],
+      "result": "pass"
     }
   ]
 }

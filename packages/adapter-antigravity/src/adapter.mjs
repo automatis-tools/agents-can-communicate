@@ -5,7 +5,9 @@ import certification from "../certification.json" with { type: "json" };
 import { denyOutcome, injectOutcome, normalizeAntigravityHook, stopOutcome } from "./hooks.mjs";
 import { detectAntigravity, doctorAntigravity, installAntigravity, planAntigravityInstall,
   preflightAntigravityUninstall, uninstallAntigravity } from "./install.mjs";
-import { nativeActivationHint } from "./native-delivery.mjs";
+import { bindNativeSession, nativeActivationHint, offerMessage, planNativeActivation,
+  probeNativeDelivery, refreshNativeSession } from "./native-delivery.mjs";
+import { PROTOCOL_CONTRACT } from "./relay-endpoint.mjs";
 
 // The one version this client has been captured on. There is no earlier tier:
 // this package's first capture is 1.2.7, and a version that has not been
@@ -15,7 +17,7 @@ export const ANTIGRAVITY_CLI_VERSION = "1.2.7";
 /**
  * Antigravity CLI.
  *
- * Three things are declared true and they are the three a capture in this
+ * Four things are declared true and they are the four a capture in this
  * package shows. Everything else is false, and most of it is false because the
  * event it would need does not exist here rather than because it was not tried.
  *
@@ -38,10 +40,13 @@ export const ANTIGRAVITY_CLI_VERSION = "1.2.7";
  *   participant cannot be deregistered from a lifecycle event. Sessions here
  *   go offline by presence age or by an explicit `acc finish`, and that is a
  *   stated limitation rather than something inferred quietly.
- * - **No live push.** `agy agentapi send-message` exists as a hidden
- *   subcommand and nothing about it has been captured; no `agentapi` binary
- *   exists under `~/.gemini/antigravity-cli/bin/`. `delivery.livePush` and
- *   `delivery.replyRoute` stay false.
+ * - **Live push through the agent's own shell.** The session endpoint that
+ *   `agy agentapi send-message` needs exists only in the agent's tool shell,
+ *   so the agent starts ACC's relay once per conversation; the relay keeps the
+ *   endpoint in memory and pushes each peer message as a system message. Print
+ *   mode ends with its turn and gets none, and neither does the first session
+ *   in a folder trusted at that launch, whose hooks see no workspace.
+ *   `delivery.replyRoute` stays false: the reply is the ordinary `acc reply`.
  *
  * The end-of-turn `Stop` continuation is real and was measured, and it is
  * deliberately not sold as a gate. Vendor 1.1.9 caps consecutive continuations,
@@ -62,12 +67,25 @@ export function createAntigravityAdapter() {
     capabilities: {
       lifecycle: { sessionStart: true },
       context: { beforeTurnInjection: true },
-      delivery: { nextTurn: true },
+      delivery: { nextTurn: true, livePush: true },
     },
+    // Live delivery runs through a relay the agent starts once per conversation
+    // from its own shell - the only process holding the session endpoint. The
+    // relay owns its registration and retires itself with its agy, so there is
+    // no retireNativeSession here: the hook runner retires and re-publishes the
+    // binding on every turn, and must not take the relay with it.
+    nativeDelivery: {
+      minimumByPlatform: { "darwin-arm64": ANTIGRAVITY_CLI_VERSION },
+      anchors: [{ platform: "darwin-arm64", version: ANTIGRAVITY_CLI_VERSION,
+        protocolContract: PROTOCOL_CONTRACT }],
+      knownBad: [], activationKinds: ["native-config"], policySource: "installation-record",
+    },
+    probeNativeDelivery, planNativeActivation, bindNativeSession, refreshNativeSession,
+    offerMessage,
     deliveryFallback: { diagnostic:
-      `Antigravity CLI next-turn delivery is certified only for ${ANTIGRAVITY_CLI_VERSION} `
-      + "on darwin-arm64; other or unknown versions keep durable acc inbox access, and live "
-      + "push is unavailable on every version" },
+      `Antigravity CLI next-turn and live delivery are certified only for ${ANTIGRAVITY_CLI_VERSION} `
+      + "on darwin-arm64; live delivery also needs the agent to start ACC's relay once per "
+      + "conversation, and every other case keeps durable acc inbox access" },
 
     startSession: async () => ({ ok: true, changes: [], diagnostics: [] }),
 
@@ -88,8 +106,7 @@ export function createAntigravityAdapter() {
       executionNum: payload?.executionNum }),
     // The one line that asks the agent to start live delivery for its
     // conversation. The runner asks for it only when the native binding is
-    // degraded, which needs a native contract: until one is certified every
-    // binding here is unsupported and this is never called.
+    // degraded: the live policy is on and no relay serves this conversation.
     nativeActivationHint,
     // The event name is the second argument, because this client's payload does
     // not carry one and two of its four events are byte-identical.
