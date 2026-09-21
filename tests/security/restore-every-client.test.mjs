@@ -1,3 +1,4 @@
+import { fakeAgy } from "../../packages/adapter-antigravity/test/fake-agy.mjs";
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { mkdir, mkdtemp, readFile, readdir, realpath, rm, writeFile }
@@ -133,10 +134,14 @@ test("a home that had nothing is left with nothing", async t => {
     const context = clientContext(home, undefined,
       { env: { ACC_ANTIGRAVITY_HOOKS: location }, cwd: path.join(home, "project") });
     for (const adapter of ALL_ADAPTERS()) {
-      await adapter.install({ ...context, probeHooks: async () => ({ hooks: [{ name: "acc",
-        enabled: true, actions: ["SessionStart", "PreInvocation", "Stop"]
-          .map(event => ({ event })) }] }) });
-      await adapter.uninstall(context);
+      // One stand-in agy per location, shared by install and uninstall, so the
+      // plugin it installs is the one it is asked to remove.
+      const agy = fakeAgy();
+      await adapter.install({ ...context, runAgy: agy.run,
+        probeHooks: async () => ({ hooks: [{ name: "acc",
+          enabled: true, actions: ["SessionStart", "PreInvocation", "Stop"]
+            .map(event => ({ event })) }] }) });
+      await adapter.uninstall({ ...context, runAgy: agy.run });
     }
   }
 

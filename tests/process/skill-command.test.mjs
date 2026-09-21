@@ -1,3 +1,4 @@
+import { fakeAgy } from "../../packages/adapter-antigravity/test/fake-agy.mjs";
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
 import { mkdir, mkdtemp, readFile, readdir, realpath, rm, stat } from "node:fs/promises";
@@ -34,7 +35,9 @@ async function installed(t, adapterId, relative) {
   // written, not which clients happen to be installed on the test runner.
   const adapter = ALL_ADAPTERS().find(item => item.id === adapterId);
   assert.notEqual(adapter, undefined, `no adapter named ${adapterId}`);
-  await adapter.install(clientContext(home));
+  // Antigravity installs its skill through `agy plugin install`; a stand-in
+  // that does what 1.2.7 was captured doing keeps the real binary out of tests.
+  await adapter.install({ ...clientContext(home), runAgy: fakeAgy().run });
   return { home, skill: path.join(home, relative) };
 }
 
@@ -45,6 +48,10 @@ const ADAPTERS = [
   ["codex", ".agents/acc-local/plugins/agents-can-communicate/skills/acc/SKILL.md"],
   ["gemini_cli", ".gemini/extensions/agents-can-communicate/skills/acc/SKILL.md"],
   ["grok", ".grok/skills/acc/SKILL.md"],
+  // Where `agy plugin install` puts ACC's plugin. Named `acc`, because the copy
+  // of the Gemini extension this client imports by itself shadows any plugin
+  // called agents-can-communicate.
+  ["antigravity", ".gemini/config/plugins/acc/skills/acc/SKILL.md"],
 ];
 
 for (const [adapter, relative] of ADAPTERS) {
@@ -91,8 +98,10 @@ test("the skill tells the agent not to write to the store by hand", async t => {
 });
 
 test("every shipped skill is templated, none forgotten", async () => {
-  // Five adapters, five bundles. A new one that forgets to bake would ship a
-  // skill telling agents to run a placeholder.
+  // One bundle per row above. A new one that forgets to bake would ship a
+  // skill telling agents to run a placeholder, and a new one with no row would
+  // never have its installed copy checked at all - so the count is the table's,
+  // not a number that has to be remembered.
   const roots = [];
   for (const entry of await readdir(path.join(repo, "packages"), { withFileTypes: true })) {
     if (!entry.isDirectory()) continue;
@@ -104,7 +113,7 @@ test("every shipped skill is templated, none forgotten", async () => {
     }
   }
 
-  assert.equal(roots.length, 5, roots.map(item => item.file).join("\n"));
+  assert.equal(roots.length, ADAPTERS.length, roots.map(item => item.file).join("\n"));
   for (const { file, text } of roots) {
     assert.match(text, /\{\{ACC\}\}/, `${file} ships without the placeholder to replace`);
   }

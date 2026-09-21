@@ -1,0 +1,15 @@
+{
+  "note": "What `agy plugin install <local path>` and `agy plugin uninstall <name>` do on 1.2.7. <home> redacted; everything else verbatim.",
+  "validate": "agy plugin validate <path> reports skills processed, and agents, commands, mcpServers and hooks as skipped (not found) - so a plugin can also carry hooks, which was not exercised",
+  "install": {
+    "copiesTo": "<home>/.gemini/config/plugins/<name>/",
+    "records": "<home>/.gemini/config/import_manifest.json",
+    "pluginListAfter": { "imports": [ { "name": "acc-probe-installed", "source": "antigravity", "components": ["skills"] } ] }
+  },
+  "uninstall": {
+    "removes": "<home>/.gemini/config/plugins/<name>/",
+    "leavesBehind": { "file": "<home>/.gemini/config/import_manifest.json", "content": { "imports": null } },
+    "didNotExistBeforeInstall": true,
+    "touchesImportedCopy": false
+  }
+}

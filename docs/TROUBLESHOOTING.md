@@ -247,10 +247,19 @@ event name is dropped out of an otherwise valid namespace, and one top-level key
 an integration namespace drops the whole file. The command above is the only answer that
 counts.
 
-A plugin directory is not a registration either. On its first authenticated run this client
-copies ACC's Gemini CLI extension into `~/.gemini/antigravity-cli/plugins/`, byte for byte,
-and registers none of it - so a machine can hold a complete copy of the ACC integration
-while ACC is invisible to the client.
+The agent may see two ACC skills: `acc:acc`, which `acc install` puts there, and
+`agents-can-communicate:acc`. The second is this client's own copy of ACC's Gemini CLI
+extension, made on its first authenticated run into `~/.gemini/antigravity-cli/plugins/`. Its
+skill loads, but none of its hooks do, and every command in it runs the Gemini CLI extension's
+shim - so it works only while Gemini CLI is wired. `acc:acc` is the one to rely on; check what
+the client actually loaded with:
+
+```
+agy -p "/skills" --output-format json
+```
+
+`agy plugin list` is not that check: it lists only plugins installed through
+`agy plugin install`, and reports none while the imported skill above is loaded.
 
 ## Grok shows no injected message
 

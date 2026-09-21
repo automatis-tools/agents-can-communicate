@@ -1,9 +1,12 @@
 import { execFile } from "node:child_process";
-import { mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { cp, mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 
-import { blankJson, removeIfEmpty, writeForeignJson, writeHookShim }
+import { bakeSkillCommand, blankJson, ownVersion, removeIfEmpty, stampPluginVersion,
+  writeCliShim, writeForeignJson, writeHookShim }
   from "@agents-can-communicate/adapter-sdk";
 import { AccError, EXIT } from "@agents-can-communicate/protocol";
 
@@ -25,6 +28,24 @@ export const ACC_NAMESPACE = "acc";
  * registering it would double this client's hook cost for no behaviour.
  */
 export const ACC_REGISTERED_EVENTS = Object.freeze(["SessionStart", "PreInvocation", "Stop"]);
+
+/**
+ * The plugin that carries ACC's skill for this client, and the id the skill
+ * then has.
+ *
+ * Deliberately not `agents-can-communicate`. On first authenticated run this
+ * client copies ACC's Gemini CLI extension into its own plugin directory under
+ * that name, and a plugin installed under the same name is silently shadowed
+ * by the copy: /skills listed only the imported one
+ * (`fixtures/plugin-name-collision-1.2.7.json`). The copy is not ACC's to
+ * rely on - every command in it points at the Gemini CLI extension's shim, so
+ * it works exactly as long as Gemini CLI is wired and not a moment longer.
+ */
+export const ACC_PLUGIN_NAME = "acc";
+export const ACC_SKILL_ID = `${ACC_PLUGIN_NAME}:acc`;
+const IMPORTED_COPY_SKILL_ID = "agents-can-communicate:acc";
+
+const bundle = fileURLToPath(new URL("../plugin", import.meta.url));
 
 /**
  * Where a registration can go, and which one is used when nobody says.
@@ -53,6 +74,12 @@ export const workspaceHooksPath = workspace => path.join(workspace, ".agents", "
 const importedPluginPath = home => path.join(home, ".gemini", "antigravity-cli", "plugins",
   "agents-can-communicate");
 const shimDir = home => path.join(home, ".gemini", "config", "acc");
+// Where `agy plugin install` copies a plugin, and the manifest it records the
+// install in. Both belong to the client; ACC reaches them only through `agy`.
+export const pluginInstallPath = home => path.join(home, ".gemini", "config", "plugins",
+  ACC_PLUGIN_NAME);
+export const vendorManifestPath = home => path.join(home, ".gemini", "config",
+  "import_manifest.json");
 /**
  * Where "ACC created this file" is recorded.
  *
@@ -184,29 +211,75 @@ export function registeredSource(readback) {
 }
 
 /**
- * Ask the client what it has loaded.
+ * Run the client's own binary, against the home ACC is working in.
  *
- * `/hooks` in print mode answers without starting a turn: changelog 1.1.12
- * records that a print-mode slash command costs no quota and runs no model.
- * A workspace file is only read when its directory is an open workspace, and in
- * print mode that means passing it with `--add-dir`.
+ * `HOME` is set explicitly. The binary honours it, and every answer it gives -
+ * what is registered, which skills load, where a plugin is installed - is an
+ * answer about that home. Inheriting the caller's would verify the machine the
+ * operator is sitting at rather than the one `acc install --home` wrote to.
  */
-export async function probeInstalledHooks({ antigravityWorkspace, antigravityHookLocation,
-  command = "agy", timeoutMs = 60_000, env } = {}) {
-  const args = ["-p", "/hooks", "--output-format", "json",
-    ...(antigravityHookLocation === "workspace" && typeof antigravityWorkspace === "string"
-      ? ["--add-dir", antigravityWorkspace] : [])];
-  const { stdout } = await run(command, args, { timeout: timeoutMs, env });
+async function runAgy(args, { home, env, timeoutMs = 60_000 } = {}) {
+  return run("agy", args, { timeout: timeoutMs,
+    env: { ...process.env, ...env, ...(typeof home === "string" ? { HOME: home } : {}) } });
+}
+
+const agyFor = context => context.runAgy ?? runAgy;
+
+/**
+ * A print-mode slash command's data, or a reason it has none.
+ *
+ * These answer without a turn: changelog 1.1.12 records that a print-mode slash
+ * command costs no quota and runs no model. They still need a signed-in
+ * account - captured: an unauthenticated home answers
+ * `authentication failed or timed out` - and that is said as such, because
+ * "could not ask" and "asked, and nothing is registered" are different states.
+ */
+async function slashCommand(context, command, extra = []) {
+  const { stdout } = await agyFor(context)(["-p", command, "--output-format", "json", ...extra],
+    { home: context.home, env: context.env });
   const parsed = JSON.parse(stdout);
   const data = parsed?.command?.data;
   if (data === undefined || data === null) {
-    throw new AccError(EXIT.DATA, "agy did not answer /hooks with a hook list",
-      { received: Object.keys(parsed ?? {}) });
+    const reason = typeof parsed?.error === "string" && /auth/i.test(parsed.error)
+      ? "this home has no signed-in Antigravity account"
+      : `agy did not answer ${command}`;
+    throw new AccError(EXIT.DATA, reason, { command, received: Object.keys(parsed ?? {}) });
   }
   return data;
 }
 
+/**
+ * Ask the client what it has loaded.
+ *
+ * A workspace file is only read when its directory is an open workspace, and in
+ * print mode that means passing it with `--add-dir`.
+ */
+export async function probeInstalledHooks(context = {}) {
+  const { antigravityWorkspace } = context;
+  return slashCommand(context, "/hooks",
+    locationOf(context) === "workspace" && typeof antigravityWorkspace === "string"
+      ? ["--add-dir", antigravityWorkspace] : []);
+}
+
+export const probeInstalledSkills = context => slashCommand(context, "/skills");
+
 const probeFor = context => context.probeHooks ?? probeInstalledHooks;
+
+/**
+ * ACC's own skill, if the client loaded it from where ACC installed it.
+ *
+ * The id alone is not enough: a same-named skill from somewhere else would
+ * answer to it. The path is what says it is the copy this install put there.
+ */
+export function registeredSkill(readback, home) {
+  const skills = Array.isArray(readback?.skills) ? readback.skills : [];
+  return skills.find(skill => skill?.name === ACC_SKILL_ID && skill.model_invocable !== false
+    && typeof skill.path === "string"
+    && !path.relative(pluginInstallPath(home), skill.path).startsWith("..")) ?? null;
+}
+
+const importedCopy = readback => (Array.isArray(readback?.skills) ? readback.skills : [])
+  .find(skill => skill?.name === IMPORTED_COPY_SKILL_ID) ?? null;
 
 /**
  * Write the registration, then make the client prove it.
@@ -216,6 +289,58 @@ const probeFor = context => context.probeHooks ?? probeInstalledHooks;
  * loaded and refusing when the two disagree. The refusal throws, because that
  * is the only thing `acc install` reports as a failure; a returned `ok: false`
  * would be recorded as a successful install.
+ */
+/**
+ * Give this client ACC's skill, through the client's own plugin manager.
+ *
+ * Staged in a temporary directory rather than anywhere this client discovers
+ * customizations, so no half-built copy is ever loaded, then handed to
+ * `agy plugin install`, which copies the whole directory to
+ * `~/.gemini/config/plugins/acc/` and records it in its manifest
+ * (`fixtures/plugin-install-lifecycle-1.2.7.json`). Installing again
+ * overwrites, which is what makes this idempotent.
+ *
+ * The command the skill teaches is ACC's own CLI shim, in ACC's shim
+ * directory, so it outlives the Gemini CLI integration this client otherwise
+ * borrows from.
+ */
+async function installSkillPlugin(context) {
+  const { home, cli, node } = context;
+  const manifestExisted = await exists(vendorManifestPath(home));
+  const cliShim = await writeCliShim({ dir: shimDir(home), cli, node });
+  const stage = await mkdtemp(path.join(tmpdir(), "acc-antigravity-plugin-"));
+  try {
+    const plugin = path.join(stage, ACC_PLUGIN_NAME);
+    await cp(bundle, plugin, { recursive: true });
+    await stampPluginVersion({ file: path.join(plugin, "plugin.json"),
+      version: await ownVersion(import.meta.url), io: { readFile, writeFile } });
+    await bakeSkillCommand({ root: plugin, cliShim });
+    await agyFor(context)(["plugin", "install", plugin], { home, env: context.env });
+  } finally {
+    await rm(stage, { recursive: true, force: true });
+  }
+  // agy creates its manifest on first install and leaves it behind, holding
+  // `{"imports": null}`, on uninstall. Whether ACC's install is the reason it
+  // exists is recorded now, while that is still knowable.
+  if (!manifestExisted) {
+    await mkdir(createdMarkerDir(context), { recursive: true });
+    await writeFile(createdMarker(context, vendorManifestPath(home)),
+      `${vendorManifestPath(home)}\n`);
+  }
+}
+
+/**
+ * Write the registration, then make the client prove it.
+ *
+ * The write is never the answer. This client accepts a config it will not load
+ * and reports nothing, so the install is finished by asking what actually
+ * loaded and refusing when the two disagree. The refusal throws, because that
+ * is the only thing `acc install` reports as a failure; a returned `ok: false`
+ * would be recorded as a successful install.
+ *
+ * An answer the client cannot give is not a refusal. A home with no signed-in
+ * account cannot run a print-mode slash command, and that is reported as
+ * unverified - never as registered.
  */
 export async function installAntigravity(context) {
   const { home, runner, node } = context;
@@ -238,41 +363,64 @@ export async function installAntigravity(context) {
     await mkdir(createdMarkerDir(context), { recursive: true });
     await writeFile(createdMarker(context, file), `${file}\n`);
   }
-  const changes = [shimDir(home), file];
+  await installSkillPlugin(context);
+  const changes = [shimDir(home), file, pluginInstallPath(home), vendorManifestPath(home)];
 
   const diagnostics = [];
+  const needsAction = [];
   if (locationOf(context) === "workspace") {
     diagnostics.push("a workspace registration loads only while this project is an open "
       + `Antigravity workspace; in print mode pass --add-dir ${context.antigravityWorkspace}`);
   }
 
-  let readback;
+  let readback = null;
   try {
     readback = await probeFor(context)(context);
   } catch (error) {
     // The client could not be asked. Say so and claim nothing: an unverifiable
     // write is exactly the state this adapter exists to stop reporting as done.
-    return { ok: true, changes, diagnostics: [...diagnostics,
-      `wrote ${file} but could not read the effective hook list back (${error.message}); `
-      + "verify with: agy -p \"/hooks\" --output-format json"],
-    needsAction: ["run agy -p \"/hooks\" --output-format json and confirm the acc namespace "
-      + "lists SessionStart, PreInvocation and Stop"] };
+    diagnostics.push(`wrote ${file} but could not read the effective hook list back `
+      + `(${error.message}); verify with: agy -p "/hooks" --output-format json`);
+    needsAction.push("run agy -p \"/hooks\" --output-format json and confirm the acc "
+      + "namespace lists SessionStart, PreInvocation and Stop");
   }
-  const loaded = registeredEvents(readback);
-  const dropped = ACC_REGISTERED_EVENTS.filter(event => !loaded.includes(event));
-  if (dropped.length > 0) {
-    throw new AccError(EXIT.DATA,
-      loaded.length === 0
-        ? `${file} was written and registered nothing: agy reports no enabled `
-          + `${ACC_NAMESPACE} hooks. The file parsed; this client drops a configuration `
-          + "it does not recognise without logging anything."
-        : `${file} is only partly registered: agy loaded ${loaded.join(", ")} and dropped `
-          + `${dropped.join(", ")}.`,
-      { file, loaded, dropped, source: registeredSource(readback) });
+  if (readback !== null) {
+    const loaded = registeredEvents(readback);
+    const dropped = ACC_REGISTERED_EVENTS.filter(event => !loaded.includes(event));
+    if (dropped.length > 0) {
+      throw new AccError(EXIT.DATA,
+        loaded.length === 0
+          ? `${file} was written and registered nothing: agy reports no enabled `
+            + `${ACC_NAMESPACE} hooks. The file parsed; this client drops a configuration `
+            + "it does not recognise without logging anything."
+          : `${file} is only partly registered: agy loaded ${loaded.join(", ")} and dropped `
+            + `${dropped.join(", ")}.`,
+        { file, loaded, dropped, source: registeredSource(readback) });
+    }
+    diagnostics.push(`acc hooks registered: ${loaded.join(", ")} loaded from `
+      + `${registeredSource(readback) ?? file}`);
   }
-  const source = registeredSource(readback);
-  return { ok: true, changes, diagnostics: [...diagnostics,
-    `acc hooks registered: ${loaded.join(", ")} loaded from ${source ?? file}`] };
+
+  let skills = null;
+  try {
+    skills = await probeInstalledSkills(context);
+  } catch (error) {
+    diagnostics.push(`installed the ${ACC_PLUGIN_NAME} plugin but could not read the skill `
+      + `list back (${error.message}); verify with: agy -p "/skills" --output-format json`);
+    needsAction.push(`run agy -p "/skills" --output-format json and confirm ${ACC_SKILL_ID} `
+      + "is listed");
+  }
+  if (skills !== null) {
+    const skill = registeredSkill(skills, home);
+    if (skill === null) {
+      throw new AccError(EXIT.DATA,
+        `installed the ${ACC_PLUGIN_NAME} plugin and the client does not list ${ACC_SKILL_ID} `
+        + `from ${pluginInstallPath(home)}: the copy is on disk and not loaded`,
+        { plugin: pluginInstallPath(home) });
+    }
+    diagnostics.push(`acc skill registered: ${ACC_SKILL_ID} loaded from ${skill.path}`);
+  }
+  return { ok: true, changes, diagnostics, ...(needsAction.length > 0 ? { needsAction } : {}) };
 }
 
 /**
@@ -286,6 +434,7 @@ export async function installAntigravity(context) {
 export async function uninstallAntigravity(context) {
   const { home, keep = [] } = context;
   const changes = [];
+  const diagnostics = [];
   for (const file of [globalHooksPath(home),
     ...(typeof context.antigravityWorkspace === "string"
       ? [workspaceHooksPath(context.antigravityWorkspace)] : [])]) {
@@ -300,8 +449,43 @@ export async function uninstallAntigravity(context) {
     if (created) await rm(marker, { force: true });
     changes.push(file);
   }
+
+  // The plugin goes back through the client that installed it, so its manifest
+  // entry goes with it. Removing the directory by hand would leave agy listing a
+  // plugin that is not there. Only when agy itself cannot be run is the copy
+  // removed directly - an ACC skill whose command is about to disappear must
+  // not stay behind for a model to follow.
+  if (await exists(pluginInstallPath(home))) {
+    try {
+      await agyFor(context)(["plugin", "uninstall", ACC_PLUGIN_NAME],
+        { home, env: context.env });
+    } catch (error) {
+      await rm(pluginInstallPath(home), { recursive: true, force: true });
+      diagnostics.push(`agy plugin uninstall ${ACC_PLUGIN_NAME} failed (${error.message}); `
+        + `removed ${pluginInstallPath(home)} directly, and agy may still list it`);
+    }
+    changes.push(pluginInstallPath(home));
+  }
+  // What agy leaves after the last uninstall: `{"imports": null}`, in a file
+  // that did not exist before ACC's install. Taken away only when ACC's install
+  // is why it exists and nothing but that null is left in it.
+  const manifest = vendorManifestPath(home);
+  const manifestMarker = createdMarker(context, manifest);
+  if (await exists(manifestMarker)) {
+    const current = await readJson(manifest, null).catch(() => undefined);
+    const empty = current !== undefined && current !== null
+      && Object.keys(current).every(key => key === "imports")
+      && (current.imports === null || (Array.isArray(current.imports)
+        && current.imports.length === 0));
+    if (empty) {
+      await rm(manifest, { force: true });
+      changes.push(manifest);
+    }
+    await rm(manifestMarker, { force: true });
+  }
+
   if (!keep.includes(shimDir(home))) await rm(shimDir(home), { recursive: true, force: true });
-  return { ok: true, changes, diagnostics: [] };
+  return { ok: true, changes, diagnostics };
 }
 
 /**
@@ -333,8 +517,19 @@ export function locationChoice(context) {
 
 export async function detectAntigravity(context) {
   const diagnostics = [];
+  const needsAction = [];
   const blocked = locationChoice(context);
   const imported = await exists(importedPluginPath(context.home));
+  // The installer runs every adapter's detect and passes a null version for a
+  // client it did not find. Asking agy then would spawn a binary the installer
+  // could not run a moment ago, or - where it does exist but did not answer -
+  // let it write its own state into a home nobody asked it about.
+  if (context.clientVersion === null) {
+    diagnostics.push("acc hooks not registered: Antigravity CLI was not found, so it was "
+      + "not asked what it has loaded");
+    if (blocked !== null) diagnostics.push(blocked.reason);
+    return { ok: true, changes: [], diagnostics, ...(blocked === null ? {} : { blocked }) };
+  }
   let readback = null;
   try {
     readback = await probeFor(context)(context);
@@ -351,14 +546,49 @@ export async function detectAntigravity(context) {
         : `acc hooks not registered completely: agy loaded ${loaded.join(", ")} and is `
           + `missing ${ACC_REGISTERED_EVENTS.filter(e => !loaded.includes(e)).join(", ")}`);
   }
-  if (imported && (readback === null || registeredEvents(readback).length === 0)) {
-    diagnostics.push("an imported plugin directory for agents-can-communicate exists at "
-      + `${importedPluginPath(context.home)} and registers nothing: this client copies the `
-      + "Gemini CLI extension on first run and reads none of its hook names (issue #176)");
+
+  let skills = null;
+  try {
+    skills = await probeInstalledSkills(context);
+  } catch (error) {
+    diagnostics.push(`acc skill unverified: could not ask agy which skills it loads `
+      + `(${error.message})`);
   }
-  if (blocked !== null) diagnostics.push(blocked.reason);
+  const hooksLoaded = readback !== null && registeredEvents(readback).length > 0;
+  if (skills !== null) {
+    const skill = registeredSkill(skills, context.home);
+    if (skill !== null) {
+      diagnostics.push(`acc skill registered: ${ACC_SKILL_ID} loaded from ${skill.path}`);
+    } else {
+      diagnostics.push(`acc skill ${ACC_SKILL_ID} is not loaded`);
+      // Hooks without the skill deliver peer messages to an agent that has no
+      // instructions for answering them. That is a reinstall, not a footnote.
+      if (hooksLoaded) {
+        needsAction.push(`acc install --adapter antigravity  # ${ACC_SKILL_ID} is not loaded, `
+          + "so an agent here receives peer messages with no instructions for answering");
+      }
+    }
+    const copy = importedCopy(skills);
+    if (copy !== null) {
+      diagnostics.push(`${IMPORTED_COPY_SKILL_ID} is this client's own copy of ACC's Gemini `
+        + `CLI extension, imported on first run from ${copy.path}. It is loaded, but it is not `
+        + `ACC's: every command in it runs the Gemini CLI extension's shim, so it stops `
+        + `working when Gemini CLI is unwired. ${ACC_SKILL_ID} is the one ACC installs here`);
+    }
+  }
+  if (imported && !hooksLoaded) {
+    diagnostics.push("an imported plugin directory for agents-can-communicate exists at "
+      + `${importedPluginPath(context.home)}: this client copies the Gemini CLI extension on `
+      + "first run and loads its skill, but none of its hook names, so no ACC hook runs here "
+      + "(issue #176)");
+  }
+  if (blocked !== null) {
+    diagnostics.push(blocked.reason);
+    needsAction.push(blocked.reason);
+  }
   return { ok: true, changes: [], diagnostics,
-    ...(blocked === null ? {} : { blocked, needsAction: [blocked.reason] }) };
+    ...(blocked === null ? {} : { blocked }),
+    ...(needsAction.length > 0 ? { needsAction } : {}) };
 }
 
 export async function doctorAntigravity(context) {
@@ -396,13 +626,20 @@ export function planAntigravityInstall(context) {
   // named - which is what uninstall already scans - rather than throwing and
   // making a recorded install unremovable. An install never reaches here
   // unchosen; `locationChoice` blocks it one step earlier.
+  // The plugin and the manifest agy records it in are the client's, reached
+  // only through `agy plugin`. Declared as delegated - `merge` is the kind the
+  // installer leaves to the adapter - so the installer never deletes the copy
+  // ahead of `agy plugin uninstall` and strands its manifest entry. That exact
+  // ordering, with the shim directory, once left `{}` behind in the user's home.
+  const plugin = [{ path: pluginInstallPath(context.home), kind: "merge" },
+    { path: vendorManifestPath(context.home), kind: "merge" }];
   if (locationChoice(context) !== null) {
-    return [shim,
+    return [shim, ...plugin,
       { path: globalHooksPath(context.home), kind: "merge" },
       ...(typeof context.antigravityWorkspace === "string" && context.antigravityWorkspace !== ""
         ? [{ path: workspaceHooksPath(context.antigravityWorkspace), kind: "merge" }] : [])];
   }
-  return [shim, { path: hooksPathFor(context), kind: "merge" }];
+  return [shim, ...plugin, { path: hooksPathFor(context), kind: "merge" }];
 }
 
 /**

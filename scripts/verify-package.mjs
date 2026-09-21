@@ -194,6 +194,13 @@ async function main() {
         fail(`${dependency} is ${workspaceManifest.version}, not ${intendedVersion}`);
       }
     }
+    // Stamped at install time as well, but a bundle that ships a stale version
+    // is one nobody bumped - and the plugin manager shows that number.
+    const antigravityPlugin = await readTarJson(tarball,
+      "node_modules/@agents-can-communicate/adapter-antigravity/plugin/plugin.json");
+    if (antigravityPlugin.version !== intendedVersion) {
+      fail(`embedded Antigravity plugin is ${antigravityPlugin.version}, not ${intendedVersion}`);
+    }
     const geminiManifest = await readTarJson(tarball,
       "node_modules/@agents-can-communicate/adapter-gemini-cli/"
       + "extension/gemini-extension.json");

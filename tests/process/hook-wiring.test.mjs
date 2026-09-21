@@ -11,6 +11,7 @@ import { promisify } from "node:util";
 import { createClaudeCodeAdapter } from "@agents-can-communicate/adapter-claude-code";
 import { createCodexAdapter } from "@agents-can-communicate/adapter-codex";
 import { createAntigravityAdapter } from "@agents-can-communicate/adapter-antigravity";
+import { fakeAgy } from "../../packages/adapter-antigravity/test/fake-agy.mjs";
 import { createGeminiCliAdapter } from "@agents-can-communicate/adapter-gemini-cli";
 import { createGrokAdapter } from "@agents-can-communicate/adapter-grok";
 import { createKimiAdapter } from "@agents-can-communicate/adapter-kimi";
@@ -76,7 +77,7 @@ const ADAPTERS = [
     // `agy -p "/hooks"`, which is the only thing that can confirm a
     // registration on this client - a write that parses can still load nothing.
     context: home => ({ home, antigravityHookLocation: "global",
-      antigravityWorkspace: path.join(home, "project"),
+      antigravityWorkspace: path.join(home, "project"), runAgy: fakeAgy().run,
       probeHooks: async () => ({ hooks: [{ name: "acc", enabled: true,
         actions: ["SessionStart", "PreInvocation", "Stop"].map(event => ({ event })) }] }) }),
     commands: async home => {

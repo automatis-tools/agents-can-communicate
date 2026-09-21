@@ -1,3 +1,4 @@
+import { fakeAgy } from "../../packages/adapter-antigravity/test/fake-agy.mjs";
 import assert from "node:assert/strict";
 import path from "node:path";
 import test from "node:test";
@@ -91,7 +92,10 @@ test("detection probes the declared binary, not the adapter id", async () => {
   };
 
   const adapters = ALL_ADAPTERS();
-  const detected = await detectInstallation({ adapters, context: clientContext(HOME), probe });
+  // Every client answers here, so every adapter's detect runs - and Antigravity's
+  // asks agy what it has loaded. A stand-in keeps the real binary out of it.
+  const detected = await detectInstallation({ adapters,
+    context: { ...clientContext(HOME), runAgy: fakeAgy().run }, probe });
 
   assert.deepEqual(asked.sort(), adapters.map(a => a.client.command).sort());
   assert.deepEqual(detected.filter(entry => !entry.present), [],

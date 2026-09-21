@@ -7,6 +7,7 @@ import test from "node:test";
 
 import { EXIT } from "@agents-can-communicate/protocol";
 
+import { fakeAgy } from "./fake-agy.mjs";
 import { ACC_NAMESPACE, ACC_REGISTERED_EVENTS, HOOK_LOCATIONS, detectAntigravity,
   doctorAntigravity, globalHooksPath, installAntigravity, planAntigravityInstall,
   registeredEvents, uninstallAntigravity, workspaceHooksPath } from "../src/install.mjs";
@@ -42,8 +43,11 @@ async function fixture(t, { location } = {}) {
   // tree: the installer deletes every recorded artifact before calling
   // uninstall, so anything kept beside the shim is already gone by then.
   const dataHome = path.join(home, "acc-data");
+  // agy itself is never run from a test: this one reproduces what 1.2.7 was
+  // captured doing, and the hook read-back is answered by probeHooks above.
   const context = { home, dataHome, antigravityWorkspace: workspace,
-    ...(location === undefined ? {} : { antigravityHookLocation: location }), probeHooks };
+    ...(location === undefined ? {} : { antigravityHookLocation: location }), probeHooks,
+    runAgy: fakeAgy().run };
   const geminiTree = async () => ({
     settings: await readFile(path.join(home, ".gemini", "settings.json"), "utf8"),
     extension: await readdir(path.join(home, ".gemini", "extensions",

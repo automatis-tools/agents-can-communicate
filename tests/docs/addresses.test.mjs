@@ -25,6 +25,14 @@ import { createKimiAdapter } from "@agents-can-communicate/adapter-kimi";
  * neither the README block nor any skill carries that marker, which is why
  * eighteen wrong examples survived. This checks the addresses themselves.
  */
+
+// One skill per adapter package, counted rather than written down: a literal
+// goes stale the moment a client is added, and fails on the one change that is
+// correct.
+const adapterPackageCount = async () => (await readdir(path.join(repo, "packages"),
+  { withFileTypes: true })).filter(entry => entry.isDirectory()
+  && entry.name.startsWith("adapter-") && entry.name !== "adapter-sdk").length;
+
 const repo = fileURLToPath(new URL("../..", import.meta.url));
 
 const ADAPTER_IDS = new Set([createAntigravityAdapter(), createClaudeCodeAdapter(),
@@ -91,7 +99,7 @@ test("no skill tells an agent to address its own client", async () => {
 test("at least one skill teaches addressing by client, since that is what an agent knows",
   async () => {
     const skills = (await documents()).filter(entry => entry.file.endsWith("SKILL.md"));
-    assert.equal(skills.length, 5);
+    assert.equal(skills.length, await adapterPackageCount());
     for (const { file, source } of skills) {
       // The roster an agent is handed names clients. Telling it only about exact
       // participant ids sends it to `status` first, which is the lookup it skips.

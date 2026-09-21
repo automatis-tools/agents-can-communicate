@@ -6,6 +6,8 @@ import test from "node:test";
 
 import { createAntigravityAdapter } from "@agents-can-communicate/adapter-antigravity";
 
+import { fakeAgy } from "../../adapter-antigravity/test/fake-agy.mjs";
+
 import { detectInstallation } from "../src/detect.mjs";
 import { planInstallation } from "../src/plan.mjs";
 import { recordInstall } from "../src/ownership.mjs";
@@ -34,7 +36,7 @@ test("detection reports a location this client cannot register in", async t => {
 
   const [entry] = await detectInstallation({ adapters: [adapter],
     context: { ...context, antigravityHookLocation: "both",
-      probeHooks: async () => ({ hooks: [] }) },
+      probeHooks: async () => ({ hooks: [] }), runAgy: fakeAgy().run },
     probe: async () => "1.2.7", probeTimeoutMs: 1_000 });
 
   assert.equal(typeof entry.blocked?.reason, "string");
@@ -80,7 +82,7 @@ test("nothing is blocked by the default, or by either location named", async t =
     const [entry] = await detectInstallation({ adapters: [adapter],
       context: { ...context, antigravityWorkspace: context.home,
         ...(location === undefined ? {} : { antigravityHookLocation: location }),
-        probeHooks: async () => ({ hooks: [] }) },
+        probeHooks: async () => ({ hooks: [] }), runAgy: fakeAgy().run },
       probe: async () => "1.2.7", probeTimeoutMs: 1_000 });
 
     assert.equal(entry.blocked, undefined, `${location ?? "the default"} was blocked`);

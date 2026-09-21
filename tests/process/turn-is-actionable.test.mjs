@@ -14,6 +14,14 @@ import { createCoordinationService } from "@agents-can-communicate/core";
 import { createId } from "@agents-can-communicate/protocol";
 import { openFilesystemStore } from "@agents-can-communicate/storage-filesystem";
 
+
+// One skill per adapter package, counted rather than written down: a literal
+// goes stale the moment a client is added, and fails on the one change that is
+// correct.
+const adapterPackageCount = async () => (await readdir(path.join(repo, "packages"),
+  { withFileTypes: true })).filter(entry => entry.isDirectory()
+  && entry.name.startsWith("adapter-") && entry.name !== "adapter-sdk").length;
+
 const run = promisify(execFile);
 const repo = path.resolve(import.meta.dirname, "..", "..");
 const hook = path.join(repo, "bin", "acc-hook.mjs");
@@ -163,7 +171,7 @@ test("every skill teaches the two lines a turn can end with", async () => {
       if (text !== null) skills.push({ file, text });
     }
   }
-  assert.equal(skills.length, 5);
+  assert.equal(skills.length, await adapterPackageCount());
   for (const { file, text } of skills) {
     assert.match(text, /\[reply_required\] message_x/, `${file} does not explain replies`);
     assert.match(text, /\[acknowledgement_required\] message_x/,
