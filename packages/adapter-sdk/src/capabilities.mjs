@@ -116,7 +116,7 @@ export function defineAdapter(manifest) {
     }
   }
   const native = {};
-  for (const method of ["refreshNativeSession", "retireNativeSession"]) {
+  for (const method of ["refreshNativeSession", "retireNativeSession", "nativeActivationHint"]) {
     if (manifest[method] !== undefined && typeof manifest[method] !== "function") {
       usage(`optional native method ${method} must be a function`, { id: manifest.id, method });
     }
