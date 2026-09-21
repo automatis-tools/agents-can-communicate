@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import path from "node:path";
 
-import { INSTALLED_HOOKS_LAUNCH_MODE, validateCapture }
+import { INSTALLED_HOOKS_LAUNCH_MODE, INSTALLED_PRODUCT_EVIDENCE, validateCapture }
   from "./spikes/delivery-capture.mjs";
 
 const CERTIFICATION =
@@ -90,7 +90,7 @@ export async function verifyCertificationFixtureAllowlist(listed, readJson, read
           throw new Error(`${certification} evidence ${index} ${key} differs from selected provenance`);
         }
       }
-      const requiresInstalledProduct = evidence.client === "codex-cli"
+      const requiresInstalledProduct = Object.hasOwn(INSTALLED_PRODUCT_EVIDENCE, evidence.client)
         && evidence.capability === "delivery.livePush" && evidence.result === "pass";
       if (requiresInstalledProduct) {
         const claims = record.claims?.filter(claim => claim.capability === evidence.capability);
@@ -128,7 +128,7 @@ export async function verifyCertificationFixtureAllowlist(listed, readJson, read
           }
         }
         if (capture.launchMode !== INSTALLED_HOOKS_LAUNCH_MODE) {
-          throw new Error("installed Codex livePush capture uses installed hooks");
+          throw new Error(`installed ${evidence.client} livePush capture uses installed hooks`);
         }
         validateCapture(capture, { productEvidence });
       } else if (capture?.capability === "native_delivery") {
