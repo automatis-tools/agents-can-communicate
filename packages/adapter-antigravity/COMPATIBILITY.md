@@ -359,12 +359,34 @@ session (`fixtures/agentapi-reachability-1.2.7.json`):
 - **Hooks are given neither.** `SessionStart`, `PreInvocation` and `Stop` all received exactly
   one `ANTIGRAVITY_*` variable, `ANTIGRAVITY_CONVERSATION_ID`, recorded by name only.
 
-So ACC's hooks cannot push into a running session, and `delivery.livePush` stays false. The
-one path left would run through the agent's own tool shell — if that shell carries the address
-and token, which was not checked — and would mean ACC recording a live session credential that
-lets anything holding it drive the user's agent. That is a security decision, not a missing
-feature, and it is not taken here. What does reach a session quickly is already wired: the
-next invocation's `PreInvocation`, and the end-of-turn `Stop` continuation.
+So ACC's hooks cannot push into a running session, and `delivery.livePush` stays false.
+
+**The agent's own tool shell can, and it wakes an idle session.** Captured on 2026-09-21 with
+the operator performing the token step himself (`fixtures/agentapi-live-push-1.2.7.json`):
+
+- The shell an agent runs commands in carries all three: `ANTIGRAVITY_CONVERSATION_ID`,
+  `ANTIGRAVITY_LS_ADDRESS` and `ANTIGRAVITY_CSRF_TOKEN`.
+- With that endpoint, a separate process's `agy agentapi send-message <conversation> <text>`
+  was accepted, and the **idle** TUI session woke within a second: a `SYSTEM_MESSAGE`
+  carrying the text, then the model's own reply, with no user input at all.
+- `get-conversation-metadata` answered with the conversation's workspace folders and root id.
+
+That is a working live-push surface, and the only one this client offers. What using it would
+cost, all observed rather than assumed:
+
+- **A live session credential.** ACC would have to take the CSRF token out of the agent's
+  shell and keep it; anything that can read it can drive the user's agent until the session
+  ends. An auto-mode coding agent was refused permission to do exactly this twice, as
+  credential materialization.
+- **The agent's cooperation, every session.** Only the agent's shell has the endpoint, so the
+  agent has to run a binding command. That needs command approval — a prompt in the TUI, an
+  outright denial in print mode — and in one attempt the model refused to run a script it took
+  for a bind shell.
+- **System framing.** The pushed text reaches the model as a `SYSTEM_MESSAGE`, as a `Stop`
+  reason does; the untrusted-peer fence is what marks peer text as data.
+
+None of it is built. What already reaches a running session without any credential is the next
+invocation's `PreInvocation` and the end-of-turn `Stop` continuation.
 
 ### Reply routing — not observed
 
@@ -474,9 +496,10 @@ From the vendor changelog, not from capture:
 
 - Any behaviour on Linux or Windows.
 - `userMessage` and `toolCall` injection types.
-- Whether the agent's own tool shell carries `ANTIGRAVITY_LS_ADDRESS` and
-  `ANTIGRAVITY_CSRF_TOKEN`, and so whether `agentapi send-message` could wake an idle session
-  from there. Hooks carry neither.
+- Whether `agentapi send-message` into a *busy* session queues until the turn ends or
+  interrupts it. Only an idle session was pushed into.
+- How long the endpoint stays valid: across a TUI restart, after `/clear`, or while the
+  session waits at a permission prompt.
 - Reply routing back to ACC.
 - The client's own continuation ceiling, and what the model is told when that is reached. What
   it is told on a continuation is observed: see **Stop continuation** above.

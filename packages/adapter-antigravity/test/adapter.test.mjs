@@ -121,6 +121,7 @@ test("evidence the tarball does not ship is still kept in the repository", async
     "plugin-name-collision-1.2.7", "plugin-install-lifecycle-1.2.7",
     "headless-reply-attempt-1.2.7", "stop-continuation-live-1.2.7",
     "hook-command-space-path-1.2.7", "agentapi-reachability-1.2.7",
+    "agentapi-live-push-1.2.7",
     "hooks-readback-empty-1.2.7", "hooks-readback-registered-1.2.7",
     "hooks-readback-dropped-1.2.7", "hooks-readback-gemini-shape-1.2.7",
     "hooks-readback-foreign-key-1.2.7", "hooks-readback-namespace-collision-1.2.7"]) {
