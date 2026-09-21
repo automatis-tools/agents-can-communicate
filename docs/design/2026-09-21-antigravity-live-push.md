@@ -54,7 +54,10 @@ one conversation — the same shape as the nonce the Claude Code Channel registr
 | `bin/entrypoints/acc-antigravity-relay.mjs` | `start`, run by the agent: validates the environment, then detaches `run` with a clean environment and hands it the endpoint over stdin. `run`: the relay process |
 | `packages/adapter-antigravity/src/relay.mjs` | The relay: private Unix socket, nonce check, duplicate suppression, rendering, the `agentapi` call, lifetime |
 | `packages/adapter-antigravity/src/relay-endpoint.mjs` | The registration record: write, read, validate, remove |
-| `packages/adapter-antigravity/src/native-delivery.mjs` | `probeNativeDelivery`, `planNativeActivation`, `bindNativeSession`, `refreshNativeSession`, `retireNativeSession`, `offerMessage`, `nativeActivationHint` |
+| `packages/adapter-antigravity/src/relay-start.mjs` | The `start` refusals, finding the conversation's session, the clean child environment |
+| `bin/entrypoints/antigravity-relay-binding.mjs` | The relay publishing its own binding, as `claude-channel-binding.mjs` does for the Channel |
+| `packages/adapter-antigravity/src/native-delivery.mjs` | `probeNativeDelivery`, `planNativeActivation`, `bindNativeSession`, `refreshNativeSession`, `offerMessage`, `nativeActivationHint` - and no `retireNativeSession` (see Lifetime and retirement) |
+| `packages/adapter-antigravity/src/relays.mjs` | Every relay on the machine, for uninstall and doctor |
 | `~/.gemini/config/acc/acc-relay.sh` | A shim written by install, pinning node and the entrypoint the way the hook shim does |
 | The `acc` skill | Explains the relay and the one command that starts it |
 
@@ -67,8 +70,10 @@ printing one line and exiting 0, when any of these hold:
 - no ancestor process is `agy`, or that `agy` was started in print mode — its argv holds `-p`,
   `--print` or `--print=…` — because a print-mode process ends with its turn and never idles;
 - the installed live policy for `antigravity` is `off`;
-- this conversation has no ACC session binding in the workspace discovered from the shell's
-  working directory;
+- no workspace under the data home holds exactly one ACC session binding for this conversation
+  owned by that `agy` pid. The session is found by conversation id, never from the shell's
+  working directory: the model chooses the directory `run_command` runs in, while the hook
+  found its workspace from the client's `workspacePaths`;
 - a live relay is already registered for this conversation.
 
 Otherwise it records the `agy` pid found in its ancestry, spawns `run` detached with those
@@ -80,7 +85,7 @@ block, which any process of the same user can read for as long as the relay runs
 
 ### The registration record
 
-`<runtimeDir>/antigravity-relays/<endpointId>.json`, mode `0600` in a `0700` directory owned by
+`<runtimeDir>/native/antigravity/<endpointId>.json` - beside the Claude Code Channel's `native/claude` - mode `0600` in a `0700` directory owned by
 the user, written by temporary file and rename, read with `O_NOFOLLOW` and a size cap — the
 rules `adapter-codex/src/native-endpoint.mjs` already enforces:
 
@@ -89,7 +94,7 @@ rules `adapter-codex/src/native-endpoint.mjs` already enforces:
   "conversationId": "<uuid>", "agyPid": 12345, "relayPid": 12399,
   "socketPath": "/tmp/acc-ch-<uid>/r<12 hex>.sock", "nonce": "<64 hex>",
   "clientVersion": "1.2.7", "protocolContract": "antigravity-agentapi-relay-v1",
-  "leaseUntil": "<iso timestamp>" }
+  "modes": ["livePush", "idleWake", "busyQueue"], "leaseUntil": "<iso timestamp>" }
 ```
 
 It carries no address and no token. The socket lives in `channelSocketDirectory()`, the short
@@ -102,8 +107,10 @@ The relay publishes its own delivery binding as soon as it listens, exactly as t
 Channel does in `claude-channel-binding.mjs`: under `withSessionLifecycle` for its harness
 session id, it reopens the store, rereads the session binding, confirms the session is open at
 the same generation, reads the installed live policy, and calls `establishNativeBinding` with
-event `{ kind: "relayReady", sessionId: <conversationId> }`. An idle session is therefore
-reachable at once, without waiting for another turn.
+event `{ kind: "relayReady", sessionId: <conversationId> }`, and records the attempt for doctor
+under that event name, which joins `sessionStart`, `beforeTurn` and `channelReady` in the SDK's
+closed native-attempt vocabulary. An idle session is therefore reachable at once, without
+waiting for another turn.
 
 `bindNativeSession` is the one handshake every path uses — relay start, and every `beforeTurn`
 the hook runner already runs. It finds the registration for `event.sessionId`, checks that the
@@ -130,9 +137,9 @@ The body is bounded by the workspace's `contextBudgetBytes` (6,000 bytes by defa
 one ends with the `acc inbox --message <id>` line that recovers it. Because the relay renders, a holder of the nonce cannot place unfenced text in front of the
 model. The relay then runs `agy agentapi send-message --title "ACC peer message"
 <conversationId> <text>`, using the `agy` on the `PATH` it inherited, with the endpoint set only
-in that child's environment. `ANTIGRAVITY_AGENTAPI_EXE` is also inherited; its value was not
-captured, and the implementation checks whether it names the executable to prefer. The relay
-maps the answer to the router's closed codes:
+in that child's environment - the invocation the prototype capture proved. `ANTIGRAVITY_AGENTAPI_EXE`
+is also inherited; the product capture records which executable it names, and the relay does not
+depend on it. The relay maps the answer to the router's closed codes:
 
 | Answer | `offerMessage` result |
 |---|---|
@@ -148,18 +155,21 @@ next-turn projector already takes only `queued` receipts. Everything else leaves
 
 ### Asking the agent to start it
 
-A new optional adapter method, `nativeActivationHint({ event, nativeBinding, livePolicy,
-runtimeDir })`, returns one line or `null`. The hook runner calls it in `beforeTurn`, after the
-native binding attempt, and appends the line to the projected context inside the context
-budget. The Antigravity adapter returns a line only when the live policy is on, the binding is
-not active, the client is not in print mode, and this conversation has not been asked before —
-a marker at `<runtimeDir>/antigravity-relays/asked/<sha256 of the conversation id>` records the
-ask. The line is:
+A new optional adapter method, `nativeActivationHint({ event, nativeBinding, runtimeDir,
+clientPid, env })`, returns one line or `null`. The hook runner calls it in `beforeTurn`, after
+the native binding attempt, only for a `degraded` binding, within 250 ms, and keeps the answer
+only when it is one line of at most 512 bytes. The line rides with the owner line when both fit
+in half the context budget. A degraded binding already implies the live policy is on, so the
+Antigravity adapter adds only that the client is not in print mode and this conversation has
+not been asked before — a marker at
+`<runtimeDir>/native/antigravity-asked/<sha256 of the conversation id>` records the ask. The
+shim path comes from `env.HOME`. The line is:
 
 ```
 ACC: live delivery is on but not running in this conversation. To let peers reach you while idle, run once: sh "<home>/.gemini/config/acc/acc-relay.sh" start
-``` One ask
-per conversation: a declined command is the user's answer, and repeating it every invocation
+```
+
+One ask per conversation: a declined command is the user's answer, and repeating it every invocation
 would be noise.
 
 ### Lifetime and retirement
@@ -177,21 +187,25 @@ A live `agy` pid keeps an idle session present: core classifies a session with a
 pid as online or stale by age and offline only past that 24-hour expiry, so an idle session can
 be woken for up to a day. Refreshing the relay's lease never counts as a heartbeat.
 
-`retireNativeSession` removes a registration after core retirement. `acc uninstall` signals the
-`relayPid` of every registration whose process is still a relay, removes the registrations and
-the shim, and leaves nothing running.
+The adapter has no `retireNativeSession`. The hook runner retires the previous binding and
+publishes a new one on every `beforeTurn`, and hands the prior binding to
+`retireNativeSession` when an adapter has one; removing the registration there, or signalling
+the relay, would cut live delivery one turn after the agent started it. The relay owns its
+registration and removes it when it exits. `acc uninstall` signals the `relayPid` of every
+registration, in every workspace under the data home, whose process still names the relay
+binary, removes the registrations, the relay logs and the shim, and leaves nothing running.
 
 ### Failure handling
 
 Every path fails open: a missing relay, a dead socket, a refused ping, an expired lease or an
 `agentapi` error each ends in durable delivery, never in a lost message and never in a stuck
-hook. The relay logs to `<runtimeDir>/antigravity-relays/<endpointId>.log`, mode `0600`: event
+hook. The relay logs to `<runtimeDir>/native/antigravity/<endpointId>.log`, mode `0600`: event
 names, message ids and closed reason codes, never message bodies, the token, the address or the
 nonce.
 
-`acc doctor` reports, per conversation with a registration, whether its relay is alive, and
-names the three states that matter: live delivery on with a relay running; on with no relay,
-because the agent has not started one; and a print-mode session, which never runs one.
+`acc doctor` says how live delivery starts - the relay command, once per conversation - and
+how many relays run on the machine, and the generic native-attempt line shows the last
+`relayReady` or `beforeTurn` outcome for a session.
 
 ## Security
 
@@ -251,11 +265,14 @@ The operator approves the relay command and `acc reply` in the TUI; ACC's side i
 
 ## Core changes
 
-Both additive and inert for every other adapter:
+All additive and inert for every other adapter:
 
 1. The optional `nativeActivationHint` adapter method and its call in the runner's
    `beforeTurn`.
-2. The capture validator admitting `antigravity-cli` for the installed-hooks launch mode.
+2. `relayReady` in the SDK's closed native-attempt event vocabulary.
+3. The capture validator admitting `antigravity-cli` for the installed-hooks launch mode, with
+   the product-evidence validator chosen by the capture's client.
+4. The managed runtime's entry kind `acc-antigravity-relay` and its stable launcher path.
 
 ## Out of scope
 
