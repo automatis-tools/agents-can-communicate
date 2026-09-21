@@ -99,7 +99,7 @@ All recipients have the same durable record, but adapters expose different accel
 - **Durable inbox:** universal recovery. `acc inbox` discovers bounded message headers;
   `acc inbox --message <id>` retrieves one complete addressed message after selection
   or compaction.
-- **Next normal turn:** exact captured versions of Codex, Claude Code, Gemini CLI, and Kimi
+- **Next normal turn:** exact captured versions of Codex, Claude Code, Gemini CLI, Antigravity CLI and Kimi
   Code can receive complete attributed peer context when the user next prompts that client.
   This does not wake an idle session.
 - **Optional Claude Code channel:** supported Claude Code versions on Apple Silicon macOS

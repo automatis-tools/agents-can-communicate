@@ -214,6 +214,43 @@ trusted` and keeps going, and the default mode has no write or shell tool to gua
 guard never fires and the mode you passed appears to have been ignored. Trust the folder,
 or start the session somewhere trusted.
 
+## Antigravity is installed and nothing happens
+
+The most likely cause is that the session has no open workspace. Antigravity CLI gives its
+hooks a project directory only through `workspacePaths`, and that array is empty unless the
+session has one - an ordinary `agy -p "..."` started in a project directory does not. The
+hook then has no workspace to join, fails open as every ACC hook must, and this client shows
+no hook output, so nothing anywhere says why.
+
+Open the project as an Antigravity workspace, or pass it explicitly:
+
+```
+agy -p "..." --add-dir /path/to/project
+```
+
+`acc doctor` names this state. Nothing else in the payload can substitute for it:
+`transcriptPath` and `artifactDirectoryPath` both point inside the client's own
+per-conversation directory, and the hook process does not inherit the directory the client
+was started in.
+
+If the session does have a workspace and ACC is still absent, check that the registration
+actually loaded rather than that the file exists:
+
+```
+agy -p "/hooks" --output-format json
+```
+
+This client accepts a hook configuration it will not load and reports nothing. A file on
+disk is not a registration: the Gemini CLI hook shape loads nothing here, an unsupported
+event name is dropped out of an otherwise valid namespace, and one top-level key that is not
+an integration namespace drops the whole file. The command above is the only answer that
+counts.
+
+A plugin directory is not a registration either. On its first authenticated run this client
+copies ACC's Gemini CLI extension into `~/.gemini/antigravity-cli/plugins/`, byte for byte,
+and registers none of it - so a machine can hold a complete copy of the ACC integration
+while ACC is invisible to the client.
+
 ## Grok shows no injected message
 
 Grok discards UserPromptSubmit context. On the observed 1.0.24 client, run public
