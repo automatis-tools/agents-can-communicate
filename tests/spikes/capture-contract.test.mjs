@@ -164,7 +164,7 @@ test("legacy bootstrap passes remain valid while installed hooks require product
   assert.throws(() => validateCapture(noPackage, { productEvidence: matrixEvidence() }),
     /installed-hook capture requires packageSha256/);
   assert.throws(() => validateCapture({ ...installed, client: "claude-code" },
-    { productEvidence: matrixEvidence() }), /installed-hook capture client is codex-cli/);
+    { productEvidence: matrixEvidence() }), /installed-hook capture client is one of codex-cli, antigravity-cli/);
   assert.throws(() => validateCapture({ ...installed, packageSha256: "b".repeat(64) },
     { productEvidence: matrixEvidence() }), /package SHA-256 matches product evidence/);
   assert.throws(() => validateCapture(installed, { productEvidence: matrixEvidence("transport") }),

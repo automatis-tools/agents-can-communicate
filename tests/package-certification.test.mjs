@@ -98,7 +98,7 @@ test("a passing Codex livePush claim cannot let malformed capture bytes opt out"
     [{ ...validCapture, result: "fail" },
       /capture result differs from selected claim/],
     [{ ...validCapture, launchMode: "ordinary-command-with-install-time-bootstrap" },
-      /installed Codex livePush capture uses installed hooks/],
+      /installed codex-cli livePush capture uses installed hooks/],
   ]) {
     await assert.rejects(verify(installedPackage({ captureValue })), expected);
   }
