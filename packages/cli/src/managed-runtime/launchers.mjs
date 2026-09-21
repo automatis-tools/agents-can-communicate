@@ -16,6 +16,7 @@ export const stablePaths = root => ({
   cli: path.join(root, "bin", "acc.mjs"), runner: path.join(root, "bin", "acc-hook.mjs"),
   bootstrap: path.join(root, "bin", "acc-bootstrap.mjs"),
   channel: path.join(root, "bin", "acc-claude-channel.mjs"),
+  antigravityRelay: path.join(root, "bin", "acc-antigravity-relay.mjs"),
 });
 
 /** Publish immutable launcher modules, then atomically replace each tiny entry.
