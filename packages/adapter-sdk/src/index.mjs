@@ -1,7 +1,8 @@
 // Capability contract, context projection, config ownership, and the binding
 // that survives between two ephemeral hook processes.
 export { CAPABILITY_SHAPE, assertCapabilities, defineAdapter } from "./capabilities.mjs";
-export { effectiveCapabilities, validateCertification } from "./certification.mjs";
+export { capabilityEvidence, effectiveCapabilities, validateCertification }
+  from "./certification.mjs";
 export { NATIVE_ACTIVATION_KINDS, NATIVE_BINDING_MODES, NATIVE_PLATFORMS, NATIVE_REASON_CODES,
   compareStableVersions, evaluateNativeEligibility, evaluateVersionContract, parseStableVersion,
   validateNativeActivationPlan, validateNativeDeliveryContract, validateNativeHandshake }

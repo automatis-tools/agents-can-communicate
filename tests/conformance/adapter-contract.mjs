@@ -26,9 +26,12 @@ export function runAdapterConformance(name, kit) {
     }
   });
 
-  test(`${name}: unknown client versions degrade every capability to false`, () => {
+  test(`${name}: a client older than every capture degrades to false`, () => {
+    // Evidence applies forward, so the client that gets nothing is the one no
+    // capture reaches. An unreadable version reads the newest evidence instead:
+    // the hook asking is proof enough that this integration is installed.
     const effective = effectiveCapabilities(adapter(), {
-      clientVersion: "unknown", platform: `${process.platform}-${process.arch}` });
+      clientVersion: "0.0.1", platform: `${process.platform}-${process.arch}` });
     for (const group of Object.values(effective)) {
       for (const value of Object.values(group)) assert.equal(value, false);
     }

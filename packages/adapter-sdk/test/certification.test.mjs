@@ -62,21 +62,19 @@ test("exact passing evidence permits the declared capability", () => {
   assert.equal(Object.isFrozen(adapter.certification.evidence[0].limitations), true);
 });
 
-test("an exact version and platform are required for an effective true", () => {
+test("evidence applies forward from the version that recorded it", () => {
   const adapter = sdk.defineAdapter(base({
     capabilities: { delivery: { livePush: true } },
     certification: { evidence: [evidence()] },
     offerMessage: noop,
   }));
+  const on = (clientVersion, platform = "darwin-arm64") =>
+    sdk.effectiveCapabilities(adapter, { clientVersion, platform }).delivery.livePush;
 
-  assert.equal(sdk.effectiveCapabilities(adapter,
-    { clientVersion: "1.2.3", platform: "darwin-arm64" }).delivery.livePush, true);
-  assert.equal(sdk.effectiveCapabilities(adapter,
-    { clientVersion: "99.0.0", platform: "darwin-arm64" }).delivery.livePush, false);
-  assert.equal(sdk.effectiveCapabilities(adapter,
-    { clientVersion: "1.2.3", platform: "linux-x64" }).delivery.livePush, false);
-  assert.equal(sdk.effectiveCapabilities(adapter,
-    { clientVersion: "unknown", platform: "darwin-arm64" }).delivery.livePush, false);
+  for (const clientVersion of ["1.2.3", "1.2.4", "1.3.0", "99.0.0"]) {
+    assert.equal(on(clientVersion), true, clientVersion);
+  }
+  assert.equal(on("1.2.2"), false, "a client older than every row stays unproven");
 });
 
 test("a retained failure capture never enables the capability", () => {
@@ -143,15 +141,22 @@ test("embedded delimiter bytes cannot make distinct certification tuples collide
     "collision-safe tuple identity must not loosen the known capability gate");
 });
 
-test("both unknown effective client facts degrade to all false", () => {
+test("an unreadable client version is judged by the newest evidence", () => {
   const adapter = sdk.defineAdapter(base({
     capabilities: { delivery: { livePush: true } },
-    certification: { evidence: [evidence()] },
+    certification: { evidence: [evidence(),
+      evidence({ version: "1.4.0", result: "fail", provenanceId: "regressed",
+        limitations: ["the vendor changed the push surface"] })] },
     offerMessage: noop,
   }));
+  const on = facts => sdk.effectiveCapabilities(adapter, facts).delivery.livePush;
 
-  assert.equal(sdk.effectiveCapabilities(adapter,
-    { clientVersion: "unknown", platform: "unknown" }).delivery.livePush, false);
+  // A running hook proves the integration is installed; a client that changed
+  // the shape of --version must not cost its user delivery.
+  assert.equal(on({ clientVersion: "unknown", platform: "darwin-arm64" }), false,
+    "the newest row decides, and here it records a loss");
+  assert.equal(on({ clientVersion: "unknown", platform: "unknown" }), false);
+  assert.equal(on({ clientVersion: "1.3.0", platform: "darwin-arm64" }), true);
 });
 
 test("delivery uses only the communication-first vocabulary", () => {
@@ -159,58 +164,121 @@ test("delivery uses only the communication-first vocabulary", () => {
   assert.equal(Object.hasOwn(sdk.CAPABILITY_SHAPE, "execution"), false);
 });
 
-test("a certification floor extends a platform's evidence to later stable versions", () => {
+test("a recorded failure withdraws an inherited capability, and a later pass restores it", () => {
   const adapter = sdk.defineAdapter(base({
-    capabilities: { delivery: { livePush: true, nextTurn: true } },
+    capabilities: { delivery: { livePush: true } },
     certification: { evidence: [evidence(),
-      evidence({ capability: "delivery.nextTurn", provenanceId: "next-turn" })] },
-    certificationFloor: { "darwin-arm64": "1.2.3" },
-    offerMessage: noop,
-    renderContextResult: () => ({ text: "", offeredMessageIds: [], includedAttentionIds: [] }),
-  }));
-  const on = facts => sdk.effectiveCapabilities(adapter, facts).delivery;
-
-  for (const clientVersion of ["1.2.3", "1.2.4", "1.3.0", "2.0.0"]) {
-    assert.deepEqual({ ...on({ clientVersion, platform: "darwin-arm64" }) },
-      { ...on({ clientVersion: "1.2.3", platform: "darwin-arm64" }) }, clientVersion);
-    assert.equal(on({ clientVersion, platform: "darwin-arm64" }).nextTurn, true, clientVersion);
-  }
-  for (const facts of [{ clientVersion: "1.2.2", platform: "darwin-arm64" },
-    { clientVersion: "1.3.0-beta.1", platform: "darwin-arm64" },
-    { clientVersion: "1.3.0", platform: "linux-x64" },
-    { clientVersion: "unknown", platform: "darwin-arm64" }]) {
-    assert.equal(on(facts).nextTurn, false, JSON.stringify(facts));
-  }
-});
-
-test("a later version's own capture wins over the floor, capability by capability", () => {
-  const adapter = sdk.defineAdapter(base({
-    capabilities: { delivery: { livePush: true, nextTurn: true } },
-    certification: { evidence: [evidence(),
-      evidence({ capability: "delivery.nextTurn", provenanceId: "next-turn" }),
       evidence({ version: "1.4.0", result: "fail", provenanceId: "regressed",
-        limitations: ["the vendor changed the push surface"] })] },
-    certificationFloor: { "darwin-arm64": "1.2.3" },
+        limitations: ["the vendor changed the push surface"] }),
+      evidence({ version: "1.6.0", provenanceId: "restored" })] },
+    offerMessage: noop,
+  }));
+  const on = clientVersion => sdk.effectiveCapabilities(adapter,
+    { clientVersion, platform: "darwin-arm64" }).delivery.livePush;
+
+  assert.equal(on("1.3.0"), true, "the first capture still applies below the regression");
+  for (const clientVersion of ["1.4.0", "1.5.9"]) {
+    assert.equal(on(clientVersion), false, clientVersion);
+  }
+  for (const clientVersion of ["1.6.0", "2.0.0"]) {
+    assert.equal(on(clientVersion), true, clientVersion);
+  }
+});
+
+test("capturing one capability leaves every other capability standing", () => {
+  const adapter = sdk.defineAdapter(base({
+    capabilities: { delivery: { livePush: true, nextTurn: true } },
+    certification: { evidence: [
+      evidence({ capability: "delivery.nextTurn", provenanceId: "next-turn" }),
+      evidence({ version: "1.4.0", provenanceId: "live-push-1-4-0" })] },
     offerMessage: noop,
     renderContextResult: () => ({ text: "", offeredMessageIds: [], includedAttentionIds: [] }),
   }));
 
-  const later = sdk.effectiveCapabilities(adapter, { clientVersion: "1.4.0", platform: "darwin-arm64" });
-  assert.equal(later.delivery.livePush, false, "a recorded failure is not overruled by the floor");
-  assert.equal(later.delivery.nextTurn, true, "an uncaptured capability still follows the floor");
+  const later = sdk.effectiveCapabilities(adapter,
+    { clientVersion: "1.4.0", platform: "darwin-arm64" }).delivery;
+  assert.equal(later.livePush, true);
+  assert.equal(later.nextTurn, true,
+    "a capture that names one capability must not withdraw the others");
 });
 
-test("a certification floor must name a stable version with passing evidence", () => {
-  const declare = certificationFloor => sdk.defineAdapter(base({
+test("evidence crosses platforms until that platform records its own", () => {
+  const adapter = sdk.defineAdapter(base({
+    capabilities: { delivery: { livePush: true } },
+    certification: { evidence: [evidence(),
+      evidence({ version: "1.3.0", platform: "linux-x64", result: "fail",
+        provenanceId: "linux-regressed", limitations: ["no session bus"] })] },
+    offerMessage: noop,
+  }));
+  const on = (clientVersion, platform) => sdk.effectiveCapabilities(adapter,
+    { clientVersion, platform }).delivery.livePush;
+
+  assert.equal(on("1.2.3", "linux-x64"), true, "a capture travels to a platform with no rows");
+  assert.equal(on("1.3.0", "linux-x64"), false, "that platform's own row decides there");
+  assert.equal(on("1.3.0", "darwin-arm64"), true, "a platform with its own row keeps it");
+  assert.equal(on("1.3.0", "win32-x64"), false,
+    "a loss is the newest thing anyone observed, and win32 has recorded nothing");
+});
+
+test("a failure wins a tie at the deciding version", () => {
+  const adapter = sdk.defineAdapter(base({
+    capabilities: { delivery: { livePush: true } },
+    certification: { evidence: [evidence(),
+      evidence({ platform: "linux-x64", result: "fail", provenanceId: "linux-fail",
+        limitations: ["no session bus"] })] },
+    offerMessage: noop,
+  }));
+
+  assert.equal(sdk.effectiveCapabilities(adapter,
+    { clientVersion: "1.2.3", platform: "win32-x64" }).delivery.livePush, false,
+  "platforms disagreeing at one version resolve to the recorded loss");
+});
+
+test("a prerelease client version is judged as its release triple", () => {
+  const adapter = sdk.defineAdapter(base({
     capabilities: { delivery: { livePush: true } },
     certification: { evidence: [evidence()] },
-    certificationFloor,
     offerMessage: noop,
   }));
+  const on = clientVersion => sdk.effectiveCapabilities(adapter,
+    { clientVersion, platform: "darwin-arm64" }).delivery.livePush;
 
-  assert.throws(() => declare({ "darwin-arm64": "1.2.4" }), /certificationFloor .* has no passing evidence/);
-  assert.throws(() => declare({ "darwin-arm64": "1.2.3-beta" }), /stable version/);
-  assert.throws(() => declare({ "beos-ppc": "1.2.3" }), /platform/);
-  assert.throws(() => declare(["1.2.3"]), /certificationFloor/);
-  assert.equal(Object.isFrozen(declare({ "darwin-arm64": "1.2.3" }).certificationFloor), true);
+  assert.equal(on("1.3.0-beta.1"), true);
+  assert.equal(on("1.2.2-rc.1"), false, "a prerelease below every row is still below them");
+});
+
+test("a refused capability says which evidence refused it", () => {
+  const adapter = sdk.defineAdapter(base({
+    capabilities: { delivery: { livePush: true, nextTurn: true } },
+    certification: { evidence: [evidence(),
+      evidence({ version: "1.4.0", result: "fail", provenanceId: "regressed",
+        limitations: ["the vendor changed the push surface"] }),
+      evidence({ capability: "delivery.nextTurn", version: "1.3.0",
+        provenanceId: "next-turn" })] },
+    offerMessage: noop,
+    renderContextResult: () => ({ text: "", offeredMessageIds: [], includedAttentionIds: [] }),
+  }));
+  const why = (clientVersion, capability, platform = "darwin-arm64") =>
+    sdk.capabilityEvidence(adapter, { clientVersion, platform }, capability);
+
+  assert.deepEqual(why("1.3.0", "delivery.livePush"),
+    { granted: true, reason: null, version: "1.2.3" });
+  assert.deepEqual(why("1.4.0", "delivery.livePush"),
+    { granted: false, reason: "recorded-failure", version: "1.4.0" });
+  assert.deepEqual(why("1.2.2", "delivery.livePush"),
+    { granted: false, reason: "older-than-evidence", version: "1.2.3" });
+  assert.deepEqual(why("1.2.9", "delivery.nextTurn"),
+    { granted: false, reason: "older-than-evidence", version: "1.3.0" },
+    "each capability names the first version that proved it, not the adapter's oldest row");
+  assert.deepEqual(why("2.0.0", "guards.beforeWrite"),
+    { granted: false, reason: "undeclared", version: null });
+});
+
+test("certificationFloor is no longer an adapter field", () => {
+  assert.throws(() => sdk.defineAdapter(base({
+    capabilities: { delivery: { livePush: true } },
+    certification: { evidence: [evidence()] },
+    certificationFloor: { "darwin-arm64": "1.2.3" },
+    offerMessage: noop,
+  })), /certificationFloor/);
 });

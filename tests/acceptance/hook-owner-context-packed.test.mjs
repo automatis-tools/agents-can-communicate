@@ -59,6 +59,10 @@ async function stage(t, budgetBytes = 6_000, queued = true, adapterId = "claude_
   }));
   const sender = await packed.acc(["attach", "--participant", "sender"]);
   const senderFlags = ["--session", sender.sessionId, "--generation", sender.generation];
+  // These cases are about what a tight budget keeps when a body is withheld,
+  // which is now the one client that withholds: older than every capture this
+  // adapter carries. Everything newer reads the capture and is delivered.
+  await packed.setClientVersions({ claude: "2.1.0", codex: "0.100.0" });
   const reader = await packed.start({ adapterId, participantId: "reader",
     harnessSessionId: "native-reader" });
   const question = queued ? await packed.acc(["request", ...senderFlags, "--to", "reader",

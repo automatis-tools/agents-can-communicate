@@ -9,10 +9,10 @@ import { bindNativeSession, nativeActivationHint, offerMessage, planNativeActiva
   probeNativeDelivery, refreshNativeSession } from "./native-delivery.mjs";
 import { PROTOCOL_CONTRACT } from "./relay-endpoint.mjs";
 
-// The version this client has been captured on, and the floor of what is
-// certified: nothing earlier was measured, and later releases - this client
-// ships every few days - are judged by this capture until one of their own
-// says otherwise.
+// The version this client has been captured on. Nothing earlier was measured,
+// and later releases - this client ships every few days - are judged by this
+// capture until one of their own says otherwise, which is how certification
+// evidence reads everywhere since 0.7.0.
 export const ANTIGRAVITY_CLI_VERSION = "1.2.7";
 
 /**
@@ -65,7 +65,6 @@ export function createAntigravityAdapter() {
     client: { command: "agy", certificationName: "antigravity-cli",
       versionArgs: ["--version"] },
     certification,
-    certificationFloor: { "darwin-arm64": ANTIGRAVITY_CLI_VERSION },
     capabilities: {
       lifecycle: { sessionStart: true },
       context: { beforeTurnInjection: true },
