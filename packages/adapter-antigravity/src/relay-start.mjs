@@ -1,3 +1,4 @@
+import { spawn as nodeSpawn } from "node:child_process";
 import { readdir } from "node:fs/promises";
 import path from "node:path";
 
@@ -69,4 +70,54 @@ export async function startRelay(ports) {
   } catch {
     return FAILED;
   }
+}
+
+/**
+ * Start the relay's `run` child with the endpoint on its stdin, and wait for its
+ * one ready line.
+ *
+ * Never throws and never waits longer than it must: a child that cannot start,
+ * closes its input before reading it, exits before it is ready, or says nothing
+ * within the budget is a closed failure. Every stream gets an error listener,
+ * because a write to a child that already exited fails with EPIPE, and an
+ * unheard stream error would crash `start` inside the agent's turn.
+ */
+export function spawnRelay({ command, args, env, payload, readyMs = 10_000, spawn = nodeSpawn }) {
+  return new Promise(resolve => {
+    let child;
+    try {
+      child = spawn(command, args, { env, detached: true, stdio: ["pipe", "pipe", "ignore"] });
+    } catch {
+      resolve({ ok: false, reason: "could not start" });
+      return;
+    }
+    let buffer = "";
+    let settled = false;
+    const finish = result => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      child.stdout?.destroy();
+      child.stdin?.destroy();
+      child.unref();
+      resolve(result);
+    };
+    const timer = setTimeout(() => finish({ ok: false,
+      reason: `no ready line within ${readyMs / 1000} seconds` }), readyMs);
+    child.stdout.on("data", chunk => {
+      buffer += chunk;
+      const newline = buffer.indexOf("\n");
+      if (newline === -1) return;
+      try { finish(JSON.parse(buffer.slice(0, newline))); }
+      catch { finish({ ok: false, reason: "unreadable ready line" }); }
+    });
+    child.stdout.on("error", () => finish({ ok: false, reason: "unreadable ready line" }));
+    child.stdin.on("error", () => finish({ ok: false,
+      reason: "the relay closed its input before reading it" }));
+    child.on("error", () => finish({ ok: false, reason: "could not start" }));
+    // After both pipes closed and the process exited: a ready line, if there
+    // was one, has already settled this.
+    child.on("close", () => finish({ ok: false, reason: "the relay exited before it was ready" }));
+    child.stdin.end(JSON.stringify(payload));
+  });
 }
