@@ -1,5 +1,5 @@
 {
   "name": "acc",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "description": "Coordinate this Antigravity CLI session with other AI agent sessions working in the same workspace."
 }
