@@ -1,5 +1,33 @@
 # Changelog
 
+## 0.6.2 — release candidate
+
+- A client is judged by the evidence that reaches it. A capture applies from the version that
+  recorded it onward, and across platforms, until a capture of its own says otherwise, so
+  updating a client no longer costs its user next-turn delivery.
+- Claude Code 2.1.278, Codex CLI 0.153.4, Gemini CLI 0.60.0 and Kimi 0.42 all read the captures
+  taken on earlier releases instead of losing delivery for being newer. Every capture in this
+  repository was taken on `darwin-arm64`, and Linux and Windows now read them too.
+- A recorded loss still withdraws a capability, and a client older than every capture is still
+  unproven. A refusal names the evidence rather than the client: "client 0.30.0 is older than
+  0.36.1, the first version acc verified for nextTurn".
+- `certificationFloor`, the per-adapter field 0.6.0 added for Antigravity CLI, is removed. The
+  general rule covers it, and an adapter still declaring it fails validation with a message
+  naming the field.
+
+| Candidate artifact | Value |
+|---|---|
+| Built from | `74ce006b165450185a641c8e4010225de8bc02bd` |
+| Tarball | `agents-can-communicate-0.6.2.tgz`, 446,538 bytes, 306 files |
+| sha256 | `3df8baa8095e65cbe437a6b93106cdade919ece8d01d58ad8c658466d82a3dc0` |
+
+The exact archive passed clean installation and an isolated upgrade from published 0.6.1. All
+306 source, archive and installed files matched; both delivery choices survived and the active
+runtime became 0.6.2. All 28 managed-update checks passed. Against published 0.6.1, 275 files
+are identical, 18 differ only by their manifest version and 13 have content changes; none are
+added or removed. See [0.6.2 release evidence](docs/release-evidence/v0.6.2.md) for
+verification and limits. Earlier development records below retain their original provenance.
+
 ## Unreleased — certification evidence applies forward
 
 - A client is judged by the evidence that reaches it. A capture applies from the version
