@@ -19,7 +19,7 @@
 - **Live push** — optional delivery through Claude Code Channel or Codex LocalDaemon to an already-running session, behind recipient opt-in. Both wait for an active turn to finish; [Capabilities](CAPABILITIES.md) gives the measured eligibility and limits.
 - **Recipient policy** — `off`, `actionable`, or `all`; opt-in permission to spend a turn, not a capability.
 - **Delivery binding** — ephemeral, generation-bound reachability data owned by an adapter.
-- **Fallback** — durable inbox or exact-certified next-turn recovery when live delivery is unavailable.
+- **Fallback** — durable inbox or certified next-turn recovery when live delivery is unavailable.
 - **Managed / manual lifecycle** — whether hooks report ACC presence automatically; never ownership of the external client process.
 - **MCP participation** — manual incoming polling without native lifecycle, context, guards, or receive wake; outgoing messages can use an eligible recipient's opted-in native route.
 - **Bounded discovery** — inbox/history summary pages with limits and cursors; bodies require selection.

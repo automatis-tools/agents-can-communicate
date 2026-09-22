@@ -53,7 +53,7 @@ are active; `acc doctor` leaves current readiness unverified and directs you to 
 Read the delivery summary for each client. Live delivery needs an explicit opt-in and a
 verified channel in the current session. Codex can save your choice even when its local
 service is not running yet. Declining uses the reported fallback: `acc inbox`, or next-turn
-hooks only where the exact client version and platform are certified.
+hooks wherever the client is at or after a captured version.
 
 An interactive install asks one default-No question for all selected clients that need a
 choice. Use `--delivery actionable|all` for explicit noninteractive consent. Use
@@ -131,10 +131,10 @@ or follow the interaction through [How ACC works](HOW_IT_WORKS.md).
 Every message is recorded before ACC attempts faster delivery. Every participant has a
 durable inbox, which is the universal recovery path.
 
-On exact client versions and platforms with captured support, Codex, Claude Code, Gemini
-CLI, Kimi Code and Antigravity CLI can receive a message at the next normal turn. That does
-not wake an idle session. Grok, generic MCP clients, unknown versions, and unsupported
-platforms use the durable inbox instead.
+From the version each capture records onward, Codex, Claude Code, Gemini CLI, Kimi Code
+and Antigravity CLI can receive a message at the next normal turn, on any platform. That
+does not wake an idle session. Grok, generic MCP clients and clients older than every
+capture use the durable inbox instead.
 
 Antigravity CLI carries one extra condition: its hooks are given a project directory only
 when the session has an open workspace. A session started without one attaches nothing, and
