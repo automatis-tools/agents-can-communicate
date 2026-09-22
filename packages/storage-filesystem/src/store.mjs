@@ -265,6 +265,23 @@ export async function openFilesystemStore({ root, clock, ids, workspaceId, failA
    * cost grow with the number of messages the workspace had ever carried, and
    * the hook budget is five seconds after which it allows the write.
    */
+  /**
+   * One state record by id, or null - the checks a listing applies to each
+   * record (the path names it, a deleted generation is absent, the record
+   * validates, it belongs to this workspace) without reading every other
+   * record of its kind. Looking one session up by listing them all cost a full
+   * pass over every session the workspace ever had, several times a hook.
+   */
+  async function stateRecord(workspace, kind, id) {
+    const filePath = statePath(paths, kind, id);
+    const found = await readJsonIfPresent(filePath, root);
+    if (found === null) return null;
+    const envelope = assertStateBinding(found.value, kind, id, filePath);
+    if (await stateGenerationIsDeleted(paths, root, kind, envelope.id, envelope.generation)) return null;
+    validateRecord(kind, envelope.record);
+    return envelope.record.workspaceId === workspace ? envelope.record : null;
+  }
+
   async function snapshot(workspace, { kinds } = {}) {
     const wanted = kinds === undefined ? null : new Set(kinds);
     const of = async kind => {
@@ -348,6 +365,6 @@ export async function openFilesystemStore({ root, clock, ids, workspaceId, failA
     },
   });
 
-  return Object.freeze({ transaction, eventsSince, snapshot, ephemeral, paths, root,
+  return Object.freeze({ transaction, eventsSince, snapshot, stateRecord, ephemeral, paths, root,
     workspaceId });
 }

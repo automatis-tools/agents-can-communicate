@@ -160,3 +160,41 @@ test("ephemeral markers are selected by numeric sequence rather than filename or
 
   assert.deepEqual(await store.ephemeral.get("deliveryBinding", "session_a"), binding());
 });
+
+const markerCount = async (root, kind, id) => (await readdir(
+  path.join(root, "retained", "ephemeral", kind, id))).length;
+
+test("renewing a present record adds no marker: history grows only with real changes",
+  async t => {
+    // A live delivery binding is renewed every forty seconds. Each renewal used
+    // to append another "present" marker, and one binding in a real workspace
+    // carried 4,043 of them - all read back on every lookup.
+    const { root, store } = await fixture(t);
+    for (let renewal = 0; renewal < 25; renewal += 1) {
+      await store.ephemeral.put("deliveryBinding", "session_a", binding());
+      await store.ephemeral.update("deliveryBinding", "session_a", current => current);
+    }
+    assert.equal(await markerCount(root, "deliveryBinding", "session_a"), 1);
+
+    await store.ephemeral.delete("deliveryBinding", "session_a");
+    await store.ephemeral.put("deliveryBinding", "session_a", binding());
+    await store.ephemeral.put("deliveryBinding", "session_a", binding());
+    assert.equal(await markerCount(root, "deliveryBinding", "session_a"), 3,
+      "present, deleted, present: one marker per change of state");
+    assert.deepEqual(await store.ephemeral.get("deliveryBinding", "session_a"), binding());
+  });
+
+test("only the newest marker decides, so an older one is never read back", async t => {
+  const { root, store } = await fixture(t);
+  await store.ephemeral.put("deliveryBinding", "session_a", binding());
+  // An older marker the newest one supersedes cannot change the answer, so a
+  // lookup no longer opens it: unreadable bytes there are never reached.
+  const older = path.join(root, "retained", "ephemeral", "deliveryBinding", "session_a",
+    "0000000000000001.json");
+  await writeFile(older, "{ not json");
+  await writeEphemeralMarker(root, "0000000000000002", "deleted");
+
+  assert.equal(await store.ephemeral.get("deliveryBinding", "session_a"), null);
+  await writeEphemeralMarker(root, "0000000000000003", "present");
+  assert.deepEqual(await store.ephemeral.get("deliveryBinding", "session_a"), binding());
+});
