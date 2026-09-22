@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.6.1 — release candidate
+
+- Hooks and CLI commands stay fast in long-lived workspaces. A workspace used for weeks had
+  pushed a single `acc status` to five or six seconds and every hook past its five-second
+  budget, so native clients - Antigravity CLI included - received no ACC context.
+- Read only the newest retention marker of a delivery binding or session, and write one
+  only when its state changes; look a session up by its id instead of listing them all.
+
+| Candidate artifact | Value |
+|---|---|
+| Built from | `913af545c95976737bcd6d0a4fcd433400524ec1` |
+| Tarball | `agents-can-communicate-0.6.1.tgz`, 445,146 bytes, 306 files |
+| sha256 | `b6364e3d28ca50f6aa7af77b49919297018917641eed42e97694d7acd12ad6a5` |
+
+The exact archive passed clean installation and an isolated upgrade from published
+0.6.0. All 306 source, archive and installed files matched; both delivery choices
+survived and the active runtime became 0.6.1. All 28 managed-update checks passed.
+See [0.6.1 release evidence](docs/release-evidence/v0.6.1.md) for verification and
+limits. Earlier development records below retain their original provenance.
+
 ## Unreleased — fast lookups in long-lived workspaces
 
 - Hooks and CLI commands no longer slow down as a workspace ages. In a workspace used for
