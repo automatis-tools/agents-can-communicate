@@ -1,5 +1,25 @@
 # Changelog
 
+## Unreleased — fast lookups in long-lived workspaces
+
+- Hooks and CLI commands no longer slow down as a workspace ages. In a workspace used for
+  weeks, one `acc status` took five to six seconds and every hook ran past its five-second
+  budget, so native clients received no ACC context at all.
+- Read only the newest retention marker of an ephemeral record, and write a marker only
+  when the record's state actually changes; renewing a live delivery binding no longer
+  grows its history.
+- Look a session up by its id instead of listing every session the workspace ever had.
+
+| Candidate artifact | Value |
+|---|---|
+| Built from | `cadd044302e6382a912a5a08c5ea7e49efcc4079` |
+| Tarball | `agents-can-communicate-0.6.0.tgz`, 445,146 bytes, 306 files |
+| sha256 | `34f00f69903eb2520db025b65040c52939e5159df6fd8b522926496de82ddd2e` |
+
+This unpublished development archive passed clean installation verification. See
+[store lookup evidence](docs/release-evidence/unreleased-store-lookup-performance.md) for the
+measurements and limits. Earlier records retain their original provenance.
+
 ## 0.6.0 — release candidate
 
 - Add Antigravity CLI support, captured on 1.2.7 and certified for later stable releases
