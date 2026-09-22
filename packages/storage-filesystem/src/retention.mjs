@@ -58,28 +58,34 @@ function ephemeralDirectory(paths, kind, id) {
   return path.join(paths.retained, "ephemeral", kind, id);
 }
 
+// The newest marker decides a record's state, so only that one is read and
+// checked. Every name is still validated first - an unparsable sequence fails
+// closed before anything is selected - and names are ordered as numbers, since
+// a sequence can outgrow its padding. Reading every marker made each lookup
+// cost an open and a full ancestor check per marker ever written: thousands
+// for a delivery binding renewed every forty seconds, and seconds for one
+// status in a workspace that had been in use for weeks.
 async function latestEphemeralMarker(paths, root, kind, id) {
   const directory = ephemeralDirectory(paths, kind, id);
-  const markers = [];
-  for (const filePath of await listJsonFiles(directory, { root })) {
+  const named = (await listJsonFiles(directory, { root })).map(filePath => {
     const sequence = path.basename(filePath, ".json");
+    if (typeof sequence !== "string" || !/^\d+$/.test(sequence)
+      || BigInt(sequence) < 1n || sequence !== pad(BigInt(sequence))) {
+      data("invalid ephemeral retention marker", { filePath });
+    }
+    return { filePath, sequence, order: BigInt(sequence) };
+  }).sort((left, right) => (left.order < right.order ? 1 : left.order > right.order ? -1 : 0));
+  for (const { filePath, sequence } of named) {
     const found = await readJsonIfPresent(filePath, root);
     if (found === null) continue;
     const marker = found.value;
-    if (typeof sequence !== "string" || !/^\d+$/.test(sequence)
-      || BigInt(sequence) < 1n || sequence !== pad(BigInt(sequence))
-      || !(marker?.state === "present" || marker?.state === "deleted")) {
+    if (!(marker?.state === "present" || marker?.state === "deleted")) {
       data("invalid ephemeral retention marker", { filePath });
     }
-    assertMarker(found, { area: "ephemeral", kind, id, sequence, state: marker.state },
-      filePath);
-    markers.push(marker);
+    assertMarker(found, { area: "ephemeral", kind, id, sequence, state: marker.state }, filePath);
+    return marker;
   }
-  return markers.sort((left, right) => {
-    const leftSequence = BigInt(left.sequence);
-    const rightSequence = BigInt(right.sequence);
-    return leftSequence < rightSequence ? -1 : leftSequence > rightSequence ? 1 : 0;
-  }).at(-1) ?? null;
+  return null;
 }
 
 export async function ephemeralIsDeleted(paths, root, kind, id) {
@@ -91,6 +97,10 @@ export async function markEphemeral(paths, options, kind, id, state) {
     data("invalid ephemeral retention state", { state });
   }
   const previous = await latestEphemeralMarker(paths, options.root, kind, id);
+  // A marker that repeats the current state changes nothing, and every renewal
+  // of a live record used to append one. History now grows only with a real
+  // change: published after a deletion, or deleted.
+  if (previous?.state === state) return previous;
   const sequence = pad(previous === null ? 1n : BigInt(previous.sequence) + 1n);
   const record = { retentionVersion: RETENTION_VERSION, area: "ephemeral", kind, id,
     sequence, state };
