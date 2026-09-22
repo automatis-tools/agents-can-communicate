@@ -573,10 +573,10 @@ and not against `agy plugin list`, which does not list the imported copy at all.
 
 ## Version floors to consider
 
-ACC's own floor is 1.2.7 on darwin-arm64 - the first captured version - declared as the
-adapter's `certificationFloor`. Earlier versions stay uncertified; later ones are judged
-by the 1.2.7 captures. A capture of a later release that records a regression takes
-precedence for that release.
+ACC's own floor is 1.2.7 - the first captured version. Earlier versions stay uncertified;
+later ones are judged by the 1.2.7 captures, on every platform, which is how every
+adapter's evidence reads since 0.7.0. A capture of a later release that records a
+regression takes precedence for that release.
 
 From the vendor changelog, not from capture:
 

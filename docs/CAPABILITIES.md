@@ -3,22 +3,25 @@
 Use this page to set expectations after installation. Integration means ACC can introduce
 peer awareness and coordination instructions; it does not guarantee what a model will do
 with them. Delivery also varies independently from awareness. The durable inbox works for
-every participant, supported exact versions may add next-turn delivery, and the
+every participant, a client at or after a captured version may add next-turn delivery, and the
 experimental Codex LocalDaemon and Claude Code Channel paths can deliver while a session is idle.
 
 Capability honesty separates four questions that are easy to collapse:
 
-1. **Certified support** — did this exact client version and platform pass a shipped
-   real-client fixture?
+1. **Certified support** — does the evidence this client can reach show the capability
+   passing in a shipped real-client fixture?
 2. **Current reachability** — does one current session generation expose a live binding
    whose lease is valid now?
 3. **Recipient policy** — did that recipient opt into spending a turn for this message
    kind?
 4. **Fallback** — what durable path remains when any earlier answer is no?
 
-A source method or vendor documentation is not certification. Uncaptured hook versions and
-unsupported platforms degrade to false, except that an adapter may declare a captured version
-as a floor for later stable releases on the same platform - Antigravity CLI does. Native minimum-based eligibility is separate. No weaker session inherits a stronger peer's capability.
+A source method or vendor documentation is not certification. A capture applies forward: from
+the version that recorded it until a later capture changes that capability, and to every
+platform until one of them records something of its own. A client older than every capture
+degrades to false, and so does a capability a capture recorded as failing. Native
+minimum-based eligibility is separate, and stays per-platform. No weaker session inherits a
+stronger peer's capability.
 
 Run `acc doctor` in the project when observed behavior differs from this page. It reports
 the installed client version, platform, effective capability, and fallback instead of
@@ -26,10 +29,9 @@ assuming that a newer or differently packaged client behaves like a captured one
 
 ## Certified support
 
-Passing evidence currently ships for these exact versions on `darwin-arm64`. Antigravity
-CLI's column also covers every later stable release there: its adapter declares 1.2.7 as a
-certification floor, so a newer version is judged by the 1.2.7 captures until one of its
-own says otherwise.
+Each column names the version that recorded the capture, on `darwin-arm64`. Every later
+version of that client reads it, on every platform, until a capture of its own says
+otherwise. A client older than the version named here is unproven and gets nothing.
 
 | Capability | Antigravity 1.2.7 | Codex 0.147.0 | Claude Code 2.1.233 | Gemini CLI 0.57.0 | Grok 1.0.13 | Kimi 0.36.1 |
 |---|---:|---:|---:|---:|---:|---:|
@@ -46,7 +48,7 @@ own says otherwise.
 Every other capability in the closed shape defaults to false, including session resume,
 child sessions, startup or safe-point injection, and before-read guards.
 
-The native rows remain `no` for the older exact hook versions in this matrix.
+The native rows are `no` at the hook versions this matrix names.
 Separate installed-client captures establish Codex `livePush` on 0.152.1 and
 0.153.4, Claude Code `livePush` plus `replyRoute` on 2.1.258 and 2.1.260, and
 Antigravity CLI `livePush` on 1.2.7 and later through a relay the agent starts in its own shell.
@@ -58,12 +60,12 @@ The limitations belong next to the adapters they affect:
 
 | Adapter | Exact limitation and evidence |
 |---|---|
-| Antigravity CLI | 1.2.7 on darwin-arm64, captured in print mode, and later stable releases by certification floor. Only `SessionStart`, `PreInvocation`, `PostInvocation` and `Stop` load; `SessionEnd`, `PreToolUse` and `PostToolUse` are accepted into the config file and silently dropped, so there is no tool guard and no session-end deregistration - a session goes offline by presence age or an explicit `acc finish`. Payloads carry no `hook_event_name`, so each registered command passes its own event name. The end-of-turn `Stop` continuation reaches the model and is a bounded nudge, not a gate: ACC continues a turn at most once and fails open, and the client caps consecutive continuations itself (vendor 1.1.9). `agy agentapi send-message` can wake an idle session - captured - but only with that session's language-server address and CSRF token, which exist in the agent's own shell and in no hook. ACC does not take that token, so live push and reply routing are false. A peer message that arrives while the model writes its last answer is carried by the `Stop` continuation instead. A write that parses can register nothing, so install and doctor read `agy -p "/hooks"` back instead of trusting the file. Live push (1.2.7, darwin-arm64, TUI only, experimental, recorded opt-in) runs through a relay the agent starts once per conversation from its own shell - the only process holding the session endpoint - after ACC's context asks it to; the operator approves that command at the client's permission prompt. An idle session wakes; a busy one sees the message after its running answer, or at the next model invocation when the turn waits on a tool. Print mode and the first session in a folder trusted at that launch get no relay. |
-| Codex | Exact 0.147.0 next-turn context requires plugin trust. The observed stock 0.153.4 upgrade from ACC 0.3.1 to 0.4 required fresh review of five modified hook definitions; a subsequent restart retained all five active (activation evidence, not new event certification). LocalDaemon native delivery was captured through the installed package on 0.152.1 and 0.153.4, darwin-arm64; minimum 0.152.1, recorded opt-in, current feature probe and exact thread/cwd/process/version/protocol checks are required. Ordinary launch preserves the receiver workspace without ACC arguments or daemon ownership. Embedded or unreachable sessions keep their inbox. Native `replyRoute` remains false. |
+| Antigravity CLI | 1.2.7 on darwin-arm64, captured in print mode, and every later release by the forward rule. Only `SessionStart`, `PreInvocation`, `PostInvocation` and `Stop` load; `SessionEnd`, `PreToolUse` and `PostToolUse` are accepted into the config file and silently dropped, so there is no tool guard and no session-end deregistration - a session goes offline by presence age or an explicit `acc finish`. Payloads carry no `hook_event_name`, so each registered command passes its own event name. The end-of-turn `Stop` continuation reaches the model and is a bounded nudge, not a gate: ACC continues a turn at most once and fails open, and the client caps consecutive continuations itself (vendor 1.1.9). `agy agentapi send-message` can wake an idle session - captured - but only with that session's language-server address and CSRF token, which exist in the agent's own shell and in no hook. ACC does not take that token, so live push and reply routing are false. A peer message that arrives while the model writes its last answer is carried by the `Stop` continuation instead. A write that parses can register nothing, so install and doctor read `agy -p "/hooks"` back instead of trusting the file. Live push (1.2.7, darwin-arm64, TUI only, experimental, recorded opt-in) runs through a relay the agent starts once per conversation from its own shell - the only process holding the session endpoint - after ACC's context asks it to; the operator approves that command at the client's permission prompt. An idle session wakes; a busy one sees the message after its running answer, or at the next model invocation when the turn waits on a tool. Print mode and the first session in a folder trusted at that launch get no relay. |
+| Codex | Next-turn context, captured on 0.147.0, requires plugin trust. The observed stock 0.153.4 upgrade from ACC 0.3.1 to 0.4 required fresh review of five modified hook definitions; a subsequent restart retained all five active (activation evidence, not new event certification). LocalDaemon native delivery was captured through the installed package on 0.152.1 and 0.153.4, darwin-arm64; minimum 0.152.1, recorded opt-in, current feature probe and exact thread/cwd/process/version/protocol checks are required. Ordinary launch preserves the receiver workspace without ACC arguments or daemon ownership. Embedded or unreachable sessions keep their inbox. Native `replyRoute` remains false. |
 | Claude Code | 2.1.233 next-turn delivery waits for the next user prompt. A 2.1.258 Channel capture proved idle offer, busy queue-after-turn, explicit reply, duplicate suppression, and durable fallback, so `delivery.livePush` and `delivery.replyRoute` are live capabilities behind the native contract (experimental, off until opted in; Claude's development-channel warning is vendor-owned and visible). |
-| Gemini CLI | Only 0.57.0 has package-shipped next-turn certification. Its TUI has no captured external wake or queue interface and `--acp` changes launch ownership, so native delivery is fallback-only; live push and reply routing remain false. |
+| Gemini CLI | Package-shipped next-turn certification starts at 0.57.0. Its TUI has no captured external wake or queue interface and `--acp` changes launch ownership, so native delivery is fallback-only; live push and reply routing remain false. |
 | Grok | The Grok 1.0.24 installed-client check observed own CLI arguments after a terminal result, followed by owned work, message, and finish calls. This identity-only path does not certify peer-context injection. Documentation-shaped payloads do not count as real captures. The public leader surface exposed no proven addressed injection into an ordinary TUI session, so native delivery is `awaiting_compatibility_capture`; all capabilities remain false. |
-| Kimi Code | 0.36.1 has next-turn and guard evidence, plus a 60-second heartbeat. Its server/queue APIs do not prove a transparent binding to an independently opened session, so native delivery is fallback-only. |
+| Kimi Code | Next-turn and guard evidence was captured on 0.36.1, plus a 60-second heartbeat. Its server/queue APIs do not prove a transparent binding to an independently opened session, so native delivery is fallback-only. |
 | Generic MCP | As a receiver, tool polling is not next-turn injection, live push, or a native reply route. It has no write guard or client-lifecycle evidence. Outgoing messages may use an eligible recipient's opted-in native adapter. |
 
 `certification.json` beside each adapter is machine-readable. `COMPATIBILITY.md` records the

@@ -48,11 +48,16 @@ leaves receipts `queued`, and a message is never marked delivered on a guess.
 the `CAPABILITY_SHAPE` independently:
 
 1. Take the adapter's evidence rows for this client and capability `C`.
-2. If any of those rows names this `platform`, keep only those rows. Otherwise keep all of them.
-3. Keep the rows whose version is less than or equal to `clientVersion`.
+2. Keep the rows whose version is less than or equal to `clientVersion`.
+3. Among those, if any names this `platform`, keep only those. Otherwise keep all of them.
 4. If no row remains, `C` is off: the client is older than anything this adapter observed.
 5. Otherwise take the highest version among the remaining rows. `C` is on when every row at
    that version has `result: "pass"`, and the adapter itself declares `C`.
+
+Version before platform, decided while writing the tests: a loss recorded for one platform at
+1.3.0 says nothing about that platform at 1.2.3, where another platform's passing capture is
+the only evidence in reach. Filtering by platform first would let a later regression reach
+backwards and darken versions it never described.
 
 A `fail` at the deciding version wins over a `pass` at the same version, which can only happen
 when two platforms disagree and neither is the platform in hand. Withholding a body costs a trip
@@ -83,6 +88,9 @@ nextTurn". Two honest reasons replace it:
   is to wait for a capture that restores it.
 
 `packages/installer/src/detect.mjs` and the `acc doctor` lines follow the same two shapes.
+Both read the verdict from `capabilityEvidence(adapter, facts, capability)`, a new SDK export
+returning `{ granted, reason, version }` with `reason` one of `undeclared`, `unobserved`,
+`older-than-evidence` or `recorded-failure`.
 
 ### An unreadable client version
 
