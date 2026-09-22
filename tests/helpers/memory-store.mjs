@@ -92,6 +92,14 @@ export function createMemoryStore({ clock, ids, workspaceId }) {
     return { cursor: page.at(-1)?.sequence ?? after, events: page };
   }
 
+  // One record by id, with the checks a snapshot applies to it: absent,
+  // removed, or another workspace's all answer null.
+  async function stateRecord(workspaceId, kind, id) {
+    const entry = committed.get(key(kind, id));
+    if (entry === undefined || entry.record.workspaceId !== workspaceId) return null;
+    return validateRecord(kind, entry.record);
+  }
+
   // `kinds` narrows the read, exactly as the filesystem store does. A double
   // that ignores an option the real store honours lets a caller pass its tests
   // and behave differently in the only place that matters.
@@ -162,7 +170,7 @@ export function createMemoryStore({ clock, ids, workspaceId }) {
     },
   });
 
-  return Object.freeze({ transaction, eventsSince, snapshot, ephemeral, clock, ids,
+  return Object.freeze({ transaction, eventsSince, snapshot, stateRecord, ephemeral, clock, ids,
     workspaceId });
 }
 

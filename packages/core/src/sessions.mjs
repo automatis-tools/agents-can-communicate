@@ -58,8 +58,7 @@ export function createSessionService(ports) {
     const ephemeral = await store.ephemeral.get("session", sessionId);
     const resolved = workspaceId ?? store.workspaceId ?? ephemeral?.workspaceId;
     if (resolved === undefined) return null;
-    const durable = (await store.snapshot(resolved, { kinds: ["session"] })).sessions
-      .find(session => session.sessionId === sessionId) ?? null;
+    const durable = await store.stateRecord(resolved, "session", sessionId);
     if (durable !== null) return { record: durable, durable: true };
     return ephemeral !== null && ephemeral.workspaceId === resolved
       ? { record: ephemeral, durable: false } : null;
