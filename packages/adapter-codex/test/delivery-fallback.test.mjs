@@ -31,22 +31,23 @@ test("legacy next-turn and captured LocalDaemon delivery keep distinct evidence 
   const capabilities = clientVersion => effectiveCapabilities(adapter,
     { clientVersion, platform: "darwin-arm64" }).delivery;
 
+  assert.equal(capabilities("0.146.0").livePush, false,
+    "a client older than every capture stays unproven");
   assert.equal(capabilities("0.147.0").nextTurn, true);
-  assert.equal(capabilities("0.147.0").livePush, false);
+  assert.equal(capabilities("0.147.0").livePush, false,
+    "the hook capture says nothing about a daemon nobody had yet");
   assert.equal(capabilities("0.147.0").replyRoute, false);
-  for (const version of ["0.152.0", "unknown"]) {
-    assert.equal(capabilities(version).nextTurn, false,
-      `${version} was promoted to nextTurn without exact passing evidence`);
-    assert.equal(capabilities(version).livePush, false);
-    assert.equal(capabilities(version).replyRoute, false);
-  }
-  for (const version of ["0.152.1", "0.153.4"]) {
-    assert.equal(capabilities(version).nextTurn, false,
-      `${version} inherited a next-turn claim from the 0.147.0 hook capture`);
+  assert.equal(capabilities("0.152.0").nextTurn, true,
+    "0.152.0 kept the hook that 0.147.0 proved");
+  assert.equal(capabilities("0.152.0").livePush, false,
+    "its own capture recorded the daemon failing");
+  for (const version of ["0.152.1", "0.153.4", "0.160.0", "unknown"]) {
+    assert.equal(capabilities(version).nextTurn, true,
+      `${version} lost the next-turn hook that no capture withdrew`);
     assert.equal(capabilities(version).livePush, true,
       `${version} lost its captured LocalDaemon capability`);
     assert.equal(capabilities(version).replyRoute, false,
-      `${version} gained an unobserved native reply route`);
+      `${version} gained a reply route the 0.152.0 capture recorded as failing`);
   }
 });
 
@@ -63,11 +64,14 @@ test("native activation reuses only an already-running LocalDaemon", () => {
   }] });
 });
 
-test("uncaptured platforms retain durable fallback", () => {
+test("an uncaptured platform reads what was captured, and no more", () => {
   const delivery = effectiveCapabilities(createCodexAdapter(),
     { clientVersion: "0.152.1", platform: "linux-arm64" }).delivery;
 
-  assert.equal(delivery.nextTurn, false);
-  assert.equal(delivery.livePush, false);
-  assert.equal(delivery.replyRoute, false);
+  // Every capture in this repository was taken on darwin-arm64. Gating on the
+  // platform left Linux and Windows with no delivery into context at all,
+  // which is a machine nobody measured rather than a client that failed.
+  assert.equal(delivery.nextTurn, true);
+  assert.equal(delivery.livePush, true);
+  assert.equal(delivery.replyRoute, false, "an unobserved capability stays unobserved");
 });
