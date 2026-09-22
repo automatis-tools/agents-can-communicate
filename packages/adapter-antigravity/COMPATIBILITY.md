@@ -586,7 +586,7 @@ rather than assume.
 
 Antigravity CLI is the vendor's actively maintained line, so new capture work goes here: it is
 the only client in this repository with live push through a relay. The Gemini CLI adapter keeps
-every capability its own captures prove and is not deprecated by this one. Since 0.7.0 that
+every capability its own captures prove and is not deprecated by this one. Since 0.6.2 that
 costs nothing to maintain - evidence applies forward, so Gemini CLI 0.60.0 reads the 0.57.0
 capture instead of waiting for a capture of its own.
 
@@ -598,7 +598,7 @@ the files of a complete ACC integration can be present while no Antigravity hook
 
 ACC's own floor is 1.2.7 - the first captured version. Earlier versions stay uncertified;
 later ones are judged by the 1.2.7 captures, on every platform, which is how every
-adapter's evidence reads since 0.7.0. A capture of a later release that records a
+adapter's evidence reads since 0.6.2. A capture of a later release that records a
 regression takes precedence for that release.
 
 From the vendor changelog, not from capture:

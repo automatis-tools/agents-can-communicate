@@ -12,7 +12,7 @@ import { PROTOCOL_CONTRACT } from "./relay-endpoint.mjs";
 // The version this client has been captured on. Nothing earlier was measured,
 // and later releases - this client ships every few days - are judged by this
 // capture until one of their own says otherwise, which is how certification
-// evidence reads everywhere since 0.7.0.
+// evidence reads everywhere since 0.6.2.
 export const ANTIGRAVITY_CLI_VERSION = "1.2.7";
 
 /**
