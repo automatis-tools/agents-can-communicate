@@ -1,7 +1,8 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 
-import { effectiveCapabilities, evaluateNativeEligibility, validateNativeActivationPlan }
+import { capabilityEvidence, effectiveCapabilities, evaluateNativeEligibility,
+  validateNativeActivationPlan }
   from "@agents-can-communicate/adapter-sdk";
 
 import { resolveExecutable, shellOf, shimDirFor } from "./native-activation.mjs";
@@ -186,9 +187,20 @@ export async function detectInstallation({ adapters, context, probe = spawnProbe
         } else if (typeof adapter.deliveryFallback?.diagnostic === "string") {
           const downgraded = adapter.capabilities?.delivery?.nextTurn === true
             && entry.capabilities?.delivery?.nextTurn !== true;
-          entry.deliveryDiagnostic = (downgraded
-            ? `${adapter.displayName} ${entry.version ?? "unknown version"} has no certified `
-              + `next-turn delivery on ${platform}; ` : "") + adapter.deliveryFallback.diagnostic;
+          // Name the evidence, not the version in hand: "has no certified
+          // next-turn delivery" told people their own client was the problem,
+          // and left them nothing to act on.
+          const evidence = capabilityEvidence(adapter,
+            { clientVersion: entry.version, platform }, "delivery.nextTurn");
+          const named = entry.version ?? "unknown version";
+          const why = evidence.reason === "older-than-evidence"
+            ? `${adapter.displayName} ${named} is older than ${evidence.version}, the first `
+              + "version acc verified for next-turn delivery; "
+            : evidence.reason === "recorded-failure"
+              ? `acc recorded that ${adapter.displayName} next-turn delivery stopped working `
+                + `in ${evidence.version}; `
+              : `${adapter.displayName} next-turn delivery has not been captured; `;
+          entry.deliveryDiagnostic = (downgraded ? why : "") + adapter.deliveryFallback.diagnostic;
         }
         if (entry.deliveryDiagnostic !== null) entry.diagnostics.push(entry.deliveryDiagnostic);
       }

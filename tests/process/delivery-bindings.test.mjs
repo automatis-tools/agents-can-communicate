@@ -92,7 +92,9 @@ test("requested Codex consent stays off without an isolated LocalDaemon session"
   assert.equal(operation.effectiveLivePolicy, "off");
   assert.equal(operation.clientVersion, "0.153.4");
   assert.match(operation.deliverySummary, /consent saved.*not active/);
-  assert.match(operation.deliveryDiagnostic, /fallback: acc inbox/);
+  // 0.153.4 reads the 0.147.0 hook capture, so the fallback names next-turn
+  // delivery beside the inbox rather than the inbox alone.
+  assert.match(operation.deliveryDiagnostic, /fallback: next-turn hooks.*acc inbox/);
   await assertOnlyVersionProbes(place);
   await assert.rejects(stat(path.join(place.codexHome, "app-server-control")), { code: "ENOENT" },
     "the dry run created a LocalDaemon control directory");

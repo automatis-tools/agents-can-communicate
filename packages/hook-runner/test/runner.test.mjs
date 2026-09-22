@@ -740,7 +740,7 @@ test("an adapter without delivery metadata withholds bodies and reports degradat
   assert.equal(receipt.state, "queued");
 });
 
-test("an uncertified platform drops an optional count before an exact inbox recovery path",
+test("an uncertified client drops an optional count before an exact inbox recovery path",
   async t => {
     const place = await workspace(t);
     await writeFile(path.join(place.root, "acc.workspace.json"), `${JSON.stringify({
@@ -755,11 +755,12 @@ test("an uncertified platform drops an optional count before an exact inbox reco
       renderContext: (sync, options) => projectContext(sync, options),
       renderContextResult: (sync, options) => projectContextResult(sync, options) };
     const adapters = { kimi: truthful };
-    const unsupportedPlatform = platform === "linux-x64" ? "darwin-arm64" : "linux-x64";
+    // Older than every capture this adapter carries, which is the one client
+    // that still withholds bodies now that evidence applies forward.
     const invoke = payload => runHook({ adapterId: "kimi", adapters,
       payload: { ...payload, cwd: payload.cwd ?? place.root }, dataHome: place.dataHome,
-      readProcessTable: noProcessTable, probeClientVersion: testProbe,
-      platform: unsupportedPlatform });
+      readProcessTable: noProcessTable, probeClientVersion: async () => "0.30.0",
+      platform });
     const recipient = await invoke(event("sessionStart"));
     const peer = await invoke(event("sessionStart", { sessionId: "uncertified-peer" }));
     const recipientId = recipient.sessions
@@ -782,7 +783,8 @@ test("an uncertified platform drops an optional count before an exact inbox reco
     assert.match(turn.stdout, new RegExp(`acc inbox --message ${message.messageId}`));
     assert.equal(Buffer.byteLength(turn.stdout, "utf8") <= 84, true);
     assert.doesNotMatch(turn.stdout, /more in/);
-    assert.match(turn.stderr, /not certified for nextTurn/);
+    assert.match(turn.stderr, /0\.30\.0 is older than 0\.36\.1/,
+      "a refusal names the evidence that refused it, not the version that asked");
     assert.equal(receipt.state, "queued");
   });
 

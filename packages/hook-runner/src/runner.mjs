@@ -4,7 +4,8 @@ import { readFile, realpath } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { clearNativeAttempt, clearSessionBinding, effectiveCapabilities, loadSessionBinding, storeSessionBinding }
+import { capabilityEvidence, clearNativeAttempt, clearSessionBinding, effectiveCapabilities,
+  loadSessionBinding, storeSessionBinding }
   from "@agents-can-communicate/adapter-sdk";
 import { createCoordinationService } from "@agents-can-communicate/core";
 import { AccError, createId } from "@agents-can-communicate/protocol";
@@ -301,12 +302,17 @@ async function projectTurn({ binding, context, adapter, adapterId,
     ? { text: await adapter.renderContext?.(projectionInput, projectionOptions) ?? "",
       offeredMessageIds: [], includedAttentionIds: [] }
     : await adapter.renderContextResult(projectionInput, projectionOptions);
-  const clientFactsKnown = typeof binding.clientVersion === "string"
-    && typeof binding.platform === "string";
+  // Name the evidence that refused, never the version that asked. "not
+  // certified" told the person their own client was at fault for existing;
+  // these two say what acc knows and what would change it.
+  const evidence = capabilityEvidence(adapter, binding, "delivery.nextTurn");
+  const refusal = {
+    "older-than-evidence": () => `client ${binding.clientVersion} is older than `
+      + `${evidence.version}, the first version acc verified for nextTurn`,
+    "recorded-failure": () => `acc recorded that nextTurn stopped working in ${evidence.version}`,
+  }[evidence.reason] ?? (() => "this client has no nextTurn evidence");
   const reason = !effective.delivery.nextTurn
-    ? clientFactsKnown
-      ? `client ${binding.clientVersion} on ${binding.platform} is not certified for nextTurn`
-      : "the client version or platform is unknown"
+    ? refusal()
     : !hasStructuredRenderer ? "this adapter lacks structured delivery metadata" : null;
   const degradation = reason !== null && messages.length > 0
     ? `acc: ${messages.length} pending message(s) withheld because ${reason}; read `
