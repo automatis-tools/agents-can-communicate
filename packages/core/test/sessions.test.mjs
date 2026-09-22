@@ -22,6 +22,25 @@ function makeService(overrides = {}) {
 const opening = (overrides = {}) => ({ workspaceId: WORKSPACE, participantId: "participant_a",
   displayName: "visual", harness: "codex", heartbeatCadenceMs: CADENCE, ...overrides });
 
+test("locating a session reads that session, not every session the workspace has", async () => {
+  const { clock, service, store } = makeService();
+  await service.openSession(opening());
+  const second = await service.openSession(opening({ participantId: "participant_b",
+    displayName: "models", harness: "claude-code" }));
+  const listings = [];
+  const counting = { ...store, snapshot: (workspaceId, options) => {
+    if (options?.kinds?.includes("session")) listings.push(options.kinds);
+    return store.snapshot(workspaceId, options);
+  } };
+
+  const located = await createCoordinationService({ store: counting, clock, ids: createFakeIds() })
+    .locateSession(second.sessionId);
+
+  assert.equal(located.record.sessionId, second.sessionId);
+  assert.equal(located.durable, true);
+  assert.deepEqual(listings, [], "a lookup by id listed every session");
+});
+
 test("a lone session leaves only ephemeral state behind", async () => {
   const { service, store } = makeService();
 

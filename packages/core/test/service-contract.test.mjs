@@ -27,6 +27,33 @@ const sessionRecord = (overrides = {}) => ({ schemaVersion: SCHEMA_VERSION,
 // Exported so every CoordinationStore implementation is held to the same
 // contract. A contract only one implementation satisfies proves nothing.
 export function runStoreContract(name, makeStore) {
+  test(`${name}: one state record is read by id, with every check a listing applies`, async () => {
+    // A session lookup used to list every session to find one, which a hook
+    // did many times over: in a long-lived workspace that alone outran the
+    // five-second hook budget.
+    const store = await makeStore();
+    const other = sessionRecord({ sessionId: "session_b", participantId: "participant_b" });
+    await store.transaction(async tx => {
+      tx.put("workspace", WORKSPACE, workspaceRecord());
+      tx.put("session", "session_a", sessionRecord());
+      tx.put("session", "session_b", other);
+      tx.append(eventRecord("workspace.materialised"));
+    });
+
+    assert.deepEqual(await store.stateRecord(WORKSPACE, "session", "session_b"), other);
+    assert.equal(await store.stateRecord(WORKSPACE, "session", "session_missing"), null);
+    assert.equal(await store.stateRecord("workspace_other", "session", "session_a"), null,
+      "a record of another workspace is not this workspace's");
+
+    await store.transaction(async tx => {
+      tx.remove("session", "session_a", tx.generationOf("session", "session_a"));
+      tx.append(eventRecord("session.closed"));
+    });
+    assert.equal(await store.stateRecord(WORKSPACE, "session", "session_a"), null,
+      "a removed record is absent, as it is from a listing");
+    assert.deepEqual((await store.snapshot(WORKSPACE, { kinds: ["session"] })).sessions, [other]);
+  });
+
   test(`${name}: a committed transaction publishes both record and event`, async () => {
     const store = await makeStore();
 
