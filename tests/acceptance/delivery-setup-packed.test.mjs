@@ -202,7 +202,7 @@ test("installed delivery setup preserves opt-in before a Codex service exists an
   await assert.rejects(readFile(path.join(p.env.CODEX_HOME,
     "app-server-control", "app-server-control.sock")), { code: "ENOENT" });
   assert.match(result.text, /Codex CLI.*live delivery/);
-  assert.match(result.text, /fallback: acc inbox/);
+  assert.match(result.text, /fallback: next-turn hooks.*acc inbox/);
   const doctor = await p.acc(["doctor"]);
   const native = doctor.adapters.find(a => a.adapterId === "codex").nativeDelivery;
   assert.equal(native.policy, expectedPolicy);
@@ -215,7 +215,7 @@ test("installed delivery setup preserves opt-in before a Codex service exists an
   await p.acc(["install", "--adapter", "codex", "--delivery", "off"]);
   const off = await human(p, ["install", "--adapter", "codex"]);
   assert.match(off.stdout, /Codex CLI.*live delivery: off/);
-  assert.match(off.stdout, /fallback: acc inbox/);
+  assert.match(off.stdout, /fallback: next-turn hooks.*acc inbox/);
   const after = await p.acc(["doctor"]);
   const offAdapter = after.adapters.find(a => a.adapterId === "codex");
   assert.equal(offAdapter.nativeDelivery.policy, "off");

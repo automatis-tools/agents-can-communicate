@@ -87,12 +87,12 @@ if registration fails. This does not create a session or revive a closed one.
 
 ## Certified capability versus current reachability
 
-Ordinary hook capabilities say an exact client version on an exact platform passed a
-captured behavior. Native live delivery uses a separate contract: installation checks the
+Ordinary hook capabilities say a captured behaviour passed, and apply forward from the
+version that recorded it until a later capture changes it. Native live delivery uses a separate contract: installation checks the
 captured minimum, platform, and current feature probe, then each session publishes a binding
 only after a generation-bound handshake. The router trusts that admission and verifies the
 binding, recipient policy, declared adapter capability, and adapter response; it does not add
-a third exact-version certification check. A binding says what that current generation
+a third certification check. A binding says what that current generation
 exposes and whether its lease is current, while recipient policy says whether it may spend a
 turn.
 

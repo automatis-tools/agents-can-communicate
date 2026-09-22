@@ -111,7 +111,7 @@ test("a platform with no capture is told so, and no channel is wired", async t =
     "saved consent was not distinguished from an active channel");
   assert.match(installed.stdout, /native delivery is not verified on this platform/i,
     "the unavailable native channel was not explained");
-  assert.match(installed.stdout, /fallback: acc inbox/i,
+  assert.match(installed.stdout, /fallback: next-turn hooks.*acc inbox/i,
     "the uncaptured platform did not name its durable fallback");
   const ownership = JSON.parse(await readFile(path.join(place.dataHome, "acc", "installs.json")));
   const record = ownership.installs.find(entry => entry.adapterId === "claude_code");

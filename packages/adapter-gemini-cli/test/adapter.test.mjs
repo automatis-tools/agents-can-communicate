@@ -145,21 +145,21 @@ test("only capabilities observed firing are declared true", () => {
   assert.equal(capabilities.delivery.replyRoute, false);
 });
 
-// The tier moved to 0.57.0, and 0.37.0 losing its claim is the cost of that,
-// stated rather than hidden: this matrix admits one exact version, so certifying
-// the version people run necessarily un-certifies the one they no longer have.
-// A capture that is no longer the certified tier stays in provenance as history.
-test("next-turn delivery exists only at the exact certified client tier", () => {
+// The capture moved to 0.57.0. Since 0.7.0 that is a starting point rather than
+// a tier: 0.59.0, the release people actually run, reads the 0.57.0 capture,
+// and 0.37.0 stays uncertified because it is older than anything measured.
+// Superseded captures stay in provenance as history.
+test("next-turn delivery starts at the captured version and continues after it", () => {
   const adapter = createGeminiCliAdapter();
+  const nextTurn = clientVersion => effectiveCapabilities(adapter,
+    { clientVersion, platform: "darwin-arm64" }).delivery.nextTurn;
 
-  assert.equal(effectiveCapabilities(adapter,
-    { clientVersion: "0.57.0", platform: "darwin-arm64" }).delivery.nextTurn, true);
-  assert.equal(effectiveCapabilities(adapter,
-    { clientVersion: "0.37.0", platform: "darwin-arm64" }).delivery.nextTurn, false);
-  assert.equal(effectiveCapabilities(adapter,
-    { clientVersion: "0.55.1", platform: "darwin-arm64" }).delivery.nextTurn, false);
-  assert.equal(effectiveCapabilities(adapter,
-    { clientVersion: undefined, platform: "darwin-arm64" }).delivery.nextTurn, false);
+  for (const clientVersion of ["0.57.0", "0.59.0", "1.0.0", undefined]) {
+    assert.equal(nextTurn(clientVersion), true, `${clientVersion} reads the 0.57.0 capture`);
+  }
+  for (const clientVersion of ["0.37.0", "0.55.1"]) {
+    assert.equal(nextTurn(clientVersion), false, `${clientVersion} predates every capture`);
+  }
   assert.match(adapter.deliveryFallback.diagnostic, /0\.57\.0/);
   assert.match(adapter.deliveryFallback.diagnostic, /acc inbox/);
 });

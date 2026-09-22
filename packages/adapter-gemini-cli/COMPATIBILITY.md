@@ -105,14 +105,13 @@ guess by command string.
 
 ## Delivery tier
 
-ACC's machine-readable `delivery.nextTurn` capability is certified only for the exact
-`0.57.0` / `darwin-arm64` tier recorded in `certification.json`. This matrix admits one
-exact version, so moving the tier to the version the client now ships as necessarily takes
-the claim away from `0.37.0`: both captures are real, only one can be the certified tier,
-and the earlier one stays in `fixtures/certification-provenance.json` as history. The
-0.55.1 observations re-certify hook and response contracts only; they were never a
-next-turn tier. Any other or unparseable version downgrades explicitly while durable
-`acc inbox` access remains available. Gemini CLI has no certified live-push binding.
+ACC's machine-readable `delivery.nextTurn` capability was captured on `0.57.0` /
+`darwin-arm64`, recorded in `certification.json`. Since 0.7.0 that capture applies forward:
+0.57.0 and everything after it reads it, on every platform, until a capture of its own says
+otherwise. The superseded 0.37.0 capture stays in `fixtures/certification-provenance.json`
+as history, and a client older than 0.57.0 is unproven. The 0.55.1 observations re-certify
+hook and response contracts only. A downgrade is explicit and durable `acc inbox` access
+remains available. Gemini CLI has no certified live-push binding.
 
 
 ## Re-certified on 0.55.1 (2026-08-16)
@@ -145,9 +144,9 @@ with a plain `gemini -p` outside ACC entirely, so it is neither ACC's doing nor 
 client's. ACC's own hooks were observed firing against the real API on 0.55.1 regardless:
 a real session attached and closed through ACC's runtime before the model call failed.
 
-## Re-certified on 0.57.0 (2026-09-03), and this is now the certified tier
+## Re-certified on 0.57.0 (2026-09-03), and this is where the evidence now starts
 
-The installed client had moved to 0.57.0 while the certified tier still named 0.37.0 - so
+The installed client had moved to 0.57.0 while the evidence still named 0.37.0 - so
 the mechanism worked on this machine and ACC refused to claim it, which is the safe
 direction to be wrong in but still wrong. Everything was measured again on 0.57.0 rather
 than carried over, and the whole set came from **one** session

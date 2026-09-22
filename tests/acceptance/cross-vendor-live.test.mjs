@@ -29,11 +29,14 @@ async function exchange(packed, { from, to, subject, body, answer, key }) {
   assert.equal((await packed.receipt(from.session.sessionId, question.messageId,
     to.participantId)).state, "queued");
 
+  // No live channel carried this, so the send left it queued. The next turn is
+  // where the durable path delivers it: both capture versions read a next-turn
+  // capture of their own, which is what a person on these clients actually has.
   const projected = await packed.beforeTurn(to);
-  assert.equal(projected.stdout.includes(body), false,
-    "an uncertified native version was promoted to next-turn delivery");
+  assert.equal(projected.stdout.includes(body), true,
+    "the captured next-turn path did not deliver the body");
   assert.equal((await packed.receipt(from.session.sessionId, question.messageId,
-    to.participantId)).state, "queued");
+    to.participantId)).state, "offered");
 
   const inbox = await toAcc(["inbox", "--session", to.session.sessionId,
     "--message", question.messageId]);
@@ -53,7 +56,8 @@ async function exchange(packed, { from, to, subject, body, answer, key }) {
     to.participantId)).state, "acknowledged");
 
   const answerProjection = await packed.beforeTurn(from);
-  assert.equal(answerProjection.stdout.includes(answer), false);
+  assert.equal(answerProjection.stdout.includes(answer), true,
+    "the answer did not reach the asker's next turn");
   const answerInbox = await fromAcc(["inbox", "--session", from.session.sessionId,
     "--message", response.messageId]);
   assert.equal(answerInbox[0].message.messageId, response.messageId);
@@ -159,8 +163,10 @@ test("packed release completes scripted cross-vendor fallback with explicit owne
   assert.equal(downgraded.delivery[0].errorCode, "delivery_disabled");
   assert.equal((await packed.receipt(restartedClaude.session.sessionId,
     downgraded.message.messageId, restartedCodex.participantId)).state, "queued");
+  // The native offer stayed refused above; the durable next-turn path is a
+  // different question and still carries the body to the recipient.
   assert.equal((await packed.beforeTurn(restartedCodex)).stdout
-    .includes("Can you still recover this?"), false);
+    .includes("Can you still recover this?"), true);
   const recovered = await packed.acc(["inbox", "--session",
     restartedCodex.session.sessionId, "--message", downgraded.message.messageId],
   await ownerEnv(packed, restartedCodex));

@@ -1,5 +1,33 @@
 # Changelog
 
+## Unreleased — certification evidence applies forward
+
+- A client is judged by the evidence that reaches it. A capture applies from the version
+  that recorded it onward, and across platforms, until a capture of its own says
+  otherwise - so updating a client no longer costs its user next-turn delivery.
+- Two defects went with the old exact-match gate. Claude Code 2.1.260 had already lost
+  `delivery.nextTurn`, because that capability was captured once at 2.1.233 while later
+  captures covered other capabilities; and every capture in this repository was taken on
+  `darwin-arm64`, so Linux and Windows received no message in any context at all.
+- A recorded loss still withdraws a capability, and a client older than every capture is
+  still unproven. `certificationFloor`, which said this for one adapter, is removed.
+- A refusal names the evidence rather than the client: "client 0.30.0 is older than
+  0.36.1, the first version acc verified for nextTurn", or "acc recorded that nextTurn
+  stopped working in 0.42.0". `acc doctor` reads the same way.
+- A version that cannot be read is judged by the newest evidence, because a running hook
+  already proves the integration is installed.
+
+| Candidate artifact | Value |
+|---|---|
+| Built from | `b3f91a8f0f293d26ce5e58998c7a07ed66747200` |
+| Tarball | `agents-can-communicate-0.6.1.tgz`, 446,538 bytes, 306 files |
+| sha256 | `47e93fd4c2c7c5a716c7c47e0f8bb778a1af92e1a971d024144488036ae6f965` |
+
+This unpublished development archive passed clean installation verification. See
+[certification evidence](docs/release-evidence/unreleased-certification-applies-forward.md)
+for what changed for each installed client. The package version remains `0.6.1` until a
+release prepares its own.
+
 ## 0.6.1 — release candidate
 
 - Hooks and CLI commands stay fast in long-lived workspaces. A workspace used for weeks had

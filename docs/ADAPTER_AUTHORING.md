@@ -118,22 +118,25 @@ example is not a capture. Failed experiments stay in the manifest as `fail`; the
 the false value and can never enable it.
 
 `effectiveCapabilities(adapter, { clientVersion, platform })` returns the full boolean
-shape for the installed client. Only an exact passing version/platform match remains true.
-Unreadable, unknown, or mismatched clients degrade every uncertified row to false.
+shape for the installed client, resolving each capability independently from the evidence
+that client can reach:
 
-An adapter for a client that ships often may declare a floor per platform:
+1. Take the rows for that capability, and keep those whose version is at or below the
+   client's. A prerelease is ordered by its release triple, so `1.3.0-rc.1` is judged as
+   `1.3.0`, and a version that cannot be read reaches every row.
+2. Among those, prefer the rows that name this platform; with none, use them all. A loss
+   recorded for one platform at 1.3.0 says nothing about that platform at 1.2.3, where
+   another platform's passing capture is the only evidence in reach.
+3. The highest version left decides. The capability is on when every row at that version
+   passes, so a recorded loss wins a tie between platforms.
 
-```js
-certificationFloor: { "darwin-arm64": "1.2.7" },
-```
+A client older than every row gets nothing, and so does a capability whose deciding row
+records a failure. `capabilityEvidence(adapter, facts, capability)` returns that verdict
+with its reason - `undeclared`, `unobserved`, `older-than-evidence` or `recorded-failure` -
+and the version that decided, so a refusal can name the evidence rather than the client.
 
-A stable version at or above the floor, on that platform, is then judged by the floor
-version's evidence for any capability it has no capture of its own for. A later capture
-wins for its own version, capability by capability - a recorded failure turns that
-capability off for that version and leaves the rest on the floor. Earlier versions,
-prereleases and other platforms stay uncertified, and `defineAdapter` refuses a floor
-that names a version with no passing evidence on its platform. Antigravity CLI declares
-one; every other adapter certifies exact versions only.
+Recording a regression is an ordinary capture with `result: "fail"` at the version where
+the loss was observed; it applies forward until a later row passes again.
 
 The backing methods for delivery are `renderContextResult()` for `nextTurn`,
 `offerMessage()` for `livePush`, and `routeReply()` for `replyRoute`.
