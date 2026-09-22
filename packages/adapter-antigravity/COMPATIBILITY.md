@@ -571,6 +571,29 @@ report that ACC "is already present" on an Antigravity install has to be checked
 `agy -p "/hooks"`, `agy -p "/skills"` and `agy mcp list`, not against the presence of files -
 and not against `agy plugin list`, which does not list the imported copy at all.
 
+## Relationship to the Gemini CLI adapter
+
+Both adapters ship, both are supported, and a machine that has both clients installed runs two
+independent ACC integrations. That is the state this was captured in: the maintainer's machine
+carries `gemini` 0.60.0 and `agy` 1.2.8 side by side.
+
+They share the `~/.gemini` tree and no code path. Antigravity's hooks live in
+`~/.gemini/config/hooks.json` under a namespace of their own, Gemini CLI's registration lives in
+`~/.gemini/settings.json` and `~/.gemini/extensions/agents-can-communicate`, and the Gemini hook
+shape is silently ignored by `agy`. Installing or uninstalling either adapter therefore has to
+leave the other's files byte-identical, which this package's install and uninstall tests assert
+rather than assume.
+
+Antigravity CLI is the vendor's actively maintained line, so new capture work goes here: it is
+the only client in this repository with live push through a relay. The Gemini CLI adapter keeps
+every capability its own captures prove and is not deprecated by this one. Since 0.7.0 that
+costs nothing to maintain - evidence applies forward, so Gemini CLI 0.60.0 reads the 0.57.0
+capture instead of waiting for a capture of its own.
+
+One direction of leakage is worth knowing about, and it is recorded under **Plugin import**
+above: `agy` copies ACC's Gemini CLI extension into its own tree on first authenticated run, so
+the files of a complete ACC integration can be present while no Antigravity hook is registered.
+
 ## Version floors to consider
 
 ACC's own floor is 1.2.7 - the first captured version. Earlier versions stay uncertified;
