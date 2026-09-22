@@ -2,6 +2,8 @@ import path from "node:path";
 
 import { AccError, EXIT } from "@agents-can-communicate/protocol";
 
+import { compareStableVersions, parseStableVersion } from "./native-vocabulary.mjs";
+
 export const CAPABILITY_SHAPE = Object.freeze({
   lifecycle: Object.freeze(["sessionStart", "sessionResume", "sessionEnd", "heartbeat",
     "childSessions"]),
@@ -132,6 +134,16 @@ function falseCapabilities() {
     Object.fromEntries(names.map(name => [name, false]))]));
 }
 
+/**
+ * What a client is certified for, judged against the exact version and
+ * platform it reports.
+ *
+ * A version's own captures decide, capability by capability, including a
+ * capture that failed. An adapter may also declare a certification floor per
+ * platform: a stable version at or above it, with no capture of its own for a
+ * capability, is judged by the floor version's evidence for that capability.
+ * Versions below the floor, prereleases and other platforms stay uncertified.
+ */
 export function effectiveCapabilities(adapter, { clientVersion, platform } = {}) {
   const resolved = falseCapabilities();
   if (typeof clientVersion !== "string" || !VERSION.test(clientVersion)
@@ -139,14 +151,22 @@ export function effectiveCapabilities(adapter, { clientVersion, platform } = {})
     || typeof platform !== "string" || !PLATFORM.test(platform)
     || platform.toLowerCase() === "unknown") return freezeCapabilities(resolved);
   const client = adapter.client?.certificationName ?? adapter.client?.command;
-  const passing = new Set((adapter.certification?.evidence ?? [])
-    .filter(item => item.result === "pass" && item.client === client
-      && item.version === clientVersion && item.platform === platform)
-    .map(item => item.capability));
+  const rows = (adapter.certification?.evidence ?? [])
+    .filter(item => item.client === client && item.platform === platform);
+  const floor = adapter.certificationFloor?.[platform];
+  const floored = typeof floor === "string" && parseStableVersion(floor) !== null
+    && parseStableVersion(clientVersion) !== null
+    && compareStableVersions(clientVersion, floor) >= 0;
+  const certified = capability => {
+    const own = rows.filter(item => item.version === clientVersion && item.capability === capability);
+    const judged = own.length > 0 || !floored ? own
+      : rows.filter(item => item.version === floor && item.capability === capability);
+    return judged.some(item => item.result === "pass");
+  };
   for (const [group, names] of Object.entries(CAPABILITY_SHAPE)) {
     for (const name of names) {
       resolved[group][name] = adapter.capabilities?.[group]?.[name] === true
-        && passing.has(`${group}.${name}`);
+        && certified(`${group}.${name}`);
     }
   }
   return freezeCapabilities(resolved);

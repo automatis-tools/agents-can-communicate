@@ -5,18 +5,20 @@ import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 
+import { createAntigravityAdapter } from "@agents-can-communicate/adapter-antigravity";
 import { createClaudeCodeAdapter } from "@agents-can-communicate/adapter-claude-code";
 import { createCodexAdapter } from "@agents-can-communicate/adapter-codex";
 import { createGeminiCliAdapter } from "@agents-can-communicate/adapter-gemini-cli";
 import { createGrokAdapter } from "@agents-can-communicate/adapter-grok";
 import { createKimiAdapter } from "@agents-can-communicate/adapter-kimi";
 import { CAPABILITY_SHAPE } from "@agents-can-communicate/adapter-sdk";
-import { INSTALLED_HOOKS_LAUNCH_MODE, PASSING_LAUNCH_MODE, validateCapture }
+import { INSTALLED_HOOKS_LAUNCH_MODE, INSTALLED_PRODUCT_EVIDENCE, PASSING_LAUNCH_MODE, validateCapture }
   from "../../scripts/spikes/delivery-capture.mjs";
 import { PASS_EXPECTATIONS } from "./certification-audit.mjs";
 
 const repoRoot = fileURLToPath(new URL("../..", import.meta.url));
 const ADAPTERS = [
+  ["adapter-antigravity", createAntigravityAdapter],
   ["adapter-claude-code", createClaudeCodeAdapter],
   ["adapter-codex", createCodexAdapter],
   ["adapter-gemini-cli", createGeminiCliAdapter],
@@ -114,8 +116,8 @@ for (const [packageName, createAdapter] of ADAPTERS) {
             `${item.fixture} protocol contract differs from the independent audit`);
           let productEvidence;
           if (launchMode === INSTALLED_HOOKS_LAUNCH_MODE) {
-            assert.equal(packageName, "adapter-codex",
-              "installed-hooks native evidence is specific to Codex");
+            assert.equal(Object.hasOwn(INSTALLED_PRODUCT_EVIDENCE, item.client), true,
+              "installed-hooks native evidence needs a product matrix of its client's own");
             const reference = provenanceRecord.productEvidence;
             assert.ok(reference, `${item.provenanceId} has no product evidence`);
             assert.equal(typeof reference.fixture === "string"
@@ -134,6 +136,18 @@ for (const [packageName, createAdapter] of ADAPTERS) {
           }
           assert.doesNotThrow(() => validateCapture(capture, { productEvidence }),
             `${item.fixture} is not valid native delivery evidence`);
+        } else if (item.result === "pass" && expectedCapture.eventInPayload === false) {
+          // One client names no event in the payload at all, and two of its
+          // events hand over byte-identical envelopes - so the capture cannot
+          // carry its own event and the provenance record is the only thing
+          // that says which hook ran. Assert the absence, rather than letting a
+          // missing field pass as a match.
+          assert.equal(capture.hook_event_name ?? capture.hookEventName, undefined,
+            `${item.fixture} is audited as carrying no event name and carries one`);
+          assert.equal(provenanceRecord.event, expectedCapture.event,
+            `${item.provenanceId} event differs from the independent audit`);
+          assert.equal(provenanceRecord.tool, expectedCapture.tool,
+            `${item.provenanceId} tool differs from the independent audit`);
         } else if (item.result === "pass") {
           assert.equal(capture.hook_event_name ?? capture.hookEventName, expectedCapture.event,
             `${item.fixture} does not contain the certified hook event`);

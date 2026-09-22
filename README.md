@@ -88,7 +88,8 @@ context; it cannot recover details that were never saved.
 
 ## Client support
 
-Integrations are available for **Claude Code, Codex, Gemini CLI, Grok, and Kimi Code**. Other
+Integrations are available for **Antigravity CLI, Claude Code, Codex, Gemini CLI, Grok, and
+Kimi Code**. Other
 clients can connect through [MCP](docs/MCP.md) with their own configuration and coordination
 instructions.
 

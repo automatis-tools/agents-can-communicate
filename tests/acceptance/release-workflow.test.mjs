@@ -5,6 +5,7 @@ import test from "node:test";
 
 import { createClaudeCodeAdapter } from "@agents-can-communicate/adapter-claude-code";
 import { createCodexAdapter } from "@agents-can-communicate/adapter-codex";
+import { createAntigravityAdapter } from "@agents-can-communicate/adapter-antigravity";
 import { createGeminiCliAdapter } from "@agents-can-communicate/adapter-gemini-cli";
 import { createGrokAdapter } from "@agents-can-communicate/adapter-grok";
 import { createKimiAdapter } from "@agents-can-communicate/adapter-kimi";
@@ -17,14 +18,15 @@ const repo = path.resolve(import.meta.dirname, "..", "..");
 // capability missing any one of them is a release that cannot honour its own
 // claim, so this gate fails the release rather than shipping it.
 const NATIVE_PROCESS_TEST = Object.freeze({
+  antigravity: "tests/process/antigravity-native-delivery.test.mjs",
   claude_code: "tests/process/claude-native-delivery.test.mjs",
   codex: "tests/process/codex-native-delivery.test.mjs",
 });
 
 test("a shipped livePush capability has a capture, a matching anchor, and an acceptance test",
   async () => {
-    for (const create of [createClaudeCodeAdapter, createCodexAdapter, createGeminiCliAdapter,
-      createGrokAdapter, createKimiAdapter]) {
+    for (const create of [createAntigravityAdapter, createClaudeCodeAdapter, createCodexAdapter,
+      createGeminiCliAdapter, createGrokAdapter, createKimiAdapter]) {
       const adapter = create();
       if (adapter.capabilities.delivery?.livePush !== true) {
         assert.equal(adapter.nativeDelivery, undefined,

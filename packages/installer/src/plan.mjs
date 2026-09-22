@@ -78,6 +78,16 @@ export function planInstallation({ adapters, detected, context, action = "instal
           + `if it is, wire it with --adapter ${entry.adapterId}` });
       continue;
     }
+    // An adapter can refuse itself for a reason that is nobody's fault and that
+    // no file on disk shows: Antigravity CLI cannot be wired until somebody
+    // picks between a machine-wide and a per-workspace hook registration. It is
+    // skipped by name so the rest of the run proceeds - but never when ACC has
+    // a record for it, because that record is the only account of what was
+    // written and an unremovable install is the worse failure.
+    if (entry.blocked !== undefined && recordedById.get(entry.adapterId) === undefined) {
+      skipped.push({ adapterId: entry.adapterId, reason: entry.blocked.reason });
+      continue;
+    }
     // The version doing the installing is whichever `acc` came first on PATH,
     // and the shim it writes pins that copy's node and runner. So a second ACC
     // on the machine quietly replaces every client's wiring with its own, older

@@ -1,0 +1,9 @@
+{
+  "note": "agy -p \"/skills\" --output-format json, command.data, reduced to the entries this capture is about. A print-mode slash command: no turn, no quota. <home> redacts the capture user's home; every other field is verbatim. This is the read-back that proves a skill loaded - `agy plugin list` is not, because it lists only plugins installed through `agy plugin install` and printed 'No imported plugins.' while the imported ACC skill below was loaded and model-invocable.",
+  "skills": [
+    { "name": "agents-can-communicate:acc", "description": "Use when ACC reports peer sessions, addressed messages, or actionable attention, or when the user asks to coordinate independent AI sessions. An owner header alone does not require this skill.", "path": "<home>/.gemini/antigravity-cli/plugins/agents-can-communicate/skills/acc/SKILL.md", "plugin": "agents-can-communicate", "builtin": false, "model_invocable": true },
+    { "name": "acc-probe-plain", "description": "Capture probe. A plain skill under the global customization root.", "path": "<home>/.gemini/config/skills/acc-probe-plain/SKILL.md", "builtin": false, "model_invocable": true },
+    { "name": "acc-probe-plugin:acc-probe-skill", "description": "Capture probe. A skill inside a plugin under the global customization root.", "path": "<home>/.gemini/config/plugins/acc-probe-plugin/skills/acc-probe-skill/SKILL.md", "plugin": "acc-probe-plugin", "builtin": false, "model_invocable": true },
+    { "name": "acc:acc", "description": "NAME PROBE - plugin acc, skill acc.", "path": "<home>/.gemini/config/plugins/acc/skills/acc/SKILL.md", "plugin": "acc", "builtin": false, "model_invocable": true }
+  ]
+}

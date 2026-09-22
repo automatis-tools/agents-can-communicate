@@ -1,0 +1,39 @@
+{
+  "note": "Every PreInvocation payload from ONE interactive user turn in the Antigravity TUI, started in a project directory with no --add-dir. workspacePaths is populated, and PreInvocation fires once per model invocation - three here, one per tool-call round - so a peer message queued while a turn is in progress is offered at the next invocation of that same turn. The hook process cwd was ~/.gemini/config throughout. Paths and ids redacted; every other field is verbatim.",
+  "hookWorkingDirectory": "<home>/.gemini/config",
+  "payloads": [
+    {
+      "artifactDirectoryPath": "<redacted: ~/.gemini/antigravity-cli/brain/<conversationId>>",
+      "conversationId": "00000000-0000-4000-8000-000000000000",
+      "initialNumSteps": 1,
+      "invocationNum": 0,
+      "modelName": "gemini-3.8-flash-high",
+      "transcriptPath": "<redacted: conversation transcript>",
+      "workspacePaths": [
+        "<workspace opened in the TUI>"
+      ]
+    },
+    {
+      "artifactDirectoryPath": "<redacted: ~/.gemini/antigravity-cli/brain/<conversationId>>",
+      "conversationId": "00000000-0000-4000-8000-000000000000",
+      "initialNumSteps": 4,
+      "invocationNum": 1,
+      "modelName": "gemini-3.8-flash-high",
+      "transcriptPath": "<redacted: conversation transcript>",
+      "workspacePaths": [
+        "<workspace opened in the TUI>"
+      ]
+    },
+    {
+      "artifactDirectoryPath": "<redacted: ~/.gemini/antigravity-cli/brain/<conversationId>>",
+      "conversationId": "00000000-0000-4000-8000-000000000000",
+      "initialNumSteps": 7,
+      "invocationNum": 2,
+      "modelName": "gemini-3.8-flash-high",
+      "transcriptPath": "<redacted: conversation transcript>",
+      "workspacePaths": [
+        "<workspace opened in the TUI>"
+      ]
+    }
+  ]
+}

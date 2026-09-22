@@ -7,6 +7,7 @@
 // empty unless ACC_BOOTSTRAP_DEBUG=1 asks for one safe line.
 import { checkNativeBootstrap } from "@agents-can-communicate/installer";
 
+import { createAntigravityAdapter } from "@agents-can-communicate/adapter-antigravity";
 import { createClaudeCodeAdapter } from "@agents-can-communicate/adapter-claude-code";
 import { createCodexAdapter } from "@agents-can-communicate/adapter-codex";
 import { createGeminiCliAdapter } from "@agents-can-communicate/adapter-gemini-cli";
@@ -29,6 +30,9 @@ try {
   const registry = {
     claude_code: createClaudeCodeAdapter, codex: createCodexAdapter,
     gemini_cli: createGeminiCliAdapter, grok: createGrokAdapter, kimi: createKimiAdapter,
+    // No native delivery contract: this reports the client unsupported rather
+    // than unknown, which is a different and more useful thing to read.
+    antigravity: createAntigravityAdapter,
   };
   const adapter = registry[options.adapter]?.();
   if (adapter === undefined) {

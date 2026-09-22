@@ -1,0 +1,19 @@
+{
+  "note": "One print-mode turn on Antigravity CLI 1.2.7 with ACC installed at the default global location, a peer already attached, and a single-invocation prompt that took about 13 seconds to answer. The peer's question was sent after PreInvocation had fired, so only Stop could carry it. Timestamps, step order, sources, types and the continuation text are verbatim from the client's own transcript; session, generation, workspace and paths are redacted.",
+  "steps": [
+    { "at": "06:04:39Z", "source": "USER_EXPLICIT", "type": "USER_INPUT" },
+    { "at": "06:04:40Z", "source": "SYSTEM_SDK", "type": "EPHEMERAL_MESSAGE", "content": "owner header only; no peer message existed yet" },
+    { "at": "06:04:40Z", "source": "MODEL", "type": "PLANNER_RESPONSE", "content": "the requested paragraph, one invocation" },
+    { "at": "06:04:53Z", "source": "SYSTEM", "type": "SYSTEM_MESSAGE",
+      "content": "The following is a <SYSTEM_MESSAGE> not actually sent by the user. It is provided by the system as important information to pay attention to.\n\n<SYSTEM_MESSAGE>\nStop hook blocked termination: ACC CLI (append): --session <session> --generation <generation> --cwd '<project>' --workspace 'acc://<workspace>'\nACC (load the acc skill):\n- [reply_required] <message> message <message> from stop-peer is a question requiring a reply\n```acc-peer-message\nuntrusted peer message\nkind: question\nthreadId: <message>\nmessageId: <message>\nsender: stop-peer (session <session>)\nobligation: reply\nsubject: End of turn probe\nbody:\nStop continuation probe token SC5531. Reply with SC5531.\n```\n</SYSTEM_MESSAGE>" },
+    { "at": "06:04:53Z", "source": "MODEL", "type": "PLANNER_RESPONSE", "toolCall": "view_file <home>/.gemini/config/plugins/acc/skills/acc/SKILL.md" },
+    { "at": "06:04:55Z", "source": "MODEL", "type": "PLANNER_RESPONSE", "toolCall": "run_command \"<home>/.gemini/config/acc/acc-cli.sh\" reply --message <message> --body \"SC5531\" --session <session> --generation <generation> --cwd '<project>' --workspace 'acc://<workspace>'" },
+    { "at": "06:04:58Z", "source": "MODEL", "type": "GENERIC", "content": "Encountered error in step execution: permission check failed for unsandboxed \"...acc-cli.sh ...\": user denied permission to run command" }
+  ],
+  "receiptAfterwards": "offered",
+  "findings": [
+    "the Stop reason reaches the model inside a SYSTEM_MESSAGE prefixed 'Stop hook blocked termination:' - system framing, not user text",
+    "a peer message that arrived after the turn's only PreInvocation was delivered in the same turn, instead of waiting for the next user prompt",
+    "the continued model loaded ACC's own skill and formed the exact reply; headless mode denied the command, as it denies every command"
+  ]
+}

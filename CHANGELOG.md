@@ -1,5 +1,32 @@
 # Changelog
 
+## Unreleased — Antigravity CLI adapter and live delivery
+
+- Add an Antigravity CLI integration, captured on 1.2.7: hooks in the client's namespaced
+  `hooks.json`, global by default, read back through `agy -p "/hooks"`; an `acc:acc`
+  skill installed with `agy plugin install`; next-turn delivery at every model
+  invocation; and a bounded end-of-turn Stop continuation for late peer messages.
+- Add experimental live delivery for Antigravity CLI on Apple Silicon macOS. With
+  delivery enabled, ACC's context asks the agent once per conversation to start a relay
+  from its own shell; the user approves that command. The relay keeps the session
+  endpoint in memory only, wakes an idle session with a fenced peer message, holds one
+  for a busy session, and ends with the client.
+- Name the Antigravity states that otherwise look like success: a hook file the client
+  did not load, a session without an open workspace, and whether a relay is running.
+- Certify Antigravity CLI from 1.2.7 onward on darwin-arm64: adapters may declare a
+  certification floor, so a later stable release is judged by the floor's captures until
+  one of its own records otherwise. Other adapters keep exact versions.
+
+| Candidate artifact | Value |
+|---|---|
+| Built from | `ca73be94f058724491824ee6c7a30036f5e38bf5` |
+| Tarball | `agents-can-communicate-0.5.10.tgz`, 444,260 bytes, 306 files |
+| sha256 | `32768535131b513b46ca2940c60f9b31971ceca33f429d64865f2a9d66d534f9` |
+
+This unpublished development archive passed clean installation verification. See
+[Antigravity evidence](docs/release-evidence/unreleased-antigravity-adapter.md) for the
+live capture, regression checks and limits. Earlier records retain their original provenance.
+
 ## 0.5.10 — release candidate
 
 - Keep a native session in the ACC room selected at launch when the agent moves

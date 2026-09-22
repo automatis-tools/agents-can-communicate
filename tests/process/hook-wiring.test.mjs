@@ -10,6 +10,8 @@ import { promisify } from "node:util";
 
 import { createClaudeCodeAdapter } from "@agents-can-communicate/adapter-claude-code";
 import { createCodexAdapter } from "@agents-can-communicate/adapter-codex";
+import { createAntigravityAdapter } from "@agents-can-communicate/adapter-antigravity";
+import { fakeAgy } from "../../packages/adapter-antigravity/test/fake-agy.mjs";
 import { createGeminiCliAdapter } from "@agents-can-communicate/adapter-gemini-cli";
 import { createGrokAdapter } from "@agents-can-communicate/adapter-grok";
 import { createKimiAdapter } from "@agents-can-communicate/adapter-kimi";
@@ -69,6 +71,25 @@ const ADAPTERS = [
         .map(line => line.slice(line.indexOf('"') + 1, line.lastIndexOf('"'))
           .replace(/\\(["\\])/g, "$1"));
     } },
+  { name: "antigravity", create: createAntigravityAdapter,
+    // A location has to be named: this client registers either machine-wide or
+    // per workspace, and ACC picks neither by itself. The probe stands in for
+    // `agy -p "/hooks"`, which is the only thing that can confirm a
+    // registration on this client - a write that parses can still load nothing.
+    context: home => ({ home, antigravityHookLocation: "global",
+      antigravityWorkspace: path.join(home, "project"), runAgy: fakeAgy().run,
+      probeHooks: async () => ({ hooks: [{ name: "acc", enabled: true,
+        actions: ["SessionStart", "PreInvocation", "Stop"].map(event => ({ event })) }] }) }),
+    commands: async home => {
+      const wired = JSON.parse(await readFile(
+        path.join(home, ".gemini", "config", "hooks.json"), "utf8"));
+      return Object.values(wired.acc).flatMap(actions => actions.map(action => action.command));
+    },
+    // This client sends no `hook_event_name`; the event is the argument the
+    // registered command carries, and the session is a `conversationId`.
+    payload: dir => ({ conversationId: "probe-antigravity", modelName: "gemini-3.8-flash-high",
+      workspacePaths: [dir], transcriptPath: `${dir}/transcript`,
+      artifactDirectoryPath: `${dir}/artifacts` }) },
   { name: "grok", create: createGrokAdapter,
     context: home => ({ home, grokHome: path.join(home, ".grok") }),
     commands: async home => {
@@ -128,8 +149,9 @@ for (const adapter of ADAPTERS) {
       const child = run("/bin/sh", ["-c", command], {
         env: { ...process.env, ACC_DATA_HOME: dataHome },
       });
-      child.child.stdin.end(JSON.stringify({ hook_event_name: "SessionStart",
-        session_id: `probe-${adapter.name}`, cwd: dir, source: "startup" }));
+      child.child.stdin.end(JSON.stringify(adapter.payload?.(dir)
+        ?? { hook_event_name: "SessionStart", session_id: `probe-${adapter.name}`,
+          cwd: dir, source: "startup" }));
 
       const { stdout } = await child;
       assert.equal(typeof stdout, "string");

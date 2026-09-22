@@ -1,0 +1,4 @@
+{
+  "note": "The read-back on a machine with no hook configuration at all. This is the answer an install must not mistake for success, and the one that names the issue #176 state when the plugin directory is present.",
+  "hooks": []
+}

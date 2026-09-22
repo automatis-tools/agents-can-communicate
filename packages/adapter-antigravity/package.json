@@ -1,0 +1,28 @@
+{
+  "name": "@agents-can-communicate/adapter-antigravity",
+  "version": "0.5.10",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/adapter.mjs",
+    "./agentapi": "./src/agentapi.mjs",
+    "./native-delivery": "./src/native-delivery.mjs",
+    "./relay": "./src/relay.mjs",
+    "./relay-endpoint": "./src/relay-endpoint.mjs",
+    "./relay-start": "./src/relay-start.mjs"
+  },
+  "files": [
+    "certification.json",
+    "fixtures/certification-provenance.json",
+    "fixtures/SessionStart-1.2.7.json",
+    "fixtures/PreInvocation-1.2.7.json",
+    "src/",
+    "plugin/",
+    "fixtures/delivery/antigravity-cli-1.2.7-relay-product.json",
+    "fixtures/delivery/antigravity-cli-1.2.7-relay-product-evidence.json",
+    "fixtures/agentapi-live-push-1.2.7.json",
+    "fixtures/live-push-surfaces-1.2.7.json",
+    "fixtures/agentapi-error-answers-1.2.7.json",
+    "fixtures/hooks-first-trust-no-workspace-1.2.7.json"
+  ]
+}

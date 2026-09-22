@@ -7,7 +7,7 @@ import { canonicalManagerRoot, readControl, readManagedJson } from "./state.mjs"
 import { commandPrefix } from "./command-prefix.mjs";
 
 export const ENTRY_KINDS = Object.freeze([
-  "acc", "acc-hook", "acc-mcp", "acc-bootstrap", "acc-claude-channel",
+  "acc", "acc-hook", "acc-mcp", "acc-bootstrap", "acc-claude-channel", "acc-antigravity-relay",
 ]);
 
 const BOOTSTRAP_FLAGS = new Map([["--adapter", "adapter"], ["--real-executable", "realExecutable"],
@@ -43,7 +43,7 @@ export function invokedDirectly(url) {
 
 function unavailable(kind) {
   // Never reflect control file content or payloads into a client diagnostic.
-  if (kind === "acc-hook" || kind === "acc-claude-channel") {
+  if (kind === "acc-hook" || kind === "acc-claude-channel" || kind === "acc-antigravity-relay") {
     process.stderr.write("acc: coordination unavailable during runtime update; session may continue\n");
     process.exitCode = 0;
   } else if (kind === "acc-bootstrap") {

@@ -52,6 +52,17 @@ it cannot create a session or advance receipts. Grok uses it to supply CLI owner
 arguments after a terminal result. This does not certify general context or peer
 delivery, and a tool such as `finish` can close the owner before the line arrives.
 
+`continueTurnOutcome({ reason, payload })` is optional. A client whose end-of-turn hook can
+hold a turn open implements it, and the runner's `turnEnd` handler calls it with the projected
+peer context when - and only when - a peer body no invocation has shown yet is waiting. It
+returns `{ stdout, stderr?, exitCode? }` in the client's own continuation shape, and prints
+nothing to let the turn end. `payload` is the raw hook payload handed back unread, so the
+adapter can apply its own ceiling from a counter the client supplies; nothing in core reads it.
+An empty `stdout` records no offer, so the body stays queued for the next invocation. A
+continuation costs the operator a model invocation, which is why an owner header or an
+attention count is never a reason to call it. Antigravity CLI uses it for `Stop`, bounded to
+one continuation per turn by the client's own `executionNum`.
+
 `renderContextResult` is required wherever an adapter renders peer messages. It returns
 `{ text, offeredMessageIds, includedAttentionIds }`, and the [receipt
 lifecycle](PROTOCOL.md#receipt-lifecycle) advances only from those ids — never by searching
@@ -109,6 +120,20 @@ the false value and can never enable it.
 `effectiveCapabilities(adapter, { clientVersion, platform })` returns the full boolean
 shape for the installed client. Only an exact passing version/platform match remains true.
 Unreadable, unknown, or mismatched clients degrade every uncertified row to false.
+
+An adapter for a client that ships often may declare a floor per platform:
+
+```js
+certificationFloor: { "darwin-arm64": "1.2.7" },
+```
+
+A stable version at or above the floor, on that platform, is then judged by the floor
+version's evidence for any capability it has no capture of its own for. A later capture
+wins for its own version, capability by capability - a recorded failure turns that
+capability off for that version and leaves the rest on the floor. Earlier versions,
+prereleases and other platforms stay uncertified, and `defineAdapter` refuses a floor
+that names a version with no passing evidence on its platform. Antigravity CLI declares
+one; every other adapter certifies exact versions only.
 
 The backing methods for delivery are `renderContextResult()` for `nextTurn`,
 `offerMessage()` for `livePush`, and `routeReply()` for `replyRoute`.
@@ -198,6 +223,13 @@ return normalizedEvent({
 Refuse an unrecognised payload. Inventing a session attaches the wrong one, or a new one
 every hook, and looks like it is working.
 
+`normalizeHook(payload, { args })` also receives the arguments the client's hook command
+carried after the adapter id. Most clients name the event inside the payload and ignore this.
+Antigravity CLI does not send one at all, and its `PreInvocation` and `PostInvocation` hand
+over byte-identical envelopes - so for that client the registered command's own argument is
+the only thing that knows which hook ran, and its install writes the event name into each
+command. `args` is always an array; an adapter that does not need it may take one parameter.
+
 ## Measure response contracts
 
 Measure them. Every client differs, and a wrong shape fails **silently**:
@@ -207,6 +239,7 @@ Measure them. Every client differs, and a wrong shape fails **silently**:
 | Codex | exit 2 + stderr | plain stdout (`developer` message) |
 | Claude Code | `hookSpecificOutput.permissionDecision` | same envelope |
 | Gemini CLI | `{"decision":"block"}` | `hookSpecificOutput` envelope |
+| Antigravity CLI | no tool event loads, so a deny is unreachable | `{"injectSteps":[{"ephemeralMessage"}]}` from `PreInvocation` |
 | Grok | `{"decision":"deny","reason"}` (documented; deny not yet captured) | UserPromptSubmit stdout discarded; own identity only via PreToolUse after a terminal result, observed on 1.0.24 |
 | Kimi Code | `hookSpecificOutput.permissionDecision` | plain stdout |
 

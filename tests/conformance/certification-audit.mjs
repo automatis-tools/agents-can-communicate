@@ -21,6 +21,19 @@ const nativeDelivery = (client, version, observedAt, fixture, protocolContract, 
   tool: null, protocolContract, outcome: "native-delivery-observed", idleBehavior: idle,
   busyBehavior: busy, authorityLevel: "experimental", limitations }));
 
+const antigravityRelayLimitations = Object.freeze([
+  "Observed on darwin-arm64 with Antigravity CLI 1.2.7 in the TUI, model Gemini 3.8 Flash, through a private candidate built from this branch and installed into an isolated ACC data home; print mode ends with its turn and runs no relay.",
+  "The agent started the relay once for the conversation through run_command, after ACC's one-time context line named the command; the operator approved that command and each acc reply once at the client's permission prompt. ACC writes no permission rule.",
+  "The relay holds the session's language-server address and CSRF token in memory only; ACC's registration carries a nonce and a socket path, never the endpoint. ANTIGRAVITY_AGENTAPI_EXE named the same agy the relay runs.",
+  "An idle session woke with no user input. A message accepted while the model was streaming a long text answer was presented only after that answer completed. A message accepted while a turn waited on a tool permission was presented at that turn's next model invocation, after the tool returned, rather than after the turn.",
+  "The busy branch took three sends: the first landed at a tool boundary as above, the second arrived after the answer had already finished and so showed an idle wake; the third, timed against the running stream, is the one recorded.",
+  "The model receives each push as a SYSTEM_MESSAGE; the send-message title is not shown to it.",
+  "The observed reply loop uses the installed acc reply CLI; native delivery.replyRoute remains false. The router reports a relay push as transport live-adapter.",
+  "A repeated logical message kept its message id, took the durable path on the second send, and was pushed and answered once.",
+  "Antigravity runs no SessionEnd: the relay retired itself about five seconds after its agy exited, and a later message stayed queued in the durable inbox.",
+  "The first TUI session in a folder trusted at that launch hands every hook an empty workspacePaths even with --add-dir, so that session gets no ACC context and no relay prompt; the next launch in the now-trusted folder does.",
+]);
+
 const codexLocalDaemonLimitations = Object.freeze([
   "Observed on darwin-arm64 with an already-running LocalDaemon and ordinary commands; ACC adds no launch arguments and owns no vendor daemon lifecycle.",
   "Recorded recipient opt-in and exact current thread, canonical cwd, live process, stable version and protocol checks are required for every session.",
@@ -38,7 +51,59 @@ const codexNativeDelivery = (version, observedAt, fixture) => nativeDelivery("co
   codexLocalDaemonLimitations, ["delivery.livePush"])
   .map(entry => ({ ...entry, launchMode: "ordinary-command-with-installed-hooks" }));
 
+// A payload with no event name in it. Antigravity CLI sends no
+// `hook_event_name`, and two of its four events carry byte-identical envelopes,
+// so the fixture cannot name its own event and the provenance record is what
+// says which hook ran. `eventInPayload: false` makes the conformance check
+// assert the absence rather than skip the field.
+const noEventField = entries => entries.map(entry => ({ ...entry, eventInPayload: false }));
+
 export const PASS_EXPECTATIONS = Object.freeze({
+  // Captured on the one version this client has been measured on. Three
+  // capabilities, and the list of what is missing is longer than the list of
+  // what is here: no tool event loads, so no guard; no SessionEnd, so no
+  // lifecycle deregistration. Live push is captured through the relay the agent
+  // starts, in the TUI only.
+  "adapter-antigravity": [...withFacts("antigravity-cli", "1.2.7", noEventField([
+    row("lifecycle.sessionStart", "fixtures/SessionStart-1.2.7.json", "SessionStart", null,
+      "event-observed", "fires when a session starts",
+      "fires before the first model invocation", "advisory",
+      ["captured in print mode only",
+        "no hook_event_name field; the event is known only from the command argument",
+        "hooks attach only when the Antigravity session has an open workspace; an ordinary"
+        + " print-mode turn sends an empty workspacePaths and no session is created. This"
+        + " capture used --add-dir"]),
+    row("context.beforeTurnInjection", "fixtures/PreInvocation-1.2.7.json", "PreInvocation",
+      null, "model-visible", "waits for the next invocation",
+      "does not interrupt an in-progress invocation", "context",
+      ["requires the injectSteps ephemeralMessage envelope",
+        "userMessage and toolCall injection types were not exercised",
+        "hooks attach only when the Antigravity session has an open workspace; an ordinary"
+        + " print-mode turn sends an empty workspacePaths and no session is created. This"
+        + " capture used --add-dir"]),
+    row("delivery.nextTurn", "fixtures/PreInvocation-1.2.7.json", "PreInvocation", null,
+      "model-visible", "offers complete peer messages at the next invocation",
+      "does not interrupt an in-progress invocation", "context", [
+        "delivery requires the next invocation; there is no live push and no reply route",
+        "the end-of-turn Stop continuation carries its reason to the model and is a bounded"
+        + " nudge, not a gate: this adapter continues one turn at most once and the client"
+        + " caps consecutive continuations itself (vendor 1.1.9)",
+        "the continuation ceiling's own value was not captured, and neither was what the"
+        + " model is told when it is reached",
+        "captured on darwin-arm64 in print mode only; Linux, Windows and interactive"
+        + " sessions were not observed",
+        "agy agentapi send-message needs the running session's language-server address and"
+        + " CSRF token, and hooks are given neither, so ACC has no live push",
+        "reply routing back to ACC was not observed",
+        "hooks attach only when the Antigravity session has an open workspace; an ordinary"
+        + " print-mode turn sends an empty workspacePaths and no session is created. This"
+        + " capture used --add-dir",
+      ]),
+  ]), "2026-09-20"),
+  ...nativeDelivery("antigravity-cli", "1.2.7", "2026-09-21T19:29:23.548Z",
+    "fixtures/delivery/antigravity-cli-1.2.7-relay-product.json", "antigravity-agentapi-relay-v1", "offered",
+    "queued_after_turn", antigravityRelayLimitations, ["delivery.livePush"])
+    .map(entry => ({ ...entry, launchMode: "ordinary-command-with-installed-hooks" }))],
   "adapter-claude-code": withFacts("claude-code", "2.1.233", [
     row("lifecycle.sessionStart", "fixtures/SessionStart.json", "SessionStart", null,
       "event-observed", "fires when a session starts", "fires before the first model turn",

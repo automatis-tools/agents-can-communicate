@@ -70,6 +70,7 @@
     "LICENSE"
   ],
   "dependencies": {
+    "@agents-can-communicate/adapter-antigravity": "*",
     "@agents-can-communicate/adapter-claude-code": "*",
     "@agents-can-communicate/adapter-codex": "*",
     "@agents-can-communicate/adapter-gemini-cli": "*",
@@ -86,6 +87,7 @@
     "@agents-can-communicate/storage-filesystem": "*"
   },
   "bundleDependencies": [
+    "@agents-can-communicate/adapter-antigravity",
     "@agents-can-communicate/adapter-claude-code",
     "@agents-can-communicate/adapter-codex",
     "@agents-can-communicate/adapter-gemini-cli",

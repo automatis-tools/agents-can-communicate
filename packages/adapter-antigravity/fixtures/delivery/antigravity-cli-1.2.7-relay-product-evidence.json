@@ -1,0 +1,132 @@
+{
+  "schemaVersion": 1,
+  "source": "real-client-capture",
+  "client": "antigravity-cli",
+  "phase": "product",
+  "clientVersion": "1.2.7",
+  "platform": "darwin-arm64",
+  "packageSha256": "fa1dab632b9ec5cef0e391b3779816eb479beaaee6c6197b0b166a24b0cf2887",
+  "startedAt": "2026-09-21T19:11:03.000Z",
+  "finishedAt": "2026-09-21T19:29:23.548Z",
+  "scenarioCount": 5,
+  "passedCount": 5,
+  "failedCount": 0,
+  "cleanup": {
+    "attempted": true,
+    "outcome": "passed",
+    "ownedProcesses": "stopped",
+    "temporaryState": "removed"
+  },
+  "scenarios": [
+    {
+      "caseId": "A01",
+      "outcome": "passed",
+      "startedAt": "2026-09-21T19:11:03.000Z",
+      "finishedAt": "2026-09-21T19:13:43.911Z",
+      "messageId": "message_LcQceupPfUv_I5WCnb1bCw",
+      "observations": [
+        {
+          "kind": "delivery",
+          "at": "2026-09-21T19:13:43.911Z",
+          "outcome": "offered"
+        },
+        {
+          "kind": "relay-push",
+          "at": "2026-09-21T19:11:04.018Z",
+          "outcome": "pushed"
+        },
+        {
+          "kind": "model-turn",
+          "outcome": "started-without-user-input",
+          "at": "2026-09-21T19:11:04.000Z"
+        }
+      ]
+    },
+    {
+      "caseId": "A02",
+      "outcome": "passed",
+      "startedAt": "2026-09-21T19:23:38.000Z",
+      "finishedAt": "2026-09-21T19:24:47.608Z",
+      "messageId": "message_JkME_nTn55TeLLB3Qk31mQ",
+      "observations": [
+        {
+          "kind": "delivery",
+          "at": "2026-09-21T19:24:47.608Z",
+          "outcome": "offered"
+        },
+        {
+          "kind": "relay-push",
+          "at": "2026-09-21T19:23:43.599Z",
+          "outcome": "pushed"
+        },
+        {
+          "kind": "presentation",
+          "outcome": "after-running-turn",
+          "at": "2026-09-21T19:24:09.000Z"
+        }
+      ]
+    },
+    {
+      "caseId": "A03",
+      "outcome": "passed",
+      "startedAt": "2026-09-21T19:11:03.000Z",
+      "finishedAt": "2026-09-21T19:13:43.943Z",
+      "messageId": "message_LcQceupPfUv_I5WCnb1bCw",
+      "observations": [
+        {
+          "kind": "answer",
+          "outcome": "recorded",
+          "at": "2026-09-21T19:11:56.127Z"
+        },
+        {
+          "kind": "receipt",
+          "outcome": "acknowledged",
+          "at": "2026-09-21T19:11:56.000Z"
+        }
+      ]
+    },
+    {
+      "caseId": "A04",
+      "outcome": "passed",
+      "startedAt": "2026-09-21T19:26:19.000Z",
+      "finishedAt": "2026-09-21T19:26:44.795Z",
+      "messageId": "message_zVsXVuB-kvhdCx-HchIyjA",
+      "observations": [
+        {
+          "kind": "relay-push",
+          "at": "2026-09-21T19:26:19.584Z",
+          "outcome": "pushed-once"
+        },
+        {
+          "kind": "logical-message",
+          "outcome": "same-message-id",
+          "at": "2026-09-21T19:26:20.000Z"
+        }
+      ]
+    },
+    {
+      "caseId": "A05",
+      "outcome": "passed",
+      "startedAt": "2026-09-21T19:28:49.000Z",
+      "finishedAt": "2026-09-21T19:29:23.548Z",
+      "messageId": "message_rO75hkkmDXB0Mf6fVCj7Uw",
+      "observations": [
+        {
+          "kind": "delivery",
+          "at": "2026-09-21T19:29:23.548Z",
+          "outcome": "queued"
+        },
+        {
+          "kind": "relay",
+          "at": "2026-09-21T19:28:55.391Z",
+          "outcome": "retired"
+        },
+        {
+          "kind": "client",
+          "outcome": "exited",
+          "at": "2026-09-21T19:28:50.000Z"
+        }
+      ]
+    }
+  ]
+}

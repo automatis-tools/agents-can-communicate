@@ -99,7 +99,7 @@ All recipients have the same durable record, but adapters expose different accel
 - **Durable inbox:** universal recovery. `acc inbox` discovers bounded message headers;
   `acc inbox --message <id>` retrieves one complete addressed message after selection
   or compaction.
-- **Next normal turn:** exact captured versions of Codex, Claude Code, Gemini CLI, and Kimi
+- **Next normal turn:** exact captured versions of Codex, Claude Code, Gemini CLI, Antigravity CLI and Kimi
   Code can receive complete attributed peer context when the user next prompts that client.
   This does not wake an idle session.
 - **Optional Claude Code channel:** supported Claude Code versions on Apple Silicon macOS
@@ -114,6 +114,12 @@ All recipients have the same durable record, but adapters expose different accel
   thread can receive them after its terminal exits. ACC adds no launch arguments
   and does not manage the vendor daemon during message delivery. Separately,
   [confirmed update maintenance](UPGRADING.md#confirmed-client-service-maintenance) can restart it.
+
+- **Optional Antigravity CLI relay:** on Apple Silicon macOS with 1.2.7 or later, the session
+  endpoint exists only in the agent's own shell, so ACC's context asks the agent once per
+  conversation to start a relay; the user approves that command. The relay keeps the endpoint
+  in memory, wakes an idle session with a fenced peer message, holds one for a busy session,
+  and ends with the client. It is experimental, off by default, and can spend tokens.
 
 Grok, generic MCP, unsupported versions and uncaptured platforms use inbox polling.
 [Capabilities](CAPABILITIES.md) lists evidence and fallback.

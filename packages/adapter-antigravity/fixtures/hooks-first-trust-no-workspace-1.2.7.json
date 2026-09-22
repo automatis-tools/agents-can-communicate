@@ -1,0 +1,37 @@
+{
+  "note": "What every hook receives in the first TUI session opened in a folder that was trusted at that same launch, captured on Antigravity CLI 1.2.7, macOS arm64, 2026-09-21. The client was started as `agy --add-dir . -i <prompt>` in a fresh git project, the trust prompt was answered yes, and SessionStart, PreInvocation and Stop all carried an empty workspacePaths - so ACC had no project to join and every hook failed open with no context and no relay prompt. The same reproduced in three fresh folders. The next launch in the now-trusted folder carried the project in workspacePaths and worked. Conversation ids and home paths redacted; every other field is verbatim.",
+  "launch": "agy --add-dir . -i <prompt>, in a folder not yet trusted",
+  "trustPrompt": "answered: Yes, I trust this folder",
+  "hookStderr": "acc: coordination unavailable; hook continued without context",
+  "refusal": "antigravity_no_open_workspace",
+  "payloads": {
+    "SessionStart": {
+      "artifactDirectoryPath": "<home>/.gemini/antigravity-cli/brain/<conversation>",
+      "conversationId": "<conversation>",
+      "modelName": "gemini-3.8-flash-high",
+      "transcriptPath": "<home>/.gemini/antigravity-cli/brain/<conversation>/.system_generated/logs/transcript_full.jsonl",
+      "workspacePaths": []
+    },
+    "PreInvocation": {
+      "artifactDirectoryPath": "<home>/.gemini/antigravity-cli/brain/<conversation>",
+      "conversationId": "<conversation>",
+      "initialNumSteps": 1,
+      "invocationNum": 0,
+      "modelName": "gemini-3.8-flash-high",
+      "transcriptPath": "<home>/.gemini/antigravity-cli/brain/<conversation>/.system_generated/logs/transcript_full.jsonl",
+      "workspacePaths": []
+    },
+    "Stop": {
+      "artifactDirectoryPath": "<home>/.gemini/antigravity-cli/brain/<conversation>",
+      "conversationId": "<conversation>",
+      "error": "",
+      "executionNum": 0,
+      "fullyIdle": true,
+      "modelName": "gemini-3.8-flash-high",
+      "terminationReason": "NO_TOOL_CALL",
+      "transcriptPath": "<home>/.gemini/antigravity-cli/brain/<conversation>/.system_generated/logs/transcript_full.jsonl",
+      "workspacePaths": []
+    }
+  },
+  "nextLaunchInTheSameFolder": "workspacePaths carried the project; SessionStart bound the session and PreInvocation injected ACC context"
+}

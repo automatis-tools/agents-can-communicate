@@ -1,0 +1,30 @@
+{
+  "note": "Both locations registered the namespace `acc`. The workspace file also carried PreInvocation and Stop. Only the global namespace survived, whole; the workspace one was discarded entirely rather than merged or duplicated. Paths redacted as above; every other byte is verbatim.",
+  "wroteGlobal": {
+    "acc": {
+      "SessionStart": [{ "type": "command", "command": "sh <workspace>/probe.sh GLOBAL", "timeout": 10 }]
+    }
+  },
+  "wroteWorkspace": {
+    "acc": {
+      "SessionStart": [{ "type": "command", "command": "sh <workspace>/probe.sh SessionStart", "timeout": 10 }],
+      "PreInvocation": [{ "type": "command", "command": "sh <workspace>/probe.sh PreInvocation", "timeout": 10 }],
+      "Stop": [{ "type": "command", "command": "sh <workspace>/probe.sh Stop", "timeout": 10 }]
+    }
+  },
+  "hooks": [
+    {
+      "name": "acc",
+      "enabled": true,
+      "source": "<home>/.gemini/config/hooks.json",
+      "actions": [
+        {
+          "event": "SessionStart",
+          "type": "command",
+          "command": "sh <workspace>/probe.sh GLOBAL",
+          "timeout_seconds": 10
+        }
+      ]
+    }
+  ]
+}

@@ -1,3 +1,4 @@
+import { fakeAgy } from "../../packages/adapter-antigravity/test/fake-agy.mjs";
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { mkdir, mkdtemp, readFile, readdir, realpath, rm, writeFile }
@@ -126,9 +127,22 @@ test("a home that had nothing is left with nothing", async t => {
   const home = await realpath(await mkdtemp(path.join(tmpdir(), "acc-empty-")));
   t.after(() => rm(home, { recursive: true, force: true }));
 
-  for (const adapter of ALL_ADAPTERS()) {
-    await adapter.install(clientContext(home));
-    await adapter.uninstall(clientContext(home));
+  // Every client, and for the one that can register in two places, both of
+  // them: a home left clean by a global registration says nothing about what a
+  // workspace registration leaves behind.
+  for (const location of ["global", "workspace"]) {
+    const context = clientContext(home, undefined,
+      { env: { ACC_ANTIGRAVITY_HOOKS: location }, cwd: path.join(home, "project") });
+    for (const adapter of ALL_ADAPTERS()) {
+      // One stand-in agy per location, shared by install and uninstall, so the
+      // plugin it installs is the one it is asked to remove.
+      const agy = fakeAgy();
+      await adapter.install({ ...context, runAgy: agy.run,
+        probeHooks: async () => ({ hooks: [{ name: "acc",
+          enabled: true, actions: ["SessionStart", "PreInvocation", "Stop"]
+            .map(event => ({ event })) }] }) });
+      await adapter.uninstall({ ...context, runAgy: agy.run });
+    }
   }
 
   const left = [...(await fingerprint(home)).keys()].sort();

@@ -1,0 +1,43 @@
+{
+  "note": "agy -p \"/hooks\" --output-format json, command.data only. Absolute paths are redacted: <home> was the capture user's home and <workspace> the directory passed with --add-dir. Every other byte is verbatim.",
+  "hooks": [
+    {
+      "name": "acc",
+      "enabled": true,
+      "source": "<workspace>/.agents/hooks.json",
+      "actions": [
+        {
+          "event": "SessionStart",
+          "type": "command",
+          "command": "sh <workspace>/probe.sh SessionStart",
+          "timeout_seconds": 10
+        },
+        {
+          "event": "PreInvocation",
+          "type": "command",
+          "command": "sh <workspace>/probe.sh PreInvocation",
+          "timeout_seconds": 10
+        },
+        {
+          "event": "Stop",
+          "type": "command",
+          "command": "sh <workspace>/probe.sh Stop",
+          "timeout_seconds": 10
+        }
+      ]
+    },
+    {
+      "name": "acc-global",
+      "enabled": true,
+      "source": "<home>/.gemini/config/hooks.json",
+      "actions": [
+        {
+          "event": "SessionStart",
+          "type": "command",
+          "command": "sh <workspace>/probe.sh GlobalSessionStart",
+          "timeout_seconds": 10
+        }
+      ]
+    }
+  ]
+}
