@@ -97,11 +97,13 @@ exposes and whether its lease is current, while recipient policy says whether it
 turn.
 
 Claude Code Channel has installed-client evidence on 2.1.258 and 2.1.260; Codex
-LocalDaemon has it on 0.152.1 and 0.153.4. Both use a captured platform minimum,
+LocalDaemon has it on 0.152.1 and 0.153.4; Antigravity CLI has it on 1.2.7 and later through a relay
+the agent starts in its own shell. All three use a captured platform minimum,
 current probe and exact session handshake. Codex preserves the ordinary client
 launch and verifies its registered thread and workspace; native delivery owns no vendor
-daemon lifecycle. Gemini CLI and Kimi Code have exact-version next-turn evidence only;
-Grok and generic MCP use inbox polling.
+daemon lifecycle. Gemini CLI and Kimi Code have exact-version next-turn evidence only; Grok
+and generic MCP use inbox polling. Antigravity CLI additionally attaches
+a session only where the client reports an open workspace.
 
 ## Storage and workspace identity
 

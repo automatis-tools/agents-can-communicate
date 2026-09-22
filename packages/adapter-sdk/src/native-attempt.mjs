@@ -11,7 +11,7 @@ import { NATIVE_REASON_CODES, TIMESTAMP } from "./native-vocabulary.mjs";
 export function nativeAttemptFrom(value) {
   if (!value || typeof value.at !== "string" || !TIMESTAMP.test(value.at)
     || !Number.isFinite(Date.parse(value.at))
-    || !["sessionStart", "beforeTurn", "channelReady"].includes(value.event)
+    || !["sessionStart", "beforeTurn", "channelReady", "relayReady"].includes(value.event)
     || !["active", "off", "degraded", "unsupported"].includes(value.state)
     || !(value.reasonCode === null || NATIVE_REASON_CODES.includes(value.reasonCode))
     || !["off", "actionable", "all"].includes(value.policy)

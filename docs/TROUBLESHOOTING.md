@@ -214,6 +214,78 @@ trusted` and keeps going, and the default mode has no write or shell tool to gua
 guard never fires and the mode you passed appears to have been ignored. Trust the folder,
 or start the session somewhere trusted.
 
+## Antigravity is installed and nothing happens
+
+The most likely cause is that the session has no open workspace. Antigravity CLI gives its
+hooks a project directory only through `workspacePaths`, and that array is empty unless the
+session has one. The interactive TUI started in a project directory has one; a print-mode
+`agy -p "..."` started in the same directory does not. The
+hook then has no workspace to join, fails open as every ACC hook must, and this client shows
+no hook output, so nothing anywhere says why.
+
+Open the project as an Antigravity workspace, or pass it explicitly:
+
+```
+agy -p "..." --add-dir /path/to/project
+```
+
+The first TUI session in a folder you trusted at that same launch has no workspace either,
+even with `--add-dir`; start the TUI again once the folder is trusted.
+
+`acc doctor` names this state. Nothing else in the payload can substitute for it:
+`transcriptPath` and `artifactDirectoryPath` both point inside the client's own
+per-conversation directory, and the hook process does not inherit the directory the client
+was started in.
+
+If the session does have a workspace and ACC is still absent, check that the registration
+actually loaded rather than that the file exists:
+
+```
+agy -p "/hooks" --output-format json
+```
+
+This client accepts a hook configuration it will not load and reports nothing. A file on
+disk is not a registration: the Gemini CLI hook shape loads nothing here, an unsupported
+event name is dropped out of an otherwise valid namespace, and one top-level key that is not
+an integration namespace drops the whole file. The command above is the only answer that
+counts.
+
+The agent may see two ACC skills: `acc:acc`, which `acc install` puts there, and
+`agents-can-communicate:acc`. The second is this client's own copy of ACC's Gemini CLI
+extension, made on its first authenticated run into `~/.gemini/antigravity-cli/plugins/`. Its
+skill loads, but none of its hooks do, and every command in it runs the Gemini CLI extension's
+shim - so it works only while Gemini CLI is wired. `acc:acc` is the one to rely on; check what
+the client actually loaded with:
+
+```
+agy -p "/skills" --output-format json
+```
+
+`agy plugin list` is not that check: it lists only plugins installed through
+`agy plugin install`, and reports none while the imported skill above is loaded.
+
+An agent that receives a peer message in print mode (`agy -p`) cannot answer it on its own.
+It forms the right `acc reply` command from the skill, and print mode denies every command
+because it cannot ask for approval; the client says so on stderr. The TUI asks instead.
+ACC does not grant itself that permission. To let headless agents answer, allow the ACC
+command yourself under `permissions.allow` in the client's settings, in the `command(...)`
+form its message names.
+
+## Antigravity never wakes while idle
+
+Live delivery needs four things, and `acc doctor` shows each:
+
+- the live policy is on: `acc install --adapter antigravity --delivery actionable` (or `all`);
+- the session is interactive - print mode ends with its turn and never runs a relay;
+- the session attached to ACC at all (see the section above);
+- the agent started the relay. ACC's context asks once per conversation; if the command was
+  declined, or never approved at the permission prompt, nothing asks again. Ask the agent to
+  run `sh "~/.gemini/config/acc/acc-relay.sh" start`, or start a new conversation.
+
+`acc doctor` reports how many relays are running and, per session, whether a live transport is
+active. A relay ends with its client; nothing is left running after the TUI exits or after
+`acc uninstall`.
+
 ## Grok shows no injected message
 
 Grok discards UserPromptSubmit context. On the observed 1.0.24 client, run public

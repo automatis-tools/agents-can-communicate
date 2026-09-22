@@ -9,9 +9,18 @@
 // explain itself with at least one limitation. Prompts, answers, transcripts,
 // paths, and secrets have no field here by design.
 
+import { assertAntigravityRunEvidence } from "../e2e/antigravity-relay-evidence.mjs";
 import { assertRunEvidence } from "../e2e/codex-local-daemon-evidence.mjs";
 
 export const CAPTURE_CAPABILITY = "native_delivery";
+
+// Each client's installed-product matrix is its own closed shape, so the
+// validator is chosen by the capture's client and never substitutes for another.
+export const INSTALLED_PRODUCT_EVIDENCE = Object.freeze({
+  "codex-cli": assertRunEvidence,
+  "antigravity-cli": assertAntigravityRunEvidence,
+});
+const INSTALLED_PRODUCT_CLIENTS = Object.keys(INSTALLED_PRODUCT_EVIDENCE);
 export const UNOBSERVED = "unobserved";
 
 export const DELIVERY_CAPTURE_REQUIRED_FIELDS = Object.freeze([
@@ -99,7 +108,8 @@ export function validateCapture(value, { productEvidence } = {}) {
   expect(matches(IDENTIFIER, value.protocolContract),
     "capture protocolContract is a closed identifier");
   if (value.launchMode === INSTALLED_HOOKS_LAUNCH_MODE) {
-    expect(value.client === "codex-cli", "installed-hook capture client is codex-cli");
+    expect(INSTALLED_PRODUCT_CLIENTS.includes(value.client),
+      `installed-hook capture client is one of ${INSTALLED_PRODUCT_CLIENTS.join(", ")}`);
     expect(matches(SHA256, value.packageSha256),
       "installed-hook capture requires packageSha256");
   }
@@ -120,7 +130,7 @@ export function validateCapture(value, { productEvidence } = {}) {
     }
     if (value.launchMode === INSTALLED_HOOKS_LAUNCH_MODE) {
       expect(productEvidence !== undefined, "installed-hook pass requires product evidence");
-      const evidence = assertRunEvidence(productEvidence);
+      const evidence = INSTALLED_PRODUCT_EVIDENCE[value.client](productEvidence);
       expect(evidence.phase === "product", "installed-hook pass requires product-phase evidence");
       expect(evidence.source === "real-client-capture",
         "installed-hook pass requires real-client product evidence");

@@ -46,10 +46,15 @@ async function skills() {
 
 test("every adapter ships a skill", async () => {
   const found = await skills();
+  const adapters = (await readdir(path.join(repo, "packages"), { withFileTypes: true }))
+    .filter(entry => entry.isDirectory() && entry.name.startsWith("adapter-")
+      && entry.name !== "adapter-sdk");
 
-  // Five adapters, five skills. A scan that found none would pass every
-  // assertion below without reading anything.
-  assert.equal(found.length, 5, found.map(item => item.file).join("\n"));
+  // One skill per adapter, counted from the packages rather than written down.
+  // A scan that found none would pass every assertion below without reading
+  // anything, and a literal goes stale the moment a client is added.
+  assert.equal(adapters.length > 0, true, "no adapter packages were found at all");
+  assert.equal(found.length, adapters.length, found.map(item => item.file).join("\n"));
 });
 
 test("each skill teaches the operations an agent is expected to use", async () => {

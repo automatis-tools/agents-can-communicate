@@ -97,6 +97,13 @@ test("the tarball carries the workspaces where imports can find them", async t =
       + "extension/gemini-extension.json"])).stdout);
   assert.equal(geminiExtension.version, intendedVersion,
     "the embedded Gemini extension drifted from the release version");
+  const antigravityPlugin = JSON.parse((await run("tar", ["-xzOf", tarball,
+    "package/node_modules/@agents-can-communicate/adapter-antigravity/"
+      + "plugin/plugin.json"])).stdout);
+  assert.equal(antigravityPlugin.version, intendedVersion,
+    "the embedded Antigravity plugin drifted from the release version");
+  assert.equal(antigravityPlugin.name, "acc",
+    "a plugin named agents-can-communicate is shadowed by this client's own imported copy");
 });
 
 test("nothing private, local, or irrelevant is published", async t => {
@@ -130,7 +137,16 @@ test("every packaged certification reference resolves inside its adapter", async
   const certifications = entries.filter(entry =>
     /^node_modules\/@agents-can-communicate\/adapter-[^/]+\/certification\.json$/.test(entry));
 
-  assert.equal(certifications.length, 5);
+  // One per packaged adapter, counted from the tarball rather than written
+  // down: a literal here goes stale the moment a client is added, and the
+  // failure it produces says nothing about what is actually missing.
+  const packagedAdapters = [...new Set(entries
+    .map(entry => /^node_modules\/@agents-can-communicate\/(adapter-[^/]+)\//.exec(entry)?.[1])
+    .filter(name => name !== undefined && name !== "adapter-sdk"))];
+  assert.equal(packagedAdapters.length > 0, true, "no adapters were packaged at all");
+  assert.deepEqual(certifications
+    .map(entry => /(adapter-[^/]+)/.exec(entry)[1]).sort(), packagedAdapters.sort(),
+  "a packaged adapter ships no certification, or a certification ships without its adapter");
   for (const certification of certifications) {
     const manifest = JSON.parse((await run("tar",
       ["-xzOf", tarball, `package/${certification}`])).stdout);

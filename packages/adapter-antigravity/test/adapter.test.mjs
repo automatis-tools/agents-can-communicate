@@ -1,0 +1,177 @@
+import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
+import test from "node:test";
+
+import { CAPABILITY_SHAPE, effectiveCapabilities } from "@agents-can-communicate/adapter-sdk";
+
+import { ANTIGRAVITY_CLI_VERSION, createAntigravityAdapter } from "../src/adapter.mjs";
+import { fakeAgy } from "./fake-agy.mjs";
+
+const trueOnes = capabilities => Object.entries(CAPABILITY_SHAPE)
+  .flatMap(([group, names]) => names.filter(name => capabilities[group][name] === true)
+    .map(name => `${group}.${name}`)).sort();
+
+test("only what a capture in this package shows is declared true", () => {
+  const adapter = createAntigravityAdapter();
+
+  assert.deepEqual(trueOnes(adapter.capabilities),
+    ["context.beforeTurnInjection", "delivery.livePush", "delivery.nextTurn",
+      "lifecycle.sessionStart"]);
+});
+
+test("the capabilities this client does not have stay false", () => {
+  const { capabilities } = createAntigravityAdapter();
+
+  // No tool event loads, so there is nothing to guard. The Gemini CLI adapter
+  // has guards.beforeWrite and this one must not inherit it.
+  assert.equal(capabilities.guards.beforeWrite, false);
+  assert.equal(capabilities.guards.beforeShell, false);
+  assert.equal(capabilities.guards.beforeRead, false);
+  // SessionEnd is accepted into the config and never fires.
+  assert.equal(capabilities.lifecycle.sessionEnd, false);
+  assert.equal(capabilities.lifecycle.heartbeat, false);
+  // The agent answers a pushed message with the ordinary acc reply; no native
+  // reply route was captured.
+  assert.equal(capabilities.delivery.replyRoute, false);
+});
+
+test("1.2.7 and every later stable release on darwin-arm64 are certified; nothing else is", () => {
+  // Decided 2026-09-21: this client ships every few days, so its captured
+  // version is a floor rather than the only version. A later capture that
+  // records a regression still wins for that version and capability.
+  const adapter = createAntigravityAdapter();
+  const captured = ["context.beforeTurnInjection", "delivery.livePush", "delivery.nextTurn",
+    "lifecycle.sessionStart"];
+
+  assert.deepEqual(adapter.certificationFloor, { "darwin-arm64": ANTIGRAVITY_CLI_VERSION });
+  for (const clientVersion of [ANTIGRAVITY_CLI_VERSION, "1.2.8", "1.3.0"]) {
+    assert.deepEqual(trueOnes(effectiveCapabilities(adapter, { clientVersion,
+      platform: "darwin-arm64" })), captured, clientVersion);
+  }
+  for (const facts of [{ clientVersion: "1.2.6", platform: "darwin-arm64" },
+    { clientVersion: "1.2.8-beta.1", platform: "darwin-arm64" },
+    { clientVersion: ANTIGRAVITY_CLI_VERSION, platform: "linux-x64" },
+    { clientVersion: ANTIGRAVITY_CLI_VERSION, platform: "darwin-x64" },
+    { clientVersion: "unknown", platform: "darwin-arm64" }, {}]) {
+    assert.deepEqual(trueOnes(effectiveCapabilities(adapter, facts)), [],
+      `${JSON.stringify(facts)} is not the client that was captured`);
+  }
+});
+
+test("every certified capability names a fixture shipped in this package", async () => {
+  const adapter = createAntigravityAdapter();
+  const shipped = JSON.parse(await readFile(new URL("../package.json", import.meta.url))).files;
+
+  for (const item of adapter.certification.evidence) {
+    assert.equal(item.client, "antigravity-cli");
+    assert.equal(shipped.includes(item.fixture), true, `${item.fixture} is not shipped`);
+    assert.equal(shipped.includes(item.provenance), true, `${item.provenance} is not shipped`);
+    await readFile(new URL(`../${item.fixture}`, import.meta.url));
+  }
+  assert.equal(shipped.includes("fixtures/"), false,
+    "a wildcard fixture directory can publish documentation-derived material");
+});
+
+test("the manifest probes the binary this client really installs", () => {
+  const adapter = createAntigravityAdapter();
+
+  assert.equal(adapter.client.command, "agy");
+  assert.equal(adapter.client.certificationName, "antigravity-cli");
+  assert.equal(adapter.id, "antigravity");
+});
+
+test("the adapter reads the event from its argument, through the manifest", async () => {
+  const adapter = createAntigravityAdapter();
+  const payload = JSON.parse(await readFile(
+    new URL("../fixtures/SessionStart-1.2.7.json", import.meta.url), "utf8"));
+
+  assert.equal(adapter.normalizeHook(payload, { args: ["SessionStart"] }).kind, "sessionStart");
+  assert.throws(() => adapter.normalizeHook(payload, { args: [] }),
+    /unrecognised Antigravity hook event/);
+});
+
+test("renderContextResult is present, because receipts advance from ids alone", () => {
+  const adapter = createAntigravityAdapter();
+
+  assert.equal(typeof adapter.renderContextResult, "function");
+  assert.equal(typeof adapter.renderContext, "function");
+});
+
+test("the delivery fallback says what stays true when the client is uncertified", () => {
+  const adapter = createAntigravityAdapter();
+
+  assert.match(adapter.deliveryFallback.diagnostic, /acc inbox/);
+  assert.match(adapter.deliveryFallback.diagnostic, new RegExp(ANTIGRAVITY_CLI_VERSION));
+});
+
+test("doctor names the state where files exist and nothing is registered", async () => {
+  const adapter = createAntigravityAdapter();
+
+  const report = await adapter.doctor({ home: "/nonexistent-home",
+    antigravityHookLocation: "global", probeHooks: async () => ({ hooks: [] }),
+    runAgy: fakeAgy().run });
+
+  assert.equal(report.diagnostics.some(line => /not registered/.test(line)), true);
+  assert.equal(report.diagnostics.some(line => /no tool guard|no session end/.test(line)), true);
+});
+
+test("evidence the tarball does not ship is still kept in the repository", async () => {
+  // The packaged allowlist refuses a fixture no certification entry references,
+  // so a tarball's fixtures are exactly its evidence. These are not evidence
+  // for a capability - they are what this client answers when a registration
+  // does not take - and they are the reason install reads the hook list back
+  // instead of trusting its own write. Named here so they are not deleted for
+  // looking unused.
+  const shipped = JSON.parse(await readFile(new URL("../package.json", import.meta.url))).files;
+  for (const name of ["PostInvocation-1.2.7", "Stop-1.2.7", "Stop-continued-1.2.7",
+    "SessionStart-no-workspace-1.2.7", "Stop-no-workspace-1.2.7",
+    "hook-process-environment-1.2.7", "PreInvocation-tui-1.2.7",
+    "tui-transcript-injection-1.2.7", "skills-readback-1.2.7",
+    "plugin-name-collision-1.2.7", "plugin-install-lifecycle-1.2.7",
+    "headless-reply-attempt-1.2.7", "stop-continuation-live-1.2.7",
+    "hook-command-space-path-1.2.7", "agentapi-reachability-1.2.7",
+    "hooks-readback-empty-1.2.7", "hooks-readback-registered-1.2.7",
+    "hooks-readback-dropped-1.2.7", "hooks-readback-gemini-shape-1.2.7",
+    "hooks-readback-foreign-key-1.2.7", "hooks-readback-namespace-collision-1.2.7"]) {
+    const captured = JSON.parse(await readFile(
+      new URL(`../fixtures/${name}.json`, import.meta.url), "utf8"));
+    assert.equal(typeof captured, "object");
+    assert.equal(shipped.includes(`fixtures/${name}.json`), false,
+      `fixtures/${name}.json is published but no certification entry references it`);
+  }
+});
+
+test("the relay certification ships the transport history it stands on", async () => {
+  // Live push is certified from the installed relay's product run; the earlier
+  // agentapi captures it builds on travel with it as historical evidence, so
+  // the tarball can be audited without the repository.
+  const shipped = JSON.parse(await readFile(new URL("../package.json", import.meta.url))).files;
+  const provenance = JSON.parse(await readFile(
+    new URL("../fixtures/certification-provenance.json", import.meta.url), "utf8"));
+  const relay = provenance.captures.find(record => record.id === "native-delivery-1-2-7-relay-product");
+  for (const { fixture } of [relay.productEvidence, ...relay.historicalFixtures]) {
+    assert.equal(shipped.includes(fixture), true, `${fixture} is not shipped`);
+  }
+  assert.deepEqual(relay.historicalFixtures.map(item => item.fixture).sort(), [
+    "fixtures/agentapi-error-answers-1.2.7.json", "fixtures/agentapi-live-push-1.2.7.json",
+    "fixtures/hooks-first-trust-no-workspace-1.2.7.json", "fixtures/live-push-surfaces-1.2.7.json"]);
+});
+
+test("the adapter continues a turn from the captured Stop payload, once", async () => {
+  const adapter = createAntigravityAdapter();
+  const first = JSON.parse(await readFile(
+    new URL("../fixtures/Stop-1.2.7.json", import.meta.url), "utf8"));
+  const second = JSON.parse(await readFile(
+    new URL("../fixtures/Stop-continued-1.2.7.json", import.meta.url), "utf8"));
+
+  // executionNum is the client's own count across a continuation - 0, then 1 -
+  // so the ceiling needs no state kept between two short-lived hook processes.
+  const held = adapter.continueTurnOutcome({ reason: "a peer asked", payload: first });
+  assert.deepEqual(JSON.parse(held.stdout), { decision: "continue", reason: "a peer asked" });
+  assert.equal(held.exitCode, 0);
+
+  const released = adapter.continueTurnOutcome({ reason: "a peer asked", payload: second });
+  assert.equal(released.stdout, "", "the adapter must stop asking before the client's cap does");
+  assert.equal(adapter.continueTurnOutcome({ reason: "x", payload: undefined }).stdout, "",
+    "no payload is not a reason to hold the turn");
+});

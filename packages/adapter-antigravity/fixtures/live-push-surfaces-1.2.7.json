@@ -1,0 +1,38 @@
+{
+  "note": "Where Antigravity CLI 1.2.7 exposes the session endpoint that `agy agentapi send-message` needs, and how a push behaves, captured 2026-09-21 on macOS arm64. Environment variables are recorded by name only; no credential value was written anywhere. Conversation and sender ids are redacted.",
+  "endpointByProcess": {
+    "hook": ["ANTIGRAVITY_CONVERSATION_ID"],
+    "mcpServerSpawnedByTheClient": [],
+    "agentToolShell": ["ANTIGRAVITY_CONVERSATION_ID", "ANTIGRAVITY_CSRF_TOKEN", "ANTIGRAVITY_LS_ADDRESS"],
+    "backgroundProcessStartedFromTheAgentShell": ["ANTIGRAVITY_AGENT", "ANTIGRAVITY_AGENTAPI_EXE",
+      "ANTIGRAVITY_APP_DATA_DIR", "ANTIGRAVITY_CONVERSATION_ID", "ANTIGRAVITY_CSRF_TOKEN",
+      "ANTIGRAVITY_LS_ADDRESS", "ANTIGRAVITY_LS_VERSION", "ANTIGRAVITY_PROJECT_ID",
+      "ANTIGRAVITY_SOURCE_METADATA", "ANTIGRAVITY_TRAJECTORY_ID"]
+  },
+  "mcp": {
+    "workspacePluginMcpConfigLoads": "a stdio server declared in <workspace>/.agents/plugins/<name>/mcp_config.json was spawned, its parent process being agy",
+    "clientSends": ["server/discover", "initialize", "notifications/initialized", "tools/list"],
+    "initialize": { "protocolVersion": "2025-11-25", "clientInfo": { "name": "antigravity-client", "version": "v1.0.0" },
+      "capabilities": { "elicitation": { "form": {}, "url": {} }, "roots": { "listChanged": true } } },
+    "meaning": "no sampling and no channel-like capability: a server cannot put text in front of the model, and elicitation asks the human, not the agent"
+  },
+  "agentToolset": "the print-mode stream `init` event lists send_message, manage_inbox, schedule and wait among the agent's own tools - a first-party inbox between conversations that agentapi send-message writes into",
+  "relayPrototype": {
+    "startedBy": "the agent, once, through run_command - approved by the operator at the TUI permission prompt",
+    "detachedParent": "/sbin/launchd",
+    "survivedTurnEnd": true,
+    "survivedClientExit": true,
+    "pushes": [
+      { "sentAt": "16:57:57Z", "sessionState": "idle", "accepted": true,
+        "observed": "SYSTEM_MESSAGE and a model reply at 16:57:57Z, with no user input" },
+      { "sentAt": "16:59:28Z", "sessionState": "busy - generating a 524-word answer started at 16:59:22Z", "accepted": true,
+        "observed": "held until that answer completed uninterrupted; the SYSTEM_MESSAGE and the reply to it appeared at 16:59:38Z" },
+      { "sentAt": "17:03:49Z", "sessionState": "client exited", "accepted": false,
+        "observed": "rpc error: code = Unavailable desc = connection error" }
+    ]
+  },
+  "asTheModelSeesIt": "The following is a <SYSTEM_MESSAGE> not actually sent by the user. It is provided by the system as important information to pay attention to.\n\n<SYSTEM_MESSAGE>\n[Message] timestamp=<utc> sender=<conversation> priority=MESSAGE_PRIORITY_HIGH content=<the text>\n</SYSTEM_MESSAGE>",
+  "notShown": "the --title given to send-message did not appear in what the model received",
+  "streamJsonInput": "one NDJSON line per turn: {\"event\":\"user\",\"message\":{\"content\":\"<text>\"}}, with an empty attached prompt (--print=) and --output-format stream-json",
+  "permissionRuleSyntax": "command(<prefix>) under permissions.allow, per strings in the binary; not exercised - an auto-mode coding agent was refused permission to add one, as security weakening"
+}

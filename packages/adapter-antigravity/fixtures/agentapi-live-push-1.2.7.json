@@ -1,0 +1,31 @@
+{
+  "note": "The live-push half of the agentapi capture, run by the operator on Antigravity CLI 1.2.7, macOS arm64, 2026-09-21. Step 1: in an interactive TUI opened in a probe project, the operator had the agent run one script from its own shell and approved it at the permission prompt; the script wrote the session's endpoint to a 0600 file and printed variable names only. Step 2: a separate process loaded that endpoint only inside subshells, asked the idle session's language server to deliver one message, watched the transcript, and deleted the endpoint file. Every value printed passed through a mask that replaced the exact token; no credential value was recorded anywhere. Conversation and initialization ids are redacted.",
+  "agentShellVariables": ["ANTIGRAVITY_CONVERSATION_ID", "ANTIGRAVITY_CSRF_TOKEN", "ANTIGRAVITY_LS_ADDRESS"],
+  "hookVariables": ["ANTIGRAVITY_CONVERSATION_ID"],
+  "getConversationMetadata": {
+    "response": { "conversationMetadata": { "metadata": {
+      "workspaces": [ { "workspaceFolderAbsoluteUri": "file://<probe project>", "gitRootAbsoluteUri": "file://<probe project>" } ],
+      "createdAt": "2026-09-21T16:28:32.249291Z",
+      "parentConversationId": "",
+      "rootConversationId": "<conversation>" } } }
+  },
+  "sendMessage": {
+    "command": "agy agentapi send-message --title \"ACC live push probe\" <conversation> \"Live push probe LP8812. Reply with the single word LP8812.\"",
+    "response": { "response": { "sendMessage": { "recipientId": "<conversation>",
+      "content": "Live push probe LP8812. Reply with the single word LP8812." } } }
+  },
+  "idleSessionAfterwards": {
+    "stepsBefore": 6,
+    "stepsAfter": 8,
+    "newSteps": [
+      { "at": "16:29:09Z", "source": "SYSTEM", "type": "SYSTEM_MESSAGE", "carriesMessage": true },
+      { "at": "16:29:09Z", "source": "MODEL", "type": "PLANNER_RESPONSE", "reply": "LP8812" }
+    ]
+  },
+  "findings": [
+    "an idle interactive session woke and answered a message pushed through agentapi, with no user input",
+    "the pushed message is presented to the model as a SYSTEM_MESSAGE, the same system framing as a Stop continuation reason",
+    "the endpoint that makes this possible - language-server address and CSRF token - exists in the agent's own tool shell and not in any hook's environment",
+    "an auto-mode coding agent was refused permission to materialize that token twice; the capture ran only because the operator performed the token step himself"
+  ]
+}

@@ -1,0 +1,19 @@
+{
+  "note": "How `agy agentapi` reports a failure, captured on Antigravity CLI 1.2.7, macOS arm64, 2026-09-21, with no session endpoint at all: no CSRF token was set in either run, and the second pointed at a closed local port. Both answers are JSON on stdout with exit status 1 and nothing on stderr, so a caller reads failures from the same stream as successes.",
+  "answers": [
+    {
+      "env": "no ANTIGRAVITY_LS_ADDRESS",
+      "command": "agy agentapi get-conversation-metadata probe-id",
+      "exitStatus": 1,
+      "stderr": "",
+      "stdout": { "error": "ANTIGRAVITY_LS_ADDRESS is not set" }
+    },
+    {
+      "env": "ANTIGRAVITY_LS_ADDRESS=127.0.0.1:9 (closed)",
+      "command": "agy agentapi get-conversation-metadata probe-id",
+      "exitStatus": 1,
+      "stderr": "",
+      "stdout": { "response": {}, "error": "rpc error: code = Unavailable desc = connection error: desc = \"transport: Error while dialing: dial tcp 127.0.0.1:9: connect: connection refused\"" }
+    }
+  ]
+}

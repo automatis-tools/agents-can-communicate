@@ -1,3 +1,4 @@
+import { fakeAgy } from "../../packages/adapter-antigravity/test/fake-agy.mjs";
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
 import { mkdir, mkdtemp, readFile, readdir, realpath, rm, writeFile }
@@ -33,6 +34,8 @@ const CONFIGS = Object.freeze({
   gemini_cli: ".gemini/settings.json",
   kimi: ".kimi-code/plugins/installed.json",
   codex: ".agents/acc-local/.agents/plugins/marketplace.json",
+  // Read before the hook shim, the CLI shim or the skill plugin is written.
+  antigravity: ".gemini/config/hooks.json",
 });
 const BROKEN = '{ "enabledPlugins": ';
 
@@ -49,8 +52,12 @@ async function home(t, { broken } = {}) {
   }
   const cli = (...argv) => run(process.execPath, [acc, ...argv, "--home", place],
     { env });
+  // Antigravity's artifacts are named `acc` - its shim directory and its
+  // plugin - because this client already holds an imported copy under the
+  // longer name. Both are ACC's, so both count as left behind.
   const ours = async () => (await readdir(place, { recursive: true }))
-    .filter(entry => entry.includes("agents-can-communicate"));
+    .filter(entry => entry.includes("agents-can-communicate")
+      || /(^|\/)\.gemini\/config\/(acc|plugins)(\/|$)/.test(entry));
   return { base, place, env, cli, ours };
 }
 
@@ -61,7 +68,8 @@ for (const [adapterId, config] of Object.entries(CONFIGS)) {
 
     // The adapter directly, not `acc install`: what is under test is what gets
     // written, not which clients happen to be on the machine running this.
-    const failure = await adapter.install(clientContext(place.place))
+    const failure = await adapter.install({ ...clientContext(place.place),
+      runAgy: fakeAgy().run })
       .then(() => null, error => error);
 
     assert.notEqual(failure, null, `${adapterId} installed over a config it cannot read`);

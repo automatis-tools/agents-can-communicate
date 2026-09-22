@@ -14,7 +14,7 @@ import { clearPin, createGitProbe, resolveHookWorkspace, platformDataHome, runti
 
 import { resolveClientPid } from "./client-pid.mjs";
 import { probeClientVersion as defaultProbeClientVersion } from "./client-version.mjs";
-import { bindNative, nativeDiagnosticDeadline } from "./native-attempt.mjs";
+import { bindNative, nativeActivationHintFor, nativeDiagnosticDeadline } from "./native-attempt.mjs";
 import { readProcessTable as defaultReadProcessTable } from "./process-table.mjs";
 import { withSessionLifecycle } from "./session-lifecycle.mjs";
 import { appendStartOwner, appendToolOwner, ownerHeader, ownerOnlyOutcome } from "./owner-context.mjs";
@@ -232,7 +232,10 @@ async function openContext({ event, adapterId, dataHome, runtime, env, deadline 
 
 // What this turn is shown and which complete groups it may commit as
 // offered. Runs after the heartbeat and the bounded native retry.
-async function projectTurn({ binding, context, adapter, adapterId }) {
+// `render` is how the projected text reaches this client: before a turn it is
+// the adapter's context envelope, at the end of one it is a continuation.
+async function projectTurn({ binding, context, adapter, adapterId,
+  render = text => adapter.injectOutcome?.(text), activationHint = null }) {
   const sync = await context.service.sync({ sessionId: binding.accSessionId,
     cursor: null, scope: "delta" });
 
@@ -255,8 +258,14 @@ async function projectTurn({ binding, context, adapter, adapterId }) {
   // Only this hook's payload selected the binding. Supply its own pair as
   // trusted context, outside peer bodies, rather than exporting inheritable
   // credentials or teaching the CLI to guess from a public roster.
-  const owner = ownerHeader(binding, context.workspaceCwd, context.workspaceRef);
   const totalBudget = context.descriptor.policy?.contextBudgetBytes ?? 6_000;
+  // An adapter's one-line ask rides with the owner line, which every projected
+  // turn carries - and only when both fit in half the budget, so peer bodies
+  // always keep the rest.
+  const header = ownerHeader(binding, context.workspaceCwd, context.workspaceRef);
+  const owner = activationHint === null
+    || byteLength(header) + 1 + byteLength(activationHint) > totalBudget / 2
+    ? header : `${header}\n${activationHint}`;
   // A peer can join after this prompt has begun. The current turn must already
   // have its own arguments when it needs inbox/reply, without reattaching or
   // waiting for another user prompt. Solo emits identity, not a peer notice.
@@ -332,7 +341,7 @@ async function projectTurn({ binding, context, adapter, adapterId }) {
   // The entry point owns the transport boundary. This handler only prepares
   // offer inputs; recording them here would claim delivery before stdout's
   // callback proves that the bytes crossed.
-  const outcome = { stdout: "", ...adapter.injectOutcome?.(projected) };
+  const outcome = { stdout: "", ...render(projected) };
   const writableOffers = outcome.stdout === "" ? [] : offerInputs;
   return { ...outcome,
     stderr: [outcome.stderr, ownerWarning, degradation].filter(Boolean).join("\n"),
@@ -485,7 +494,9 @@ const HANDLERS = {
       const started = await HANDLERS.sessionStart(input);
       const fresh = await loadSessionBinding({ runtimeDir: paths.root,
         harnessSessionId: event.sessionId });
-      const turn = await projectTurn({ ...input, binding: fresh });
+      const activationHint = await nativeActivationHintFor({ adapter, event,
+        nativeBinding: started.nativeBinding, binding: fresh, context, paths, deadline });
+      const turn = await projectTurn({ ...input, binding: fresh, activationHint });
       return { ...turn, nativeBinding: started.nativeBinding };
     }
     const current = await context.service.locateSession(binding.accSessionId);
@@ -499,7 +510,9 @@ const HANDLERS = {
       const started = await HANDLERS.sessionStart(input);
       const fresh = await loadSessionBinding({ runtimeDir: paths.root,
         harnessSessionId: event.sessionId });
-      const turn = await projectTurn({ ...input, binding: fresh });
+      const activationHint = await nativeActivationHintFor({ adapter, event,
+        nativeBinding: started.nativeBinding, binding: fresh, context, paths, deadline });
+      const turn = await projectTurn({ ...input, binding: fresh, activationHint });
       return { ...turn, nativeBinding: started.nativeBinding };
     }
     // A turn is the clearest sign a session is alive. Never a reason to fail:
@@ -511,8 +524,36 @@ const HANDLERS = {
     const nativeBinding = await bindNative({ adapter, event, hookBinding: binding,
       clientVersion: binding.clientVersion, platform: binding.platform, context, paths,
       deadline });
-    const turn = await projectTurn(input);
+    const activationHint = await nativeActivationHintFor({ adapter, event, nativeBinding,
+      binding, context, paths, deadline });
+    const turn = await projectTurn({ ...input, activationHint });
     return nativeBinding === undefined ? turn : { ...turn, nativeBinding };
+  },
+
+  /**
+   * The end of a turn, for a client that can hold one open.
+   *
+   * A peer message that arrives while the model is producing its last answer
+   * has no next invocation to ride on, and would otherwise wait for the next
+   * user prompt - which can be hours. A client whose end-of-turn hook can
+   * continue the turn (`continueTurnOutcome`) gets that message now instead.
+   *
+   * Only for peer bodies the projector actually offers. Continuing a turn costs
+   * the operator a model invocation, so an owner header, an attention count or
+   * a degradation notice is never a reason to. The adapter owns the shape and
+   * the ceiling, and reads its own counter from the payload handed back to it;
+   * when it declines, it prints nothing, no offer is recorded, and the body
+   * stays queued for the next invocation. Every failure ends the turn normally.
+   */
+  async turnEnd(input) {
+    const { binding, context, adapter, payload } = input;
+    if (typeof adapter.continueTurnOutcome !== "function" || binding === null) return {};
+    const current = await context.service.locateSession(binding.accSessionId);
+    if (current === null || current.record.state !== "open"
+      || current.record.generation !== binding.generation) return {};
+    const turn = await projectTurn({ ...input,
+      render: text => adapter.continueTurnOutcome({ reason: text, payload }) });
+    return (turn.offerInputs ?? []).length === 0 ? {} : turn;
   },
 
   async beforeTool({ binding, context, event, adapter }) {
@@ -582,6 +623,13 @@ const HANDLERS = {
  * only thing this function refuses to do is fail closed.
  */
 export async function runHook({ adapterId, payload, adapters, dataHome, env,
+  // The arguments the client's hook command carried, after the adapter id.
+  // Most clients name the event inside the payload and their adapters ignore
+  // this; Antigravity CLI sends no `hook_event_name` at all, and two of its
+  // four events hand over byte-identical envelopes - so for that client the
+  // registered command's own argument is the only thing that knows which hook
+  // ran. Passed to every adapter, read by the ones that need it.
+  args = [],
   runtime = defaultRuntime(), budgetMs = DEFAULT_BUDGET_MS,
   readProcessTable = defaultReadProcessTable,
   probeClientVersion = defaultProbeClientVersion,
@@ -594,7 +642,7 @@ export async function runHook({ adapterId, payload, adapters, dataHome, env,
     const adapter = adapters?.[adapterId];
     if (adapter === undefined) throw new Error(`no adapter named ${adapterId}`);
 
-    const event = await adapter.normalizeHook(payload);
+    const event = await adapter.normalizeHook(payload, { args });
     const context = await openContext({ event, adapterId, dataHome, runtime, env, deadline });
     const handler = HANDLERS[event.kind];
     const lifecycle = ["sessionStart", "sessionEnd", "beforeTurn"].includes(event.kind);
@@ -610,8 +658,10 @@ export async function runHook({ adapterId, payload, adapters, dataHome, env,
       const binding = await loadSessionBinding({ runtimeDir: context.paths.root,
         harnessSessionId: event.sessionId });
       assertHookBudget(deadline);
+      // The raw payload goes to a handler only to be handed back to the adapter
+      // that produced it; nothing in core reads it.
       const result = handler === undefined ? {} : await handler({ event, context, adapter, adapterId,
-        binding, paths: context.paths,
+        binding, paths: context.paths, payload,
         readProcessTable, probeClientVersion, platform, deadline });
       return appendToolOwner(appendStartOwner(result, { event, context, adapter }),
         { event, binding, context, adapter });

@@ -26,6 +26,29 @@ test("the Codex home respects an explicit CODEX_HOME and otherwise follows the s
     env: { CODEX_HOME: "" } }).codexHome, "/supplied/home/.codex");
 });
 
+test("the Antigravity hook location defaults to global and honours an override", () => {
+  // Issue #178: the machine-wide file. It always loads, where a workspace
+  // registration does nothing at all unless the project is an open Antigravity
+  // workspace - and a default that silently registers nothing is worse than one
+  // that is broader than a given project needs.
+  assert.equal(clientContext("/supplied/home", "/state", { env: {} })
+    .antigravityHookLocation, "global");
+  assert.equal(clientContext("/supplied/home", "/state",
+    { env: { ACC_ANTIGRAVITY_HOOKS: "workspace" } }).antigravityHookLocation, "workspace");
+  // Carried through exactly as asked, wrong values included, so the adapter can
+  // refuse them by name. Substituting the default here would answer a question
+  // the operator did not ask.
+  assert.equal(clientContext("/supplied/home", "/state",
+    { env: { ACC_ANTIGRAVITY_HOOKS: "both" } }).antigravityHookLocation, "both");
+});
+
+test("a workspace registration is written into the project the command ran in", () => {
+  assert.equal(clientContext("/supplied/home", "/state", { env: {}, cwd: "/work/project" })
+    .antigravityWorkspace, "/work/project");
+  assert.equal(typeof clientContext("/supplied/home", "/state", { env: {} })
+    .antigravityWorkspace, "string");
+});
+
 /**
  * The command's own wiring.
  *

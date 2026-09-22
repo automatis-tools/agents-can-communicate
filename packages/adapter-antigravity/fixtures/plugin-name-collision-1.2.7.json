@@ -1,0 +1,11 @@
+{
+  "note": "A plugin named agents-can-communicate installed with `agy plugin install` into <home>/.gemini/config/plugins/, on a machine where this client had already auto-imported ACC's Gemini CLI extension under the same name. /skills listed exactly one agents-can-communicate:acc, and it was the imported copy: the installed one was silently shadowed. The same class as two hook namespaces sharing a name. A plugin named acc loaded beside it as acc:acc.",
+  "installed": { "name": "agents-can-communicate", "path": "<home>/.gemini/config/plugins/agents-can-communicate/skills/acc/SKILL.md", "description": "COLLISION PROBE - this is the ACC-installed copy, not the imported one." },
+  "skillsListed": [
+    { "name": "agents-can-communicate:acc", "path": "<home>/.gemini/antigravity-cli/plugins/agents-can-communicate/skills/acc/SKILL.md" }
+  ],
+  "withDistinctName": [
+    { "name": "acc:acc", "path": "<home>/.gemini/config/plugins/acc/skills/acc/SKILL.md" },
+    { "name": "agents-can-communicate:acc", "path": "<home>/.gemini/antigravity-cli/plugins/agents-can-communicate/skills/acc/SKILL.md" }
+  ]
+}
