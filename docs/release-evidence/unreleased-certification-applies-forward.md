@@ -27,7 +27,7 @@ the shipped evidence against the versions installed on this machine on 2026-09-2
 |---|---|---|---|---|
 | Claude Code | `nextTurn` 2.1.233; `livePush`/`replyRoute` 2.1.258, 2.1.260 | 2.1.278 | nothing | context, nextTurn, livePush, replyRoute |
 | Codex CLI | 0.147.0 hooks; `livePush` 0.152.1, 0.153.4; `livePush`/`replyRoute` fail at 0.152.0 | 0.153.4 | livePush only | context, nextTurn, livePush |
-| Gemini CLI | 0.57.0 | 0.59.0 | nothing | context, nextTurn |
+| Gemini CLI | 0.57.0 | 0.59.0, then 0.60.0 | nothing | context, nextTurn |
 | Kimi Code | 0.36.1 | 0.42 | nothing | context, nextTurn |
 | Antigravity CLI | 1.2.7, plus a `certificationFloor` | 1.2.8 | what the floor named | the same, with no floor field |
 
@@ -40,6 +40,9 @@ Two separate defects sat in that table.
 - **Platforms.** Every row of every adapter reads `darwin-arm64`, and the platform matched
   exactly. On `linux-x64` and `win32-x64` every capability of every adapter resolved to
   `false`, so ACC placed no message in any context there.
+
+Gemini CLI moved from 0.59.0 to 0.60.0 during the session that wrote this, which is the
+argument in one line: a list of exact versions goes stale faster than it can be recorded.
 
 ## The rule now
 
