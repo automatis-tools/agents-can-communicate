@@ -59,7 +59,7 @@ for (const policy of ["actionable", "all"]) {
     assert.equal(operation.livePolicy, policy);
     assert.equal(operation.effectiveLivePolicy, "off");
     assertNativeReason(operation.deliveryDiagnostic);
-    assert.match(operation.deliveryDiagnostic, /fallback: acc inbox/);
+    assert.match(operation.deliveryDiagnostic, /fallback: next-turn hooks.*acc inbox/);
 
     const installed = await place.command("install", "--adapter", "claude_code",
       "--delivery", policy, "--home", place.home);
@@ -82,7 +82,7 @@ test("doctor names the failed native capture and the durable fallback", async t 
 
   const human = (await place.command("doctor", "--home", place.home)).stdout;
   assertNativeReason(human);
-  assert.match(human, /fallback: acc inbox/);
+  assert.match(human, /fallback: next-turn hooks.*acc inbox/);
 
   const body = JSON.parse((await place.command("doctor", "--home", place.home,
     "--json")).stdout).data;
@@ -90,7 +90,7 @@ test("doctor names the failed native capture and the durable fallback", async t 
   assert.equal(claude.capabilities.delivery.livePush, false);
   assert.equal(claude.capabilities.delivery.replyRoute, false);
   assertNativeReason(claude.deliveryDiagnostic);
-  assert.match(claude.diagnostics.join(" "), /fallback: acc inbox/);
+  assert.match(claude.diagnostics.join(" "), /fallback: next-turn hooks.*acc inbox/);
 });
 
 test("delivery off removes only legacy ACC channel opt-ins", async t => {

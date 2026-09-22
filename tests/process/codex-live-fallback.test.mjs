@@ -97,7 +97,7 @@ for (const policy of ["actionable", "all"]) {
     assert.equal(operation.effectiveLivePolicy, "off");
     assert.match(operation.deliveryDiagnostic, capturedPlatform
       ? /local delivery service is unavailable/ : /not verified on this platform/);
-    assert.match(operation.deliveryDiagnostic, /fallback: acc inbox/);
+    assert.match(operation.deliveryDiagnostic, /fallback: next-turn hooks.*acc inbox/);
 
     const installed = await place.command("install", "--adapter", "codex",
       "--delivery", policy, "--home", place.home);
@@ -127,7 +127,7 @@ test("doctor names unavailable fallback without withdrawing captured live delive
 
   const human = (await place.command("doctor", "--home", place.home)).stdout;
   assert.match(human, /Codex CLI live delivery:.*off/);
-  assert.match(human, /fallback: acc inbox/);
+  assert.match(human, /fallback: next-turn hooks.*acc inbox/);
   if (capturedPlatform) {
     assert.match(human, /local delivery service is unavailable/);
     assert.match(human, /acc install --adapter codex --delivery actionable/);
@@ -139,25 +139,32 @@ test("doctor names unavailable fallback without withdrawing captured live delive
   const body = JSON.parse((await place.command("doctor", "--home", place.home,
     "--json")).stdout).data;
   const codex = body.adapters.find(adapter => adapter.adapterId === "codex");
-  assert.equal(codex.capabilities.delivery.nextTurn, false);
-  assert.equal(codex.capabilities.delivery.livePush, capturedPlatform);
+  // What a capture proves travels; what a native contract requires does not.
+  // The capability is on everywhere the evidence reaches, while the reason code
+  // below still says this machine's platform was never captured.
+  assert.equal(codex.capabilities.delivery.nextTurn, true);
+  assert.equal(codex.capabilities.delivery.livePush, true);
   assert.equal(codex.capabilities.delivery.replyRoute, false);
-  assert.match(codex.deliveryDiagnostic, /fallback: acc inbox/);
+  assert.match(codex.deliveryDiagnostic, /fallback: next-turn hooks.*acc inbox/);
   assert.equal(codex.nativeDelivery.reasonCode, capturedPlatform
     ? "native_endpoint_unavailable" : "platform_not_captured");
   await assertOnlyVersionProbes(place);
 });
 
-test("an unknown Codex version retains only the durable inbox", async t => {
+test("an unreadable Codex version keeps what the captures prove", async t => {
   const place = await machine(t, "codex-cli development build");
   const body = JSON.parse((await place.command("doctor", "--home", place.home,
     "--json")).stdout).data;
   const codex = body.adapters.find(adapter => adapter.adapterId === "codex");
 
+  // A development build prints no version. It is still this client, running
+  // this integration, so it is judged by the newest evidence rather than
+  // losing delivery over the shape of a --version line.
   assert.equal(codex.version, null);
-  assert.equal(codex.capabilities.delivery.nextTurn, false);
-  assert.equal(codex.capabilities.delivery.livePush, false);
-  assert.equal(codex.capabilities.delivery.replyRoute, false);
+  assert.equal(codex.capabilities.delivery.nextTurn, true);
+  assert.equal(codex.capabilities.delivery.livePush, true);
+  assert.equal(codex.capabilities.delivery.replyRoute, false,
+    "a capability the 0.152.0 capture recorded as failing stays off");
   assert.match(codex.deliveryDiagnostic, /acc inbox/);
   await assertOnlyVersionProbes(place);
 });

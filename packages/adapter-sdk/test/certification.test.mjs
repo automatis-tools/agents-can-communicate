@@ -247,6 +247,33 @@ test("a prerelease client version is judged as its release triple", () => {
   assert.equal(on("1.2.2-rc.1"), false, "a prerelease below every row is still below them");
 });
 
+test("a refused capability says which evidence refused it", () => {
+  const adapter = sdk.defineAdapter(base({
+    capabilities: { delivery: { livePush: true, nextTurn: true } },
+    certification: { evidence: [evidence(),
+      evidence({ version: "1.4.0", result: "fail", provenanceId: "regressed",
+        limitations: ["the vendor changed the push surface"] }),
+      evidence({ capability: "delivery.nextTurn", version: "1.3.0",
+        provenanceId: "next-turn" })] },
+    offerMessage: noop,
+    renderContextResult: () => ({ text: "", offeredMessageIds: [], includedAttentionIds: [] }),
+  }));
+  const why = (clientVersion, capability, platform = "darwin-arm64") =>
+    sdk.capabilityEvidence(adapter, { clientVersion, platform }, capability);
+
+  assert.deepEqual(why("1.3.0", "delivery.livePush"),
+    { granted: true, reason: null, version: "1.2.3" });
+  assert.deepEqual(why("1.4.0", "delivery.livePush"),
+    { granted: false, reason: "recorded-failure", version: "1.4.0" });
+  assert.deepEqual(why("1.2.2", "delivery.livePush"),
+    { granted: false, reason: "older-than-evidence", version: "1.2.3" });
+  assert.deepEqual(why("1.2.9", "delivery.nextTurn"),
+    { granted: false, reason: "older-than-evidence", version: "1.3.0" },
+    "each capability names the first version that proved it, not the adapter's oldest row");
+  assert.deepEqual(why("2.0.0", "guards.beforeWrite"),
+    { granted: false, reason: "undeclared", version: null });
+});
+
 test("certificationFloor is no longer an adapter field", () => {
   assert.throws(() => sdk.defineAdapter(base({
     capabilities: { delivery: { livePush: true } },

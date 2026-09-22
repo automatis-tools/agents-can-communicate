@@ -52,22 +52,24 @@ test("a present client reports the version it printed", async t => {
   assert.equal(detected.find(entry => entry.adapterId === "kimi").present, false);
 });
 
-test("detection advertises only capabilities effective for the observed version and platform",
+test("detection advertises the capabilities the observed version can reach",
   async t => {
     const context = { home: await home(t), dataHome: await home(t) };
-    const exact = await detectInstallation({ adapters: [adapter("codex")],
-      probe: probeFor({ codex: "codex-cli 0.147.0" }), context,
-      platform: "darwin-arm64" });
-    const mismatch = await detectInstallation({ adapters: [adapter("codex")],
-      probe: probeFor({ codex: "codex-cli 0.148.0" }), context,
-      platform: "darwin-arm64" });
-    const unknown = await detectInstallation({ adapters: [adapter("codex")],
-      probe: probeFor({ codex: "build from source" }), context,
-      platform: "darwin-arm64" });
+    const beforeWrite = async (output, platform = "darwin-arm64") =>
+      (await detectInstallation({ adapters: [adapter("codex")],
+        probe: probeFor({ codex: output }), context, platform }))[0]
+        .capabilities.guards.beforeWrite;
 
-    assert.equal(exact[0].capabilities.guards.beforeWrite, true);
-    assert.equal(mismatch[0].capabilities.guards.beforeWrite, false);
-    assert.equal(unknown[0].capabilities.guards.beforeWrite, false);
+    assert.equal(await beforeWrite("codex-cli 0.147.0"), true);
+    assert.equal(await beforeWrite("codex-cli 0.148.0"), true,
+      "a release after the capture reads it");
+    assert.equal(await beforeWrite("codex-cli 0.147.0", "linux-x64"), true,
+      "a platform nobody captured reads it too");
+    // A running client whose version cannot be read is still this client; the
+    // newest evidence is the best answer available for it.
+    assert.equal(await beforeWrite("build from source"), true);
+    assert.equal(await beforeWrite("codex-cli 0.146.0"), false,
+      "a client older than every capture stays unproven");
   });
 
 test("a version that cannot be parsed is reported raw, not dropped", async t => {
@@ -120,7 +122,7 @@ test("a fallback diagnostic does not mutate adapter-owned detection results", as
   assert.deepEqual(adapterDiagnostics, ["acc plugin not registered"]);
 });
 
-test("an uncertified next-turn version is named as an inbox downgrade", async t => {
+test("a client older than every capture is named as an inbox downgrade", async t => {
   const context = { home: await home(t), dataHome: await home(t) };
   const nextTurn = adapter("gemini_cli", {
     capabilities: { delivery: { nextTurn: true } },
@@ -129,11 +131,19 @@ test("an uncertified next-turn version is named as an inbox downgrade", async t 
     deliveryFallback: { diagnostic: "live delivery unavailable; acc inbox remains active" },
   });
 
-  const [detected] = await detectInstallation({ adapters: [nextTurn],
+  const later = await detectInstallation({ adapters: [nextTurn],
     probe: probeFor({ gemini_cli: "0.55.1" }), context, platform: "darwin-arm64" });
+  assert.equal(later[0].capabilities.delivery.nextTurn, true,
+    "a release after the capture reads it rather than losing delivery");
+  assert.equal(later[0].deliveryDiagnostic,
+    "live delivery unavailable; acc inbox remains active",
+    "the standing fallback line stays, with nothing blamed on the version");
+
+  const [detected] = await detectInstallation({ adapters: [nextTurn],
+    probe: probeFor({ gemini_cli: "0.30.0" }), context, platform: "darwin-arm64" });
 
   assert.equal(detected.capabilities.delivery.nextTurn, false);
-  assert.match(detected.deliveryDiagnostic, /0\.55\.1/);
+  assert.match(detected.deliveryDiagnostic, /0\.30\.0 is older than 0\.37\.0/);
   assert.match(detected.deliveryDiagnostic, /next-turn/);
   assert.match(detected.deliveryDiagnostic, /acc inbox/);
 });

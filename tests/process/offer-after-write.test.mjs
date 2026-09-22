@@ -96,21 +96,33 @@ test("the offer records the exact client version observed for the recipient sess
   assert.equal(offered.payload.clientVersion, "1.0.0");
 });
 
-for (const [label, clientVersion] of [["unknown", null], ["uncertified", "9.9.9"]]) {
-  test(`${label} client versions withhold next-turn bodies and offers`, async t => {
+test("a client older than every capture withholds next-turn bodies and offers", async t => {
+  const { invoke, message, receipt } = await fixture(t, { clientVersion: "0.9.0" });
+  const result = await invoke("beforeTurn", "recipient-session");
+
+  assert.doesNotMatch(result.stdout, /Commit only after these bytes cross/);
+  assert.match(result.stderr, /pending message.*withheld/);
+  assert.match(result.stderr, /0\.9\.0 is older than 1\.0\.0/);
+  assert.match(`${result.stdout}\n${result.stderr}`, new RegExp(message.messageId));
+  await result.commitOffers();
+  assert.equal((await receipt()).state, "queued");
+});
+
+for (const [label, clientVersion] of [["a later release", "9.9.9"],
+  ["a version that cannot be read", null]]) {
+  test(`${label} still delivers, on the evidence that reaches it`, async t => {
     const { invoke, message, receipt } = await fixture(t, { clientVersion });
     const result = await invoke("beforeTurn", "recipient-session");
 
-    assert.doesNotMatch(result.stdout, /Commit only after these bytes cross/);
-    assert.match(result.stderr, /pending message.*withheld/);
-    assert.match(`${result.stdout}\n${result.stderr}`, new RegExp(message.messageId));
+    assert.match(result.stdout, /Commit only after these bytes cross/);
     await result.commitOffers();
-    assert.equal((await receipt()).state, "queued");
+    assert.equal((await receipt()).state, "offered",
+      `${message.messageId} was withheld from a client the capture reaches`);
   });
 }
 
-test("a failed reattach cannot leave certified client facts for a later turn", async t => {
-  const { invoke, message, receipt } = await fixture(t);
+test("a failed reattach cannot invent client facts for a later turn", async t => {
+  const { invoke, message, sender } = await fixture(t);
   const reattach = await invoke("sessionStart", "recipient-session", {
     probeClientVersion: async () => null,
     readProcessTable: async () => { throw new Error("process table unavailable"); },
@@ -118,12 +130,16 @@ test("a failed reattach cannot leave certified client facts for a later turn", a
   assert.equal(reattach.failed, true);
 
   const laterTurn = await invoke("beforeTurn", "recipient-session");
-
-  assert.doesNotMatch(laterTurn.stdout, /Commit only after these bytes cross/);
-  assert.match(laterTurn.stderr, /pending message.*withheld/);
-  assert.match(`${laterTurn.stdout}\n${laterTurn.stderr}`, new RegExp(message.messageId));
   await laterTurn.commitOffers();
-  assert.equal((await receipt()).state, "queued");
+  const events = (await sender.service.store.eventsSince(
+    sender.service.store.workspaceId, null, 100)).events;
+  const offered = events.find(item => item.type === "message.offer_succeeded"
+    && item.payload.messageId === message.messageId);
+
+  // The turn delivers, because unread facts are judged by the newest evidence.
+  // What it must not do is record a version nobody observed on this turn.
+  assert.notEqual(offered, undefined);
+  assert.equal(offered.payload.clientVersion ?? null, null);
 });
 
 test("committing the same prepared offers twice is idempotent", async t => {

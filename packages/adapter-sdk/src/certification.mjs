@@ -162,42 +162,62 @@ function falseCapabilities() {
  * capability, is judged by the floor version's evidence for that capability.
  * Versions below the floor, prereleases and other platforms stay uncertified.
  */
-export function effectiveCapabilities(adapter, { clientVersion, platform } = {}) {
-  const resolved = falseCapabilities();
+/**
+ * Why a capability is on or off for one client, so a refusal can name the
+ * evidence that refused it instead of the version that asked.
+ *
+ * A capture says where a behaviour was observed, not which single release may
+ * use it. Clients ship almost daily, so evidence applies forward from the
+ * version that recorded it until a later capture changes that capability, and
+ * across platforms until one of them records something of its own. A version
+ * that cannot be read is judged by the newest evidence: a hook that runs has
+ * already proven the integration is installed.
+ *
+ * `reason` is one of `undeclared` (the adapter does not claim it), `unobserved`
+ * (nobody has captured it), `older-than-evidence` (this client predates the
+ * first capture, whose version is returned) or `recorded-failure` (a capture at
+ * the returned version recorded the loss).
+ */
+export function capabilityEvidence(adapter, { clientVersion, platform } = {}, capability) {
+  const [group, name] = capability.split(".");
+  if (adapter.capabilities?.[group]?.[name] !== true) {
+    return { granted: false, reason: "undeclared", version: null };
+  }
   const client = adapter.client?.certificationName ?? adapter.client?.command;
-  const evidence = (adapter.certification?.evidence ?? [])
-    .filter(item => item.client === client);
-  // A capture says where a behaviour was observed, not which single release may
-  // use it. Clients ship almost daily, so evidence applies forward from the
-  // version that recorded it until a later capture changes that capability, and
-  // across platforms until one of them records something of its own. A version
-  // that cannot be read is judged by the newest evidence: a hook that runs has
-  // already proven the integration is installed.
+  const named = (adapter.certification?.evidence ?? [])
+    .filter(item => item.client === client && item.capability === capability);
+  if (named.length === 0) return { granted: false, reason: "unobserved", version: null };
   const asked = versionOrder(clientVersion);
-  const certified = capability => {
-    const named = evidence.filter(item => item.capability === capability);
-    const reachable = asked === null ? named
-      : named.filter(item => compareVersionOrder(versionOrder(item.version), asked) <= 0);
-    // Version first, platform second: a loss recorded on one platform at 1.3.0
-    // says nothing about that platform at 1.2.3, where the only evidence in
-    // reach is another platform's passing capture.
-    const own = reachable.filter(item => item.platform === platform);
-    const usable = own.length > 0 ? own : reachable;
-    if (usable.length === 0) return false;
-    const newest = usable.reduce((best, item) =>
-      compareVersionOrder(versionOrder(item.version), versionOrder(best.version)) > 0 ? item : best);
-    const deciding = versionOrder(newest.version);
-    // Two platforms can disagree at the deciding version when neither is the
-    // platform in hand. Withholding a body costs a trip to acc inbox; a false
-    // "delivered" loses the message, so a recorded loss wins the tie.
-    return usable
-      .filter(item => compareVersionOrder(versionOrder(item.version), deciding) === 0)
-      .every(item => item.result === "pass");
-  };
+  const reachable = asked === null ? named
+    : named.filter(item => compareVersionOrder(versionOrder(item.version), asked) <= 0);
+  // Version first, platform second: a loss recorded on one platform at 1.3.0
+  // says nothing about that platform at 1.2.3, where the only evidence in
+  // reach is another platform's passing capture.
+  const own = reachable.filter(item => item.platform === platform);
+  const usable = own.length > 0 ? own : reachable;
+  if (usable.length === 0) {
+    const first = named.reduce((earliest, item) =>
+      compareVersionOrder(versionOrder(item.version), versionOrder(earliest.version)) < 0
+        ? item : earliest);
+    return { granted: false, reason: "older-than-evidence", version: first.version };
+  }
+  const newest = usable.reduce((best, item) =>
+    compareVersionOrder(versionOrder(item.version), versionOrder(best.version)) > 0 ? item : best);
+  const deciding = versionOrder(newest.version);
+  // Two platforms can disagree at the deciding version when neither is the
+  // platform in hand. Withholding a body costs a trip to acc inbox; a false
+  // "delivered" loses the message, so a recorded loss wins the tie.
+  const granted = usable
+    .filter(item => compareVersionOrder(versionOrder(item.version), deciding) === 0)
+    .every(item => item.result === "pass");
+  return { granted, reason: granted ? null : "recorded-failure", version: newest.version };
+}
+
+export function effectiveCapabilities(adapter, facts = {}) {
+  const resolved = falseCapabilities();
   for (const [group, names] of Object.entries(CAPABILITY_SHAPE)) {
     for (const name of names) {
-      resolved[group][name] = adapter.capabilities?.[group]?.[name] === true
-        && certified(`${group}.${name}`);
+      resolved[group][name] = capabilityEvidence(adapter, facts, `${group}.${name}`).granted;
     }
   }
   return freezeCapabilities(resolved);
