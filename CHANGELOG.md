@@ -16,9 +16,9 @@
 
 | Candidate artifact | Value |
 |---|---|
-| Built from | `646e634b3e2ebfa76fd5ca1a40a6ea1be7fa1d22` |
-| Tarball | `agents-can-communicate-0.6.0.tgz`, 444,253 bytes, 306 files |
-| sha256 | `7921df2d69195c11b688b0278f591970ca1f8babd8558ee2ad62c23dee10a7f7` |
+| Built from | `cda41fde384c15fa949f3373a609a597dde543a7` |
+| Tarball | `agents-can-communicate-0.6.0.tgz`, 444,601 bytes, 306 files |
+| sha256 | `fed73768b83df33a7d5b779358a4907bb3ce880709f4faa5dda97d8c458b6c94` |
 
 The exact archive passed clean installation and an isolated upgrade from published
 0.5.10. All 306 source, archive and installed files matched; both delivery choices
