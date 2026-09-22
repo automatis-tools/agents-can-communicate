@@ -1,5 +1,31 @@
 # Changelog
 
+## 0.6.0 — release candidate
+
+- Add Antigravity CLI support, captured on 1.2.7 and certified for later stable releases
+  on Apple Silicon macOS: hooks registered in the client's own `hooks.json` and read back
+  from the client, an `acc:acc` skill, next-turn delivery at every model invocation, and
+  a bounded end-of-turn continuation for late peer messages.
+- Add experimental live delivery for Antigravity CLI. With delivery enabled, ACC's context
+  asks the agent once per conversation to start a relay from its own shell; the user
+  approves that command, and the relay wakes an idle session with a fenced peer message,
+  holds one for a busy session, and ends with the client.
+- Adapters may declare a certification floor, so a client that ships often stays
+  certified on later stable releases until a capture of its own says otherwise. Other
+  adapters keep exact versions.
+
+| Candidate artifact | Value |
+|---|---|
+| Built from | `cda41fde384c15fa949f3373a609a597dde543a7` |
+| Tarball | `agents-can-communicate-0.6.0.tgz`, 444,601 bytes, 306 files |
+| sha256 | `fed73768b83df33a7d5b779358a4907bb3ce880709f4faa5dda97d8c458b6c94` |
+
+The exact archive passed clean installation and an isolated upgrade from published
+0.5.10. All 306 source, archive and installed files matched; both delivery choices
+survived and the active runtime became 0.6.0. All 28 managed-update checks passed.
+See [0.6.0 release evidence](docs/release-evidence/v0.6.0.md) for verification and
+limits. Earlier development records below retain their original provenance.
+
 ## Unreleased — Antigravity CLI adapter and live delivery
 
 - Add an Antigravity CLI integration, captured on 1.2.7: hooks in the client's namespaced

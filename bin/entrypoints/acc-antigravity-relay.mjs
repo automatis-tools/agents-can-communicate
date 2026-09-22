@@ -2,7 +2,7 @@
 // The relay the agent starts: `start` in its tool shell, `run` detached from it.
 // Fails open everywhere - `start` prints one line and exits 0; `run` answers its
 // ready line and exits quietly when anything it needs is missing.
-import { execFile, spawn } from "node:child_process";
+import { execFile } from "node:child_process";
 import { randomBytes } from "node:crypto";
 import { appendFile } from "node:fs/promises";
 import path from "node:path";
@@ -10,7 +10,7 @@ import path from "node:path";
 import { agentApiCommand, createAgentApi } from "@agents-can-communicate/adapter-antigravity/agentapi";
 import { createRelay } from "@agents-can-communicate/adapter-antigravity/relay";
 import { listRegistrations, newRelayId, relayDir } from "@agents-can-communicate/adapter-antigravity/relay-endpoint";
-import { findConversation, startRelay } from "@agents-can-communicate/adapter-antigravity/relay-start";
+import { findConversation, spawnRelay, startRelay } from "@agents-can-communicate/adapter-antigravity/relay-start";
 import { loadSessionBinding } from "@agents-can-communicate/adapter-sdk";
 import { platformDataHome } from "@agents-can-communicate/cli";
 import { createCoordinationService } from "@agents-can-communicate/core";
@@ -30,36 +30,11 @@ const READY_MS = 10_000;
 const argvOf = pid => new Promise(resolve => execFile("ps", ["-o", "args=", "-p", String(pid)],
   { timeout: 1_000 }, (_error, out) => resolve(String(out ?? "").trim().split(/\s+/).filter(Boolean))));
 
-function spawnRun({ env, payload }) {
-  return new Promise(resolve => {
-    // Through the launcher that ran `start`, never this module directly: an
-    // entry module does not run itself, and under the managed runtime the
-    // launcher takes the lease that keeps this generation installed for as
-    // long as the relay lives.
-    const child = spawn(process.execPath, [process.argv[1], "run"],
-      { env, detached: true, stdio: ["pipe", "pipe", "ignore"] });
-    let buffer = "";
-    let settled = false;
-    const finish = result => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timer);
-      child.stdout.destroy();
-      child.unref();
-      resolve(result);
-    };
-    const timer = setTimeout(() => finish({ ok: false, reason: "no ready line within 10 seconds" }), READY_MS);
-    child.stdout.on("data", chunk => {
-      buffer += chunk;
-      const newline = buffer.indexOf("\n");
-      if (newline === -1) return;
-      try { finish(JSON.parse(buffer.slice(0, newline))); }
-      catch { finish({ ok: false, reason: "unreadable ready line" }); }
-    });
-    child.on("error", () => finish({ ok: false, reason: "could not start" }));
-    child.stdin.end(JSON.stringify(payload));
-  });
-}
+// Through the launcher that ran `start`, never this module directly: an entry
+// module does not run itself, and under the managed runtime the launcher takes
+// the lease that keeps this generation installed for as long as the relay lives.
+const spawnRun = ({ env, payload }) => spawnRelay({ command: process.execPath,
+  args: [process.argv[1], "run"], env, payload, readyMs: READY_MS });
 
 async function start() {
   const dataHome = platformDataHome({ platform: process.platform, env: process.env });
