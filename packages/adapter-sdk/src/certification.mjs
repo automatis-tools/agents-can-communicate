@@ -2,8 +2,6 @@ import path from "node:path";
 
 import { AccError, EXIT } from "@agents-can-communicate/protocol";
 
-import { compareStableVersions, parseStableVersion } from "./native-vocabulary.mjs";
-
 export const CAPABILITY_SHAPE = Object.freeze({
   lifecycle: Object.freeze(["sessionStart", "sessionResume", "sessionEnd", "heartbeat",
     "childSessions"]),
@@ -20,6 +18,26 @@ const EVIDENCE_KEYS = new Set([...REQUIRED_TEXT, "limitations", "result"]);
 const RESULTS = new Set(["pass", "fail"]);
 const VERSION = /^\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$/;
 const PLATFORM = /^(?:darwin|linux|win32)-(?:arm64|x64)$/;
+const TRIPLE = /^(\d+)\.(\d+)\.(\d+)(?:[-+][0-9A-Za-z.-]+)?$/;
+
+/** A client version as the triple that orders it. A prerelease is ordered by
+ * its release triple: 1.3.0-rc.1 is judged as 1.3.0, because a prerelease of a
+ * version ACC has already observed is not an older client. Anything unreadable
+ * - a probe that failed, "unknown", a vendor string - returns null.
+ */
+function versionOrder(text) {
+  const match = typeof text === "string" && text.toLowerCase() !== "unknown"
+    ? TRIPLE.exec(text) : null;
+  return match === null ? null : [Number(match[1]), Number(match[2]), Number(match[3])];
+}
+
+function compareVersionOrder(left, right) {
+  if (left === null || right === null) return left === right ? 0 : left === null ? -1 : 1;
+  for (let index = 0; index < 3; index += 1) {
+    if (left[index] !== right[index]) return left[index] < right[index] ? -1 : 1;
+  }
+  return 0;
+}
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
 const TIMESTAMP = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?Z$/;
 
@@ -146,22 +164,35 @@ function falseCapabilities() {
  */
 export function effectiveCapabilities(adapter, { clientVersion, platform } = {}) {
   const resolved = falseCapabilities();
-  if (typeof clientVersion !== "string" || !VERSION.test(clientVersion)
-    || clientVersion.toLowerCase() === "unknown"
-    || typeof platform !== "string" || !PLATFORM.test(platform)
-    || platform.toLowerCase() === "unknown") return freezeCapabilities(resolved);
   const client = adapter.client?.certificationName ?? adapter.client?.command;
-  const rows = (adapter.certification?.evidence ?? [])
-    .filter(item => item.client === client && item.platform === platform);
-  const floor = adapter.certificationFloor?.[platform];
-  const floored = typeof floor === "string" && parseStableVersion(floor) !== null
-    && parseStableVersion(clientVersion) !== null
-    && compareStableVersions(clientVersion, floor) >= 0;
+  const evidence = (adapter.certification?.evidence ?? [])
+    .filter(item => item.client === client);
+  // A capture says where a behaviour was observed, not which single release may
+  // use it. Clients ship almost daily, so evidence applies forward from the
+  // version that recorded it until a later capture changes that capability, and
+  // across platforms until one of them records something of its own. A version
+  // that cannot be read is judged by the newest evidence: a hook that runs has
+  // already proven the integration is installed.
+  const asked = versionOrder(clientVersion);
   const certified = capability => {
-    const own = rows.filter(item => item.version === clientVersion && item.capability === capability);
-    const judged = own.length > 0 || !floored ? own
-      : rows.filter(item => item.version === floor && item.capability === capability);
-    return judged.some(item => item.result === "pass");
+    const named = evidence.filter(item => item.capability === capability);
+    const reachable = asked === null ? named
+      : named.filter(item => compareVersionOrder(versionOrder(item.version), asked) <= 0);
+    // Version first, platform second: a loss recorded on one platform at 1.3.0
+    // says nothing about that platform at 1.2.3, where the only evidence in
+    // reach is another platform's passing capture.
+    const own = reachable.filter(item => item.platform === platform);
+    const usable = own.length > 0 ? own : reachable;
+    if (usable.length === 0) return false;
+    const newest = usable.reduce((best, item) =>
+      compareVersionOrder(versionOrder(item.version), versionOrder(best.version)) > 0 ? item : best);
+    const deciding = versionOrder(newest.version);
+    // Two platforms can disagree at the deciding version when neither is the
+    // platform in hand. Withholding a body costs a trip to acc inbox; a false
+    // "delivered" loses the message, so a recorded loss wins the tie.
+    return usable
+      .filter(item => compareVersionOrder(versionOrder(item.version), deciding) === 0)
+      .every(item => item.result === "pass");
   };
   for (const [group, names] of Object.entries(CAPABILITY_SHAPE)) {
     for (const name of names) {

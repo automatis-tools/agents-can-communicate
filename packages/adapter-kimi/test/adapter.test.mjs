@@ -174,15 +174,15 @@ test("only capabilities observed firing are declared true", () => {
   assert.equal(capabilities.delivery.replyRoute, false);
 });
 
-test("next-turn delivery downgrades visibly outside the exact certified tier", () => {
+test("next-turn delivery downgrades visibly below the captured version", () => {
   const adapter = createKimiAdapter();
+  const nextTurn = clientVersion => effectiveCapabilities(adapter,
+    { clientVersion, platform: "darwin-arm64" }).delivery.nextTurn;
 
-  assert.equal(effectiveCapabilities(adapter,
-    { clientVersion: "0.36.1", platform: "darwin-arm64" }).delivery.nextTurn, true);
-  assert.equal(effectiveCapabilities(adapter,
-    { clientVersion: "0.36.2", platform: "darwin-arm64" }).delivery.nextTurn, false);
-  assert.equal(effectiveCapabilities(adapter,
-    { clientVersion: null, platform: "darwin-arm64" }).delivery.nextTurn, false);
+  for (const clientVersion of ["0.36.1", "0.36.2", "0.42.0", null]) {
+    assert.equal(nextTurn(clientVersion), true, `${clientVersion} reads the 0.36.1 capture`);
+  }
+  assert.equal(nextTurn("0.36.0"), false, "a client older than the capture stays unproven");
   assert.match(adapter.deliveryFallback.diagnostic, /0\.36\.1/);
   assert.match(adapter.deliveryFallback.diagnostic, /acc inbox/);
 });
