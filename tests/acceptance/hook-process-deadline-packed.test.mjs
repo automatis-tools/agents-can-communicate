@@ -87,7 +87,10 @@ test(`the installed hook bounds its ${command} probe when it ignores SIGTERM`, {
     const snapshot = (await packed.acc(["sync", "--scope", "full"])).snapshot;
     assert.equal(snapshot.sessions.length, 1);
     assert.equal(snapshot.sessions[0].pid, null);
-    assert.equal(snapshot.sessions[0].enforcement, "advisory");
+    // The probe timed out, so the binding records no version - and the session
+    // is still this client, running the guard hooks the installer wrote. The
+    // capabilities its captures prove therefore stand, enforcement included.
+    assert.equal(snapshot.sessions[0].enforcement, "guarded");
     await packed.acc(["heartbeat", "--session", binding.accSessionId,
       "--generation", binding.generation]);
   }

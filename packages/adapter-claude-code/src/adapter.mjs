@@ -46,8 +46,8 @@ export function createClaudeCodeAdapter() {
       guards: { beforeWrite: true, beforeShell: true },
       // nextTurn is the certified 2.1.233 hook projection; livePush and
       // replyRoute rest on the 2.1.258 Channel capture and the native contract
-      // below. effectiveCapabilities() still gates every row on an exact
-      // certified version; the native contract is the separate live rule.
+      // below. effectiveCapabilities() carries each of those captures forward
+      // to later clients; the native contract is the separate live rule.
       delivery: { nextTurn: true, livePush: true, replyRoute: true },
     },
     // The first passing capture is the shipped minimum; the research lower
