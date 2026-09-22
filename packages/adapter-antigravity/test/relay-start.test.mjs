@@ -6,7 +6,7 @@ import test from "node:test";
 
 import { storeSessionBinding } from "@agents-can-communicate/adapter-sdk";
 
-import { REFUSALS, cleanEnv, findConversation, startRelay } from "../src/relay-start.mjs";
+import { REFUSALS, cleanEnv, findConversation, spawnRelay, startRelay } from "../src/relay-start.mjs";
 
 const CONVERSATION = "3ed65ea5-31f2-4ddf-b6c7-e3c85a9a3c29";
 const ENV = { PATH: "/usr/bin", HOME: "/Users/someone", ANTIGRAVITY_LS_ADDRESS: "127.0.0.1:1",
@@ -91,4 +91,45 @@ test("the conversation is found by its id, in whichever workspace opened it", as
     "two candidates name nobody");
   assert.equal(await findConversation({ dataHome: path.join(dataHome, "absent"),
     conversationId: CONVERSATION, agyPid: 4242 }), null);
+});
+
+// A real child for each case: the relay's handover runs through an OS pipe, and
+// the failure the review found - EPIPE on a child that exits without reading -
+// only exists between real processes.
+const node = code => ({ command: process.execPath, args: ["-e", code] });
+
+test("a relay that exits without reading the endpoint is a refusal, not a crash", async () => {
+  // Larger than any pipe buffer, so the write is still pending when the child
+  // exits and the stream reports EPIPE.
+  const started = Date.now();
+  const result = await spawnRelay({ ...node(""), env: process.env,
+    payload: { filler: "x".repeat(4 * 1024 * 1024) }, readyMs: 10_000 });
+
+  assert.equal(result.ok, false);
+  assert.match(result.reason, /closed its input|exited before it was ready/);
+  assert.ok(Date.now() - started < 5_000, "a child that is gone must not cost the full ready budget");
+});
+
+test("a relay that reads the endpoint and says it is ready is started", async () => {
+  const result = await spawnRelay({ ...node("let s='';process.stdin.on('data',c=>s+=c)"
+    + ".on('end',()=>process.stdout.write(JSON.stringify({ok:JSON.parse(s).conversationId==='c1'})+'\\n'))"),
+  env: process.env, payload: { conversationId: "c1" } });
+  assert.deepEqual(result, { ok: true });
+});
+
+test("a relay that exits before its ready line fails at once, with the reason", async () => {
+  const started = Date.now();
+  const result = await spawnRelay({ ...node("process.stdin.resume();process.stdin.on('end',()=>process.exit(0))"),
+    env: process.env, payload: {}, readyMs: 10_000 });
+  assert.deepEqual(result, { ok: false, reason: "the relay exited before it was ready" });
+  assert.ok(Date.now() - started < 5_000);
+});
+
+test("an unreadable ready line and a silent relay are closed failures", async () => {
+  assert.deepEqual(await spawnRelay({ ...node("process.stdout.write('garbage\\n');setTimeout(()=>{},2000)"),
+    env: process.env, payload: {} }), { ok: false, reason: "unreadable ready line" });
+  assert.deepEqual(await spawnRelay({ ...node("setTimeout(()=>{},2000)"), env: process.env, payload: {},
+    readyMs: 300 }), { ok: false, reason: "no ready line within 0.3 seconds" });
+  assert.deepEqual(await spawnRelay({ command: "/nonexistent/acc-relay-binary", args: [],
+    env: process.env, payload: {} }), { ok: false, reason: "could not start" });
 });
