@@ -185,13 +185,17 @@ test("a trailer in a comment or in the `git commit -v` diff is not the message",
   assert.equal(result.code, 0, result.stderr);
 });
 
-test("the pre-push hook refuses attributed commits before the suite runs", async t => {
+// The real pre-push hook, with a stub npm standing in for the eight-minute suite.
+async function stubNpmPath(t) {
   const stub = await mkdtemp(path.join(tmpdir(), "acc-attribution-npm-"));
   t.after(() => rm(stub, { recursive: true, force: true }));
   await writeFile(path.join(stub, "npm"), "#!/bin/sh\nexit 0\n");
   await chmod(path.join(stub, "npm"), 0o755);
-  const PATH = [stub, path.dirname(process.execPath), "/usr/bin", "/bin"].join(path.delimiter);
-  const { git, commit } = await scratch(t, { PATH });
+  return [stub, path.dirname(process.execPath), "/usr/bin", "/bin"].join(path.delimiter);
+}
+
+test("the pre-push hook refuses attributed commits before the suite runs", async t => {
+  const { git, commit } = await scratch(t, { PATH: await stubNpmPath(t) });
 
   assert.equal((await git(["push", "-q", "origin", "main"])).code, 0, "a clean first push was refused");
   assert.equal((await commit(ATTRIBUTED["a session trailer"], "--no-verify")).code, 0);
@@ -204,6 +208,21 @@ test("the pre-push hook refuses attributed commits before the suite runs", async
 
   const branch = await git(["push", "-q", "origin", "HEAD:refs/heads/feature"]);
   assert.notEqual(branch.code, 0, "a new branch carrying an attributed commit went through");
+});
+
+test("a new branch cannot carry an attributed commit that another remote branch already has", async t => {
+  const { git, commit } = await scratch(t, { PATH: await stubNpmPath(t) });
+  assert.equal((await git(["push", "-q", "origin", "main"])).code, 0);
+  assert.equal((await commit(ATTRIBUTED["a Claude co-author trailer"], "--no-verify")).code, 0);
+  // Fixture only: the attributed commit reaches the remote the way it would have
+  // before this gate existed.
+  assert.equal((await git(["push", "-q", "--no-verify", "origin", "HEAD:refs/heads/legacy"])).code, 0);
+  assert.equal((await commit("chore: clean work on top\n")).code, 0);
+  const pushed = await git(["push", "-q", "origin", "HEAD:refs/heads/new-feature"]);
+  assert.notEqual(pushed.code, 0, "a new branch carried attributed history already on origin/legacy");
+  // Deleting the attributed branch pushes nothing and must stay possible.
+  const deleted = await git(["push", "-q", "origin", ":refs/heads/legacy"]);
+  assert.equal(deleted.code, 0, deleted.stderr);
 });
 
 test("the Lint mode refuses attributed history and accepts a clean one", async t => {

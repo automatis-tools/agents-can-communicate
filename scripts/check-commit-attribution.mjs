@@ -6,7 +6,7 @@
 //
 // One check, four callers:
 //   .githooks/commit-msg   --message-file <file>
-//   .githooks/pre-push     --pre-push <remote>     (git's ref lines on stdin)
+//   .githooks/pre-push     --pre-push <remote>     (whole history of each ref on stdin)
 //   Lint job               --history <rev>...      and  --text-env PR_BODY
 //
 // The Lint job runs on the runner's own Node, so this file stays within what
@@ -79,18 +79,16 @@ async function readStdin() {
   return Buffer.concat(chunks).toString("utf8");
 }
 
-// One rev-list argument set per pushed ref. A new ref, or a remote tip this clone
-// has never seen, is checked against everything the remote already has.
-async function pushedRevisions(remote) {
-  const sets = [];
+// Every pushed ref must carry a clean history, the rule the Lint job applies to
+// HEAD: checking only commits new to the remote would let a new branch carry an
+// attributed commit that another remote branch already has. Deletions push nothing.
+async function pushedTips() {
+  const tips = [];
   for (const line of (await readStdin()).split("\n")) {
-    const [, localSha, , remoteSha] = line.trim().split(/\s+/);
-    if (!localSha || ZERO.test(localSha)) continue;
-    const known = remoteSha && !ZERO.test(remoteSha)
-      && await git(["cat-file", "-e", `${remoteSha}^{commit}`]).then(() => true, () => false);
-    sets.push(known ? [`${remoteSha}..${localSha}`] : [localSha, "--not", `--remotes=${remote}`]);
+    const [, localSha] = line.trim().split(/\s+/);
+    if (localSha && !ZERO.test(localSha)) tips.push(localSha);
   }
-  return sets;
+  return tips;
 }
 
 function refuse(what, findings) {
@@ -102,7 +100,10 @@ function refuse(what, findings) {
 
 async function commitsGate(what, revisionSets, advice) {
   const found = [];
-  for (const revisions of revisionSets) found.push(...await offendingCommits(revisions));
+  // An empty set would make `git log` read HEAD instead of nothing.
+  for (const revisions of revisionSets.filter(set => set.length > 0)) {
+    found.push(...await offendingCommits(revisions));
+  }
   const unique = [...new Map(found.map(commit => [commit.sha, commit])).values()];
   if (unique.length === 0) return;
   refuse(what, [...unique.map(commit => `  ${commit.sha} ${commit.subject}\n    ${commit.lines.join("\n    ")}`),
@@ -114,7 +115,7 @@ if (mode === "--message-file" && rest.length === 1) {
   const lines = attributionLines(await storedMessage(await readFile(rest[0], "utf8")));
   if (lines.length > 0) refuse("commit", lines.map(line => `  ${line}`));
 } else if (mode === "--pre-push" && rest.length >= 1) {
-  await commitsGate("push", await pushedRevisions(rest[0]),
+  await commitsGate("push", [await pushedTips()],
     "Reword those commits first (git rebase -i <base>, mark each as reword).");
 } else if (mode === "--history" && rest.length >= 1) {
   await commitsGate("history", [rest],
