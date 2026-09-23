@@ -145,8 +145,8 @@ test("only capabilities observed firing are declared true", () => {
   assert.equal(capabilities.delivery.replyRoute, false);
 });
 
-// The capture moved to 0.57.0. Since 0.7.0 that is a starting point rather than
-// a tier: 0.59.0, the release people actually run, reads the 0.57.0 capture,
+// The capture moved to 0.57.0. Since 0.6.2 that is a starting point rather than
+// a tier: 0.60.0, the release people actually run, reads the 0.57.0 capture,
 // and 0.37.0 stays uncertified because it is older than anything measured.
 // Superseded captures stay in provenance as history.
 test("next-turn delivery starts at the captured version and continues after it", () => {
@@ -154,7 +154,7 @@ test("next-turn delivery starts at the captured version and continues after it",
   const nextTurn = clientVersion => effectiveCapabilities(adapter,
     { clientVersion, platform: "darwin-arm64" }).delivery.nextTurn;
 
-  for (const clientVersion of ["0.57.0", "0.59.0", "1.0.0", undefined]) {
+  for (const clientVersion of ["0.57.0", "0.59.0", "0.60.0", "1.0.0", undefined]) {
     assert.equal(nextTurn(clientVersion), true, `${clientVersion} reads the 0.57.0 capture`);
   }
   for (const clientVersion of ["0.37.0", "0.55.1"]) {
