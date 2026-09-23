@@ -30,6 +30,13 @@ export const ZERO_CURSOR = "0".repeat(SEQUENCE_WIDTH);
 // corrupt record, so nothing ever had a reason to put one aside. An empty
 // directory that reads as a feature is the same mistake as an attention kind
 // with no rule behind it. If quarantining is ever built, it comes back with it.
+//
+// `stage` is the counter-example that keeps that rule rather than breaking it:
+// every immutable publication fills it and stage-sweep.mjs empties it. Holding
+// accepted stages apart from the partials in `tmp` is what lets the sweep
+// remove a whole directory instead of deciding file by file from a filename
+// suffix. A `stage` ever found empty by design rather than by sweeping is the
+// mistake described above, and should go.
 const DIRECTORIES = ["state", "events", "journal", "locks", "ephemeral", "retained", "tmp",
   "stage"];
 
