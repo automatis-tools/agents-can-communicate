@@ -132,6 +132,20 @@ test("a scissors line typed in the editor, with no diff below it, hides nothing"
   assert.notEqual(result.code, 0, "a trailer below a typed scissors line was committed");
 });
 
+test("under scissors cleanup an editor session loses everything below the line, so it passes", async t => {
+  const { base, root, git } = await scratch(t);
+  await git(["config", "commit.cleanup", "scissors"]);
+  await writeFile(path.join(root, "d.txt"), "d\n");
+  await git(["add", "d.txt"]);
+  const editor = path.join(base, "editor.sh");
+  await writeFile(editor, "#!/bin/sh\nprintf \"fix: s\\n\\n# ------------------------ >8 ------------------------\\n"
+    + 'Claude-Session: https://claude.ai/code/session_x\\n" > "$1"\n');
+  await chmod(editor, 0o755);
+  const result = await attempt("git", ["-C", root, "commit", "-q"], { env: gitEnv({ GIT_EDITOR: editor }) });
+  assert.equal(result.code, 0, result.stderr);
+  assert.equal((await git(["log", "-1", "--format=%B"])).stdout.trim(), "fix: s");
+});
+
 // git hands commit-msg the file before its own cleanup, so the hook sees comment
 // lines and, under `git commit -v`, the staged diff below the scissors line.
 test("a trailer in a comment or in the `git commit -v` diff is not the message", async t => {
