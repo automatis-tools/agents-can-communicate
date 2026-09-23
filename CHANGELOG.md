@@ -1,5 +1,33 @@
 # Changelog
 
+## 0.6.3 — release candidate
+
+- `acc doctor` prints an adapter's fallback diagnostic verbatim, and three of them still
+  described the gate 0.6.2 removed. On this machine Gemini CLI 0.60.0 was told next-turn
+  delivery is "certified only for 0.57.0 on darwin-arm64" while it was in fact delivering.
+- Gemini CLI, Kimi Code and Antigravity CLI now say what the rule says: certified from the
+  captured version onward, on every platform. The Kimi and Antigravity compatibility notes
+  follow.
+- A conformance case holds every adapter to it, so a fallback diagnostic cannot claim a single
+  certified version or tie certification to one platform.
+- Two diagnostics are deliberately unchanged: Codex CLI names the native contract minimum,
+  which stays per-platform, and Claude Code names client-side Channels activation.
+
+| Candidate artifact | Value |
+|---|---|
+| Built from | `a93d89d4f3af90add6bc3f6e1faadb515011c0ce` |
+| Tarball | `agents-can-communicate-0.6.3.tgz`, 446,522 bytes, 306 files |
+| sha256 | `e3e0dc4411086ec5b2416de58636557ed8a39777c5dd2cb9393138bb3c11161e` |
+
+The exact archive passed clean installation and an isolated upgrade from published 0.6.2, in
+which the installed doctor line changed from "certified only for 0.57.0 on darwin-arm64" to
+"certified from 0.57.0 onward, on every platform". All 306 source, archive and installed files
+matched; both delivery choices survived and the active runtime became 0.6.3. All 28
+managed-update checks passed. Against published 0.6.2, 285 files are identical, 18 differ only
+by their manifest version and three have content changes; none are added or removed. See
+[0.6.3 release evidence](docs/release-evidence/v0.6.3.md) for verification and limits. Earlier
+development records below retain their original provenance.
+
 ## Unreleased — fallback diagnostics tell the truth about certification
 
 - `acc doctor` prints an adapter's fallback diagnostic verbatim, and three of them still
