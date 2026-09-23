@@ -4,8 +4,11 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
 
+import { SCHEMA_VERSION } from "@agents-can-communicate/protocol";
+
 import { sweepAcceptedStages, sweepIfDue } from "../src/stage-sweep.mjs";
-import { storePaths } from "../src/store.mjs";
+import { openFilesystemStore, storePaths } from "../src/store.mjs";
+import { createFakeClock, createFakeIds } from "../../../tests/helpers/memory-store.mjs";
 
 async function fixture(t, stages) {
   const root = await realpath(await mkdtemp(path.join(tmpdir(), "acc-sweep-")));
@@ -160,4 +163,48 @@ test("repeated passes drain a legacy accumulation completely", async t => {
   assert.deepEqual(await readdir(paths.stage), []);
   assert.deepEqual(await readdir(paths.tmp), []);
   assert.deepEqual(await detachedIn(root), []);
+});
+
+// The tests above run against files a fixture wrote, which proves the mechanism
+// and not the claim behind it: that an accepted stage is a redundant second name
+// for bytes already committed. These open a real store and read the record back.
+const NOW = "2026-09-23T10:00:00.000Z";
+const WORKSPACE = "workspace_a";
+
+const workspaceRecord = () => ({ schemaVersion: SCHEMA_VERSION, workspaceId: WORKSPACE,
+  displayName: "Example", source: "directory", roots: ["/tmp/example"], createdAt: NOW });
+
+async function liveStore(t) {
+  const root = await realpath(await mkdtemp(path.join(tmpdir(), "acc-sweep-live-")));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const store = await openFilesystemStore({ root, clock: createFakeClock(NOW),
+    ids: createFakeIds(), workspaceId: WORKSPACE });
+  return { root, store, paths: storePaths(root) };
+}
+
+test("a record stays readable after its accepted stage is swept", async t => {
+  const { root, store, paths } = await liveStore(t);
+  await store.transaction(async tx => { tx.put("workspace", WORKSPACE, workspaceRecord()); });
+  assert.ok((await readdir(paths.stage)).length > 0,
+    "the publication should have left an accepted stage");
+
+  await sweepAcceptedStages(paths, { root });
+
+  assert.deepEqual(await readdir(paths.stage), []);
+  const snapshot = await store.snapshot(WORKSPACE);
+  assert.equal(snapshot.workspace.workspaceId, WORKSPACE);
+});
+
+test("publishing again after a sweep is unharmed by the missing stage", async t => {
+  const { root, store, paths } = await liveStore(t);
+  await store.transaction(async tx => { tx.put("workspace", WORKSPACE, workspaceRecord()); });
+  await sweepAcceptedStages(paths, { root });
+
+  await store.transaction(async tx => {
+    tx.put("workspace", WORKSPACE, { ...workspaceRecord(), displayName: "Renamed" },
+      tx.generationOf("workspace", WORKSPACE));
+  });
+
+  const snapshot = await store.snapshot(WORKSPACE);
+  assert.equal(snapshot.workspace.displayName, "Renamed");
 });
