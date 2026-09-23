@@ -4,7 +4,13 @@
 # Never bypass with --no-verify; fix the failure instead.
 set -e
 
-# The lint step runs first, while git's own repository variables are still set,
+# The attribution gate runs before anything else: it reads the ref lines git sends
+# on stdin, and it refuses a push in a second rather than after the whole suite.
+# A commit made with --no-verify, or one rebased from an old branch, stops here.
+echo "pre-push: refusing Claude attribution in pushed commits"
+node "$(dirname "$0")/../scripts/check-commit-attribution.mjs" --pre-push "$1"
+
+# The lint step runs next, while git's own repository variables are still set,
 # so `git ls-files` resolves this repository without relying on discovery.
 echo "pre-push: syntax-checking tracked .mjs files"
 git ls-files -z '*.mjs' | xargs -0 -n1 node --check
