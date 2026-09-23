@@ -41,8 +41,8 @@ export function createKimiAdapter() {
       delivery: { nextTurn: true },
     },
     deliveryFallback: { diagnostic:
-      "Kimi Code next-turn delivery is certified only for 0.36.1 on darwin-arm64; "
-      + "other or unknown versions keep durable acc inbox access, and live push is unavailable" },
+      "Kimi Code next-turn delivery is certified from 0.36.1 onward, on every platform; "
+      + "an older client keeps durable acc inbox access, and live push is unavailable" },
 
     startSession: async () => ({ ok: true, changes: [], diagnostics: [] }),
     heartbeat: async () => ({ ok: true, changes: [], diagnostics: [] }),

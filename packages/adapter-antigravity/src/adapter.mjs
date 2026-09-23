@@ -84,9 +84,9 @@ export function createAntigravityAdapter() {
     probeNativeDelivery, planNativeActivation, bindNativeSession, refreshNativeSession,
     offerMessage,
     deliveryFallback: { diagnostic:
-      `Antigravity CLI next-turn and live delivery are certified for ${ANTIGRAVITY_CLI_VERSION} and `
-      + "later stable releases on darwin-arm64; live delivery also needs the agent to start "
-      + "ACC's relay once per conversation, and every other case keeps durable acc inbox access" },
+      `Antigravity CLI next-turn and live delivery are certified from ${ANTIGRAVITY_CLI_VERSION} `
+      + "onward; live delivery also needs the agent to start ACC's relay once per conversation, "
+      + "and an older client keeps durable acc inbox access" },
 
     startSession: async () => ({ ok: true, changes: [], diagnostics: [] }),
 

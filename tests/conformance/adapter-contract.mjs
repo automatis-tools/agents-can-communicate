@@ -26,6 +26,17 @@ export function runAdapterConformance(name, kit) {
     }
   });
 
+  test(`${name}: a fallback diagnostic cannot claim one certified version`, () => {
+    // A capture applies forward, so "certified only for 1.2.3" and "on
+    // darwin-arm64" stopped being true in 0.6.2 while the sentences that said
+    // them stayed in place. Doctor prints these verbatim, so a stale one tells
+    // a person their current client is unsupported when it is not.
+    const diagnostic = adapter().deliveryFallback?.diagnostic;
+    if (typeof diagnostic !== "string") return;
+    assert.doesNotMatch(diagnostic, /certified only for/i);
+    assert.doesNotMatch(diagnostic, /certified[^;]*\bon (?:darwin|linux|win32)-/i);
+  });
+
   test(`${name}: a client older than every capture degrades to false`, () => {
     // Evidence applies forward, so the client that gets nothing is the one no
     // capture reaches. An unreadable version reads the newest evidence instead:

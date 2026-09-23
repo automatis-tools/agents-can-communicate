@@ -11,10 +11,11 @@ running that client, not by reading about it.
 
 ## Delivery tier
 
-ACC's machine-readable `delivery.nextTurn` capability is certified only for the exact
-`0.36.1` / `darwin-arm64` tier in `certification.json`. A different or unparseable client
-version is reported as a downgrade, while durable `acc inbox` polling remains available.
-Kimi Code has no certified live-push binding.
+ACC's machine-readable `delivery.nextTurn` capability was captured on `0.36.1` /
+`darwin-arm64`, recorded in `certification.json`. Since 0.6.2 that capture applies forward:
+0.36.1 and everything after it reads it, on every platform, until a capture of its own says
+otherwise. A client older than 0.36.1 is reported as a downgrade, while durable `acc inbox`
+polling remains available. Kimi Code has no certified live-push binding.
 
 ## The integration surface is not the plugin
 
