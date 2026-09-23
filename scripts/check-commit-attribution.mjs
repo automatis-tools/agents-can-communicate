@@ -22,7 +22,7 @@ const ATTRIBUTION = [
   /generated with \[?claude code/i,
   /claude\.ai\/code\/session_/i,
 ];
-const SCISSORS = /^# -{24} >8 -{24}$/;
+const CUT_LINE = "------------------------ >8 ------------------------";
 const ZERO = /^0+$/;
 
 const attributionLines = text =>
@@ -38,20 +38,24 @@ const setting = async key => (await git(["config", "--get", key]).catch(() => ""
 // known to drop is left out, and only in an editor session (without one git sets
 // GIT_EDITOR=: and keeps comments and a typed scissors line): everything from the
 // scissors line under scissors cleanup, or the `git commit -v` diff below it under
-// any cleanup; and comment lines under the default strip cleanup with `#`
-// comments. Everything else is checked as written, because git may store it.
+// any cleanup; and comment lines under the default strip cleanup. Both the scissors
+// line and a comment start with the configured comment string; with `auto` git
+// picks it per message, so nothing is dropped. Everything else is checked as
+// written, because git may store it.
 async function storedMessage(raw) {
   const lines = raw.split(/\r?\n/);
   if (process.env.GIT_EDITOR === ":") return lines.join("\n");
+  const comment = (await setting("core.commentString")) || (await setting("core.commentChar")) || "#";
+  if (comment === "auto") return lines.join("\n");
   const cleanup = await setting("commit.cleanup");
-  const scissors = lines.findIndex(line => SCISSORS.test(line));
-  const below = scissors === -1 ? undefined : lines.slice(scissors + 1).find(line => !line.startsWith("#"));
+  const isComment = line => line.startsWith(comment);
+  const scissors = lines.indexOf(`${comment} ${CUT_LINE}`);
+  const below = scissors === -1 ? undefined : lines.slice(scissors + 1).find(line => !isComment(line));
   const cut = scissors !== -1
     && (cleanup === "scissors" || below === undefined || below.startsWith("diff --git "));
   const kept = cut ? lines.slice(0, scissors) : lines;
-  const comment = (await setting("core.commentString")) || (await setting("core.commentChar")) || "#";
-  const strips = ["", "default", "strip"].includes(cleanup) && comment === "#";
-  return (strips ? kept.filter(line => !line.startsWith("#")) : kept).join("\n");
+  const strips = ["", "default", "strip"].includes(cleanup);
+  return (strips ? kept.filter(line => !isComment(line)) : kept).join("\n");
 }
 
 async function offendingCommits(revisions) {

@@ -132,6 +132,29 @@ test("a scissors line typed in the editor, with no diff below it, hides nothing"
   assert.notEqual(result.code, 0, "a trailer below a typed scissors line was committed");
 });
 
+// git builds its scissors line and recognises comments from core.commentChar.
+test("with another comment character, only that character marks comments and scissors", async t => {
+  const { base, root, git } = await scratch(t);
+  await git(["config", "core.commentChar", ";"]);
+  const editorWriting = async (name, text) => {
+    const editor = path.join(base, `${name}.sh`);
+    await writeFile(editor, `#!/bin/sh\nprintf "${text}" > "$1"\n`);
+    await chmod(editor, 0o755);
+    await writeFile(path.join(root, `${name}.txt`), `${name}\n`);
+    await git(["add", `${name}.txt`]);
+    return attempt("git", ["-C", root, "commit", "-q"], { env: gitEnv({ GIT_EDITOR: editor }) });
+  };
+
+  const dropped = await editorWriting("dropped", "fix: c\\n\\n; Claude-Session: https://claude.ai/code/session_x\\n");
+  assert.equal(dropped.code, 0, dropped.stderr);
+  assert.equal((await git(["log", "-1", "--format=%B"])).stdout.trim(), "fix: c");
+
+  await git(["config", "commit.cleanup", "scissors"]);
+  const kept = await editorWriting("kept", "fix: d\\n\\n# ------------------------ >8 ------------------------\\n"
+    + "Claude-Session: https://claude.ai/code/session_x\\n");
+  assert.notEqual(kept.code, 0, "a `#` scissors line hid a trailer git keeps under `;` comments");
+});
+
 test("under scissors cleanup an editor session loses everything below the line, so it passes", async t => {
   const { base, root, git } = await scratch(t);
   await git(["config", "commit.cleanup", "scissors"]);
