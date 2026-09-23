@@ -235,6 +235,19 @@ test("the Lint mode refuses attributed history and accepts a clean one", async t
   assert.match(dirty.stderr, /docs: x/);
 });
 
+// git allows every control character but NUL in a message, so the history reader
+// must not split records on one of them.
+test("a control character in a clean message cannot break the history reader", async t => {
+  const { root, env, commit } = await scratch(t);
+  assert.equal((await commit("chore: odd\x01bytes\x02here\n\nbody\x01line\n")).code, 0);
+  const clean = await attempt(process.execPath, [script, "--history", "HEAD"], { cwd: root, env });
+  assert.equal(clean.code, 0, clean.stderr);
+  assert.equal((await commit(`fix: x\x01y\n\nClaude-Session: https://claude.ai/code/session_z\n`, "--no-verify")).code, 0);
+  const dirty = await attempt(process.execPath, [script, "--history", "HEAD"], { cwd: root, env });
+  assert.equal(dirty.code, 1, dirty.stderr);
+  assert.match(dirty.stderr, /Claude-Session/);
+});
+
 test("the Lint mode checks a pull request description handed over in the environment", async t => {
   const check = body => attempt(process.execPath, [script, "--text-env", "PR_BODY"],
     { env: { ...process.env, PR_BODY: body } });

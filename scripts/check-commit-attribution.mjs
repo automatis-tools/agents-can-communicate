@@ -63,12 +63,14 @@ async function storedMessage(raw) {
   return (strips ? kept.filter(line => !isComment(line)) : kept).join("\n");
 }
 
+// Records are NUL-separated (`-z`): git refuses a NUL byte in a commit message, so
+// no message can split a record, whatever other control characters it carries.
 async function offendingCommits(revisions) {
-  const log = await git(["log", "--format=%h%x00%s%x00%B%x01", ...revisions]);
-  return log.split("\x01").map(record => record.replace(/^\n/, "")).filter(Boolean)
+  const log = await git(["log", "-z", "--format=%h%n%s%n%B", ...revisions]);
+  return log.split("\0").filter(Boolean)
     .map(record => {
-      const [sha, subject, body] = record.split("\x00");
-      return { sha, subject, lines: attributionLines(body) };
+      const [sha = "", subject = "", ...body] = record.split("\n");
+      return { sha, subject, lines: attributionLines(body.join("\n")) };
     })
     .filter(commit => commit.lines.length > 0);
 }
