@@ -106,7 +106,7 @@ guess by command string.
 ## Delivery tier
 
 ACC's machine-readable `delivery.nextTurn` capability was captured on `0.57.0` /
-`darwin-arm64`, recorded in `certification.json`. Since 0.7.0 that capture applies forward:
+`darwin-arm64`, recorded in `certification.json`. Since 0.6.2 that capture applies forward:
 0.57.0 and everything after it reads it, on every platform, until a capture of its own says
 otherwise. The superseded 0.37.0 capture stays in `fixtures/certification-provenance.json`
 as history, and a client older than 0.57.0 is unproven. The 0.55.1 observations re-certify
