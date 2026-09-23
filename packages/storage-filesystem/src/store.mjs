@@ -16,6 +16,7 @@ import { assertEventBinding, assertStateBinding, eventPath, stateEnvelope, state
 import { ephemeralIsDeleted, markEphemeral, stateDeletionPublication,
   stateGenerationIsDeleted } from "./retention.mjs";
 import { ensureManagedDirectory } from "./safe-directory.mjs";
+import { sweepIfDue } from "./stage-sweep.mjs";
 import { withWriterMutex } from "./writer-mutex.mjs";
 
 // Kept cohesive above 300 lines because durable transactions and ephemeral
@@ -93,6 +94,13 @@ export async function openFilesystemStore({ root, clock, ids, workspaceId, failA
   // it holds the writer mutex: two processes opening the same store at once
   // must not roll the same journal forward concurrently.
   await recoverOpenJournals();
+
+  // Sweeping is a write, so it holds the same mutex recovery does and no
+  // publisher is in flight while the stage directory is detached. It is bounded
+  // per pass: a store carrying a large accumulation drains over several opens
+  // rather than spending one hook's whole budget on it.
+  await withWriterMutex(paths, { root, tmpDir: paths.tmp, clock, deadlineAt: storeDeadline },
+    () => sweepIfDue(paths, { root, clock, deadlineAt: storeDeadline }));
 
   async function recoverOpenJournals() {
     const open = await readOpenJournals(paths, root);

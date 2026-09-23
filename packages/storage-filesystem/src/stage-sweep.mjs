@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { open, rename, rm, rmdir } from "node:fs/promises";
 import path from "node:path";
 
-import { listDirectoryEntries } from "./atomic-json.mjs";
+import { encode, listDirectoryEntries, publishAtomic, readJsonIfPresent } from "./atomic-json.mjs";
 import { assertManagedDirectory, ensureManagedDirectory } from "./safe-directory.mjs";
 
 // One pass never touches more than this many entries, counting both the legacy
@@ -10,6 +10,11 @@ import { assertManagedDirectory, ensureManagedDirectory } from "./safe-directory
 // as many accepted stages as an unswept tmp/ did - tens of thousands - and an
 // unbounded removal inside a hook is the budget failure this exists to avoid.
 export const SWEEP_BUDGET = 512;
+
+// A day between passes. A count-based threshold costs either a full listing of
+// the directory this keeps small, or an fsync'ed write on every transaction. A
+// timestamp costs one read.
+export const SWEEP_INTERVAL_MS = 24 * 60 * 60 * 1000;
 
 const DETACHED = "stage.sweeping-";
 
@@ -115,4 +120,31 @@ export async function sweepAcceptedStages(paths,
   swept += removed.spent;
   if (!removed.drained) remaining = true;
   return { swept, remaining };
+}
+
+const markerPath = paths => path.join(paths.locks, "stage-sweep.json");
+
+// An unreadable marker means the interval is unknown, and an unknown interval
+// is treated as due: maintenance that refuses to run because its own bookkeeping
+// is damaged is the failure it exists to prevent.
+async function sweptAt(paths, root) {
+  const found = await readJsonIfPresent(markerPath(paths), root).catch(() => null);
+  const value = Date.parse(found?.value?.sweptAt ?? "");
+  return Number.isNaN(value) ? null : value;
+}
+
+/**
+ * Sweep only when the recorded pass is older than SWEEP_INTERVAL_MS.
+ *
+ * @returns {Promise<{ swept: number, remaining: boolean }>}
+ */
+export async function sweepIfDue(paths, { root, clock, limit = SWEEP_BUDGET, deadlineAt } = {}) {
+  const now = Date.parse(clock.now());
+  const last = await sweptAt(paths, root);
+  if (last !== null && now - last < SWEEP_INTERVAL_MS) return { swept: 0, remaining: false };
+
+  const result = await sweepAcceptedStages(paths, { root, limit, deadlineAt });
+  await publishAtomic(markerPath(paths), encode({ sweptAt: clock.now() }),
+    { root, tmpDir: paths.tmp, stageDir: paths.stage, replace: true, deadlineAt });
+  return result;
 }

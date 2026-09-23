@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
 
-import { sweepAcceptedStages } from "../src/stage-sweep.mjs";
+import { sweepAcceptedStages, sweepIfDue } from "../src/stage-sweep.mjs";
 import { storePaths } from "../src/store.mjs";
 
 async function fixture(t, stages) {
@@ -106,6 +106,42 @@ test("legacy reclamation shares the one budget", async t => {
   assert.deepEqual(await readdir(paths.tmp), []);
   const [detached] = await detachedIn(root);
   assert.equal((await readdir(path.join(root, detached))).length, 3);
+});
+
+const clockAt = value => ({ now: () => value });
+
+test("the first sweep is due and records when it ran", async t => {
+  const { root, paths } = await fixture(t, 2);
+  await mkdir(paths.locks, { recursive: true });
+
+  const result = await sweepIfDue(paths, { root, clock: clockAt("2026-09-23T10:00:00.000Z") });
+
+  assert.equal(result.swept, 2);
+  assert.deepEqual(await readdir(paths.stage), []);
+});
+
+test("a second sweep within the interval does nothing", async t => {
+  const { root, paths } = await fixture(t, 2);
+  await mkdir(paths.locks, { recursive: true });
+  await sweepIfDue(paths, { root, clock: clockAt("2026-09-23T10:00:00.000Z") });
+  await writeFile(path.join(paths.stage, "later.published"), "{}\n");
+
+  const result = await sweepIfDue(paths, { root, clock: clockAt("2026-09-23T20:00:00.000Z") });
+
+  assert.equal(result.swept, 0);
+  assert.deepEqual(await readdir(paths.stage), ["later.published"]);
+});
+
+test("a sweep a day later is due again", async t => {
+  const { root, paths } = await fixture(t, 1);
+  await mkdir(paths.locks, { recursive: true });
+  await sweepIfDue(paths, { root, clock: clockAt("2026-09-23T10:00:00.000Z") });
+  await writeFile(path.join(paths.stage, "later.published"), "{}\n");
+
+  const result = await sweepIfDue(paths, { root, clock: clockAt("2026-09-24T10:00:01.000Z") });
+
+  assert.equal(result.swept, 1);
+  assert.deepEqual(await readdir(paths.stage), []);
 });
 
 test("repeated passes drain a legacy accumulation completely", async t => {
