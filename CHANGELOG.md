@@ -1,5 +1,21 @@
 # Changelog
 
+## Unreleased — a first-try report goes to Discussions
+
+- The README's closing call to action sent every first impression to the issue tracker. GitHub
+  Discussions have been enabled on the repository since 2026-09-14, so "here is how it went"
+  now points at **Show and tell**, and issues stay what they are for: bugs.
+
+| Candidate artifact | Value |
+|---|---|
+| Built from | `eec7b7f0db63510028e23897f05111454f784259` |
+| Tarball | `agents-can-communicate-0.6.3.tgz`, 446,564 bytes, 306 files |
+| sha256 | `66956ea9409f2bd51705c486fdc8153cf7b0f888753112984c15e61cf66964c6` |
+
+This unpublished development archive passed clean installation verification. See
+[first-try feedback evidence](docs/release-evidence/unreleased-first-try-discussions.md). The
+package version remains `0.6.3` until a release prepares its own.
+
 ## 0.6.3 — release candidate
 
 - `acc doctor` prints an adapter's fallback diagnostic verbatim, and three of them still
