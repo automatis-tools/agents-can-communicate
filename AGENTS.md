@@ -24,13 +24,19 @@ npm test           # the whole suite; refuses to pass on an empty file list
 npm pack && node scripts/verify-package.mjs   # what a user actually receives
 ```
 
-Enable the pre-push gate once per clone:
+Enable the commit-msg and pre-push gates once per clone:
 
 ```bash
 git config core.hooksPath .githooks
 ```
 
-Never bypass it with `--no-verify` — fix the failure instead.
+Never bypass them with `--no-verify` — fix the failure instead.
+
+Commit messages and pull request descriptions carry no Claude attribution: no
+`Co-Authored-By: Claude` or `<noreply@anthropic.com>` trailer, no `Claude-Session:` line,
+no "Generated with Claude Code" footer. The commit-msg gate refuses such a message, the
+pre-push gate refuses a push that carries one, and the required Lint job checks the whole
+history and the pull request description with `scripts/check-commit-attribution.mjs`.
 
 ## Invariants
 

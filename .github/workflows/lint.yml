@@ -2,6 +2,8 @@ name: Lint
 
 on:
   pull_request:
+    # `edited` re-checks a description changed after the pull request was opened.
+    types: [opened, synchronize, reopened, edited]
   push:
     branches: [main]
 
@@ -10,5 +12,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # The attribution check reads every commit message, not just the tip.
+          fetch-depth: 0
       - name: Syntax-check tracked .mjs files
         run: git ls-files -z '*.mjs' | xargs -0 -n1 node --check
+      - name: Refuse Claude attribution in commit messages
+        run: node scripts/check-commit-attribution.mjs --history HEAD
+      - name: Refuse Claude attribution in the pull request description
+        if: github.event_name == 'pull_request'
+        env:
+          # Passed through the environment, never interpolated into the command.
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: node scripts/check-commit-attribution.mjs --text-env PR_BODY

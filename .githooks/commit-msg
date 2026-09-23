@@ -1,0 +1,6 @@
+#!/bin/sh
+# Commit-message gate: refuse Claude attribution (Co-Authored-By: Claude,
+# Claude-Session, "Generated with Claude Code") before it enters history.
+# Enabled together with the pre-push gate:  git config core.hooksPath .githooks
+# Never bypass it with --no-verify; the pre-push gate and CI check again anyway.
+exec node "$(dirname "$0")/../scripts/check-commit-attribution.mjs" --message-file "$1"
