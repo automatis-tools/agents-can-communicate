@@ -72,3 +72,56 @@ test("an expired deadline stops the pass without throwing", async t => {
   assert.equal(result.remaining, true);
   assert.equal((await detachedIn(root)).length, 1);
 });
+
+test("an accepted stage an older version left in tmp is reclaimed", async t => {
+  const { root, paths } = await fixture(t, 0);
+  await writeFile(path.join(paths.tmp, "abc.published"), "{}\n");
+
+  const result = await sweepAcceptedStages(paths, { root });
+
+  assert.equal(result.swept, 1);
+  assert.deepEqual(await readdir(paths.tmp), []);
+});
+
+test("a partial in tmp survives a sweep untouched", async t => {
+  const { root, paths } = await fixture(t, 1);
+  await writeFile(path.join(paths.tmp, "abc.published.1234.uuid.tmp"), "half\n");
+
+  await sweepAcceptedStages(paths, { root });
+
+  assert.deepEqual(await readdir(paths.tmp), ["abc.published.1234.uuid.tmp"]);
+});
+
+test("legacy reclamation shares the one budget", async t => {
+  const { root, paths } = await fixture(t, 2);
+  await writeFile(path.join(paths.tmp, "a.published"), "{}\n");
+  await writeFile(path.join(paths.tmp, "b.published"), "{}\n");
+
+  // Budget 3 buys two moves out of tmp and one removal, so one record left the
+  // store and three entries remain in the detached directory for the next pass.
+  const result = await sweepAcceptedStages(paths, { root, limit: 3 });
+
+  assert.equal(result.swept, 1);
+  assert.equal(result.remaining, true);
+  assert.deepEqual(await readdir(paths.tmp), []);
+  const [detached] = await detachedIn(root);
+  assert.equal((await readdir(path.join(root, detached))).length, 3);
+});
+
+test("repeated passes drain a legacy accumulation completely", async t => {
+  const { root, paths } = await fixture(t, 2);
+  await writeFile(path.join(paths.tmp, "a.published"), "{}\n");
+  await writeFile(path.join(paths.tmp, "b.published"), "{}\n");
+
+  let guard = 0;
+  let result = await sweepAcceptedStages(paths, { root, limit: 3 });
+  while (result.remaining && guard < 10) {
+    result = await sweepAcceptedStages(paths, { root, limit: 3 });
+    guard += 1;
+  }
+
+  assert.equal(result.remaining, false);
+  assert.deepEqual(await readdir(paths.stage), []);
+  assert.deepEqual(await readdir(paths.tmp), []);
+  assert.deepEqual(await detachedIn(root), []);
+});

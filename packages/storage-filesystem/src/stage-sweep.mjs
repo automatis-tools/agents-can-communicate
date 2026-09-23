@@ -52,6 +52,22 @@ async function discard(directory, root, budget, deadlineAt) {
   return { spent, drained: true };
 }
 
+// An older ACC keeps renaming accepted stages onto tmp, because it does not
+// know stage exists, so this is a standing rule rather than a one-off
+// migration. They are moved rather than unlinked: joining the doomed directory
+// costs one rename and keeps the no-unlink rule intact. A partial from a failed
+// publication does not end in .published and never moves.
+async function reclaimLegacy(paths, root, detached, budget, deadlineAt) {
+  let spent = 0;
+  for (const entry of await listDirectoryEntries(paths.tmp, { root })) {
+    if (spent >= budget || expired(deadlineAt)) return { spent, drained: false };
+    if (!entry.isFile() || !entry.name.endsWith(".published")) continue;
+    await rename(path.join(paths.tmp, entry.name), path.join(detached, entry.name));
+    spent += 1;
+  }
+  return { spent, drained: true };
+}
+
 /**
  * Empty the store's accepted staging directory.
  *
@@ -59,6 +75,12 @@ async function discard(directory, root, budget, deadlineAt) {
  */
 export async function sweepAcceptedStages(paths,
   { root, limit = SWEEP_BUDGET, deadlineAt } = {}) {
+  // Two counters, because they answer different questions. `spent` is what the
+  // budget bought: moving a legacy entry and removing one both cost a syscall
+  // on the same directory. `swept` is what left the store, and a legacy entry
+  // that was only moved has not left it yet. Counting a move as a sweep would
+  // report two reclaimed records where one record was reclaimed.
+  let spent = 0;
   let swept = 0;
   let remaining = false;
 
@@ -66,9 +88,10 @@ export async function sweepAcceptedStages(paths,
   // first for a second reason: a pass that stops here never detaches a further
   // directory, so an exhausted budget cannot make them accumulate.
   for (const directory of await detachedDirectories(root)) {
-    const { spent, drained } = await discard(directory, root, limit - swept, deadlineAt);
-    swept += spent;
-    if (!drained) return { swept, remaining: true };
+    const removed = await discard(directory, root, limit - spent, deadlineAt);
+    spent += removed.spent;
+    swept += removed.spent;
+    if (!removed.drained) return { swept, remaining: true };
   }
 
   const detached = path.join(root, `${DETACHED}${randomUUID()}`);
@@ -84,8 +107,12 @@ export async function sweepAcceptedStages(paths,
   await ensureManagedDirectory(root, paths.stage);
   await syncDirectory(root);
 
-  const { spent, drained } = await discard(detached, root, limit - swept, deadlineAt);
-  swept += spent;
-  if (!drained) remaining = true;
+  const reclaimed = await reclaimLegacy(paths, root, detached, limit - spent, deadlineAt);
+  spent += reclaimed.spent;
+  if (!reclaimed.drained) return { swept, remaining: true };
+
+  const removed = await discard(detached, root, limit - spent, deadlineAt);
+  swept += removed.spent;
+  if (!removed.drained) remaining = true;
   return { swept, remaining };
 }
