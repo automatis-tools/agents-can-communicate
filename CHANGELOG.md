@@ -20,13 +20,15 @@
   per-pass bound, because an operator is waiting on it and a hook is not.
 - An older ACC keeps writing accepted stages into `tmp/` and the sweep keeps reclaiming them by
   renaming them into the doomed directory, so both versions can share one store. No store
-  layout version is introduced and nothing refuses to open a store.
+  layout version is introduced and nothing refuses to open a store. A store that has never
+  published into `stage/` — which is every store written before this change — is swept rather
+  than refused; a copy of a real 0.6.2 store reclaimed 484 entries and kept its partial.
 
 | Candidate artifact | Value |
 |---|---|
-| Built from | `096847160c932c2e6264cc08035a502930fbd9b4` |
-| Tarball | `agents-can-communicate-0.6.3.tgz`, 449,775 bytes, 307 files |
-| sha256 | `f82e15869d4d7576ad4242516ddcb5ce6a8be5d5449f07a6149a1a0d42369ae1` |
+| Built from | `9e2d121f56ca10b9c80e9344a7ada16b1d869355` |
+| Tarball | `agents-can-communicate-0.6.3.tgz`, 449,834 bytes, 307 files |
+| sha256 | `90f44abd3805a3becd43c344e505b3a673ef070a876954f6aff86e5e0be4b869` |
 
 This unpublished development archive passed clean installation verification. See
 [store staging sweep evidence](docs/release-evidence/unreleased-store-stage-sweep.md) and the

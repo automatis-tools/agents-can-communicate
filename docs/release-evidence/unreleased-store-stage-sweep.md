@@ -60,22 +60,51 @@ writing accepted stages into `tmp/`, and the sweep keeps reclaiming them. Both t
 writer mutex, so a sweep and a publication never overlap. No store layout version is introduced
 and nothing refuses to open a store.
 
+## Checked against a real store
+
+A copy of a live 0.6.2 workspace store — never the live one — was repaired with the new code.
+The workspace held 484 accepted stages in `tmp/` and no `stage/` directory at all, which is what
+every store written before this change looks like. A partial was planted by hand, since this
+workspace had none.
+
+```
+before: tmp accepted=484 tmp partial=1 stage accepted=0
+diagnose: healthy=true staged=484 partials=1 corrupt=0
+repair:   healthy=true swept=484 staged=0 partials=1
+after:  tmp accepted=0 tmp partial=1 stage accepted=0
+records: events=276 state=159
+leftover detached directories: 0
+```
+
+The planted partial was still present afterwards with its bytes unchanged, and all 276 events
+and 159 state records remained readable.
+
+This run is also what found the one defect in the change. `sweepAcceptedStages` validated the
+stage directory before detaching it, outside the branch that tolerated its absence, so a store
+with no `stage/` — which is every existing store — raised `ENOENT` from `acc doctor --repair`.
+Both test fixtures had hidden it: the unit one creates the directory by hand, and the live-store
+one gets it from opening the store. A unit test now reproduces a store that has never published
+into `stage/`, and the directory is created before the detach so its absence is the ordinary
+case rather than an error.
+
 ## Exact local artifact
 
-- Source: clean commit `096847160c932c2e6264cc08035a502930fbd9b4`.
+- Source: clean commit `9e2d121f56ca10b9c80e9344a7ada16b1d869355`.
 - Archive: `agents-can-communicate-0.6.3.tgz`, packed from that commit.
-- Size: 449,775 bytes; 307 packed entries.
-- SHA-256: `f82e15869d4d7576ad4242516ddcb5ce6a8be5d5449f07a6149a1a0d42369ae1`.
+- Size: 449,834 bytes; 307 packed entries.
+- SHA-256: `90f44abd3805a3becd43c344e505b3a673ef070a876954f6aff86e5e0be4b869`.
 - Package version remains `0.6.3`; this is an unpublished development artifact.
 
-The digest was produced twice by independent runs of `scripts/verify-package.mjs` and once more
-by a separate `npm pack`, and was identical each time. The exact archive passed clean
+The digest was produced by `scripts/verify-package.mjs` and reproduced by a separate `npm pack`.
+An earlier candidate at `0968471`, before the fix described above, was measured the same way and
+its digest was identical across three independent builds, so the measurement itself is stable
+against repacking. The exact archive passed clean
 installation verification: install into a directory with no workspace anywhere, `acc doctor`
 reporting 6 adapters, a workspace with no Git, and an install followed by an uninstall that
 restored topology, modes, links and bytes. The packed entry count rose from 306 to 307 with the
 new `packages/storage-filesystem/src/stage-sweep.mjs`.
 
-`npm test` on this tree: 2,470 passing, 0 failing, 1 skipped, of 2,471.
+`npm test` on this tree: 2,471 passing, 0 failing, 1 skipped, of 2,472.
 
 ## Limits
 
