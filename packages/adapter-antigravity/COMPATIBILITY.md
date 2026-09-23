@@ -6,9 +6,9 @@ line below is either observed on a live install or labelled as not observed.
 Four capabilities are certified from these captures - `lifecycle.sessionStart`,
 `context.beforeTurnInjection` and `delivery.nextTurn` from 2026-09-20, and
 `delivery.livePush` from 2026-09-21, through a relay the agent starts in its own shell (see
-**Live push — certified through a relay the agent starts**). The adapter declares 1.2.7 as a
-certification floor on darwin-arm64: later stable releases are judged by these captures until
-one of their own records otherwise. Everything else in the fourteen-entry
+**Live push — certified through a relay the agent starts**). 1.2.7 is the first captured version:
+everything after it is judged by these captures, on every platform, until a capture of its
+own records otherwise. Everything else in the fourteen-entry
 capability shape is false, and most of it is false because the event it would need does not
 exist on this client rather than because nobody tried.
 
