@@ -100,15 +100,12 @@ export async function sweepAcceptedStages(paths,
   }
 
   const detached = path.join(root, `${DETACHED}${randomUUID()}`);
-  await assertManagedDirectory(root, paths.stage);
-  try {
-    await rename(paths.stage, detached);
-  } catch (error) {
-    if (error.code !== "ENOENT") throw error;
-    // Nothing to detach: the store has not published into stage yet.
-    await ensureManagedDirectory(root, paths.stage);
-    return { swept, remaining };
-  }
+  // A store written by an older version has no stage directory at all, because
+  // nothing ever published into one. Creating it before the detach makes that
+  // the ordinary case rather than an error, and such a store is exactly the one
+  // whose accepted stages are all still in tmp for the reclamation below.
+  await ensureManagedDirectory(root, paths.stage);
+  await rename(paths.stage, detached);
   await ensureManagedDirectory(root, paths.stage);
   await syncDirectory(root);
 

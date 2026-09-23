@@ -76,6 +76,20 @@ test("an expired deadline stops the pass without throwing", async t => {
   assert.equal((await detachedIn(root)).length, 1);
 });
 
+test("a store with no stage directory yet is swept, not refused", async t => {
+  const { root, paths } = await fixture(t, 0);
+  // What an older version leaves behind: accepted stages in tmp and no stage
+  // directory at all, because nothing has ever published into one.
+  await rm(paths.stage, { recursive: true });
+  await writeFile(path.join(paths.tmp, "abc.published"), "{}\n");
+
+  const result = await sweepAcceptedStages(paths, { root });
+
+  assert.equal(result.swept, 1);
+  assert.deepEqual(await readdir(paths.tmp), []);
+  assert.deepEqual(await readdir(paths.stage), []);
+});
+
 test("an accepted stage an older version left in tmp is reclaimed", async t => {
   const { root, paths } = await fixture(t, 0);
   await writeFile(path.join(paths.tmp, "abc.published"), "{}\n");
