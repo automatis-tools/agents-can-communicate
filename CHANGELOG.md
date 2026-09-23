@@ -8,7 +8,7 @@
 
 | Candidate artifact | Value |
 |---|---|
-| Built from | `eec7b7f0db63510028e23897f05111454f784259` |
+| Built from | `8e2e05becec3c9229c48ec3ae55d7232d399a486` |
 | Tarball | `agents-can-communicate-0.6.3.tgz`, 446,564 bytes, 306 files |
 | sha256 | `66956ea9409f2bd51705c486fdc8153cf7b0f888753112984c15e61cf66964c6` |
 
@@ -31,7 +31,7 @@ package version remains `0.6.3` until a release prepares its own.
 
 | Candidate artifact | Value |
 |---|---|
-| Built from | `a93d89d4f3af90add6bc3f6e1faadb515011c0ce` |
+| Built from | `a193accb7304d1db2e16be13fe058cfb3b953407` |
 | Tarball | `agents-can-communicate-0.6.3.tgz`, 446,522 bytes, 306 files |
 | sha256 | `e3e0dc4411086ec5b2416de58636557ed8a39777c5dd2cb9393138bb3c11161e` |
 
@@ -57,7 +57,7 @@ development records below retain their original provenance.
 
 | Candidate artifact | Value |
 |---|---|
-| Built from | `c64a3d857648c86ac9eb0967dc0bc0917ef45195` |
+| Built from | `96f78ad33b1c94c771e6855aea12d6f51dd7e82e` |
 | Tarball | `agents-can-communicate-0.6.2.tgz`, 446,522 bytes, 306 files |
 | sha256 | `878a4efeec5ca3015f4252a0a59ba1b7f7ec11c65d8d7dfb15a2fa0d86372d02` |
 
@@ -83,7 +83,7 @@ prepares its own.
 
 | Candidate artifact | Value |
 |---|---|
-| Built from | `74ce006b165450185a641c8e4010225de8bc02bd` |
+| Built from | `95cba99b32e0383df81b443ac6dcd65199e25b49` |
 | Tarball | `agents-can-communicate-0.6.2.tgz`, 446,538 bytes, 306 files |
 | sha256 | `3df8baa8095e65cbe437a6b93106cdade919ece8d01d58ad8c658466d82a3dc0` |
 
@@ -113,7 +113,7 @@ verification and limits. Earlier development records below retain their original
 
 | Candidate artifact | Value |
 |---|---|
-| Built from | `b3f91a8f0f293d26ce5e58998c7a07ed66747200` |
+| Built from | `e99acc7420dd584ad548dbb39e402bf6e09b2ec9` |
 | Tarball | `agents-can-communicate-0.6.1.tgz`, 446,538 bytes, 306 files |
 | sha256 | `47e93fd4c2c7c5a716c7c47e0f8bb778a1af92e1a971d024144488036ae6f965` |
 
@@ -132,7 +132,7 @@ release prepares its own.
 
 | Candidate artifact | Value |
 |---|---|
-| Built from | `913af545c95976737bcd6d0a4fcd433400524ec1` |
+| Built from | `fec58786b24dfdd2a06933d2e60ffc1053bffdb8` |
 | Tarball | `agents-can-communicate-0.6.1.tgz`, 445,146 bytes, 306 files |
 | sha256 | `b6364e3d28ca50f6aa7af77b49919297018917641eed42e97694d7acd12ad6a5` |
 
@@ -154,7 +154,7 @@ limits. Earlier development records below retain their original provenance.
 
 | Candidate artifact | Value |
 |---|---|
-| Built from | `cadd044302e6382a912a5a08c5ea7e49efcc4079` |
+| Built from | `72d7933acca1c8ac354aeab0ef6ce8e668f7e93b` |
 | Tarball | `agents-can-communicate-0.6.0.tgz`, 445,146 bytes, 306 files |
 | sha256 | `34f00f69903eb2520db025b65040c52939e5159df6fd8b522926496de82ddd2e` |
 
@@ -178,7 +178,7 @@ measurements and limits. Earlier records retain their original provenance.
 
 | Candidate artifact | Value |
 |---|---|
-| Built from | `cda41fde384c15fa949f3373a609a597dde543a7` |
+| Built from | `a3df7d4011c574879d2bc14a2da17067ea55608f` |
 | Tarball | `agents-can-communicate-0.6.0.tgz`, 444,601 bytes, 306 files |
 | sha256 | `fed73768b83df33a7d5b779358a4907bb3ce880709f4faa5dda97d8c458b6c94` |
 
@@ -207,7 +207,7 @@ limits. Earlier development records below retain their original provenance.
 
 | Candidate artifact | Value |
 |---|---|
-| Built from | `ca73be94f058724491824ee6c7a30036f5e38bf5` |
+| Built from | `57d977b545ea76de38d2ed17850a39ff38f0ed78` |
 | Tarball | `agents-can-communicate-0.5.10.tgz`, 444,260 bytes, 306 files |
 | sha256 | `32768535131b513b46ca2940c60f9b31971ceca33f429d64865f2a9d66d534f9` |
 
@@ -228,7 +228,7 @@ live capture, regression checks and limits. Earlier records retain their origina
 
 | Candidate artifact | Value |
 |---|---|
-| Built from | `b577f5790b9655be0055be14655c8c7203ab560d` |
+| Built from | `e226022b56f36000a95ea30227d943f0a4f86b65` |
 | Tarball | `agents-can-communicate-0.5.10.tgz`, 402,274 bytes, 281 files |
 | sha256 | `56fc37184ab120a801dd84a0f30b2f467ae55feda445559251c1747ba47e6044` |
 
@@ -249,7 +249,7 @@ limits. Earlier development records below retain their original provenance.
 
 | Candidate artifact | Value |
 |---|---|
-| Built from | `686c3303f4e60de6c561a7d44647617ae8778c19` |
+| Built from | `c9a85fc7b80ae396d686a6780abe03463f407152` |
 | Tarball | `agents-can-communicate-0.5.9.tgz`, 402,272 bytes, 281 files |
 | sha256 | `f54b899e0d074be2e2d722096a643ee5ede8fa40514d547dd0b4d3533382195e` |
 
@@ -270,7 +270,7 @@ for regression checks and limits. Earlier records retain their original provenan
 
 | Candidate artifact | Value |
 |---|---|
-| Built from | `40d207505f31f6a8d740a22a5c743ef2c9f94724` |
+| Built from | `97954cb41b6ad6718af7cdcb4f49143aae5e2a6e` |
 | Tarball | `agents-can-communicate-0.5.9.tgz`, 401,444 bytes, 281 files |
 | sha256 | `013e2005932b37c51c5bcc43d71e03286254ed9c100ac66cd85909be9f10f4b0` |
 
@@ -292,7 +292,7 @@ retain their original provenance.
 
 | Candidate artifact | Value |
 |---|---|
-| Built from | `4adbac5c38167f75b78d624db6cf7d7ef8b6c3ce` |
+| Built from | `aab857adae7c9fd165148ddd4fae94d36ca303f9` |
 | Tarball | `agents-can-communicate-0.5.9.tgz`, 398,941 bytes, 280 files |
 | sha256 | `d18905f8ada5fb66d6f77b70b0c4015870986bbf64d2369e6f8ad9af47807105` |
 
@@ -316,7 +316,7 @@ for regression checks, the real-client observation, and its limits.
 
 | Candidate artifact | Value |
 |---|---|
-| Built from | `33d7f358e51234ea26fe8f8891aa242a182561e5` |
+| Built from | `b4c2c7315e3610e30894f227a97c85d6e0024b9f` |
 | Tarball | `agents-can-communicate-0.5.9.tgz`, 396,954 bytes, 279 files |
 | sha256 | `bce564ea69700f1f26ef418a51c78929db24e08c23d132b5c0a2e728c2a38ee1` |
 

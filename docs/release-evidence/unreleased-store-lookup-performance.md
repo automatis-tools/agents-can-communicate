@@ -7,7 +7,7 @@ five-second budget and failed open. The same hooks against an empty data home to
 
 ## Exact local artifact
 
-- Source: clean commit `cadd044302e6382a912a5a08c5ea7e49efcc4079`.
+- Source: clean commit `72d7933acca1c8ac354aeab0ef6ce8e668f7e93b`.
 - Archive: `agents-can-communicate-0.6.0.tgz`, packed from that commit.
 - Size: 445,146 bytes; 306 packed entries.
 - SHA-256: `34f00f69903eb2520db025b65040c52939e5159df6fd8b522926496de82ddd2e`.

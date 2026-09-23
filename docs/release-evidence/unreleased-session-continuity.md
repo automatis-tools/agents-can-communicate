@@ -5,7 +5,7 @@ The published 0.5.9 evidence remains unchanged.
 
 | Artifact | Value |
 |---|---|
-| Source commit | `4adbac5c38167f75b78d624db6cf7d7ef8b6c3ce` |
+| Source commit | `aab857adae7c9fd165148ddd4fae94d36ca303f9` |
 | Archive | `agents-can-communicate-0.5.9.tgz` |
 | Bytes / entries | 398,941 / 280 |
 | SHA-256 | `d18905f8ada5fb66d6f77b70b0c4015870986bbf64d2369e6f8ad9af47807105` |

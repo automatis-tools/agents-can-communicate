@@ -17,7 +17,7 @@ unsupported when it is not.
 
 ## Exact local artifact
 
-- Source: clean commit `c64a3d857648c86ac9eb0967dc0bc0917ef45195`.
+- Source: clean commit `96f78ad33b1c94c771e6855aea12d6f51dd7e82e`.
 - Archive: `agents-can-communicate-0.6.2.tgz`, packed from that commit.
 - Size: 446,522 bytes; 306 packed entries.
 - SHA-256: `878a4efeec5ca3015f4252a0a59ba1b7f7ec11c65d8d7dfb15a2fa0d86372d02`.

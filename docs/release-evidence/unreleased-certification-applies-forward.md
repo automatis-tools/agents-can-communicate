@@ -7,7 +7,7 @@ not certified for nextTurn`. Both clients were current; the capture set was not.
 
 ## Exact local artifact
 
-- Source: clean commit `b3f91a8f0f293d26ce5e58998c7a07ed66747200`.
+- Source: clean commit `e99acc7420dd584ad548dbb39e402bf6e09b2ec9`.
 - Archive: `agents-can-communicate-0.6.1.tgz`, packed from that commit.
 - Size: 446,538 bytes; 306 packed entries.
 - SHA-256: `47e93fd4c2c7c5a716c7c47e0f8bb778a1af92e1a971d024144488036ae6f965`.

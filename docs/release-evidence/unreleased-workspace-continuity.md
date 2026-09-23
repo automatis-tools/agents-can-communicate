@@ -6,7 +6,7 @@ looking for the workspace-local owner. Their current cwd still resolves file tar
 
 ## Exact local artifact
 
-- Source: clean commit `40d207505f31f6a8d740a22a5c743ef2c9f94724`.
+- Source: clean commit `97954cb41b6ad6718af7cdcb4f49143aae5e2a6e`.
 - Archive: `dist/workspace-affinity/agents-can-communicate-0.5.9.tgz`.
 - Size: 401,444 bytes; 281 packed entries.
 - SHA-256: `013e2005932b37c51c5bcc43d71e03286254ed9c100ac66cd85909be9f10f4b0`.

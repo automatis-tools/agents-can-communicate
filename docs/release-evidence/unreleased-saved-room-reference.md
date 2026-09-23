@@ -9,7 +9,7 @@ credentials and performs no network access.
 
 ## Exact local artifact
 
-- Source: clean commit `686c3303f4e60de6c561a7d44647617ae8778c19`.
+- Source: clean commit `c9a85fc7b80ae396d686a6780abe03463f407152`.
 - Archive: `dist/workspace-reference/agents-can-communicate-0.5.9.tgz`.
 - Size: 402,272 bytes; 281 packed entries.
 - SHA-256: `f54b899e0d074be2e2d722096a643ee5ede8fa40514d547dd0b4d3533382195e`.

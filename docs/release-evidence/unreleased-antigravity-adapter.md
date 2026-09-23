@@ -7,7 +7,7 @@ relay. Every client behaviour it relies on is a capture in
 
 ## Exact local artifact
 
-- Source: clean commit `ca73be94f058724491824ee6c7a30036f5e38bf5`.
+- Source: clean commit `57d977b545ea76de38d2ed17850a39ff38f0ed78`.
 - Archive: `agents-can-communicate-0.5.10.tgz`, packed from that commit.
 - Size: 444,260 bytes; 306 packed entries.
 - SHA-256: `32768535131b513b46ca2940c60f9b31971ceca33f429d64865f2a9d66d534f9`.

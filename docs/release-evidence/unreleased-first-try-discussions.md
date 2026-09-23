@@ -16,7 +16,7 @@ candidate of 279 entries, three releases behind.
 
 ## Exact local artifact
 
-- Source: clean commit `eec7b7f0db63510028e23897f05111454f784259`.
+- Source: clean commit `8e2e05becec3c9229c48ec3ae55d7232d399a486`.
 - Archive: `agents-can-communicate-0.6.3.tgz`, packed from that commit.
 - Size: 446,564 bytes; 306 packed entries.
 - SHA-256: `66956ea9409f2bd51705c486fdc8153cf7b0f888753112984c15e61cf66964c6`.
