@@ -28,16 +28,29 @@ const ZERO = /^0+$/;
 const attributionLines = text =>
   text.split(/\r?\n/).filter(line => ATTRIBUTION.some(pattern => pattern.test(line)));
 
-// What git will store: everything above the `git commit -v` scissors line,
-// without comment lines.
-function storedMessage(raw) {
-  const lines = raw.split(/\r?\n/);
-  const cut = lines.findIndex(line => SCISSORS.test(line));
-  return (cut === -1 ? lines : lines.slice(0, cut)).filter(line => !line.startsWith("#")).join("\n");
-}
-
 async function git(args) {
   return (await run("git", args, { maxBuffer: 256 * 1024 * 1024 })).stdout;
+}
+
+const setting = async key => (await git(["config", "--get", key]).catch(() => "")).trim();
+
+// git hands commit-msg the file before its own cleanup. Only the case git's cleanup
+// is known to drop is left out: an editor session (without one git sets
+// GIT_EDITOR=:, keeps comments and a typed scissors line) under the default strip
+// cleanup with `#` comments loses its comment lines, and `git commit -v` loses the
+// diff below its scissors line. Everything else is checked as written, because git
+// may store any of it.
+async function storedMessage(raw) {
+  const lines = raw.split(/\r?\n/);
+  if (process.env.GIT_EDITOR === ":") return lines.join("\n");
+  const scissors = lines.findIndex(line => SCISSORS.test(line));
+  const below = scissors === -1 ? undefined : lines.slice(scissors + 1).find(line => !line.startsWith("#"));
+  const verboseDiff = scissors !== -1 && (below === undefined || below.startsWith("diff --git "));
+  const kept = verboseDiff ? lines.slice(0, scissors) : lines;
+  const cleanup = await setting("commit.cleanup");
+  const comment = (await setting("core.commentString")) || (await setting("core.commentChar")) || "#";
+  const strips = ["", "default", "strip"].includes(cleanup) && comment === "#";
+  return (strips ? kept.filter(line => !line.startsWith("#")) : kept).join("\n");
 }
 
 async function offendingCommits(revisions) {
@@ -88,7 +101,7 @@ async function commitsGate(what, revisionSets, advice) {
 
 const [mode, ...rest] = process.argv.slice(2);
 if (mode === "--message-file" && rest.length === 1) {
-  const lines = attributionLines(storedMessage(await readFile(rest[0], "utf8")));
+  const lines = attributionLines(await storedMessage(await readFile(rest[0], "utf8")));
   if (lines.length > 0) refuse("commit", lines.map(line => `  ${line}`));
 } else if (mode === "--pre-push" && rest.length >= 1) {
   await commitsGate("push", await pushedRevisions(rest[0]),

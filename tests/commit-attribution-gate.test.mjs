@@ -93,6 +93,45 @@ for (const [name, message] of Object.entries(CLEAN)) {
   });
 }
 
+// Without an editor git keeps comment lines and a typed scissors line (whitespace
+// cleanup), so neither may hide a trailer from a `git commit -F` message.
+test("a scissors line or a comment cannot hide a trailer in a message committed without an editor", async t => {
+  const { commit } = await scratch(t);
+  const hidden = {
+    "below a scissors line": "fix: x\n\n# ------------------------ >8 ------------------------\n"
+      + "Claude-Session: https://claude.ai/code/session_x\n",
+    "on a comment line": "fix: y\n\n# 🤖 Generated with [Claude Code](https://claude.com/claude-code)\n",
+  };
+  for (const [where, message] of Object.entries(hidden)) {
+    const result = await commit(message);
+    assert.notEqual(result.code, 0, `a trailer ${where} was committed`);
+  }
+});
+
+test("an editor session that keeps comments cannot hide a trailer in one", async t => {
+  const { base, root, git } = await scratch(t);
+  await git(["config", "commit.cleanup", "verbatim"]);
+  await writeFile(path.join(root, "b.txt"), "b\n");
+  await git(["add", "b.txt"]);
+  const editor = path.join(base, "editor.sh");
+  await writeFile(editor, '#!/bin/sh\nprintf "fix: z\\n\\n# Claude-Session: https://claude.ai/code/session_x\\n" > "$1"\n');
+  await chmod(editor, 0o755);
+  const result = await attempt("git", ["-C", root, "commit", "-q"], { env: gitEnv({ GIT_EDITOR: editor }) });
+  assert.notEqual(result.code, 0, "verbatim cleanup stored a commented trailer");
+});
+
+test("a scissors line typed in the editor, with no diff below it, hides nothing", async t => {
+  const { base, root, git } = await scratch(t);
+  await writeFile(path.join(root, "c.txt"), "c\n");
+  await git(["add", "c.txt"]);
+  const editor = path.join(base, "editor.sh");
+  await writeFile(editor, "#!/bin/sh\nprintf \"fix: w\\n\\n# ------------------------ >8 ------------------------\\n"
+    + 'Claude-Session: https://claude.ai/code/session_x\\n" > "$1"\n');
+  await chmod(editor, 0o755);
+  const result = await attempt("git", ["-C", root, "commit", "-q"], { env: gitEnv({ GIT_EDITOR: editor }) });
+  assert.notEqual(result.code, 0, "a trailer below a typed scissors line was committed");
+});
+
 // git hands commit-msg the file before its own cleanup, so the hook sees comment
 // lines and, under `git commit -v`, the staged diff below the scissors line.
 test("a trailer in a comment or in the `git commit -v` diff is not the message", async t => {
