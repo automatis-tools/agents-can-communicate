@@ -1,5 +1,38 @@
 # Changelog
 
+## Unreleased — the store sweeps its accepted staging files
+
+- A workspace store's `tmp/` grew by one file per published immutable record and nothing ever
+  removed one. On the maintainer's machine 26 workspaces held about 48,000 entries, and 733
+  came back within a day of clearing them by hand. Each is a hard link to a live record, so
+  what accumulated was directory entries, which every operation on that directory then walks.
+- Accepted staging files are published into their own `stage/` directory. The sweep detaches
+  that directory with one `rename`, recreates it empty and discards the detached copy, so it
+  removes by directory instead of deciding file by file from a filename suffix, and nothing
+  unlinks a name a publisher can still resolve.
+- A partial from a failed publication stays in `tmp/` and is never removed or moved. It is the
+  evidence that bytes may not have reached their destination.
+- The sweep runs where recovery already runs — under the writer mutex, once a day — and is
+  bounded per pass, so draining a large accumulation takes several opens instead of one hook's
+  whole budget. That budget is what hooks ran out of in 0.6.1.
+- `acc doctor` reports how many accepted stages are held and how many partials are in `tmp/`,
+  so a store still carrying an accumulation says so. `acc doctor --repair` sweeps without the
+  per-pass bound, because an operator is waiting on it and a hook is not.
+- An older ACC keeps writing accepted stages into `tmp/` and the sweep keeps reclaiming them by
+  renaming them into the doomed directory, so both versions can share one store. No store
+  layout version is introduced and nothing refuses to open a store.
+
+| Candidate artifact | Value |
+|---|---|
+| Built from | `096847160c932c2e6264cc08035a502930fbd9b4` |
+| Tarball | `agents-can-communicate-0.6.3.tgz`, 449,775 bytes, 307 files |
+| sha256 | `f82e15869d4d7576ad4242516ddcb5ce6a8be5d5449f07a6149a1a0d42369ae1` |
+
+This unpublished development archive passed clean installation verification. See
+[store staging sweep evidence](docs/release-evidence/unreleased-store-stage-sweep.md) and the
+design in [docs/design/2026-09-23-store-tmp-sweep.md](docs/design/2026-09-23-store-tmp-sweep.md).
+The package version remains `0.6.3` until a release prepares its own.
+
 ## Unreleased — a first-try report goes to Discussions
 
 - The README's closing call to action sent every first impression to the issue tracker. GitHub
