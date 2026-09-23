@@ -1,5 +1,27 @@
 # Changelog
 
+## Unreleased — fallback diagnostics tell the truth about certification
+
+- `acc doctor` prints an adapter's fallback diagnostic verbatim, and three of them still
+  described the gate 0.6.2 removed. Gemini CLI 0.60.0 was told next-turn delivery is
+  "certified only for 0.57.0 on darwin-arm64" while it was in fact delivering; Kimi Code read
+  the same way, and Antigravity CLI limited itself to later stable releases on one platform.
+- Each now says what the rule says: certified from the captured version onward, on every
+  platform. The Kimi and Antigravity compatibility notes follow.
+- A conformance case holds every adapter to it, so a fallback diagnostic cannot claim a single
+  certified version or tie certification to one platform.
+
+| Candidate artifact | Value |
+|---|---|
+| Built from | `c64a3d857648c86ac9eb0967dc0bc0917ef45195` |
+| Tarball | `agents-can-communicate-0.6.2.tgz`, 446,522 bytes, 306 files |
+| sha256 | `878a4efeec5ca3015f4252a0a59ba1b7f7ec11c65d8d7dfb15a2fa0d86372d02` |
+
+This unpublished development archive passed clean installation verification. See
+[fallback wording evidence](docs/release-evidence/unreleased-fallback-diagnostics.md) for what
+each client was told before and after. The package version remains `0.6.2` until a release
+prepares its own.
+
 ## 0.6.2 — release candidate
 
 - A client is judged by the evidence that reaches it. A capture applies from the version that
