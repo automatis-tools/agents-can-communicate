@@ -122,7 +122,7 @@ test("reopening the store completes a journalled transaction exactly", async t =
 
 test("opening a v0.1 store refuses it before recovery and preserves every byte", async t => {
   const root = await tempRoot(t);
-  for (const directory of ["state", "events", "journal", "locks", "ephemeral", "tmp"]) {
+  for (const directory of ["state", "events", "journal", "locks", "ephemeral", "tmp", "stage"]) {
     await mkdir(path.join(root, directory));
   }
   await writeFile(path.join(root, "protocol.json"), `${JSON.stringify({ storeVersion: 2,

@@ -15,10 +15,11 @@ async function fixture(t) {
   const root = await realpath(await mkdtemp(path.join(tmpdir(), "acc-atomic-")));
   t.after(() => rm(root, { recursive: true, force: true }));
   const tmpDir = path.join(root, "tmp");
+  const stageDir = path.join(root, "stage");
   const records = path.join(root, "records");
   await mkdir(tmpDir);
   await mkdir(records);
-  return { root, tmpDir, records, options: { root, tmpDir } };
+  return { root, tmpDir, stageDir, records, options: { root, tmpDir } };
 }
 
 const bytes = value => Buffer.from(`${value}\n`, "utf8");
@@ -55,7 +56,7 @@ test("replace publication updates materialised state in place", async t => {
 });
 
 test("immutable retries and conflicts retain one accepted staging file", async t => {
-  const { tmpDir, records, options } = await fixture(t);
+  const { stageDir, records, options } = await fixture(t);
   const destination = path.join(records, "evidence.json");
   await publishAtomic(destination, bytes("original"), options);
   for (let attempt = 0; attempt < 32; attempt += 1) {
@@ -65,14 +66,14 @@ test("immutable retries and conflicts retain one accepted staging file", async t
       error => error.code === EXIT.CONFLICT);
   }
 
-  const retained = await readdir(tmpDir);
+  const retained = await readdir(stageDir);
   assert.equal(retained.length, 1);
-  assert.deepEqual(await Promise.all(retained.map(file => readFile(path.join(tmpDir, file),
+  assert.deepEqual(await Promise.all(retained.map(file => readFile(path.join(stageDir, file),
     "utf8"))), ["original\n"]);
 });
 
 test("concurrent immutable conflicts retain only the published bytes", async t => {
-  const { tmpDir, records, options } = await fixture(t);
+  const { stageDir, records, options } = await fixture(t);
   const destination = path.join(records, "evidence.json");
   const outcomes = await Promise.allSettled(Array.from({ length: 16 }, (_, index) =>
     publishAtomic(destination, bytes(`candidate-${index}`), options)));
@@ -81,9 +82,9 @@ test("concurrent immutable conflicts retain only the published bytes", async t =
   assert.equal(outcomes.filter(outcome => outcome.status === "rejected"
     && outcome.reason.code === EXIT.CONFLICT).length, 15);
   const published = await readFile(destination);
-  const retained = await readdir(tmpDir);
+  const retained = await readdir(stageDir);
   assert.equal(retained.length, 1);
-  assert.equal((await readFile(path.join(tmpDir, retained[0]))).equals(published), true,
+  assert.equal((await readFile(path.join(stageDir, retained[0]))).equals(published), true,
     "staging retained bytes rejected by the destination");
 });
 
@@ -178,4 +179,13 @@ test("invalid JSON is a data error naming its file", async t => {
 
   await assert.rejects(readJsonIfPresent(filePath, root),
     error => error.code === EXIT.DATA && error.details.filePath === filePath);
+});
+
+test("an accepted stage is retained in stage, not in tmp", async t => {
+  const { root, tmpDir, records, options } = await fixture(t);
+  await publishAtomic(path.join(records, "record.json"), bytes("accepted"), options);
+
+  const staged = await readdir(path.join(root, "stage"));
+  assert.equal(staged.filter(name => name.endsWith(".published")).length, 1);
+  assert.deepEqual((await readdir(tmpDir)).filter(name => name.endsWith(".published")), []);
 });
