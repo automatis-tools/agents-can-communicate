@@ -42,6 +42,11 @@ const setting = async key => (await git(["config", "--get", key]).catch(() => ""
 // line and a comment start with the configured comment string; with `auto` git
 // picks it per message, so nothing is dropped. Everything else is checked as
 // written, because git may store it.
+//
+// An editor session explicitly run with GIT_EDITOR=: reaches the hook exactly like
+// a commit with no editor, so it is checked as written too. That can refuse a line
+// git would have cleaned away, never accept one git keeps; trusting editor mode
+// instead would let every `git commit -F` hide a trailer again.
 async function storedMessage(raw) {
   const lines = raw.split(/\r?\n/);
   if (process.env.GIT_EDITOR === ":") return lines.join("\n");
