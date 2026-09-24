@@ -1,11 +1,13 @@
-import { randomUUID } from "node:crypto";
-import { open, rename, rm, rmdir } from "node:fs/promises";
+import { rename } from "node:fs/promises";
 import path from "node:path";
 
 import { EXIT } from "@agents-can-communicate/protocol";
 
 import { encode, listDirectoryEntries, publishAtomic, readJsonIfPresent } from "./atomic-json.mjs";
-import { assertManagedDirectory, ensureManagedDirectory } from "./safe-directory.mjs";
+import { discard, discardLeftovers, doomedName, expired, syncDirectory }
+  from "./doomed-directory.mjs";
+import { reclaimRetired } from "./reclaim.mjs";
+import { ensureManagedDirectory } from "./safe-directory.mjs";
 
 // One pass never touches more than this many entries, counting both the legacy
 // entries it moves and the entries it discards. A store left unopened can hold
@@ -17,47 +19,6 @@ export const SWEEP_BUDGET = 512;
 // the directory this keeps small, or an fsync'ed write on every transaction. A
 // timestamp costs one read.
 export const SWEEP_INTERVAL_MS = 24 * 60 * 60 * 1000;
-
-const DETACHED = "stage.sweeping-";
-
-// Not assertPublicationDeadline: that one throws, and a maintenance pass on the
-// path that opens the store must stop rather than fail the open. What is left
-// is reported as remaining, and the next pass adopts it.
-const expired = deadlineAt => deadlineAt !== undefined && Date.now() >= deadlineAt;
-
-async function syncDirectory(directory) {
-  const handle = await open(directory, "r");
-  try {
-    await handle.sync();
-  } finally {
-    await handle.close();
-  }
-}
-
-async function detachedDirectories(root) {
-  return (await listDirectoryEntries(root, { root }))
-    .filter(entry => entry.isDirectory() && entry.name.startsWith(DETACHED))
-    .map(entry => path.join(root, entry.name))
-    .sort((left, right) => left.localeCompare(right));
-}
-
-// Removal happens only in here: a directory this sweep named with a value no
-// other process knows, and detached from the name a publisher resolves before a
-// single entry was touched. That is the ground releaseCanonical stands on in
-// writer-mutex.mjs, not the check-then-unlink window atomic-json.mjs refuses.
-async function discard(directory, root, budget, deadlineAt) {
-  let spent = 0;
-  await assertManagedDirectory(root, directory);
-  for (const entry of await listDirectoryEntries(directory, { root })) {
-    if (spent >= budget || expired(deadlineAt)) return { spent, drained: false };
-    await rm(path.join(directory, entry.name), { recursive: true, force: true });
-    spent += 1;
-  }
-  await rmdir(directory).catch(error => {
-    if (error.code !== "ENOENT" && error.code !== "ENOTEMPTY") throw error;
-  });
-  return { spent, drained: true };
-}
 
 // An older ACC keeps renaming accepted stages onto tmp, because it does not
 // know stage exists, so this is a standing rule rather than a one-off
@@ -78,7 +39,10 @@ async function reclaimLegacy(paths, root, detached, budget, deadlineAt) {
 /**
  * Empty the store's accepted staging directory.
  *
- * @returns {Promise<{ swept: number, remaining: boolean }>}
+ * `spent` is what the budget bought, which the caller needs to give whatever
+ * runs next the part of the budget this pass did not use.
+ *
+ * @returns {Promise<{ swept: number, remaining: boolean, spent: number }>}
  */
 export async function sweepAcceptedStages(paths,
   { root, limit = SWEEP_BUDGET, deadlineAt } = {}) {
@@ -94,14 +58,12 @@ export async function sweepAcceptedStages(paths,
   // Finish what an interrupted pass left before starting another one. This runs
   // first for a second reason: a pass that stops here never detaches a further
   // directory, so an exhausted budget cannot make them accumulate.
-  for (const directory of await detachedDirectories(root)) {
-    const removed = await discard(directory, root, limit - spent, deadlineAt);
-    spent += removed.spent;
-    swept += removed.spent;
-    if (!removed.drained) return { swept, remaining: true };
-  }
+  const leftovers = await discardLeftovers(root, limit, deadlineAt);
+  spent += leftovers.spent;
+  swept += leftovers.spent;
+  if (!leftovers.drained) return { swept, remaining: true, spent };
 
-  const detached = path.join(root, `${DETACHED}${randomUUID()}`);
+  const detached = doomedName(root);
   // A store written by an older version has no stage directory at all, because
   // nothing ever published into one. Creating it before the detach makes that
   // the ordinary case rather than an error, and such a store is exactly the one
@@ -113,12 +75,13 @@ export async function sweepAcceptedStages(paths,
 
   const reclaimed = await reclaimLegacy(paths, root, detached, limit - spent, deadlineAt);
   spent += reclaimed.spent;
-  if (!reclaimed.drained) return { swept, remaining: true };
+  if (!reclaimed.drained) return { swept, remaining: true, spent };
 
   const removed = await discard(detached, root, limit - spent, deadlineAt);
+  spent += removed.spent;
   swept += removed.spent;
   if (!removed.drained) remaining = true;
-  return { swept, remaining };
+  return { swept, remaining, spent };
 }
 
 const markerPath = paths => path.join(paths.locks, "stage-sweep.json");
@@ -183,7 +146,16 @@ export async function sweepIfDue(paths,
     if (holder !== null && holder !== last && Date.parse(clock.now()) - holder < SWEEP_INTERVAL_MS) {
       return { swept: 0, remaining: false };
     }
-    const result = await sweepAcceptedStages(paths, { root, limit, deadlineAt });
+    const stages = await sweepAcceptedStages(paths, { root, limit, deadlineAt });
+    // One budget for the whole pass. The reclaimer gets what the stage sweep
+    // did not spend, so opening a store never pays the bound twice, and a stage
+    // sweep that ran out leaves the reclaimer for the next open rather than
+    // borrowing against it.
+    const retired = stages.remaining
+      ? { reclaimed: 0, remaining: true }
+      : await reclaimRetired(paths, { root, limit: limit - stages.spent, deadlineAt });
+    const result = { swept: stages.swept + retired.reclaimed,
+      remaining: stages.remaining || retired.remaining };
     // The marker records a *finished* pass, never an attempted one. A pass that
     // stopped at its entry budget or ran out of time leaves it unwritten, so
     // the next open carries on immediately. Recording an unfinished pass as
