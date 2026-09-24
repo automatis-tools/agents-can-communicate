@@ -5,10 +5,11 @@ that never ran the command. The marker was already written, so the ask never ret
 session stayed unreachable while idle. Issue #189.
 
 The reminder now returns on a later turn while the binding stays degraded and no relay for
-that conversation is serving, up to three times. An empty marker left by the one-ask rule
-counts as zero asks. A serving relay is not asked, and neither is a binding that is not
-degraded; those calls do not spend an ask. A permission decline and a model that never tried
-leave the same trace — the shim never ran — so the asking cannot stop because someone
+that conversation is serving, up to three times. Each ask is its own file, created with
+`O_EXCL`, so overlapping calls cannot both take the same number. An empty marker left by the
+one-ask rule counts as zero asks. A serving relay is not asked, and neither is a binding that
+is not degraded; those calls do not spend an ask. A permission decline and a model that never
+tried leave the same trace — the shim never ran — so the asking cannot stop because someone
 declined. The third ask is what stops it.
 
 The 2026-09-21 live-push capture still records what that build did: one ask. This note does
@@ -17,10 +18,10 @@ behavior is the adapter function, covered by `packages/adapter-antigravity/test/
 
 ## Exact local artifact
 
-- Source: clean commit `e497d41d1704d29fd66be044723daf3f595a62c7`.
+- Source: clean commit `c4cf004c7e55d6787536b03d5a5f1275fedbabe0`.
 - Archive: `agents-can-communicate-0.6.3.tgz`, packed from that commit.
-- Size: 447,284 bytes; 306 packed entries.
-- SHA-256: `83aa8e5dc86922a51c69d72a05d31f75f8465c4b1b47586f83727cf4cb634219`.
+- Size: 447,190 bytes; 306 packed entries.
+- SHA-256: `2fe885069a93a1dfc3ab5b05eca66cbe6e28436eeb1aaa769dfbb405a5c2fd40`.
 - Package version remains `0.6.3`; this is an unpublished development artifact.
 
 The exact archive passed `scripts/verify-package.mjs`: pack, contents, certification
