@@ -133,15 +133,34 @@ async function sweptAt(paths, root) {
 /**
  * Sweep only when the recorded pass is older than SWEEP_INTERVAL_MS.
  *
+ * The due check is one read and it happens before the lock. Sweeping is a
+ * write and needs the writer mutex, but taking that mutex is itself a mkdir, a
+ * write, an fsync and a rename, and this runs on every store open - which means
+ * inside every hook. Paying for the lock on the days there is nothing to sweep
+ * would put that cost on every hook to do nothing, which is the shape of the
+ * slowdown that made hooks time out in 0.6.1.
+ *
+ * `withLock` is the seam: production passes the writer mutex, tests count calls.
+ *
  * @returns {Promise<{ swept: number, remaining: boolean }>}
  */
-export async function sweepIfDue(paths, { root, clock, limit = SWEEP_BUDGET, deadlineAt } = {}) {
+export async function sweepIfDue(paths,
+  { root, clock, limit = SWEEP_BUDGET, deadlineAt, withLock = operation => operation() } = {}) {
   const now = Date.parse(clock.now());
   const last = await sweptAt(paths, root);
   if (last !== null && now - last < SWEEP_INTERVAL_MS) return { swept: 0, remaining: false };
 
-  const result = await sweepAcceptedStages(paths, { root, limit, deadlineAt });
-  await publishAtomic(markerPath(paths), encode({ sweptAt: clock.now() }),
-    { root, tmpDir: paths.tmp, stageDir: paths.stage, replace: true, deadlineAt });
-  return result;
+  return withLock(async () => {
+    // Re-read under the lock: another process may have swept while this one
+    // waited for it, and two sweeps in a row would detach an empty directory
+    // for nothing.
+    const holder = await sweptAt(paths, root);
+    if (holder !== null && holder !== last && Date.parse(clock.now()) - holder < SWEEP_INTERVAL_MS) {
+      return { swept: 0, remaining: false };
+    }
+    const result = await sweepAcceptedStages(paths, { root, limit, deadlineAt });
+    await publishAtomic(markerPath(paths), encode({ sweptAt: clock.now() }),
+      { root, tmpDir: paths.tmp, stageDir: paths.stage, replace: true, deadlineAt });
+    return result;
+  });
 }

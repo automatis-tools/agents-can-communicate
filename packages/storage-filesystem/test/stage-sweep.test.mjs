@@ -149,6 +149,22 @@ test("a second sweep within the interval does nothing", async t => {
   assert.deepEqual(await readdir(paths.stage), ["later.published"]);
 });
 
+test("the writer mutex is taken only on the opens that actually sweep", async t => {
+  const { root, paths } = await fixture(t, 2);
+  await mkdir(paths.locks, { recursive: true });
+  let locked = 0;
+  const withLock = operation => { locked += 1; return operation(); };
+
+  await sweepIfDue(paths, { root, clock: clockAt("2026-09-23T10:00:00.000Z"), withLock });
+  assert.equal(locked, 1, "the first, due pass locks");
+
+  await sweepIfDue(paths, { root, clock: clockAt("2026-09-23T20:00:00.000Z"), withLock });
+  assert.equal(locked, 1, "a pass inside the interval must not pay for the lock");
+
+  await sweepIfDue(paths, { root, clock: clockAt("2026-09-24T10:00:01.000Z"), withLock });
+  assert.equal(locked, 2, "a pass after the interval locks again");
+});
+
 test("a sweep a day later is due again", async t => {
   const { root, paths } = await fixture(t, 1);
   await mkdir(paths.locks, { recursive: true });

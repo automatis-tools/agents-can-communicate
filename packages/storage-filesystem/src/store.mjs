@@ -105,9 +105,12 @@ export async function openFilesystemStore({ root, clock, ids, workspaceId, failA
   // Sweeping is a write, so it holds the same mutex recovery does and no
   // publisher is in flight while the stage directory is detached. It is bounded
   // per pass: a store carrying a large accumulation drains over several opens
-  // rather than spending one hook's whole budget on it.
-  await withWriterMutex(paths, { root, tmpDir: paths.tmp, clock, deadlineAt: storeDeadline },
-    () => sweepIfDue(paths, { root, clock, deadlineAt: storeDeadline }));
+  // rather than spending one hook's whole budget on it. The mutex is taken only
+  // on the opens that actually sweep - see sweepIfDue, which decides before it
+  // locks, because this runs inside every hook.
+  await sweepIfDue(paths, { root, clock, deadlineAt: storeDeadline,
+    withLock: operation => withWriterMutex(paths,
+      { root, tmpDir: paths.tmp, clock, deadlineAt: storeDeadline }, operation) });
 
   async function recoverOpenJournals() {
     const open = await readOpenJournals(paths, root);
