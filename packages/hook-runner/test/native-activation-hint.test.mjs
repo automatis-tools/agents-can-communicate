@@ -77,6 +77,14 @@ test("nothing is asked while the live policy is off", async t => {
   assert.equal(result.stdout.includes(ASK), false);
 });
 
+test("a synchronous throw from the adapter leaves the turn open", async t => {
+  const result = await turn(t, () => { throw new Error("unexpected"); });
+
+  assert.equal(result.failed, undefined);
+  assert.match(result.stdout, /^ACC CLI \(append\): --session /);
+  assert.equal(result.stdout.includes(ASK), false);
+});
+
 test("anything but one bounded line is dropped, and a failing adapter costs the turn nothing", async t => {
   for (const hint of [async () => null, async () => "one\ntwo", async () => "x".repeat(513),
     async () => { throw new Error("adapter failed"); }, () => new Promise(() => {})]) {

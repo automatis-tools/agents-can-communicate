@@ -101,7 +101,10 @@ export async function nativeActivationHintFor({ adapter, event, nativeBinding, b
   if (budget <= 0) return null;
   let timer = null;
   let keep = false;
-  const pending = Promise.resolve(adapter.nativeActivationHint({ event, nativeBinding,
+  // The call sits inside then so a synchronous throw becomes a rejection.
+  // Promise.resolve(adapter.nativeActivationHint()) evaluates the call first
+  // and lets that throw escape the hook.
+  const pending = Promise.resolve().then(() => adapter.nativeActivationHint({ event, nativeBinding,
     runtimeDir: paths.root, clientPid: binding?.clientPid, env: context.env })).then(asHint, () => null);
   try {
     const taken = await Promise.race([

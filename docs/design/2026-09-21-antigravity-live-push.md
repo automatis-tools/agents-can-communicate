@@ -161,7 +161,8 @@ reserved. `{ line, release }` has reserved an ask, and the runner calls `release
 line is in the stdout it delivers. `release` may return nothing or throw; either way
 the hook stays open. The hook runner calls it in `beforeTurn`, after
 the native binding attempt, only for a `degraded` binding, within 250 ms, and keeps the answer
-only when it is one line of at most 512 bytes. The line rides with the owner line when both fit
+only when it is one line of at most 512 bytes. A synchronous throw from the adapter is a
+dropped hint. The line rides with the owner line when both fit
 in half the context budget. A degraded binding already implies the live policy is on, so the
 Antigravity adapter adds only that the client is not in print mode. The shim path comes from
 `env.HOME`. The line is:
