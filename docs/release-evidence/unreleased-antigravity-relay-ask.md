@@ -18,15 +18,18 @@ behavior is the adapter function, covered by `packages/adapter-antigravity/test/
 
 ## Exact local artifact
 
-- Source: clean commit `c4cf004c7e55d6787536b03d5a5f1275fedbabe0`.
+- Source: clean commit `3718e21d19e17f12df3132b3a6acbcd610ce3221`.
 - Archive: `agents-can-communicate-0.6.3.tgz`, packed from that commit.
-- Size: 447,190 bytes; 306 packed entries.
-- SHA-256: `2fe885069a93a1dfc3ab5b05eca66cbe6e28436eeb1aaa769dfbb405a5c2fd40`.
+- Size: 447,484 bytes; 306 packed entries.
+- SHA-256: `843878f11773d2f15315153b79add319693678e49515407a8a5ce1403d479a49`.
 - Package version remains `0.6.3`; this is an unpublished development artifact.
 
 The exact archive passed `scripts/verify-package.mjs`: pack, contents, certification
 allowlist, packed Markdown links, bundled workspace versions, clean installation, doctor,
 no-Git workspace operations, and install/uninstall byte restoration.
+
+The same candidate gives a native diagnostic write 1.5 s before abandoning it. Ubuntu CI
+had dropped the attempt file when worker startup and the write together passed 250 ms.
 
 ## Limits
 

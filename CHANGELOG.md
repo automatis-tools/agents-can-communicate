@@ -8,12 +8,16 @@
   exclusively, so overlapping calls cannot pass three. An empty marker left by the old rule
   does not count as a spent ask. A serving relay is not asked. A permission decline cannot
   be told from an ignore, so the third ask is what stops the line.
+- A native diagnostic write had 250 ms, including worker startup. On a busy runner the
+  attempt file never appeared and doctor reported no attempt. A fresh hook now waits up
+  to 1.5 s for that write. A stuck disk is still abandoned, and a hook with under 750 ms
+  left still skips the diagnostic.
 
 | Candidate artifact | Value |
 |---|---|
-| Built from | `c4cf004c7e55d6787536b03d5a5f1275fedbabe0` |
-| Tarball | `agents-can-communicate-0.6.3.tgz`, 447,190 bytes, 306 files |
-| sha256 | `2fe885069a93a1dfc3ab5b05eca66cbe6e28436eeb1aaa769dfbb405a5c2fd40` |
+| Built from | `3718e21d19e17f12df3132b3a6acbcd610ce3221` |
+| Tarball | `agents-can-communicate-0.6.3.tgz`, 447,484 bytes, 306 files |
+| sha256 | `843878f11773d2f15315153b79add319693678e49515407a8a5ce1403d479a49` |
 
 This unpublished development archive passed clean installation verification. See
 [Antigravity relay ask evidence](docs/release-evidence/unreleased-antigravity-relay-ask.md). The
