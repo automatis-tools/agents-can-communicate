@@ -15,7 +15,8 @@ import { clearPin, createGitProbe, resolveHookWorkspace, platformDataHome, runti
 
 import { resolveClientPid } from "./client-pid.mjs";
 import { probeClientVersion as defaultProbeClientVersion } from "./client-version.mjs";
-import { bindNative, nativeActivationHintFor, nativeDiagnosticDeadline } from "./native-attempt.mjs";
+import { bindNative, callRelease, nativeActivationHintFor, nativeDiagnosticDeadline }
+  from "./native-attempt.mjs";
 import { readProcessTable as defaultReadProcessTable } from "./process-table.mjs";
 import { withSessionLifecycle } from "./session-lifecycle.mjs";
 import { appendStartOwner, appendToolOwner, ownerHeader, ownerOnlyOutcome } from "./owner-context.mjs";
@@ -264,14 +265,17 @@ async function projectTurn({ binding, context, adapter, adapterId,
   // turn carries - and only when both fit in half the budget, so peer bodies
   // always keep the rest.
   const header = ownerHeader(binding, context.workspaceCwd, context.workspaceRef);
-  const owner = activationHint === null
-    || byteLength(header) + 1 + byteLength(activationHint) > totalBudget / 2
-    ? header : `${header}\n${activationHint}`;
+  const hintFits = activationHint !== null
+    && byteLength(header) + 1 + byteLength(activationHint) <= totalBudget / 2;
+  const owner = hintFits ? `${header}\n${activationHint}` : header;
+  const withHint = (outcome, attached) => ({ ...outcome,
+    activationHintIncluded: attached === true && outcome.stdout !== "" });
   // A peer can join after this prompt has begun. The current turn must already
   // have its own arguments when it needs inbox/reply, without reattaching or
   // waiting for another user prompt. Solo emits identity, not a peer notice.
   if (sync.solo && messages.length === 0) {
-    return ownerOnlyOutcome(text => adapter.injectOutcome?.(text), owner, totalBudget);
+    return withHint(ownerOnlyOutcome(text => adapter.injectOutcome?.(text), owner, totalBudget),
+      hintFits);
   }
 
   // The ceiling a team agreed on in `acc.workspace.json`, or the default when
@@ -324,12 +328,13 @@ async function projectTurn({ binding, context, adapter, adapterId,
   // Own claims make sync non-solo but produce no peer context. They cannot
   // remove this turn's identity or consume a nonexistent body separator.
   if (body === "" && messages.length === 0) {
-    return ownerOnlyOutcome(text => adapter.injectOutcome?.(text), owner, totalBudget);
+    return withHint(ownerOnlyOutcome(text => adapter.injectOutcome?.(text), owner, totalBudget),
+      hintFits);
   }
   const projected = body === "" ? "" : ownerFits ? `${owner}\n${body}` : body;
   if (projected === "") {
-    return { stdout: "", stderr: messages.length === 0 ? ""
-      : [ownerWarning, degradation].filter(Boolean).join("\n") };
+    return withHint({ stdout: "", stderr: messages.length === 0 ? ""
+      : [ownerWarning, degradation].filter(Boolean).join("\n") }, false);
   }
 
   // The renderer returns ids as metadata, never as text to parse. A peer body
@@ -349,9 +354,30 @@ async function projectTurn({ binding, context, adapter, adapterId,
   // callback proves that the bytes crossed.
   const outcome = { stdout: "", ...render(projected) };
   const writableOffers = outcome.stdout === "" ? [] : offerInputs;
-  return { ...outcome,
+  return withHint({ ...outcome,
     stderr: [outcome.stderr, ownerWarning, degradation].filter(Boolean).join("\n"),
-    offerInputs: writableOffers };
+    offerInputs: writableOffers }, hintFits && ownerFits);
+}
+
+// The adapter may already have reserved an ask. That reservation is an ask
+// only when this turn's stdout carries the line. A throw discards the turn,
+// so the reservation goes with it.
+async function projectActivation(input, offered) {
+  try {
+    const turn = await projectTurn({ ...input, activationHint: offered?.line ?? null });
+    const included = turn.activationHintIncluded === true;
+    delete turn.activationHintIncluded;
+    if (!offered) return turn;
+    if (!included) await callRelease(offered.release);
+    else if (typeof offered.release === "function") {
+      const release = offered.release;
+      turn.releaseActivationAsk = () => callRelease(release);
+    }
+    return turn;
+  } catch (error) {
+    await callRelease(offered?.release);
+    throw error;
+  }
 }
 
 const HANDLERS = {
@@ -500,9 +526,9 @@ const HANDLERS = {
       const started = await HANDLERS.sessionStart(input);
       const fresh = await loadSessionBinding({ runtimeDir: paths.root,
         harnessSessionId: event.sessionId });
-      const activationHint = await nativeActivationHintFor({ adapter, event,
+      const offered = await nativeActivationHintFor({ adapter, event,
         nativeBinding: started.nativeBinding, binding: fresh, context, paths, deadline });
-      const turn = await projectTurn({ ...input, binding: fresh, activationHint });
+      const turn = await projectActivation({ ...input, binding: fresh }, offered);
       return { ...turn, nativeBinding: started.nativeBinding };
     }
     const current = await context.service.locateSession(binding.accSessionId);
@@ -516,9 +542,9 @@ const HANDLERS = {
       const started = await HANDLERS.sessionStart(input);
       const fresh = await loadSessionBinding({ runtimeDir: paths.root,
         harnessSessionId: event.sessionId });
-      const activationHint = await nativeActivationHintFor({ adapter, event,
+      const offered = await nativeActivationHintFor({ adapter, event,
         nativeBinding: started.nativeBinding, binding: fresh, context, paths, deadline });
-      const turn = await projectTurn({ ...input, binding: fresh, activationHint });
+      const turn = await projectActivation({ ...input, binding: fresh }, offered);
       return { ...turn, nativeBinding: started.nativeBinding };
     }
     // A turn is the clearest sign a session is alive. Never a reason to fail:
@@ -530,9 +556,9 @@ const HANDLERS = {
     const nativeBinding = await bindNative({ adapter, event, hookBinding: binding,
       clientVersion: binding.clientVersion, platform: binding.platform, context, paths,
       deadline });
-    const activationHint = await nativeActivationHintFor({ adapter, event, nativeBinding,
+    const offered = await nativeActivationHintFor({ adapter, event, nativeBinding,
       binding, context, paths, deadline });
-    const turn = await projectTurn({ ...input, activationHint });
+    const turn = await projectActivation(input, offered);
     return nativeBinding === undefined ? turn : { ...turn, nativeBinding };
   },
 

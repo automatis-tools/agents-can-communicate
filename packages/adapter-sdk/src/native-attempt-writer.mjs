@@ -15,7 +15,7 @@ const checkDeadline = deadline => {
   if (Date.now() >= deadline) throw new Error("native diagnostic deadline expired");
 };
 
-// The caller stops waiting after 250 ms at most. An in-flight filesystem call
+// The caller stops waiting after 1.5 s at most. An in-flight filesystem call
 // may complete later, so retain this SEPARATE mutex until its continuation is
 // finished. Unique staging names also isolate cleanup after stale-lock recovery.
 // No diagnostic operation can touch the authoritative hook-owner file.
