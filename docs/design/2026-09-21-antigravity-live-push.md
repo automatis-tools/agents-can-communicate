@@ -160,17 +160,31 @@ clientPid, env })`, returns one line or `null`. The hook runner calls it in `bef
 the native binding attempt, only for a `degraded` binding, within 250 ms, and keeps the answer
 only when it is one line of at most 512 bytes. The line rides with the owner line when both fit
 in half the context budget. A degraded binding already implies the live policy is on, so the
-Antigravity adapter adds only that the client is not in print mode and this conversation has
-not been asked before — a marker at
-`<runtimeDir>/native/antigravity-asked/<sha256 of the conversation id>` records the ask. The
-shim path comes from `env.HOME`. The line is:
+Antigravity adapter adds only that the client is not in print mode. The shim path comes from
+`env.HOME`. The line is:
 
 ```
 ACC: live delivery is on but not running in this conversation. To let peers reach you while idle, run once: sh "<home>/.gemini/config/acc/acc-relay.sh" start
 ```
 
-One ask per conversation: a declined command is the user's answer, and repeating it every invocation
-would be noise.
+The marker at `<runtimeDir>/native/antigravity-asked/<sha256 of the conversation id>` records
+how many times this conversation has been asked, as `{ "asks": N }`. An empty file left by the
+earlier one-ask rule counts as zero: it shows that the line was displayed, not that anyone ran
+the command.
+
+While the binding stays degraded and no relay for this conversation is serving, each turn may
+ask again, up to three times. The first ask can be spent on a turn that runs no tool — a
+greeting did this on 2026-09-22 — and the next two turns are the chances to run the command.
+The fourth turn stays quiet. A serving relay is not asked, even when this call's binding still
+says degraded, and that check does not spend an ask. Any `nativeBinding.state` other than
+`degraded` is not asked either, and spends nothing.
+
+A permission decline and a model that never tried leave the same trace: the shim never ran.
+There is no decline to record, so the asking cannot stop because someone declined. It stops
+when a relay for the conversation is serving, or when the three asks are spent. Repeating the
+line on every later turn is the noise the one-ask rule was written to prevent; the bound is
+what prevents it now. The line still says to run the command once. The relay itself still
+starts once. Only the reminder repeats.
 
 ### Lifetime and retirement
 
@@ -203,9 +217,9 @@ hook. The relay logs to `<runtimeDir>/native/antigravity/<endpointId>.log`, mode
 names, message ids and closed reason codes, never message bodies, the token, the address or the
 nonce.
 
-`acc doctor` says how live delivery starts - the relay command, once per conversation - and
-how many relays run on the machine, and the generic native-attempt line shows the last
-`relayReady` or `beforeTurn` outcome for a session.
+`acc doctor` says how live delivery starts - the relay command, asked for up to three times
+while none is serving - and how many relays run on the machine. The generic native-attempt
+line shows the last `relayReady` or `beforeTurn` outcome for a session.
 
 ## Security
 
@@ -259,7 +273,8 @@ The operator approves the relay command and `acc reply` in the TUI; ACC's side i
   `test/fake-agy.mjs`, extended with `agentapi` answers taken from the fixtures.
 - Unit tests for each refusal in `start`, the clean child environment, nonce rejection,
   duplicate suppression, rendering bounds, pid-death retirement, and print-mode detection.
-- `nativeActivationHint` in the hook runner: budgeted, once per conversation, absent when off.
+- `nativeActivationHint` in the hook runner: budgeted, absent when off. The adapter asks at most
+  three times while the binding stays degraded, and does not ask a serving relay.
 - The existing trap run stays: the suite with a failing `agy` first on `PATH` records no call
   beyond the installer's version probe.
 
@@ -286,7 +301,8 @@ All additive and inert for every other adapter:
 - `agentapi` is a hidden subcommand. Its output shape is pinned by the contract's
   `protocolContract`, checked by `probeNativeDelivery`, and a change fails closed to durable
   delivery.
-- A model may decline to run the relay command; it declined a script named `bind.sh` once.
-  Live delivery then stays off for that conversation, and `acc doctor` says so.
+- A model may decline the relay command; it declined a script named `bind.sh` once. A decline
+  looks the same as an ignored ask, so the line can return on the next two turns. After the
+  third ask it stays quiet, and `acc doctor` still reports live delivery on with no relay.
 - The client may change which variables reach the tool shell. The relay then refuses to start
   and says which variable is missing, and `acc doctor` reports live delivery on with no relay.

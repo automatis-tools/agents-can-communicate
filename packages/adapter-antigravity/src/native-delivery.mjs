@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { execFile } from "node:child_process";
+import { constants } from "node:fs";
 import { lstat, mkdir, open } from "node:fs/promises";
 import net from "node:net";
 import path from "node:path";
@@ -144,27 +145,68 @@ export async function offerMessage({ binding, message, runtimeDir, timeoutMs = 8
   }
 }
 
+const ASK_LIMIT = 3;
 const HINT = home => "ACC: live delivery is on but not running in this conversation. To let "
   + `peers reach you while idle, run once: sh "${path.join(home, ".gemini", "config", "acc",
     "acc-relay.sh")}" start`;
 
+// An empty file is the old one-ask marker: it shows the line was displayed, not
+// that anyone ran the command, so it does not spend the budget. A link or any
+// other unreadable marker stops the asking rather than being followed.
+async function recordedAsks(marker) {
+  let handle;
+  try {
+    handle = await open(marker, constants.O_RDONLY | constants.O_NOFOLLOW);
+    const info = await handle.stat();
+    if (!info.isFile()) return ASK_LIMIT;
+    const parsed = JSON.parse(await handle.readFile("utf8"));
+    return Number.isInteger(parsed?.asks) && parsed.asks > 0 ? parsed.asks : 0;
+  } catch (error) {
+    return error?.code === "ENOENT" || error instanceof SyntaxError ? 0 : ASK_LIMIT;
+  } finally {
+    await handle?.close().catch(() => {});
+  }
+}
+
+async function relayAlreadyServing({ runtimeDir, conversationId, clientPid, isAlive }) {
+  for (const record of await listRegistrations({ runtimeDir })) {
+    if (record.conversationId !== conversationId) continue;
+    if (await serving(record, { timeoutMs: 100, isAlive, clientPid }) === null) return true;
+  }
+  return false;
+}
+
 export async function nativeActivationHint({ event, nativeBinding, runtimeDir, clientPid, env,
-  argvOf = argvDefault }) {
+  argvOf = argvDefault, isAlive = defaultAlive }) {
   // Only a degraded binding can be helped by starting a relay: "off" means the
   // live policy is off, "unsupported" that the contract does not admit this
-  // client, and "active" that a relay already serves it.
+  // client, and "active" that a relay already serves it. Those calls spend
+  // none of the asks recorded below.
   if (nativeBinding?.state !== "degraded") return null;
   const home = env?.HOME;
   if (typeof event?.sessionId !== "string" || typeof home !== "string" || home === "") return null;
   if (!Number.isInteger(clientPid) || isPrintMode(await argvOf(clientPid).catch(() => []))) return null;
+  // The runner asks only when its own handshake failed. A relay can still be
+  // serving under a stale degraded binding; telling the agent to start it again
+  // would be wrong, and the check does not spend an ask.
+  if (await relayAlreadyServing({ runtimeDir, conversationId: event.sessionId, clientPid,
+    isAlive })) return null;
   const asked = path.join(path.dirname(relayDir(runtimeDir)), "antigravity-asked");
   const marker = path.join(asked, createHash("sha256").update(event.sessionId).digest("hex"));
+  const asks = await recordedAsks(marker);
+  // A decline and an ignored ask leave the same trace, so neither can stop the
+  // line by itself. Three asks is the bound that keeps a later turn from nagging.
+  if (asks >= ASK_LIMIT) return null;
+  let handle;
   try {
     await mkdir(asked, { recursive: true, mode: 0o700 });
-    const handle = await open(marker, "wx", 0o600);
-    await handle.close();
+    handle = await open(marker, constants.O_WRONLY | constants.O_CREAT | constants.O_TRUNC
+      | constants.O_NOFOLLOW, 0o600);
+    await handle.writeFile(`${JSON.stringify({ asks: asks + 1 })}\n`, "utf8");
   } catch {
     return null;
+  } finally {
+    await handle?.close().catch(() => {});
   }
   return HINT(home);
 }

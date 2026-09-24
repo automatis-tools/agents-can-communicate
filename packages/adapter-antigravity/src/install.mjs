@@ -654,7 +654,8 @@ export async function doctorAntigravity(context) {
     diagnostics.push("registered per workspace; a session opened anywhere else loads nothing");
   }
   diagnostics.push(`live delivery starts when the agent runs sh "${relayShimPath(context.home)}" `
-    + "start once in a conversation; ACC asks it to, in its context line, when the policy is on");
+    + "start once in a conversation; while none is serving, ACC asks for that in its context "
+    + "line, up to three times, when the policy is on");
   diagnostics.push(`antigravity relays running on this machine: ${await runningRelays({
     dataHome: context.dataHome })}`);
   return { ok: true, changes: [], diagnostics };
