@@ -150,22 +150,30 @@ const HINT = home => "ACC: live delivery is on but not running in this conversat
   + `peers reach you while idle, run once: sh "${path.join(home, ".gemini", "config", "acc",
     "acc-relay.sh")}" start`;
 
-// An empty file is the old one-ask marker: it shows the line was displayed, not
-// that anyone ran the command, so it does not spend the budget. A link or any
-// other unreadable marker stops the asking rather than being followed.
-async function recordedAsks(marker) {
-  let handle;
+// Each ask is its own file, created exclusively. A counter read and then
+// rewritten lets overlapping calls all observe the same count and each return
+// a hint. An empty file at the unsuffixed hash is the old one-ask marker: it
+// is not one of these three, so it does not spend the budget.
+async function claimAsk(directory, marker) {
   try {
-    handle = await open(marker, constants.O_RDONLY | constants.O_NOFOLLOW);
-    const info = await handle.stat();
-    if (!info.isFile()) return ASK_LIMIT;
-    const parsed = JSON.parse(await handle.readFile("utf8"));
-    return Number.isInteger(parsed?.asks) && parsed.asks > 0 ? parsed.asks : 0;
-  } catch (error) {
-    return error?.code === "ENOENT" || error instanceof SyntaxError ? 0 : ASK_LIMIT;
-  } finally {
-    await handle?.close().catch(() => {});
+    await mkdir(directory, { recursive: true, mode: 0o700 });
+  } catch {
+    return false;
   }
+  for (let n = 1; n <= ASK_LIMIT; n += 1) {
+    let handle;
+    try {
+      handle = await open(`${marker}.${n}`, constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL
+        | constants.O_NOFOLLOW, 0o600);
+      return true;
+    } catch (error) {
+      if (error?.code === "EEXIST") continue;
+      return false;
+    } finally {
+      await handle?.close().catch(() => {});
+    }
+  }
+  return false;
 }
 
 async function relayAlreadyServing({ runtimeDir, conversationId, clientPid, isAlive }) {
@@ -193,20 +201,8 @@ export async function nativeActivationHint({ event, nativeBinding, runtimeDir, c
     isAlive })) return null;
   const asked = path.join(path.dirname(relayDir(runtimeDir)), "antigravity-asked");
   const marker = path.join(asked, createHash("sha256").update(event.sessionId).digest("hex"));
-  const asks = await recordedAsks(marker);
   // A decline and an ignored ask leave the same trace, so neither can stop the
-  // line by itself. Three asks is the bound that keeps a later turn from nagging.
-  if (asks >= ASK_LIMIT) return null;
-  let handle;
-  try {
-    await mkdir(asked, { recursive: true, mode: 0o700 });
-    handle = await open(marker, constants.O_WRONLY | constants.O_CREAT | constants.O_TRUNC
-      | constants.O_NOFOLLOW, 0o600);
-    await handle.writeFile(`${JSON.stringify({ asks: asks + 1 })}\n`, "utf8");
-  } catch {
-    return null;
-  } finally {
-    await handle?.close().catch(() => {});
-  }
+  // line by itself. Three exclusive creates are the bound.
+  if (!await claimAsk(asked, marker)) return null;
   return HINT(home);
 }

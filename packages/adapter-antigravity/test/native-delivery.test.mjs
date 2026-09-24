@@ -146,6 +146,16 @@ test("an ignored ask comes back on the next turn and stops after three", async t
     "another conversation keeps its own asks");
 });
 
+test("overlapping asks cannot pass three", async t => {
+  const runtimeDir = await realpath(await mkdtemp(path.join(tmpdir(), "acc-hint-")));
+  t.after(() => rm(runtimeDir, { recursive: true, force: true }));
+
+  const results = await Promise.all(Array.from({ length: 8 }, () => ask(runtimeDir)));
+
+  assert.equal(results.filter(line => line === ASK).length, 3);
+  assert.equal(await ask(runtimeDir), null, "the overlapping asks spent the bound");
+});
+
 test("a marker left by the one-ask rule does not block a later ask", async t => {
   const runtimeDir = await realpath(await mkdtemp(path.join(tmpdir(), "acc-hint-")));
   t.after(() => rm(runtimeDir, { recursive: true, force: true }));

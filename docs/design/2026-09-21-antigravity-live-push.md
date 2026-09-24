@@ -167,10 +167,12 @@ Antigravity adapter adds only that the client is not in print mode. The shim pat
 ACC: live delivery is on but not running in this conversation. To let peers reach you while idle, run once: sh "<home>/.gemini/config/acc/acc-relay.sh" start
 ```
 
-The marker at `<runtimeDir>/native/antigravity-asked/<sha256 of the conversation id>` records
-how many times this conversation has been asked, as `{ "asks": N }`. An empty file left by the
-earlier one-ask rule counts as zero: it shows that the line was displayed, not that anyone ran
-the command.
+Each ask is its own file under `<runtimeDir>/native/antigravity-asked/`, named
+`<sha256 of the conversation id>.<1|2|3>` and created with `O_EXCL`. Creating the file is the
+ask. Overlapping calls cannot both take the same number, so the conversation cannot be asked
+more than three times. An empty file at the unsuffixed hash, left by the earlier one-ask
+rule, is not one of those three: it shows that a line was displayed, not that anyone ran the
+command.
 
 While the binding stays degraded and no relay for this conversation is serving, each turn may
 ask again, up to three times. The first ask can be spent on a turn that runs no tool — a
