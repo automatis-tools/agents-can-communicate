@@ -1,0 +1,145 @@
+# Unreleased the store sweeps its accepted staging files
+
+A workspace store's `tmp/` directory grew by one file per published immutable record and nothing
+in the product removed one. `publishAtomic` writes its bytes to a unique temporary, links that
+inode to its destination, and then renames the temporary onto a deterministic name. The file
+stayed because the store never unlinks: Node exposes `unlink` only by pathname, so validating a
+parent and then unlinking still lets an adversary replace that parent in between. The
+deterministic name bounded the residue to one file per destination rather than one per attempt.
+
+Bounding is not reclaiming. The count only ever grew.
+
+Two facts were read out of the tree before anything was changed. Nothing anywhere in the
+repository reads a `*.published` path — the name is written at two places and read at none — so
+the retry the comment bounded did not exist as a code path. And only the immutable branch leaks:
+the `replace` branch publishes by `rename`, which consumes its temporary.
+
+## What was measured
+
+macOS arm64, ACC 0.6.2, 26 workspaces under `~/Library/Application Support/acc/workspaces`, on
+2026-09-23.
+
+- Before a manual sweep: 17,880 / 12,139 / 11,621 / 2,202 / 1,494 entries in the five busiest
+  workspaces, about 48,000 in total.
+- Every sampled entry matched `<64 hex>.published`, contained
+  `{"retentionVersion":1,"transactionId":"transaction_…"}`, and had link count 2 — a hard link
+  to a live record. Removing one frees a directory entry, not bytes.
+- `find <store>/tmp -name '*.published' -delete` cleared them; `acc doctor` then reported
+  `store healthy`, with no message, claim or binding lost.
+- Within one day the same directories held 733 entries again, 356 of them in the busiest
+  workspace.
+
+## What changed
+
+Accepted staging files are published into a new `stage/` directory. The sweep detaches that
+directory with one `rename`, recreates it empty, moves any `*.published` an older version left
+in `tmp/` into the detached copy, and discards it.
+
+Removal therefore happens only inside a directory the sweep itself named with a random value and
+already detached from the name any publisher resolves. That is the ground `releaseCanonical` in
+`writer-mutex.mjs` already stands on, not the check-then-unlink window `atomic-json.mjs` refuses;
+that comment stands unchanged.
+
+A partial from a failed publication is never removed and never moved. The sweep only ever
+renames names ending in `.published` out of `tmp/`, and a partial does not.
+
+The sweep runs under the writer mutex, where recovery already runs, so no publisher is in flight
+while the directory is detached. A marker in `locks/stage-sweep.json` records when the last pass
+ran and one read decides whether an open is due; the interval is a day.
+
+That read happens **before** the mutex is taken, and the distinction matters. Recovery takes the
+mutex only when there is an open journal to roll forward. A first attempt here took it on every
+store open — which is inside every hook — so every hook paid a mkdir, a write, an fsync and a
+rename to discover there was nothing to sweep. That is the shape of the slowdown that made hooks
+time out in 0.6.1, and it was caught on this branch before it shipped. The marker is re-read
+under the lock, because another process may have swept while this one waited for it.
+
+The budget is checked before the lock for a second reason, found by the AI review on PR #193.
+The soft deadline stop was a fiction: a pass that ran out of budget stopped sweeping and then
+wrote its marker through `publishAtomic`, which begins by refusing an expired deadline — by
+throwing, out of the store open this runs inside. `withWriterMutex` refuses one the same way.
+An exhausted pass now leaves before the first call that would throw, the marker is left
+unwritten when the budget went on sweeping so the next open is due again, and the store open
+tolerates the `CONFLICT` a lost lock arrives as while still propagating every other fault.
+Maintenance never decides whether a store can be opened.
+
+The same review found the other half of that rule missing. The marker was written whenever the
+pass returned, including when it had stopped at its entry budget with work left, so the next
+open read a fresh timestamp and waited out the whole interval. A store holding 17,880 accepted
+stages would have drained at 512 a day — weeks — instead of over a few opens. The marker now
+records a finished pass only, and the interval starts counting once there is nothing left to
+sweep.
+
+A third round found the boundary case in the same rule. The budget can lapse *after* the due
+check — the lock may be granted late, or granted to a contending writer first — and both arrive
+as `CONFLICT`. The store open was catching that code, which worked but left the guarantee with
+the caller, where every later caller of `sweepIfDue` would inherit the flaw silently.
+`sweepIfDue` now absorbs a lost lock and a lapsed budget itself and raises only real store
+faults, so the rule travels with the function. Two tests hold both halves: a `CONFLICT` from the
+lock seam is absorbed, and a `DATA` fault from that same seam still reaches the caller. Each pass is bounded to
+512 entries, counting moves and removals against the one budget, and stops early on the
+publication deadline. An interrupted pass leaves a single `stage.sweeping-<uuid>` that the next
+pass adopts before detaching anything further, so they cannot accumulate.
+
+`acc doctor` reports the counts. `acc doctor --repair` sweeps without the per-pass bound.
+
+## Compatibility
+
+Both directions were kept deliberately. A newer ACC on an older store creates `stage/` and
+reclaims what is in `tmp/`. An older ACC on a migrated store does not know `stage/`, keeps
+writing accepted stages into `tmp/`, and the sweep keeps reclaiming them. Both take the same
+writer mutex, so a sweep and a publication never overlap. No store layout version is introduced
+and nothing refuses to open a store.
+
+## Checked against a real store
+
+A copy of a live 0.6.2 workspace store — never the live one — was repaired with the new code.
+The workspace held 484 accepted stages in `tmp/` and no `stage/` directory at all, which is what
+every store written before this change looks like. A partial was planted by hand, since this
+workspace had none.
+
+```
+before: tmp accepted=484 tmp partial=1 stage accepted=0
+diagnose: healthy=true staged=484 partials=1 corrupt=0
+repair:   healthy=true swept=484 staged=0 partials=1
+after:  tmp accepted=0 tmp partial=1 stage accepted=0
+records: events=276 state=159
+leftover detached directories: 0
+```
+
+The planted partial was still present afterwards with its bytes unchanged, and all 276 events
+and 159 state records remained readable.
+
+This run is also what found the one defect in the change. `sweepAcceptedStages` validated the
+stage directory before detaching it, outside the branch that tolerated its absence, so a store
+with no `stage/` — which is every existing store — raised `ENOENT` from `acc doctor --repair`.
+Both test fixtures had hidden it: the unit one creates the directory by hand, and the live-store
+one gets it from opening the store. A unit test now reproduces a store that has never published
+into `stage/`, and the directory is created before the detach so its absence is the ordinary
+case rather than an error.
+
+## Exact local artifact
+
+- Source: clean commit `54b0c8baa545dbfcf4dcedd15d7ba68b14b7c603`.
+- Archive: `agents-can-communicate-0.6.3.tgz`, packed from that commit.
+- Size: 450,995 bytes; 307 packed entries.
+- SHA-256: `46c0de551e3d89501837930b6258a3d2ec7053ebdf2ca730fef579bc07dd7d19`.
+- Package version remains `0.6.3`; this is an unpublished development artifact.
+
+The digest was produced by `scripts/verify-package.mjs` and reproduced by a separate `npm pack`.
+An earlier candidate at `0968471`, before the fix described above, was measured the same way and
+its digest was identical across three independent builds, so the measurement itself is stable
+against repacking. The exact archive passed clean
+installation verification: install into a directory with no workspace anywhere, `acc doctor`
+reporting 6 adapters, a workspace with no Git, and an install followed by an uninstall that
+restored topology, modes, links and bytes. The packed entry count rose from 306 to 307 with the
+new `packages/storage-filesystem/src/stage-sweep.mjs`.
+
+`npm test` on this tree: 2,476 passing, 0 failing, 1 skipped, of 2,477.
+
+## Limits
+
+The sweep is bounded per pass, so a store carrying tens of thousands of entries stays large
+until enough passes have run; `acc doctor --repair` is the way to reclaim it at once. The
+reported numbers above come from one machine's store. No capability claim, adapter
+certification, or published interface changes, and no message, claim or binding is touched.

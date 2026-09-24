@@ -34,11 +34,11 @@ async function bytesIfPresent(filePath, root, openFile) {
   }
 }
 
-function retainedStage(destination, root, tmpDir) {
+function retainedStage(destination, root, stageDir) {
   const identity = createHash("sha256")
     .update(path.relative(root, destination))
     .digest("hex");
-  return path.join(tmpDir, `${identity}.published`);
+  return path.join(stageDir, `${identity}.published`);
 }
 
 async function replaceHandleBytes(handle, bytes) {
@@ -63,11 +63,18 @@ async function replaceHandleBytes(handle, bytes) {
  *
  * @returns {Promise<"published" | "already_published">}
  */
-export async function publishAtomic(destination, bytes, { root, tmpDir, replace = false, deadlineAt }) {
+export async function publishAtomic(destination, bytes,
+  { root, tmpDir, stageDir, replace = false, deadlineAt }) {
   assertPublicationDeadline(deadlineAt);
+  // The accepted stage lives apart from the partial a failed publication
+  // leaves, so what a file is follows from the directory it was created in
+  // rather than from how its name ends. Defaulted from the root the way
+  // active-journal.mjs defaults tmpDir, so every caller keeps working.
+  stageDir = stageDir ?? path.join(root, "stage");
   const destinationDir = path.dirname(destination);
   await Promise.all([
     ensureManagedDirectory(root, tmpDir),
+    ensureManagedDirectory(root, stageDir),
     ensureManagedDirectory(root, destinationDir),
   ]);
   if (!replace) {
@@ -79,8 +86,11 @@ export async function publishAtomic(destination, bytes, { root, tmpDir, replace 
     }
   }
 
-  const stage = retainedStage(destination, root, tmpDir);
-  const temporary = `${stage}.${process.pid}.${randomUUID()}.tmp`;
+  const stage = retainedStage(destination, root, stageDir);
+  // The temporary stays in tmpDir: until the bytes are accepted it is a
+  // partial, and a partial is exactly what tmp holds.
+  const temporary = path.join(tmpDir,
+    `${path.basename(stage)}.${process.pid}.${randomUUID()}.tmp`);
   let handle = await open(temporary, "wx");
   let stageAcceptedBytes = false;
   try {
@@ -121,9 +131,9 @@ export async function publishAtomic(destination, bytes, { root, tmpDir, replace 
   } finally {
     await handle?.close();
     if (stageAcceptedBytes) {
-      await assertManagedDirectory(root, tmpDir);
+      await assertManagedDirectory(root, stageDir);
       await rename(temporary, stage);
-      await syncDirectory(tmpDir);
+      await syncDirectory(stageDir);
     } else {
       // A crash/error before immutable acceptance keeps its unique partial.
       // Retention avoids the unsafe parent-check/unlink pathname window, while
