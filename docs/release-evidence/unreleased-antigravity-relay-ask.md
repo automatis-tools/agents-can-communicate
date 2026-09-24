@@ -8,9 +8,11 @@ The reminder now returns on a later turn while the binding stays degraded and no
 that conversation is serving, up to three times. Each ask is its own file, created with
 `O_EXCL`, so overlapping calls cannot both take the same number. An empty marker left by the
 one-ask rule counts as zero asks. A serving relay is not asked, and neither is a binding that
-is not degraded; those calls do not spend an ask. A permission decline and a model that never
+is not degraded; those calls do not spend an ask. A line the hook does not deliver does not
+spend an ask either: the reservation is removed when the line misses the context budget, the
+runner drops it, or the stdout write does not finish. A permission decline and a model that never
 tried leave the same trace — the shim never ran — so the asking cannot stop because someone
-declined. The third ask is what stops it.
+declined. The third delivered ask is what stops it.
 
 The 2026-09-21 live-push capture still records what that build did: one ask. This note does
 not replace that capture. No new Antigravity session was observed for this change. The
@@ -18,10 +20,10 @@ behavior is the adapter function, covered by `packages/adapter-antigravity/test/
 
 ## Exact local artifact
 
-- Source: clean commit `3718e21d19e17f12df3132b3a6acbcd610ce3221`.
+- Source: clean commit `f3c15f53c7faf240518679643d8ed86cb4ab1b25`.
 - Archive: `agents-can-communicate-0.6.3.tgz`, packed from that commit.
-- Size: 447,484 bytes; 306 packed entries.
-- SHA-256: `843878f11773d2f15315153b79add319693678e49515407a8a5ce1403d479a49`.
+- Size: 448,303 bytes; 306 packed entries.
+- SHA-256: `5596bed48e1f0c7ae49257b4d6dadd91ce175a378aec415ab17882890020f8bf`.
 - Package version remains `0.6.3`; this is an unpublished development artifact.
 
 The exact archive passed `scripts/verify-package.mjs`: pack, contents, certification
@@ -30,6 +32,8 @@ no-Git workspace operations, and install/uninstall byte restoration.
 
 The same candidate gives a native diagnostic write 1.5 s before abandoning it. Ubuntu CI
 had dropped the attempt file when worker startup and the write together passed 250 ms.
+It also releases an Antigravity relay-ask reservation when the hook does not deliver
+the line.
 
 ## Limits
 

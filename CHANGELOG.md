@@ -6,8 +6,10 @@
   command, so a greeting spent the ask for the whole conversation. Later turns ask again,
   up to three times, while no relay is serving. Each ask is its own file, created
   exclusively, so overlapping calls cannot pass three. An empty marker left by the old rule
-  does not count as a spent ask. A serving relay is not asked. A permission decline cannot
-  be told from an ignore, so the third ask is what stops the line.
+  does not count as a spent ask. A serving relay is not asked. A line the hook does not
+  deliver (it misses the context budget, the runner drops it, or stdout does not finish)
+  does not spend one of those three. A permission decline cannot
+  be told from an ignore, so the third delivered ask is what stops the line.
 - A native diagnostic write had 250 ms, including worker startup. On a busy runner the
   attempt file never appeared and doctor reported no attempt. A fresh hook now waits up
   to 1.5 s for that write. A stuck disk is still abandoned, and a hook with under 750 ms
@@ -15,9 +17,9 @@
 
 | Candidate artifact | Value |
 |---|---|
-| Built from | `3718e21d19e17f12df3132b3a6acbcd610ce3221` |
-| Tarball | `agents-can-communicate-0.6.3.tgz`, 447,484 bytes, 306 files |
-| sha256 | `843878f11773d2f15315153b79add319693678e49515407a8a5ce1403d479a49` |
+| Built from | `f3c15f53c7faf240518679643d8ed86cb4ab1b25` |
+| Tarball | `agents-can-communicate-0.6.3.tgz`, 448,303 bytes, 306 files |
+| sha256 | `5596bed48e1f0c7ae49257b4d6dadd91ce175a378aec415ab17882890020f8bf` |
 
 This unpublished development archive passed clean installation verification. See
 [Antigravity relay ask evidence](docs/release-evidence/unreleased-antigravity-relay-ask.md). The
