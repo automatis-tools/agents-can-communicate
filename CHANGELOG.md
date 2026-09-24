@@ -18,9 +18,9 @@
 
 | Candidate artifact | Value |
 |---|---|
-| Built from | `f3c15f53c7faf240518679643d8ed86cb4ab1b25` |
-| Tarball | `agents-can-communicate-0.6.3.tgz`, 448,303 bytes, 306 files |
-| sha256 | `5596bed48e1f0c7ae49257b4d6dadd91ce175a378aec415ab17882890020f8bf` |
+| Built from | `c0cd9722b3c8864cc5c4f13038e812f988461762` |
+| Tarball | `agents-can-communicate-0.6.3.tgz`, 452,954 bytes, 307 files |
+| sha256 | `328f1b4bbfa3f0a385c73595a5a1caf9201361b55020db1a24b21a9c6b24a108` |
 
 This unpublished development archive passed clean installation verification. See
 [Antigravity relay ask evidence](docs/release-evidence/unreleased-antigravity-relay-ask.md). The
