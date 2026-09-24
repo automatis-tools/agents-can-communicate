@@ -1,11 +1,12 @@
 import assert from "node:assert/strict";
-import { mkdtemp, realpath, rm } from "node:fs/promises";
+import { mkdtemp, realpath, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
 
 import { recordInstall } from "@agents-can-communicate/installer";
 
+import { completeHookOutput } from "../../../bin/acc-hook.mjs";
 import { runHook } from "../src/runner.mjs";
 
 const platform = `${process.platform}-${process.arch}`;
@@ -34,11 +35,17 @@ function relayed(nativeActivationHint) {
   };
 }
 
-async function turn(t, nativeActivationHint, { policy = "actionable" } = {}) {
+async function turn(t, nativeActivationHint, { policy = "actionable", contextBudgetBytes } = {}) {
   const root = await realpath(await mkdtemp(path.join(tmpdir(), "acc-hint-")));
   const dataHome = await realpath(await mkdtemp(path.join(tmpdir(), "acc-hint-data-")));
   t.after(() => Promise.all([rm(root, { recursive: true, force: true }),
     rm(dataHome, { recursive: true, force: true })]));
+  if (contextBudgetBytes !== undefined) {
+    await writeFile(path.join(root, "acc.workspace.json"), `${JSON.stringify({
+      schemaVersion: 1, workspaceId: "workspace_hint_budget", displayName: "hint budget",
+      policy: { claimMode: "advisory", contextBudgetBytes },
+    })}\n`);
+  }
   await recordInstall({ dataHome, adapterId: "relayed", version: "1.0.0", artifacts: [],
     deliveryPolicy: policy });
   const invoke = kind => runHook({ adapterId: "relayed", adapters: { relayed: relayed(nativeActivationHint) },
@@ -77,4 +84,72 @@ test("anything but one bounded line is dropped, and a failing adapter costs the 
     assert.match(result.stdout, /^ACC CLI \(append\): --session /);
     assert.equal(result.stdout.trim().split("\n").length, 1, "only the owner line");
   }
+});
+
+function reserved(line) {
+  let released = 0;
+  return { line, release: async () => { released += 1; },
+    get released() { return released; } };
+}
+
+test("a hint that cannot fit the context budget is released and not shown", async t => {
+  const hint = reserved(ASK);
+  const result = await turn(t, async () => hint, { contextBudgetBytes: 400 });
+
+  assert.equal(result.stdout.includes(ASK), false);
+  assert.equal(hint.released, 1);
+});
+
+test("a hint that reaches the turn keeps its reservation", async t => {
+  const hint = reserved(ASK);
+  const result = await turn(t, async () => hint);
+
+  assert.equal(result.stdout.split("\n").includes(ASK), true);
+  assert.equal(hint.released, 0);
+});
+
+test("a line the runner refuses releases the reservation", async t => {
+  const hint = reserved("one\ntwo");
+  const result = await turn(t, async () => hint);
+
+  assert.equal(result.stdout.includes("one"), false);
+  assert.equal(hint.released, 1);
+});
+
+test("a hint that misses the runner's budget releases the reservation", async t => {
+  let release;
+  const released = new Promise(resolve => { release = resolve; });
+  const result = await turn(t, () => new Promise(resolve => {
+    setTimeout(() => resolve({ line: ASK, release: async () => release() }), 1_000);
+  }));
+
+  assert.equal(result.stdout.includes(ASK), false);
+  await Promise.race([released, new Promise((_resolve, reject) => {
+    setTimeout(() => reject(new Error("release was not called")), 2_000);
+  })]);
+});
+
+test("a stdout write that completes keeps the ask", async t => {
+  const hint = reserved(ASK);
+  const result = await turn(t, async () => hint);
+  await completeHookOutput(result, {
+    stdout: { write(_output, callback) { callback(); } },
+    stderr: { write(_output, callback) { callback?.(); } },
+  });
+
+  assert.equal(hint.released, 0);
+});
+
+test("a stdout write that fails releases the ask the turn was holding", async t => {
+  const hint = reserved(ASK);
+  const result = await turn(t, async () => hint);
+  assert.equal(hint.released, 0);
+  const stderr = [];
+  await completeHookOutput(result, {
+    stdout: { write(_output, callback) { callback(new Error("pipe rejected")); } },
+    stderr: { write(output, callback) { stderr.push(output); callback?.(); } },
+  });
+
+  assert.equal(hint.released, 1);
+  assert.match(stderr.join(""), /stdout write failed/);
 });

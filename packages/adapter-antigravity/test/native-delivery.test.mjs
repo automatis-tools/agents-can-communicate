@@ -134,15 +134,18 @@ function ask(runtimeDir, sessionId = CONVERSATION, extra = {}) {
     ...extra });
 }
 
+// A kept return is an ask. Callers that do not release leave the reservation.
+const kept = async (...args) => (await ask(...args))?.line ?? null;
+
 test("an ignored ask comes back on the next turn and stops after three", async t => {
   const runtimeDir = await realpath(await mkdtemp(path.join(tmpdir(), "acc-hint-")));
   t.after(() => rm(runtimeDir, { recursive: true, force: true }));
 
-  assert.equal(await ask(runtimeDir), ASK);
-  assert.equal(await ask(runtimeDir), ASK, "the first ask was ignored");
-  assert.equal(await ask(runtimeDir), ASK);
-  assert.equal(await ask(runtimeDir), null, "three asks is the bound");
-  assert.equal(await ask(runtimeDir, "a-different-conversation"), ASK,
+  assert.equal(await kept(runtimeDir), ASK);
+  assert.equal(await kept(runtimeDir), ASK, "the first ask was ignored");
+  assert.equal(await kept(runtimeDir), ASK);
+  assert.equal(await kept(runtimeDir), null, "three asks is the bound");
+  assert.equal(await kept(runtimeDir, "a-different-conversation"), ASK,
     "another conversation keeps its own asks");
 });
 
@@ -152,8 +155,24 @@ test("overlapping asks cannot pass three", async t => {
 
   const results = await Promise.all(Array.from({ length: 8 }, () => ask(runtimeDir)));
 
-  assert.equal(results.filter(line => line === ASK).length, 3);
+  assert.equal(results.filter(item => item?.line === ASK).length, 3);
   assert.equal(await ask(runtimeDir), null, "the overlapping asks spent the bound");
+});
+
+test("a hint the runner does not keep does not spend an ask", async t => {
+  const runtimeDir = await realpath(await mkdtemp(path.join(tmpdir(), "acc-hint-")));
+  t.after(() => rm(runtimeDir, { recursive: true, force: true }));
+
+  for (let n = 0; n < 3; n += 1) {
+    const offered = await ask(runtimeDir);
+    assert.equal(offered.line, ASK);
+    await offered.release();
+  }
+
+  assert.equal((await ask(runtimeDir))?.line, ASK, "three dropped hints leave the bound intact");
+  assert.equal((await ask(runtimeDir))?.line, ASK);
+  assert.equal((await ask(runtimeDir))?.line, ASK);
+  assert.equal(await ask(runtimeDir), null, "three kept hints are still the bound");
 });
 
 test("a marker left by the one-ask rule does not block a later ask", async t => {
@@ -163,10 +182,10 @@ test("a marker left by the one-ask rule does not block a later ask", async t => 
   await mkdir(asked, { recursive: true });
   await writeFile(path.join(asked, createHash("sha256").update(CONVERSATION).digest("hex")), "");
 
-  assert.equal(await ask(runtimeDir), ASK, "an empty marker is not a spent ask");
-  assert.equal(await ask(runtimeDir), ASK);
-  assert.equal(await ask(runtimeDir), ASK);
-  assert.equal(await ask(runtimeDir), null, "the empty marker still leaves only three asks");
+  assert.equal(await kept(runtimeDir), ASK, "an empty marker is not a spent ask");
+  assert.equal(await kept(runtimeDir), ASK);
+  assert.equal(await kept(runtimeDir), ASK);
+  assert.equal(await kept(runtimeDir), null, "the empty marker still leaves only three asks");
 });
 
 test("a serving relay is not asked, and an active binding never spends an ask", async t => {
@@ -175,13 +194,13 @@ test("a serving relay is not asked, and an active binding never spends an ask", 
 
   assert.equal(await ask(runtimeDir, CONVERSATION, alive), null, "the relay is already serving");
   await relay.close("test_end");
-  assert.equal(await ask(runtimeDir, CONVERSATION, alive), ASK,
+  assert.equal(await kept(runtimeDir, CONVERSATION, alive), ASK,
     "once that relay is gone the conversation can be asked");
 
   const quiet = await realpath(await mkdtemp(path.join(tmpdir(), "acc-hint-")));
   t.after(() => rm(quiet, { recursive: true, force: true }));
   assert.equal(await ask(quiet, CONVERSATION, { nativeBinding: { state: "active" } }), null);
-  assert.equal(await ask(quiet), ASK, "an active binding does not spend one of the three");
+  assert.equal(await kept(quiet), ASK, "an active binding does not spend one of the three");
   assert.equal(await ask(quiet, "other-off", { nativeBinding: { state: "off" } }), null);
   assert.equal(await ask(quiet, "other-home", { env: {} }), null, "no home, no path to name");
   assert.equal(await ask(quiet, "other-unsupported",

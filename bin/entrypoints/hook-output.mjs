@@ -62,6 +62,8 @@ export async function completeHookOutput(result,
     await writeOutput(stdout, result.stdout ?? "", { deadlineAt: result.deadlineAt });
   } catch (error) {
     tryWrite(stderr, boundedDiagnostic("stdout write failed", error));
+    // The bytes did not cross, so a reserved activation line is not an ask.
+    await result.releaseActivationAsk?.().catch(() => {});
     return { exitCode: 0, wroteStdout: false, committedOffers: false };
   }
 

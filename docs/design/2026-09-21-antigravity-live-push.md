@@ -156,7 +156,9 @@ next-turn projector already takes only `queued` receipts. Everything else leaves
 ### Asking the agent to start it
 
 A new optional adapter method, `nativeActivationHint({ event, nativeBinding, runtimeDir,
-clientPid, env })`, returns one line or `null`. The hook runner calls it in `beforeTurn`, after
+clientPid, env })`, returns one line, `{ line, release }`, or `null`. A string has nothing
+reserved. `{ line, release }` has reserved an ask, and the runner calls `release` unless that
+line is in the stdout it delivers. The hook runner calls it in `beforeTurn`, after
 the native binding attempt, only for a `degraded` binding, within 250 ms, and keeps the answer
 only when it is one line of at most 512 bytes. The line rides with the owner line when both fit
 in half the context budget. A degraded binding already implies the live policy is on, so the
@@ -168,9 +170,12 @@ ACC: live delivery is on but not running in this conversation. To let peers reac
 ```
 
 Each ask is its own file under `<runtimeDir>/native/antigravity-asked/`, named
-`<sha256 of the conversation id>.<1|2|3>` and created with `O_EXCL`. Creating the file is the
-ask. Overlapping calls cannot both take the same number, so the conversation cannot be asked
-more than three times. An empty file at the unsuffixed hash, left by the earlier one-ask
+`<sha256 of the conversation id>.<1|2|3>` and created with `O_EXCL`. Creating the file reserves
+that number so overlapping calls cannot both take it. The reservation becomes an ask when the
+hook delivers the line. The runner deletes the file when the line does not fit the context
+budget, when the runner itself drops the line, or when the stdout write does not finish. A
+file that remains is a line the model was shown. Overlapping calls cannot hold more than three
+reservations. An empty file at the unsuffixed hash, left by the earlier one-ask
 rule, is not one of those three: it shows that a line was displayed, not that anyone ran the
 command.
 
@@ -276,7 +281,8 @@ The operator approves the relay command and `acc reply` in the TUI; ACC's side i
 - Unit tests for each refusal in `start`, the clean child environment, nonce rejection,
   duplicate suppression, rendering bounds, pid-death retirement, and print-mode detection.
 - `nativeActivationHint` in the hook runner: budgeted, absent when off. The adapter asks at most
-  three times while the binding stays degraded, and does not ask a serving relay.
+  three times while the binding stays degraded, and does not ask a serving relay. A line the
+  runner does not deliver does not spend an ask.
 - The existing trap run stays: the suite with a failing `agy` first on `PATH` records no call
   beyond the installer's version probe.
 

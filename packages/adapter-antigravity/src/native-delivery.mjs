@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { execFile } from "node:child_process";
 import { constants } from "node:fs";
-import { lstat, mkdir, open } from "node:fs/promises";
+import { lstat, mkdir, open, rm } from "node:fs/promises";
 import net from "node:net";
 import path from "node:path";
 
@@ -153,27 +153,33 @@ const HINT = home => "ACC: live delivery is on but not running in this conversat
 // Each ask is its own file, created exclusively. A counter read and then
 // rewritten lets overlapping calls all observe the same count and each return
 // a hint. An empty file at the unsuffixed hash is the old one-ask marker: it
-// is not one of these three, so it does not spend the budget.
+// is not one of these three, so it does not spend the budget. The path is a
+// reservation: the caller deletes it when the line is not delivered.
 async function claimAsk(directory, marker) {
   try {
     await mkdir(directory, { recursive: true, mode: 0o700 });
   } catch {
-    return false;
+    return null;
   }
   for (let n = 1; n <= ASK_LIMIT; n += 1) {
+    const slot = `${marker}.${n}`;
     let handle;
     try {
-      handle = await open(`${marker}.${n}`, constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL
+      handle = await open(slot, constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL
         | constants.O_NOFOLLOW, 0o600);
-      return true;
+      return slot;
     } catch (error) {
       if (error?.code === "EEXIST") continue;
-      return false;
+      return null;
     } finally {
       await handle?.close().catch(() => {});
     }
   }
-  return false;
+  return null;
+}
+
+function releaseAsk(slot) {
+  return rm(slot, { force: true }).catch(() => {});
 }
 
 async function relayAlreadyServing({ runtimeDir, conversationId, clientPid, isAlive }) {
@@ -202,7 +208,9 @@ export async function nativeActivationHint({ event, nativeBinding, runtimeDir, c
   const asked = path.join(path.dirname(relayDir(runtimeDir)), "antigravity-asked");
   const marker = path.join(asked, createHash("sha256").update(event.sessionId).digest("hex"));
   // A decline and an ignored ask leave the same trace, so neither can stop the
-  // line by itself. Three exclusive creates are the bound.
-  if (!await claimAsk(asked, marker)) return null;
-  return HINT(home);
+  // line by itself. Three exclusive creates are the bound. The file reserves
+  // the number now; release gives it back when the runner does not deliver.
+  const slot = await claimAsk(asked, marker);
+  if (slot === null) return null;
+  return { line: HINT(home), release: () => releaseAsk(slot) };
 }

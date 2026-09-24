@@ -454,7 +454,8 @@ How it works, in the order the capture exercised it:
 That capture asked once. The product no longer does. While the binding stays degraded and no
 relay is serving, a later turn asks again, up to three times for the conversation. An empty
 marker from the one-ask rule does not count as a spent ask. A serving relay is not asked. A
-decline cannot be told from an ignore, so the third ask is what stops the line.
+line the hook does not deliver does not count as one of the three. A
+decline cannot be told from an ignore, so the third delivered ask is what stops the line.
 
 The five branches:
 
