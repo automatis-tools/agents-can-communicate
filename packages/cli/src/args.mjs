@@ -43,7 +43,7 @@ export const COMMANDS = Object.freeze({
   // `--apply` rather than `--dry-run`: this is the one command that takes
   // records out of the store, so the reporting run is what happens by
   // default and meaning it is what has to be said out loud.
-  prune: { required: [], optional: ["session", "generation"], repeated: ["class"],
+  prune: { required: [], optional: ["session", "generation", "before"], repeated: ["class"],
     flags: ["apply"] },
   // The one command with a subcommand. Kept as an explicit list rather than a
   // free positional: `acc config delete` should fail at the parser, not deep

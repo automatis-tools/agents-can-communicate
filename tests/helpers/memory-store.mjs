@@ -89,7 +89,10 @@ export function createMemoryStore({ clock, ids, workspaceId }) {
     const matching = events.map(event => validateRecord("event", event))
       .filter(event => event.workspaceId === workspaceId && event.sequence > after);
     const page = matching.slice(0, limit);
-    return { cursor: page.at(-1)?.sequence ?? after, events: page };
+    // The double reports the boundary too, so a caller that forgets to handle
+    // a trimmed log cannot pass its tests and then read short in production.
+    return { cursor: page.at(-1)?.sequence ?? after, events: page,
+      trimmedThrough: trimmedThrough };
   }
 
   // One record by id, with the checks a snapshot applies to it: absent,
@@ -120,6 +123,20 @@ export function createMemoryStore({ clock, ids, workspaceId }) {
       messages: of("message"),
       receipts: of("receipt"),
     };
+  }
+
+  let trimmedThrough = null;
+
+  // Trimming drops events at or below a boundary and reports where the log now
+  // starts, exactly as the filesystem store does.
+  async function trimHistory(boundary) {
+    trimmedThrough = trimmedThrough === null || boundary > trimmedThrough
+      ? boundary : trimmedThrough;
+    const before = events.length;
+    for (let index = events.length - 1; index >= 0; index -= 1) {
+      if (events[index].sequence <= boundary) events.splice(index, 1);
+    }
+    return { reclaimed: before - events.length, trimmedThrough, remaining: false };
   }
 
   // The envelope generation, which `snapshot` deliberately withholds. Reclaiming
@@ -198,7 +215,7 @@ export function createMemoryStore({ clock, ids, workspaceId }) {
   });
 
   return Object.freeze({ transaction, eventsSince, snapshot, stateRecord, stateEnvelopes,
-    reclaimRecords, ephemeral, clock, ids,
+    reclaimRecords, trimHistory, ephemeral, clock, ids,
     workspaceId });
 }
 

@@ -16,7 +16,8 @@ import { assertEventBinding, assertStateBinding, eventPath, stateEnvelope, state
 import { ephemeralIsDeleted, markEphemeral, stateDeletionPublication,
   stateGenerationIsDeleted } from "./retention.mjs";
 import { ensureManagedDirectory } from "./safe-directory.mjs";
-import { reclaimStateRecords } from "./reclaim.mjs";
+import { readEventFloor } from "./event-floor.mjs";
+import { reclaimStateRecords, trimEventLog } from "./reclaim.mjs";
 import { sweepIfDue } from "./stage-sweep.mjs";
 import { withWriterMutex } from "./writer-mutex.mjs";
 
@@ -78,7 +79,14 @@ async function loadAllState(paths, root, wanted = null) {
 
 async function nextSequence(paths, root) {
   const last = (await listJsonFiles(paths.events, { root })).at(-1);
-  return last === undefined ? 1 : Number(path.basename(last, ".json")) + 1;
+  if (last !== undefined) return Number(path.basename(last, ".json")) + 1;
+  // Only an empty directory consults the floor, so the path every transaction
+  // runs pays nothing for retention. Trimming removes the oldest events, so
+  // while any file remains the newest one still answers this. A log trimmed
+  // away entirely is the case that would otherwise restart at 1 and hand out a
+  // sequence a peer already holds a cursor for.
+  const floor = await readEventFloor(paths, root);
+  return floor === null ? 1 : Number(floor) + 1;
 }
 
 export async function openFilesystemStore({ root, clock, ids, workspaceId, failAt,
@@ -275,7 +283,11 @@ export async function openFilesystemStore({ root, clock, ids, workspaceId, failA
       events.push(event);
       if (events.length === limit) break;
     }
-    return { cursor: events.at(-1)?.sequence ?? after, events };
+    // A caller whose cursor precedes the boundary is served what is left and
+    // told where the log now starts. A short page that reads like a complete
+    // one is the failure trimming must not introduce.
+    return { cursor: events.at(-1)?.sequence ?? after, events,
+      trimmedThrough: await readEventFloor(paths, root) };
   }
 
   /**
@@ -415,6 +427,19 @@ export async function openFilesystemStore({ root, clock, ids, workspaceId, failA
       () => reclaimStateRecords(paths, entries, { root, limit, deadlineAt: bounded }));
   }
 
+  /**
+   * Trim the event log to a boundary and report where it now starts.
+   *
+   * Under the writer mutex, because it competes with the sequence every
+   * transaction allocates.
+   */
+  async function trimHistory(boundary, { limit, deadlineAt } = {}) {
+    const bounded = Math.min(deadlineAt ?? Infinity, storeDeadline ?? Infinity);
+    const publish = { ...publishOptions, deadlineAt: bounded };
+    return withWriterMutex(paths, publish,
+      () => trimEventLog(paths, boundary, { root, publish, limit, deadlineAt: bounded }));
+  }
+
   return Object.freeze({ transaction, eventsSince, snapshot, stateRecord, stateEnvelopes,
-    reclaimRecords, ephemeral, paths, root, workspaceId });
+    reclaimRecords, trimHistory, ephemeral, paths, root, workspaceId });
 }

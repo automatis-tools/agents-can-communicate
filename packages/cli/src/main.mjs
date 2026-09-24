@@ -381,7 +381,8 @@ const HANDLERS = Object.freeze({
 
   prune: async ({ options, context }) => {
     const result = await context.service.prune({
-      classes: options.class, apply: options.apply === true, limit: Infinity });
+      classes: options.class, before: options.before,
+      apply: options.apply === true, limit: Infinity });
     const named = Object.entries(result.counts)
       .map(([name, count]) => `${count} ${name}`).join(", ");
     // The reporting run says what it would do; the applying run says what the
@@ -389,6 +390,7 @@ const HANDLERS = Object.freeze({
     // it owns leave together.
     const text = result.applied
       ? `reclaimed ${result.reclaimed} file(s) from ${named}`
+        + (result.trimmedThrough === null ? "" : `; history starts after ${result.trimmedThrough}`)
         + (result.skipped > 0 ? `; ${result.skipped} changed and were left` : "")
         + (result.remaining ? "; more remains, run it again" : "")
       : `would prune ${named}; nothing was changed, add --apply to act`;

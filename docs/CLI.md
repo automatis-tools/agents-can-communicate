@@ -101,6 +101,43 @@ delivery bindings. Default `sync` reads events after a 16-digit event cursor (10
 default, up to 500). `--scope history` discovers historical message headers and reads
 selected records; `--scope full` adds an unbounded snapshot for explicit workspace forensics.
 
+### Retention
+
+A workspace keeps what it is told to keep. `acc prune` reports what it no longer needs and
+reclaims it only when asked:
+
+```bash
+acc prune
+acc prune --apply
+acc prune --class claims --apply
+acc prune --before 0000000000001840 --apply
+```
+
+**`prune` changes nothing without `--apply`.** The reporting run is the default because this
+is the one command that takes records out of the store.
+
+| Class | Reclaimed when | Threshold |
+|---|---|---|
+| `sessions` | presence is `offline` | a confirmed dead pid, or 24 hours without a heartbeat |
+| `intents` | the session they belong to is reclaimed | - |
+| `claims` | the lease has expired | leases default to 30 minutes (`--lease-seconds`) |
+| `participants` | no session of theirs survives and no surviving message names them | - |
+
+`--before` takes a 16-digit cursor, the same one `sync` returns, and trims the event log to
+it. Messages recorded at or below that point go too, but only once nobody is owed them: a
+receipt that is still `queued`, `offered` or `retrieved` keeps its message, because offered is
+not read and retrieved is not model attention. A recipient that no longer exists cannot
+acknowledge anything, and does not hold a message forever.
+
+After a trim, `sync` reports `trimmedThrough`. A caller whose cursor precedes it was served a
+short page and can tell. **An ACC older than this feature cannot**: it will serve the same
+cursor without reporting the boundary, which is why trimming history is never automatic.
+
+Two classes need no operator at all. A retired transaction journal and a superseded retention
+marker have no reader, so a bounded pass reclaims them once a day when a store is opened, and
+`acc doctor --repair` reclaims them without that bound. `acc doctor` reports what is still
+held.
+
 ### Claims
 
 ```bash

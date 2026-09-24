@@ -17,7 +17,7 @@ import { needsOwner } from "./session-owner.mjs";
  * protocol's enum choices before a caller has to attempt a mutation.
  */
 const GROUPS = Object.freeze([
-  ["Set up", ["install", "uninstall", "doctor", "config"]],
+  ["Set up", ["install", "uninstall", "doctor", "config", "prune"]],
   ["In a session", ["status", "sync", "work", "claim", "release", "inbox", "reply",
     "ack", "message", "request", "finish"]],
   ["Session lifecycle", ["attach", "heartbeat", "detach"]],

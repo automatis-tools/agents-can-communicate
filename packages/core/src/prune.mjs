@@ -17,6 +17,66 @@ function assertClasses(classes) {
 
 const of = (envelopes, kind) => envelopes.filter(envelope => envelope.kind === kind);
 
+const CURSOR = /^[0-9]{16}$/;
+const EVENT_PAGE = 500;
+
+function assertBefore(before) {
+  if (typeof before !== "string" || !CURSOR.test(before)) {
+    throw new AccError(EXIT.USAGE,
+      "before is the 16-digit cursor a previous sync returned", { before });
+  }
+  return before;
+}
+
+/**
+ * Read the log up to the boundary, counting it and naming what it recorded.
+ *
+ * The boundary is a cursor rather than a date on purpose: a cursor is what
+ * `sync` already returns and what a peer already holds, so an operator trimming
+ * to one names the same point its readers name. A duration would have to be
+ * resolved to a sequence anyway, and the resolution could move between the
+ * report and the apply.
+ */
+async function readBelow(store, workspaceId, before) {
+  const messageIds = new Set();
+  let events = 0;
+  let cursor = null;
+  for (;;) {
+    const page = await store.eventsSince(workspaceId, cursor, EVENT_PAGE);
+    if (page.events.length === 0) break;
+    let past = false;
+    for (const event of page.events) {
+      if (event.sequence > before) {
+        past = true;
+        break;
+      }
+      events += 1;
+      if (event.type === "message.recorded") messageIds.add(event.payload.messageId);
+    }
+    if (past) break;
+    cursor = page.cursor;
+  }
+  return { events, messageIds };
+}
+
+/**
+ * A message is resolved when nobody is still owed it.
+ *
+ * Offered is not read and retrieved is not model attention, so only an
+ * acknowledged receipt settles the obligation. A recipient that no longer
+ * exists cannot acknowledge anything, and holding the message for it would
+ * keep the whole thread forever.
+ */
+function resolvedMessages(envelopes, messageIds) {
+  const participants = new Set(of(envelopes, "participant").map(envelope => envelope.id));
+  const open = new Set(of(envelopes, "receipt").map(envelope => envelope.record)
+    .filter(receipt => receipt.state !== "acknowledged"
+      && participants.has(receipt.recipientParticipantId))
+    .map(receipt => receipt.messageId));
+  return of(envelopes, "message")
+    .filter(envelope => messageIds.has(envelope.id) && !open.has(envelope.id));
+}
+
 /**
  * Which records describe work that has stopped for good.
  *
@@ -85,11 +145,25 @@ export function createPruneService(ports) {
         .map(envelope => envelope.record))
       : [];
 
-    const named = { sessions: wants("sessions") ? sessions : [], intents, claims, participants };
+    // History is named by a boundary rather than by a class, because there is
+    // no such thing as an event that has stopped being true - only one the
+    // operator has decided nobody will read again.
+    const before = input.before === undefined ? null : assertBefore(input.before);
+    const below = before === null ? { events: 0, messageIds: new Set() }
+      : await readBelow(store, workspaceId, before);
+    const messages = before === null ? [] : resolvedMessages(envelopes, below.messageIds);
+    const doomedMessages = new Set(messages.map(envelope => envelope.id));
+    const receipts = of(envelopes, "receipt")
+      .filter(envelope => doomedMessages.has(envelope.record.messageId));
+
+    const named = { sessions: wants("sessions") ? sessions : [], intents, claims, participants,
+      messages, receipts };
     const entries = Object.values(named).flat()
       .map(({ kind, id, generation }) => ({ kind, id, generation }));
     return { workspaceId,
-      counts: Object.fromEntries(Object.entries(named).map(([name, list]) => [name, list.length])),
+      before,
+      counts: { ...Object.fromEntries(Object.entries(named)
+        .map(([name, list]) => [name, list.length])), events: below.events },
       entries };
   }
 
@@ -102,11 +176,23 @@ export function createPruneService(ports) {
   async function prune(input = {}) {
     const plan = await planPrune(input);
     if (input.apply !== true) {
-      return { ...plan, applied: false, reclaimed: 0, skipped: 0, remaining: false };
+      return { ...plan, applied: false, reclaimed: 0, skipped: 0, remaining: false,
+        trimmedThrough: null };
     }
     const result = await store.reclaimRecords(plan.entries,
       { limit: input.limit, deadlineAt: input.deadlineAt });
-    return { ...plan, applied: true, ...result };
+    if (plan.before === null) return { ...plan, applied: true, ...result, trimmedThrough: null };
+    // Records first, then the log. A message removed while its recording event
+    // survives reads as history describing a record that is gone, which is
+    // ordinary. The reverse - an event log that starts after a message it never
+    // mentions - is the gap the floor is there to report.
+    const trimmed = await store.trimHistory(plan.before,
+      { limit: input.limit, deadlineAt: input.deadlineAt });
+    return { ...plan, applied: true,
+      reclaimed: result.reclaimed + trimmed.reclaimed,
+      skipped: result.skipped,
+      trimmedThrough: trimmed.trimmedThrough,
+      remaining: result.remaining || trimmed.remaining };
   }
 
   return { planPrune, prune };

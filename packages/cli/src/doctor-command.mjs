@@ -270,9 +270,15 @@ export async function runDoctor({ options, context, runtime }) {
   // Named rather than left to be inferred: staging files are reclaimed a
   // bounded amount at a time, so a store still carrying a large accumulation
   // should say so instead of reading as if nothing were held.
-  const staging = report.staged > 0 || report.partials > 0
-    ? ` (${report.staged} staged, ${report.partials} partial)`
-    : "";
+  const held = [
+    report.staged > 0 ? `${report.staged} staged` : null,
+    report.partials > 0 ? `${report.partials} partial` : null,
+    // A retired journal entry has no reader at all, so a count above zero says
+    // the automatic pass has not caught up rather than that anything is wrong.
+    report.retired > 0 ? `${report.retired} retired journal` : null,
+    report.trimmedThrough === null ? null : `history from ${report.trimmedThrough}`,
+  ].filter(Boolean);
+  const staging = held.length === 0 ? "" : ` (${held.join(", ")})`;
   const text = [`store healthy${staging}; ${describePresence(status.counts)}; `
     + `protection ${status.protection}; ${installed} of ${adapters.length} adapter(s) installed`,
   ...adapters.filter(adapter => (adapter.present || adapter.installed)

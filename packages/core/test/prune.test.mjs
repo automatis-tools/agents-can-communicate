@@ -131,3 +131,70 @@ test("an unknown class is refused rather than ignored", async t => {
   await assert.rejects(prune.planPrune({ classes: ["everything"] }),
     error => error.code === EXIT.USAGE);
 });
+
+async function sentMessage(service, from, to, clientMessageId, obligation = "none") {
+  return service.sendMessage({ sessionId: from.sessionId, generation: from.generation,
+    toParticipantIds: [to], kind: obligation === "reply" ? "question" : "note",
+    obligation, subject: "subject", body: "body", clientMessageId });
+}
+
+test("a message nobody is owed any more is eligible below the boundary", async t => {
+  const { service, prune, store } = makeService();
+  const { live, gone } = await workspaceWith(service);
+  const sent = await sentMessage(service, gone, "participant_live", "client_settled");
+  await service.acknowledgeMessage({ messageId: sent.messageId, sessionId: live.sessionId,
+    generation: live.generation });
+  const cursor = (await store.eventsSince(WORKSPACE, null, 100)).cursor;
+
+  const plan = await prune.planPrune({ classes: [], before: cursor });
+
+  assert.equal(plan.counts.messages, 1);
+  assert.ok(plan.counts.receipts >= 1);
+  assert.ok(plan.counts.events > 0);
+});
+
+test("a message still owed to someone who is here is kept", async t => {
+  const { service, prune, store } = makeService();
+  const { gone } = await workspaceWith(service);
+  await sentMessage(service, gone, "participant_live", "client_open", "reply");
+  const cursor = (await store.eventsSince(WORKSPACE, null, 100)).cursor;
+
+  const plan = await prune.planPrune({ classes: [], before: cursor });
+
+  // Offered is not read and retrieved is not model attention. Only an
+  // acknowledged receipt settles the obligation, and its recipient is still
+  // here to acknowledge it.
+  assert.equal(plan.counts.messages, 0);
+  assert.equal(plan.counts.receipts, 0);
+});
+
+test("applying a boundary trims the log and reports where it now starts", async t => {
+  const { service, prune, store } = makeService();
+  await workspaceWith(service);
+  const cursor = (await store.eventsSince(WORKSPACE, null, 100)).cursor;
+
+  const result = await prune.prune({ classes: [], before: cursor, apply: true });
+
+  assert.equal(result.trimmedThrough, cursor);
+  const page = await store.eventsSince(WORKSPACE, null, 100);
+  assert.deepEqual(page.events, []);
+  assert.equal(page.trimmedThrough, cursor);
+});
+
+test("a boundary that is not a cursor is refused", async t => {
+  const { prune } = makeService();
+
+  await assert.rejects(prune.planPrune({ before: "last tuesday" }),
+    error => error.code === EXIT.USAGE);
+});
+
+test("naming no boundary leaves history alone", async t => {
+  const { service, prune, store } = makeService();
+  await workspaceWith(service);
+  const before = (await store.eventsSince(WORKSPACE, null, 100)).events.length;
+
+  const result = await prune.prune({ apply: true });
+
+  assert.equal(result.trimmedThrough, null);
+  assert.equal((await store.eventsSince(WORKSPACE, null, 100)).events.length, before);
+});

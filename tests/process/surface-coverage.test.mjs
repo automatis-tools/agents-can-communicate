@@ -54,6 +54,7 @@ const BY_CLI = Object.freeze({
   forceReleaseClaim: "release", sendMessage: "message", acknowledgeMessage: "ack",
   listInbox: "inbox", readInbox: "inbox", replyToMessage: "reply",
   finishSession: "finish", collectStatus: "status",
+  planPrune: "prune", prune: "prune",
 });
 
 // Deliberately internal, each for a stated reason rather than by omission.

@@ -3,6 +3,7 @@ import path from "node:path";
 import { readActiveJournal } from "./active-journal.mjs";
 import { listDirectoryEntries, readJsonIfPresent } from "./atomic-json.mjs";
 import { condemn, detachDoomed, discard, discardLeftovers, expired } from "./doomed-directory.mjs";
+import { assertSequence, raiseEventFloor, readEventFloor } from "./event-floor.mjs";
 import { statePath } from "./record-id.mjs";
 
 // Shared with the stage sweep that calls this, so one pass cannot spend two
@@ -203,4 +204,44 @@ export async function reclaimStateRecords(paths, entries,
   const removed = await discard(doomed, root, limit - spent, deadlineAt);
   return { reclaimed: leftovers.spent + removed.spent, skipped,
     remaining: !drained || !removed.drained || removed.spent < condemned };
+}
+
+/**
+ * Trim the event log to a boundary, reclaiming every event at or below it.
+ *
+ * The floor is raised before a single file moves, and that order is the whole
+ * safety argument. A floor ahead of the trim reports a boundary for events that
+ * are still present, which costs a reader nothing. A trim ahead of the floor is
+ * a silent gap, which is the failure the floor exists to prevent.
+ *
+ * @returns {Promise<{ reclaimed: number, trimmedThrough: string, remaining: boolean }>}
+ */
+export async function trimEventLog(paths, boundary,
+  { root, publish, limit = RECLAIM_BUDGET, deadlineAt } = {}) {
+  assertSequence(boundary, "before");
+  if (expired(deadlineAt)) {
+    return { reclaimed: 0, trimmedThrough: (await readEventFloor(paths, root)) ?? boundary,
+      remaining: true };
+  }
+  const trimmedThrough = await raiseEventFloor(paths, { ...publish, root }, boundary);
+
+  let spent = 0;
+  let drained = true;
+  const doomed = await detachDoomed(root);
+  for (const name of (await jsonNames(paths.events, root)).sort()) {
+    // Sequences are fixed-width, so comparing the names is comparing the
+    // numbers, and the sorted listing lets this stop at the boundary rather
+    // than walk a log that is mostly newer than it.
+    if (path.basename(name, ".json") > boundary) break;
+    if (spent >= limit || expired(deadlineAt)) {
+      drained = false;
+      break;
+    }
+    await condemn(path.join(paths.events, name), doomed);
+    spent += 1;
+  }
+
+  const removed = await discard(doomed, root, limit - spent, deadlineAt);
+  return { reclaimed: removed.spent, trimmedThrough,
+    remaining: !drained || !removed.drained };
 }
