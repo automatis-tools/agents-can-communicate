@@ -11,6 +11,7 @@
   does not spend one of those three. A permission decline cannot
   be told from an ignore, so the third delivered ask is what stops the line.
 - Releasing that reservation may return nothing or throw. Either one leaves the hook open.
+- A synchronous throw from the activation hint is a dropped line. The hook stays open.
 - A native diagnostic write had 250 ms, including worker startup. On a busy runner the
   attempt file never appeared and doctor reported no attempt. A fresh hook now waits up
   to 1.5 s for that write. A stuck disk is still abandoned, and a hook with under 750 ms
@@ -18,9 +19,9 @@
 
 | Candidate artifact | Value |
 |---|---|
-| Built from | `c0cd9722b3c8864cc5c4f13038e812f988461762` |
-| Tarball | `agents-can-communicate-0.6.3.tgz`, 452,954 bytes, 307 files |
-| sha256 | `328f1b4bbfa3f0a385c73595a5a1caf9201361b55020db1a24b21a9c6b24a108` |
+| Built from | `bc479ca0d076924363972d392ee314eef1284e02` |
+| Tarball | `agents-can-communicate-0.6.3.tgz`, 453,019 bytes, 307 files |
+| sha256 | `239b9ed2712a2040d8b11b7019d6bce31a5ec5e6a0fe4f304111bd023b42b998` |
 
 This unpublished development archive passed clean installation verification. See
 [Antigravity relay ask evidence](docs/release-evidence/unreleased-antigravity-relay-ask.md). The

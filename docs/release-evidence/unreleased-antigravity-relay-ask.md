@@ -20,10 +20,10 @@ behavior is the adapter function, covered by `packages/adapter-antigravity/test/
 
 ## Exact local artifact
 
-- Source: clean commit `c0cd9722b3c8864cc5c4f13038e812f988461762`.
+- Source: clean commit `bc479ca0d076924363972d392ee314eef1284e02`.
 - Archive: `agents-can-communicate-0.6.3.tgz`, packed from that commit.
-- Size: 452,954 bytes; 307 packed entries.
-- SHA-256: `328f1b4bbfa3f0a385c73595a5a1caf9201361b55020db1a24b21a9c6b24a108`.
+- Size: 453,019 bytes; 307 packed entries.
+- SHA-256: `239b9ed2712a2040d8b11b7019d6bce31a5ec5e6a0fe4f304111bd023b42b998`.
 - Package version remains `0.6.3`; this is an unpublished development artifact.
 
 The exact archive passed `scripts/verify-package.mjs`: pack, contents, certification
@@ -33,8 +33,9 @@ no-Git workspace operations, and install/uninstall byte restoration.
 The same candidate gives a native diagnostic write 1.5 s before abandoning it. Ubuntu CI
 had dropped the attempt file when worker startup and the write together passed 250 ms.
 It also releases an Antigravity relay-ask reservation when the hook does not deliver
-the line. A synchronous release, or one that throws, leaves the hook open. This
-archive is packed from the merge with main, so it also contains the store stage sweep.
+the line. A synchronous release, or one that throws, leaves the hook open. A
+synchronous throw from the hint itself is a dropped line, and the hook stays open. The
+tree also contains the store stage sweep from main.
 
 ## Limits
 
