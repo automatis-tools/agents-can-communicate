@@ -1,5 +1,34 @@
 # Changelog
 
+## Unreleased — status stops reporting a finished intent as current work
+
+- `acc work --clear` marks a durable intent done rather than erasing it, so the workspace keeps
+  what each session worked on. Nothing read that state: `acc status` returned the summary of a
+  done record as the participant's current work, and attention kept matching its `resourceHints`
+  against live claims. The command and the status contradicted each other about the same session,
+  and a peer read finished work as work in progress.
+- An ephemeral clear deletes the record instead, so a lone session always read correctly and only
+  a workspace shared by two or more sessions showed it — which is every workspace where the
+  answer matters. On a copy of a real store, ten of twelve intents were done and one session
+  still marked open carried one of them.
+- One predicate now decides which states describe work in progress, and status, `claim_conflict`
+  and `claim_contended` all ask it, so the three cannot drift apart again.
+- Stopped is not finished: a `blocked` or `waiting` session still owns its work and its hints, so
+  only `done` gives them up.
+- The status payload is unchanged in shape — `intent` is still a string or `null` — so a client
+  reading it needs no change, and `docs/CLI.md` already described `status` as returning current
+  intent.
+
+| Candidate artifact | Value |
+|---|---|
+| Built from | `fd35c416d6c3c991bb46dd54076ef1fc9842b8ab` |
+| Tarball | `agents-can-communicate-0.6.3.tgz`, 451,509 bytes, 307 files |
+| sha256 | `e942c9b40e774d2bb17522bd6afb9b607ebd81bcaad6d218dcf7b516de4d2ecf` |
+
+This unpublished development archive passed clean installation verification. See
+[finished intent evidence](docs/release-evidence/unreleased-status-finished-intent.md). The
+package version remains `0.6.3` until a release prepares its own.
+
 ## Unreleased — the store sweeps its accepted staging files
 
 - A workspace store's `tmp/` grew by one file per published immutable record and nothing ever
