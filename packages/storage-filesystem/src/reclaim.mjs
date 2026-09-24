@@ -191,14 +191,21 @@ export async function reclaimStateRecords(paths, entries,
       continue;
     }
     await condemn(filePath, doomed);
-    await condemn(path.join(paths.retained, "state", entry.kind, entry.id), doomed)
-      .catch(error => {
-        // A record whose generation was never superseded owns no marker
-        // directory. Nothing to move is the ordinary case, not a fault.
-        if (error.code !== "ENOENT") throw error;
-      });
-    spent += 2;
-    condemned += 2;
+    spent += 1;
+    condemned += 1;
+    try {
+      await condemn(path.join(paths.retained, "state", entry.kind, entry.id), doomed);
+      spent += 1;
+      // Counted only when it moved. Most records own no marker directory at
+      // all, and counting one anyway made `remaining` compare what was
+      // condemned against a number larger than could ever be discarded - so a
+      // finished pass reported work left and asked to be run again forever.
+      condemned += 1;
+    } catch (error) {
+      // A record whose generation was never superseded owns no markers.
+      // Nothing to move is the ordinary case, not a fault.
+      if (error.code !== "ENOENT") throw error;
+    }
   }
 
   const removed = await discard(doomed, root, limit - spent, deadlineAt);

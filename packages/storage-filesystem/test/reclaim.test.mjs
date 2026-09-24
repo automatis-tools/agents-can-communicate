@@ -176,6 +176,20 @@ test("a record and its retention markers leave together", async t => {
   assert.deepEqual(await markerNames(paths, "claim"), []);
 });
 
+test("a record that owns no markers finishes rather than asking to run again", async t => {
+  const { root, paths } = await fixture(t);
+  const doomed = await stateRecord(paths, "session", "session_plain", "generation_a");
+  await rm(path.join(paths.retained, "state", "session", "session_plain"),
+    { recursive: true, force: true });
+
+  const result = await reclaimStateRecords(paths, [doomed], { root });
+
+  // Most records never had a generation superseded, so most own no marker
+  // directory. Counting one anyway made a finished pass report work left.
+  assert.deepEqual(result, { reclaimed: 1, skipped: 0, remaining: false });
+  assert.deepEqual(await stateNames(paths, "session"), []);
+});
+
 test("a record whose generation changed is skipped rather than removed", async t => {
   const { root, paths } = await fixture(t);
   await stateRecord(paths, "claim", "claim_renewed", "generation_b");
