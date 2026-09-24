@@ -1,5 +1,32 @@
 # Changelog
 
+## Unreleased — an ignored Antigravity relay ask comes back
+
+- A degraded Antigravity binding wrote its one-ask marker before the model ran the relay
+  command, so a greeting spent the ask for the whole conversation. Later turns ask again,
+  up to three times, while no relay is serving. Each ask is its own file, created
+  exclusively, so overlapping calls cannot pass three. An empty marker left by the old rule
+  does not count as a spent ask. A serving relay is not asked. A line the hook does not
+  deliver (it misses the context budget, the runner drops it, or stdout does not finish)
+  does not spend one of those three. A permission decline cannot
+  be told from an ignore, so the third delivered ask is what stops the line.
+- Releasing that reservation may return nothing or throw. Either one leaves the hook open.
+- A synchronous throw from the activation hint is a dropped line. The hook stays open.
+- A native diagnostic write had 250 ms, including worker startup. On a busy runner the
+  attempt file never appeared and doctor reported no attempt. A fresh hook now waits up
+  to 1.5 s for that write. A stuck disk is still abandoned, and a hook with under 750 ms
+  left still skips the diagnostic.
+
+| Candidate artifact | Value |
+|---|---|
+| Built from | `bc479ca0d076924363972d392ee314eef1284e02` |
+| Tarball | `agents-can-communicate-0.6.3.tgz`, 453,019 bytes, 307 files |
+| sha256 | `239b9ed2712a2040d8b11b7019d6bce31a5ec5e6a0fe4f304111bd023b42b998` |
+
+This unpublished development archive passed clean installation verification. See
+[Antigravity relay ask evidence](docs/release-evidence/unreleased-antigravity-relay-ask.md). The
+package version remains `0.6.3` until a release prepares its own.
+
 ## Unreleased — the store sweeps its accepted staging files
 
 - A workspace store's `tmp/` grew by one file per published immutable record and nothing ever

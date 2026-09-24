@@ -278,9 +278,10 @@ Live delivery needs four things, and `acc doctor` shows each:
 - the live policy is on: `acc install --adapter antigravity --delivery actionable` (or `all`);
 - the session is interactive - print mode ends with its turn and never runs a relay;
 - the session attached to ACC at all (see the section above);
-- the agent started the relay. ACC's context asks once per conversation; if the command was
-  declined, or never approved at the permission prompt, nothing asks again. Ask the agent to
-  run `sh "~/.gemini/config/acc/acc-relay.sh" start`, or start a new conversation.
+- the agent started the relay. While none is running, ACC's context asks up to three times
+  in that conversation. A declined prompt and an ignored ask look the same, so the line can
+  return after a decline; after the third ask it stays quiet. Run
+  `sh "~/.gemini/config/acc/acc-relay.sh" start` to start it directly.
 
 `acc doctor` reports how many relays are running and, per session, whether a live transport is
 active. A relay ends with its client; nothing is left running after the TUI exits or after

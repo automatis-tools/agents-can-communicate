@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { execFile } from "node:child_process";
-import { lstat, mkdir, open } from "node:fs/promises";
+import { constants } from "node:fs";
+import { lstat, mkdir, open, rm } from "node:fs/promises";
 import net from "node:net";
 import path from "node:path";
 
@@ -144,27 +145,72 @@ export async function offerMessage({ binding, message, runtimeDir, timeoutMs = 8
   }
 }
 
+const ASK_LIMIT = 3;
 const HINT = home => "ACC: live delivery is on but not running in this conversation. To let "
   + `peers reach you while idle, run once: sh "${path.join(home, ".gemini", "config", "acc",
     "acc-relay.sh")}" start`;
 
+// Each ask is its own file, created exclusively. A counter read and then
+// rewritten lets overlapping calls all observe the same count and each return
+// a hint. An empty file at the unsuffixed hash is the old one-ask marker: it
+// is not one of these three, so it does not spend the budget. The path is a
+// reservation: the caller deletes it when the line is not delivered.
+async function claimAsk(directory, marker) {
+  try {
+    await mkdir(directory, { recursive: true, mode: 0o700 });
+  } catch {
+    return null;
+  }
+  for (let n = 1; n <= ASK_LIMIT; n += 1) {
+    const slot = `${marker}.${n}`;
+    let handle;
+    try {
+      handle = await open(slot, constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL
+        | constants.O_NOFOLLOW, 0o600);
+      return slot;
+    } catch (error) {
+      if (error?.code === "EEXIST") continue;
+      return null;
+    } finally {
+      await handle?.close().catch(() => {});
+    }
+  }
+  return null;
+}
+
+function releaseAsk(slot) {
+  return rm(slot, { force: true }).catch(() => {});
+}
+
+async function relayAlreadyServing({ runtimeDir, conversationId, clientPid, isAlive }) {
+  for (const record of await listRegistrations({ runtimeDir })) {
+    if (record.conversationId !== conversationId) continue;
+    if (await serving(record, { timeoutMs: 100, isAlive, clientPid }) === null) return true;
+  }
+  return false;
+}
+
 export async function nativeActivationHint({ event, nativeBinding, runtimeDir, clientPid, env,
-  argvOf = argvDefault }) {
+  argvOf = argvDefault, isAlive = defaultAlive }) {
   // Only a degraded binding can be helped by starting a relay: "off" means the
   // live policy is off, "unsupported" that the contract does not admit this
-  // client, and "active" that a relay already serves it.
+  // client, and "active" that a relay already serves it. Those calls spend
+  // none of the asks recorded below.
   if (nativeBinding?.state !== "degraded") return null;
   const home = env?.HOME;
   if (typeof event?.sessionId !== "string" || typeof home !== "string" || home === "") return null;
   if (!Number.isInteger(clientPid) || isPrintMode(await argvOf(clientPid).catch(() => []))) return null;
+  // The runner asks only when its own handshake failed. A relay can still be
+  // serving under a stale degraded binding; telling the agent to start it again
+  // would be wrong, and the check does not spend an ask.
+  if (await relayAlreadyServing({ runtimeDir, conversationId: event.sessionId, clientPid,
+    isAlive })) return null;
   const asked = path.join(path.dirname(relayDir(runtimeDir)), "antigravity-asked");
   const marker = path.join(asked, createHash("sha256").update(event.sessionId).digest("hex"));
-  try {
-    await mkdir(asked, { recursive: true, mode: 0o700 });
-    const handle = await open(marker, "wx", 0o600);
-    await handle.close();
-  } catch {
-    return null;
-  }
-  return HINT(home);
+  // A decline and an ignored ask leave the same trace, so neither can stop the
+  // line by itself. Three exclusive creates are the bound. The file reserves
+  // the number now; release gives it back when the runner does not deliver.
+  const slot = await claimAsk(asked, marker);
+  if (slot === null) return null;
+  return { line: HINT(home), release: () => releaseAsk(slot) };
 }
