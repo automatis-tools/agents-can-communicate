@@ -38,6 +38,15 @@ function boundedDiagnostic(label, error) {
   return `${line}\n`;
 }
 
+async function releaseActivation(release) {
+  if (typeof release !== "function") return;
+  try {
+    await release();
+  } catch {
+    // The line was not delivered. Releasing its reservation is not the hook.
+  }
+}
+
 function tryWrite(stream, output) {
   if (output === "") return;
   try {
@@ -63,7 +72,8 @@ export async function completeHookOutput(result,
   } catch (error) {
     tryWrite(stderr, boundedDiagnostic("stdout write failed", error));
     // The bytes did not cross, so a reserved activation line is not an ask.
-    await result.releaseActivationAsk?.().catch(() => {});
+    // release may return nothing or throw; neither may fail this hook.
+    await releaseActivation(result.releaseActivationAsk);
     return { exitCode: 0, wroteStdout: false, committedOffers: false };
   }
 

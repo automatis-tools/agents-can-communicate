@@ -158,7 +158,8 @@ next-turn projector already takes only `queued` receipts. Everything else leaves
 A new optional adapter method, `nativeActivationHint({ event, nativeBinding, runtimeDir,
 clientPid, env })`, returns one line, `{ line, release }`, or `null`. A string has nothing
 reserved. `{ line, release }` has reserved an ask, and the runner calls `release` unless that
-line is in the stdout it delivers. The hook runner calls it in `beforeTurn`, after
+line is in the stdout it delivers. `release` may return nothing or throw; either way
+the hook stays open. The hook runner calls it in `beforeTurn`, after
 the native binding attempt, only for a `degraded` binding, within 250 ms, and keeps the answer
 only when it is one line of at most 512 bytes. The line rides with the owner line when both fit
 in half the context budget. A degraded binding already implies the live policy is on, so the

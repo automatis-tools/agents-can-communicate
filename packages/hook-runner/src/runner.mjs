@@ -15,7 +15,8 @@ import { clearPin, createGitProbe, resolveHookWorkspace, platformDataHome, runti
 
 import { resolveClientPid } from "./client-pid.mjs";
 import { probeClientVersion as defaultProbeClientVersion } from "./client-version.mjs";
-import { bindNative, nativeActivationHintFor, nativeDiagnosticDeadline } from "./native-attempt.mjs";
+import { bindNative, callRelease, nativeActivationHintFor, nativeDiagnosticDeadline }
+  from "./native-attempt.mjs";
 import { readProcessTable as defaultReadProcessTable } from "./process-table.mjs";
 import { withSessionLifecycle } from "./session-lifecycle.mjs";
 import { appendStartOwner, appendToolOwner, ownerHeader, ownerOnlyOutcome } from "./owner-context.mjs";
@@ -367,11 +368,14 @@ async function projectActivation(input, offered) {
     const included = turn.activationHintIncluded === true;
     delete turn.activationHintIncluded;
     if (!offered) return turn;
-    if (!included) await offered.release?.().catch(() => {});
-    else if (typeof offered.release === "function") turn.releaseActivationAsk = offered.release;
+    if (!included) await callRelease(offered.release);
+    else if (typeof offered.release === "function") {
+      const release = offered.release;
+      turn.releaseActivationAsk = () => callRelease(release);
+    }
     return turn;
   } catch (error) {
-    await offered?.release?.().catch(() => {});
+    await callRelease(offered?.release);
     throw error;
   }
 }

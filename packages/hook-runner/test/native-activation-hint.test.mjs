@@ -140,6 +140,61 @@ test("a stdout write that completes keeps the ask", async t => {
   assert.equal(hint.released, 0);
 });
 
+test("a synchronous release of a dropped hint leaves the turn open", async t => {
+  let released = 0;
+  const result = await turn(t, async () => ({
+    line: ASK,
+    release() { released += 1; },
+  }), { contextBudgetBytes: 400 });
+
+  assert.equal(result.failed, undefined);
+  assert.match(result.stdout, /^ACC CLI \(append\): --session /);
+  assert.equal(result.stdout.includes(ASK), false);
+  assert.equal(released, 1);
+});
+
+test("a release that throws does not fail the turn", async t => {
+  const result = await turn(t, async () => ({
+    line: ASK,
+    release() { throw new Error("release failed"); },
+  }), { contextBudgetBytes: 400 });
+
+  assert.equal(result.failed, undefined);
+  assert.match(result.stdout, /^ACC CLI \(append\): --session /);
+  assert.equal(result.stdout.includes(ASK), false);
+});
+
+test("a stdout write failure accepts a synchronous release", async () => {
+  let released = 0;
+  const stderr = [];
+  const outcome = await completeHookOutput({
+    stdout: "payload",
+    releaseActivationAsk() { released += 1; },
+  }, {
+    stdout: { write(_output, callback) { callback(new Error("pipe rejected")); } },
+    stderr: { write(output, callback) { stderr.push(output); callback?.(); } },
+  });
+
+  assert.equal(outcome.exitCode, 0);
+  assert.equal(released, 1);
+  assert.match(stderr.join(""), /stdout write failed/);
+});
+
+test("a delivered hint releases synchronously when stdout does not finish", async t => {
+  let released = 0;
+  const result = await turn(t, async () => ({
+    line: ASK,
+    release() { released += 1; },
+  }));
+  assert.equal(released, 0);
+  await completeHookOutput(result, {
+    stdout: { write(_output, callback) { callback(new Error("pipe rejected")); } },
+    stderr: { write(_output, callback) { callback?.(); } },
+  });
+
+  assert.equal(released, 1);
+});
+
 test("a stdout write that fails releases the ask the turn was holding", async t => {
   const hint = reserved(ASK);
   const result = await turn(t, async () => hint);

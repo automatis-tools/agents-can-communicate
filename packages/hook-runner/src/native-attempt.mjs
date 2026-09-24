@@ -71,6 +71,18 @@ function usableHint(line) {
   return line !== "" && !/[\r\n]/.test(line) && Buffer.byteLength(line, "utf8") <= HINT_MAX_BYTES;
 }
 
+// An adapter may release with a synchronous function. Calling `.catch` on its
+// return value throws when that return value is undefined, and a throw from
+// the function itself must not become a failed hook.
+export function callRelease(release) {
+  if (typeof release !== "function") return Promise.resolve();
+  try {
+    return Promise.resolve(release()).catch(() => {});
+  } catch {
+    return Promise.resolve();
+  }
+}
+
 /**
  * One line an adapter asks the agent to act on, when the agent itself can fix
  * a degraded native binding - Antigravity's relay is started from the agent's
@@ -107,6 +119,6 @@ export async function nativeActivationHintFor({ adapter, event, nativeBinding, b
     if (timer !== null) clearTimeout(timer);
     // A late or rejected answer still holds its reservation. Do not wait for
     // it: an adapter that never settles must not hold the hook.
-    if (!keep) pending.then(taken => taken?.release?.()).catch(() => {});
+    if (!keep) pending.then(taken => callRelease(taken?.release)).catch(() => {});
   }
 }
