@@ -108,19 +108,11 @@ export async function openFilesystemStore({ root, clock, ids, workspaceId, failA
   // rather than spending one hook's whole budget on it. The mutex is taken only
   // on the opens that actually sweep - see sweepIfDue, which decides before it
   // locks, because this runs inside every hook.
-  // Maintenance must never fail an open. sweepIfDue leaves before anything that
-  // refuses an expired budget, but the lock itself can still be lost to a
-  // contending writer or to the deadline passing while waiting for it, and
-  // both of those arrive as CONFLICT. Leaving that pass for the next open is
-  // the bounded behaviour working. Any other fault is a real store problem and
-  // still propagates.
+  // Maintenance never decides whether a store can be opened: sweepIfDue answers
+  // a lost lock and a lapsed budget itself, and raises only real store faults.
   await sweepIfDue(paths, { root, clock, deadlineAt: storeDeadline,
     withLock: operation => withWriterMutex(paths,
-      { root, tmpDir: paths.tmp, clock, deadlineAt: storeDeadline }, operation) })
-    .catch(error => {
-      if (error?.code !== EXIT.CONFLICT) throw error;
-      return { swept: 0, remaining: true };
-    });
+      { root, tmpDir: paths.tmp, clock, deadlineAt: storeDeadline }, operation) });
 
   async function recoverOpenJournals() {
     const open = await readOpenJournals(paths, root);

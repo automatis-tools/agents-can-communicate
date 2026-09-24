@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
 
-import { SCHEMA_VERSION } from "@agents-can-communicate/protocol";
+import { AccError, EXIT, SCHEMA_VERSION } from "@agents-can-communicate/protocol";
 
 import { sweepAcceptedStages, sweepIfDue } from "../src/stage-sweep.mjs";
 import { openFilesystemStore, storePaths } from "../src/store.mjs";
@@ -207,6 +207,33 @@ test("a pass that left work behind stays due instead of waiting a whole interval
   assert.equal(result.remaining, false);
   assert.deepEqual(await readdir(paths.stage), []);
   assert.deepEqual(await detachedIn(root), []);
+});
+
+test("a deadline that expires after the due check never reaches the caller", async t => {
+  const { root, paths } = await fixture(t, 3);
+  await mkdir(paths.locks, { recursive: true });
+  // The budget is alive when sweepIfDue checks it and gone by the time the lock
+  // is granted, which is what the mutex reports by refusing with CONFLICT.
+  const withLock = () => {
+    throw new AccError(EXIT.CONFLICT, "operation deadline expired before publication", {});
+  };
+
+  const result = await sweepIfDue(paths, { root, clock: clockAt("2026-09-23T10:00:00.000Z"),
+    deadlineAt: Date.now() + 60_000, withLock });
+
+  assert.equal(result.swept, 0);
+  assert.equal(result.remaining, true);
+});
+
+test("a real store fault still reaches the caller", async t => {
+  const { root, paths } = await fixture(t, 3);
+  await mkdir(paths.locks, { recursive: true });
+  const withLock = () => {
+    throw new AccError(EXIT.DATA, "managed directory escapes the store root", {});
+  };
+
+  await assert.rejects(sweepIfDue(paths, { root, clock: clockAt("2026-09-23T10:00:00.000Z"),
+    withLock }), error => error.code === EXIT.DATA);
 });
 
 test("a sweep a day later is due again", async t => {

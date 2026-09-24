@@ -2,6 +2,8 @@ import { randomUUID } from "node:crypto";
 import { open, rename, rm, rmdir } from "node:fs/promises";
 import path from "node:path";
 
+import { EXIT } from "@agents-can-communicate/protocol";
+
 import { encode, listDirectoryEntries, publishAtomic, readJsonIfPresent } from "./atomic-json.mjs";
 import { assertManagedDirectory, ensureManagedDirectory } from "./safe-directory.mjs";
 
@@ -121,6 +123,17 @@ export async function sweepAcceptedStages(paths,
 
 const markerPath = paths => path.join(paths.locks, "stage-sweep.json");
 
+// A lost lock and a lapsed budget are the same answer: not now, next open. They
+// both arrive as CONFLICT, and neither is a reason to fail the caller.
+async function withLockTolerantly(withLock, operation) {
+  try {
+    return await withLock(operation);
+  } catch (error) {
+    if (error?.code !== EXIT.CONFLICT) throw error;
+    return { swept: 0, remaining: true };
+  }
+}
+
 // An unreadable marker means the interval is unknown, and an unknown interval
 // is treated as due: maintenance that refuses to run because its own bookkeeping
 // is damaged is the failure it exists to prevent.
@@ -156,7 +169,13 @@ export async function sweepIfDue(paths,
   const last = await sweptAt(paths, root);
   if (last !== null && now - last < SWEEP_INTERVAL_MS) return { swept: 0, remaining: false };
 
-  return withLock(async () => {
+  // The budget can lapse after the check above: the lock may be granted late,
+  // or granted to someone else first. Both arrive as CONFLICT, from the mutex
+  // or from the publishAtomic that writes the marker. Leaving that pass for the
+  // next open is the bounded behaviour working, so it is answered here rather
+  // than left for whoever called - maintenance never decides whether a store
+  // can be opened. Every other fault is a real store problem and propagates.
+  return withLockTolerantly(withLock, async () => {
     // Re-read under the lock: another process may have swept while this one
     // waited for it, and two sweeps in a row would detach an empty directory
     // for nothing.
