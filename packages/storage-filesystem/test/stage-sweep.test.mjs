@@ -165,6 +165,23 @@ test("the writer mutex is taken only on the opens that actually sweep", async t 
   assert.equal(locked, 2, "a pass after the interval locks again");
 });
 
+test("an expired deadline never fails the caller that opened the store", async t => {
+  const { root, paths } = await fixture(t, 3);
+  await mkdir(paths.locks, { recursive: true });
+  let locked = 0;
+  const withLock = operation => { locked += 1; return operation(); };
+
+  // A due sweep whose budget is already gone. Writing the marker goes through
+  // publishAtomic, which refuses an expired deadline by throwing, so this used
+  // to raise out of the store open it runs inside.
+  const result = await sweepIfDue(paths, { root, clock: clockAt("2026-09-23T10:00:00.000Z"),
+    deadlineAt: Date.now() - 1, withLock });
+
+  assert.equal(result.remaining, true);
+  assert.equal(locked, 0, "an exhausted budget should not even take the lock");
+  assert.deepEqual(await readdir(paths.stage), ["0.published", "1.published", "2.published"]);
+});
+
 test("a sweep a day later is due again", async t => {
   const { root, paths } = await fixture(t, 1);
   await mkdir(paths.locks, { recursive: true });

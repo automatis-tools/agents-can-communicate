@@ -146,6 +146,12 @@ async function sweptAt(paths, root) {
  */
 export async function sweepIfDue(paths,
   { root, clock, limit = SWEEP_BUDGET, deadlineAt, withLock = operation => operation() } = {}) {
+  // Nothing below tolerates an expired budget: withWriterMutex refuses one, and
+  // so does the publishAtomic that writes the marker. Leaving the work for the
+  // next open is the whole point of a bounded pass, so leave before the first
+  // call that would throw instead of failing the open this runs inside.
+  if (expired(deadlineAt)) return { swept: 0, remaining: true };
+
   const now = Date.parse(clock.now());
   const last = await sweptAt(paths, root);
   if (last !== null && now - last < SWEEP_INTERVAL_MS) return { swept: 0, remaining: false };
@@ -159,6 +165,11 @@ export async function sweepIfDue(paths,
       return { swept: 0, remaining: false };
     }
     const result = await sweepAcceptedStages(paths, { root, limit, deadlineAt });
+    // The marker is bookkeeping, not evidence. A pass that spent its budget
+    // sweeping leaves it unwritten, so the next open is due again - which is
+    // correct, because that pass did not finish. Writing it here would refuse
+    // the expired deadline by throwing, out of a store open.
+    if (expired(deadlineAt)) return { swept: result.swept, remaining: true };
     await publishAtomic(markerPath(paths), encode({ sweptAt: clock.now() }),
       { root, tmpDir: paths.tmp, stageDir: paths.stage, replace: true, deadlineAt });
     return result;
