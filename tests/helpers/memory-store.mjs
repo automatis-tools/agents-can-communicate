@@ -122,6 +122,33 @@ export function createMemoryStore({ clock, ids, workspaceId }) {
     };
   }
 
+  // The envelope generation, which `snapshot` deliberately withholds. Reclaiming
+  // reads eligibility outside the writer mutex and applies it inside, and this
+  // is what proves the record did not change in between.
+  async function stateEnvelopes(workspaceId, { kinds } = {}) {
+    const wanted = kinds === undefined ? null : new Set(kinds);
+    return [...committed.values()].filter(entry => entry.record.workspaceId === workspaceId
+      && (wanted === null || wanted.has(entry.kind)));
+  }
+
+  // A double that removed a record whose generation had moved would let a
+  // caller pass its tests and lose a renewed claim in the only place that
+  // matters, so the generation check is real here too.
+  async function reclaimRecords(entries) {
+    let reclaimed = 0;
+    let skipped = 0;
+    for (const entry of entries) {
+      const found = committed.get(key(entry.kind, entry.id));
+      if (found === undefined || found.generation !== entry.generation) {
+        skipped += 1;
+        continue;
+      }
+      committed.delete(key(entry.kind, entry.id));
+      reclaimed += 1;
+    }
+    return { reclaimed, skipped, remaining: false };
+  }
+
   // Ephemeral records live outside transactions and outside the event log:
   // they are presence and Intent for a workspace that has not materialised.
   const volatile = new Map();
@@ -170,7 +197,8 @@ export function createMemoryStore({ clock, ids, workspaceId }) {
     },
   });
 
-  return Object.freeze({ transaction, eventsSince, snapshot, stateRecord, ephemeral, clock, ids,
+  return Object.freeze({ transaction, eventsSince, snapshot, stateRecord, stateEnvelopes,
+    reclaimRecords, ephemeral, clock, ids,
     workspaceId });
 }
 

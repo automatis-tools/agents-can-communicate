@@ -16,6 +16,7 @@ import { assertEventBinding, assertStateBinding, eventPath, stateEnvelope, state
 import { ephemeralIsDeleted, markEphemeral, stateDeletionPublication,
   stateGenerationIsDeleted } from "./retention.mjs";
 import { ensureManagedDirectory } from "./safe-directory.mjs";
+import { reclaimStateRecords } from "./reclaim.mjs";
 import { sweepIfDue } from "./stage-sweep.mjs";
 import { withWriterMutex } from "./writer-mutex.mjs";
 
@@ -386,6 +387,34 @@ export async function openFilesystemStore({ root, clock, ids, workspaceId, failA
     },
   });
 
-  return Object.freeze({ transaction, eventsSince, snapshot, stateRecord, ephemeral, paths, root,
-    workspaceId });
+  /**
+   * Every live state record with the generation that identifies it.
+   *
+   * `snapshot` deliberately hands back records alone, because that is all any
+   * reader of coordination state needs. Reclaiming is the one caller that needs
+   * the envelope generation too: it decides what is eligible from a reading
+   * taken outside the writer mutex and applies it inside, and the generation is
+   * what proves the record did not change in between.
+   */
+  async function stateEnvelopes(workspace, { kinds } = {}) {
+    const wanted = kinds === undefined ? null : new Set(kinds);
+    return [...(await loadAllState(paths, root, wanted)).values()]
+      .filter(envelope => envelope.record.workspaceId === workspace);
+  }
+
+  /**
+   * Remove named state records and the retention markers they own.
+   *
+   * Under the writer mutex, because it competes with every transaction; the
+   * store deadline still bounds it, so an operator waiting on a busy store is
+   * told rather than blocked forever.
+   */
+  async function reclaimRecords(entries, { limit, deadlineAt } = {}) {
+    const bounded = Math.min(deadlineAt ?? Infinity, storeDeadline ?? Infinity);
+    return withWriterMutex(paths, { ...publishOptions, deadlineAt: bounded },
+      () => reclaimStateRecords(paths, entries, { root, limit, deadlineAt: bounded }));
+  }
+
+  return Object.freeze({ transaction, eventsSince, snapshot, stateRecord, stateEnvelopes,
+    reclaimRecords, ephemeral, paths, root, workspaceId });
 }

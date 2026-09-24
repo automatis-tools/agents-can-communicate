@@ -1,8 +1,9 @@
 import path from "node:path";
 
 import { readActiveJournal } from "./active-journal.mjs";
-import { listDirectoryEntries } from "./atomic-json.mjs";
+import { listDirectoryEntries, readJsonIfPresent } from "./atomic-json.mjs";
 import { condemn, detachDoomed, discard, discardLeftovers, expired } from "./doomed-directory.mjs";
+import { statePath } from "./record-id.mjs";
 
 // Shared with the stage sweep that calls this, so one pass cannot spend two
 // budgets. Exported for the caller that wants to reclaim without a bound.
@@ -137,4 +138,69 @@ export async function reclaimRetired(paths,
   reclaimed += removed.spent;
   return { reclaimed,
     remaining: !journals.drained || !markers.drained || !removed.drained };
+}
+
+/**
+ * Reclaim named state records, each with every retention marker it owns.
+ *
+ * `tx.remove` is the wrong instrument here and the difference matters. It
+ * publishes a deletion marker, which hides the record and *adds* a file, and
+ * `listState` then reads the record before asking whether that marker exists.
+ * Removing records that way would make the store larger and its listings
+ * slower, which is the opposite of what an operator ran this for. A marker only
+ * exists because the store cannot unlink a live name; when the record itself
+ * can be moved out, the marker has nothing left to say.
+ *
+ * `generation` is the caller's optimistic lock. Eligibility is decided from a
+ * snapshot and applied later, and a claim can be renewed in between, which
+ * writes a new generation onto the same id. A record that no longer matches is
+ * skipped rather than removed: it is no longer the record that was judged.
+ *
+ * @param {{kind: string, id: string, generation: string}[]} entries
+ * @returns {Promise<{ reclaimed: number, skipped: number, remaining: boolean }>}
+ */
+export async function reclaimStateRecords(paths, entries,
+  { root, limit = RECLAIM_BUDGET, deadlineAt } = {}) {
+  if (expired(deadlineAt)) return { reclaimed: 0, skipped: 0, remaining: entries.length > 0 };
+  let spent = 0;
+  let skipped = 0;
+
+  const leftovers = await discardLeftovers(root, limit, deadlineAt);
+  spent += leftovers.spent;
+  if (!leftovers.drained) {
+    return { reclaimed: leftovers.spent, skipped, remaining: true };
+  }
+
+  const doomed = await detachDoomed(root);
+  let condemned = 0;
+  let drained = true;
+  for (const entry of entries) {
+    // Two condemnations per record, asked for together, so a budget never
+    // leaves a record half removed - its markers gone and the record itself
+    // still listed, which would read as a live record whose deletion history
+    // had been erased.
+    if (spent + 2 > limit || expired(deadlineAt)) {
+      drained = false;
+      break;
+    }
+    const filePath = statePath(paths, entry.kind, entry.id);
+    const found = await readJsonIfPresent(filePath, root).catch(() => null);
+    if (found === null || found.value?.generation !== entry.generation) {
+      skipped += 1;
+      continue;
+    }
+    await condemn(filePath, doomed);
+    await condemn(path.join(paths.retained, "state", entry.kind, entry.id), doomed)
+      .catch(error => {
+        // A record whose generation was never superseded owns no marker
+        // directory. Nothing to move is the ordinary case, not a fault.
+        if (error.code !== "ENOENT") throw error;
+      });
+    spent += 2;
+    condemned += 2;
+  }
+
+  const removed = await discard(doomed, root, limit - spent, deadlineAt);
+  return { reclaimed: leftovers.spent + removed.spent, skipped,
+    remaining: !drained || !removed.drained || removed.spent < condemned };
 }

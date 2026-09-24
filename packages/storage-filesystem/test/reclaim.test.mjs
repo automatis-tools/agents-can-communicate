@@ -5,7 +5,7 @@ import path from "node:path";
 import test from "node:test";
 
 import { initialiseActiveJournal, activateJournal } from "../src/active-journal.mjs";
-import { reclaimRetired } from "../src/reclaim.mjs";
+import { reclaimRetired, reclaimStateRecords } from "../src/reclaim.mjs";
 import { storePaths } from "../src/store.mjs";
 
 async function fixture(t, { active = true } = {}) {
@@ -145,4 +145,71 @@ test("an expired budget reclaims nothing rather than failing", async t => {
 
   assert.deepEqual(result, { reclaimed: 0, remaining: true });
   assert.equal((await journalEntries(paths)).length, 1);
+});
+
+async function stateRecord(paths, kind, id, generation) {
+  const directory = path.join(paths.state, kind);
+  await mkdir(directory, { recursive: true });
+  await writeFile(path.join(directory, `${id}.json`),
+    `${JSON.stringify({ kind, id, generation, record: { id } })}\n`);
+  const markers = path.join(paths.retained, "state", kind, id);
+  await mkdir(markers, { recursive: true });
+  await writeFile(path.join(markers, `${generation}.json`), "{}\n");
+  return { kind, id, generation };
+}
+
+const stateNames = (paths, kind) => readdir(path.join(paths.state, kind)).catch(() => []);
+const markerNames = (paths, kind) =>
+  readdir(path.join(paths.retained, "state", kind)).catch(() => []);
+
+test("a record and its retention markers leave together", async t => {
+  const { root, paths } = await fixture(t);
+  const doomed = await stateRecord(paths, "claim", "claim_expired", "generation_a");
+
+  const result = await reclaimStateRecords(paths, [doomed], { root });
+
+  // A marker outliving its record would describe the deletion of a file
+  // nothing can find, and the marker area is what grew fastest of the two.
+  assert.equal(result.reclaimed, 2);
+  assert.equal(result.skipped, 0);
+  assert.deepEqual(await stateNames(paths, "claim"), []);
+  assert.deepEqual(await markerNames(paths, "claim"), []);
+});
+
+test("a record whose generation changed is skipped rather than removed", async t => {
+  const { root, paths } = await fixture(t);
+  await stateRecord(paths, "claim", "claim_renewed", "generation_b");
+
+  const result = await reclaimStateRecords(paths,
+    [{ kind: "claim", id: "claim_renewed", generation: "generation_a" }], { root });
+
+  // A claim can be renewed between the plan and the apply, and renewal writes a
+  // new generation. Eligibility was decided about a record that is now gone.
+  assert.equal(result.reclaimed, 0);
+  assert.equal(result.skipped, 1);
+  assert.deepEqual(await stateNames(paths, "claim"), ["claim_renewed.json"]);
+});
+
+test("a record that is already gone is not an error", async t => {
+  const { root, paths } = await fixture(t);
+
+  const result = await reclaimStateRecords(paths,
+    [{ kind: "session", id: "session_absent", generation: "generation_a" }], { root });
+
+  assert.equal(result.reclaimed, 0);
+  assert.equal(result.skipped, 1);
+});
+
+test("reclaiming records stops at its budget", async t => {
+  const { root, paths } = await fixture(t);
+  const first = await stateRecord(paths, "session", "session_a", "generation_a");
+  const second = await stateRecord(paths, "session", "session_b", "generation_b");
+
+  const result = await reclaimStateRecords(paths, [first, second], { root, limit: 2 });
+
+  // Two condemnations per record, so a budget of two reaches exactly one and
+  // leaves the other whole rather than half removed.
+  assert.equal(result.remaining, true);
+  assert.deepEqual(await stateNames(paths, "session"), ["session_b.json"]);
+  assert.deepEqual(await markerNames(paths, "session"), ["session_b"]);
 });

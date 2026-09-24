@@ -5,6 +5,7 @@ import { createIntentService } from "./intents.mjs";
 import { createInboxService } from "./inbox.mjs";
 import { defaultPidIsAlive } from "./pid.mjs";
 import { assertPorts } from "./ports.mjs";
+import { createPruneService } from "./prune.mjs";
 import { createReceiptService } from "./receipts.mjs";
 import { createSessionService } from "./sessions.mjs";
 import { createGuardStateService, createStatusService } from "./status.mjs";
@@ -37,6 +38,7 @@ export function createCoordinationService({ store, clock, ids,
   const sync = createSyncService(ports, sessions);
   const status = createStatusService(ports, sessions, deliveryBindings);
   const guardState = createGuardStateService(ports);
+  const prune = createPruneService(ports);
   return Object.freeze({
     store,
     clock,
@@ -62,6 +64,7 @@ export function createCoordinationService({ store, clock, ids,
     ...receipts,
     ...sync,
     ...status,
+    ...prune,
     guardState,
   });
 }
