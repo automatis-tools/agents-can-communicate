@@ -120,3 +120,40 @@ test("a roster drops a session whose pid is dead, and --all still lists it", asy
   const withAll = await service.collectStatus({ workspaceId: WORKSPACE, all: true });
   assert.equal(withAll.participants.length, 1);
 });
+
+test("a cleared intent stops being reported as current work", async () => {
+  const { service } = makeService();
+  // Two sessions materialise the workspace, which is where the defect lived: an
+  // ephemeral clear deletes the record, so a lone session always read correctly
+  // while every shared workspace read a finished intent as work in progress.
+  const working = await service.openSession(opening({ participantId: "participant_working" }));
+  const finished = await service.openSession(opening({ participantId: "participant_finished" }));
+  await service.setIntent({ sessionId: working.sessionId, generation: working.generation,
+    summary: "porting the claim model", mode: "edit" });
+  await service.setIntent({ sessionId: finished.sessionId, generation: finished.generation,
+    summary: "reviewing the inbox", mode: "review" });
+
+  await service.clearIntent({ sessionId: finished.sessionId, generation: finished.generation });
+
+  const status = await service.collectStatus({ workspaceId: WORKSPACE });
+  const reported = new Map(status.participants.map(item => [item.participantId, item.intent]));
+  assert.equal(reported.get("participant_working"), "porting the claim model");
+  assert.equal(reported.get("participant_finished"), null);
+});
+
+test("a blocked or waiting session is still working on something", async () => {
+  const { service } = makeService();
+  const first = await service.openSession(opening({ participantId: "participant_a" }));
+  await service.openSession(opening({ participantId: "participant_b" }));
+
+  for (const state of ["active", "blocked", "waiting"]) {
+    await service.setIntent({ sessionId: first.sessionId, generation: first.generation,
+      summary: `${state} on the parser`, mode: "edit", state });
+
+    // Stopped is not finished. A session waiting on a peer's answer still owns
+    // its work and its resource hints; only "done" gives them up.
+    const status = await service.collectStatus({ workspaceId: WORKSPACE });
+    assert.equal(status.participants.find(item => item.participantId === "participant_a").intent,
+      `${state} on the parser`);
+  }
+});

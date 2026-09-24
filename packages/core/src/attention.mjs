@@ -3,6 +3,7 @@ import { AccError, EXIT } from "@agents-can-communicate/protocol";
 import { overlaps } from "./claims.mjs";
 import { classifySessionPresence } from "./sessions.mjs";
 import { decisionView, isCurrentDecision } from "./decision-state.mjs";
+import { isCurrentIntent } from "./intents.mjs";
 
 export const ATTENTION_PRIORITY = Object.freeze({
   reply_required: 1,
@@ -65,7 +66,11 @@ function expiredClaims(snapshot, session, now) {
 }
 
 function claimConflicts(snapshot, session, now) {
-  const mine = (snapshot.intents ?? []).find(intent => intent.sessionId === session?.sessionId);
+  // Both kinds read resourceHints as a statement of what a session means to
+  // touch. Finishing that work retracts the statement, so a done record must
+  // not keep raising conflicts on either side of it.
+  const mine = (snapshot.intents ?? []).find(intent => intent.sessionId === session?.sessionId
+    && isCurrentIntent(intent));
   if (mine === undefined) return [];
   return (snapshot.claims ?? []).filter(claim => claim.ownerSessionId !== session.sessionId
     && Date.parse(claim.expiresAt) > Date.parse(now)
@@ -78,7 +83,7 @@ function claimConflicts(snapshot, session, now) {
 function claimContended(snapshot, session, now) {
   if (session == null) return [];
   const peerIntents = (snapshot.intents ?? [])
-    .filter(intent => intent.sessionId !== session.sessionId);
+    .filter(intent => intent.sessionId !== session.sessionId && isCurrentIntent(intent));
   return (snapshot.claims ?? []).filter(claim => claim.ownerSessionId === session.sessionId
     && Date.parse(claim.expiresAt) > Date.parse(now)).flatMap(claim => {
     const peer = peerIntents.find(intent => intent.resourceHints
