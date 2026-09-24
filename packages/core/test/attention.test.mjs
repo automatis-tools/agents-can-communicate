@@ -127,6 +127,39 @@ test("claim-derived attention remains reachable and the vocabulary is closed", (
     "claim_contended", "claim_expired"]);
 });
 
+const contested = intents => ({
+  messages: [], receipts: [], intents,
+  claims: [
+    { claimId: "claim_conflict", ownerSessionId: "session_b", resource: "file:src/a.mjs",
+      expiresAt: "2026-09-01T20:00:00.000Z" },
+    { claimId: "claim_contended", ownerSessionId: "session_a", resource: "file:held.mjs",
+      expiresAt: "2026-09-01T20:00:00.000Z" },
+  ],
+  sessions: [open("session_b", "participant_b")],
+});
+
+test("a finished intent reserves nothing", () => {
+  const snapshot = contested([
+    { sessionId: "session_a", resourceHints: ["file:src/**"], state: "done" },
+    { sessionId: "session_b", resourceHints: ["file:held.mjs"], state: "done" },
+  ]);
+
+  // Both kinds read resourceHints as a statement of what a session means to
+  // touch. Once that work is finished the statement has expired, so a claim it
+  // used to overlap is neither a conflict for me nor contention against me.
+  assert.deepEqual(computeAttention(snapshot, options()), []);
+});
+
+test("an intent that stopped without finishing still holds its ground", () => {
+  const snapshot = contested([
+    { sessionId: "session_a", resourceHints: ["file:src/**"], state: "blocked" },
+    { sessionId: "session_b", resourceHints: ["file:held.mjs"], state: "waiting" },
+  ]);
+
+  assert.deepEqual(computeAttention(snapshot, options()).map(item => item.kind),
+    ["claim_conflict", "claim_contended"]);
+});
+
 test("attention refuses to infer presence without a liveness probe", () => {
   assert.throws(() => computeAttention({ sessions: [] }, { session: null,
     participantId: "participant_a", now: NOW }), error => error.code === EXIT.USAGE);

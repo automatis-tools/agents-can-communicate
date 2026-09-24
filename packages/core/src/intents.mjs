@@ -3,6 +3,22 @@ import { AccError, EXIT, SCHEMA_VERSION, validateRecord }
 
 import { isMaterialised } from "./materialisation.mjs";
 
+/**
+ * Does this record still answer "what is this session doing now?".
+ *
+ * `clearIntent` marks a durable intent done instead of erasing it, so the
+ * workspace keeps what each session worked on. That leaves every reader to
+ * exclude the finished ones, and this is the single place that decides which
+ * states count - status and attention disagreeing about the same record is
+ * exactly the defect this exists to prevent.
+ *
+ * Stopped is not finished. A blocked or waiting session still owns its work and
+ * the resourceHints that announce it, so only "done" gives them up.
+ */
+export function isCurrentIntent(intent) {
+  return intent.state !== "done";
+}
+
 // Intent answers "what is this session doing now?". It is awareness, not
 // authorisation: an edit intent never substitutes for a claim, which is why
 // resourceHints are advisory strings rather than reservations.

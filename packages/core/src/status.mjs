@@ -1,5 +1,6 @@
 import { classifySessionPresence } from "./sessions.mjs";
 import { computeAttention } from "./attention.mjs";
+import { isCurrentIntent } from "./intents.mjs";
 
 /**
  * Protection level, reported from what is actually enforceable.
@@ -108,7 +109,11 @@ export function createStatusService(ports, sessions, deliveryBindings) {
         enforcement: session.enforcement ?? "advisory",
         lifecycle: session.lifecycle ?? "manual",
         presence,
-        intent: intents.find(intent => intent.sessionId === session.sessionId)?.summary ?? null,
+        // A finished intent reads as no intent at all. `--clear` exists so a
+        // peer stops seeing work that has stopped, and reporting the summary of
+        // a done record made the command and this line contradict each other.
+        intent: intents.find(intent => intent.sessionId === session.sessionId
+          && isCurrentIntent(intent))?.summary ?? null,
       })),
       // The owner is named twice on purpose. Every command that reaches a peer
       // takes a participant id, so a claim that gave only a session id sent the
