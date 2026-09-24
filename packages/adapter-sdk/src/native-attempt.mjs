@@ -39,7 +39,9 @@ export async function loadNativeAttempt({ runtimeDir, harnessSessionId, accSessi
 // must not keep the vendor's short-lived hook process alive after its output.
 // The unreferenced worker owns its mutex through any late I/O continuation.
 async function writeDiagnostic(operation, input) {
-  const deadlineAt = Math.min(input.deadlineAt ?? Infinity, Date.now() + 250);
+  // Same ceiling as the hook runner's diagnostic budget. A caller cannot wait
+  // longer than this, and a shorter deadlineAt is still honored.
+  const deadlineAt = Math.min(input.deadlineAt ?? Infinity, Date.now() + 1_500);
   if (Date.now() >= deadlineAt) return false;
   let worker;
   let timer;

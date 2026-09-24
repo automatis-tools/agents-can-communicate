@@ -159,6 +159,34 @@ test("diagnostic write failure cannot discard an otherwise successful hook", asy
   assert.doesNotMatch(await m.doctor(false), /private-handshake-failure/);
 });
 
+test("a diagnostic write past a quarter second is still recorded", async t => {
+  const m = await machine(t);
+  const preload = path.join(m.home, "paced-diagnostic.mjs");
+  await writeFile(preload, `
+    import fs from "node:fs/promises";
+    import { syncBuiltinESMExports } from "node:module";
+    const write = fs.writeFile;
+    fs.writeFile = async (file, ...args) => {
+      if (String(file).includes("native-attempts")) await new Promise(r => setTimeout(r, 400));
+      return write(file, ...args);
+    };
+    syncBuiltinESMExports();
+  `);
+  const child = exec(process.execPath, ["--import", preload,
+    path.resolve(import.meta.dirname, "../../../bin/acc-hook.mjs"), "claude_code"], {
+    cwd: path.join(m.home, "project"), timeout: 3000,
+    env: { HOME: m.home, ACC_DATA_HOME: m.dataHome, ACC_NO_UPDATE_CHECK: "1", PATH: "",
+      ACC_NATIVE_DELIVERY_POLICY: "off", GIT_DIR: "", GIT_WORK_TREE: "" },
+  });
+  child.child.stdin.end(JSON.stringify({ hook_event_name: "UserPromptSubmit", session_id: "paced",
+    cwd: path.join(m.home, "project"), prompt: "continue" }));
+  const { stdout } = await child;
+  assert.match(stdout, /ACC|acc/);
+  const [session] = await m.doctor();
+  assert.equal(session?.lastAttempt?.policyStatus, "off",
+    "a write slower than the diagnostic budget was abandoned");
+});
+
 test("slow diagnostic I/O cannot hold the hook process open or replace its owner", async t => {
   const m = await machine(t);
   await m.hook("slow", { pid: false });

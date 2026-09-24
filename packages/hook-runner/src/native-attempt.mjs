@@ -3,10 +3,20 @@ import { readInstalledLivePolicyState } from "@agents-can-communicate/installer"
 
 import { establishNativeBinding, LIVE_POLICIES, livePolicyFrom } from "./native-binding.mjs";
 
-// Reserve time for turn projection, status and output before optional disk I/O.
+// A cold worker plus the write has to finish inside this window. 250 ms was
+// not enough on a busy CI runner, so the attempt file never appeared and
+// doctor reported no attempt. 1.5 s still abandons a stuck disk, and the
+// extra 500 ms stays available for turn projection, status and output.
+const DIAGNOSTIC_BUDGET_MS = 1_500;
+const DIAGNOSTIC_FLOOR_MS = 250;
+const AFTER_DIAGNOSTIC_MS = 500;
+
 export function nativeDiagnosticDeadline(hookDeadline) {
   const now = Date.now();
-  return hookDeadline - now >= 750 ? now + 250 : null;
+  const remaining = hookDeadline - now;
+  // Below this, even the old quarter-second write would crowd out projection.
+  if (remaining < DIAGNOSTIC_FLOOR_MS + AFTER_DIAGNOSTIC_MS) return null;
+  return now + Math.min(DIAGNOSTIC_BUDGET_MS, remaining - AFTER_DIAGNOSTIC_MS);
 }
 
 // The diagnostic has its own bounded writer; it never rewrites hook ownership.
