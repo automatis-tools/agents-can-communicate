@@ -1,5 +1,23 @@
 # Changelog
 
+## Unreleased — an ignored Antigravity relay ask comes back
+
+- A degraded Antigravity binding wrote its one-ask marker before the model ran the relay
+  command, so a greeting spent the ask for the whole conversation. Later turns ask again,
+  up to three times, while no relay is serving. An empty marker left by the old rule does
+  not count as a spent ask. A serving relay is not asked. A permission decline cannot be
+  told from an ignore, so the third ask is what stops the line.
+
+| Candidate artifact | Value |
+|---|---|
+| Built from | `e497d41d1704d29fd66be044723daf3f595a62c7` |
+| Tarball | `agents-can-communicate-0.6.3.tgz`, 447,284 bytes, 306 files |
+| sha256 | `83aa8e5dc86922a51c69d72a05d31f75f8465c4b1b47586f83727cf4cb634219` |
+
+This unpublished development archive passed clean installation verification. See
+[Antigravity relay ask evidence](docs/release-evidence/unreleased-antigravity-relay-ask.md). The
+package version remains `0.6.3` until a release prepares its own.
+
 ## Unreleased — a first-try report goes to Discussions
 
 - The README's closing call to action sent every first impression to the issue tracker. GitHub
