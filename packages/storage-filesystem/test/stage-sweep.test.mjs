@@ -182,6 +182,33 @@ test("an expired deadline never fails the caller that opened the store", async t
   assert.deepEqual(await readdir(paths.stage), ["0.published", "1.published", "2.published"]);
 });
 
+test("a pass that left work behind stays due instead of waiting a whole interval", async t => {
+  const { root, paths } = await fixture(t, 5);
+  await mkdir(paths.locks, { recursive: true });
+
+  const first = await sweepIfDue(paths, { root, clock: clockAt("2026-09-23T10:00:00.000Z"),
+    limit: 2 });
+  assert.equal(first.remaining, true);
+
+  // One minute later, far inside the interval. Recording an unfinished pass as
+  // done would park the rest for a day: a store holding 17,880 entries at 512
+  // a pass would take weeks rather than a few opens.
+  const second = await sweepIfDue(paths, { root, clock: clockAt("2026-09-23T10:01:00.000Z"),
+    limit: 2 });
+  assert.equal(second.swept, 2, "the next open must carry on, not wait out the interval");
+
+  let guard = 0;
+  let result = second;
+  while (result.remaining && guard < 10) {
+    result = await sweepIfDue(paths, { root, clock: clockAt("2026-09-23T10:02:00.000Z"),
+      limit: 2 });
+    guard += 1;
+  }
+  assert.equal(result.remaining, false);
+  assert.deepEqual(await readdir(paths.stage), []);
+  assert.deepEqual(await detachedIn(root), []);
+});
+
 test("a sweep a day later is due again", async t => {
   const { root, paths } = await fixture(t, 1);
   await mkdir(paths.locks, { recursive: true });

@@ -165,11 +165,17 @@ export async function sweepIfDue(paths,
       return { swept: 0, remaining: false };
     }
     const result = await sweepAcceptedStages(paths, { root, limit, deadlineAt });
-    // The marker is bookkeeping, not evidence. A pass that spent its budget
-    // sweeping leaves it unwritten, so the next open is due again - which is
-    // correct, because that pass did not finish. Writing it here would refuse
-    // the expired deadline by throwing, out of a store open.
-    if (expired(deadlineAt)) return { swept: result.swept, remaining: true };
+    // The marker records a *finished* pass, never an attempted one. A pass that
+    // stopped at its entry budget or ran out of time leaves it unwritten, so
+    // the next open carries on immediately. Recording an unfinished pass as
+    // done would park the remainder for a whole interval: a store holding
+    // 17,880 entries would drain over weeks rather than over a few opens.
+    //
+    // Writing it after an expired deadline would also throw, since
+    // publishAtomic refuses one - out of the store open this runs inside.
+    if (result.remaining || expired(deadlineAt)) {
+      return { swept: result.swept, remaining: true };
+    }
     await publishAtomic(markerPath(paths), encode({ sweptAt: clock.now() }),
       { root, tmpDir: paths.tmp, stageDir: paths.stage, replace: true, deadlineAt });
     return result;
