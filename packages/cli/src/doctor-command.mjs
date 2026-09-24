@@ -267,7 +267,13 @@ export async function runDoctor({ options, context, runtime }) {
   // command documented as saying "what to run next" said it only to `--json`.
   // A person running `acc doctor` on a client wired to an older plugin was told
   // the store was healthy and nothing else.
-  const text = [`store healthy; ${describePresence(status.counts)}; `
+  // Named rather than left to be inferred: staging files are reclaimed a
+  // bounded amount at a time, so a store still carrying a large accumulation
+  // should say so instead of reading as if nothing were held.
+  const staging = report.staged > 0 || report.partials > 0
+    ? ` (${report.staged} staged, ${report.partials} partial)`
+    : "";
+  const text = [`store healthy${staging}; ${describePresence(status.counts)}; `
     + `protection ${status.protection}; ${installed} of ${adapters.length} adapter(s) installed`,
   ...adapters.filter(adapter => (adapter.present || adapter.installed)
     && adapter.nativeDelivery.reasonCode === "native_delivery_unsupported"

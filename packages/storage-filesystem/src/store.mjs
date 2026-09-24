@@ -16,6 +16,7 @@ import { assertEventBinding, assertStateBinding, eventPath, stateEnvelope, state
 import { ephemeralIsDeleted, markEphemeral, stateDeletionPublication,
   stateGenerationIsDeleted } from "./retention.mjs";
 import { ensureManagedDirectory } from "./safe-directory.mjs";
+import { sweepIfDue } from "./stage-sweep.mjs";
 import { withWriterMutex } from "./writer-mutex.mjs";
 
 // Kept cohesive above 300 lines because durable transactions and ephemeral
@@ -29,7 +30,15 @@ export const ZERO_CURSOR = "0".repeat(SEQUENCE_WIDTH);
 // corrupt record, so nothing ever had a reason to put one aside. An empty
 // directory that reads as a feature is the same mistake as an attention kind
 // with no rule behind it. If quarantining is ever built, it comes back with it.
-const DIRECTORIES = ["state", "events", "journal", "locks", "ephemeral", "retained", "tmp"];
+//
+// `stage` is the counter-example that keeps that rule rather than breaking it:
+// every immutable publication fills it and stage-sweep.mjs empties it. Holding
+// accepted stages apart from the partials in `tmp` is what lets the sweep
+// remove a whole directory instead of deciding file by file from a filename
+// suffix. A `stage` ever found empty by design rather than by sweeping is the
+// mistake described above, and should go.
+const DIRECTORIES = ["state", "events", "journal", "locks", "ephemeral", "retained", "tmp",
+  "stage"];
 
 const pad = value => String(value).padStart(SEQUENCE_WIDTH, "0");
 
@@ -92,6 +101,18 @@ export async function openFilesystemStore({ root, clock, ids, workspaceId, failA
   // it holds the writer mutex: two processes opening the same store at once
   // must not roll the same journal forward concurrently.
   await recoverOpenJournals();
+
+  // Sweeping is a write, so it holds the same mutex recovery does and no
+  // publisher is in flight while the stage directory is detached. It is bounded
+  // per pass: a store carrying a large accumulation drains over several opens
+  // rather than spending one hook's whole budget on it. The mutex is taken only
+  // on the opens that actually sweep - see sweepIfDue, which decides before it
+  // locks, because this runs inside every hook.
+  // Maintenance never decides whether a store can be opened: sweepIfDue answers
+  // a lost lock and a lapsed budget itself, and raises only real store faults.
+  await sweepIfDue(paths, { root, clock, deadlineAt: storeDeadline,
+    withLock: operation => withWriterMutex(paths,
+      { root, tmpDir: paths.tmp, clock, deadlineAt: storeDeadline }, operation) });
 
   async function recoverOpenJournals() {
     const open = await readOpenJournals(paths, root);

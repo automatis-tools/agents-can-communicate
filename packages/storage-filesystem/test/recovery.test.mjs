@@ -12,7 +12,7 @@ import { EXIT, SCHEMA_VERSION } from "@agents-can-communicate/protocol";
 import { diagnoseFilesystemStore, repairFilesystemStore } from "../src/recovery.mjs";
 import { activateJournal } from "../src/active-journal.mjs";
 import { JOURNAL_VERSION, readOpenJournals } from "../src/journal.mjs";
-import { openFilesystemStore } from "../src/store.mjs";
+import { openFilesystemStore, storePaths } from "../src/store.mjs";
 import { createFakeClock, createFakeIds } from "../../../tests/helpers/memory-store.mjs";
 
 const NOW = "2026-08-16T01:00:00.000Z";
@@ -122,7 +122,7 @@ test("reopening the store completes a journalled transaction exactly", async t =
 
 test("opening a v0.1 store refuses it before recovery and preserves every byte", async t => {
   const root = await tempRoot(t);
-  for (const directory of ["state", "events", "journal", "locks", "ephemeral", "tmp"]) {
+  for (const directory of ["state", "events", "journal", "locks", "ephemeral", "tmp", "stage"]) {
     await mkdir(path.join(root, directory));
   }
   await writeFile(path.join(root, "protocol.json"), `${JSON.stringify({ storeVersion: 2,
@@ -317,4 +317,33 @@ test("an unknown store version blocks both diagnosis and repair", async t => {
   assert.equal(diagnosis.healthy, false);
   assert.deepEqual(diagnosis.blocked, [path.join(root, "protocol.json")]);
   assert.equal(repaired.healthy, false);
+});
+
+test("repair reclaims the staging directory and reports what it took", async t => {
+  const root = await tempRoot(t);
+  await open(root);
+  const paths = storePaths(root);
+  for (const name of ["a.published", "b.published"]) {
+    await writeFile(path.join(paths.stage, name), "{}\n");
+  }
+
+  const repaired = await repairFilesystemStore({ root, clock: createFakeClock(NOW) });
+
+  assert.equal(repaired.healthy, true);
+  assert.equal(repaired.swept, 2);
+  assert.deepEqual(await readdir(paths.stage), []);
+});
+
+test("diagnosis counts the staging directory without changing it", async t => {
+  const root = await tempRoot(t);
+  await open(root);
+  const paths = storePaths(root);
+  await writeFile(path.join(paths.stage, "a.published"), "{}\n");
+  await writeFile(path.join(paths.tmp, "a.published.1.uuid.tmp"), "half\n");
+
+  const diagnosis = await diagnoseFilesystemStore({ root });
+
+  assert.equal(diagnosis.staged, 1);
+  assert.equal(diagnosis.partials, 1);
+  assert.deepEqual(await readdir(paths.stage), ["a.published"]);
 });

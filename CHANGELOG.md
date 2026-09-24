@@ -10,6 +10,7 @@
   deliver (it misses the context budget, the runner drops it, or stdout does not finish)
   does not spend one of those three. A permission decline cannot
   be told from an ignore, so the third delivered ask is what stops the line.
+- Releasing that reservation may return nothing or throw. Either one leaves the hook open.
 - A native diagnostic write had 250 ms, including worker startup. On a busy runner the
   attempt file never appeared and doctor reported no attempt. A fresh hook now waits up
   to 1.5 s for that write. A stuck disk is still abandoned, and a hook with under 750 ms
@@ -24,6 +25,46 @@
 This unpublished development archive passed clean installation verification. See
 [Antigravity relay ask evidence](docs/release-evidence/unreleased-antigravity-relay-ask.md). The
 package version remains `0.6.3` until a release prepares its own.
+
+## Unreleased — the store sweeps its accepted staging files
+
+- A workspace store's `tmp/` grew by one file per published immutable record and nothing ever
+  removed one. On the maintainer's machine 26 workspaces held about 48,000 entries, and 733
+  came back within a day of clearing them by hand. Each is a hard link to a live record, so
+  what accumulated was directory entries, which every operation on that directory then walks.
+- Accepted staging files are published into their own `stage/` directory. The sweep detaches
+  that directory with one `rename`, recreates it empty and discards the detached copy, so it
+  removes by directory instead of deciding file by file from a filename suffix, and nothing
+  unlinks a name a publisher can still resolve.
+- A partial from a failed publication stays in `tmp/` and is never removed or moved. It is the
+  evidence that bytes may not have reached their destination.
+- The sweep runs where recovery already runs — under the writer mutex, once a day — and is
+  bounded per pass, so draining a large accumulation takes several opens instead of one hook's
+  whole budget. That budget is what hooks ran out of in 0.6.1. Whether a pass is due is one
+  read, decided before the mutex is taken, so an open with nothing to sweep does not pay a
+  mkdir, a write, an fsync and a rename to find that out. A pass with no budget left leaves its
+  work for the next open instead of failing the open it runs inside: maintenance never decides
+  whether a store can be used. The marker records a finished pass only, so a pass that stopped
+  at its budget stays due and the next open carries on rather than waiting out the interval.
+- `acc doctor` reports how many accepted stages are held and how many partials are in `tmp/`,
+  so a store still carrying an accumulation says so. `acc doctor --repair` sweeps without the
+  per-pass bound, because an operator is waiting on it and a hook is not.
+- An older ACC keeps writing accepted stages into `tmp/` and the sweep keeps reclaiming them by
+  renaming them into the doomed directory, so both versions can share one store. No store
+  layout version is introduced and nothing refuses to open a store. A store that has never
+  published into `stage/` — which is every store written before this change — is swept rather
+  than refused; a copy of a real 0.6.2 store reclaimed 484 entries and kept its partial.
+
+| Candidate artifact | Value |
+|---|---|
+| Built from | `54b0c8baa545dbfcf4dcedd15d7ba68b14b7c603` |
+| Tarball | `agents-can-communicate-0.6.3.tgz`, 450,995 bytes, 307 files |
+| sha256 | `46c0de551e3d89501837930b6258a3d2ec7053ebdf2ca730fef579bc07dd7d19` |
+
+This unpublished development archive passed clean installation verification. See
+[store staging sweep evidence](docs/release-evidence/unreleased-store-stage-sweep.md) and the
+design in [docs/design/2026-09-23-store-tmp-sweep.md](docs/design/2026-09-23-store-tmp-sweep.md).
+The package version remains `0.6.3` until a release prepares its own.
 
 ## Unreleased — a first-try report goes to Discussions
 

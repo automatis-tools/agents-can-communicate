@@ -6,18 +6,45 @@ import { listDirectoryEntries, listJsonFiles, readJsonIfPresent } from "./atomic
 import { readStoreIdentity } from "./identity.mjs";
 import { readOpenJournals, rollForward } from "./journal.mjs";
 import { assertEventBinding, assertStateBinding } from "./record-id.mjs";
+import { sweepAcceptedStages } from "./stage-sweep.mjs";
 import { storePaths } from "./store.mjs";
 import { withWriterMutex } from "./writer-mutex.mjs";
 
 /** @typedef {{ healthy: boolean, repaired: string[], blocked: string[],
- * corrupt: string[] }} RepairReport */
+ * corrupt: string[], swept: number, staged: number, partials: number }} RepairReport */
 
-const report = ({ repaired = [], blocked = [], corrupt = [] }) => ({
+const report = ({ repaired = [], blocked = [], corrupt = [], swept = 0, staged = 0,
+  partials = 0 }) => ({
   healthy: blocked.length === 0 && corrupt.length === 0,
   repaired: [...repaired].sort(),
   blocked: [...blocked].sort(),
   corrupt: [...corrupt].sort(),
+  swept,
+  staged,
+  partials,
 });
+
+// Counting, never touching. A stage held in tmp by an older version is an
+// accepted stage wherever it sits, so both places are counted as staged, while
+// a partial is only ever the unfinished temporary a failed publication left.
+async function countStaging(paths, root) {
+  const entries = async directory => {
+    try {
+      return await listDirectoryEntries(directory, { root });
+    } catch (error) {
+      if (error.code === "ENOENT") return [];
+      throw error;
+    }
+  };
+  const accepted = name => name.endsWith(".published");
+  const staged = (await entries(paths.stage)).filter(entry => entry.isFile()
+    && accepted(entry.name)).length;
+  const inTmp = await entries(paths.tmp);
+  return {
+    staged: staged + inTmp.filter(entry => accepted(entry.name)).length,
+    partials: inTmp.filter(entry => entry.name.endsWith(".tmp")).length,
+  };
+}
 
 async function inspect(root) {
   const paths = storePaths(root);
@@ -82,6 +109,7 @@ export async function diagnoseFilesystemStore({ root }) {
     blocked: state.blocked,
     corrupt: state.corrupt,
     repaired: state.pending.map(entry => entry.transactionId),
+    ...await countStaging(state.paths, root),
   });
 }
 
@@ -92,18 +120,20 @@ export async function repairFilesystemStore({ root, clock }) {
     // would turn an ambiguous store into a confidently wrong one.
     return report({ blocked: state.blocked, corrupt: state.corrupt });
   }
-  if (state.pending.length === 0) return report({});
-
-  const repaired = await withWriterMutex(state.paths, { root, tmpDir: state.paths.tmp, clock },
+  // No early return for an empty journal any more: a store with nothing to roll
+  // forward is exactly the store whose staging directory needs reclaiming.
+  return withWriterMutex(state.paths, { root, tmpDir: state.paths.tmp, clock },
     async () => {
       const completed = [];
       for (const entry of await readOpenJournals(state.paths, root)) {
         await rollForward(state.paths, { root, tmpDir: state.paths.tmp, clock }, entry);
         completed.push(entry.transactionId);
       }
-      return completed;
+      // An operator is waiting on this and a hook is not, so the sweep runs
+      // without the per-pass bound the automatic one obeys.
+      const { swept } = await sweepAcceptedStages(state.paths, { root, limit: Infinity });
+      return report({ repaired: completed, swept, ...await countStaging(state.paths, root) });
     });
-  return report({ repaired });
 }
 
 export function assertRepairable(reportValue) {
