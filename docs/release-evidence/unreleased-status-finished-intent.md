@@ -49,10 +49,10 @@ three, and a done intent produces neither kind.
 
 ## Exact local artifact
 
-- Source: clean commit `fd35c416d6c3c991bb46dd54076ef1fc9842b8ab`.
+- Source: clean commit `15fe8e3afec79f3a8bfec2925185d7bda0b7b7bf`, which merges `main` at `6f48870`.
 - Archive: `agents-can-communicate-0.6.3.tgz`, packed from that commit.
-- Size: 451,509 bytes; 307 packed entries.
-- SHA-256: `e942c9b40e774d2bb17522bd6afb9b607ebd81bcaad6d218dcf7b516de4d2ecf`.
+- Size: 453,539 bytes; 307 packed entries.
+- SHA-256: `5e72accf5bfd1540faddbbb69ffb2a77452122ab2cea2a54384f32f62e216fab`.
 - Package version remains `0.6.3`; this is an unpublished development artifact.
 
 The exact archive passed `scripts/verify-package.mjs`, including clean installation, the doctor
