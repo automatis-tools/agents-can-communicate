@@ -58,7 +58,7 @@ three, and a done intent produces neither kind.
 The exact archive passed `scripts/verify-package.mjs`, including clean installation, the doctor
 run, and the check that every packed Markdown link resolves inside the tarball.
 
-`npm test` on this tree: 2,480 passing, 0 failing, 1 skipped, of 2,481.
+`npm test` on this tree: 2,496 passing, 0 failing, 1 skipped, of 2,497.
 
 ## Limits
 
