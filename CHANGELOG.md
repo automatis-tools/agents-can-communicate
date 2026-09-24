@@ -18,7 +18,8 @@
   read, decided before the mutex is taken, so an open with nothing to sweep does not pay a
   mkdir, a write, an fsync and a rename to find that out. A pass with no budget left leaves its
   work for the next open instead of failing the open it runs inside: maintenance never decides
-  whether a store can be used.
+  whether a store can be used. The marker records a finished pass only, so a pass that stopped
+  at its budget stays due and the next open carries on rather than waiting out the interval.
 - `acc doctor` reports how many accepted stages are held and how many partials are in `tmp/`,
   so a store still carrying an accumulation says so. `acc doctor --repair` sweeps without the
   per-pass bound, because an operator is waiting on it and a hook is not.
@@ -30,9 +31,9 @@
 
 | Candidate artifact | Value |
 |---|---|
-| Built from | `defb17410161ceeab9d847a2e6cba4360c508256` |
-| Tarball | `agents-can-communicate-0.6.3.tgz`, 450,744 bytes, 307 files |
-| sha256 | `be2bb7829e2053964a5cd0a41333d95ddd0cfb0f4b04dc7e88e51d81fdfd6db0` |
+| Built from | `e7464b04cf9260e1ccf6fec9f963455844486296` |
+| Tarball | `agents-can-communicate-0.6.3.tgz`, 450,828 bytes, 307 files |
+| sha256 | `b6f6d8c39b5266c39d2407f47b9113ce415d6b9becc6558fcfce5fe9889999b1` |
 
 This unpublished development archive passed clean installation verification. See
 [store staging sweep evidence](docs/release-evidence/unreleased-store-stage-sweep.md) and the
