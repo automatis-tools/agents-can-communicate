@@ -14,7 +14,9 @@
   evidence that bytes may not have reached their destination.
 - The sweep runs where recovery already runs — under the writer mutex, once a day — and is
   bounded per pass, so draining a large accumulation takes several opens instead of one hook's
-  whole budget. That budget is what hooks ran out of in 0.6.1.
+  whole budget. That budget is what hooks ran out of in 0.6.1. Whether a pass is due is one
+  read, decided before the mutex is taken, so an open with nothing to sweep does not pay a
+  mkdir, a write, an fsync and a rename to find that out.
 - `acc doctor` reports how many accepted stages are held and how many partials are in `tmp/`,
   so a store still carrying an accumulation says so. `acc doctor --repair` sweeps without the
   per-pass bound, because an operator is waiting on it and a hook is not.
@@ -26,9 +28,9 @@
 
 | Candidate artifact | Value |
 |---|---|
-| Built from | `9e2d121f56ca10b9c80e9344a7ada16b1d869355` |
-| Tarball | `agents-can-communicate-0.6.3.tgz`, 449,834 bytes, 307 files |
-| sha256 | `90f44abd3805a3becd43c344e505b3a673ef070a876954f6aff86e5e0be4b869` |
+| Built from | `383f86d2f1bc4d8abf0e25a6401a1d0d5e53a3b5` |
+| Tarball | `agents-can-communicate-0.6.3.tgz`, 450,284 bytes, 307 files |
+| sha256 | `09f77deefb9213d007acc36ff564a726fc2b50599c8995f6f38063e1b3d297d8` |
 
 This unpublished development archive passed clean installation verification. See
 [store staging sweep evidence](docs/release-evidence/unreleased-store-stage-sweep.md) and the

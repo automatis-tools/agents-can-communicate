@@ -45,7 +45,14 @@ renames names ending in `.published` out of `tmp/`, and a partial does not.
 
 The sweep runs under the writer mutex, where recovery already runs, so no publisher is in flight
 while the directory is detached. A marker in `locks/stage-sweep.json` records when the last pass
-ran and one read decides whether an open is due; the interval is a day. Each pass is bounded to
+ran and one read decides whether an open is due; the interval is a day.
+
+That read happens **before** the mutex is taken, and the distinction matters. Recovery takes the
+mutex only when there is an open journal to roll forward. A first attempt here took it on every
+store open — which is inside every hook — so every hook paid a mkdir, a write, an fsync and a
+rename to discover there was nothing to sweep. That is the shape of the slowdown that made hooks
+time out in 0.6.1, and it was caught on this branch before it shipped. The marker is re-read
+under the lock, because another process may have swept while this one waited for it. Each pass is bounded to
 512 entries, counting moves and removals against the one budget, and stops early on the
 publication deadline. An interrupted pass leaves a single `stage.sweeping-<uuid>` that the next
 pass adopts before detaching anything further, so they cannot accumulate.
@@ -89,10 +96,10 @@ case rather than an error.
 
 ## Exact local artifact
 
-- Source: clean commit `9e2d121f56ca10b9c80e9344a7ada16b1d869355`.
+- Source: clean commit `383f86d2f1bc4d8abf0e25a6401a1d0d5e53a3b5`.
 - Archive: `agents-can-communicate-0.6.3.tgz`, packed from that commit.
-- Size: 449,834 bytes; 307 packed entries.
-- SHA-256: `90f44abd3805a3becd43c344e505b3a673ef070a876954f6aff86e5e0be4b869`.
+- Size: 450,284 bytes; 307 packed entries.
+- SHA-256: `09f77deefb9213d007acc36ff564a726fc2b50599c8995f6f38063e1b3d297d8`.
 - Package version remains `0.6.3`; this is an unpublished development artifact.
 
 The digest was produced by `scripts/verify-package.mjs` and reproduced by a separate `npm pack`.
@@ -104,7 +111,7 @@ reporting 6 adapters, a workspace with no Git, and an install followed by an uni
 restored topology, modes, links and bytes. The packed entry count rose from 306 to 307 with the
 new `packages/storage-filesystem/src/stage-sweep.mjs`.
 
-`npm test` on this tree: 2,471 passing, 0 failing, 1 skipped, of 2,472.
+`npm test` on this tree: 2,472 passing, 0 failing, 1 skipped, of 2,473.
 
 ## Limits
 
