@@ -68,7 +68,15 @@ pass returned, including when it had stopped at its entry budget with work left,
 open read a fresh timestamp and waited out the whole interval. A store holding 17,880 accepted
 stages would have drained at 512 a day — weeks — instead of over a few opens. The marker now
 records a finished pass only, and the interval starts counting once there is nothing left to
-sweep. Each pass is bounded to
+sweep.
+
+A third round found the boundary case in the same rule. The budget can lapse *after* the due
+check — the lock may be granted late, or granted to a contending writer first — and both arrive
+as `CONFLICT`. The store open was catching that code, which worked but left the guarantee with
+the caller, where every later caller of `sweepIfDue` would inherit the flaw silently.
+`sweepIfDue` now absorbs a lost lock and a lapsed budget itself and raises only real store
+faults, so the rule travels with the function. Two tests hold both halves: a `CONFLICT` from the
+lock seam is absorbed, and a `DATA` fault from that same seam still reaches the caller. Each pass is bounded to
 512 entries, counting moves and removals against the one budget, and stops early on the
 publication deadline. An interrupted pass leaves a single `stage.sweeping-<uuid>` that the next
 pass adopts before detaching anything further, so they cannot accumulate.
@@ -112,10 +120,10 @@ case rather than an error.
 
 ## Exact local artifact
 
-- Source: clean commit `e7464b04cf9260e1ccf6fec9f963455844486296`.
+- Source: clean commit `54b0c8baa545dbfcf4dcedd15d7ba68b14b7c603`.
 - Archive: `agents-can-communicate-0.6.3.tgz`, packed from that commit.
-- Size: 450,828 bytes; 307 packed entries.
-- SHA-256: `b6f6d8c39b5266c39d2407f47b9113ce415d6b9becc6558fcfce5fe9889999b1`.
+- Size: 450,995 bytes; 307 packed entries.
+- SHA-256: `46c0de551e3d89501837930b6258a3d2ec7053ebdf2ca730fef579bc07dd7d19`.
 - Package version remains `0.6.3`; this is an unpublished development artifact.
 
 The digest was produced by `scripts/verify-package.mjs` and reproduced by a separate `npm pack`.
@@ -127,7 +135,7 @@ reporting 6 adapters, a workspace with no Git, and an install followed by an uni
 restored topology, modes, links and bytes. The packed entry count rose from 306 to 307 with the
 new `packages/storage-filesystem/src/stage-sweep.mjs`.
 
-`npm test` on this tree: 2,474 passing, 0 failing, 1 skipped, of 2,475.
+`npm test` on this tree: 2,476 passing, 0 failing, 1 skipped, of 2,477.
 
 ## Limits
 
