@@ -16,7 +16,9 @@
   bounded per pass, so draining a large accumulation takes several opens instead of one hook's
   whole budget. That budget is what hooks ran out of in 0.6.1. Whether a pass is due is one
   read, decided before the mutex is taken, so an open with nothing to sweep does not pay a
-  mkdir, a write, an fsync and a rename to find that out.
+  mkdir, a write, an fsync and a rename to find that out. A pass with no budget left leaves its
+  work for the next open instead of failing the open it runs inside: maintenance never decides
+  whether a store can be used.
 - `acc doctor` reports how many accepted stages are held and how many partials are in `tmp/`,
   so a store still carrying an accumulation says so. `acc doctor --repair` sweeps without the
   per-pass bound, because an operator is waiting on it and a hook is not.
@@ -28,9 +30,9 @@
 
 | Candidate artifact | Value |
 |---|---|
-| Built from | `383f86d2f1bc4d8abf0e25a6401a1d0d5e53a3b5` |
-| Tarball | `agents-can-communicate-0.6.3.tgz`, 450,284 bytes, 307 files |
-| sha256 | `09f77deefb9213d007acc36ff564a726fc2b50599c8995f6f38063e1b3d297d8` |
+| Built from | `defb17410161ceeab9d847a2e6cba4360c508256` |
+| Tarball | `agents-can-communicate-0.6.3.tgz`, 450,744 bytes, 307 files |
+| sha256 | `be2bb7829e2053964a5cd0a41333d95ddd0cfb0f4b04dc7e88e51d81fdfd6db0` |
 
 This unpublished development archive passed clean installation verification. See
 [store staging sweep evidence](docs/release-evidence/unreleased-store-stage-sweep.md) and the

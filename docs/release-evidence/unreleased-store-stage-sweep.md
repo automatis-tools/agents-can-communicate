@@ -52,7 +52,16 @@ mutex only when there is an open journal to roll forward. A first attempt here t
 store open — which is inside every hook — so every hook paid a mkdir, a write, an fsync and a
 rename to discover there was nothing to sweep. That is the shape of the slowdown that made hooks
 time out in 0.6.1, and it was caught on this branch before it shipped. The marker is re-read
-under the lock, because another process may have swept while this one waited for it. Each pass is bounded to
+under the lock, because another process may have swept while this one waited for it.
+
+The budget is checked before the lock for a second reason, found by the AI review on PR #193.
+The soft deadline stop was a fiction: a pass that ran out of budget stopped sweeping and then
+wrote its marker through `publishAtomic`, which begins by refusing an expired deadline — by
+throwing, out of the store open this runs inside. `withWriterMutex` refuses one the same way.
+An exhausted pass now leaves before the first call that would throw, the marker is left
+unwritten when the budget went on sweeping so the next open is due again, and the store open
+tolerates the `CONFLICT` a lost lock arrives as while still propagating every other fault.
+Maintenance never decides whether a store can be opened. Each pass is bounded to
 512 entries, counting moves and removals against the one budget, and stops early on the
 publication deadline. An interrupted pass leaves a single `stage.sweeping-<uuid>` that the next
 pass adopts before detaching anything further, so they cannot accumulate.
@@ -96,10 +105,10 @@ case rather than an error.
 
 ## Exact local artifact
 
-- Source: clean commit `383f86d2f1bc4d8abf0e25a6401a1d0d5e53a3b5`.
+- Source: clean commit `defb17410161ceeab9d847a2e6cba4360c508256`.
 - Archive: `agents-can-communicate-0.6.3.tgz`, packed from that commit.
-- Size: 450,284 bytes; 307 packed entries.
-- SHA-256: `09f77deefb9213d007acc36ff564a726fc2b50599c8995f6f38063e1b3d297d8`.
+- Size: 450,744 bytes; 307 packed entries.
+- SHA-256: `be2bb7829e2053964a5cd0a41333d95ddd0cfb0f4b04dc7e88e51d81fdfd6db0`.
 - Package version remains `0.6.3`; this is an unpublished development artifact.
 
 The digest was produced by `scripts/verify-package.mjs` and reproduced by a separate `npm pack`.
@@ -111,7 +120,7 @@ reporting 6 adapters, a workspace with no Git, and an install followed by an uni
 restored topology, modes, links and bytes. The packed entry count rose from 306 to 307 with the
 new `packages/storage-filesystem/src/stage-sweep.mjs`.
 
-`npm test` on this tree: 2,472 passing, 0 failing, 1 skipped, of 2,473.
+`npm test` on this tree: 2,473 passing, 0 failing, 1 skipped, of 2,474.
 
 ## Limits
 
