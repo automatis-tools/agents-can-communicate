@@ -235,3 +235,29 @@ test("a session that opens between the report and the apply is not removed", asy
   const survivors = (await store.snapshot(WORKSPACE)).participants.map(item => item.participantId);
   assert.deepEqual(survivors, ["participant_live"]);
 });
+
+test("asking for participants alone orphans nothing", async t => {
+  const { service, prune, store, clock } = makeService();
+  await workspaceWith(service);
+  clock.advance(2 * DAY);
+
+  const plan = await prune.planPrune({ classes: ["participants"] });
+
+  // Every session stays, so every participant is still pointed at. Removing one
+  // anyway would leave its sessions naming a roster entry that is gone.
+  assert.equal(plan.counts.participants, 0);
+  await prune.prune({ classes: ["participants"], apply: true });
+  assert.equal((await store.snapshot(WORKSPACE)).participants.length, 2);
+});
+
+test("asking for sessions and participants together removes both", async t => {
+  const { service, prune, store, clock } = makeService();
+  await workspaceWith(service);
+  clock.advance(2 * DAY);
+
+  await prune.prune({ classes: ["sessions", "participants"], apply: true });
+
+  const snapshot = await store.snapshot(WORKSPACE);
+  assert.deepEqual(snapshot.sessions, []);
+  assert.deepEqual(snapshot.participants, []);
+});

@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdir, mkdtemp, readdir, realpath, rename, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, readdir, realpath, rename, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -141,5 +141,17 @@ test("a floor past the safe integer range refuses rather than repeating a sequen
   // Sixteen digits reach past Number.MAX_SAFE_INTEGER, where adding one stops
   // changing the value. Allocating from such a floor would hand out a sequence
   // a peer already holds a cursor for, so the store refuses instead.
+  await assert.rejects(appendEvents(opened, 1), error => error.code === EXIT.DATA);
+});
+
+test("a log whose newest event is past the safe range refuses to allocate", async t => {
+  const { root, store: opened } = await store(t);
+  await appendEvents(opened, 1);
+  // Named as a sequence beyond Number.MAX_SAFE_INTEGER. This is the branch the
+  // floor never reaches: a directory that still has files answers from its
+  // newest one, and that name has to survive the same arithmetic.
+  await writeFile(path.join(opened.paths.events, `${"9".repeat(16)}.json`),
+    `${JSON.stringify({ sequence: "9".repeat(16) })}\n`);
+
   await assert.rejects(appendEvents(opened, 1), error => error.code === EXIT.DATA);
 });

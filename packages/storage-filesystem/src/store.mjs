@@ -79,20 +79,22 @@ async function loadAllState(paths, root, wanted = null) {
 
 async function nextSequence(paths, root) {
   const last = (await listJsonFiles(paths.events, { root })).at(-1);
-  if (last !== undefined) return Number(path.basename(last, ".json")) + 1;
   // Only an empty directory consults the floor, so the path every transaction
   // runs pays nothing for retention. Trimming removes the oldest events, so
   // while any file remains the newest one still answers this. A log trimmed
   // away entirely is the case that would otherwise restart at 1 and hand out a
   // sequence a peer already holds a cursor for.
-  const floor = await readEventFloor(paths, root);
-  if (floor === null) return 1;
-  // A 16-digit sequence reaches past Number.MAX_SAFE_INTEGER, where adding one
-  // stops changing the value. Refusing is the only honest answer: the next
-  // sequence would repeat one a peer already holds a cursor for.
-  const next = BigInt(floor) + 1n;
+  const highest = last === undefined
+    ? await readEventFloor(paths, root)
+    : path.basename(last, ".json");
+  if (highest === null) return 1;
+  // Counted as a BigInt whichever side it came from. A 16-digit sequence
+  // reaches past Number.MAX_SAFE_INTEGER, where adding one stops changing the
+  // value, so a Number here would eventually hand out a sequence twice.
+  // Refusing is the only honest answer left at that point.
+  const next = BigInt(highest) + 1n;
   if (next > BigInt(Number.MAX_SAFE_INTEGER)) {
-    throw new AccError(EXIT.DATA, "event sequence is exhausted", { trimmedThrough: floor });
+    throw new AccError(EXIT.DATA, "event sequence is exhausted", { highest });
   }
   return Number(next);
 }

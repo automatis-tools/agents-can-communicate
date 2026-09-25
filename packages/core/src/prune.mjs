@@ -100,14 +100,18 @@ function eligibleSessions(envelopes, now, pidIsAlive) {
 /**
  * A participant is kept while anything still points at it.
  *
- * Messages are not pruned here, so every message that exists is one that
- * survives, and the roster is where "who sent this" is answered. A participant
- * whose sessions are all gone and whose name appears on no message is a name
- * nothing can reach any more.
+ * `removedSessions` is what this pass actually takes, not what it could take.
+ * The difference matters when an operator names classes: asked for participants
+ * alone, every session stays, so every participant is still pointed at and none
+ * is eligible. Judging by what is merely *eligible* would remove a participant
+ * and leave its sessions naming a roster entry that is gone.
+ *
+ * Messages are not pruned unless a boundary says so, and the roster is where
+ * "who sent this" is answered, so a name on a surviving message stays too.
  */
-function eligibleParticipants(envelopes, doomedSessions, messages) {
+function eligibleParticipants(envelopes, removedSessions, messages) {
   const surviving = new Set(of(envelopes, "session")
-    .filter(envelope => !doomedSessions.has(envelope.id))
+    .filter(envelope => !removedSessions.has(envelope.id))
     .map(envelope => envelope.record.participantId));
   const named = new Set(messages.flatMap(message =>
     [message.fromParticipantId, ...message.toParticipantIds]));
@@ -148,8 +152,11 @@ export function createPruneService(ports) {
       ? of(envelopes, "claim")
         .filter(envelope => Date.parse(envelope.record.expiresAt) <= Date.parse(now))
       : [];
+    // The sessions this pass will actually remove, which is empty when the
+    // operator asked for other classes only.
+    const removedSessions = new Set(wants("sessions") ? doomedSessions : []);
     const participants = wants("participants")
-      ? eligibleParticipants(envelopes, doomedSessions, of(envelopes, "message")
+      ? eligibleParticipants(envelopes, removedSessions, of(envelopes, "message")
         .map(envelope => envelope.record))
       : [];
 
