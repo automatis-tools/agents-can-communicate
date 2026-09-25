@@ -292,8 +292,8 @@ export function createConversationService(ports, sessions) {
     return (await nextTurnDelivery(input)).queuedMessages;
   }
 
-  function nextTurnDelivery(input) {
-    return selectNextTurnDelivery(store, input);
+  function nextTurnDelivery(input = {}) {
+    return selectNextTurnDelivery(store, { ...input, now: clock.now() });
   }
 
   return { sendMessage, finishSession, pendingMessages, nextTurnDelivery };

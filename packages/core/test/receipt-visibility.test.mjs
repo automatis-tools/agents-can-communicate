@@ -231,3 +231,63 @@ test("a replaced decision leaves the unretrieved counts, as it leaves the inbox"
   assert.deepEqual(status.participants
     .find(item => item.participantId === "recipient").unretrieved, { queued: 1, offered: 0 });
 });
+
+const deliver = (f, extra = {}) => f.service.nextTurnDelivery({ workspaceId: WORKSPACE,
+  participantId: "recipient", exceptSessionId: f.recipient.sessionId, ...extra });
+
+test("a live offer nobody followed up is selected for one repeat after new messages", async () => {
+  const f = await fixture();
+  const question = await send(f, { kind: "question", obligation: "reply" });
+  await offer(f, question);
+  f.clock.advance(REPEAT_OFFER_AFTER_MS);
+  const fresh = await send(f);
+
+  const delivery = await deliver(f, { repeats: true });
+
+  assert.deepEqual(delivery.queuedMessages.map(item => item.messageId), [fresh.messageId]);
+  assert.deepEqual(delivery.repeatMessages.map(item => item.messageId), [question.messageId]);
+  assert.deepEqual(delivery.repeatOffers, [{ messageId: question.messageId,
+    transport: "codex-app-server", at: NOW }]);
+  // Shown whole this turn, so it is neither a breadcrumb nor a reminder count.
+  assert.equal(delivery.liveOfferedMessageIds.includes(question.messageId), false);
+  assert.equal(delivery.reminderMessageIds.includes(question.messageId), false);
+});
+
+test("only a caller that asks for repeats gets them, and the others see what they saw", async () => {
+  const f = await fixture();
+  const question = await send(f, { kind: "question", obligation: "reply" });
+  await offer(f, question);
+  f.clock.advance(REPEAT_OFFER_AFTER_MS);
+
+  const delivery = await deliver(f);
+
+  assert.deepEqual(delivery.repeatMessages, []);
+  assert.deepEqual(delivery.repeatOffers, []);
+  assert.deepEqual(delivery.liveOfferedMessageIds, [question.messageId]);
+  assert.deepEqual(delivery.reminderMessageIds, [question.messageId]);
+});
+
+test("nothing is selected for a repeat before it is due", async () => {
+  const cases = {
+    "before the threshold": async (f, message) => {
+      await offer(f, message);
+      f.clock.advance(REPEAT_OFFER_AFTER_MS - 1);
+    },
+    "after a next-turn offer": async (f, message) => {
+      await offer(f, message, { transport: "next-turn" });
+      f.clock.advance(REPEAT_OFFER_AFTER_MS);
+    },
+    "once it was repeated": async (f, message) => {
+      await offer(f, message);
+      f.clock.advance(REPEAT_OFFER_AFTER_MS);
+      await offer(f, message, { transport: "next-turn", repeat: true });
+      f.clock.advance(REPEAT_OFFER_AFTER_MS);
+    },
+  };
+  for (const [name, arrange] of Object.entries(cases)) {
+    const f = await fixture();
+    await arrange(f, await send(f));
+
+    assert.deepEqual((await deliver(f, { repeats: true })).repeatMessages, [], name);
+  }
+});
