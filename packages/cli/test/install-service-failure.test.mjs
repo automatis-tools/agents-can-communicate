@@ -46,13 +46,3 @@ process.exitCode = await main(["install", "--adapter", "codex", "--delivery", "a
       assert.match(output.stderr, /retry acc install/);
     }
   });
-
-test("partial-failure errors retain reload instructions for a completed shell activation", async () => {
-  const { failureOf } = await import("../src/install-command.mjs");
-  const error = failureOf({ action: "install", acted: 1,
-    failed: [{ adapterId: "codex", error: "Service start failed" }], operations: [{
-      adapterId: "claude_code", applied: true, appendedRcBlock: true,
-      nativeActivation: { rcFile: "/fixture/.zshrc" },
-    }] });
-  assert.match(error.message, /open a new terminal.*\/fixture\/\.zshrc/);
-});

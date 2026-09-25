@@ -7,8 +7,7 @@ import { createCodexAdapter } from "@agents-can-communicate/adapter-codex";
 import { createGeminiCliAdapter } from "@agents-can-communicate/adapter-gemini-cli";
 import { createGrokAdapter } from "@agents-can-communicate/adapter-grok";
 import { createKimiAdapter } from "@agents-can-communicate/adapter-kimi";
-import { applyPlan, detectInstallation,
-  loadOwnership, planInstallation, rcFileFor, shellOf, shimDirFor }
+import { applyPlan, detectInstallation, loadOwnership, planInstallation }
   from "@agents-can-communicate/installer";
 import { AccError, EXIT } from "@agents-can-communicate/protocol";
 
@@ -29,7 +28,7 @@ export { decideDelivery } from "./install-delivery-consent.mjs";
 // pointed at the home itself writes beside them rather than inside them. That
 // install reports success and the client never reads a byte of it.
 export const clientContext = (home, stateRoot,
-  { shell = null, env = {}, dataHome, cwd = process.cwd() } = {}) => ({
+  { env = {}, dataHome, cwd = process.cwd() } = {}) => ({
   home,
   ...(dataHome === undefined ? {} : { dataHome }),
   configDir: path.join(home, ".claude"),
@@ -39,10 +38,8 @@ export const clientContext = (home, stateRoot,
   kimiHome: path.join(home, ".kimi-code"),
   grokHome: typeof env.GROK_HOME === "string" && env.GROK_HOME !== ""
     ? env.GROK_HOME : path.join(home, ".grok"),
-  // The user's login shell and PATH, for the optional native shell bootstrap:
-  // which rc file could carry an ACC PATH block and which real executable a
-  // shim would exec. Detection reads them; nothing here writes.
-  shell,
+  // The user's PATH, for finding the real client executable to probe.
+  // Detection reads it; nothing here writes.
   env,
   // Antigravity CLI keeps its hooks in the `~/.gemini` tree Gemini CLI also
   // uses, and reads none of the same files. Two locations load - the
@@ -200,8 +197,7 @@ export function describeOutcome({ action, acted, failed = [], skipped = [],
 export function failureOf({ action, acted, failed = [], operations = [], skipped = [], home }) {
   if (failed.length === 0) return null;
   return new AccError(EXIT.DATA,
-    [describeOutcome({ action, acted, failed, operations, skipped, home }),
-      ...reloadAdvice(operations)].join("\n"), { failed });
+    describeOutcome({ action, acted, failed, operations, skipped, home }), { failed });
 }
 
 /**
@@ -220,23 +216,13 @@ export function actedOn(result) {
         + (operation.changes?.length ?? 0) > 0)).length;
 }
 
-// Said once, after the first PATH block is written: a running shell and a
-// running client know nothing about it.
-function reloadAdvice(operations) {
-  const appended = operations.filter(operation => operation.appendedRcBlock === true);
-  if (appended.length === 0) return [];
-  const rc = appended[0].nativeActivation?.rcFile ?? "your shell rc file";
-  return ["", `native delivery is wired for new sessions: open a new terminal (or reload ${rc}), `
-    + "then start the client normally; a session already running keeps durable delivery"];
-}
-
 export async function runInstallCommand({ options, runtime, action = "install" }) {
   const adapters = selectAdapters(options.adapter);
   const home = options.home ?? runtime.env?.HOME ?? homedir();
   const { data: dataHome } = platformPaths({ platform: runtime.platform,
     env: runtime.env ?? {} });
   const context = clientContext(home, path.join(dataHome, "acc"),
-    { shell: shellOf(runtime.env), env: runtime.env ?? {}, dataHome });
+    { env: runtime.env ?? {}, dataHome });
 
   const detected = await detectInstallation({ adapters, context,
     probeTimeoutMs: probeTimeout(runtime.env) });
@@ -293,9 +279,8 @@ export async function runInstallCommand({ options, runtime, action = "install" }
 
   return { data: { ...result, plan, dataHome, deliveryByAdapter: decided.deliveryByAdapter,
     deliveryDecisionByAdapter: decided.deliveryDecisionByAdapter, asked: decided.asked },
-  text: [describeOutcome({ action, acted, failed: result.failed,
+  text: describeOutcome({ action, acted, failed: result.failed,
     skipped: plan.skipped, operations: result.operations, home }),
-  ...reloadAdvice(result.operations)].join("\n"),
   error: failureOf({ action, acted, failed: result.failed, operations: result.operations,
     skipped: plan.skipped, home }) };
 }

@@ -2,7 +2,7 @@ import { describeInstallDelivery } from "./delivery-diagnostics.mjs";
 
 import { AccError, EXIT } from "@agents-can-communicate/protocol";
 
-import { LIVE_POLICIES, describeActivation, describeDeactivation, planActivationRetirements, rcFileFor, shimDirFor }
+import { LIVE_POLICIES, describeActivation, describeDeactivation, planActivationRetirements }
   from "./native-activation.mjs";
 
 /**
@@ -154,8 +154,6 @@ export function planInstallation({ adapters, detected, context, action = "instal
     // creates one.
     const nativeActivation = action === "install" && effectiveLivePolicy !== "off"
       ? { livePolicy: effectiveLivePolicy, protocolContract: native.eligibility.protocolContract,
-        shell: context?.shell ?? null, rcFile: rcFileFor(context?.home, context?.shell),
-        shimDir: typeof context?.stateRoot === "string" ? shimDirFor(context.stateRoot) : null,
         mechanisms: native.activationPlan.mechanisms }
       : null;
     // A failed readiness probe is not revocation. Keep existing guarded launch

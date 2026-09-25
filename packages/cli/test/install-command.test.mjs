@@ -270,14 +270,15 @@ const eligible = (adapterId, displayName, command) => ({ adapterId, displayName,
   version: "2.1.258", nativeDelivery: { state: "eligible", reasonCode: null,
     realExecutable: `/vendor/${command}`, probe: null,
     eligibility: { eligible: true, protocolContract: `${command}-native-v1` },
-    activationPlan: { eligible: true, reasonCode: null, mechanisms: [{ kind: "shell-bootstrap",
-      command, realExecutable: `/vendor/${command}`, prefixArgs: ["--captured"] }] } } });
+    activationPlan: { eligible: true, reasonCode: null, mechanisms: [{ kind: "native-service",
+      serviceId: `${command}-service`, preExisting: true, applyCommand: null,
+      teardownCommand: null }] } } });
 const ineligible = adapterId => ({ adapterId, displayName: adapterId, present: true,
   version: "1.0.0", nativeDelivery: { state: "unsupported",
     reasonCode: "native_delivery_unsupported", activationPlan: null } });
 const DETECTED = [eligible("claude_code", "Claude Code", "claude"),
   eligible("codex", "Codex", "codex"), ineligible("grok")];
-const CONTEXT = { home: "/home/dana", stateRoot: "/data/acc", shell: "zsh" };
+const CONTEXT = { home: "/home/dana", stateRoot: "/data/acc" };
 const neverAsk = { isInteractive: () => true,
   confirm: async () => { throw new Error("must not prompt"); } };
 const decide = overrides => decideDelivery({ options: {}, detected: DETECTED, recorded: [],
@@ -325,7 +326,7 @@ test("an interactive install asks one default-No question for all eligible clien
   assert.match(first, /experimental/);
   assert.match(first, /automatic turns can spend tokens/);
   assert.match(first, /local permission grants/);
-  assert.match(first, /Channels/);
+  assert.match(first, /bypass permission prompts ask before each ACC wake/);
   assert.match(first, /No:.*acc inbox/);
   assert.doesNotMatch(first, /messages still arrive, at the session.s next turn/);
   assert.doesNotMatch(first, /--captured|PATH|shim|launcher|plugin entry|\.zshrc/);

@@ -7,10 +7,11 @@ import path from "node:path";
 import test from "node:test";
 import { applyPlan } from "../src/apply.mjs";
 import { detectInstallation } from "../src/detect.mjs";
-import { applyNativeActivation, planActivationRetirements } from "../src/native-activation.mjs";
+import { planActivationRetirements } from "../src/native-activation.mjs";
 import { loadOwnership, recordInstall } from "../src/ownership.mjs";
 import { planInstallation } from "../src/plan.mjs";
 import { planNativeActivation } from "../../adapter-codex/src/native-delivery.mjs";
+import { writeLegacyShellActivation } from "../../../tests/helpers/legacy-shell-bootstrap.mjs";
 
 const service = { kind: "native-service", serviceId: "codex-app-server", preExisting: true,
   applyCommand: null, teardownCommand: null };
@@ -26,16 +27,15 @@ async function machine(t, { shared = false } = {}) {
   await mkdir(path.dirname(vendor));
   await writeFile(vendor, "#!/bin/sh\nprintf '%s\\n' 0.152.1\n", { mode: 0o700 });
   await writeFile(rcFile, "# user rc\n");
-  const activation = { livePolicy: "actionable", protocolContract, shell: "zsh", rcFile,
-    shimDir, mechanisms: [service, { kind: "shell-bootstrap", command: "codex",
-      realExecutable: vendor, prefixArgs: ["--remote", "unix://"] }] };
-  const runtime = { node: process.execPath, bootstrap: "/tmp/unused-bootstrap.mjs" };
-  const applied = await applyNativeActivation({ adapter: { id: "codex" }, activation, dataHome, ...runtime });
+  // What an older install left: the Codex wrapper shim beside its service.
+  const shell = await writeLegacyShellActivation({ adapterId: "codex", command: "codex",
+    realExecutable: vendor, prefixArgs: ["--remote", "unix://"], shimDir, rcFile, dataHome });
   await recordInstall({ dataHome, adapterId: "codex", version: "0.152.1", accVersion: "0.3.0",
-    artifacts: [], nativeActivation: applied.nativeActivation });
-  if (shared) await applyNativeActivation({ adapter: { id: "claude_code" }, dataHome, ...runtime,
-    activation: { ...activation, mechanisms: [{ kind: "shell-bootstrap", command: "claude",
-      realExecutable: vendor, prefixArgs: [] }] } });
+    artifacts: [], nativeActivation: { livePolicy: "actionable", protocolContract, mechanisms: [
+      { kind: "native-service", serviceId: service.serviceId, createdByAcc: false, teardownCommand: null },
+      shell] } });
+  if (shared) await writeLegacyShellActivation({ adapterId: "claude_code", command: "claude",
+    realExecutable: vendor, shimDir, rcFile, dataHome });
   const context = { home, dataHome, stateRoot: path.join(dataHome, "acc"), shell: "bash",
     env: { PATH: path.dirname(vendor), CODEX_HOME: path.join(home, "custom-codex") } };
   const adapter = { id: "codex", displayName: "Fixture Codex migration", planInstall: () => [],
@@ -47,7 +47,7 @@ async function machine(t, { shared = false } = {}) {
     adapters: [adapter], detected, context, action, recorded: (await loadOwnership({ dataHome })).installs,
     deliveryByAdapter: { codex: policy } });
   const apply = async (options = {}) => applyPlan({ plan: await plan(), adapters: [adapter], context,
-    dataHome, activation: { ...runtime, exec: async () => { throw new Error("service command forbidden"); } }, ...options });
+    dataHome, activation: { exec: async () => { throw new Error("service command forbidden"); } }, ...options });
   return { home, dataHome, shimDir, rcFile, vendor, context, adapter, plan, apply,
     shim: path.join(shimDir, "codex") };
 }
@@ -215,4 +215,13 @@ test("an eligible inbox plan retires the Channel config and the shim", () => {
   assert.deepEqual(operation.nativeActivation.mechanisms, [inbox]);
   assert.deepEqual(operation.deactivation.mechanisms.map(item => item.kind).sort(),
     ["native-config", "shell-bootstrap"]);
+});
+
+test("an install removes the bootstrap cache a 0.7.x shim kept", async t => {
+  const h = await machine(t);
+  const cache = path.join(h.dataHome, "acc", "native-bootstrap");
+  await mkdir(cache, { recursive: true });
+  await writeFile(path.join(cache, "claude_code.json"), "{}\n");
+  assert.deepEqual((await h.apply()).failed, []);
+  await assert.rejects(stat(cache), { code: "ENOENT" });
 });

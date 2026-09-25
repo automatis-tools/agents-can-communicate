@@ -57,9 +57,6 @@ function questionFor(entries) {
   const names = entries.map(entry => entry.displayName ?? entry.adapterId).join(", ");
   const setup = [...new Set(entries.map(entry => entry.outgoingDelivery?.setup)
     .filter(value => typeof value === "string"))];
-  const channels = entries.some(entry => (entry.nativeDelivery?.activationPlan?.mechanisms ?? [])
-    .some(mechanism => mechanism.kind === "shell-bootstrap"
-      && (mechanism.prefixArgs ?? []).some(argument => argument.startsWith("--"))));
   return [
     `Complete automatic peer-request setup for ${names}? (experimental)`,
     "  Yes: automatic turns can spend tokens without waiting for you.",
@@ -69,7 +66,8 @@ function questionFor(entries) {
     ...entries.filter(needsPrerequisite).map(entry =>
       `       Download the official Codex ${entry.nativeServiceSetup.cliVersion} standalone package for its service; retain your existing codex command.`),
     ...setup.map(note => `       ${note}`),
-    ...(channels ? ["       Allow Claude Code development Channels when prompted at startup."] : []),
+    ...(entries.some(entry => entry.adapterId === "claude_code")
+      ? ["       Claude Code sessions that bypass permission prompts ask before each ACC wake."] : []),
     "  No: keep current delivery policies and use available next-turn hooks or acc inbox.",
   ].join("\n");
 }

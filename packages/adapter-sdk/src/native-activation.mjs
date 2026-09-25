@@ -1,6 +1,6 @@
 import path from "node:path";
 
-import { COMMAND_NAME, IDENTIFIER, NATIVE_ACTIVATION_KINDS, SHELL_SOURCE, assertReasonCode,
+import { IDENTIFIER, NATIVE_ACTIVATION_KINDS, SHELL_SOURCE, assertReasonCode,
   closed, deepFreeze, isPlainObject, isText, usage } from "./native-vocabulary.mjs";
 
 // A native activation plan is what an adapter hands the installer: closed
@@ -27,19 +27,9 @@ function validateMechanism(mechanism, index) {
     usage(`${label} kind must be one of ${NATIVE_ACTIVATION_KINDS.join(", ")}`);
   }
   if (mechanism.kind === "shell-bootstrap") {
-    closed(mechanism, ["kind", "command", "realExecutable", "prefixArgs"], label);
-    if (!isText(mechanism.command) || !COMMAND_NAME.test(mechanism.command)) {
-      usage(`${label} command must be a bare command name`);
-    }
-    if (!isText(mechanism.realExecutable) || !path.isAbsolute(mechanism.realExecutable)) {
-      usage(`${label} realExecutable must be an absolute path`);
-    }
-    if (!Array.isArray(mechanism.prefixArgs) || mechanism.prefixArgs.some(arg => !isText(arg)
-      || SHELL_SOURCE.test(arg))) {
-      usage(`${label} prefixArgs must be plain argument strings, never shell source`);
-    }
-    return { kind: mechanism.kind, command: mechanism.command,
-      realExecutable: mechanism.realExecutable, prefixArgs: [...mechanism.prefixArgs] };
+    // ACC 0.7.x put a `claude` shim on PATH this way. Install records of it are
+    // still read so it can be retired; a plan can no longer create one.
+    usage(`${label}: shell-bootstrap activation was removed; no adapter may plan one`);
   }
   if (mechanism.kind === "native-config") {
     closed(mechanism, ["kind", "artifactIds"], label);

@@ -1,5 +1,5 @@
-import { CONTRACT_ID, FINGERPRINT, HANDSHAKE_KEYS, KNOWN_BAD_REASON, NATIVE_ACTIVATION_KINDS,
-  NATIVE_BINDING_MODES, NATIVE_PLATFORMS, PROBE_KEYS, TIMESTAMP, assertModes,
+import { CONTRACT_ID, FINGERPRINT, HANDSHAKE_KEYS, KNOWN_BAD_REASON, NATIVE_BINDING_MODES,
+  NATIVE_PLATFORMS, PLANNABLE_ACTIVATION_KINDS, PROBE_KEYS, TIMESTAMP, assertModes,
   assertReasonCode, closed, compareStableVersions, deepFreeze, isPlainObject, isText,
   parseStableVersion, usage } from "./native-vocabulary.mjs";
 
@@ -12,7 +12,7 @@ import { CONTRACT_ID, FINGERPRINT, HANDSHAKE_KEYS, KNOWN_BAD_REASON, NATIVE_ACTI
 // capability; this rule is used for native live delivery alone.
 
 export { NATIVE_ACTIVATION_KINDS, NATIVE_BINDING_MODES, NATIVE_PLATFORMS, NATIVE_REASON_CODES,
-  compareStableVersions, parseStableVersion } from "./native-vocabulary.mjs";
+  PLANNABLE_ACTIVATION_KINDS, compareStableVersions, parseStableVersion } from "./native-vocabulary.mjs";
 export { validateNativeActivationPlan } from "./native-activation.mjs";
 
 const orderedModes = modes => NATIVE_BINDING_MODES.filter(mode => modes.includes(mode));
@@ -101,8 +101,8 @@ export function validateNativeDeliveryContract(value, { certification, client })
   });
   const kinds = value.activationKinds;
   if (!Array.isArray(kinds) || kinds.length === 0 || new Set(kinds).size !== kinds.length
-    || kinds.some(kind => !NATIVE_ACTIVATION_KINDS.includes(kind))) {
-    usage(`nativeDelivery.activationKinds must be unique entries of ${NATIVE_ACTIVATION_KINDS.join(", ")}`);
+    || kinds.some(kind => !PLANNABLE_ACTIVATION_KINDS.includes(kind))) {
+    usage(`nativeDelivery.activationKinds must be unique entries of ${PLANNABLE_ACTIVATION_KINDS.join(", ")}`);
   }
   return deepFreeze({ minimumByPlatform: { ...minimums }, anchors, knownBad,
     activationKinds: [...kinds], policySource, offerKind });

@@ -5,7 +5,7 @@ import { capabilityEvidence, effectiveCapabilities, evaluateNativeEligibility,
   validateNativeActivationPlan }
   from "@agents-can-communicate/adapter-sdk";
 
-import { resolveExecutable, shellOf, shimDirFor } from "./native-activation.mjs";
+import { resolveExecutable, shimDirFor } from "./native-activation.mjs";
 
 import { describeDeliveryFallback, describeNativeReason } from "./delivery-diagnostics.mjs";
 
@@ -100,10 +100,6 @@ async function detectNative(adapter, entry, { context, platform, probeTimeoutMs,
       return degraded("feature_probe_failed", facts);
     }
     if (!activationPlan.eligible) return degraded(activationPlan.reasonCode, facts);
-    const shell = context?.shell ?? null;
-    if (activationPlan.mechanisms.some(item => item.kind === "shell-bootstrap") && shell !== "zsh") {
-      return { ...degraded("unsupported_shell", facts), activationPlan };
-    }
     return { state: "eligible", reasonCode: null, ...facts, activationPlan };
   } catch {
     return degraded("feature_probe_failed", { realExecutable: null, probe: null, eligibility: null });

@@ -4,7 +4,7 @@ import test from "node:test";
 import { EXIT } from "@agents-can-communicate/protocol";
 
 import { defineAdapter } from "../src/capabilities.mjs";
-import { NATIVE_ACTIVATION_KINDS, NATIVE_BINDING_MODES, compareStableVersions,
+import { NATIVE_ACTIVATION_KINDS, NATIVE_BINDING_MODES, PLANNABLE_ACTIVATION_KINDS, compareStableVersions,
   evaluateNativeEligibility, evaluateVersionContract, validateNativeActivationPlan,
   validateNativeDeliveryContract, validateNativeHandshake } from "../src/native-delivery.mjs";
 
@@ -26,7 +26,7 @@ const nativeDelivery = {
   anchors: [{ platform: "darwin-arm64", version: "2.1.258", protocolContract: "fixture-native-v1" }],
   knownBad: [{ from: "2.1.300", to: "2.1.302", reasonCode: "known_bad_version" },
     { version: "2.1.310", reasonCode: "known_bad_version" }],
-  activationKinds: ["shell-bootstrap"],
+  activationKinds: ["native-service"],
 };
 const manifest = (overrides = {}) => ({
   id: "fixture", displayName: "Fixture",
@@ -213,9 +213,11 @@ test("every anchor needs passing livePush certification for the same client, ver
 
 test("the static contract is closed in every field", () => {
   const bad = patch => () => defineAdapter(manifest({ nativeDelivery: { ...nativeDelivery, ...patch } }));
-  assert.throws(bad({ activationKinds: ["shell-bootstrap", "telepathy"] }), /activationKinds/);
+  assert.throws(bad({ activationKinds: ["native-service", "telepathy"] }), /activationKinds/);
+  // A kind install records still carry, and no adapter may ask for again.
+  assert.throws(bad({ activationKinds: ["shell-bootstrap"] }), /activationKinds/);
   assert.throws(bad({ activationKinds: [] }), /activationKinds/);
-  assert.throws(bad({ activationKinds: ["shell-bootstrap", "shell-bootstrap"] }), /activationKinds/);
+  assert.throws(bad({ activationKinds: ["native-service", "native-service"] }), /activationKinds/);
   assert.throws(bad({ minimumByPlatform: { "darwin-arm64": "2.1" } }), /minimumByPlatform/);
   assert.throws(bad({ minimumByPlatform: { "solaris-sparc": "2.1.258" } }), /minimumByPlatform/);
   assert.throws(bad({ minimumByPlatform: {} }), /minimumByPlatform/);
@@ -226,6 +228,7 @@ test("the static contract is closed in every field", () => {
   assert.throws(bad({ anchors: [{ platform: "darwin-arm64", version: "2.1.258",
     protocolContract: "Fixture Native" }] }), /protocolContract/);
   assert.deepEqual(NATIVE_ACTIVATION_KINDS, ["shell-bootstrap", "native-config", "native-service"]);
+  assert.deepEqual(PLANNABLE_ACTIVATION_KINDS, ["native-config", "native-service"]);
   assert.throws(() => validateNativeDeliveryContract(nativeDelivery, { certification: { evidence: [] },
     client: "fixture-client" }), /passing delivery\.livePush/);
 });
@@ -328,27 +331,21 @@ test("the session handshake rechecks the static rule and publishes only adapter 
 
 test("an activation plan is closed, frozen, and never shell source", () => {
   const plan = validateNativeActivationPlan({ eligible: true, reasonCode: null, mechanisms: [
-    { kind: "shell-bootstrap", command: "claude", realExecutable: "/abs/vendor/bin/claude",
-      prefixArgs: ["--captured-vendor-flag", "captured-value"] },
     { kind: "native-config", artifactIds: ["adapter-owned-config-block"] },
     { kind: "native-service", serviceId: "vendor-daemon", preExisting: false,
       applyCommand: { executable: "/abs/vendor/bin/client", args: ["vendor", "bootstrap"] },
       teardownCommand: null },
   ] });
   assert.equal(Object.isFrozen(plan), true);
-  assert.equal(Object.isFrozen(plan.mechanisms[0].prefixArgs), true);
-  assert.equal(Object.isFrozen(plan.mechanisms[2].applyCommand), true);
+  assert.equal(Object.isFrozen(plan.mechanisms[0].artifactIds), true);
+  assert.equal(Object.isFrozen(plan.mechanisms[1].applyCommand), true);
   const bad = value => () => validateNativeActivationPlan(value);
   assert.throws(bad({ eligible: true, reasonCode: null, mechanisms: [], shell: "sh" }), /unknown .*plan/);
   assert.throws(bad({ eligible: false, reasonCode: "unsupported_shell", mechanisms: [
     { kind: "native-config", artifactIds: ["x"] }] }), /ineligible/);
   assert.throws(bad({ eligible: true, reasonCode: null, mechanisms: [{ kind: "shell-bootstrap",
-    command: "claude", realExecutable: "vendor/bin/claude", prefixArgs: [] }] }), /realExecutable/);
-  assert.throws(bad({ eligible: true, reasonCode: null, mechanisms: [{ kind: "shell-bootstrap",
-    command: "claude", realExecutable: "/abs/claude", prefixArgs: ["--flag; rm -rf /"] }] }),
-  /prefixArgs/);
-  assert.throws(bad({ eligible: true, reasonCode: null, mechanisms: [{ kind: "shell-bootstrap",
-    command: "claude && evil", realExecutable: "/abs/claude", prefixArgs: [] }] }), /command/);
+    command: "claude", realExecutable: "/abs/claude", prefixArgs: [] }] }),
+  /shell-bootstrap activation was removed/);
   assert.throws(bad({ eligible: true, reasonCode: null, mechanisms: [{ kind: "native-service",
     serviceId: "d", preExisting: false, applyCommand: "codex app-server daemon start",
     teardownCommand: null }] }), /applyCommand/);
