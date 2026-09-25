@@ -68,12 +68,14 @@ ships `acc-bootstrap` and `acc-claude-channel` entrypoints, as stubs.
 
 ## Candidate archive
 
-`node scripts/verify-package.mjs` on `05fc4339e482ca17620b62712955fdb46d084eea`:
+`node scripts/verify-package.mjs` on `34e24396a2d9b3065b0c1eae8b8c0a25f3002e3a`, after the
+review fixes (a refused or late handshake retires the endpoint it wrote; install and update
+sweep crashed Channel registrations):
 
 ```text
 == pack
-   ok  agents-can-communicate-0.7.1.tgz  451 KB
-   ok  sha256 f6f255ce977ccfe329b8b68db17f0ce26cdbb8e8e21757a834748d4857367a37
+   ok  agents-can-communicate-0.7.1.tgz  452 KB
+   ok  sha256 04088ef7aeaa0974b97e89ffff6b10bc24af80111034968bae2a48d3625b3e35
 == tarball contents
    ok  310 entries, none forbidden
    ok  6 certification manifest(s), exact evidence allowlist shipped
