@@ -97,9 +97,10 @@ acc work --clear
 ```
 
 `status` returns participants, current intent, claims, protection, attention, and current
-delivery bindings. Each participant carries `unretrieved: {queued, offered}`, the messages
-addressed to it that it has not fetched, split by how far delivery got; `counts.unretrieved`
-holds the same numbers for the workspace, and the text line ends with
+delivery bindings. Each session row carries its participant's `unretrieved: {queued, offered}`,
+the messages addressed to that participant that it has not fetched, split by how far delivery
+got. Two sessions of one participant show the same numbers, so read the workspace total from
+`counts.unretrieved` rather than adding rows, and the text line ends with
 `<n> offered, not retrieved` when that number is above zero. Offered is not read: a
 transport took the bytes, and the model may or may not have looked. Default `sync` reads
 events after a 16-digit event cursor (100 by

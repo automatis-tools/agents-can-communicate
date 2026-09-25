@@ -130,7 +130,8 @@ Use `inbox --cursor <nextCursor>` for older headers when needed. Omit the cursor
 on a new poll to see arrivals; a cursor is the complete last message id, not an offset.
 
 A peer block with a `repeat:` line was pushed live earlier and nothing has
-retrieved it since. If you already acted on it, it needs nothing more.
+retrieved it since. A note you already acted on needs nothing more; for a
+message that asks for one, a reply or acknowledgement is still owed.
 
 An injected peer block is already the message body. If context was compacted,
 or a body did not fit, retrieve exactly the named message:

@@ -291,3 +291,19 @@ test("nothing is selected for a repeat before it is due", async () => {
     assert.deepEqual((await deliver(f, { repeats: true })).repeatMessages, [], name);
   }
 });
+
+test("a repeat keeps offer facts it does not own", async () => {
+  const f = await fixture();
+  const message = await send(f);
+  await offer(f, message);
+  // A later ACC may record more about an offer. This one must not drop it.
+  await rewriteReceipt(f, message, current => ({ ...current, extensions: { ...current.extensions,
+    offer: { ...current.extensions.offer, targetSessionId: "session_future" } } }));
+  f.clock.advance(REPEAT_OFFER_AFTER_MS);
+
+  await offer(f, message, { transport: "next-turn", repeat: true });
+
+  const { offer: facts } = (await receipt(f, message)).extensions;
+  assert.equal(facts.targetSessionId, "session_future");
+  assert.equal(typeof facts.repeatedAt, "string");
+});

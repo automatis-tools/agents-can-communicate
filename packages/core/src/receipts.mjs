@@ -119,8 +119,10 @@ export function createReceiptService(ports) {
         // another hook's repeat may have landed since this one was selected.
         // The receipt keeps its state and its time; only the attempt is new.
         if (!dueForRepeat(tx.get("message", input.messageId), receipt, now)) return receipt;
+        // Spread from the stored object, never from offerFacts: a later ACC
+        // may keep more about an offer, and this write must not drop it.
         const repeated = { ...receipt, extensions: { ...receipt.extensions,
-          offer: { ...offerFacts(receipt), repeatedAt: now } } };
+          offer: { ...receipt.extensions.offer, repeatedAt: now } } };
         tx.put("receipt", id, repeated, tx.generationOf("receipt", id));
         success({ repeat: true });
         return repeated;

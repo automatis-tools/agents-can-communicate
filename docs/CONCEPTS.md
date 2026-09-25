@@ -125,7 +125,8 @@ The sender can see where each copy got to. An exact history read of a message li
 recipient's receipt with the time of its last change and the transport that offered it, and
 `acc status` counts, per participant, the messages offered and not yet retrieved. A live
 transport accepting a message is the weakest of these facts, so a live offer that nothing
-followed for 15 minutes is shown once more at the recipient's next turn, marked as a repeat.
+followed for 15 minutes is shown once more at the recipient's next turn, marked as a repeat,
+on a client that takes next-turn bodies.
 
 ## Durable first, faster delivery second
 

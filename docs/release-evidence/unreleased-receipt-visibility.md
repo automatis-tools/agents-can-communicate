@@ -83,6 +83,12 @@ because every receipt transition spreads the record it replaces.
   the queued original. The `repeat:` line makes that visible to the model.
 - A model that already handled a live-offered message it never acknowledged sees one
   duplicate block, labelled as a repeat.
+- A repeat is recorded once per receipt. As with a first offer, two sessions of one participant
+  can both show it before either commits, and a hook that runs out of time after writing does
+  not commit it.
+- The status suffix counts every offered receipt, including next-turn offers of notes that
+  were shown whole and never fetched. That is what `offered` means; the exact history read
+  names the transport.
 
 ## Exact local artifact
 

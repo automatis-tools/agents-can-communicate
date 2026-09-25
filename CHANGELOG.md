@@ -9,7 +9,7 @@
   `unretrieved: {queued, offered}`, and the text line ends with `<n> offered, not retrieved`
   when there are any. Offered is not read: a transport took the bytes.
 - A live offer that nothing followed for 15 minutes is shown once more at the recipient's next
-  turn, after new messages and marked `repeat:`. A next-turn offer is recorded only after the
+  turn, on a client that takes next-turn bodies, after new messages and marked `repeat:`. A next-turn offer is recorded only after the
   hook's output carried the body, so it is never repeated; a live offer proves only that a
   transport accepted the bytes. The repeat is another `message.offer_succeeded`, never a second
   message, and an end-of-turn continuation never carries one.

@@ -143,3 +143,15 @@ test("each skill keeps an agent from spending a call it cannot need", async () =
       `${file} sends an agent to re-fetch a body it already holds`);
   }
 });
+
+test("a repeated message is never taught as settled while a reply is owed", async () => {
+  // A repeat is chosen by how it was offered, not by what it asks for, so a
+  // repeated question can still be waiting for its answer. Telling a model a
+  // repeat "needs nothing more" would talk it out of a reply it owes.
+  for (const { file, text } of await skills()) {
+    const paragraph = text.split("\n\n").find(block => block.includes("`repeat:`"));
+    assert.ok(paragraph, `${file} never explains a repeat: line`);
+    assert.match(paragraph.replaceAll("\n", " "), /reply or acknowledgement is still owed/,
+      `${file} lets a repeat read as settled while an obligation is open`);
+  }
+});
