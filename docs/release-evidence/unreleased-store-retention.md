@@ -96,10 +96,10 @@ Trimming is not reversible. The dry run is the default for that reason.
 
 ## Exact local artifact
 
-- Source: clean commit `PLACEHOLDER_SHA`.
+- Source: clean commit `c7ad36de5e829b02b8833434b0ea32eb4ddc6fc2`.
 - Archive: `agents-can-communicate-0.6.3.tgz`, packed from that commit.
-- Size: PLACEHOLDER_BYTES bytes; PLACEHOLDER_ENTRIES packed entries.
-- SHA-256: `PLACEHOLDER_SHA256`.
+- Size: 463,366 bytes; 311 packed entries.
+- SHA-256: `c7ad36de5e829b02b8833434b0ea32eb4ddc6fc2256`.
 - Package version remains `0.6.3`; this is an unpublished development artifact.
 
 `npm test` on this tree: PLACEHOLDER_TESTS.
