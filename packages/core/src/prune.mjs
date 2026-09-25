@@ -173,7 +173,15 @@ export function createPruneService(ports) {
 
     const named = { sessions: wants("sessions") ? sessions : [], intents, claims, participants,
       messages, receipts };
-    const entries = Object.values(named).flat()
+    // Ordered so that anything holding a reference goes before what it refers
+    // to. A pass can stop at its budget or its deadline, and what it has done
+    // by then is a prefix of this list - so the prefix has to be a state the
+    // store can be left in. A receipt names a message, a message and an intent
+    // and a claim each name a session, and a session names a participant.
+    // Removing them in that order means an interrupted pass never leaves a
+    // record pointing at one that is already gone.
+    const order = ["receipts", "messages", "intents", "claims", "sessions", "participants"];
+    const entries = order.flatMap(name => named[name])
       .map(({ kind, id, generation }) => ({ kind, id, generation }));
     return { workspaceId,
       before,

@@ -122,7 +122,7 @@ Trimming is not reversible. The dry run is the default for that reason.
 - Source: clean commit `b983ae7d8b4aa248f4d508acf59be5f24f31df90`.
 - Archive: `agents-can-communicate-0.6.3.tgz`, packed from that commit.
 - Size: 464,437 bytes; 311 packed entries.
-- SHA-256: `b983ae7d8b4aa248f4d508acf59be5f24f31df90256`.
+- SHA-256: `aaed061bd951b302e1e13b0408d18199e1e939276a467413c7a2631f9987e4d0`.
 - Package version remains `0.6.3`; this is an unpublished development artifact.
 
 `npm test` on this tree: 2,540 passing, 0 failing, 1 skipped, of 2,541.

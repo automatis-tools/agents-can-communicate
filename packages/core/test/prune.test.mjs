@@ -261,3 +261,24 @@ test("asking for sessions and participants together removes both", async t => {
   assert.deepEqual(snapshot.sessions, []);
   assert.deepEqual(snapshot.participants, []);
 });
+
+test("a pass cut short leaves no record pointing at one that is gone", async t => {
+  const { service, prune, store, clock } = makeService();
+  const { gone } = await workspaceWith(service);
+  await service.setIntent({ sessionId: gone.sessionId, generation: gone.generation,
+    summary: "work that stopped", mode: "edit" });
+  clock.advance(2 * DAY);
+
+  // What a bounded pass has done when it stops is a prefix of the plan, so the
+  // prefix has to be a state the store can be left in. An intent names a
+  // session and a session names a participant, so each must go before what it
+  // names.
+  const plan = await prune.planPrune({ workspaceId: WORKSPACE });
+  const position = kind => plan.entries.findIndex(entry => entry.kind === kind);
+
+  assert.ok(position("intent") < position("session"),
+    "an intent must be removed before the session it names");
+  assert.ok(position("session") < position("participant"),
+    "a session must be removed before the participant it names");
+  assert.equal((await store.snapshot(WORKSPACE)).intents.length, 1);
+});
