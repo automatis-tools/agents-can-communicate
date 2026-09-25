@@ -282,3 +282,37 @@ test("a pass cut short leaves no record pointing at one that is gone", async t =
     "a session must be removed before the participant it names");
   assert.equal((await store.snapshot(WORKSPACE)).intents.length, 1);
 });
+
+test("removing a session takes its intent with it, even unasked", async t => {
+  const { service, prune, store, clock } = makeService();
+  const { gone } = await workspaceWith(service);
+  await service.setIntent({ sessionId: gone.sessionId, generation: gone.generation,
+    summary: "work that stopped", mode: "edit" });
+  clock.advance(2 * DAY);
+
+  await prune.prune({ classes: ["sessions"], apply: true });
+
+  // An intent with no session is work nobody owns, and its sessionId would
+  // resolve to nothing. Naming only sessions cannot produce that.
+  assert.deepEqual((await store.snapshot(WORKSPACE)).intents, []);
+  assert.deepEqual((await store.snapshot(WORKSPACE)).sessions, []);
+});
+
+test("a participant named only by a message this run removes goes in the same run", async t => {
+  const { service, prune, store, clock } = makeService();
+  const { live, gone } = await workspaceWith(service);
+  const sent = await sentMessage(service, gone, "participant_live", "client_settled");
+  await service.acknowledgeMessage({ messageId: sent.messageId, sessionId: live.sessionId,
+    generation: live.generation });
+  const cursor = (await store.eventsSince(WORKSPACE, null, 100)).cursor;
+  clock.advance(2 * DAY);
+
+  const result = await prune.prune({ before: cursor, apply: true });
+
+  // Judging participants against every message that exists would keep this one,
+  // report nothing remaining, and need a second identical run to reclaim it.
+  assert.equal(result.remaining, false);
+  const after = await prune.planPrune({ before: cursor });
+  assert.equal(after.counts.participants, 0);
+  assert.deepEqual((await store.snapshot(WORKSPACE)).participants, []);
+});

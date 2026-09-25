@@ -138,26 +138,25 @@ export function createPruneService(ports) {
     const envelopes = await store.stateEnvelopes(workspaceId);
     const wants = name => classes.includes(name);
 
-    const sessions = wants("sessions") || wants("intents") || wants("participants")
+    const eligible = wants("sessions") || wants("intents") || wants("participants")
       ? eligibleSessions(envelopes, now, pidIsAlive)
       : [];
-    const doomedSessions = new Set(sessions.map(envelope => envelope.id));
+    const sessions = wants("sessions") ? eligible : [];
+    const removedSessions = new Set(sessions.map(envelope => envelope.id));
+    const eligibleSessionIds = new Set(eligible.map(envelope => envelope.id));
 
-    // An intent belongs to one session and outlives nothing. Its session going
-    // means the answer to "what is this session doing" has no one left to ask.
-    const intents = wants("intents")
-      ? of(envelopes, "intent").filter(envelope => doomedSessions.has(envelope.record.sessionId))
-      : [];
+    // An intent belongs to one session and outlives nothing, so a session
+    // leaving takes its intent with it whether or not the operator named the
+    // class. Asking for intents alone reaches further: every intent whose
+    // session has stopped, including sessions this pass is keeping. Nothing
+    // points at an intent, so removing one leaves nothing dangling - but
+    // leaving one behind when its session goes would.
+    const owning = wants("intents") ? eligibleSessionIds : removedSessions;
+    const intents = of(envelopes, "intent")
+      .filter(envelope => owning.has(envelope.record.sessionId));
     const claims = wants("claims")
       ? of(envelopes, "claim")
         .filter(envelope => Date.parse(envelope.record.expiresAt) <= Date.parse(now))
-      : [];
-    // The sessions this pass will actually remove, which is empty when the
-    // operator asked for other classes only.
-    const removedSessions = new Set(wants("sessions") ? doomedSessions : []);
-    const participants = wants("participants")
-      ? eligibleParticipants(envelopes, removedSessions, of(envelopes, "message")
-        .map(envelope => envelope.record))
       : [];
 
     // History is named by a boundary rather than by a class, because there is
@@ -171,8 +170,17 @@ export function createPruneService(ports) {
     const receipts = of(envelopes, "receipt")
       .filter(envelope => doomedMessages.has(envelope.record.messageId));
 
-    const named = { sessions: wants("sessions") ? sessions : [], intents, claims, participants,
-      messages, receipts };
+    // Decided after the messages, and against the ones that will survive this
+    // pass. A participant named only by a message the same run removes is a
+    // participant nothing will point at once the run finishes; judging it
+    // against every message that exists now would keep it, report no work
+    // remaining, and need a second identical run to reclaim it.
+    const participants = wants("participants")
+      ? eligibleParticipants(envelopes, removedSessions, of(envelopes, "message")
+        .map(envelope => envelope.record).filter(record => !doomedMessages.has(record.messageId)))
+      : [];
+
+    const named = { sessions, intents, claims, participants, messages, receipts };
     // Ordered so that anything holding a reference goes before what it refers
     // to. A pass can stop at its budget or its deadline, and what it has done
     // by then is a prefix of this list - so the prefix has to be a state the
