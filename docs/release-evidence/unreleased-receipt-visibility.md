@@ -97,3 +97,5 @@ because every receipt transition spreads the record it replaces.
 - Size: 469,045 bytes; 311 packed entries.
 - SHA-256: `881db778b7b2afd1f6b824f7759bb181da0f2bbebd8770368f71a7e2e23873cb`.
 - Package version remains `0.7.0`; this is an unpublished development artifact.
+
+`npm test` on this tree: 2,574 passing, 0 failing, 1 skipped, of 2,575.
