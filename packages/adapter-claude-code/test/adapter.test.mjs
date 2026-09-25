@@ -117,24 +117,17 @@ test("only capabilities observed in a real session are declared true", () => {
   assert.equal(capabilities.lifecycle.childSessions, false);
   assert.equal(capabilities.context.startupInjection, false);
   assert.equal(capabilities.delivery.nextTurn, true);
-  // Declared true from the 2.1.258 Channel capture and gated by the native
-  // contract; effectiveCapabilities() still turns them off on any other version.
-  assert.equal(capabilities.delivery.livePush, true);
-  assert.equal(capabilities.delivery.replyRoute, true);
+  // The Channel path is gone and the inbox wake has no product capture yet.
+  assert.equal(capabilities.delivery.livePush, false);
+  assert.equal(capabilities.delivery.replyRoute, false);
 });
 
-test("native delivery is declared with a captured contract and its five methods", () => {
+test("no native contract is declared until the inbox capture certifies one", () => {
   const adapter = createClaudeCodeAdapter();
-  assert.deepEqual(adapter.nativeDelivery.minimumByPlatform, { "darwin-arm64": "2.1.258" });
-  assert.equal(adapter.nativeDelivery.anchors[0].protocolContract, "claude-code-channel-mcp-v1");
-  assert.deepEqual(adapter.nativeDelivery.activationKinds, ["shell-bootstrap", "native-config"]);
-  for (const method of ["probeNativeDelivery", "planNativeActivation", "bindNativeSession",
-    "offerMessage", "routeReply"]) {
-    assert.equal(typeof adapter[method], "function", method);
+  assert.equal(adapter.nativeDelivery, undefined);
+  for (const method of ["offerMessage", "routeReply", "bindNativeSession"]) {
+    assert.equal(adapter[method], undefined, method);
   }
-  // Off on an older or unknown client, on only on an exact certified version.
-  const { effectiveCapabilities } = adapter;
-  assert.equal(adapter.capabilities.delivery.livePush, true);
 });
 
 test("captured payloads normalise and drop conversation content", async () => {
@@ -245,8 +238,8 @@ test("doctor states that the handoff is not written at SessionEnd", async t => {
   // summarise anything. Saying so in doctor keeps the limitation visible.
   assert.match(report.diagnostics.join(" "), /while the model is active/);
   assert.match(report.diagnostics.join(" "), /captured/);
-  assert.match(report.diagnostics.join(" "), /client-side Channels activation/,
-    "doctor hid the admission check that MCP connection cannot establish");
+  assert.doesNotMatch(report.diagnostics.join(" "), /Channel/,
+    "doctor still describes the removed Channel path");
   assert.doesNotMatch(report.diagnostics.join(" "), /native delivery is off/,
     "a historical failed capture was reported as current delivery state");
   assert.match(report.diagnostics.join(" "), /next-turn.*acc inbox/,
@@ -293,6 +286,26 @@ test("an upgrade keeps the version it wrote and the one it moved off", async t =
   await createClaudeCodeAdapter().install({ ...context, keepPreviousVersion: "0.0.2" });
 
   assert.deepEqual((await readdir(cache)).sort(), ["0.0.2", version].sort());
+});
+
+test("an install with live delivery writes no Channel config and strips it from the kept copy", async t => {
+  const { context } = await fixture(t);
+  const version = await pluginVersion(CLAUDE_PLUGIN);
+  const plugins = path.join(context.configDir, "plugins");
+  const cache = path.join(plugins, "cache", "acc-local", "agents-can-communicate");
+  const legacy = '{"mcpServers":{"acc-channel":{"command":"node","args":["acc-claude-channel.mjs"]}}}\n';
+  await mkdir(path.join(cache, "0.0.2"), { recursive: true });
+  await writeFile(path.join(cache, "0.0.2", ".mcp.json"), legacy);
+
+  const result = await createClaudeCodeAdapter().install({ ...context, keepPreviousVersion: "0.0.2",
+    livePolicy: "all" });
+
+  for (const tree of [path.join(plugins, "marketplaces", "acc-local", "agents-can-communicate"),
+    path.join(cache, version), path.join(cache, "0.0.2")]) {
+    await assert.rejects(readFile(path.join(tree, ".mcp.json")), { code: "ENOENT" }, tree);
+  }
+  assert.deepEqual((await readdir(cache)).sort(), ["0.0.2", version].sort());
+  assert.deepEqual(result.needsAction, []);
 });
 
 test("an install with no previous version to hold leaves one copy", async t => {
