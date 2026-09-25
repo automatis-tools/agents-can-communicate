@@ -215,3 +215,13 @@ test("activation uses the inbox Claude Code already runs and changes nothing", (
       preExisting: true, applyCommand: null, teardownCommand: null }] });
   assert.equal(planNativeActivation({ detection: {} }).eligible, false);
 });
+
+test("bind refuses a client below the captured minimum without writing an endpoint", async t => {
+  const f = await fixture(t);
+  const handshake = await bind(f, { clientVersion: "2.1.281" });
+  assert.equal(handshake.supported, false);
+  assert.equal(handshake.reasonCode, "below_minimum_version");
+  const { readdirSync } = await import("node:fs");
+  const dir = path.join(f.runtime, "claude-inbox-endpoints");
+  assert.deepEqual((() => { try { return readdirSync(dir); } catch { return []; } })(), []);
+});

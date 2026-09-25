@@ -225,3 +225,30 @@ test("an install removes the bootstrap cache a 0.7.x shim kept", async t => {
   assert.deepEqual((await h.apply()).failed, []);
   await assert.rejects(stat(cache), { code: "ENOENT" });
 });
+
+test("an activation record without mechanisms cannot fail the plan", () => {
+  // Nothing validates this record on load, and a plan that throws here fails
+  // every automatic update.
+  for (const detectedNative of [{ state: "degraded", reasonCode: "native_endpoint_unavailable" },
+    { state: "unsupported", reasonCode: "native_delivery_unsupported" }]) {
+    const operation = planClaude({ detectedNative,
+      previous: { livePolicy: "actionable", protocolContract: "fixture-native-v1" },
+      nativeDelivery: { anchors: [{ platform: "darwin-arm64", version: "1.0.0",
+        protocolContract: "fixture-native-v1" }] } });
+    assert.equal(operation.adapterId, "claude_code");
+  }
+});
+
+test("an install removes Channel registrations a crashed 0.7.x Channel left in workspaces", async t => {
+  const h = await machine(t);
+  const workspaces = path.join(h.dataHome, "acc", "workspaces");
+  const registrations = path.join(workspaces, "workspace_a", "native", "claude");
+  await mkdir(registrations, { recursive: true });
+  await writeFile(path.join(registrations, "endpoint_old.json"), "{}\n");
+  const codexEndpoints = path.join(workspaces, "workspace_a", "codex-native-endpoints");
+  await mkdir(codexEndpoints, { recursive: true });
+  await writeFile(path.join(codexEndpoints, "codex_endpoint_keep.json"), "{}\n");
+  assert.deepEqual((await h.apply()).failed, []);
+  await assert.rejects(stat(registrations), { code: "ENOENT" });
+  assert.ok(await stat(path.join(codexEndpoints, "codex_endpoint_keep.json")), "other adapters keep theirs");
+});

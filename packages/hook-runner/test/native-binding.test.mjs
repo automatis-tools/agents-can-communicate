@@ -212,3 +212,33 @@ test("a binding without a resolved client process cannot go live until a fresh s
     [["clear", "session_a", "generation_a"]]);
   assert.equal(Number.isFinite(service.calls[0][1].deadlineAt), true);
 });
+
+// An adapter may write its private endpoint before the static rule judges the
+// handshake. Nothing else would ever remove it, and a refused client binds on
+// every turn: one orphan record per prompt. An adapter that retires its own
+// endpoints also has retirement read the prior binding, so the service here
+// holds none.
+const serviceWithStore = () => ({ ...fakeService(),
+  store: { ephemeral: { get: async () => null } } });
+test("a refused handshake retires the endpoint the adapter already wrote", async () => {
+  const retired = [];
+  const adapter = { ...nativeAdapter(async () => ({ ...HANDSHAKE, clientVersion: "2.1.250" })),
+    retireNativeSession: async input => { retired.push(input); } };
+  const result = await establish(adapter, serviceWithStore(), { clientVersion: "2.1.250" });
+  assert.equal(result.state, "unsupported");
+  assert.deepEqual(retired.map(item => [item.binding.opaqueEndpointRef, item.runtimeDir]),
+    [["adapter-owned-endpoint-id", "/runtime"]]);
+});
+
+test("a handshake that answers after the budget still has its endpoint retired", async () => {
+  let answer;
+  const late = new Promise(resolve => { answer = resolve; });
+  const retired = [];
+  const adapter = { ...nativeAdapter(() => late),
+    retireNativeSession: async input => { retired.push(input.binding.opaqueEndpointRef); } };
+  const result = await establish(adapter, serviceWithStore(), { timeoutMs: 10 });
+  assert.equal(result.reasonCode, "handshake_timeout");
+  answer(HANDSHAKE);
+  await new Promise(resolve => setTimeout(resolve, 20));
+  assert.deepEqual(retired, ["adapter-owned-endpoint-id"]);
+});

@@ -140,6 +140,10 @@ export async function bindNativeSession({ event, clientPid, clientVersion, runti
   if (typeof clientVersion !== "string" || !STABLE_VERSION.test(clientVersion)) {
     return closed(clientVersion, "version_unavailable");
   }
+  // The contract refuses it anyway, after this returns. Refusing here keeps an
+  // older client - which binds again on every turn - from writing an endpoint
+  // record each time.
+  if (compare(clientVersion, MIN_VERSION) < 0) return closed(clientVersion, "below_minimum_version");
   const socketPath = env?.CLAUDE_CODE_MESSAGING_SOCKET;
   if (typeof socketPath !== "string" || socketPath === "") {
     return closed(clientVersion, "native_endpoint_unavailable");

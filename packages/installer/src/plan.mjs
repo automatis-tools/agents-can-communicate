@@ -130,7 +130,7 @@ export function planInstallation({ adapters, detected, context, action = "instal
     const declaredContracts = new Set((adapter.nativeDelivery?.anchors ?? [])
       .map(anchor => anchor.protocolContract));
     const retainable = previous !== null && declaredContracts.has(previous.protocolContract)
-      ? { ...previous, mechanisms: previous.mechanisms.filter(item => item.kind !== "shell-bootstrap") }
+      ? { ...previous, mechanisms: (previous.mechanisms ?? []).filter(item => item.kind !== "shell-bootstrap") }
       : null;
     const retainedActivation = action === "install" && delivery !== "off"
       && !liveDeliverySupported && retainable?.livePolicy === delivery ? retainable : null;
@@ -159,7 +159,7 @@ export function planInstallation({ adapters, detected, context, action = "instal
     // A failed readiness probe is not revocation. Keep existing guarded launch
     // setup without applying service commands or claiming it is available.
     const retirements = retainedActivation
-      ? previous.mechanisms.filter(item => item.kind === "shell-bootstrap")
+      ? (previous.mechanisms ?? []).filter(item => item.kind === "shell-bootstrap")
       : planActivationRetirements({ previous, desired: nativeActivation });
     const deactivation = retirements.length > 0 ? { ...previous, mechanisms: retirements } : null;
     const artifacts = (record?.artifacts ?? adapter.planInstall(installContext))
