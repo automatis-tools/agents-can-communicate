@@ -181,6 +181,11 @@ Adapters project peer bodies in an attributed untrusted frame. If a complete bod
 fit, the projection keeps the message id and points to `acc inbox --message <id>` instead
 of silently truncating it.
 
+On a client that takes next-turn bodies, a live offer that is still `offered` 15 minutes later
+is projected once more before a turn,
+after the new bodies and marked as a repeat, and never by an end-of-turn continuation; see
+[the protocol contract](PROTOCOL.md#one-repeat-of-a-live-offer).
+
 For this participant's unresolved messages already `offered` or `retrieved`, the standard
 projector combines reply and acknowledgement reminders into a compact count after new
 message bodies. Queued obligations and claim conflicts remain individual attention items.

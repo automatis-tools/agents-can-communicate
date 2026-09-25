@@ -237,7 +237,7 @@ async function openContext({ event, adapterId, dataHome, runtime, env, deadline 
 // `render` is how the projected text reaches this client: before a turn it is
 // the adapter's context envelope, at the end of one it is a continuation.
 async function projectTurn({ binding, context, adapter, adapterId,
-  render = text => adapter.injectOutcome?.(text), activationHint = null }) {
+  render = text => adapter.injectOutcome?.(text), activationHint = null, repeats = true }) {
   const sync = await context.service.sync({ sessionId: binding.accSessionId,
     cursor: null, scope: "delta" });
 
@@ -251,11 +251,22 @@ async function projectTurn({ binding, context, adapter, adapterId,
   // Without this the projector's peer block never runs in production: an
   // agent sees only the obligation attention line, not the durable body that
   // may be offered after the stdout transport succeeds.
+  // Decided before selection: a repeat is taken out of the reminder lists, so
+  // asking for one this turn cannot show is how a message would go quiet.
+  // The ceiling a team agreed on in `acc.workspace.json`, or the default when
+  // there is no config. Validated by the protocol and, until now, never read:
+  // the projector was always called with its own default.
+  const effective = effectiveCapabilities(adapter, binding);
+  const hasStructuredRenderer = typeof adapter.renderContextResult === "function";
+  const canOfferNextTurn = effective.delivery.nextTurn === true && hasStructuredRenderer;
   const delivery = await context.service.nextTurnDelivery({
     workspaceId: context.descriptor.id,
     participantId: mine?.participantId,
-    exceptSessionId: binding.accSessionId });
-  const messages = delivery.queuedMessages;
+    exceptSessionId: binding.accSessionId,
+    repeats: repeats && canOfferNextTurn });
+  // New bodies first, so a repeat is what the byte budget drops.
+  const messages = [...delivery.queuedMessages, ...delivery.repeatMessages];
+  const repeating = new Set(delivery.repeatMessages.map(message => message.messageId));
 
   // Only this hook's payload selected the binding. Supply its own pair as
   // trusted context, outside peer bodies, rather than exporting inheritable
@@ -278,16 +289,11 @@ async function projectTurn({ binding, context, adapter, adapterId,
       hintFits);
   }
 
-  // The ceiling a team agreed on in `acc.workspace.json`, or the default when
-  // there is no config. Validated by the protocol and, until now, never read:
-  // the projector was always called with its own default.
-  const effective = effectiveCapabilities(adapter, binding);
-  const hasStructuredRenderer = typeof adapter.renderContextResult === "function";
-  const canOfferNextTurn = effective.delivery.nextTurn === true && hasStructuredRenderer;
   const projectionInput = { ...sync, messages: canOfferNextTurn ? messages : [],
     liveOfferedMessageIds: delivery.liveOfferedMessageIds,
     reminderMessageIds: delivery.reminderMessageIds,
     roomMessageIds: delivery.roomMessageIds,
+    repeatOffers: delivery.repeatOffers,
     currentParticipantId: mine?.participantId };
   // Credentials alone cannot replace the command that reaches a queued body.
   // If both cannot fit, preserve recovery and explain the missing owner pair.
@@ -346,7 +352,8 @@ async function projectTurn({ binding, context, adapter, adapterId,
       recipientParticipantId: mine.participantId,
       targetSessionId: binding.accSessionId, targetGeneration: binding.generation,
       transport: "next-turn", adapterId,
-      clientVersion: binding.clientVersion }));
+      clientVersion: binding.clientVersion,
+      ...(repeating.has(message.messageId) ? { repeat: true } : {}) }));
   // Same again: Kimi Code shows the model a hook's raw stdout, while Gemini
   // and Claude Code want an envelope and drop a bare string.
   // The entry point owns the transport boundary. This handler only prepares
@@ -583,7 +590,9 @@ const HANDLERS = {
     const current = await context.service.locateSession(binding.accSessionId);
     if (current === null || current.record.state !== "open"
       || current.record.generation !== binding.generation) return {};
-    const turn = await projectTurn({ ...input,
+    // A repeat is a body the model may already have. It rides on the next
+    // turn that happens anyway and never buys a model call of its own.
+    const turn = await projectTurn({ ...input, repeats: false,
       render: text => adapter.continueTurnOutcome({ reason: text, payload }) });
     return (turn.offerInputs ?? []).length === 0 ? {} : turn;
   },

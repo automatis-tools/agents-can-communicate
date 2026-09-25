@@ -199,6 +199,37 @@ peer body into diagnostics.
 Receipt `offered` is committed only after the transport accepts bytes. A failed attempt
 leaves the receipt queued.
 
+The same transaction records how the receipt was offered, in the receipt's `extensions`:
+
+```json
+{ "offer": { "transport": "codex-app-server", "at": "<timestamp>", "repeatedAt": null } }
+```
+
+It lives in `extensions` because a new receipt field would fail validation in an older ACC
+that reads the same store. A receipt offered by an older ACC has no `offer` entry; readers
+report `offer: null` and never guess a transport. An exact history read returns every
+recipient's `state`, `updatedAt` and `offer` beside the message.
+
+### One repeat of a live offer
+
+A `next-turn` offer is recorded only after the hook's output carried the body, which is the
+closest ACC comes to the model. A live offer proves that a transport accepted the bytes. A
+direct message whose receipt is still `offered`, whose offer transport is anything other than
+`next-turn`, and whose offer is at least 15 minutes old, is shown once more by the
+recipient's next turn on a client that takes next-turn bodies (a certified `nextTurn` and a
+structured renderer): the body in the usual untrusted block, after new messages, with the
+line `repeat: offered via <transport> at <timestamp>; no retrieval recorded`. An end-of-turn
+continuation never carries a repeat, because continuing a turn costs a model call.
+
+When the hook's output carried it, the repeat is recorded as another
+`message.offer_succeeded` with `transport: "next-turn"` and `repeat: true`, and
+`extensions.offer.repeatedAt` is set. The receipt keeps its state and `updatedAt`: a repeat
+is an attempt, never a transition and never a second message. A repeat is recorded at most
+once per receipt, and a receipt that was retrieved, acknowledged or repeated in the meantime is
+left unchanged with nothing appended. Like a first offer, the display itself can happen twice:
+two sessions of one participant can both show it before either commits, and a hook that runs
+out of time after writing does not commit at all.
+
 `transport_permission_denied` means the sender's OS or sandbox refused local transport
 access (`EPERM` or `EACCES`). It is distinct from `recipient_unavailable` and remains a
 failed offer with a queued receipt; raw OS error strings are not persisted.

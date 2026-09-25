@@ -23,15 +23,17 @@ const stringList = description => ({ type: "array", items: { type: "string" }, d
 export const PUBLIC_TOOLS = Object.freeze([
   {
     name: "acc_status",
-    description: `Read who is here, current intents and claims, and the workspace's real `
-      + `protection level. ${POLLED}`,
+    description: `Read who is here, current intents and claims, the workspace's real `
+      + `protection level, and how many messages each participant has not fetched `
+      + `(offered is not read). ${POLLED}`,
     inputSchema: object({}),
   },
   {
     name: "acc_sync",
     description: `Read coordination state for this workspace: roster, attention items, and `
       + `events since a cursor. Use scope "history" for bounded message summaries, then `
-      + `messageId to read one complete historical message without changing receipts. `
+      + `messageId to read one complete historical message, with every recipient's `
+      + `receipt state, without changing receipts. `
       + `Scope "full" is an unbounded forensic workspace snapshot. Use acc_inbox for `
       + `your addressed messages. ${POLLED}`,
     inputSchema: object({

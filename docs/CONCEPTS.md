@@ -121,6 +121,13 @@ Listing inbox headers and observing workspace history do not change receipts.
 There is no `seen` receipt. A failed delivery attempt leaves the message queued and
 recoverable rather than creating a terminal failure state.
 
+The sender can see where each copy got to. An exact history read of a message lists every
+recipient's receipt with the time of its last change and the transport that offered it, and
+`acc status` counts, per participant, the messages offered and not yet retrieved. A live
+transport accepting a message is the weakest of these facts, so a live offer that nothing
+followed for 15 minutes is shown once more at the recipient's next turn, marked as a repeat,
+on a client that takes next-turn bodies.
+
 ## Durable first, faster delivery second
 
 The durable inbox is universal. An adapter whose captures reach the installed client may

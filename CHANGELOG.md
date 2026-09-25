@@ -1,5 +1,36 @@
 # Changelog
 
+## Unreleased — the sender can see where a message got to
+
+- An exact history read, `acc sync --scope history --message <id>`, lists every recipient's
+  receipt: its state, when that last changed, and the transport that offered it. A sender used
+  to learn the delivery state once, in the send result, and nothing after.
+- `acc status` counts, per participant, the messages it has not fetched,
+  `unretrieved: {queued, offered}`, and the text line ends with `<n> offered, not retrieved`
+  when there are any. Offered is not read: a transport took the bytes.
+- A live offer that nothing followed for 15 minutes is shown once more at the recipient's next
+  turn, on a client that takes next-turn bodies, after new messages and marked `repeat:`. A next-turn offer is recorded only after the
+  hook's output carried the body, so it is never repeated; a live offer proves only that a
+  transport accepted the bytes. The repeat is another `message.offer_succeeded`, never a second
+  message, and an end-of-turn continuation never carries one.
+- The store format is unchanged. Offer facts live in the receipt's `extensions`, and the repeat
+  uses an existing event type, because an older ACC rejects an unknown field or event type on
+  read. The published 0.7.0 was run against a store this build wrote: it read every event and
+  receipt, and its own transition to `retrieved` kept the offer facts.
+- Every skill tells a sender how to check a receipt, and a recipient what a `repeat:` line
+  means.
+
+| Candidate artifact | Value |
+|---|---|
+| Built from | `dbc4acf106033ab6f90977676e34ff495d9472c4` |
+| Tarball | `agents-can-communicate-0.7.0.tgz`, 469,045 bytes, 311 files |
+| sha256 | `881db778b7b2afd1f6b824f7759bb181da0f2bbebd8770368f71a7e2e23873cb` |
+
+This unpublished development archive passed clean installation verification. See
+[receipt visibility evidence](docs/release-evidence/unreleased-receipt-visibility.md) and the
+design in [docs/design/2026-09-25-receipt-visibility.md](docs/design/2026-09-25-receipt-visibility.md).
+The package version remains `0.7.0` until a release prepares its own.
+
 ## 0.7.0 — release candidate
 
 - A workspace store can give space back. `acc prune` reports what a workspace no longer needs

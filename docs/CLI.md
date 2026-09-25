@@ -97,7 +97,13 @@ acc work --clear
 ```
 
 `status` returns participants, current intent, claims, protection, attention, and current
-delivery bindings. Default `sync` reads events after a 16-digit event cursor (100 by
+delivery bindings. Each session row carries its participant's `unretrieved: {queued, offered}`,
+the messages addressed to that participant that it has not fetched, split by how far delivery
+got. Two sessions of one participant show the same numbers, so read the workspace total from
+`counts.unretrieved` rather than adding rows, and the text line ends with
+`<n> offered, not retrieved` when that number is above zero. Offered is not read: a
+transport took the bytes, and the model may or may not have looked. Default `sync` reads
+events after a 16-digit event cursor (100 by
 default, up to 500). `--scope history` discovers historical message headers and reads
 selected records; `--scope full` adds an unbounded snapshot for explicit workspace forensics.
 
@@ -258,7 +264,12 @@ summary fields, ordering, page limits, and message-id cursors as inbox. `--type`
 any message kind and filters before pagination; keep the same filter between pages.
 This public workspace observation includes records from before your session joined.
 Exact history reads return `view: "message"` and one complete message in `items`,
-without changing any receipt. Do not combine `--message` with type, cursor, or limit;
+without changing any receipt, plus `receipts`: one entry per recipient with `state`,
+`updatedAt` (the last state change) and `offer` - the transport that accepted it, when, and
+`repeatedAt` if the next turn showed it again - or `offer: null` when no offer was recorded
+or an older ACC recorded it. This is how a sender tells a message a peer's client accepted
+(`offered`) from one its participant fetched (`retrieved`) or answered (`acknowledged`).
+Retrieved is not model attention either. Do not combine `--message` with type, cursor, or limit;
 message and type are valid only in history scope. Decision reads also include `decisionStatus`. Use
 `acc sync --scope history --type decision --current --json` for terminal decisions
 and withdrawals; keep these filters when paging. Exact reads cannot use `--current`.

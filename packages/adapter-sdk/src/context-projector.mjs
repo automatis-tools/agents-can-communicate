@@ -51,7 +51,18 @@ function offeredBreadcrumb(item, liveOfferedMessageIds) {
     + `\`acc inbox --message ${item.sourceId}\``;
 }
 
-function messageGroups(messages) {
+// A body shown again because a live transport accepted it and nothing followed.
+// Said inside the block so the model can match it to what it may already have.
+function repeatLines(message, repeats) {
+  const repeat = repeats.get(message.messageId);
+  // Both values come from the store, and the store is shared with every peer's
+  // process, so they are escaped like any other line inside the block.
+  return repeat === undefined ? []
+    : [oneLine(escapePeerText(`repeat: offered via ${repeat.transport} at ${repeat.at}; `
+      + "no retrieval recorded"))];
+}
+
+function messageGroups(messages, repeats = new Map()) {
   return messages.map(message => ({
     messageId: message.messageId,
     kind: "message",
@@ -63,6 +74,7 @@ function messageGroups(messages) {
       `messageId: ${message.messageId}`,
       `sender: ${message.fromParticipantId} (session ${message.fromSessionId})`,
       `obligation: ${message.obligation}`,
+      ...repeatLines(message, repeats),
       ...decisionLines(message).map(escapePeerText),
       `subject: ${oneLine(escapePeerText(message.subject))}`,
       "body:",
@@ -129,7 +141,8 @@ export function projectContextResult(sync, { budgetBytes = DEFAULT_BUDGET_BYTES 
   const liveOfferedMessageIds = new Set(sync.liveOfferedMessageIds ?? []);
   const groups = [
     ...attentionGroups(urgent, { truncatable: true, liveOfferedMessageIds }),
-    ...messageGroups(messages),
+    ...messageGroups(messages, new Map((sync.repeatOffers ?? [])
+      .map(repeat => [repeat.messageId, repeat]))),
     ...reminderGroups(attention.filter(isReminder)),
     ...attentionGroups(informational, { truncatable: false }),
   ];
