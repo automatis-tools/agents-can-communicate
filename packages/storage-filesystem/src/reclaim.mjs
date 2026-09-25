@@ -1,5 +1,7 @@
 import path from "node:path";
 
+import { AccError, EXIT } from "@agents-can-communicate/protocol";
+
 import { readActiveJournal } from "./active-journal.mjs";
 import { listDirectoryEntries, readJsonIfPresent } from "./atomic-json.mjs";
 import { condemn, detachDoomed, discard, discardLeftovers, expired } from "./doomed-directory.mjs";
@@ -230,12 +232,28 @@ export async function trimEventLog(paths, boundary,
     return { reclaimed: 0, trimmedThrough: (await readEventFloor(paths, root)) ?? boundary,
       remaining: true };
   }
+
+  const names = (await jsonNames(paths.events, root)).sort();
+  const newest = names.at(-1);
+  const allocated = newest === undefined
+    ? await readEventFloor(paths, root)
+    : path.basename(newest, ".json");
+  // A boundary past what this store has ever issued is not a point in its
+  // history. Persisting one would raise the floor above every sequence that can
+  // still be allocated, so a single mistyped cursor would leave a workspace
+  // that can never publish again. Refused rather than clamped: an operator who
+  // named the wrong cursor should hear about it.
+  if (allocated === null || boundary > allocated) {
+    throw new AccError(EXIT.USAGE,
+      "before is past the newest event this workspace has issued",
+      { before: boundary, newest: allocated });
+  }
   const trimmedThrough = await raiseEventFloor(paths, { ...publish, root }, boundary);
 
   let spent = 0;
   let drained = true;
   const doomed = await detachDoomed(root);
-  for (const name of (await jsonNames(paths.events, root)).sort()) {
+  for (const name of names) {
     // Sequences are fixed-width, so comparing the names is comparing the
     // numbers, and the sorted listing lets this stop at the boundary rather
     // than walk a log that is mostly newer than it.

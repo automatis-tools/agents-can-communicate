@@ -7,7 +7,7 @@ import test from "node:test";
 import { EXIT, SCHEMA_VERSION } from "@agents-can-communicate/protocol";
 
 import { publishAtomic } from "../src/atomic-json.mjs";
-import { readEventFloor } from "../src/event-floor.mjs";
+import { raiseEventFloor, readEventFloor } from "../src/event-floor.mjs";
 import { openFilesystemStore, storePaths } from "../src/store.mjs";
 import { createFakeClock, createFakeIds } from "../../../tests/helpers/memory-store.mjs";
 
@@ -132,11 +132,56 @@ test("a publication survives the sweep taking its staging directory away", async
   assert.equal((await readdir(paths.stage)).length, 1);
 });
 
-test("a floor past the safe integer range refuses rather than repeating a sequence", async t => {
+test("a boundary that is not a sequence is refused", async t => {
   const { store: opened } = await store(t);
-  await appendEvents(opened, 1);
 
-  await opened.trimHistory("9999999999999999");
+  await assert.rejects(opened.trimHistory("yesterday"),
+    error => error.code === EXIT.USAGE);
+});
+
+test("trimming leaves no detached directory behind", async t => {
+  const { root, store: opened } = await store(t);
+  const sequences = await appendEvents(opened, 3);
+
+  await opened.trimHistory(sequences[1]);
+
+  assert.deepEqual((await readdir(root)).filter(name => name.startsWith("stage.sweeping-")), []);
+});
+
+test("a publication survives the sweep taking its staging directory away", async t => {
+  const root = await realpath(await mkdtemp(path.join(tmpdir(), "acc-stage-race-")));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const paths = storePaths(root);
+  await mkdir(paths.tmp, { recursive: true });
+  await mkdir(paths.stage, { recursive: true });
+  await mkdir(path.join(root, "state"), { recursive: true });
+
+  // The sweep empties `stage/` by renaming it aside and recreating it. A
+  // publication that began before that swap used to arrive at a name that was
+  // gone, and failed a write whose bytes were already linked into place. The
+  // seam puts the swap exactly inside that window.
+  await publishAtomic(path.join(root, "state", "record.json"), Buffer.from("{}\n"), {
+    root,
+    tmpDir: paths.tmp,
+    stageDir: paths.stage,
+    afterAccepted: () => rename(paths.stage, path.join(root, "stage.taken-aside")),
+  });
+
+  assert.deepEqual(await readdir(path.join(root, "state")), ["record.json"]);
+  assert.equal((await readdir(paths.stage)).length, 1);
+});
+
+test("a floor past the safe integer range refuses rather than repeating a sequence", async t => {
+  const { root, store: opened } = await store(t);
+  const [first] = await appendEvents(opened, 1);
+  // Emptied legitimately first, because only an empty directory reads the
+  // floor - while any file remains the newest name answers instead.
+  await opened.trimHistory(first);
+
+  // `trimHistory` refuses a boundary this high, so the floor is written
+  // directly. The guard exists for a store that reads such a floor however it
+  // came by one, not only for a path that can still create it.
+  await raiseEventFloor(opened.paths, { root, tmpDir: opened.paths.tmp }, "9".repeat(16));
 
   // Sixteen digits reach past Number.MAX_SAFE_INTEGER, where adding one stops
   // changing the value. Allocating from such a floor would hand out a sequence
@@ -154,4 +199,28 @@ test("a log whose newest event is past the safe range refuses to allocate", asyn
     `${JSON.stringify({ sequence: "9".repeat(16) })}\n`);
 
   await assert.rejects(appendEvents(opened, 1), error => error.code === EXIT.DATA);
+});
+
+test("a boundary past the newest issued sequence is refused, not persisted", async t => {
+  const { root, store: opened } = await store(t);
+  const sequences = await appendEvents(opened, 2);
+
+  await assert.rejects(opened.trimHistory("9".repeat(16)),
+    error => error.code === EXIT.USAGE);
+
+  // Persisting it would raise the floor above every sequence still available,
+  // so one mistyped cursor would leave a workspace that can never publish
+  // again. Nothing was written, and the log is untouched.
+  assert.equal(await readEventFloor(opened.paths, root), null);
+  assert.deepEqual((await opened.eventsSince(WORKSPACE, null, 50)).events.map(e => e.sequence),
+    sequences);
+  const more = await appendEvents(opened, 1);
+  assert.ok(more[0] > sequences.at(-1));
+});
+
+test("trimming an empty log that has never issued anything is refused", async t => {
+  const { store: opened } = await store(t);
+
+  await assert.rejects(opened.trimHistory("0".repeat(15) + "1"),
+    error => error.code === EXIT.USAGE);
 });
