@@ -86,6 +86,10 @@ export function createSyncService(ports, sessions) {
       && snapshot.claims.length === 0;
     return {
       cursor: page.cursor,
+      // Where the log starts, when it no longer starts at the beginning. A
+      // caller whose cursor precedes this was served a short page, and saying
+      // so is the difference between a trim and a silent gap.
+      trimmedThrough: page.trimmedThrough ?? null,
       scope: input.scope === "full" ? "full" : "delta",
       solo,
       attention,

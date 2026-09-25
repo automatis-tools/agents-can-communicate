@@ -122,6 +122,17 @@ async function historyCursor(place) {
   return page.nextCursor;
 }
 
+// The newest event sequence this workspace has issued, which is what a history
+// boundary has to name. A message-history cursor is a message id and would be
+// refused.
+async function eventCursor(place) {
+  const page = JSON.parse((await run(process.execPath,
+    [path.join(repo, "bin", "acc.mjs"), "sync", "--cwd", place.cwd, "--json"],
+    { env: place.env })).stdout).data;
+  assert.ok(/^[0-9]{16}$/.test(page.cursor), "sync did not return an event cursor");
+  return page.cursor;
+}
+
 test("every documented acc command is one the CLI accepts", async t => {
   const rejected = [];
   let checked = 0;
@@ -140,6 +151,14 @@ test("every documented acc command is one the CLI accepts", async t => {
       if (parts[0] === "sync" && parts.includes("history")
         && cursor !== -1 && parts[cursor + 1] === "message_x") {
         parts[cursor + 1] = await historyCursor(place);
+      }
+      // `prune --before` refuses a boundary the store never issued, so the
+      // documented example is given one the store just handed out. Obtained
+      // through the public API for the same reason the history cursor is: the
+      // documented command is then actually exercised rather than skipped.
+      const before = parts.indexOf("--before");
+      if (parts[0] === "prune" && before !== -1 && parts[before + 1] === "event_cursor") {
+        parts[before + 1] = await eventCursor(place);
       }
       const result = await run(process.execPath,
         [path.join(repo, "bin", "acc.mjs"), ...parts, "--cwd", place.cwd,

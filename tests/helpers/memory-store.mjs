@@ -89,7 +89,10 @@ export function createMemoryStore({ clock, ids, workspaceId }) {
     const matching = events.map(event => validateRecord("event", event))
       .filter(event => event.workspaceId === workspaceId && event.sequence > after);
     const page = matching.slice(0, limit);
-    return { cursor: page.at(-1)?.sequence ?? after, events: page };
+    // The double reports the boundary too, so a caller that forgets to handle
+    // a trimmed log cannot pass its tests and then read short in production.
+    return { cursor: page.at(-1)?.sequence ?? after, events: page,
+      trimmedThrough: trimmedThrough };
   }
 
   // One record by id, with the checks a snapshot applies to it: absent,
@@ -120,6 +123,50 @@ export function createMemoryStore({ clock, ids, workspaceId }) {
       messages: of("message"),
       receipts: of("receipt"),
     };
+  }
+
+  let trimmedThrough = null;
+
+  // Trimming drops events at or below a boundary and reports where the log now
+  // starts, exactly as the filesystem store does.
+  async function trimHistory(boundary) {
+    trimmedThrough = trimmedThrough === null || boundary > trimmedThrough
+      ? boundary : trimmedThrough;
+    const before = events.length;
+    for (let index = events.length - 1; index >= 0; index -= 1) {
+      if (events[index].sequence <= boundary) events.splice(index, 1);
+    }
+    return { reclaimed: before - events.length, trimmedThrough, remaining: false };
+  }
+
+  // The envelope generation, which `snapshot` deliberately withholds. Reclaiming
+  // reads eligibility outside the writer mutex and applies it inside, and this
+  // is what proves the record did not change in between.
+  async function stateEnvelopes(workspaceId, { kinds } = {}) {
+    const wanted = kinds === undefined ? null : new Set(kinds);
+    return [...committed.values()].filter(entry => entry.record.workspaceId === workspaceId
+      && (wanted === null || wanted.has(entry.kind)));
+  }
+
+  // A double that removed a record whose generation had moved would let a
+  // caller pass its tests and lose a renewed claim in the only place that
+  // matters, so the generation check is real here too.
+  async function reclaimRecords(plan) {
+    // A function is decided here rather than by the caller, exactly as the
+    // filesystem store decides it under the writer mutex.
+    const entries = typeof plan === "function" ? await plan() : plan;
+    let reclaimed = 0;
+    let skipped = 0;
+    for (const entry of entries) {
+      const found = committed.get(key(entry.kind, entry.id));
+      if (found === undefined || found.generation !== entry.generation) {
+        skipped += 1;
+        continue;
+      }
+      committed.delete(key(entry.kind, entry.id));
+      reclaimed += 1;
+    }
+    return { reclaimed, skipped, remaining: false };
   }
 
   // Ephemeral records live outside transactions and outside the event log:
@@ -170,7 +217,8 @@ export function createMemoryStore({ clock, ids, workspaceId }) {
     },
   });
 
-  return Object.freeze({ transaction, eventsSince, snapshot, stateRecord, ephemeral, clock, ids,
+  return Object.freeze({ transaction, eventsSince, snapshot, stateRecord, stateEnvelopes,
+    reclaimRecords, trimHistory, ephemeral, clock, ids,
     workspaceId });
 }
 

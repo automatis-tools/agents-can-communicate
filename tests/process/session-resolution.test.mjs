@@ -153,6 +153,9 @@ const AGENT_FACING = Object.freeze([
 // Setup and lifecycle: a model should not be running the installer, and these
 // three are the adapter's own calls, which pass their identity explicitly.
 const NOT_AGENT_FACING = Object.freeze(["install", "uninstall", "doctor", "config",
+  // Reclaiming acts on the workspace rather than as a participant in it, and
+  // deciding what a workspace no longer needs is an operator's call.
+  "prune",
   "attach", "heartbeat", "detach",
   // These answer about the program itself, so they need no session and must
   // work in a directory that is no workspace.

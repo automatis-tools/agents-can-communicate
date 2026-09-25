@@ -17,7 +17,7 @@ import { needsOwner } from "./session-owner.mjs";
  * protocol's enum choices before a caller has to attempt a mutation.
  */
 const GROUPS = Object.freeze([
-  ["Set up", ["install", "uninstall", "doctor", "config"]],
+  ["Set up", ["install", "uninstall", "doctor", "config", "prune"]],
   ["In a session", ["status", "sync", "work", "claim", "release", "inbox", "reply",
     "ack", "message", "request", "finish"]],
   ["Session lifecycle", ["attach", "heartbeat", "detach"]],
@@ -30,6 +30,7 @@ const SUMMARY = Object.freeze({
   doctor: "clients, versions, install health, and what to run next",
   config: "write or check acc.workspace.json (init | validate)",
   status: "who else is here, what they hold, how protected this workspace is",
+  prune: "report what this workspace no longer needs; --apply to reclaim it",
   sync: "events since a cursor, or bounded message history",
   work: "publish what this session is doing, or --clear when it has stopped",
   claim: "reserve a resource; exit 5 when someone else already holds it",

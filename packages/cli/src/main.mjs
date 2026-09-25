@@ -379,6 +379,24 @@ const HANDLERS = Object.freeze({
   uninstall: async ({ options, runtime }) =>
     runInstallCommand({ options, runtime, action: "uninstall" }),
 
+  prune: async ({ options, context }) => {
+    const result = await context.service.prune({
+      classes: options.class, before: options.before,
+      apply: options.apply === true, limit: Infinity });
+    const named = Object.entries(result.counts)
+      .map(([name, count]) => `${count} ${name}`).join(", ");
+    // The reporting run says what it would do; the applying run says what the
+    // store gave back, which is not the same number - a record and the markers
+    // it owns leave together.
+    const text = result.applied
+      ? `reclaimed ${result.reclaimed} file(s) from ${named}`
+        + (result.trimmedThrough === null ? "" : `; history starts after ${result.trimmedThrough}`)
+        + (result.skipped > 0 ? `; ${result.skipped} changed and were left` : "")
+        + (result.remaining ? "; more remains, run it again" : "")
+      : `would prune ${named}; nothing was changed, add --apply to act`;
+    return { data: result, text };
+  },
+
   doctor: async ({ options, context, runtime }) => runDoctor({ options, context, runtime }),
 
   update: async ({ options, runtime }) => runUpdateCommand({ options, runtime }),

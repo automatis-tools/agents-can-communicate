@@ -40,6 +40,12 @@ export const COMMANDS = Object.freeze({
     repeated: ["completed", "remaining", "blocker"] },
   status: { required: [], optional: ["session", "generation", "participant"], flags: ["all"] },
   doctor: { required: [], optional: ["home"], flags: ["repair"] },
+  // `--apply` rather than `--dry-run`: this is the one command that takes
+  // records out of the store, so the reporting run is what happens by
+  // default and meaning it is what has to be said out loud.
+  // No `--session`: this acts on the workspace, not as a participant in it, so
+  // a session id would be a credential nothing reads.
+  prune: { required: [], optional: ["before"], repeated: ["class"], flags: ["apply"] },
   // The one command with a subcommand. Kept as an explicit list rather than a
   // free positional: `acc config delete` should fail at the parser, not deep
   // inside a handler that has already decided what to do.

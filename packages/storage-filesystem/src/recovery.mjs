@@ -3,18 +3,21 @@ import path from "node:path";
 import { AccError, EXIT, validateRecord } from "@agents-can-communicate/protocol";
 
 import { listDirectoryEntries, listJsonFiles, readJsonIfPresent } from "./atomic-json.mjs";
+import { readEventFloor } from "./event-floor.mjs";
 import { readStoreIdentity } from "./identity.mjs";
 import { readOpenJournals, rollForward } from "./journal.mjs";
 import { assertEventBinding, assertStateBinding } from "./record-id.mjs";
+import { reclaimRetired } from "./reclaim.mjs";
 import { sweepAcceptedStages } from "./stage-sweep.mjs";
 import { storePaths } from "./store.mjs";
 import { withWriterMutex } from "./writer-mutex.mjs";
 
 /** @typedef {{ healthy: boolean, repaired: string[], blocked: string[],
- * corrupt: string[], swept: number, staged: number, partials: number }} RepairReport */
+ * corrupt: string[], swept: number, staged: number, partials: number, retired: number,
+ * trimmedThrough: string|null }} RepairReport */
 
 const report = ({ repaired = [], blocked = [], corrupt = [], swept = 0, staged = 0,
-  partials = 0 }) => ({
+  partials = 0, retired = 0, trimmedThrough = null }) => ({
   healthy: blocked.length === 0 && corrupt.length === 0,
   repaired: [...repaired].sort(),
   blocked: [...blocked].sort(),
@@ -22,6 +25,8 @@ const report = ({ repaired = [], blocked = [], corrupt = [], swept = 0, staged =
   swept,
   staged,
   partials,
+  retired,
+  trimmedThrough,
 });
 
 // Counting, never touching. A stage held in tmp by an older version is an
@@ -40,9 +45,17 @@ async function countStaging(paths, root) {
   const staged = (await entries(paths.stage)).filter(entry => entry.isFile()
     && accepted(entry.name)).length;
   const inTmp = await entries(paths.tmp);
+  // A retired journal entry is one the store keeps and never reads again, so
+  // counting them is what tells an operator the automatic pass has work left.
+  const completed = new Set((await entries(path.join(paths.retained, "journal")))
+    .filter(entry => entry.isFile()).map(entry => entry.name));
+  const retired = (await entries(paths.journal))
+    .filter(entry => entry.isFile() && completed.has(entry.name)).length;
   return {
     staged: staged + inTmp.filter(entry => accepted(entry.name)).length,
     partials: inTmp.filter(entry => entry.name.endsWith(".tmp")).length,
+    retired,
+    trimmedThrough: await readEventFloor(paths, root),
   };
 }
 
@@ -131,8 +144,12 @@ export async function repairFilesystemStore({ root, clock }) {
       }
       // An operator is waiting on this and a hook is not, so the sweep runs
       // without the per-pass bound the automatic one obeys.
+      // An operator is waiting on this, and a hook is not, so neither pass is
+      // bounded here.
       const { swept } = await sweepAcceptedStages(state.paths, { root, limit: Infinity });
-      return report({ repaired: completed, swept, ...await countStaging(state.paths, root) });
+      const reclaimed = await reclaimRetired(state.paths, { root, limit: Infinity });
+      return report({ repaired: completed, swept: swept + reclaimed.reclaimed,
+        ...await countStaging(state.paths, root) });
     });
 }
 

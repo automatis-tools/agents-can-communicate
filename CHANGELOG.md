@@ -1,5 +1,54 @@
 # Changelog
 
+## Unreleased — a workspace store can give space back
+
+- A store grew for as long as it was used and offered no way to reclaim anything. One workspace
+  on the maintainer's machine held 14,150 files: 2,381 transaction journal entries, 9,628
+  retention markers, 876 events and 511 records. `retireJournalEntry` calls `retainFile`, which
+  by construction never unlinks, and `completeJournal` wrote a marker that nothing reads — the
+  same shape as the accepted stage in the previous release.
+- A retired journal entry and a superseded ephemeral marker are provably unread, so the daily
+  pass that already runs on store open reclaims them, under the same writer mutex and sharing
+  one budget. Nothing else happens without being asked.
+- `acc prune` reports what a workspace no longer needs and changes nothing; `--apply` is what
+  acts. That is the opposite of the usual dry-run flag, and deliberate: this is the one command
+  that takes records out of a store.
+- `tx.remove` is not what reclaims them. It publishes a deletion marker, which hides a record
+  and adds a file, and `listState` reads the record before asking whether that marker exists —
+  so removing records that way would make the store larger and its listings slower. A record and
+  the markers it owns now leave together, moved into a directory the process named and then
+  removed whole. Nothing unlinks a live name.
+- Eligibility is read outside the writer mutex and applied inside it, so every record carries the
+  generation that proves it is still the one that was judged; a claim renewed in between is
+  skipped rather than removed. A `stale` session is never reclaimed — only `offline`, which is a
+  confirmed dead pid or a full day of silence. A participant named on a surviving message stays,
+  because the roster answers who sent it.
+- `acc prune --before <cursor>` trims the event log to a point the operator names, and `sync`
+  then reports `trimmedThrough` so a caller whose cursor precedes it can tell it was served a
+  short page. The floor is written before a single event moves, because a floor ahead of the trim
+  costs a reader nothing while a trim ahead of the floor is a silent gap. Only an empty events
+  directory reads the floor, so the path every transaction runs pays nothing for retention.
+- A message recorded below the boundary goes only when nobody is owed it: a receipt that is
+  queued, offered or retrieved keeps its message, because offered is not read and retrieved is
+  not model attention.
+- An ACC older than this release does not know about `trimmedThrough` and will serve a cursor
+  below the boundary without reporting that anything is missing. Trimming history is therefore
+  always an explicit operator act, and never automatic.
+- On a copy of that real store, `acc prune --apply` followed by `acc doctor --repair` took it
+  from 14,150 files to 1,437, and it still read: one live participant, 70 messages, no leftover
+  directories.
+
+| Candidate artifact | Value |
+|---|---|
+| Built from | `abb11871de1a66554f9299444527007bd5c91b75` |
+| Tarball | `agents-can-communicate-0.6.3.tgz`, 465,084 bytes, 311 files |
+| sha256 | `ca49e4d1756d719b56c67dad84c8a2401e0178ed10fc628155dc2e609c18160a` |
+
+This unpublished development archive passed clean installation verification. See
+[store retention evidence](docs/release-evidence/unreleased-store-retention.md) and the design in
+[docs/design/2026-09-24-store-retention.md](docs/design/2026-09-24-store-retention.md). The
+package version remains `0.6.3` until a release prepares its own.
+
 ## Unreleased — status stops reporting a finished intent as current work
 
 - `acc work --clear` marks a durable intent done rather than erasing it, so the workspace keeps
