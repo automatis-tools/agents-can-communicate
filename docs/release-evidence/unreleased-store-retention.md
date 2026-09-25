@@ -86,6 +86,23 @@ nothing for retention. A log trimmed away entirely is the case the floor exists 
 the sequence would restart at 1 and hand out a number a peer already holds a cursor for. A test
 covers exactly that.
 
+## What the review caught
+
+The pull-request review found three holes that no test here had, each confirmed against the code
+before it was changed:
+
+- A publication that began before the sweep swapped `stage/` aside failed a write whose bytes
+  were already linked into place. This is what failed on macOS in CI - a race, not a flake.
+- Eligibility is relational: a participant is eligible because no session of theirs survives. A
+  session opening between the report and the apply changes that answer without changing any
+  record the report named, so an entry's generation cannot catch it. The decision is now taken
+  again inside the writer mutex.
+- A session holding a live claim was removed, leaving the claim reading as owned by nobody - and
+  that name is how a peer blocked by the claim finds someone to ask.
+
+A fourth: a 16-digit sequence reaches past `Number.MAX_SAFE_INTEGER`, so allocating from a floor
+that high would repeat a sequence a peer already holds a cursor for. The store refuses instead.
+
 ## Limits
 
 An ACC older than this release does not know about `trimmedThrough`. Served a cursor below the
@@ -96,10 +113,10 @@ Trimming is not reversible. The dry run is the default for that reason.
 
 ## Exact local artifact
 
-- Source: clean commit `c7ad36de5e829b02b8833434b0ea32eb4ddc6fc2`.
+- Source: clean commit `d60d2f650845ab90d9fd273909991273fa78a536`.
 - Archive: `agents-can-communicate-0.6.3.tgz`, packed from that commit.
-- Size: 463,366 bytes; 311 packed entries.
-- SHA-256: `c7ad36de5e829b02b8833434b0ea32eb4ddc6fc2256`.
+- Size: 464,209 bytes; 311 packed entries.
+- SHA-256: `d60d2f650845ab90d9fd273909991273fa78a536256`.
 - Package version remains `0.6.3`; this is an unpublished development artifact.
 
 `npm test` on this tree: 2,533 passing, 0 failing, 1 skipped, of 2,534.

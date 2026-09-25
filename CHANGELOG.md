@@ -40,9 +40,9 @@
 
 | Candidate artifact | Value |
 |---|---|
-| Built from | `c7ad36de5e829b02b8833434b0ea32eb4ddc6fc2` |
-| Tarball | `agents-can-communicate-0.6.3.tgz`, 463,366 bytes, 311 files |
-| sha256 | `ad6f730cf1bef29c6b9f24c3a431fbb2849378baba22756f2a1f51b8151c1217` |
+| Built from | `d60d2f650845ab90d9fd273909991273fa78a536` |
+| Tarball | `agents-can-communicate-0.6.3.tgz`, 464,209 bytes, 311 files |
+| sha256 | `5ad88ffdaca15949b7e1de6f32b0b2155b260125c8a7b9b5ca386d39faff47af` |
 
 This unpublished development archive passed clean installation verification. See
 [store retention evidence](docs/release-evidence/unreleased-store-retention.md) and the design in
