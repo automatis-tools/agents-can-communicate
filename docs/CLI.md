@@ -208,6 +208,17 @@ Human output starts with `recorded message_x`. A transport failure after that co
 not change the command exit code. Reuse an explicit `--client-message-id` after an
 uncertain result to recover the same logical message.
 
+The delivery outcome `woken` means ACC woke a Claude Code session through its inbox:
+
+```json
+{ "recipientParticipantId": "models", "outcome": "woken", "transport": "claude-inbox" }
+```
+
+Human output prints it as `woke models via claude-inbox; the message arrives with its next turn`.
+The wake carries only fixed ACC text and the message id. The receipt stays `queued`. The
+session's next-turn hook then shows the body and records the receipt as `offered` via
+`next-turn`.
+
 `reply` additionally returns `receipt`: the original message id, the replying participant,
 and state `acknowledged`. Its `message` and `delivery` describe the outgoing answer.
 Human output distinguishes `recorded <reply-id>` from `acknowledged <original-id>`.
@@ -320,12 +331,12 @@ terminal asks one default-No question for all selected clients that need a decis
 its local service is unavailable or has no loaded session; this does not activate delivery.
 A non-interactive run or a `--dry-run` keeps fresh clients off. A recorded opt-in is kept on upgrade. If the detected
 client cannot receive native delivery - unsupported, below the captured minimum, a
-prerelease, known-bad, a wrong platform, or an unsupported shell - installation keeps the
-effective policy off and prints the reason. Claude Code shell activation writes an owned
-zsh PATH block and a shim that `exec`s the real client; `ACC_BYPASS=1` bypasses that
-activation. Codex LocalDaemon delivery uses recorded installation consent without changing
-ordinary launch arguments. Its opt-in remains active when shim variables are absent or
-bypassed; `acc install --adapter codex --delivery off` disables new native offers. On a
+prerelease, known-bad, or a wrong platform - installation keeps the
+effective policy off and prints the reason. Every adapter reads live-delivery consent from
+the installation record. Claude Code live delivery uses the inbox that each Claude Code
+session opens itself. ACC adds no launch argument, shell file or wrapper for it. Codex
+LocalDaemon delivery also keeps ordinary launch arguments unchanged.
+`acc install --adapter <adapter> --delivery off` disables new native offers for that client. On a
 supported explicit install, complete consent can prepare a missing Codex service. On macOS
 arm64 with Codex 0.154.0 or newer, the same choice includes downloading a missing standalone
 package from OpenAI. ACC selects the installed CLI version and verifies the official
@@ -341,15 +352,14 @@ The install summary names each client's requested policy,
 activation state and verified fallback. `doctor` separates protocol readiness, recorded
 consent and a live channel in the current workspace, with a next step for missing activation.
 A supported version or an installed plugin alone is not an active delivery channel.
-`runtime: active` means ACC has a reachable local transport binding. Claude can still
-block inbound Channels messages while its MCP server and tools remain connected;
-doctor therefore also names the client-side startup check.
+`runtime: active` means ACC has a reachable local transport binding. Claude Code applies
+its own inbound controls to each wake: a session in `bypassPermissions` mode holds the wake
+for approval. See [delivery troubleshooting](TROUBLESHOOTING.md#a-claude-code-session-holds-or-drops-acc-wakes).
 In doctor JSON, `nativeDelivery.activation` distinguishes missing launch setup from a
 recorded setup (or `not_required` for a pre-existing service). `policy` is the installed
 choice. `deliveryDecision` gives its known source and reports legacy provenance as unknown.
-`nativeServiceSetup` reports service infrastructure separately. `sessionPolicy` describes a native binding when one is visible. Existing Claude
-sessions can retain their launch policy after a different choice is installed for new
-sessions; Codex checks current recorded consent before new offers.
+`nativeServiceSetup` reports service infrastructure separately. `sessionPolicy` describes a native binding when one is visible.
+Every adapter rereads the current recorded consent at hooks and before new offers.
 `nativeDelivery.sessions` lists each current session's identity, present transport state
 and `lastAttempt`: timestamp, startup/turn event, effective policy and its source, whether
 that policy was missing/invalid/off, whether a client process was identified, and the closed

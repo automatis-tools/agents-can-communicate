@@ -73,12 +73,25 @@ never copy the peer body.
 
 A live adapter must match its declared evidence contract, one current
 generation-bound binding and recipient opt-in. Opaque endpoints remain private
-and outside repositories. Claude Code Channel and Codex LocalDaemon delivery are
+and outside repositories. Claude Code inbox wakes and Codex LocalDaemon delivery are
 experimental and off by default. Codex verifies the exact receiver thread,
 canonical cwd, live process, stable version and protocol, and rereads recorded
 consent before offers. A loaded daemon thread can receive messages after its TUI
 exits. Delivery off and uninstall prevent new Codex submissions; a submission
 already accepted by the vendor queue cannot be withdrawn.
+
+A Claude Code inbox wake carries only fixed ACC text. It is one line with the message id,
+and it carries no subject, body, sender name or other peer byte. The body reaches the model
+only through the next-turn hook, inside the untrusted `acc-peer-message` block. Before each
+wake, ACC checks that the session registry still names the same pid, session id and socket,
+so a wake never reaches a reused pid.
+
+ACC connects to the inbox without credentials. It never reads the session's
+`CLAUDE_CODE_MESSAGING_TOKEN` or its `.key` file, and it sends no auth line. A frame with
+that token would pass as the session's own child and skip the receiver's inbound controls.
+ACC also never attests a permission mode. Claude Code's inbound controls therefore stay the
+user's: a session in `bypassPermissions` mode holds each wake for approval unless
+`crossSessionInbound` is `accept`, and `refuse` drops wakes.
 
 On captured Codex/macOS configurations, live opt-in also grants outgoing access to ACC's
 state and local Unix sockets through a deny-by-default network proxy. Custom permission

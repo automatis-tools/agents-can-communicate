@@ -102,10 +102,14 @@ All recipients have the same durable record, but adapters expose different accel
 - **Next normal turn:** exact captured versions of Codex, Claude Code, Gemini CLI, Antigravity CLI and Kimi
   Code can receive complete attributed peer context when the user next prompts that client.
   This does not wake an idle session.
-- **Optional Claude Code channel:** supported Claude Code versions on Apple Silicon macOS
-  may receive an addressed actionable message while idle. This is experimental, off by
-  default, can spend tokens, never interrupts a running turn, and requires the vendor's
-  visible development-channel warning.
+- **Optional Claude Code inbox wake:** on Apple Silicon macOS with Claude Code 2.1.282 or
+  later, ACC wakes the session through the inbox socket that the session opens itself. The
+  wake is one line of fixed ACC text with the message id. It carries no subject, body or
+  sender name. An idle session starts a turn. A busy session takes the wake between two tool
+  calls and keeps its turn. Each delivered wake fires `UserPromptSubmit`, ACC's next-turn
+  hook, which shows the message in its untrusted block. The model answers with
+  `acc reply`. This is experimental, off by default and can spend tokens. Claude Code's
+  own inbound controls apply to each wake.
 
 - **Optional Codex LocalDaemon delivery:** on Apple Silicon macOS, a captured
   minimum of 0.152.1 plus a current probe and exact session checks allow delivery

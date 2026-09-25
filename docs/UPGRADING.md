@@ -1,11 +1,52 @@
 # Upgrading to 0.5.0
 
+## From 0.7.x
+
+Claude Code live delivery wakes each session through the inbox socket that Claude Code opens
+for every session. The research-preview Channels path of 0.7.x is retired. Update as usual:
+
+```bash
+acc update
+acc version
+acc doctor
+```
+
+`acc update` and `acc install` retire these 0.7.x parts automatically:
+
+- the `claude` shim that 0.7.x put early on `PATH`, and its PATH block in `~/.zshrc`
+- the Channel entry `acc-channel` in the plugin `.mcp.json`, from every kept plugin copy
+- the `acc-bootstrap` and `acc-claude-channel` launchers
+- the bootstrap cache
+
+The shim and the `~/.zshrc` block are hash-checked. An edited shim or block is kept, and
+the command reports it. Remove a kept one by hand when you no longer need it. An old shim
+that is still on `PATH` launches the plain `claude` command, without
+`--dangerously-load-development-channels`.
+
+Live-delivery consent comes only from the installation record, and upgrading keeps the
+recorded policy. ACC ignores `ACC_NATIVE_DELIVERY_POLICY`, `ACC_BYPASS` and
+`ACC_BOOTSTRAP_DEBUG`. For Claude Code, the consent question now says that a session in
+`bypassPermissions` mode asks before each ACC wake.
+
+A Claude Code session that started through the old shim keeps its Channel until it exits.
+Its next turn binds the inbox. Start new sessions with your ordinary `claude` command.
+
+The Claude Code live-delivery minimum is now 2.1.282 on Apple Silicon macOS. With an older
+Claude Code, live delivery stays off and the recorded policy is kept. Update Claude Code and
+start a new session: the recorded policy applies to it, with nothing to install again.
+`acc doctor` reports the state. Native Windows keeps next-turn delivery.
+
+This release adds no new store event type or field, so a store it writes stays readable by
+0.7.x. The Channel captures remain as history in
+`packages/adapter-claude-code/COMPATIBILITY.md`.
+
 ## Recover missing runtime contracts
 
 ACC 0.5.5 fixes an upgrade defect that can leave 0.5.3 or 0.5.4 waiting for
 `acc-claude-channel` processes with `contract unknown`. The 0.4.x updater can activate
-a newer generation without copying its store contract into the active pointer. Channels
-started afterward copy that incomplete pointer even though their runtime declares a contract.
+a newer generation without copying its store contract into the active pointer. Claude Code
+Channel processes started afterward copy that incomplete pointer even though their runtime
+declares a contract.
 
 For an installation already waiting on an older pending release, run:
 
@@ -21,8 +62,8 @@ needed because the older updater retries its pending release before checking npm
 version. If a version pin selects an older release, clear it or select 0.5.5 first.
 
 The reader verifies the referenced generation's package identity, complete contents and
-file modes before recovering a missing contract. Compatible Channels can keep running on
-their original generation during activation. Explicit differing contracts and unknown
+file modes before recovering a missing contract. Compatible Channel processes can keep
+running on their original generation during activation. Explicit differing contracts and unknown
 native bindings still block. A generation without a contract, missing files, or changed
 contents remains unknown. ACC does not terminate these processes or edit their lease records.
 
@@ -51,15 +92,15 @@ policy is default or contains only ACC's legacy state root. Custom policies are 
 and reported as unverified. See [outgoing permissions](CONFIGURATION.md#codex-outgoing-permissions).
 If doctor names a missing local service, follow its prerequisite or explicit install action
 before opening the new session. A supported explicit install can prepare the service. It
-does not make a session-bound channel ready.
+does not make a session-bound transport ready.
 
 Run `acc doctor` in the project after the new clients have started (or submitted a normal
-turn). Its per-session lines now explain missing launch consent, an unidentified client
+turn). Its per-session lines now explain missing consent, an unidentified client
 process and a failed or timed-out handshake. `nativeDelivery.sessions[].lastAttempt` in
 `acc doctor --json` provides the same closed metadata and timestamp. Existing owners may
 have no attempt record until a new hook runs; missing metadata does not prove hooks are
-disabled. A previous successful handshake and a connected MCP server do not prove that
-Claude admitted inbound Channels messages. See [delivery troubleshooting](TROUBLESHOOTING.md#i-enabled-live-delivery-but-got-fallback).
+disabled. A previous successful handshake does not prove that the session is reachable
+now. See [delivery troubleshooting](TROUBLESHOOTING.md#i-enabled-live-delivery-but-got-fallback).
 
 Upgrading preserves delivery consent. If doctor reports native delivery off and you want
 automatic peer requests, use `acc install --adapter codex --delivery actionable` (or the

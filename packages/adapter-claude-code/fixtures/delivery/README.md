@@ -4,6 +4,13 @@ These redacted fixtures record only what an installed client actually exposed. A
 `result` of `fail` is a boundary finding, not a test failure, and does not certify native
 delivery.
 
+The three Channel captures (2.1.252, 2.1.258 and 2.1.260) are history. ACC removed the
+Channels path in issue #130, and these files certify no shipped transport. Claude Code live
+delivery now wakes the session through its inbox socket. Its captures are
+`../inbox-wake-2.1.282.json`, the transport capture, and `claude-code-2.1.282.json` in this
+directory, the real-client product capture of the installed candidate with its product
+evidence. `COMPATIBILITY.md` records both.
+
 `claude-code-2.1.252.json` records the documented development-channel invocation on
 macOS arm64. Claude Code displayed its full-screen security warning before it spawned
 the configured `acc-spike` MCP child. The operator cancelled instead of bypassing the
