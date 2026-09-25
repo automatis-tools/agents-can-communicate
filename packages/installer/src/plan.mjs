@@ -122,8 +122,18 @@ export function planInstallation({ adapters, detected, context, action = "instal
       && native.activationPlan?.eligible === true;
     const effectiveLivePolicy = liveDeliverySupported ? delivery : "off";
     const previous = recordedById.get(entry.adapterId)?.nativeActivation ?? null;
+    // What a failed readiness probe may keep. Not a shell bootstrap: no adapter
+    // can plan one any more, so keeping it would keep a launch path nothing
+    // maintains - the 0.7.x `claude` shim. Not an activation recorded under a
+    // contract the adapter no longer declares: it describes a transport that is
+    // gone, the Claude Channel among them.
+    const declaredContracts = new Set((adapter.nativeDelivery?.anchors ?? [])
+      .map(anchor => anchor.protocolContract));
+    const retainable = previous !== null && declaredContracts.has(previous.protocolContract)
+      ? { ...previous, mechanisms: previous.mechanisms.filter(item => item.kind !== "shell-bootstrap") }
+      : null;
     const retainedActivation = action === "install" && delivery !== "off"
-      && !liveDeliverySupported && previous?.livePolicy === delivery ? previous : null;
+      && !liveDeliverySupported && retainable?.livePolicy === delivery ? retainable : null;
     const configuredLivePolicy = retainedActivation ? delivery : effectiveLivePolicy;
     const deliveryDiagnostic = action === "install" && delivery !== "off"
       && !liveDeliverySupported
@@ -150,7 +160,9 @@ export function planInstallation({ adapters, detected, context, action = "instal
       : null;
     // A failed readiness probe is not revocation. Keep existing guarded launch
     // setup without applying service commands or claiming it is available.
-    const retirements = retainedActivation ? [] : planActivationRetirements({ previous, desired: nativeActivation });
+    const retirements = retainedActivation
+      ? previous.mechanisms.filter(item => item.kind === "shell-bootstrap")
+      : planActivationRetirements({ previous, desired: nativeActivation });
     const deactivation = retirements.length > 0 ? { ...previous, mechanisms: retirements } : null;
     const artifacts = (record?.artifacts ?? adapter.planInstall(installContext))
       .map(artifact => ({ path: artifact.path, kind: artifact.kind ?? "file" }))
