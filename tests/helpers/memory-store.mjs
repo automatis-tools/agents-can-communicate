@@ -151,7 +151,10 @@ export function createMemoryStore({ clock, ids, workspaceId }) {
   // A double that removed a record whose generation had moved would let a
   // caller pass its tests and lose a renewed claim in the only place that
   // matters, so the generation check is real here too.
-  async function reclaimRecords(entries) {
+  async function reclaimRecords(plan) {
+    // A function is decided here rather than by the caller, exactly as the
+    // filesystem store decides it under the writer mutex.
+    const entries = typeof plan === "function" ? await plan() : plan;
     let reclaimed = 0;
     let skipped = 0;
     for (const entry of entries) {

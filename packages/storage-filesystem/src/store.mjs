@@ -86,7 +86,15 @@ async function nextSequence(paths, root) {
   // away entirely is the case that would otherwise restart at 1 and hand out a
   // sequence a peer already holds a cursor for.
   const floor = await readEventFloor(paths, root);
-  return floor === null ? 1 : Number(floor) + 1;
+  if (floor === null) return 1;
+  // A 16-digit sequence reaches past Number.MAX_SAFE_INTEGER, where adding one
+  // stops changing the value. Refusing is the only honest answer: the next
+  // sequence would repeat one a peer already holds a cursor for.
+  const next = BigInt(floor) + 1n;
+  if (next > BigInt(Number.MAX_SAFE_INTEGER)) {
+    throw new AccError(EXIT.DATA, "event sequence is exhausted", { trimmedThrough: floor });
+  }
+  return Number(next);
 }
 
 export async function openFilesystemStore({ root, clock, ids, workspaceId, failAt,
@@ -421,10 +429,17 @@ export async function openFilesystemStore({ root, clock, ids, workspaceId, failA
    * store deadline still bounds it, so an operator waiting on a busy store is
    * told rather than blocked forever.
    */
-  async function reclaimRecords(entries, { limit, deadlineAt } = {}) {
+  async function reclaimRecords(plan, { limit, deadlineAt } = {}) {
     const bounded = Math.min(deadlineAt ?? Infinity, storeDeadline ?? Infinity);
-    return withWriterMutex(paths, { ...publishOptions, deadlineAt: bounded },
-      () => reclaimStateRecords(paths, entries, { root, limit, deadlineAt: bounded }));
+    return withWriterMutex(paths, { ...publishOptions, deadlineAt: bounded }, async () => {
+      // A function is decided here, holding the mutex, because eligibility is a
+      // statement about relationships between records and not only about each
+      // record. The generation on an entry proves that record did not change;
+      // it says nothing about a session opening for a participant this was
+      // about to remove. Deciding inside the lock is what closes that.
+      const entries = typeof plan === "function" ? await plan() : plan;
+      return reclaimStateRecords(paths, entries, { root, limit, deadlineAt: bounded });
+    });
   }
 
   /**

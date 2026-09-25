@@ -85,8 +85,16 @@ function resolvedMessages(envelopes, messageIds) {
  * quiet session is still someone's.
  */
 function eligibleSessions(envelopes, now, pidIsAlive) {
+  // A live claim names the session that holds it, and that name is how a peer
+  // blocked by the claim finds someone to ask. Removing the session leaves the
+  // claim reading as owned by nobody, so a session keeping a live lease stays
+  // however long it has been quiet. Its claim expiring makes both eligible.
+  const holding = new Set(of(envelopes, "claim")
+    .filter(envelope => Date.parse(envelope.record.expiresAt) > Date.parse(now))
+    .map(envelope => envelope.record.ownerSessionId));
   return of(envelopes, "session")
-    .filter(envelope => classifySessionPresence(envelope.record, now, pidIsAlive) === "offline");
+    .filter(envelope => !holding.has(envelope.id)
+      && classifySessionPresence(envelope.record, now, pidIsAlive) === "offline");
 }
 
 /**
@@ -174,14 +182,25 @@ export function createPruneService(ports) {
    * records out of the store. A caller that means it says so.
    */
   async function prune(input = {}) {
-    const plan = await planPrune(input);
+    let plan = await planPrune(input);
     if (input.apply !== true) {
       return { ...plan, applied: false, reclaimed: 0, skipped: 0, remaining: false,
         trimmedThrough: null };
     }
-    const result = await store.reclaimRecords(plan.entries,
-      { limit: input.limit, deadlineAt: input.deadlineAt });
-    if (plan.before === null) return { ...plan, applied: true, ...result, trimmedThrough: null };
+    // Decided again inside the writer mutex, and that second reading is the one
+    // acted on. Eligibility here is relational - a participant is eligible
+    // because no session of theirs survives - and a generation proves only that
+    // one record did not change. A session opening between the report and the
+    // apply changes the answer without changing any record this had named.
+    let decided = plan;
+    const result = await store.reclaimRecords(async () => {
+      decided = await planPrune(input);
+      return decided.entries;
+    }, { limit: input.limit, deadlineAt: input.deadlineAt });
+    if (decided.before === null) {
+      return { ...decided, applied: true, ...result, trimmedThrough: null };
+    }
+    plan = decided;
     // Records first, then the log. A message removed while its recording event
     // survives reads as history describing a record that is gone, which is
     // ordinary. The reverse - an event log that starts after a message it never

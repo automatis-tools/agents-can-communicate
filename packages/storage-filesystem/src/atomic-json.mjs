@@ -64,7 +64,7 @@ async function replaceHandleBytes(handle, bytes) {
  * @returns {Promise<"published" | "already_published">}
  */
 export async function publishAtomic(destination, bytes,
-  { root, tmpDir, stageDir, replace = false, deadlineAt }) {
+  { root, tmpDir, stageDir, replace = false, deadlineAt, afterAccepted }) {
   assertPublicationDeadline(deadlineAt);
   // The accepted stage lives apart from the partial a failed publication
   // leaves, so what a file is follows from the directory it was created in
@@ -131,7 +131,16 @@ export async function publishAtomic(destination, bytes,
   } finally {
     await handle?.close();
     if (stageAcceptedBytes) {
-      await assertManagedDirectory(root, stageDir);
+      // `ensure`, not `assert`: the sweep empties this directory by renaming it
+      // aside and recreating it, and a publication that began before that swap
+      // arrives here to find the name gone. Both apply the same managed-root
+      // checks - the only difference is that this one recreates what the sweep
+      // has already taken away, instead of failing a write whose bytes are
+      // already published.
+      // The seam the race test uses, in the manner retainFile already
+      // establishes: the window this closes is invisible without one.
+      await afterAccepted?.();
+      await ensureManagedDirectory(root, stageDir);
       await rename(temporary, stage);
       await syncDirectory(stageDir);
     } else {

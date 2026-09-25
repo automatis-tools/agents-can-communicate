@@ -198,3 +198,40 @@ test("naming no boundary leaves history alone", async t => {
   assert.equal(result.trimmedThrough, null);
   assert.equal((await store.eventsSince(WORKSPACE, null, 100)).events.length, before);
 });
+
+test("a session still holding a live claim is kept however quiet it is", async t => {
+  const { service, prune, clock } = makeService();
+  const { live } = await workspaceWith(service);
+  await service.acquireClaim({ sessionId: live.sessionId, generation: live.generation,
+    resource: "file:src/a.mjs", reason: "editing", leaseSeconds: 7 * 24 * 60 * 60 });
+  clock.advance(2 * DAY);
+
+  const plan = await prune.planPrune({ workspaceId: WORKSPACE });
+
+  // The claim names the session that holds it, and that name is how a peer
+  // blocked by it finds someone to ask. One of the two sessions is offline and
+  // free; the one holding the lease is not.
+  assert.equal(plan.counts.sessions, 1);
+  assert.equal(plan.counts.claims, 0);
+});
+
+test("a session that opens between the report and the apply is not removed", async t => {
+  const { service, prune, store, clock } = makeService();
+  await workspaceWith(service);
+  clock.advance(2 * DAY);
+  const reported = await prune.planPrune({ workspaceId: WORKSPACE });
+  assert.equal(reported.counts.participants, 2);
+
+  // Eligibility is relational: a participant is eligible because no session of
+  // theirs survives. A new session changes that answer without changing any
+  // record the report had named, so a generation check cannot catch it. The
+  // decision is taken again under the writer mutex, and that reading is the one
+  // acted on.
+  const fresh = await service.openSession(opening({ participantId: "participant_live" }));
+  assert.ok(fresh.sessionId);
+  const result = await prune.prune({ workspaceId: WORKSPACE, apply: true });
+
+  assert.equal(result.counts.participants, 1);
+  const survivors = (await store.snapshot(WORKSPACE)).participants.map(item => item.participantId);
+  assert.deepEqual(survivors, ["participant_live"]);
+});
