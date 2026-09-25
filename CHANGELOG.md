@@ -1,5 +1,37 @@
 # Changelog
 
+## 0.7.0 — release candidate
+
+- A workspace store can give space back. `acc prune` reports what a workspace no longer needs
+  and reclaims it only when asked; a bounded pass reclaims retired transaction journals and
+  superseded retention markers without being asked, because neither has a reader. One workspace
+  on the maintainer's machine held 14,434 files and now holds 1,437.
+- `acc prune --before <cursor>` trims the event log to a point the operator names, and `sync`
+  reports `trimmedThrough` so a caller whose cursor precedes the boundary can tell it was served
+  a short page. An older ACC cannot, which is why trimming history is never automatic.
+- `acc status` no longer reports a finished work intent as current work. `acc work --clear`
+  marks an intent done rather than erasing it, and nothing read that state - so a peer read
+  completed work as work in progress and its resource hints looked reserved.
+- A workspace store's `tmp/` no longer grows by one file per published record. Accepted staging
+  files live in their own directory, and the sweep empties it by detaching the directory rather
+  than deciding file by file.
+- A degraded Antigravity relay ask is no longer spent by a greeting, and a synchronous throw
+  from the activation hint no longer drops the hook's line.
+- The README's closing call to action points at Discussions rather than the issue tracker.
+
+| Candidate artifact | Value |
+|---|---|
+| Built from | `b230fb9d5296376f2ea76deae7ad71bb73b41823` |
+| Tarball | `agents-can-communicate-0.7.0.tgz`, 465,084 bytes, 311 files |
+| sha256 | `ae073277c5df3a48ba0d06e75e76609e24fdfd999dfcef38b086597f764bdbaa` |
+
+The exact archive passed clean installation, doctor, a workspace with no Git, and client
+install/uninstall, and all 28 managed-update packed checks passed against real installed
+archives. On the maintainer's machine 32 workspace stores went from 44,415 files to 4,454, all
+still healthy with 402 records readable. See
+[0.7.0 release evidence](docs/release-evidence/v0.7.0.md) for verification and limits. Earlier
+development records below retain their original provenance.
+
 ## Unreleased — a workspace store can give space back
 
 - A store grew for as long as it was used and offered no way to reclaim anything. One workspace
