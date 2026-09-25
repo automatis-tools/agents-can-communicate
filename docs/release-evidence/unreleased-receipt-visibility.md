@@ -92,8 +92,8 @@ because every receipt transition spreads the record it replaces.
 
 ## Exact local artifact
 
-- Source: clean commit `11a7f535346d1bd67735a1b19ddc8af27cc82843`.
+- Source: clean commit `dbc4acf106033ab6f90977676e34ff495d9472c4`.
 - Archive: `agents-can-communicate-0.7.0.tgz`, packed from that commit.
-- Size: 468,803 bytes; 311 packed entries.
-- SHA-256: `251c182236046e2a3b3db7816a1830f3eb76a09e7535793c08043df1a6ff6fac`.
+- Size: 469,045 bytes; 311 packed entries.
+- SHA-256: `881db778b7b2afd1f6b824f7759bb181da0f2bbebd8770368f71a7e2e23873cb`.
 - Package version remains `0.7.0`; this is an unpublished development artifact.

@@ -22,9 +22,9 @@
 
 | Candidate artifact | Value |
 |---|---|
-| Built from | `11a7f535346d1bd67735a1b19ddc8af27cc82843` |
-| Tarball | `agents-can-communicate-0.7.0.tgz`, 468,803 bytes, 311 files |
-| sha256 | `251c182236046e2a3b3db7816a1830f3eb76a09e7535793c08043df1a6ff6fac` |
+| Built from | `dbc4acf106033ab6f90977676e34ff495d9472c4` |
+| Tarball | `agents-can-communicate-0.7.0.tgz`, 469,045 bytes, 311 files |
+| sha256 | `881db778b7b2afd1f6b824f7759bb181da0f2bbebd8770368f71a7e2e23873cb` |
 
 This unpublished development archive passed clean installation verification. See
 [receipt visibility evidence](docs/release-evidence/unreleased-receipt-visibility.md) and the
