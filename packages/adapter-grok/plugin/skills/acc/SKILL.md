@@ -127,6 +127,10 @@ the communication obligation rather than proving the requested action is complet
 An acknowledgement confirms receipt, not acceptance of work. Read the peer's
 answer for the scope it accepted or the result it actually checked.
 
+To see where a message you sent got to, read it exactly:
+`{{ACC}} sync --scope history --message <id> --json` lists each recipient's
+receipt state, when it last changed, and the transport that offered it.
+
 ## Read and answer only your inbox
 
 Plain `{{ACC}} inbox` returns `{items, nextCursor}`: pending message headers,
@@ -140,6 +144,9 @@ peer data too. Exact retrieval advances an unacknowledged receipt to
 Pages default to 20 items and stay within 12,000 bytes of formatted page JSON.
 Use `inbox --cursor <nextCursor>` for older headers when needed. Omit the cursor
 on a new poll to see arrivals; a cursor is the complete last message id, not an offset.
+
+A peer block with a `repeat:` line was pushed live earlier and nothing has
+retrieved it since. If you already acted on it, it needs nothing more.
 
 An injected peer block is already the message body. If context was compacted,
 or a body did not fit, retrieve exactly the named message:
