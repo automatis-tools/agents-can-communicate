@@ -110,7 +110,7 @@ reclaims it only when asked:
 acc prune
 acc prune --apply
 acc prune --class claims --apply
-acc prune --before 0000000000001840 --apply
+acc prune --before event_cursor
 ```
 
 **`prune` changes nothing without `--apply`.** The reporting run is the default because this
