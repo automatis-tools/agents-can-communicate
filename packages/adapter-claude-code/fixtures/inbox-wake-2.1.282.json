@@ -1,0 +1,44 @@
+{
+  "note": "Transport capture of the Claude Code session inbox, run on Claude Code 2.1.282, macOS arm64, 2026-09-25, before any ACC code used it. A receiving interactive TUI session ran from the real executable in auto mode with ACC 0.7.0 hooks installed and no Channel. A separate process, not a child of the receiver, wrote one JSON line per connection to the socket the session registry named, with no auth line and no token. Session ids, paths, pids and message text are redacted; outcomes are read from the receiver's own transcript records and ACC's store events.",
+  "clientVersion": "2.1.282",
+  "platform": "darwin-arm64",
+  "observedAt": "2026-09-25T19:40:41.000Z",
+  "registry": {
+    "file": "<config>/sessions/<pid>.json",
+    "fieldsRead": ["pid", "sessionId", "messagingSocketPath"],
+    "sessionIdEqualsHookSessionId": true,
+    "statusValuesSeen": ["idle", "busy", "waiting"]
+  },
+  "frame": {
+    "shape": { "type": "user", "message": { "role": "user", "content": "<text>" }, "msg_id": "<id>" },
+    "authLine": "absent",
+    "socketAnswer": "none"
+  },
+  "idle": {
+    "result": "new turn started without user input",
+    "transcriptRecord": "user, isMeta, origin.kind peer, verifiedPeerPid set",
+    "userPromptSubmitFired": true
+  },
+  "busy": {
+    "result": "queued while a Bash tool call ran; delivered after its tool_result, before the next tool call; the turn continued",
+    "transcriptRecord": "attachment queued_command, origin.kind peer",
+    "userPromptSubmitFired": true
+  },
+  "accWake": {
+    "frameCarried": "ACC wording and the message id only",
+    "idle": "the beforeTurn projection showed the queued ACC question in its untrusted block; the model answered with acc reply; the store recorded the answer and acknowledged",
+    "midTurn": "the same projection arrived with the UserPromptSubmit that the mid-turn frame fired; the model answered after its running commands",
+    "offerRecordedAs": "next-turn"
+  },
+  "inbound": {
+    "promptingReceiverUnattestedSender": "delivered",
+    "promptingReceiverSenderAttestsBypass": "held with an approval dialog; registry status waiting; deny dropped it",
+    "bypassReceiver": "unobserved"
+  },
+  "burst": {
+    "framesFromSeparateProcesses": 6,
+    "delivered": 6,
+    "queuedFramesDeliveredInOneTurn": 5,
+    "userPromptSubmitPerFrame": true
+  }
+}

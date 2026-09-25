@@ -10,6 +10,7 @@
 // paths, and secrets have no field here by design.
 
 import { assertAntigravityRunEvidence } from "../e2e/antigravity-relay-evidence.mjs";
+import { assertClaudeInboxRunEvidence } from "../e2e/claude-inbox-evidence.mjs";
 import { assertRunEvidence } from "../e2e/codex-local-daemon-evidence.mjs";
 
 export const CAPTURE_CAPABILITY = "native_delivery";
@@ -19,6 +20,7 @@ export const CAPTURE_CAPABILITY = "native_delivery";
 export const INSTALLED_PRODUCT_EVIDENCE = Object.freeze({
   "codex-cli": assertRunEvidence,
   "antigravity-cli": assertAntigravityRunEvidence,
+  "claude-code": assertClaudeInboxRunEvidence,
 });
 const INSTALLED_PRODUCT_CLIENTS = Object.keys(INSTALLED_PRODUCT_EVIDENCE);
 export const UNOBSERVED = "unobserved";
@@ -50,10 +52,11 @@ export const DELIVERY_LAUNCH_MODES = Object.freeze([
 ]);
 
 // `busy` deliberately has no "the turn was not interrupted" value: a pass must
-// show the queued message presented after the turn, or an explicit rejection.
+// show when the queued message was presented - after the turn, or between two
+// tool calls of it (the Claude Code inbox) - or an explicit rejection.
 export const PASSING_DELIVERY_BRANCHES = Object.freeze({
   idle: Object.freeze(["offered"]),
-  busy: Object.freeze(["queued_after_turn", "rejected_busy"]),
+  busy: Object.freeze(["queued_after_turn", "presented_between_tool_calls", "rejected_busy"]),
   reply: Object.freeze(["routed"]),
   duplicate: Object.freeze(["same_message_id"]),
   fallback: Object.freeze(["queued"]),
