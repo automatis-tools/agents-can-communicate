@@ -14,7 +14,7 @@ async function fixture(t) {
   const runtime = { version: "0.4.0", root: path.join(managerRoot, "generations", "0.4.0-test") };
   await mkdir(path.join(runtime.root, "bin", "entrypoints"), { recursive: true });
   const marker = path.join(root, "imported");
-  for (const kind of ["acc", "acc-hook", "acc-mcp", "acc-bootstrap", "acc-claude-channel"]) {
+  for (const kind of ["acc", "acc-hook", "acc-mcp", "acc-antigravity-relay"]) {
     await writeFile(path.join(runtime.root, "bin", "entrypoints", `${kind}.mjs`),
       `import {writeFile,readFile,readdir} from 'node:fs/promises';
 `
@@ -33,9 +33,7 @@ async function fixture(t) {
   return { root, managerRoot, runtime, marker, control };
 }
 function child(t, f, kind) {
-  const args = kind === "acc-bootstrap" ? ["--adapter", "claude_code", "--real-executable",
-    process.execPath, "--data-home", f.root] : [];
-  const code = `process.argv = [process.execPath, "fixture", ...${JSON.stringify(args)}];
+  const code = `process.argv = [process.execPath, "fixture"];
 import {runEntry} from ${JSON.stringify(entry)}; await runEntry(${JSON.stringify({
     kind, managerRoot: f.managerRoot, packageRoot: path.join(f.root, "missing-source") })});`;
   const cp = spawn(process.execPath, ["--input-type=module", "-e", code], {
@@ -55,9 +53,9 @@ async function ready(c) {
   assert.fail(`entry never ready: ${JSON.stringify(c.output())}`);
 }
 
-test("all five entry points register the actual process before importing the selected runtime", async t => {
+test("every entry point registers the actual process before importing the selected runtime", async t => {
   const f = await fixture(t);
-  for (const kind of ["acc", "acc-hook", "acc-mcp", "acc-bootstrap", "acc-claude-channel"]) {
+  for (const kind of ["acc", "acc-hook", "acc-mcp", "acc-antigravity-relay"]) {
     const c = child(t, f, kind);
     await ready(c);
     assert.equal(await readFile(f.marker, "utf8"), kind);
@@ -97,12 +95,12 @@ test("a reclaimed generation degrades acc management-only recovery instead of cr
   assert.match(c.output().stderr, /runtime unavailable/i);
 });
 
-test("a reclaimed generation degrades the claude channel to graceful unavailability instead of crashing", async t => {
+test("a reclaimed generation degrades the relay to graceful unavailability instead of crashing", async t => {
   const f = await fixture(t);
   await writeFile(path.join(f.managerRoot, "control.json"), JSON.stringify({ ...f.control,
     phase: "activating", pending: f.runtime }));
   await rm(f.runtime.root, { recursive: true, force: true });
-  const c = child(t, f, "acc-claude-channel");
+  const c = child(t, f, "acc-antigravity-relay");
   const [code] = await c.done;
   assert.equal(code, 0);
   assert.match(c.output().stderr, /coordination unavailable/i);

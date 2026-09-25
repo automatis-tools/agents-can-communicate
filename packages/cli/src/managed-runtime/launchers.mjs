@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import { lstat, mkdtemp, open, readFile, rename, rm } from "node:fs/promises";
 import path from "node:path";
-import { ENTRY_KINDS } from "./entry.mjs";
+import { ENTRY_KINDS, RETIRED_ENTRY_KINDS } from "./entry.mjs";
 import { managedDirectory, syncDirectory } from "./state.mjs";
 
 const MODULES = ["entry.mjs", "command-prefix.mjs", "state.mjs", "generation-files.mjs",
@@ -14,8 +14,6 @@ async function durableFile(file, bytes, mode = 0o600) {
 
 export const stablePaths = root => ({
   cli: path.join(root, "bin", "acc.mjs"), runner: path.join(root, "bin", "acc-hook.mjs"),
-  bootstrap: path.join(root, "bin", "acc-bootstrap.mjs"),
-  channel: path.join(root, "bin", "acc-claude-channel.mjs"),
   antigravityRelay: path.join(root, "bin", "acc-antigravity-relay.mjs"),
 });
 
@@ -57,6 +55,10 @@ export async function writeLaunchers(root, packageRoot) {
       await rename(temporary, path.join(bin, `${kind}.mjs`));
     } finally { await rm(temporary, { force: true }); }
   }
+  // A 0.7.x `claude` shim or plugin copy that still reaches for one of these
+  // finds nothing: the shim then launches the vendor command untouched, and a
+  // re-laid plugin names none of them.
+  for (const kind of RETIRED_ENTRY_KINDS) await rm(path.join(bin, `${kind}.mjs`), { force: true });
   await syncDirectory(bin);
   return stablePaths(root);
 }

@@ -9,7 +9,7 @@ import { MINIMUM_VERSION, PROTOCOL_CONTRACT, addCodexQueueMessage, compareStable
   discoverCodexThreads, evaluateClientVersion, isMethodMissing, locateCodexThread,
   probeCodexQueue, runCodexQueueCapture, serverVersionOf }
   from "../../scripts/spikes/codex-existing-session.mjs";
-import { runProcess } from "../helpers/claude-channel.mjs";
+import { runProcess } from "../helpers/run-process.mjs";
 
 // Kept cohesive above 300 lines because every case drives the same disposable
 // queue probe against one fake App Server; splitting would duplicate the peer.

@@ -5,7 +5,7 @@
   "type": "module",
   "exports": {
     ".": "./src/adapter.mjs",
-    "./channel": "./src/channel.mjs"
+    "./inbox-delivery": "./src/inbox-delivery.mjs"
   },
   "files": [
     "certification.json",
