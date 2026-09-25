@@ -91,3 +91,8 @@ sweep crashed Channel registrations):
    ok  client-home topology, modes, links, and bytes restored; repeated uninstall was a no-op
 PASS
 ```
+
+## Test suite
+
+`npm test` on `8ad1b9b` (the recorded candidate plus its CHANGELOG record): 2538 tests, 2537
+passing, 1 skipped, 0 failing.
