@@ -100,8 +100,14 @@ before it was changed:
 - A session holding a live claim was removed, leaving the claim reading as owned by nobody - and
   that name is how a peer blocked by the claim finds someone to ask.
 
-A fourth: a 16-digit sequence reaches past `Number.MAX_SAFE_INTEGER`, so allocating from a floor
-that high would repeat a sequence a peer already holds a cursor for. The store refuses instead.
+A fourth: a 16-digit sequence reaches past `Number.MAX_SAFE_INTEGER`, so allocating from a name
+that high would repeat a sequence a peer already holds a cursor for. Both the floor and the
+newest event file are counted as BigInt, and a store that has run out refuses.
+
+A second round found two more. Asking for `--class participants` alone judged eligibility from
+the sessions that *could* go rather than the ones that will, so it removed participants and left
+their sessions naming a roster entry that was gone; that combination now reclaims nothing. And
+the sequence guard covered only the floor, not the branch a non-empty directory takes.
 
 ## Limits
 
@@ -113,10 +119,10 @@ Trimming is not reversible. The dry run is the default for that reason.
 
 ## Exact local artifact
 
-- Source: clean commit `d60d2f650845ab90d9fd273909991273fa78a536`.
+- Source: clean commit `b983ae7d8b4aa248f4d508acf59be5f24f31df90`.
 - Archive: `agents-can-communicate-0.6.3.tgz`, packed from that commit.
-- Size: 464,209 bytes; 311 packed entries.
-- SHA-256: `d60d2f650845ab90d9fd273909991273fa78a536256`.
+- Size: 464,437 bytes; 311 packed entries.
+- SHA-256: `b983ae7d8b4aa248f4d508acf59be5f24f31df90256`.
 - Package version remains `0.6.3`; this is an unpublished development artifact.
 
 `npm test` on this tree: 2,537 passing, 0 failing, 1 skipped, of 2,538.
