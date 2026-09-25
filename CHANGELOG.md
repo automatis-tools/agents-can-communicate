@@ -1,5 +1,31 @@
 # Changelog
 
+## 0.7.1 — release candidate
+
+- A sender can see where a message got to. An exact history read,
+  `acc sync --scope history --message <id>`, lists every recipient's receipt: its state, when
+  that last changed, and the transport that offered it.
+- `acc status` counts, per participant, the messages it has not fetched,
+  `unretrieved: {queued, offered}`, and the text line ends with `<n> offered, not retrieved`
+  when there are any.
+- A live offer that nothing followed for 15 minutes is shown once more at the recipient's next
+  turn, on a client that takes next-turn bodies, marked `repeat:`. It is recorded as another
+  offer attempt, never a second message, and never continues a turn.
+- The store format is unchanged, so 0.7.0 and 0.7.1 can share a workspace. Offer facts live in
+  the receipt's `extensions`, and the repeat uses an existing event type.
+
+| Candidate artifact | Value |
+|---|---|
+| Built from | `2967a4cbd1904304265256ca7a5c9eb39f80dcd9` |
+| Tarball | `agents-can-communicate-0.7.1.tgz`, 469,045 bytes, 311 files |
+| sha256 | `651198b550adb6943deea9e358a0ee8da56b2f91685a52b756ce2e8cfe7eb32d` |
+
+The exact archive passed clean installation, doctor, a workspace with no Git, and client
+install/uninstall, and all 28 managed-update packed checks passed against real installed
+archives. The installed archive and the published 0.7.0 read and wrote one store without an
+error. See [0.7.1 release evidence](docs/release-evidence/v0.7.1.md) for verification and
+limits. Earlier development records below retain their original provenance.
+
 ## Unreleased — the sender can see where a message got to
 
 - An exact history read, `acc sync --scope history --message <id>`, lists every recipient's
