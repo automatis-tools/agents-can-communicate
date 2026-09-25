@@ -102,4 +102,4 @@ Trimming is not reversible. The dry run is the default for that reason.
 - SHA-256: `c7ad36de5e829b02b8833434b0ea32eb4ddc6fc2256`.
 - Package version remains `0.6.3`; this is an unpublished development artifact.
 
-`npm test` on this tree: PLACEHOLDER_TESTS.
+`npm test` on this tree: 2,533 passing, 0 failing, 1 skipped, of 2,534.
