@@ -33,7 +33,7 @@ async function machine(t) {
   const hook = async (name, { kind = "SessionStart", policy = "actionable", pid = true,
     bindNativeSession, policySource } = {}) => {
     if (policy !== null) {
-      await recordInstall({ dataHome, adapterId: claudeCodeAdapter.id, version: "2.1.266",
+      await recordInstall({ dataHome, adapterId: claudeCodeAdapter.id, version: "2.1.282",
         artifacts: [], deliveryPolicy: policy });
     }
     const adapter = { ...claudeCodeAdapter,
@@ -45,7 +45,7 @@ async function machine(t) {
         prompt: "secret-prompt-must-not-be-recorded" }, dataHome, env,
       readProcessTable: async () => pid
         ? new Map([[process.pid, { ppid: 1, comm: "claude" }]]) : new Map(),
-      probeClientVersion: async () => "2.1.266", platform: "darwin-arm64" });
+      probeClientVersion: async () => "2.1.282", platform: "darwin-arm64" });
     assert.equal(result.failed, undefined, result.reason);
     assert.equal(result.timedOut, undefined);
     return result;
@@ -95,13 +95,17 @@ test("a later turn replaces the failed attempt; old success never claims current
   let [session] = await m.doctor();
   assert.equal(session?.lastAttempt?.reasonCode, "handshake_failed");
   const active = await m.hook("retry", { kind: "UserPromptSubmit", bindNativeSession: async () => ({
-    supported: true, clientVersion: "2.1.266", protocolContract: "claude-code-channel-mcp-v1",
+    supported: true, clientVersion: "2.1.282", protocolContract: "claude-code-inbox-socket-v1",
     modes: ["livePush"], opaqueEndpointRef: "secret-endpoint-and-vendor-error",
     leaseUntil: new Date(Date.now() + 60_000).toISOString(), reasonCode: null }) });
   [session] = await m.doctor();
   assert.equal(session.lastAttempt.state, "active");
   assert.equal(session.sessionId, failed.accSessionId);
-  assert.equal(session.runtime, "active");
+  // Doctor verifies a leased binding through the adapter's refresh. This
+  // fixture's opaque reference has no inbox endpoint behind it, so the live
+  // check reports it undeliverable - the attempt itself stays the active one.
+  assert.equal(session.runtime, "degraded");
+  assert.equal(session.delivery.deliverable, false);
   await active.service.clearDeliveryBinding({ sessionId: failed.accSessionId,
     generation: active.generation ?? failed.generation });
   [session] = await m.doctor();
@@ -139,7 +143,7 @@ test("doctor ignores superseded or corrupt attempts and closed sessions", async 
 
 test("handshake timeout and recorded consent survive into doctor without vendor output", async t => {
   const m = await machine(t);
-  await recordInstall({ dataHome: m.dataHome, adapterId: "claude_code", version: "2.1.266",
+  await recordInstall({ dataHome: m.dataHome, adapterId: "claude_code", version: "2.1.282",
     artifacts: [], deliveryPolicy: "all" });
   await m.hook("timeout", { policySource: "installation-record", policy: null,
     bindNativeSession: async () => new Promise(() => {}) });
@@ -166,6 +170,8 @@ test("diagnostic write failure cannot discard an otherwise successful hook", asy
 
 test("a diagnostic write past a quarter second is still recorded", async t => {
   const m = await machine(t);
+  await recordInstall({ dataHome: m.dataHome, adapterId: "claude_code", version: "2.1.282",
+    artifacts: [], deliveryPolicy: "off" });
   const preload = path.join(m.home, "paced-diagnostic.mjs");
   await writeFile(preload, `
     import fs from "node:fs/promises";

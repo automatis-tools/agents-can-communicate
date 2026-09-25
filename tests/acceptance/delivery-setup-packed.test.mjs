@@ -36,9 +36,9 @@ const terminal = async (p, args, answer, { expectedCode = 0 } = {}) => {
   if (code !== expectedCode) throw new Error(`terminal install exited ${code}: ${stderr}`);
   return { stdout, stderr };
 };
-const enableClaudeChannelProbe = async p => {
+const enableClaudeInboxProbe = async p => {
   const executable = path.join(p.clientBin, "claude");
-  await writeFile(executable, '#!/bin/sh\n# notifications/claude/channel\nprintf "2.1.266 (Claude Code)\\n"\n');
+  await writeFile(executable, '#!/bin/sh\n# messagingSocketPath\nprintf "2.1.282 (Claude Code)\\n"\n');
   await chmod(executable, 0o755);
 };
 const enableManagedCodex = async p => {
@@ -66,8 +66,8 @@ test("packed CLI asks once for two clients and preserves complete setup decision
   const p = await createPackedAcc(t);
   p.env.CODEX_HOME = path.join(p.clientHome, ".codex");
   p.env.SHELL = "/bin/zsh";
-  await p.setClientVersions({ claude: "2.1.266", codex: "0.154.0" });
-  await enableClaudeChannelProbe(p);
+  await p.setClientVersions({ claude: "2.1.282", codex: "0.154.0" });
+  await enableClaudeInboxProbe(p);
   const commandLog = await enableManagedCodex(p);
   await rm(path.join(p.env.CODEX_HOME, "packages/standalone"), { recursive: true });
   const downloads = path.join(p.root, "downloads.log"), preload = path.join(p.root, "download-failure.mjs");
@@ -119,8 +119,8 @@ test("packed CLI refusal, explicit automation, and dry run keep their distinct e
   const refused = await createPackedAcc(t);
   refused.env.CODEX_HOME = path.join(refused.clientHome, ".codex");
   refused.env.SHELL = "/bin/zsh";
-  await refused.setClientVersions({ claude: "2.1.266", codex: "0.154.0" });
-  await enableClaudeChannelProbe(refused);
+  await refused.setClientVersions({ claude: "2.1.282", codex: "0.154.0" });
+  await enableClaudeInboxProbe(refused);
   const refusedCommands = await enableManagedCodex(refused);
   const selected = ["install", "--adapter", "claude_code", "--adapter", "codex",
     "--home", refused.clientHome];
@@ -235,46 +235,39 @@ test("installed delivery setup preserves opt-in before a Codex service exists an
 });
 
 
-test("doctor asks to complete missing launch setup before asking for a new session", async t => {
+test("doctor asks for a new session once Claude consent is recorded", async t => {
   const p = await createPackedAcc(t);
   p.env.CODEX_HOME = path.join(p.clientHome, ".codex");
-  await p.setClientVersions({ claude: "2.1.266" });
+  await p.setClientVersions({ claude: "2.1.282" });
   const executable = path.join(p.clientBin, "claude");
-  await writeFile(executable, '#!/bin/sh\n# notifications/claude/channel\nprintf "2.1.266 (Claude Code)\\n"\n');
-  p.env.SHELL = "/bin/bash";
+  // Consent recorded while the client could not take the wake yet.
+  await writeFile(executable, '#!/bin/sh\n# inbox unavailable\nprintf "2.1.282 (Claude Code)\\n"\n');
   await p.acc(["install", "--adapter", "claude_code", "--delivery", "actionable"]);
-  p.env.SHELL = "/bin/zsh";
+  await enableClaudeInboxProbe(p);
   const before = (await p.acc(["doctor"])).adapters.find(a => a.adapterId === "claude_code");
   assert.equal(before.nativeDelivery.policy, "actionable");
   if (!captured) {
     assert.equal(before.nativeDelivery.eligibility, "unsupported");
     return;
   }
+  // The inbox is Claude Code's own: nothing is left to install, and the next
+  // step is a session whose hooks bind it.
   assert.equal(before.nativeDelivery.eligibility, "eligible");
-  assert.equal(before.nativeDelivery.activation, "missing");
-  assert.ok(before.remediation.some(line => line.startsWith("acc install --adapter claude_code")),
-    "a restart cannot create the missing launch shim or Channel configuration");
-  await p.acc(["install", "--adapter", "claude_code"]);
-  const after = (await p.acc(["doctor"])).adapters.find(a => a.adapterId === "claude_code");
-  assert.equal(after.nativeDelivery.activation, "recorded");
-  assert.equal(after.nativeDelivery.runtime, "waiting");
-  assert.ok(after.remediation.some(line => /new terminal/.test(line)));
+  assert.equal(before.nativeDelivery.activation, "not_required");
+  assert.equal(before.nativeDelivery.runtime, "waiting");
+  assert.equal(before.remediation.some(line => line.startsWith("acc install --adapter claude_code")), false);
+  assert.ok(before.remediation.some(line => /start a new client session/.test(line)));
 
   // Execute the shipped hook in separate processes. No vendor process is in
-  // their ancestry, so enabled consent must explain the missing PID, while an
-  // ordinary environment reports its absent launch policy independently.
+  // their ancestry, so enabled consent must explain the missing PID.
   const payload = name => ({ hook_event_name: "SessionStart", session_id: name, cwd: p.project });
-  delete p.env.ACC_NATIVE_DELIVERY_POLICY;
-  await p.hook("claude_code", payload("no-consent"), { ACC_PARTICIPANT: "no-consent" });
-  await p.hook("claude_code", payload("no-client-pid"), {
-    ACC_PARTICIPANT: "no-client-pid", ACC_NATIVE_DELIVERY_POLICY: "actionable" });
+  await p.hook("claude_code", payload("no-client-pid"), { ACC_PARTICIPANT: "no-client-pid" });
   const sessions = (await p.acc(["doctor"])).adapters.find(a => a.adapterId === "claude_code")
     .nativeDelivery.sessions;
-  assert.equal(sessions.find(s => s.participantId === "no-consent").lastAttempt.policyStatus, "missing");
   assert.equal(sessions.find(s => s.participantId === "no-client-pid").lastAttempt.reasonCode,
     "client_process_unknown");
   assert.match((await human(p, ["doctor"])).stdout, /client process could not be identified/);
   await p.hook("claude_code", { ...payload("no-client-pid"), hook_event_name: "SessionEnd" });
   assert.equal((await p.acc(["doctor"])).adapters.find(a => a.adapterId === "claude_code")
-    .nativeDelivery.sessions.length, 1);
+    .nativeDelivery.sessions.length, 0);
 });

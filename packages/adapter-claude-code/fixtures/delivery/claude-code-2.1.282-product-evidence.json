@@ -1,0 +1,161 @@
+{
+  "schemaVersion": 1,
+  "source": "real-client-capture",
+  "client": "claude-code",
+  "phase": "product",
+  "clientVersion": "2.1.282",
+  "platform": "darwin-arm64",
+  "packageSha256": "fa81c55588988ed7274636c564a0adb5c442110f014f82e7a3f94da26fdd8891",
+  "startedAt": "2026-09-25T21:31:56.000Z",
+  "finishedAt": "2026-09-25T21:35:56.792Z",
+  "scenarioCount": 6,
+  "passedCount": 6,
+  "failedCount": 0,
+  "cleanup": {
+    "attempted": true,
+    "outcome": "passed",
+    "ownedProcesses": "stopped",
+    "temporaryState": "removed"
+  },
+  "scenarios": [
+    {
+      "caseId": "C01",
+      "outcome": "passed",
+      "startedAt": "2026-09-25T21:31:56.000Z",
+      "finishedAt": "2026-09-25T21:32:44.339Z",
+      "messageId": "message_EaLKeCerBFIR_o0gQpT4vQ",
+      "observations": [
+        {
+          "kind": "delivery",
+          "at": "2026-09-25T21:32:44.339Z",
+          "outcome": "woken"
+        },
+        {
+          "kind": "wake",
+          "at": "2026-09-25T21:31:56.373Z",
+          "outcome": "started-turn"
+        },
+        {
+          "kind": "projection",
+          "at": "2026-09-25T21:31:56.808Z",
+          "outcome": "body-shown"
+        },
+        {
+          "kind": "offer",
+          "at": "2026-09-25T21:31:56.724Z",
+          "outcome": "next-turn"
+        }
+      ]
+    },
+    {
+      "caseId": "C02",
+      "outcome": "passed",
+      "startedAt": "2026-09-25T21:33:05.000Z",
+      "finishedAt": "2026-09-25T21:34:19.560Z",
+      "messageId": "message_YFDLjj4jtNLDsC67GV9Y1g",
+      "observations": [
+        {
+          "kind": "delivery",
+          "at": "2026-09-25T21:34:19.560Z",
+          "outcome": "woken"
+        },
+        {
+          "kind": "wake",
+          "at": "2026-09-25T21:33:05.316Z",
+          "outcome": "between-tool-calls"
+        },
+        {
+          "kind": "projection",
+          "at": "2026-09-25T21:33:17.285Z",
+          "outcome": "body-shown"
+        },
+        {
+          "kind": "offer",
+          "at": "2026-09-25T21:33:17.207Z",
+          "outcome": "next-turn"
+        }
+      ]
+    },
+    {
+      "caseId": "C03",
+      "outcome": "passed",
+      "startedAt": "2026-09-25T21:31:56.000Z",
+      "finishedAt": "2026-09-25T21:32:44.370Z",
+      "messageId": "message_EaLKeCerBFIR_o0gQpT4vQ",
+      "observations": [
+        {
+          "kind": "answer",
+          "at": "2026-09-25T21:32:16.968Z",
+          "outcome": "recorded"
+        },
+        {
+          "kind": "receipt",
+          "at": "2026-09-25T21:32:16.968Z",
+          "outcome": "acknowledged"
+        }
+      ]
+    },
+    {
+      "caseId": "C04",
+      "outcome": "passed",
+      "startedAt": "2026-09-25T21:34:28.000Z",
+      "finishedAt": "2026-09-25T21:34:56.510Z",
+      "messageId": "message_zzo8wi26wFyq8hfGvAsWIw",
+      "observations": [
+        {
+          "kind": "logical-message",
+          "at": "2026-09-25T21:34:56.510Z",
+          "outcome": "same-message-id"
+        },
+        {
+          "kind": "wake",
+          "at": "2026-09-25T21:34:28.385Z",
+          "outcome": "delivered-once"
+        }
+      ]
+    },
+    {
+      "caseId": "C05",
+      "outcome": "passed",
+      "startedAt": "2026-09-25T21:35:44.000Z",
+      "finishedAt": "2026-09-25T21:35:56.792Z",
+      "messageId": "message_owEZDIuuC0KygynZk-b0Hg",
+      "observations": [
+        {
+          "kind": "delivery",
+          "at": "2026-09-25T21:35:56.792Z",
+          "outcome": "queued"
+        },
+        {
+          "kind": "client",
+          "outcome": "exited",
+          "at": "2026-09-25T21:35:47.000Z"
+        }
+      ]
+    },
+    {
+      "caseId": "C06",
+      "outcome": "passed",
+      "startedAt": "2026-09-25T21:35:05.000Z",
+      "finishedAt": "2026-09-25T21:35:34.783Z",
+      "messageId": "message_tDm0K7jQWFVKmVhs_t_29Q",
+      "observations": [
+        {
+          "kind": "delivery",
+          "at": "2026-09-25T21:35:34.783Z",
+          "outcome": "woken"
+        },
+        {
+          "kind": "wake",
+          "at": "2026-09-25T21:35:05.754Z",
+          "outcome": "started-turn"
+        },
+        {
+          "kind": "other-session",
+          "at": "2026-09-25T21:35:34.783Z",
+          "outcome": "not-woken"
+        }
+      ]
+    }
+  ]
+}

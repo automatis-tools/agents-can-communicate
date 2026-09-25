@@ -10,9 +10,11 @@ import { promisify } from "node:util";
 const run = promisify(execFile);
 const repo = path.resolve(import.meta.dirname, "..", "..");
 const acc = path.join(repo, "bin", "acc.mjs");
-// Until the inbox wake has a product capture, the adapter declares no native
-// contract, and every platform gets the same durable fallback.
-const assertNativeReason = text => assert.match(text, /live delivery is not certified in this build/);
+// A 2.1.252 client is older than the inbox wake's first capture. Away from the
+// captured platform the reason is the platform itself.
+const capturedPlatform = process.platform === "darwin" && process.arch === "arm64";
+const assertNativeReason = text => assert.match(text, capturedPlatform
+  ? /2\.1\.252.*2\.1\.282/ : /not verified on this platform/);
 
 
 async function machine(t) {
@@ -63,7 +65,7 @@ for (const policy of ["actionable", "all"]) {
 
     const installed = await place.command("install", "--adapter", "claude_code",
       "--delivery", policy, "--home", place.home);
-    assert.match(installed.stdout, /no native delivery channel; fallback: next-turn hooks/);
+    assertNativeReason(installed.stdout);
     for (const tree of await place.pluginTrees()) {
       await assert.rejects(readFile(path.join(tree, ".mcp.json")), { code: "ENOENT" });
       assert.equal((await readFile(path.join(tree, "hooks", "hooks.json"), "utf8"))

@@ -125,28 +125,23 @@ export const PASS_EXPECTATIONS = Object.freeze({
       ["only tool calls reaching PreToolUse are guarded"]),
     nextTurn("fixtures/UserPromptSubmit.json", "UserPromptSubmit",
       "delivery requires the next normal user turn"),
-    ...nativeDelivery("claude-code", "2.1.258", "2026-09-02T21:20:11.676Z",
-      "fixtures/delivery/claude-code-2.1.258.json", "claude-code-channel-mcp-v1",
-      "offered", "queued_after_turn", [
-          "captured on darwin-arm64 only; Linux and Windows remain uncaptured",
-          "the vendor development-channel warning stayed visible and was accepted by the operator by hand",
-          "the plugin .mcp.json must live in the marketplace source copy; the plugin cache copy alone is not read",
-          "acc_reply routed through the spike's explicit tool call; the spike created no durable ACC answer record",
-          "presentation after the busy turn was observed by the operator; the channel log records the write at 21:18:45Z and the explicit reply at 21:19:21Z"
-    ]),
-    // Passing evidence beside 2.1.258, and deliberately not a second anchor:
-    // an anchor is the minimum's proof, while this contract admits a newer
-    // stable client by probe and handshake. The release capture is what
-    // exercised that rule rather than replacing the tier it rests on.
-    ...nativeDelivery("claude-code", "2.1.260", "2026-09-04T03:41:29.688Z",
-      "fixtures/delivery/claude-code-2.1.260.json", "claude-code-channel-mcp-v1",
-      "offered", "queued_after_turn", [
-          "captured on darwin-arm64 only; Linux and Windows remain uncaptured",
-          "the vendor development-channel warning stayed visible and was accepted by the operator by hand",
-          "two ordinary sessions in one workspace, each bound to its own client process; the earlier 2.1.259 attempt is what exposed the channel binding another session identity, and this run is the verification of that fix",
-          "duplicate was observed as one logical message id and one native offer: the repeated send took the durable path, so the channel was never asked to notify twice, and exactly one answer was recorded",
-          "busy was observed by the operator: the running turn completed before the channel presented the message, and the session named that order in its own answer"
-    ]),
+    // The inbox wake's product capture: a private candidate of this branch,
+    // real Claude Code 2.1.282 sessions, six cases. The Channel captures it
+    // replaced are history now, kept as fixtures beside it.
+    ...nativeDelivery("claude-code", "2.1.282", "2026-09-25T21:35:56.792Z",
+      "fixtures/delivery/claude-code-2.1.282.json", "claude-code-inbox-socket-v1", "offered",
+      "presented_between_tool_calls", [
+      "Observed on darwin-arm64 with Claude Code 2.1.282 in the TUI, model Sonnet 5, auto permission mode, through a private candidate built from this branch and installed with an isolated ACC data home; the plugin registration in the real Claude config directory was restored byte for byte afterwards.",
+      "Every wake carried ACC wording and the message id only. The body reached the model through the UserPromptSubmit projection that each delivered wake fired, inside the untrusted acc-peer-message block.",
+      "An idle session started a turn with no user input. A wake sent while a Bash tool call ran was taken after that call returned and before the next one, and the turn continued.",
+      "The observed reply loop uses the installed acc reply CLI; native delivery.replyRoute remains false. The router reports a wake as outcome woken via claude-inbox and leaves the receipt queued until the hook's output carried the body, which records it offered via next-turn.",
+      "A repeated logical send kept its message id, took the durable path because the receipt was already acknowledged, and produced exactly one wake.",
+      "Two sessions in one workspace each bound their own inbox; a message addressed to one never woke the other.",
+      "An exited session left no registry entry; the next message stayed queued as recipient_unavailable.",
+      "A receiving session in bypassPermissions mode was not captured; Claude Code documents that such a session holds each wake whose sender does not attest bypass, and ACC never attests a mode.",
+      "Linux and native Windows remain uncaptured.",
+    ], ["delivery.livePush"])
+      .map(entry => ({ ...entry, launchMode: "ordinary-command-with-installed-hooks" })),
   ]),
   "adapter-codex": [
     ...withFacts("codex-cli", "0.147.0", [

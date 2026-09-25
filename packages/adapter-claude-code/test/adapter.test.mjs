@@ -117,17 +117,24 @@ test("only capabilities observed in a real session are declared true", () => {
   assert.equal(capabilities.lifecycle.childSessions, false);
   assert.equal(capabilities.context.startupInjection, false);
   assert.equal(capabilities.delivery.nextTurn, true);
-  // The Channel path is gone and the inbox wake has no product capture yet.
-  assert.equal(capabilities.delivery.livePush, false);
+  // The inbox wake's 2.1.282 product capture; the reply is the ordinary CLI.
+  assert.equal(capabilities.delivery.livePush, true);
   assert.equal(capabilities.delivery.replyRoute, false);
 });
 
-test("no native contract is declared until the inbox capture certifies one", () => {
+test("Claude Code declares the inbox wake contract", () => {
   const adapter = createClaudeCodeAdapter();
-  assert.equal(adapter.nativeDelivery, undefined);
-  for (const method of ["offerMessage", "routeReply", "bindNativeSession"]) {
-    assert.equal(adapter[method], undefined, method);
+  assert.equal(adapter.nativeDelivery.offerKind, "wake");
+  assert.equal(adapter.nativeDelivery.policySource, "installation-record");
+  assert.deepEqual(adapter.nativeDelivery.activationKinds, ["native-service"]);
+  assert.deepEqual(adapter.nativeDelivery.minimumByPlatform, { "darwin-arm64": "2.1.282" });
+  assert.deepEqual(adapter.nativeDelivery.anchors, [{ platform: "darwin-arm64", version: "2.1.282",
+    protocolContract: "claude-code-inbox-socket-v1" }]);
+  for (const method of ["probeNativeDelivery", "planNativeActivation", "bindNativeSession",
+    "refreshNativeSession", "retireNativeSession", "offerMessage"]) {
+    assert.equal(typeof adapter[method], "function", method);
   }
+  assert.equal(adapter.routeReply, undefined);
 });
 
 test("captured payloads normalise and drop conversation content", async () => {
@@ -240,6 +247,8 @@ test("doctor states that the handoff is not written at SessionEnd", async t => {
   assert.match(report.diagnostics.join(" "), /captured/);
   assert.doesNotMatch(report.diagnostics.join(" "), /Channel/,
     "doctor still describes the removed Channel path");
+  assert.match(report.diagnostics.join(" "), /bypasses permission prompts holds each ACC wake/,
+    "doctor hid the inbound control that can hold a wake");
   assert.doesNotMatch(report.diagnostics.join(" "), /native delivery is off/,
     "a historical failed capture was reported as current delivery state");
   assert.match(report.diagnostics.join(" "), /next-turn.*acc inbox/,

@@ -18,6 +18,9 @@
     "fixtures/delivery/claude-code-2.1.252.json",
     "fixtures/delivery/claude-code-2.1.258.json",
     "fixtures/delivery/claude-code-2.1.260.json",
+    "fixtures/delivery/claude-code-2.1.282.json",
+    "fixtures/delivery/claude-code-2.1.282-product-evidence.json",
+    "fixtures/inbox-wake-2.1.282.json",
     "src/",
     "plugin/"
   ]
