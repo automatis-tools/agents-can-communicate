@@ -153,10 +153,12 @@ This check is what stops a wake from reaching a recycled pid.
 - Protocol contract `claude-code-inbox-socket-v1`. `offerKind: "wake"`.
 - `delivery: { nextTurn: true, livePush: true, replyRoute: false }`. The reply goes through the
   ordinary `acc reply` path that every adapter has, not through the transport.
-- Minimum and anchor: `2.1.282` on `darwin-arm64`, from a new fixture
-  `fixtures/delivery/claude-code-2.1.282.json` built from the 2026-09-25 capture (launch mode
-  `ordinary-command`, idle `woken`, busy `delivered_between_tool_calls`, reply `acc_reply_cli`).
-  A release capture with the packed artifact is required before release, as it was for 2.1.260.
+- Minimum and anchor: `2.1.282` on `darwin-arm64`, from a real-client product capture of the
+  packed candidate: `fixtures/delivery/claude-code-2.1.282.json` with launch mode
+  `ordinary-command-with-installed-hooks` and its product evidence file. The closed capture
+  vocabulary gains two passing values: busy `presented_between_tool_calls` (the 2026-09-25
+  observation) and reply `answered_through_cli` (the answer is an `acc reply` record, not a
+  transport route). Idle stays `offered`.
 - The Channel evidence rows (2.1.252, 2.1.258, 2.1.260) certified a transport that no longer
   ships. They leave `certification.json`, and their fixtures and `COMPATIBILITY.md` history stay.
 - Native Windows is out of scope: it needs an auth line on a named pipe, and it has no capture.
