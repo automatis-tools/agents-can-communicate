@@ -154,6 +154,37 @@ test("one eligible certified binding is offered and only then committed", async 
   assert.equal((await receipt(f.store, message.messageId)).state, "offered");
 });
 
+const wakeAdapter = offerMessage => {
+  const adapter = certifiedAdapter(offerMessage);
+  return { ...adapter, nativeDelivery: { ...adapter.nativeDelivery, offerKind: "wake" } };
+};
+
+test("an accepted wake leaves the receipt queued for the next-turn hook and records nothing", async () => {
+  const f = await fixture({ adapter: wakeAdapter(async ({ binding }) => ({ accepted: true,
+    transport: "claude-inbox", clientVersion: binding.clientVersion })) });
+  await publish(f.service, f.sessions[0]);
+  const message = await send(f.service, f.sender);
+  const before = (await f.store.eventsSince(WORKSPACE, null, 100)).events.length;
+
+  assert.deepEqual(await f.router.offer(message), [{ recipientParticipantId: "models",
+    outcome: "woken", transport: "claude-inbox" }]);
+  assert.equal((await receipt(f.store, message.messageId)).state, "queued");
+  assert.equal((await f.store.eventsSince(WORKSPACE, null, 100)).events.length, before);
+});
+
+test("a rejected wake is recorded as a failed offer", async () => {
+  const f = await fixture({ adapter: wakeAdapter(async () => ({ accepted: false,
+    transport: "claude-inbox", clientVersion: "1.2.3", safeErrorCode: "recipient_unavailable" })) });
+  await publish(f.service, f.sessions[0]);
+  const message = await send(f.service, f.sender);
+
+  assert.deepEqual(await f.router.offer(message), durable("recipient_unavailable"));
+  assert.equal((await receipt(f.store, message.messageId)).state, "queued");
+  const failed = (await f.store.eventsSince(WORKSPACE, null, 100)).events
+    .find(event => event.type === "message.offer_failed");
+  assert.equal(failed.payload.transport, "claude-inbox");
+});
+
 test("an adapter throw observes queued and cannot advance the receipt", async () => {
   let stateAtOffer;
   let f;

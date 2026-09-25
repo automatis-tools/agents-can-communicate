@@ -6,9 +6,15 @@ import test from "node:test";
 
 import { createDeliveryRouter } from "@agents-can-communicate/delivery-router";
 
-import { main, recordAndOffer } from "../src/main.mjs";
+import { main, recordAndOffer, recordedText } from "../src/main.mjs";
 
 const message = { messageId: "message_a", toParticipantIds: ["models"] };
+
+test("a woken recipient is reported as woken, with the body still to come", () => {
+  assert.equal(recordedText(message, [{ recipientParticipantId: "models", outcome: "woken",
+    transport: "claude-inbox" }]),
+  "recorded message_a; woke models via claude-inbox; the message arrives with its next turn");
+});
 
 test("the CLI composition seam records before it offers", async () => {
   const order = [];

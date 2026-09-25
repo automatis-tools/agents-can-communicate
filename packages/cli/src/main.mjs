@@ -138,9 +138,11 @@ function obligationFor(kind, explicit, addressed) {
   return obligation;
 }
 
-function recordedText(message, delivery) {
+export function recordedText(message, delivery) {
   const diagnostics = delivery.map(item => item.outcome === "offered"
     ? `live offered to ${item.recipientParticipantId} via ${item.transport}`
+    : item.outcome === "woken"
+      ? `woke ${item.recipientParticipantId} via ${item.transport}; the message arrives with its next turn`
     : item.outcome === "queued"
       ? item.errorCode === "transport_permission_denied"
         ? "live offer blocked by sender permissions; message remains queued; run acc doctor in the sending session"

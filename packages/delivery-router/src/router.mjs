@@ -5,7 +5,7 @@ import { refreshExpiredBinding } from "./refresh-binding.mjs";
 const SAFE_ERRORS = new Set(["ambiguous_recipient_sessions", "delivery_disabled",
   "recipient_busy", "recipient_unavailable", "transport_error", "transport_rejected", "transport_permission_denied",
   "unsupported_client_version"]);
-const NAMED_LIVE_TRANSPORTS = new Set(["claude-channel", "codex-app-server"]);
+const NAMED_LIVE_TRANSPORTS = new Set(["claude-channel", "claude-inbox", "codex-app-server"]);
 
 const adaptersById = adapters => adapters instanceof Map
   ? adapters
@@ -213,6 +213,13 @@ export function createDeliveryRouter({ service, adapters, clock, platform = HOST
       await recordFailure(binding, message, participantId, transport,
         "unsupported_client_version");
       return durable(participantId, "unsupported_client_version");
+    }
+    // A wake put a notice in front of the client, not the body. Recording it
+    // as offered would make the next-turn projection treat the body as already
+    // shown and leave it out of the very turn the wake started. The receipt
+    // stays queued; the hook records the offer once its stdout carried the body.
+    if (adapter.nativeDelivery?.offerKind === "wake") {
+      return { recipientParticipantId: participantId, outcome: "woken", transport };
     }
     try {
       await service.recordOfferSucceeded({ messageId: message.messageId,
