@@ -63,7 +63,7 @@ function nativeHookAdapter(onBind = () => {}, policySource) {
     certification: { evidence: [pass("native-client", "2.1.258", "delivery.livePush")] },
     nativeDelivery: { minimumByPlatform: { "darwin-arm64": "2.1.258" },
       anchors: [{ platform: "darwin-arm64", version: "2.1.258",
-        protocolContract: "native-v1" }], knownBad: [], activationKinds: ["shell-bootstrap"],
+        protocolContract: "native-v1" }], knownBad: [], activationKinds: ["native-service"],
       ...(policySource === undefined ? {} : { policySource }) },
     normalizeHook: payload => payload,
     denyOutcome: reason => ({ stdout: "", stderr: reason, exitCode: 2 }),

@@ -154,7 +154,7 @@ test("a replacement turn retains its client PID and performs one native handshak
       capability: "delivery.livePush", result: "pass" }] },
     nativeDelivery: { minimumByPlatform: { [platform]: "1.0.0" },
       anchors: [{ platform, version: "1.0.0", protocolContract: "fixture-v1" }],
-      knownBad: [], activationKinds: ["shell-bootstrap"] },
+      knownBad: [], activationKinds: ["native-service"] },
     bindNativeSession: async input => {
       calls.push(input);
       return { supported: true, clientVersion: "1.0.0", protocolContract: "fixture-v1",
@@ -163,8 +163,12 @@ test("a replacement turn retains its client PID and performs one native handshak
     },
   });
   await f.prepare("native-delivery");
-  const result = await f.invoke("beforeTurn", "native-delivery", {
-    env: { ...f.packed.env, ACC_NATIVE_DELIVERY_POLICY: "actionable" }, platform });
+  // Consent recorded after the session opened, so only the replacement turn binds.
+  const { recordInstall } = await import(pathToFileURL(path.join(f.packed.installed, "node_modules",
+    "@agents-can-communicate", "installer", "src", "index.mjs")).href);
+  await recordInstall({ dataHome: f.packed.dataHome, adapterId: "fixture", version: "1.0.0",
+    artifacts: [], deliveryPolicy: "actionable" });
+  const result = await f.invoke("beforeTurn", "native-delivery", { platform });
   assert.equal(result.failed, undefined, result.reason);
   assert.equal(result.nativeBinding.state, "active");
   assert.equal(calls.length, 1);

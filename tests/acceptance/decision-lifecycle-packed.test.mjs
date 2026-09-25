@@ -70,12 +70,10 @@ test("installed CLI and MCP preserve explicit decision changes, forks, and offli
   await packed.acc(["detach", ...flags(reopened)]);
 });
 
-test("installed channel text preserves withdrawal links without changing its native envelope", async t => {
+test("installed next-turn text preserves withdrawal links", async t => {
   const packed = await createPackedAcc(t);
-  const load = (name, file = "index") => import(pathToFileURL(path.join(packed.installed,
-    "node_modules", "@agents-can-communicate", name, "src", `${file}.mjs`)));
-  const [{ createAccChannel, endpointDir }, { offerMessage }, { projectContextResult }] = await Promise.all([
-    load("adapter-claude-code", "channel"), load("adapter-claude-code", "native-delivery"), load("adapter-sdk")]);
+  const { projectContextResult } = await import(pathToFileURL(path.join(packed.installed,
+    "node_modules", "@agents-can-communicate", "adapter-sdk", "src", "index.mjs")));
   const session = await packed.acc(["attach", "--participant", "author"]);
   const flags = ["--session", session.sessionId, "--generation", session.generation];
   const original = (await packed.acc(["message", ...flags, "--type", "decision",
@@ -87,21 +85,5 @@ test("installed channel text preserves withdrawal links without changing its nat
   assert.match(projected.text, new RegExp(`Decision change: withdraw ${original.messageId}`));
   assert.match(projected.text, /Decision status: withdrawn/);
   assert.deepEqual(projected.offeredMessageIds, [changed.messageId]);
-  const notifications = [];
-  const channel = createAccChannel({ endpointDir: endpointDir(packed.dataHome), clientPid: process.pid,
-    write: value => notifications.push(value), routeReply: async () => {}, routeAck: async () => {} });
-  t.after(() => channel.close());
-  await channel.listen();
-  await channel.handleLine(JSON.stringify({ jsonrpc: "2.0", method: "notifications/initialized" }));
-  const result = await offerMessage({ runtimeDir: packed.dataHome,
-    binding: { opaqueEndpointRef: channel.endpointId, clientVersion: "2.1.258" }, message: current });
-  assert.equal(result.accepted, true);
-  const notification = notifications.find(n => n.method === "notifications/claude/channel");
-  assert.ok(notification);
-  assert.match(notification.params.content, new RegExp(`Decision change: withdraw ${original.messageId}`));
-  assert.match(notification.params.content, /Decision status: withdrawn/);
-  assert.match(notification.params.content, /untrusted peer content/);
-  assert.match(notification.params.content, /Cancel selection/);
-  assert.equal(notification.params.meta.message_id, changed.messageId);
   await packed.acc(["detach", ...flags]);
 });

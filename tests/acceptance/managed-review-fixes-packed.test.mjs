@@ -1,6 +1,5 @@
 import assert from "node:assert/strict";
-import { execFile, spawn } from "node:child_process";
-import { once } from "node:events";
+import { execFile } from "node:child_process";
 import { mkdir, readFile, readdir, rm, symlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 import test from "node:test";
@@ -78,57 +77,6 @@ for (const direction of ["runtime into repository", "data home inside repository
     assert.deepEqual(await f.snapshotClientFiles(), homeBefore);
   });
 }
-
-// Removing Channel admission fallback must cause EOF instead of MCP replies.
-test("packed fenced Channel answers MCP without workspace discovery or a runtime lease", async t => {
-  const f = await createPackedAcc(t);
-  await f.acc(["install", "--adapter", "claude_code"]);
-  const state = await stateOf(f);
-  await writeFile(path.join(managerOf(f), "control.json"), JSON.stringify({ ...state,
-    phase: "activating", pending: state.active }));
-  await writeFile(path.join(f.project, "acc.workspace.json"), "malformed");
-  const workspaceFiles = async () => (await readdir(f.dataHome, { recursive: true }))
-    .filter(file => !file.startsWith(path.join("acc", "runtime")));
-  const before = await workspaceFiles();
-  const channel = spawn(process.execPath, [path.join(managerOf(f), "bin", "acc-claude-channel.mjs")],
-    { cwd: f.project, env: f.env, stdio: ["pipe", "pipe", "pipe"] });
-  const exited = once(channel, "exit");
-  t.after(() => { if (channel.exitCode === null) channel.kill("SIGKILL"); });
-  let buffer = "";
-  const replies = [];
-  channel.stdout.setEncoding("utf8").on("data", chunk => {
-    buffer += chunk;
-    while (buffer.includes("\n")) {
-      const newline = buffer.indexOf("\n");
-      replies.push(JSON.parse(buffer.slice(0, newline))); buffer = buffer.slice(newline + 1);
-    }
-  });
-  const request = async (id, method, params) => {
-    channel.stdin.write(JSON.stringify({ jsonrpc: "2.0", id, method, params }) + "\n");
-    const deadline = Date.now() + 5_000;
-    while (!replies.some(reply => reply.id === id) && channel.exitCode === null && Date.now() < deadline) {
-      await new Promise(resolve => setTimeout(resolve, 20));
-    }
-    const reply = replies.find(value => value.id === id);
-    assert.ok(reply, `Channel did not answer ${method}; exit=${channel.exitCode}`);
-    return reply;
-  };
-  const initialized = await request(1, "initialize", { protocolVersion: "2024-11-05" });
-  assert.equal(initialized.result.protocolVersion, "2024-11-05");
-  assert.equal(initialized.result.capabilities["claude/channel"], undefined);
-  assert.deepEqual((await request(2, "tools/list")).result.tools, []);
-  assert.deepEqual((await request(3, "ping")).result, {});
-  assert.equal(channel.exitCode, null);
-  const leases = await readdir(path.join(managerOf(f), "leases")).catch(error => {
-    if (error.code === "ENOENT") return []; throw error;
-  });
-  for (const file of leases.filter(name => name.endsWith(".json"))) {
-    assert.notEqual(JSON.parse(await readFile(path.join(managerOf(f), "leases", file), "utf8")).pid, channel.pid);
-  }
-  assert.deepEqual(await workspaceFiles(), before);
-  channel.stdin.end(); assert.equal((await exited)[0], 0);
-  await f.hook("claude_code", {});
-});
 
 // Replacing refresh details with the generic retry notice must fail these diagnostics.
 test("packed manual update explains a failed integration and repairs forward after correction", async t => {

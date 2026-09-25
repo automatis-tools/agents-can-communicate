@@ -82,7 +82,7 @@ function routed(policy, kind, { bindingPolicy = "all", failed = false } = {}) {
       platform: PLATFORM, capability: "delivery.livePush" }] },
     nativeDelivery: { minimumByPlatform: { [PLATFORM]: BOUND },
       anchors: [{ platform: PLATFORM, version: BOUND, protocolContract: "fixture-native-v1" }],
-      knownBad: [], activationKinds: ["shell-bootstrap"],
+      knownBad: [], activationKinds: ["native-service"],
       policySource: "installation-record" },
     offerMessage: async ({ binding: offered }) => {
       offers += 1;

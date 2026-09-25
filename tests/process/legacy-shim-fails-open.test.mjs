@@ -4,12 +4,15 @@ import { mkdtemp, readFile, realpath, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
-import { renderCommandShim } from "../../packages/installer/src/shell-bootstrap.mjs";
+import { renderCommandShim } from "../helpers/legacy-shell-bootstrap.mjs";
 
+// A `claude` shim that ACC 0.7.x wrote stays on a user's PATH until the next
+// `acc install` or `acc update` retires it. Until then it must launch the plain
+// vendor command: never the development-channel flag, never an exported policy.
 const repo = fileURLToPath(new URL("../..", import.meta.url));
-const realBootstrap = path.join(repo, "bin", "acc-bootstrap.mjs");
+const stub = path.join(repo, "bin", "entrypoints", "acc-bootstrap.mjs");
 const USER_ARGS = ["a b", "it's", "*", "", "--flag=value", "$HOME", "`x`", "-n"];
 
 // The vendor is a shell script that records its own pid, its arguments byte for
@@ -66,65 +69,29 @@ async function shimIn(place, { node = process.execPath, bootstrap = place.bootst
   return file;
 }
 
-test("a passing check exports the owned policy, prepends the captured args, and execs in place",
-  async t => {
-    const here = await place(t);
-    const shim = await shimIn(here);
-    const result = await run(shim, USER_ARGS, { FAKE_PROBE: "ok" });
-    const seen = await observed(here.out);
-    assert.equal(result.code, 0);
-    assert.equal(seen.pid, result.pid, "exec did not replace the shim process");
-    assert.equal(seen.policy, "actionable");
-    assert.deepEqual(seen.args, ["--captured-flag", "captured value", ...USER_ARGS]);
-    assert.equal(result.stdout, "");
-  });
-
-test("a failed probe launches the untouched vendor command", async t => {
+test("a 0.7.x shim whose launcher ACC removed runs the vendor command untouched", async t => {
   const here = await place(t);
-  const shim = await shimIn(here);
-  const result = await run(shim, USER_ARGS, { FAKE_PROBE: "no", ACC_NATIVE_DELIVERY_POLICY: "all" });
+  const shim = await shimIn(here, { bootstrap: path.join(here.root, "removed", "acc-bootstrap.mjs"),
+    prefixArgs: ["--dangerously-load-development-channels", "plugin:agents-can-communicate@acc-local"] });
+  const result = await run(shim, USER_ARGS, {});
   const seen = await observed(here.out);
-  assert.equal(seen.pid, result.pid);
-  assert.equal(seen.policy, "<unset>", "a fallback launch must not inherit a policy");
-  assert.deepEqual(seen.args, USER_ARGS);
+  assert.equal(seen.pid, result.pid, "the shim must exec, not wrap, the vendor");
+  assert.equal(seen.policy, "<unset>");
+  assert.deepEqual(seen.args, USER_ARGS, "no development-channel flag may be added");
 });
 
-test("ACC_BYPASS=1 never runs the check and unsets the reserved policy", async t => {
+test("a 0.7.x launcher that reaches the bootstrap stub runs the vendor command untouched", async t => {
   const here = await place(t);
-  const shim = await shimIn(here, { bootstrap: path.join(here.root, "explodes.mjs") });
-  const result = await run(shim, USER_ARGS, { ACC_BYPASS: "1", ACC_NATIVE_DELIVERY_POLICY: "all",
-    FAKE_PROBE: "ok" });
+  // What a 0.7.x managed launcher does with the active generation's entrypoint.
+  const launcher = path.join(here.root, "acc-bootstrap-launcher.mjs");
+  await writeFile(launcher, `const m = await import(${JSON.stringify(pathToFileURL(stub).href)});\n`
+    + "await m.main({});\n");
+  const shim = await shimIn(here, { bootstrap: launcher,
+    prefixArgs: ["--dangerously-load-development-channels", "plugin:agents-can-communicate@acc-local"] });
+  const result = await run(shim, ["hello"], {});
   const seen = await observed(here.out);
   assert.equal(seen.pid, result.pid);
   assert.equal(seen.policy, "<unset>");
-  assert.deepEqual(seen.args, USER_ARGS);
+  assert.deepEqual(seen.args, ["hello"]);
+  assert.equal(result.stdout, "");
 });
-
-test("a missing Node executable or a damaged ACC file falls open to the vendor command",
-  async t => {
-    for (const patch of [{ node: path.join("/", "nonexistent", "node") },
-      { bootstrap: path.join("/", "nonexistent", "acc-bootstrap.mjs") }]) {
-      const here = await place(t);
-      const shim = await shimIn(here, patch);
-      const result = await run(shim, ["only"], { FAKE_PROBE: "ok" });
-      const seen = await observed(here.out);
-      assert.equal(seen.pid, result.pid);
-      assert.equal(seen.policy, "<unset>");
-      assert.deepEqual(seen.args, ["only"]);
-    }
-  });
-
-test("the shipped bootstrap refuses an adapter without a native contract and writes nothing to stdout",
-  async t => {
-    const here = await place(t);
-    const shim = await shimIn(here, { bootstrap: realBootstrap });
-    const result = await run(shim, ["hello"], { ACC_BOOTSTRAP_DEBUG: "1" });
-    const seen = await observed(here.out);
-    assert.equal(seen.pid, result.pid);
-    assert.equal(seen.policy, "<unset>");
-    assert.deepEqual(seen.args, ["hello"]);
-    assert.equal(result.stdout, "");
-    const usage = await run(process.execPath, [realBootstrap, "--adapter"], {});
-    assert.equal(usage.code, 2);
-    assert.equal(usage.stdout, "");
-  });

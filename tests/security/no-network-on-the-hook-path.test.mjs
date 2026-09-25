@@ -30,9 +30,10 @@ const HOOK_PATH = ["hook-runner", "adapter-sdk", "adapter-claude-code", "adapter
   "adapter-gemini-cli", "adapter-grok", "adapter-kimi", "core", "storage-filesystem",
   "protocol"];
 
-// Reached only by the delivery router and the Channel binary, or by the hook's
-// bounded fail-open native handshake; each connects to a local Unix socket path.
-const NATIVE_TRANSPORT = new Set(["channel.mjs", "native-delivery.mjs", "ws-json-rpc.mjs",
+// Reached only by the delivery router, or by the hook's bounded fail-open
+// native handshake; each connects to a local Unix socket path. The Claude inbox
+// wake writes one line to the session's own socket and reads nothing back.
+const NATIVE_TRANSPORT = new Set(["inbox-delivery.mjs", "native-delivery.mjs", "ws-json-rpc.mjs",
   "app-server-client.mjs"]);
 
 // Remote reachability is forbidden everywhere on the hook path. A local Unix

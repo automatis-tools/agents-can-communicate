@@ -6,7 +6,7 @@ import { createPackedAcc } from "../helpers/packed-acc.mjs";
 import { createUpdateRegistry } from "../helpers/update-registry.mjs";
 import { connectMcp } from "../helpers/mcp-client.mjs";
 
-test("packed launchers recover legacy admission and update with two live Channels", { timeout: 90_000 }, async t => {
+test("packed launchers recover legacy admission and update with two live MCP servers", { timeout: 90_000 }, async t => {
   const f = await createPackedAcc(t);
   const registry = await createUpdateRegistry(t, f);
   await f.setClientVersions({ claude: "2.1.266", codex: "0.135.0" });
@@ -16,31 +16,32 @@ test("packed launchers recover legacy admission and update with two live Channel
   const state = () => readFile(controlFile, "utf8").then(JSON.parse);
   const before = await state();
   // A pre-contract updater can publish a newer runtime without this field.
-  // Only the private control fixture is seeded; both Channel processes must
-  // publish their own leases through the installed immutable launchers.
+  // Only the private control fixture is seeded; both long-lived MCP servers
+  // must publish their own leases through the installed immutable launchers.
   delete before.active.storeVersion;
   await writeFile(controlFile, JSON.stringify(before));
-  const channels = [];
+  const servers = [];
   t.after(async () => {
-    for (const client of channels) {
+    for (const client of servers) {
       if (client.child.exitCode === null) client.child.kill("SIGKILL");
       await client.closed;
     }
   });
   for (let index = 0; index < 2; index++) {
     const client = connectMcp({ cwd: f.project, dataHome: f.dataHome, env: f.env,
-      binary: path.join(manager, "bin", "acc-claude-channel.mjs") });
-    channels.push(client);
-    const reply = await client.request("initialize", { protocolVersion: "2024-11-05" });
+      binary: path.join(manager, "bin", "acc-mcp.mjs") });
+    servers.push(client);
+    const reply = await client.request("initialize", { protocolVersion: "2024-11-05",
+      capabilities: {}, clientInfo: { name: "legacy-contract-test", version: "1.0.0" } });
     assert.equal(reply.error, undefined, client.stderr());
   }
   const leases = await Promise.all((await readdir(path.join(manager, "leases")))
     .filter(name => name.endsWith(".json"))
     .map(name => readFile(path.join(manager, "leases", name), "utf8").then(JSON.parse)));
-  for (const client of channels) {
-    const lease = leases.find(item => item.pid === client.child.pid && item.kind === "acc-claude-channel");
-    assert.ok(lease, "the real Channel must publish its actual PID");
-    assert.equal(lease.runtime.storeVersion, 6, "legacy pointers must not poison newly admitted Channels");
+  for (const client of servers) {
+    const lease = leases.find(item => item.pid === client.child.pid && item.kind === "acc-mcp");
+    assert.ok(lease, "the real MCP server must publish its actual PID");
+    assert.equal(lease.runtime.storeVersion, 6, "legacy pointers must not poison newly admitted servers");
   }
   const result = await f.acc(["update"], { ACC_NO_UPDATE_CHECK: "0",
     npm_config_registry: registry.url, npm_config_cache: path.join(f.root, "update-cache") });
@@ -50,8 +51,8 @@ test("packed launchers recover legacy admission and update with two live Channel
   assert.equal(after.active.storeVersion, 6);
   assert.equal(after.pending, null);
   assert.equal(JSON.parse(await readFile(path.join(before.active.root, "package.json"))).version,
-    f.manifest.version, "the live Channels retain their original generation");
-  for (const client of channels) {
+    f.manifest.version, "the live servers retain their original generation");
+  for (const client of servers) {
     assert.equal(client.child.exitCode, null);
     assert.deepEqual((await client.request("ping", {})).result, {});
     assert.equal(await client.close(), 0, client.stderr());

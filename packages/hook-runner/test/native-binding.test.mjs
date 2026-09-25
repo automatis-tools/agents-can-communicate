@@ -28,7 +28,7 @@ function nativeAdapter(bindNativeSession = async () => HANDSHAKE) {
       limitations: ["fixture only"], result: "pass" }] },
     nativeDelivery: { minimumByPlatform: { "darwin-arm64": "2.1.258" },
       anchors: [{ platform: "darwin-arm64", version: "2.1.258", protocolContract: "fixture-native-v1" }],
-      knownBad: [], activationKinds: ["shell-bootstrap"] },
+      knownBad: [], activationKinds: ["native-service"] },
     detect: noop, install: noop, uninstall: noop, doctor: noop,
     normalizeHook: () => ({ kind: "sessionStart", sessionId: "s", cwd: "/tmp" }),
     renderContext: () => "",

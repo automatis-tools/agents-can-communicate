@@ -27,7 +27,7 @@ function certifiedAdapter(offerMessage = async ({ binding }) => ({
       version: "1.2.3", platform: PLATFORM, capability: "delivery.livePush" }] },
     nativeDelivery: { minimumByPlatform: { [PLATFORM]: "1.2.3" },
       anchors: [{ platform: PLATFORM, version: "1.2.3", protocolContract: "fixture-native-v1" }],
-      knownBad: [], activationKinds: ["shell-bootstrap"] },
+      knownBad: [], activationKinds: ["native-service"] },
     offerMessage,
   };
 }
@@ -74,7 +74,7 @@ const singlePlatformAdapter = offerMessage => defineAdapter({
     minimumByPlatform: { [CAPTURED]: MINIMUM },
     anchors: [{ platform: CAPTURED, version: MINIMUM, protocolContract: "fixture-native-v1" }],
     knownBad: [{ version: DENIED, reasonCode: "known_bad_version" }],
-    activationKinds: ["shell-bootstrap"],
+    activationKinds: ["native-service"],
   },
   detect: answers, install: answers, uninstall: answers, doctor: answers,
   normalizeHook: answers, renderContext: answers,
