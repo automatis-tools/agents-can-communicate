@@ -20,11 +20,20 @@ const orderedModes = modes => NATIVE_BINDING_MODES.filter(mode => modes.includes
 export function validateNativeDeliveryContract(value, { certification, client }) {
   const policySource = Object.hasOwn(value ?? {}, "policySource")
     ? value.policySource : "bootstrap-environment";
-  closed({ ...value, policySource },
-    ["minimumByPlatform", "anchors", "knownBad", "activationKinds", "policySource"],
+  // What a successful offer put in front of the model. "message" carries the
+  // body, so the router records the receipt as offered. "wake" carries only a
+  // notice that makes the client run a turn; the body reaches the model through
+  // the next-turn hook, which records the offer itself once its stdout carried
+  // the body. Recording a wake as offered would hide the body from that hook.
+  const offerKind = Object.hasOwn(value ?? {}, "offerKind") ? value.offerKind : "message";
+  closed({ ...value, policySource, offerKind },
+    ["minimumByPlatform", "anchors", "knownBad", "activationKinds", "policySource", "offerKind"],
     "nativeDelivery");
   if (!["installation-record", "bootstrap-environment"].includes(policySource)) {
     usage("nativeDelivery.policySource must be installation-record or bootstrap-environment");
+  }
+  if (!["message", "wake"].includes(offerKind)) {
+    usage("nativeDelivery.offerKind must be message or wake");
   }
   const minimums = value.minimumByPlatform;
   if (!isPlainObject(minimums) || Object.keys(minimums).length === 0) {
@@ -93,7 +102,7 @@ export function validateNativeDeliveryContract(value, { certification, client })
     usage(`nativeDelivery.activationKinds must be unique entries of ${NATIVE_ACTIVATION_KINDS.join(", ")}`);
   }
   return deepFreeze({ minimumByPlatform: { ...minimums }, anchors, knownBad,
-    activationKinds: [...kinds], policySource });
+    activationKinds: [...kinds], policySource, offerKind });
 }
 
 function knownBadHit(contract, version) {

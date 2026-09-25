@@ -166,6 +166,16 @@ test("native policy source defaults to bootstrap environment and accepts install
   assert.equal(withRecord.nativeDelivery.policySource, "installation-record");
 });
 
+test("a native offer carries the message unless the contract says it is a wake", () => {
+  assert.equal(adapter().nativeDelivery.offerKind, "message");
+  const wake = defineAdapter(manifest({ nativeDelivery: { ...nativeDelivery, offerKind: "wake" } }));
+  assert.equal(wake.nativeDelivery.offerKind, "wake");
+  for (const offerKind of [null, "", "push", "WAKE"]) {
+    assert.throws(() => defineAdapter(manifest({ nativeDelivery: { ...nativeDelivery, offerKind } })),
+      /offerKind must be message or wake/);
+  }
+});
+
 test("an invalid native policy source is rejected instead of falling back", () => {
   for (const policySource of [null, "", "environment", "INSTALLATION-RECORD"]) {
     assert.throws(() => defineAdapter(manifest({ nativeDelivery: {
