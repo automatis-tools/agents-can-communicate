@@ -104,6 +104,14 @@ A fourth: a 16-digit sequence reaches past `Number.MAX_SAFE_INTEGER`, so allocat
 that high would repeat a sequence a peer already holds a cursor for. Both the floor and the
 newest event file are counted as BigInt, and a store that has run out refuses.
 
+Later rounds found four more, all of one shape: a class-filtered prune has to be referentially
+closed. Naming only participants removed them while their sessions stayed; naming only sessions
+left their intents behind; participants were judged against messages the same run was removing;
+and what a budget-limited pass had done was not a state the store could be left in, because
+sessions were removed before the intents naming them. Records now leave in reference order -
+receipts, messages, intents, claims, sessions, participants - and a session takes its intent with
+it whatever classes were named.
+
 A second round found two more. Asking for `--class participants` alone judged eligibility from
 the sessions that *could* go rather than the ones that will, so it removed participants and left
 their sessions naming a roster entry that was gone; that combination now reclaims nothing. And
@@ -119,10 +127,10 @@ Trimming is not reversible. The dry run is the default for that reason.
 
 ## Exact local artifact
 
-- Source: clean commit `a2401c7a8f9de120ff2cf251a5a0353b9cfd6d07`.
+- Source: clean commit `20004766427a724be081fc2d0f69576af6f6cd43`.
 - Archive: `agents-can-communicate-0.6.3.tgz`, packed from that commit.
-- Size: 464,660 bytes; 311 packed entries.
-- SHA-256: `518c3d5c0572e7dea2cc91ae3a5aaf9e437386ff1e1709d7cfb21e2e919bb4dd`.
+- Size: 464,867 bytes; 311 packed entries.
+- SHA-256: `140f431e159737c6379325f528a2a24daa1c61dea37fea06bb71d855e3cc90b8`.
 - Package version remains `0.6.3`; this is an unpublished development artifact.
 
 `npm test` on this tree: 2,541 passing, 0 failing, 1 skipped, of 2,542.
