@@ -174,6 +174,20 @@ export function describePresence({ live = 0, stale = 0 } = {}) {
   return `${live} live (${stale} not answering)`;
 }
 
+export function describeStatus(status) {
+  // `live` counts everyone present, which includes sessions gone stale - a
+  // client that exited without its session being closed keeps a record that
+  // stops being answered but does not disappear. Printing the number alone
+  // said "1 live" about a workspace where the last agent had left minutes
+  // before, which is the one thing a person reads this line to find out.
+  const line = `${describePresence(status.counts)}; ${status.counts.claims} claim(s); `
+    + `protection ${status.protection}`;
+  // A transport accepting a message is not a model reading it. Said only when
+  // it is true of something, so the everyday line stays the everyday line.
+  const offered = status.counts.unretrieved?.offered ?? 0;
+  return offered === 0 ? line : `${line}; ${offered} offered, not retrieved`;
+}
+
 const HANDLERS = Object.freeze({
   attach: async ({ options, context }) => {
     const session = await context.service.openSession({
@@ -336,14 +350,7 @@ const HANDLERS = Object.freeze({
   status: async ({ options, context }) => {
     const status = await context.service.collectStatus({
       participantId: options.participant, all: options.all === true });
-    // `live` counts everyone present, which includes sessions gone stale - a
-    // client that exited without its session being closed keeps a record that
-    // stops being answered but does not disappear. Printing the number alone
-    // said "1 live" about a workspace where the last agent had left minutes
-    // before, which is the one thing a person reads this line to find out.
-    const text = `${describePresence(status.counts)}; ${status.counts.claims} claim(s); `
-      + `protection ${status.protection}`;
-    return { data: status, text };
+    return { data: status, text: describeStatus(status) };
   },
 
   config: async ({ options, runtime }) => {

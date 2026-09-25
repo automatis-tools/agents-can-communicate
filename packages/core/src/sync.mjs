@@ -4,6 +4,7 @@ import { computeAttention } from "./attention.mjs";
 import { classifySessionPresence } from "./sessions.mjs";
 import { assertMessageId, messagePage } from "./message-pages.mjs";
 import { decisionView, isCurrentDecision } from "./decision-state.mjs";
+import { offerFacts } from "./receipts.mjs";
 
 const DEFAULT_LIMIT = 100;
 const CURSOR = /^[0-9]{16}$/;
@@ -38,7 +39,7 @@ export function createSyncService(ports, sessions) {
     }
     if (exact) assertMessageId(input.messageId);
     const snapshot = await store.snapshot(input.workspaceId ?? store.workspaceId,
-      { kinds: ["message"] });
+      { kinds: exact ? ["message", "receipt"] : ["message"] });
     const messages = snapshot.messages.map(decisionView(snapshot.messages));
     if (!exact) return messagePage(messages, input,
       { include: message => input.current !== true || isCurrentDecision(message),
@@ -47,7 +48,15 @@ export function createSyncService(ports, sessions) {
     if (message === undefined) {
       throw new AccError(EXIT.DATA, "message is not in this workspace's history");
     }
-    return { scope: "history", view: "message", items: [message], nextCursor: null };
+    // Beside the message rather than inside it: the router offers `items[0]`
+    // to a transport, and a sender asking "did they get it" wants every
+    // recipient's answer. `sync --scope full` already shows all of it.
+    const receipts = snapshot.receipts
+      .filter(receipt => receipt.messageId === message.messageId)
+      .sort((left, right) => left.recipientParticipantId.localeCompare(right.recipientParticipantId))
+      .map(receipt => ({ recipientParticipantId: receipt.recipientParticipantId,
+        state: receipt.state, updatedAt: receipt.updatedAt, offer: offerFacts(receipt) }));
+    return { scope: "history", view: "message", items: [message], receipts, nextCursor: null };
   }
 
   async function sync(input = {}) {

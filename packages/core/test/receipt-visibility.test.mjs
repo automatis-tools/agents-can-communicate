@@ -159,3 +159,75 @@ test("a repeat travels only through the next turn", async () => {
     error => error.code === EXIT.DATA && /next turn/.test(error.message));
   assert.equal((await receipt(f, message)).extensions.offer.repeatedAt, null);
 });
+
+test("an exact history read shows every recipient's receipt to its reader", async () => {
+  const f = await fixture();
+  const message = await send(f, { toParticipantIds: ["recipient", "other"] });
+  await offer(f, message);
+  const later = f.clock.advance(60_000);
+  await f.service.readInbox({ ...owner(f.other), messageId: message.messageId });
+
+  const read = await f.service.sync({ scope: "history", messageId: message.messageId });
+
+  assert.deepEqual(read.receipts, [
+    { recipientParticipantId: "other", state: "retrieved", updatedAt: later, offer: null },
+    { recipientParticipantId: "recipient", state: "offered", updatedAt: NOW,
+      offer: { transport: "codex-app-server", at: NOW, repeatedAt: null } },
+  ]);
+  // The router reads a decision back through this same call and offers
+  // `items[0]`: the record it hands a transport must stay the message itself.
+  assert.equal(read.items.length, 1);
+  assert.equal(Object.hasOwn(read.items[0], "receipts"), false);
+  assert.equal(read.items[0].body, "Checked at abc123.");
+});
+
+test("a receipt an older ACC offered reads as offered by an unknown transport", async () => {
+  const f = await fixture();
+  const message = await send(f);
+  await offer(f, message);
+  await rewriteReceipt(f, message, ({ extensions, ...current }) => current);
+
+  const read = await f.service.sync({ scope: "history", messageId: message.messageId });
+
+  assert.deepEqual(read.receipts, [{ recipientParticipantId: "recipient",
+    state: "offered", updatedAt: NOW, offer: null }]);
+});
+
+test("a history page of summaries carries no receipts", async () => {
+  const f = await fixture();
+  await send(f);
+
+  const page = await f.service.sync({ scope: "history" });
+
+  assert.equal(Object.hasOwn(page, "receipts"), false);
+});
+
+test("status counts what each participant has not retrieved, split by how far it got", async () => {
+  const f = await fixture();
+  const offered = await send(f);
+  await offer(f, offered);
+  await send(f);
+  const retrieved = await send(f);
+  await f.service.readInbox({ ...owner(f.recipient), messageId: retrieved.messageId });
+  await send(f, { toParticipantIds: ["other"] });
+
+  const status = await f.service.collectStatus({ workspaceId: WORKSPACE });
+
+  const row = participantId => status.participants
+    .find(item => item.participantId === participantId).unretrieved;
+  assert.deepEqual(row("recipient"), { queued: 1, offered: 1 });
+  assert.deepEqual(row("other"), { queued: 1, offered: 0 });
+  assert.deepEqual(row("sender"), { queued: 0, offered: 0 });
+  assert.deepEqual(status.counts.unretrieved, { queued: 2, offered: 1 });
+});
+
+test("a replaced decision leaves the unretrieved counts, as it leaves the inbox", async () => {
+  const f = await fixture();
+  const old = await send(f, { kind: "decision", obligation: "acknowledge" });
+  await send(f, { kind: "decision", obligation: "acknowledge", supersedes: [old.messageId] });
+
+  const status = await f.service.collectStatus({ workspaceId: WORKSPACE });
+
+  assert.deepEqual(status.participants
+    .find(item => item.participantId === "recipient").unretrieved, { queued: 1, offered: 0 });
+});

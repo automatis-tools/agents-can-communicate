@@ -1,6 +1,7 @@
 import { classifySessionPresence } from "./sessions.mjs";
 import { computeAttention } from "./attention.mjs";
 import { isCurrentIntent } from "./intents.mjs";
+import { decisionView, isCurrentDecision } from "./decision-state.mjs";
 
 /**
  * Protection level, reported from what is actually enforceable.
@@ -87,6 +88,22 @@ export function createStatusService(ports, sessions, deliveryBindings) {
     const claims = snapshot.claims
       .filter(claim => Date.parse(claim.expiresAt) > Date.parse(now));
     const currentBindings = await deliveryBindings.currentBindings(now);
+    // What each recipient has not fetched yet, and how far it got. Offered is
+    // not read: a transport took the bytes. Queued sits beside it so "0
+    // offered" cannot be mistaken for "nothing waits". Replaced decisions
+    // leave these counts exactly as they leave the inbox.
+    const current = new Set(snapshot.messages.map(decisionView(snapshot.messages))
+      .filter(isCurrentDecision).map(message => message.messageId));
+    const unretrieved = new Map();
+    const tally = key => unretrieved.get(key) ?? { queued: 0, offered: 0 };
+    for (const receipt of snapshot.receipts) {
+      if (!current.has(receipt.messageId)
+        || !["queued", "offered"].includes(receipt.state)) continue;
+      for (const key of [receipt.recipientParticipantId, null]) {
+        const counts = tally(key);
+        unretrieved.set(key, { ...counts, [receipt.state]: counts[receipt.state] + 1 });
+      }
+    }
 
     return {
       workspaceId,
@@ -114,6 +131,7 @@ export function createStatusService(ports, sessions, deliveryBindings) {
         // a done record made the command and this line contradict each other.
         intent: intents.find(intent => intent.sessionId === session.sessionId
           && isCurrentIntent(intent))?.summary ?? null,
+        unretrieved: tally(session.participantId),
       })),
       // The owner is named twice on purpose. Every command that reaches a peer
       // takes a participant id, so a claim that gave only a session id sent the
@@ -148,6 +166,7 @@ export function createStatusService(ports, sessions, deliveryBindings) {
         stale: live.filter(item => item.presence === "stale").length,
         claims: claims.length,
         messages: snapshot.messages.length,
+        unretrieved: tally(null),
       },
     };
   }
