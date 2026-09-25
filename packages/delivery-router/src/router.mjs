@@ -72,10 +72,9 @@ export function createDeliveryRouter({ service, adapters, clock, platform = HOST
   readLivePolicy }) {
   const registry = adaptersById(adapters);
 
+  // Read at offer time, not from the binding: consent withdrawn after a session
+  // bound must stop the next offer, not the next rebind.
   async function policyFor(adapter, binding) {
-    if (adapter?.nativeDelivery?.policySource !== "installation-record") {
-      return LIVE_POLICIES.has(binding.livePolicy) ? binding.livePolicy : "off";
-    }
     if (typeof readLivePolicy !== "function") return "off";
     try {
       const policy = await readLivePolicy({ adapter, binding });

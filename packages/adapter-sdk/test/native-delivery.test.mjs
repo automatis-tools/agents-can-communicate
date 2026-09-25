@@ -158,9 +158,9 @@ test("the result and the manifest contract are deeply frozen", () => {
   assert.equal(Object.isFrozen(contract.activationKinds), true);
 });
 
-test("native policy source defaults to bootstrap environment and accepts installation records", () => {
+test("the live policy always comes from the installation record", () => {
   const recorded = adapter().nativeDelivery;
-  assert.equal(recorded.policySource, "bootstrap-environment");
+  assert.equal(recorded.policySource, "installation-record");
   const withRecord = defineAdapter(manifest({ nativeDelivery: {
     ...nativeDelivery, policySource: "installation-record" } }));
   assert.equal(withRecord.nativeDelivery.policySource, "installation-record");
@@ -177,7 +177,9 @@ test("a native offer carries the message unless the contract says it is a wake",
 });
 
 test("an invalid native policy source is rejected instead of falling back", () => {
-  for (const policySource of [null, "", "environment", "INSTALLATION-RECORD"]) {
+  // bootstrap-environment was the policy a Claude shell shim exported; the
+  // shim is gone, so nothing can supply that source any more.
+  for (const policySource of [null, "", "environment", "INSTALLATION-RECORD", "bootstrap-environment"]) {
     assert.throws(() => defineAdapter(manifest({ nativeDelivery: {
       ...nativeDelivery, policySource } })), /policySource/);
   }

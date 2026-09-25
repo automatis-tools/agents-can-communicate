@@ -134,7 +134,8 @@ test("filesystem composition records before an offer failure and keeps command s
         .receipts.find(item => item.messageId === message.messageId).state;
       throw new Error("secret process transport detail");
     } };
-  const router = createDeliveryRouter({ service, adapters: { fixture_adapter: adapter }, clock });
+  const router = createDeliveryRouter({ service, adapters: { fixture_adapter: adapter }, clock,
+    readLivePolicy: async ({ binding }) => binding.livePolicy });
 
   const result = await recordAndOffer({ router, record: () => service.sendMessage({
     sessionId: sender.sessionId, generation: sender.generation,

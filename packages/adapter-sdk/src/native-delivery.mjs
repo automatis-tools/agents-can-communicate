@@ -18,8 +18,11 @@ export { validateNativeActivationPlan } from "./native-activation.mjs";
 const orderedModes = modes => NATIVE_BINDING_MODES.filter(mode => modes.includes(mode));
 
 export function validateNativeDeliveryContract(value, { certification, client }) {
+  // Consent to live delivery is what `acc install` recorded. Up to 0.7.x a
+  // Claude shell shim could export it instead ("bootstrap-environment"); the
+  // shim is gone, and the installation record is the one source left.
   const policySource = Object.hasOwn(value ?? {}, "policySource")
-    ? value.policySource : "bootstrap-environment";
+    ? value.policySource : "installation-record";
   // What a successful offer put in front of the model. "message" carries the
   // body, so the router records the receipt as offered. "wake" carries only a
   // notice that makes the client run a turn; the body reaches the model through
@@ -29,8 +32,8 @@ export function validateNativeDeliveryContract(value, { certification, client })
   closed({ ...value, policySource, offerKind },
     ["minimumByPlatform", "anchors", "knownBad", "activationKinds", "policySource", "offerKind"],
     "nativeDelivery");
-  if (!["installation-record", "bootstrap-environment"].includes(policySource)) {
-    usage("nativeDelivery.policySource must be installation-record or bootstrap-environment");
+  if (policySource !== "installation-record") {
+    usage("nativeDelivery.policySource must be installation-record");
   }
   if (!["message", "wake"].includes(offerKind)) {
     usage("nativeDelivery.offerKind must be message or wake");

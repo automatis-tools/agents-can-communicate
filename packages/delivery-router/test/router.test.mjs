@@ -85,8 +85,12 @@ const singlePlatformAdapter = offerMessage => defineAdapter({
 const reports = version => async () => ({ accepted: true, transport: "codex-app-server",
   clientVersion: version });
 
+// The install record every fixture consents with: the policy its binding
+// recorded, so a case that changes consent changes it in one place.
+const recordedPolicy = async ({ binding }) => binding.livePolicy;
+
 async function fixture({ adapter = certifiedAdapter(), secondRecipientSession = false,
-  omitPlatform = false, platform = PLATFORM, readLivePolicy } = {}) {
+  omitPlatform = false, platform = PLATFORM, readLivePolicy = recordedPolicy } = {}) {
   const clock = createFakeClock(NOW);
   const ids = createFakeIds();
   const store = createMemoryStore({ clock, ids, workspaceId: WORKSPACE });
@@ -597,7 +601,8 @@ test("policy is read again immediately before offer", async () => {
 
 test("missing or failed recorded-policy readers disable live delivery", async () => {
   for (const [name, readLivePolicy] of [
-    ["missing", undefined],
+    // null, because an omitted reader takes the fixture's recorded policy.
+    ["missing", null],
     ["failed", async () => { throw new Error("corrupt installation record"); }],
   ]) {
     let offers = 0;

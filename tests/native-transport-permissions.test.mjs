@@ -58,7 +58,8 @@ for (const code of ["EPERM", "EACCES"]) {
     const adapter = { id: "claude_code", capabilities: { delivery: { livePush: true } },
       nativeDelivery: {}, offerMessage: input => offerMessage({ ...input, runtimeDir: endpoint.runtimeDir,
         connect }) };
-    const router = createDeliveryRouter({ service, clock, adapters: [adapter] });
+    const router = createDeliveryRouter({ service, clock, adapters: [adapter],
+      readLivePolicy: async () => "actionable" });
     const message = await service.sendMessage({ sessionId: sender.sessionId,
       generation: sender.generation, toParticipantIds: ["receiver"], kind: "request",
       obligation: "reply", subject: "permission probe", body: "synthetic",

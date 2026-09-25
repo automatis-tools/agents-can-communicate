@@ -4,7 +4,7 @@ import test from "node:test";
 import { defineAdapter } from "@agents-can-communicate/adapter-sdk";
 import { AccError, EXIT } from "@agents-can-communicate/protocol";
 
-import { LIVE_POLICIES, establishNativeBinding, livePolicyFrom } from "../src/native-binding.mjs";
+import { LIVE_POLICIES, establishNativeBinding } from "../src/native-binding.mjs";
 
 const NOW = "2026-09-02T12:00:00.000Z";
 const noop = async () => ({ ok: true, changes: [], diagnostics: [] });
@@ -82,14 +82,15 @@ test("the hook environment reaches the adapter handshake for endpoint lookup", a
   assert.equal(received.env, env);
 });
 
-test("a missing, malformed, or foreign policy value is off", () => {
+test("a missing, malformed, or foreign policy value is off", async () => {
   assert.deepEqual(LIVE_POLICIES, ["off", "actionable", "all"]);
   for (const value of [undefined, "", "ALL", "1", "true", "actionable ", " off"]) {
-    assert.equal(livePolicyFrom({ ACC_NATIVE_DELIVERY_POLICY: value }), "off", String(value));
+    let handshakes = 0;
+    const result = await establish(nativeAdapter(async () => { handshakes += 1; return HANDSHAKE; }),
+      fakeService(), { livePolicy: value });
+    assert.deepEqual(result, { state: "off", reasonCode: null, modes: [] }, String(value));
+    assert.equal(handshakes, 0, String(value));
   }
-  assert.equal(livePolicyFrom({}), "off");
-  assert.equal(livePolicyFrom(undefined), "off");
-  assert.equal(livePolicyFrom({ ACC_NATIVE_DELIVERY_POLICY: "all" }), "all");
 });
 
 test("an adapter without a native contract is a no-op", async () => {

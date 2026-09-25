@@ -28,7 +28,8 @@ const adapterWith = (offerMessage, { refreshNativeSession, policySource } = {}) 
   offerMessage,
 });
 
-async function fixture(offerMessage, { refreshNativeSession, readLivePolicy,
+async function fixture(offerMessage, { refreshNativeSession,
+  readLivePolicy = async ({ binding }) => binding.livePolicy,
   policySource, secondRecipientSession = false, beforeBindingList } = {}) {
   const clock = createFakeClock(NOW);
   const ids = createFakeIds();

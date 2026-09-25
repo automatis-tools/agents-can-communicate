@@ -565,15 +565,32 @@ test("a session still opens when the client cannot be named", async t => {
   assert.equal(record.pid, null);
 });
 
+test("an exported live policy alone no longer binds a session", async t => {
+  // The variable was the policy a Claude shell shim exported. The shim is gone
+  // and the install record is the only consent a hook reads.
+  const place = await workspace(t);
+  const handshakes = [];
+  const native = nativeHookAdapter(input => { handshakes.push(input.event.kind); });
+  const table = new Map([[process.pid, { ppid: 900, comm: "node" }],
+    [900, { ppid: 1, comm: "native-client" }]]);
+  const started = await runHook({ adapterId: "native", adapters: { native },
+    dataHome: place.dataHome, env: { ACC_NATIVE_DELIVERY_POLICY: "all" },
+    readProcessTable: async () => table, probeClientVersion: async () => "2.1.258",
+    platform: "darwin-arm64", payload: event("sessionStart", { cwd: place.root }) });
+  assert.deepEqual(started.nativeBinding, { state: "off", reasonCode: null, modes: [] });
+  assert.deepEqual(handshakes, []);
+});
+
 test("a native adapter binds at start and retries on a later turn under a live policy", async t => {
   const place = await workspace(t);
   const handshakes = [];
   const native = nativeHookAdapter(input => { handshakes.push(input.event.kind); });
   const table = new Map([[process.pid, { ppid: 900, comm: "node" }],
     [900, { ppid: 1, comm: "native-client" }]]);
-  const env = { ACC_NATIVE_DELIVERY_POLICY: "actionable" };
+  await recordInstall({ dataHome: place.dataHome, adapterId: "native", version: "2.1.258",
+    artifacts: [], deliveryPolicy: "actionable" });
   const runNative = (kind, options = {}) => runHook({ adapterId: "native", adapters: { native },
-    dataHome: place.dataHome, env, readProcessTable: async () => table,
+    dataHome: place.dataHome, env: {}, readProcessTable: async () => table,
     probeClientVersion: async () => "2.1.258", platform: "darwin-arm64",
     payload: event(kind, { cwd: place.root }), ...options });
 
@@ -587,13 +604,12 @@ test("a native adapter binds at start and retries on a later turn under a live p
   assert.equal(turn.nativeBinding.state, "active");
   assert.deepEqual(handshakes, ["sessionStart", "beforeTurn"]);
 
-  // With no exported policy an ordinary launch never handshakes, but still
-  // retires any binding that an earlier consented turn published.
+  // With the policy recorded off a turn never handshakes, but still retires
+  // any binding that an earlier consented turn published.
   handshakes.length = 0;
-  const plain = await runHook({ adapterId: "native", adapters: { native },
-    dataHome: place.dataHome, env: {}, readProcessTable: async () => table,
-    probeClientVersion: async () => "2.1.258", platform: "darwin-arm64",
-    payload: event("beforeTurn", { cwd: place.root }) });
+  await recordInstall({ dataHome: place.dataHome, adapterId: "native", version: "2.1.258",
+    artifacts: [], deliveryPolicy: "off" });
+  const plain = await runNative("beforeTurn");
   assert.deepEqual(plain.nativeBinding, { state: "off", reasonCode: null, modes: [] });
   assert.deepEqual(handshakes, []);
 });
@@ -802,8 +818,10 @@ test("SessionEnd retires core binding before adapter endpoint cleanup", async t 
   } };
   const table = new Map([[process.pid, { ppid: 900, comm: "node" }],
     [900, { ppid: 1, comm: "native-client" }]]);
+  await recordInstall({ dataHome: place.dataHome, adapterId: "native", version: "2.1.258",
+    artifacts: [], deliveryPolicy: "actionable" });
   const invoke = kind => runHook({ adapterId: "native", adapters: { native },
-    dataHome: place.dataHome, env: { ACC_NATIVE_DELIVERY_POLICY: "actionable" },
+    dataHome: place.dataHome, env: {},
     readProcessTable: async () => table, probeClientVersion: async () => "2.1.258",
     platform: "darwin-arm64", payload: event(kind, { cwd: place.root }) });
   const started = await invoke("sessionStart");

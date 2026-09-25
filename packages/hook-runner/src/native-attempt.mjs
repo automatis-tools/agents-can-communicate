@@ -1,7 +1,7 @@
 import { storeNativeAttempt } from "@agents-can-communicate/adapter-sdk";
 import { readInstalledLivePolicyState } from "@agents-can-communicate/installer";
 
-import { establishNativeBinding, LIVE_POLICIES, livePolicyFrom } from "./native-binding.mjs";
+import { establishNativeBinding } from "./native-binding.mjs";
 
 // A cold worker plus the write has to finish inside this window. 250 ms was
 // not enough on a busy CI runner, so the attempt file never appeared and
@@ -27,13 +27,11 @@ export async function bindNative({ adapter, event, hookBinding, clientVersion, p
     if (Date.now() >= deadline) throw new Error("hook deadline expired");
   };
   assertBudget();
-  const policySource = adapter?.nativeDelivery?.policySource === "installation-record"
-    ? "installation-record" : "bootstrap-environment";
-  const raw = context.env?.ACC_NATIVE_DELIVERY_POLICY;
-  const { policy, policyStatus } = policySource === "installation-record"
-    ? await readInstalledLivePolicyState({ dataHome: context.dataHome, adapterId: adapter.id })
-    : { policy: livePolicyFrom(context.env), policyStatus: raw === undefined ? "missing"
-      : !LIVE_POLICIES.includes(raw) ? "invalid" : raw === "off" ? "off" : "enabled" };
+  // The install record is the only consent a hook reads; see
+  // validateNativeDeliveryContract for the environment source this replaced.
+  const policySource = "installation-record";
+  const { policy, policyStatus } = await readInstalledLivePolicyState({ dataHome: context.dataHome,
+    adapterId: adapter.id });
   assertBudget();
   const result = await establishNativeBinding({ adapter, event, hookBinding, clientVersion, platform,
     livePolicy: policy, service: context.service, runtimeDir: paths.root,

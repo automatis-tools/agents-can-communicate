@@ -20,13 +20,6 @@ const STATIC_REASONS = new Set(["native_delivery_unsupported", "platform_not_cap
   "version_unavailable", "prerelease_not_captured", "below_minimum_version",
   "known_bad_version"]);
 
-// Only the value a successful owned shell bootstrap exported counts; anything
-// else - missing, blank, differently cased, a number - is off.
-export function livePolicyFrom(env) {
-  const value = env?.ACC_NATIVE_DELIVERY_POLICY;
-  return LIVE_POLICIES.includes(value) ? value : "off";
-}
-
 const isPid = value => Number.isInteger(value) && value > 0;
 
 export async function establishNativeBinding({ adapter, event, hookBinding, clientVersion,
