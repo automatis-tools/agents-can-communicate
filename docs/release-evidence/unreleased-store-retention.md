@@ -104,6 +104,10 @@ A fourth: a 16-digit sequence reaches past `Number.MAX_SAFE_INTEGER`, so allocat
 that high would repeat a sequence a peer already holds a cursor for. Both the floor and the
 newest event file are counted as BigInt, and a store that has run out refuses.
 
+A later round found that `--before` was checked for shape but not against the log, so a mistyped
+cursor could be persisted as a floor above every sequence still available - leaving a workspace
+that could never publish again. A boundary past what the store has issued is now refused.
+
 Later rounds found four more, all of one shape: a class-filtered prune has to be referentially
 closed. Naming only participants removed them while their sessions stayed; naming only sessions
 left their intents behind; participants were judged against messages the same run was removing;
@@ -127,10 +131,10 @@ Trimming is not reversible. The dry run is the default for that reason.
 
 ## Exact local artifact
 
-- Source: clean commit `20004766427a724be081fc2d0f69576af6f6cd43`.
+- Source: clean commit `71f3f374e2ae0f07f692e4d72f4f2caa255d19d5`.
 - Archive: `agents-can-communicate-0.6.3.tgz`, packed from that commit.
-- Size: 464,867 bytes; 311 packed entries.
-- SHA-256: `140f431e159737c6379325f528a2a24daa1c61dea37fea06bb71d855e3cc90b8`.
+- Size: 465,088 bytes; 311 packed entries.
+- SHA-256: `d45ba2264996a792d32bd71cb0b09cd5498f5f3a8679106f6da3dc4ac279235d`.
 - Package version remains `0.6.3`; this is an unpublished development artifact.
 
 `npm test` on this tree: 2,543 passing, 0 failing, 1 skipped, of 2,544.
