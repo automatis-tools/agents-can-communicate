@@ -65,16 +65,31 @@ nativeDelivery: {
 
 ### Judgement
 
-`evaluateVersionContract(adapter, { clientVersion })` keeps every rule but the platform one:
-`native_delivery_unsupported` for no contract, `version_unavailable`, `prerelease_not_captured`,
-`below_minimum_version`, `known_bad_version`. It never answers `platform_not_captured`. A
-hand-built declaration missing its minimum or anchors is `native_delivery_unsupported`: a
-closed answer rather than a `TypeError`, as today. `evaluateNativeEligibility` and
-`validateNativeHandshake` drop `platform` from their inputs with it.
+`evaluateVersionContract(adapter, { clientVersion })` keeps these rules and no other:
+`native_delivery_unsupported` for no contract, `version_unavailable` when nothing answered
+with a version, `below_minimum_version`, `known_bad_version`. A hand-built declaration
+missing its minimum or anchors is `native_delivery_unsupported`: a closed answer rather than
+a `TypeError`, as today. `evaluateNativeEligibility` and `validateNativeHandshake` drop
+`platform` from their inputs with it.
 
-`platform_not_captured` stays in `NATIVE_REASON_CODES`, marked as historical: native-attempt
-records written by earlier versions carry it, and the store reads them unchanged. Nothing
-produces it any more. `NATIVE_PLATFORMS` goes with the field that validated against it.
+A prerelease is judged by its release triple, exactly as
+[the 2026-09-22 rule](2026-09-22-certification-applies-forward.md) already judges hook
+capabilities: `0.156.0-alpha.3` is `0.156.0` against `minimum` and `knownBad`, through the
+triple helper `certification.mjs` gained then, not a second one. What admits any version,
+prerelease or not, is the protocol contract the probe and the handshake report. The Claude
+probe's stable-version test in `inbox-delivery.mjs`, Codex's `probeCodexQueue` and
+`serverVersionOf` path, and the Antigravity probe, where it does the same, stop refusing a
+`-pre` suffix. A version that cannot be read at all stays `version_unavailable`.
+
+`platform_not_captured` and `prerelease_not_captured` stay in `NATIVE_REASON_CODES`, marked
+as historical: native-attempt records written by earlier versions carry them, and the store
+reads them unchanged. Nothing produces either any more. `NATIVE_PLATFORMS` goes with the
+field that validated against it.
+
+What may refuse live delivery is therefore exactly three things: the machine's own probe or
+per-session handshake failing, a client older than the first passing capture, and a
+regression recorded in `knownBad`. Nothing else: not the platform, not a prerelease suffix,
+not where the evidence was taken.
 
 ### Consumers
 
@@ -107,6 +122,12 @@ produces it any more. `NATIVE_PLATFORMS` goes with the field that validated agai
   `darwin-arm64`, the minimum applies on every platform, and the probe and handshake decide
   on the machine in hand. Native Windows keeps next-turn delivery for Claude Code because of
   its transport.
+- `docs/CAPABILITIES.md` (native section) and `docs/ADAPTER_AUTHORING.md` (native contract
+  section) each carry one short list, "What may refuse live delivery": the machine's own
+  probe or per-session handshake failing; a client older than the first passing capture; a
+  recorded regression in `knownBad`. Nothing else: not the platform, not a prerelease
+  suffix, not where the evidence was taken. It is written where the next implementer reads,
+  so this class of gate stops recurring.
 - `docs/ADAPTER_AUTHORING.md` shows the new shape and rules.
 - `docs/PROTOCOL.md`: "a 2.1.282 minimum, captured on darwin-arm64".
 - `docs/TROUBLESHOOTING.md`: the Gemini sentence still says "Only Gemini CLI 0.57.0 on
@@ -114,7 +135,9 @@ produces it any more. `NATIVE_PLATFORMS` goes with the field that validated agai
   it now says certified from 0.57.0 onward, on every platform.
 - `docs/RELEASING.md`: "captured minimum" instead of "captured macOS arm64 minimum".
   "An unsupported platform is an explicit skip, never a passing capture" stays: it is about
-  recording evidence, which this design does not loosen.
+  recording evidence, which this design does not loosen. "Capture only capabilities you
+  observed" gains one sentence: a capture records evidence, and it never gates beyond that
+  floor.
 - Each native adapter's `COMPATIBILITY.md` gets a dated note: the minimum now applies on
   every platform; Linux and Intel macOS have no capture of their own, and the probe and
   handshake admit them.
@@ -143,9 +166,19 @@ Test first, each seen failing for its stated reason.
   `live-permissions-install.test.mjs`: `linux-x64` proceeds to inspection, setup and
   permissions; `lsof` is taken from `/usr/bin` when `/usr/sbin` has none, and neither from
   PATH.
-- A hook-runner or adapter-codex test runs the real `/bin/ps -p <own pid> -o
-  lstart=,command=` and the real `lsof` resolution on the host it runs on, so the `ubuntu`
-  job of the CI matrix measures Linux; this repository has no Linux machine of its own.
+- An adapter-codex test runs the real `/bin/ps -p <own pid> -o lstart=,command=` and the
+  real `lsof` resolution on the host it runs on, so the `ubuntu` job of the CI matrix
+  measures Linux; this repository has no Linux machine of its own. It passes on a host
+  without `lsof` while still measuring one that has it: resolution returns the first
+  executable candidate when one exists and reports absence otherwise, and verification then
+  fails closed with `daemon_socket_unproven`. The test is never skipped. The evidence file
+  says whether the ubuntu job had `lsof`, read from its log after the push, or that this is
+  unknown until the pull request runs.
+- `packages/adapter-sdk/test/native-delivery.test.mjs`, `packages/delivery-router/test`,
+  `packages/adapter-claude-code/test`, `packages/adapter-codex/test`: a `0.156.0-alpha.3`
+  Codex daemon above the minimum is eligible and admitted by the router; a `2.2.0-beta.1`
+  Claude executable with the inbox is eligible; a prerelease below the minimum is
+  `below_minimum_version`.
 - `tests/conformance/adapter-contract.mjs`: every anchor is eligible on a platform the
   adapter never captured when the probe reports the anchored contract, and a probe with
   another contract is `protocol_mismatch`.
