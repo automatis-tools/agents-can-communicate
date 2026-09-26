@@ -26,7 +26,10 @@
 - Certified on Claude Code 2.1.282, darwin-arm64, by a product capture of a private candidate
   in real sessions: idle, busy, reply, duplicate, fallback and exact binding all passed. The
   model answers with `acc reply`, so `delivery.replyRoute` stays false. The Channel's pass rows
-  left `certification.json`; its captures stay as history.
+  left `certification.json`; its captures stay as history. The recorded candidate then passed
+  those six cases and the rest in real Claude Code 2.1.283 sessions: a replayed send, a reply
+  from one Claude session waking another, `/clear`, `/resume`, a `bypassPermissions` receiver,
+  `crossSessionInbound: "refuse"` and the `acc doctor` line.
 - `acc update` and `acc install` retire what 0.7.x wrote for Claude Code: the `claude` shim and
   its `~/.zshrc` block (hash-checked, an edited one is kept and reported), the `acc-channel`
   entry in every kept plugin copy, the `acc-bootstrap` and `acc-claude-channel` launchers, and

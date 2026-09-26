@@ -48,31 +48,59 @@ Capture and product evidence: `packages/adapter-claude-code/fixtures/delivery/cl
 and `claude-code-2.1.282-product-evidence.json`. The capture's limitations name what it did
 not cover: a receiver in `bypassPermissions` mode, `darwin-x64`, Linux and native Windows.
 
-### Re-run on the recorded candidate
+### Product runs on 2.1.283 and what they found
 
-That capture ran before the review fixes (`34e2439`), the Channel stub fix (`71f3db7`) and the
-publication race fix (`7611b7e`). The same six cases ran again on 2026-09-26 against the
-archive recorded below (SHA-256 `8b6606eb…`), installed as shipped, with no private anchor.
-Claude Code had moved to 2.1.283, and the 2.1.282 anchor carried forward to it: the install
-planned `claude-code-inbox-socket-v1` and both sessions bound `livePush`, `idleWake` and
-`busyQueue`. Two TUI sessions, Sonnet 5, `auto` mode, isolated ACC data home; the real Claude
-config was backed up first.
+The capture above ran before the review fixes (`34e2439`), the Channel stub fix (`71f3db7`)
+and the publication race fix (`7611b7e`). On 2026-09-26 the six cases ran again on the recorded
+archive `8b6606eb…`, installed as shipped, with Claude Code 2.1.283; the 2.1.282 anchor carried
+forward and all six passed. The same sessions were then taken through what those cases did not
+cover, and each thing that did not work was fixed with a failing test first:
 
-| Case | Observations | Outcome |
+| Found in real sessions | Fix |
+|---|---|
+| A send replayed three times while the receiver was busy put three wakes in front of it; Claude Code does not drop a repeated `msg_id` | one wake per message and binding (`797cc80`) |
+| A busy receiver called `SendMessage` to the sender's name, then `ListAgents` (94 sessions), before `acc reply` | the wake names `acc reply --message <id>` (`df17988`) |
+| After `/resume` the bind refused with `native_session_unavailable`: Claude Code rewrites `sessions/<pid>.json` only after `SessionStart` | the bind checks process and socket; every wake still checks the session id (`8ba6a97`) |
+| A `bypassPermissions` receiver held the wake in an approval dialog while the sender read `woke` | `pendingApproval` and a held message in the CLI; `refuse` sends no wake (`1723cd5`, `6b8fe9d`) |
+| `acc doctor` never printed the inbound note | a `Claude Code inbound:` line when live delivery is on (`4b720e3`) |
+| Every reply to a CLI sender printed `live offer unavailable (recipient_unavailable)` | `no_live_transport` (`73ca3e5`) |
+| After `/clear` a message to the old participant said `recipient_unavailable`, and the participant left `acc status` | `recipient_offline` with `endReason: "clear"`, kept in status while messages wait (`0cd542e`) |
+
+### Final run on the recorded candidate
+
+2026-09-26, the archive recorded below (SHA-256 `13363d63…`, built from `6b8fe9d`), installed
+as shipped with an isolated ACC data home, Claude Code 2.1.283 TUI sessions on Sonnet 5, the
+real Claude config backed up first. One script ran every case in order.
+
+| Case | Observed | Outcome |
 |---|---|---|
-| C01 idle | delivery `woken`, wake `started-turn`, projection `body-shown`, offer `next-turn` | passed |
-| C02 busy | delivery `woken`, wake `between-tool-calls`, projection `body-shown`, offer `next-turn` | passed |
-| C03 reply | answer `recorded`, receipt `acknowledged` | passed |
-| C04 duplicate | logical message `same-message-id`, wake `delivered-once` | passed |
-| C05 fallback | client `exited`, delivery `queued` | passed |
-| C06 exact binding | delivery `woken`, wake `started-turn`, other session `not-woken` | passed |
+| C01 idle | `woken`, a turn started, body shown by the next-turn hook, one wake | passed |
+| C02 busy | taken between two Bash calls, body shown, offer `next-turn` | passed |
+| One message sent three times while busy | one wake frame | passed |
+| C03 reply | answer recorded, receipt `acknowledged` | passed |
+| C04 duplicate | same message id, one wake | passed |
+| Claude to Claude | A asked B through ACC; B's `acc reply` printed `woke <A> via claude-inbox`; A got one wake and the answer `42` in its untrusted block | passed |
+| C06 exact binding | only B woken | passed |
+| `/clear` | the sender read `<B>'s conversation was cleared (/clear); the message waits until that conversation resumes`; JSON `recipient_offline`, `endReason: "clear"`; status `waiting for a closed session: <B> (cleared, 2)`; the new conversation woken once | passed |
+| `/resume` before any prompt | the resumed conversation bound on `SessionStart` (`active`) and was woken once | passed |
+| C05 fallback | `/exit`, then `queued` with `recipient_offline` | passed |
+| `bypassPermissions` before any prompt | JSON `pendingApproval: true`; the sender read `which its session holds for approval`; Claude Code held it (`waiting`); after Deny the next turn carried the body | passed |
+| `crossSessionInbound: "refuse"` in project settings | `delivery_disabled`, no wake frame, the session stayed idle; its next turn's hook showed the body | passed |
+| `acc doctor` | printed the `Claude Code inbound:` line naming `crossSessionInbound` and the settings file | passed |
+| `SendMessage` or `ListAgents` in any of the five transcripts | none; every answer went through the `acc` skill and `acc reply` | passed |
 
-`scripts/e2e/claude-inbox-product.mjs finish` accepted the run (6/6). Its capture is not
-committed, because `fixtures/` is packed and the 2.1.282 capture already certifies the
-contract. Of the 23 backed-up files in the Claude config (`settings.json`, the plugin registry
-and the `acc-local` plugin copies), 22 matched the backup byte for byte afterwards.
-`known_marketplaces.json` differed only in the `lastUpdated` of two git marketplaces that
-Claude Code refreshed during the run, and its `acc-local` entry was unchanged.
+`scripts/e2e/claude-inbox-product.mjs finish` accepted C01 to C06 (6/6); its capture stays
+uncommitted, because `fixtures/` is packed and the 2.1.282 capture certifies the contract. Two
+checks in the script first reported failures that were the script's own: it read the refusing
+session's transcript before that session had a first turn, and it expected the model to answer
+an unrelated peer question, which it declined to do on its own. Read after the turn, the
+transcript showed no wake and the body in the hook's block.
+
+Afterwards 22 of the 23 backed-up files in the Claude config matched the backup byte for byte.
+`known_marketplaces.json` differed only in the `lastUpdated` of the two git marketplaces
+Claude Code refreshes on its own, with the `acc-local` entry unchanged. Starting a
+`bypassPermissions` session had added `skipDangerousModePermissionPrompt` to the user's
+`settings.json`; the restore took it out again.
 
 ## Upgrade from 0.7.x
 
@@ -96,8 +124,9 @@ the Channel stub exits on SIGTERM and on SIGINT while its parent still holds std
 ### Channel stub stop, local end to end
 
 Run on darwin-arm64 against the candidate archive recorded from `71f3db7` (sha256
-`f22cf626…`), with an isolated `HOME` and `ACC_DATA_HOME`. The archive recorded below differs
-from it only in `packages/storage-filesystem/src/atomic-json.mjs`, which the stub never loads. The variant "before the fix" is the same archive with
+`f22cf626…`), with an isolated `HOME` and `ACC_DATA_HOME`. `bin/entrypoints/acc-claude-channel.mjs`
+is byte-identical in the archive recorded below; the later changes are in code the stub never
+loads. The variant "before the fix" is the same archive with
 `bin/entrypoints/acc-claude-channel.mjs` taken from `4e02a15`.
 
 - ACC 0.7.1 from npm ran `acc install --adapter claude_code`, then its own `acc update`
@@ -126,19 +155,15 @@ from it only in `packages/storage-filesystem/src/atomic-json.mjs`, which the stu
 
 ## Candidate archive
 
-`node scripts/verify-package.mjs` on `7611b7e5acbe4b9276e8c66845ab5eb7f1907b2c`, after the
-review fixes (a refused or late handshake retires the endpoint it wrote; install and update
-sweep crashed Channel registrations; the Channel stub exits on a signal while its stdin stays
-open) and a fix for a race the pre-push suite hit (a refused store publication settles its
-directory checks before it reports). A separate `npm pack` of the same commit gives the same
-digest, 462,678 bytes:
+`node scripts/verify-package.mjs` on `6b8fe9d8a52bd9dad4f54bb857356413c66e079d`, after the
+review fixes, the Channel stub and publication race fixes, and every fix the product runs above
+led to. A separate `npm pack` of the same commit gives the same digest, 468,533 bytes:
 
 ```text
 == pack
-   ok  agents-can-communicate-0.7.1.tgz  452 KB
-   ok  sha256 8b6606ebeebbbe94e751999d08af8e9180d6a2146d1d11ee849b9cfd30260262
+   ok  sha256 13363d63f5e46a3b30451f2d9141e2014eb2834c60577d9683dbdd0859f26d07
 == tarball contents
-   ok  310 entries, none forbidden
+   ok  311 entries, none forbidden
    ok  6 certification manifest(s), exact evidence allowlist shipped
    ok  every packed Markdown link resolves inside the tarball
 == install into a clean directory
@@ -155,5 +180,5 @@ PASS
 
 ## Test suite
 
-`npm test` on `9308dfd` (the recorded candidate plus its CHANGELOG record): 2541 tests, 2540
+`npm test` on `5cd8841` (the recorded candidate plus its CHANGELOG record): 2580 tests, 2579
 passing, 1 skipped, 0 failing.
