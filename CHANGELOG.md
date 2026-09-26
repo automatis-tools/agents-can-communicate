@@ -71,9 +71,9 @@
 
 | Candidate artifact | Value |
 |---|---|
-| Built from | `7611b7e5acbe4b9276e8c66845ab5eb7f1907b2c` |
-| Tarball | `agents-can-communicate-0.7.1.tgz`, 462,678 bytes, 310 files |
-| sha256 | `8b6606ebeebbbe94e751999d08af8e9180d6a2146d1d11ee849b9cfd30260262` |
+| Built from | `792c8f56d97056468508bad57cf39fd1ad92f3db` |
+| Tarball | `agents-can-communicate-0.7.1.tgz`, 468,040 bytes, 311 files |
+| sha256 | `91b9e57b4cc8c3cbf72b3745c0d9a0b51ea55cc1da31e88ddaff7d83e1fe784e` |
 
 This unpublished development archive passed clean installation verification. See
 [Claude Code inbox wake evidence](docs/release-evidence/unreleased-claude-inbox-wake.md) and the
