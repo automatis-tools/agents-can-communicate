@@ -34,9 +34,24 @@ export function offerFacts(receipt) {
 export function dueForRepeat(message, receipt, now) {
   const offer = offerFacts(receipt);
   return message != null && message.toParticipantIds.length > 0
-    && receipt?.state === "offered" && offer !== null
-    && offer.transport !== "next-turn" && offer.repeatedAt === null
+    && receipt?.state === "offered" && offer !== null && liveAndUnrepeated(offer)
     && Date.parse(now) - Date.parse(offer.at) >= REPEAT_OFFER_AFTER_MS;
+}
+
+// A live transport took the bytes, and the next turn has not shown them again.
+const liveAndUnrepeated = offer => offer.transport !== "next-turn" && offer.repeatedAt === null;
+
+/**
+ * Whether the recipient's next turn could still show this receipt's message:
+ * queued, or offered live and not yet shown again. A next-turn offer already
+ * put the body in the recipient's context. An offer an older ACC recorded
+ * without facts is unknown, so it counts as still to be shown.
+ */
+export function awaitsNextTurn(receipt) {
+  if (receipt?.state === "queued") return true;
+  if (receipt?.state !== "offered") return false;
+  const offer = offerFacts(receipt);
+  return offer === null || liveAndUnrepeated(offer);
 }
 
 export const SAFE_OFFER_ERROR_CODES = Object.freeze([

@@ -104,9 +104,12 @@ got. Two sessions of one participant show the same numbers, so read the workspac
 `<n> offered, not retrieved` when that number is above zero. Offered is not read: a
 transport took the bytes, and the model may or may not have looked.
 
-A participant with no open session is left out, unless messages still wait for it. Then its
-latest session stays listed as `offline`, with `endReason` when the client said why the
-session ended, such as `"clear"` for Claude Code's `/clear`. The text line names each one:
+A participant with no open session is left out, unless messages still wait for it: queued,
+or offered by a live transport and not yet shown again, so that its next turn would show
+them. A message the next-turn hook already showed does not wait, since nothing will reach the
+participant for it again. A waiting participant's latest session stays listed as `offline`,
+with that number as `waiting`, and with `endReason` when the client said why the session
+ended, such as `"clear"` for Claude Code's `/clear`. The text line names each one:
 `waiting for a closed session: claude_code-b (cleared, 2)`. `acc status --all` lists every
 session. Default `sync` reads
 events after a 16-digit event cursor (100 by
