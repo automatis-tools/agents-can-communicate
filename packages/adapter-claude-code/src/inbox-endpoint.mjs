@@ -92,4 +92,45 @@ export async function removeInboxEndpoint({ runtimeDir, endpointId }) {
     const dir = await directory(runtimeDir);
     await rm(path.join(dir, `${endpointId}.json`), { force: true });
   } catch { /* retirement is already recorded; cleanup is best effort */ }
+  try {
+    await rm(path.join(await wakesDirectory(runtimeDir), endpointId), { recursive: true, force: true });
+  } catch { /* the same */ }
+}
+
+// One empty marker per message a binding woke. A wake leaves the receipt
+// queued until the receiver's hook commits it, so a replayed send reaches the
+// transport again; the marker keeps it to one wake per message and binding.
+const WAKE_MESSAGE = /^[A-Za-z0-9_-]{1,200}$/;
+
+async function wakesDirectory(runtimeDir, create = false) {
+  const dir = path.join(path.dirname(await directory(runtimeDir, create)), "claude-inbox-wakes");
+  if (create) await mkdir(dir, { mode: 0o700 }).catch(error => {
+    if (error.code !== "EEXIST") throw error;
+  });
+  const info = await lstat(dir);
+  if (!info.isDirectory() || info.isSymbolicLink() || !own(info) || (info.mode & 0o022) !== 0) throw invalid();
+  return dir;
+}
+
+/** True when this call is the first to wake the binding for the message. */
+export async function claimWake({ runtimeDir, endpointId, messageId }) {
+  if (!ENDPOINT.test(endpointId) || !WAKE_MESSAGE.test(messageId)) throw invalid();
+  const dir = path.join(await wakesDirectory(runtimeDir, true), endpointId);
+  await mkdir(dir, { mode: 0o700 }).catch(error => {
+    if (error.code !== "EEXIST") throw error;
+  });
+  try {
+    await (await open(path.join(dir, messageId), "wx", 0o600)).close();
+    return true;
+  } catch (error) {
+    if (error.code === "EEXIST") return false;
+    throw error;
+  }
+}
+
+export async function releaseWake({ runtimeDir, endpointId, messageId }) {
+  if (!ENDPOINT.test(endpointId) || !WAKE_MESSAGE.test(messageId)) return;
+  try {
+    await rm(path.join(await wakesDirectory(runtimeDir), endpointId, messageId), { force: true });
+  } catch { /* a marker left behind only suppresses a repeat wake */ }
 }

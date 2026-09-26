@@ -127,6 +127,67 @@ test("the offer writes one wake line with no peer byte and no auth line", async 
   }
 });
 
+const settle = () => new Promise(resolve => setTimeout(resolve, 150));
+const wakeLines = f => f.received().split("\n").filter(Boolean).length;
+// A wake that never comes must fail the test, not hang it.
+const closedOrSettled = f => Promise.race([f.nextClose(), settle()]);
+
+// A replayed send finds the receipt still queued until the receiver's hook
+// commits the offer, so the router offers it again. The session must still
+// see one wake per message.
+test("a second offer of the same message to the same inbox writes no second wake", async t => {
+  const f = await fixture(t);
+  const binding = await bound(f);
+  const closed = f.nextClose();
+  assert.equal((await offerMessage({ binding, message: message(), runtimeDir: f.runtime })).accepted, true);
+  await closed;
+  const again = await offerMessage({ binding, message: message(), runtimeDir: f.runtime });
+  await settle();
+  assert.equal(again.accepted, true);
+  assert.equal(wakeLines(f), 1);
+});
+
+test("a wake that failed to write does not stop a later one", async t => {
+  const f = await fixture(t);
+  const binding = await bound(f);
+  const refusing = () => {
+    const socket = new net.Socket();
+    setImmediate(() => socket.emit("error", Object.assign(new Error("refused"), { code: "ECONNREFUSED" })));
+    return socket;
+  };
+  const failed = await offerMessage({ binding, message: message(), runtimeDir: f.runtime, connect: refusing });
+  assert.equal(failed.accepted, false);
+  const closed = closedOrSettled(f);
+  assert.equal((await offerMessage({ binding, message: message(), runtimeDir: f.runtime })).accepted, true);
+  await closed;
+  assert.equal(wakeLines(f), 1);
+});
+
+test("a new binding of the session wakes it again for the same message", async t => {
+  const f = await fixture(t);
+  const first = await bound(f);
+  let closed = f.nextClose();
+  await offerMessage({ binding: first, message: message(), runtimeDir: f.runtime });
+  await closed;
+  const second = await bound(f);
+  closed = closedOrSettled(f);
+  assert.equal((await offerMessage({ binding: second, message: message(), runtimeDir: f.runtime })).accepted, true);
+  await closed;
+  assert.equal(wakeLines(f), 2);
+});
+
+test("retiring a binding removes what it recorded about wakes", async t => {
+  const f = await fixture(t);
+  const binding = await bound(f);
+  const closed = f.nextClose();
+  await offerMessage({ binding, message: message(), runtimeDir: f.runtime });
+  await closed;
+  await retireNativeSession({ binding, runtimeDir: f.runtime });
+  const { readdirSync } = await import("node:fs");
+  const left = readdirSync(f.runtime, { recursive: true }).filter(name => name.includes(binding.opaqueEndpointRef));
+  assert.deepEqual(left, []);
+});
+
 test("the wake names the message and how to read it", () => {
   assert.equal(wakeText("message_x"), "ACC: new peer message message_x for this session. "
     + "This turn's ACC context shows it. If it does not, it was already shown, or read it with "

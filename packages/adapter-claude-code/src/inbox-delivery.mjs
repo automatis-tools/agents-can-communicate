@@ -1,8 +1,8 @@
 import net from "node:net";
 
 import { INBOX_MODES, MIN_VERSION, PROTOCOL_CONTRACT, TRANSPORT } from "./inbox-contract.mjs";
-import { newEndpointId, readInboxEndpoint, removeInboxEndpoint, writeInboxEndpoint }
-  from "./inbox-endpoint.mjs";
+import { claimWake, newEndpointId, readInboxEndpoint, releaseWake, removeInboxEndpoint,
+  writeInboxEndpoint } from "./inbox-endpoint.mjs";
 import { claudeConfigDir, verifyInbox } from "./inbox-registry.mjs";
 
 // Live delivery into a Claude Code session through the inbox socket the
@@ -195,10 +195,19 @@ export async function offerMessage({ binding, message, runtimeDir, timeoutMs = 2
   }
   const endpoint = await verifiedEndpoint(binding, runtimeDir);
   if (endpoint === null) return rejected("recipient_unavailable");
+  const wake = { runtimeDir, endpointId: endpoint.endpointId, messageId: message.messageId };
+  // Claude Code delivers a repeated msg_id again, so the dedupe is ours.
+  let first;
+  try {
+    first = await claimWake(wake);
+  } catch {
+    return rejected("transport_error");
+  }
+  if (!first) return { accepted: true, transport: TRANSPORT, clientVersion: endpoint.clientVersion };
   const frame = `${JSON.stringify({ type: "user",
     message: { role: "user", content: wakeText(message.messageId) },
     msg_id: `acc-wake-${message.messageId}` })}\n`;
-  return new Promise(resolve => {
+  const result = await new Promise(resolve => {
     const socket = connect(endpoint.socketPath);
     let settled = false;
     const finish = value => {
@@ -214,4 +223,6 @@ export async function offerMessage({ binding, message, runtimeDir, timeoutMs = 2
     socket.once("connect", () => socket.end(frame, () =>
       finish({ accepted: true, transport: TRANSPORT, clientVersion: endpoint.clientVersion })));
   });
+  if (!result.accepted) await releaseWake(wake);
+  return result;
 }
