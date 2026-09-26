@@ -96,5 +96,5 @@ PASS
 
 ## Test suite
 
-`npm test` on `8ad1b9b` (the recorded candidate plus its CHANGELOG record): 2538 tests, 2537
+`npm test` on `5c78b28` (the recorded candidate plus its CHANGELOG record): 2540 tests, 2539
 passing, 1 skipped, 0 failing.
