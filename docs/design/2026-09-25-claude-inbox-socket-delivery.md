@@ -69,8 +69,14 @@ The wake text is fixed ACC wording plus the ACC message id:
 
 ```text
 ACC: new peer message <messageId> for this session. This turn's ACC context shows it. If it
-does not, it was already shown, or read it with acc inbox --message <messageId>.
+does not, it was already shown, or read it with acc inbox --message <messageId>. Answer it
+through ACC with acc reply --message <messageId>; SendMessage cannot deliver to an ACC
+participant.
 ```
+
+The last sentence was added after the product re-run on Claude Code 2.1.283: a busy receiver
+first called Claude Code's own `SendMessage` to the sender's name, then `ListAgents`, and only
+then `acc reply`.
 
 The frame carries no subject, no body, no sender name and no peer-supplied byte. Claude Code
 wraps it in its own "Another Claude session sent a message" framing, which asks the model to
@@ -223,7 +229,9 @@ line, and `docs/TROUBLESHOOTING.md` explains it.
   the single-line mentions.
 - `packages/adapter-claude-code/COMPATIBILITY.md` gets an "Inbox socket capture" section; the
   Channel sections stay as history under a heading that says the path was removed.
-- The Claude skill stops saying "use this session's ACC MCP tools": the plugin ships none.
+- The Claude skill keeps its conditional line "use this session's ACC MCP tools when
+  available". The plugin ships no MCP server, but a user who configured `acc-mcp` by hand has
+  those tools, and the line applies only when the CLI reports `caller_identity_unresolved`.
 
 ## Testing
 

@@ -242,10 +242,13 @@ test("a bind removes what a process that no longer exists left behind", async t 
   assert.notEqual(await readInboxEndpoint({ runtimeDir: f.runtime, endpointId: live.opaqueEndpointRef }), null);
 });
 
-test("the wake names the message and how to read it", () => {
+// Claude Code frames the wake as a message from another Claude session, and a
+// model then reached for SendMessage first. The wake names the ACC route.
+test("the wake names the message, how to read it and how to answer it", () => {
   assert.equal(wakeText("message_x"), "ACC: new peer message message_x for this session. "
     + "This turn's ACC context shows it. If it does not, it was already shown, or read it with "
-    + "acc inbox --message message_x.");
+    + "acc inbox --message message_x. Answer it through ACC with acc reply --message message_x; "
+    + "SendMessage cannot deliver to an ACC participant.");
 });
 
 test("the offer refuses a message id that is not ACC's own shape", async t => {

@@ -28,9 +28,12 @@ const STABLE_VERSION = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:\+[0-9A-Za-z
 
 export { INBOX_MODES, MIN_VERSION, PROTOCOL_CONTRACT, TRANSPORT };
 
+// Claude Code shows the wake as a message from another Claude session, so the
+// text names the ACC route: a model otherwise tries SendMessage first.
 export const wakeText = messageId => `ACC: new peer message ${messageId} for this session. `
   + "This turn's ACC context shows it. If it does not, it was already shown, or read it with "
-  + `acc inbox --message ${messageId}.`;
+  + `acc inbox --message ${messageId}. Answer it through ACC with acc reply --message ${messageId}; `
+  + "SendMessage cannot deliver to an ACC participant.";
 
 function compare(left, right) {
   const a = left.split("+")[0].split(".").map(Number);
