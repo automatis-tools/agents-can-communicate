@@ -5,13 +5,14 @@ import path from "node:path";
 
 import { PROTOCOL_CONTRACT } from "./inbox-contract.mjs";
 import { inboxSocketIsSafe } from "./inbox-registry.mjs";
+import { isReception } from "./inbox-settings.mjs";
 
 // One private record per hook binding, the way the Codex adapter keeps its
 // daemon endpoints: core holds only the random id, and the socket path, pid and
 // session id stay in a 0600 file under the workspace runtime directory.
 
 const KEYS = ["schemaVersion", "endpointId", "socketPath", "configDir", "clientPid", "sessionId",
-  "clientVersion", "protocolContract", "leaseUntil"];
+  "clientVersion", "protocolContract", "leaseUntil", "reception"];
 const ENDPOINT = /^claude_inbox_[a-f0-9]{32}$/;
 const STABLE = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:\+[0-9A-Za-z.-]+)?$/;
 const MAX_BYTES = 8_192;
@@ -32,7 +33,8 @@ function valid(record) {
     && record.protocolContract === PROTOCOL_CONTRACT
     && typeof record.leaseUntil === "string"
     && /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z$/.test(record.leaseUntil)
-    && Number.isFinite(Date.parse(record.leaseUntil));
+    && Number.isFinite(Date.parse(record.leaseUntil))
+    && isReception(record.reception);
 }
 
 async function directory(runtimeDir, create = false) {

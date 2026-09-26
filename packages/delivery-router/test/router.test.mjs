@@ -176,6 +176,21 @@ test("an accepted wake leaves the receipt queued for the next-turn hook and reco
   assert.equal((await f.store.eventsSince(WORKSPACE, null, 100)).events.length, before);
 });
 
+// Claude Code holds a wake for approval in a session that bypasses permission
+// prompts. The adapter says so, and the sender must hear it rather than "woke".
+test("a wake the receiver holds for approval is reported as such and still records nothing", async () => {
+  const f = await fixture({ adapter: wakeAdapter(async ({ binding }) => ({ accepted: true,
+    transport: "claude-inbox", clientVersion: binding.clientVersion, pendingApproval: true })) });
+  await publish(f.service, f.sessions[0]);
+  const message = await send(f.service, f.sender);
+  const before = (await f.store.eventsSince(WORKSPACE, null, 100)).events.length;
+
+  assert.deepEqual(await f.router.offer(message), [{ recipientParticipantId: "models",
+    outcome: "woken", transport: "claude-inbox", pendingApproval: true }]);
+  assert.equal((await receipt(f.store, message.messageId)).state, "queued");
+  assert.equal((await f.store.eventsSince(WORKSPACE, null, 100)).events.length, before);
+});
+
 test("a rejected wake is recorded as a failed offer", async () => {
   const f = await fixture({ adapter: wakeAdapter(async () => ({ accepted: false,
     transport: "claude-inbox", clientVersion: "1.2.3", safeErrorCode: "recipient_unavailable" })) });

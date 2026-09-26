@@ -3,7 +3,8 @@ import net from "node:net";
 import { INBOX_MODES, MIN_VERSION, PROTOCOL_CONTRACT, TRANSPORT } from "./inbox-contract.mjs";
 import { claimWake, newEndpointId, readInboxEndpoint, releaseWake, removeInboxEndpoint,
   sweepDeadEndpoints, writeInboxEndpoint } from "./inbox-endpoint.mjs";
-import { claudeConfigDir, verifyInbox } from "./inbox-registry.mjs";
+import { claudeConfigDir, readSessionRecord, verifyInbox } from "./inbox-registry.mjs";
+import { MANAGED_SETTINGS, readInboundSettings, receptionOf } from "./inbox-settings.mjs";
 
 // Live delivery into a Claude Code session through the inbox socket the
 // session itself binds (2.1.224 and later, no flag, every provider).
@@ -137,7 +138,7 @@ const handshake = (endpoint, now) => ({ supported: true, clientVersion: endpoint
  * catches up only once the hook has run.
  */
 export async function bindNativeSession({ event, clientPid, clientVersion, runtimeDir,
-  env = process.env, now = Date.now } = {}) {
+  env = process.env, now = Date.now, managedSettingsPath = MANAGED_SETTINGS[process.platform] } = {}) {
   if (!Number.isInteger(clientPid) || clientPid <= 0) return closed(clientVersion, "client_process_unknown");
   if (typeof event?.sessionId !== "string" || event.sessionId === "") {
     return closed(clientVersion, "handshake_failed");
@@ -158,9 +159,16 @@ export async function bindNativeSession({ event, clientPid, clientVersion, runti
   const refused = await verifyInbox({ configDir, clientPid, sessionId: event.sessionId, socketPath,
     anyConversation: true });
   if (refused !== null) return closed(clientVersion, refused);
+  // Project settings sit where the session was started, which the registry
+  // records; the hook's cwd follows the shell.
+  const record = await readSessionRecord({ configDir, clientPid });
+  const settings = await readInboundSettings({ configDir, projectDir: record?.cwd ?? event.cwd,
+    managedSettingsPath });
+  const reception = receptionOf({ permissionMode: event.permissionMode ?? settings.defaultMode,
+    crossSessionInbound: settings.crossSessionInbound });
   const endpoint = { schemaVersion: 1, endpointId: newEndpointId(), socketPath, configDir, clientPid,
     sessionId: event.sessionId, clientVersion, protocolContract: PROTOCOL_CONTRACT,
-    leaseUntil: new Date(now() + LEASE_MS).toISOString() };
+    leaseUntil: new Date(now() + LEASE_MS).toISOString(), reception };
   try {
     await writeInboxEndpoint({ runtimeDir, record: endpoint });
   } catch {
@@ -202,6 +210,11 @@ export async function offerMessage({ binding, message, runtimeDir, timeoutMs = 2
   }
   const endpoint = await verifiedEndpoint(binding, runtimeDir);
   if (endpoint === null) return rejected("recipient_unavailable");
+  // The receiver's own crossSessionInbound refuses unattested wakes; one would
+  // be dropped, so none is sent and the message waits for its next turn.
+  if (endpoint.reception === "refused") return rejected("delivery_disabled");
+  const accepted = { accepted: true, transport: TRANSPORT, clientVersion: endpoint.clientVersion,
+    ...(endpoint.reception === "held" ? { pendingApproval: true } : {}) };
   const wake = { runtimeDir, endpointId: endpoint.endpointId, messageId: message.messageId };
   // Claude Code delivers a repeated msg_id again, so the dedupe is ours.
   let first;
@@ -210,7 +223,7 @@ export async function offerMessage({ binding, message, runtimeDir, timeoutMs = 2
   } catch {
     return rejected("transport_error");
   }
-  if (!first) return { accepted: true, transport: TRANSPORT, clientVersion: endpoint.clientVersion };
+  if (!first) return accepted;
   const frame = `${JSON.stringify({ type: "user",
     message: { role: "user", content: wakeText(message.messageId) },
     msg_id: `acc-wake-${message.messageId}` })}\n`;
@@ -227,8 +240,7 @@ export async function offerMessage({ binding, message, runtimeDir, timeoutMs = 2
     const timer = setTimeout(() => finish(rejected("transport_error")), timeoutMs);
     socket.once("error", error => finish(rejected(["EPERM", "EACCES"].includes(error?.code)
       ? "transport_permission_denied" : "recipient_unavailable")));
-    socket.once("connect", () => socket.end(frame, () =>
-      finish({ accepted: true, transport: TRANSPORT, clientVersion: endpoint.clientVersion })));
+    socket.once("connect", () => socket.end(frame, () => finish(accepted)));
   });
   if (!result.accepted) await releaseWake(wake);
   return result;

@@ -218,7 +218,9 @@ export function createDeliveryRouter({ service, adapters, clock, platform = HOST
     // shown and leave it out of the very turn the wake started. The receipt
     // stays queued; the hook records the offer once its stdout carried the body.
     if (adapter.nativeDelivery?.offerKind === "wake") {
-      return { recipientParticipantId: participantId, outcome: "woken", transport };
+      // The client took the wake but holds it for its user's approval.
+      return { recipientParticipantId: participantId, outcome: "woken", transport,
+        ...(response.pendingApproval === true ? { pendingApproval: true } : {}) };
     }
     try {
       await service.recordOfferSucceeded({ messageId: message.messageId,

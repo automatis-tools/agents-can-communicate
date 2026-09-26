@@ -141,6 +141,9 @@ function obligationFor(kind, explicit, addressed) {
 export function recordedText(message, delivery) {
   const diagnostics = delivery.map(item => item.outcome === "offered"
     ? `live offered to ${item.recipientParticipantId} via ${item.transport}`
+    : item.outcome === "woken" && item.pendingApproval === true
+      ? `sent a wake to ${item.recipientParticipantId} via ${item.transport}, which its session holds `
+        + "for approval because it bypasses permission prompts; the message arrives with its next turn"
     : item.outcome === "woken"
       ? `woke ${item.recipientParticipantId} via ${item.transport}; the message arrives with its next turn`
     : item.outcome === "queued"

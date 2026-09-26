@@ -16,6 +16,13 @@ test("a woken recipient is reported as woken, with the body still to come", () =
   "recorded message_a; woke models via claude-inbox; the message arrives with its next turn");
 });
 
+test("a wake held for the receiver's approval is reported as held, not as woken", () => {
+  assert.equal(recordedText(message, [{ recipientParticipantId: "models", outcome: "woken",
+    transport: "claude-inbox", pendingApproval: true }]),
+  "recorded message_a; sent a wake to models via claude-inbox, which its session holds for approval "
+    + "because it bypasses permission prompts; the message arrives with its next turn");
+});
+
 test("the CLI composition seam records before it offers", async () => {
   const order = [];
   const result = await recordAndOffer({

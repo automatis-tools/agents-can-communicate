@@ -209,6 +209,10 @@ wake and returns this delivery outcome:
 { "recipientParticipantId": "<id>", "outcome": "woken", "transport": "claude-inbox" }
 ```
 
+An adapter whose client took the wake but holds it for its user's approval adds
+`"pendingApproval": true` to its acceptance, and the outcome carries it. Nothing about it is
+stored.
+
 The receipt stays `queued`. The recipient's next-turn hook shows the body and records
 `message.offer_succeeded` with `transport: "next-turn"` after its output carried the body.
 A failed wake is recorded as `message.offer_failed`, like any failed offer.

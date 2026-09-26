@@ -219,6 +219,14 @@ The wake carries only fixed ACC text and the message id. The receipt stays `queu
 session's next-turn hook then shows the body and records the receipt as `offered` via
 `next-turn`.
 
+A Claude Code session that bypasses permission prompts holds each wake for its user's
+approval, unless its `crossSessionInbound` setting is `accept`. The outcome then carries
+`"pendingApproval": true`, and human output says
+`sent a wake to models via claude-inbox, which its session holds for approval because it
+bypasses permission prompts; the message arrives with its next turn`. A session whose
+`crossSessionInbound` is `refuse` gets no wake: the message stays `queued` with
+`delivery_disabled`.
+
 `reply` additionally returns `receipt`: the original message id, the replying participant,
 and state `acknowledged`. Its `message` and `delivery` describe the outgoing answer.
 Human output distinguishes `recorded <reply-id>` from `acknowledged <original-id>`.

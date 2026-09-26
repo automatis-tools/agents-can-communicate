@@ -26,7 +26,8 @@ export async function readSessionRecord({ configDir, clientPid }) {
     const record = JSON.parse(await handle.readFile("utf8"));
     return record?.pid === clientPid && typeof record.sessionId === "string" && record.sessionId !== ""
       && typeof record.messagingSocketPath === "string" && path.isAbsolute(record.messagingSocketPath)
-      ? { pid: record.pid, sessionId: record.sessionId, messagingSocketPath: record.messagingSocketPath }
+      ? { pid: record.pid, sessionId: record.sessionId, messagingSocketPath: record.messagingSocketPath,
+        cwd: typeof record.cwd === "string" && path.isAbsolute(record.cwd) ? record.cwd : null }
       : null;
   } catch {
     return null;

@@ -188,7 +188,9 @@ published binding cannot override it.
   offer and returns the outcome `woken`. The receipt stays `queued`. The next-turn hook
   records `offered` via `next-turn` after its output carried the body. Use `"wake"` only
   where the turn that the wake starts runs the client's next-turn hook, as Claude Code's
-  `UserPromptSubmit` does.
+  `UserPromptSubmit` does. When the client takes the wake but holds it for its user's
+  approval, return `pendingApproval: true` with the acceptance; the outcome carries it so
+  the sender is told the truth.
 
 A failed offer of either kind is recorded as a failed offer and leaves the receipt queued.
 

@@ -229,7 +229,7 @@ test("a bind removes what a process that no longer exists left behind", async t 
   const crashed = { schemaVersion: 1, endpointId: `claude_inbox_${"c".repeat(32)}`, socketPath: f.socket,
     configDir: f.configDir, clientPid: await deadPid(), sessionId: "crashed-session",
     clientVersion: MIN_VERSION, protocolContract: PROTOCOL_CONTRACT,
-    leaseUntil: new Date(Date.now() + 60_000).toISOString() };
+    leaseUntil: new Date(Date.now() + 60_000).toISOString(), reception: "delivered" };
   await writeInboxEndpoint({ runtimeDir: f.runtime, record: crashed });
   const { claimWake } = await import("../src/inbox-endpoint.mjs");
   await claimWake({ runtimeDir: f.runtime, endpointId: crashed.endpointId, messageId: "message_old" });
@@ -244,6 +244,68 @@ test("a bind removes what a process that no longer exists left behind", async t 
 
 // Claude Code frames the wake as a message from another Claude session, and a
 // model then reached for SendMessage first. The wake names the ACC route.
+// Claude Code decides what an unattested wake does: a session that bypasses
+// permission prompts holds it for approval, `crossSessionInbound` overrides that
+// either way. The bind reads the same inputs so the sender is told the truth.
+async function reception(t, { mode = null, user = null, project = null, local = null,
+  managed = null } = {}) {
+  const f = await fixture(t);
+  const projectDir = path.join(f.root, "project");
+  mkdirSync(path.join(projectDir, ".claude"), { recursive: true });
+  const write = (file, value) => value === null || writeFileSync(file, JSON.stringify(value));
+  write(path.join(f.configDir, "settings.json"), user);
+  write(path.join(projectDir, ".claude", "settings.json"), project);
+  write(path.join(projectDir, ".claude", "settings.local.json"), local);
+  const managedSettingsPath = path.join(f.root, "managed-settings.json");
+  write(managedSettingsPath, managed);
+  const handshake = await bind(f, { event: { sessionId: SESSION, cwd: projectDir, permissionMode: mode },
+    managedSettingsPath });
+  assert.equal(handshake.supported, true, handshake.reasonCode);
+  const binding = { clientVersion: handshake.clientVersion, opaqueEndpointRef: handshake.opaqueEndpointRef };
+  const closed = closedOrSettled(f);
+  const result = await offerMessage({ binding, message: message(), runtimeDir: f.runtime });
+  await closed;
+  return { result, wakes: wakeLines(f) };
+}
+
+test("a session that bypasses permission prompts is woken and the sender told it is held", async t => {
+  const { result, wakes } = await reception(t, { mode: "bypassPermissions" });
+  assert.equal(result.accepted, true);
+  assert.equal(result.pendingApproval, true);
+  assert.equal(wakes, 1);
+});
+
+test("crossSessionInbound accept lets a bypassing session take the wake directly", async t => {
+  const { result } = await reception(t, { mode: "bypassPermissions", user: { crossSessionInbound: "accept" } });
+  assert.equal(result.accepted, true);
+  assert.equal(result.pendingApproval, undefined);
+});
+
+test("crossSessionInbound refuse gets no wake, and the offer says delivery is off", async t => {
+  const { result, wakes } = await reception(t, { mode: "auto", project: { crossSessionInbound: "refuse" } });
+  assert.equal(result.accepted, false);
+  assert.equal(result.safeErrorCode, "delivery_disabled");
+  assert.equal(wakes, 0);
+});
+
+test("settings apply in Claude Code's own order: managed, local, project, user", async t => {
+  assert.equal((await reception(t, { mode: "bypassPermissions", project: { crossSessionInbound: "hold" },
+    local: { crossSessionInbound: "accept" } })).result.pendingApproval, undefined);
+  assert.equal((await reception(t, { mode: "auto", user: { crossSessionInbound: "accept" },
+    managed: { crossSessionInbound: "refuse" } })).result.safeErrorCode, "delivery_disabled");
+});
+
+test("without a mode on the hook, the configured default mode decides", async t => {
+  const { result } = await reception(t, { user: { permissions: { defaultMode: "bypassPermissions" } } });
+  assert.equal(result.pendingApproval, true);
+});
+
+test("an ordinary session takes the wake with nothing held", async t => {
+  const { result } = await reception(t, { mode: "auto" });
+  assert.equal(result.accepted, true);
+  assert.equal(result.pendingApproval, undefined);
+});
+
 test("the wake names the message, how to read it and how to answer it", () => {
   assert.equal(wakeText("message_x"), "ACC: new peer message message_x for this session. "
     + "This turn's ACC context shows it. If it does not, it was already shown, or read it with "
