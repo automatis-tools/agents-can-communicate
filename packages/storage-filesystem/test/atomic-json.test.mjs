@@ -114,6 +114,21 @@ test("publication rejects a destination outside the managed root", async t => {
   assert.equal(typeof root, "string");
 });
 
+// A caller that removes or renames the store after a refused publication must
+// not race directory creation the publication left running.
+test("a refused publication leaves no directory creation running", async t => {
+  const { root, options } = await fixture(t);
+  const outside = await realpath(await mkdtemp(path.join(tmpdir(), "acc-outside-")));
+  t.after(() => rm(outside, { recursive: true, force: true }));
+
+  await assert.rejects(publishAtomic(path.join(outside, "escaped.json"), bytes("x"), options),
+    error => error.code === EXIT.DATA);
+  const whenRefused = (await readdir(root)).sort();
+  await new Promise(resolve => setTimeout(resolve, 200));
+
+  assert.deepEqual((await readdir(root)).sort(), whenRefused);
+});
+
 test("reads reject a symlink instead of following it", async t => {
   const { root, records } = await fixture(t);
   const backing = path.join(root, "backing.json");

@@ -72,11 +72,16 @@ export async function publishAtomic(destination, bytes,
   // active-journal.mjs defaults tmpDir, so every caller keeps working.
   stageDir = stageDir ?? path.join(root, "stage");
   const destinationDir = path.dirname(destination);
-  await Promise.all([
+  // Every check settles before a refusal is reported: Promise.all would reject
+  // on the first one while the others still create directories under a root
+  // the caller may already be removing.
+  const prepared = await Promise.allSettled([
     ensureManagedDirectory(root, tmpDir),
     ensureManagedDirectory(root, stageDir),
     ensureManagedDirectory(root, destinationDir),
   ]);
+  const refused = prepared.find(result => result.status === "rejected");
+  if (refused) throw refused.reason;
   if (!replace) {
     const existing = await bytesIfPresent(destination, root);
     if (existing !== null) {
