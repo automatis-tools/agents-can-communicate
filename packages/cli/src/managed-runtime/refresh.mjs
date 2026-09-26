@@ -1,5 +1,5 @@
 import path from "node:path";
-import { applyPlan, detectInstallation, livePolicyOf, loadOwnership, planInstallation, shellOf }
+import { applyPlan, detectInstallation, livePolicyOf, loadOwnership, planInstallation }
   from "@agents-can-communicate/installer";
 import { ALL_ADAPTERS, clientContext, probeTimeout } from "../install-command.mjs";
 import { stablePaths, writeLaunchers } from "./launchers.mjs";
@@ -17,7 +17,7 @@ export async function prepareRefresh({ control, root, env = process.env, callerP
   // session open across the update keeps running from the outgoing copy until it
   // restarts. Naming it here keeps that copy; everything older than it goes.
   const context = { ...clientContext(control.home, path.join(dataHome, "acc"),
-    { env, shell: shellOf(env), dataHome }), ...stablePaths(root),
+    { env, dataHome }), ...stablePaths(root),
   keepPreviousVersion: control.active.version };
   const recorded = (await loadOwnership({ dataHome })).installs;
   const detected = await detectInstallation({ adapters, context, probeTimeoutMs: probeTimeout(env) });
@@ -38,8 +38,7 @@ export async function prepareRefresh({ control, root, env = process.env, callerP
   }
   return async () => {
     await writeLaunchers(root, control.pending.root);
-    const result = await applyPlan({ plan, adapters, context, dataHome, accVersion: control.pending.version,
-      activation: { bootstrap: context.bootstrap } });
+    const result = await applyPlan({ plan, adapters, context, dataHome, accVersion: control.pending.version });
     return { ...result, failed: result.failed.map(failure => ({ ...failure,
       paths: plan.operations.find(operation => operation.adapterId === failure.adapterId)
         ?.artifacts?.map(artifact => artifact.path).filter(file => typeof file === "string") ?? [],

@@ -1,5 +1,94 @@
 # Changelog
 
+## Unreleased — Claude Code live delivery through the session inbox
+
+- Claude Code live delivery wakes a session through the inbox socket that Claude Code opens
+  for every session. You start Claude Code with your ordinary command: the `claude` shim, the
+  development-channel flag and the Channel MCP server are gone, and the inbox works with every
+  provider Claude Code supports on one machine (issue #130).
+- The wake is one line of ACC wording and the ACC message id, never a byte a peer wrote. Every
+  wake Claude Code delivers fires `UserPromptSubmit`, idle or between two tool calls, so the
+  existing next-turn projection shows the body inside its untrusted block. A busy session now
+  gets the message before its turn ends.
+- `acc message` reports `woke <participant> via claude-inbox; the message arrives with its next
+  turn`. The receipt stays `queued` until the hook's output carried the body, then `offered` via
+  `next-turn`. A native contract declares `offerKind: "message"` or `"wake"`.
+- One message wakes a session once. A replayed send before the receiver's hook committed the
+  offer used to wake it again, and Claude Code delivers a repeated wake: three sends put three
+  wakes in front of a busy session.
+- The wake names the reply route, `acc reply --message <id>`. Claude Code frames a wake as a
+  message from another Claude session, and a model reached for `SendMessage` and `ListAgents`
+  before it answered through ACC.
+- A conversation resumed with `/resume` is reachable live at once. Claude Code rewrites its
+  session registry only after `SessionStart`, so the bind refused, and the session could not be
+  woken until its user typed again. The bind now checks the process and socket; every wake still
+  checks the session id.
+- Certified on Claude Code 2.1.282, darwin-arm64, by a product capture of a private candidate
+  in real sessions: idle, busy, reply, duplicate, fallback and exact binding all passed. The
+  model answers with `acc reply`, so `delivery.replyRoute` stays false. The Channel's pass rows
+  left `certification.json`; its captures stay as history. The recorded candidate then passed
+  those six cases and the rest in real Claude Code 2.1.283 sessions: a replayed send, a reply
+  from one Claude session waking another, `/clear`, `/resume`, a `bypassPermissions` receiver,
+  `crossSessionInbound: "refuse"` and the `acc doctor` line.
+- `acc update` and `acc install` retire what 0.7.x wrote for Claude Code: the `claude` shim and
+  its `~/.zshrc` block (hash-checked, an edited one is kept and reported), the `acc-channel`
+  entry in every kept plugin copy, the `acc-bootstrap` and `acc-claude-channel` launchers, and
+  the bootstrap cache. They do this even while the client cannot take the wake yet, and they
+  keep the recorded consent. A 0.7.x updater still accepts this package, because the two
+  retired entrypoints remain as stubs that launch the plain vendor command.
+- Live-delivery consent comes only from the install record, for every adapter.
+  `ACC_NATIVE_DELIVERY_POLICY`, `ACC_BYPASS` and `ACC_BOOTSTRAP_DEBUG` are gone.
+- A Claude Code session in `bypassPermissions` mode holds each wake for approval unless its
+  `crossSessionInbound` setting is `accept`, and `refuse` drops every wake. ACC reads the same
+  inputs as Claude Code: the hook's permission mode; before the first prompt, the launch flag
+  (`--permission-mode`, `--dangerously-skip-permissions`) from the client's own arguments, then
+  `permissions.defaultMode`; and `crossSessionInbound` from managed, local, project and user
+  settings. A held wake is still sent,
+  and the sender reads `sent a wake to <participant> via claude-inbox, which its session holds for
+  approval`, with `"pendingApproval": true` in JSON. A refused one is not sent: the message stays
+  `queued` with `delivery_disabled`. In every case the message arrives with the next turn.
+- `acc doctor` prints a `Claude Code inbound:` line when Claude Code live delivery is on and
+  the user or managed setting is not `accept`: how to take wakes without asking, or that
+  `refuse` drops them. Before, the note never reached `acc doctor` output at all. The consent
+  question names the setting too.
+- A sender is told why a message waits. `no_live_transport` means the recipient is online but
+  has no live transport, such as a participant attached with the CLI: `<id> has no live
+  transport; the message waits in its inbox`. `recipient_offline` means it has no open session,
+  and after Claude Code's `/clear` the result carries `"endReason": "clear"`: `<id>'s conversation
+  was cleared (/clear); the message waits until that conversation resumes`. `recipient_unavailable`
+  now means only an open session whose transport could not be reached.
+- `acc status` keeps a participant with no open session listed while messages wait for it, by
+  its latest session and with its `endReason`, and the text line names it:
+  `waiting for a closed session: claude_code-b (cleared, 2)`.
+- A normalised hook event carries `permissionMode` and `endReason`, `null` unless the client
+  reports them. Claude Code's adapter fills both.
+- `acc uninstall` removes nothing inside or around a plugin tree it keeps because someone put
+  their own file in it. Before, it kept the marketplace directory and removed the plugin
+  directory inside it, with the file. Retiring the 0.7.x `~/.zshrc` block keeps the file's
+  permissions; 0.7.x had set them to 0600 and recorded nothing to undo that with.
+- A Claude Code process that crashed without `SessionEnd` no longer leaves its inbox record
+  behind: the next bind in the workspace removes records whose process is gone.
+- `acc doctor` no longer reports Claude Code's plugin cache as edited after an update. Claude
+  Code writes `.orphaned_at` into the previous version's copy, which ACC keeps for sessions still
+  running from it, and the ownership check counted that marker as an edit: doctor advised a
+  reinstall, and `acc uninstall` kept the whole cache as the user's.
+- A refused store publication reports only after its directory checks have settled. Before,
+  the refusal could reach the caller while a check was still creating a directory under the
+  store root.
+- The store format is unchanged: a wake records nothing, and a session's end reason is kept in
+  its record's `extensions`, which 0.7.x skips. 0.7.x and this build can share a workspace.
+
+| Candidate artifact | Value |
+|---|---|
+| Built from | `97d80045b31ab93a18f51831471e9b3d7db1cce1` |
+| Tarball | `agents-can-communicate-0.7.1.tgz`, 468,697 bytes, 311 files |
+| sha256 | `54e224cd4da725d1806570f492957abe89cb605646a2b4d46f5ae6530e4fab8c` |
+
+This unpublished development archive passed clean installation verification. See
+[Claude Code inbox wake evidence](docs/release-evidence/unreleased-claude-inbox-wake.md) and the
+design in [docs/design/2026-09-25-claude-inbox-socket-delivery.md](docs/design/2026-09-25-claude-inbox-socket-delivery.md).
+The package version remains `0.7.1` until a release prepares its own.
+
 ## 0.7.1 — release candidate
 
 - A sender can see where a message got to. An exact history read,

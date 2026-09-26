@@ -148,11 +148,12 @@ to its capabilities:
 
 ```js
 nativeDelivery: {
-  minimumByPlatform: { "darwin-arm64": "2.1.258" },
-  anchors: [{ platform: "darwin-arm64", version: "2.1.258",
-    protocolContract: "claude-code-channel-mcp-v1" }],
+  minimumByPlatform: { "darwin-arm64": "2.1.282" },
+  anchors: [{ platform: "darwin-arm64", version: "2.1.282",
+    protocolContract: "claude-code-inbox-socket-v1" }],
   knownBad: [],
-  activationKinds: ["shell-bootstrap"],
+  activationKinds: ["native-service"],
+  offerKind: "wake",
 }
 ```
 
@@ -172,11 +173,32 @@ The rules `defineAdapter` enforces, and the ones the runtime applies:
 - Native methods return closed facts (`validateNativeActivationPlan()` closes the
   activation plan) and never put vendor data - endpoints, sockets, raw errors - into core.
 
-`nativeDelivery.policySource` defaults to the session environment. An adapter may
-declare `"installation-record"` when hooks and senders must read current recorded
-recipient consent independently of the vendor process environment. Installation
-records the requested policy even when current activation is unavailable. An absent
-or invalid record means `off`; a previously published binding cannot override it.
+`nativeDelivery.policySource` accepts only `"installation-record"`, which is also the
+default. Hooks and senders read the current recorded recipient consent, independently of
+the vendor process environment. Installation records the requested policy even when
+current activation is unavailable. An absent or invalid record means `off`. A previously
+published binding cannot override it.
+
+`nativeDelivery.offerKind` says what an accepted offer puts in front of the model. It is
+`"message"` (the default) or `"wake"`:
+
+- `"message"` carries the body. The router records the receipt as `offered` with the
+  transport name and returns the outcome `offered`.
+- `"wake"` carries only a notice that makes the client run a turn. The router records no
+  offer and returns the outcome `woken`. The receipt stays `queued`. The next-turn hook
+  records `offered` via `next-turn` after its output carried the body. Use `"wake"` only
+  where the turn that the wake starts runs the client's next-turn hook, as Claude Code's
+  `UserPromptSubmit` does. When the client takes the wake but holds it for its user's
+  approval, return `pendingApproval: true` with the acceptance; the outcome carries it so
+  the sender is told the truth.
+
+A failed offer of either kind is recorded as a failed offer and leaves the receipt queued.
+
+`nativeDelivery.activationKinds` names the mechanisms the adapter may plan:
+`"native-config"` or `"native-service"`. A `native-service` mechanism with
+`preExisting: true` and no commands describes a service that the client itself runs, such
+as the Claude Code inbox. A `shell-bootstrap` mechanism can no longer be planned. Install
+records of one stay readable, so that `acc install` and `acc update` can retire it.
 
 The optional `refreshNativeSession()` method may revalidate an expired lease before
 an offer. It returns the same closed handshake shape as `bindNativeSession()` and
@@ -204,7 +226,7 @@ earlier failures without duplicating a certification tuple.
 
 Installed hook wiring may reach tier 2, but each effective hook capability still
 requires exact client/version/platform evidence. Tier 3 has separate native
-contracts: Claude Code Channel from 2.1.258 and Codex LocalDaemon from 0.152.1 on
+contracts: the Claude Code inbox wake from 2.1.282 and Codex LocalDaemon from 0.152.1 on
 macOS arm64, with current probes and exact session handshakes. Codex's earlier
 remote-wrapper failure remains historical evidence. Ordinary launch now preserves
 workspace identity; the full installed product matrix, including negative controls
@@ -220,8 +242,17 @@ return normalizedEvent({
   kind, sessionId, cwd, model, parentSessionId, tool,
   targets,   // paths this call would WRITE. For a shell call, pass the command to
              // shellWriteTargets() — it reads write positions only, never reads.
+  permissionMode, // the client's own name for the session's permission mode, or null
+  endReason,      // on sessionEnd, the client's own word for why, or null
 });
 ```
+
+`permissionMode` and `endReason` are optional and default to `null`. Pass `permissionMode`
+when the client's hook reports one: a native binding reads it to tell a sender whether the
+client will hold a wake for approval. Claude Code reports it on most hooks but not on
+`SessionStart`. Pass `endReason` on `sessionEnd` when the client says why, as Claude Code's
+`reason` does (`"clear"` after `/clear`). ACC keeps it in the closed session record's
+`extensions`, and a sender is told that the conversation was cleared.
 
 Refuse an unrecognised payload. Inventing a session attaches the wrong one, or a new one
 every hook, and looks like it is working.

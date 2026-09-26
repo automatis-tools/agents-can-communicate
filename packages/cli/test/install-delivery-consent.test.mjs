@@ -17,10 +17,8 @@ const eligible = (adapterId, displayName, command, extra = {}) => ({
     probe: null,
     eligibility: { eligible: true, protocolContract: `${command}-native-v1` },
     activationPlan: { eligible: true, reasonCode: null, mechanisms: [{
-      kind: "shell-bootstrap",
-      command,
-      realExecutable: `/vendor/${command}`,
-      prefixArgs: ["--captured"],
+      kind: "native-service", serviceId: `${command}-service`, preExisting: true,
+      applyCommand: null, teardownCommand: null,
     }] },
   },
   ...extra,
@@ -60,7 +58,10 @@ test("two undecided clients share one complete-setup answer", async () => {
   assert.match(questions[0], /Codex/);
   assert.match(questions[0], /tokens/);
   assert.match(questions[0], /local permission grants/i);
-  assert.match(questions[0], /Channels/);
+  assert.doesNotMatch(questions[0], /Channels/);
+  // A Claude session that bypasses permission prompts holds each wake.
+  assert.match(questions[0], /Claude Code sessions that bypass permission prompts ask before each ACC wake/);
+  assert.match(questions[0], /crossSessionInbound to accept/);
   assert.match(questions[0], /start/i);
 });
 

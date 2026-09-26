@@ -6,7 +6,7 @@ import path from "node:path";
 import test from "node:test";
 import { promisify } from "node:util";
 
-import { writeCliShim, writeHookShim } from "../src/hook-shim.mjs";
+import { removeInstalledTree, writeCliShim, writeHookShim } from "../src/hook-shim.mjs";
 
 const run = promisify(execFile);
 
@@ -244,3 +244,24 @@ test("a CLI path with a space in it survives being written into a shell script",
   assert.match((await here.invoke(shim)).stdout,
     new RegExp(cli.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
 });
+
+// Ownership keeps a tree someone put their own work into. Removing a directory
+// inside it, or one that holds it, deletes that work just the same.
+test("a tree kept by ownership survives removal of a directory inside it or around it", async t => {
+  const root = await realpath(await mkdtemp(path.join(tmpdir(), "acc-keep-")));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const marketplace = path.join(root, "marketplaces", "acc-local");
+  const plugin = path.join(marketplace, "agents-can-communicate");
+  await mkdir(plugin, { recursive: true });
+  await writeFile(path.join(plugin, "their-notes.md"), "mine\n");
+
+  assert.equal(await removeInstalledTree(plugin, [marketplace]), false);
+  assert.equal(await removeInstalledTree(path.join(root, "marketplaces"), [marketplace]), false);
+  await writeFile(path.join(plugin, "their-notes.md"), "still mine\n");
+
+  const unrelated = path.join(root, "cache");
+  await mkdir(unrelated);
+  assert.equal(await removeInstalledTree(unrelated, [marketplace]), true);
+  assert.equal(await removeInstalledTree(path.join(root, "acc-local-other"), [marketplace]), false);
+});
+

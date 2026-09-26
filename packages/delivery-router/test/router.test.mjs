@@ -27,7 +27,7 @@ function certifiedAdapter(offerMessage = async ({ binding }) => ({
       version: "1.2.3", platform: PLATFORM, capability: "delivery.livePush" }] },
     nativeDelivery: { minimumByPlatform: { [PLATFORM]: "1.2.3" },
       anchors: [{ platform: PLATFORM, version: "1.2.3", protocolContract: "fixture-native-v1" }],
-      knownBad: [], activationKinds: ["shell-bootstrap"] },
+      knownBad: [], activationKinds: ["native-service"] },
     offerMessage,
   };
 }
@@ -74,7 +74,7 @@ const singlePlatformAdapter = offerMessage => defineAdapter({
     minimumByPlatform: { [CAPTURED]: MINIMUM },
     anchors: [{ platform: CAPTURED, version: MINIMUM, protocolContract: "fixture-native-v1" }],
     knownBad: [{ version: DENIED, reasonCode: "known_bad_version" }],
-    activationKinds: ["shell-bootstrap"],
+    activationKinds: ["native-service"],
   },
   detect: answers, install: answers, uninstall: answers, doctor: answers,
   normalizeHook: answers, renderContext: answers,
@@ -85,8 +85,12 @@ const singlePlatformAdapter = offerMessage => defineAdapter({
 const reports = version => async () => ({ accepted: true, transport: "codex-app-server",
   clientVersion: version });
 
+// The install record every fixture consents with: the policy its binding
+// recorded, so a case that changes consent changes it in one place.
+const recordedPolicy = async ({ binding }) => binding.livePolicy;
+
 async function fixture({ adapter = certifiedAdapter(), secondRecipientSession = false,
-  omitPlatform = false, platform = PLATFORM, readLivePolicy } = {}) {
+  omitPlatform = false, platform = PLATFORM, readLivePolicy = recordedPolicy } = {}) {
   const clock = createFakeClock(NOW);
   const ids = createFakeIds();
   const store = createMemoryStore({ clock, ids, workspaceId: WORKSPACE });
@@ -152,6 +156,52 @@ test("one eligible certified binding is offered and only then committed", async 
   assert.deepEqual(await f.router.offer(message), [{ recipientParticipantId: "models",
     outcome: "offered", transport: "codex-app-server" }]);
   assert.equal((await receipt(f.store, message.messageId)).state, "offered");
+});
+
+const wakeAdapter = offerMessage => {
+  const adapter = certifiedAdapter(offerMessage);
+  return { ...adapter, nativeDelivery: { ...adapter.nativeDelivery, offerKind: "wake" } };
+};
+
+test("an accepted wake leaves the receipt queued for the next-turn hook and records nothing", async () => {
+  const f = await fixture({ adapter: wakeAdapter(async ({ binding }) => ({ accepted: true,
+    transport: "claude-inbox", clientVersion: binding.clientVersion })) });
+  await publish(f.service, f.sessions[0]);
+  const message = await send(f.service, f.sender);
+  const before = (await f.store.eventsSince(WORKSPACE, null, 100)).events.length;
+
+  assert.deepEqual(await f.router.offer(message), [{ recipientParticipantId: "models",
+    outcome: "woken", transport: "claude-inbox" }]);
+  assert.equal((await receipt(f.store, message.messageId)).state, "queued");
+  assert.equal((await f.store.eventsSince(WORKSPACE, null, 100)).events.length, before);
+});
+
+// Claude Code holds a wake for approval in a session that bypasses permission
+// prompts. The adapter says so, and the sender must hear it rather than "woke".
+test("a wake the receiver holds for approval is reported as such and still records nothing", async () => {
+  const f = await fixture({ adapter: wakeAdapter(async ({ binding }) => ({ accepted: true,
+    transport: "claude-inbox", clientVersion: binding.clientVersion, pendingApproval: true })) });
+  await publish(f.service, f.sessions[0]);
+  const message = await send(f.service, f.sender);
+  const before = (await f.store.eventsSince(WORKSPACE, null, 100)).events.length;
+
+  assert.deepEqual(await f.router.offer(message), [{ recipientParticipantId: "models",
+    outcome: "woken", transport: "claude-inbox", pendingApproval: true }]);
+  assert.equal((await receipt(f.store, message.messageId)).state, "queued");
+  assert.equal((await f.store.eventsSince(WORKSPACE, null, 100)).events.length, before);
+});
+
+test("a rejected wake is recorded as a failed offer", async () => {
+  const f = await fixture({ adapter: wakeAdapter(async () => ({ accepted: false,
+    transport: "claude-inbox", clientVersion: "1.2.3", safeErrorCode: "recipient_unavailable" })) });
+  await publish(f.service, f.sessions[0]);
+  const message = await send(f.service, f.sender);
+
+  assert.deepEqual(await f.router.offer(message), durable("recipient_unavailable"));
+  assert.equal((await receipt(f.store, message.messageId)).state, "queued");
+  const failed = (await f.store.eventsSince(WORKSPACE, null, 100)).events
+    .find(event => event.type === "message.offer_failed");
+  assert.equal(failed.payload.transport, "claude-inbox");
 });
 
 test("an adapter throw observes queued and cannot advance the receipt", async () => {
@@ -320,7 +370,37 @@ test("lease expiry and generation replacement remove a binding from eligibility"
   await f.service.openSession({ workspaceId: WORKSPACE, participantId: "models",
     sessionId: current.sessionId, harness: "fixture", heartbeatCadenceMs: 30_000 });
   const replaced = await send(f.service, f.sender, "question", "replaced");
-  assert.deepEqual(await f.router.offer(replaced), durable("recipient_unavailable"));
+  assert.deepEqual(await f.router.offer(replaced), durable("no_live_transport"));
+});
+
+// After /clear the old conversation's participant has no open session. The
+// sender is told that, and why when the client said, instead of "unavailable".
+test("a recipient whose session ended is queued as offline, with the client's reason", async () => {
+  const f = await fixture();
+  await publish(f.service, f.sessions[0]);
+  await f.service.closeSession({ sessionId: f.sessions[0].sessionId,
+    generation: f.sessions[0].generation, endReason: "clear" });
+  const cleared = await send(f.service, f.sender, "question", "after_clear");
+  assert.deepEqual(await f.router.offer(cleared), [{ recipientParticipantId: "models",
+    outcome: "queued", transport: "durable", errorCode: "recipient_offline", endReason: "clear" }]);
+  assert.equal((await receipt(f.store, cleared.messageId)).state, "queued");
+});
+
+test("a recipient whose session ended without a reason is queued as offline", async () => {
+  const f = await fixture();
+  await f.service.closeSession({ sessionId: f.sessions[0].sessionId,
+    generation: f.sessions[0].generation });
+  const message = await send(f.service, f.sender, "question", "after_exit");
+  assert.deepEqual(await f.router.offer(message), durable("recipient_offline"));
+});
+
+// A CLI participant, or any session whose client binds no live transport, is
+// online and reads its inbox. Calling it unavailable told senders it was gone.
+test("an online recipient with no live transport is queued as such, not as unavailable", async () => {
+  const f = await fixture();
+  const message = await send(f.service, f.sender, "question", "cli_recipient");
+  assert.deepEqual(await f.router.offer(message), durable("no_live_transport"));
+  assert.equal((await receipt(f.store, message.messageId)).state, "queued");
 });
 
 test("off, missing reachability, and live-incapable adapters stay queued for distinct reasons",
@@ -329,7 +409,7 @@ test("off, missing reachability, and live-incapable adapters stay queued for dis
     const declaredOff = { ...certifiedAdapter(), capabilities: { delivery: { livePush: false } } };
     for (const [name, overrides, errorCode, adapter] of [
       ["off", { livePolicy: "off" }, "delivery_disabled", undefined],
-      ["no-mode", { availableModes: ["nextTurn"] }, "recipient_unavailable", undefined],
+      ["no-mode", { availableModes: ["nextTurn"] }, "no_live_transport", undefined],
       ["no-native-contract", {}, "unsupported_client_version", noContract],
       ["capability-off", {}, "unsupported_client_version", declaredOff],
       ["unknown-adapter", { adapterId: "other_adapter" }, "unsupported_client_version", undefined],
@@ -566,7 +646,8 @@ test("policy is read again immediately before offer", async () => {
 
 test("missing or failed recorded-policy readers disable live delivery", async () => {
   for (const [name, readLivePolicy] of [
-    ["missing", undefined],
+    // null, because an omitted reader takes the fixture's recorded policy.
+    ["missing", null],
     ["failed", async () => { throw new Error("corrupt installation record"); }],
   ]) {
     let offers = 0;

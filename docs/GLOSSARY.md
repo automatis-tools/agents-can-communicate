@@ -16,7 +16,8 @@
 - **Retrieved** — the participant received the body; not proof of model attention.
 - **Acknowledged** — that participant explicitly acknowledged or replied; a reply is not proof requested work finished.
 - **Next-turn delivery** — certified projection at the client's next normal turn; it never interrupts an active turn.
-- **Live push** — optional delivery through Claude Code Channel or Codex LocalDaemon to an already-running session, behind recipient opt-in. Both wait for an active turn to finish; [Capabilities](CAPABILITIES.md) gives the measured eligibility and limits.
+- **Live push** — optional delivery through the Claude Code inbox wake or Codex LocalDaemon to an already-running session, behind recipient opt-in. A busy Claude Code session takes the wake between two tool calls. Codex waits for an active turn to finish. [Capabilities](CAPABILITIES.md) gives the measured eligibility and limits.
+- **Wake** — a live offer that carries only fixed ACC text and the message id. Its delivery outcome is `woken`, and the receipt stays `queued` until the next-turn hook shows the body.
 - **Recipient policy** — `off`, `actionable`, or `all`; opt-in permission to spend a turn, not a capability.
 - **Delivery binding** — ephemeral, generation-bound reachability data owned by an adapter.
 - **Fallback** — durable inbox or certified next-turn recovery when live delivery is unavailable.

@@ -199,6 +199,24 @@ peer body into diagnostics.
 Receipt `offered` is committed only after the transport accepts bytes. A failed attempt
 leaves the receipt queued.
 
+A wake is the one accepted offer that records nothing. An adapter whose native contract
+declares `offerKind: "wake"` sends only a notice that makes the client run a turn. The
+Claude Code inbox wake is one line of fixed ACC text with the message id, and it carries no
+subject, body, sender name or other peer byte. The router records no event for an accepted
+wake and returns this delivery outcome:
+
+```json
+{ "recipientParticipantId": "<id>", "outcome": "woken", "transport": "claude-inbox" }
+```
+
+An adapter whose client took the wake but holds it for its user's approval adds
+`"pendingApproval": true` to its acceptance, and the outcome carries it. Nothing about it is
+stored.
+
+The receipt stays `queued`. The recipient's next-turn hook shows the body and records
+`message.offer_succeeded` with `transport: "next-turn"` after its output carried the body.
+A failed wake is recorded as `message.offer_failed`, like any failed offer.
+
 The same transaction records how the receipt was offered, in the receipt's `extensions`:
 
 ```json
@@ -298,12 +316,13 @@ The recipient owns `livePolicy` because native push may start a model turn:
 
 Default is `off`. Policy never creates a capability. The router requires one
 current eligible recipient generation, supported client evidence, a verified
-binding and adapter acceptance. Claude Code Channel uses a captured 2.1.258
-minimum, confirmed on 2.1.260. Codex LocalDaemon uses a 0.152.1 minimum, confirmed
-through installed-product captures on 0.152.1 and 0.153.4; recorded consent and
-exact thread, cwd, process, version and protocol verification govern every session.
-Unavailable or refused routes fall back durably. Codex replies use the ACC CLI;
-its native reply route remains false.
+binding and adapter acceptance. The Claude Code inbox wake uses a captured 2.1.282
+minimum on darwin-arm64. Its binding requires the same pid and socket in Claude Code's
+session registry, and every refresh and wake also requires the same session id. Codex LocalDaemon uses a 0.152.1 minimum, confirmed
+through installed-product captures on 0.152.1 and 0.153.4. Recorded consent and
+exact thread, cwd, process, version and protocol verification govern every Codex session.
+Unavailable or refused routes fall back durably. Claude Code and Codex replies use the ACC
+CLI. Their native reply route remains false.
 
 ## Attention and sync
 

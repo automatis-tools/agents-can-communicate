@@ -34,11 +34,11 @@ export function nativeRemediation(entry) {
       + "  # opt in to automatic peer requests; may spend tokens");
   } else if (native.configured && native.activation === "missing") {
     steps.push(`acc install --adapter ${entry.adapterId}`
-      + "  # complete the missing native launch setup from a supported shell");
+      + "  # complete the missing native delivery setup");
   } else if (native.configured && native.runtime !== "active"
     && !["needed", "blocked", "unsupported"].includes(service?.state)) {
     steps.push(`${entry.displayName}: no verified live channel in this workspace; `
-      + "open a new terminal, start a new client session and check its integration/channel prompts; "
+      + "start a new client session and check its integration prompts; "
       + "then run acc doctor here");
   }
   if (native.reasonCode === "native_endpoint_unavailable") {

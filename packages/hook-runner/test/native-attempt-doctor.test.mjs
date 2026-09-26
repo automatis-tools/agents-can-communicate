@@ -13,7 +13,6 @@ import { runHook } from "../src/runner.mjs";
 const exec = promisify(execFile);
 const binary = path.resolve(import.meta.dirname, "../../../bin/acc.mjs");
 const claudeCodeAdapter = createClaudeCodeAdapter();
-const consent = { ACC_NATIVE_DELIVERY_POLICY: "actionable" };
 
 async function machine(t) {
   const home = await realpath(await mkdtemp(path.join(tmpdir(), "acc-attempt-")));
@@ -29,18 +28,24 @@ async function machine(t) {
     return json ? JSON.parse(stdout).data.adapters.find(a => a.adapterId === "claude_code")
       .nativeDelivery.sessions : stdout;
   };
-  const hook = async (name, { kind = "SessionStart", policy = consent, pid = true,
+  // Consent is the install record, as `acc install --delivery` writes it; null
+  // leaves whatever an earlier call recorded.
+  const hook = async (name, { kind = "SessionStart", policy = "actionable", pid = true,
     bindNativeSession, policySource } = {}) => {
+    if (policy !== null) {
+      await recordInstall({ dataHome, adapterId: claudeCodeAdapter.id, version: "2.1.282",
+        artifacts: [], deliveryPolicy: policy });
+    }
     const adapter = { ...claudeCodeAdapter,
       nativeDelivery: { ...claudeCodeAdapter.nativeDelivery,
         ...(policySource ? { policySource } : {}) },
       ...(bindNativeSession ? { bindNativeSession } : {}) };
     const result = await runHook({ adapterId: adapter.id, adapters: { [adapter.id]: adapter },
       payload: { hook_event_name: kind, session_id: name, cwd: project,
-        prompt: "secret-prompt-must-not-be-recorded" }, dataHome, env: { ...env, ...policy },
+        prompt: "secret-prompt-must-not-be-recorded" }, dataHome, env,
       readProcessTable: async () => pid
         ? new Map([[process.pid, { ppid: 1, comm: "claude" }]]) : new Map(),
-      probeClientVersion: async () => "2.1.266", platform: "darwin-arm64" });
+      probeClientVersion: async () => "2.1.282", platform: "darwin-arm64" });
     assert.equal(result.failed, undefined, result.reason);
     assert.equal(result.timedOut, undefined);
     return result;
@@ -64,7 +69,7 @@ async function machine(t) {
 
 test("doctor preserves the hook's missing consent and PID failures per session", async t => {
   const m = await machine(t);
-  const missing = await m.hook("missing", { policy: {} });
+  const missing = await m.hook("missing", { policy: null });
   const unknown = await m.hook("unknown", { pid: false });
   const sessions = await m.doctor();
   assert.ok(Array.isArray(sessions), "doctor discarded the hook's native binding outcomes");
@@ -90,13 +95,17 @@ test("a later turn replaces the failed attempt; old success never claims current
   let [session] = await m.doctor();
   assert.equal(session?.lastAttempt?.reasonCode, "handshake_failed");
   const active = await m.hook("retry", { kind: "UserPromptSubmit", bindNativeSession: async () => ({
-    supported: true, clientVersion: "2.1.266", protocolContract: "claude-code-channel-mcp-v1",
+    supported: true, clientVersion: "2.1.282", protocolContract: "claude-code-inbox-socket-v1",
     modes: ["livePush"], opaqueEndpointRef: "secret-endpoint-and-vendor-error",
     leaseUntil: new Date(Date.now() + 60_000).toISOString(), reasonCode: null }) });
   [session] = await m.doctor();
   assert.equal(session.lastAttempt.state, "active");
   assert.equal(session.sessionId, failed.accSessionId);
-  assert.equal(session.runtime, "active");
+  // Doctor verifies a leased binding through the adapter's refresh. This
+  // fixture's opaque reference has no inbox endpoint behind it, so the live
+  // check reports it undeliverable - the attempt itself stays the active one.
+  assert.equal(session.runtime, "degraded");
+  assert.equal(session.delivery.deliverable, false);
   await active.service.clearDeliveryBinding({ sessionId: failed.accSessionId,
     generation: active.generation ?? failed.generation });
   [session] = await m.doctor();
@@ -124,7 +133,7 @@ test("doctor ignores superseded or corrupt attempts and closed sessions", async 
   await writeFile(file, JSON.stringify(record));
   await started.service.closeSession({ sessionId: started.accSessionId, generation: started.generation });
   assert.deepEqual(await m.doctor(), []);
-  const fresh = await m.hook("restart", { policy: { ACC_NATIVE_DELIVERY_POLICY: "off" } });
+  const fresh = await m.hook("restart", { policy: "off" });
   const [session] = await m.doctor();
   assert.notEqual(session.sessionId, started.accSessionId);
   assert.equal(session.sessionId, fresh.sessions[0].sessionId);
@@ -134,9 +143,9 @@ test("doctor ignores superseded or corrupt attempts and closed sessions", async 
 
 test("handshake timeout and recorded consent survive into doctor without vendor output", async t => {
   const m = await machine(t);
-  await recordInstall({ dataHome: m.dataHome, adapterId: "claude_code", version: "2.1.266",
+  await recordInstall({ dataHome: m.dataHome, adapterId: "claude_code", version: "2.1.282",
     artifacts: [], deliveryPolicy: "all" });
-  await m.hook("timeout", { policySource: "installation-record", policy: {},
+  await m.hook("timeout", { policySource: "installation-record", policy: null,
     bindNativeSession: async () => new Promise(() => {}) });
   const [session] = await m.doctor();
   assert.equal(session?.lastAttempt?.reasonCode, "handshake_timeout");
@@ -161,6 +170,8 @@ test("diagnostic write failure cannot discard an otherwise successful hook", asy
 
 test("a diagnostic write past a quarter second is still recorded", async t => {
   const m = await machine(t);
+  await recordInstall({ dataHome: m.dataHome, adapterId: "claude_code", version: "2.1.282",
+    artifacts: [], deliveryPolicy: "off" });
   const preload = path.join(m.home, "paced-diagnostic.mjs");
   await writeFile(preload, `
     import fs from "node:fs/promises";
@@ -176,7 +187,7 @@ test("a diagnostic write past a quarter second is still recorded", async t => {
     path.resolve(import.meta.dirname, "../../../bin/acc-hook.mjs"), "claude_code"], {
     cwd: path.join(m.home, "project"), timeout: 3000,
     env: { HOME: m.home, ACC_DATA_HOME: m.dataHome, ACC_NO_UPDATE_CHECK: "1", PATH: "",
-      ACC_NATIVE_DELIVERY_POLICY: "off", GIT_DIR: "", GIT_WORK_TREE: "" },
+      GIT_DIR: "", GIT_WORK_TREE: "" },
   });
   child.child.stdin.end(JSON.stringify({ hook_event_name: "UserPromptSubmit", session_id: "paced",
     cwd: path.join(m.home, "project"), prompt: "continue" }));
@@ -206,7 +217,7 @@ test("slow diagnostic I/O cannot hold the hook process open or replace its owner
     path.resolve(import.meta.dirname, "../../../bin/acc-hook.mjs"), "claude_code"], {
     cwd: path.join(m.home, "project"), timeout: 3000,
     env: { HOME: m.home, ACC_DATA_HOME: m.dataHome, ACC_NO_UPDATE_CHECK: "1", PATH: "",
-      ACC_NATIVE_DELIVERY_POLICY: "off", GIT_DIR: "", GIT_WORK_TREE: "" },
+      GIT_DIR: "", GIT_WORK_TREE: "" },
   });
   child.child.stdin.end(JSON.stringify({ hook_event_name: "UserPromptSubmit", session_id: "slow",
     cwd: path.join(m.home, "project"), prompt: "continue" }));
@@ -247,7 +258,7 @@ test("slow diagnostic I/O cannot hold the hook process open or replace its owner
   const nearDeadline = JSON.parse((await exec(process.execPath, ["--import", preload, driver], {
     cwd: path.join(m.home, "project"), timeout: 3000,
     env: { HOME: m.home, ACC_DATA_HOME: m.dataHome, ACC_NO_UPDATE_CHECK: "1", PATH: "",
-      ACC_NATIVE_DELIVERY_POLICY: "off", GIT_DIR: "", GIT_WORK_TREE: "" },
+      GIT_DIR: "", GIT_WORK_TREE: "" },
   })).stdout);
   assert.equal(nearDeadline.diagnosticWorkers, 0,
     "optional diagnostic work was started without its reserved budget");
@@ -255,7 +266,7 @@ test("slow diagnostic I/O cannot hold the hook process open or replace its owner
     "optional diagnostics consumed the remaining functional hook budget");
   assert.equal(nearDeadline.failed, undefined);
   assert.match(nearDeadline.stdout, /ACC|acc/);
-  await m.hook("slow", { policy: { ACC_NATIVE_DELIVERY_POLICY: "off" } });
+  await m.hook("slow", { policy: "off" });
   assert.equal((await m.doctor())[0].lastAttempt.policyStatus, "off",
     "a dead diagnostic writer prevented a subsequent session from recording its result");
 });

@@ -6,7 +6,9 @@ import path from "node:path";
 import test from "node:test";
 
 import { projectContextResult } from "@agents-can-communicate/adapter-sdk";
+import { createCoordinationService } from "@agents-can-communicate/core";
 import { createId } from "@agents-can-communicate/protocol";
+import { openFilesystemStore } from "@agents-can-communicate/storage-filesystem";
 
 import { runHook } from "../src/runner.mjs";
 
@@ -54,17 +56,22 @@ async function withLiveOffer(t, options = {}) {
   const peer = await invoke(event("sessionStart", place.root, { sessionId: "peer-session" }));
   const participantId = recipient.sessions
     .find(session => session.sessionId === recipient.accSessionId).participantId;
-  const message = await peer.service.sendMessage({ sessionId: peer.accSessionId,
+  // The send and the router's record run in the sender's own process. A hook's
+  // service carries that hook's budget, which has run out by now under load.
+  const { root, workspaceId } = recipient.service.store;
+  const sender = createCoordinationService({ clock: runtime.clock, ids: runtime.ids,
+    store: await openFilesystemStore({ root, workspaceId, clock: runtime.clock, ids: runtime.ids }) });
+  const message = await sender.sendMessage({ sessionId: peer.accSessionId,
     generation: peer.generation, clientMessageId: "client_repeat",
     toParticipantIds: [participantId], kind: options.kind ?? "note",
     obligation: options.obligation ?? "none",
     subject: "Schema verified", body: "checked at abc123, nothing to do" });
   // What the router records when a live transport accepts the bytes.
-  await recipient.service.recordOfferSucceeded({ messageId: message.messageId,
+  await sender.recordOfferSucceeded({ messageId: message.messageId,
     recipientParticipantId: participantId, targetSessionId: recipient.accSessionId,
     targetGeneration: recipient.generation, transport: "codex-app-server",
     adapterId: "rep", clientVersion: "1.0.0" });
-  const receipt = () => recipient.service.readReceipt({ messageId: message.messageId,
+  const receipt = () => sender.readReceipt({ messageId: message.messageId,
     recipientParticipantId: participantId });
   return { place, invoke, message, receipt, advance: ms => { offset += ms; } };
 }

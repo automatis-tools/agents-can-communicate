@@ -18,7 +18,7 @@ function adapterWith(refreshNativeSession) {
       minimumByPlatform: { [PLATFORM]: "1.2.3" },
       anchors: [{ platform: PLATFORM, version: "1.2.3",
         protocolContract: "fixture-native-v1" }],
-      knownBad: [], activationKinds: ["shell-bootstrap"],
+      knownBad: [], activationKinds: ["native-service"],
     },
     refreshNativeSession,
   };

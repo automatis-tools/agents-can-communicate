@@ -5,7 +5,7 @@ import { capabilityEvidence, effectiveCapabilities, evaluateNativeEligibility,
   validateNativeActivationPlan }
   from "@agents-can-communicate/adapter-sdk";
 
-import { resolveExecutable, shellOf, shimDirFor } from "./native-activation.mjs";
+import { resolveExecutable, shimDirFor } from "./native-activation.mjs";
 
 import { describeDeliveryFallback, describeNativeReason } from "./delivery-diagnostics.mjs";
 
@@ -83,8 +83,7 @@ async function detectNative(adapter, entry, { context, platform, probeTimeoutMs,
     if (facts.eligibility.eligible !== true) {
       const reasonCode = facts.eligibility.reasonCode ?? "feature_probe_failed";
       // A stored policy can be consented to before a service/session exists.
-      // No activation is planned until the full probe passes; bootstrap-based
-      // clients still need their verified plan to disclose launch changes.
+      // No activation is planned until the full probe passes.
       const consentAvailable = adapter.nativeDelivery.policySource === "installation-record"
         && ["native_endpoint_unavailable", "native_session_unavailable"].includes(reasonCode);
       return STATIC_REASONS.has(reasonCode)
@@ -100,10 +99,6 @@ async function detectNative(adapter, entry, { context, platform, probeTimeoutMs,
       return degraded("feature_probe_failed", facts);
     }
     if (!activationPlan.eligible) return degraded(activationPlan.reasonCode, facts);
-    const shell = context?.shell ?? null;
-    if (activationPlan.mechanisms.some(item => item.kind === "shell-bootstrap") && shell !== "zsh") {
-      return { ...degraded("unsupported_shell", facts), activationPlan };
-    }
     return { state: "eligible", reasonCode: null, ...facts, activationPlan };
   } catch {
     return degraded("feature_probe_failed", { realExecutable: null, probe: null, eligibility: null });
@@ -165,6 +160,7 @@ export async function detectInstallation({ adapters, context, probe = spawnProbe
         // on the machine down with it.
         if (detected.blocked) entry.blocked = detected.blocked;
         if (detected.outgoingDelivery) entry.outgoingDelivery = detected.outgoingDelivery;
+        if (detected.inboundDelivery) entry.inboundDelivery = detected.inboundDelivery;
         if (detected.nativeSetup) entry.nativeSetup = detected.nativeSetup;
         entry.diagnostics = [...(detected.diagnostics ?? [])];
         // What a person has to do, as opposed to what is true. Adapters that

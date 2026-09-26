@@ -5,7 +5,7 @@ import { refreshExpiredBinding } from "./refresh-binding.mjs";
 const SAFE_ERRORS = new Set(["ambiguous_recipient_sessions", "delivery_disabled",
   "recipient_busy", "recipient_unavailable", "transport_error", "transport_rejected", "transport_permission_denied",
   "unsupported_client_version"]);
-const NAMED_LIVE_TRANSPORTS = new Set(["claude-channel", "codex-app-server"]);
+const NAMED_LIVE_TRANSPORTS = new Set(["claude-inbox", "codex-app-server"]);
 
 const adaptersById = adapters => adapters instanceof Map
   ? adapters
@@ -72,10 +72,9 @@ export function createDeliveryRouter({ service, adapters, clock, platform = HOST
   readLivePolicy }) {
   const registry = adaptersById(adapters);
 
+  // Read at offer time, not from the binding: consent withdrawn after a session
+  // bound must stop the next offer, not the next rebind.
   async function policyFor(adapter, binding) {
-    if (adapter?.nativeDelivery?.policySource !== "installation-record") {
-      return LIVE_POLICIES.has(binding.livePolicy) ? binding.livePolicy : "off";
-    }
     if (typeof readLivePolicy !== "function") return "off";
     try {
       const policy = await readLivePolicy({ adapter, binding });
@@ -101,7 +100,14 @@ export function createDeliveryRouter({ service, adapters, clock, platform = HOST
     // endpoint lease never sends a hook heartbeat: a daemon is reachability,
     // not evidence that this particular session thread is still present.
     const liveSessions = await service.listLiveSessions({ participantId, now });
-    if (liveSessions.length === 0) return durable(participantId, "recipient_unavailable");
+    if (liveSessions.length === 0) {
+      // No open session: the message waits until one starts or resumes. The
+      // client's own reason, when it gave one (Claude Code's /clear), is passed on.
+      const last = typeof service.lastSessionOf === "function"
+        ? await service.lastSessionOf({ participantId }).catch(() => null) : null;
+      return { ...durable(participantId, "recipient_offline"),
+        ...(last?.state === "closed" && typeof last.endReason === "string" ? { endReason: last.endReason } : {}) };
+    }
     if (liveSessions.length > 1) {
       return durable(participantId, "ambiguous_recipient_sessions");
     }
@@ -110,7 +116,9 @@ export function createDeliveryRouter({ service, adapters, clock, platform = HOST
       participantId, now, includeExpired: true }))
       .filter(binding => binding.sessionId === target.sessionId
         && binding.generation === target.generation);
-    if (bindings.length === 0) return durable(participantId, "recipient_unavailable");
+    // Online, with nothing to push through: a CLI participant, or a client
+    // that bound no live transport. It reads its inbox, so it is not gone.
+    if (bindings.length === 0) return durable(participantId, "no_live_transport");
     const evaluated = await Promise.all(bindings.map(async binding => {
       const adapter = registry.get(binding.adapterId);
       return { binding, adapter, policy: await policyFor(adapter, binding) };
@@ -118,7 +126,7 @@ export function createDeliveryRouter({ service, adapters, clock, platform = HOST
     const permitted = evaluated.filter(({ policy }) => permits(policy, message.kind));
     if (permitted.length === 0) return durable(participantId, "delivery_disabled");
     const reachable = permitted.filter(({ binding }) => binding.availableModes.includes("livePush"));
-    if (reachable.length === 0) return durable(participantId, "recipient_unavailable");
+    if (reachable.length === 0) return durable(participantId, "no_live_transport");
     const capable = reachable.filter(({ binding, adapter }) => liveCapable(adapter, binding));
     if (capable.length === 0) {
       return durable(participantId, "unsupported_client_version");
@@ -213,6 +221,15 @@ export function createDeliveryRouter({ service, adapters, clock, platform = HOST
       await recordFailure(binding, message, participantId, transport,
         "unsupported_client_version");
       return durable(participantId, "unsupported_client_version");
+    }
+    // A wake put a notice in front of the client, not the body. Recording it
+    // as offered would make the next-turn projection treat the body as already
+    // shown and leave it out of the very turn the wake started. The receipt
+    // stays queued; the hook records the offer once its stdout carried the body.
+    if (adapter.nativeDelivery?.offerKind === "wake") {
+      // The client took the wake but holds it for its user's approval.
+      return { recipientParticipantId: participantId, outcome: "woken", transport,
+        ...(response.pendingApproval === true ? { pendingApproval: true } : {}) };
     }
     try {
       await service.recordOfferSucceeded({ messageId: message.messageId,

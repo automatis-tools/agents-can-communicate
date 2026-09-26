@@ -22,13 +22,14 @@ const adapterWith = (offerMessage, { refreshNativeSession, policySource } = {}) 
     version: "1.2.3", platform: PLATFORM, capability: "delivery.livePush" }] },
   nativeDelivery: { minimumByPlatform: { [PLATFORM]: "1.2.3" },
     anchors: [{ platform: PLATFORM, version: "1.2.3", protocolContract: "fixture-native-v1" }],
-    knownBad: [], activationKinds: ["shell-bootstrap"], ...(policySource === undefined
+    knownBad: [], activationKinds: ["native-service"], ...(policySource === undefined
       ? {} : { policySource }) },
   refreshNativeSession,
   offerMessage,
 });
 
-async function fixture(offerMessage, { refreshNativeSession, readLivePolicy,
+async function fixture(offerMessage, { refreshNativeSession,
+  readLivePolicy = async ({ binding }) => binding.livePolicy,
   policySource, secondRecipientSession = false, beforeBindingList } = {}) {
   const clock = createFakeClock(NOW);
   const ids = createFakeIds();

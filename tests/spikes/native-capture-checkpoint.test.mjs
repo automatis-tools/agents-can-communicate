@@ -8,7 +8,7 @@ import test from "node:test";
 import { decideNativeCaptures, parseCheckpointArgs, renderDecisionTable }
   from "../../scripts/spikes/check-native-captures.mjs";
 import { INSTALLED_HOOKS_LAUNCH_MODE } from "../../scripts/spikes/delivery-capture.mjs";
-import { runProcess } from "../helpers/claude-channel.mjs";
+import { runProcess } from "../helpers/run-process.mjs";
 import { matrixEvidence as productEvidence }
   from "../helpers/codex-local-daemon-evidence.mjs";
 

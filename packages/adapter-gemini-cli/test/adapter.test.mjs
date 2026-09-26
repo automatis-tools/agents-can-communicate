@@ -211,7 +211,7 @@ test("captured payloads normalise and drop conversation content", async () => {
     assert.equal(normalised.kind, kind, `${event} normalised wrongly`);
     assert.equal(normalised.sessionId, payload.session_id);
     assert.deepEqual(Object.keys(normalised).sort(),
-      ["cwd", "kind", "model", "parentSessionId", "sessionId", "targets", "tool"]);
+      ["cwd", "endReason", "kind", "model", "parentSessionId", "permissionMode", "sessionId", "targets", "tool"]);
     assert.equal(JSON.stringify(normalised).includes("redacted"), false,
       `${event} carried conversation content through`);
   }

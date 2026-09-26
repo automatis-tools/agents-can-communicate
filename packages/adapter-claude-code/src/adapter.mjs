@@ -2,18 +2,15 @@ import { defineAdapter, projectContext, projectContextResult }
   from "@agents-can-communicate/adapter-sdk";
 import certification from "../certification.json" with { type: "json" };
 
-import { PROTOCOL_CONTRACT } from "./channel.mjs";
 import { denyOutcome, injectOutcome, injectStartOwnerOutcome, normalizeClaudeHook } from "./hooks.mjs";
+import { MIN_VERSION, PROTOCOL_CONTRACT, bindNativeSession, offerMessage, planNativeActivation,
+  probeNativeDelivery, refreshNativeSession, retireNativeSession } from "./inbox-delivery.mjs";
 import { planClaudeInstall, detectClaude, installClaudePlugin, uninstallClaudePlugin } from "./install.mjs";
-import { bindNativeSession, offerMessage, planNativeActivation, probeNativeDelivery, routeReply }
-  from "./native-delivery.mjs";
 
 export const CLAUDE_CODE_VERSION = "2.1.233";
-export const CLAUDE_CHANNEL_MINIMUM = "2.1.258";
 export const CLAUDE_DELIVERY_FALLBACK = Object.freeze({
-  diagnostic: "Claude Code native delivery requires client-side Channels activation; "
-    + "a successful bootstrap or connected ACC MCP server does not prove inbound delivery "
-    + "is enabled. Messages remain durable for certified next-turn delivery or acc inbox",
+  diagnostic: `Claude Code live delivery wakes a session through its inbox socket from ${MIN_VERSION}; `
+    + "fallback: next-turn hooks or acc inbox",
 });
 
 /**
@@ -25,7 +22,8 @@ export const CLAUDE_DELIVERY_FALLBACK = Object.freeze({
  * and a parent/child mapping claimed without observation is the kind of thing
  * that quietly maps every child onto its parent. `startupInjection` and
  * `safePointInjection` were not exercised - only the before-turn path was.
- * Native live delivery and reply routing are not certified for this harness.
+ * Native live delivery is the inbox wake, certified from 2.1.282 on
+ * darwin-arm64; reply routing through the transport is not claimed.
  */
 export function createClaudeCodeAdapter() {
   return defineAdapter({
@@ -44,28 +42,22 @@ export function createClaudeCodeAdapter() {
       context: { beforeTurnInjection: true },
       // PreToolUse denied both a Write and a Bash call; neither ran.
       guards: { beforeWrite: true, beforeShell: true },
-      // nextTurn is the certified 2.1.233 hook projection; livePush and
-      // replyRoute rest on the 2.1.258 Channel capture and the native contract
-      // below. effectiveCapabilities() carries each of those captures forward
-      // to later clients; the native contract is the separate live rule.
-      delivery: { nextTurn: true, livePush: true, replyRoute: true },
+      // nextTurn is the certified 2.1.233 hook projection. livePush rests on
+      // the 2.1.282 product capture of the inbox wake; the reply is the
+      // ordinary `acc reply` every adapter has, so replyRoute stays false.
+      delivery: { nextTurn: true, livePush: true },
     },
-    // The first passing capture is the shipped minimum; the research lower
-    // bound (2.1.80) is documented but not admitted without its own capture.
-    //
-    // The 2.1.260 release capture is passing evidence beside this, deliberately
-    // not a second anchor: an anchor is the minimum's proof, one per platform,
-    // and this contract has no maximum precisely so a newer stable client is
-    // admitted by probe and a generation-bound handshake instead of by another
-    // anchor. That capture is what exercised the rule - every branch observed
-    // on 2.1.260 while the minimum stayed here. Two minor versions of drift,
-    // served without a capture at either of them, is the rule working.
+
+    // The first passing capture is the minimum, and there is no maximum: a
+    // newer stable client is admitted by the probe and the per-session
+    // handshake. The offer is a wake; see src/inbox-delivery.mjs.
     nativeDelivery: {
-      minimumByPlatform: { "darwin-arm64": CLAUDE_CHANNEL_MINIMUM },
-      anchors: [{ platform: "darwin-arm64", version: CLAUDE_CHANNEL_MINIMUM,
-        protocolContract: PROTOCOL_CONTRACT }],
+      minimumByPlatform: { "darwin-arm64": MIN_VERSION },
+      anchors: [{ platform: "darwin-arm64", version: MIN_VERSION, protocolContract: PROTOCOL_CONTRACT }],
       knownBad: [],
-      activationKinds: ["shell-bootstrap", "native-config"],
+      activationKinds: ["native-service"],
+      policySource: "installation-record",
+      offerKind: "wake",
     },
 
     startSession: async () => ({ ok: true, changes: [], diagnostics: [] }),
@@ -75,8 +67,7 @@ export function createClaudeCodeAdapter() {
 
     planInstall: context => planClaudeInstall(context),
     detect: context => detectClaude(context),
-    install: context => installClaudePlugin({ ...context,
-      livePolicy: context.livePolicy ?? "off" }),
+    install: context => installClaudePlugin(context),
     uninstall: context => uninstallClaudePlugin(context),
 
     doctor: async context => {
@@ -85,6 +76,9 @@ export function createClaudeCodeAdapter() {
         ...detected.diagnostics,
         "hook payloads captured from Claude Code 2.1.233",
         CLAUDE_DELIVERY_FALLBACK.diagnostic,
+        // Claude Code's own inbound control decides whether a wake reaches the
+        // model; ACC never attests a permission mode. Said only when it matters.
+        ...(detected.inboundDelivery.diagnostic === null ? [] : [detected.inboundDelivery.diagnostic]),
         // SessionEnd is advisory and cannot summarise a conversation that has
         // already stopped, so the handoff is written from Stop or the skill.
         "handoff is written while the model is active, not at SessionEnd",
@@ -94,8 +88,9 @@ export function createClaudeCodeAdapter() {
     probeNativeDelivery,
     planNativeActivation,
     bindNativeSession,
+    refreshNativeSession,
+    retireNativeSession,
     offerMessage,
-    routeReply,
 
     denyOutcome,
     injectOutcome,

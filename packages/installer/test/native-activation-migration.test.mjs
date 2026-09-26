@@ -7,10 +7,11 @@ import path from "node:path";
 import test from "node:test";
 import { applyPlan } from "../src/apply.mjs";
 import { detectInstallation } from "../src/detect.mjs";
-import { applyNativeActivation, planActivationRetirements } from "../src/native-activation.mjs";
+import { planActivationRetirements } from "../src/native-activation.mjs";
 import { loadOwnership, recordInstall } from "../src/ownership.mjs";
 import { planInstallation } from "../src/plan.mjs";
 import { planNativeActivation } from "../../adapter-codex/src/native-delivery.mjs";
+import { writeLegacyShellActivation } from "../../../tests/helpers/legacy-shell-bootstrap.mjs";
 
 const service = { kind: "native-service", serviceId: "codex-app-server", preExisting: true,
   applyCommand: null, teardownCommand: null };
@@ -26,16 +27,15 @@ async function machine(t, { shared = false } = {}) {
   await mkdir(path.dirname(vendor));
   await writeFile(vendor, "#!/bin/sh\nprintf '%s\\n' 0.152.1\n", { mode: 0o700 });
   await writeFile(rcFile, "# user rc\n");
-  const activation = { livePolicy: "actionable", protocolContract, shell: "zsh", rcFile,
-    shimDir, mechanisms: [service, { kind: "shell-bootstrap", command: "codex",
-      realExecutable: vendor, prefixArgs: ["--remote", "unix://"] }] };
-  const runtime = { node: process.execPath, bootstrap: "/tmp/unused-bootstrap.mjs" };
-  const applied = await applyNativeActivation({ adapter: { id: "codex" }, activation, dataHome, ...runtime });
+  // What an older install left: the Codex wrapper shim beside its service.
+  const shell = await writeLegacyShellActivation({ adapterId: "codex", command: "codex",
+    realExecutable: vendor, prefixArgs: ["--remote", "unix://"], shimDir, rcFile, dataHome });
   await recordInstall({ dataHome, adapterId: "codex", version: "0.152.1", accVersion: "0.3.0",
-    artifacts: [], nativeActivation: applied.nativeActivation });
-  if (shared) await applyNativeActivation({ adapter: { id: "claude_code" }, dataHome, ...runtime,
-    activation: { ...activation, mechanisms: [{ kind: "shell-bootstrap", command: "claude",
-      realExecutable: vendor, prefixArgs: [] }] } });
+    artifacts: [], nativeActivation: { livePolicy: "actionable", protocolContract, mechanisms: [
+      { kind: "native-service", serviceId: service.serviceId, createdByAcc: false, teardownCommand: null },
+      shell] } });
+  if (shared) await writeLegacyShellActivation({ adapterId: "claude_code", command: "claude",
+    realExecutable: vendor, shimDir, rcFile, dataHome });
   const context = { home, dataHome, stateRoot: path.join(dataHome, "acc"), shell: "bash",
     env: { PATH: path.dirname(vendor), CODEX_HOME: path.join(home, "custom-codex") } };
   const adapter = { id: "codex", displayName: "Fixture Codex migration", planInstall: () => [],
@@ -47,7 +47,7 @@ async function machine(t, { shared = false } = {}) {
     adapters: [adapter], detected, context, action, recorded: (await loadOwnership({ dataHome })).installs,
     deliveryByAdapter: { codex: policy } });
   const apply = async (options = {}) => applyPlan({ plan: await plan(), adapters: [adapter], context,
-    dataHome, activation: { ...runtime, exec: async () => { throw new Error("service command forbidden"); } }, ...options });
+    dataHome, activation: { exec: async () => { throw new Error("service command forbidden"); } }, ...options });
   return { home, dataHome, shimDir, rcFile, vendor, context, adapter, plan, apply,
     shim: path.join(shimDir, "codex") };
 }
@@ -166,4 +166,89 @@ test("shell retirement compares command identity and refuses an empty legacy ide
     { kind: "shell-bootstrap", ownedFiles: [{ path: "/old/bin/claude" }] }]) {
     assert.deepEqual(planActivationRetirements({ previous: { mechanisms: [old] }, desired }), []);
   }
+});
+
+// What a 0.7.x Claude live install recorded: the Channel config and the shim.
+const channelActivation = { livePolicy: "actionable", protocolContract: "claude-code-channel-mcp-v1",
+  mechanisms: [{ kind: "native-config", artifactIds: ["claude-channel-mcp"] },
+    { kind: "shell-bootstrap", command: "claude", shimDir: "/d/acc/bin",
+      ownedFiles: [{ path: "/d/acc/bin/claude", sha256: "a".repeat(64) }],
+      rcFile: { path: "/h/.zshrc", blockSha256: "b".repeat(64), appended: true } }] };
+
+function planClaude({ nativeDelivery, detectedNative, previous = channelActivation }) {
+  const adapter = { id: "claude_code", displayName: "Claude Code", planInstall: () => [],
+    ...(nativeDelivery === undefined ? {} : { nativeDelivery }) };
+  return planInstallation({ adapters: [adapter], action: "install",
+    context: { home: "/h", dataHome: "/d", stateRoot: "/d/acc" },
+    detected: [{ adapterId: "claude_code", present: true, version: "2.1.260", installed: true,
+      nativeDelivery: detectedNative }],
+    recorded: [{ adapterId: "claude_code", deliveryPolicy: "actionable", nativeActivation: previous }],
+    deliveryByAdapter: { claude_code: "actionable" } }).operations[0];
+}
+
+test("a recorded shim is retired even when this client cannot take live delivery", () => {
+  const operation = planClaude({ detectedNative: { state: "unsupported",
+    reasonCode: "native_delivery_unsupported" } });
+  assert.equal(operation.retainedNativeActivation, undefined);
+  assert.deepEqual(operation.deactivation.mechanisms.map(item => item.kind).sort(),
+    ["native-config", "shell-bootstrap"]);
+});
+
+test("an activation under a contract the adapter still declares keeps all but its shim", () => {
+  const previous = { ...channelActivation, protocolContract: "fixture-native-v1",
+    mechanisms: [{ kind: "native-service", serviceId: "fixture", createdByAcc: false,
+      teardownCommand: null }, channelActivation.mechanisms[1]] };
+  const operation = planClaude({ previous, detectedNative: { state: "degraded",
+    reasonCode: "native_endpoint_unavailable" },
+  nativeDelivery: { anchors: [{ platform: "darwin-arm64", version: "1.0.0",
+    protocolContract: "fixture-native-v1" }] } });
+  assert.deepEqual(operation.retainedNativeActivation.mechanisms.map(item => item.kind), ["native-service"]);
+  assert.deepEqual(operation.deactivation.mechanisms.map(item => item.kind), ["shell-bootstrap"]);
+});
+
+test("an eligible inbox plan retires the Channel config and the shim", () => {
+  const inbox = { kind: "native-service", serviceId: "claude-code-inbox", preExisting: true,
+    applyCommand: null, teardownCommand: null };
+  const operation = planClaude({ detectedNative: { state: "eligible",
+    eligibility: { protocolContract: "claude-code-inbox-socket-v1" },
+    activationPlan: { eligible: true, reasonCode: null, mechanisms: [inbox] } } });
+  assert.deepEqual(operation.nativeActivation.mechanisms, [inbox]);
+  assert.deepEqual(operation.deactivation.mechanisms.map(item => item.kind).sort(),
+    ["native-config", "shell-bootstrap"]);
+});
+
+test("an install removes the bootstrap cache a 0.7.x shim kept", async t => {
+  const h = await machine(t);
+  const cache = path.join(h.dataHome, "acc", "native-bootstrap");
+  await mkdir(cache, { recursive: true });
+  await writeFile(path.join(cache, "claude_code.json"), "{}\n");
+  assert.deepEqual((await h.apply()).failed, []);
+  await assert.rejects(stat(cache), { code: "ENOENT" });
+});
+
+test("an activation record without mechanisms cannot fail the plan", () => {
+  // Nothing validates this record on load, and a plan that throws here fails
+  // every automatic update.
+  for (const detectedNative of [{ state: "degraded", reasonCode: "native_endpoint_unavailable" },
+    { state: "unsupported", reasonCode: "native_delivery_unsupported" }]) {
+    const operation = planClaude({ detectedNative,
+      previous: { livePolicy: "actionable", protocolContract: "fixture-native-v1" },
+      nativeDelivery: { anchors: [{ platform: "darwin-arm64", version: "1.0.0",
+        protocolContract: "fixture-native-v1" }] } });
+    assert.equal(operation.adapterId, "claude_code");
+  }
+});
+
+test("an install removes Channel registrations a crashed 0.7.x Channel left in workspaces", async t => {
+  const h = await machine(t);
+  const workspaces = path.join(h.dataHome, "acc", "workspaces");
+  const registrations = path.join(workspaces, "workspace_a", "native", "claude");
+  await mkdir(registrations, { recursive: true });
+  await writeFile(path.join(registrations, "endpoint_old.json"), "{}\n");
+  const codexEndpoints = path.join(workspaces, "workspace_a", "codex-native-endpoints");
+  await mkdir(codexEndpoints, { recursive: true });
+  await writeFile(path.join(codexEndpoints, "codex_endpoint_keep.json"), "{}\n");
+  assert.deepEqual((await h.apply()).failed, []);
+  await assert.rejects(stat(registrations), { code: "ENOENT" });
+  assert.ok(await stat(path.join(codexEndpoints, "codex_endpoint_keep.json")), "other adapters keep theirs");
 });

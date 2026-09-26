@@ -7,13 +7,14 @@ import path from "node:path";
 import { AccError, EXIT } from "@agents-can-communicate/protocol";
 import { fileURLToPath } from "node:url";
 
-import { acccreatedFile, bakeSkillCommand, blankJson, defaultBootstrap, defaultChannel,
+import { acccreatedFile, bakeSkillCommand, blankJson,
   mergeOwnedEntries, ownedEntries,
   keepVersions, ownVersion, stampPluginVersion,
   removeIfEmpty,
   removeInstalledTree,
   removeOwnedEntries, writeCliShim, writeForeignJson, writeHookShim }
   from "@agents-can-communicate/adapter-sdk";
+import { MANAGED_SETTINGS, inboundStatus } from "./inbox-settings.mjs";
 
 const bundle = fileURLToPath(new URL("../plugin", import.meta.url));
 const manifest = fileURLToPath(new URL("../plugin/.claude-plugin/plugin.json",
@@ -22,9 +23,6 @@ const manifest = fileURLToPath(new URL("../plugin/.claude-plugin/plugin.json",
 const PLUGIN_NAME = "agents-can-communicate";
 const MARKETPLACE = "acc-local";
 const QUALIFIED = `${PLUGIN_NAME}@${MARKETPLACE}`;
-const CHANNEL_ACTIVATION_CHECK = "Check Claude's Channels startup notice for ACC; "
-  + "an MCP connection does not verify inbound delivery. If Channels are unavailable "
-  + "or blocked, resolve that client warning before expecting live messages.";
 
 /**
  * How this client actually installs a plugin.
@@ -147,24 +145,21 @@ const marketplaceManifest = () => ({
   }],
 });
 
-// The channel MCP entry Claude Code loads only when the session is started with
-// the captured development-channel flag. Written with the pinned Node and the
-// installed Channel binary, so the generated file carries no repository path;
-// removed entirely for a non-live install so a plain launch spawns nothing.
+// Up to 0.7.x a live install wrote the Channel MCP server here, and Claude
+// Code spawned it for every session that enabled the plugin. The inbox wake
+// needs no MCP server, so no plugin copy ACC keeps may name one.
 const mcpPath = target => path.join(target, ".mcp.json");
-async function writeChannelMcp(target, { node, channel }) {
-  await writeJson(mcpPath(target), { mcpServers: { "acc-channel": {
-    command: node, args: [channel] } } });
+
+async function removeChannelConfig(versionsRoot) {
+  const versions = await readdir(versionsRoot).catch(() => []);
+  await Promise.all(versions.map(version => rm(mcpPath(path.join(versionsRoot, version)),
+    { force: true })));
 }
 
 /** A plugin tree with the shim written and the skill's command baked in. */
-async function layOutPlugin(target, { runner, node, cli, channel, live }) {
+async function layOutPlugin(target, { runner, node, cli }) {
   await rm(target, { recursive: true, force: true });
   await cp(bundle, target, { recursive: true });
-  // The bundle ships a placeholder .mcp.json; the real one is written only for a
-  // live install, and a non-live tree carries none.
-  await rm(mcpPath(target), { force: true });
-  if (live) await writeChannelMcp(target, { node, channel });
   // The skill ships with a placeholder where the command belongs: `acc` is not
   // on PATH everywhere, and an agent that cannot run it improvises. The shim
   // carries the pinning so each example can name one path. No data home is
@@ -181,9 +176,8 @@ async function layOutPlugin(target, { runner, node, cli, channel, live }) {
     version: await pluginVersion(), io: { readFile, writeFile } });
 }
 
-export async function installClaudePlugin({ configDir, runner, cli, keepPreviousVersion = null, node = process.execPath,
-  channel = defaultChannel(), livePolicy = "off", now = new Date() }) {
-  const live = livePolicy === "actionable" || livePolicy === "all";
+export async function installClaudePlugin({ configDir, runner, cli, keepPreviousVersion = null,
+  node = process.execPath, now = new Date() }) {
   // Everything this will merge into, read before a byte is written. A settings
   // file that will not parse used to be discovered after the plugin tree was
   // already on disk, and the install then failed with nineteen files left
@@ -200,12 +194,12 @@ export async function installClaudePlugin({ configDir, runner, cli, keepPrevious
   const source = sourceDir(configDir);
   const cached = cachePath(configDir, version);
 
-  await layOutPlugin(source, { runner, node, cli, channel, live });
+  await layOutPlugin(source, { runner, node, cli });
   await writeJson(marketplaceFile(configDir), marketplaceManifest());
   // The copy the client runs from. Written here rather than asking the user to
   // run `claude plugin install`, exactly as the Codex adapter does, because the
   // command's only effect is this copy plus the two registry entries below.
-  await layOutPlugin(cached, { runner, node, cli, channel, live });
+  await layOutPlugin(cached, { runner, node, cli });
   // The copy just written, plus the one an upgrade moved off. A client caches a
   // plugin under its version, so every upgrade would otherwise leave the previous
   // release's tree beside this one - invisible while the version never moved,
@@ -214,6 +208,10 @@ export async function installClaudePlugin({ configDir, runner, cli, keepPrevious
   // anything older than that holds no session and is litter.
   await keepVersions({ root: path.dirname(cached), keep: [version, keepPreviousVersion],
     io: { readdir, rm } });
+  // The copy an upgrade moved off stays for sessions already running from it,
+  // but its Channel config would still start a Channel for any session that
+  // reads it. Those sessions keep what they loaded; nothing new starts one.
+  await removeChannelConfig(path.dirname(cached));
 
   await writeClientJson(knownMarketplacesPath(configDir), {
     ...known,
@@ -254,12 +252,9 @@ export async function installClaudePlugin({ configDir, runner, cli, keepPrevious
 
   return { ok: true,
     changes: [source, cached, marketplaceFile(configDir),
-      knownMarketplacesPath(configDir), installedPluginsPath(configDir), file,
-      ...(live ? [mcpPath(source), mcpPath(cached)] : [])],
-    needsAction: live ? [CHANNEL_ACTIVATION_CHECK] : [],
-    diagnostics: live
-      ? ["native channel wired; Claude's experimental development-channel warning still applies"]
-      : [] };
+      knownMarketplacesPath(configDir), installedPluginsPath(configDir), file],
+    needsAction: [],
+    diagnostics: [] };
 }
 
 export async function uninstallClaudePlugin({ configDir, keep = [] }) {
@@ -297,16 +292,15 @@ export async function uninstallClaudePlugin({ configDir, keep = [] }) {
   return { ok: true, changes, diagnostics: [] };
 }
 
-export async function detectClaude({ configDir }) {
+export async function detectClaude({ configDir, managedSettingsPath = MANAGED_SETTINGS[process.platform] }) {
   const settings = await readJson(settingsPath(configDir), null);
   const enabled = settings?.enabledPlugins?.[QUALIFIED] === true;
   const registered = Object.hasOwn(
     (await readJson(installedPluginsPath(configDir), { plugins: {} })).plugins ?? {},
     QUALIFIED);
-  const channelConfigured = enabled && registered
-    && (await readJson(mcpPath(sourceDir(configDir)), null))?.mcpServers?.["acc-channel"] != null;
   return { ok: true, changes: [],
-    needsAction: channelConfigured ? [CHANNEL_ACTIVATION_CHECK] : [],
+    inboundDelivery: await inboundStatus({ configDir, managedSettingsPath }),
+    needsAction: [],
     diagnostics: [enabled && registered
       ? "acc plugin registered and enabled"
       : "acc plugin not registered"] };

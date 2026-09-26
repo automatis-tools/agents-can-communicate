@@ -102,7 +102,13 @@ the messages addressed to that participant that it has not fetched, split by how
 got. Two sessions of one participant show the same numbers, so read the workspace total from
 `counts.unretrieved` rather than adding rows, and the text line ends with
 `<n> offered, not retrieved` when that number is above zero. Offered is not read: a
-transport took the bytes, and the model may or may not have looked. Default `sync` reads
+transport took the bytes, and the model may or may not have looked.
+
+A participant with no open session is left out, unless messages still wait for it. Then its
+latest session stays listed as `offline`, with `endReason` when the client said why the
+session ended, such as `"clear"` for Claude Code's `/clear`. The text line names each one:
+`waiting for a closed session: claude_code-b (cleared, 2)`. `acc status --all` lists every
+session. Default `sync` reads
 events after a 16-digit event cursor (100 by
 default, up to 500). `--scope history` discovers historical message headers and reads
 selected records; `--scope full` adds an unbounded snapshot for explicit workspace forensics.
@@ -207,6 +213,36 @@ The JSON result for `message`, `request`, `reply`, and `finish` is:
 Human output starts with `recorded message_x`. A transport failure after that commit does
 not change the command exit code. Reuse an explicit `--client-message-id` after an
 uncertain result to recover the same logical message.
+
+A queued result names why no live offer was made. `no_live_transport` means the recipient
+is online but its session has no live transport bound: a participant attached with the CLI,
+or a client without live delivery. It reads the message from its inbox or next turn, and
+human output says `models has no live transport; the message waits in its inbox`.
+`recipient_offline` means the recipient has no open session; the message waits until one
+starts or resumes. When the client said why its last session ended, the result carries it,
+for example `"endReason": "clear"` after Claude Code's `/clear`, and human output says
+`models's conversation was cleared (/clear); the message waits until that conversation
+resumes`. `recipient_unavailable` means the recipient's session is open but its live
+transport could not be reached.
+
+The delivery outcome `woken` means ACC woke a Claude Code session through its inbox:
+
+```json
+{ "recipientParticipantId": "models", "outcome": "woken", "transport": "claude-inbox" }
+```
+
+Human output prints it as `woke models via claude-inbox; the message arrives with its next turn`.
+The wake carries only fixed ACC text and the message id. The receipt stays `queued`. The
+session's next-turn hook then shows the body and records the receipt as `offered` via
+`next-turn`.
+
+A Claude Code session that bypasses permission prompts holds each wake for its user's
+approval, unless its `crossSessionInbound` setting is `accept`. The outcome then carries
+`"pendingApproval": true`, and human output says
+`sent a wake to models via claude-inbox, which its session holds for approval because it
+bypasses permission prompts; the message arrives with its next turn`. A session whose
+`crossSessionInbound` is `refuse` gets no wake: the message stays `queued` with
+`delivery_disabled`.
 
 `reply` additionally returns `receipt`: the original message id, the replying participant,
 and state `acknowledged`. Its `message` and `delivery` describe the outgoing answer.
@@ -320,12 +356,12 @@ terminal asks one default-No question for all selected clients that need a decis
 its local service is unavailable or has no loaded session; this does not activate delivery.
 A non-interactive run or a `--dry-run` keeps fresh clients off. A recorded opt-in is kept on upgrade. If the detected
 client cannot receive native delivery - unsupported, below the captured minimum, a
-prerelease, known-bad, a wrong platform, or an unsupported shell - installation keeps the
-effective policy off and prints the reason. Claude Code shell activation writes an owned
-zsh PATH block and a shim that `exec`s the real client; `ACC_BYPASS=1` bypasses that
-activation. Codex LocalDaemon delivery uses recorded installation consent without changing
-ordinary launch arguments. Its opt-in remains active when shim variables are absent or
-bypassed; `acc install --adapter codex --delivery off` disables new native offers. On a
+prerelease, known-bad, or a wrong platform - installation keeps the
+effective policy off and prints the reason. Every adapter reads live-delivery consent from
+the installation record. Claude Code live delivery uses the inbox that each Claude Code
+session opens itself. ACC adds no launch argument, shell file or wrapper for it. Codex
+LocalDaemon delivery also keeps ordinary launch arguments unchanged.
+`acc install --adapter <adapter> --delivery off` disables new native offers for that client. On a
 supported explicit install, complete consent can prepare a missing Codex service. On macOS
 arm64 with Codex 0.154.0 or newer, the same choice includes downloading a missing standalone
 package from OpenAI. ACC selects the installed CLI version and verifies the official
@@ -341,15 +377,14 @@ The install summary names each client's requested policy,
 activation state and verified fallback. `doctor` separates protocol readiness, recorded
 consent and a live channel in the current workspace, with a next step for missing activation.
 A supported version or an installed plugin alone is not an active delivery channel.
-`runtime: active` means ACC has a reachable local transport binding. Claude can still
-block inbound Channels messages while its MCP server and tools remain connected;
-doctor therefore also names the client-side startup check.
+`runtime: active` means ACC has a reachable local transport binding. Claude Code applies
+its own inbound controls to each wake: a session in `bypassPermissions` mode holds the wake
+for approval. See [delivery troubleshooting](TROUBLESHOOTING.md#a-claude-code-session-holds-or-drops-acc-wakes).
 In doctor JSON, `nativeDelivery.activation` distinguishes missing launch setup from a
 recorded setup (or `not_required` for a pre-existing service). `policy` is the installed
 choice. `deliveryDecision` gives its known source and reports legacy provenance as unknown.
-`nativeServiceSetup` reports service infrastructure separately. `sessionPolicy` describes a native binding when one is visible. Existing Claude
-sessions can retain their launch policy after a different choice is installed for new
-sessions; Codex checks current recorded consent before new offers.
+`nativeServiceSetup` reports service infrastructure separately. `sessionPolicy` describes a native binding when one is visible.
+Every adapter rereads the current recorded consent at hooks and before new offers.
 `nativeDelivery.sessions` lists each current session's identity, present transport state
 and `lastAttempt`: timestamp, startup/turn event, effective policy and its source, whether
 that policy was missing/invalid/off, whether a client process was identified, and the closed

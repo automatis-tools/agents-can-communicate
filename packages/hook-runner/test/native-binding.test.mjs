@@ -4,7 +4,7 @@ import test from "node:test";
 import { defineAdapter } from "@agents-can-communicate/adapter-sdk";
 import { AccError, EXIT } from "@agents-can-communicate/protocol";
 
-import { LIVE_POLICIES, establishNativeBinding, livePolicyFrom } from "../src/native-binding.mjs";
+import { LIVE_POLICIES, establishNativeBinding } from "../src/native-binding.mjs";
 
 const NOW = "2026-09-02T12:00:00.000Z";
 const noop = async () => ({ ok: true, changes: [], diagnostics: [] });
@@ -28,7 +28,7 @@ function nativeAdapter(bindNativeSession = async () => HANDSHAKE) {
       limitations: ["fixture only"], result: "pass" }] },
     nativeDelivery: { minimumByPlatform: { "darwin-arm64": "2.1.258" },
       anchors: [{ platform: "darwin-arm64", version: "2.1.258", protocolContract: "fixture-native-v1" }],
-      knownBad: [], activationKinds: ["shell-bootstrap"] },
+      knownBad: [], activationKinds: ["native-service"] },
     detect: noop, install: noop, uninstall: noop, doctor: noop,
     normalizeHook: () => ({ kind: "sessionStart", sessionId: "s", cwd: "/tmp" }),
     renderContext: () => "",
@@ -82,14 +82,15 @@ test("the hook environment reaches the adapter handshake for endpoint lookup", a
   assert.equal(received.env, env);
 });
 
-test("a missing, malformed, or foreign policy value is off", () => {
+test("a missing, malformed, or foreign policy value is off", async () => {
   assert.deepEqual(LIVE_POLICIES, ["off", "actionable", "all"]);
   for (const value of [undefined, "", "ALL", "1", "true", "actionable ", " off"]) {
-    assert.equal(livePolicyFrom({ ACC_NATIVE_DELIVERY_POLICY: value }), "off", String(value));
+    let handshakes = 0;
+    const result = await establish(nativeAdapter(async () => { handshakes += 1; return HANDSHAKE; }),
+      fakeService(), { livePolicy: value });
+    assert.deepEqual(result, { state: "off", reasonCode: null, modes: [] }, String(value));
+    assert.equal(handshakes, 0, String(value));
   }
-  assert.equal(livePolicyFrom({}), "off");
-  assert.equal(livePolicyFrom(undefined), "off");
-  assert.equal(livePolicyFrom({ ACC_NATIVE_DELIVERY_POLICY: "all" }), "all");
 });
 
 test("an adapter without a native contract is a no-op", async () => {
@@ -210,4 +211,34 @@ test("a binding without a resolved client process cannot go live until a fresh s
   assert.deepEqual(service.calls.map(([name, input]) => [name, input.sessionId, input.generation]),
     [["clear", "session_a", "generation_a"]]);
   assert.equal(Number.isFinite(service.calls[0][1].deadlineAt), true);
+});
+
+// An adapter may write its private endpoint before the static rule judges the
+// handshake. Nothing else would ever remove it, and a refused client binds on
+// every turn: one orphan record per prompt. An adapter that retires its own
+// endpoints also has retirement read the prior binding, so the service here
+// holds none.
+const serviceWithStore = () => ({ ...fakeService(),
+  store: { ephemeral: { get: async () => null } } });
+test("a refused handshake retires the endpoint the adapter already wrote", async () => {
+  const retired = [];
+  const adapter = { ...nativeAdapter(async () => ({ ...HANDSHAKE, clientVersion: "2.1.250" })),
+    retireNativeSession: async input => { retired.push(input); } };
+  const result = await establish(adapter, serviceWithStore(), { clientVersion: "2.1.250" });
+  assert.equal(result.state, "unsupported");
+  assert.deepEqual(retired.map(item => [item.binding.opaqueEndpointRef, item.runtimeDir]),
+    [["adapter-owned-endpoint-id", "/runtime"]]);
+});
+
+test("a handshake that answers after the budget still has its endpoint retired", async () => {
+  let answer;
+  const late = new Promise(resolve => { answer = resolve; });
+  const retired = [];
+  const adapter = { ...nativeAdapter(() => late),
+    retireNativeSession: async input => { retired.push(input.binding.opaqueEndpointRef); } };
+  const result = await establish(adapter, serviceWithStore(), { timeoutMs: 10 });
+  assert.equal(result.reasonCode, "handshake_timeout");
+  answer(HANDSHAKE);
+  await new Promise(resolve => setTimeout(resolve, 20));
+  assert.deepEqual(retired, ["adapter-owned-endpoint-id"]);
 });

@@ -154,31 +154,35 @@ or a connected MCP server does not by itself establish automatic delivery. `life
 manual` can also mean the current version has no certified session-end hook; it does not
 prove that no hooks ran.
 
-For Claude Code, open a fresh interactive zsh after installation so its launcher
-is on PATH. Check Claude's **Channels startup notice for ACC**, and accept the
-development-channel warning when it appears. A successful bootstrap cache means the
-executable passed ACC's compatibility probe. `/mcp` showing `connected` and two tools
-means the MCP server connected. Even `runtime: active` in ACC's doctor JSON describes
-the local transport; none of these proves that Claude enabled inbound channel messages.
+For Claude Code, use version 2.1.282 or newer on Apple Silicon macOS, and start it with
+your ordinary command. Each Claude Code session opens its own inbox socket. ACC reads the
+socket path from `CLAUDE_CODE_MESSAGING_SOCKET` in the hook environment. ACC then checks that
+path against Claude Code's session registry `<config>/sessions/<pid>.json`, where
+`<config>` is `CLAUDE_CONFIG_DIR` or `~/.claude`. The pid and the socket must match for the
+binding, and the session id must match too before each wake. Each turn hook binds the
+session again, so the next ordinary prompt retries a failed binding.
 
-If Claude says `--dangerously-load-development-channels ignored` or `Channels are not
-currently available`, it has not enabled that delivery path. On a fresh 2.1.266 test
-profile, the first launch showed those messages and the next launch showed the development
-warning; restarting once can recheck availability, but is not a guaranteed fix. If it
-remains unavailable, follow Claude's notice. Organization policy can also block Channels;
-an administrator must enable them where required. ACC does not override that policy.
-See [Claude's Channels documentation](https://code.claude.com/docs/en/channels).
+- Claude Code 2.1.224 and later open the inbox, but ACC's captured minimum is 2.1.282. An
+  older version reports `below_minimum_version` and keeps next-turn delivery.
+- On native Windows, Claude Code serves its inbox on a named pipe that requires an auth
+  line. ACC has no capture of that inbox, so Windows keeps next-turn delivery.
+- Linux is uncaptured for live delivery. A Linux session keeps next-turn delivery.
+- A wake that reached the session can still wait for your approval. See
+  [the next section](#a-claude-code-session-holds-or-drops-acc-wakes).
 
-If `deliveryBindings` is empty, ACC has not bound a local transport either. Read the
+If `deliveryBindings` is empty, ACC has not bound a local transport. Read the
 per-session lines in `acc doctor`, or `nativeDelivery.sessions[].lastAttempt` in JSON:
 
-- An absent launch policy means that hook did not receive delivery consent, even if an
-  earlier bootstrap probe succeeded. For Claude, open a new terminal and client through
-  the installed launcher.
+- An absent or `off` policy means the installation record has no live-delivery consent
+  for that client. Run `acc install --adapter <adapter> --delivery actionable` (or `all`).
 - `client_process_unknown` means ACC could not identify the client process. A new client
   session repeats that lookup.
-- `handshake_failed` or `handshake_timeout` means the session could not bind the local
-  channel. Check the client's integration/channel setup; the next ordinary turn retries.
+- For Claude Code, `native_endpoint_unavailable` means the hook environment had no
+  `CLAUDE_CODE_MESSAGING_SOCKET`, or the socket failed ACC's safety checks.
+  `native_session_unavailable` means the session registry is missing or names another
+  session or socket.
+- `handshake_failed` or `handshake_timeout` means the session could not bind its local
+  transport. Check the client's integration. The next ordinary turn retries.
 - No attempt observed can mean no native hook ran, an older runtime wrote the owner, or
   diagnostic persistence failed. Check hook activation and the runtime versions in doctor.
 
@@ -189,6 +193,37 @@ Closing a Codex terminal can leave its daemon thread loaded and eligible. Use
 `acc install --adapter codex --delivery off` to stop new ACC native offers.
 Already accepted queue entries remain with the vendor. Actual thread archive
 requires Codex's confirmation and produces `SessionEnd`.
+
+## A Claude Code session holds or drops ACC wakes
+
+Claude Code applies its own inbound controls to each ACC wake. These controls stay yours.
+ACC never attests a permission mode, never reads the session's messaging token or key file,
+and sends no auth line.
+
+- A session in a prompting mode (`default`, `auto`, `acceptEdits` or `dontAsk`) takes each
+  wake.
+- A session in `bypassPermissions` mode holds each wake for your approval. To let such a
+  session take wakes without approval, set Claude Code's `crossSessionInbound` setting to
+  `accept`.
+- A session with `crossSessionInbound` set to `refuse` drops each wake. ACC then sends
+  none: the message stays `queued` with `delivery_disabled` and arrives with the next turn.
+
+ACC reads the same inputs Claude Code reads: the hook's permission mode; before the first
+prompt, whose hook carries none, the `--permission-mode` or `--dangerously-skip-permissions`
+flag the session was started with, then `permissions.defaultMode`; and `crossSessionInbound`
+from managed, local, project and user settings in that order. A held wake is still sent, because Claude
+Code's approval dialog tells you a message is waiting, and the sender reads
+`sent a wake to <participant> via claude-inbox, which its session holds for approval`.
+
+The product re-run on 2.1.283 observed both the prompting case and a `bypassPermissions`
+session holding the wake. When live delivery is on and your user or managed settings do not
+say `accept`, `acc doctor` prints a `Claude Code inbound:` line naming the setting and the
+file.
+
+In every case the message stays durable. The receipt stays `queued` until the session's
+next-turn hook shows the body. The message arrives with the session's next turn, and
+`acc inbox` shows it at any time. The sender's `acc message` output still reports
+`woke <participant> via claude-inbox`, because the wake reached the inbox.
 
 ## Codex plugin is listed but inactive
 
@@ -333,7 +368,7 @@ reported and retained. Remove those leftovers manually if desired.
 Runtime state is outside the repository by design. `ACC_DATA_HOME` can relocate it, but ACC
 refuses a path inside any workspace root. Relocate the whole data directory; a symlink for
 that directory is supported. Install rejects a symlink that moves only the internal
-`acc/runtime` tree, because runtime admission and the bootstrap cache need the same data home.
+`acc/runtime` tree, because the runtime launchers and their leases need the same data home.
 
 Next: [Getting started](GETTING_STARTED.md) · [Capabilities](CAPABILITIES.md) ·
 [Configuration](CONFIGURATION.md)
@@ -355,10 +390,11 @@ unrelated holds still require lifecycle cleanup or confirmed process exit; safet
 do not expire merely by elapsed time. See
 [maintenance and recovery](UPGRADING.md#confirmed-client-service-maintenance).
 
-If ACC 0.5.3 or 0.5.4 reports `acc-claude-channel; contract unknown` after an earlier
-0.4.x upgrade, its active pointer may have lost the contract field. This can affect newly
-opened Channels too. A pending old updater retries its downloaded release without looking
-for a newer fix. Install the current global CLI, then use that CLI to complete the update:
+If ACC 0.5.3 or 0.5.4 reports a Claude Code Channel process with `contract unknown` after
+an earlier 0.4.x upgrade, its active pointer may have lost the contract field. This can
+affect Channel processes opened after that upgrade too. A pending old updater retries its
+downloaded release without looking for a newer fix. Install the current global CLI, then use
+that CLI to complete the update:
 
 ```bash
 npm install -g agents-can-communicate@latest
@@ -366,9 +402,10 @@ acc update
 acc doctor
 ```
 
-The new reader can activate a compatible release while those Channels remain open.
+The new reader can activate a compatible release while those processes remain open.
 It still waits for different contracts, unknown native bindings, or generation files it
 cannot verify. See [legacy contract recovery](UPGRADING.md#recover-missing-runtime-contracts).
+Current releases retire the Channel path. See [upgrading from 0.7.x](UPGRADING.md#from-07x).
 
 Use `acc update` to retry a failed download or finish an interrupted integration refresh.
 A download failure keeps the working version. A partial integration refresh blocks

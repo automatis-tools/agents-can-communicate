@@ -117,24 +117,24 @@ test("only capabilities observed in a real session are declared true", () => {
   assert.equal(capabilities.lifecycle.childSessions, false);
   assert.equal(capabilities.context.startupInjection, false);
   assert.equal(capabilities.delivery.nextTurn, true);
-  // Declared true from the 2.1.258 Channel capture and gated by the native
-  // contract; effectiveCapabilities() still turns them off on any other version.
+  // The inbox wake's 2.1.282 product capture; the reply is the ordinary CLI.
   assert.equal(capabilities.delivery.livePush, true);
-  assert.equal(capabilities.delivery.replyRoute, true);
+  assert.equal(capabilities.delivery.replyRoute, false);
 });
 
-test("native delivery is declared with a captured contract and its five methods", () => {
+test("Claude Code declares the inbox wake contract", () => {
   const adapter = createClaudeCodeAdapter();
-  assert.deepEqual(adapter.nativeDelivery.minimumByPlatform, { "darwin-arm64": "2.1.258" });
-  assert.equal(adapter.nativeDelivery.anchors[0].protocolContract, "claude-code-channel-mcp-v1");
-  assert.deepEqual(adapter.nativeDelivery.activationKinds, ["shell-bootstrap", "native-config"]);
+  assert.equal(adapter.nativeDelivery.offerKind, "wake");
+  assert.equal(adapter.nativeDelivery.policySource, "installation-record");
+  assert.deepEqual(adapter.nativeDelivery.activationKinds, ["native-service"]);
+  assert.deepEqual(adapter.nativeDelivery.minimumByPlatform, { "darwin-arm64": "2.1.282" });
+  assert.deepEqual(adapter.nativeDelivery.anchors, [{ platform: "darwin-arm64", version: "2.1.282",
+    protocolContract: "claude-code-inbox-socket-v1" }]);
   for (const method of ["probeNativeDelivery", "planNativeActivation", "bindNativeSession",
-    "offerMessage", "routeReply"]) {
+    "refreshNativeSession", "retireNativeSession", "offerMessage"]) {
     assert.equal(typeof adapter[method], "function", method);
   }
-  // Off on an older or unknown client, on only on an exact certified version.
-  const { effectiveCapabilities } = adapter;
-  assert.equal(adapter.capabilities.delivery.livePush, true);
+  assert.equal(adapter.routeReply, undefined);
 });
 
 test("captured payloads normalise and drop conversation content", async () => {
@@ -149,12 +149,26 @@ test("captured payloads normalise and drop conversation content", async () => {
     assert.equal(normalised.kind, kind, `${event} normalised wrongly`);
     assert.equal(normalised.sessionId, payload.session_id);
     assert.deepEqual(Object.keys(normalised).sort(),
-      ["cwd", "kind", "model", "parentSessionId", "sessionId", "targets", "tool"]);
+      ["cwd", "endReason", "kind", "model", "parentSessionId", "permissionMode", "sessionId", "targets", "tool"]);
     // Every payload carries a transcript path, and some carry the prompt or the
     // model's last message. None of it may survive normalisation.
     assert.equal(JSON.stringify(normalised).includes("redacted"), false,
       `${event} carried conversation content through`);
   }
+});
+
+// The inbox binding reads the mode to tell a sender whether a wake will be held
+// for approval. SessionStart carries none on the captured client.
+test("SessionEnd's reason reaches the normalised event, and no other event carries one", async () => {
+  assert.equal(normalizeClaudeHook(await captured("SessionEnd")).endReason, "other");
+  assert.equal(normalizeClaudeHook({ ...(await captured("SessionEnd")), reason: "clear" }).endReason, "clear");
+  assert.equal(normalizeClaudeHook(await captured("UserPromptSubmit")).endReason, null);
+});
+
+test("the hook's permission mode reaches the normalised event when Claude Code sends one", async () => {
+  assert.equal(normalizeClaudeHook(await captured("UserPromptSubmit")).permissionMode, "bypassPermissions");
+  assert.equal(normalizeClaudeHook(await captured("PreToolUse-Edit")).permissionMode, "auto");
+  assert.equal(normalizeClaudeHook(await captured("SessionStart")).permissionMode, null);
 });
 
 test("the guard sees this client's real tool names", async () => {
@@ -245,8 +259,10 @@ test("doctor states that the handoff is not written at SessionEnd", async t => {
   // summarise anything. Saying so in doctor keeps the limitation visible.
   assert.match(report.diagnostics.join(" "), /while the model is active/);
   assert.match(report.diagnostics.join(" "), /captured/);
-  assert.match(report.diagnostics.join(" "), /client-side Channels activation/,
-    "doctor hid the admission check that MCP connection cannot establish");
+  assert.doesNotMatch(report.diagnostics.join(" "), /Channel/,
+    "doctor still describes the removed Channel path");
+  assert.match(report.diagnostics.join(" "), /bypasses permission prompts asks before each ACC wake.*crossSessionInbound/,
+    "doctor hid the inbound control that can hold a wake");
   assert.doesNotMatch(report.diagnostics.join(" "), /native delivery is off/,
     "a historical failed capture was reported as current delivery state");
   assert.match(report.diagnostics.join(" "), /next-turn.*acc inbox/,
@@ -293,6 +309,26 @@ test("an upgrade keeps the version it wrote and the one it moved off", async t =
   await createClaudeCodeAdapter().install({ ...context, keepPreviousVersion: "0.0.2" });
 
   assert.deepEqual((await readdir(cache)).sort(), ["0.0.2", version].sort());
+});
+
+test("an install with live delivery writes no Channel config and strips it from the kept copy", async t => {
+  const { context } = await fixture(t);
+  const version = await pluginVersion(CLAUDE_PLUGIN);
+  const plugins = path.join(context.configDir, "plugins");
+  const cache = path.join(plugins, "cache", "acc-local", "agents-can-communicate");
+  const legacy = '{"mcpServers":{"acc-channel":{"command":"node","args":["acc-claude-channel.mjs"]}}}\n';
+  await mkdir(path.join(cache, "0.0.2"), { recursive: true });
+  await writeFile(path.join(cache, "0.0.2", ".mcp.json"), legacy);
+
+  const result = await createClaudeCodeAdapter().install({ ...context, keepPreviousVersion: "0.0.2",
+    livePolicy: "all" });
+
+  for (const tree of [path.join(plugins, "marketplaces", "acc-local", "agents-can-communicate"),
+    path.join(cache, version), path.join(cache, "0.0.2")]) {
+    await assert.rejects(readFile(path.join(tree, ".mcp.json")), { code: "ENOENT" }, tree);
+  }
+  assert.deepEqual((await readdir(cache)).sort(), ["0.0.2", version].sort());
+  assert.deepEqual(result.needsAction, []);
 });
 
 test("an install with no previous version to hold leaves one copy", async t => {

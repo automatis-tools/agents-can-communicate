@@ -7,24 +7,13 @@ import { canonicalManagerRoot, readControl, readManagedJson } from "./state.mjs"
 import { commandPrefix } from "./command-prefix.mjs";
 
 export const ENTRY_KINDS = Object.freeze([
-  "acc", "acc-hook", "acc-mcp", "acc-bootstrap", "acc-claude-channel", "acc-antigravity-relay",
+  "acc", "acc-hook", "acc-mcp", "acc-antigravity-relay",
 ]);
 
-const BOOTSTRAP_FLAGS = new Map([["--adapter", "adapter"], ["--real-executable", "realExecutable"],
-  ["--data-home", "dataHome"]]);
-
-/** Shared with the runtime; parse before admission without importing installer code. */
-export function parseBootstrapOptions(args) {
-  const options = {};
-  for (let index = 0; index < args.length; index += 2) {
-    const key = BOOTSTRAP_FLAGS.get(args[index]);
-    const value = args[index + 1];
-    if (key === undefined || typeof value !== "string" || value === "" || key in options) return null;
-    options[key] = value;
-  }
-  return BOOTSTRAP_FLAGS.values().every(key => key in options) && path.isAbsolute(options.dataHome)
-    ? options : null;
-}
+// Kinds a 0.7.x install wrote a launcher for. The package still ships their
+// entrypoints for 0.7.x updaters and launchers; a current install removes the
+// launchers themselves.
+export const RETIRED_ENTRY_KINDS = Object.freeze(["acc-bootstrap", "acc-claude-channel"]);
 
 // Bootstrap resolution deliberately needs only Node built-ins: no selected
 // generation is imported until admission and its actual PID lease are durable.
@@ -43,11 +32,9 @@ export function invokedDirectly(url) {
 
 function unavailable(kind) {
   // Never reflect control file content or payloads into a client diagnostic.
-  if (kind === "acc-hook" || kind === "acc-claude-channel" || kind === "acc-antigravity-relay") {
+  if (kind === "acc-hook" || kind === "acc-antigravity-relay") {
     process.stderr.write("acc: coordination unavailable during runtime update; session may continue\n");
     process.exitCode = 0;
-  } else if (kind === "acc-bootstrap") {
-    process.exitCode = 1; // The vendor shell shim launches its original command.
   } else {
     process.stderr.write("acc: runtime unavailable; retry after the update or run acc update to recover\n");
     process.exitCode = 4;
@@ -83,28 +70,12 @@ async function updateImplementation(packageRoot, control) {
 export async function runEntry({ kind, packageRoot, managerRoot, managedRequired = false }) {
   if (!ENTRY_KINDS.includes(kind)) throw new Error("unknown ACC entry point");
   const command = kind === "acc" ? commandPrefix(process.argv.slice(2)).command : null;
-  const bootstrapOptions = kind === "acc-bootstrap" ? parseBootstrapOptions(process.argv.slice(2)) : null;
-  if (kind === "acc-bootstrap" && bootstrapOptions === null) {
-    if (process.env.ACC_BOOTSTRAP_DEBUG === "1") {
-      process.stderr.write("acc-bootstrap: usage: --adapter <id> --real-executable <path> --data-home <path>\n");
-    }
-    process.exitCode = 2;
-    return;
-  }
   let selected = packageRoot;
   let managed = null;
   let managementOnly = false;
   let root;
   try {
-    const requestedDataHome = bootstrapOptions === null ? null : await canonicalManagerRoot(bootstrapOptions.dataHome);
-    const requestedRoot = requestedDataHome === null ? null
-      : await canonicalManagerRoot(path.join(requestedDataHome, "acc", "runtime"));
-    if (managerRoot && requestedDataHome !== null
-      && requestedDataHome !== await canonicalManagerRoot(path.dirname(path.dirname(managerRoot)))) {
-      throw new Error("bootstrap cache home differs from its launcher");
-    }
-    root = await canonicalManagerRoot(managerRoot ?? requestedRoot ?? managerLocation());
-    if (requestedRoot !== null && root !== requestedRoot) throw new Error("bootstrap data home differs from its launcher");
+    root = await canonicalManagerRoot(managerRoot ?? managerLocation());
     const control = await readControl(root);
     if (control !== null) {
       selected = control.active.root;
@@ -138,13 +109,6 @@ export async function runEntry({ kind, packageRoot, managerRoot, managedRequired
       } catch { /* Fall through to the same graceful unavailability below. */ }
     }
     unavailable(kind);
-    if (kind === "acc-claude-channel" && selected) {
-      try {
-        const { startInertChannel } = await import(pathToFileURL(path.join(selected,
-          "bin", "entrypoints", "claude-channel-stdio.mjs")).href);
-        startInertChannel();
-      } catch { /* The stderr notice above already fired either way. */ }
-    }
     return;
   }
   const runtime = await import(pathToFileURL(path.join(selected, "bin", "entrypoints", `${kind}.mjs`)).href);

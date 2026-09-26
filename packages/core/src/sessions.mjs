@@ -33,6 +33,9 @@ const ageBand = (session, age) =>
  * @returns {"online" | "stale" | "offline"}
  * @throws {AccError} EXIT.USAGE when pidIsAlive is not a function.
  */
+// A client's end reason is a short word of its own ("clear", "logout").
+const END_REASON = /^[a-z][a-z0-9_-]{0,63}$/;
+
 export function classifySessionPresence(session, now, pidIsAlive) {
   // Required rather than defaulted. A probe that defaults to "everyone is
   // alive" turns a forgotten call site into a check that silently passes, which
@@ -149,10 +152,14 @@ export function createSessionService(ports) {
     }, { kinds: ["session"] });
   }
 
-  async function closeSession({ sessionId, workspaceId, generation }) {
+  async function closeSession({ sessionId, workspaceId, generation, endReason = null }) {
+    // The client's own word for why, kept in extensions: an older ACC reading
+    // the same store skips them, and the session.closed event is unchanged.
+    const reason = typeof endReason === "string" && END_REASON.test(endReason) ? endReason : null;
     const close = current => {
       assertGeneration({ record: current }, generation, "close", workspaceId ?? store.workspaceId);
-      return { ...current, state: "closed", heartbeatAt: clock.now() };
+      return { ...current, state: "closed", heartbeatAt: clock.now(),
+        ...(reason === null ? {} : { extensions: { ...(current.extensions ?? {}), endReason: reason } }) };
     };
     let ephemeral = null;
     await store.ephemeral.delete("session", sessionId, async current => {
@@ -179,6 +186,21 @@ export function createSessionService(ports) {
     }, { kinds: ["session"] });
   }
 
+  /** The participant's most recent session, open or closed, or null. */
+  async function lastSessionOf({ participantId, workspaceId }) {
+    const resolved = workspaceId ?? store.workspaceId;
+    const snapshot = resolved === undefined ? null
+      : await store.snapshot(resolved, { kinds: ["workspace", "session"] });
+    const records = snapshot?.workspace === null
+      ? await store.ephemeral.list("session")
+      : snapshot?.sessions ?? await store.ephemeral.list("session");
+    const [last] = records.filter(session => session.participantId === participantId)
+      .sort((left, right) => Date.parse(right.heartbeatAt) - Date.parse(left.heartbeatAt)
+        || right.sessionId.localeCompare(left.sessionId));
+    return last === undefined ? null : { sessionId: last.sessionId, generation: last.generation,
+      state: last.state, endReason: last.extensions?.endReason ?? null };
+  }
+
   async function listLiveSessions({ participantId, workspaceId, now = clock.now() }) {
     const resolved = workspaceId ?? store.workspaceId;
     const snapshot = resolved === undefined ? null
@@ -198,6 +220,7 @@ export function createSessionService(ports) {
     resumeSession,
     heartbeatSession,
     closeSession,
+    lastSessionOf,
     listLiveSessions,
     locateSession: locate,
     ensureMaterialised: options => ensureMaterialised(ports, options),

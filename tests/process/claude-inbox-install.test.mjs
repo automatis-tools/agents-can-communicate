@@ -10,9 +10,11 @@ import { promisify } from "node:util";
 const run = promisify(execFile);
 const repo = path.resolve(import.meta.dirname, "..", "..");
 const acc = path.join(repo, "bin", "acc.mjs");
+// A 2.1.252 client is older than the inbox wake's first capture. Away from the
+// captured platform the reason is the platform itself.
 const capturedPlatform = process.platform === "darwin" && process.arch === "arm64";
 const assertNativeReason = text => assert.match(text, capturedPlatform
-  ? /2\.1\.252.*2\.1\.258/ : /not verified on this platform/);
+  ? /2\.1\.252.*2\.1\.282/ : /not verified on this platform/);
 
 
 async function machine(t) {
@@ -50,7 +52,7 @@ async function machine(t) {
 }
 
 for (const policy of ["actionable", "all"]) {
-  test(`Claude ${policy} delivery stays off and installs no channel`, async t => {
+  test(`Claude ${policy} delivery stays off and installs no Channel config`, async t => {
     const place = await machine(t);
     const preview = JSON.parse((await place.command("install", "--adapter", "claude_code",
       "--delivery", policy, "--home", place.home, "--dry-run", "--json")).stdout).data;

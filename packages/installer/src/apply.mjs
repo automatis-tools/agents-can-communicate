@@ -1,3 +1,6 @@
+import { readdir, rm } from "node:fs/promises";
+import path from "node:path";
+
 import { applyServiceSetup } from "./service-setup.mjs";
 import { applyNativeActivation, deactivateNative } from "./native-activation.mjs";
 import { finalizeRemoval, missingArtifactParents, recordInstall,
@@ -52,12 +55,10 @@ export async function applyPlan({ plan, adapters, context, dataHome, dryRun = fa
           retainedMechanisms = report.retainedMechanisms;
         }
         let native = operation.retainedNativeActivation ?? null;
-        let appendedRcBlock = false;
         if (operation.nativeActivation !== undefined) {
-          const applied = await applyNativeActivation({ adapter,
-            activation: operation.nativeActivation, dataHome, ...activation });
+          const applied = await applyNativeActivation({
+            activation: operation.nativeActivation, ...activation });
           native = applied.nativeActivation;
-          appendedRcBlock = applied.appendedRcBlock;
         }
         if (retainedMechanisms.length > 0) {
           native = { ...(native ?? operation.deactivation),
@@ -71,7 +72,7 @@ export async function applyPlan({ plan, adapters, context, dataHome, dryRun = fa
           artifacts: operation.artifacts, createdDirectories,
           deliveryPolicy: operation.livePolicy, deliveryDecision: operation.deliveryDecision,
           nativeActivation: native });
-        results.operations.push({ ...operation, applied: true, appendedRcBlock,
+        results.operations.push({ ...operation, applied: true,
           needsAction: outcome.needsAction ?? [],
           changes: outcome.changes ?? [], diagnostics: [
             ...(operation.deliveryDiagnostic === undefined
@@ -116,6 +117,19 @@ export async function applyPlan({ plan, adapters, context, dataHome, dryRun = fa
       }
     } catch (error) {
       results.failed.push({ adapterId: operation.adapterId, error: error.message });
+    }
+  }
+  // The eligibility cache a 0.7.x `claude` shim read before every launch. No
+  // shim reads it any more, and it holds nothing a user wrote.
+  if (!dryRun && typeof dataHome === "string") {
+    await rm(path.join(dataHome, "acc", "native-bootstrap"), { recursive: true, force: true })
+      .catch(() => {});
+    // A 0.7.x Claude Channel unlinked its own registration on a clean exit;
+    // one that crashed left it in its workspace, naming a dead socket.
+    const workspaces = path.join(dataHome, "acc", "workspaces");
+    for (const workspace of await readdir(workspaces).catch(() => [])) {
+      await rm(path.join(workspaces, workspace, "native", "claude"), { recursive: true, force: true })
+        .catch(() => {});
     }
   }
   return results;

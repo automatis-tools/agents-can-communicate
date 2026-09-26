@@ -129,13 +129,22 @@ acc install --adapter codex --delivery off
 
 The allowed values are `off`, `actionable`, and `all`; the default is `off`. This setting
 does not belong in `acc.workspace.json`, where a pull request could opt someone else into
-spending a turn. It also cannot create a capability. Exact-version evidence governs
-ordinary hook features; Claude Code live delivery separately requires macOS arm64, version
-2.1.258 or newer, and a current feature probe before installation applies the requested
+spending a turn. It also cannot create a capability. Every adapter reads live-delivery
+consent from this installation record, and only from it. Exact-version evidence governs
+ordinary hook features. Claude Code live delivery separately requires macOS arm64, version
+2.1.282 or newer, and a current feature probe before installation applies the requested
 policy. If those install-time checks fail, effective policy remains `off` and the installer
 reports next-turn or inbox fallback. Each later session must also pass its own
 generation-bound handshake. A failed session handshake clears or refuses that binding and
-reports degraded reachability; it does not rewrite the installed consent.
+reports degraded reachability. It does not rewrite the installed consent.
+
+Claude Code live delivery wakes the session through the inbox socket that the session opens
+itself. ACC changes no launch argument, shell profile or `PATH` entry for it. Claude Code's
+own inbound controls still apply to each wake. A session in `bypassPermissions` mode holds
+each wake for your approval unless its `crossSessionInbound` setting is `accept`. A
+`crossSessionInbound` setting of `refuse` drops wakes. These controls belong to you, and ACC
+never overrides them. See
+[held or dropped wakes](TROUBLESHOOTING.md#a-claude-code-session-holds-or-drops-acc-wakes).
 
 Codex LocalDaemon delivery separately requires macOS arm64, Codex 0.152.1 or newer, a
 current feature probe, and exact thread, canonical cwd, process, version and protocol
@@ -144,10 +153,9 @@ standalone package and prepare a definitely absent service. The setup choice nam
 download. Existing service-start consent alone does not permit it. Codex files remain
 under the selected `CODEX_HOME`; the existing CLI command and shell profiles are preserved.
 Message delivery does not install Codex, start it, or stop it.
-Explicit update maintenance can restart a verified service after separate confirmation. Codex reads
-consent from the installation record, not a shell-shim variable. Unavailable or ineligible
-sessions retain durable inbox fallback. Use `acc install --adapter codex --delivery off`
-to stop new native offers; bypassing a shim does not disable that recorded opt-in.
+Explicit update maintenance can restart a verified service after separate confirmation.
+Unavailable or ineligible sessions retain durable inbox fallback. Use
+`acc install --adapter codex --delivery off` to stop new native offers.
 
 ### Codex outgoing permissions
 
@@ -195,7 +203,6 @@ that resolves inside a workspace.
 | `ACC_NO_UPDATE_CHECK=1` | Disables update networking and background scheduling; manual recovery of an already downloaded update remains available |
 | `ACC_PROBE_TIMEOUT_MS` | How long to wait for a client to print its version. Three seconds by default: generous on an idle machine, and not always enough on a busy one, where a client that overruns it is reported as not installed |
 | `ACC_ANTIGRAVITY_HOOKS` | Where `acc install` registers Antigravity CLI hooks. `global`, the default, writes `~/.gemini/config/hooks.json`, which always loads and applies to every Antigravity session on the machine. `workspace` writes `<project>/.agents/hooks.json`, which is scoped to the project the command ran in and loads only while that project is an open Antigravity workspace - in print mode, only when it is passed with `--add-dir`. Any other value is refused by name rather than replaced by the default, and that client is skipped. The two cannot be combined: both files use the namespace `acc`, and a name in both is kept only once |
-| `ACC_NATIVE_DELIVERY_POLICY` | Owned shell-bootstrap consent, currently used by Claude Code. The shim sets `off`, `actionable`, or `all`; missing/invalid values mean off for that route. Codex instead reads recorded installation consent, even when this variable is absent |
-| `ACC_BYPASS=1` | Bypasses owned shell activation, currently Claude Code: no bootstrap check/native flags, and shim policy is unset. It does not disable Codex recorded opt-in; use `acc install --adapter codex --delivery off` for new Codex offers |
-| `ACC_BOOTSTRAP_DEBUG=1` | Lets the internal `acc-bootstrap` check write one safe diagnostic line to stderr. Off, it is silent, and it never writes to stdout |
 | `CODEX_HOME` | Codex's own home, honoured when locating the Codex App Server daemon's control socket for native delivery. Codex sets it; ACC only reads it |
+| `CLAUDE_CONFIG_DIR` | Claude Code's own configuration directory, `~/.claude` by default. ACC reads the session registry `sessions/<pid>.json` under it to verify a session's inbox. ACC reads the value from the hook environment and never sets it |
+| `CLAUDE_CODE_MESSAGING_SOCKET` | The inbox socket of one Claude Code session, which Claude Code exports to that session's hooks. ACC reads it in the hook environment and checks it against the session registry. ACC never reads `CLAUDE_CODE_MESSAGING_TOKEN` |

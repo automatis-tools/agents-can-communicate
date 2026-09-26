@@ -6,9 +6,38 @@ import test from "node:test";
 
 import { createDeliveryRouter } from "@agents-can-communicate/delivery-router";
 
-import { main, recordAndOffer } from "../src/main.mjs";
+import { main, recordAndOffer, recordedText } from "../src/main.mjs";
 
 const message = { messageId: "message_a", toParticipantIds: ["models"] };
+
+test("a woken recipient is reported as woken, with the body still to come", () => {
+  assert.equal(recordedText(message, [{ recipientParticipantId: "models", outcome: "woken",
+    transport: "claude-inbox" }]),
+  "recorded message_a; woke models via claude-inbox; the message arrives with its next turn");
+});
+
+test("a wake held for the receiver's approval is reported as held, not as woken", () => {
+  assert.equal(recordedText(message, [{ recipientParticipantId: "models", outcome: "woken",
+    transport: "claude-inbox", pendingApproval: true }]),
+  "recorded message_a; sent a wake to models via claude-inbox, which its session holds for approval "
+    + "because it bypasses permission prompts; the message arrives with its next turn");
+});
+
+test("a recipient with no live transport is reported as reading its inbox", () => {
+  assert.equal(recordedText(message, [{ recipientParticipantId: "models", outcome: "queued",
+    transport: "durable", errorCode: "no_live_transport" }]),
+  "recorded message_a; models has no live transport; the message waits in its inbox");
+});
+
+test("a recipient whose conversation was cleared is reported with where the message waits", () => {
+  assert.equal(recordedText(message, [{ recipientParticipantId: "models", outcome: "queued",
+    transport: "durable", errorCode: "recipient_offline", endReason: "clear" }]),
+  "recorded message_a; models's conversation was cleared (/clear); the message waits until "
+    + "that conversation resumes");
+  assert.equal(recordedText(message, [{ recipientParticipantId: "models", outcome: "queued",
+    transport: "durable", errorCode: "recipient_offline" }]),
+  "recorded message_a; models has no open session; the message waits until it starts or resumes one");
+});
 
 test("the CLI composition seam records before it offers", async () => {
   const order = [];
@@ -89,7 +118,7 @@ function routed(policy, kind, { bindingPolicy = "all", failed = false } = {}) {
       platform: PLATFORM, capability: "delivery.livePush" }] },
     nativeDelivery: { minimumByPlatform: { [PLATFORM]: BOUND },
       anchors: [{ platform: PLATFORM, version: BOUND, protocolContract: "fixture-native-v1" }],
-      knownBad: [], activationKinds: ["shell-bootstrap"],
+      knownBad: [], activationKinds: ["native-service"],
       policySource: "installation-record" },
     offerMessage: async ({ binding: offered }) => {
       offers += 1;

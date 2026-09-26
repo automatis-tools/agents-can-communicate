@@ -163,8 +163,8 @@ test("legacy bootstrap passes remain valid while installed hooks require product
   delete noPackage.packageSha256;
   assert.throws(() => validateCapture(noPackage, { productEvidence: matrixEvidence() }),
     /installed-hook capture requires packageSha256/);
-  assert.throws(() => validateCapture({ ...installed, client: "claude-code" },
-    { productEvidence: matrixEvidence() }), /installed-hook capture client is one of codex-cli, antigravity-cli/);
+  assert.throws(() => validateCapture({ ...installed, client: "gemini-cli" },
+    { productEvidence: matrixEvidence() }), /installed-hook capture client is one of codex-cli, antigravity-cli, claude-code/);
   assert.throws(() => validateCapture({ ...installed, packageSha256: "b".repeat(64) },
     { productEvidence: matrixEvidence() }), /package SHA-256 matches product evidence/);
   assert.throws(() => validateCapture(installed, { productEvidence: matrixEvidence("transport") }),
@@ -218,14 +218,15 @@ test("an idle pass proves a native offer", () => {
     /a passing capture proves idle behavior: offered/);
 });
 
-test("a busy pass proves delivery after the current turn or an honest busy rejection", () => {
-  assert.deepEqual([...PASSING_DELIVERY_BRANCHES.busy], ["queued_after_turn", "rejected_busy"]);
+test("a busy pass proves when the message was presented, or an honest busy rejection", () => {
+  assert.deepEqual([...PASSING_DELIVERY_BRANCHES.busy],
+    ["queued_after_turn", "presented_between_tool_calls", "rejected_busy"]);
   for (const busy of PASSING_DELIVERY_BRANCHES.busy) accepts({ ...PASSING_CAPTURE, busy });
-  const vocabulary = /capture busy is queued_after_turn, rejected_busy or unobserved/;
+  const vocabulary = /capture busy is queued_after_turn, presented_between_tool_calls, rejected_busy or unobserved/;
   rejects({ ...PASSING_CAPTURE, busy: "not_interrupted" }, vocabulary);
   rejects({ ...BASE_CAPTURE, busy: "not_interrupted" }, vocabulary);
   rejects({ ...PASSING_CAPTURE, busy: "unobserved" },
-    /a passing capture proves busy behavior: queued_after_turn or rejected_busy/);
+    /a passing capture proves busy behavior: queued_after_turn or presented_between_tool_calls or rejected_busy/);
 });
 
 test("a reply pass proves an explicit ACC reply route", () => {

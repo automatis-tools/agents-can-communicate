@@ -2,7 +2,7 @@ import { mkdir, readdir, readFile, stat, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import path from "node:path";
 
-import { describeDeliveryFallback, detectInstallation, livePolicyOf, loadOwnership, shellOf, verifyOwned }
+import { describeDeliveryFallback, detectInstallation, livePolicyOf, loadOwnership, verifyOwned }
   from "@agents-can-communicate/installer";
 import { AccError, EXIT } from "@agents-can-communicate/protocol";
 
@@ -114,12 +114,9 @@ export async function diagnoseAdapters({ options, runtime, detect = detectInstal
   const home = options?.home ?? runtime?.env?.HOME ?? homedir();
   const { data: dataHome } = platformPaths({ platform: runtime?.platform,
     env: runtime?.env ?? {} });
-  // The same shell and environment install reads, so detection plans the same
-  // shell bootstrap it would apply. Omitting them left detection with a null
-  // shell, which degrades every shell-bootstrap client to `unsupported_shell` -
-  // so a zsh machine with a working shim read as degraded on every run.
+  // The same environment install reads, so detection probes the same client.
   const clients = clientContext(home, path.join(dataHome, "acc"),
-    { shell: shellOf(runtime?.env ?? {}), env: runtime?.env ?? {} });
+    { env: runtime?.env ?? {} });
   const adapters = ALL_ADAPTERS();
   const detected = await detect({ adapters, context: clients,
     probeTimeoutMs: probeTimeout(runtime?.env) });
@@ -297,6 +294,11 @@ export async function runDoctor({ options, context, runtime }) {
   ...nativeSessionLines(adapters),
   ...adapters.filter(adapter => adapter.present && adapter.outgoingDelivery?.state === "configured")
     .map(adapter => `  ${adapter.displayName} ${adapter.outgoingDelivery.diagnostic}`),
+  // The client's own inbound control decides whether a wake reaches the model.
+  // Only someone who turned live delivery on needs to hear about it.
+  ...adapters.filter(adapter => adapter.present && adapter.nativeDelivery.configured
+    && typeof adapter.inboundDelivery?.diagnostic === "string")
+    .map(adapter => `  ${adapter.displayName} inbound: ${adapter.inboundDelivery.diagnostic}`),
   ...(manager === null ? [] : [`  automatic updates ${manager.auto ? "on" : "off"}; ACC ${manager.active.version}`
     + (manager.pin ? `; pinned to ${manager.pin}` : ""), ...(update.notice ? [`  ${update.notice}`] : [])]),
   ...data.remediation.map(line => `  ${line}`),

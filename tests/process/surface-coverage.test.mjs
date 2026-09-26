@@ -80,6 +80,8 @@ const INTERNAL = Object.freeze({
   listDeliveryBindings: "called by the delivery router while selecting one eligible target",
   listLiveSessions: "called by the delivery router before binding eligibility, so one "
     + "certified endpoint cannot hide an ambiguous recipient participant",
+  lastSessionOf: "called by the delivery router when a recipient has no open session, to tell "
+    + "the sender why; `acc status` shows the same session through collectStatus",
 });
 
 test("every core operation is reachable, or named as internal on purpose", () => {

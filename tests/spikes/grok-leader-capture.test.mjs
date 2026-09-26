@@ -8,7 +8,7 @@ import test from "node:test";
 import { PROTOCOL_CONTRACT, buildGrokCapture, inspectGrokSurface }
   from "../../scripts/spikes/grok-leader-capture.mjs";
 import { validateCapture } from "../../scripts/spikes/delivery-capture.mjs";
-import { runProcess } from "../helpers/claude-channel.mjs";
+import { runProcess } from "../helpers/run-process.mjs";
 
 const script = fileURLToPath(new URL("../../scripts/spikes/grok-leader-capture.mjs",
   import.meta.url));

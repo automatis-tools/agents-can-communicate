@@ -6,10 +6,10 @@ import test from "node:test";
 
 import { applyPlan } from "../src/apply.mjs";
 import { detectInstallation } from "../src/detect.mjs";
-import { livePolicyOf, shimDirFor } from "../src/native-activation.mjs";
+import { applyNativeActivation, livePolicyOf, shimDirFor } from "../src/native-activation.mjs";
 import { loadOwnership, recordInstall } from "../src/ownership.mjs";
 import { planInstallation } from "../src/plan.mjs";
-import { BLOCK_BEGIN } from "../src/shell-bootstrap.mjs";
+import { SHIM_MARKER, writeLegacyShellActivation } from "../../../tests/helpers/legacy-shell-bootstrap.mjs";
 
 // Kept cohesive above 300 lines because every case drives one fixture
 // adapter through detection, planning, apply, and ownership on one temporary
@@ -18,6 +18,8 @@ import { BLOCK_BEGIN } from "../src/shell-bootstrap.mjs";
 const PLATFORM = "darwin-arm64";
 const PROBE = { supported: true, clientVersion: "2.1.258", protocolContract: "fixture-native-v1",
   executableFingerprint: null, modes: ["livePush"], reasonCode: null };
+const REUSED = { kind: "native-service", serviceId: "fixture-daemon", preExisting: true,
+  applyCommand: null, teardownCommand: null };
 
 async function machine(t, { shell = "zsh" } = {}) {
   const home = await realpath(await mkdtemp(path.join(tmpdir(), "acc-native-home-")));
@@ -29,13 +31,23 @@ async function machine(t, { shell = "zsh" } = {}) {
   await writeFile(vendor, "#!/bin/sh\necho 2.1.258\n", { mode: 0o700 });
   await writeFile(path.join(home, ".zshrc"), "export USER_STUFF=1\n");
   const stateRoot = path.join(dataHome, "acc");
-  const context = { home, dataHome, configDir: path.join(home, ".claude"), stateRoot, shell,
-    env: { PATH: `${shimDirFor(stateRoot)}${path.delimiter}${vendorDir}` } };
-  return { home, dataHome, vendor, vendorDir, stateRoot, context, rcFile: path.join(home, ".zshrc"),
-    shimDir: shimDirFor(stateRoot) };
+  const context = { home, dataHome, configDir: path.join(home, ".claude"), stateRoot,
+    env: { PATH: `${shimDirFor(stateRoot)}${path.delimiter}${vendorDir}`, SHELL: `/bin/${shell}` } };
+  const rcFile = path.join(home, ".zshrc");
+  const shimDir = shimDirFor(stateRoot);
+  // The state a 0.7.x live install left: its shim and PATH block, recorded.
+  const legacy = async (policy = "actionable") => {
+    const shell = await writeLegacyShellActivation({ adapterId: "fixture", command: "fixture-client",
+      realExecutable: vendor, prefixArgs: ["--captured"], shimDir, rcFile, dataHome });
+    await recordInstall({ dataHome, adapterId: "fixture", version: "2.1.258", accVersion: "0.7.1",
+      artifacts: [], deliveryPolicy: policy, nativeActivation: { livePolicy: policy,
+        protocolContract: "fixture-native-v1", mechanisms: [shell] } });
+    return shell;
+  };
+  return { home, dataHome, vendor, vendorDir, stateRoot, context, rcFile, shimDir, legacy };
 }
 
-function fixtureAdapter({ service = null, probe = async () => PROBE, log = [] } = {}) {
+function fixtureAdapter({ service = REUSED, probe = async () => PROBE, log = [] } = {}) {
   return {
     id: "fixture", displayName: "Fixture Client",
     client: { command: "fixture-client", certificationName: "fixture-client",
@@ -43,19 +55,15 @@ function fixtureAdapter({ service = null, probe = async () => PROBE, log = [] } 
     capabilities: { delivery: { livePush: true } },
     nativeDelivery: { minimumByPlatform: { [PLATFORM]: "2.1.258" },
       anchors: [{ platform: PLATFORM, version: "2.1.258", protocolContract: "fixture-native-v1" }],
-      knownBad: [], activationKinds: ["shell-bootstrap", "native-service"] },
+      knownBad: [], activationKinds: ["native-service"] },
     planInstall: () => [],
     detect: async () => { log.push("detect"); return { ok: true, diagnostics: ["registered"] }; },
     install: async context => { log.push(["install", context.livePolicy]); return { changes: [] }; },
     uninstall: async () => { log.push("uninstall"); return { changes: [] }; },
     probeNativeDelivery: async () => { log.push("probe"); return probe(); },
-    planNativeActivation: async ({ detection }) => {
+    planNativeActivation: async () => {
       log.push("plan");
-      return { eligible: true, reasonCode: null, mechanisms: [
-        { kind: "shell-bootstrap", command: "fixture-client",
-          realExecutable: detection.realExecutable, prefixArgs: ["--captured", "value"] },
-        ...(service === null ? [] : [service]),
-      ] };
+      return { eligible: true, reasonCode: null, mechanisms: [service] };
     },
   };
 }
@@ -67,21 +75,24 @@ const entryFor = detected => detected[0];
 
 test("detection reports a closed native state and only ever probes", async t => {
   const here = await machine(t);
+  // A 0.7.x shim a user edited stays on disk; detection must look past it.
+  await mkdir(here.shimDir, { recursive: true });
+  await writeFile(path.join(here.shimDir, "fixture-client"), `#!/bin/sh\n${SHIM_MARKER}\n`, { mode: 0o700 });
   const log = [];
   const [entry] = await detect(fixtureAdapter({ log }), here.context);
   assert.equal(entry.nativeDelivery.state, "eligible");
   assert.equal(entry.nativeDelivery.realExecutable, here.vendor,
     "the shim directory must never be the resolved executable");
   assert.deepEqual(entry.nativeDelivery.activationPlan.mechanisms.map(m => m.kind),
-    ["shell-bootstrap"]);
+    ["native-service"]);
   assert.deepEqual(log, ["probe", "plan", "detect"]);
   const plain = { ...fixtureAdapter(), nativeDelivery: undefined };
   assert.equal((await detect(plain, here.context))[0].nativeDelivery.reasonCode,
     "native_delivery_unsupported");
+  // No mechanism depends on the login shell any more.
   const bash = await machine(t, { shell: "bash" });
   const [onBash] = await detect(fixtureAdapter(), bash.context);
-  assert.deepEqual([onBash.nativeDelivery.state, onBash.nativeDelivery.reasonCode],
-    ["degraded", "unsupported_shell"]);
+  assert.equal(onBash.nativeDelivery.state, "eligible");
   const old = await detect(fixtureAdapter({ probe: async () => ({ ...PROBE,
     protocolContract: "other-v1" }) }), here.context);
   assert.deepEqual([old[0].nativeDelivery.state, old[0].nativeDelivery.reasonCode],
@@ -101,8 +112,8 @@ test("policies are explicit per adapter, and an ineligible client cannot be acti
     const byId = Object.fromEntries(plan.operations.map(op => [op.adapterId, op]));
     assert.equal(byId.fixture.effectiveLivePolicy, "actionable");
     assert.equal(byId.fixture.nativeActivation.livePolicy, "actionable");
-    assert.match(byId.fixture.summary.join("\n"), /create shim .*fixture-client/);
-    assert.match(byId.fixture.summary.join("\n"), /PATH block to .*\.zshrc/);
+    assert.match(byId.fixture.summary.join("\n"), /use the existing fixture-daemon service/);
+    assert.doesNotMatch(byId.fixture.summary.join("\n"), /shim|PATH block/);
     assert.equal(byId.other.livePolicy, "off", "a missing map entry is off");
     assert.equal(byId.other.nativeActivation, undefined);
     const forced = planInstallation({ adapters: [eligible, other], detected, context: here.context,
@@ -112,50 +123,36 @@ test("policies are explicit per adapter, and an ineligible client cannot be acti
     assert.match(otherOp.deliveryDiagnostic, /client version could not be verified/);
   });
 
-test("apply activates, records owned bytes, and a second policy regenerates only the shim",
-  async t => {
-    const here = await machine(t);
-    const log = [];
-    const adapter = fixtureAdapter({ log });
-    const detected = await detect(adapter, here.context);
-    const apply = policy => applyPlan({ plan: planInstallation({ adapters: [adapter], detected,
-      context: here.context, deliveryByAdapter: { fixture: policy } }), adapters: [adapter],
-    context: here.context, dataHome: here.dataHome,
-    activation: { node: "/usr/bin/env", bootstrap: "/abs/acc-bootstrap.mjs" } });
+test("apply records the activation, and a second policy changes only the policy", async t => {
+  const here = await machine(t);
+  const log = [];
+  const adapter = fixtureAdapter({ log });
+  const detected = await detect(adapter, here.context);
+  const apply = policy => applyPlan({ plan: planInstallation({ adapters: [adapter], detected,
+    context: here.context, deliveryByAdapter: { fixture: policy } }), adapters: [adapter],
+  context: here.context, dataHome: here.dataHome });
 
-    const first = await apply("actionable");
-    assert.deepEqual(first.failed, []);
-    assert.equal(first.operations[0].appendedRcBlock, true);
-    const shim = path.join(here.shimDir, "fixture-client");
-    assert.equal((await stat(shim)).mode & 0o777, 0o700);
-    const rc = await readFile(here.rcFile, "utf8");
-    assert.match(rc, /^export USER_STUFF=1\n/);
-    assert.equal(rc.includes(BLOCK_BEGIN), true);
-    const record = (await loadOwnership({ dataHome: here.dataHome })).installs[0];
-    assert.equal(livePolicyOf(record), "actionable");
-    assert.equal(record.nativeActivation.protocolContract, "fixture-native-v1");
-    assert.deepEqual(record.nativeActivation.mechanisms[0].ownedFiles.map(f => f.path), [shim]);
-    assert.match(record.nativeActivation.mechanisms[0].ownedFiles[0].sha256, /^[0-9a-f]{64}$/);
-    assert.match(await readFile(shim, "utf8"), /ACC_NATIVE_DELIVERY_POLICY='actionable'/);
+  const first = await apply("actionable");
+  assert.deepEqual(first.failed, []);
+  const record = (await loadOwnership({ dataHome: here.dataHome })).installs[0];
+  assert.equal(livePolicyOf(record), "actionable");
+  assert.equal(record.nativeActivation.protocolContract, "fixture-native-v1");
+  assert.deepEqual(record.nativeActivation.mechanisms, [{ kind: "native-service",
+    serviceId: "fixture-daemon", createdByAcc: false, teardownCommand: null }]);
+  await assert.rejects(stat(here.shimDir), { code: "ENOENT" }, "no shim is written");
+  assert.equal(await readFile(here.rcFile, "utf8"), "export USER_STUFF=1\n", "no PATH block is written");
 
-    const second = await apply("all");
-    assert.equal(second.operations[0].appendedRcBlock, false);
-    assert.equal(await readFile(here.rcFile, "utf8"), rc, "the PATH block is not rewritten");
-    assert.match(await readFile(shim, "utf8"), /ACC_NATIVE_DELIVERY_POLICY='all'/);
-    assert.equal(livePolicyOf((await loadOwnership({ dataHome: here.dataHome })).installs[0]), "all");
-    assert.deepEqual(log.filter(item => Array.isArray(item)),
-      [["install", "actionable"], ["install", "all"]]);
-  });
+  await apply("all");
+  assert.equal(livePolicyOf((await loadOwnership({ dataHome: here.dataHome })).installs[0]), "all");
+  assert.deepEqual(log.filter(item => Array.isArray(item)),
+    [["install", "actionable"], ["install", "all"]]);
+});
 
-test("explicit off takes a recorded activation back and keeps the ordinary install", async t => {
+test("explicit off retires a 0.7.x shim and keeps the ordinary install", async t => {
   const here = await machine(t);
   const adapter = fixtureAdapter();
   const detected = await detect(adapter, here.context);
-  const apply = policy => applyPlan({ plan: planInstallation({ adapters: [adapter], detected,
-    context: here.context, deliveryByAdapter: { fixture: policy },
-    recorded: [] }), adapters: [adapter], context: here.context, dataHome: here.dataHome,
-  activation: { node: "/usr/bin/env", bootstrap: "/abs/acc-bootstrap.mjs" } });
-  await apply("actionable");
+  await here.legacy("actionable");
   const recorded = (await loadOwnership({ dataHome: here.dataHome })).installs;
   const plan = planInstallation({ adapters: [adapter], detected, context: here.context,
     deliveryByAdapter: { fixture: "off" }, recorded });
@@ -171,6 +168,22 @@ test("explicit off takes a recorded activation back and keeps the ordinary insta
   assert.equal(livePolicyOf(after), "off");
 });
 
+test("an install that keeps live delivery on replaces a 0.7.x shim with the planned service", async t => {
+  const here = await machine(t);
+  const adapter = fixtureAdapter();
+  const detected = await detect(adapter, here.context);
+  await here.legacy("actionable");
+  const result = await applyPlan({ plan: planInstallation({ adapters: [adapter], detected,
+    context: here.context, deliveryByAdapter: { fixture: "actionable" },
+    recorded: (await loadOwnership({ dataHome: here.dataHome })).installs }),
+  adapters: [adapter], context: here.context, dataHome: here.dataHome });
+  assert.deepEqual(result.failed, []);
+  await assert.rejects(stat(path.join(here.shimDir, "fixture-client")));
+  assert.equal(await readFile(here.rcFile, "utf8"), "export USER_STUFF=1\n");
+  assert.deepEqual((await loadOwnership({ dataHome: here.dataHome })).installs[0].nativeActivation
+    .mechanisms.map(item => item.kind), ["native-service"]);
+});
+
 test("a native service is started only when absent and torn down only when ACC created it",
   async t => {
     const here = await machine(t);
@@ -184,7 +197,7 @@ test("a native service is started only when absent and torn down only when ACC c
     const install = await applyPlan({ plan: planInstallation({ adapters: [adapter], detected,
       context: here.context, deliveryByAdapter: { fixture: "actionable" } }), adapters: [adapter],
     context: here.context, dataHome: here.dataHome,
-    activation: { node: "/usr/bin/env", bootstrap: "/abs/acc-bootstrap.mjs", exec } });
+    activation: { exec } });
     assert.deepEqual(install.failed, []);
     assert.deepEqual(commands, [["/abs/vendor", "daemon", "start"]]);
     const record = (await loadOwnership({ dataHome: here.dataHome })).installs[0];
@@ -207,7 +220,7 @@ test("a native service is started only when absent and torn down only when ACC c
     await applyPlan({ plan: planInstallation({ adapters: [preExisting], detected: seen,
       context: here.context, deliveryByAdapter: { fixture: "actionable" } }),
     adapters: [preExisting], context: here.context, dataHome: here.dataHome,
-    activation: { node: "/usr/bin/env", bootstrap: "/abs/acc-bootstrap.mjs", exec } });
+    activation: { exec } });
     const removal = await applyPlan({ plan: planInstallation({ adapters: [preExisting],
       detected: seen, context: here.context, action: "uninstall",
       recorded: (await loadOwnership({ dataHome: here.dataHome })).installs }),
@@ -217,33 +230,32 @@ test("a native service is started only when absent and torn down only when ACC c
       /retained the vendor-daemon service \(it was reused at activation\)/);
   });
 
-test("a refused shell step fails the operation and writes no shell bytes", async t => {
+test("a hand-built shell step is refused before anything is written", async t => {
   const here = await machine(t);
-  await writeFile(here.rcFile, `${BLOCK_BEGIN}\nexport PATH="/someone/else:$PATH"\n# <<< agents-can-communicate native delivery <<<\n`);
-  const adapter = fixtureAdapter();
-  const detected = await detect(adapter, here.context);
-  const result = await applyPlan({ plan: planInstallation({ adapters: [adapter], detected,
-    context: here.context, deliveryByAdapter: { fixture: "actionable" } }), adapters: [adapter],
-  context: here.context, dataHome: here.dataHome,
-  activation: { node: "/usr/bin/env", bootstrap: "/abs/acc-bootstrap.mjs" } });
-  assert.equal(result.failed.length, 1);
-  assert.match(result.failed[0].error, /rc_block_modified/);
+  await assert.rejects(applyNativeActivation({ activation: { livePolicy: "actionable",
+    protocolContract: "fixture-native-v1", mechanisms: [{ kind: "shell-bootstrap",
+      command: "fixture-client", realExecutable: here.vendor, prefixArgs: [] }] } }),
+  /shell-bootstrap activation was removed/);
   await assert.rejects(stat(here.shimDir));
-  assert.deepEqual((await loadOwnership({ dataHome: here.dataHome })).installs, []);
+  assert.equal(await readFile(here.rcFile, "utf8"), "export USER_STUFF=1\n");
 });
 
 test("a dry run computes the activation and executes nothing", async t => {
   const here = await machine(t);
-  const adapter = fixtureAdapter();
+  const commands = [];
+  const adapter = fixtureAdapter({ service: { ...REUSED, preExisting: false,
+    applyCommand: { executable: "/abs/vendor", args: ["daemon", "start"] } } });
   const detected = await detect(adapter, here.context);
   const plan = planInstallation({ adapters: [adapter], detected, context: here.context,
     deliveryByAdapter: { fixture: "all" } });
   const result = await applyPlan({ plan, adapters: [adapter], context: here.context,
-    dataHome: here.dataHome, dryRun: true });
+    dataHome: here.dataHome, dryRun: true,
+    activation: { exec: async (...command) => { commands.push(command); } } });
   assert.equal(result.operations[0].applied, false);
-  assert.equal(plan.operations[0].nativeActivation.shimDir, here.shimDir);
-  await assert.rejects(stat(here.shimDir));
-  assert.equal(await readFile(here.rcFile, "utf8"), "export USER_STUFF=1\n");
+  assert.deepEqual(plan.operations[0].nativeActivation.mechanisms.map(item => item.kind),
+    ["native-service"]);
+  assert.deepEqual(commands, []);
+  assert.deepEqual((await loadOwnership({ dataHome: here.dataHome })).installs, []);
 });
 
 test("a 0.2 ownership record keeps native delivery off and is not migrated", async t => {
@@ -272,9 +284,7 @@ test("uninstall is driven by the record even when the client left PATH", async t
   const here = await machine(t);
   const adapter = fixtureAdapter();
   const detected = await detect(adapter, here.context);
-  await applyPlan({ plan: planInstallation({ adapters: [adapter], detected, context: here.context,
-    deliveryByAdapter: { fixture: "actionable" } }), adapters: [adapter], context: here.context,
-  dataHome: here.dataHome, activation: { node: "/usr/bin/env", bootstrap: "/abs/acc-bootstrap.mjs" } });
+  await here.legacy("actionable");
   const gone = [{ ...detected[0], present: false, version: null,
     nativeDelivery: { state: "unsupported", reasonCode: "version_unavailable" } }];
   const plan = planInstallation({ adapters: [adapter], detected: gone, context: here.context,

@@ -119,8 +119,9 @@ work belongs under `Unreleased` and gets a new candidate record.
 
 Run native real-client checks on the exact versions and platforms recorded in
 retained fixtures. Exact-version evidence governs normal-turn and guard behavior.
-Claude Code Channel uses its captured macOS arm64 minimum plus a current probe and
-per-session handshake; its vendor warning remains part of startup. Codex LocalDaemon
+The Claude Code inbox wake uses its captured macOS arm64 minimum plus a current probe and
+per-session handshake. Its passing capture is a real-client product run of the packed
+candidate, launched with the ordinary command and installed hooks. Codex LocalDaemon
 uses a separate 0.152.1 minimum with installed-product captures on 0.152.1 and
 0.153.4. Its passing capture must ship the hashed complete product matrix and
 historical evidence references. Direct queue success alone cannot certify that route.

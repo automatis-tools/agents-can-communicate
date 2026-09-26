@@ -66,13 +66,14 @@ means the infrastructure is ready. Start a Codex session and complete the client
 trust review to establish a session-bound channel. An incomplete existing standalone
 installation or unsupported CLI version still needs the vendor action named by install.
 
-If you opt into Claude Code's experimental idle delivery, check Claude's Channels startup
-notice for ACC and accept its development-channel warning when shown. If it reports Channels
-unavailable or blocked, a connected MCP server does not make inbound delivery work;
-see [troubleshooting](TROUBLESHOOTING.md#i-enabled-live-delivery-but-got-fallback).
-The feature is off by default, can spend
-model tokens, and currently requires Apple Silicon macOS, zsh, and Claude Code 2.1.258 or
-newer. You do not need it for durable messages or supported next-turn delivery.
+Claude Code's experimental live delivery wakes the session through the inbox that Claude
+Code opens for every session. After you opt in, start Claude Code with your ordinary command.
+ACC adds no launch flag, shell change or wrapper. A session in `bypassPermissions` mode asks
+you to approve each ACC wake. See
+[held or dropped wakes](TROUBLESHOOTING.md#a-claude-code-session-holds-or-drops-acc-wakes).
+The feature is off by default, can spend model tokens, and currently requires Apple Silicon
+macOS and Claude Code 2.1.282 or newer. You do not need it for durable messages or supported
+next-turn delivery.
 
 ## 2. Open two sessions and give them ordinary tasks
 
@@ -140,11 +141,13 @@ Antigravity CLI carries one extra condition: its hooks are given a project direc
 when the session has an open workspace. A session started without one attaches nothing, and
 the client shows no hook output to say so - `acc doctor` names it.
 
-Codex LocalDaemon and Claude Code Channel offer optional native delivery on
-Apple Silicon macOS. They are experimental, can spend tokens, and queue messages
-until a running turn finishes. Codex requires 0.152.1 or newer, LocalDaemon infrastructure,
-recorded opt-in, and a verified session. Supported explicit setup can prepare a missing
-service. Start the client with your normal command. A loaded daemon thread can receive
+Codex LocalDaemon and the Claude Code inbox wake offer optional native delivery on
+Apple Silicon macOS. They are experimental and can spend tokens. Codex queues a message
+until a running turn finishes. A busy Claude Code session takes the wake between two tool
+calls. Claude Code requires 2.1.282 or newer and recorded opt-in, and it wakes through the
+inbox that each session opens itself. Codex requires 0.152.1 or newer, LocalDaemon
+infrastructure, recorded opt-in, and a verified session. Supported explicit setup can
+prepare a missing service. Start the client with your normal command. A loaded daemon thread can receive
 messages after its terminal exits. Antigravity CLI 1.2.7 and later has one too: with delivery enabled,
 ACC's context asks the agent to start a relay from its own shell, up to three times while
 none is running, and you approve that command at the client's prompt.

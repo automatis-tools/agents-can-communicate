@@ -1,0 +1,28 @@
+{
+  "client": "claude-code",
+  "version": "2.1.282",
+  "platform": "darwin-arm64",
+  "observedAt": "2026-09-25T21:35:56.792Z",
+  "capability": "native_delivery",
+  "result": "pass",
+  "fixture": "claude-code-2.1.282",
+  "launchMode": "ordinary-command-with-installed-hooks",
+  "protocolContract": "claude-code-inbox-socket-v1",
+  "idle": "offered",
+  "busy": "presented_between_tool_calls",
+  "reply": "routed",
+  "duplicate": "same_message_id",
+  "fallback": "queued",
+  "limitations": [
+    "Observed on darwin-arm64 with Claude Code 2.1.282 in the TUI, model Sonnet 5, auto permission mode, through a private candidate built from this branch and installed with an isolated ACC data home; the plugin registration in the real Claude config directory was restored byte for byte afterwards.",
+    "Every wake carried ACC wording and the message id only. The body reached the model through the UserPromptSubmit projection that each delivered wake fired, inside the untrusted acc-peer-message block.",
+    "An idle session started a turn with no user input. A wake sent while a Bash tool call ran was taken after that call returned and before the next one, and the turn continued.",
+    "The observed reply loop uses the installed acc reply CLI; native delivery.replyRoute remains false. The router reports a wake as outcome woken via claude-inbox and leaves the receipt queued until the hook's output carried the body, which records it offered via next-turn.",
+    "A repeated logical send kept its message id, took the durable path because the receipt was already acknowledged, and produced exactly one wake.",
+    "Two sessions in one workspace each bound their own inbox; a message addressed to one never woke the other.",
+    "An exited session left no registry entry; the next message stayed queued as recipient_unavailable.",
+    "A receiving session in bypassPermissions mode was not captured; Claude Code documents that such a session holds each wake whose sender does not attest bypass, and ACC never attests a mode.",
+    "Linux and native Windows remain uncaptured."
+  ],
+  "packageSha256": "fa81c55588988ed7274636c564a0adb5c442110f014f82e7a3f94da26fdd8891"
+}

@@ -1,10 +1,10 @@
 # Claude Code compatibility
 
 Decision lifecycle rendering is checked by `tests/acceptance/decision-lifecycle-packed.test.mjs`
-using the installed ACC channel and a local socket. Replacement/withdrawal links and
-status survive in its existing untrusted text envelope. This is a transport regression
-fixture, not a new observation of a Claude model interpreting the change; it adds no
-capability claim.
+through the installed next-turn projection. Replacement and withdrawal links and status
+survive in its existing untrusted text envelope. This is a projection regression fixture,
+not a new observation of a Claude model interpreting the change. It adds no capability
+claim.
 
 Verified 2026-08-16 against the installed client and the primary documentation.
 
@@ -126,7 +126,21 @@ Verified on a real machine: after `acc install --adapter claude_code`, a
 `claude -p` run with nothing about ACC in the prompt attached a session by
 itself, and `acc uninstall` restored all three files byte for byte.
 
-## Native Channel boundary (2026-09-01)
+## Removed: the Channels path (history)
+
+ACC 0.7.x and earlier delivered live messages to Claude Code through the research-preview
+Channels path. A `claude` shim early on `PATH` added
+`--dangerously-load-development-channels plugin:agents-can-communicate@acc-local` to each
+launch, and a Channel MCP server (`acc-claude-channel`, plugin entry `acc-channel`) held the
+endpoint inside each session. That path needed the shim on the user's `PATH`, a per-session
+MCP server, Anthropic authentication and, on Team and Enterprise plans, an organization owner
+who enables `channelsEnabled`. The vendor labels Channels a research preview whose protocol may
+change. Issue #130 therefore removed the path and replaced it with the inbox socket that every
+Claude Code session binds, described in [Inbox socket](#inbox-socket-live-delivery). The sections
+below keep their original text and their fixtures under `fixtures/delivery/` as history of a
+transport that ACC no longer ships.
+
+### Native Channel boundary (2026-09-01)
 
 The installed Claude Code `2.1.252` recognizes the documented
 `--dangerously-load-development-channels server:acc-spike` entry and displays the
@@ -149,7 +163,7 @@ is also `off`. Messages remain durable for the certified 2.1.233 next-turn hook 
 explicit recovery through `acc inbox`; an unknown or uncertified version retains the inbox
 path without being promoted to next-turn support. `acc doctor` reports the same boundary.
 
-## Native Channel capture (2026-09-02)
+### Native Channel capture (2026-09-02)
 
 The installed Claude Code `2.1.258` on `darwin-arm64` was started with the user's ordinary
 `claude` command. A temporary shell bootstrap added only
@@ -198,7 +212,7 @@ the adapter's declared capabilities were still `false`; the production Channel h
 shipped and both are declared true behind the native contract - see the release capture
 below.
 
-## Release capture on the installed tarball (2026-09-04, 2.1.260)
+### Release capture on the installed tarball (2026-09-04, 2.1.260)
 
 The spike above proved the protocol. This one proves the product: the packed artifact
 installed into the real home, two ordinary `claude` sessions in one workspace, no wrapper
@@ -235,6 +249,114 @@ Two behaviours worth knowing, both measured here rather than assumed:
 
 This capture is also the verification of the Channel ownership fix: before it, a second
 session in the same workspace made both Channels register under the first client's pid.
+
+### Startup admission check, 2026-09-09 (no model delivery capture)
+
+Claude Code 2.1.266 on darwin-arm64 was launched through the ordinary ACC-generated
+shim in a disposable profile. ACC was installed from the development archive built
+from `5503e2a867f23215c7e8fc8aa072ab4efd9b725f`, SHA-256
+`04ce871d1a79f47f4bac14795a7c26d9bfe627df08b57bd300534fe97990d064`.
+The profile used a dummy API key and an unreachable localhost model endpoint; this
+exercise did not authenticate to a model or demonstrate a model receiving a message.
+
+On the first completed startup, bootstrap reported `supported: true`, `/mcp` showed
+the ACC Channel connected with two tools, and ACC published an `actionable` binding
+for the actual Claude PID. Claude nevertheless reported that it ignored the development
+flag because Channels were not currently available. On the next launch of that same
+profile, Claude displayed its development-channel warning. The cause of that change
+in vendor availability was not established; restarting is not a guaranteed remedy.
+
+A metadata-only witness on the second launch observed `actionable` in the MCP child
+and subsequent prompt hook. MCP initialization used protocol `2025-11-25`, client
+version `2.1.266`, roots/listChanged and elicitation capabilities; it did not report
+whether Claude admitted inbound Channel notifications. No raw conversation content
+was retained as evidence, and no capability certification is added by this check.
+
+This exposes a diagnostic limit: ACC's native binding verifies its local endpoint,
+not the vendor's inbound Channel gate. Install/doctor now name the separate client-side
+check, and doctor calls the observed state a local active transport. The remote report
+of an empty binding list remains unconfirmed; it was not reproduced by this local run.
+
+### Channel MCP reply to Codex transport, 2026-09-13
+
+A real 0.5.6 exchange exposed a missing composition step: the Channel's `acc_reply`
+recorded an answer and acknowledged its question, but never called the delivery
+router. The answer remained queued until an explicit inbox read. The CLI reply
+path already offered its answers; that did not cover the Channel tool.
+
+The development archive built from `7173fd59100c805454f7115b9d5e1b46dabe168c`,
+SHA-256 `9fed94ab27b4c40aaeac856670df7661caeb41dc92279503adfb1d0d196356ce`,
+was privately installed with the 0.5.6 manifest version. Its unchanged Channel
+entrypoint ran under a temporary installed test plugin in Claude Code 2.1.270 on
+darwin-arm64, launched through the ordinary ACC bootstrap. The plugin supplied
+session-only hooks and the candidate MCP command; it did not replace the user's
+normal ACC installation. Both changed production modules matched the archive.
+
+The fresh test question `message_JQ0b8u_niPJDU9DZSb3X0A` was offered through
+`claude-channel` at `2026-09-13T06:31:09.797Z`. Claude called the Channel reply tool:
+answer `message_mgYZRPXcCAyUmgoB6xBo8A` was recorded at `06:31:18.005Z` with
+client key `channel-reply-message_JQ0b8u_niPJDU9DZSb3X0A`. Its body matched the
+requested verification text. At `06:31:21.640Z`, `message.offer_succeeded` recorded
+`codex-app-server`, serving version 0.153.4, and the exact original Codex session.
+No inbox read was used to retrieve that answer. Evidence retains message identities,
+delivery facts and a body-match boolean, without a vendor transcript.
+
+Limits: the test's startup handshake failed; a subsequent ordinary prompt hook
+bound the already running Channel before the successful fresh question. This is
+not proof of cold-start delivery. Codex accepted the answer while its turn was
+active; a subsequent automatic model turn was not observed during this capture.
+The temporary Claude process, plugin and marketplace were removed afterward.
+No new capability certification or version guarantee is added by this observation.
+
+Follow-up in the same exchange: after the receiving Codex turn ended, the native
+peer message automatically started a new model turn with that exact reply ID and
+matching verification text. No user prompt or inbox read intervened. The receiving
+session acknowledged the reply at `2026-09-13T06:44:27.099Z`. This completes the
+observed live round trip for these already initialized clients, including model
+attention after a busy turn. The cold-start limitation above remains unverified.
+
+### Channel startup without an initial user prompt, 2026-09-13
+
+On published ACC 0.5.7, a normal Claude Code 2.1.270 session recorded
+`SessionStart: handshake_failed` at `16:03:15.765Z`. Its own MCP endpoint opened
+at `16:03:18.350Z` and kept renewing, but the router had no delivery binding.
+A later user turn bound it. The subsequent Channel round trip worked; startup
+without that turn did not. Endpoint readiness and initial binding were separate
+operations, and the ready process could only renew an existing binding.
+
+A temporary installed plugin then ran the corrected production entrypoints from
+an unpublished development archive, still labelled 0.5.7, SHA-256
+`8526ced0fcda0e4469d96f9c7304aeaca4b42caa283eddeca4bcfd3c8e75178b`.
+The archive was built on `fix/claude-channel-startup` from base
+`43cc58bb07026648f292be895949b7c240558be2`, before this documentation update.
+This is not the published 0.5.7 artifact. The installed activation module matched
+the working source. Claude Code 2.1.270 on darwin-arm64 was launched through the
+ordinary ACC bootstrap; the local development-channel notice was accepted.
+
+The test submitted no user prompt. A metadata-only hook observer recorded
+`SessionStart` at `16:54:58.397Z`. Before any `UserPromptSubmit`, doctor reported
+the new session's native transport active. Question `message_7g5uW7zJXw5uaeJS3_2kEw`
+was sent at `16:56:02.222Z` and accepted through `claude-channel`. The resulting
+Channel turn triggered `UserPromptSubmit` at `16:56:05.538Z`, after delivery.
+Claude used MCP `acc_reply`: answer `message_ck0UPGyKrFn4oPO40cIAhA` was recorded
+at `16:56:18.252Z` with client key
+`channel-reply-message_7g5uW7zJXw5uaeJS3_2kEw`. Its Codex receipt became `offered`
+at `16:56:23.150Z`. The receiving Codex turn was still busy; its subsequent
+automatic model turn was not observed at this capture point. No inbox body read
+or user prompt was used to obtain the reply.
+
+The temporary Claude and MCP processes were confirmed absent afterward, and the
+temporary plugin and marketplace were removed. The PTY shutdown acknowledgement
+timed out, so process absence was checked separately; no SessionEnd capture is
+claimed. No raw vendor transcript was retained. This observation proves the
+initial Channel activation and MCP reply for this client, not universal startup
+timing or a new exact-version capability certification.
+
+The installed-package regression reproduces the late ordering by completing
+SessionStart before starting MCP. Removing the ready-process activation restores
+`queued / recipient_unavailable`. Separate mutations verify the lifecycle lock
+and current installation consent. An interrupted-close regression also verifies
+that journal recovery prevents a late Channel from republishing a closed session.
 
 ## CLI ownership observation — 2026-09-06
 
@@ -705,113 +827,6 @@ tool results reported errors; their text was not retained, so their causes canno
 be classified from this capture. The final outcome and independent checks passed.
 No ACC runtime, maintained test or capability changed; delivery stayed off. Only
 Claude ran natively in this capture, and no native Codex settings were changed.
-## Startup admission check, 2026-09-09 (no model delivery capture)
-
-Claude Code 2.1.266 on darwin-arm64 was launched through the ordinary ACC-generated
-shim in a disposable profile. ACC was installed from the development archive built
-from `5503e2a867f23215c7e8fc8aa072ab4efd9b725f`, SHA-256
-`04ce871d1a79f47f4bac14795a7c26d9bfe627df08b57bd300534fe97990d064`.
-The profile used a dummy API key and an unreachable localhost model endpoint; this
-exercise did not authenticate to a model or demonstrate a model receiving a message.
-
-On the first completed startup, bootstrap reported `supported: true`, `/mcp` showed
-the ACC Channel connected with two tools, and ACC published an `actionable` binding
-for the actual Claude PID. Claude nevertheless reported that it ignored the development
-flag because Channels were not currently available. On the next launch of that same
-profile, Claude displayed its development-channel warning. The cause of that change
-in vendor availability was not established; restarting is not a guaranteed remedy.
-
-A metadata-only witness on the second launch observed `actionable` in the MCP child
-and subsequent prompt hook. MCP initialization used protocol `2025-11-25`, client
-version `2.1.266`, roots/listChanged and elicitation capabilities; it did not report
-whether Claude admitted inbound Channel notifications. No raw conversation content
-was retained as evidence, and no capability certification is added by this check.
-
-This exposes a diagnostic limit: ACC's native binding verifies its local endpoint,
-not the vendor's inbound Channel gate. Install/doctor now name the separate client-side
-check, and doctor calls the observed state a local active transport. The remote report
-of an empty binding list remains unconfirmed; it was not reproduced by this local run.
-
-## Channel MCP reply to Codex transport, 2026-09-13
-
-A real 0.5.6 exchange exposed a missing composition step: the Channel's `acc_reply`
-recorded an answer and acknowledged its question, but never called the delivery
-router. The answer remained queued until an explicit inbox read. The CLI reply
-path already offered its answers; that did not cover the Channel tool.
-
-The development archive built from `7173fd59100c805454f7115b9d5e1b46dabe168c`,
-SHA-256 `9fed94ab27b4c40aaeac856670df7661caeb41dc92279503adfb1d0d196356ce`,
-was privately installed with the 0.5.6 manifest version. Its unchanged Channel
-entrypoint ran under a temporary installed test plugin in Claude Code 2.1.270 on
-darwin-arm64, launched through the ordinary ACC bootstrap. The plugin supplied
-session-only hooks and the candidate MCP command; it did not replace the user's
-normal ACC installation. Both changed production modules matched the archive.
-
-The fresh test question `message_JQ0b8u_niPJDU9DZSb3X0A` was offered through
-`claude-channel` at `2026-09-13T06:31:09.797Z`. Claude called the Channel reply tool:
-answer `message_mgYZRPXcCAyUmgoB6xBo8A` was recorded at `06:31:18.005Z` with
-client key `channel-reply-message_JQ0b8u_niPJDU9DZSb3X0A`. Its body matched the
-requested verification text. At `06:31:21.640Z`, `message.offer_succeeded` recorded
-`codex-app-server`, serving version 0.153.4, and the exact original Codex session.
-No inbox read was used to retrieve that answer. Evidence retains message identities,
-delivery facts and a body-match boolean, without a vendor transcript.
-
-Limits: the test's startup handshake failed; a subsequent ordinary prompt hook
-bound the already running Channel before the successful fresh question. This is
-not proof of cold-start delivery. Codex accepted the answer while its turn was
-active; a subsequent automatic model turn was not observed during this capture.
-The temporary Claude process, plugin and marketplace were removed afterward.
-No new capability certification or version guarantee is added by this observation.
-
-Follow-up in the same exchange: after the receiving Codex turn ended, the native
-peer message automatically started a new model turn with that exact reply ID and
-matching verification text. No user prompt or inbox read intervened. The receiving
-session acknowledged the reply at `2026-09-13T06:44:27.099Z`. This completes the
-observed live round trip for these already initialized clients, including model
-attention after a busy turn. The cold-start limitation above remains unverified.
-
-## Channel startup without an initial user prompt, 2026-09-13
-
-On published ACC 0.5.7, a normal Claude Code 2.1.270 session recorded
-`SessionStart: handshake_failed` at `16:03:15.765Z`. Its own MCP endpoint opened
-at `16:03:18.350Z` and kept renewing, but the router had no delivery binding.
-A later user turn bound it. The subsequent Channel round trip worked; startup
-without that turn did not. Endpoint readiness and initial binding were separate
-operations, and the ready process could only renew an existing binding.
-
-A temporary installed plugin then ran the corrected production entrypoints from
-an unpublished development archive, still labelled 0.5.7, SHA-256
-`8526ced0fcda0e4469d96f9c7304aeaca4b42caa283eddeca4bcfd3c8e75178b`.
-The archive was built on `fix/claude-channel-startup` from base
-`43cc58bb07026648f292be895949b7c240558be2`, before this documentation update.
-This is not the published 0.5.7 artifact. The installed activation module matched
-the working source. Claude Code 2.1.270 on darwin-arm64 was launched through the
-ordinary ACC bootstrap; the local development-channel notice was accepted.
-
-The test submitted no user prompt. A metadata-only hook observer recorded
-`SessionStart` at `16:54:58.397Z`. Before any `UserPromptSubmit`, doctor reported
-the new session's native transport active. Question `message_7g5uW7zJXw5uaeJS3_2kEw`
-was sent at `16:56:02.222Z` and accepted through `claude-channel`. The resulting
-Channel turn triggered `UserPromptSubmit` at `16:56:05.538Z`, after delivery.
-Claude used MCP `acc_reply`: answer `message_ck0UPGyKrFn4oPO40cIAhA` was recorded
-at `16:56:18.252Z` with client key
-`channel-reply-message_7g5uW7zJXw5uaeJS3_2kEw`. Its Codex receipt became `offered`
-at `16:56:23.150Z`. The receiving Codex turn was still busy; its subsequent
-automatic model turn was not observed at this capture point. No inbox body read
-or user prompt was used to obtain the reply.
-
-The temporary Claude and MCP processes were confirmed absent afterward, and the
-temporary plugin and marketplace were removed. The PTY shutdown acknowledgement
-timed out, so process absence was checked separately; no SessionEnd capture is
-claimed. No raw vendor transcript was retained. This observation proves the
-initial Channel activation and MCP reply for this client, not universal startup
-timing or a new exact-version capability certification.
-
-The installed-package regression reproduces the late ordering by completing
-SessionStart before starting MCP. Removing the ready-process activation restores
-`queued / recipient_unavailable`. Separate mutations verify the lifecycle lock
-and current installation consent. An interrupted-close regression also verifies
-that journal recovery prevents a late Channel from republishing a closed session.
 
 ## SessionStart owner context — 2026-09-19
 
@@ -837,3 +852,105 @@ the web repository has an external linked worktree. Claude retains its original
 owner and room through turns, a synthetic compact SessionStart, and SessionEnd from
 those locations; a Codex peer launched in the parent stays in the same room. These
 are executable hook fixtures, not a new real-client delivery certification.
+
+## Inbox socket (live delivery)
+
+Claude Code live delivery wakes the session through the inbox socket that every Claude Code
+session binds by default, with nothing to enable and on every provider. The transport capture
+ran on 2026-09-25 on Claude Code 2.1.282, `darwin-arm64`, before any ACC code used the inbox.
+Its redacted record is `fixtures/inbox-wake-2.1.282.json`.
+
+The receiver was an interactive TUI session started from the real executable in
+`auto` mode, with ACC 0.7.0 hooks installed and no Channel. A separate process, not a child
+of the receiver, connected to the socket that the session registry named. It wrote one JSON
+line per connection, with no auth line and no token:
+
+```json
+{ "type": "user", "message": { "role": "user", "content": "<text>" }, "msg_id": "<id>" }
+```
+
+The socket answered nothing. Outcomes were read from the receiver's own transcript records
+and from ACC's store events. Session ids, paths, pids and message text are redacted.
+
+The session registry is `<config>/sessions/<pid>.json`, where `<config>` is
+`CLAUDE_CONFIG_DIR` or `~/.claude`. ACC reads its `pid`, `sessionId` and
+`messagingSocketPath` fields. `sessionId` equals the hook input `session_id`. The status
+values seen were `idle`, `busy` and `waiting`.
+
+Observed:
+
+- **idle** — a new turn started without user input. The transcript recorded a `user` entry
+  with `isMeta`, `origin.kind` `peer` and `verifiedPeerPid` set. `UserPromptSubmit` fired.
+- **busy** — a frame that arrived while a Bash tool call ran was queued. It was delivered
+  after that call's `tool_result` and before the next tool call, as an `attachment` of type
+  `queued_command` with `origin.kind` `peer`. The turn continued, and `UserPromptSubmit`
+  fired mid-turn.
+- **ACC wake** — the frame carried ACC wording and the message id only. In an idle session,
+  the `beforeTurn` projection showed the queued ACC question in its untrusted block. The
+  model answered with `acc reply`, and the store recorded the answer and `acknowledged`. In
+  a busy session, the same projection arrived with the `UserPromptSubmit` that the mid-turn
+  frame fired. The model answered after its running commands. The offer was recorded as
+  `next-turn`.
+- **inbound controls** — a prompting receiver took a frame whose sender attested no
+  permission mode. A frame whose sender attested `from-mode="bypass"` was held with an
+  approval dialog, and the registry status became `waiting`. Deny dropped that frame.
+- **burst** — six frames from six separate processes were all delivered. Claude Code does
+  not deduplicate frames from separate processes. Five queued frames reached the model in
+  one turn, and each one fired `UserPromptSubmit`. ACC's projection is idempotent, so an
+  extra wake costs one hook run and no extra turn.
+
+Facts that shape the adapter:
+
+- The wake carries fixed ACC text and the ACC message id. It carries no subject, body, sender
+  name or other peer byte. Claude Code frames every inbox message as a teammate's request to
+  act on, and the only thing a wake gives the model to act on is ACC's own notice.
+- Every delivered frame fires `UserPromptSubmit`, idle or mid-turn. The body reaches the
+  model through ACC's existing next-turn projection, inside the untrusted `acc-peer-message`
+  block, with receipts and the `acc reply` route. `delivery.replyRoute` therefore stays
+  false.
+- A successful wake returns the delivery outcome `woken` over transport `claude-inbox`. The
+  receipt stays `queued` until the hook's output carried the body, and the hook then records
+  `offered` via `next-turn`.
+- ACC reads the socket path from `CLAUDE_CODE_MESSAGING_SOCKET` in the hook environment. It
+  binds when the registry names the same pid and socket. On every lease refresh and before
+  every wake it also requires the same session id, so a wake never reaches a reused pid.
+  The bind leaves the session id out because Claude Code 2.1.283 runs SessionStart for a
+  `/resume` before it rewrites the entry.
+- ACC connects without credentials. It never reads the session's `.key` file or
+  `CLAUDE_CODE_MESSAGING_TOKEN`, and it sends no auth line. A frame with that token would
+  pass as the session's own child and skip the receiver's inbound controls. ACC also never
+  attests a permission mode.
+- Minimum: Claude Code 2.1.224 and later bind the inbox. This capture observed a delivered
+  frame firing `UserPromptSubmit` on 2.1.282, so ACC's captured minimum is 2.1.282 on
+  `darwin-arm64`, with no maximum. The protocol contract is `claude-code-inbox-socket-v1`.
+- Uncaptured: a receiver in `bypassPermissions` mode, where Claude Code's documentation and
+  the text of the 2.1.282 client say each unattested wake is held for approval unless
+  `crossSessionInbound` is `accept`. Also uncaptured: `darwin-x64`, Linux, and native Windows,
+  where the inbox is a named pipe that requires an auth line. Native Windows keeps next-turn
+  delivery.
+
+The product capture of the installed candidate is recorded below.
+
+### Product capture, 2026-09-25
+
+A private candidate built from this branch (`scripts/e2e/claude-inbox-candidate.mjs`, package
+SHA-256 `fa81c55588988ed7274636c564a0adb5c442110f014f82e7a3f94da26fdd8891`) was installed with
+an isolated ACC data home. Two real Claude Code 2.1.282 TUI sessions ran in one workspace, in
+`auto` mode, model Sonnet 5, from the ordinary `claude` command. The plugin registration in the
+real Claude config directory was backed up first and restored byte for byte afterwards.
+
+`scripts/e2e/claude-inbox-product.mjs` derived every observation from ACC's own JSON results
+and events and from the receiving session's transcript records. All six cases passed:
+
+| Case | Branch | What was observed |
+|---|---|---|
+| C01 | idle | `acc message` returned `woken` via `claude-inbox`. The wake started a turn with no user input. The `beforeTurn` projection showed the body, and the hook recorded `offered` via `next-turn`. |
+| C02 | busy | A wake sent during a Bash tool call was taken after that call returned and before the next one. The turn continued, and the projection showed the body in the same turn. |
+| C03 | reply | The model answered with `acc reply`. The store recorded the answer and `acknowledged`. |
+| C04 | duplicate | A repeated logical send kept its message id and took the durable path, because the receipt was already acknowledged. The session got exactly one wake. |
+| C05 | fallback | After the session exited, its registry entry was gone, and the next message stayed `queued` as `recipient_unavailable`. |
+| C06 | exact binding | A message to one session woke that session only. The other session's transcript has no wake for it. |
+
+Fixtures: `fixtures/delivery/claude-code-2.1.282.json` and
+`fixtures/delivery/claude-code-2.1.282-product-evidence.json`. The capture's limitations
+list what it did not cover: a receiver in `bypassPermissions` mode, Linux and native Windows.

@@ -48,6 +48,11 @@ The order is part of the public guarantee:
 4. ask one adapter to cross its transport boundary;
 5. only after acceptance, commit `offered` and an immutable success event.
 
+An adapter whose contract declares `offerKind: "wake"` puts only a notice in front of the
+client, never the body. The router records no offer for an accepted wake and returns the
+outcome `woken`. The receipt stays `queued` until the recipient's next-turn hook output
+carried the body. That hook then commits `offered` via `next-turn`.
+
 A failed offer records the selected recipient session id and generation with a safe
 diagnostic code, then leaves the receipt queued. Core validates that target provenance and
 derives the event actor from it. A crash after bytes cross the boundary but before the
@@ -78,12 +83,16 @@ or projected into agent context; session restart replaces it and SessionEnd atte
 cleanup. Doctor ignores closed or superseded generations even if cleanup could not finish. Diagnostic disk I/O runs in an
 unreferenced worker, so a stalled write cannot hold the hook process open.
 
-Claude's MCP process can become ready after the bounded SessionStart handshake
-has ended. Once its endpoint listens, the Channel completes the same validated
-binding without a user prompt. It acquires the session lifecycle lock, recovers
-any committed journal, and rechecks its exact owner and current consent before
-publication. The optional diagnostic records `channelReady`; MCP remains responsive
-if registration fails. This does not create a session or revive a closed one.
+Claude Code's inbox binding runs inside ACC's own hooks, with no ACC process in the
+session. Each turn hook reads the session's inbox socket from `CLAUDE_CODE_MESSAGING_SOCKET`
+and verifies it against Claude Code's session registry `<config>/sessions/<pid>.json`. The
+pid and the socket must match; the session id is checked from the first offer on, because
+Claude Code rewrites the entry for a `/resume` only after SessionStart. The hook then writes
+a private endpoint record and publishes the binding with a 120-second lease. The router refreshes an expired
+lease with the same registry check, so an idle session stays reachable between turns. The
+adapter repeats the check before each offer. A registry that disappeared, or that names
+another session or socket, refuses the offer, so a wake never reaches a reused pid. This
+does not create a session or revive a closed one.
 
 ## Certified capability versus current reachability
 
@@ -96,14 +105,15 @@ a third certification check. A binding says what that current generation
 exposes and whether its lease is current, while recipient policy says whether it may spend a
 turn.
 
-Claude Code Channel has installed-client evidence on 2.1.258 and 2.1.260; Codex
-LocalDaemon has it on 0.152.1 and 0.153.4; Antigravity CLI has it on 1.2.7 and later through a relay
+The Claude Code inbox wake has installed-client evidence on 2.1.282. Codex LocalDaemon
+has it on 0.152.1 and 0.153.4. Antigravity CLI has it on 1.2.7 and later through a relay
 the agent starts in its own shell. All three use a captured platform minimum,
-current probe and exact session handshake. Codex preserves the ordinary client
-launch and verifies its registered thread and workspace; native delivery owns no vendor
-daemon lifecycle. Gemini CLI and Kimi Code have exact-version next-turn evidence only; Grok
-and generic MCP use inbox polling. Antigravity CLI additionally attaches
-a session only where the client reports an open workspace.
+current probe and exact session handshake. Claude Code and Codex preserve the ordinary
+client launch. Claude Code verifies its session registry, and Codex verifies its registered
+thread and workspace. Native delivery owns no vendor daemon lifecycle. Gemini CLI and Kimi
+Code have exact-version next-turn evidence only. Grok and generic MCP use inbox polling.
+Antigravity CLI additionally attaches a session only where the client reports an open
+workspace.
 
 ## Storage and workspace identity
 

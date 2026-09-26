@@ -50,6 +50,12 @@ export function normalizeClaudeHook(payload) {
     parentSessionId: typeof payload.agent_id === "string" ? payload.session_id : null,
     tool,
     targets: writeTargets(tool, payload.tool_input),
+    // Documented as conditional; SessionStart carried none on 2.1.233.
+    permissionMode: typeof payload.permission_mode === "string" && payload.permission_mode !== ""
+      ? payload.permission_mode : null,
+    // SessionEnd says why: "clear", "logout", "prompt_input_exit", "other".
+    endReason: event === "SessionEnd" && typeof payload.reason === "string" && payload.reason !== ""
+      ? payload.reason : null,
   });
 }
 

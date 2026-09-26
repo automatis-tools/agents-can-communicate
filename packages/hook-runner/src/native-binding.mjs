@@ -20,14 +20,20 @@ const STATIC_REASONS = new Set(["native_delivery_unsupported", "platform_not_cap
   "version_unavailable", "prerelease_not_captured", "below_minimum_version",
   "known_bad_version"]);
 
-// Only the value a successful owned shell bootstrap exported counts; anything
-// else - missing, blank, differently cased, a number - is off.
-export function livePolicyFrom(env) {
-  const value = env?.ACC_NATIVE_DELIVERY_POLICY;
-  return LIVE_POLICIES.includes(value) ? value : "off";
-}
-
 const isPid = value => Number.isInteger(value) && value > 0;
+
+// An adapter may write its private endpoint before the static rule below judges
+// the handshake, or after this hook stopped waiting. Nothing publishes such an
+// endpoint, so nothing would ever retire it, and a refused client binds again
+// on every turn. Fail-open and never awaited past the adapter's own answer.
+function discardEndpoint(adapter, handshake, runtimeDir) {
+  const opaqueEndpointRef = handshake?.opaqueEndpointRef;
+  if (typeof opaqueEndpointRef !== "string" || opaqueEndpointRef === ""
+    || typeof adapter?.retireNativeSession !== "function") return Promise.resolve();
+  return Promise.resolve().then(() => adapter.retireNativeSession({
+    binding: { opaqueEndpointRef, clientVersion: handshake.clientVersion ?? null }, runtimeDir }))
+    .catch(() => {});
+}
 
 export async function establishNativeBinding({ adapter, event, hookBinding, clientVersion,
   platform, livePolicy, service, runtimeDir, clock, env,
@@ -57,16 +63,23 @@ export async function establishNativeBinding({ adapter, event, hookBinding, clie
   let timer = null;
   try {
     const budget = Math.max(1, Math.floor(timeoutMs));
+    const pending = Promise.resolve().then(() => adapter.bindNativeSession({ event, clientPid,
+      clientVersion, runtimeDir, timeoutMs: budget, env }));
+    // An answer that lands after the budget has nobody left to use it.
+    let timedOut = false;
+    pending.then(late => { if (timedOut) discardEndpoint(adapter, late, runtimeDir); }, () => {});
     const handshake = await Promise.race([
-      adapter.bindNativeSession({ event, clientPid, clientVersion, runtimeDir,
-        timeoutMs: budget, env }),
+      pending,
       new Promise((_resolve, reject) => {
-        timer = setTimeout(() => reject(Object.assign(new Error("native handshake timed out"),
-          { code: "ETIMEDOUT" })), budget);
+        timer = setTimeout(() => {
+          timedOut = true;
+          reject(Object.assign(new Error("native handshake timed out"), { code: "ETIMEDOUT" }));
+        }, budget);
       }),
     ]);
     const verdict = validateNativeHandshake(adapter, { clientVersion, platform, handshake });
     if (!verdict.ok) {
+      await discardEndpoint(adapter, handshake, runtimeDir);
       return outcome(STATIC_REASONS.has(verdict.reasonCode) ? "unsupported" : "degraded",
         verdict.reasonCode);
     }

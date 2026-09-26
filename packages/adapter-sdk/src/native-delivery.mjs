@@ -1,5 +1,5 @@
-import { CONTRACT_ID, FINGERPRINT, HANDSHAKE_KEYS, KNOWN_BAD_REASON, NATIVE_ACTIVATION_KINDS,
-  NATIVE_BINDING_MODES, NATIVE_PLATFORMS, PROBE_KEYS, TIMESTAMP, assertModes,
+import { CONTRACT_ID, FINGERPRINT, HANDSHAKE_KEYS, KNOWN_BAD_REASON, NATIVE_BINDING_MODES,
+  NATIVE_PLATFORMS, PLANNABLE_ACTIVATION_KINDS, PROBE_KEYS, TIMESTAMP, assertModes,
   assertReasonCode, closed, compareStableVersions, deepFreeze, isPlainObject, isText,
   parseStableVersion, usage } from "./native-vocabulary.mjs";
 
@@ -12,19 +12,31 @@ import { CONTRACT_ID, FINGERPRINT, HANDSHAKE_KEYS, KNOWN_BAD_REASON, NATIVE_ACTI
 // capability; this rule is used for native live delivery alone.
 
 export { NATIVE_ACTIVATION_KINDS, NATIVE_BINDING_MODES, NATIVE_PLATFORMS, NATIVE_REASON_CODES,
-  compareStableVersions, parseStableVersion } from "./native-vocabulary.mjs";
+  PLANNABLE_ACTIVATION_KINDS, compareStableVersions, parseStableVersion } from "./native-vocabulary.mjs";
 export { validateNativeActivationPlan } from "./native-activation.mjs";
 
 const orderedModes = modes => NATIVE_BINDING_MODES.filter(mode => modes.includes(mode));
 
 export function validateNativeDeliveryContract(value, { certification, client }) {
+  // Consent to live delivery is what `acc install` recorded. Up to 0.7.x a
+  // Claude shell shim could export it instead ("bootstrap-environment"); the
+  // shim is gone, and the installation record is the one source left.
   const policySource = Object.hasOwn(value ?? {}, "policySource")
-    ? value.policySource : "bootstrap-environment";
-  closed({ ...value, policySource },
-    ["minimumByPlatform", "anchors", "knownBad", "activationKinds", "policySource"],
+    ? value.policySource : "installation-record";
+  // What a successful offer put in front of the model. "message" carries the
+  // body, so the router records the receipt as offered. "wake" carries only a
+  // notice that makes the client run a turn; the body reaches the model through
+  // the next-turn hook, which records the offer itself once its stdout carried
+  // the body. Recording a wake as offered would hide the body from that hook.
+  const offerKind = Object.hasOwn(value ?? {}, "offerKind") ? value.offerKind : "message";
+  closed({ ...value, policySource, offerKind },
+    ["minimumByPlatform", "anchors", "knownBad", "activationKinds", "policySource", "offerKind"],
     "nativeDelivery");
-  if (!["installation-record", "bootstrap-environment"].includes(policySource)) {
-    usage("nativeDelivery.policySource must be installation-record or bootstrap-environment");
+  if (policySource !== "installation-record") {
+    usage("nativeDelivery.policySource must be installation-record");
+  }
+  if (!["message", "wake"].includes(offerKind)) {
+    usage("nativeDelivery.offerKind must be message or wake");
   }
   const minimums = value.minimumByPlatform;
   if (!isPlainObject(minimums) || Object.keys(minimums).length === 0) {
@@ -89,11 +101,11 @@ export function validateNativeDeliveryContract(value, { certification, client })
   });
   const kinds = value.activationKinds;
   if (!Array.isArray(kinds) || kinds.length === 0 || new Set(kinds).size !== kinds.length
-    || kinds.some(kind => !NATIVE_ACTIVATION_KINDS.includes(kind))) {
-    usage(`nativeDelivery.activationKinds must be unique entries of ${NATIVE_ACTIVATION_KINDS.join(", ")}`);
+    || kinds.some(kind => !PLANNABLE_ACTIVATION_KINDS.includes(kind))) {
+    usage(`nativeDelivery.activationKinds must be unique entries of ${PLANNABLE_ACTIVATION_KINDS.join(", ")}`);
   }
   return deepFreeze({ minimumByPlatform: { ...minimums }, anchors, knownBad,
-    activationKinds: [...kinds], policySource });
+    activationKinds: [...kinds], policySource, offerKind });
 }
 
 function knownBadHit(contract, version) {

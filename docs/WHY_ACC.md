@@ -53,9 +53,11 @@ coordinate across machines.
 ACC also does not merge model memory, read raw conversations, guarantee agent choices,
 approve tools, operate CI,
 or make guarded claims immune to unrelated local processes. Experimental live delivery is
-available through Claude Code Channel and Codex LocalDaemon on supported versions and
-platforms, behind recipient opt-in and with possible token spend. Neither interrupts a
-turn in progress; messages wait for it to finish. See [Capabilities](CAPABILITIES.md).
+available through the Claude Code inbox wake and Codex LocalDaemon on supported versions and
+platforms, behind recipient opt-in and with possible token spend. Both work inside the
+session you opened with your ordinary command, and Claude Code needs no launcher shim.
+Neither interrupts a turn in progress. A busy Claude Code session takes the message between
+two tool calls, and Codex waits for the turn to finish. See [Capabilities](CAPABILITIES.md).
 
 If the sessions should remain yours and simply stop working in isolation, that is the
 product ACC is designed to be.

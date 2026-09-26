@@ -35,9 +35,11 @@ test("normal installed ACC enrolls automatic updates and surviving stable integr
   assert.equal(hooks.length >= 4, true);
   for (const hook of hooks) assert.equal((await readFile(path.join(f.clientHome, hook), "utf8"))
     .includes(path.join(root, "bin", "acc-hook.mjs")), true, hook);
-  for (const name of ["acc", "acc-hook", "acc-mcp", "acc-bootstrap", "acc-claude-channel",
-    "acc-antigravity-relay"]) {
+  for (const name of ["acc", "acc-hook", "acc-mcp", "acc-antigravity-relay"]) {
     assert.match(await readFile(path.join(root, "bin", `${name}.mjs`), "utf8"), /runEntry/);
+  }
+  for (const name of ["acc-bootstrap", "acc-claude-channel"]) {
+    await assert.rejects(readFile(path.join(root, "bin", `${name}.mjs`)), { code: "ENOENT" }, name);
   }
   await rm(f.installed, { recursive: true });
   const result = await run(process.execPath, [path.join(root, "bin", "acc.mjs"), "version", "--json"],

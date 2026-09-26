@@ -2,10 +2,7 @@ import { execFile } from "node:child_process";
 import { access, constants } from "node:fs/promises";
 import path from "node:path";
 
-import { defaultBootstrap } from "@agents-can-communicate/adapter-sdk";
-
-import { installShellBootstrap, planShellBootstrap, uninstallShellBootstrap }
-  from "./shell-bootstrap.mjs";
+import { uninstallShellBootstrap } from "./shell-bootstrap.mjs";
 import { LIVE_POLICIES, livePolicyOf } from "./live-policy.mjs";
 
 // The installer's side of a native activation: which owned mechanisms an
@@ -16,26 +13,15 @@ import { LIVE_POLICIES, livePolicyOf } from "./live-policy.mjs";
 // apply, and only when it did not already exist.
 
 export { LIVE_POLICIES, livePolicyOf };
-const MECHANISM_ORDER = ["native-config", "native-service", "shell-bootstrap"];
+const MECHANISM_ORDER = ["native-config", "native-service"];
 const SERVICE_TIMEOUT_MS = 15_000;
 
-export const shellOf = env => {
-  const shell = env?.SHELL;
-  return typeof shell === "string" && shell !== "" ? path.basename(shell) : null;
-};
+// Where ACC 0.7.x put its `claude` shim. An edited shim is kept rather than
+// deleted, so detection still has to look past this directory.
 export const shimDirFor = stateRoot => path.join(stateRoot, "bin");
-// `.zshrc`, deliberately, and that makes the shim interactive-only: zsh reads
-// this file for interactive shells and not for `zsh -lc` or a script. An
-// interactive launch is where a client session comes from, and putting the PATH
-// entry somewhere every shell reads would put ACC in front of a vendor command
-// in scripts and CI that never asked for it. Worth knowing when checking an
-// install: a non-interactive shell resolving the vendor binary directly is this
-// choice working, not a broken bootstrap.
-export const rcFileFor = (home, shell) => (shell === "zsh" && typeof home === "string"
-  ? path.join(home, ".zshrc") : null);
 
-// The vendor executable a shim will exec: the first executable on PATH that is
-// not ACC's own shim directory, so a shim never resolves itself.
+// The vendor executable to probe: the first executable on PATH outside the
+// excluded directories, so a kept 0.7.x shim is never probed as the client.
 export async function resolveExecutable(command, { pathEnv = "", exclude = [] } = {}) {
   const excluded = exclude.filter(Boolean).map(directory => path.resolve(directory));
   for (const directory of String(pathEnv).split(path.delimiter).filter(Boolean)) {
@@ -65,11 +51,7 @@ const renderCommand = command => [command.executable, ...command.args].join(" ")
 export function describeActivation(activation) {
   const lines = [];
   for (const mechanism of ordered(activation.mechanisms)) {
-    if (mechanism.kind === "shell-bootstrap") {
-      lines.push(`create shim ${path.join(activation.shimDir, mechanism.command)} for `
-        + `${mechanism.command} (${activation.livePolicy} live delivery)`);
-      lines.push(`add a PATH block to ${activation.rcFile}`);
-    } else if (mechanism.kind === "native-config") {
+    if (mechanism.kind === "native-config") {
       lines.push(`write native config ${mechanism.artifactIds.join(", ")}`);
     } else if (mechanism.preExisting) {
       lines.push(`use the existing ${mechanism.serviceId} service`);
@@ -96,47 +78,27 @@ export function describeDeactivation(nativeActivation) {
   return lines;
 }
 
-export async function applyNativeActivation({ adapter, activation, dataHome,
-  node = process.execPath, bootstrap = defaultBootstrap(), exec = defaultExec }) {
+export async function applyNativeActivation({ activation, exec = defaultExec }) {
   const record = { livePolicy: activation.livePolicy,
     protocolContract: activation.protocolContract, mechanisms: [] };
-  let shell = null;
-  try {
-    for (const mechanism of ordered(activation.mechanisms)) {
-      if (mechanism.kind === "native-config") {
-        record.mechanisms.push({ kind: mechanism.kind, artifactIds: [...mechanism.artifactIds] });
-      } else if (mechanism.kind === "native-service") {
-        let createdByAcc = false;
-        if (!mechanism.preExisting && mechanism.applyCommand !== null) {
-          await exec(mechanism.applyCommand.executable, mechanism.applyCommand.args);
-          createdByAcc = true;
-        }
-        record.mechanisms.push({ kind: mechanism.kind, serviceId: mechanism.serviceId,
-          createdByAcc, teardownCommand: mechanism.teardownCommand });
-      } else {
-        const plan = planShellBootstrap({ shell: activation.shell, rcFile: activation.rcFile,
-          shimDir: activation.shimDir, runtime: { node, bootstrap, dataHome },
-          entries: [{ adapterId: adapter.id, command: mechanism.command,
-            realExecutable: mechanism.realExecutable, prefixArgs: mechanism.prefixArgs,
-            livePolicy: activation.livePolicy }] });
-        const result = await installShellBootstrap({ plan });
-        if (!result.ok) throw new Error(`shell bootstrap refused: ${result.reasonCode}`);
-        shell = result;
-        record.mechanisms.push({ kind: mechanism.kind, command: mechanism.command, shimDir: activation.shimDir,
-          ownedFiles: result.shims.map(shim => ({ path: shim.path, sha256: shim.sha256 })),
-          rcFile: result.rcFile });
+  for (const mechanism of ordered(activation.mechanisms)) {
+    if (mechanism.kind === "native-config") {
+      record.mechanisms.push({ kind: mechanism.kind, artifactIds: [...mechanism.artifactIds] });
+    } else if (mechanism.kind === "native-service") {
+      let createdByAcc = false;
+      if (!mechanism.preExisting && mechanism.applyCommand !== null) {
+        await exec(mechanism.applyCommand.executable, mechanism.applyCommand.args);
+        createdByAcc = true;
       }
+      record.mechanisms.push({ kind: mechanism.kind, serviceId: mechanism.serviceId,
+        createdByAcc, teardownCommand: mechanism.teardownCommand });
+    } else {
+      // validateNativeActivationPlan refuses a shell bootstrap before any plan
+      // gets here; this is the same refusal for a hand-built one.
+      throw new Error("shell-bootstrap activation was removed");
     }
-    return { nativeActivation: record, appendedRcBlock: shell?.rcFile.appended === true };
-  } catch (error) {
-    // Only bytes this operation wrote are taken back; a pre-existing service
-    // or a user's own file is never touched on the way out.
-    if (shell !== null) {
-      await uninstallShellBootstrap({ ownership: { shims: shell.shims, shimDir: activation.shimDir,
-        rcFile: shell.rcFile } }).catch(() => null);
-    }
-    throw error;
   }
+  return { nativeActivation: record };
 }
 
 // Compare planned mechanisms with the deletion authority saved by older installs.
