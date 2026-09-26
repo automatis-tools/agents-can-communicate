@@ -67,6 +67,36 @@ kinds. `packages/cli/test/managed-runtime-retired-kinds.test.mjs` pins that this
 ships `acc-bootstrap` and `acc-claude-channel` entrypoints, as stubs. The same file pins that
 the Channel stub exits on SIGTERM and on SIGINT while its parent still holds stdin open.
 
+### Channel stub stop, local end to end
+
+Run on darwin-arm64 against the recorded candidate archive (sha256 `f22cf626…`), with an
+isolated `HOME` and `ACC_DATA_HOME`. The variant "before the fix" is the same archive with
+`bin/entrypoints/acc-claude-channel.mjs` taken from `4e02a15`.
+
+- ACC 0.7.1 from npm ran `acc install --adapter claude_code`, then its own `acc update`
+  activated the candidate from a local registry. The candidate's refresh removed the
+  `acc-bootstrap` and `acc-claude-channel` launchers in that update, so an ordinary update
+  never reaches the stub. The stub serves the state an interrupted 0.7.x refresh leaves:
+  0.7.1's own launchers over the active candidate.
+- Through that 0.7.1 launcher, 0.7.1 `runEntry` took an `acc-claude-channel` runtime lease and
+  loaded the candidate's stub, which answered `initialize` with no tools. A signal sent while
+  stdin stayed open:
+
+  | Stub | SIGTERM | SIGINT |
+  |---|---|---|
+  | before the fix | still running after 5 s; exited only when stdin closed | the same |
+  | fixed | exited in 3 ms, code 0 | exited in 3 ms, code 0 |
+
+  The next admission (`acc status`) removed the lease of the exited stub.
+- Claude Code 2.1.283 (`--bare` with no real credentials, `--mcp-config` naming the launcher
+  as a 0.7.x `.mcp.json` does; the `stream-json` runs used a dummy key and a closed local API
+  port, so no request left the machine) stops an MCP server with SIGINT, then SIGTERM about
+  100 ms later, then SIGKILL. Before the fix the stub ignored the first two and was killed; fixed, it exited with
+  code 0 within 1 ms of SIGINT. On `mcp_reconnect` in a live `stream-json` session the
+  replacement started about 530 ms after SIGINT before the fix and about 74 ms after it with
+  the fix. On `mcp_toggle` disable Claude Code sends no signal and keeps stdin open, so either
+  stub runs until Claude Code exits. No stub process remained after any run.
+
 ## Candidate archive
 
 `node scripts/verify-package.mjs` on `71f3db716ae985bbc9c8c5ba938158174c30557f`, after the
