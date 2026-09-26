@@ -68,9 +68,11 @@ cover, and each thing that did not work was fixed with a failing test first:
 
 ### Final run on the recorded candidate
 
-2026-09-26, the archive recorded below (SHA-256 `13363d63…`, built from `6b8fe9d`), installed
-as shipped with an isolated ACC data home, Claude Code 2.1.283 TUI sessions on Sonnet 5, the
-real Claude config backed up first. One script ran every case in order.
+2026-09-26, the archive `13363d63…` built from `6b8fe9d`, installed as shipped with an isolated
+ACC data home, Claude Code 2.1.283 TUI sessions on Sonnet 5, the real Claude config backed up
+first. One script ran every case in order. The archive recorded below differs from it in one
+file, `packages/installer/src/ownership.mjs`, whose tree fingerprint now skips Claude Code's
+`.orphaned_at` marker; no delivery code changed.
 
 | Case | Observed | Outcome |
 |---|---|---|
@@ -155,13 +157,14 @@ loads. The variant "before the fix" is the same archive with
 
 ## Candidate archive
 
-`node scripts/verify-package.mjs` on `6b8fe9d8a52bd9dad4f54bb857356413c66e079d`, after the
-review fixes, the Channel stub and publication race fixes, and every fix the product runs above
-led to. A separate `npm pack` of the same commit gives the same digest, 468,533 bytes:
+`node scripts/verify-package.mjs` on `97d80045b31ab93a18f51831471e9b3d7db1cce1`, after the
+review fixes, the Channel stub and publication race fixes, every fix the product runs above
+led to, and the plugin cache ownership fix. A separate `npm pack` of the same commit gives the
+same digest, 468,697 bytes:
 
 ```text
 == pack
-   ok  sha256 13363d63f5e46a3b30451f2d9141e2014eb2834c60577d9683dbdd0859f26d07
+   ok  sha256 54e224cd4da725d1806570f492957abe89cb605646a2b4d46f5ae6530e4fab8c
 == tarball contents
    ok  311 entries, none forbidden
    ok  6 certification manifest(s), exact evidence allowlist shipped
