@@ -226,7 +226,7 @@ test("request returns the same send result and human output leads with durable r
       sender.generation, "--to", "models", "--subject", "FYI", "--body", "Recorded."]);
     assert.equal(human.code, 0, human.stderr);
     assert.match(human.stdout, /^recorded message_[A-Za-z0-9_-]+/);
-    assert.match(human.stdout, /live offer unavailable \(recipient_unavailable\)/);
+    assert.match(human.stdout, /models has no live transport; the message waits in its inbox/);
   });
 
 test("inbox reads one message and reply answers plus acknowledges it", async t => {

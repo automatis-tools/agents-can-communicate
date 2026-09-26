@@ -109,7 +109,9 @@ export function createDeliveryRouter({ service, adapters, clock, platform = HOST
       participantId, now, includeExpired: true }))
       .filter(binding => binding.sessionId === target.sessionId
         && binding.generation === target.generation);
-    if (bindings.length === 0) return durable(participantId, "recipient_unavailable");
+    // Online, with nothing to push through: a CLI participant, or a client
+    // that bound no live transport. It reads its inbox, so it is not gone.
+    if (bindings.length === 0) return durable(participantId, "no_live_transport");
     const evaluated = await Promise.all(bindings.map(async binding => {
       const adapter = registry.get(binding.adapterId);
       return { binding, adapter, policy: await policyFor(adapter, binding) };
@@ -117,7 +119,7 @@ export function createDeliveryRouter({ service, adapters, clock, platform = HOST
     const permitted = evaluated.filter(({ policy }) => permits(policy, message.kind));
     if (permitted.length === 0) return durable(participantId, "delivery_disabled");
     const reachable = permitted.filter(({ binding }) => binding.availableModes.includes("livePush"));
-    if (reachable.length === 0) return durable(participantId, "recipient_unavailable");
+    if (reachable.length === 0) return durable(participantId, "no_live_transport");
     const capable = reachable.filter(({ binding, adapter }) => liveCapable(adapter, binding));
     if (capable.length === 0) {
       return durable(participantId, "unsupported_client_version");

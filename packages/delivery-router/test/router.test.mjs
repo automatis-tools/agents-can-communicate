@@ -370,7 +370,16 @@ test("lease expiry and generation replacement remove a binding from eligibility"
   await f.service.openSession({ workspaceId: WORKSPACE, participantId: "models",
     sessionId: current.sessionId, harness: "fixture", heartbeatCadenceMs: 30_000 });
   const replaced = await send(f.service, f.sender, "question", "replaced");
-  assert.deepEqual(await f.router.offer(replaced), durable("recipient_unavailable"));
+  assert.deepEqual(await f.router.offer(replaced), durable("no_live_transport"));
+});
+
+// A CLI participant, or any session whose client binds no live transport, is
+// online and reads its inbox. Calling it unavailable told senders it was gone.
+test("an online recipient with no live transport is queued as such, not as unavailable", async () => {
+  const f = await fixture();
+  const message = await send(f.service, f.sender, "question", "cli_recipient");
+  assert.deepEqual(await f.router.offer(message), durable("no_live_transport"));
+  assert.equal((await receipt(f.store, message.messageId)).state, "queued");
 });
 
 test("off, missing reachability, and live-incapable adapters stay queued for distinct reasons",
@@ -379,7 +388,7 @@ test("off, missing reachability, and live-incapable adapters stay queued for dis
     const declaredOff = { ...certifiedAdapter(), capabilities: { delivery: { livePush: false } } };
     for (const [name, overrides, errorCode, adapter] of [
       ["off", { livePolicy: "off" }, "delivery_disabled", undefined],
-      ["no-mode", { availableModes: ["nextTurn"] }, "recipient_unavailable", undefined],
+      ["no-mode", { availableModes: ["nextTurn"] }, "no_live_transport", undefined],
       ["no-native-contract", {}, "unsupported_client_version", noContract],
       ["capability-off", {}, "unsupported_client_version", declaredOff],
       ["unknown-adapter", { adapterId: "other_adapter" }, "unsupported_client_version", undefined],

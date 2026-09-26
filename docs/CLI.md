@@ -208,6 +208,13 @@ Human output starts with `recorded message_x`. A transport failure after that co
 not change the command exit code. Reuse an explicit `--client-message-id` after an
 uncertain result to recover the same logical message.
 
+A queued result names why no live offer was made. `no_live_transport` means the recipient
+is online but its session has no live transport bound: a participant attached with the CLI,
+or a client without live delivery. It reads the message from its inbox or next turn, and
+human output says `models has no live transport; the message waits in its inbox`.
+`recipient_unavailable` means the recipient has no online session, or its live transport
+could not be reached.
+
 The delivery outcome `woken` means ACC woke a Claude Code session through its inbox:
 
 ```json

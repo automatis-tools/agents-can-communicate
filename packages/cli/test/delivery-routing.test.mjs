@@ -23,6 +23,12 @@ test("a wake held for the receiver's approval is reported as held, not as woken"
     + "because it bypasses permission prompts; the message arrives with its next turn");
 });
 
+test("a recipient with no live transport is reported as reading its inbox", () => {
+  assert.equal(recordedText(message, [{ recipientParticipantId: "models", outcome: "queued",
+    transport: "durable", errorCode: "no_live_transport" }]),
+  "recorded message_a; models has no live transport; the message waits in its inbox");
+});
+
 test("the CLI composition seam records before it offers", async () => {
   const order = [];
   const result = await recordAndOffer({

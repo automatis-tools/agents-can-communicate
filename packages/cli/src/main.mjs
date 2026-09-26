@@ -149,7 +149,9 @@ export function recordedText(message, delivery) {
     : item.outcome === "queued"
       ? item.errorCode === "transport_permission_denied"
         ? "live offer blocked by sender permissions; message remains queued; run acc doctor in the sending session"
-        : `live offer unavailable (${item.errorCode ?? "durable_fallback"})`
+        : item.errorCode === "no_live_transport"
+          ? `${item.recipientParticipantId} has no live transport; the message waits in its inbox`
+          : `live offer unavailable (${item.errorCode ?? "durable_fallback"})`
       : `delivery already ${item.outcome}`);
   return [`recorded ${message.messageId}`, ...diagnostics].join("; ");
 }
