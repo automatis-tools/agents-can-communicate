@@ -158,9 +158,9 @@ For Claude Code, use version 2.1.282 or newer on Apple Silicon macOS, and start 
 your ordinary command. Each Claude Code session opens its own inbox socket. ACC reads the
 socket path from `CLAUDE_CODE_MESSAGING_SOCKET` in the hook environment. ACC then checks that
 path against Claude Code's session registry `<config>/sessions/<pid>.json`, where
-`<config>` is `CLAUDE_CONFIG_DIR` or `~/.claude`. The pid, the session id and the socket
-must all match. Each turn hook binds the session again, so the next ordinary prompt retries
-a failed binding.
+`<config>` is `CLAUDE_CONFIG_DIR` or `~/.claude`. The pid and the socket must match for the
+binding, and the session id must match too before each wake. Each turn hook binds the
+session again, so the next ordinary prompt retries a failed binding.
 
 - Claude Code 2.1.224 and later open the inbox, but ACC's captured minimum is 2.1.282. An
   older version reports `below_minimum_version` and keeps next-turn delivery.

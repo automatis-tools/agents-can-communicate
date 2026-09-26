@@ -912,8 +912,10 @@ Facts that shape the adapter:
   receipt stays `queued` until the hook's output carried the body, and the hook then records
   `offered` via `next-turn`.
 - ACC reads the socket path from `CLAUDE_CODE_MESSAGING_SOCKET` in the hook environment. It
-  binds only when the registry names the same pid, session id and socket. It repeats that
-  check on every lease refresh and before every wake, so a wake never reaches a reused pid.
+  binds when the registry names the same pid and socket. On every lease refresh and before
+  every wake it also requires the same session id, so a wake never reaches a reused pid.
+  The bind leaves the session id out because Claude Code 2.1.283 runs SessionStart for a
+  `/resume` before it rewrites the entry.
 - ACC connects without credentials. It never reads the session's `.key` file or
   `CLAUDE_CODE_MESSAGING_TOKEN`, and it sends no auth line. A frame with that token would
   pass as the session's own child and skip the receiver's inbound controls. ACC also never

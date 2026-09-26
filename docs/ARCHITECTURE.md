@@ -86,8 +86,9 @@ unreferenced worker, so a stalled write cannot hold the hook process open.
 Claude Code's inbox binding runs inside ACC's own hooks, with no ACC process in the
 session. Each turn hook reads the session's inbox socket from `CLAUDE_CODE_MESSAGING_SOCKET`
 and verifies it against Claude Code's session registry `<config>/sessions/<pid>.json`. The
-pid, the session id and the socket must match. The hook then writes a private endpoint
-record and publishes the binding with a 120-second lease. The router refreshes an expired
+pid and the socket must match; the session id is checked from the first offer on, because
+Claude Code rewrites the entry for a `/resume` only after SessionStart. The hook then writes
+a private endpoint record and publishes the binding with a 120-second lease. The router refreshes an expired
 lease with the same registry check, so an idle session stays reachable between turns. The
 adapter repeats the check before each offer. A registry that disappeared, or that names
 another session or socket, refuses the offer, so a wake never reaches a reused pid. This

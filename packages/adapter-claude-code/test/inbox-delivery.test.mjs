@@ -76,7 +76,6 @@ test("bind verifies the session registry and publishes an inbox endpoint", async
 for (const [name, change, reasonCode] of [
   ["the session has no inbox", f => { delete f.env.CLAUDE_CODE_MESSAGING_SOCKET; }, "native_endpoint_unavailable"],
   ["the registry is missing", f => rmSync(f.registry), "native_session_unavailable"],
-  ["the registry names another session", f => f.writeRegistry({ sessionId: "other" }), "native_session_unavailable"],
   ["the registry names another pid", f => f.writeRegistry({ pid: PID + 1 }), "native_session_unavailable"],
   ["the registry names another socket", f => f.writeRegistry({ messagingSocketPath: "/tmp/elsewhere.sock" }),
     "native_session_unavailable"],
@@ -101,6 +100,31 @@ for (const [name, change, reasonCode] of [
     assert.equal(handshake.opaqueEndpointRef, null);
   });
 }
+
+// Claude Code 2.1.283 runs SessionStart for a /resume before it rewrites its
+// registry, so the entry still names the conversation the process left. The
+// process and its socket are what the bind proves; every offer then waits for
+// the registry to name the bound session.
+test("a resumed conversation binds while the registry still names the previous one", async t => {
+  const f = await fixture(t);
+  f.writeRegistry({ sessionId: "conversation-before-resume" });
+  const handshake = await bind(f);
+  assert.equal(handshake.supported, true, handshake.reasonCode);
+  const endpoint = await readInboxEndpoint({ runtimeDir: f.runtime, endpointId: handshake.opaqueEndpointRef });
+  assert.equal(endpoint.sessionId, SESSION);
+  const binding = { clientVersion: handshake.clientVersion, opaqueEndpointRef: handshake.opaqueEndpointRef };
+
+  const early = await offerMessage({ binding, message: message(), runtimeDir: f.runtime });
+  assert.equal(early.accepted, false);
+  assert.equal(early.safeErrorCode, "recipient_unavailable");
+  assert.equal(f.received(), "");
+
+  f.writeRegistry();
+  const closed = closedOrSettled(f);
+  assert.equal((await offerMessage({ binding, message: message(), runtimeDir: f.runtime })).accepted, true);
+  await closed;
+  assert.equal(wakeLines(f), 1);
+});
 
 test("bind refuses without a client process or a session id", async t => {
   const f = await fixture(t);

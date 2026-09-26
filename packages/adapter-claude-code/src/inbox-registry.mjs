@@ -53,11 +53,17 @@ export async function inboxSocketIsSafe(socketPath) {
  * gets a new registry entry under the same name. Requiring the registry to
  * name both this session id and this socket is what keeps a wake from reaching
  * whatever process holds the pid later. Returns null, or the reason it is not.
+ *
+ * `anyConversation` is for the bind alone. Claude Code runs SessionStart for a
+ * /resume before it rewrites the entry, so there the hook's own process and
+ * socket are the proof; every offer and refresh still requires the session id.
  */
-export async function verifyInbox({ configDir, clientPid, sessionId, socketPath }) {
+export async function verifyInbox({ configDir, clientPid, sessionId, socketPath, anyConversation = false }) {
   if (!await inboxSocketIsSafe(socketPath)) return "native_endpoint_unavailable";
   const record = await readSessionRecord({ configDir, clientPid });
-  if (record === null || record.sessionId !== sessionId) return "native_session_unavailable";
+  if (record === null || (!anyConversation && record.sessionId !== sessionId)) {
+    return "native_session_unavailable";
+  }
   const [registered, expected] = await Promise.all([
     realpath(record.messagingSocketPath).catch(() => null), realpath(socketPath).catch(() => null)]);
   return registered !== null && registered === expected ? null : "native_session_unavailable";

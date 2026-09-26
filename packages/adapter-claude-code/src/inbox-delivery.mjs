@@ -129,7 +129,9 @@ const handshake = (endpoint, now) => ({ supported: true, clientVersion: endpoint
  * Bind this ACC session to the inbox of the Claude process whose hook is
  * running. The socket comes from the hook's own environment, which Claude Code
  * exports per session and never inherits from a parent; the registry must
- * agree on both the session id and the socket before anything is published.
+ * name this process and this socket before anything is published. The session
+ * id is checked by every offer and refresh, since after /resume the registry
+ * catches up only once the hook has run.
  */
 export async function bindNativeSession({ event, clientPid, clientVersion, runtimeDir,
   env = process.env, now = Date.now } = {}) {
@@ -150,7 +152,8 @@ export async function bindNativeSession({ event, clientPid, clientVersion, runti
   }
   await sweepDeadEndpoints({ runtimeDir });
   const configDir = claudeConfigDir(env);
-  const refused = await verifyInbox({ configDir, clientPid, sessionId: event.sessionId, socketPath });
+  const refused = await verifyInbox({ configDir, clientPid, sessionId: event.sessionId, socketPath,
+    anyConversation: true });
   if (refused !== null) return closed(clientVersion, refused);
   const endpoint = { schemaVersion: 1, endpointId: newEndpointId(), socketPath, configDir, clientPid,
     sessionId: event.sessionId, clientVersion, protocolContract: PROTOCOL_CONTRACT,
