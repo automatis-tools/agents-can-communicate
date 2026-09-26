@@ -28,14 +28,17 @@
   session in `bypassPermissions` mode holds each wake for approval unless its
   `crossSessionInbound` setting is `accept`; the message still arrives with its next turn, and
   `acc doctor` and the consent question say so.
+- A refused store publication reports only after its directory checks have settled. Before,
+  the refusal could reach the caller while a check was still creating a directory under the
+  store root.
 - The store format is unchanged: a wake records nothing, so 0.7.x and this build can share a
   workspace.
 
 | Candidate artifact | Value |
 |---|---|
-| Built from | `71f3db716ae985bbc9c8c5ba938158174c30557f` |
-| Tarball | `agents-can-communicate-0.7.1.tgz`, 462,560 bytes, 310 files |
-| sha256 | `f22cf6261f399cf718b2ea6359a21e3a48722d0d40a295543c8f98b550d45728` |
+| Built from | `7611b7e5acbe4b9276e8c66845ab5eb7f1907b2c` |
+| Tarball | `agents-can-communicate-0.7.1.tgz`, 462,678 bytes, 310 files |
+| sha256 | `8b6606ebeebbbe94e751999d08af8e9180d6a2146d1d11ee849b9cfd30260262` |
 
 This unpublished development archive passed clean installation verification. See
 [Claude Code inbox wake evidence](docs/release-evidence/unreleased-claude-inbox-wake.md) and the

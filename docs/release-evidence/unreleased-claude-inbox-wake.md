@@ -69,8 +69,9 @@ the Channel stub exits on SIGTERM and on SIGINT while its parent still holds std
 
 ### Channel stub stop, local end to end
 
-Run on darwin-arm64 against the recorded candidate archive (sha256 `f22cf626…`), with an
-isolated `HOME` and `ACC_DATA_HOME`. The variant "before the fix" is the same archive with
+Run on darwin-arm64 against the candidate archive recorded from `71f3db7` (sha256
+`f22cf626…`), with an isolated `HOME` and `ACC_DATA_HOME`. The archive recorded below differs
+from it only in `packages/storage-filesystem/src/atomic-json.mjs`, which the stub never loads. The variant "before the fix" is the same archive with
 `bin/entrypoints/acc-claude-channel.mjs` taken from `4e02a15`.
 
 - ACC 0.7.1 from npm ran `acc install --adapter claude_code`, then its own `acc update`
@@ -99,15 +100,17 @@ isolated `HOME` and `ACC_DATA_HOME`. The variant "before the fix" is the same ar
 
 ## Candidate archive
 
-`node scripts/verify-package.mjs` on `71f3db716ae985bbc9c8c5ba938158174c30557f`, after the
+`node scripts/verify-package.mjs` on `7611b7e5acbe4b9276e8c66845ab5eb7f1907b2c`, after the
 review fixes (a refused or late handshake retires the endpoint it wrote; install and update
 sweep crashed Channel registrations; the Channel stub exits on a signal while its stdin stays
-open). A separate `npm pack` of the same commit gives the same digest, 462,560 bytes:
+open) and a fix for a race the pre-push suite hit (a refused store publication settles its
+directory checks before it reports). A separate `npm pack` of the same commit gives the same
+digest, 462,678 bytes:
 
 ```text
 == pack
    ok  agents-can-communicate-0.7.1.tgz  452 KB
-   ok  sha256 f22cf6261f399cf718b2ea6359a21e3a48722d0d40a295543c8f98b550d45728
+   ok  sha256 8b6606ebeebbbe94e751999d08af8e9180d6a2146d1d11ee849b9cfd30260262
 == tarball contents
    ok  310 entries, none forbidden
    ok  6 certification manifest(s), exact evidence allowlist shipped
