@@ -10,15 +10,27 @@ const MAX_HOPS = 16;
 const SCRIPT_HOSTS = new Set(["node"]);
 const SCRIPT_EXTENSION = /\.[mc]?js$/;
 
-/** The basename of the script a script host runs, without its extension. */
-function scriptOf(entry) {
-  if (!SCRIPT_HOSTS.has(path.basename(entry.comm)) || typeof entry.args !== "string") return null;
+/** What the script a script host runs could be called, without extensions. */
+function scriptsOf(entry) {
+  if (!SCRIPT_HOSTS.has(path.basename(entry.comm)) || typeof entry.args !== "string") return [];
   // `args` starts with the interpreter as it was invoked, which is the comm
-  // itself on macOS; past it, the first word that is no option is the script.
+  // itself on macOS; past it, the first word that is no option is the script -
+  // unless an option written without `=` came right before it, since that word
+  // may be the option's value (`--require ./preload.cjs`). Which options take
+  // one depends on the client's own node, so such a word is kept as a candidate
+  // and the search goes on; it ends at the first word no bare option precedes.
   const rest = entry.args.startsWith(`${entry.comm} `) ? entry.args.slice(entry.comm.length)
     : entry.args.replace(/^\S+/, "");
-  const script = rest.trim().split(/\s+/).find(word => word !== "" && !word.startsWith("-"));
-  return script === undefined ? null : path.basename(script).replace(SCRIPT_EXTENSION, "");
+  const candidates = [];
+  let afterBareOption = false;
+  for (const word of rest.trim().split(/\s+/)) {
+    if (word === "") continue;
+    if (word.startsWith("-")) { afterBareOption = !word.includes("="); continue; }
+    candidates.push(path.basename(word).replace(SCRIPT_EXTENSION, ""));
+    if (!afterBareOption) break;
+    afterBareOption = false;
+  }
+  return candidates;
 }
 
 /**
@@ -41,7 +53,7 @@ export function resolveClientPid({ table, from, command, maxHops = MAX_HOPS }) {
     seen.add(current);
     // `ps` reports some entries bare (`claude`) and some with a path
     // (`/bin/zsh`), so the comparison has to be on the basename.
-    if (path.basename(entry.comm) === command || scriptOf(entry) === command) return current;
+    if (path.basename(entry.comm) === command || scriptsOf(entry).includes(command)) return current;
     if (entry.ppid === current || entry.ppid <= 1) return null;
     current = entry.ppid;
   }

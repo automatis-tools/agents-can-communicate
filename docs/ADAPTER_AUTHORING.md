@@ -84,7 +84,9 @@ presence liveness separately walks the hook's process ancestry for the first anc
 executable basename matches it, to learn the client's own pid. A client shipped as a node
 script, such as Gemini CLI, runs as `node`; for a `node` ancestor the walk also matches the
 script it runs: the first argument after any interpreter options, by basename, with a
-`.js`, `.mjs` or `.cjs` extension ignored. Declare the name the client actually runs as. A
+`.js`, `.mjs` or `.cjs` extension ignored. A word right after an option written without `=`
+may be that option's value (`--require ./preload.cjs`), so it is also tried and the script
+after it still counts. Declare the name the client actually runs as. A
 command that matches neither resolves nothing, and the failure is silent: the session gets
 `pid: null`, falls back to reading presence by age alone, and is not pinned to its
 generation, with nothing telling you why.

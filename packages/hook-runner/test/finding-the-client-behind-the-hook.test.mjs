@@ -98,6 +98,30 @@ test("only the script a node process runs names it, not a later argument", () =>
   assert.equal(resolveClientPid({ table: processes, from: 301, command: "gemini" }), null);
 });
 
+for (const options of ["--require ./preload.cjs", "-r ./preload.cjs",
+  "--import ./register.mjs --max-old-space-size=4096"]) {
+  test(`an option's separate value does not hide the script: node ${options}`, () => {
+    const processes = new Map([
+      [300, { ppid: 1, comm: "node", args: `node ${options} /opt/bin/gemini -p hello` }],
+      [301, { ppid: 300, comm: "node", args: "node hook.mjs" }]]);
+    assert.equal(resolveClientPid({ table: processes, from: 301, command: "gemini" }), 300);
+  });
+}
+
+test("an option with its value attached leaves the next word the script", () => {
+  const processes = new Map([
+    [300, { ppid: 1, comm: "node", args: "node --max-old-space-size=4096 /srv/server.js gemini" }],
+    [301, { ppid: 300, comm: "node", args: "node hook.mjs" }]]);
+  assert.equal(resolveClientPid({ table: processes, from: 301, command: "gemini" }), null);
+});
+
+test("past an option's value, the script's own arguments still do not name it", () => {
+  const processes = new Map([
+    [300, { ppid: 1, comm: "node", args: "node --require ./preload.cjs /srv/server.js gemini" }],
+    [301, { ppid: 300, comm: "node", args: "node hook.mjs" }]]);
+  assert.equal(resolveClientPid({ table: processes, from: 301, command: "gemini" }), null);
+});
+
 test("another interpreter's script is not matched", () => {
   const processes = new Map([
     [300, { ppid: 1, comm: "python3", args: "python3 /opt/gemini" }],
