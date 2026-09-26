@@ -197,7 +197,10 @@ export async function writeCliShim({ dir, cli = defaultCli(), node = process.exe
  * created, and a recognised path is not a reason to delete it.
  */
 export async function removeInstalledTree(target, keep = []) {
-  if (keep.includes(target)) return false;
+  // A kept tree holds someone's own work. Removing a directory inside it, or one
+  // that contains it, would delete that work as surely as removing it.
+  const within = (inner, outer) => inner === outer || inner.startsWith(`${outer}${path.sep}`);
+  if (keep.some(kept => within(target, kept) || within(kept, target))) return false;
   try {
     await lstat(target);
   } catch (error) {
