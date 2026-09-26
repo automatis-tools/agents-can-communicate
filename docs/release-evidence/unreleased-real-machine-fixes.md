@@ -197,7 +197,7 @@ The ones that first survived got their own tests: Codex's timeout branch, the so
 guard (a symlink), an unsafe PID record, a dead PID record without a socket, and a connect
 failing for a reason other than refusal, and an option written with its value attached.
 
-`npm test` on the evidence commit `9bcfb54`: 2,614 tests, 2,613 passing, 0 failing, 1 skipped.
+`npm test` on the evidence commit `7d144e7`: 2,619 tests, 2,618 passing, 0 failing, 1 skipped.
 The skipped test plans an uninstall from the install record and skips on a machine where
 Gemini CLI is installed, as it does on `main`.
 
