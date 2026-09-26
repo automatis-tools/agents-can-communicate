@@ -37,8 +37,10 @@
   `ACC_NATIVE_DELIVERY_POLICY`, `ACC_BYPASS` and `ACC_BOOTSTRAP_DEBUG` are gone.
 - A Claude Code session in `bypassPermissions` mode holds each wake for approval unless its
   `crossSessionInbound` setting is `accept`, and `refuse` drops every wake. ACC reads the same
-  inputs as Claude Code: the hook's permission mode, else `permissions.defaultMode`, and
-  `crossSessionInbound` from managed, local, project and user settings. A held wake is still sent,
+  inputs as Claude Code: the hook's permission mode; before the first prompt, the launch flag
+  (`--permission-mode`, `--dangerously-skip-permissions`) from the client's own arguments, then
+  `permissions.defaultMode`; and `crossSessionInbound` from managed, local, project and user
+  settings. A held wake is still sent,
   and the sender reads `sent a wake to <participant> via claude-inbox, which its session holds for
   approval`, with `"pendingApproval": true` in JSON. A refused one is not sent: the message stays
   `queued` with `delivery_disabled`. In every case the message arrives with the next turn.

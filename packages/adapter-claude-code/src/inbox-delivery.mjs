@@ -4,7 +4,8 @@ import { INBOX_MODES, MIN_VERSION, PROTOCOL_CONTRACT, TRANSPORT } from "./inbox-
 import { claimWake, newEndpointId, readInboxEndpoint, releaseWake, removeInboxEndpoint,
   sweepDeadEndpoints, writeInboxEndpoint } from "./inbox-endpoint.mjs";
 import { claudeConfigDir, readSessionRecord, verifyInbox } from "./inbox-registry.mjs";
-import { MANAGED_SETTINGS, readInboundSettings, receptionOf } from "./inbox-settings.mjs";
+import { MANAGED_SETTINGS, permissionModeFromArgs, readInboundSettings, readProcessArgs, receptionOf }
+  from "./inbox-settings.mjs";
 
 // Live delivery into a Claude Code session through the inbox socket the
 // session itself binds (2.1.224 and later, no flag, every provider).
@@ -138,7 +139,8 @@ const handshake = (endpoint, now) => ({ supported: true, clientVersion: endpoint
  * catches up only once the hook has run.
  */
 export async function bindNativeSession({ event, clientPid, clientVersion, runtimeDir,
-  env = process.env, now = Date.now, managedSettingsPath = MANAGED_SETTINGS[process.platform] } = {}) {
+  env = process.env, now = Date.now, managedSettingsPath = MANAGED_SETTINGS[process.platform],
+  readClientArgs = readProcessArgs } = {}) {
   if (!Number.isInteger(clientPid) || clientPid <= 0) return closed(clientVersion, "client_process_unknown");
   if (typeof event?.sessionId !== "string" || event.sessionId === "") {
     return closed(clientVersion, "handshake_failed");
@@ -164,7 +166,12 @@ export async function bindNativeSession({ event, clientPid, clientVersion, runti
   const record = await readSessionRecord({ configDir, clientPid });
   const settings = await readInboundSettings({ configDir, projectDir: record?.cwd ?? event.cwd,
     managedSettingsPath });
-  const reception = receptionOf({ permissionMode: event.permissionMode ?? settings.defaultMode,
+  // The hook's mode is current. SessionStart carries none, so until the first
+  // prompt the launch flag stands in, then the configured default.
+  const launchMode = event.permissionMode == null
+    ? permissionModeFromArgs(await readClientArgs(clientPid).catch(() => null)) : null;
+  const reception = receptionOf({
+    permissionMode: event.permissionMode ?? launchMode ?? settings.defaultMode,
     crossSessionInbound: settings.crossSessionInbound });
   const endpoint = { schemaVersion: 1, endpointId: newEndpointId(), socketPath, configDir, clientPid,
     sessionId: event.sessionId, clientVersion, protocolContract: PROTOCOL_CONTRACT,

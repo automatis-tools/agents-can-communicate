@@ -1,3 +1,4 @@
+import { execFile } from "node:child_process";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 
@@ -47,6 +48,32 @@ export async function readInboundSettings({ configDir, projectDir, managedSettin
     crossSessionInbound: first(layer => text(layer.crossSessionInbound)),
     defaultMode: first(layer => text(layer.permissions?.defaultMode)),
   };
+}
+
+/**
+ * The permission mode a Claude Code process was started with, from its own
+ * arguments, or null. Only the two flags are read; nothing else is kept.
+ */
+export function permissionModeFromArgs(args) {
+  if (!Array.isArray(args)) return null;
+  for (let index = 0; index < args.length; index += 1) {
+    const arg = args[index];
+    if (arg === "--dangerously-skip-permissions") return "bypassPermissions";
+    if (arg === "--permission-mode") return text(args[index + 1]);
+    if (typeof arg === "string" && arg.startsWith("--permission-mode=")) {
+      return text(arg.slice("--permission-mode=".length));
+    }
+  }
+  return null;
+}
+
+/** A process's arguments as `ps` prints them, split on spaces, or null. */
+export function readProcessArgs(pid, { timeoutMs = 500 } = {}) {
+  if (!Number.isInteger(pid) || pid <= 0 || process.platform === "win32") return Promise.resolve(null);
+  return new Promise(resolve => {
+    execFile("ps", ["-o", "args=", "-p", String(pid)], { timeout: timeoutMs, maxBuffer: 64 * 1024 },
+      (error, stdout) => resolve(error ? null : String(stdout).trim().split(/\s+/).filter(Boolean)));
+  });
 }
 
 export function receptionOf({ permissionMode, crossSessionInbound }) {

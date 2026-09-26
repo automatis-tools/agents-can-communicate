@@ -208,9 +208,10 @@ and sends no auth line.
 - A session with `crossSessionInbound` set to `refuse` drops each wake. ACC then sends
   none: the message stays `queued` with `delivery_disabled` and arrives with the next turn.
 
-ACC reads the same inputs Claude Code reads: the hook's permission mode, or
-`permissions.defaultMode` before the first prompt, and `crossSessionInbound` from managed,
-local, project and user settings in that order. A held wake is still sent, because Claude
+ACC reads the same inputs Claude Code reads: the hook's permission mode; before the first
+prompt, whose hook carries none, the `--permission-mode` or `--dangerously-skip-permissions`
+flag the session was started with, then `permissions.defaultMode`; and `crossSessionInbound`
+from managed, local, project and user settings in that order. A held wake is still sent, because Claude
 Code's approval dialog tells you a message is waiting, and the sender reads
 `sent a wake to <participant> via claude-inbox, which its session holds for approval`.
 

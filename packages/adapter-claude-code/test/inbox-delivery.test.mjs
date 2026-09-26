@@ -248,7 +248,7 @@ test("a bind removes what a process that no longer exists left behind", async t 
 // permission prompts holds it for approval, `crossSessionInbound` overrides that
 // either way. The bind reads the same inputs so the sender is told the truth.
 async function reception(t, { mode = null, user = null, project = null, local = null,
-  managed = null } = {}) {
+  managed = null, clientArgs = ["claude"] } = {}) {
   const f = await fixture(t);
   const projectDir = path.join(f.root, "project");
   mkdirSync(path.join(projectDir, ".claude"), { recursive: true });
@@ -259,7 +259,7 @@ async function reception(t, { mode = null, user = null, project = null, local = 
   const managedSettingsPath = path.join(f.root, "managed-settings.json");
   write(managedSettingsPath, managed);
   const handshake = await bind(f, { event: { sessionId: SESSION, cwd: projectDir, permissionMode: mode },
-    managedSettingsPath });
+    managedSettingsPath, readClientArgs: async () => clientArgs });
   assert.equal(handshake.supported, true, handshake.reasonCode);
   const binding = { clientVersion: handshake.clientVersion, opaqueEndpointRef: handshake.opaqueEndpointRef };
   const closed = closedOrSettled(f);
@@ -298,6 +298,31 @@ test("settings apply in Claude Code's own order: managed, local, project, user",
 test("without a mode on the hook, the configured default mode decides", async t => {
   const { result } = await reception(t, { user: { permissions: { defaultMode: "bypassPermissions" } } });
   assert.equal(result.pendingApproval, true);
+});
+
+// SessionStart carries no permission mode on 2.1.283; a mode given on the
+// command line is only in the client's own arguments until the first prompt.
+test("before the first prompt, the launch flag decides the mode", async t => {
+  assert.equal((await reception(t, { clientArgs: ["claude", "--permission-mode", "bypassPermissions"] }))
+    .result.pendingApproval, true);
+  assert.equal((await reception(t, { clientArgs: ["claude", "--permission-mode=bypassPermissions"] }))
+    .result.pendingApproval, true);
+  assert.equal((await reception(t, { clientArgs: ["claude", "--dangerously-skip-permissions"] }))
+    .result.pendingApproval, true);
+  assert.equal((await reception(t, { clientArgs: ["claude", "--allow-dangerously-skip-permissions"] }))
+    .result.pendingApproval, undefined);
+});
+
+test("the hook's own mode wins over the launch flag, since the user can switch modes", async t => {
+  const { result } = await reception(t, { mode: "default",
+    clientArgs: ["claude", "--permission-mode", "bypassPermissions"] });
+  assert.equal(result.pendingApproval, undefined);
+});
+
+test("the launch flag wins over the configured default mode", async t => {
+  const { result } = await reception(t, { user: { permissions: { defaultMode: "bypassPermissions" } },
+    clientArgs: ["claude", "--permission-mode", "acceptEdits"] });
+  assert.equal(result.pendingApproval, undefined);
 });
 
 test("an ordinary session takes the wake with nothing held", async t => {
