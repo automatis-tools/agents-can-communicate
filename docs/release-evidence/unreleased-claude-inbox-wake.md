@@ -64,18 +64,20 @@ plain vendor command with its arguments byte for byte, without the development-c
 
 A 0.7.x updater checks that a downloaded package has an entrypoint for each of its own entry
 kinds. `packages/cli/test/managed-runtime-retired-kinds.test.mjs` pins that this package still
-ships `acc-bootstrap` and `acc-claude-channel` entrypoints, as stubs.
+ships `acc-bootstrap` and `acc-claude-channel` entrypoints, as stubs. The same file pins that
+the Channel stub exits on SIGTERM and on SIGINT while its parent still holds stdin open.
 
 ## Candidate archive
 
-`node scripts/verify-package.mjs` on `34e24396a2d9b3065b0c1eae8b8c0a25f3002e3a`, after the
+`node scripts/verify-package.mjs` on `71f3db716ae985bbc9c8c5ba938158174c30557f`, after the
 review fixes (a refused or late handshake retires the endpoint it wrote; install and update
-sweep crashed Channel registrations):
+sweep crashed Channel registrations; the Channel stub exits on a signal while its stdin stays
+open). A separate `npm pack` of the same commit gives the same digest, 462,560 bytes:
 
 ```text
 == pack
    ok  agents-can-communicate-0.7.1.tgz  452 KB
-   ok  sha256 04088ef7aeaa0974b97e89ffff6b10bc24af80111034968bae2a48d3625b3e35
+   ok  sha256 f22cf6261f399cf718b2ea6359a21e3a48722d0d40a295543c8f98b550d45728
 == tarball contents
    ok  310 entries, none forbidden
    ok  6 certification manifest(s), exact evidence allowlist shipped
