@@ -18,6 +18,18 @@ test("every adapter produces the same key set", () => {
   assert.deepEqual(event.targets, []);
 });
 
+// A native binding needs to know whether the client will hold a wake for
+// approval; Claude Code reports the session's permission mode on its hooks.
+test("a permission mode is carried when the client reports one, null otherwise", () => {
+  assert.equal(normalizedEvent(base).permissionMode, null);
+  assert.equal(normalizedEvent({ ...base, permissionMode: "bypassPermissions" }).permissionMode,
+    "bypassPermissions");
+  assert.throws(() => normalizedEvent({ ...base, permissionMode: "" }),
+    error => error.code === EXIT.DATA && /permission/.test(error.message));
+  assert.throws(() => normalizedEvent({ ...base, permissionMode: 7 }),
+    error => error.code === EXIT.DATA && /permission/.test(error.message));
+});
+
 test("targets carry the paths a call would write, and nothing else", () => {
   // A resource identifier, not conversation content. Without it a guard has
   // nothing to compare against a claim, and `guards.beforeWrite` is decorative.

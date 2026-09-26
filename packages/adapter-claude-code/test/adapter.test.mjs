@@ -149,12 +149,20 @@ test("captured payloads normalise and drop conversation content", async () => {
     assert.equal(normalised.kind, kind, `${event} normalised wrongly`);
     assert.equal(normalised.sessionId, payload.session_id);
     assert.deepEqual(Object.keys(normalised).sort(),
-      ["cwd", "kind", "model", "parentSessionId", "sessionId", "targets", "tool"]);
+      ["cwd", "kind", "model", "parentSessionId", "permissionMode", "sessionId", "targets", "tool"]);
     // Every payload carries a transcript path, and some carry the prompt or the
     // model's last message. None of it may survive normalisation.
     assert.equal(JSON.stringify(normalised).includes("redacted"), false,
       `${event} carried conversation content through`);
   }
+});
+
+// The inbox binding reads the mode to tell a sender whether a wake will be held
+// for approval. SessionStart carries none on the captured client.
+test("the hook's permission mode reaches the normalised event when Claude Code sends one", async () => {
+  assert.equal(normalizeClaudeHook(await captured("UserPromptSubmit")).permissionMode, "bypassPermissions");
+  assert.equal(normalizeClaudeHook(await captured("PreToolUse-Edit")).permissionMode, "auto");
+  assert.equal(normalizeClaudeHook(await captured("SessionStart")).permissionMode, null);
 });
 
 test("the guard sees this client's real tool names", async () => {

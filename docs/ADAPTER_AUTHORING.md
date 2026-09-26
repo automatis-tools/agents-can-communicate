@@ -240,8 +240,13 @@ return normalizedEvent({
   kind, sessionId, cwd, model, parentSessionId, tool,
   targets,   // paths this call would WRITE. For a shell call, pass the command to
              // shellWriteTargets() — it reads write positions only, never reads.
+  permissionMode, // the client's own name for the session's permission mode, or null
 });
 ```
+
+`permissionMode` is optional and defaults to `null`. Pass it when the client's hook reports
+one: a native binding reads it to tell a sender whether the client will hold a wake for
+approval. Claude Code reports it on most hooks but not on `SessionStart`.
 
 Refuse an unrecognised payload. Inventing a session attaches the wrong one, or a new one
 every hook, and looks like it is working.

@@ -4,7 +4,7 @@ import { AccError, EXIT } from "@agents-can-communicate/protocol";
 // so the four cannot drift: a consumer that has to ask which adapter produced an
 // event is a consumer that will eventually get it wrong.
 export const NORMALIZED_EVENT_KEYS = Object.freeze(["kind", "sessionId", "cwd", "model",
-  "parentSessionId", "tool", "targets"]);
+  "parentSessionId", "tool", "targets", "permissionMode"]);
 
 export const EVENT_KINDS = Object.freeze(["sessionStart", "sessionEnd", "heartbeat",
   "beforeTurn", "beforeTool", "afterTool", "turnEnd", "childStart", "childEnd", "other"]);
@@ -34,7 +34,7 @@ export function normalizedEvent(fields) {
     }
   }
   const { kind, sessionId, cwd, model = null, parentSessionId = null, tool = null,
-    targets = [] } = fields;
+    targets = [], permissionMode = null } = fields;
 
   if (!EVENT_KINDS.includes(kind)) data("unknown normalised event kind", { kind });
   if (typeof sessionId !== "string" || sessionId === "") {
@@ -50,6 +50,13 @@ export function normalizedEvent(fields) {
     }
   }
 
+  // The client's own name for the session's permission mode, when its hook
+  // reports one. Only a native binding reads it, to tell a sender whether the
+  // client will hold a wake for approval.
+  if (permissionMode !== null && (typeof permissionMode !== "string" || permissionMode === "")) {
+    data("normalised event permission mode must be a non-empty string", { kind });
+  }
+
   return Object.freeze({ kind, sessionId, cwd, model, parentSessionId, tool,
-    targets: Object.freeze([...targets]) });
+    targets: Object.freeze([...targets]), permissionMode });
 }

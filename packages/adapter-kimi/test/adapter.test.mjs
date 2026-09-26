@@ -200,7 +200,7 @@ test("captured payloads normalise and drop conversation content", async () => {
     assert.equal(normalised.kind, kind, `${name} normalised wrongly`);
     assert.equal(normalised.sessionId, payload.session_id);
     assert.deepEqual(Object.keys(normalised).sort(),
-      ["cwd", "kind", "model", "parentSessionId", "sessionId", "targets", "tool"]);
+      ["cwd", "kind", "model", "parentSessionId", "permissionMode", "sessionId", "targets", "tool"]);
     // The prompt, the tool output, the written file's contents and the error
     // text are all handed to hooks by this client. None may survive.
     assert.equal(JSON.stringify(normalised).includes("redacted"), false,
