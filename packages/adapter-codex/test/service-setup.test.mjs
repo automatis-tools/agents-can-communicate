@@ -1,4 +1,6 @@
 import assert from "node:assert/strict";
+import { spawn } from "node:child_process";
+import { once } from "node:events";
 import { chmod, lstat, mkdir, realpath, rm, symlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 import test from "node:test";
@@ -132,6 +134,85 @@ for (const failure of ["startFails", "startThrows", "protocolFails", "socketOwne
     assert.doesNotMatch(result.diagnostic, /private failure/);
   });
 }
+
+// What a service killed without cleanup leaves: the socket file, and nothing
+// accepting on it. A graceful close unlinks the file, so the listener is killed.
+async function leaveStaleSocket(socketPath) {
+  const listener = spawn(process.execPath, ["-e", "require('node:net').createServer()"
+    + `.listen(${JSON.stringify(socketPath)}, () => process.stdout.write('up'))`]);
+  await once(listener.stdout, "data");
+  listener.kill("SIGKILL");
+  await once(listener, "exit");
+  assert.equal((await lstat(socketPath)).isSocket(), true);
+}
+
+const unix = { skip: process.platform === "win32" && "Unix domain socket files" };
+
+// Measured on Codex 0.155.1: its own `app-server daemon start` replaces both
+// files a stopped service leaves. ACC still starts only on definite absence.
+for (const leftovers of [["socket"], ["socket", "pid"], ["pid"]]) {
+  test(`a stopped service's leftover ${leftovers.join(" and ")} gets the start advice, never an ACC start`,
+    unix, async t => {
+      const f = await serviceFixture(t);
+      if (leftovers.includes("socket")) await leaveStaleSocket(f.socketPath);
+      if (leftovers.includes("pid")) await f.writePid();
+      const plan = await f.inspectNativeServiceSetup(f.context);
+      assert.equal(plan.state, "blocked");
+      assert.equal(plan.reasonCode, "service_stopped");
+      assert.match(plan.diagnostic, /codex app-server daemon start/);
+      assert.equal((await apply(f, plan)).started, false);
+      assert.equal(f.starts.length, 0);
+    });
+}
+
+const notStopped = async (f, t) => {
+  const plan = await f.inspectNativeServiceSetup(f.context);
+  assert.notEqual(plan.reasonCode, "service_stopped");
+  assert.equal(f.starts.length, 0);
+};
+
+test("a leftover socket beside the pid of a live process is not a stopped service", unix, async t => {
+  const f = await serviceFixture(t);
+  await leaveStaleSocket(f.socketPath);
+  await f.writePid();
+  f.state.running = true;
+  await notStopped(f, t);
+});
+
+test("an unsafe pid file beside a leftover socket is not a stopped service", unix, async t => {
+  const f = await serviceFixture(t);
+  await leaveStaleSocket(f.socketPath);
+  await f.writePid();
+  await chmod(f.pidPath, 0o666);
+  await notStopped(f, t);
+});
+
+test("a socket that still accepts, with no pid file, is not a stopped service", async t => {
+  const f = await serviceFixture(t, { missing: false });
+  await rm(f.pidPath);
+  await notStopped(f, t);
+});
+
+test("a socket that fails to connect for another reason is not a stopped service", unix, async t => {
+  const f = await serviceFixture(t, { missing: false });
+  await rm(f.pidPath);
+  await chmod(f.socketPath, 0o000); // connect is refused permission, not the connection
+  await notStopped(f, t);
+});
+
+test("a symlink to a leftover socket is not a stopped service", unix, async t => {
+  const f = await serviceFixture(t);
+  const elsewhere = path.join(f.root, "elsewhere.sock");
+  await leaveStaleSocket(elsewhere);
+  await symlink(elsewhere, f.socketPath);
+  await notStopped(f, t);
+});
+
+test("a regular file where the socket belongs is not a stopped service", async t => {
+  const f = await serviceFixture(t);
+  await writeFile(f.socketPath, "not a socket");
+  await notStopped(f, t);
+});
 
 test("a ready service that disappears becomes blocked without inventing cold-start consent", async t => {
   const f = await serviceFixture(t, { missing: false });

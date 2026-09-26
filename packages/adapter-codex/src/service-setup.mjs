@@ -1,10 +1,11 @@
 import { lstat, realpath } from "node:fs/promises";
 import path from "node:path";
-import { socketIsReady } from "./native-endpoint.mjs";
+import { refusesConnections, socketIsReady } from "./native-endpoint.mjs";
 import { probeNativeDelivery } from "./native-delivery.mjs";
 import { installCodexStandalone } from "./standalone-install.mjs";
-import { failMaintenance, maintenanceContext, probeMaintenanceCli, probeMaintenanceInstall,
-  readMaintenancePid, runMaintenanceCommand, verifyMaintenanceProcess } from "./maintenance-host.mjs";
+import { approvedProcessIsDead, failMaintenance, maintenanceContext, probeMaintenanceCli,
+  probeMaintenanceInstall, readMaintenancePid, runMaintenanceCommand, verifyMaintenanceProcess }
+  from "./maintenance-host.mjs";
 
 const keys = ["home", "codexHome", "cliPath", "cliVersion", "managedPath", "managedVersion",
   "managedRealPath", "cliIdentity", "managedIdentity", "socketPath", "pidPath", "platform"];
@@ -14,6 +15,7 @@ const own = info => typeof process.getuid !== "function" || info.uid === process
 const sessionNeeded = "Codex service ready; open a new Codex session to establish its delivery binding and review client hooks and permissions";
 const diagnostics = {
   native_endpoint_unavailable: "Prepare the missing Codex service with codex app-server daemon start, then open a new Codex session",
+  service_stopped: "The Codex service stopped and left its files behind; start it with codex app-server daemon start, which replaces them, then open a new Codex session",
   managed_install_missing: "Codex service needs its standalone package; run acc install to download the matching official Codex release and prepare the service",
   managed_install_incomplete: "Codex standalone installation is incomplete; repair it with the official Codex installer, then retry acc install",
   prerequisite_consent_required: "Codex standalone download was not approved. Run acc install --adapter codex --delivery actionable to allow the download and automatic peer requests",
@@ -37,6 +39,18 @@ export function createCodexServiceSetup({ run = runMaintenanceCommand, probe = p
   async function info(file) {
     try { return await fs.lstat(file); }
     catch (error) { if (error.code === "ENOENT") return null; throw error; }
+  }
+  // A service that stopped without cleaning up: its pid file names a process
+  // that is gone, and its socket refuses every connection; either may be gone
+  // already. Not definite absence, so ACC still starts nothing over it, but the
+  // user can: Codex's own start replaces both files.
+  async function serviceStopped(paths) {
+    if (await info(paths.pidPath)) {
+      const recorded = await readMaintenancePid(paths.pidPath).catch(() => null);
+      if (recorded === null || !await approvedProcessIsDead(recorded, paths, run)) return false;
+    }
+    return !await info(paths.socketPath)
+      || (await socketIsReady(paths.socketPath) && await refusesConnections(paths.socketPath));
   }
   async function safeDirectories(paths) {
     for (const dir of [paths.codexHome, path.dirname(paths.socketPath), path.dirname(paths.pidPath)]) {
@@ -116,6 +130,7 @@ export function createCodexServiceSetup({ run = runMaintenanceCommand, probe = p
       if (!await info(paths.socketPath) && !await info(paths.pidPath)) {
         return report("needed", "native_endpoint_unavailable", facts);
       }
+      if (await serviceStopped(paths)) return report("blocked", "service_stopped", facts);
       return await verify(paths, facts);
     } catch (error) {
       const reason = error.reasonCode ?? "service_inspection_failed";

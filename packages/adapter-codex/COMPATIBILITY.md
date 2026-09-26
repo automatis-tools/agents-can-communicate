@@ -1068,3 +1068,22 @@ It records the source capture SHA-256
 The source is this completed final capture only. Original source and script bytes
 remain unchanged; their temporary paths identify capture provenance, not permanent
 publication links.
+
+## A stopped service's leftover files — Codex 0.155.1, 2026-09-26
+
+A real machine updated to ACC 0.8.0 had no Codex service running. The service had
+stopped on 2026-09-09 and left its control socket and its PID record, which named a
+process that no longer existed; a connect to the socket was refused. Detection called
+this `feature_probe_failed`, and service inspection reached `app-server daemon version`,
+which exited 1, so doctor printed `could not verify daemon_version_unavailable`. Neither
+named the stopped service or the command that restarts it.
+
+With a separate `CODEX_HOME` holding the same leftovers, `codex app-server daemon start`
+returned `started`, replaced the socket, and wrote a new PID record: once with only the
+leftover socket, and once with the socket and a PID record naming a dead process.
+Detection now reports `native_endpoint_unavailable` for a refused socket, and inspection
+reports `service_stopped` when the recorded process is confirmed dead or absent and the
+socket refuses connections or is absent. Its advice is that command, followed by a new
+Codex session. ACC itself still starts the service only when neither file exists; a PID
+record naming a live process, an unreadable record, a symlink, or a socket that fails
+for any other reason is not a stopped service.
