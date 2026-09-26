@@ -41,6 +41,28 @@ const start = ({ root, dataHome }, readProcessTable) => runHook({
     model: null, parentSessionId: null, tool: null, targets: [] },
 });
 
+// Gemini CLI is a node script, so its process is `node` and only the script it
+// runs names it - as measured with Gemini CLI 0.60.0.
+test("a client that is a node script is found and pins its session", async t => {
+  const workspace = await place(t);
+  const scriptClient = { ...adapter, client: { command: "gemini", versionArgs: ["--version"] } };
+  const started = await runHook({
+    adapterId: adapter.id,
+    adapters: { [adapter.id]: scriptClient },
+    dataHome: workspace.dataHome,
+    readProcessTable: async () => new Map([
+      [process.pid, { ppid: CLIENT_PID, comm: "node", args: "node /data/acc-hook.mjs gemini_cli" }],
+      [CLIENT_PID, { ppid: 1, comm: "/usr/local/bin/node",
+        args: "/usr/local/bin/node --max-old-space-size=65536 /usr/local/bin/gemini -p hello" }]]),
+    probeClientVersion: async () => null,
+    payload: { kind: "sessionStart", sessionId: "pinned-harness-session", cwd: workspace.root,
+      model: null, parentSessionId: null, tool: null, targets: [] },
+  });
+  assert.equal(started.failed, undefined, started.reason);
+  const pin = await readPin({ root: workspace.managerRoot, harnessSessionId: "pinned-harness-session" });
+  assert.equal(pin?.clientPid, CLIENT_PID);
+});
+
 test("a session start whose client pid is unknown writes no pin", async t => {
   const workspace = await place(t);
   const started = await start(workspace, clientNotFound);

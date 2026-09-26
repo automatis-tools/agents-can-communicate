@@ -81,10 +81,13 @@ is not evidence for compaction. Counts add no ids to `offeredMessageIds` or
 
 `client.command` does double duty. `detect.mjs` uses it as the version-probe binary, and
 presence liveness separately walks the hook's process ancestry for the first ancestor whose
-executable basename matches it, to learn the client's own pid. Declare the binary the client
-actually runs as — `command: "claude"` for a client that really runs as `node` resolves
-nothing, and the failure is silent: the session gets `pid: null` and falls back to reading
-presence by age alone, with nothing telling you why.
+executable basename matches it, to learn the client's own pid. A client shipped as a node
+script, such as Gemini CLI, runs as `node`; for a `node` ancestor the walk also matches the
+script it runs: the first argument after any interpreter options, by basename, with a
+`.js`, `.mjs` or `.cjs` extension ignored. Declare the name the client actually runs as. A
+command that matches neither resolves nothing, and the failure is silent: the session gets
+`pid: null`, falls back to reading presence by age alone, and is not pinned to its
+generation, with nothing telling you why.
 
 ## Declare only proven capabilities
 
