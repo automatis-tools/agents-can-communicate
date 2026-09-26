@@ -174,3 +174,35 @@ test("a fingerprint is stable for identical bytes and differs otherwise", async 
   assert.notEqual(await fingerprint(one), await fingerprint(three));
   assert.equal(await fingerprint(path.join(target, "absent")), null);
 });
+
+// Claude Code writes `.orphaned_at` into a plugin cache version its registry no
+// longer names - the previous copy ACC keeps for sessions still running from it.
+// That is the client's bookkeeping, not an edit: doctor called every updated
+// install "files were edited", and uninstall kept the whole cache.
+test("a client's orphan marker inside an owned tree is not an edit", async t => {
+  const { dataHome, target } = await place(t);
+  const tree = path.join(target, "cache", "acc-local");
+  await write(path.join(tree, "agents-can-communicate", "0.7.0", "hooks", "hooks.json"), "{}\n");
+  await write(path.join(tree, "agents-can-communicate", "0.7.1", "hooks", "hooks.json"), "{}\n");
+  await recordInstall({ dataHome, adapterId: "claude_code", version: "0.0.0",
+    artifacts: [{ path: tree, kind: "tree" }] });
+  await writeFile(path.join(tree, "agents-can-communicate", "0.7.0", ".orphaned_at"), "1790397638202");
+
+  const verified = await verifyOwned({ dataHome, adapterId: "claude_code" });
+  assert.deepEqual(verified.modified, []);
+
+  const result = await removeOwned({ dataHome, adapterId: "claude_code" });
+  assert.deepEqual(result.removed, [tree]);
+  assert.deepEqual(result.kept, []);
+});
+
+test("any other file added inside an owned tree still is an edit", async t => {
+  const { dataHome, target } = await place(t);
+  const tree = path.join(target, "cache", "acc-local");
+  await write(path.join(tree, "agents-can-communicate", "0.7.1", "hooks", "hooks.json"), "{}\n");
+  await recordInstall({ dataHome, adapterId: "claude_code", version: "0.0.0",
+    artifacts: [{ path: tree, kind: "tree" }] });
+  await writeFile(path.join(tree, "agents-can-communicate", "0.7.1", "orphaned_at.txt"), "mine\n");
+
+  assert.deepEqual((await verifyOwned({ dataHome, adapterId: "claude_code" })).modified, [tree]);
+});

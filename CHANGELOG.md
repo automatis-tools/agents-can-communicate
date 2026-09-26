@@ -68,6 +68,10 @@
   permissions; 0.7.x had set them to 0600 and recorded nothing to undo that with.
 - A Claude Code process that crashed without `SessionEnd` no longer leaves its inbox record
   behind: the next bind in the workspace removes records whose process is gone.
+- `acc doctor` no longer reports Claude Code's plugin cache as edited after an update. Claude
+  Code writes `.orphaned_at` into the previous version's copy, which ACC keeps for sessions still
+  running from it, and the ownership check counted that marker as an edit: doctor advised a
+  reinstall, and `acc uninstall` kept the whole cache as the user's.
 - A refused store publication reports only after its directory checks have settled. Before,
   the refusal could reach the caller while a check was still creating a directory under the
   store root.

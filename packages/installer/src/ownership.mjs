@@ -28,6 +28,8 @@ export async function fingerprint(file) {
   }
 }
 
+const CLIENT_ORPHAN_MARKER = ".orphaned_at";
+
 /**
  * Fingerprint of a whole directory ACC created.
  *
@@ -45,7 +47,11 @@ export async function treeFingerprint(root) {
     if (error.code === "ENOTDIR") return fingerprint(root);
     throw error;
   }
-  const files = entries.filter(entry => entry.isFile())
+  // Claude Code marks a plugin cache version its registry no longer names with
+  // `.orphaned_at`, and removes the marker again if the version comes back. That
+  // is the client's own bookkeeping inside a copy ACC keeps on purpose, never an
+  // edit, and ACC never writes a file by that name.
+  const files = entries.filter(entry => entry.isFile() && entry.name !== CLIENT_ORPHAN_MARKER)
     .map(entry => path.relative(root, path.join(entry.parentPath ?? entry.path, entry.name)))
     .sort();
   const hash = createHash("sha256");
