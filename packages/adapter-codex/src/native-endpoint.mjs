@@ -1,7 +1,6 @@
 import { randomBytes } from "node:crypto";
 import { constants } from "node:fs";
 import { lstat, mkdir, open, realpath, rename, rm } from "node:fs/promises";
-import net from "node:net";
 import path from "node:path";
 
 import { PROTOCOL_CONTRACT, parseStableVersion } from "./app-server-client.mjs";
@@ -48,18 +47,6 @@ export async function socketIsReady(socketPath) {
     const info = await lstat(socketPath);
     return info.isSocket() && !info.isSymbolicLink() && own(info);
   } catch { return false; }
-}
-
-/** True only when a connect to the socket is refused: a file with nobody
- * listening. Accepting, timing out, or any other error is not proof of that. */
-export function refusesConnections(socketPath, { timeoutMs = 1_000 } = {}) {
-  return new Promise(resolve => {
-    const socket = net.createConnection({ path: socketPath });
-    const settle = refused => { clearTimeout(timer); socket.destroy(); resolve(refused); };
-    const timer = setTimeout(() => settle(false), timeoutMs);
-    socket.once("connect", () => settle(false));
-    socket.once("error", error => settle(error?.code === "ECONNREFUSED"));
-  });
 }
 
 // A fresh, immutable registration for one hook binding. Refresh observes the

@@ -1,8 +1,9 @@
 import { lstat, realpath } from "node:fs/promises";
 import path from "node:path";
-import { refusesConnections, socketIsReady } from "./native-endpoint.mjs";
+import { socketIsReady } from "./native-endpoint.mjs";
 import { probeNativeDelivery } from "./native-delivery.mjs";
 import { installCodexStandalone } from "./standalone-install.mjs";
+import { refusesConnections } from "./ws-json-rpc.mjs";
 import { approvedProcessIsDead, failMaintenance, maintenanceContext, probeMaintenanceCli,
   probeMaintenanceInstall, readMaintenancePid, runMaintenanceCommand, verifyMaintenanceProcess }
   from "./maintenance-host.mjs";
