@@ -1,5 +1,41 @@
 # Changelog
 
+## 0.8.0 — release candidate
+
+- Claude Code live delivery wakes a session through the inbox socket Claude Code opens for every
+  session. Start Claude Code with your ordinary command: the `claude` shim, the
+  development-channel flag and the Channel MCP server are gone. A busy session gets the message
+  between two tool calls; an idle one starts a turn. The wake carries ACC wording and the message
+  id only, one wake per message, and names the reply route, `acc reply --message <id>`. It works
+  after `/resume` and `/compact`, and a reply from one Claude session wakes the other.
+- A sender is told what the recipient's client did: `woke`; `held for approval` with
+  `"pendingApproval": true` when a `bypassPermissions` session holds the wake;
+  `delivery_disabled` when its `crossSessionInbound` is `refuse`; `no_live_transport` for an
+  online recipient without live transport; `recipient_offline`, with `"endReason": "clear"` after
+  `/clear`. `acc status` lists a participant with no open session while messages wait for it.
+  `acc doctor` names the `crossSessionInbound` setting when live delivery is on.
+- `acc update` and `acc install` retire what 0.7.x wrote for Claude Code and keep the recorded
+  consent; a 0.7.x updater accepts this package. `ACC_NATIVE_DELIVERY_POLICY`, `ACC_BYPASS` and
+  `ACC_BOOTSTRAP_DEBUG` are gone.
+- `acc doctor` no longer calls Claude Code's plugin cache edited after an update, `acc uninstall`
+  removes nothing inside a tree it keeps for the user's own file and keeps `~/.zshrc`'s
+  permissions, and a refused store publication no longer races the caller.
+- The store format is unchanged, so 0.7.1 and 0.8.0 can share a workspace.
+
+| Candidate artifact | Value |
+|---|---|
+| Built from | `f184465aa17a4ed04194008524622b8543175e2f` |
+| Tarball | `agents-can-communicate-0.8.0.tgz`, 468,698 bytes, 311 files |
+| sha256 | `327f4e646f12831bb5ab081cf63627fca2ef6f777468bc6a71710243084648b8` |
+
+The exact archive passed clean installation, doctor, a workspace with no Git, and client
+install/uninstall, and all 23 managed-update packed checks passed against real installed
+archives. The published 0.7.1 updated itself to these bytes, and the 0.7.1 code and this archive
+read and wrote one store without an error. Real Claude Code 2.1.283 sessions exercised every
+delivery case on the development candidate these bytes differ from only in version fields. See
+[0.8.0 release evidence](docs/release-evidence/v0.8.0.md) for verification and limits. Earlier
+development records below retain their original provenance.
+
 ## Unreleased — Claude Code live delivery through the session inbox
 
 - Claude Code live delivery wakes a session through the inbox socket that Claude Code opens
