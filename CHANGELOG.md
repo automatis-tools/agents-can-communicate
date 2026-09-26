@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased — four fixes from the first real 0.8.0 update
+## Unreleased — fixes from the first real 0.8.0 update
 
 - A session pin that names no client no longer holds its generation forever. A pin keeps the
   generation its session started with until the client is confirmed dead, but 0.8.0 and earlier
@@ -17,7 +17,10 @@
   up leaves. It used to report `feature_probe_failed` ("the native protocol probe did not
   succeed"), which hid the advice that fixes it: `codex app-server daemon start`, then a new
   Codex session. A probe that times out still reports `probe_timeout`, and any other failure
-  `feature_probe_failed`.
+  `feature_probe_failed`. When the stopped service also left its PID record, doctor said
+  `could not verify daemon_version_unavailable`; it now says the service stopped and left its
+  files behind, and gives the same command, which on Codex 0.155.1 replaces both files. ACC
+  itself still starts the service only when neither file exists.
 - `acc status` lists a participant with no open session only while its next turn would still
   show a message: queued, or offered by a live transport and not yet shown again. An answer the
   next-turn hook had already put in a closed Claude Code session's context kept that
@@ -35,9 +38,9 @@
 
 | Candidate artifact | Value |
 |---|---|
-| Built from | `3cacc5cdc8c7d2567b29952032a0ebf34fada8d7` |
-| Tarball | `agents-can-communicate-0.8.0.tgz`, 470,521 bytes, 311 files |
-| sha256 | `b4b4bf3fdcfd5342070135d05c5007b4ea9baa2e3e5764d21627268d0abee85d` |
+| Built from | `af4d6ff41229087066ce948d190ac01d315826ba` |
+| Tarball | `agents-can-communicate-0.8.0.tgz`, 471,075 bytes, 311 files |
+| sha256 | `bce6eb14dfcc3088f07b8a1ed48ce6c1c27e9b679badd892bbe99efa3e3b23a2` |
 
 This unpublished development archive passed clean installation verification. See
 [real-machine fixes evidence](docs/release-evidence/unreleased-real-machine-fixes.md). The

@@ -1,4 +1,4 @@
-# Unreleased four fixes from the first real 0.8.0 update
+# Unreleased fixes from the first real 0.8.0 update
 
 All four defects were found on the maintainer's machine right after the published 0.8.0
 updated it. They came from reading the managed runtime's records, `acc doctor`, `acc status`
@@ -56,9 +56,29 @@ is killed with `SIGKILL`, because a graceful `close()` unlinks the file. Measure
 after `close()` the file is gone; after `SIGKILL` it stays a socket, and the real client's
 connection fails with `ECONNREFUSED`.
 
-Doctor's final line on such a machine also depends on Codex service inspection. The socket file
-exists, so that inspection takes its verify path, which asks `codex app-server daemon version`.
-Its result on the machine was not measured here.
+Service inspection needed the same correction. The stopped service had also left its PID
+record, `{"pid":30290,…}` from 2026-09-09, and no process 30290 existed. Either file sent
+inspection down its verify path, and `codex app-server daemon version` exited 1 on the refused
+socket, so doctor on the machine printed
+`Codex service preparation could not verify daemon_version_unavailable; inspect the vendor
+service and retry acc install`, a raw code with no action in it.
+
+What restarts it was measured with Codex 0.155.1 in a separate `CODEX_HOME` holding the same
+leftovers, linked to the installed standalone package. `codex app-server daemon start` returned
+`started`, replaced the socket, and wrote a new PID record: once with only a leftover socket,
+and once with the socket and a PID record naming a dead process. The test daemons and their
+`pid-update-loop` helpers were stopped afterwards, and the temporary homes removed; the
+machine's own `~/.codex` was never touched.
+
+Inspection now reports `service_stopped`, state `blocked`, when the recorded process is
+confirmed dead or absent (`approvedProcessIsDead`, the rule maintenance already uses) and the
+socket is absent or is a socket, owned and not a symlink, that refuses connections. The advice
+reads "The Codex service stopped and left its files behind; start it with codex app-server
+daemon start, which replaces them, then open a new Codex session". ACC's own start keeps the
+existing definite-absence rule: it runs `daemon start` only when neither file exists, so
+setup still never starts over leftover files itself. A PID record naming a live process, an
+unreadable or unsafe record, a symlink, or a socket that fails with anything but
+`ECONNREFUSED` is not a stopped service.
 
 ## 3. A closed participant listed for an answer it already saw
 
@@ -111,6 +131,23 @@ A stand-in shaped like Gemini ran through the real `ps` on this machine. It was 
 reached through a `bin/gemini` symlink, which relaunched itself with `--max-old-space-size`, and
 its hook ran `node hook.mjs`. The hook resolved the relaunched process's pid.
 
+## Checked against the machine's own state
+
+The branch's `acc doctor` and `acc status` ran directly from the worktree, without the managed
+runtime, against a copy of the machine's data home and its real client homes, beside the
+published 0.8.0 run the same way.
+
+| Check | Published 0.8.0 | This branch |
+|---|---|---|
+| Codex live delivery reason | `the native protocol probe did not succeed` | `the client's local delivery service is unavailable` |
+| Codex service line | none; with fix 2 alone, `could not verify daemon_version_unavailable` | `The Codex service stopped and left its files behind; start it with codex app-server daemon start, …` |
+| Scratch project status | `waiting for a closed session: claude_code-cudrff (1), claude_code-0ah3im (1), loc-sender (14)` | `waiting for a closed session: claude_code-0ah3im (1), loc-sender (14)` |
+| Another project's status | `claude_code-m5YAzG (2)` | `claude_code-m5YAzG (2)` |
+
+`claude_code-cudrff` held only B's answer, already shown by its next turn. The other entries
+are queued messages that the next turn would show: C05's question to an exited session, and
+replies to a CLI sender that never read its inbox.
+
 ## Tests
 
 Each test was seen failing for the stated reason before its fix.
@@ -125,6 +162,11 @@ Each test was seen failing for the stated reason before its fix.
 - `packages/adapter-codex/test/native-delivery.test.mjs`: a stale socket probes as
   `native_endpoint_unavailable`, and detection turns that into the daemon start advice; a
   timeout and any other failure keep their own codes.
+- `packages/adapter-codex/test/service-setup.test.mjs`: a leftover socket, a leftover socket
+  with a dead PID record, and a dead PID record alone each get `service_stopped` with the start
+  advice and no ACC start; a PID record naming a live process, an unsafe PID record, an
+  accepting socket, a socket refusing permission, a symlink and a regular file are not a
+  stopped service.
 - `packages/core/test/receipt-visibility.test.mjs`: a next-turn offer and a repeated live offer
   do not keep a closed participant listed; a queued message, a live offer not yet repeated and
   an offer without facts do, with `waiting` set; `unretrieved` is unchanged.
@@ -136,10 +178,12 @@ Each test was seen failing for the stated reason before its fix.
   as stated; command lines parse beside the tree, a failed read leaves the tree as before, and
   both reads share the caller's timeout.
 
-Each changed production line was mutated, and a test failed every time. That covered 21
+Each changed production line was mutated, and a test failed every time. That covered 28
 mutations across `pins.mjs`, `runner.mjs`, `native-delivery.mjs`, `receipts.mjs`, `status.mjs`,
-`main.mjs`, `client-pid.mjs` and `process-table.mjs`. The one that first survived, Codex's
-timeout branch, got its own test.
+`main.mjs`, `client-pid.mjs`, `process-table.mjs`, `service-setup.mjs` and `native-endpoint.mjs`.
+The ones that first survived got their own tests: Codex's timeout branch, the socket type
+guard (a symlink), an unsafe PID record, a dead PID record without a socket, and a connect
+failing for a reason other than refusal.
 
 `npm test` on the evidence commit `6deda87`: 2,605 tests, 2,604 passing, 0 failing, 1 skipped.
 The skipped test plans an uninstall from the install record and skips on a machine where
@@ -147,11 +191,11 @@ Gemini CLI is installed, as it does on `main`.
 
 ## Exact local artifact
 
-- Source: clean commit `3cacc5cdc8c7d2567b29952032a0ebf34fada8d7` on `fix/pidless-session-pins`,
+- Source: clean commit `af4d6ff41229087066ce948d190ac01d315826ba` on `fix/pidless-session-pins`,
   from `main` at `00c5416`.
 - Archive: `agents-can-communicate-0.8.0.tgz`, packed from that commit.
-- Size: 470,521 bytes; 311 packed entries.
-- SHA-256: `b4b4bf3fdcfd5342070135d05c5007b4ea9baa2e3e5764d21627268d0abee85d`.
+- Size: 471,075 bytes; 311 packed entries.
+- SHA-256: `bce6eb14dfcc3088f07b8a1ed48ce6c1c27e9b679badd892bbe99efa3e3b23a2`.
 - Package version remains `0.8.0`; this is an unpublished development artifact.
 
 The exact archive passed `scripts/verify-package.mjs`: 311 entries with none forbidden, six
