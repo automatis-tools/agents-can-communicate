@@ -57,3 +57,26 @@ export function receptionOf({ permissionMode, crossSessionInbound }) {
 }
 
 export const isReception = value => RECEPTIONS.includes(value);
+
+/**
+ * What `acc doctor` tells a person who turned live delivery on: the machine-wide
+ * view, from managed policy and the user's settings. A project can still set
+ * its own value; the bind reads that one per session.
+ */
+export async function inboundStatus({ configDir, managedSettingsPath }) {
+  const userFile = path.join(configDir, "settings.json");
+  for (const file of [managedSettingsPath, userFile].filter(item => typeof item === "string")) {
+    const value = text((await readSettings(file))?.crossSessionInbound);
+    if (value === "accept") return { state: "accepted", diagnostic: null };
+    if (value === "refuse") {
+      return { state: "refused", diagnostic: `crossSessionInbound is "refuse" in ${file}, so `
+        + "Claude Code drops every ACC wake; messages arrive with each next turn; set it to "
+        + "\"accept\" for live delivery" };
+    }
+    if (value !== null) break;
+  }
+  return { state: "attention", diagnostic: "a session that bypasses permission prompts asks "
+    + `before each ACC wake; add "crossSessionInbound": "accept" to ${userFile} to take wakes `
+    + "without asking; the next turn shows the message either way" };
+}
+

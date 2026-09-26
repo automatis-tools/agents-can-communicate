@@ -255,7 +255,7 @@ test("doctor states that the handoff is not written at SessionEnd", async t => {
   assert.match(report.diagnostics.join(" "), /captured/);
   assert.doesNotMatch(report.diagnostics.join(" "), /Channel/,
     "doctor still describes the removed Channel path");
-  assert.match(report.diagnostics.join(" "), /bypasses permission prompts holds each ACC wake/,
+  assert.match(report.diagnostics.join(" "), /bypasses permission prompts asks before each ACC wake.*crossSessionInbound/,
     "doctor hid the inbound control that can hold a wake");
   assert.doesNotMatch(report.diagnostics.join(" "), /native delivery is off/,
     "a historical failed capture was reported as current delivery state");

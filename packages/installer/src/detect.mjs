@@ -161,6 +161,7 @@ export async function detectInstallation({ adapters, context, probe = spawnProbe
         // on the machine down with it.
         if (detected.blocked) entry.blocked = detected.blocked;
         if (detected.outgoingDelivery) entry.outgoingDelivery = detected.outgoingDelivery;
+        if (detected.inboundDelivery) entry.inboundDelivery = detected.inboundDelivery;
         if (detected.nativeSetup) entry.nativeSetup = detected.nativeSetup;
         entry.diagnostics = [...(detected.diagnostics ?? [])];
         // What a person has to do, as opposed to what is true. Adapters that

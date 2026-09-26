@@ -61,6 +61,7 @@ test("two undecided clients share one complete-setup answer", async () => {
   assert.doesNotMatch(questions[0], /Channels/);
   // A Claude session that bypasses permission prompts holds each wake.
   assert.match(questions[0], /Claude Code sessions that bypass permission prompts ask before each ACC wake/);
+  assert.match(questions[0], /crossSessionInbound to accept/);
   assert.match(questions[0], /start/i);
 });
 

@@ -12,13 +12,6 @@ export const CLAUDE_DELIVERY_FALLBACK = Object.freeze({
   diagnostic: `Claude Code live delivery wakes a session through its inbox socket from ${MIN_VERSION}; `
     + "fallback: next-turn hooks or acc inbox",
 });
-// Claude Code's own inbound controls decide whether a wake reaches the model.
-// ACC never attests a permission mode, so a session that bypasses permission
-// prompts holds each wake for approval; the message still arrives with its
-// next turn either way.
-export const CLAUDE_INBOUND_NOTE = "a Claude Code session that bypasses permission prompts holds "
-  + "each ACC wake for approval unless crossSessionInbound is accept; its next turn still shows "
-  + "the message";
 
 /**
  * Every true capability below was observed in a real `claude -p` session on
@@ -83,7 +76,9 @@ export function createClaudeCodeAdapter() {
         ...detected.diagnostics,
         "hook payloads captured from Claude Code 2.1.233",
         CLAUDE_DELIVERY_FALLBACK.diagnostic,
-        CLAUDE_INBOUND_NOTE,
+        // Claude Code's own inbound control decides whether a wake reaches the
+        // model; ACC never attests a permission mode. Said only when it matters.
+        ...(detected.inboundDelivery.diagnostic === null ? [] : [detected.inboundDelivery.diagnostic]),
         // SessionEnd is advisory and cannot summarise a conversation that has
         // already stopped, so the handoff is written from Stop or the skill.
         "handoff is written while the model is active, not at SessionEnd",

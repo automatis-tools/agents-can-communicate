@@ -67,7 +67,8 @@ function questionFor(entries) {
       `       Download the official Codex ${entry.nativeServiceSetup.cliVersion} standalone package for its service; retain your existing codex command.`),
     ...setup.map(note => `       ${note}`),
     ...(entries.some(entry => entry.adapterId === "claude_code")
-      ? ["       Claude Code sessions that bypass permission prompts ask before each ACC wake."] : []),
+      ? ["       Claude Code sessions that bypass permission prompts ask before each ACC wake;",
+        "       set Claude Code's crossSessionInbound to accept to take wakes without asking."] : []),
     "  No: keep current delivery policies and use available next-turn hooks or acc inbox.",
   ].join("\n");
 }

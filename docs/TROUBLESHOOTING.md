@@ -205,11 +205,19 @@ and sends no auth line.
 - A session in `bypassPermissions` mode holds each wake for your approval. To let such a
   session take wakes without approval, set Claude Code's `crossSessionInbound` setting to
   `accept`.
-- A session with `crossSessionInbound` set to `refuse` drops each wake.
+- A session with `crossSessionInbound` set to `refuse` drops each wake. ACC then sends
+  none: the message stays `queued` with `delivery_disabled` and arrives with the next turn.
 
-ACC's capture observed the prompting case. The `bypassPermissions` behaviour comes from
-Claude Code's documentation and the text of the 2.1.282 client. `acc doctor` states this
-control next to the Claude Code live-delivery line.
+ACC reads the same inputs Claude Code reads: the hook's permission mode, or
+`permissions.defaultMode` before the first prompt, and `crossSessionInbound` from managed,
+local, project and user settings in that order. A held wake is still sent, because Claude
+Code's approval dialog tells you a message is waiting, and the sender reads
+`sent a wake to <participant> via claude-inbox, which its session holds for approval`.
+
+The product re-run on 2.1.283 observed both the prompting case and a `bypassPermissions`
+session holding the wake. When live delivery is on and your user or managed settings do not
+say `accept`, `acc doctor` prints a `Claude Code inbound:` line naming the setting and the
+file.
 
 In every case the message stays durable. The receipt stays `queued` until the session's
 next-turn hook shows the body. The message arrives with the session's next turn, and

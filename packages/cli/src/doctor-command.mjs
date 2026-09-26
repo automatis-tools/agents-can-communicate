@@ -294,6 +294,11 @@ export async function runDoctor({ options, context, runtime }) {
   ...nativeSessionLines(adapters),
   ...adapters.filter(adapter => adapter.present && adapter.outgoingDelivery?.state === "configured")
     .map(adapter => `  ${adapter.displayName} ${adapter.outgoingDelivery.diagnostic}`),
+  // The client's own inbound control decides whether a wake reaches the model.
+  // Only someone who turned live delivery on needs to hear about it.
+  ...adapters.filter(adapter => adapter.present && adapter.nativeDelivery.configured
+    && typeof adapter.inboundDelivery?.diagnostic === "string")
+    .map(adapter => `  ${adapter.displayName} inbound: ${adapter.inboundDelivery.diagnostic}`),
   ...(manager === null ? [] : [`  automatic updates ${manager.auto ? "on" : "off"}; ACC ${manager.active.version}`
     + (manager.pin ? `; pinned to ${manager.pin}` : ""), ...(update.notice ? [`  ${update.notice}`] : [])]),
   ...data.remediation.map(line => `  ${line}`),

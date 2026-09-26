@@ -306,6 +306,21 @@ test("an ordinary session takes the wake with nothing held", async t => {
   assert.equal(result.pendingApproval, undefined);
 });
 
+test("doctor's machine-wide view lets managed policy override the user's setting", async t => {
+  const { inboundStatus } = await import("../src/inbox-settings.mjs");
+  const root = mkdtempSync("/tmp/acc-inbound-");
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const configDir = path.join(root, "claude");
+  mkdirSync(configDir);
+  writeFileSync(path.join(configDir, "settings.json"), JSON.stringify({ crossSessionInbound: "accept" }));
+  const managedSettingsPath = path.join(root, "managed.json");
+  assert.equal((await inboundStatus({ configDir, managedSettingsPath })).state, "accepted");
+  writeFileSync(managedSettingsPath, JSON.stringify({ crossSessionInbound: "refuse" }));
+  const refused = await inboundStatus({ configDir, managedSettingsPath });
+  assert.equal(refused.state, "refused");
+  assert.ok(refused.diagnostic.includes(managedSettingsPath));
+});
+
 test("the wake names the message, how to read it and how to answer it", () => {
   assert.equal(wakeText("message_x"), "ACC: new peer message message_x for this session. "
     + "This turn's ACC context shows it. If it does not, it was already shown, or read it with "

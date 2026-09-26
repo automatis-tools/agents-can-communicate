@@ -14,6 +14,7 @@ import { acccreatedFile, bakeSkillCommand, blankJson,
   removeInstalledTree,
   removeOwnedEntries, writeCliShim, writeForeignJson, writeHookShim }
   from "@agents-can-communicate/adapter-sdk";
+import { MANAGED_SETTINGS, inboundStatus } from "./inbox-settings.mjs";
 
 const bundle = fileURLToPath(new URL("../plugin", import.meta.url));
 const manifest = fileURLToPath(new URL("../plugin/.claude-plugin/plugin.json",
@@ -291,13 +292,14 @@ export async function uninstallClaudePlugin({ configDir, keep = [] }) {
   return { ok: true, changes, diagnostics: [] };
 }
 
-export async function detectClaude({ configDir }) {
+export async function detectClaude({ configDir, managedSettingsPath = MANAGED_SETTINGS[process.platform] }) {
   const settings = await readJson(settingsPath(configDir), null);
   const enabled = settings?.enabledPlugins?.[QUALIFIED] === true;
   const registered = Object.hasOwn(
     (await readJson(installedPluginsPath(configDir), { plugins: {} })).plugins ?? {},
     QUALIFIED);
   return { ok: true, changes: [],
+    inboundDelivery: await inboundStatus({ configDir, managedSettingsPath }),
     needsAction: [],
     diagnostics: [enabled && registered
       ? "acc plugin registered and enabled"
