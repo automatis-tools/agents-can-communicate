@@ -34,10 +34,14 @@ test("the package keeps an entrypoint for every kind a 0.7.x updater verifies", 
   }
 });
 
-function runStub(kind, input) {
+function spawnStub(kind) {
   const entry = pathToFileURL(path.join(repo, "bin", "entrypoints", `${kind}.mjs`)).href;
-  const child = spawn(process.execPath, ["--input-type=module", "-e",
+  return spawn(process.execPath, ["--input-type=module", "-e",
     `const m = await import(${JSON.stringify(entry)}); await m.main({});`], { stdio: "pipe" });
+}
+
+function runStub(kind, input) {
+  const child = spawnStub(kind);
   let stdout = "";
   child.stdout.on("data", chunk => { stdout += chunk; });
   child.stdin.end(input);
@@ -64,3 +68,23 @@ test("an old Channel config reaching the channel stub gets a complete server wit
   assert.deepEqual(answers[0].result.capabilities, { tools: {} });
   assert.deepEqual(answers[1].result, { tools: [] });
 });
+
+for (const signal of ["SIGTERM", "SIGINT"]) {
+  test(`the channel stub exits on ${signal} while Claude still holds its stdin open`, async t => {
+    const child = spawnStub("acc-claude-channel");
+    const closed = new Promise(resolve => child.on("close", () => resolve("exited")));
+    t.after(() => { child.kill("SIGKILL"); });
+    // The first answer proves main() is serving, so its signal handling is in place.
+    const serving = new Promise(resolve => child.stdout.once("data", resolve));
+    child.stdin.write(`${JSON.stringify({ jsonrpc: "2.0", id: 1, method: "ping" })}\n`);
+    await serving;
+
+    child.kill(signal);
+
+    let timer;
+    const outcome = await Promise.race([closed,
+      new Promise(resolve => { timer = setTimeout(resolve, 10_000, "still running"); })]);
+    clearTimeout(timer);
+    assert.equal(outcome, "exited");
+  });
+}

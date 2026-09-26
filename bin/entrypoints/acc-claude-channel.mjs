@@ -6,7 +6,7 @@
 //
 // A child that answers nothing is reported to the user as a server that failed
 // to connect, so this finishes the MCP handshake, declares no Channel and
-// offers no tools, and exits when Claude closes its stdin.
+// offers no tools, and exits when Claude closes its stdin or stops it with a signal.
 
 function answer(message) {
   if (message.method === "initialize") {
@@ -50,4 +50,7 @@ export async function main() {
     process.once("SIGINT", resolve);
     process.stdin.resume();
   });
+  // A signal can arrive while Claude still holds the pipe open; a stdin left
+  // reading would keep this process alive after main() returns.
+  process.stdin.destroy();
 }
