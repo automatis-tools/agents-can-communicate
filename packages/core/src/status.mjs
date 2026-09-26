@@ -105,6 +105,20 @@ export function createStatusService(ports, sessions, deliveryBindings) {
       }
     }
 
+    // A participant with no live session but messages waiting for it stays in
+    // the roster, by its latest session, so a sender can see where they went.
+    const liveParticipants = new Set(live.map(item => item.session.participantId));
+    const latest = new Map();
+    for (const { session } of classified) {
+      const seen = latest.get(session.participantId);
+      if (seen === undefined || Date.parse(session.heartbeatAt) > Date.parse(seen.heartbeatAt)) {
+        latest.set(session.participantId, session);
+      }
+    }
+    const awaited = new Set([...latest.values()].filter(session => !liveParticipants.has(session.participantId)
+      && (tally(session.participantId).queued + tally(session.participantId).offered) > 0)
+      .map(session => session.sessionId));
+
     return {
       workspaceId,
       materialised: durable,
@@ -115,7 +129,8 @@ export function createStatusService(ports, sessions, deliveryBindings) {
       // after a month of work this listed sixty entries for one live session.
       // `acc status --all` is how the worktree-cleanup question is asked.
       participants: classified
-        .filter(item => input.all === true || item.presence !== "offline")
+        .filter(item => input.all === true || item.presence !== "offline"
+          || awaited.has(item.session.sessionId))
         .map(({ session, presence }) => ({
         sessionId: session.sessionId,
         participantId: session.participantId,
@@ -132,6 +147,9 @@ export function createStatusService(ports, sessions, deliveryBindings) {
         intent: intents.find(intent => intent.sessionId === session.sessionId
           && isCurrentIntent(intent))?.summary ?? null,
         unretrieved: tally(session.participantId),
+        // The client's reason when it ended the session, such as Claude Code's
+        // "clear". Kept in the record's extensions, so it is null for 0.7.x.
+        ...(presence === "offline" ? { endReason: session.extensions?.endReason ?? null } : {}),
       })),
       // The owner is named twice on purpose. Every command that reaches a peer
       // takes a participant id, so a claim that gave only a session id sent the

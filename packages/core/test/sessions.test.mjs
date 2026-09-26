@@ -309,3 +309,37 @@ test("a session records the process behind it, or null when nobody knows", async
   assert.equal(known.pid, 4321);
   assert.equal(unknown.pid, null);
 });
+
+// Why a session ended is kept where an older ACC ignores it: the record's
+// extensions. The session.closed event stays exactly as 0.7.x writes it.
+test("a close records the client's end reason in the session's extensions only", async () => {
+  const { service, store } = makeService();
+  const first = await service.openSession(opening());
+  await service.openSession(opening({ participantId: "participant_b", displayName: "models",
+    harness: "claude-code" }));
+  await service.closeSession({ sessionId: first.sessionId, generation: first.generation,
+    endReason: "clear" });
+
+  const located = await service.locateSession(first.sessionId);
+  assert.equal(located.record.state, "closed");
+  assert.deepEqual(located.record.extensions, { endReason: "clear" });
+  const closed = (await store.eventsSince(WORKSPACE, null, 50)).events
+    .filter(event => event.type === "session.closed");
+  assert.deepEqual(closed.map(event => event.payload), [{}]);
+});
+
+test("the last session of a participant is found whether it is open or closed", async () => {
+  const { clock, service } = makeService();
+  const first = await service.openSession(opening());
+  await service.openSession(opening({ participantId: "participant_b", displayName: "models",
+    harness: "claude-code" }));
+  assert.equal((await service.lastSessionOf({ participantId: "participant_a" })).sessionId,
+    first.sessionId);
+  clock.advance(1_000);
+  await service.closeSession({ sessionId: first.sessionId, generation: first.generation,
+    endReason: "clear" });
+  const last = await service.lastSessionOf({ participantId: "participant_a" });
+  assert.equal(last.state, "closed");
+  assert.equal(last.endReason, "clear");
+  assert.equal(await service.lastSessionOf({ participantId: "nobody" }), null);
+});

@@ -30,6 +30,15 @@ test("a permission mode is carried when the client reports one, null otherwise",
     error => error.code === EXIT.DATA && /permission/.test(error.message));
 });
 
+// A peer asking why a message waits deserves "that conversation was cleared",
+// which only the client's SessionEnd knows.
+test("an end reason is carried when the client reports one, null otherwise", () => {
+  assert.equal(normalizedEvent({ ...base, kind: "sessionEnd" }).endReason, null);
+  assert.equal(normalizedEvent({ ...base, kind: "sessionEnd", endReason: "clear" }).endReason, "clear");
+  assert.throws(() => normalizedEvent({ ...base, kind: "sessionEnd", endReason: "" }),
+    error => error.code === EXIT.DATA && /end reason/.test(error.message));
+});
+
 test("targets carry the paths a call would write, and nothing else", () => {
   // A resource identifier, not conversation content. Without it a guard has
   // nothing to compare against a claim, and `guards.beforeWrite` is decorative.

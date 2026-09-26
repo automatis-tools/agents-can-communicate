@@ -4,7 +4,7 @@ import { AccError, EXIT } from "@agents-can-communicate/protocol";
 // so the four cannot drift: a consumer that has to ask which adapter produced an
 // event is a consumer that will eventually get it wrong.
 export const NORMALIZED_EVENT_KEYS = Object.freeze(["kind", "sessionId", "cwd", "model",
-  "parentSessionId", "tool", "targets", "permissionMode"]);
+  "parentSessionId", "tool", "targets", "permissionMode", "endReason"]);
 
 export const EVENT_KINDS = Object.freeze(["sessionStart", "sessionEnd", "heartbeat",
   "beforeTurn", "beforeTool", "afterTool", "turnEnd", "childStart", "childEnd", "other"]);
@@ -34,7 +34,7 @@ export function normalizedEvent(fields) {
     }
   }
   const { kind, sessionId, cwd, model = null, parentSessionId = null, tool = null,
-    targets = [], permissionMode = null } = fields;
+    targets = [], permissionMode = null, endReason = null } = fields;
 
   if (!EVENT_KINDS.includes(kind)) data("unknown normalised event kind", { kind });
   if (typeof sessionId !== "string" || sessionId === "") {
@@ -57,6 +57,12 @@ export function normalizedEvent(fields) {
     data("normalised event permission mode must be a non-empty string", { kind });
   }
 
+  // Why the client ended the session, in its own words, when it says. A sender
+  // is told a conversation was cleared rather than that its peer vanished.
+  if (endReason !== null && (typeof endReason !== "string" || endReason === "")) {
+    data("normalised event end reason must be a non-empty string", { kind });
+  }
+
   return Object.freeze({ kind, sessionId, cwd, model, parentSessionId, tool,
-    targets: Object.freeze([...targets]), permissionMode });
+    targets: Object.freeze([...targets]), permissionMode, endReason });
 }

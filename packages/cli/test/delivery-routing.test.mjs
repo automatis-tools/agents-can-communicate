@@ -29,6 +29,16 @@ test("a recipient with no live transport is reported as reading its inbox", () =
   "recorded message_a; models has no live transport; the message waits in its inbox");
 });
 
+test("a recipient whose conversation was cleared is reported with where the message waits", () => {
+  assert.equal(recordedText(message, [{ recipientParticipantId: "models", outcome: "queued",
+    transport: "durable", errorCode: "recipient_offline", endReason: "clear" }]),
+  "recorded message_a; models's conversation was cleared (/clear); the message waits until "
+    + "that conversation resumes");
+  assert.equal(recordedText(message, [{ recipientParticipantId: "models", outcome: "queued",
+    transport: "durable", errorCode: "recipient_offline" }]),
+  "recorded message_a; models has no open session; the message waits until it starts or resumes one");
+});
+
 test("the CLI composition seam records before it offers", async () => {
   const order = [];
   const result = await recordAndOffer({

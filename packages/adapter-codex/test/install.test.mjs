@@ -209,7 +209,7 @@ test("real captured payloads normalise without guesswork", async () => {
     assert.equal(normalised.cwd, payload.cwd);
     // Conversation content is dropped by the whitelist, not carried along.
     assert.deepEqual(Object.keys(normalised).sort(),
-      ["cwd", "kind", "model", "parentSessionId", "permissionMode", "sessionId", "targets", "tool"]);
+      ["cwd", "endReason", "kind", "model", "parentSessionId", "permissionMode", "sessionId", "targets", "tool"]);
     assert.equal(JSON.stringify(normalised).includes("redacted"), false);
   }
 });
@@ -231,7 +231,7 @@ test("a recognised payload normalises to the shared event shape", () => {
 
   assert.deepEqual({ ...normalised, targets: [...normalised.targets] },
     { kind: "beforeTool", sessionId: "abc-123", cwd: "/tmp/project", model: null,
-      parentSessionId: null, tool: "Write", targets: [], permissionMode: null });
+      parentSessionId: null, tool: "Write", targets: [], permissionMode: null, endReason: null });
 });
 
 test("the write target is read out of the patch body, where this client puts it", async () => {

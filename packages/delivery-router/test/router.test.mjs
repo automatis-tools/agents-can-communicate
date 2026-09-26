@@ -373,6 +373,27 @@ test("lease expiry and generation replacement remove a binding from eligibility"
   assert.deepEqual(await f.router.offer(replaced), durable("no_live_transport"));
 });
 
+// After /clear the old conversation's participant has no open session. The
+// sender is told that, and why when the client said, instead of "unavailable".
+test("a recipient whose session ended is queued as offline, with the client's reason", async () => {
+  const f = await fixture();
+  await publish(f.service, f.sessions[0]);
+  await f.service.closeSession({ sessionId: f.sessions[0].sessionId,
+    generation: f.sessions[0].generation, endReason: "clear" });
+  const cleared = await send(f.service, f.sender, "question", "after_clear");
+  assert.deepEqual(await f.router.offer(cleared), [{ recipientParticipantId: "models",
+    outcome: "queued", transport: "durable", errorCode: "recipient_offline", endReason: "clear" }]);
+  assert.equal((await receipt(f.store, cleared.messageId)).state, "queued");
+});
+
+test("a recipient whose session ended without a reason is queued as offline", async () => {
+  const f = await fixture();
+  await f.service.closeSession({ sessionId: f.sessions[0].sessionId,
+    generation: f.sessions[0].generation });
+  const message = await send(f.service, f.sender, "question", "after_exit");
+  assert.deepEqual(await f.router.offer(message), durable("recipient_offline"));
+});
+
 // A CLI participant, or any session whose client binds no live transport, is
 // online and reads its inbox. Calling it unavailable told senders it was gone.
 test("an online recipient with no live transport is queued as such, not as unavailable", async () => {

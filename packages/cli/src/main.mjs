@@ -151,6 +151,12 @@ export function recordedText(message, delivery) {
         ? "live offer blocked by sender permissions; message remains queued; run acc doctor in the sending session"
         : item.errorCode === "no_live_transport"
           ? `${item.recipientParticipantId} has no live transport; the message waits in its inbox`
+        : item.errorCode === "recipient_offline" && item.endReason === "clear"
+          ? `${item.recipientParticipantId}'s conversation was cleared (/clear); the message waits `
+            + "until that conversation resumes"
+        : item.errorCode === "recipient_offline"
+          ? `${item.recipientParticipantId} has no open session; the message waits until it starts `
+            + "or resumes one"
           : `live offer unavailable (${item.errorCode ?? "durable_fallback"})`
       : `delivery already ${item.outcome}`);
   return [`recorded ${message.messageId}`, ...diagnostics].join("; ");
@@ -192,7 +198,16 @@ export function describeStatus(status) {
   // A transport accepting a message is not a model reading it. Said only when
   // it is true of something, so the everyday line stays the everyday line.
   const offered = status.counts.unretrieved?.offered ?? 0;
-  return offered === 0 ? line : `${line}; ${offered} offered, not retrieved`;
+  const withOffers = offered === 0 ? line : `${line}; ${offered} offered, not retrieved`;
+  // Status lists a participant with no open session only while messages wait
+  // for it; each is named here, with the client's reason when it gave one.
+  const waiting = (status.participants ?? []).filter(item => item.presence === "offline")
+    .map(item => {
+      const count = (item.unretrieved?.queued ?? 0) + (item.unretrieved?.offered ?? 0);
+      return `${item.participantId} (${item.endReason === "clear" ? "cleared, " : ""}${count})`;
+    });
+  return waiting.length === 0 ? withOffers
+    : `${withOffers}; waiting for a closed session: ${waiting.join(", ")}`;
 }
 
 const HANDLERS = Object.freeze({

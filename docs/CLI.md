@@ -102,7 +102,13 @@ the messages addressed to that participant that it has not fetched, split by how
 got. Two sessions of one participant show the same numbers, so read the workspace total from
 `counts.unretrieved` rather than adding rows, and the text line ends with
 `<n> offered, not retrieved` when that number is above zero. Offered is not read: a
-transport took the bytes, and the model may or may not have looked. Default `sync` reads
+transport took the bytes, and the model may or may not have looked.
+
+A participant with no open session is left out, unless messages still wait for it. Then its
+latest session stays listed as `offline`, with `endReason` when the client said why the
+session ended, such as `"clear"` for Claude Code's `/clear`. The text line names each one:
+`waiting for a closed session: claude_code-b (cleared, 2)`. `acc status --all` lists every
+session. Default `sync` reads
 events after a 16-digit event cursor (100 by
 default, up to 500). `--scope history` discovers historical message headers and reads
 selected records; `--scope full` adds an unbounded snapshot for explicit workspace forensics.
@@ -212,8 +218,12 @@ A queued result names why no live offer was made. `no_live_transport` means the 
 is online but its session has no live transport bound: a participant attached with the CLI,
 or a client without live delivery. It reads the message from its inbox or next turn, and
 human output says `models has no live transport; the message waits in its inbox`.
-`recipient_unavailable` means the recipient has no online session, or its live transport
-could not be reached.
+`recipient_offline` means the recipient has no open session; the message waits until one
+starts or resumes. When the client said why its last session ended, the result carries it,
+for example `"endReason": "clear"` after Claude Code's `/clear`, and human output says
+`models's conversation was cleared (/clear); the message waits until that conversation
+resumes`. `recipient_unavailable` means the recipient's session is open but its live
+transport could not be reached.
 
 The delivery outcome `woken` means ACC woke a Claude Code session through its inbox:
 

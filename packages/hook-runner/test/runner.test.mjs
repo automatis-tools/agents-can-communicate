@@ -309,6 +309,18 @@ test("sessionEnd closes the session and drops the binding", async t => {
   assert.equal(typeof started.accSessionId, "string");
 });
 
+test("sessionEnd keeps the client's end reason on the closed session", async t => {
+  const place = await workspace(t);
+  const started = await run("kimi", event("sessionStart"), place);
+  await run("kimi", event("sessionStart", { sessionId: "peer" }), place);
+
+  const ended = await run("kimi", event("sessionEnd", { endReason: "clear" }), place);
+
+  const located = await ended.service.locateSession(started.accSessionId);
+  assert.equal(located.record.state, "closed");
+  assert.equal(located.record.extensions?.endReason, "clear");
+});
+
 test("an internal failure never breaks the session it is hooked into", async t => {
   const place = await workspace(t);
   const broken = { ...kimi, normalizeHook: () => { throw new Error("boom"); } };

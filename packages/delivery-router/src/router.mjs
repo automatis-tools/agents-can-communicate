@@ -100,7 +100,14 @@ export function createDeliveryRouter({ service, adapters, clock, platform = HOST
     // endpoint lease never sends a hook heartbeat: a daemon is reachability,
     // not evidence that this particular session thread is still present.
     const liveSessions = await service.listLiveSessions({ participantId, now });
-    if (liveSessions.length === 0) return durable(participantId, "recipient_unavailable");
+    if (liveSessions.length === 0) {
+      // No open session: the message waits until one starts or resumes. The
+      // client's own reason, when it gave one (Claude Code's /clear), is passed on.
+      const last = typeof service.lastSessionOf === "function"
+        ? await service.lastSessionOf({ participantId }).catch(() => null) : null;
+      return { ...durable(participantId, "recipient_offline"),
+        ...(last?.state === "closed" && typeof last.endReason === "string" ? { endReason: last.endReason } : {}) };
+    }
     if (liveSessions.length > 1) {
       return durable(participantId, "ambiguous_recipient_sessions");
     }

@@ -307,3 +307,25 @@ test("a repeat keeps offer facts it does not own", async () => {
   assert.equal(facts.targetSessionId, "session_future");
   assert.equal(typeof facts.repeatedAt, "string");
 });
+
+// A participant whose conversation ended - Claude Code's /clear - vanished from
+// status while messages to it waited. It stays listed while something waits for
+// it, as offline, with the client's reason; with nothing waiting it goes quiet.
+test("status keeps an offline participant listed while messages wait for it", async () => {
+  const f = await fixture();
+  await f.service.closeSession({ ...owner(f.recipient), endReason: "clear" });
+  const waiting = await send(f);
+
+  const listed = (await f.service.collectStatus({ workspaceId: WORKSPACE })).participants
+    .filter(item => item.participantId === "recipient");
+  assert.equal(listed.length, 1);
+  assert.equal(listed[0].presence, "offline");
+  assert.equal(listed[0].endReason, "clear");
+  assert.deepEqual(listed[0].unretrieved, { queued: 1, offered: 0 });
+
+  await f.service.closeSession(owner(f.other));
+  const quiet = (await f.service.collectStatus({ workspaceId: WORKSPACE })).participants
+    .filter(item => item.participantId === "other");
+  assert.deepEqual(quiet, [], "an offline participant with nothing waiting was listed");
+  assert.equal(typeof waiting.messageId, "string");
+});

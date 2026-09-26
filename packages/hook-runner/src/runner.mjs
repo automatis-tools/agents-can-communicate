@@ -506,7 +506,7 @@ const HANDLERS = {
     const owner = { sessionId: binding.accSessionId, generation: binding.generation };
     const current = await context.service.locateSession(binding.accSessionId);
     if (current?.record.generation === binding.generation && current.record.state === "open") {
-      await context.service.closeSession(owner);
+      await context.service.closeSession({ ...owner, endReason: event.endReason ?? null });
     } else {
       // Close may have committed before this hook died. Retire only the old
       // endpoint and binding; do not close a replacement or repeat a close event.
