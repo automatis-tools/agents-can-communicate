@@ -83,8 +83,7 @@ async function detectNative(adapter, entry, { context, platform, probeTimeoutMs,
     if (facts.eligibility.eligible !== true) {
       const reasonCode = facts.eligibility.reasonCode ?? "feature_probe_failed";
       // A stored policy can be consented to before a service/session exists.
-      // No activation is planned until the full probe passes; bootstrap-based
-      // clients still need their verified plan to disclose launch changes.
+      // No activation is planned until the full probe passes.
       const consentAvailable = adapter.nativeDelivery.policySource === "installation-record"
         && ["native_endpoint_unavailable", "native_session_unavailable"].includes(reasonCode);
       return STATIC_REASONS.has(reasonCode)

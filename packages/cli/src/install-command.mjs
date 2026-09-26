@@ -259,7 +259,7 @@ export async function runInstallCommand({ options, runtime, action = "install" }
     deliveryDecisionByAdapter: decided.deliveryDecisionByAdapter,
     allowServiceSetup: action === "install" });
   const apply = (paths = {}) => applyPlan({ plan, adapters, context: { ...context, ...paths },
-    dataHome, dryRun, accVersion, activation: { bootstrap: paths.bootstrap } });
+    dataHome, dryRun, accVersion });
   const result = action === "install" && !dryRun && runtime.packageRoot
     ? await installManaged({ packageRoot: runtime.packageRoot,
       managerRoot: path.join(dataHome, "acc", "runtime"), dataHome, home, cwd: options.cwd ?? runtime.cwd,

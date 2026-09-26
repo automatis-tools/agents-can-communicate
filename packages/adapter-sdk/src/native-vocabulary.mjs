@@ -39,7 +39,6 @@ export const NATIVE_REASON_CODES = Object.freeze([
 export const STABLE_VERSION = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:\+[0-9A-Za-z.-]+)?$/;
 export const CONTRACT_ID = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
 export const IDENTIFIER = /^[a-z][a-z0-9_-]*$/;
-export const COMMAND_NAME = /^[a-z][a-z0-9_.-]*$/;
 export const FINGERPRINT = /^sha256:[0-9a-f]{64}$/;
 export const TIMESTAMP = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?Z$/;
 export const SHELL_SOURCE = /[;&|<>`\n\0]|\$\(/;
