@@ -1,8 +1,12 @@
 import assert from "node:assert/strict";
-import { mkdir, readFile, readdir, rename, writeFile } from "node:fs/promises";
+import { spawn } from "node:child_process";
+import { once } from "node:events";
+import { lstat, mkdir, mkdtemp, readFile, readdir, realpath, rename, rm, writeFile }
+  from "node:fs/promises";
 import path from "node:path";
 import test from "node:test";
 
+import { detectCodex } from "../src/install.mjs";
 import * as native from "../src/native-delivery.mjs";
 import { nativeFixture, THREAD } from "./native-fixture.mjs";
 
@@ -201,3 +205,47 @@ test("replacing the receiver socket with a regular file blocks bind, refresh and
   assert.equal((await native.offerMessage({ ...h, binding, message: { messageId: "socket-replaced", kind: "note" } })).accepted, false);
   assert.equal(h.calls.length, 0, "wrong socket type must be rejected before RPC");
 });
+
+// Codex leaves its control socket behind when the service dies without
+// cleaning up: the file is still a socket, but nothing accepts on it.
+async function staleControlSocket(t) {
+  const root = await realpath(await mkdtemp("/tmp/acc-cx-stale-"));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const socketPath = path.join(root, "app-server-control", "app-server-control.sock");
+  await mkdir(path.dirname(socketPath), { recursive: true });
+  // A graceful close unlinks the file, so only a killed listener leaves it.
+  const listener = spawn(process.execPath, ["-e", "require('node:net').createServer()"
+    + `.listen(${JSON.stringify(socketPath)}, () => process.stdout.write('up'))`]);
+  await once(listener.stdout, "data");
+  listener.kill("SIGKILL");
+  await once(listener, "exit");
+  assert.equal((await lstat(socketPath)).isSocket(), true);
+  return { env: { CODEX_HOME: root } };
+}
+
+test("a control socket nothing listens on is an unavailable service, not a failed probe",
+  { skip: process.platform === "win32" && "Unix domain socket files" }, async t => {
+    const probe = await native.probeNativeDelivery(await staleControlSocket(t));
+    assert.equal(probe.supported, false);
+    assert.equal(probe.reasonCode, "native_endpoint_unavailable");
+  });
+
+test("a probe that times out or fails otherwise keeps its own reason", async t => {
+  const h = await nativeFixture(t);
+  const silent = { notify() {}, async close() {}, request: () => new Promise(() => {}) };
+  assert.equal((await native.probeNativeDelivery({ ...h, timeoutMs: 20, open: () => silent }))
+    .reasonCode, "probe_timeout");
+  const broken = { notify() {}, async close() {},
+    async request() { throw Object.assign(new Error("vendor detail"), { code: "EVENDOR" }); } };
+  assert.equal((await native.probeNativeDelivery({ ...h, open: () => broken })).reasonCode,
+    "feature_probe_failed");
+});
+
+test("a dead service's leftover socket still leads detection to the daemon start advice",
+  { skip: process.platform === "win32" && "Unix domain socket files" }, async t => {
+    const { env } = await staleControlSocket(t);
+    const detected = await detectCodex({ home: env.CODEX_HOME, codexHome: env.CODEX_HOME,
+      stateRoot: path.join(env.CODEX_HOME, "state"), clientVersion: "0.155.1",
+      platform: "darwin-arm64", nativeDelivery: await native.probeNativeDelivery({ env }) });
+    assert.match(detected.nativeSetup ?? "", /codex app-server daemon start/);
+  });

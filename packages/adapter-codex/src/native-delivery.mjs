@@ -46,7 +46,12 @@ export async function probeNativeDelivery({ timeoutMs = 750, env = process.env,
         modes: [...QUEUE_MODES], reasonCode: null };
     });
   } catch (error) {
-    return unsupported(error?.code === "ETIMEDOUT" ? "probe_timeout" : "feature_probe_failed");
+    if (error?.code === "ETIMEDOUT") return unsupported("probe_timeout");
+    // A service that died without cleaning up leaves its socket file behind,
+    // and a connect to it is refused. That is a missing service, the one fact
+    // whose advice (start the daemon) fixes it, not a failed feature probe.
+    return unsupported(safeReason(error) === "transport_unavailable"
+      ? "native_endpoint_unavailable" : "feature_probe_failed");
   }
 }
 
