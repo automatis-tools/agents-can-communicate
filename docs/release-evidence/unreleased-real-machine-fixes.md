@@ -141,6 +141,10 @@ mutations across `pins.mjs`, `runner.mjs`, `native-delivery.mjs`, `receipts.mjs`
 `main.mjs`, `client-pid.mjs` and `process-table.mjs`. The one that first survived, Codex's
 timeout branch, got its own test.
 
+`npm test` on the evidence commit `6deda87`: 2,605 tests, 2,604 passing, 0 failing, 1 skipped.
+The skipped test plans an uninstall from the install record and skips on a machine where
+Gemini CLI is installed, as it does on `main`.
+
 ## Exact local artifact
 
 - Source: clean commit `3cacc5cdc8c7d2567b29952032a0ebf34fada8d7` on `fix/pidless-session-pins`,
