@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased — old runtimes are freed and a dead Codex service is named
+## Unreleased — four fixes from the first real 0.8.0 update
 
 - A session pin that names no client no longer holds its generation forever. A pin keeps the
   generation its session started with until the client is confirmed dead, but 0.8.0 and earlier
@@ -18,16 +18,30 @@
   succeed"), which hid the advice that fixes it: `codex app-server daemon start`, then a new
   Codex session. A probe that times out still reports `probe_timeout`, and any other failure
   `feature_probe_failed`.
+- `acc status` lists a participant with no open session only while its next turn would still
+  show a message: queued, or offered by a live transport and not yet shown again. An answer the
+  next-turn hook had already put in a closed Claude Code session's context kept that
+  participant listed as `waiting for a closed session` forever, although nothing would reach it
+  again and nothing was owed. The rule is the repeat rule without its elapsed time, and an offer
+  an older ACC recorded without facts still counts as waiting. An offline participant carries
+  the number as `waiting`, which the text line prints; `unretrieved` keeps its meaning.
+- A client that runs as a node script is found. Presence and pinning learn the client's pid by
+  walking the hook's ancestors for the client's command, but Gemini CLI runs as `node`, so a
+  real Gemini CLI 0.60.0 session opened with `pid: null`. The process table now also reads each
+  process's command line, in parallel and within the same timeout, and a `node` ancestor
+  matches by the script it runs. The innermost match still wins, so the pid is Gemini's own
+  relaunch. If the command lines cannot be read, the table is what it was before, and a native
+  client matches exactly as before.
 
 | Candidate artifact | Value |
 |---|---|
-| Built from | `da734573785a8b927bee5f396b549c6cb755e03a` |
-| Tarball | `agents-can-communicate-0.8.0.tgz`, 469,236 bytes, 311 files |
-| sha256 | `c4e8ff1eae0e6cf05f3a02aa73a4d63b2b0748f2645fb0d6afa9a0241608ecad` |
+| Built from | `3cacc5cdc8c7d2567b29952032a0ebf34fada8d7` |
+| Tarball | `agents-can-communicate-0.8.0.tgz`, 470,521 bytes, 311 files |
+| sha256 | `b4b4bf3fdcfd5342070135d05c5007b4ea9baa2e3e5764d21627268d0abee85d` |
 
 This unpublished development archive passed clean installation verification. See
-[pin and Codex endpoint evidence](docs/release-evidence/unreleased-pidless-pins-codex-endpoint.md).
-The package version remains `0.8.0` until a release prepares its own.
+[real-machine fixes evidence](docs/release-evidence/unreleased-real-machine-fixes.md). The
+package version remains `0.8.0` until a release prepares its own.
 
 ## 0.8.0 — release candidate
 
