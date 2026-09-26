@@ -191,11 +191,11 @@ Gemini CLI is installed, as it does on `main`.
 
 ## Exact local artifact
 
-- Source: clean commit `af4d6ff41229087066ce948d190ac01d315826ba` on `fix/pidless-session-pins`,
+- Source: clean commit `efcf1ee6165475789bad2fa6db9d56834ee4bec7` on `fix/pidless-session-pins`,
   from `main` at `00c5416`.
 - Archive: `agents-can-communicate-0.8.0.tgz`, packed from that commit.
-- Size: 471,075 bytes; 311 packed entries.
-- SHA-256: `bce6eb14dfcc3088f07b8a1ed48ce6c1c27e9b679badd892bbe99efa3e3b23a2`.
+- Size: 471,008 bytes; 311 packed entries.
+- SHA-256: `116821078ac390207d03e8d03f639f7e2dc10b815fd3e212de1fabc9fbb94f62`.
 - Package version remains `0.8.0`; this is an unpublished development artifact.
 
 The exact archive passed `scripts/verify-package.mjs`: 311 entries with none forbidden, six

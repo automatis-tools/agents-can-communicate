@@ -38,9 +38,9 @@
 
 | Candidate artifact | Value |
 |---|---|
-| Built from | `af4d6ff41229087066ce948d190ac01d315826ba` |
-| Tarball | `agents-can-communicate-0.8.0.tgz`, 471,075 bytes, 311 files |
-| sha256 | `bce6eb14dfcc3088f07b8a1ed48ce6c1c27e9b679badd892bbe99efa3e3b23a2` |
+| Built from | `efcf1ee6165475789bad2fa6db9d56834ee4bec7` |
+| Tarball | `agents-can-communicate-0.8.0.tgz`, 471,008 bytes, 311 files |
+| sha256 | `116821078ac390207d03e8d03f639f7e2dc10b815fd3e212de1fabc9fbb94f62` |
 
 This unpublished development archive passed clean installation verification. See
 [real-machine fixes evidence](docs/release-evidence/unreleased-real-machine-fixes.md). The
