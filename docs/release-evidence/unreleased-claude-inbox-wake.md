@@ -48,6 +48,32 @@ Capture and product evidence: `packages/adapter-claude-code/fixtures/delivery/cl
 and `claude-code-2.1.282-product-evidence.json`. The capture's limitations name what it did
 not cover: a receiver in `bypassPermissions` mode, `darwin-x64`, Linux and native Windows.
 
+### Re-run on the recorded candidate
+
+That capture ran before the review fixes (`34e2439`), the Channel stub fix (`71f3db7`) and the
+publication race fix (`7611b7e`). The same six cases ran again on 2026-09-26 against the
+archive recorded below (SHA-256 `8b6606eb…`), installed as shipped, with no private anchor.
+Claude Code had moved to 2.1.283, and the 2.1.282 anchor carried forward to it: the install
+planned `claude-code-inbox-socket-v1` and both sessions bound `livePush`, `idleWake` and
+`busyQueue`. Two TUI sessions, Sonnet 5, `auto` mode, isolated ACC data home; the real Claude
+config was backed up first.
+
+| Case | Observations | Outcome |
+|---|---|---|
+| C01 idle | delivery `woken`, wake `started-turn`, projection `body-shown`, offer `next-turn` | passed |
+| C02 busy | delivery `woken`, wake `between-tool-calls`, projection `body-shown`, offer `next-turn` | passed |
+| C03 reply | answer `recorded`, receipt `acknowledged` | passed |
+| C04 duplicate | logical message `same-message-id`, wake `delivered-once` | passed |
+| C05 fallback | client `exited`, delivery `queued` | passed |
+| C06 exact binding | delivery `woken`, wake `started-turn`, other session `not-woken` | passed |
+
+`scripts/e2e/claude-inbox-product.mjs finish` accepted the run (6/6). Its capture is not
+committed, because `fixtures/` is packed and the 2.1.282 capture already certifies the
+contract. Of the 23 backed-up files in the Claude config (`settings.json`, the plugin registry
+and the `acc-local` plugin copies), 22 matched the backup byte for byte afterwards.
+`known_marketplaces.json` differed only in the `lastUpdated` of two git marketplaces that
+Claude Code refreshed during the run, and its `acc-local` entry was unchanged.
+
 ## Upgrade from 0.7.x
 
 `tests/acceptance/managed-update-degraded-packed.test.mjs` lays out what 0.7.x wrote for a live
