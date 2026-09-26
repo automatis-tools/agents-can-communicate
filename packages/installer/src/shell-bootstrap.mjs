@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { chmod, readdir, readFile, rename, rm, rmdir, writeFile } from "node:fs/promises";
+import { chmod, readdir, readFile, rename, rm, rmdir, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 // Retirement of the shell half of 0.7.x native delivery: one marked PATH block
@@ -13,7 +13,7 @@ export const BLOCK_END = "# <<< agents-can-communicate native delivery <<<";
 export const SHIM_MARKER = "# agents-can-communicate native delivery shim";
 
 const sha256 = text => createHash("sha256").update(text).digest("hex");
-const defaultIo = Object.freeze({ readFile, writeFile, chmod, rename, rm, rmdir, readdir });
+const defaultIo = Object.freeze({ readFile, writeFile, chmod, rename, rm, rmdir, readdir, stat });
 
 async function readText(io, file) {
   try {
@@ -74,7 +74,9 @@ export async function uninstallShellBootstrap({ ownership, io = defaultIo }) {
     } else if (remaining.length > 0) {
       result.rcBlock = "kept";
     } else {
-      await writeAtomic(io, rcFile.path, text.slice(0, span.start) + text.slice(span.end), 0o600);
+      // The user's file keeps the permissions it has now.
+      const mode = ((await io.stat?.(rcFile.path).catch(() => null))?.mode ?? 0o600) & 0o777;
+      await writeAtomic(io, rcFile.path, text.slice(0, span.start) + text.slice(span.end), mode);
       result.rcBlock = "removed";
     }
   }

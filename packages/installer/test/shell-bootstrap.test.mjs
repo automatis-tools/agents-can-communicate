@@ -66,3 +66,19 @@ test("uninstall refuses a modified block and keeps a modified shim", async t => 
   assert.equal(await readFile(place.rcFile, "utf8"), rc);
   assert.match(await readFile(shim, "utf8"), /# mine now/);
 });
+
+// The rc file is the user's. Retiring ACC's block takes the block and leaves
+// the file's permissions as they are, rather than tightening them to 0600.
+test("retiring the block keeps the rc file's own permissions", async t => {
+  const place = await home(t);
+  await writeFile(place.rcFile, "export FOO=1\n");
+  const owned = await installShellBootstrap({ plan: plan(place) });
+  const { chmod } = await import("node:fs/promises");
+  await chmod(place.rcFile, 0o644);
+
+  const result = await uninstallShellBootstrap({ ownership: owned });
+
+  assert.equal(result.rcBlock, "removed");
+  assert.equal(await readFile(place.rcFile, "utf8"), "export FOO=1\n");
+  assert.equal((await stat(place.rcFile)).mode & 0o777, 0o644);
+});
