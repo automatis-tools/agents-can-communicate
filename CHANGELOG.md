@@ -1,5 +1,34 @@
 # Changelog
 
+## Unreleased — old runtimes are freed and a dead Codex service is named
+
+- A session pin that names no client no longer holds its generation forever. A pin keeps the
+  generation its session started with until the client is confirmed dead, but 0.8.0 and earlier
+  could write one without the client's pid: before the pid lookup on a repeated start, or when
+  the lookup found no client. Only `SessionEnd` removed such a pin, and it does not always come.
+  On a real machine two of them kept the 0.5.10 and 0.6.0 generations on disk after 0.8.0 was
+  active.
+- A session whose client cannot be found is now left unpinned, so its hooks run the active
+  generation, the fallback every unresolvable pin already gets. A repeated start re-pins with
+  the pid its binding already knew. The next reclaim removes the pid-less pins earlier versions
+  left and frees their generations.
+- Codex live delivery reports `native_endpoint_unavailable` when the Codex control socket is
+  still on disk but nothing accepts on it, which is what a service that died without cleaning
+  up leaves. It used to report `feature_probe_failed` ("the native protocol probe did not
+  succeed"), which hid the advice that fixes it: `codex app-server daemon start`, then a new
+  Codex session. A probe that times out still reports `probe_timeout`, and any other failure
+  `feature_probe_failed`.
+
+| Candidate artifact | Value |
+|---|---|
+| Built from | `da734573785a8b927bee5f396b549c6cb755e03a` |
+| Tarball | `agents-can-communicate-0.8.0.tgz`, 469,236 bytes, 311 files |
+| sha256 | `c4e8ff1eae0e6cf05f3a02aa73a4d63b2b0748f2645fb0d6afa9a0241608ecad` |
+
+This unpublished development archive passed clean installation verification. See
+[pin and Codex endpoint evidence](docs/release-evidence/unreleased-pidless-pins-codex-endpoint.md).
+The package version remains `0.8.0` until a release prepares its own.
+
 ## 0.8.0 — release candidate
 
 - Claude Code live delivery wakes a session through the inbox socket Claude Code opens for every
