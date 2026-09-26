@@ -14,7 +14,8 @@ import { readInboxEndpoint } from "../src/inbox-endpoint.mjs";
 // fake would only restate. macOS caps a socket path near 104 bytes, so the
 // fixture lives under /tmp rather than the long per-user tmpdir.
 
-const PID = 424242;
+// A live process, the way a bound Claude Code session always is.
+const PID = process.pid;
 const SESSION = "6665aab9-5400-477d-9010-1cad40dfe9d7";
 
 async function fixture(t) {
@@ -186,6 +187,35 @@ test("retiring a binding removes what it recorded about wakes", async t => {
   const { readdirSync } = await import("node:fs");
   const left = readdirSync(f.runtime, { recursive: true }).filter(name => name.includes(binding.opaqueEndpointRef));
   assert.deepEqual(left, []);
+});
+
+async function deadPid() {
+  const { spawn } = await import("node:child_process");
+  const child = spawn(process.execPath, ["-e", ""], { stdio: "ignore" });
+  await new Promise(resolve => child.on("exit", resolve));
+  return child.pid;
+}
+
+// A Claude Code process that crashed never ran SessionEnd, so nothing retired
+// its binding. The next bind in the workspace clears what it left.
+test("a bind removes what a process that no longer exists left behind", async t => {
+  const f = await fixture(t);
+  const live = await bound(f);
+  const { writeInboxEndpoint } = await import("../src/inbox-endpoint.mjs");
+  const crashed = { schemaVersion: 1, endpointId: `claude_inbox_${"c".repeat(32)}`, socketPath: f.socket,
+    configDir: f.configDir, clientPid: await deadPid(), sessionId: "crashed-session",
+    clientVersion: MIN_VERSION, protocolContract: PROTOCOL_CONTRACT,
+    leaseUntil: new Date(Date.now() + 60_000).toISOString() };
+  await writeInboxEndpoint({ runtimeDir: f.runtime, record: crashed });
+  const { claimWake } = await import("../src/inbox-endpoint.mjs");
+  await claimWake({ runtimeDir: f.runtime, endpointId: crashed.endpointId, messageId: "message_old" });
+
+  await bind(f);
+
+  assert.equal(await readInboxEndpoint({ runtimeDir: f.runtime, endpointId: crashed.endpointId }), null);
+  const { readdirSync } = await import("node:fs");
+  assert.deepEqual(readdirSync(f.runtime, { recursive: true }).filter(name => name.includes(crashed.endpointId)), []);
+  assert.notEqual(await readInboxEndpoint({ runtimeDir: f.runtime, endpointId: live.opaqueEndpointRef }), null);
 });
 
 test("the wake names the message and how to read it", () => {

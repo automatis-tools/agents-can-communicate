@@ -1,6 +1,6 @@
 import { randomBytes } from "node:crypto";
 import { constants } from "node:fs";
-import { lstat, mkdir, open, realpath, rename, rm } from "node:fs/promises";
+import { lstat, mkdir, open, readdir, realpath, rename, rm } from "node:fs/promises";
 import path from "node:path";
 
 import { PROTOCOL_CONTRACT } from "./inbox-contract.mjs";
@@ -95,6 +95,34 @@ export async function removeInboxEndpoint({ runtimeDir, endpointId }) {
   try {
     await rm(path.join(await wakesDirectory(runtimeDir), endpointId), { recursive: true, force: true });
   } catch { /* the same */ }
+}
+
+const processExists = pid => {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    return error.code === "EPERM";
+  }
+};
+
+/**
+ * A Claude Code process that crashed ran no SessionEnd, so its binding was never
+ * retired. Only a record whose process is gone is removed: a live session whose
+ * registry briefly names another conversation (right after /resume) keeps its own.
+ */
+export async function sweepDeadEndpoints({ runtimeDir, exists = processExists, limit = 64 }) {
+  let names;
+  try {
+    names = await readdir(await directory(runtimeDir));
+  } catch {
+    return;
+  }
+  for (const name of names.filter(item => /^claude_inbox_[a-f0-9]{32}\.json$/.test(item)).slice(0, limit)) {
+    const endpointId = name.slice(0, -".json".length);
+    const record = await readInboxEndpoint({ runtimeDir, endpointId });
+    if (record !== null && !exists(record.clientPid)) await removeInboxEndpoint({ runtimeDir, endpointId });
+  }
 }
 
 // One empty marker per message a binding woke. A wake leaves the receipt

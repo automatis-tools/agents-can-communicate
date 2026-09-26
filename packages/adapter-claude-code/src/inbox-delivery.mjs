@@ -2,7 +2,7 @@ import net from "node:net";
 
 import { INBOX_MODES, MIN_VERSION, PROTOCOL_CONTRACT, TRANSPORT } from "./inbox-contract.mjs";
 import { claimWake, newEndpointId, readInboxEndpoint, releaseWake, removeInboxEndpoint,
-  writeInboxEndpoint } from "./inbox-endpoint.mjs";
+  sweepDeadEndpoints, writeInboxEndpoint } from "./inbox-endpoint.mjs";
 import { claudeConfigDir, verifyInbox } from "./inbox-registry.mjs";
 
 // Live delivery into a Claude Code session through the inbox socket the
@@ -148,6 +148,7 @@ export async function bindNativeSession({ event, clientPid, clientVersion, runti
   if (typeof socketPath !== "string" || socketPath === "") {
     return closed(clientVersion, "native_endpoint_unavailable");
   }
+  await sweepDeadEndpoints({ runtimeDir });
   const configDir = claudeConfigDir(env);
   const refused = await verifyInbox({ configDir, clientPid, sessionId: event.sessionId, socketPath });
   if (refused !== null) return closed(clientVersion, refused);
