@@ -124,7 +124,17 @@ desktop Mac, and each read took about 30 ms. For an ancestor whose comm is `node
 matches the script it runs. The interpreter is skipped by its comm, so a path with spaces is
 skipped whole. Options are skipped too. The first remaining word matches by basename, with a
 `.js`, `.mjs` or `.cjs` extension ignored. The walk still returns the innermost match, 46032
-above. A failed or slow command-line read leaves every entry as before. Claude Code, Codex, Grok
+above.
+
+The pull request's AI review found that an option taking a separate value hid the script:
+`node --require ./preload.cjs /path/gemini.js` selected `./preload.cjs` and found no client.
+Which options take a value depends on the client's own node, so no list is kept. A word right
+after an option written without `=` is tried as a candidate and the search continues; it ends
+at the first word no such option precedes. `node --require ./preload.cjs /srv/server.js gemini`
+still names only `server`, and an option written as `--flag=value` leaves the next word the
+script. A boolean option before a script whose first argument is the client's name would also
+match; the walk stops at the innermost match, which is the client's own process whenever it
+is an ancestor, so that wider match cannot displace it. A failed or slow command-line read leaves every entry as before. Claude Code, Codex, Grok
 and Antigravity are native binaries and still match by their comm alone.
 
 A stand-in shaped like Gemini ran through the real `ps` on this machine. It was a node script
@@ -173,17 +183,19 @@ Each test was seen failing for the stated reason before its fix.
 - `packages/cli/test/status-line.test.mjs`: the text line counts `waiting` and skips an offline
   entry with nothing waiting; `(cleared, n)` still reads as before.
 - `packages/hook-runner/test/finding-the-client-behind-the-hook.test.mjs`: the measured Gemini
-  tree resolves to the relaunched process; an extension, an interpreter path with spaces, a
+  tree resolves to the relaunched process; `--require`, `-r` and `--import` with separate values
+  do not hide the script, while an attached `--flag=value` and a script's own later arguments
+  do not widen the match; an extension, an interpreter path with spaces, a
   later positional argument, another interpreter and a table without command lines each behave
   as stated; command lines parse beside the tree, a failed read leaves the tree as before, and
   both reads share the caller's timeout.
 
-Each changed production line was mutated, and a test failed every time. That covered 28
+Each changed production line was mutated, and a test failed every time. That covered 33
 mutations across `pins.mjs`, `runner.mjs`, `native-delivery.mjs`, `receipts.mjs`, `status.mjs`,
 `main.mjs`, `client-pid.mjs`, `process-table.mjs`, `service-setup.mjs` and `native-endpoint.mjs`.
 The ones that first survived got their own tests: Codex's timeout branch, the socket type
 guard (a symlink), an unsafe PID record, a dead PID record without a socket, and a connect
-failing for a reason other than refusal.
+failing for a reason other than refusal, and an option written with its value attached.
 
 `npm test` on the evidence commit `9bcfb54`: 2,614 tests, 2,613 passing, 0 failing, 1 skipped.
 The skipped test plans an uninstall from the install record and skips on a machine where
@@ -191,11 +203,11 @@ Gemini CLI is installed, as it does on `main`.
 
 ## Exact local artifact
 
-- Source: clean commit `efcf1ee6165475789bad2fa6db9d56834ee4bec7` on `fix/pidless-session-pins`,
+- Source: clean commit `58fe458a4bdc58f1a2b0c78f2a1cd8ed908168cc` on `fix/pidless-session-pins`,
   from `main` at `00c5416`.
 - Archive: `agents-can-communicate-0.8.0.tgz`, packed from that commit.
-- Size: 471,008 bytes; 311 packed entries.
-- SHA-256: `116821078ac390207d03e8d03f639f7e2dc10b815fd3e212de1fabc9fbb94f62`.
+- Size: 471,257 bytes; 311 packed entries.
+- SHA-256: `26be0d83d64c4ea10a549c3e859a7d8080b9590148a508dad6c999ab2c5a55ce`.
 - Package version remains `0.8.0`; this is an unpublished development artifact.
 
 The exact archive passed `scripts/verify-package.mjs`: 311 entries with none forbidden, six

@@ -32,15 +32,16 @@
   walking the hook's ancestors for the client's command, but Gemini CLI runs as `node`, so a
   real Gemini CLI 0.60.0 session opened with `pid: null`. The process table now also reads each
   process's command line, in parallel and within the same timeout, and a `node` ancestor
-  matches by the script it runs. The innermost match still wins, so the pid is Gemini's own
+  matches by the script it runs, also past an option's separate value such as
+  `--require ./preload.cjs`. The innermost match still wins, so the pid is Gemini's own
   relaunch. If the command lines cannot be read, the table is what it was before, and a native
   client matches exactly as before.
 
 | Candidate artifact | Value |
 |---|---|
-| Built from | `efcf1ee6165475789bad2fa6db9d56834ee4bec7` |
-| Tarball | `agents-can-communicate-0.8.0.tgz`, 471,008 bytes, 311 files |
-| sha256 | `116821078ac390207d03e8d03f639f7e2dc10b815fd3e212de1fabc9fbb94f62` |
+| Built from | `58fe458a4bdc58f1a2b0c78f2a1cd8ed908168cc` |
+| Tarball | `agents-can-communicate-0.8.0.tgz`, 471,257 bytes, 311 files |
+| sha256 | `26be0d83d64c4ea10a549c3e859a7d8080b9590148a508dad6c999ab2c5a55ce` |
 
 This unpublished development archive passed clean installation verification. See
 [real-machine fixes evidence](docs/release-evidence/unreleased-real-machine-fixes.md). The
