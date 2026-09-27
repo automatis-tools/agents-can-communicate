@@ -49,6 +49,9 @@ it pass.
 Mutations, each caught by a test: removing the adapter lift, heartbeating on every shell
 command, and ignoring `liveDelivery` in the breakdown.
 
+`npm test` on the evidence commit `ffeabaa`: 2,646 tests, 2,646 passing, 0 failing, 0 skipped.
+Nothing was re-run.
+
 ## Measured on this host
 
 Run from this worktree's code against the real workspace at 06:02 UTC, beside the
