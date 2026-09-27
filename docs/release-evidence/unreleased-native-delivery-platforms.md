@@ -119,8 +119,18 @@ and that line was removed.
 
 ## Measured on this host
 
-`maintenance host on darwin-arm64: lsof /usr/sbin/lsof`. Whether the ubuntu CI job has
-`lsof` is unknown until the pull request runs; its log prints the same line.
+`maintenance host on darwin-arm64: lsof /usr/sbin/lsof` here, and
+`maintenance host on linux-x64: lsof /usr/bin/lsof` in the pull request's ubuntu job
+(run 36287380564), so the second candidate is the one Linux needs.
+
+That first ubuntu run also failed five tests that encoded the platform gate themselves:
+`tests/acceptance/delivery-setup-packed.test.mjs`,
+`managed-update-degraded-packed.test.mjs`, `codex-service-preparation-packed.test.mjs`
+and `codex-live-permissions-packed.test.mjs` kept a `captured` flag or a skip for any host
+but darwin-arm64, and `tests/process/claude-inbox-install.test.mjs` expected "not verified
+on this platform" there. The macOS suite never reached those branches. They now expect the
+same on every host, which puts the packed Codex service preparation, its live permissions
+and the Claude consent flow under the ubuntu job for the first time.
 
 `npm test` on the evidence commit `1d26a8f`: 2,595 tests, 2,594 passing, 0 failing, 1 skipped.
 The skipped test is the existing uninstall check that skips on a machine where Gemini CLI is

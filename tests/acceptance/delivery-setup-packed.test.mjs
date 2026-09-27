@@ -9,7 +9,6 @@ import test from "node:test";
 import { createPackedAcc } from "../helpers/packed-acc.mjs";
 
 const run = promisify(execFile);
-const captured = process.platform === "darwin" && process.arch === "arm64";
 const human = (p, args) => run(process.execPath, [p.accBin, ...args],
   { cwd: p.project, env: p.env });
 const terminal = async (p, args, answer, { expectedCode = 0 } = {}) => {
@@ -60,9 +59,7 @@ esac
   return commandLog;
 };
 
-test("packed CLI asks once for two clients and preserves complete setup decisions", {
-  skip: !captured,
-}, async t => {
+test("packed CLI asks once for two clients and preserves complete setup decisions", async t => {
   const p = await createPackedAcc(t);
   p.env.CODEX_HOME = path.join(p.clientHome, ".codex");
   p.env.SHELL = "/bin/zsh";
@@ -113,9 +110,7 @@ test("packed CLI asks once for two clients and preserves complete setup decision
   assert.equal((await readFile(downloads, "utf8")).trim().split("\n").length, 2);
 });
 
-test("packed CLI refusal, explicit automation, and dry run keep their distinct effects", {
-  skip: !captured,
-}, async t => {
+test("packed CLI refusal, explicit automation, and dry run keep their distinct effects", async t => {
   const refused = await createPackedAcc(t);
   refused.env.CODEX_HOME = path.join(refused.clientHome, ".codex");
   refused.env.SHELL = "/bin/zsh";
@@ -183,16 +178,14 @@ test("installed delivery setup preserves opt-in before a Codex service exists an
   `);
   const result = JSON.parse((await run(process.execPath, [driver],
     { cwd: p.project, env: p.env })).stdout);
-  assert.equal(result.questions.length, captured ? 1 : 0,
+  assert.equal(result.questions.length, 1,
     "a supported client with no running service must still offer to save consent");
-  if (captured) {
-    assert.match(preview.stdout, /interactive choices were not made/);
-    assert.match(result.questions[0], /Codex CLI/);
-    assert.match(result.questions[0], /tokens/);
-    assert.match(result.questions[0], /acc inbox/);
-    assert.doesNotMatch(result.questions[0], /messages still arrive|use next-turn hooks/);
-  }
-  const expectedPolicy = captured ? "actionable" : "off";
+  assert.match(preview.stdout, /interactive choices were not made/);
+  assert.match(result.questions[0], /Codex CLI/);
+  assert.match(result.questions[0], /tokens/);
+  assert.match(result.questions[0], /acc inbox/);
+  assert.doesNotMatch(result.questions[0], /messages still arrive|use next-turn hooks/);
+  const expectedPolicy = "actionable";
   const operation = result.data.operations[0];
   assert.equal(operation.livePolicy, expectedPolicy);
   assert.equal(operation.effectiveLivePolicy, "off");
@@ -207,10 +200,8 @@ test("installed delivery setup preserves opt-in before a Codex service exists an
   const native = doctor.adapters.find(a => a.adapterId === "codex").nativeDelivery;
   assert.equal(native.policy, expectedPolicy);
   assert.notEqual(native.runtime, "active");
-  if (captured) {
-    assert.equal(native.reasonCode, "native_endpoint_unavailable");
-    assert.match((await human(p, ["doctor"])).stdout, /local delivery service is unavailable/);
-  }
+  assert.equal(native.reasonCode, "native_endpoint_unavailable");
+  assert.match((await human(p, ["doctor"])).stdout, /local delivery service is unavailable/);
 
   await p.acc(["install", "--adapter", "codex", "--delivery", "off"]);
   const off = await human(p, ["install", "--adapter", "codex"]);
@@ -222,7 +213,7 @@ test("installed delivery setup preserves opt-in before a Codex service exists an
   assert.deepEqual(offAdapter.deliveryDecision,
     { source: "explicit-option", completeSetup: false });
   assert.match((await human(p, ["doctor"])).stdout, /decision: disabled by explicit option/);
-  if (captured) assert.ok(after.remediation.some(line =>
+  assert.ok(after.remediation.some(line =>
     line.includes("acc install --adapter codex --delivery actionable")));
 
   // A missing service is retryable; a version below the native minimum is not.
@@ -231,7 +222,7 @@ test("installed delivery setup preserves opt-in before a Codex service exists an
     { cwd: p.project, env: p.env })).stdout);
   assert.equal(older.questions.length, 0);
   assert.equal(older.data.operations[0].livePolicy, "off");
-  if (captured) assert.match(older.text, /fallback: next-turn hooks \(when enabled\) or acc inbox/);
+  assert.match(older.text, /fallback: next-turn hooks \(when enabled\) or acc inbox/);
 });
 
 
@@ -246,10 +237,6 @@ test("doctor asks for a new session once Claude consent is recorded", async t =>
   await enableClaudeInboxProbe(p);
   const before = (await p.acc(["doctor"])).adapters.find(a => a.adapterId === "claude_code");
   assert.equal(before.nativeDelivery.policy, "actionable");
-  if (!captured) {
-    assert.equal(before.nativeDelivery.eligibility, "unsupported");
-    return;
-  }
   // The inbox is Claude Code's own: nothing is left to install, and the next
   // step is a session whose hooks bind it.
   assert.equal(before.nativeDelivery.eligibility, "eligible");
