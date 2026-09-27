@@ -129,6 +129,13 @@ export function defineAdapter(manifest) {
       usage(`optional native method ${method} must be a function`, { id: manifest.id, method });
     }
   }
+  // `inboundSockets(context)` names the Unix socket paths - directories or
+  // sockets - a sender connects to when this adapter's sessions receive live
+  // delivery. A sandboxed sender's installer allows exactly these, so a value
+  // that is not a function would silently read as "nothing to allow".
+  if (manifest.inboundSockets !== undefined && typeof manifest.inboundSockets !== "function") {
+    usage("optional inboundSockets must be a function", { id: manifest.id });
+  }
   if (manifest.nativeDelivery !== undefined) {
     const client = manifest.client.certificationName ?? manifest.client.command;
     native.nativeDelivery = validateNativeDeliveryContract(manifest.nativeDelivery,

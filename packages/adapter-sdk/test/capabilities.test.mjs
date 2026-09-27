@@ -139,3 +139,13 @@ test("optional native refresh and retirement methods must be callable", () => {
     assert.equal(typeof defineAdapter(base({ [method]: noop }))[method], "function");
   }
 });
+
+// A sender's sandbox is configured from every receiving adapter's declaration.
+// A list where a function belongs would be read as "no sockets" by the
+// installer, and the sender would be told its grants are complete.
+test("the inbound socket declaration must be callable", () => {
+  assert.throws(() => defineAdapter(base({ inboundSockets: ["/tmp/x"] })),
+    error => error.code === EXIT.USAGE && /inboundSockets/.test(error.message));
+  assert.equal(typeof defineAdapter(base({ inboundSockets: () => [] })).inboundSockets, "function");
+  assert.equal(defineAdapter(base()).inboundSockets, undefined);
+});

@@ -48,10 +48,14 @@ const hasCustomPolicy = (source, context) => {
     || proxies.length > 1 || proxies.some(entry => entry.header || !["true", "false"].includes(entry.value));
 };
 
+// Where this adapter's own sessions receive: the app-server control socket in
+// Codex's actual home.
+export const controlSocket = context => path.join(context.codexHome ?? path.join(context.home, ".codex"),
+  "app-server-control", "app-server-control.sock");
+
 // Match the channel's per-user temporary directory and Codex's actual home.
 // Grants cover only ACC's local channel namespace, never arbitrary Unix sockets.
-const sockets = context => [channelSocketDirectory(),
-  path.join(context.codexHome ?? path.join(context.home, ".codex"), "app-server-control", "app-server-control.sock")];
+const sockets = context => [channelSocketDirectory(), controlSocket(context)];
 
 export function outgoingStatus(source, context) {
   const state = inspectPermissions(source).state;

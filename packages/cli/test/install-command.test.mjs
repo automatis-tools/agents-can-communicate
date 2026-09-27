@@ -9,6 +9,8 @@ import { EXIT } from "@agents-can-communicate/protocol";
 
 import { PassThrough } from "node:stream";
 
+import { channelSocketDirectory } from "@agents-can-communicate/adapter-sdk";
+
 import { askConfirmation } from "../src/confirm.mjs";
 import { clientContext, decideDelivery, runInstallCommand } from "../src/install-command.mjs";
 
@@ -24,6 +26,28 @@ test("the Codex home respects an explicit CODEX_HOME and otherwise follows the s
     env: { HOME: "/ambient/home" } }).codexHome, "/supplied/home/.codex");
   assert.equal(clientContext("/supplied/home", "/state", {
     env: { CODEX_HOME: "" } }).codexHome, "/supplied/home/.codex");
+});
+
+// Issue #213: the Codex permission profile allowed ACC's channel directory and
+// its own control socket, while Claude Code receives on its inbox socket in
+// `/tmp/cc-socks`. Every receiving adapter's sockets reach the context the
+// sender's sandbox is configured and diagnosed from, whichever adapter is named.
+test("every receiving adapter's sockets reach the context a sandboxed sender is configured from", () => {
+  const linux = clientContext("/supplied/home", "/state", { platform: "linux",
+    env: { XDG_RUNTIME_DIR: "/run/user/1000", CODEX_HOME: "/explicit/codex" } }).receiverSockets;
+  for (const expected of ["/run/user/1000/cc-socks", "/tmp/cc-socks", channelSocketDirectory(),
+    "/explicit/codex/app-server-control/app-server-control.sock"]) {
+    assert.ok(linux.includes(expected), `${expected} in ${linux.join(", ")}`);
+  }
+  const darwin = clientContext("/supplied/home", "/state", { platform: "darwin", env: {} })
+    .receiverSockets;
+  assert.ok(darwin.includes("/tmp/cc-socks"));
+  assert.ok(darwin.includes("/supplied/home/.codex/app-server-control/app-server-control.sock"));
+  assert.equal(darwin.some(item => item.startsWith("/run/user/")), false);
+  // Claude Code on native Windows receives on a named pipe: nothing to allow.
+  const windows = clientContext("/supplied/home", "/state", { platform: "win32", env: {} })
+    .receiverSockets;
+  assert.equal(windows.some(item => item.includes("cc-socks")), false);
 });
 
 test("the Antigravity hook location defaults to global and honours an override", () => {
