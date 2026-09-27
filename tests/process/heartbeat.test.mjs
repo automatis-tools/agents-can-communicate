@@ -46,6 +46,9 @@ async function workspace(t) {
   const write = participant => fire(participant, { hook_event_name: "PreToolUse",
     tool_name: "apply_patch",
     tool_input: { command: "*** Begin Patch\n*** Update File: x\n@@\n-a\n+b\n*** End Patch" } });
+  // A command that writes nothing, so the write guard has no target to check.
+  const shell = participant => fire(participant, { hook_event_name: "PreToolUse",
+    tool_name: "shell", tool_input: { command: "git status" } });
   const cli = (...argv) => run(process.execPath, [acc, ...argv, "--cwd", project, "--json"],
     { env });
   const presence = async participant => JSON.parse((await cli("status")).stdout).data
@@ -68,7 +71,14 @@ async function workspace(t) {
       }
     }
   };
-  return { project, env, attach, turn, write, cli, presence, goQuiet };
+  /** The stored session record, byte for byte. */
+  const sessionRecord = async () => {
+    const root = path.join(base, "data", "acc", "workspaces");
+    const [workspaceId] = await readdir(root);
+    const dir = path.join(root, workspaceId, "ephemeral", "session");
+    return readFile(path.join(dir, (await readdir(dir))[0]), "utf8");
+  };
+  return { project, env, attach, turn, write, shell, cli, presence, goQuiet, sessionRecord };
 }
 
 test("a turn is a sign of life", async t => {
@@ -94,6 +104,34 @@ test("a long turn is a sign of life too", async t => {
   await place.write("worker");
 
   assert.equal(await place.presence("worker"), "online");
+});
+
+test("a long turn of shell commands is a sign of life too", async t => {
+  const place = await workspace(t);
+  await place.attach("worker");
+  await place.turn("worker");
+  await place.goQuiet(4);
+
+  // The refresh sat behind the write guard, and a command with nothing to
+  // guard left before reaching it. A session working through the shell went
+  // stale three minutes into its turn - measured on 0.8.1, mid-turn.
+  await place.shell("worker");
+
+  assert.equal(await place.presence("worker"), "online",
+    "a session running shell commands looked dead to its peers");
+});
+
+test("a shell command is still a read when the session was heard from lately", async t => {
+  const place = await workspace(t);
+  await place.attach("worker");
+  await place.turn("worker");
+  const before = await place.sessionRecord();
+
+  await place.shell("worker");
+  await place.shell("worker");
+
+  assert.equal(await place.sessionRecord(), before,
+    "a heartbeat was written for a session heard from seconds ago");
 });
 
 test("guarding a write is still a read when the session was heard from lately", async t => {

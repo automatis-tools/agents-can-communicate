@@ -104,6 +104,17 @@ got. Two sessions of one participant show the same numbers, so read the workspac
 `<n> offered, not retrieved` when that number is above zero. Offered is not read: a
 transport took the bytes, and the model may or may not have looked.
 
+A session is `stale` when no turn has sent a heartbeat for three heartbeat cadences. Each
+session row says what a message to such a session meets. `processTracked` is true when ACC
+knows the client process. A dead process makes the session `offline`, so a stale session with
+a tracked process is idle. `liveDelivery` is true when the session has a live delivery
+binding, and `liveLeaseCurrent` says whether the binding's lease is still valid. A stale
+session wakes on send when the lease is valid, or when its adapter can verify the receiver
+again: the router does that for a lapsed lease before it offers. The text line counts stale
+sessions by that result:
+`5 live (2 idle, wake on send; 1 idle until next turn; 1 idle, inbox only)`. `not answering`
+is kept for a stale session whose process ACC does not know.
+
 A participant with no open session is left out, unless messages still wait for it: queued,
 or offered by a live transport and not yet shown again, so that its next turn would show
 them. A message the next-turn hook already showed does not wait, since nothing will reach the
