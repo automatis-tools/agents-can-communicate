@@ -107,8 +107,9 @@ turn.
 
 The Claude Code inbox wake has installed-client evidence on 2.1.282. Codex LocalDaemon
 has it on 0.152.1 and 0.153.4. Antigravity CLI has it on 1.2.7 and later through a relay
-the agent starts in its own shell. All three use a captured platform minimum,
-current probe and exact session handshake. Claude Code and Codex preserve the ordinary
+the agent starts in its own shell. All three use a captured minimum that applies on every
+platform, a current probe and an exact session handshake; a prerelease is judged by its
+release triple. Claude Code and Codex preserve the ordinary
 client launch. Claude Code verifies its session registry, and Codex verifies its registered
 thread and workspace. Native delivery owns no vendor daemon lifecycle. Gemini CLI and Kimi
 Code have exact-version next-turn evidence only. Grok and generic MCP use inbox polling.

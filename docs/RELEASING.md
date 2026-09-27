@@ -118,8 +118,10 @@ work belongs under `Unreleased` and gets a new candidate record.
 ## Capture only capabilities you observed
 
 Run native real-client checks on the exact versions and platforms recorded in
-retained fixtures. Exact-version evidence governs normal-turn and guard behavior.
-The Claude Code inbox wake uses its captured macOS arm64 minimum plus a current probe and
+retained fixtures. A capture records evidence, and it never gates beyond that floor: what it
+proves applies from its version onward and on every platform, and what refuses a client is
+the machine's own probe or handshake, an older client, or a recorded regression.
+The Claude Code inbox wake uses its captured minimum plus a current probe and
 per-session handshake. Its passing capture is a real-client product run of the packed
 candidate, launched with the ordinary command and installed hooks. Codex LocalDaemon
 uses a separate 0.152.1 minimum with installed-product captures on 0.152.1 and
