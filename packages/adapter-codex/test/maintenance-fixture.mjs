@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { chmod, mkdir, mkdtemp, realpath, rm, symlink, writeFile } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, realpath, rename, rm, symlink, writeFile } from "node:fs/promises";
 import net from "node:net";
 import os from "node:os";
 import path from "node:path";
@@ -26,9 +26,32 @@ export async function maintenanceFixture(t, { binLayout = false } = {}) {
   const writePid = () => writeFile(pidPath, JSON.stringify({ pid: state.pid,
     processStartTime: state.processStartTime }));
   async function start() {
+    // Codex 0.155.1 `app-server daemon start` replaces the socket file a
+    // stopped service left behind (measured), so the fixture service does too.
+    await rm(socketPath, { force: true });
+    const listenPath = state.listenPath ?? socketPath;
+    // 0.157.1 likewise replaces a stale socket at the path it listens on (measured).
+    await rm(listenPath, { force: true });
     socket = net.createServer();
-    await new Promise((resolve, reject) => { socket.once("error", reject); socket.listen(socketPath, resolve); });
+    await new Promise((resolve, reject) => { socket.once("error", reject); socket.listen(listenPath, resolve); });
+    if (listenPath !== socketPath) await symlink(listenPath, socketPath);
     state.running = true; await writePid();
+  }
+  // Codex 0.157.1, measured 2026-09-26: the control socket path is a symlink to
+  // a socket under /private/tmp/codex-daemon-<uid>/<hex>, `current` is a
+  // symlink into releases/, and the daemon's command line is
+  // `<releases path>/bin/codex app-server --listen unix:// --managed-daemon`.
+  async function daemonLayout157() {
+    await stop();
+    const standalone = path.join(codexHome, "packages/standalone");
+    const releases = path.join(standalone, "releases/0.157.1-aarch64-apple-darwin");
+    await mkdir(path.dirname(releases), { recursive: true });
+    await rename(path.join(standalone, "current"), releases);
+    await symlink(releases, path.join(standalone, "current"));
+    state.listenPath = path.join(root, "tmp/codex-daemon-501/220dda598ee8");
+    await mkdir(path.dirname(state.listenPath), { recursive: true, mode: 0o700 });
+    state.processCommand = `${await realpath(managedPath)} app-server --listen unix:// --managed-daemon`;
+    await start();
   }
   async function stop() {
     if (socket) { await new Promise(resolve => socket.close(resolve)); socket = null; }
@@ -46,7 +69,7 @@ export async function maintenanceFixture(t, { binLayout = false } = {}) {
       return ok(`${state.processStartTime} ${state.processCommand ?? `${managedPath} app-server --listen unix://`}\n`);
     }
     // Wherever this host keeps lsof: /usr/sbin on macOS, /usr/bin on Linux.
-    if (path.basename(command) === "lsof") return ok(state.socketOwned ? `p${state.pid}\nn${socketPath}\n` : "");
+    if (path.basename(command) === "lsof") return ok(state.socketOwned ? `p${state.pid}\nn${state.listenPath ?? socketPath}\n` : "");
     assert.ok([cliPath, managedPath].includes(command), "never execute an approved job's arbitrary path");
     assert.equal(options.env.CODEX_HOME, codexHome);
     const argsText = args.join(" ");
@@ -82,5 +105,5 @@ export async function maintenanceFixture(t, { binLayout = false } = {}) {
     throw new Error(`Unexpected maintenance RPC: ${method}`);
   } });
   return { ...createCodexMaintenance({ run, open }), context, state, commands, requests,
-    root, cliPath, managedPath, codexHome, socketPath, pidPath, writePid, stop, start, run, open };
+    root, cliPath, managedPath, codexHome, socketPath, pidPath, writePid, stop, start, daemonLayout157, run, open };
 }

@@ -76,6 +76,24 @@ test("a pin whose client is confirmed dead does not save its generation", async 
   assert.deepEqual(await readdir(path.join(root, "generations")), ["0.4.1-active"]);
 });
 
+test("a pin that names no client does not save its generation", async t => {
+  // 0.5.x to 0.8.0 could write a pin before the client's pid was known, and
+  // nothing can ever prove such a pin's session over.
+  const root = await fixtureRoot(t, "acc-retain-pidlesspin-");
+  for (const name of ["0.4.0-pidless-pin-only", "0.4.1-active"]) {
+    await mkdir(path.join(root, "generations", name), { recursive: true });
+  }
+  await fixtureControl(root, { active: path.join(root, "generations", "0.4.1-active") });
+  await mkdir(path.join(root, "pins"), { recursive: true, mode: 0o700 });
+  await writeManagedJson(path.join(root, "pins", "legacy.json"), { schemaVersion: 1,
+    harnessSessionId: "session-pidless", runtimeRoot: path.join(root, "generations", "0.4.0-pidless-pin-only"),
+    version: "0.4.0", storeVersion: 6, clientPid: null, createdAt: new Date().toISOString() });
+  const result = await reclaimGenerations({ root, active: path.join(root, "generations", "0.4.1-active"),
+    pidIsAlive: () => true });
+  assert.deepEqual(result.removed, ["0.4.0-pidless-pin-only"]);
+  assert.deepEqual(await readdir(path.join(root, "generations")), ["0.4.1-active"]);
+});
+
 test("a pin that cannot be read is an unknown holder and reclaim removes nothing", async t => {
   const root = await fixtureRoot(t, "acc-retain-badpin-");
   await mkdir(path.join(root, "generations", "0.4.0-would-be-orphan"), { recursive: true });

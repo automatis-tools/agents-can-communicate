@@ -1,11 +1,10 @@
-import { realpath } from "node:fs/promises";
 import { decisionBody } from "@agents-can-communicate/adapter-sdk";
 
 import { CODEX_QUEUE_MINIMUM, MINIMUM_VERSION, PROTOCOL_CONTRACT, QUEUE_MODES,
   addCodexQueueMessage, canonicalCwd, compareVersions, controlSocketPath,
   locateCodexThread, openCodexAppServer, probeCodexQueue, safeReason, serverVersionOf,
   versionOrder } from "./app-server-client.mjs";
-import { newEndpointId, readNativeEndpoint, removeNativeEndpoint, socketIsReady,
+import { newEndpointId, readNativeEndpoint, readySocketPath, removeNativeEndpoint, socketIsReady,
   writeNativeEndpoint } from "./native-endpoint.mjs";
 
 // The receiver's hook supplies thread and cwd. Core holds only a random endpoint
@@ -35,8 +34,8 @@ export async function probeNativeDelivery({ timeoutMs = 750, env = process.env,
   open = openCodexAppServer } = {}) {
   const unsupported = (reasonCode, clientVersion = null) => ({ supported: false, clientVersion,
     protocolContract: PROTOCOL_CONTRACT, executableFingerprint: null, modes: [], reasonCode });
-  const socketPath = controlSocketPath(env);
-  if (!await socketIsReady(socketPath)) return unsupported("native_endpoint_unavailable");
+  const socketPath = await readySocketPath(controlSocketPath(env));
+  if (socketPath === null) return unsupported("native_endpoint_unavailable");
   try {
     return await usingPeer(socketPath, timeoutMs, open, async peer => {
       const probe = await probeCodexQueue(peer);
@@ -46,7 +45,12 @@ export async function probeNativeDelivery({ timeoutMs = 750, env = process.env,
         modes: [...QUEUE_MODES], reasonCode: null };
     });
   } catch (error) {
-    return unsupported(error?.code === "ETIMEDOUT" ? "probe_timeout" : "feature_probe_failed");
+    if (error?.code === "ETIMEDOUT") return unsupported("probe_timeout");
+    // A service that died without cleaning up leaves its socket file behind,
+    // and a connect to it is refused. That is a missing service, the one fact
+    // whose advice (start the daemon) fixes it, not a failed feature probe.
+    return unsupported(safeReason(error) === "transport_unavailable"
+      ? "native_endpoint_unavailable" : "feature_probe_failed");
   }
 }
 
@@ -103,8 +107,8 @@ export async function bindNativeSession({ event, clientPid, clientVersion, runti
   if (typeof event?.sessionId !== "string" || event.sessionId === "") return rejected("handshake_failed");
   const cwd = await canonicalCwd(event.cwd);
   if (cwd === null) return rejected("workspace_identity_unavailable");
-  const socketPath = await realpath(controlSocketPath(env)).catch(() => null);
-  if (!await socketIsReady(socketPath)) return rejected("handshake_failed");
+  const socketPath = await readySocketPath(controlSocketPath(env));
+  if (socketPath === null) return rejected("handshake_failed");
   try {
     return await usingPeer(socketPath, timeoutMs, open, async peer => {
       const endpoint = { schemaVersion: 1, endpointId: newEndpointId(), socketPath,

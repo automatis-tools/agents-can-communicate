@@ -76,6 +76,17 @@ test("service remediation uses current structured readiness and names consent ex
 });
 
 
+test("a stopped service under a legacy consent is remedied by the install that approves the start", () => {
+  const steps = nativeRemediation({ adapterId: "codex", displayName: "Codex CLI", present: true,
+    nativeDelivery: state({ configured: true, policy: "actionable", runtime: "waiting",
+      reasonCode: "native_endpoint_unavailable" }),
+    deliveryDecision: { source: "legacy-unknown", completeSetup: false },
+    nativeServiceSetup: { state: "needed", reasonCode: "service_stopped",
+      diagnostic: "The Codex service stopped and left its files behind" } });
+  assert.deepEqual(steps, ["acc install --adapter codex --delivery actionable"
+    + "  # approve complete automatic peer-request setup"]);
+});
+
 test("native runtime ignores next-turn bindings and separates installed from running consent", () => {
   const entry = (policySource, policy = "actionable") => ({ adapterId: "fixture",
     nativeDelivery: state({ configured: policy !== "off", policy, policySource, runtime: "waiting" }) });

@@ -1,10 +1,12 @@
 import { lstat, realpath } from "node:fs/promises";
 import path from "node:path";
-import { socketIsReady } from "./native-endpoint.mjs";
+import { readySocketPath, socketIsReady } from "./native-endpoint.mjs";
 import { probeNativeDelivery } from "./native-delivery.mjs";
 import { installCodexStandalone } from "./standalone-install.mjs";
-import { failMaintenance, maintenanceContext, probeMaintenanceCli, probeMaintenanceInstall,
-  readMaintenancePid, runMaintenanceCommand, verifyMaintenanceProcess } from "./maintenance-host.mjs";
+import { refusesConnections } from "./ws-json-rpc.mjs";
+import { approvedProcessIsDead, failMaintenance, maintenanceContext, probeMaintenanceCli,
+  probeMaintenanceInstall, readMaintenancePid, runMaintenanceCommand, verifyMaintenanceProcess }
+  from "./maintenance-host.mjs";
 
 const keys = ["home", "codexHome", "cliPath", "cliVersion", "managedPath", "managedVersion",
   "managedRealPath", "cliIdentity", "managedIdentity", "socketPath", "pidPath", "platform"];
@@ -14,6 +16,7 @@ const own = info => typeof process.getuid !== "function" || info.uid === process
 const sessionNeeded = "Codex service ready; open a new Codex session to establish its delivery binding and review client hooks and permissions";
 const diagnostics = {
   native_endpoint_unavailable: "Prepare the missing Codex service with codex app-server daemon start, then open a new Codex session",
+  service_stopped: "The Codex service stopped and left its files behind; acc install starts it in place with codex app-server daemon start, which replaces them, then open a new Codex session",
   managed_install_missing: "Codex service needs its standalone package; run acc install to download the matching official Codex release and prepare the service",
   managed_install_incomplete: "Codex standalone installation is incomplete; repair it with the official Codex installer, then retry acc install",
   prerequisite_consent_required: "Codex standalone download was not approved. Run acc install --adapter codex --delivery actionable to allow the download and automatic peer requests",
@@ -36,6 +39,20 @@ export function createCodexServiceSetup({ run = runMaintenanceCommand, probe = p
   async function info(file) {
     try { return await fs.lstat(file); }
     catch (error) { if (error.code === "ENOENT") return null; throw error; }
+  }
+  // A service that stopped without cleaning up: its pid file names a process
+  // that is gone, and its socket refuses every connection; either may be gone
+  // already. Prepared like an absent one: Codex's own start replaces both
+  // files (measured on 0.155.1), and every identity check follows it.
+  async function serviceStopped(paths) {
+    if (await info(paths.pidPath)) {
+      const recorded = await readMaintenancePid(paths.pidPath).catch(() => null);
+      if (recorded === null || !await approvedProcessIsDead(recorded, paths, run)) return false;
+    }
+    // Absent, or a symlink whose socket is gone (what 0.157.1 leaves after a
+    // reboot cleared /private/tmp), or a socket nothing listens on.
+    const target = await fs.realpath(paths.socketPath).catch(() => null);
+    return target === null || (await socketIsReady(target) && await refusesConnections(target));
   }
   async function safeDirectories(paths) {
     for (const dir of [paths.codexHome, path.dirname(paths.socketPath), path.dirname(paths.pidPath)]) {
@@ -78,7 +95,7 @@ export function createCodexServiceSetup({ run = runMaintenanceCommand, probe = p
       socketPath: paths.socketPath, pidPath: paths.pidPath, platform: paths.platform, ...installation });
   }
   async function verify(paths, facts) {
-    if (!await socketIsReady(paths.socketPath)) failMaintenance("daemon_socket_unproven");
+    if (!await readySocketPath(paths.socketPath)) failMaintenance("daemon_socket_unproven");
     const version = await run(facts.cliPath, ["app-server", "daemon", "version"], paths.options);
     if (version.status !== 0) failMaintenance("daemon_version_unavailable");
     const observed = JSON.parse(version.stdout);
@@ -114,6 +131,7 @@ export function createCodexServiceSetup({ run = runMaintenanceCommand, probe = p
       if (!await info(paths.socketPath) && !await info(paths.pidPath)) {
         return report("needed", "native_endpoint_unavailable", facts);
       }
+      if (await serviceStopped(paths)) return report("needed", "service_stopped", facts);
       return await verify(paths, facts);
     } catch (error) {
       const reason = error.reasonCode ?? "service_inspection_failed";
@@ -164,9 +182,10 @@ export function createCodexServiceSetup({ run = runMaintenanceCommand, probe = p
       if (current.state !== "needed") return { ...current, state: "blocked", started };
       const paths = await contextPaths(context);
       if (!same(plan, await installed(paths))) failMaintenance("service_identity_changed");
-      // Last check immediately before the only mutating command. Never delete
-      // stale metadata or stop/restart a process on this path.
-      if (await info(paths.socketPath) || await info(paths.pidPath)) {
+      // Last check immediately before the only mutating command. ACC deletes no
+      // metadata and never stops or restarts a process on this path; a service
+      // whose files are all that is left of it is started over them.
+      if ((await info(paths.socketPath) || await info(paths.pidPath)) && !await serviceStopped(paths)) {
         return { ...await verify(paths, current), started };
       }
       started = true;

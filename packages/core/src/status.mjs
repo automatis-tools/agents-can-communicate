@@ -2,6 +2,7 @@ import { classifySessionPresence } from "./sessions.mjs";
 import { computeAttention } from "./attention.mjs";
 import { isCurrentIntent } from "./intents.mjs";
 import { decisionView, isCurrentDecision } from "./decision-state.mjs";
+import { awaitsNextTurn } from "./receipts.mjs";
 
 /**
  * Protection level, reported from what is actually enforceable.
@@ -96,12 +97,20 @@ export function createStatusService(ports, sessions, deliveryBindings) {
       .filter(isCurrentDecision).map(message => message.messageId));
     const unretrieved = new Map();
     const tally = key => unretrieved.get(key) ?? { queued: 0, offered: 0 };
+    // Narrower than unretrieved: what the recipient's next turn would still
+    // show. An offer the next turn already made is unretrieved, but nothing
+    // will ever reach the recipient for it again.
+    const waiting = new Map();
     for (const receipt of snapshot.receipts) {
       if (!current.has(receipt.messageId)
         || !["queued", "offered"].includes(receipt.state)) continue;
       for (const key of [receipt.recipientParticipantId, null]) {
         const counts = tally(key);
         unretrieved.set(key, { ...counts, [receipt.state]: counts[receipt.state] + 1 });
+      }
+      if (awaitsNextTurn(receipt)) {
+        waiting.set(receipt.recipientParticipantId,
+          (waiting.get(receipt.recipientParticipantId) ?? 0) + 1);
       }
     }
 
@@ -116,7 +125,7 @@ export function createStatusService(ports, sessions, deliveryBindings) {
       }
     }
     const awaited = new Set([...latest.values()].filter(session => !liveParticipants.has(session.participantId)
-      && (tally(session.participantId).queued + tally(session.participantId).offered) > 0)
+      && (waiting.get(session.participantId) ?? 0) > 0)
       .map(session => session.sessionId));
 
     return {
@@ -149,7 +158,10 @@ export function createStatusService(ports, sessions, deliveryBindings) {
         unretrieved: tally(session.participantId),
         // The client's reason when it ended the session, such as Claude Code's
         // "clear". Kept in the record's extensions, so it is null for 0.7.x.
-        ...(presence === "offline" ? { endReason: session.extensions?.endReason ?? null } : {}),
+        // And how many messages its next turn would still show, the count that
+        // keeps it listed.
+        ...(presence === "offline" ? { endReason: session.extensions?.endReason ?? null,
+          waiting: waiting.get(session.participantId) ?? 0 } : {}),
       })),
       // The owner is named twice on purpose. Every command that reaches a peer
       // takes a participant id, so a claim that gave only a session id sent the

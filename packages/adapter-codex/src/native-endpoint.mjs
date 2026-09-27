@@ -49,6 +49,16 @@ export async function socketIsReady(socketPath) {
   } catch { return false; }
 }
 
+/** The socket a control socket path leads to, or null. Codex 0.157.1 keeps a
+ * symlink at the path it reports and the socket itself under /private/tmp
+ * (measured 2026-09-26), so the path is followed once and the socket at its
+ * end is held to socketIsReady: an owned socket, never itself a link. */
+export async function readySocketPath(socketPath) {
+  if (!absolute(socketPath)) return null;
+  const resolved = await realpath(socketPath).catch(() => null);
+  return resolved !== null && await socketIsReady(resolved) ? resolved : null;
+}
+
 // A fresh, immutable registration for one hook binding. Refresh observes the
 // same registration again; it cannot overwrite a successor's random endpoint.
 export async function writeNativeEndpoint({ runtimeDir, record }) {

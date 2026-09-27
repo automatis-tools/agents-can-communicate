@@ -1,6 +1,6 @@
 import path from "node:path";
 import { openCodexAppServer, versionOrder } from "./app-server-client.mjs";
-import { socketIsReady } from "./native-endpoint.mjs";
+import { readySocketPath } from "./native-endpoint.mjs";
 import { absolute, approvedProcessIsDead, failMaintenance, maintenanceContext,
   managedExecutablePaths, metadataExists, probeMaintenanceInstall, readMaintenancePid, runMaintenanceCommand,
   startTimeValid, verifyMaintenanceProcess } from "./maintenance-host.mjs";
@@ -36,7 +36,7 @@ export function createCodexMaintenance({ run = runMaintenanceCommand, open = ope
       const paths = await maintenanceContext(context);
       Object.assign(snapshot, { codexHome: paths.codexHome, socketPath: paths.socketPath, managedPath: paths.managedPath });
       if (!await metadataExists(paths.socketPath) && !await metadataExists(paths.pidPath)) return null;
-      if (!await socketIsReady(paths.socketPath)) failMaintenance("daemon_socket_unproven");
+      if (!await readySocketPath(paths.socketPath)) failMaintenance("daemon_socket_unproven");
       Object.assign(snapshot, await probeMaintenanceInstall(paths, run));
       const version = await run(snapshot.cliPath, ["app-server", "daemon", "version"], paths.options);
       if (version.status !== 0) failMaintenance("daemon_version_unavailable");

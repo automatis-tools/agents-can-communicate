@@ -4,6 +4,35 @@ import path from "node:path";
 // enough that a table which disagrees with itself cannot spin.
 const MAX_HOPS = 16;
 
+// A client shipped as a node script runs as `node`, so its comm names the
+// interpreter. Gemini CLI is one, measured on 0.60.0. For these, the script the
+// interpreter was given names the client.
+const SCRIPT_HOSTS = new Set(["node"]);
+const SCRIPT_EXTENSION = /\.[mc]?js$/;
+
+/** What the script a script host runs could be called, without extensions. */
+function scriptsOf(entry) {
+  if (!SCRIPT_HOSTS.has(path.basename(entry.comm)) || typeof entry.args !== "string") return [];
+  // `args` starts with the interpreter as it was invoked, which is the comm
+  // itself on macOS; past it, the first word that is no option is the script -
+  // unless an option written without `=` came right before it, since that word
+  // may be the option's value (`--require ./preload.cjs`). Which options take
+  // one depends on the client's own node, so such a word is kept as a candidate
+  // and the search goes on; it ends at the first word no bare option precedes.
+  const rest = entry.args.startsWith(`${entry.comm} `) ? entry.args.slice(entry.comm.length)
+    : entry.args.replace(/^\S+/, "");
+  const candidates = [];
+  let afterBareOption = false;
+  for (const word of rest.trim().split(/\s+/)) {
+    if (word === "") continue;
+    if (word.startsWith("-")) { afterBareOption = !word.includes("="); continue; }
+    candidates.push(path.basename(word).replace(SCRIPT_EXTENSION, ""));
+    if (!afterBareOption) break;
+    afterBareOption = false;
+  }
+  return candidates;
+}
+
 /**
  * The pid of the client this hook is running for, or null when nobody knows.
  *
@@ -24,7 +53,7 @@ export function resolveClientPid({ table, from, command, maxHops = MAX_HOPS }) {
     seen.add(current);
     // `ps` reports some entries bare (`claude`) and some with a path
     // (`/bin/zsh`), so the comparison has to be on the basename.
-    if (path.basename(entry.comm) === command) return current;
+    if (path.basename(entry.comm) === command || scriptsOf(entry).includes(command)) return current;
     if (entry.ppid === current || entry.ppid <= 1) return null;
     current = entry.ppid;
   }

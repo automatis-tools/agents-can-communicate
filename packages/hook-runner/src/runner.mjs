@@ -400,8 +400,10 @@ const HANDLERS = {
       const facts = await runtimeFacts(import.meta.url);
       await storeSessionBinding({ runtimeDir: paths.root, deadlineAt: deadline, harnessSessionId: event.sessionId,
         accSessionId: binding.accSessionId, generation: binding.generation, ...facts });
+      // The pid this binding already knew keeps the refreshed pin reapable if
+      // the lookup below cannot find the client.
       await writePin({ root: pinRoot, harnessSessionId: event.sessionId, runtimeRoot: facts.runtimeRoot,
-        version: facts.version, storeVersion: facts.storeVersion });
+        version: facts.version, storeVersion: facts.storeVersion, clientPid: binding.clientPid });
     }
     const clientVersion = await probeClientVersion(adapter,
       { timeoutMs: Math.max(1, Math.min(1_000, deadline - Date.now())) });

@@ -227,10 +227,12 @@ modes. It preserves explicit declarations and does not rewrite live leases. Miss
 changed generation files and unknown native bindings remain unverified holds.
 A session is also pinned to the generation
 it started with: its hooks delegate to that generation while the pin declares the same
-store contract this one does, and run the active generation otherwise. A generation
-directory is reclaimed once no control pointer, live lease, live pin or staging hold names
-it. Parsed help, version, and update recovery remain available when workspace admission is
-unavailable.
+store contract this one does, and run the active generation otherwise. Apart from
+`SessionEnd`, only the client's confirmed death releases a pin, so a session whose client
+process cannot be found is not pinned, and a pin that names no client is reaped. A
+generation directory is reclaimed once no control pointer, live lease, live pin or staging
+hold names it. Parsed help, version, and update recovery remain available when workspace
+admission is unavailable.
 
 An independent worker downloads npm packages with lifecycle scripts disabled, checks exact
 stable package identity and the discovered integrity, and health-checks the staged runtime.
