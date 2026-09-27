@@ -602,6 +602,15 @@ const HANDLERS = {
   async beforeTool({ binding, context, event, adapter }) {
     if (binding === null) return { decision: "allow" };
     if (event.targets.length === 0) {
+      // A shell command is work too. The refresh below sat behind the write
+      // guard, so a turn spent in the shell went stale three minutes in, measured
+      // on 0.8.1. With no guard read to borrow from, the session's own record is
+      // the narrow read that says whether a heartbeat is due.
+      const own = await context.service.locateSession(binding.accSessionId).catch(() => null);
+      if (own !== null && needsRefresh(own.record.heartbeatAt, Date.now())) {
+        await context.service.heartbeatSession({ sessionId: binding.accSessionId,
+          generation: binding.generation }).catch(() => null);
+      }
       // The runner cannot tell what a shell command touches. Saying so is the
       // honest answer; guessing would block work at random and miss real writes.
       return { decision: "allow", unguarded: true };
