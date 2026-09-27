@@ -117,17 +117,27 @@ export async function observeMaintenanceProcess(pid, paths, run) {
   return { state: "alive", processStartTime: match[1], command: match[2] };
 }
 
+// The daemon's command line as measured: 0.154.0 ran `<current path> app-server
+// --listen unix://`; 0.157.1 runs the resolved releases path with
+// `--managed-daemon` appended. The executable must live in the standalone tree
+// and be the managed binary itself, however the tree names it.
+const DAEMON_COMMAND = /^(\/.+?) app-server --listen unix:\/\/(?: --managed-daemon)?$/;
+
 export async function verifyMaintenanceProcess(snapshot, paths, run) {
   const process = await observeMaintenanceProcess(snapshot.pid, paths, run);
-  const suffix = " app-server --listen unix://";
-  const executable = process.command?.endsWith(suffix) ? process.command.slice(0, -suffix.length) : null;
+  const executable = DAEMON_COMMAND.exec(process.command ?? "")?.[1] ?? null;
+  const standalone = path.join(paths.codexHome, "packages", "standalone") + path.sep;
   if (process.state !== "alive" || process.processStartTime !== snapshot.processStartTime
-    || !managedExecutablePaths(paths.codexHome).includes(executable)
-    || await realpath(executable) !== await realpath(paths.managedPath)) {
+    || executable === null || !executable.startsWith(standalone)
+    || await realpath(executable).catch(() => null) !== await realpath(paths.managedPath)) {
     failMaintenance("daemon_identity_unavailable");
   }
+  // 0.157.1 lists the socket by the path it listens on, not by the symlink it
+  // reports; either names the same socket.
+  const listening = new Set([paths.socketPath, await realpath(paths.socketPath).catch(() => null)]
+    .filter(value => value !== null).map(value => `n${value}`));
   const sockets = await run("/usr/sbin/lsof", ["-n", "-a", "-p", String(snapshot.pid), "-U", "-Fn"], paths.options);
-  if (sockets.status !== 0 || !sockets.stdout.split("\n").includes(`n${paths.socketPath}`)) {
+  if (sockets.status !== 0 || !sockets.stdout.split("\n").some(line => listening.has(line))) {
     failMaintenance("daemon_socket_unproven");
   }
 }

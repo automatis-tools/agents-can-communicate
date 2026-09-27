@@ -30,10 +30,23 @@ test("the status line names who has messages waiting and no open session", () =>
   const withOffline = { ...status(), participants: [
     { participantId: "claude_code-a", presence: "online", unretrieved: { queued: 0, offered: 0 } },
     { participantId: "claude_code-b", presence: "offline", endReason: "clear",
-      unretrieved: { queued: 2, offered: 0 } },
+      unretrieved: { queued: 2, offered: 0 }, waiting: 2 },
     { participantId: "cli-c", presence: "offline", endReason: null,
-      unretrieved: { queued: 1, offered: 0 } },
+      unretrieved: { queued: 1, offered: 0 }, waiting: 1 },
   ] };
   assert.equal(describeStatus(withOffline), "2 live; 1 claim(s); protection none; "
     + "waiting for a closed session: claude_code-b (cleared, 2), cli-c (1)");
+});
+
+// An offer the next turn already showed is unretrieved but no longer waits:
+// nothing will reach the closed session for it. `--all` lists such entries too.
+test("the status line counts only what a closed session's next turn would still show", () => {
+  const withOffline = { ...status(), participants: [
+    { participantId: "claude_code-a", presence: "offline", endReason: null,
+      unretrieved: { queued: 1, offered: 2 }, waiting: 2 },
+    { participantId: "claude_code-d", presence: "offline", endReason: null,
+      unretrieved: { queued: 0, offered: 1 }, waiting: 0 },
+  ] };
+  assert.equal(describeStatus(withOffline), "2 live; 1 claim(s); protection none; "
+    + "waiting for a closed session: claude_code-a (2)");
 });

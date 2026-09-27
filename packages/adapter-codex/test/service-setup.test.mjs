@@ -1,4 +1,6 @@
 import assert from "node:assert/strict";
+import { spawn } from "node:child_process";
+import { once } from "node:events";
 import { chmod, lstat, mkdir, realpath, rm, symlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 import test from "node:test";
@@ -74,10 +76,12 @@ test("unsupported platform and incomplete managed install provide action without
   assert.equal(f.starts.length, 0);
 });
 
-for (const entry of ["pid", "socket", "directory-symlink", "directory-writable"]) {
-  test(`stale or unsafe ${entry} is not definite absence`, async t => {
+// A pid record naming a process nobody can observe is not a stopped service:
+// the process may be alive under another user, and ACC never starts over it.
+for (const entry of ["unobservable-pid", "socket", "directory-symlink", "directory-writable"]) {
+  test(`an unobservable pid or an unsafe ${entry === "unobservable-pid" ? "record" : entry} is not definite absence`, async t => {
     const f = await serviceFixture(t);
-    if (entry === "pid") await f.writePid();
+    if (entry === "unobservable-pid") { await f.writePid(); f.state.processUnknown = true; }
     if (entry === "socket") await writeFile(f.socketPath, "stale");
     const directory = path.dirname(f.socketPath);
     if (entry === "directory-symlink") {
@@ -132,6 +136,116 @@ for (const failure of ["startFails", "startThrows", "protocolFails", "socketOwne
     assert.doesNotMatch(result.diagnostic, /private failure/);
   });
 }
+
+// What a service killed without cleanup leaves: the socket file, and nothing
+// accepting on it. A graceful close unlinks the file, so the listener is killed.
+async function leaveStaleSocket(socketPath) {
+  const listener = spawn(process.execPath, ["-e", "require('node:net').createServer()"
+    + `.listen(${JSON.stringify(socketPath)}, () => process.stdout.write('up'))`]);
+  await once(listener.stdout, "data");
+  listener.kill("SIGKILL");
+  await once(listener, "exit");
+  assert.equal((await lstat(socketPath)).isSocket(), true);
+}
+
+const unix = { skip: process.platform === "win32" && "Unix domain socket files" };
+
+// Measured on Codex 0.155.1: its own `app-server daemon start` replaces both
+// files a stopped service leaves, so a stopped service is prepared like an
+// absent one - by that command, with every identity check after it.
+for (const leftovers of [["socket"], ["socket", "pid"], ["pid"]]) {
+  test(`a stopped service's leftover ${leftovers.join(" and ")} is started once, in place`,
+    unix, async t => {
+      const f = await serviceFixture(t);
+      if (leftovers.includes("socket")) await leaveStaleSocket(f.socketPath);
+      if (leftovers.includes("pid")) await f.writePid();
+      const plan = await f.inspectNativeServiceSetup(f.context);
+      assert.equal(plan.state, "needed");
+      assert.equal(plan.reasonCode, "service_stopped");
+      assert.match(plan.diagnostic, /acc install/);
+      const result = await apply(f, plan);
+      assert.equal(result.state, "ready");
+      assert.equal(result.started, true);
+      assert.equal(f.starts.length, 1);
+      assert.ok((await lstat(f.socketPath)).isSocket());
+    });
+}
+
+const notStopped = async (f, t) => {
+  const plan = await f.inspectNativeServiceSetup(f.context);
+  assert.notEqual(plan.reasonCode, "service_stopped");
+  assert.equal(f.starts.length, 0);
+};
+
+test("a leftover socket beside the pid of a live process is not a stopped service", unix, async t => {
+  const f = await serviceFixture(t);
+  await leaveStaleSocket(f.socketPath);
+  await f.writePid();
+  f.state.running = true;
+  await notStopped(f, t);
+});
+
+test("an unsafe pid file beside a leftover socket is not a stopped service", unix, async t => {
+  const f = await serviceFixture(t);
+  await leaveStaleSocket(f.socketPath);
+  await f.writePid();
+  await chmod(f.pidPath, 0o666);
+  await notStopped(f, t);
+});
+
+test("a socket that still accepts, with no pid file, is not a stopped service", async t => {
+  const f = await serviceFixture(t, { missing: false });
+  await rm(f.pidPath);
+  await notStopped(f, t);
+});
+
+test("a socket that fails to connect for another reason is not a stopped service", unix, async t => {
+  const f = await serviceFixture(t, { missing: false });
+  await rm(f.pidPath);
+  await chmod(f.socketPath, 0o000); // connect is refused permission, not the connection
+  await notStopped(f, t);
+});
+
+// Codex 0.157.1 keeps the control socket behind a symlink, so a symlink is
+// the ordinary shape of a running service, and what a stopped one leaves.
+test("a 0.157.1 service is ready through its symlinked socket", unix, async t => {
+  const f = await serviceFixture(t);
+  await f.daemonLayout157();
+  const plan = await f.inspectNativeServiceSetup(f.context);
+  assert.equal(plan.state, "ready", plan.reasonCode);
+  assert.equal(f.starts.length, 0);
+});
+
+for (const leftover of ["dangling", "refusing"]) {
+  test(`a stopped 0.157.1 service, its symlink ${leftover}, is started once in place`, unix, async t => {
+    const f = await serviceFixture(t);
+    await f.daemonLayout157();
+    await f.stop();
+    if (leftover === "refusing") await leaveStaleSocket(f.state.listenPath);
+    await f.writePid();
+    assert.equal((await lstat(f.socketPath)).isSymbolicLink(), true);
+    const plan = await f.inspectNativeServiceSetup(f.context);
+    assert.equal(plan.state, "needed", plan.reasonCode);
+    assert.equal(plan.reasonCode, "service_stopped");
+    const result = await apply(f, plan);
+    assert.equal(result.state, "ready", result.reasonCode);
+    assert.equal(f.starts.length, 1);
+  });
+}
+
+test("a symlink to a regular file is not a stopped service", async t => {
+  const f = await serviceFixture(t);
+  const elsewhere = path.join(f.root, "elsewhere");
+  await writeFile(elsewhere, "not a socket");
+  await symlink(elsewhere, f.socketPath);
+  await notStopped(f, t);
+});
+
+test("a regular file where the socket belongs is not a stopped service", async t => {
+  const f = await serviceFixture(t);
+  await writeFile(f.socketPath, "not a socket");
+  await notStopped(f, t);
+});
 
 test("a ready service that disappears becomes blocked without inventing cold-start consent", async t => {
   const f = await serviceFixture(t, { missing: false });

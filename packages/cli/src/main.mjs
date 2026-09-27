@@ -200,12 +200,11 @@ export function describeStatus(status) {
   const offered = status.counts.unretrieved?.offered ?? 0;
   const withOffers = offered === 0 ? line : `${line}; ${offered} offered, not retrieved`;
   // Status lists a participant with no open session only while messages wait
-  // for it; each is named here, with the client's reason when it gave one.
-  const waiting = (status.participants ?? []).filter(item => item.presence === "offline")
-    .map(item => {
-      const count = (item.unretrieved?.queued ?? 0) + (item.unretrieved?.offered ?? 0);
-      return `${item.participantId} (${item.endReason === "clear" ? "cleared, " : ""}${count})`;
-    });
+  // for it; each is named here, with the client's reason when it gave one. The
+  // count is what its next turn would still show, never an offer already made.
+  const waiting = (status.participants ?? [])
+    .filter(item => item.presence === "offline" && (item.waiting ?? 0) > 0)
+    .map(item => `${item.participantId} (${item.endReason === "clear" ? "cleared, " : ""}${item.waiting})`);
   return waiting.length === 0 ? withOffers
     : `${withOffers}; waiting for a closed session: ${waiting.join(", ")}`;
 }

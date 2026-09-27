@@ -1,5 +1,61 @@
 # Changelog
 
+## Unreleased — fixes from the first real 0.8.0 update
+
+- A session pin that names no client no longer holds its generation forever. A pin keeps the
+  generation its session started with until the client is confirmed dead, but 0.8.0 and earlier
+  could write one without the client's pid: before the pid lookup on a repeated start, or when
+  the lookup found no client. Only `SessionEnd` removed such a pin, and it does not always come.
+  On a real machine two of them kept the 0.5.10 and 0.6.0 generations on disk after 0.8.0 was
+  active.
+- A session whose client cannot be found is now left unpinned, so its hooks run the active
+  generation, the fallback every unresolvable pin already gets. A repeated start re-pins with
+  the pid its binding already knew. The next reclaim removes the pid-less pins earlier versions
+  left and frees their generations.
+- Codex live delivery reports `native_endpoint_unavailable` when the Codex control socket is
+  still on disk but nothing accepts on it, which is what a service that died without cleaning
+  up leaves. It used to report `feature_probe_failed` ("the native protocol probe did not
+  succeed"), which hid the advice that fixes it: `codex app-server daemon start`, then a new
+  Codex session. A probe that times out still reports `probe_timeout`, and any other failure
+  `feature_probe_failed`. When the stopped service also left its PID record, doctor said
+  `could not verify daemon_version_unavailable`; it now says the service stopped and left its
+  files behind. `acc install` now starts such a service in place, with the vendor's own
+  `codex app-server daemon start`, which on Codex 0.155.1 replaces both files, and with every
+  identity check after it; a pid record whose process cannot be observed is still never started
+  over. A legacy consent that predates service setup is named by doctor:
+  `acc install --adapter codex --delivery actionable` approves the start.
+- Codex CLI 0.157.1 keeps its control socket behind a symlink and runs the daemon as the
+  resolved releases path with `--managed-daemon`. Detection, doctor, inspection and service
+  setup follow the reported path to the socket and accept that command line, as the session
+  hook already did; a stopped 0.157.1 service, its symlink dangling or its socket refusing, is
+  started in place like any other. A 0.157.1 home that has no standalone package installs a
+  daemon package of its own, which is measured and not yet supported.
+- `acc status` lists a participant with no open session only while its next turn would still
+  show a message: queued, or offered by a live transport and not yet shown again. An answer the
+  next-turn hook had already put in a closed Claude Code session's context kept that
+  participant listed as `waiting for a closed session` forever, although nothing would reach it
+  again and nothing was owed. The rule is the repeat rule without its elapsed time, and an offer
+  an older ACC recorded without facts still counts as waiting. An offline participant carries
+  the number as `waiting`, which the text line prints; `unretrieved` keeps its meaning.
+- A client that runs as a node script is found. Presence and pinning learn the client's pid by
+  walking the hook's ancestors for the client's command, but Gemini CLI runs as `node`, so a
+  real Gemini CLI 0.60.0 session opened with `pid: null`. The process table now also reads each
+  process's command line, in parallel and within the same timeout, and a `node` ancestor
+  matches by the script it runs, also past an option's separate value such as
+  `--require ./preload.cjs`. The innermost match still wins, so the pid is Gemini's own
+  relaunch. If the command lines cannot be read, the table is what it was before, and a native
+  client matches exactly as before.
+
+| Candidate artifact | Value |
+|---|---|
+| Built from | `acf867081ca545a6a22db54175e5194d8f52d776` |
+| Tarball | `agents-can-communicate-0.8.0.tgz`, 471,879 bytes, 311 files |
+| sha256 | `7e759fa48d368f7f46ccda857ad3a253cdaa714933c5277d35d31c8c4884376f` |
+
+This unpublished development archive passed clean installation verification. See
+[real-machine fixes evidence](docs/release-evidence/unreleased-real-machine-fixes.md). The
+package version remains `0.8.0` until a release prepares its own.
+
 ## 0.8.0 — release candidate
 
 - Claude Code live delivery wakes a session through the inbox socket Claude Code opens for every

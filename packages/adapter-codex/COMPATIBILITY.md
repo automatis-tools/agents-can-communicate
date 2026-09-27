@@ -1068,3 +1068,61 @@ It records the source capture SHA-256
 The source is this completed final capture only. Original source and script bytes
 remain unchanged; their temporary paths identify capture provenance, not permanent
 publication links.
+
+## A stopped service's leftover files — Codex 0.155.1, 2026-09-26
+
+A real machine updated to ACC 0.8.0 had no Codex service running. The service had
+stopped on 2026-09-09 and left its control socket and its PID record, which named a
+process that no longer existed; a connect to the socket was refused. Detection called
+this `feature_probe_failed`, and service inspection reached `app-server daemon version`,
+which exited 1, so doctor printed `could not verify daemon_version_unavailable`. Neither
+named the stopped service or the command that restarts it.
+
+With a separate `CODEX_HOME` holding the same leftovers, `codex app-server daemon start`
+returned `started`, replaced the socket, and wrote a new PID record: once with only the
+leftover socket, and once with the socket and a PID record naming a dead process.
+Detection now reports `native_endpoint_unavailable` for a refused socket, and inspection
+reports `service_stopped` when the recorded process is confirmed dead or absent and the
+socket refuses connections or is absent. Setup prepares such a service exactly like an
+absent one: the vendor's own `daemon start`, then the same identity checks (PID record,
+start time, executable, socket ownership, served version, protocol). The 2026-09-12 rule
+against starting over leftover metadata rested on not having measured what the vendor's
+start does with it; that is measured now. A PID record naming a live process or one that
+cannot be observed, an unreadable record, a symlink, or a socket that fails for any other
+reason is not a stopped service, and setup still never starts over those.
+
+## The daemon as Codex 0.157.1 presents it — 2026-09-26
+
+The same machine updated to Codex CLI 0.157.1 during the day, and a daemon was running by
+20:05. Measured against it, read-only, and against a separate `CODEX_HOME` linked to the
+installed standalone package:
+
+- `~/.codex/app-server-control/app-server-control.sock` is a symlink to
+  `/private/tmp/codex-daemon-<uid>/<64 hex>`, a socket with mode `0600` owned by the user
+  in a `0700` directory. `app-server daemon version` still reports the symlink path as
+  `socketPath`.
+- `lsof -n -a -p <pid> -U -Fn` lists the listening socket by the path it listens on, the
+  target, on two descriptors; the connected pairs appear as `->0x…` addresses.
+- `ps -o command=` shows `<codex home>/packages/standalone/releases/<version>-aarch64-apple-darwin/bin/codex
+  app-server --listen unix:// --managed-daemon`: the resolved releases path, which
+  `packages/standalone/current` links to, and a new trailing argument.
+- The PID record keeps `pid` and `processStartTime` and adds `processIdentity` (boot id,
+  unique id, start seconds) and `executableIdentity`.
+- `daemon stop` removes the symlink and the socket. `daemon start` over a stale socket at
+  the target path returned `started` and replaced it.
+
+ACC 0.8.0 refused all of this: the probe and inspection held the symlink itself to
+`socketIsReady`, so doctor said the service was unavailable and `daemon_socket_unproven`;
+identity verification accepted only `current/bin/codex` and the exact
+`app-server --listen unix://` line. A session's hook still bound, because the bind
+resolved the path first, and live delivery worked through it. Now every check follows
+the reported path once and holds the socket at its end to the same rule; the executable
+must live in the standalone tree and be the managed binary; the trailing
+`--managed-daemon` is accepted; the socket is proven by either path.
+
+Measured and not supported: in a `CODEX_HOME` with no standalone package, 0.157.1's
+`daemon start` installs its own `packages/app-server-daemon/` and keeps its records as
+`app-server-daemon/daemon.pid` and `daemon-updater.*`, with `managedCodexPath`
+`packages/app-server-daemon/current/bin/codex`. ACC's service setup still expects the
+standalone package and its file names, so a fresh 0.157.1 home reports the standalone
+prerequisite. That layout needs its own capture.

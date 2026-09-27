@@ -9,6 +9,7 @@ import { canonicalManagerRoot, managedDirectory, readManagedJson, syncDirectory,
   writeManagedJson } from "./state.mjs";
 
 const SCHEMA_VERSION = 1;
+const isPid = value => Number.isSafeInteger(value) && value > 0;
 
 // Same hashing rule as session bindings: a foreign harness id never selects
 // which file is written.
@@ -30,13 +31,19 @@ export const hookEntrypointFor = root => path.join(root, "bin", "entrypoints", "
 // once, on every entry point - matching every other managed-runtime module -
 // is what makes "the root the writer used" and "the root the reader used"
 // the same derivation instead of two that merely happen to agree today.
+//
+// A pin holds its generation until its client is confirmed dead, so a pin with
+// no client pid could never be released and kept its generation forever. A
+// session whose client cannot be found goes unpinned instead, and its hooks run
+// the active generation - the fallback every unresolvable pin already gets.
 export async function writePin({ root, harnessSessionId, runtimeRoot, version, storeVersion,
   clientPid }) {
+  if (!isPid(clientPid)) return;
   root = await canonicalManagerRoot(root);
   await managedDirectory(path.join(root, "pins"), { create: true });
   await writeManagedJson(fileFor(root, harnessSessionId), { schemaVersion: SCHEMA_VERSION,
     harnessSessionId, runtimeRoot, version, storeVersion: storeVersion ?? null,
-    clientPid: clientPid ?? null, createdAt: new Date().toISOString() });
+    clientPid, createdAt: new Date().toISOString() });
 }
 
 export async function readPin({ root, harnessSessionId }) {
@@ -105,7 +112,9 @@ export async function resolvePinnedGeneration({ root, harnessSessionId, active }
 }
 
 /** A client that exits without SessionEnd leaves its pin behind. Admission
- * already reaps dead leases; pins follow the same confirmed-death rule. */
+ * already reaps dead leases; pins follow the same confirmed-death rule. A pin
+ * that names no client, which 0.8.0 and earlier wrote when the pid was not yet
+ * known, is reaped outright: nothing could ever prove its session over. */
 export async function reapPins({ root, pidIsAlive = defaultPidIsAlive } = {}) {
   root = await canonicalManagerRoot(root);
   const directory = path.join(root, "pins");
@@ -115,8 +124,8 @@ export async function reapPins({ root, pidIsAlive = defaultPidIsAlive } = {}) {
     if (!name.endsWith(".json")) continue;
     const file = path.join(directory, name);
     const record = await readManagedJson(file).catch(() => null);
-    const pid = Number.isSafeInteger(record?.clientPid) ? record.clientPid : null;
-    if (pid !== null && await confirmedDead(pid, pidIsAlive)) {
+    if (record?.schemaVersion !== SCHEMA_VERSION) continue; // Unknown shape: an unknown holder.
+    if (!isPid(record.clientPid) || await confirmedDead(record.clientPid, pidIsAlive)) {
       await rm(file, { force: true });
       removed = true;
     }

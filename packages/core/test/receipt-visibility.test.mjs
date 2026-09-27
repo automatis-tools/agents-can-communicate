@@ -322,10 +322,61 @@ test("status keeps an offline participant listed while messages wait for it", as
   assert.equal(listed[0].presence, "offline");
   assert.equal(listed[0].endReason, "clear");
   assert.deepEqual(listed[0].unretrieved, { queued: 1, offered: 0 });
+  assert.equal(listed[0].waiting, 1);
 
   await f.service.closeSession(owner(f.other));
   const quiet = (await f.service.collectStatus({ workspaceId: WORKSPACE })).participants
     .filter(item => item.participantId === "other");
   assert.deepEqual(quiet, [], "an offline participant with nothing waiting was listed");
   assert.equal(typeof waiting.messageId, "string");
+});
+
+// Whether a message waits for a closed participant is whether its next turn
+// would still show it. A next-turn offer already put the body in its context,
+// and a live offer that was shown again once is never shown a third time.
+const closedEntry = async f => {
+  await f.service.closeSession(owner(f.recipient));
+  return (await f.service.collectStatus({ workspaceId: WORKSPACE })).participants
+    .filter(item => item.participantId === "recipient");
+};
+
+test("a message the next turn already showed does not keep a closed participant listed", async () => {
+  const f = await fixture();
+  await offer(f, await send(f), { transport: "next-turn" });
+
+  assert.deepEqual(await closedEntry(f), []);
+  const [everyone] = (await f.service.collectStatus({ workspaceId: WORKSPACE, all: true }))
+    .participants.filter(item => item.participantId === "recipient");
+  assert.deepEqual(everyone.unretrieved, { queued: 0, offered: 1 },
+    "the unretrieved counts keep their meaning");
+  assert.equal(everyone.waiting, 0);
+});
+
+test("a live offer not yet shown again keeps a closed participant listed", async () => {
+  const f = await fixture();
+  await offer(f, await send(f));
+
+  const [listed] = await closedEntry(f);
+  assert.equal(listed.waiting, 1);
+  assert.deepEqual(listed.unretrieved, { queued: 0, offered: 1 });
+});
+
+test("a live offer the next turn already showed again does not keep it listed", async () => {
+  const f = await fixture();
+  const message = await send(f);
+  await offer(f, message);
+  f.clock.advance(REPEAT_OFFER_AFTER_MS);
+  await offer(f, message, { transport: "next-turn", repeat: true });
+
+  assert.deepEqual(await closedEntry(f), []);
+});
+
+test("an offer an older ACC recorded without facts still counts as waiting", async () => {
+  const f = await fixture();
+  const message = await send(f);
+  await offer(f, message);
+  await rewriteReceipt(f, message, ({ extensions, ...current }) => current);
+
+  const [listed] = await closedEntry(f);
+  assert.equal(listed.waiting, 1);
 });

@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { createCodexAdapter } from "../src/adapter.mjs";
 import { maintenanceFixture } from "./maintenance-fixture.mjs";
+import { mkdir, symlink } from "node:fs/promises";
 import path from "node:path";
 
 const unixSocketHost = { skip: process.platform === "win32"
@@ -12,6 +13,24 @@ test("Codex update maintenance is exposed separately from native message deliver
   for (const method of ["inspectMaintenance", "stopForMaintenance", "startAfterMaintenance"]) {
     assert.equal(typeof adapter[method], "function", `${method} must be available to update recovery`);
   }
+});
+
+test("a 0.157.1 daemon is inspected as ready through its symlinked socket and releases executable", unixSocketHost, async t => {
+  const h = await maintenanceFixture(t);
+  await h.daemonLayout157();
+  const result = await h.inspectMaintenance(h.context);
+  assert.equal(result?.state, "ready", result?.reasonCode);
+  assert.equal(result.socketPath, h.socketPath);
+  assert.equal(h.commands.length, 0);
+});
+
+test("an executable outside the standalone tree is not the daemon, even when it resolves to the managed binary", unixSocketHost, async t => {
+  const h = await maintenanceFixture(t);
+  const elsewhere = path.join(h.root, "elsewhere", "codex");
+  await mkdir(path.dirname(elsewhere), { recursive: true });
+  await symlink(h.managedPath, elsewhere);
+  h.state.processCommand = `${elsewhere} app-server --listen unix://`;
+  assert.equal((await h.inspectMaintenance(h.context))?.reasonCode, "daemon_identity_unavailable");
 });
 
 test("inspection verifies current process and socket identity without collecting thread content", unixSocketHost, async t => {

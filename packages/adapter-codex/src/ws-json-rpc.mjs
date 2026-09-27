@@ -63,6 +63,18 @@ export function acceptKey(key) {
   return createHash("sha1").update(`${key}${GUID}`).digest("base64");
 }
 
+/** True only when a connect to the socket is refused: a file with nobody
+ * listening. Accepting, timing out, or any other error is not proof of that. */
+export function refusesConnections(socketPath, { timeoutMs = 1_000 } = {}) {
+  return new Promise(resolve => {
+    const socket = net.createConnection({ path: socketPath });
+    const settle = refused => { clearTimeout(timer); socket.destroy(); resolve(refused); };
+    const timer = setTimeout(() => settle(false), timeoutMs);
+    socket.once("connect", () => settle(false));
+    socket.once("error", error => settle(error?.code === "ECONNREFUSED"));
+  });
+}
+
 export function openWebSocketPeer({ socketPath, timeoutMs, path = "/", host = "localhost",
   retainNotifications = true }) {
   const notifications = [];
