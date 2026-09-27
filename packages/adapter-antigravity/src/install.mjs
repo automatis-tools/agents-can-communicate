@@ -642,6 +642,17 @@ export async function detectAntigravity(context) {
       + "first run and loads its skill, but none of its hook names, so no ACC hook runs here "
       + "(issue #176)");
   }
+  // Every install writes the rule, so where ACC's wrapper is on disk a missing
+  // or unreadable rule is an install to finish, whatever the delivery policy.
+  if (await exists(cliWrapperPath(context.home))) {
+    if (commandApproval.state === "prompts") {
+      needsAction.push(`acc install --adapter antigravity  # ${commandApproval.rule} is missing `
+        + `from permissions.allow in ${commandApproval.file}, so each ACC command waits for `
+        + "approval");
+    } else if (commandApproval.state === "unreadable") {
+      needsAction.push(commandApproval.diagnostic);
+    }
+  }
   if (blocked !== null) {
     diagnostics.push(blocked.reason);
     needsAction.push(blocked.reason);

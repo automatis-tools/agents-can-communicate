@@ -41,6 +41,27 @@ test("a missing rule is ACC's install undone, and doctor says how to put it back
   }
 });
 
+test("doctor asks for a reinstall when ACC's rule is gone, whatever the delivery", async t => {
+  // Always on: a missing rule is an install that did not finish here, so it
+  // goes where doctor prints what to run next, not only into the inbound line
+  // doctor shows for a client with live delivery on.
+  const fixture = await agyHome(t);
+  await fixture.write(fixture.theirs);
+  const notInstalled = await detectAntigravity(fixture.context);
+  await installAntigravity(fixture.context);
+  await fixture.write(fixture.theirs);
+
+  const detected = await detectAntigravity(fixture.context);
+
+  assert.equal((notInstalled.needsAction ?? []).some(line => line.includes(fixture.rule)), false,
+    "ACC is not installed here, and doctor already says to install it");
+  assert.equal(detected.needsAction?.some(line =>
+    /^acc install --adapter antigravity\b/.test(line) && line.includes(fixture.rule)), true);
+  await fixture.write("{ broken");
+  const unreadable = await detectAntigravity(fixture.context);
+  assert.equal(unreadable.needsAction?.some(line => line.includes(fixture.settings)), true);
+});
+
 test("detect reports a rule ACC added as present, and as ACC's", async t => {
   const fixture = await agyHome(t);
   await fixture.write(fixture.theirs);
