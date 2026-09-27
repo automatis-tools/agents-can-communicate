@@ -145,11 +145,11 @@ installed, as on `main`. Nothing was re-run.
 
 ## Exact local artifact
 
-- Source: clean commit `ca3fb402641c3ea9df671aac17ac9bb96177836c` on `feat/native-delivery-platforms`, from `main`
+- Source: clean commit `4642e74b774679f6d078b01eb4a7b661c3c47c72` on `feat/native-delivery-platforms`, with `main` at `6b6f1c9` (#204) merged in
   at `00c5416`.
 - Archive: `agents-can-communicate-0.8.0.tgz`, packed from that commit.
-- Size: 469,017 bytes; 311 packed entries.
-- SHA-256: `1c0a0f78a33e6a7d2e4ee3904ad02ab5365017bf0cb5ea660c7fc9abe5c51dce`.
+- Size: 472,123 bytes; 311 packed entries.
+- SHA-256: `929d20311a0c5325ef639a6ac338c10beef44645f4cb6c98a9aeb1be1a5ed7a6`.
 - Package version remains `0.8.0`; this is an unpublished development artifact.
 
 The exact archive passed `scripts/verify-package.mjs`.
