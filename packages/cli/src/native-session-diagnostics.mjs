@@ -60,14 +60,19 @@ export async function updateNativeSessions(adapters, { service, status, root, no
         && b.availableModes.includes("livePush"));
       const off = native.policySource === "installation-record" && !native.configured;
       const leased = binding !== undefined && Date.parse(binding.leaseUntil) > Date.parse(now);
-      // Only where the old rule would have said "active": everywhere else the
-      // answer is already degraded or unbound, and a live check would buy
-      // nothing but a socket round trip.
-      const delivery = off || !leased ? null
+      // A lapsed lease is asked about too. Nothing renews it while a session
+      // sits idle, and the router does not refuse it: it re-verifies the
+      // receiver and refreshes the lease before it offers. Stopping at the
+      // lease reported sessions that answered a live question in seconds as
+      // degraded, with advice to start a new one.
+      const delivery = off || binding === undefined ? null
         : await verifyDelivery(byAdapterId.get(entry.adapterId), { binding, runtimeDir: root });
+      // Without a re-verification the router cannot refresh a lapsed lease
+      // either, so only a live lease keeps the old answer.
       const runtime = off ? "inactive"
         : binding === undefined ? "unbound"
-          : leased && (delivery === null || delivery.deliverable) ? "active" : "degraded";
+          : delivery === null ? (leased ? "active" : "degraded")
+            : !delivery.deliverable ? "degraded" : leased ? "active" : "idle";
       native.sessions.push({ sessionId: peer.sessionId, participantId: peer.participantId,
         presence: peer.presence, runtime, clientVersion: binding?.clientVersion ?? null, delivery,
         lastAttempt: owner === null ? null : await loadNativeAttempt({ runtimeDir: root, ...owner }) });
@@ -76,10 +81,13 @@ export async function updateNativeSessions(adapters, { service, status, root, no
     // one claiming health while nothing could be delivered. If this adapter
     // has bound sessions in this workspace and not one of them can take a
     // push, this is not an active transport.
-    if (native.runtime === "active" && native.sessions.length > 0
-      && !native.sessions.some(session => session.runtime === "active")) {
+    const reachable = native.sessions.some(session => ["active", "idle"].includes(session.runtime));
+    if (native.runtime === "active" && native.sessions.length > 0 && !reachable) {
       native.runtime = "degraded";
     }
+    // The other direction, which the binding pass cannot see: it reads a
+    // lapsed lease as unreachable, and a receiver that answered says otherwise.
+    if (native.runtime === "degraded" && reachable) native.runtime = "active";
   }
 }
 
@@ -131,10 +139,12 @@ function describeDelivery(session) {
     : "receiver verified";
 }
 
+const RUNTIME_TEXT = { active: "local transport active", idle: "idle, lease lapsed" };
+
 export function nativeSessionLines(adapters) {
   return adapters.flatMap(entry => (entry.nativeDelivery.sessions ?? []).map(session =>
     `  ${entry.displayName} session ${session.participantId} (${session.sessionId}): `
-    + `${session.runtime === "active" ? "local transport active" : session.runtime}; `
-    + [describeDelivery(session), describeAttempt(session.lastAttempt)]
-      .filter(part => part !== null).join("; ")));
+    + `${RUNTIME_TEXT[session.runtime] ?? session.runtime}; `
+    + [describeDelivery(session), session.runtime === "idle" ? "the next send refreshes it" : null,
+      describeAttempt(session.lastAttempt)].filter(part => part !== null).join("; ")));
 }

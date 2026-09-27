@@ -23,9 +23,10 @@ async function runtimeDir(t) {
   return dir;
 }
 
-const entry = () => ({ adapterId: "codex", displayName: "Codex CLI", present: true, installed: true,
+const entry = (runtime = "active") => ({ adapterId: "codex", displayName: "Codex CLI",
+  present: true, installed: true,
   nativeDelivery: { eligibility: "eligible", configured: true, policy: "actionable",
-    policySource: "installation-record", runtime: "active", modes: ["livePush"],
+    policySource: "installation-record", runtime, modes: ["livePush"],
     reasonCode: null, minimumVersion: "0.152.1", activation: "not_required",
     sessionPolicy: "actionable" } });
 
@@ -42,8 +43,8 @@ const status = { participants: [{ sessionId: "session_a", participantId: "review
 
 const adapterThat = refreshNativeSession => ({ id: "codex", refreshNativeSession });
 
-async function report(t, adapter, { leaseUntil } = {}) {
-  const adapters = [entry()];
+async function report(t, adapter, { leaseUntil, runtime } = {}) {
+  const adapters = [entry(runtime)];
   await updateNativeSessions(adapters, { service: service(leaseUntil), status,
     root: await runtimeDir(t), now: NOW, registry: adapter === null ? [] : [adapter] });
   return { adapters, lines: nativeSessionLines(adapters) };
@@ -111,13 +112,48 @@ test("an adapter that cannot re-verify keeps the lease answer rather than being 
     assert.doesNotMatch(lines[0], /receiver verified|no live delivery/);
   });
 
-test("an expired lease is already degraded and is never re-verified over the wire", async t => {
-  let asked = 0;
-  const { adapters } = await report(t, adapterThat(async () => { asked += 1;
-    return { supported: true, clientVersion: BOUND, protocolContract: "x", modes: ["livePush"],
-      opaqueEndpointRef: "codex_endpoint_ref", leaseUntil: LEASE, reasonCode: null }; }),
-  { leaseUntil: "2026-09-02T11:59:00.000Z" });
+// A lease lapses two minutes after the last turn, and nothing renews it while a
+// session sits idle. The router does not read that as a refusal: it asks the
+// receiver again and refreshes the lease before it offers. Doctor used to stop
+// at the lapsed lease and report "degraded", "channel unreachable" and "start a
+// new client session" about sessions that answered a live question in seconds.
+const LAPSED = "2026-09-02T11:59:00.000Z";
+
+test("a lapsed lease is re-verified as the router does, and a verified receiver reads idle",
+  async t => {
+    let asked = 0;
+    const { adapters, lines } = await report(t, adapterThat(async () => { asked += 1;
+      return { supported: true, clientVersion: BOUND, protocolContract: "x", modes: ["livePush"],
+        opaqueEndpointRef: "codex_endpoint_ref", leaseUntil: LEASE, reasonCode: null }; }),
+    { leaseUntil: LAPSED, runtime: "degraded" });
+    assert.equal(asked, 1);
+    const [session] = adapters[0].nativeDelivery.sessions;
+    assert.equal(session.runtime, "idle");
+    assert.equal(session.delivery.deliverable, true);
+    assert.match(lines[0],
+      /: idle, lease lapsed; receiver verified; the next send refreshes it; /);
+    // The binding pass read the lapsed lease as unreachable. A receiver that
+    // answered is a live channel, and the adapter line and advice follow it.
+    assert.equal(adapters[0].nativeDelivery.runtime, "active");
+    assert.equal(describeNative(adapters[0].nativeDelivery),
+      "available; enabled (actionable); local transport active");
+    assert.doesNotMatch(nativeRemediation(adapters[0]).join("\n"), /start a new client session/);
+  });
+
+test("a lapsed lease whose receiver refuses is degraded and says why", async t => {
+  const { adapters, lines } = await report(t, adapterThat(async () => ({ supported: false,
+    clientVersion: null, protocolContract: "x", modes: [], opaqueEndpointRef: null,
+    leaseUntil: null, reasonCode: "handshake_timeout" })), { leaseUntil: LAPSED, runtime: "degraded" });
   assert.equal(adapters[0].nativeDelivery.sessions[0].runtime, "degraded");
+  assert.equal(adapters[0].nativeDelivery.runtime, "degraded");
+  assert.match(lines[0], /: degraded; no live delivery: the session handshake timed out/);
+});
+
+test("a lapsed lease on an adapter that cannot re-verify stays degraded", async t => {
+  // The router refreshes only through the adapter's own re-verification, so
+  // without one the next send falls back to durable, and so must the report.
+  const { adapters } = await report(t, null, { leaseUntil: LAPSED, runtime: "degraded" });
   assert.equal(adapters[0].nativeDelivery.sessions[0].delivery, null);
-  assert.equal(asked, 0);
+  assert.equal(adapters[0].nativeDelivery.sessions[0].runtime, "degraded");
+  assert.equal(adapters[0].nativeDelivery.runtime, "degraded");
 });
