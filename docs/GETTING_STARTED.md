@@ -150,7 +150,10 @@ infrastructure, recorded opt-in, and a verified session. Supported explicit setu
 prepare a missing service. Start the client with your normal command. A loaded daemon thread can receive
 messages after its terminal exits. Antigravity CLI 1.2.7 and later has one too: with delivery enabled,
 ACC's context asks the agent to start a relay from its own shell, up to three times while
-none is running, and you approve that command at the client's prompt.
+none is running, and you approve that command at the client's prompt. Antigravity also asks
+before each ACC command, so a woken session waits for you at its first one. Install asks
+once whether to allow ACC's commands without that prompt; see
+[Antigravity CLI command approval](CONFIGURATION.md#antigravity-cli-command-approval).
 [Capabilities](CAPABILITIES.md) explains policy, versions and fallback.
 
 Delivery evidence is deliberately narrow: `queued -> offered -> retrieved -> acknowledged`.

@@ -123,7 +123,9 @@ All recipients have the same durable record, but adapters expose different accel
   endpoint exists only in the agent's own shell, so ACC's context asks the agent once per
   conversation to start a relay; the user approves that command. The relay keeps the endpoint
   in memory, wakes an idle session with a fenced peer message, holds one for a busy session,
-  and ends with the client. It is experimental, off by default, and can spend tokens.
+  and ends with the client. It is experimental, off by default, and can spend tokens. The
+  woken agent's ACC commands still wait at the client's approval prompt unless the user
+  answered a separate install question with yes, which adds one allow rule for ACC's wrapper.
 
 Grok, generic MCP, unsupported versions and uncaptured platforms use inbox polling.
 [Capabilities](CAPABILITIES.md) lists evidence and fallback.

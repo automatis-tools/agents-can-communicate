@@ -1,5 +1,30 @@
 # Changelog
 
+## Unreleased — ACC commands without an approval prompt in Antigravity CLI
+
+- Antigravity CLI asks before each shell command, so a session that live delivery woke on
+  1.2.12 stopped at the agent's first ACC command and the peer got no answer (#214). With
+  Antigravity's live delivery on, an interactive `acc install` now asks one more default-No
+  question, once: "Let ACC commands run without an approval prompt in Antigravity CLI?". Yes
+  adds one prefix rule, `command(<home>/.gemini/config/acc/acc-cli.sh)`, to
+  `permissions.allow` in `~/.gemini/antigravity-cli/settings.json`; the answer is recorded as
+  `deliveryDecision.allowCommands`. An explicit `--delivery actionable|all` answers it yes and
+  `--delivery off` no; a preview or a noninteractive run adds nothing.
+- The rule stays only while live delivery is on and the answer is yes. `--delivery off`, a No,
+  or `acc uninstall` removes exactly the rule ACC recorded adding, and a container or file ACC
+  created only if nothing else is in it. Every other key and rule is kept. A settings file that
+  does not parse, or whose `permissions.allow` is not a list, is never rewritten and is
+  reported.
+- The Antigravity skill names ACC's wrapper without quotes when the path is one shell word
+  and asks the model to start each command exactly as written: on 1.2.12 a command whose first
+  word was quoted matched no allow rule at all. A wrapper path that needs quotes, such as a
+  home with a space, keeps them and gets no rule. Every other client's skill is unchanged.
+- `acc doctor` prints `Antigravity CLI inbound:` with the rule present, absent or unable to
+  apply, the file, and what a live wake meets without it. The live capture of a woken session
+  answering with no prompt under ACC's rule is still to be recorded. See the
+  [design](docs/design/2026-09-27-antigravity-acc-allow-rule.md) and
+  [evidence draft](docs/release-evidence/unreleased-antigravity-acc-allow-rule.md).
+
 ## Unreleased — idle and working sessions reported as broken
 
 - `acc doctor` asks the receiver whenever a session has a binding, as the router does before
