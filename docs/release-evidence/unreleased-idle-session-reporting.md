@@ -22,9 +22,12 @@ session a question and comparing the answers with what doctor and status said.
   live lease. The session runtime is `active`, `idle` (verified, lease lapsed) or `degraded`
   (refused, with its reason). An adapter with no re-verification keeps the lease answer. A
   verified session lifts an adapter the binding pass had marked `degraded`.
-- `core/status.mjs` adds `processTracked` and `liveDelivery` to each participant row. A lapsed
-  lease still counts as a live binding.
+- `core/status.mjs` adds `processTracked`, `liveDelivery` and `liveLeaseCurrent` to each
+  participant row.
 - `cli/main.mjs` adds `presenceBreakdown`; `describePresence` takes it and names each group.
+  A live binding counts as wakeable on the router's rule: a valid lease, or a lapsed one
+  the adapter can re-verify. The pull request review found the first version counted every
+  lapsed lease, which is false for an adapter with no re-verification.
   Without one it keeps the earlier wording. Status and doctor both pass it.
 - `hook-runner/runner.mjs` heartbeats in the no-target branch of `beforeTool` from the
   session's own record, under the existing at-most-twice-a-cadence rule.
@@ -41,13 +44,16 @@ it pass.
   re-verification stays degraded.
 - `tests/process/heartbeat.test.mjs`: a shell command after four quiet minutes makes the
   session online; two shell commands moments apart write nothing.
-- `packages/core/test/status.test.mjs`: three stale sessions report `liveDelivery` and
-  `processTracked` for a bound, a hooked and an untracked session.
+- `packages/core/test/status.test.mjs`: a bound session reports `liveLeaseCurrent` true
+  after publication and false once its lease lapses; three stale sessions report
+  `liveDelivery` and `processTracked` for a bound, a hooked and an untracked session.
 - `packages/cli/test/install-command.test.mjs`: the breakdown and the wording, including
-  `not answering` and `present, none answering` for untracked sessions.
+  `not answering` and `present, none answering` for untracked sessions, and a lapsed lease
+  that wakes on send only for an adapter that can re-verify.
 
 Mutations, each caught by a test: removing the adapter lift, heartbeating on every shell
-command, and ignoring `liveDelivery` in the breakdown.
+command, ignoring `liveDelivery` in the breakdown, and dropping the re-verification branch
+from the wake rule.
 
 `npm test` on the evidence commit `ffeabaa`: 2,646 tests, 2,646 passing, 0 failing, 0 skipped.
 Nothing was re-run.

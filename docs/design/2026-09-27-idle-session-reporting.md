@@ -32,10 +32,12 @@ from `stale`, not how often the clocks move.
    `degraded` and names its reason. An adapter with no re-verification keeps the old answer,
    because the router cannot refresh its lease either. A verified session lifts the adapter
    line to `local transport active`, which also removes the restart advice.
-2. **A stale session is described by what a message meets.** Core adds two facts per status
-   row: `processTracked` (the pid is known) and `liveDelivery` (a live binding exists; a
-   lapsed lease counts). Core stays vendor-free; the CLI reads next-turn support from the
-   adapter registry. Chosen wording (Mykola, 2026-09-27, "Compact"):
+2. **A stale session is described by what a message meets.** Core adds three facts per
+   status row: `processTracked` (the pid is known), `liveDelivery` (a live binding exists)
+   and `liveLeaseCurrent` (its lease is valid). Core stays vendor-free; the CLI reads
+   next-turn support and re-verification from the adapter registry, and counts a session as
+   wakeable on the router's rule: a valid lease, or a lapsed one the adapter can re-verify
+   (review of #216). Chosen wording (Mykola, 2026-09-27, "Compact"):
    `5 live (2 idle, wake on send; 1 idle until next turn; 1 idle, inbox only)`.
    "not answering" stays for a stale session with no known process, and
    "N present, none answering" when every live session is such.

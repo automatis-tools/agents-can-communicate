@@ -11,8 +11,9 @@
   names its reason (#209).
 - `acc status` and doctor describe a stale session by what a message meets:
   `5 live (2 idle, wake on send; 1 idle until next turn; 1 idle, inbox only)`. Each status row
-  carries `processTracked` and `liveDelivery`. `not answering` is kept for a stale session
-  whose process ACC does not know (#210).
+  carries `processTracked`, `liveDelivery` and `liveLeaseCurrent`; a lapsed lease wakes on
+  send only for an adapter that can re-verify its receiver, as in the router. `not answering`
+  is kept for a stale session whose process ACC does not know (#210).
 - A turn spent in shell commands keeps the session online. The mid-turn heartbeat ran only
   behind the write guard, so a command with nothing to guard went stale three minutes into
   its turn (#215).
