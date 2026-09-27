@@ -1083,7 +1083,10 @@ returned `started`, replaced the socket, and wrote a new PID record: once with o
 leftover socket, and once with the socket and a PID record naming a dead process.
 Detection now reports `native_endpoint_unavailable` for a refused socket, and inspection
 reports `service_stopped` when the recorded process is confirmed dead or absent and the
-socket refuses connections or is absent. Its advice is that command, followed by a new
-Codex session. ACC itself still starts the service only when neither file exists; a PID
-record naming a live process, an unreadable record, a symlink, or a socket that fails
-for any other reason is not a stopped service.
+socket refuses connections or is absent. Setup prepares such a service exactly like an
+absent one: the vendor's own `daemon start`, then the same identity checks (PID record,
+start time, executable, socket ownership, served version, protocol). The 2026-09-12 rule
+against starting over leftover metadata rested on not having measured what the vendor's
+start does with it; that is measured now. A PID record naming a live process or one that
+cannot be observed, an unreadable record, a symlink, or a socket that fails for any other
+reason is not a stopped service, and setup still never starts over those.

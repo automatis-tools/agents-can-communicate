@@ -76,10 +76,12 @@ test("unsupported platform and incomplete managed install provide action without
   assert.equal(f.starts.length, 0);
 });
 
-for (const entry of ["pid", "socket", "directory-symlink", "directory-writable"]) {
-  test(`stale or unsafe ${entry} is not definite absence`, async t => {
+// A pid record naming a process nobody can observe is not a stopped service:
+// the process may be alive under another user, and ACC never starts over it.
+for (const entry of ["unobservable-pid", "socket", "directory-symlink", "directory-writable"]) {
+  test(`an unobservable pid or an unsafe ${entry === "unobservable-pid" ? "record" : entry} is not definite absence`, async t => {
     const f = await serviceFixture(t);
-    if (entry === "pid") await f.writePid();
+    if (entry === "unobservable-pid") { await f.writePid(); f.state.processUnknown = true; }
     if (entry === "socket") await writeFile(f.socketPath, "stale");
     const directory = path.dirname(f.socketPath);
     if (entry === "directory-symlink") {
@@ -149,19 +151,23 @@ async function leaveStaleSocket(socketPath) {
 const unix = { skip: process.platform === "win32" && "Unix domain socket files" };
 
 // Measured on Codex 0.155.1: its own `app-server daemon start` replaces both
-// files a stopped service leaves. ACC still starts only on definite absence.
+// files a stopped service leaves, so a stopped service is prepared like an
+// absent one - by that command, with every identity check after it.
 for (const leftovers of [["socket"], ["socket", "pid"], ["pid"]]) {
-  test(`a stopped service's leftover ${leftovers.join(" and ")} gets the start advice, never an ACC start`,
+  test(`a stopped service's leftover ${leftovers.join(" and ")} is started once, in place`,
     unix, async t => {
       const f = await serviceFixture(t);
       if (leftovers.includes("socket")) await leaveStaleSocket(f.socketPath);
       if (leftovers.includes("pid")) await f.writePid();
       const plan = await f.inspectNativeServiceSetup(f.context);
-      assert.equal(plan.state, "blocked");
+      assert.equal(plan.state, "needed");
       assert.equal(plan.reasonCode, "service_stopped");
-      assert.match(plan.diagnostic, /codex app-server daemon start/);
-      assert.equal((await apply(f, plan)).started, false);
-      assert.equal(f.starts.length, 0);
+      assert.match(plan.diagnostic, /acc install/);
+      const result = await apply(f, plan);
+      assert.equal(result.state, "ready");
+      assert.equal(result.started, true);
+      assert.equal(f.starts.length, 1);
+      assert.ok((await lstat(f.socketPath)).isSocket());
     });
 }
 

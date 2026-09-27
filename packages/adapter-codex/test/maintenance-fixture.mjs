@@ -26,6 +26,9 @@ export async function maintenanceFixture(t, { binLayout = false } = {}) {
   const writePid = () => writeFile(pidPath, JSON.stringify({ pid: state.pid,
     processStartTime: state.processStartTime }));
   async function start() {
+    // Codex 0.155.1 `app-server daemon start` replaces the socket file a
+    // stopped service left behind (measured), so the fixture service does too.
+    await rm(socketPath, { force: true });
     socket = net.createServer();
     await new Promise((resolve, reject) => { socket.once("error", reject); socket.listen(socketPath, resolve); });
     state.running = true; await writePid();
