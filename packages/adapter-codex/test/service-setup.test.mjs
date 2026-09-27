@@ -206,10 +206,37 @@ test("a socket that fails to connect for another reason is not a stopped service
   await notStopped(f, t);
 });
 
-test("a symlink to a leftover socket is not a stopped service", unix, async t => {
+// Codex 0.157.1 keeps the control socket behind a symlink, so a symlink is
+// the ordinary shape of a running service, and what a stopped one leaves.
+test("a 0.157.1 service is ready through its symlinked socket", unix, async t => {
   const f = await serviceFixture(t);
-  const elsewhere = path.join(f.root, "elsewhere.sock");
-  await leaveStaleSocket(elsewhere);
+  await f.daemonLayout157();
+  const plan = await f.inspectNativeServiceSetup(f.context);
+  assert.equal(plan.state, "ready", plan.reasonCode);
+  assert.equal(f.starts.length, 0);
+});
+
+for (const leftover of ["dangling", "refusing"]) {
+  test(`a stopped 0.157.1 service, its symlink ${leftover}, is started once in place`, unix, async t => {
+    const f = await serviceFixture(t);
+    await f.daemonLayout157();
+    await f.stop();
+    if (leftover === "refusing") await leaveStaleSocket(f.state.listenPath);
+    await f.writePid();
+    assert.equal((await lstat(f.socketPath)).isSymbolicLink(), true);
+    const plan = await f.inspectNativeServiceSetup(f.context);
+    assert.equal(plan.state, "needed", plan.reasonCode);
+    assert.equal(plan.reasonCode, "service_stopped");
+    const result = await apply(f, plan);
+    assert.equal(result.state, "ready", result.reasonCode);
+    assert.equal(f.starts.length, 1);
+  });
+}
+
+test("a symlink to a regular file is not a stopped service", async t => {
+  const f = await serviceFixture(t);
+  const elsewhere = path.join(f.root, "elsewhere");
+  await writeFile(elsewhere, "not a socket");
   await symlink(elsewhere, f.socketPath);
   await notStopped(f, t);
 });

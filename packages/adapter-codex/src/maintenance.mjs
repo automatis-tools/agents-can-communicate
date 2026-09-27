@@ -1,6 +1,6 @@
 import path from "node:path";
 import { openCodexAppServer, parseStableVersion } from "./app-server-client.mjs";
-import { socketIsReady } from "./native-endpoint.mjs";
+import { readySocketPath, socketIsReady } from "./native-endpoint.mjs";
 import { absolute, approvedProcessIsDead, failMaintenance, maintenanceContext,
   managedExecutablePaths, metadataExists, probeMaintenanceInstall, readMaintenancePid, runMaintenanceCommand,
   startTimeValid, verifyMaintenanceProcess } from "./maintenance-host.mjs";
@@ -37,7 +37,7 @@ export function createCodexMaintenance({ run = runMaintenanceCommand, open = ope
       Object.assign(snapshot, { codexHome: paths.codexHome, socketPath: paths.socketPath, managedPath: paths.managedPath });
       if (!await metadataExists(paths.socketPath) && !await metadataExists(paths.pidPath)) return null;
       if (paths.platform !== "darwin-arm64") failMaintenance("maintenance_platform_unsupported");
-      if (!await socketIsReady(paths.socketPath)) failMaintenance("daemon_socket_unproven");
+      if (!await readySocketPath(paths.socketPath)) failMaintenance("daemon_socket_unproven");
       Object.assign(snapshot, await probeMaintenanceInstall(paths, run));
       const version = await run(snapshot.cliPath, ["app-server", "daemon", "version"], paths.options);
       if (version.status !== 0) failMaintenance("daemon_version_unavailable");

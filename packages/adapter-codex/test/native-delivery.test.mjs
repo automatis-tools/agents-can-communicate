@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { once } from "node:events";
-import { lstat, mkdir, mkdtemp, readFile, readdir, realpath, rename, rm, writeFile }
+import { lstat, mkdir, mkdtemp, readFile, readdir, realpath, rename, rm, symlink, writeFile }
   from "node:fs/promises";
 import path from "node:path";
 import test from "node:test";
@@ -228,6 +228,18 @@ test("a control socket nothing listens on is an unavailable service, not a faile
     const probe = await native.probeNativeDelivery(await staleControlSocket(t));
     assert.equal(probe.supported, false);
     assert.equal(probe.reasonCode, "native_endpoint_unavailable");
+  });
+
+test("the probe follows the symlink Codex 0.157.1 puts at the control socket path",
+  { skip: process.platform === "win32" && "Unix domain socket files" }, async t => {
+    const h = await nativeFixture(t);
+    const real = path.join(h.root, "codex-daemon-501", "220dda598ee8");
+    await mkdir(path.dirname(real), { recursive: true, mode: 0o700 });
+    await rename(h.socketPath, real);
+    await symlink(real, h.socketPath);
+    const probe = await native.probeNativeDelivery(h);
+    assert.equal(probe.supported, true, probe.reasonCode);
+    assert.equal(h.opened.at(-1), real, "the peer is opened on the socket itself");
   });
 
 test("a probe that times out or fails otherwise keeps its own reason", async t => {

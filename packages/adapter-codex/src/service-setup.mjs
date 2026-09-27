@@ -1,6 +1,6 @@
 import { lstat, realpath } from "node:fs/promises";
 import path from "node:path";
-import { socketIsReady } from "./native-endpoint.mjs";
+import { readySocketPath, socketIsReady } from "./native-endpoint.mjs";
 import { probeNativeDelivery } from "./native-delivery.mjs";
 import { installCodexStandalone } from "./standalone-install.mjs";
 import { refusesConnections } from "./ws-json-rpc.mjs";
@@ -50,8 +50,10 @@ export function createCodexServiceSetup({ run = runMaintenanceCommand, probe = p
       const recorded = await readMaintenancePid(paths.pidPath).catch(() => null);
       if (recorded === null || !await approvedProcessIsDead(recorded, paths, run)) return false;
     }
-    return !await info(paths.socketPath)
-      || (await socketIsReady(paths.socketPath) && await refusesConnections(paths.socketPath));
+    // Absent, or a symlink whose socket is gone (what 0.157.1 leaves after a
+    // reboot cleared /private/tmp), or a socket nothing listens on.
+    const target = await fs.realpath(paths.socketPath).catch(() => null);
+    return target === null || (await socketIsReady(target) && await refusesConnections(target));
   }
   async function safeDirectories(paths) {
     for (const dir of [paths.codexHome, path.dirname(paths.socketPath), path.dirname(paths.pidPath)]) {
@@ -94,7 +96,7 @@ export function createCodexServiceSetup({ run = runMaintenanceCommand, probe = p
       socketPath: paths.socketPath, pidPath: paths.pidPath, platform: paths.platform, ...installation });
   }
   async function verify(paths, facts) {
-    if (!await socketIsReady(paths.socketPath)) failMaintenance("daemon_socket_unproven");
+    if (!await readySocketPath(paths.socketPath)) failMaintenance("daemon_socket_unproven");
     const version = await run(facts.cliPath, ["app-server", "daemon", "version"], paths.options);
     if (version.status !== 0) failMaintenance("daemon_version_unavailable");
     const observed = JSON.parse(version.stdout);

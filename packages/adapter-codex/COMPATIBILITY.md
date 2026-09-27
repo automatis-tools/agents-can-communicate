@@ -1090,3 +1090,39 @@ against starting over leftover metadata rested on not having measured what the v
 start does with it; that is measured now. A PID record naming a live process or one that
 cannot be observed, an unreadable record, a symlink, or a socket that fails for any other
 reason is not a stopped service, and setup still never starts over those.
+
+## The daemon as Codex 0.157.1 presents it — 2026-09-26
+
+The same machine updated to Codex CLI 0.157.1 during the day, and a daemon was running by
+20:05. Measured against it, read-only, and against a separate `CODEX_HOME` linked to the
+installed standalone package:
+
+- `~/.codex/app-server-control/app-server-control.sock` is a symlink to
+  `/private/tmp/codex-daemon-<uid>/<64 hex>`, a socket with mode `0600` owned by the user
+  in a `0700` directory. `app-server daemon version` still reports the symlink path as
+  `socketPath`.
+- `lsof -n -a -p <pid> -U -Fn` lists the listening socket by the path it listens on, the
+  target, on two descriptors; the connected pairs appear as `->0x…` addresses.
+- `ps -o command=` shows `<codex home>/packages/standalone/releases/<version>-aarch64-apple-darwin/bin/codex
+  app-server --listen unix:// --managed-daemon`: the resolved releases path, which
+  `packages/standalone/current` links to, and a new trailing argument.
+- The PID record keeps `pid` and `processStartTime` and adds `processIdentity` (boot id,
+  unique id, start seconds) and `executableIdentity`.
+- `daemon stop` removes the symlink and the socket. `daemon start` over a stale socket at
+  the target path returned `started` and replaced it.
+
+ACC 0.8.0 refused all of this: the probe and inspection held the symlink itself to
+`socketIsReady`, so doctor said the service was unavailable and `daemon_socket_unproven`;
+identity verification accepted only `current/bin/codex` and the exact
+`app-server --listen unix://` line. A session's hook still bound, because the bind
+resolved the path first, and live delivery worked through it. Now every check follows
+the reported path once and holds the socket at its end to the same rule; the executable
+must live in the standalone tree and be the managed binary; the trailing
+`--managed-daemon` is accepted; the socket is proven by either path.
+
+Measured and not supported: in a `CODEX_HOME` with no standalone package, 0.157.1's
+`daemon start` installs its own `packages/app-server-daemon/` and keeps its records as
+`app-server-daemon/daemon.pid` and `daemon-updater.*`, with `managedCodexPath`
+`packages/app-server-daemon/current/bin/codex`. ACC's service setup still expects the
+standalone package and its file names, so a fresh 0.157.1 home reports the standalone
+prerequisite. That layout needs its own capture.
