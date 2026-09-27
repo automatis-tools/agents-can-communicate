@@ -182,8 +182,8 @@ What may refuse live delivery is exactly three things:
 Nothing else: not the platform, not a prerelease suffix, not where the evidence was taken. A
 transport that is technically different on some platform is the probe's fact to report, as
 `native_delivery_unsupported`, never a gap in the captures. The 0.8.0 shape,
-`minimumByPlatform` with a platform on each anchor, is refused by name; see
-[the design](design/2026-09-26-native-delivery-across-platforms.md).
+`minimumByPlatform` with a platform on each anchor, is refused by name; the design record is
+`docs/design/2026-09-26-native-delivery-across-platforms.md` in the repository.
 - Native methods return closed facts (`validateNativeActivationPlan()` closes the
   activation plan) and never put vendor data - endpoints, sockets, raw errors - into core.
 
