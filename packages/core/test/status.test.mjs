@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
+import { SCHEMA_VERSION } from "@agents-can-communicate/protocol";
+
 import { createCoordinationService } from "../src/service.mjs";
 import { createFakeClock, createFakeIds, createMemoryStore }
   from "../../../tests/helpers/memory-store.mjs";
@@ -120,6 +122,32 @@ test("a roster drops a session whose pid is dead, and --all still lists it", asy
   const withAll = await service.collectStatus({ workspaceId: WORKSPACE, all: true });
   assert.equal(withAll.participants.length, 1);
 });
+
+test("a stale session says whether a live push can wake it and whether its process is known",
+  async () => {
+    const { service, clock } = makeService({ pidIsAlive: () => true });
+    const bound = await service.openSession(opening({ participantId: "bound", pid: 111 }));
+    await service.openSession(opening({ participantId: "hooked", pid: 222 }));
+    await service.openSession(opening({ participantId: "untracked" }));
+    await service.publishDeliveryBinding({ schemaVersion: SCHEMA_VERSION,
+      sessionId: bound.sessionId, generation: bound.generation, adapterId: "fixture_adapter",
+      clientVersion: "1.2.3", availableModes: ["livePush"], livePolicy: "actionable",
+      opaqueEndpointRef: "fixture:endpoint:secret", leaseUntil: "2026-08-16T01:02:00.000Z",
+      retiredAt: null });
+    // Ten minutes without a turn: every session is stale and the lease has
+    // lapsed. Stale alone said "not answering" about all three, and a live push
+    // still wakes the first one - the router refreshes a lapsed lease.
+    clock.advance(10 * 60_000);
+    const status = await service.collectStatus({ workspaceId: WORKSPACE });
+    const by = participantId => status.participants
+      .find(participant => participant.participantId === participantId);
+    assert.deepEqual(["bound", "hooked", "untracked"].map(id => by(id).presence),
+      ["stale", "stale", "stale"]);
+    assert.deepEqual([by("bound").liveDelivery, by("bound").processTracked], [true, true]);
+    assert.deepEqual([by("hooked").liveDelivery, by("hooked").processTracked], [false, true]);
+    assert.deepEqual([by("untracked").liveDelivery, by("untracked").processTracked],
+      [false, false]);
+  });
 
 test("a cleared intent stops being reported as current work", async () => {
   const { service } = makeService();

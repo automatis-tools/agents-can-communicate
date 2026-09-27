@@ -12,7 +12,7 @@ export { describeNative } from "./native-delivery-status.mjs";
 import { nativeSessionLines, updateNativeSessions } from "./native-session-diagnostics.mjs";
 import { ALL_ADAPTERS, clientContext, probeTimeout } from "./install-command.mjs";
 import { decisionOf } from "./install-delivery-consent.mjs";
-import { describePresence } from "./main.mjs";
+import { describePresence, presenceBreakdown } from "./main.mjs";
 import { platformPaths } from "./platform-paths.mjs";
 import { noticeUpdate } from "./update-check.mjs";
 import { managedUpdateDiagnostic } from "./managed-runtime/diagnostics.mjs";
@@ -276,7 +276,8 @@ export async function runDoctor({ options, context, runtime }) {
     report.trimmedThrough === null ? null : `history from ${report.trimmedThrough}`,
   ].filter(Boolean);
   const staging = held.length === 0 ? "" : ` (${held.join(", ")})`;
-  const text = [`store healthy${staging}; ${describePresence(status.counts)}; `
+  const text = [`store healthy${staging}; `
+    + `${describePresence(status.counts, presenceBreakdown(status.participants, ALL_ADAPTERS()))}; `
     + `protection ${status.protection}; ${installed} of ${adapters.length} adapter(s) installed`,
   ...adapters.filter(adapter => (adapter.present || adapter.installed)
     && adapter.nativeDelivery.reasonCode === "native_delivery_unsupported"

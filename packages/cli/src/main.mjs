@@ -16,7 +16,7 @@ const usage = message => new AccError(EXIT.USAGE, message);
 import { commandHelpText, describeCommand, describeCommands, helpText } from "./help.mjs";
 import { runUpdateCommand } from "./update-command.mjs";
 import { runConfigCommand } from "./config-command.mjs";
-import { runInstallCommand } from "./install-command.mjs";
+import { ALL_ADAPTERS, runInstallCommand } from "./install-command.mjs";
 import { runDoctor } from "./doctor-command.mjs";
 import { runManagementDoctor } from "./managed-runtime/diagnostics.mjs";
 import { createGitProbe } from "./git-probe.mjs";
@@ -179,12 +179,42 @@ export async function recordAndOffer({ record, router, selectMessage = value => 
   }
 }
 
-/** How many are here, and how many only look it. */
-export function describePresence({ live = 0, stale = 0 } = {}) {
+/**
+ * What a message sent to each stale session would meet.
+ *
+ * Presence reads the client process, so a dead one is offline and a stale
+ * session with a live process is idle. Idle is then told apart by delivery: a
+ * live binding wakes it, a client with next-turn delivery shows the message on
+ * its next turn, and anything else reads it through `acc inbox`. A session with
+ * no known process cannot be told from one that left, so it is not answering.
+ */
+export function presenceBreakdown(participants = [], adapters = ALL_ADAPTERS()) {
+  const nextTurn = new Set(adapters.filter(adapter => adapter.capabilities?.delivery?.nextTurn === true)
+    .map(adapter => adapter.id));
+  const idle = { wake: 0, nextTurn: 0, inbox: 0, unknown: 0 };
+  for (const participant of participants.filter(item => item.presence === "stale")) {
+    const kind = participant.processTracked !== true ? "unknown"
+      : participant.liveDelivery === true ? "wake"
+        : nextTurn.has(participant.harness) ? "nextTurn" : "inbox";
+    idle[kind] += 1;
+  }
+  return idle;
+}
+
+/**
+ * How many are here, and what a message would meet with those not active.
+ * Without a breakdown every stale session counts as not answering, the answer
+ * before presence could tell an idle session from one whose client had left.
+ */
+export function describePresence({ live = 0, stale = 0 } = {},
+  idle = { wake: 0, nextTurn: 0, inbox: 0, unknown: stale }) {
   if (live === 0) return "0 live";
   if (stale === 0) return `${live} live`;
-  if (stale === live) return `${live} present, none answering`;
-  return `${live} live (${stale} not answering)`;
+  if (idle.unknown === live) return `${live} present, none answering`;
+  const parts = [[idle.wake, "idle, wake on send"], [idle.nextTurn, "idle until next turn"],
+    [idle.inbox, "idle, inbox only"], [idle.unknown, "not answering"]]
+    .filter(([count]) => count > 0).map(([count, text]) => `${count} ${text}`);
+  return `${live} live (${parts.join("; ")})`;
 }
 
 export function describeStatus(status) {
@@ -193,7 +223,8 @@ export function describeStatus(status) {
   // stops being answered but does not disappear. Printing the number alone
   // said "1 live" about a workspace where the last agent had left minutes
   // before, which is the one thing a person reads this line to find out.
-  const line = `${describePresence(status.counts)}; ${status.counts.claims} claim(s); `
+  const line = `${describePresence(status.counts, presenceBreakdown(status.participants))}; `
+    + `${status.counts.claims} claim(s); `
     + `protection ${status.protection}`;
   // A transport accepting a message is not a model reading it. Said only when
   // it is true of something, so the everyday line stays the everyday line.
