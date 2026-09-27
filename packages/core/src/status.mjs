@@ -89,11 +89,12 @@ export function createStatusService(ports, sessions, deliveryBindings) {
     const claims = snapshot.claims
       .filter(claim => Date.parse(claim.expiresAt) > Date.parse(now));
     const currentBindings = await deliveryBindings.currentBindings(now);
-    // A lapsed lease is still a live binding here: the router re-verifies the
-    // receiver and refreshes it before offering, so a push can wake the session.
-    const liveBound = new Set(currentBindings
+    // A live binding and its lease are reported apart. The router refreshes a
+    // lapsed lease only through the adapter's own re-verification, and which
+    // adapters have one is not a fact core may know, so the reader decides.
+    const liveBound = new Map(currentBindings
       .filter(({ binding }) => binding.availableModes.includes("livePush"))
-      .map(({ binding }) => binding.sessionId));
+      .map(({ binding, reachable }) => [binding.sessionId, reachable]));
     // What each recipient has not fetched yet, and how far it got. Offered is
     // not read: a transport took the bytes. Queued sits beside it so "0
     // offered" cannot be mistaken for "nothing waits". Replaced decisions
@@ -155,11 +156,12 @@ export function createStatusService(ports, sessions, deliveryBindings) {
         enforcement: session.enforcement ?? "advisory",
         lifecycle: session.lifecycle ?? "manual",
         presence,
-        // What a stale presence means depends on both. With the process known,
+        // What a stale presence means depends on these. With the process known,
         // stale is idle, since a dead process is offline; with a live binding,
-        // a push wakes it. Only a session nobody can observe is not answering.
+        // a push can wake it. Only a session nobody can observe is not answering.
         processTracked: (session.pid ?? null) !== null,
         liveDelivery: liveBound.has(session.sessionId),
+        liveLeaseCurrent: liveBound.get(session.sessionId) === true,
         // A finished intent reads as no intent at all. `--clear` exists so a
         // peer stops seeing work that has stopped, and reporting the summary of
         // a done record made the command and this line contradict each other.

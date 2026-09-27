@@ -270,11 +270,15 @@ test("an idle session is described by what happens to a message sent to it", asy
   // Since presence reads the client process, a dead one is offline, and a
   // stale session with a live process is idle. On 0.8.1 three such sessions
   // read "not answering" and two answered a live question within 12 seconds.
-  const adapters = [{ id: "claude_code", capabilities: { delivery: { nextTurn: true } } },
-    { id: "gemini_cli", capabilities: { delivery: { nextTurn: true } } },
-    { id: "grok", capabilities: {} }];
-  const session = (harness, presence, liveDelivery, processTracked = true) =>
-    ({ harness, presence, liveDelivery, processTracked });
+  const adapters = [{ id: "claude_code", capabilities: { delivery: { nextTurn: true } },
+    refreshNativeSession: async () => ({ supported: true }) },
+  { id: "gemini_cli", capabilities: { delivery: { nextTurn: true } } },
+  { id: "grok", capabilities: {} },
+  // Live delivery with no re-verification: a lapsed lease is never refreshed.
+  { id: "lease_only", capabilities: { delivery: { nextTurn: true } } }];
+  const session = (harness, presence, liveDelivery,
+    { processTracked = true, liveLeaseCurrent = liveDelivery } = {}) =>
+    ({ harness, presence, liveDelivery, liveLeaseCurrent, processTracked });
   const idle = presenceBreakdown([session("claude_code", "online", true),
     session("claude_code", "stale", true), session("codex", "stale", true),
     session("gemini_cli", "stale", false), session("grok", "stale", false)], adapters);
@@ -282,9 +286,16 @@ test("an idle session is described by what happens to a message sent to it", asy
   assert.equal(describePresence({ live: 5, stale: 4 }, idle),
     "5 live (2 idle, wake on send; 1 idle until next turn; 1 idle, inbox only)");
 
+  // A lapsed lease wakes on send only where the router can refresh it: through
+  // the adapter's own re-verification. Without one the next send is durable.
+  const lapsed = { liveLeaseCurrent: false };
+  assert.deepEqual(presenceBreakdown([session("claude_code", "stale", true, lapsed),
+    session("lease_only", "stale", true, lapsed)], adapters),
+  { wake: 1, nextTurn: 1, inbox: 0, unknown: 0 });
+
   // Only a session whose process nobody knows keeps the old words.
   const untracked = presenceBreakdown([session("claude_code", "stale", true),
-    session("gemini_cli", "stale", false, false)], adapters);
+    session("gemini_cli", "stale", false, { processTracked: false })], adapters);
   assert.deepEqual(untracked, { wake: 1, nextTurn: 0, inbox: 0, unknown: 1 });
   assert.equal(describePresence({ live: 2, stale: 2 }, untracked),
     "2 live (1 idle, wake on send; 1 not answering)");

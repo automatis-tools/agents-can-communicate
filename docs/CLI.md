@@ -108,8 +108,10 @@ A session is `stale` when no turn has sent a heartbeat for three heartbeat caden
 session row says what a message to such a session meets. `processTracked` is true when ACC
 knows the client process. A dead process makes the session `offline`, so a stale session with
 a tracked process is idle. `liveDelivery` is true when the session has a live delivery
-binding, and a lapsed lease still counts: the router verifies the receiver again before it
-offers. The text line counts stale sessions by that result:
+binding, and `liveLeaseCurrent` says whether the binding's lease is still valid. A stale
+session wakes on send when the lease is valid, or when its adapter can verify the receiver
+again: the router does that for a lapsed lease before it offers. The text line counts stale
+sessions by that result:
 `5 live (2 idle, wake on send; 1 idle until next turn; 1 idle, inbox only)`. `not answering`
 is kept for a stale session whose process ACC does not know.
 

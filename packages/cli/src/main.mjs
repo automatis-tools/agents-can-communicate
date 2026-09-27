@@ -187,14 +187,21 @@ export async function recordAndOffer({ record, router, selectMessage = value => 
  * live binding wakes it, a client with next-turn delivery shows the message on
  * its next turn, and anything else reads it through `acc inbox`. A session with
  * no known process cannot be told from one that left, so it is not answering.
+ *
+ * A live binding wakes on the router's own rule: a current lease, or a lapsed
+ * one the adapter can re-verify. Without that the next send is durable.
  */
 export function presenceBreakdown(participants = [], adapters = ALL_ADAPTERS()) {
   const nextTurn = new Set(adapters.filter(adapter => adapter.capabilities?.delivery?.nextTurn === true)
     .map(adapter => adapter.id));
+  const refreshes = new Set(adapters.filter(adapter => typeof adapter.refreshNativeSession === "function")
+    .map(adapter => adapter.id));
+  const wakes = participant => participant.liveDelivery === true
+    && (participant.liveLeaseCurrent === true || refreshes.has(participant.harness));
   const idle = { wake: 0, nextTurn: 0, inbox: 0, unknown: 0 };
   for (const participant of participants.filter(item => item.presence === "stale")) {
     const kind = participant.processTracked !== true ? "unknown"
-      : participant.liveDelivery === true ? "wake"
+      : wakes(participant) ? "wake"
         : nextTurn.has(participant.harness) ? "nextTurn" : "inbox";
     idle[kind] += 1;
   }

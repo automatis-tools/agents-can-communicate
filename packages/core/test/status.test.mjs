@@ -134,16 +134,22 @@ test("a stale session says whether a live push can wake it and whether its proce
       clientVersion: "1.2.3", availableModes: ["livePush"], livePolicy: "actionable",
       opaqueEndpointRef: "fixture:endpoint:secret", leaseUntil: "2026-08-16T01:02:00.000Z",
       retiredAt: null });
+    const fresh = (await service.collectStatus({ workspaceId: WORKSPACE })).participants
+      .find(participant => participant.participantId === "bound");
+    assert.deepEqual([fresh.liveDelivery, fresh.liveLeaseCurrent], [true, true]);
     // Ten minutes without a turn: every session is stale and the lease has
-    // lapsed. Stale alone said "not answering" about all three, and a live push
-    // still wakes the first one - the router refreshes a lapsed lease.
+    // lapsed. Stale alone said "not answering" about all three. Whether a push
+    // still wakes the first one depends on the adapter: the router refreshes a
+    // lapsed lease only through the adapter's own re-verification, which core
+    // cannot know about, so it reports the binding and the lease separately.
     clock.advance(10 * 60_000);
     const status = await service.collectStatus({ workspaceId: WORKSPACE });
     const by = participantId => status.participants
       .find(participant => participant.participantId === participantId);
     assert.deepEqual(["bound", "hooked", "untracked"].map(id => by(id).presence),
       ["stale", "stale", "stale"]);
-    assert.deepEqual([by("bound").liveDelivery, by("bound").processTracked], [true, true]);
+    assert.deepEqual([by("bound").liveDelivery, by("bound").liveLeaseCurrent,
+      by("bound").processTracked], [true, false, true]);
     assert.deepEqual([by("hooked").liveDelivery, by("hooked").processTracked], [false, true]);
     assert.deepEqual([by("untracked").liveDelivery, by("untracked").processTracked],
       [false, false]);
