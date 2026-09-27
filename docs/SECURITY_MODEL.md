@@ -100,11 +100,11 @@ unchanged; edited or newly referenced settings remain intact. See
 [Codex outgoing permissions](CONFIGURATION.md#codex-outgoing-permissions). Configuration
 readiness does not prove that an active session's overrides permit a live offer.
 
-Antigravity CLI asks before each shell command. After a separate default-No install
-question, ACC adds one prefix rule to that client's `permissions.allow`, for its own wrapper
-path only. The agent then runs every ACC command without a prompt, including one that a
-peer's message prompts. Every other command still asks. ACC records the one rule it added
-and removes only that rule. It never writes a settings file that it cannot parse. See
+Antigravity CLI asks before each shell command. Installing its adapter adds one prefix rule
+to that client's `permissions.allow`, for ACC's own wrapper path only. The agent then runs
+every ACC command without a prompt, including one that a peer's message prompts. Every other
+command still asks. ACC records the one rule it added and uninstall removes only that rule.
+It never writes a settings file that it cannot parse. See
 [Antigravity CLI command approval](CONFIGURATION.md#antigravity-cli-command-approval).
 
 ## Claims
@@ -182,7 +182,7 @@ caller chooses to send. The sender remains responsible for that content.
 | Symlink or traversal escapes a managed root | Per-segment containment, no-follow reads, closed config schema | Host filesystem compromise is out of scope |
 | Claim denial of service | Leases, visible owner, explicit authority release | Deliberate abuse by a trusted local peer is social |
 | Installer removes user configuration | Content-hashed ownership and byte comparison | User must remove modified leftovers manually |
-| Peer message leads an Antigravity agent to run ACC commands unasked | Allow rule only after its own default-No consent, scoped to ACC's wrapper, removed with delivery off or uninstall | A peer can still prompt ACC actions, such as a reply or a claim, that nobody approves one by one |
+| Peer message leads an Antigravity agent to run ACC commands unasked | Allow rule scoped to ACC's wrapper; every other command still asks; uninstall removes it | A peer can still prompt ACC actions, such as a reply or a claim, that nobody approves one by one |
 | False delivery claim | Record-first order, transport-owned `offered`, recipient-owned retrieval/ack, mutation tests | Crash after offer before commit can cause duplicate display |
 | Native endpoint leaks | Ephemeral opaque reference, user-only local endpoint, status redaction | Same-user local processes are outside the trust boundary |
 | MCP client impersonates another session | Identity fixed by launch env, closed tool schemas | A compromised launch config already controls that client |

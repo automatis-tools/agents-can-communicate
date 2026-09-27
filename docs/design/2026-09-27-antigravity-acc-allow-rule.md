@@ -71,24 +71,21 @@ matched `sh "<relay>" start`, where the quotes are around an argument. The concl
    the skill, and a quoted first word matches nothing, so a rule would only look like a
    grant. Install writes nothing and says why; doctor says the prefix rule cannot apply and
    names the quoted-first-word behaviour.
-4. **Consent is its own default-No question, asked after the delivery question.** "Let ACC
-   commands run without an approval prompt in Antigravity CLI?" names the rule and the file,
-   says the agent then runs every ACC command without asking (including one a peer's message
-   prompts), and says what No costs. It is asked only when the live policy is on after the
-   delivery decision, the adapter reports the rule absent and addable (`prompts`), and no
-   answer is on record. An operator who accepted live delivery on 0.8.1 is asked once; a
-   fresh install asks about delivery and then about the prompt; a declined delivery is never
-   followed by it. The same pattern as the delivery question: a preview and a run with
-   nobody at the terminal ask nothing and add nothing, and an explicit `--delivery` answers
-   it with the rest of complete setup (`actionable`/`all` yes, `off` no), as it already
-   approves a Codex service download.
-5. **The answer is recorded as `deliveryDecision.allowCommands`.** It must be a boolean, and
-   a yes on record for a delivery that is off describes no decision anyone made, so such a
-   record reads as legacy. The installer hands the decision to the adapter in the plan and
-   install contexts, so a refresh from the record keeps the rule without asking.
-6. **The rule exists only while its reason does.** Install adds it when the requested live
-   policy is on and `allowCommands` is true, and takes ACC's rule back when either stops
-   being true. Uninstall takes it back.
+4. **The rule is always on.** Every install of the Antigravity adapter writes it, with no
+   question, whatever the delivery policy, interactive or not, a preview aside. This is the
+   user's decision of 2026-09-27 (below), and it replaces a first design that asked a
+   separate default-No question. Nothing is recorded about it in the installation record:
+   `deliveryDecision` carries no `allowCommands`, and a record that still has one from that
+   first design is read as its decision with the field ignored. The installer no longer
+   hands the delivery decision to adapters, since only that question needed it.
+5. **Install ensures the rule; only uninstall takes it back.** A rule removed by hand comes
+   back at the next install or automatic refresh. The simplest behaviour consistent with
+   "always on" is that uninstall is the one way to keep it out.
+6. **Uninstall always ends ACC's claim.** It removes ACC's rule when it is there and drops
+   the claim when it is not, so the same words added later by the operator stay theirs.
+   While ACC stays installed, a rule that is present and claimed is ACC's; that is the one
+   case ACC cannot tell apart from an operator removing ACC's rule and adding the same words
+   between two installs, and uninstall then removes it.
 7. **Ownership is recorded in ACC's data home**, beside the existing `created-*` markers:
    `<data home>/acc/adapter-antigravity/allow-rule-<base64url of the settings path>`, a JSON
    record of the file, the exact rule, and which of the file, `permissions` and
@@ -96,8 +93,7 @@ matched `sh "<relay>" start`, where the quotes are around an argument. The concl
    between the two leaves a claim uninstall drops rather than a rule nobody can attribute.
    Uninstall removes one copy of the recorded rule, then removes a container ACC created only
    if it is empty, and the file ACC created only if nothing is left in it. A rule the
-   operator already had is never claimed. A rule the operator removed by hand ends the claim,
-   so the same words added back later stay theirs.
+   operator already had is never claimed.
 8. **The operator's file is never rewritten when ACC cannot read it.** A file that does not
    parse, a top level that is not an object, a `permissions` that is not an object, or a
    `permissions.allow` that is not a list is left byte for byte. Install reports it as a
@@ -107,12 +103,26 @@ matched `sh "<relay>" start`, where the quotes are around an argument. The concl
 9. **Doctor reports the rule as present, absent, or unable to apply.** Detection reports
    `commandApproval` - `allowed`, `prompts`, `unmatchable` or `unreadable`, with the rule and
    the file - and the same sentence as `inboundDelivery`, which `acc doctor` prints as
-   `Antigravity CLI inbound: ...` for a client with live delivery on. Absent says a live wake
-   stops at the agent's first ACC command and names the rule, `permissions.allow` and the
-   file. The adapter's own doctor and the JSON report carry the line in every state.
+   `Antigravity CLI inbound: ...` for a client with live delivery on. Absent (`prompts`) now
+   means ACC's install did not write the rule here or it was removed since: the line says a
+   live wake stops at the agent's first ACC command, names the rule, `permissions.allow` and
+   the file, and gives `acc install --adapter antigravity` as the remedy. Where ACC's wrapper
+   is on disk, a missing or unreadable rule is also a remediation step, which doctor prints
+   whatever the delivery policy. The adapter's own doctor and the JSON report carry the line
+   in every state.
 10. **No capability changes.** `delivery.livePush` stays as the 1.2.7 relay capture
     certified it. "A woken session answers without an approval prompt" is not claimed until
     the live capture below records it.
+
+## The user's decision, 2026-09-27
+
+The first version of this change asked the operator a separate default-No question at install
+("Let ACC commands run without an approval prompt in Antigravity CLI?"), recorded the answer
+as `deliveryDecision.allowCommands`, and wrote the rule only with live delivery on and a yes.
+The user reviewed it the same day and decided: "remove this question altogether; let
+everything always be enabled; there is no sense in something not being enabled." The question,
+the recorded answer and the dependence on the delivery policy were removed; the rule is part
+of the Antigravity integration, as its hooks are.
 
 ## What remains unverified
 
@@ -131,10 +141,15 @@ conversation, when the operator is present to approve it or has a rule of their 
 
 ## Live capture still to do
 
-With the user, on the capture machine: remove the three capture rules from
-`~/.gemini/antigravity-cli/settings.json` (keeping the operator's relay rule), run
-`acc install --adapter antigravity` from this branch and answer Yes, confirm the file gained
-exactly `command(<home>/.gemini/config/acc/acc-cli.sh)` and kept every other key, restart
-`agy`, start the relay, send a question from a peer while the session is idle, and confirm
-the reply is recorded with no approval prompt. Then `acc uninstall` and confirm the file is
-back to its earlier bytes.
+Run with the user through the full end-to-end recipe: the candidate installed into an
+isolated npm prefix with an isolated `ACC_DATA_HOME`, the real `agy`, and the real client homes
+backed up before and restored after. Before install, remove the three capture rules from
+`~/.gemini/antigravity-cli/settings.json`, keeping the operator's relay rule, and note the
+bytes of that file and of `~/.gemini/settings.json`. Install the Antigravity adapter from the
+candidate with no `--delivery` option and confirm it asks no approval-prompt question, that the
+file gained exactly `command(<home>/.gemini/config/acc/acc-cli.sh)` and kept every other key,
+that the claim is under `<ACC_DATA_HOME>/acc/adapter-antigravity/`, and that doctor reports the
+rule as added by ACC. Restart `agy`, start the relay, send a question from a peer while the
+session is idle and nobody is at the terminal, and confirm the agent's ACC commands use the
+bare path, run with no prompt, and record the reply. Then uninstall and confirm both files are
+back to their earlier bytes.

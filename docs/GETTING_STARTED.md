@@ -151,8 +151,8 @@ prepare a missing service. Start the client with your normal command. A loaded d
 messages after its terminal exits. Antigravity CLI 1.2.7 and later has one too: with delivery enabled,
 ACC's context asks the agent to start a relay from its own shell, up to three times while
 none is running, and you approve that command at the client's prompt. Antigravity also asks
-before each ACC command, so a woken session waits for you at its first one. Install asks
-once whether to allow ACC's commands without that prompt; see
+before each shell command, so install adds a rule that lets ACC's own commands run without
+that prompt, and a woken session can answer while you are away; see
 [Antigravity CLI command approval](CONFIGURATION.md#antigravity-cli-command-approval).
 [Capabilities](CAPABILITIES.md) explains policy, versions and fallback.
 

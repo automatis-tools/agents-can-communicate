@@ -384,11 +384,10 @@ Your existing npm or Homebrew command and shell profiles remain unchanged.
 An older consent that covered service start receives one expanded choice for the download.
 An accepted or declined answer persists. To change a declined answer, use
 `acc install --adapter codex --delivery actionable` (or `all` for that policy).
-With Antigravity CLI's live delivery on, an interactive install asks one more default-No
-question, once: whether ACC commands may run there without an approval prompt. Yes adds one
-prefix rule for ACC's wrapper to `~/.gemini/antigravity-cli/settings.json`; `--delivery off`,
-a No or uninstall removes exactly that rule. An explicit `--delivery actionable|all` answers
-it yes, and `off` answers it no. See
+Installing the Antigravity adapter always adds one prefix rule for ACC's wrapper to
+`~/.gemini/antigravity-cli/settings.json`, so ACC's commands run there without an approval
+prompt; nothing asks about it and the delivery policy does not change it. Uninstall removes
+exactly that rule. See
 [Antigravity CLI command approval](CONFIGURATION.md#antigravity-cli-command-approval).
 Explicit `--delivery actionable|all` also approves a required download on supported clients.
 Dry runs, delivery off, doctor, automatic refresh, and message delivery do not download

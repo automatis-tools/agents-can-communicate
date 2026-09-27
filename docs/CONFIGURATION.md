@@ -187,9 +187,9 @@ bundle and reports it for review. Plugin registration can still be removed indep
 ### Antigravity CLI command approval
 
 Antigravity CLI asks for approval before each shell command, ACC's included. A session that
-live delivery wakes while you are away therefore stops at the agent's first ACC command, and
-the peer gets no answer until someone approves it. One rule in the client's own settings
-removes that prompt for ACC's commands:
+live delivery wakes while you are away would therefore stop at the agent's first ACC command,
+and the peer would get no answer until someone approved it. So when `acc install` installs
+the Antigravity adapter, it always adds one rule to the client's own settings:
 
 ```text
 ~/.gemini/antigravity-cli/settings.json
@@ -197,23 +197,23 @@ removes that prompt for ACC's commands:
 ```
 
 A one-word rule is a prefix: every command that starts with that path runs without asking.
-With it, the agent runs every ACC command without asking you, including one a peer's message
-prompts. So it is a separate choice. When Antigravity's live delivery is on, an interactive
-`acc install` asks a second default-No question, "Let ACC commands run without an approval
-prompt in Antigravity CLI?", once. Yes adds that one rule; No is recorded and not asked again.
-An explicit `--delivery actionable|all` counts as yes and `--delivery off` as no, as with the
-rest of complete setup. A dry run or a noninteractive run adds nothing.
+The agent then runs every ACC command without asking you, including one a peer's message
+prompts; every other command still asks. Install does not ask about the rule, and the
+delivery policy does not change it: it is part of ACC's Antigravity integration, as its hooks
+are.
 
-ACC keeps every other key and rule in the file and records what it added in its own data
-home. `--delivery off`, a No, or `acc uninstall` removes exactly that rule, and a container or
-file ACC created only if nothing else is in it. A file that is not valid JSON, or whose
-`permissions.allow` is not a list, is left as it is and reported. The client reads the file
-when it starts, so restart `agy` after install.
+ACC keeps every other key and rule in the file, leaves a rule you already had as yours, and
+records what it added in its own data home. `acc uninstall` removes exactly that rule, and a
+container or file ACC created only if nothing else is in it. A rule removed by hand comes back
+at the next `acc install` or automatic refresh; uninstall is what keeps it out. A file that is
+not valid JSON, or whose `permissions.allow` is not a list, is left as it is and reported. The
+client reads the file when it starts, so restart `agy` after install.
 
 The rule matches only a command whose first word is the path without quotes, so ACC's skill
 for this client writes the path without quotes. When your home path contains a space or a
-shell metacharacter, the path needs quotes, no rule can match it, and ACC adds none;
-`acc doctor` says so. `acc doctor` reports the rule as present, absent, or unable to apply.
+shell metacharacter, the path needs quotes, no rule can match it, and ACC adds none.
+`acc doctor` reports the rule as present, absent, or unable to apply, and asks for
+`acc install --adapter antigravity` when ACC's rule is missing.
 
 ## Override local paths and identity
 

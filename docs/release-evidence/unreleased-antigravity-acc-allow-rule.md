@@ -27,44 +27,50 @@ ACC 0.8.1, Antigravity CLI 1.2.12 (`agy`), macOS arm64, 2026-09-27.
   and `bakeSkillCommand({ bareWhenSafe })`, which bakes such a path bare and quotes any
   other. Default unchanged.
 - `adapter-antigravity`: the skill is baked bare when the path allows it and says to start
-  each command exactly as written. `src/allow-rule.mjs` inspects, adds and withdraws
+  each command exactly as written. `src/allow-rule.mjs` inspects, ensures and withdraws
   `command(<wrapper>)` in `permissions.allow`, with a claim under
   `<data home>/acc/adapter-antigravity/allow-rule-*` recording the rule and the containers ACC
-  created. Install reconciles the rule with the decision; uninstall withdraws it; detect
-  reports `commandApproval` and `inboundDelivery`; the plan names the settings file when the
-  rule is wanted.
-- `installer`: the delivery decision reaches the adapter in the plan and install contexts;
-  detection carries `commandApproval`.
-- `cli`: `install-command-approval.mjs` asks the second default-No question; the decision
-  records `allowCommands` and rejects a yes for a delivery that is off.
+  created. Every install ensures the rule, whatever the delivery policy; uninstall withdraws
+  it and always ends the claim. Detection reports `commandApproval` and `inboundDelivery`,
+  and adds a remediation step where ACC's wrapper is on disk and its rule is missing or the
+  file cannot be read. The plan names the settings file whenever a rule can be written.
+- `installer`: detection carries `commandApproval`.
+- `cli`: unchanged in behaviour. A record that carries `allowCommands`, written by the first
+  version of this change, is read as its decision with the field ignored.
 - Docs: configuration, CLI, getting started, troubleshooting, capabilities, how it works,
-  security model, the adapter's `COMPATIBILITY.md`.
+  security model, the adapter's `COMPATIBILITY.md`, and the design note, which records the
+  user's decision of 2026-09-27 to drop the consent question and keep the rule always on.
 
 ## Tests
 
-Each new test was seen failing for its stated reason before the change that made it pass;
-the tests that assert nothing is written were proven by the mutations below.
+Each new or changed test was seen failing for its stated reason before the change that made it
+pass, except the rewritten end-to-end test, which was written after the behaviour and proven by
+mutation.
 
 - `packages/adapter-sdk/test/skill-command.test.mjs` (4): the shell-word rule; default,
   bare and kept-quotes bakes.
 - `packages/adapter-antigravity/test/skill-plugin.test.mjs`: the installed skill is bare for
   a one-word home and quoted for a home with a space, and carries the instruction.
-- `packages/adapter-antigravity/test/allow-rule-install.test.mjs` (19): add with consent and
-  keep the rest byte for byte; idempotent reinstall; exact uninstall; the operator's own
-  rule (bare and quoted) kept; four decisions that write nothing; withdrawal on delivery off;
-  a created file removed; created containers removed only when empty; the operator's empty
-  containers and empty file kept; a rule removed by hand ends the claim; four unreadable
-  shapes never rewritten; an unreadable uninstall keeps the claim; the claim lives in the
-  data home.
-- `packages/adapter-antigravity/test/allow-rule-report.test.mjs` (7): absent, present and
-  ACC's, the state-root lookup `acc doctor` uses, the operator's own rule, unreadable,
-  unmatchable, and the plan.
-- `packages/installer/test/delivery-decision.test.mjs`, `detect.test.mjs`: the decision
-  reaches plan and install, also from the record; `commandApproval` reaches the entry.
-- `packages/cli/test/install-command-approval.test.mjs` (9): who is asked, when, and what is
-  recorded.
-- `tests/process/antigravity-allow-rule.test.mjs` (2): from the 0.8.1 record through detect,
-  the question, plan, apply, reinstall and uninstall, for a yes and a no.
+- `packages/adapter-antigravity/test/allow-rule-install.test.mjs` (19): install adds the rule
+  and keeps the rest byte for byte; idempotent reinstall; exact uninstall; the operator's own
+  rule (bare and quoted) kept; the rule written for four install contexts (no policy, off, on,
+  a record carrying the old No); a rule removed by hand put back by the next install and still
+  ACC's; a created file removed; created containers removed only when empty; the operator's
+  empty containers and empty file kept; uninstall ends the claim when the rule was already
+  gone; four unreadable shapes never rewritten; an unreadable uninstall keeps the claim; the
+  claim lives in the data home.
+- `packages/adapter-antigravity/test/allow-rule-report.test.mjs` (8): absent with the
+  reinstall remedy; the remediation step whatever the delivery; present and ACC's; the
+  state-root lookup `acc doctor` uses; the operator's own rule; unreadable; unmatchable; the
+  plan.
+- `packages/installer/test/detect.test.mjs`: `commandApproval` reaches the entry.
+- `packages/cli/test/install-no-approval-question.test.mjs` (5): the 0.8.1 record is asked
+  nothing more; a fresh install asks only the delivery question; an explicit delivery records
+  no answer about the rule; a preview says nothing about it; a record carrying `allowCommands`
+  is read with the field ignored.
+- `tests/process/antigravity-allow-rule.test.mjs` (2): over the 0.8.1 record through
+  detection, decision, plan, apply, reinstall and uninstall, asking nothing; and delivery off
+  with nobody at the terminal, which still gets the rule.
 - `tests/process/skill-command.test.mjs`: the Antigravity skill's bare command is found and
   runs.
 
@@ -80,40 +86,25 @@ Each was applied alone, the named tests run, and the file restored.
 | bake bare without the shell-word check | kept-quotes bake; skill bare for one-word home |
 | Antigravity skill baked quoted | skill bare for one-word home |
 | skill instruction removed | skill bare for one-word home |
+| rule gated on the delivery policy | 17 install and report tests, including the off and no-policy contexts; delivery-off end-to-end test |
+| rule gated on an old recorded No | the old-No context |
+| install skips the rule | 19 install and report tests; both end-to-end tests |
+| plan names the settings file for a quoted wrapper, or never | plan test; the first end-to-end test when never |
+| remedy asks for `--delivery` | absent report |
+| claim kept when uninstall finds the rule gone | uninstall ends the claim |
+| install leaves a hand-removed rule out while a claim exists | next install puts it back |
+| remediation without ACC's wrapper on disk, or none for missing, or none for unreadable | the remediation test, each time |
 | unmatchable check off | wrapper path that needs quotes |
 | unreadable check off (inspect) | four never-rewritten tests; unreadable report |
 | top level, `permissions`, `permissions.allow` shape checks off, one at a time | the matching never-rewritten test |
-| consent answer ignored | declined; never asked |
-| live policy ignored | delivery off with a yes on record; withdrawn consent |
 | quoted one-word form unrecognised | operator's own rule (install and report) |
 | ownership always true | operator's own rule not called ACC's |
 | uninstall keeps the rule | six uninstall tests |
 | created `allow`, `permissions`, file flags ignored, one at a time | operator's empty containers and file |
 | unreadable uninstall proceeds | uninstall keeps its claim |
-| claim kept after a hand removal | rule removed by hand ends the claim |
 | state-root lookup removed | doctor reads the data home the installer used |
-| plan never names the settings file | plan test |
-| detect drops the diagnostic | absent report |
-| uninstall skips the withdrawal | five uninstall tests |
-| install skips the rule | fifteen tests |
-| install drops its needed action | five tests |
-| plan or install context without the decision, one at a time | installer decision test; yes end to end |
-| detection drops `commandApproval` | installer detect test; both end-to-end tests |
-| explicit `--delivery` leaves it unanswered | explicit delivery test |
-| asked with delivery off | declined delivery test |
-| recorded answer ignored | not asked again |
-| rule state not checked | nothing to ask |
-| asked with nobody at the terminal | preview and noninteractive |
-| a client with no report treated as asking | ten consent tests |
-| incoherent yes accepted | contradicting record |
-| recorded answer dropped by `decisionOf` | two consent tests; both end-to-end tests |
-| answer forced to yes | a No is recorded |
-| preview note dropped | preview test |
-| question never asked | five consent tests; both end-to-end tests |
-
-The first run of "live policy ignored" survived: the fixture for delivery off also carried
-`allowCommands: false`, so the consent check hid the policy check. The fixture now carries a
-yes with the policy off, and the mutation is caught.
+| detection drops `commandApproval` | installer detect test; the first end-to-end test |
+| `decisionOf` carries `allowCommands`, or rejects a malformed one | record carrying the old answer |
 
 ## Live capture
 

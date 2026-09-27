@@ -545,11 +545,10 @@ recorded the reply. Fixture: `fixtures/headless-reply-attempt-1.2.7.json`.
 **Headless mode cannot run it.** Print mode auto-denies any tool needing the `command`
 permission, because it cannot prompt, and says so on stderr: *add an allow-rule under
 `permissions.allow` in settings.json (e.g. `command(<target>)`)*. In the TUI the same call
-raises the ordinary approval prompt. Whether an agent may run ACC without asking is the
-operator's decision. Since 2026-09-27 `acc install` asks it as its own question and, on a yes,
-adds one prefix rule for ACC's wrapper (see **Approval prompts and the ACC allow rule,
-2026-09-27** below). Without that answer, a headless agent receives peer messages and knows
-the exact command to answer them, and cannot send it until the operator allows it.
+raises the ordinary approval prompt. Since 2026-09-27 `acc install` always adds one prefix rule
+for ACC's wrapper (see **Approval prompts and the ACC allow rule, 2026-09-27** below). Print
+mode with that rule loaded has not been captured; without it, a headless agent receives peer
+messages and knows the exact command to answer them, and cannot send it.
 
 Why it cannot lean on the imported copy: all 23 commands in its skill run
 `~/.gemini/extensions/agents-can-communicate/acc-cli.sh`, the Gemini CLI extension's shim. It
@@ -683,11 +682,13 @@ grant is matched as a full word.
 
 **What ACC does with it.** The skill names the wrapper bare when its path is one shell word
 (absolute; letters, digits, `.`, `_`, `-`, `/`), and tells the model to start each command
-exactly as written. With the operator's yes to a separate install question, and live delivery
-on, install adds `command(<wrapper>)` to `permissions.allow` and records the claim in
-`<data home>/acc/adapter-antigravity/`; uninstall, delivery off, or a No takes back exactly
-that rule. A wrapper path that needs quotes gets no rule, and doctor says why. Detection
-reports the rule as `allowed`, `prompts`, `unmatchable` or `unreadable`.
+exactly as written. Every install of this adapter adds `command(<wrapper>)` to
+`permissions.allow` and records the claim in `<data home>/acc/adapter-antigravity/`, whatever
+the delivery policy and with no question: the user decided on 2026-09-27 that it is always on.
+Uninstall takes back exactly that rule. A wrapper path that needs quotes gets no rule, and
+doctor says why. Detection reports the rule as `allowed`, `prompts` (absent: ACC's install did
+not write it or it was removed, and doctor asks for `acc install --adapter antigravity`),
+`unmatchable` or `unreadable`.
 
 **Not observed.**
 

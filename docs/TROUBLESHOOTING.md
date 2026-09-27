@@ -302,8 +302,8 @@ agy -p "/skills" --output-format json
 An agent that receives a peer message in print mode (`agy -p`) cannot answer it on its own.
 It forms the right `acc reply` command from the skill, and print mode denies every command
 because it cannot ask for approval; the client says so on stderr and names
-`permissions.allow` in its settings. The TUI asks instead. The one rule ACC adds there, with
-your consent, is described in
+`permissions.allow` in its settings. The TUI asks instead. The one rule ACC's install adds
+there is described in
 [Antigravity CLI command approval](CONFIGURATION.md#antigravity-cli-command-approval); it was
 captured in the TUI, and print mode with it has not been captured.
 
@@ -329,11 +329,9 @@ A woken session that stops at an approval prompt answers only once someone appro
 first ACC command. `acc doctor` prints an `Antigravity CLI inbound:` line with what it found in
 `~/.gemini/antigravity-cli/settings.json`:
 
-- **No rule.** Each ACC command waits for approval. Run `acc install --adapter antigravity`
-  on a terminal and answer Yes to the approval-prompt question. After an earlier No, pass the
-  delivery policy you use, `--delivery actionable` or `--delivery all`. You can also add
-  `command(<home>/.gemini/config/acc/acc-cli.sh)` to `permissions.allow` yourself. Then
-  restart `agy`.
+- **No rule.** Each ACC command waits for approval. ACC's install writes the rule, so it was
+  removed since or the install did not reach this file: run `acc install --adapter antigravity`,
+  then restart `agy`. Doctor lists this under what to run next.
 - **The rule is present.** The client reads it at startup, so a session started before it was
   added still asks; restart `agy`. If a prompt still appears, check the command the agent
   ran: a path in quotes, or a command wrapped in `sh -c`, matches no rule.
