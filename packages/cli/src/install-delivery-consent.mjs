@@ -1,8 +1,6 @@
 import { LIVE_POLICIES, livePolicyOf } from "@agents-can-communicate/installer";
 import { AccError, EXIT } from "@agents-can-communicate/protocol";
 
-import { decideCommandApproval } from "./install-command-approval.mjs";
-
 const DECISION_SOURCES = new Set([
   "interactive-accepted",
   "interactive-declined",
@@ -27,11 +25,6 @@ function validDecision(record) {
       || (decision.installPrerequisites && !decision.completeSetup))) return false;
 
   const enabled = livePolicyOf(record) !== "off";
-  // Running ACC commands unasked was granted for a live delivery; a yes on
-  // record for a delivery that is off describes no decision anyone made.
-  if (Object.hasOwn(decision, "allowCommands")
-    && (typeof decision.allowCommands !== "boolean"
-      || (decision.allowCommands && !enabled))) return false;
   if (decision.source === "interactive-accepted") return decision.completeSetup && enabled;
   if (decision.source === "interactive-declined") return !decision.completeSetup && !enabled;
   if (decision.source === "explicit-option") return decision.completeSetup === enabled;
@@ -46,9 +39,7 @@ export function decisionOf(record) {
     ? { source: record.deliveryDecision.source,
       completeSetup: record.deliveryDecision.completeSetup,
       ...(Object.hasOwn(record.deliveryDecision, "installPrerequisites")
-        ? { installPrerequisites: record.deliveryDecision.installPrerequisites } : {}),
-      ...(Object.hasOwn(record.deliveryDecision, "allowCommands")
-        ? { allowCommands: record.deliveryDecision.allowCommands } : {}) }
+        ? { installPrerequisites: record.deliveryDecision.installPrerequisites } : {}) }
     : legacyDecision();
 }
 
@@ -167,14 +158,9 @@ export async function decideDelivery({ options, detected, recorded, runtime, dry
     }
   }
 
-  // Asked after delivery is settled, because it only matters where it is on.
-  const approval = await decideCommandApproval({ explicit, detected, deliveryByAdapter,
-    deliveryDecisionByAdapter, runtime, dryRun });
-
-  const notes = [...(explicit === undefined && dryRun && withheld > 0
+  const notes = explicit === undefined && dryRun && withheld > 0
     ? ["interactive choices were not made: this preview keeps native delivery off for "
       + `${withheld} eligible client(s) without a recorded opt-in`]
-    : []), ...approval.notes];
-  return { deliveryByAdapter, deliveryDecisionByAdapter, asked, notes,
-    commandApprovalAsked: approval.asked };
+    : [];
+  return { deliveryByAdapter, deliveryDecisionByAdapter, asked, notes };
 }

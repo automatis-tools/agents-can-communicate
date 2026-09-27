@@ -3,7 +3,7 @@ import { readdir } from "node:fs/promises";
 import test from "node:test";
 
 import { installAntigravity, uninstallAntigravity } from "../src/install.mjs";
-import { CONSENTED, WITHOUT_CONSENT, agyHome } from "./agy-home.mjs";
+import { ANY_POLICY, agyHome } from "./agy-home.mjs";
 
 /**
  * The allow rule that lets a woken Antigravity session answer unattended.
@@ -14,16 +14,17 @@ import { CONSENTED, WITHOUT_CONSENT, agyHome } from "./agy-home.mjs";
  * under `permissions.allow` removes the prompt: `command(<wrapper>)`, a
  * one-word prefix for every command whose first word is the unquoted wrapper.
  *
- * The file is the operator's. ACC adds that one rule only with consent, keeps
- * every other byte, and takes back only what it added.
+ * The user decided on 2026-09-27 that ACC always writes it: every install of
+ * this adapter, whatever the delivery policy, with nobody asked. The file is
+ * still the operator's. ACC adds that one rule, keeps every other byte, and
+ * uninstall takes back only what it added.
  */
-const consented = fixture => ({ ...fixture.context, ...CONSENTED });
 
-test("consent adds one prefix rule for the unquoted wrapper and keeps the rest", async t => {
+test("install adds one prefix rule for the unquoted wrapper and keeps the rest", async t => {
   const fixture = await agyHome(t);
   await fixture.write(fixture.theirs);
 
-  const result = await installAntigravity(consented(fixture));
+  const result = await installAntigravity(fixture.context);
 
   const expected = { ...fixture.theirs, permissions: {
     allow: [...fixture.theirs.permissions.allow, `command(${fixture.wrapper})`] } };
@@ -35,13 +36,13 @@ test("consent adds one prefix rule for the unquoted wrapper and keeps the rest",
     && /restart/.test(line)), true, "install must say the rule loads when agy starts again");
 });
 
-test("a second install with the same consent changes nothing", async t => {
+test("a second install changes nothing", async t => {
   const fixture = await agyHome(t);
   await fixture.write(fixture.theirs);
-  await installAntigravity(consented(fixture));
+  await installAntigravity(fixture.context);
   const once = await fixture.read();
 
-  const again = await installAntigravity(consented(fixture));
+  const again = await installAntigravity(fixture.context);
 
   assert.equal(await fixture.read(), once);
   assert.equal(again.changes.includes(fixture.settings), false);
@@ -52,7 +53,7 @@ test("uninstall takes back exactly the rule ACC added", async t => {
   const fixture = await agyHome(t);
   await fixture.write(fixture.theirs);
   const before = await fixture.read();
-  await installAntigravity(consented(fixture));
+  await installAntigravity(fixture.context);
 
   const result = await uninstallAntigravity(fixture.context);
 
@@ -69,48 +70,46 @@ test("a rule the operator already has stays theirs through install and uninstall
     await fixture.write({ ...fixture.theirs, permissions: { allow: [own] } });
     const before = await fixture.read();
 
-    await installAntigravity(consented(fixture));
+    await installAntigravity(fixture.context);
     assert.equal(await fixture.read(), before, `${form}: install added a second rule`);
     await uninstallAntigravity(fixture.context);
     assert.equal(await fixture.read(), before, `${form}: uninstall took the operator's rule`);
   }
 });
 
-for (const [label, decision] of WITHOUT_CONSENT) {
-  test(`no consent, no rule: ${label}`, async t => {
+for (const [label, decision] of ANY_POLICY) {
+  test(`the rule does not depend on delivery: ${label}`, async t => {
     const fixture = await agyHome(t);
     await fixture.write(fixture.theirs);
-    const before = await fixture.read();
 
     await installAntigravity({ ...fixture.context, ...decision });
 
-    assert.equal(await fixture.read(), before);
+    assert.deepEqual(JSON.parse(await fixture.read()).permissions.allow,
+      [...fixture.theirs.permissions.allow, fixture.rule]);
   });
 }
 
-test("a withdrawn consent takes ACC's rule back at the next install", async t => {
+test("the next install puts back a rule removed by hand, and still owns it", async t => {
+  // Always on: the only way to keep the rule out is to uninstall ACC.
   const fixture = await agyHome(t);
   await fixture.write(fixture.theirs);
   const before = await fixture.read();
-  await installAntigravity(consented(fixture));
+  await installAntigravity(fixture.context);
+  const withRule = await fixture.read();
+  await fixture.write(fixture.theirs);
 
-  const [, off] = WITHOUT_CONSENT[1];
-  const result = await installAntigravity({ ...fixture.context, ...off });
+  const result = await installAntigravity(fixture.context);
 
-  assert.equal(await fixture.read(), before);
+  assert.equal(await fixture.read(), withRule);
   assert.equal(result.changes.includes(fixture.settings), true);
-  // Nothing of ACC's is left to claim: a later uninstall touches nothing.
-  await fixture.write({ ...fixture.theirs, permissions: { allow: [fixture.rule] } });
-  const theirsNow = await fixture.read();
   await uninstallAntigravity(fixture.context);
-  assert.equal(await fixture.read(), theirsNow,
-    "a rule the operator added after ACC withdrew its own was taken as ACC's");
+  assert.equal(await fixture.read(), before);
 });
 
 test("a settings file that did not exist is created, then removed again", async t => {
   const fixture = await agyHome(t);
 
-  await installAntigravity(consented(fixture));
+  await installAntigravity(fixture.context);
   assert.equal(await fixture.read(),
     `${JSON.stringify({ permissions: { allow: [fixture.rule] } }, null, 2)}\n`);
 
@@ -122,13 +121,13 @@ test("containers ACC created go only while nothing of the operator's is in them"
   const fixture = await agyHome(t);
   await fixture.write({ colorScheme: "dark" });
   const before = await fixture.read();
-  await installAntigravity(consented(fixture));
+  await installAntigravity(fixture.context);
 
   await uninstallAntigravity(fixture.context);
   assert.equal(await fixture.read(), before);
 
   // The operator adds a rule of their own beside ACC's after install.
-  await installAntigravity(consented(fixture));
+  await installAntigravity(fixture.context);
   const current = JSON.parse(await fixture.read());
   current.permissions.allow.push("command(git status)");
   await fixture.write(current);
@@ -143,7 +142,7 @@ test("empty containers and an empty file the operator had are left in place", as
     const fixture = await agyHome(t);
     await fixture.write(theirs);
 
-    await installAntigravity(consented(fixture));
+    await installAntigravity(fixture.context);
     await uninstallAntigravity(fixture.context);
 
     assert.equal(await fixture.exists() ? await fixture.read() : null, theirs,
@@ -151,10 +150,10 @@ test("empty containers and an empty file the operator had are left in place", as
   }
 });
 
-test("a rule the operator removed by hand ends ACC's claim to it", async t => {
+test("uninstall ends ACC's claim even when its rule was already gone", async t => {
   const fixture = await agyHome(t);
   await fixture.write(fixture.theirs);
-  await installAntigravity(consented(fixture));
+  await installAntigravity(fixture.context);
   await fixture.write(fixture.theirs);
   await uninstallAntigravity(fixture.context);
 
@@ -178,7 +177,7 @@ for (const [label, text] of UNREADABLE) {
     const fixture = await agyHome(t);
     await fixture.write(text);
 
-    const result = await installAntigravity(consented(fixture));
+    const result = await installAntigravity(fixture.context);
 
     assert.equal(await fixture.read(), text);
     assert.equal(result.needsAction?.some(line => line.includes(fixture.settings)
@@ -193,8 +192,8 @@ test("an uninstall that cannot read the file keeps ACC's claim for the next one"
   const fixture = await agyHome(t);
   await fixture.write(fixture.theirs);
   const before = await fixture.read();
-  await installAntigravity(consented(fixture));
-  const installed = await fixture.read();
+  await installAntigravity(fixture.context);
+  const withRule = await fixture.read();
   await fixture.write("{ broken");
 
   const result = await uninstallAntigravity(fixture.context);
@@ -202,7 +201,7 @@ test("an uninstall that cannot read the file keeps ACC's claim for the next one"
   assert.equal(result.needsAction?.some(line => line.includes(fixture.settings)), true);
 
   // Repaired by the operator: the next uninstall finds the claim and finishes.
-  await fixture.write(installed);
+  await fixture.write(withRule);
   await uninstallAntigravity(fixture.context);
   assert.equal(await fixture.read(), before);
 });
@@ -211,7 +210,7 @@ test("ACC's claim is kept in its own data home, never in the client's file", asy
   const fixture = await agyHome(t);
   await fixture.write(fixture.theirs);
 
-  await installAntigravity(consented(fixture));
+  await installAntigravity(fixture.context);
 
   const settings = JSON.parse(await fixture.read());
   assert.deepEqual(Object.keys(settings), Object.keys(fixture.theirs));

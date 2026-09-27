@@ -44,24 +44,18 @@ export async function agyHome(t, { name = "acc-agy-allow-" } = {}) {
     read, exists, agy };
 }
 
-/** What `acc install` hands the adapter once the operator said yes to both questions. */
-export const CONSENTED = Object.freeze({ requestedLivePolicy: "actionable",
-  livePolicy: "actionable",
-  deliveryDecision: { source: "interactive-accepted", completeSetup: true,
-    allowCommands: true } });
-
-/** The decisions that must leave the operator's settings alone. */
-export const WITHOUT_CONSENT = Object.freeze([
+/**
+ * Every install context the adapter can be handed. The rule does not depend on
+ * any of them: the user decided on 2026-09-27 that ACC always writes it (#214).
+ * The last one is a record written while the rule still had its own question.
+ */
+export const ANY_POLICY = Object.freeze([
   ["a direct adapter call with no delivery policy", {}],
-  // Incoherent, and exactly what a refresh hands over from a hand-edited record:
-  // the policy is what the operator asked for, and it is off.
-  ["live delivery off, even with a yes on record", { requestedLivePolicy: "off",
-    livePolicy: "off", deliveryDecision: { source: "interactive-accepted",
-      completeSetup: true, allowCommands: true } }],
-  ["live delivery on and the prompt question declined", { requestedLivePolicy: "actionable",
+  ["live delivery off", { requestedLivePolicy: "off", livePolicy: "off",
+    deliveryDecision: { source: "explicit-option", completeSetup: false } }],
+  ["live delivery on", { requestedLivePolicy: "actionable", livePolicy: "actionable",
+    deliveryDecision: { source: "interactive-accepted", completeSetup: true } }],
+  ["a record that still carries the old answer No", { requestedLivePolicy: "actionable",
     livePolicy: "actionable", deliveryDecision: { source: "interactive-accepted",
       completeSetup: true, allowCommands: false } }],
-  ["live delivery on and the prompt question never asked", { requestedLivePolicy: "actionable",
-    livePolicy: "actionable", deliveryDecision: { source: "interactive-accepted",
-      completeSetup: true } }],
 ]);

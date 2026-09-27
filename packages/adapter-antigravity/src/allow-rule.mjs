@@ -20,10 +20,14 @@ import { blankJson, isShellWord, removeIfEmpty, writeForeignJson }
  *   quotes around an argument are fine. So the skill names the wrapper bare,
  *   and a wrapper path that only stays one word inside quotes cannot be allowed.
  *
- * ACC writes the bare form, `command(<wrapper>)`. The file is the operator's:
- * one that does not parse, or whose `permissions.allow` is not a list, is never
- * rewritten. What ACC added is recorded in its own data home - the rule and the
- * containers it had to create - and uninstall takes back exactly that.
+ * ACC writes the bare form, `command(<wrapper>)`, on every install of this
+ * adapter: the user decided on 2026-09-27 that it is always on, with no
+ * question and no dependence on the delivery policy. The file is still the
+ * operator's: one that does not parse, or whose `permissions.allow` is not a
+ * list, is never rewritten. What ACC added is recorded in its own data home -
+ * the rule and the containers it had to create - and uninstall takes back
+ * exactly that, and always ends the claim, so the same words added later by
+ * the operator stay theirs.
  */
 export const agySettingsPath = home => path.join(home, ".gemini", "antigravity-cli",
   "settings.json");
@@ -89,7 +93,7 @@ export async function inspectAllowRule(context) {
   const file = agySettingsPath(context.home);
   const wrapper = cliWrapperPath(context.home);
   const rule = accAllowRule(wrapper);
-  const base = { file, wrapper, rule, owned: false, setup: null };
+  const base = { file, wrapper, rule, owned: false };
   if (!isShellWord(wrapper)) {
     return { ...base, state: "unmatchable", diagnostic: "each ACC command waits for approval, "
       + "so a live wake stops at the agent's first ACC command until someone answers the "
@@ -111,22 +115,16 @@ export async function inspectAllowRule(context) {
     const owned = claim?.rule === matched;
     return { ...base, state: "allowed", owned, diagnostic: "ACC commands run without an "
       + `approval prompt: permissions.allow in ${file} holds ${matched}`
-      + `${owned ? ", added by ACC with your consent" : ""}. ${RESTART}` };
+      + `${owned ? ", added by ACC" : ""}. ${RESTART}` };
   }
+  // Every install writes the rule, so its absence means one did not run here, or
+  // the rule was taken out since.
   return { ...base, state: "prompts",
-    setup: `add ${rule} to permissions.allow in ${file}; every command that starts with `
-      + `${wrapper} then runs without an approval prompt, in sessions started afterwards`,
     diagnostic: "each ACC command waits for approval, so a live wake stops at the agent's "
-      + "first ACC command until someone answers the approval prompt. The allow rule "
-      + `${rule} in permissions.allow of ${file} removes the prompt: to let ACC add it, run `
-      + "acc install --adapter antigravity with the delivery policy you use (--delivery "
-      + "actionable or all), or add it yourself; then restart agy" };
+      + "first ACC command until someone answers the approval prompt. ACC's install adds "
+      + `${rule} to permissions.allow in ${file}, and it is not there: run acc install `
+      + "--adapter antigravity, then restart agy" };
 }
-
-/** Did the operator consent to the rule for a live delivery they asked for. */
-export const wantsAllowRule = context =>
-  (context.requestedLivePolicy ?? context.livePolicy ?? "off") !== "off"
-  && context.deliveryDecision?.allowCommands === true;
 
 async function addRule(context, found) {
   const settings = await readSettings(found.file);
@@ -183,9 +181,8 @@ export async function withdrawAllowRule(context) {
     needsAction: [] };
 }
 
-/** Make the settings match the recorded decision, at install time. */
-export async function reconcileAllowRule(context) {
-  if (!wantsAllowRule(context)) return withdrawAllowRule(context);
+/** Put ACC's rule in place, at every install. */
+export async function ensureAllowRule(context) {
   const found = await inspectAllowRule(context);
   if (found.state === "unmatchable" || found.state === "unreadable") {
     return { changes: [], diagnostics: [found.diagnostic], needsAction: [found.diagnostic] };

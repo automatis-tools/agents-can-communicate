@@ -5,12 +5,12 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 
-import { bakeSkillCommand, blankJson, defaultAntigravityRelay, ownVersion, removeIfEmpty,
-  stampPluginVersion, writeCliShim, writeForeignJson, writeHookShim }
+import { bakeSkillCommand, blankJson, defaultAntigravityRelay, isShellWord, ownVersion,
+  removeIfEmpty, stampPluginVersion, writeCliShim, writeForeignJson, writeHookShim }
   from "@agents-can-communicate/adapter-sdk";
 import { AccError, EXIT } from "@agents-can-communicate/protocol";
 
-import { agySettingsPath, inspectAllowRule, reconcileAllowRule, wantsAllowRule,
+import { agySettingsPath, cliWrapperPath, ensureAllowRule, inspectAllowRule,
   withdrawAllowRule } from "./allow-rule.mjs";
 import { relayShimPath, runningRelays, stopRelays } from "./relays.mjs";
 
@@ -403,8 +403,8 @@ export async function installAntigravity(context) {
     await writeFile(createdMarker(context, file), `${file}\n`);
   }
   await installSkillPlugin(context);
-  // After the skill, whose wrapper the rule names. Added only with consent.
-  const allow = await reconcileAllowRule(context);
+  // After the skill, whose wrapper the rule names. Always on (#214, 2026-09-27).
+  const allow = await ensureAllowRule(context);
   const changes = [shimDir(home), file, pluginInstallPath(home), vendorManifestPath(home),
     ...allow.changes];
 
@@ -698,10 +698,12 @@ export function planAntigravityInstall(context) {
   // installer leaves to the adapter - so the installer never deletes the copy
   // ahead of `agy plugin uninstall` and strands its manifest entry. That exact
   // ordering, with the shim directory, once left `{}` behind in the user's home.
-  // The operator's own settings, edited only for the consented allow rule.
+  // The operator's own settings, edited for ACC's allow rule wherever one can
+  // match: a wrapper path that needs quotes gets none.
   const plugin = [{ path: pluginInstallPath(context.home), kind: "merge" },
     { path: vendorManifestPath(context.home), kind: "merge" },
-    ...(wantsAllowRule(context) ? [{ path: agySettingsPath(context.home), kind: "merge" }] : [])];
+    ...(isShellWord(cliWrapperPath(context.home))
+      ? [{ path: agySettingsPath(context.home), kind: "merge" }] : [])];
   if (locationChoice(context) !== null) {
     return [shim, ...plugin,
       { path: globalHooksPath(context.home), kind: "merge" },

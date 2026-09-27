@@ -41,8 +41,7 @@ export async function applyPlan({ plan, adapters, context, dataHome, dryRun = fa
         const installContext = { ...context,
           clientVersion: operation.clientVersion, platform: operation.platform,
           requestedLivePolicy: operation.livePolicy ?? "off",
-          livePolicy: operation.configuredLivePolicy ?? operation.effectiveLivePolicy ?? "off",
-          deliveryDecision: operation.deliveryDecision };
+          livePolicy: operation.configuredLivePolicy ?? operation.effectiveLivePolicy ?? "off" };
         const outcome = await adapter.install(installContext);
         // A consented activation is applied after the adapter's own wiring, in
         // a fixed order; an explicit off takes a recorded one back first so the
