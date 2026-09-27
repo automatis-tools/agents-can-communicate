@@ -330,9 +330,10 @@ first ACC command. `acc doctor` prints an `Antigravity CLI inbound:` line with w
 `~/.gemini/antigravity-cli/settings.json`:
 
 - **No rule.** Each ACC command waits for approval. Run `acc install --adapter antigravity`
-  on a terminal and answer Yes to the approval-prompt question, or pass
-  `--delivery actionable`. You can also add `command(<home>/.gemini/config/acc/acc-cli.sh)`
-  to `permissions.allow` yourself. Then restart `agy`.
+  on a terminal and answer Yes to the approval-prompt question. After an earlier No, pass the
+  delivery policy you use, `--delivery actionable` or `--delivery all`. You can also add
+  `command(<home>/.gemini/config/acc/acc-cli.sh)` to `permissions.allow` yourself. Then
+  restart `agy`.
 - **The rule is present.** The client reads it at startup, so a session started before it was
   added still asks; restart `agy`. If a prompt still appears, check the command the agent
   ran: a path in quotes, or a command wrapped in `sh -c`, matches no rule.

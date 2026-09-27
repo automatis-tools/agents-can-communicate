@@ -118,9 +118,9 @@ export async function inspectAllowRule(context) {
       + `${wrapper} then runs without an approval prompt, in sessions started afterwards`,
     diagnostic: "each ACC command waits for approval, so a live wake stops at the agent's "
       + "first ACC command until someone answers the approval prompt. The allow rule "
-      + `${rule} in permissions.allow of ${file} removes the prompt: run acc install --adapter `
-      + "antigravity --delivery actionable to let ACC add it, or add it yourself, then "
-      + "restart agy" };
+      + `${rule} in permissions.allow of ${file} removes the prompt: to let ACC add it, run `
+      + "acc install --adapter antigravity with the delivery policy you use (--delivery "
+      + "actionable or all), or add it yourself; then restart agy" };
 }
 
 /** Did the operator consent to the rule for a live delivery they asked for. */
