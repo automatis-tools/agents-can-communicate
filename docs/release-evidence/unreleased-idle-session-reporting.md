@@ -55,6 +55,10 @@ Mutations, each caught by a test: removing the adapter lift, heartbeating on eve
 command, ignoring `liveDelivery` in the breakdown, and dropping the re-verification branch
 from the wake rule.
 
+`npm test` on the evidence commit `b259566`: 2,646 tests, 2,645 passing, 0 failing, 1 skipped.
+The skipped test is the existing uninstall check that skips on a machine where Gemini CLI is
+installed, as on `main`. Nothing was re-run.
+
 
 ## Measured on this host
 
