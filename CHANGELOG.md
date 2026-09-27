@@ -1,5 +1,32 @@
 # Changelog
 
+## Unreleased — idle and working sessions reported as broken
+
+- `acc doctor` asks the receiver whenever a session has a binding, as the router does before
+  it offers. A lease lasts 120 seconds and only a turn renews it, so every idle Claude Code
+  and Codex session read `degraded`, its adapter `channel unreachable`, with advice to start a
+  new client session; on 0.8.1 two such sessions answered a live question within 12 seconds.
+  A verified receiver behind a lapsed lease now reads `idle, lease lapsed; receiver verified;
+  the next send refreshes it` and keeps the adapter at `local transport active`. A refusal
+  names its reason (#209).
+- `acc status` and doctor describe a stale session by what a message meets:
+  `5 live (2 idle, wake on send; 1 idle until next turn; 1 idle, inbox only)`. Each status row
+  carries `processTracked` and `liveDelivery`. `not answering` is kept for a stale session
+  whose process ACC does not know (#210).
+- A turn spent in shell commands keeps the session online. The mid-turn heartbeat ran only
+  behind the write guard, so a command with nothing to guard went stale three minutes into
+  its turn (#215).
+
+| Candidate artifact | Value |
+|---|---|
+| Built from | `5500d9337ddb30cc72e320a698e19534595e7a4f` |
+| Tarball | `agents-can-communicate-0.8.1.tgz`, 473,693 bytes, 311 files |
+| sha256 | `8eebdc6acd2d436a76bf9b7a58f6f38b35361092a343e8179925b2aee455f1cf` |
+
+This unpublished development archive passed clean installation verification. See
+[idle session reporting evidence](docs/release-evidence/unreleased-idle-session-reporting.md).
+The package version remains `0.8.1` until a release prepares its own.
+
 ## 0.8.1 — release candidate
 
 - Native live delivery is judged by the client's version and by the machine's own probe and
