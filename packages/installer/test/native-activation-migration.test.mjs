@@ -117,8 +117,8 @@ test("service-only detection accepts a non-zsh shell and explicitly uses install
   const h = await machine(t);
   let received;
   const adapter = { ...h.adapter, client: { command: "codex" }, detect: async () => ({ ok: true }),
-    nativeDelivery: { minimumByPlatform: { "darwin-arm64": "0.152.1" },
-      anchors: [{ platform: "darwin-arm64", version: "0.152.1", protocolContract }],
+    nativeDelivery: { minimum: "0.152.1",
+      anchors: [{ version: "0.152.1", protocolContract }],
       knownBad: [], activationKinds: ["native-service"] },
     probeNativeDelivery: async input => { received = input.env; return { supported: true,
       clientVersion: "0.152.1", protocolContract, executableFingerprint: null,

@@ -33,9 +33,8 @@ try {
   text = text.replace("delivery: { nextTurn: true, livePush: false }",
     "delivery: { nextTurn: true, livePush: true }");
   text = text.replace('    startSession:', `    nativeDelivery: {
-      minimumByPlatform: { "darwin-arm64": CODEX_QUEUE_MINIMUM },
-      anchors: [{ platform: "darwin-arm64", version: CODEX_QUEUE_MINIMUM,
-        protocolContract: PROTOCOL_CONTRACT }], knownBad: [],
+      minimum: CODEX_QUEUE_MINIMUM,
+      anchors: [{ version: CODEX_QUEUE_MINIMUM, protocolContract: PROTOCOL_CONTRACT }], knownBad: [],
       activationKinds: ["native-service"], policySource: "installation-record",
     },
     probeNativeDelivery, planNativeActivation, bindNativeSession,

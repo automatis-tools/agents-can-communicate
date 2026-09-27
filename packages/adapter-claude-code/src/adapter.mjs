@@ -22,8 +22,9 @@ export const CLAUDE_DELIVERY_FALLBACK = Object.freeze({
  * and a parent/child mapping claimed without observation is the kind of thing
  * that quietly maps every child onto its parent. `startupInjection` and
  * `safePointInjection` were not exercised - only the before-turn path was.
- * Native live delivery is the inbox wake, certified from 2.1.282 on
- * darwin-arm64; reply routing through the transport is not claimed.
+ * Native live delivery is the inbox wake, certified from 2.1.282 (captured on
+ * darwin-arm64, applied on every platform the probe admits); reply routing
+ * through the transport is not claimed.
  */
 export function createClaudeCodeAdapter() {
   return defineAdapter({
@@ -52,8 +53,8 @@ export function createClaudeCodeAdapter() {
     // newer stable client is admitted by the probe and the per-session
     // handshake. The offer is a wake; see src/inbox-delivery.mjs.
     nativeDelivery: {
-      minimumByPlatform: { "darwin-arm64": MIN_VERSION },
-      anchors: [{ platform: "darwin-arm64", version: MIN_VERSION, protocolContract: PROTOCOL_CONTRACT }],
+      minimum: MIN_VERSION,
+      anchors: [{ version: MIN_VERSION, protocolContract: PROTOCOL_CONTRACT }],
       knownBad: [],
       activationKinds: ["native-service"],
       policySource: "installation-record",

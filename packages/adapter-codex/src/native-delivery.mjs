@@ -2,9 +2,9 @@ import { realpath } from "node:fs/promises";
 import { decisionBody } from "@agents-can-communicate/adapter-sdk";
 
 import { CODEX_QUEUE_MINIMUM, MINIMUM_VERSION, PROTOCOL_CONTRACT, QUEUE_MODES,
-  addCodexQueueMessage, canonicalCwd, compareStableVersions, controlSocketPath,
-  locateCodexThread, openCodexAppServer, parseStableVersion, probeCodexQueue,
-  safeReason, serverVersionOf } from "./app-server-client.mjs";
+  addCodexQueueMessage, canonicalCwd, compareVersions, controlSocketPath,
+  locateCodexThread, openCodexAppServer, probeCodexQueue, safeReason, serverVersionOf,
+  versionOrder } from "./app-server-client.mjs";
 import { newEndpointId, readNativeEndpoint, removeNativeEndpoint, socketIsReady,
   writeNativeEndpoint } from "./native-endpoint.mjs";
 
@@ -85,7 +85,7 @@ export async function verifyReceiver(peer, endpoint, { probe = probeCodexQueue,
       : result.reasonCode === "below_minimum_version" ? "handshake_version_mismatch"
         : "protocol_mismatch", servingVersion: null };
   }
-  if (compareStableVersions(result.serverVersion, CODEX_QUEUE_MINIMUM) < 0) {
+  if (compareVersions(result.serverVersion, CODEX_QUEUE_MINIMUM) < 0) {
     return { reasonCode: "handshake_version_mismatch", servingVersion: null };
   }
   const located = await locate(peer, { threadId: endpoint.threadId, cwd: endpoint.cwd });
@@ -99,7 +99,7 @@ export async function bindNativeSession({ event, clientPid, clientVersion, runti
   env = process.env, timeoutMs = 750, now = Date.now, open = openCodexAppServer } = {}) {
   const rejected = reason => closed(clientVersion, reason);
   if (!Number.isInteger(clientPid) || clientPid <= 0) return rejected("client_process_unknown");
-  if (parseStableVersion(clientVersion) === null) return rejected("version_unavailable");
+  if (versionOrder(clientVersion) === null) return rejected("version_unavailable");
   if (typeof event?.sessionId !== "string" || event.sessionId === "") return rejected("handshake_failed");
   const cwd = await canonicalCwd(event.cwd);
   if (cwd === null) return rejected("workspace_identity_unavailable");

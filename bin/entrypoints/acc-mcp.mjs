@@ -54,7 +54,6 @@ await serve({
   context: {
     service,
     deliveryRouter: createDeliveryRouter({ service, adapters, clock,
-      platform: `${process.platform}-${process.arch}`,
       readLivePolicy: ({ adapter }) => readInstalledLivePolicy({ dataHome,
         adapterId: adapter.id }) }),
     workspaceId: descriptor.id,

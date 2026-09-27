@@ -42,7 +42,7 @@ test("active turns and pending vendor input postpone maintenance", unixSocketHos
   assert.equal(JSON.stringify(result).includes("PRIVATE"), false);
 });
 
-test("unproven process, socket, binary and platform combinations never become ready", unixSocketHost, async t => {
+test("unproven process, socket and binary combinations never become ready", unixSocketHost, async t => {
   const h = await maintenanceFixture(t);
   for (const change of [{ processUnknown: true }, { processCommand: "/wrong/codex app-server --listen unix://" },
     { socketOwned: false }, { managedVersion: "0.153.4" }, { cliVersion: "0.153.4" }, { backend: "launchd" }]) {
@@ -51,7 +51,18 @@ test("unproven process, socket, binary and platform combinations never become re
     assert.equal((await h.inspectMaintenance(h.context))?.state, "unsupported", JSON.stringify(change));
     Object.assign(h.state, original);
   }
-  assert.equal((await h.inspectMaintenance({ ...h.context, platform: "linux-x64" }))?.state, "unsupported");
+  assert.deepEqual(h.commands, []);
+});
+
+// The maintenance captures were taken on darwin-arm64; the same identity checks
+// judge a daemon on any host, and a ready one is ready there too.
+test("a ready daemon is inspected the same way on a platform the captures never named", unixSocketHost, async t => {
+  const h = await maintenanceFixture(t);
+  for (const platform of ["linux-x64", "darwin-x64", "linux-arm64"]) {
+    const result = await h.inspectMaintenance({ ...h.context, platform });
+    assert.equal(result?.state, "ready", platform);
+    assert.equal(result.reasonCode, null, platform);
+  }
   assert.deepEqual(h.commands, []);
 });
 

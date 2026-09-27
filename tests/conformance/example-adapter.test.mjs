@@ -112,8 +112,8 @@ function createNativeAdapter() {
       limitations: ["reference adapter only"], result: "pass",
     }] },
     nativeDelivery: {
-      minimumByPlatform: { "darwin-arm64": "1.2.3" },
-      anchors: [{ platform: "darwin-arm64", version: "1.2.3", protocolContract: "example-native-v1" }],
+      minimum: "1.2.3",
+      anchors: [{ version: "1.2.3", protocolContract: "example-native-v1" }],
       knownBad: [],
       activationKinds: ["native-config"],
     },
@@ -138,7 +138,7 @@ test("the native reference adapter exposes its contract while the regular one do
   assert.equal(createAdapter().capabilities.delivery.livePush, false);
   const native = createNativeAdapter();
   assert.equal(native.capabilities.delivery.livePush, true);
-  assert.deepEqual(native.nativeDelivery.minimumByPlatform, { "darwin-arm64": "1.2.3" });
+  assert.equal(native.nativeDelivery.minimum, "1.2.3");
   assert.equal(Object.isFrozen(native.nativeDelivery.anchors), true);
 });
 

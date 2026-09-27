@@ -33,9 +33,8 @@ try {
     + "import certification from");
   text = text.replace("delivery: { nextTurn: true },", "delivery: { nextTurn: true, livePush: true },");
   text = text.replace("    startSession:", `    nativeDelivery: {
-      minimumByPlatform: { "darwin-arm64": "1.2.7" },
-      anchors: [{ platform: "darwin-arm64", version: "1.2.7",
-        protocolContract: "antigravity-agentapi-relay-v1" }],
+      minimum: "1.2.7",
+      anchors: [{ version: "1.2.7", protocolContract: "antigravity-agentapi-relay-v1" }],
       knownBad: [], activationKinds: ["native-config"], policySource: "installation-record",
     },
     probeNativeDelivery, planNativeActivation, bindNativeSession, refreshNativeSession, offerMessage,

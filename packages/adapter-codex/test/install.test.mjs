@@ -155,8 +155,8 @@ test("only capabilities observed in a real session are declared true", () => {
 // make this fail: without all three, ACC cannot safely reuse LocalDaemon.
 test("native delivery names the captured LocalDaemon contract and leaves replies unrouted", () => {
   const adapter = createCodexAdapter();
-  assert.deepEqual(adapter.nativeDelivery.minimumByPlatform, { "darwin-arm64": "0.152.1" });
-  assert.deepEqual(adapter.nativeDelivery.anchors, [{ platform: "darwin-arm64", version: "0.152.1",
+  assert.equal(adapter.nativeDelivery.minimum, "0.152.1");
+  assert.deepEqual(adapter.nativeDelivery.anchors, [{ version: "0.152.1",
     protocolContract: "codex-app-server-thread-queue-v1" }]);
   assert.deepEqual(adapter.nativeDelivery.activationKinds, ["native-service"]);
   assert.equal(adapter.nativeDelivery.policySource, "installation-record");

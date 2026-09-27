@@ -1,4 +1,5 @@
 import net from "node:net";
+import { compareVersionOrder, versionOrder } from "@agents-can-communicate/adapter-sdk";
 
 import { INBOX_MODES, MIN_VERSION, PROTOCOL_CONTRACT, TRANSPORT } from "./inbox-contract.mjs";
 import { claimWake, newEndpointId, readInboxEndpoint, releaseWake, removeInboxEndpoint,
@@ -26,7 +27,6 @@ const LEASE_MS = 120_000;
 const MESSAGE_ID = /^[A-Za-z0-9_-]{1,200}$/;
 const PROBE_NEEDLE = Buffer.from("messagingSocketPath");
 const PROBE_MAX_BYTES = 256 * 1024 * 1024;
-const STABLE_VERSION = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:\+[0-9A-Za-z.-]+)?$/;
 
 export { INBOX_MODES, MIN_VERSION, PROTOCOL_CONTRACT, TRANSPORT };
 
@@ -37,12 +37,11 @@ export const wakeText = messageId => `ACC: new peer message ${messageId} for thi
   + `acc inbox --message ${messageId}. Answer it through ACC with acc reply --message ${messageId}; `
   + "SendMessage cannot deliver to an ACC participant.";
 
-function compare(left, right) {
-  const a = left.split("+")[0].split(".").map(Number);
-  const b = right.split("+")[0].split(".").map(Number);
-  for (let index = 0; index < 3; index += 1) if (a[index] !== b[index]) return a[index] < b[index] ? -1 : 1;
-  return 0;
-}
+// A version is judged by its release triple: a prerelease of a version above
+// the minimum is not an older client, and the inbox in the executable is what
+// admits it. An unreadable version orders as null.
+const belowMinimum = clientVersion => compareVersionOrder(versionOrder(clientVersion),
+  versionOrder(MIN_VERSION)) < 0;
 
 // The registry field only a build with the inbox writes. Read-only, bounded.
 async function executableHasInbox(realExecutable) {
@@ -92,8 +91,8 @@ function withTimeout(work, ms) {
 }
 
 /**
- * Read-only: a stable version at or above the capture, a platform whose inbox
- * is a Unix socket, and an executable that writes the inbox into its session
+ * Read-only: a version at or above the capture, a platform whose inbox is a
+ * Unix socket, and an executable that writes the inbox into its session
  * registry. Never launches a session. Native Windows serves a named pipe that
  * demands an auth line; nothing there is captured, so it keeps hook delivery.
  */
@@ -105,10 +104,8 @@ export async function probeNativeDelivery({ realExecutable, timeoutMs = 750, pla
   if (typeof realExecutable !== "string" || realExecutable === "") return unsupported("feature_probe_failed");
   const clientVersion = await withTimeout(Promise.resolve(readVersion(realExecutable, timeoutMs)), timeoutMs)
     .catch(() => null);
-  if (clientVersion === null || !STABLE_VERSION.test(clientVersion)) {
-    return unsupported("feature_probe_failed", clientVersion);
-  }
-  if (compare(clientVersion, MIN_VERSION) < 0) return unsupported("below_minimum_version", clientVersion);
+  if (versionOrder(clientVersion) === null) return unsupported("feature_probe_failed", clientVersion);
+  if (belowMinimum(clientVersion)) return unsupported("below_minimum_version", clientVersion);
   const present = await withTimeout(Promise.resolve(hasInbox(realExecutable)), timeoutMs).catch(() => false);
   if (!present) return unsupported("protocol_mismatch", clientVersion);
   return { supported: true, clientVersion, protocolContract: PROTOCOL_CONTRACT,
@@ -145,13 +142,11 @@ export async function bindNativeSession({ event, clientPid, clientVersion, runti
   if (typeof event?.sessionId !== "string" || event.sessionId === "") {
     return closed(clientVersion, "handshake_failed");
   }
-  if (typeof clientVersion !== "string" || !STABLE_VERSION.test(clientVersion)) {
-    return closed(clientVersion, "version_unavailable");
-  }
+  if (versionOrder(clientVersion) === null) return closed(clientVersion, "version_unavailable");
   // The contract refuses it anyway, after this returns. Refusing here keeps an
   // older client - which binds again on every turn - from writing an endpoint
   // record each time.
-  if (compare(clientVersion, MIN_VERSION) < 0) return closed(clientVersion, "below_minimum_version");
+  if (belowMinimum(clientVersion)) return closed(clientVersion, "below_minimum_version");
   const socketPath = env?.CLAUDE_CODE_MESSAGING_SOCKET;
   if (typeof socketPath !== "string" || socketPath === "") {
     return closed(clientVersion, "native_endpoint_unavailable");

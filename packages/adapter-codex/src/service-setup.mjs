@@ -21,7 +21,6 @@ const diagnostics = {
   prerequisite_integrity_failed: "The Codex installer checksum did not match the reviewed version; no installer was run",
   prerequisite_install_failed: "The official Codex installation did not complete; check connectivity and the selected Codex home, then retry acc install",
   managed_binary_mismatch: "Codex CLI and managed standalone versions differ; repair the vendor installation, then retry acc install",
-  maintenance_platform_unsupported: "Codex service preparation is captured only on darwin-arm64; configure the vendor service manually",
   maintenance_cli_unsupported: "Codex cold service preparation requires codex-cli 0.154.0 or newer with daemon commands; update the vendor installation, then retry acc install",
 };
 function report(state, reasonCode, facts = {}) {
@@ -103,7 +102,6 @@ export function createCodexServiceSetup({ run = runMaintenanceCommand, probe = p
   async function inspect(context, { strict = false } = {}) {
     try {
       const paths = await contextPaths(context);
-      if (paths.platform !== "darwin-arm64") failMaintenance("maintenance_platform_unsupported");
       if (!strict) {
         const native = await probe({ env: paths.options.env, timeoutMs: 1_500 });
         // Preserve the existing delivery support matrix: a healthy older

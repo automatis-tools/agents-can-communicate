@@ -152,8 +152,8 @@ test("a replacement turn retains its client PID and performs one native handshak
     capabilities: { delivery: { livePush: true } },
     certification: { evidence: [{ client: "fixture", version: "1.0.0", platform,
       capability: "delivery.livePush", result: "pass" }] },
-    nativeDelivery: { minimumByPlatform: { [platform]: "1.0.0" },
-      anchors: [{ platform, version: "1.0.0", protocolContract: "fixture-v1" }],
+    nativeDelivery: { minimum: "1.0.0",
+      anchors: [{ version: "1.0.0", protocolContract: "fixture-v1" }],
       knownBad: [], activationKinds: ["native-service"] },
     bindNativeSession: async input => {
       calls.push(input);

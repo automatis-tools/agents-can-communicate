@@ -13,9 +13,8 @@ const run = promisify(execFile);
 
 // Reasons the client itself will not change within an install: unsupported,
 // as opposed to degraded, which a repaired probe or shell may lift.
-const STATIC_REASONS = new Set(["native_delivery_unsupported", "platform_not_captured",
-  "version_unavailable", "prerelease_not_captured", "below_minimum_version",
-  "known_bad_version"]);
+const STATIC_REASONS = new Set(["native_delivery_unsupported", "version_unavailable",
+  "below_minimum_version", "known_bad_version"]);
 
 const DEFAULT_PROBE_TIMEOUT_MS = 3_000;
 
@@ -76,7 +75,7 @@ async function detectNative(adapter, entry, { context, platform, probeTimeoutMs,
     }
     try {
       facts.eligibility = evaluateNativeEligibility(adapter,
-        { clientVersion: entry.version, platform, probe: facts.probe });
+        { clientVersion: entry.version, probe: facts.probe });
     } catch {
       facts.eligibility = { eligible: false, reasonCode: "feature_probe_failed" };
     }

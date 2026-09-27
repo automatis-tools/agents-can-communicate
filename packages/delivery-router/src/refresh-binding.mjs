@@ -14,14 +14,14 @@ function sameBinding(current, expected, leaseUntil) {
 }
 
 export async function refreshExpiredBinding({ service, adapter, binding, runtimeDir,
-  platform, clock, timeoutMs = 750 }) {
+  clock, timeoutMs = 750 }) {
   if (typeof adapter?.refreshNativeSession !== "function") return false;
   const now = Date.parse(clock.now());
   if (!Number.isFinite(now)) return false;
   try {
     const handshake = await adapter.refreshNativeSession({ binding, runtimeDir, timeoutMs });
     const validated = validateNativeHandshake(adapter, {
-      clientVersion: binding.clientVersion, platform, handshake,
+      clientVersion: binding.clientVersion, handshake,
     });
     if (!validated.ok || validated.opaqueEndpointRef !== binding.opaqueEndpointRef) return false;
     const requestedLease = Date.parse(validated.leaseUntil);

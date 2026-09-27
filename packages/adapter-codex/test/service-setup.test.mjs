@@ -25,6 +25,20 @@ test("definite absence starts the pinned executable once with exact homes and ve
   assert.ok((await lstat(f.socketPath)).isSocket());
 });
 
+// Service preparation was captured on darwin-arm64; a host the captures never
+// named is inspected and, on definite absence, started the same way.
+test("a missing service is prepared the same way on a platform the captures never named", async t => {
+  const f = await serviceFixture(t, { binLayout: true });
+  const context = { ...f.context, platform: "linux-x64" };
+  const plan = await f.inspectNativeServiceSetup(context);
+  assert.equal(plan.state, "needed");
+  assert.equal(plan.reasonCode, "native_endpoint_unavailable");
+  const result = await apply(f, plan, context);
+  assert.equal(result.state, "ready");
+  assert.equal(result.started, true);
+  assert.equal(f.starts.length, 1);
+});
+
 test("a healthy empty service and a healthy raced service start zero times", async t => {
   const f = await serviceFixture(t);
   const absent = await f.inspectNativeServiceSetup(f.context);
@@ -63,9 +77,8 @@ for (const [field, value, reason] of [
   assert.equal(f.starts.length, 0);
 });
 
-test("unsupported platform and incomplete managed install provide action without start", async t => {
+test("an incomplete managed install provides action without start", async t => {
   const f = await serviceFixture(t);
-  assert.equal((await f.inspectNativeServiceSetup({ ...f.context, platform: "linux-x64" })).state, "unsupported");
   await rm(f.managedPath);
   const result = await f.inspectNativeServiceSetup(f.context);
   assert.equal(result.state, "blocked");

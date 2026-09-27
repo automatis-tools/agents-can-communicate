@@ -21,35 +21,12 @@ const LIVE_POLICIES = new Set(["off", "actionable", "all"]);
 const permits = (policy, kind) => policy === "all"
   || (policy === "actionable" && ACTIONABLE.has(kind));
 
-// A native-delivery contract is captured per platform, and the only platform a
-// router can judge an offer against is the one it is running on - which is why
-// both entrypoints pass exactly this value. Leaving the parameter optional made
-// its absence silently disable every live offer: `undefined` reached the
-// contract check as "platform_not_captured" and the offer was refused as an
-// unsupported client version. Default it here instead, so a router that is
-// handed nothing behaves as the host it runs on. Injection stays available for
-// callers that need to judge against another platform.
-const HOST_PLATFORM = `${process.platform}-${process.arch}`;
-
-// evaluateVersionContract answers two different questions with one field.
-// "below_minimum_version", "known_bad_version", "version_unavailable" and
-// "prerelease_not_captured" are a capture reading the reported version and
-// refusing it. "platform_not_captured" is the opposite: a complete, valid
-// declaration that records nothing for the platform this router runs on. That
-// is not a malformed adapter, it is the ordinary shape of every shipped
-// adapter away from darwin-arm64 - the only platform any of them has captured
-// - so reading it as a refusal disables live delivery on Linux entirely.
-//
-// "native_delivery_unsupported" is absent deliberately: liveCapable already
-// required a nativeDelivery declaration before an offer was attempted, so the
-// contract check is never handed an adapter without one.
-const UNCAPTURED_PLATFORM = "platform_not_captured";
-
 // Compatibility was decided twice already - at bootstrap by the probe and at
 // SessionStart by the generation-bound handshake that published this binding.
 // The router validates binding identity and the adapter's answer; it does not
 // impose a third, exact-version rule that would reject a client the handshake
-// admitted.
+// admitted. The host it runs on is not asked either: a contract's minimum was
+// captured somewhere and applies everywhere.
 const liveCapable = (adapter, binding) => adapter !== undefined
   && adapter.capabilities?.delivery?.livePush === true
   && adapter.nativeDelivery !== undefined
@@ -68,8 +45,7 @@ function safeTransport(value, opaqueEndpointRef) {
   return opaqueEndpointRef === "live-adapter" ? "native-live" : "live-adapter";
 }
 
-export function createDeliveryRouter({ service, adapters, clock, platform = HOST_PLATFORM,
-  readLivePolicy }) {
+export function createDeliveryRouter({ service, adapters, clock, readLivePolicy }) {
   const registry = adaptersById(adapters);
 
   // Read at offer time, not from the binding: consent withdrawn after a session
@@ -139,7 +115,7 @@ export function createDeliveryRouter({ service, adapters, clock, platform = HOST
     const { adapter } = capable[0];
     if (Date.parse(binding.leaseUntil) <= Date.parse(now)) {
       const refreshed = await refreshExpiredBinding({ service, adapter, binding,
-        runtimeDir: service.store?.root, platform, clock });
+        runtimeDir: service.store?.root, clock });
       if (!refreshed) return durable(participantId, "recipient_unavailable");
       const current = (await service.listDeliveryBindings({
         participantId, now: clock.now() })).filter(item => item.sessionId === binding.sessionId
@@ -205,19 +181,11 @@ export function createDeliveryRouter({ service, adapters, clock, platform = HOST
     // Compatibility was already decided at bind time; a serving version that
     // still satisfies the adapter's captured contract keeps offering, even
     // when it differs from the value recorded when the binding was created.
-    // Only a version below the captured minimum or on the denylist refuses.
-    // When the contract captured nothing for this platform there is no
-    // minimum to judge against, so the offer keeps the rule this path had
-    // before the contract gate existed: the version that answered must be the
-    // one the binding recorded. defineAdapter rejecting a partial declaration
-    // does not make this unreachable - a complete, valid contract that names
-    // only darwin-arm64 says nothing about linux-x64, and that is every
-    // shipped adapter on Linux.
-    const versionRule = evaluateVersionContract(adapter, { clientVersion: response.clientVersion, platform });
-    const admitted = versionRule.reasonCode === null
-      || (versionRule.reasonCode === UNCAPTURED_PLATFORM
-        && response.clientVersion === binding.clientVersion);
-    if (!admitted) {
+    // Only a version below the captured minimum or on the denylist refuses,
+    // and a declaration that captured nothing refuses everything: a binding
+    // is not a capture.
+    const versionRule = evaluateVersionContract(adapter, { clientVersion: response.clientVersion });
+    if (versionRule.reasonCode !== null) {
       await recordFailure(binding, message, participantId, transport,
         "unsupported_client_version");
       return durable(participantId, "unsupported_client_version");

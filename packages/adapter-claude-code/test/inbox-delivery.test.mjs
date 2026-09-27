@@ -424,6 +424,13 @@ test("the probe needs a captured version, a non-Windows platform and the inbox i
     executableFingerprint: null, modes: [...INBOX_MODES], reasonCode: null });
   assert.equal((await probe({ readVersion: async () => "2.1.281" })).reasonCode, "below_minimum_version");
   assert.equal((await probe({ readVersion: async () => null })).reasonCode, "feature_probe_failed");
+  assert.equal((await probe({ readVersion: async () => "unknown" })).reasonCode, "feature_probe_failed");
+  // A prerelease is judged by its release triple; the inbox in the executable
+  // is what admits it.
+  assert.deepEqual(await probe({ readVersion: async () => "2.2.0-beta.1" }), { ...supported,
+    clientVersion: "2.2.0-beta.1" });
+  assert.equal((await probe({ readVersion: async () => "2.1.281-rc.1" })).reasonCode,
+    "below_minimum_version");
   assert.equal((await probe({ platform: "win32" })).reasonCode, "native_delivery_unsupported");
   assert.equal((await probe({ hasInbox: async () => false })).reasonCode, "protocol_mismatch");
   assert.equal((await probe({ realExecutable: "" })).reasonCode, "feature_probe_failed");
@@ -434,6 +441,27 @@ test("activation uses the inbox Claude Code already runs and changes nothing", (
     eligible: true, reasonCode: null, mechanisms: [{ kind: "native-service", serviceId: "claude-code-inbox",
       preExisting: true, applyCommand: null, teardownCommand: null }] });
   assert.equal(planNativeActivation({ detection: {} }).eligible, false);
+});
+
+test("bind admits a prerelease above the captured minimum", async t => {
+  const f = await fixture(t);
+  const handshake = await bind(f, { clientVersion: "2.2.0-beta.1" });
+  assert.equal(handshake.reasonCode, null);
+  assert.equal(handshake.supported, true);
+  assert.equal(handshake.clientVersion, "2.2.0-beta.1");
+  assert.equal((await bind(f, { clientVersion: "2.1.281-rc.1" })).reasonCode, "below_minimum_version");
+  assert.equal((await bind(f, { clientVersion: "unknown" })).reasonCode, "version_unavailable");
+  assert.equal((await bind(f, { clientVersion: null })).reasonCode, "version_unavailable");
+  // The record the bind wrote is the one read back; a record whose version
+  // cannot be ordered is refused at the write, whoever hands it in.
+  const { readFile, readdir } = await import("node:fs/promises");
+  const dir = path.join(f.runtime, "claude-inbox-endpoints");
+  const [file] = await readdir(dir);
+  const record = JSON.parse(await readFile(path.join(dir, file), "utf8"));
+  assert.equal(record.clientVersion, "2.2.0-beta.1");
+  const { writeInboxEndpoint } = await import("../src/inbox-endpoint.mjs");
+  await assert.rejects(writeInboxEndpoint({ runtimeDir: f.runtime,
+    record: { ...record, clientVersion: "unknown" } }), /invalid/);
 });
 
 test("bind refuses a client below the captured minimum without writing an endpoint", async t => {
