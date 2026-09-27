@@ -19,8 +19,17 @@
   Codex session. A probe that times out still reports `probe_timeout`, and any other failure
   `feature_probe_failed`. When the stopped service also left its PID record, doctor said
   `could not verify daemon_version_unavailable`; it now says the service stopped and left its
-  files behind, and gives the same command, which on Codex 0.155.1 replaces both files. ACC
-  itself still starts the service only when neither file exists.
+  files behind. `acc install` now starts such a service in place, with the vendor's own
+  `codex app-server daemon start`, which on Codex 0.155.1 replaces both files, and with every
+  identity check after it; a pid record whose process cannot be observed is still never started
+  over. A legacy consent that predates service setup is named by doctor:
+  `acc install --adapter codex --delivery actionable` approves the start.
+- Codex CLI 0.157.1 keeps its control socket behind a symlink and runs the daemon as the
+  resolved releases path with `--managed-daemon`. Detection, doctor, inspection and service
+  setup follow the reported path to the socket and accept that command line, as the session
+  hook already did; a stopped 0.157.1 service, its symlink dangling or its socket refusing, is
+  started in place like any other. A 0.157.1 home that has no standalone package installs a
+  daemon package of its own, which is measured and not yet supported.
 - `acc status` lists a participant with no open session only while its next turn would still
   show a message: queued, or offered by a live transport and not yet shown again. An answer the
   next-turn hook had already put in a closed Claude Code session's context kept that
@@ -39,9 +48,9 @@
 
 | Candidate artifact | Value |
 |---|---|
-| Built from | `58fe458a4bdc58f1a2b0c78f2a1cd8ed908168cc` |
-| Tarball | `agents-can-communicate-0.8.0.tgz`, 471,257 bytes, 311 files |
-| sha256 | `26be0d83d64c4ea10a549c3e859a7d8080b9590148a508dad6c999ab2c5a55ce` |
+| Built from | `acf867081ca545a6a22db54175e5194d8f52d776` |
+| Tarball | `agents-can-communicate-0.8.0.tgz`, 471,879 bytes, 311 files |
+| sha256 | `7e759fa48d368f7f46ccda857ad3a253cdaa714933c5277d35d31c8c4884376f` |
 
 This unpublished development archive passed clean installation verification. See
 [real-machine fixes evidence](docs/release-evidence/unreleased-real-machine-fixes.md). The

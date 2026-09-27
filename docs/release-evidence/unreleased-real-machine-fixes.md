@@ -70,15 +70,57 @@ and once with the socket and a PID record naming a dead process. The test daemon
 `pid-update-loop` helpers were stopped afterwards, and the temporary homes removed; the
 machine's own `~/.codex` was never touched.
 
-Inspection now reports `service_stopped`, state `blocked`, when the recorded process is
+Inspection now reports `service_stopped`, state `needed`, when the recorded process is
 confirmed dead or absent (`approvedProcessIsDead`, the rule maintenance already uses) and the
-socket is absent or is a socket, owned and not a symlink, that refuses connections. The advice
-reads "The Codex service stopped and left its files behind; start it with codex app-server
-daemon start, which replaces them, then open a new Codex session". ACC's own start keeps the
-existing definite-absence rule: it runs `daemon start` only when neither file exists, so
-setup still never starts over leftover files itself. A PID record naming a live process, an
-unreadable or unsafe record, a symlink, or a socket that fails with anything but
-`ECONNREFUSED` is not a stopped service.
+socket is absent or is a socket, owned and not a symlink, that refuses connections. Setup then
+prepares it exactly like an absent service: the vendor's own `daemon start`, followed by the
+same identity checks. The 2026-09-12 rule against starting over leftover metadata rested on
+not having measured what the vendor's start does with it. A PID record naming a live process
+or one that cannot be observed, an unreadable or unsafe record, a symlink, or a socket that
+fails with anything but `ECONNREFUSED` is not a stopped service, and setup never starts over
+those.
+
+Why the maintainer's `acc install` had never started it: the Codex record carries
+`deliveryDecision: { source: "legacy-unknown", completeSetup: false }`, written by an ACC that
+predates service setup, and setup is planned only under `completeSetup: true`. Doctor never
+named the way out, because its remediation line for that case requires the probe's
+`native_endpoint_unavailable` (fix 2) and a service state of `needed` (this change). It now
+prints `acc install --adapter codex --delivery actionable  # approve complete automatic
+peer-request setup`. The consent itself stays explicit: a daemon that runs model turns on
+peer messages is never approved by an old record.
+
+## 2b. The daemon as Codex 0.157.1 presents it
+
+While this branch was open, the machine's Codex CLI updated to 0.157.1 and a daemon was
+started at 20:05. ACC 0.8.0 then reported "the client's local delivery service is
+unavailable" beside a service that was running and had just completed a session handshake.
+Measured on the running daemon, read-only, and repeated in a separate `CODEX_HOME`:
+
+- the control socket path is a symlink to `/private/tmp/codex-daemon-<uid>/<64 hex>`, an
+  owned `0600` socket; `daemon version` reports the symlink path;
+- `lsof -Fn` lists the listening socket by its target path;
+- the daemon's command line is the resolved releases path with `--managed-daemon`;
+- the PID record gained `processIdentity` and `executableIdentity`, beside the two fields
+  ACC reads;
+- `daemon stop` removes symlink and socket; `daemon start` over a stale target socket returns
+  `started` and replaces it.
+
+The probe, inspection and service setup held the symlink itself to `socketIsReady`, which
+refuses links, while the session bind had always resolved the path first. `readySocketPath`
+in `native-endpoint.mjs` now does that once for every caller: follow the reported path,
+hold the socket at its end to the same rule. Identity verification accepts the executable
+anywhere in `packages/standalone/` when it resolves to the managed binary, accepts the
+trailing `--managed-daemon`, and proves the socket by either path in `lsof`. The doctor
+lines on the machine's own data went from
+`Codex CLI live delivery: readiness unverified: the client's local delivery service is
+unavailable` plus `Codex service preparation could not verify daemon_socket_unproven` to
+`Codex CLI live delivery: available; enabled (actionable)`; the remaining `channel
+unreachable` is the session's expired 120-second lease after it ended.
+
+A `CODEX_HOME` without a standalone package behaves differently on 0.157.1: `daemon start`
+installs `packages/app-server-daemon/` and keeps `daemon.pid` there. Setup still expects the
+standalone package, so such a home reports the standalone prerequisite. Recorded in the
+adapter's compatibility log as measured and not supported.
 
 ## 3. A closed participant listed for an answer it already saw
 
@@ -150,7 +192,7 @@ published 0.8.0 run the same way.
 | Check | Published 0.8.0 | This branch |
 |---|---|---|
 | Codex live delivery reason | `the native protocol probe did not succeed` | `the client's local delivery service is unavailable` |
-| Codex service line | none; with fix 2 alone, `could not verify daemon_version_unavailable` | `The Codex service stopped and left its files behind; start it with codex app-server daemon start, …` |
+| Codex service line | none; with fix 2 alone, `could not verify daemon_version_unavailable` | `acc install --adapter codex --delivery actionable  # approve complete automatic peer-request setup` |
 | Scratch project status | `waiting for a closed session: claude_code-cudrff (1), claude_code-0ah3im (1), loc-sender (14)` | `waiting for a closed session: claude_code-0ah3im (1), loc-sender (14)` |
 | Another project's status | `claude_code-m5YAzG (2)` | `claude_code-m5YAzG (2)` |
 
@@ -173,10 +215,19 @@ Each test was seen failing for the stated reason before its fix.
   `native_endpoint_unavailable`, and detection turns that into the daemon start advice; a
   timeout and any other failure keep their own codes.
 - `packages/adapter-codex/test/service-setup.test.mjs`: a leftover socket, a leftover socket
-  with a dead PID record, and a dead PID record alone each get `service_stopped` with the start
-  advice and no ACC start; a PID record naming a live process, an unsafe PID record, an
-  accepting socket, a socket refusing permission, a symlink and a regular file are not a
-  stopped service.
+  with a dead PID record, and a dead PID record alone each get `service_stopped`, state
+  `needed`, and one ACC start that leaves a listening socket; a PID record naming a live
+  process, one whose process cannot be observed, an unsafe PID record, an accepting socket, a
+  socket refusing permission, a symlink and a regular file are not a stopped service.
+- `packages/adapter-codex/test/maintenance.test.mjs`, `service-setup.test.mjs`,
+  `native-delivery.test.mjs`: the 0.157.1 layout (symlinked socket, releases executable,
+  `--managed-daemon`) inspects as ready, probes as supported with the peer opened on the
+  socket itself, and a stopped one, its symlink dangling or refusing, is started once; an
+  executable outside the standalone tree is refused even when it resolves to the managed
+  binary; a symlink to a regular file is not a stopped service.
+- `packages/cli/test/native-delivery-doctor.test.mjs`: a stopped service under a legacy consent
+  is remedied by the install that approves the start. This one passed before the change: the
+  remediation branch existed and only the service state kept it unreachable.
 - `packages/core/test/receipt-visibility.test.mjs`: a next-turn offer and a repeated live offer
   do not keep a closed participant listed; a queued message, a live offer not yet repeated and
   an offer without facts do, with `waiting` set; `unretrieved` is unchanged.
@@ -190,7 +241,7 @@ Each test was seen failing for the stated reason before its fix.
   as stated; command lines parse beside the tree, a failed read leaves the tree as before, and
   both reads share the caller's timeout.
 
-Each changed production line was mutated, and a test failed every time. That covered 33
+Each changed production line was mutated, and a test failed every time. That covered 41
 mutations across `pins.mjs`, `runner.mjs`, `native-delivery.mjs`, `receipts.mjs`, `status.mjs`,
 `main.mjs`, `client-pid.mjs`, `process-table.mjs`, `service-setup.mjs` and `native-endpoint.mjs`.
 The ones that first survived got their own tests: Codex's timeout branch, the socket type
@@ -203,11 +254,11 @@ Gemini CLI is installed, as it does on `main`.
 
 ## Exact local artifact
 
-- Source: clean commit `58fe458a4bdc58f1a2b0c78f2a1cd8ed908168cc` on `fix/pidless-session-pins`,
+- Source: clean commit `acf867081ca545a6a22db54175e5194d8f52d776` on `fix/pidless-session-pins`,
   from `main` at `00c5416`.
 - Archive: `agents-can-communicate-0.8.0.tgz`, packed from that commit.
-- Size: 471,257 bytes; 311 packed entries.
-- SHA-256: `26be0d83d64c4ea10a549c3e859a7d8080b9590148a508dad6c999ab2c5a55ce`.
+- Size: 471,879 bytes; 311 packed entries.
+- SHA-256: `7e759fa48d368f7f46ccda857ad3a253cdaa714933c5277d35d31c8c4884376f`.
 - Package version remains `0.8.0`; this is an unpublished development artifact.
 
 The exact archive passed `scripts/verify-package.mjs`: 311 entries with none forbidden, six
