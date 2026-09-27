@@ -45,7 +45,8 @@ export async function maintenanceFixture(t, { binLayout = false } = {}) {
       if (!state.running || Number(args[1]) !== state.pid) return { status: 1, stdout: "", stderr: "" };
       return ok(`${state.processStartTime} ${state.processCommand ?? `${managedPath} app-server --listen unix://`}\n`);
     }
-    if (command === "/usr/sbin/lsof") return ok(state.socketOwned ? `p${state.pid}\nn${socketPath}\n` : "");
+    // Wherever this host keeps lsof: /usr/sbin on macOS, /usr/bin on Linux.
+    if (path.basename(command) === "lsof") return ok(state.socketOwned ? `p${state.pid}\nn${socketPath}\n` : "");
     assert.ok([cliPath, managedPath].includes(command), "never execute an approved job's arbitrary path");
     assert.equal(options.env.CODEX_HOME, codexHome);
     const argsText = args.join(" ");
