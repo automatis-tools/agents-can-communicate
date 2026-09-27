@@ -94,7 +94,10 @@ user's: a session in `bypassPermissions` mode holds each wake for approval unles
 `crossSessionInbound` is `accept`, and `refuse` drops wakes.
 
 On captured Codex/macOS configurations, live opt-in also grants outgoing access to ACC's
-state and local Unix sockets through a deny-by-default network proxy. Custom permission
+state and local Unix sockets through a deny-by-default network proxy. The sockets are the
+ones ACC delivers to, which include the directories where Claude Code binds each session's
+inbox: a command in the Codex sandbox can connect to those sockets, and Claude Code's own
+inbound settings decide what a received frame may do. Custom permission
 policies remain user-owned. Selection, proxy and grants are restored together only while
 unchanged; edited or newly referenced settings remain intact. See
 [Codex outgoing permissions](CONFIGURATION.md#codex-outgoing-permissions). Configuration

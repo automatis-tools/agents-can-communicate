@@ -165,10 +165,35 @@ for default workspace permissions. This happens even when the daemon is not yet 
 Installation, its preview, and the interactive consent question disclose this change.
 
 ACC selects a permission profile named `acc-workspace`, extending `:workspace`. It grants
-write access to the ACC state directory and allows only the local ACC channel directory
-(`/tmp/acc-ch-<uid>`) and the Codex home control socket. The profile enables networking
-through `features.network_proxy = true`, with no external domains allowed. The proxy and
-socket grants must stay together: enabling networking without the proxy changes its scope.
+write access to the ACC state directory and allows only the Unix sockets ACC delivers to.
+Each receiving adapter declares its own, and the profile lists all of them even when an
+install names Codex alone:
+
+| Receiver | Allowed path |
+|---|---|
+| Codex | the control socket, `<CODEX_HOME>/app-server-control/app-server-control.sock` |
+| Antigravity CLI relay | the ACC channel directory, `/tmp/acc-ch-<uid>` on macOS |
+| Claude Code inbox | `/tmp/cc-socks`, `/tmp/cc-socks-<uid>`, `$XDG_RUNTIME_DIR/cc-socks` or else `$CLAUDE_CODE_TMPDIR/cc-socks` when set, and `/run/user/<uid>/cc-socks` on Linux |
+
+ACC writes each path with its existing parent resolved, so on macOS the entries read
+`/private/tmp/...`. Codex resolves a granted path only if it exists when Codex builds the
+sandbox policy, and the sandbox compares resolved paths: a `/tmp/cc-socks-<uid>` entry
+written before that directory existed never matched. A socket that is a link, such as the
+Codex control socket, keeps its own name.
+
+A command in the Codex sandbox can therefore connect to any of your Claude Code sessions'
+inbox sockets. Claude Code's own inbound settings still decide what a received frame may do,
+and ACC checks Claude Code's session registry before each wake it sends.
+
+The profile enables networking through `features.network_proxy = true`, with no external
+domains allowed. The proxy and socket grants must stay together: enabling networking
+without the proxy changes its scope.
+
+Doctor reports outgoing delivery as configured only while the profile allows every socket
+above. A profile that ACC 0.8.0 or 0.8.1 wrote lacks the Claude Code inbox directories;
+doctor names the missing paths and `acc install --adapter codex`. That command and
+`acc update` rewrite ACC's own profile under the recorded delivery policy, `off` included.
+Start a new Codex session afterwards.
 
 An existing legacy workspace-write configuration is migrated only when its sole writable
 root is ACC's state directory. Custom permission/configuration profiles, additional roots,
