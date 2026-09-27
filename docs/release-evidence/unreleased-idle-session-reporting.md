@@ -55,8 +55,6 @@ Mutations, each caught by a test: removing the adapter lift, heartbeating on eve
 command, ignoring `liveDelivery` in the breakdown, and dropping the re-verification branch
 from the wake rule.
 
-`npm test` on the evidence commit `ffeabaa`: 2,646 tests, 2,646 passing, 0 failing, 0 skipped.
-Nothing was re-run.
 
 ## Measured on this host
 
@@ -71,11 +69,11 @@ installed 0.8.1:
 
 ## Exact local artifact
 
-- Source: clean commit `5500d9337ddb30cc72e320a698e19534595e7a4f` on
+- Source: clean commit `c62356f2f2670e18f7d96e39a6b4a58c052f015f` on
   `fix/idle-session-reporting`.
 - Archive: `agents-can-communicate-0.8.1.tgz`, packed from that commit.
-- Size: 473,693 bytes; 311 packed entries.
-- SHA-256: `8eebdc6acd2d436a76bf9b7a58f6f38b35361092a343e8179925b2aee455f1cf`.
+- Size: 473,900 bytes; 311 packed entries.
+- SHA-256: `1cae36e5c39920bea54fc3d408af4d51c6ddefccf03c7f614d8a955b42bb13e4`.
 - Package version remains `0.8.1`; this is an unpublished development artifact.
 
 The exact archive passed `scripts/verify-package.mjs`.

@@ -20,9 +20,9 @@
 
 | Candidate artifact | Value |
 |---|---|
-| Built from | `5500d9337ddb30cc72e320a698e19534595e7a4f` |
-| Tarball | `agents-can-communicate-0.8.1.tgz`, 473,693 bytes, 311 files |
-| sha256 | `8eebdc6acd2d436a76bf9b7a58f6f38b35361092a343e8179925b2aee455f1cf` |
+| Built from | `c62356f2f2670e18f7d96e39a6b4a58c052f015f` |
+| Tarball | `agents-can-communicate-0.8.1.tgz`, 473,900 bytes, 311 files |
+| sha256 | `1cae36e5c39920bea54fc3d408af4d51c6ddefccf03c7f614d8a955b42bb13e4` |
 
 This unpublished development archive passed clean installation verification. See
 [idle session reporting evidence](docs/release-evidence/unreleased-idle-session-reporting.md).
