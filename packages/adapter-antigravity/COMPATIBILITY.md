@@ -545,10 +545,11 @@ recorded the reply. Fixture: `fixtures/headless-reply-attempt-1.2.7.json`.
 **Headless mode cannot run it.** Print mode auto-denies any tool needing the `command`
 permission, because it cannot prompt, and says so on stderr: *add an allow-rule under
 `permissions.allow` in settings.json (e.g. `command(<target>)`)*. In the TUI the same call
-raises the ordinary approval prompt. The adapter adds no allow rule: no other ACC adapter grants
-itself command permission, and whether an agent may run ACC without asking is the operator's
-decision. A headless agent therefore receives peer messages and knows the exact command to
-answer them, and cannot send it until the operator allows it.
+raises the ordinary approval prompt. Whether an agent may run ACC without asking is the
+operator's decision. Since 2026-09-27 `acc install` asks it as its own question and, on a yes,
+adds one prefix rule for ACC's wrapper (see **Approval prompts and the ACC allow rule,
+2026-09-27** below). Without that answer, a headless agent receives peer messages and knows
+the exact command to answer them, and cannot send it until the operator allows it.
 
 Why it cannot lean on the imported copy: all 23 commands in its skill run
 `~/.gemini/extensions/agents-can-communicate/acc-cli.sh`, the Gemini CLI extension's shim. It
@@ -646,3 +647,55 @@ minimum, 1.2.7, that applies wherever `agy --version` answers at or above it and
 `agy agentapi --help` lists `send-message`; the per-session handshake still requires the
 relay the agent started. The probe already read the version as a release triple, so a
 prerelease build was never refused here. Linux and Intel macOS have no capture of their own.
+
+## Approval prompts and the ACC allow rule, 2026-09-27
+
+Antigravity CLI **1.2.12** (`agy`), macOS arm64, ACC 0.8.1, issue #214.
+
+**Observed.** The relay pushed a question into an idle TUI session at 05:30:23 UTC. The model
+started a turn and its first ACC command, `"<home>/.gemini/config/acc/acc-cli.sh" status ...`,
+stopped at an approval prompt; with nobody there the receipt stayed `offered`. Choosing
+"Yes, and always allow ... (Persist to settings.json)" logged one grant for that complete
+command line, session arguments included, and wrote nothing to `settings.json`, during the
+session or at exit; the next ACC command asked again five seconds later.
+
+Allow rules live in `~/.gemini/antigravity-cli/settings.json` under `permissions.allow`, as
+`command(<words>)` strings, beside the client's other keys (`colorScheme`,
+`trustedWorkspaces`). The file is read once per start: the log shows `CLI settings
+initialized` once. One session started with these rules loaded, beside the operator's
+`command(sh "<home>/.gemini/config/acc/acc-relay.sh" start)`:
+`command("<wrapper>")`, `command("<wrapper>" status)` and `command(<wrapper> reply)`, where
+`<wrapper>` is `<home>/.gemini/config/acc/acc-cli.sh`.
+
+| Command | Approval prompt |
+|---|---|
+| `"<wrapper>" status --json --session ...` | yes |
+| `"<wrapper>" reply --message ... --body ... --session ...` | yes |
+| `"<wrapper>" inbox --session ...` | yes |
+| `<wrapper> help` | no |
+| `"<wrapper>" help` | yes |
+
+A one-word rule is a prefix: the quoted one-word rule is the only loaded rule that can match
+`<wrapper> help`. A command whose first word is quoted matched no rule, quoted or not. Quotes
+around an argument are fine: the relay rule matched `sh "<relay>" start`. The vendor changelog
+(not captured) says rules are strict unless they start with `regex:` and that each token of a
+grant is matched as a full word.
+
+**What ACC does with it.** The skill names the wrapper bare when its path is one shell word
+(absolute; letters, digits, `.`, `_`, `-`, `/`), and tells the model to start each command
+exactly as written. With the operator's yes to a separate install question, and live delivery
+on, install adds `command(<wrapper>)` to `permissions.allow` and records the claim in
+`<data home>/acc/adapter-antigravity/`; uninstall, delivery off, or a No takes back exactly
+that rule. A wrapper path that needs quotes gets no rule, and doctor says why. Detection
+reports the rule as `allowed`, `prompts`, `unmatchable` or `unreadable`.
+
+**Not observed.**
+
+- The bare rule `command(<wrapper>)` that ACC writes, matching an ACC command. The observed
+  match used the quoted one-word form `command("<wrapper>")`.
+- A woken session answering unattended with ACC's rule loaded. No capability is claimed for
+  it; `delivery.livePush` is unchanged.
+- The client reading, and keeping, a `settings.json` that ACC created because none existed.
+- Whether the client rewrites `settings.json` itself and keeps entries it did not write.
+- Whether a model always keeps the bare form rather than adding quotes.
+- Any other version or platform.
