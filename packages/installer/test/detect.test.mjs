@@ -197,3 +197,18 @@ test("the report is ordered by adapter id, so two runs can be compared", async t
   assert.deepEqual(detected.map(entry => entry.adapterId),
     ["claude_code", "codex", "kimi"]);
 });
+
+test("a client's own command-approval state reaches the installer", async t => {
+  // What the consent question and doctor read: whether the client will ask
+  // before each ACC command, and what would change that.
+  const commandApproval = { state: "prompts", rule: "command(/x/acc-cli.sh)",
+    file: "/x/settings.json", setup: "add command(/x/acc-cli.sh)", diagnostic: "asks" };
+  const context = { home: await home(t), dataHome: await home(t) };
+
+  const [entry] = await detectInstallation({
+    adapters: [adapter("agy", { detect: async () => ({ ok: true, changes: [],
+      diagnostics: [], commandApproval }) })],
+    probe: probeFor({ agy: "1.2.12" }), context });
+
+  assert.deepEqual(entry.commandApproval, commandApproval);
+});

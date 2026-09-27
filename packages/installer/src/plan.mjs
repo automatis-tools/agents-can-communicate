@@ -143,8 +143,11 @@ export function planInstallation({ adapters, detected, context, action = "instal
       : null;
     const deliverySummary = action === "install"
       ? describeInstallDelivery(entry, delivery, effectiveLivePolicy) : null;
+    // The decision travels with the policy: an adapter may write a grant the
+    // operator answered separately, such as Antigravity's command allow rule.
     const installContext = { ...context, requestedLivePolicy: delivery,
-      livePolicy: configuredLivePolicy, clientVersion: entry.version, platform: entry.platform };
+      livePolicy: configuredLivePolicy, deliveryDecision, clientVersion: entry.version,
+      platform: entry.platform };
     const nativeServiceSetup = action === "install" && allowServiceSetup && delivery !== "off"
       && deliveryDecision.completeSetup === true ? entry.nativeServiceSetup : undefined;
     const setupNotes = action === "install" && delivery !== "off"

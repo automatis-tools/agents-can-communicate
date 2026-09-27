@@ -61,3 +61,36 @@ test("delivery decision provenance survives plan, apply, and maintenance replann
   await applyPlan({ plan: refreshPlan, adapters: [adapter], context, dataHome });
   assert.deepEqual((await loadOwnership({ dataHome })).installs[0].deliveryDecision, decision);
 });
+
+test("the adapter plans and installs with the decision the operator made", async t => {
+  // Antigravity CLI adds its allow rule only when the decision says yes to it,
+  // so the decision has to reach the adapter itself, not only the record.
+  const home = await realpath(await mkdtemp(path.join(tmpdir(), "acc-decision-home-")));
+  const dataHome = await realpath(await mkdtemp(path.join(tmpdir(), "acc-decision-data-")));
+  t.after(() => Promise.all([home, dataHome]
+    .map(directory => rm(directory, { recursive: true, force: true }))));
+  const context = { home, dataHome };
+  const seen = [];
+  const adapter = { id: "decision_fixture", displayName: "Decision Fixture",
+    capabilities: { delivery: { livePush: true } },
+    planInstall: installContext => { seen.push(["plan", installContext.deliveryDecision]);
+      return []; },
+    install: async installContext => { seen.push(["apply", installContext.deliveryDecision]);
+      return { changes: [], diagnostics: [] }; } };
+  const detected = [{ adapterId: adapter.id, displayName: adapter.displayName, present: true,
+    version: "1.0.0", installed: false, capabilities: adapter.capabilities }];
+  const decision = { source: "interactive-accepted", completeSetup: true, allowCommands: true };
+
+  const plan = planInstallation({ adapters: [adapter], detected, context,
+    deliveryByAdapter: { decision_fixture: "actionable" },
+    deliveryDecisionByAdapter: { decision_fixture: decision } });
+  await applyPlan({ plan, adapters: [adapter], context, dataHome });
+  // A refresh has only the record to go on.
+  const recorded = (await loadOwnership({ dataHome })).installs;
+  const refresh = planInstallation({ adapters: [adapter], detected, context, recorded,
+    deliveryByAdapter: { decision_fixture: "actionable" } });
+  await applyPlan({ plan: refresh, adapters: [adapter], context, dataHome });
+
+  assert.deepEqual(seen, [["plan", decision], ["apply", decision], ["plan", decision],
+    ["apply", decision]]);
+});
