@@ -15,7 +15,7 @@ test("doctor explains per-session native eligibility and durable fallback", asyn
   const report = await createCodexAdapter().doctor({ home });
   const diagnostics = report.diagnostics.join(" ");
 
-  assert.match(diagnostics, /0\.152\.1.*darwin-arm64/, "doctor names the captured native minimum");
+  assert.match(diagnostics, /0\.152\.1 or newer, recorded recipient consent/, "doctor names the captured native minimum");
   assert.match(diagnostics, /recorded.*consent/, "current recipient consent is required");
   assert.match(diagnostics, /exact.*thread.*cwd/i, "a session needs verified identity");
   assert.match(diagnostics, /Embedded.*unreachable/i, "unreachable sessions retain fallback");

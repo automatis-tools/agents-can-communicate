@@ -18,7 +18,7 @@ import { planCodexInstall, detectCodex, installCodexPlugin, preflightCodexUninst
 export { CODEX_QUEUE_MINIMUM };
 export const CODEX_VERSION = "0.147.0";
 export const CODEX_DELIVERY_FALLBACK = Object.freeze({
-  diagnostic: "Codex native delivery requires codex-cli 0.152.1 or newer on darwin-arm64, "
+  diagnostic: "Codex native delivery requires codex-cli 0.152.1 or newer, "
     + "recorded recipient consent and a reachable LocalDaemon session with exact thread, cwd, "
     + "process, version and protocol verification. Embedded or unreachable sessions retain "
     + "durable messages. Message delivery does not start, restart or stop the vendor daemon and adds no "
@@ -61,9 +61,8 @@ export function createCodexAdapter() {
     // Native acceleration is a separate, per-session eligibility decision.
 
     nativeDelivery: {
-      minimumByPlatform: { "darwin-arm64": CODEX_QUEUE_MINIMUM },
-      anchors: [{ platform: "darwin-arm64", version: CODEX_QUEUE_MINIMUM,
-        protocolContract: PROTOCOL_CONTRACT }], knownBad: [],
+      minimum: CODEX_QUEUE_MINIMUM,
+      anchors: [{ version: CODEX_QUEUE_MINIMUM, protocolContract: PROTOCOL_CONTRACT }], knownBad: [],
       activationKinds: ["native-service"], policySource: "installation-record",
     },
     probeNativeDelivery, planNativeActivation, bindNativeSession,

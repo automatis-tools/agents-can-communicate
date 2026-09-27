@@ -637,3 +637,12 @@ From the vendor changelog, not from capture:
 - Whether a `PostInvocation` registration costs anything measurable. It is not registered,
   because its envelope is byte-identical to `PreInvocation`'s and there is nothing ACC would do
   there twice.
+
+## The relay minimum applies on every platform, 2026-09-26
+
+The 1.2.7 relay capture above was taken on darwin-arm64, and the contract named that
+platform, so no relay ever bound on an Intel Mac or on Linux. The contract now declares one
+minimum, 1.2.7, that applies wherever `agy --version` answers at or above it and
+`agy agentapi --help` lists `send-message`; the per-session handshake still requires the
+relay the agent started. The probe already read the version as a release triple, so a
+prerelease build was never refused here. Linux and Intel macOS have no capture of their own.

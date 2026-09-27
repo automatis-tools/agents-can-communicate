@@ -7,12 +7,9 @@ import { pathToFileURL } from "node:url";
 
 import { createPackedAcc } from "../helpers/packed-acc.mjs";
 
-const captured = process.platform === "darwin" && process.arch === "arm64";
 const quoted = value => `'${String(value).replaceAll("'", "'\\\"'\\\"'")}'`;
 
-test("packed install successfully prepares and verifies a supported Codex service", {
-  skip: !captured,
-}, async t => {
+test("packed install successfully prepares and verifies a supported Codex service", async t => {
   const p = await createPackedAcc(t);
   // macOS CI's TMPDIR can exceed the 104-byte Unix socket path limit.
   // Keep the packed install in that environment, but give its daemon a short home.

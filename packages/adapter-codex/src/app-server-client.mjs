@@ -2,6 +2,8 @@ import os from "node:os";
 import path from "node:path";
 import { realpath, stat } from "node:fs/promises";
 
+import { compareVersionOrder, versionOrder } from "@agents-can-communicate/adapter-sdk";
+
 import { openWebSocketPeer } from "./ws-json-rpc.mjs";
 
 // The Codex App Server queue protocol, captured on codex-cli 0.152.1. Every
@@ -18,7 +20,6 @@ export const MINIMUM_VERSION = "0.152.1";
 export const CODEX_QUEUE_MINIMUM = MINIMUM_VERSION;
 export const QUEUE_MODES = Object.freeze(["livePush", "idleWake", "busyQueue"]);
 const CLIENT_INFO = Object.freeze({ name: "agents-can-communicate", version: "0.2.0" });
-const STABLE_VERSION = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/;
 const MAX_PAGES = 20;
 const METHOD_NOT_FOUND = -32601;
 const INVALID_REQUEST = -32600;
@@ -27,15 +28,11 @@ export const controlSocketPath = (env = process.env) =>
   path.join(env.CODEX_HOME ?? path.join(os.homedir(), ".codex"),
     "app-server-control", "app-server-control.sock");
 
-export function parseStableVersion(text) {
-  return STABLE_VERSION.test(String(text ?? "")) ? String(text).split(".").map(Number) : null;
-}
-export function compareStableVersions(left, right) {
-  const a = parseStableVersion(left);
-  const b = parseStableVersion(right);
-  for (let index = 0; index < 3; index += 1) if (a[index] !== b[index]) return a[index] < b[index] ? -1 : 1;
-  return 0;
-}
+// A version is judged by its release triple, the same order certification
+// evidence uses: a prerelease daemon above the minimum is admitted by the queue
+// method it answers with, not refused for its suffix. Unreadable orders as null.
+export { versionOrder };
+export const compareVersions = (left, right) => compareVersionOrder(versionOrder(left), versionOrder(right));
 export function serverVersionOf(userAgent) {
   return /^[^\s/]+\/(\d+\.\d+\.\d+(?:-[0-9A-Za-z.]+)?)(?=[\s(]|$)/
     .exec(String(userAgent ?? ""))?.[1] ?? null;
@@ -58,10 +55,10 @@ export async function initializeCodex(peer) {
 
 export async function probeCodexQueue(peer, { threadId, minimum = MINIMUM_VERSION } = {}) {
   const serverVersion = await initializeCodex(peer);
-  if (serverVersion === null || parseStableVersion(serverVersion) === null) {
-    return { supported: false, serverVersion, reasonCode: "prerelease_not_captured" };
+  if (versionOrder(serverVersion) === null) {
+    return { supported: false, serverVersion, reasonCode: "version_unavailable" };
   }
-  if (compareStableVersions(serverVersion, minimum) < 0) {
+  if (compareVersions(serverVersion, minimum) < 0) {
     return { supported: false, serverVersion, reasonCode: "below_minimum_version" };
   }
   try {

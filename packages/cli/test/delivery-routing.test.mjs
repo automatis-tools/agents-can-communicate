@@ -107,7 +107,7 @@ function routed(policy, kind, { bindingPolicy = "all", failed = false } = {}) {
     recordOfferFailed: async () => {},
     recordOfferSucceeded: async () => { receipt.state = "offered"; } };
   // The contract a real adapter declares, in the shape defineAdapter accepts:
-  // a per-platform minimum that is itself a passing capture, the anchor that
+  // a minimum that is itself a passing capture, the anchor that
   // proves it, an explicit denylist, and the activation kinds the installer may
   // be asked for. A declaration missing any of it is rejected at definition
   // time, so a fixture without one routes through nothing a shipped adapter
@@ -116,8 +116,8 @@ function routed(policy, kind, { bindingPolicy = "all", failed = false } = {}) {
     capabilities: { delivery: { livePush: true } },
     certification: { evidence: [{ result: "pass", client: "fixture-client", version: BOUND,
       platform: PLATFORM, capability: "delivery.livePush" }] },
-    nativeDelivery: { minimumByPlatform: { [PLATFORM]: BOUND },
-      anchors: [{ platform: PLATFORM, version: BOUND, protocolContract: "fixture-native-v1" }],
+    nativeDelivery: { minimum: BOUND,
+      anchors: [{ version: BOUND, protocolContract: "fixture-native-v1" }],
       knownBad: [], activationKinds: ["native-service"],
       policySource: "installation-record" },
     offerMessage: async ({ binding: offered }) => {

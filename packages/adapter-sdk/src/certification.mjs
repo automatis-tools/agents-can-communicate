@@ -25,13 +25,13 @@ const TRIPLE = /^(\d+)\.(\d+)\.(\d+)(?:[-+][0-9A-Za-z.-]+)?$/;
  * version ACC has already observed is not an older client. Anything unreadable
  * - a probe that failed, "unknown", a vendor string - returns null.
  */
-function versionOrder(text) {
+export function versionOrder(text) {
   const match = typeof text === "string" && text.toLowerCase() !== "unknown"
     ? TRIPLE.exec(text) : null;
   return match === null ? null : [Number(match[1]), Number(match[2]), Number(match[3])];
 }
 
-function compareVersionOrder(left, right) {
+export function compareVersionOrder(left, right) {
   if (left === null || right === null) return left === right ? 0 : left === null ? -1 : 1;
   for (let index = 0; index < 3; index += 1) {
     if (left[index] !== right[index]) return left[index] < right[index] ? -1 : 1;

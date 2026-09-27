@@ -16,9 +16,8 @@ const DEFAULT_CADENCE_MS = 60_000;
 
 // Reasons the static rule refused: the client will not change within the
 // session, so the state is "unsupported" rather than a retryable "degraded".
-const STATIC_REASONS = new Set(["native_delivery_unsupported", "platform_not_captured",
-  "version_unavailable", "prerelease_not_captured", "below_minimum_version",
-  "known_bad_version"]);
+const STATIC_REASONS = new Set(["native_delivery_unsupported", "version_unavailable",
+  "below_minimum_version", "known_bad_version"]);
 
 const isPid = value => Number.isInteger(value) && value > 0;
 
@@ -77,7 +76,7 @@ export async function establishNativeBinding({ adapter, event, hookBinding, clie
         }, budget);
       }),
     ]);
-    const verdict = validateNativeHandshake(adapter, { clientVersion, platform, handshake });
+    const verdict = validateNativeHandshake(adapter, { clientVersion, handshake });
     if (!verdict.ok) {
       await discardEndpoint(adapter, handshake, runtimeDir);
       return outcome(STATIC_REASONS.has(verdict.reasonCode) ? "unsupported" : "degraded",

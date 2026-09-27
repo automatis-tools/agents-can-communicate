@@ -119,12 +119,24 @@ test("customized generated permissions retain their proxy and selection on unins
   assert.ok(result.diagnostics.some(line => /kept|preserved/.test(line) && /permission/.test(line)));
 });
 
-test("unknown or uncaptured clients do not receive unverified security settings", async t => {
-  for (const change of [{ clientVersion: null }, { clientVersion: "0.152.1" }, { platform: "linux-x64" }]) {
+test("unknown or older clients do not receive unverified security settings", async t => {
+  for (const change of [{ clientVersion: null }, { clientVersion: "0.152.1" }, { clientVersion: "0.153.3-rc.1" }]) {
     const f = await fixture(t);
     const result = await f.adapter.install({ ...f.context, ...change });
     assert.doesNotMatch(await f.read(), /default_permissions|network_proxy/);
     assert.ok(result.needsAction.some(line => /outgoing|outbound/.test(line)));
+  }
+});
+
+// The permissions capture was taken on darwin-arm64 and reads the same on any
+// host; a prerelease at or above the minimum is judged by its triple.
+test("outgoing permissions are written on a platform the captures never named", async t => {
+  for (const change of [{ platform: "linux-x64" }, { platform: "darwin-x64" },
+    { platform: "linux-x64", clientVersion: "0.154.0-beta.2" }]) {
+    const f = await fixture(t);
+    await f.adapter.install({ ...f.context, ...change });
+    assert.match(await f.read(), /default_permissions = "acc-workspace"/, JSON.stringify(change));
+    assert.match(await f.read(), /network_proxy = true/, JSON.stringify(change));
   }
 });
 

@@ -2,9 +2,7 @@
 // reasons; installation and doctor must not turn a version floor into readiness.
 const REASONS = Object.freeze({
   native_delivery_unsupported: "this adapter has no native delivery channel",
-  platform_not_captured: "native delivery is not verified on this platform",
   version_unavailable: "the client version could not be verified",
-  prerelease_not_captured: "this client version is not a verified stable release",
   below_minimum_version: "the client is below the native delivery minimum version",
   known_bad_version: "this client version has a known native delivery failure",
   native_endpoint_unavailable: "the client's local delivery service is unavailable",

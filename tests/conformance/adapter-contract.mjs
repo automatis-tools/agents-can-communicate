@@ -163,7 +163,7 @@ export function runAdapterConformance(name, kit) {
     assert.equal(typeof fixture.context, "object");
   });
 
-  test(`${name}: a native contract, when declared, admits only its captured platforms`, () => {
+  test(`${name}: a native contract, when declared, admits its anchors on any platform`, () => {
     const instance = adapter();
     const probeFor = (clientVersion, protocolContract) => ({ supported: true, clientVersion,
       protocolContract, executableFingerprint: null, modes: ["livePush"], reasonCode: null });
@@ -175,16 +175,26 @@ export function runAdapterConformance(name, kit) {
       return;
     }
     assert.equal(Object.isFrozen(instance.nativeDelivery), true);
+    assert.equal(typeof instance.nativeDelivery.minimum, "string");
     for (const anchor of instance.nativeDelivery.anchors) {
-      const result = evaluateNativeEligibility(instance, { clientVersion: anchor.version,
-        platform: anchor.platform, probe: probeFor(anchor.version, anchor.protocolContract) });
-      assert.equal(result.eligible, true, `${anchor.platform} ${anchor.version} is not eligible`);
-      assert.equal(result.protocolContract, anchor.protocolContract);
+      assert.equal(Object.hasOwn(anchor, "platform"), false, "an anchor names no platform");
+      // The captures were taken on one platform; the anchor admits its version
+      // wherever the probe reports the anchored contract.
+      for (const platform of ["darwin-arm64", "linux-x64", "win32-x64", undefined]) {
+        const result = evaluateNativeEligibility(instance, { clientVersion: anchor.version,
+          platform, probe: probeFor(anchor.version, anchor.protocolContract) });
+        assert.equal(result.eligible, true, `${anchor.version} is not eligible on ${platform}`);
+        assert.equal(result.protocolContract, anchor.protocolContract);
+      }
     }
-    const uncaptured = evaluateNativeEligibility(instance, { clientVersion: "999.0.0",
-      platform: "win32-x64", probe: probeFor("999.0.0", "any-v1") });
-    assert.equal(uncaptured.eligible === false && ["platform_not_captured", "protocol_mismatch"]
-      .includes(uncaptured.reasonCode), true);
+    // A newer version answering another contract is refused for the contract.
+    const foreign = evaluateNativeEligibility(instance, { clientVersion: "999.0.0",
+      probe: probeFor("999.0.0", "any-v1") });
+    assert.deepEqual([foreign.eligible, foreign.reasonCode], [false, "protocol_mismatch"]);
+    // A client older than the first passing capture is refused for its age.
+    const older = evaluateNativeEligibility(instance, { clientVersion: "0.0.1",
+      probe: probeFor("0.0.1", instance.nativeDelivery.anchors[0].protocolContract) });
+    assert.deepEqual([older.eligible, older.reasonCode], [false, "below_minimum_version"]);
   });
 
   test(`${name}: no hook payload field is copied verbatim into coordination state`, async () => {

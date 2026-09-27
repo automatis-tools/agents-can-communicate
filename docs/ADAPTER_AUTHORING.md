@@ -153,9 +153,8 @@ to its capabilities:
 
 ```js
 nativeDelivery: {
-  minimumByPlatform: { "darwin-arm64": "2.1.282" },
-  anchors: [{ platform: "darwin-arm64", version: "2.1.282",
-    protocolContract: "claude-code-inbox-socket-v1" }],
+  minimum: "2.1.282",
+  anchors: [{ version: "2.1.282", protocolContract: "claude-code-inbox-socket-v1" }],
   knownBad: [],
   activationKinds: ["native-service"],
   offerKind: "wake",
@@ -164,17 +163,32 @@ nativeDelivery: {
 
 The rules `defineAdapter` enforces, and the ones the runtime applies:
 
-- A minimum is the **first passing capture** on that platform, never a guessed first vendor
-  release. Every anchor must have passing `delivery.livePush` evidence for the same client,
-  version, and platform, and each minimum must itself be an anchor.
-- There is intentionally **no maximum version**. A newer stable release is admitted only
-  when a current read-only feature probe (`probeNativeDelivery()`) and a per-session
-  handshake (`bindNativeSession()`) both report the anchored `protocolContract`;
-  `evaluateNativeEligibility()` and `validateNativeHandshake()` are those two checks.
-- Prereleases require their own passing capture; they are `prerelease_not_captured` even
-  when numerically newer. `knownBad` names exact versions or inclusive intervals.
-- Exact-version certification still governs every non-native capability;
+- The minimum is the **first passing capture**, never a guessed first vendor release. Every
+  anchor must have passing `delivery.livePush` evidence for the same client and version, and
+  the minimum must itself be an anchor. The platform an evidence row names is where the
+  capture was taken; it is provenance, and the anchor names no platform.
+- There is intentionally **no maximum version** and **no platform**. A newer release is
+  admitted, on every platform, only when a current read-only feature probe
+  (`probeNativeDelivery()`) and a per-session handshake (`bindNativeSession()`) both report
+  the anchored `protocolContract`; `evaluateNativeEligibility()` and
+  `validateNativeHandshake()` are those two checks.
+- A prerelease is judged by its release triple, as hook capabilities are: `2.2.0-beta.1` is
+  `2.2.0` against the minimum and `knownBad`. `knownBad` names exact versions or inclusive
+  intervals. A version that cannot be read at all is `version_unavailable`.
+- Certification evidence still governs every non-native capability;
   `effectiveCapabilities()` is unchanged. The native rule is used for live delivery alone.
+
+What may refuse live delivery is exactly three things:
+
+- the machine's own probe or per-session handshake failing;
+- a client older than the first passing capture;
+- a regression recorded in `knownBad`.
+
+Nothing else: not the platform, not a prerelease suffix, not where the evidence was taken. A
+transport that is technically different on some platform is the probe's fact to report, as
+`native_delivery_unsupported`, never a gap in the captures. The 0.8.0 shape,
+`minimumByPlatform` with a platform on each anchor, is refused by name; the design record is
+`docs/design/2026-09-26-native-delivery-across-platforms.md` in the repository.
 - Native methods return closed facts (`validateNativeActivationPlan()` closes the
   activation plan) and never put vendor data - endpoints, sockets, raw errors - into core.
 

@@ -1,6 +1,6 @@
 import path from "node:path";
 import { channelSocketDirectory, tomlString } from "@agents-can-communicate/adapter-sdk";
-import { compareStableVersions, parseStableVersion } from "./app-server-client.mjs";
+import { compareVersions } from "./app-server-client.mjs";
 import { addPermissions, inspectPermissions } from "./permission-ownership.mjs";
 import { scanConfig } from "./toml-scan.mjs";
 
@@ -8,9 +8,9 @@ const PROFILE = "acc-workspace";
 const MINIMUM = "0.153.4";
 const equal = (keys, expected) => JSON.stringify(keys) === JSON.stringify(expected);
 const literal = value => { try { return JSON.parse(value); } catch { return null; } };
-const supported = context => context.platform === "darwin-arm64"
-  && parseStableVersion(context.clientVersion) !== null
-  && compareStableVersions(context.clientVersion, MINIMUM) >= 0;
+// Captured on darwin-arm64 with 0.153.4; the capture's minimum applies on
+// every platform, and a prerelease is judged by its release triple.
+const supported = context => compareVersions(context.clientVersion, MINIMUM) >= 0;
 const hasPermissions = entries => entries.some(entry =>
   ["permissions", "default_permissions", "profile", "profiles"].includes(entry.keys[0]));
 const configured = (source, context) => {
@@ -69,7 +69,7 @@ export function outgoingStatus(source, context) {
       ? "outgoing live delivery: local socket permissions configured for new sessions; active session overrides remain unverified"
       : `outgoing live delivery: sender permissions unverified in ${context.file}; `
         + (reasonCode === "permission_configuration_uncaptured"
-          ? `automatic setup requires Codex ${MINIMUM} or newer on darwin-arm64`
+          ? `automatic setup requires Codex ${MINIMUM} or newer`
           : custom
             ? "custom permission policy was preserved; manually allow ACC state and local sockets "
               + "through the network proxy in the effective workspace profile"

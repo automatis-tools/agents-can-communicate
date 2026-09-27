@@ -40,8 +40,8 @@ async function fixture({ refreshed, boundary, kind = "question" }) {
   const offers = [];
   const adapter = { id: "fixture", capabilities: { delivery: { livePush: true } },
     nativeDelivery: { policySource: "installation-record",
-      minimumByPlatform: { [PLATFORM]: "1.2.3" },
-      anchors: [{ platform: PLATFORM, version: "1.2.3", protocolContract: "fixture-native-v1" }],
+      minimum: "1.2.3",
+      anchors: [{ version: "1.2.3", protocolContract: "fixture-native-v1" }],
       knownBad: [], activationKinds: ["native-service"] },
     refreshNativeSession: async () => {
       refreshes += 1;

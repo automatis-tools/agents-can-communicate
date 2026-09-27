@@ -1,6 +1,6 @@
 import path from "node:path";
-import { openCodexAppServer, parseStableVersion } from "./app-server-client.mjs";
-import { readySocketPath, socketIsReady } from "./native-endpoint.mjs";
+import { openCodexAppServer, versionOrder } from "./app-server-client.mjs";
+import { readySocketPath } from "./native-endpoint.mjs";
 import { absolute, approvedProcessIsDead, failMaintenance, maintenanceContext,
   managedExecutablePaths, metadataExists, probeMaintenanceInstall, readMaintenancePid, runMaintenanceCommand,
   startTimeValid, verifyMaintenanceProcess } from "./maintenance-host.mjs";
@@ -16,7 +16,7 @@ function validApproval(value) {
   return value?.serviceId === "codex-app-server" && ["ready", "busy"].includes(value.state)
     && Number.isSafeInteger(value.pid) && value.pid > 1 && startTimeValid(value.processStartTime)
     && ["codexHome", "cliPath", "managedPath", "socketPath"].every(key => absolute(value[key]))
-    && ["cliVersion", "serverVersion", "managedVersion"].every(key => parseStableVersion(value[key]))
+    && ["cliVersion", "serverVersion", "managedVersion"].every(key => versionOrder(value[key]))
     && value.managedVersion === value.cliVersion
     && managedExecutablePaths(value.codexHome).includes(value.managedPath)
     && value.socketPath === path.join(value.codexHome, "app-server-control/app-server-control.sock");
@@ -36,7 +36,6 @@ export function createCodexMaintenance({ run = runMaintenanceCommand, open = ope
       const paths = await maintenanceContext(context);
       Object.assign(snapshot, { codexHome: paths.codexHome, socketPath: paths.socketPath, managedPath: paths.managedPath });
       if (!await metadataExists(paths.socketPath) && !await metadataExists(paths.pidPath)) return null;
-      if (paths.platform !== "darwin-arm64") failMaintenance("maintenance_platform_unsupported");
       if (!await readySocketPath(paths.socketPath)) failMaintenance("daemon_socket_unproven");
       Object.assign(snapshot, await probeMaintenanceInstall(paths, run));
       const version = await run(snapshot.cliPath, ["app-server", "daemon", "version"], paths.options);
@@ -45,7 +44,7 @@ export function createCodexMaintenance({ run = runMaintenanceCommand, open = ope
       if (observed.status !== "running" || observed.backend !== "pid") failMaintenance("maintenance_backend_unsupported");
       if (observed.managedCodexPath !== snapshot.managedPath || observed.socketPath !== snapshot.socketPath
         || observed.cliVersion !== snapshot.cliVersion || observed.managedCodexVersion !== snapshot.managedVersion
-        || !parseStableVersion(observed.appServerVersion)) failMaintenance("daemon_identity_unavailable");
+        || !versionOrder(observed.appServerVersion)) failMaintenance("daemon_identity_unavailable");
       snapshot.serverVersion = observed.appServerVersion;
       Object.assign(snapshot, await readMaintenancePid(paths.pidPath));
       await verifyMaintenanceProcess(snapshot, paths, run);
@@ -83,7 +82,6 @@ export function createCodexMaintenance({ run = runMaintenanceCommand, open = ope
     try {
       const pinned = { ...context, env: { ...(context?.env ?? process.env), CODEX_HOME: expected.codexHome } };
       const paths = await maintenanceContext(pinned);
-      if (paths.platform !== "darwin-arm64") return refused("maintenance_platform_unsupported");
       const install = { ...paths, ...await probeMaintenanceInstall(paths, run) };
       if (!sameFields(expected, install, installationKeys)) return refused("service_identity_changed");
       const existing = await inspectMaintenance(pinned);

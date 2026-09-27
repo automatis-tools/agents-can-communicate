@@ -126,8 +126,8 @@ test("filesystem composition records before an offer failure and keeps command s
     capabilities: { delivery: { livePush: true } }, certification: { evidence: [{
       result: "pass", client: "fixture-client", version: "1.2.3",
       platform, capability: "delivery.livePush",
-    }] }, nativeDelivery: { minimumByPlatform: { [platform]: "1.2.3" },
-      anchors: [{ platform, version: "1.2.3", protocolContract: "fixture-native-v1" }],
+    }] }, nativeDelivery: { minimum: "1.2.3",
+      anchors: [{ version: "1.2.3", protocolContract: "fixture-native-v1" }],
       knownBad: [], activationKinds: ["native-service"] },
     offerMessage: async ({ message }) => {
       stateAtOffer = (await store.snapshot(status.workspaceId, { kinds: ["receipt"] }))

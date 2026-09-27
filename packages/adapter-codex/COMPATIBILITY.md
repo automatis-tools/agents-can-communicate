@@ -1126,3 +1126,17 @@ Measured and not supported: in a `CODEX_HOME` with no standalone package, 0.157.
 `packages/app-server-daemon/current/bin/codex`. ACC's service setup still expects the
 standalone package and its file names, so a fresh 0.157.1 home reports the standalone
 prerequisite. That layout needs its own capture.
+
+## The LocalDaemon minimum applies on every platform, 2026-09-26
+
+The 0.152.1 and 0.153.4 captures above were taken on darwin-arm64, and the contract,
+service inspection, service preparation and the outgoing-permissions setup each refused any
+other platform outright. All four now judge a host by what they measure on it: the daemon's
+protocol answer against the 0.152.1 minimum, the PID record, start time, executable path,
+socket ownership and served version, and the CLI's 0.154.0 daemon commands. A prerelease
+daemon or CLI is judged by its release triple: `0.156.0-alpha.3` above the minimum is admitted
+by the queue method it answers with. Socket ownership is proven with `lsof` taken from a fixed
+list, `/usr/sbin/lsof` then `/usr/bin/lsof`, never from PATH; a host with neither fails
+verification closed with `daemon_socket_unproven`. Linux and Intel macOS have no capture of
+their own, and the test that runs this host's real `ps` and `lsof` resolution also runs in
+the ubuntu CI job. Maintenance keeps every identity check and never stops a busy service.

@@ -954,3 +954,17 @@ and events and from the receiving session's transcript records. All six cases pa
 Fixtures: `fixtures/delivery/claude-code-2.1.282.json` and
 `fixtures/delivery/claude-code-2.1.282-product-evidence.json`. The capture's limitations
 list what it did not cover: a receiver in `bypassPermissions` mode, Linux and native Windows.
+
+## The inbox wake's minimum applies on every platform, 2026-09-26
+
+The 2.1.282 capture above was taken on darwin-arm64, and until now the contract named that
+platform: on an Intel Mac or on Linux the adapter answered `platform_not_captured`, doctor
+said the platform was not verified, and no session was ever woken there, although the probe
+reads the same registry entry and the same Unix socket path on those hosts. The contract now
+declares one minimum, 2.1.282, that applies wherever the probe finds the inbox in the
+executable and the handshake finds the session's socket. Native Windows is still refused by
+the probe itself: its inbox is a named pipe with an auth line, which nothing here speaks.
+A prerelease build is judged by its release triple, so `2.2.0-beta.1` with the inbox is
+admitted and `2.1.281-rc.1` is below the minimum. Linux and Intel macOS have no capture of
+their own; what admits them is the probe and the handshake, and a wake that fails there is
+recorded as a failed offer with the durable fallback, as it is here when the socket is gone.

@@ -7,7 +7,6 @@ import { createPackedAcc, treeSnapshot } from "../helpers/packed-acc.mjs";
 import { createUpdateRegistry } from "../helpers/update-registry.mjs";
 import { writeLegacyShellActivation } from "../helpers/legacy-shell-bootstrap.mjs";
 
-const captured = process.platform === "darwin" && process.arch === "arm64";
 const ownership = f => readFile(path.join(f.dataHome, "acc", "installs.json"), "utf8").then(JSON.parse);
 const updateEnv = (f, registry) => ({ ...f.env, ACC_NO_UPDATE_CHECK: "0",
   npm_config_registry: registry.url, npm_config_cache: path.join(f.root, "update-cache") });
@@ -36,7 +35,7 @@ test("packed update retains delivery consent while native services and capabilit
     assert.notEqual(adapter.nativeDelivery.runtime, "active");
     assert.deepEqual(adapter.nativeDelivery.modes, []);
   }
-  if (captured) assert.equal(doctor.adapters.find(a => a.adapterId === "codex").outgoingDelivery.state, "configured");
+  assert.equal(doctor.adapters.find(a => a.adapterId === "codex").outgoingDelivery.state, "configured");
   for (const record of (await ownership(f)).installs) assert.equal(record.deliveryPolicy, "actionable");
 });
 
@@ -83,7 +82,7 @@ async function leaveChannelInstall(f) {
 // inbox probe fails, keep the recorded consent, and let a later install on a
 // supporting client activate the inbox wake.
 test("packed update retires a 0.7.x Claude shim and Channel even when the inbox probe fails",
-  { skip: !captured }, async t => {
+  async t => {
     const f = await createPackedAcc(t);
     await writeFile(path.join(f.clientHome, ".zshrc"), "export USER_STUFF=1\n");
     await writeClaude(f, false);

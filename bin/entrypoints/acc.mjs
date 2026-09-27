@@ -25,7 +25,6 @@ const runtime = {
   ids: { next: kind => createId(kind, randomBytes) },
   createDeliveryRouter: ({ service, clock, dataHome }) =>
     createDeliveryRouter({ service, adapters, clock,
-      platform: `${process.platform}-${process.arch}`,
       readLivePolicy: ({ adapter }) => readInstalledLivePolicy({ dataHome,
         adapterId: adapter.id }) }),
   // Asked only by `acc config init`, and only when stdout is a terminal. There

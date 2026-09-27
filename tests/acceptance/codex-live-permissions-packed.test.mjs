@@ -8,9 +8,7 @@ import { createPackedAcc } from "../helpers/packed-acc.mjs";
 
 const run = promisify(execFile);
 
-test("installed live setup discloses permissions, diagnoses them, and reverses only its unchanged bundle", {
-  skip: process.platform !== "darwin" || process.arch !== "arm64",
-}, async t => {
+test("installed live setup discloses permissions, diagnoses them, and reverses only its unchanged bundle", async t => {
   const packed = await createPackedAcc(t);
   await packed.setClientVersions({ codex: "0.153.4" });
   const config = path.join(packed.clientHome, ".codex", "config.toml");

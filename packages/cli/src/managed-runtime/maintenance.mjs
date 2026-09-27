@@ -31,24 +31,18 @@ export function maintenanceContext(control, env) {
  * untouched, so a genuinely stale or unbound service is still selected.
  *
  * The contract answers two different questions with one field, and reading
- * every non-null code as a refusal conflated them. "platform_not_captured" and
- * "native_delivery_unsupported" are not verdicts on any version: the first is
- * a complete, valid declaration that records nothing for the platform this
- * process runs on, and the second is an adapter that declares no native
- * delivery at all. Every shipped adapter captures darwin-arm64 alone, so on
- * Linux and on an Intel Mac the first of those is the ordinary answer - and it
- * made every ready daemon a restart candidate, including one already serving
- * exactly the version its CLI is running. That is the complaint this work
- * began from, reproduced on every machine but one. With no opinion to act on,
- * the decision falls back to the comparison that governed before this branch:
- * the served version against the CLI's. */
-const UNCAPTURED = new Set(["platform_not_captured", "native_delivery_unsupported"]);
+ * every non-null code as a refusal conflated them. "native_delivery_unsupported"
+ * is not a verdict on any version: it is an adapter that declares no native
+ * delivery at all. With no opinion to act on, the decision falls back to the
+ * comparison that governed before the contract existed: the served version
+ * against the CLI's. A contract captured on one platform judges the daemon on
+ * every platform, so the host this process runs on is not asked. */
+const NO_CONTRACT = "native_delivery_unsupported";
 
 const servingVersionIsContrary = (adapter, snapshot) => {
-  const { reasonCode } = evaluateVersionContract(adapter,
-    { clientVersion: snapshot.serverVersion, platform: HOST_PLATFORM });
+  const { reasonCode } = evaluateVersionContract(adapter, { clientVersion: snapshot.serverVersion });
   if (reasonCode === null) return false;
-  if (!UNCAPTURED.has(reasonCode)) return true;
+  if (reasonCode !== NO_CONTRACT) return true;
   return snapshot.serverVersion !== snapshot.cliVersion;
 };
 

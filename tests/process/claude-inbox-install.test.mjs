@@ -10,11 +10,8 @@ import { promisify } from "node:util";
 const run = promisify(execFile);
 const repo = path.resolve(import.meta.dirname, "..", "..");
 const acc = path.join(repo, "bin", "acc.mjs");
-// A 2.1.252 client is older than the inbox wake's first capture. Away from the
-// captured platform the reason is the platform itself.
-const capturedPlatform = process.platform === "darwin" && process.arch === "arm64";
-const assertNativeReason = text => assert.match(text, capturedPlatform
-  ? /2\.1\.252.*2\.1\.282/ : /not verified on this platform/);
+// A 2.1.252 client is older than the inbox wake's first capture, on every host.
+const assertNativeReason = text => assert.match(text, /2\.1\.252.*2\.1\.282/);
 
 
 async function machine(t) {

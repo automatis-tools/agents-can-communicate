@@ -35,9 +35,8 @@ try {
     + "from \"./inbox-delivery.mjs\";\nimport certification from");
   text = text.replace("      delivery: { nextTurn: true },", "      delivery: { nextTurn: true, livePush: true },");
   text = text.replace("    startSession:", `    nativeDelivery: {
-      minimumByPlatform: { "darwin-arm64": "2.1.282" },
-      anchors: [{ platform: "darwin-arm64", version: "2.1.282",
-        protocolContract: "claude-code-inbox-socket-v1" }],
+      minimum: "2.1.282",
+      anchors: [{ version: "2.1.282", protocolContract: "claude-code-inbox-socket-v1" }],
       knownBad: [], activationKinds: ["native-service"], policySource: "installation-record",
       offerKind: "wake",
     },

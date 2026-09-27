@@ -240,8 +240,8 @@ local socket permissions as well; a writable state directory alone is insufficie
 ## Gemini does not guard a write
 
 Default and `plan` modes expose no write tool to the model. `auto_edit` exposes edit tools;
-shell availability depends on approval mode. Only Gemini CLI 0.57.0 on `darwin-arm64` has
-package-shipped delivery certification; other versions still use inbox.
+shell availability depends on approval mode. Gemini CLI next-turn delivery is certified from
+0.57.0 onward, on every platform; an older client still uses inbox.
 
 From 0.55 onwards there is a quieter cause with the same symptom: an untrusted folder. The
 client prints `Approval mode overridden to "default" because the current folder is not

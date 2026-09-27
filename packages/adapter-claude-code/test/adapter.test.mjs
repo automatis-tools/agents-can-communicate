@@ -127,8 +127,8 @@ test("Claude Code declares the inbox wake contract", () => {
   assert.equal(adapter.nativeDelivery.offerKind, "wake");
   assert.equal(adapter.nativeDelivery.policySource, "installation-record");
   assert.deepEqual(adapter.nativeDelivery.activationKinds, ["native-service"]);
-  assert.deepEqual(adapter.nativeDelivery.minimumByPlatform, { "darwin-arm64": "2.1.282" });
-  assert.deepEqual(adapter.nativeDelivery.anchors, [{ platform: "darwin-arm64", version: "2.1.282",
+  assert.equal(adapter.nativeDelivery.minimum, "2.1.282");
+  assert.deepEqual(adapter.nativeDelivery.anchors, [{ version: "2.1.282",
     protocolContract: "claude-code-inbox-socket-v1" }]);
   for (const method of ["probeNativeDelivery", "planNativeActivation", "bindNativeSession",
     "refreshNativeSession", "retireNativeSession", "offerMessage"]) {

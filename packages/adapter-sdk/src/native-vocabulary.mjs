@@ -18,12 +18,12 @@ export const NATIVE_ACTIVATION_KINDS = Object.freeze([
 // The kinds an adapter may still ask for.
 export const PLANNABLE_ACTIVATION_KINDS = Object.freeze(["native-config", "native-service"]);
 
-export const NATIVE_PLATFORMS = Object.freeze([
-  "darwin-arm64", "darwin-x64", "linux-arm64", "linux-x64", "win32-x64",
-]);
-
 // Every reason a client is not live, closed so doctor, hooks, and docs share
 // one vocabulary and vendor strings never leak through it.
+// "platform_not_captured" and "prerelease_not_captured" are historical: 0.8.0
+// and earlier refused a platform no capture named and any prerelease suffix,
+// and their native-attempt records carry both. Nothing produces either any
+// more (docs/design/2026-09-26-native-delivery-across-platforms.md).
 export const NATIVE_REASON_CODES = Object.freeze([
   "native_delivery_unsupported", "platform_not_captured", "version_unavailable",
   "prerelease_not_captured", "below_minimum_version", "known_bad_version",

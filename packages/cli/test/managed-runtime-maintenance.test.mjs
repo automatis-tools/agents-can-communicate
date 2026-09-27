@@ -3,7 +3,7 @@ import { mkdir, mkdtemp, readFile, realpath, rm, writeFile } from "node:fs/promi
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
-import { NATIVE_PLATFORMS, defineAdapter } from "@agents-can-communicate/adapter-sdk";
+import { defineAdapter } from "@agents-can-communicate/adapter-sdk";
 import { activatePending } from "../src/managed-runtime/activation.mjs";
 import { runManagedUpdate } from "../src/managed-runtime/command.mjs";
 import { inspectMaintenanceServices, requestMaintenance } from "../src/managed-runtime/maintenance.mjs";
@@ -204,17 +204,16 @@ test("successful ACC activation still offers maintenance for a stale unbound dae
 // place that reads it.
 const HOST_PLATFORM = `${process.platform}-${process.arch}`;
 const capturedContract = (minimum, knownBad = []) => ({
-  minimumByPlatform: { [HOST_PLATFORM]: minimum },
-  anchors: [{ platform: HOST_PLATFORM, version: minimum, protocolContract: "fixture/1" }],
+  minimum, anchors: [{ version: minimum, protocolContract: "fixture/1" }],
   knownBad, activationKinds: ["native-service"], policySource: "installation-record",
 });
-// A complete, valid declaration that captured one real platform - and not the
-// one this process runs on. That is the shape of every shipped adapter on
-// every machine but darwin-arm64, and the case that reached CI. Built through
+// A complete, valid declaration whose capture was taken on a real platform -
+// and not the one this process runs on. That is every shipped adapter on every
+// machine but darwin-arm64, and the case that reached CI. Built through
 // defineAdapter, which runs the declaration through
 // validateNativeDeliveryContract and rejects a partial one, so this fixture
 // cannot be mistaken for a malformed contract.
-const OTHER_PLATFORM = NATIVE_PLATFORMS.find(name => name !== HOST_PLATFORM);
+const OTHER_PLATFORM = HOST_PLATFORM === "linux-x64" ? "darwin-arm64" : "linux-x64";
 const answers = async () => ({ ok: true, changes: [], diagnostics: [] });
 const elsewhere = () => defineAdapter({
   id: "fixture", displayName: "Fixture Client", client: { command: "fixture-client" },
@@ -224,8 +223,8 @@ const elsewhere = () => defineAdapter({
     fixture: "fixtures/live-push.json", provenance: "fixtures/provenance.json",
     provenanceId: "fixture-capture", idleBehavior: "delivers while idle",
     busyBehavior: "queues while busy", authorityLevel: "observed", limitations: [] }] },
-  nativeDelivery: { minimumByPlatform: { [OTHER_PLATFORM]: "0.150.0" },
-    anchors: [{ platform: OTHER_PLATFORM, version: "0.150.0", protocolContract: "fixture-native-v1" }],
+  nativeDelivery: { minimum: "0.150.0",
+    anchors: [{ version: "0.150.0", protocolContract: "fixture-native-v1" }],
     knownBad: [], activationKinds: ["native-service"], policySource: "installation-record" },
   detect: answers, install: answers, uninstall: answers, doctor: answers,
   normalizeHook: answers, renderContext: answers, probeNativeDelivery: answers,
@@ -285,13 +284,10 @@ test("a service that satisfies the contract is still offered a restart while it 
     capturedContract("0.150.0")), []);
 });
 
-// A contract with nothing to say about this platform is not a contract that
-// refuses. Read as one, it made every ready daemon a restart candidate on
-// every machine that is not darwin-arm64 - including one already serving the
-// version its CLI is running, which is the interruption this branch exists to
-// remove. With no opinion, the decision falls back to the rule that governed
-// before the branch: the served version against the CLI's.
-test("a contract with nothing to say falls back to comparing the served version with the CLI's",
+// An adapter with no native-delivery declaration has no opinion, and the
+// decision falls back to the rule that governed before the contract existed:
+// the served version against the CLI's.
+test("an adapter with no contract falls back to comparing the served version with the CLI's",
   async t => {
     const f = await fixture(t);
     const daemon = { ...f.service, pid: UNBOUND_PID, cliVersion: "0.154.0", serverVersion: "0.153.0" };
@@ -302,13 +298,13 @@ test("a contract with nothing to say falls back to comparing the served version 
     assert.deepEqual(await inspect(f, matched, undefined), [],
       "a daemon already serving the CLI's version was offered a restart");
 
-    // A complete, valid declaration that captured one real platform - and not
-    // the one this process is running on. Built through defineAdapter, so
-    // "valid" is proved here rather than asserted.
-    assert.deepEqual(await inspect(f, daemon, elsewhere().nativeDelivery), ["0.153.0"]);
-    assert.deepEqual(await inspect(f, matched, elsewhere().nativeDelivery), [],
-      "an uncaptured platform made a matching daemon a restart candidate");
-
+    // A complete, valid declaration whose capture was taken on another
+    // platform judges this daemon all the same: 0.153.0 satisfies its 0.150.0
+    // minimum, so neither daemon is a restart candidate. Built through
+    // defineAdapter, so "valid" is proved here rather than asserted.
+    assert.deepEqual(await inspect(f, daemon, elsewhere().nativeDelivery), [],
+      "a capture taken elsewhere made an admitted daemon a restart candidate");
+    assert.deepEqual(await inspect(f, matched, elsewhere().nativeDelivery), []);
     // A daemon that reports no version at all is judged, not excused: the
     // captured contract answers version_unavailable and still offers.
     assert.deepEqual(await inspect(f, { ...daemon, serverVersion: null },
@@ -328,9 +324,12 @@ test("a captured contract refuses the version it judges even when the CLI is run
     assert.deepEqual(await inspect(f, daemon, capturedContract("0.150.0")), ["0.149.0"]);
     assert.deepEqual(await inspect(f, daemon,
       capturedContract("0.148.0", [{ version: "0.149.0" }])), ["0.149.0"]);
-    // Not a stable version, so the capture cannot accept it either.
+    // A prerelease is judged by its release triple: 0.151.0-rc.1 satisfies a
+    // 0.150.0 minimum and is not a restart candidate; 0.149.0-rc.1 is below it.
     assert.deepEqual(await inspect(f, { ...daemon, cliVersion: "0.151.0-rc.1",
-      serverVersion: "0.151.0-rc.1" }, capturedContract("0.150.0")), ["0.151.0-rc.1"]);
+      serverVersion: "0.151.0-rc.1" }, capturedContract("0.150.0")), []);
+    assert.deepEqual(await inspect(f, { ...daemon, cliVersion: "0.149.0-rc.1",
+      serverVersion: "0.149.0-rc.1" }, capturedContract("0.150.0")), ["0.149.0-rc.1"]);
 
     // The control: the same capture, accepting the same matching version.
     assert.deepEqual(await inspect(f, daemon, capturedContract("0.148.0")), []);

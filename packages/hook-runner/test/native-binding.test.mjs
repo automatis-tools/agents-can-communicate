@@ -26,8 +26,8 @@ function nativeAdapter(bindNativeSession = async () => HANDSHAKE) {
       provenance: "fixtures/certification-provenance.json", provenanceId: "native",
       idleBehavior: "offered", busyBehavior: "queued_after_turn", authorityLevel: "experimental",
       limitations: ["fixture only"], result: "pass" }] },
-    nativeDelivery: { minimumByPlatform: { "darwin-arm64": "2.1.258" },
-      anchors: [{ platform: "darwin-arm64", version: "2.1.258", protocolContract: "fixture-native-v1" }],
+    nativeDelivery: { minimum: "2.1.258",
+      anchors: [{ version: "2.1.258", protocolContract: "fixture-native-v1" }],
       knownBad: [], activationKinds: ["native-service"] },
     detect: noop, install: noop, uninstall: noop, doctor: noop,
     normalizeHook: () => ({ kind: "sessionStart", sessionId: "s", cwd: "/tmp" }),
@@ -199,8 +199,27 @@ test("a client the static rule refuses is unsupported, not retried as degraded",
   const older = await establish(nativeAdapter(async () => ({ ...HANDSHAKE, clientVersion: "2.1.100" })),
     service, { clientVersion: "2.1.100" });
   assert.deepEqual(older, { state: "unsupported", reasonCode: "below_minimum_version", modes: [] });
-  const elsewhere = await establish(nativeAdapter(), service, { platform: "linux-x64" });
-  assert.equal(elsewhere.reasonCode, "platform_not_captured");
+});
+
+// The capture was taken on darwin-arm64; a session on a host the captures
+// never named goes live by the same handshake.
+test("a session on a platform the captures never named binds like any other", async () => {
+  for (const platform of ["linux-x64", "darwin-x64", "win32-x64"]) {
+    const service = fakeService();
+    const result = await establish(nativeAdapter(), service, { platform });
+    assert.equal(result.state, "active", platform);
+    assert.equal(service.calls.some(([name]) => name === "publish"), true, platform);
+  }
+});
+
+// A prerelease session above the minimum is judged by its release triple.
+test("a prerelease session above the minimum goes live", async () => {
+  const service = fakeService();
+  const result = await establish(nativeAdapter(async () => ({ ...HANDSHAKE, clientVersion: "2.2.0-beta.1" })),
+    service, { clientVersion: "2.2.0-beta.1" });
+  assert.equal(result.state, "active");
+  const [, published] = service.calls.find(([name]) => name === "publish");
+  assert.equal(published.clientVersion, "2.2.0-beta.1");
 });
 
 test("a binding without a resolved client process cannot go live until a fresh start", async () => {

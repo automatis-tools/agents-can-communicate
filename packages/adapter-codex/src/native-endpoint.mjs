@@ -3,7 +3,7 @@ import { constants } from "node:fs";
 import { lstat, mkdir, open, realpath, rename, rm } from "node:fs/promises";
 import path from "node:path";
 
-import { PROTOCOL_CONTRACT, parseStableVersion } from "./app-server-client.mjs";
+import { PROTOCOL_CONTRACT, versionOrder } from "./app-server-client.mjs";
 
 const KEYS = ["schemaVersion", "endpointId", "socketPath", "threadId", "cwd",
   "clientVersion", "protocolContract", "leaseUntil"];
@@ -21,7 +21,7 @@ function valid(record) {
     && record.schemaVersion === 1 && ENDPOINT.test(record.endpointId)
     && absolute(record.socketPath) && absolute(record.cwd)
     && typeof record.threadId === "string" && /^[a-zA-Z0-9_-]{1,128}$/.test(record.threadId)
-    && parseStableVersion(record.clientVersion) !== null
+    && versionOrder(record.clientVersion) !== null
     && record.protocolContract === PROTOCOL_CONTRACT
     && typeof record.leaseUntil === "string"
     && /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z$/.test(record.leaseUntil)

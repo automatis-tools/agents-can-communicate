@@ -316,8 +316,8 @@ The recipient owns `livePolicy` because native push may start a model turn:
 
 Default is `off`. Policy never creates a capability. The router requires one
 current eligible recipient generation, supported client evidence, a verified
-binding and adapter acceptance. The Claude Code inbox wake uses a captured 2.1.282
-minimum on darwin-arm64. Its binding requires the same pid and socket in Claude Code's
+binding and adapter acceptance. The Claude Code inbox wake uses a 2.1.282 minimum,
+captured on darwin-arm64 and applied on every platform. Its binding requires the same pid and socket in Claude Code's
 session registry, and every refresh and wake also requires the same session id. Codex LocalDaemon uses a 0.152.1 minimum, confirmed
 through installed-product captures on 0.152.1 and 0.153.4. Recorded consent and
 exact thread, cwd, process, version and protocol verification govern every Codex session.

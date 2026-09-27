@@ -20,9 +20,9 @@ Capability honesty separates four questions that are easy to collapse:
 A source method or vendor documentation is not certification. A capture applies forward: from
 the version that recorded it until a later capture changes that capability, and to every
 platform until one of them records something of its own. A client older than every capture
-degrades to false, and so does a capability a capture recorded as failing. Native
-minimum-based eligibility is separate, and stays per-platform. No weaker session inherits a
-stronger peer's capability.
+degrades to false, and so does a capability a capture recorded as failing. Native live
+delivery reads its captured minimum the same way: on every platform, with a prerelease judged
+by its release triple. No weaker session inherits a stronger peer's capability.
 
 Run `acc doctor` in the project when observed behavior differs from this page. It reports
 the installed client version, platform, effective capability, and fallback instead of
@@ -53,9 +53,18 @@ The native rows are `no` at the hook versions this matrix names.
 Separate installed-client captures establish Codex `livePush` on 0.152.1 and
 0.153.4, Claude Code `livePush` on 2.1.282 through the session inbox, and
 Antigravity CLI `livePush` on 1.2.7 and later through a relay the agent starts in its own shell.
-Native eligibility uses the captured platform minimum, a current feature probe,
-and an exact per-session handshake. It is experimental and requires recipient
-opt-in. Codex, Claude Code and Antigravity CLI reply through `acc reply`. Their native
+Native eligibility uses the captured minimum, a current feature probe, and an exact
+per-session handshake. It is experimental and requires recipient opt-in.
+
+What may refuse live delivery is exactly three things:
+
+- the machine's own probe or per-session handshake failing;
+- a client older than the first passing capture;
+- a regression recorded in `knownBad`.
+
+Nothing else: not the platform, not a prerelease suffix, not where the evidence was taken.
+A platform whose transport is technically different is refused by the probe as a fact about
+that transport, which is what Claude Code's named pipe on native Windows is. Codex, Claude Code and Antigravity CLI reply through `acc reply`. Their native
 `replyRoute` remains false.
 
 The limitations belong next to the adapters they affect:
@@ -64,7 +73,7 @@ The limitations belong next to the adapters they affect:
 |---|---|
 | Antigravity CLI | 1.2.7 on darwin-arm64, captured in print mode, and every later release by the forward rule. Only `SessionStart`, `PreInvocation`, `PostInvocation` and `Stop` load; `SessionEnd`, `PreToolUse` and `PostToolUse` are accepted into the config file and silently dropped, so there is no tool guard and no session-end deregistration - a session goes offline by presence age or an explicit `acc finish`. Payloads carry no `hook_event_name`, so each registered command passes its own event name. The end-of-turn `Stop` continuation reaches the model and is a bounded nudge, not a gate: ACC continues a turn at most once and fails open, and the client caps consecutive continuations itself (vendor 1.1.9). `agy agentapi send-message` can wake an idle session - captured - but only with that session's language-server address and CSRF token, which exist in the agent's own shell and in no hook. ACC does not take that token, so live push and reply routing are false. A peer message that arrives while the model writes its last answer is carried by the `Stop` continuation instead. A write that parses can register nothing, so install and doctor read `agy -p "/hooks"` back instead of trusting the file. Live push (1.2.7, darwin-arm64, TUI only, experimental, recorded opt-in) runs through a relay the agent starts once per conversation from its own shell - the only process holding the session endpoint - after ACC's context asks it to, up to three times while none is serving; the operator approves that command at the client's permission prompt. An idle session wakes; a busy one sees the message after its running answer, or at the next model invocation when the turn waits on a tool. Print mode and the first session in a folder trusted at that launch get no relay. |
 | Codex | Next-turn context, captured on 0.147.0, requires plugin trust. The observed stock 0.153.4 upgrade from ACC 0.3.1 to 0.4 required fresh review of five modified hook definitions; a subsequent restart retained all five active (activation evidence, not new event certification). LocalDaemon native delivery was captured through the installed package on 0.152.1 and 0.153.4, darwin-arm64; minimum 0.152.1, recorded opt-in, current feature probe and exact thread/cwd/process/version/protocol checks are required. Ordinary launch preserves the receiver workspace without ACC arguments or daemon ownership. Embedded or unreachable sessions keep their inbox. Native `replyRoute` remains false. |
-| Claude Code | 2.1.233 next-turn delivery waits for the next user prompt. From 2.1.282 on darwin-arm64, `delivery.livePush` is a live capability behind the native contract (experimental, off until opted in). ACC wakes the session through the inbox socket that Claude Code opens for every session, with one line of fixed ACC text and the message id. An idle session starts a turn. A busy session takes the wake between two tool calls. Each delivered wake fires `UserPromptSubmit`, so the next-turn hook shows the body and records the receipt `offered` via `next-turn`. The model answers with `acc reply`, so `delivery.replyRoute` stays false. A session in `bypassPermissions` mode holds each wake for approval unless `crossSessionInbound` is `accept`, and `refuse` drops wakes. Native Windows keeps next-turn delivery: its inbox is a named pipe that requires an auth line, and it is uncaptured. Linux is uncaptured. |
+| Claude Code | 2.1.233 next-turn delivery waits for the next user prompt. From 2.1.282, captured on darwin-arm64 and applied on every platform whose inbox is a Unix socket, `delivery.livePush` is a live capability behind the native contract (experimental, off until opted in). ACC wakes the session through the inbox socket that Claude Code opens for every session, with one line of fixed ACC text and the message id. An idle session starts a turn. A busy session takes the wake between two tool calls. Each delivered wake fires `UserPromptSubmit`, so the next-turn hook shows the body and records the receipt `offered` via `next-turn`. The model answers with `acc reply`, so `delivery.replyRoute` stays false. A session in `bypassPermissions` mode holds each wake for approval unless `crossSessionInbound` is `accept`, and `refuse` drops wakes. Native Windows keeps next-turn delivery: its inbox is a named pipe that requires an auth line, and it is uncaptured. Linux is uncaptured. |
 | Gemini CLI | Package-shipped next-turn certification starts at 0.57.0. Its TUI has no captured external wake or queue interface and `--acp` changes launch ownership, so native delivery is fallback-only; live push and reply routing remain false. |
 | Grok | The Grok 1.0.24 installed-client check observed own CLI arguments after a terminal result, followed by owned work, message, and finish calls. This identity-only path does not certify peer-context injection. Documentation-shaped payloads do not count as real captures. The public leader surface exposed no proven addressed injection into an ordinary TUI session, so native delivery is `awaiting_compatibility_capture`; all capabilities remain false. |
 | Kimi Code | Next-turn and guard evidence was captured on 0.36.1, plus a 60-second heartbeat. Its server/queue APIs do not prove a transparent binding to an independently opened session, so native delivery is fallback-only. |
@@ -93,10 +102,11 @@ demand without a client heartbeat. Retirement is final: neither route may revive
 retired binding, a closed session or an old generation. Delivery lease refresh does
 not renew participant presence.
 
-On darwin-arm64, Codex LocalDaemon, the Claude Code inbox wake and the Antigravity CLI
-relay have captured experimental live delivery. Other adapters retain their separately
-certified next-turn paths or inbox polling. Linux and other uncaptured platforms retain
-the durable inbox; these captures establish no new hook capabilities there.
+Codex LocalDaemon, the Claude Code inbox wake and the Antigravity CLI relay have captured
+experimental live delivery, on darwin-arm64. Those captures set the minimum that applies on
+every platform; on a host they never named, the probe and the per-session handshake decide,
+and a transport that does not answer keeps the durable inbox. Other adapters retain their
+separately certified next-turn paths or inbox polling.
 
 Codex's 120-second delivery lease can refresh on demand for the same live endpoint;
 it does not extend the 24-hour participant presence limit. A TUI exit can leave its
@@ -116,8 +126,8 @@ policy:
 | `all` | every addressed message kind may use live push |
 
 The default is `off`. `acc install --delivery actionable|all` records recipient consent.
-Current activation remains off when the platform, captured minimum or feature probe
-does not qualify; that temporary failure does not erase the requested policy. Each
+Current activation remains off when the captured minimum or the feature probe does not
+qualify; that temporary failure does not erase the requested policy. Each
 session must pass its own generation-bound handshake. Every adapter reads consent from the
 installation record and rereads it at hooks and before offers, so a long-running vendor
 process cannot retain permission through an old binding snapshot.

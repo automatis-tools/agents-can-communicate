@@ -25,8 +25,8 @@ function certifiedAdapter(offerMessage = async ({ binding }) => ({
     capabilities: { delivery: { livePush: true } },
     certification: { evidence: [{ result: "pass", client: "fixture-client",
       version: "1.2.3", platform: PLATFORM, capability: "delivery.livePush" }] },
-    nativeDelivery: { minimumByPlatform: { [PLATFORM]: "1.2.3" },
-      anchors: [{ platform: PLATFORM, version: "1.2.3", protocolContract: "fixture-native-v1" }],
+    nativeDelivery: { minimum: "1.2.3",
+      anchors: [{ version: "1.2.3", protocolContract: "fixture-native-v1" }],
       knownBad: [], activationKinds: ["native-service"] },
     offerMessage,
   };
@@ -40,12 +40,9 @@ const uncapturedAdapter = offerMessage => {
   return { ...adapter, nativeDelivery: { policySource: "installation-record" } };
 };
 
-// The ordinary shape of every shipped adapter: one captured platform and
-// nothing said about any other. CAPTURED is where the contract speaks;
-// UNCAPTURED is a real platform it is simply silent about - what darwin-arm64
-// and linux-x64 are to `claude_code` and `codex` today.
+// Every capture in this repository was taken on darwin-arm64. The minimum it
+// establishes applies on every host; the router asks no platform question.
 const CAPTURED = "darwin-arm64";
-const UNCAPTURED = "linux-x64";
 const MINIMUM = "1.2.3";
 const DENIED = "1.2.9";
 const PRERELEASE = "1.3.0-rc.1";
@@ -60,19 +57,18 @@ const answers = async () => ({ ok: true, changes: [], diagnostics: [] });
 
 // Built through defineAdapter so that "a complete, valid contract" is proved
 // here rather than asserted: defineAdapter runs the declaration through
-// validateNativeDeliveryContract, which rejects a missing minimum map, missing
+// validateNativeDeliveryContract, which rejects a missing minimum, missing
 // anchors, an anchor with no passing capture, or a minimum no anchor matches.
-// What survives is exactly what a shipped adapter carries - and it captures one
-// platform, because that is all any of them has captured.
-const singlePlatformAdapter = offerMessage => defineAdapter({
+// What survives is exactly what a shipped adapter carries.
+const capturedAdapter = offerMessage => defineAdapter({
   id: "fixture_adapter",
   displayName: "Fixture client",
   client: { command: "fixture-client" },
   capabilities: { delivery: { livePush: true } },
   certification: { evidence: [capture(MINIMUM)] },
   nativeDelivery: {
-    minimumByPlatform: { [CAPTURED]: MINIMUM },
-    anchors: [{ platform: CAPTURED, version: MINIMUM, protocolContract: "fixture-native-v1" }],
+    minimum: MINIMUM,
+    anchors: [{ version: MINIMUM, protocolContract: "fixture-native-v1" }],
     knownBad: [{ version: DENIED, reasonCode: "known_bad_version" }],
     activationKinds: ["native-service"],
   },
@@ -90,7 +86,7 @@ const reports = version => async () => ({ accepted: true, transport: "codex-app-
 const recordedPolicy = async ({ binding }) => binding.livePolicy;
 
 async function fixture({ adapter = certifiedAdapter(), secondRecipientSession = false,
-  omitPlatform = false, platform = PLATFORM, readLivePolicy = recordedPolicy } = {}) {
+  readLivePolicy = recordedPolicy } = {}) {
   const clock = createFakeClock(NOW);
   const ids = createFakeIds();
   const store = createMemoryStore({ clock, ids, workspaceId: WORKSPACE });
@@ -106,7 +102,7 @@ async function fixture({ adapter = certifiedAdapter(), secondRecipientSession = 
     workspaceId: WORKSPACE, participantId: "models", sessionId: "session_models_two",
     harness: "fixture", heartbeatCadenceMs: 30_000 }));
   const router = createDeliveryRouter({ service, adapters: { fixture_adapter: adapter }, clock,
-    ...(omitPlatform ? {} : { platform }), readLivePolicy });
+    readLivePolicy });
   return { adapter, clock, router, sender, service, sessions, store };
 }
 
@@ -458,68 +454,49 @@ test("an offer whose reported client version differs from the binding but still 
   assert.equal((await receipt(f.store, message.messageId)).state, "offered");
 });
 
-// The contract is captured per platform, so a router handed no platform judged
-// every offer against "no capture for undefined" and refused it. The fixture
-// minimum is captured for the host platform, which is what the default
-// resolves to. The answering version is above the minimum but different from
-// the bound one, so only a real capture for the right platform admits it.
-test("a router given no platform judges against the captured contract for the host it runs on",
+// The captures were taken on darwin-arm64 and this router may run anywhere.
+// The contract knows no platform, so an answering version above the minimum
+// is admitted on every host, even when it differs from the bound one; nothing
+// in the offer path reads process.platform.
+test("an answering version above the minimum is admitted, whatever host the router runs on",
   async () => {
-    const f = await fixture({ omitPlatform: true,
-      adapter: certifiedAdapter(async () => ({ accepted: true,
-        transport: "codex-app-server", clientVersion: "1.2.4" })) });
-    await publish(f.service, f.sessions[0]);
-    const message = await send(f.service, f.sender, "question", "default_platform");
-    assert.deepEqual(await f.router.offer(message), [{ recipientParticipantId: "models",
-      outcome: "offered", transport: "codex-app-server" }]);
-    assert.equal((await receipt(f.store, message.messageId)).state, "offered");
+    for (const answered of ["1.2.4", MINIMUM, "2.0.0"]) {
+      const f = await fixture({ adapter: capturedAdapter(reports(answered)) });
+      await publish(f.service, f.sessions[0], { clientVersion: MINIMUM });
+      const message = await send(f.service, f.sender, "question", `admitted_${answered}`);
+      assert.deepEqual(await f.router.offer(message), [{ recipientParticipantId: "models",
+        outcome: "offered", transport: "codex-app-server" }], answered);
+      assert.equal((await receipt(f.store, message.messageId)).state, "offered", answered);
+    }
   });
 
-// The real uncaptured case, and the reason CI refused every live offer on
-// Linux: `claude_code` and `codex` capture darwin-arm64 and say nothing about
-// linux-x64, so the contract returns platform_not_captured there. That is not
-// the contract refusing a version - it is the contract having no minimum to
-// judge one against - and it is the ordinary state of every shipped adapter on
-// every host but one. With nothing captured, the offer keeps the rule this
-// path had before the contract gate: the version that answered must be the one
-// the binding recorded. The declaration here went through defineAdapter, so it
-// is complete and valid by construction, not partial.
-test("a contract silent about this platform admits the version the binding recorded",
-  async () => {
-    const f = await fixture({ platform: UNCAPTURED,
-      adapter: singlePlatformAdapter(reports(MINIMUM)) });
+// A prerelease is judged by its release triple, as hook capabilities are: a
+// daemon serving 1.3.0-rc.1 is above the 1.2.3 minimum and is admitted, and
+// one serving 1.2.2-rc.1 is below it and refused. The suffix decides nothing.
+test("a prerelease answering version is judged by its release triple", async () => {
+  for (const [version, expected, state] of [
+    [PRERELEASE, [{ recipientParticipantId: "models", outcome: "offered",
+      transport: "codex-app-server" }], "offered"],
+    ["1.2.2-rc.1", durable("unsupported_client_version"), "queued"],
+    [`${DENIED}-beta.2`, durable("unsupported_client_version"), "queued"],
+  ]) {
+    const f = await fixture({ adapter: capturedAdapter(reports(version)) });
     await publish(f.service, f.sessions[0], { clientVersion: MINIMUM });
-    const message = await send(f.service, f.sender, "question", "uncaptured_match");
-    assert.deepEqual(await f.router.offer(message), [{ recipientParticipantId: "models",
-      outcome: "offered", transport: "codex-app-server" }]);
-    assert.equal((await receipt(f.store, message.messageId)).state, "offered");
-  });
+    const message = await send(f.service, f.sender, "question", `prerelease_${version}`);
+    assert.deepEqual(await f.router.offer(message), expected, version);
+    assert.equal((await receipt(f.store, message.messageId)).state, state, version);
+  }
+});
 
-// The other half of the same rule. Silence about the platform is not a licence
-// to admit anything: without a capture the identity comparison is all the
-// evidence there is, and a version the binding never recorded fails it. A
-// fallback that simply admitted every uncaptured platform would pass the test
-// above and fail this one.
-test("a contract silent about this platform still refuses a version the binding never recorded",
-  async () => {
-    const f = await fixture({ platform: UNCAPTURED,
-      adapter: singlePlatformAdapter(reports("1.2.4")) });
-    await publish(f.service, f.sessions[0], { clientVersion: MINIMUM });
-    const message = await send(f.service, f.sender, "question", "uncaptured_drift");
-    assert.deepEqual(await f.router.offer(message), durable("unsupported_client_version"));
-    assert.equal((await receipt(f.store, message.messageId)).state, "queued");
-  });
-
-// The merge guarded from the opposite direction. Every version here is the one
-// the binding recorded, so the identity comparison would admit all of them -
-// only a captured contract reading the version refuses. Extending the
-// uncaptured fallback to these reason codes turns each case into an offer.
+// Every version here is the one the binding recorded, so an identity
+// comparison would admit all of them - only the contract reading the version
+// refuses. A version below the minimum or on the denylist is refused even
+// when the binding recorded it.
 test("a captured contract refuses the version it judges even when the binding recorded it",
   async () => {
     for (const [name, version] of [["below the captured minimum", "1.2.2"],
-      ["on the captured denylist", DENIED], ["not a stable version", PRERELEASE]]) {
-      const f = await fixture({ platform: CAPTURED,
-        adapter: singlePlatformAdapter(reports(version)) });
+      ["on the captured denylist", DENIED]]) {
+      const f = await fixture({ adapter: capturedAdapter(reports(version)) });
       await publish(f.service, f.sessions[0], { clientVersion: version });
       const message = await send(f.service, f.sender, "question", `judged_${version}`);
       assert.deepEqual(await f.router.offer(message), durable("unsupported_client_version"), name);
@@ -531,10 +508,9 @@ test("a captured contract refuses the version it judges even when the binding re
 // text, so this can never equal it and the grouping cannot change the outcome;
 // what is pinned is that a missing version is refused rather than read as
 // agreement with an absent value.
-test("an answer with no client version is refused on a captured platform", async () => {
-  const f = await fixture({ platform: CAPTURED,
-    adapter: singlePlatformAdapter(async () => ({ accepted: true,
-      transport: "codex-app-server" })) });
+test("an answer with no client version is refused", async () => {
+  const f = await fixture({ adapter: capturedAdapter(async () => ({ accepted: true,
+    transport: "codex-app-server" })) });
   await publish(f.service, f.sessions[0], { clientVersion: MINIMUM });
   const message = await send(f.service, f.sender, "question", "absent_version");
   assert.deepEqual(await f.router.offer(message), durable("unsupported_client_version"));
@@ -547,14 +523,14 @@ test("an answer with no client version is refused on a captured platform", async
 // offer, where the failure would surface as a transport diagnostic pointing
 // nowhere near the declaration that caused it - a throw is reported as
 // transport_error, never as unsupported_client_version. A declaration with no
-// minimum map has captured nothing for any platform, so it lands in the same
-// group as a valid contract that is silent about this one.
+// minimum has captured nothing, which is no contract, so every answer is
+// refused - the version the binding recorded included: a binding is not a
+// capture.
 test("an adapter whose declaration captured nothing answers without crashing the offer",
   async () => {
     for (const [name, answered, expected] of [
       ["a version the binding never recorded", "1.2.4", durable("unsupported_client_version")],
-      ["the version the binding recorded", "1.2.3", [{ recipientParticipantId: "models",
-        outcome: "offered", transport: "codex-app-server" }]],
+      ["the version the binding recorded", "1.2.3", durable("unsupported_client_version")],
     ]) {
       const f = await fixture({ adapter: uncapturedAdapter(reports(answered)),
         readLivePolicy: async () => "actionable" });

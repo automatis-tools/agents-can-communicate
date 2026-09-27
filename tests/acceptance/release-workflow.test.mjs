@@ -39,12 +39,12 @@ test("a shipped livePush capability has a capture, a matching anchor, and an acc
       for (const anchor of contract.anchors) {
         const passing = adapter.certification.evidence.some(item => item.result === "pass"
           && item.capability === "delivery.livePush" && item.client === client
-          && item.version === anchor.version && item.platform === anchor.platform);
+          && item.version === anchor.version);
         assert.equal(passing, true,
-          `${adapter.id} anchor ${anchor.version}/${anchor.platform} has no passing livePush capture`);
-        assert.equal(contract.minimumByPlatform[anchor.platform], anchor.version,
-          `${adapter.id} minimum on ${anchor.platform} is not the first passing capture`);
+          `${adapter.id} anchor ${anchor.version} has no passing livePush capture`);
       }
+      assert.equal(contract.anchors.some(anchor => anchor.version === contract.minimum), true,
+        `${adapter.id} minimum ${contract.minimum} is not the first passing capture`);
       const processTest = NATIVE_PROCESS_TEST[adapter.id];
       assert.equal(typeof processTest, "string",
         `${adapter.id} ships livePush with no named installed-path acceptance test`);

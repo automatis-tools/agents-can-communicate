@@ -2,6 +2,7 @@ import { randomBytes } from "node:crypto";
 import { constants } from "node:fs";
 import { lstat, mkdir, open, readdir, realpath, rename, rm } from "node:fs/promises";
 import path from "node:path";
+import { versionOrder } from "@agents-can-communicate/adapter-sdk";
 
 import { PROTOCOL_CONTRACT } from "./inbox-contract.mjs";
 import { inboxSocketIsSafe } from "./inbox-registry.mjs";
@@ -14,7 +15,6 @@ import { isReception } from "./inbox-settings.mjs";
 const KEYS = ["schemaVersion", "endpointId", "socketPath", "configDir", "clientPid", "sessionId",
   "clientVersion", "protocolContract", "leaseUntil", "reception"];
 const ENDPOINT = /^claude_inbox_[a-f0-9]{32}$/;
-const STABLE = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:\+[0-9A-Za-z.-]+)?$/;
 const MAX_BYTES = 8_192;
 const absolute = value => typeof value === "string" && path.isAbsolute(value) && !value.includes("\0");
 const own = info => typeof process.getuid !== "function" || info.uid === process.getuid();
@@ -29,7 +29,7 @@ function valid(record) {
     && absolute(record.socketPath) && absolute(record.configDir)
     && Number.isInteger(record.clientPid) && record.clientPid > 0
     && typeof record.sessionId === "string" && record.sessionId !== "" && record.sessionId.length <= 200
-    && typeof record.clientVersion === "string" && STABLE.test(record.clientVersion)
+    && typeof record.clientVersion === "string" && versionOrder(record.clientVersion) !== null
     && record.protocolContract === PROTOCOL_CONTRACT
     && typeof record.leaseUntil === "string"
     && /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z$/.test(record.leaseUntil)

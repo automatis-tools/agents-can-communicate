@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
 
-import { addCodexQueueMessage, compareStableVersions, isMethodMissing, locateCodexThread,
+import { addCodexQueueMessage, compareVersions, isMethodMissing, locateCodexThread,
   openCodexAppServer, probeCodexQueue, safeReason, serverVersionOf }
   from "../src/app-server-client.mjs";
 import { acceptKey, decodeFrames, encodeFrame } from "../src/ws-json-rpc.mjs";
@@ -86,8 +86,10 @@ const withDaemon = (options, fn) => async () => {
 };
 
 test("stable version comparison is numeric", () => {
-  assert.equal(compareStableVersions("0.10.0", "0.9.99"), 1);
-  assert.equal(compareStableVersions("0.152.1", "0.152.1"), 0);
+  assert.equal(compareVersions("0.10.0", "0.9.99"), 1);
+  assert.equal(compareVersions("0.152.1", "0.152.1"), 0);
+  assert.equal(compareVersions("0.153.0-alpha.1", "0.153.0"), 0);
+  assert.equal(compareVersions("0.152.1", "0.153.0-alpha.1"), -1);
   assert.equal(serverVersionOf(USER_AGENT), "0.152.1");
   assert.equal(isMethodMissing({ code: -32600, message: "Invalid request: unknown variant `x`" }), true);
   assert.equal(isMethodMissing({ code: -32603, message: "no rollout" }), false);
@@ -100,13 +102,22 @@ test("a supported probe reports the queue protocol and modes", withDaemon({}, as
     modes: ["livePush", "idleWake", "busyQueue"] });
 }));
 
+// A prerelease daemon is judged by its release triple: 0.156.0-alpha.3 is above
+// the 0.152.1 minimum, and the queue method it answers with is what admits it.
+test("a prerelease daemon above the minimum is supported",
+  withDaemon({ userAgent: "acc/0.156.0-alpha.3 (Mac OS)" }, async peer => {
+    assert.deepEqual(await probeCodexQueue(peer, { threadId: THREAD }), { supported: true,
+      serverVersion: "0.156.0-alpha.3", reasonCode: null, modes: ["livePush", "idleWake", "busyQueue"] });
+  }));
+
 test("a probe rejects an app server without the queue method, below minimum, or mismatched",
   async () => {
     for (const [options, reasonCode] of [
       [{ queueSupported: false }, "protocol_mismatch"],
       [{ queueSupported: false, missingCode: -32600 }, "protocol_mismatch"],
       [{ userAgent: "acc/0.152.0 (Mac OS)" }, "below_minimum_version"],
-      [{ userAgent: "acc/0.153.0-alpha.1 (Mac OS)" }, "prerelease_not_captured"],
+      [{ userAgent: "acc/0.152.0-rc.1 (Mac OS)" }, "below_minimum_version"],
+      [{ userAgent: "acc (Mac OS)" }, "version_unavailable"],
     ]) {
       const daemon = await startDaemon(options);
       const peer = openCodexAppServer({ socketPath: daemon.socketPath, timeoutMs: 1_000 });

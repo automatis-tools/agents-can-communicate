@@ -76,9 +76,8 @@ export function createAntigravityAdapter() {
     // no retireNativeSession here: the hook runner retires and re-publishes the
     // binding on every turn, and must not take the relay with it.
     nativeDelivery: {
-      minimumByPlatform: { "darwin-arm64": ANTIGRAVITY_CLI_VERSION },
-      anchors: [{ platform: "darwin-arm64", version: ANTIGRAVITY_CLI_VERSION,
-        protocolContract: PROTOCOL_CONTRACT }],
+      minimum: ANTIGRAVITY_CLI_VERSION,
+      anchors: [{ version: ANTIGRAVITY_CLI_VERSION, protocolContract: PROTOCOL_CONTRACT }],
       knownBad: [], activationKinds: ["native-config"], policySource: "installation-record",
     },
     probeNativeDelivery, planNativeActivation, bindNativeSession, refreshNativeSession,

@@ -53,8 +53,8 @@ function fixtureAdapter({ service = REUSED, probe = async () => PROBE, log = [] 
     client: { command: "fixture-client", certificationName: "fixture-client",
       versionArgs: ["--version"] },
     capabilities: { delivery: { livePush: true } },
-    nativeDelivery: { minimumByPlatform: { [PLATFORM]: "2.1.258" },
-      anchors: [{ platform: PLATFORM, version: "2.1.258", protocolContract: "fixture-native-v1" }],
+    nativeDelivery: { minimum: "2.1.258",
+      anchors: [{ version: "2.1.258", protocolContract: "fixture-native-v1" }],
       knownBad: [], activationKinds: ["native-service"] },
     planInstall: () => [],
     detect: async () => { log.push("detect"); return { ok: true, diagnostics: ["registered"] }; },
@@ -72,6 +72,18 @@ const detect = (adapter, context) => detectInstallation({ adapters: [adapter], c
   probe: async () => "2.1.258", platform: PLATFORM, pathEnv: context.env.PATH });
 
 const entryFor = detected => detected[0];
+
+// The client will not change within the session, so a version the contract
+// cannot order is "unsupported" rather than a retryable "degraded".
+test("a client whose version cannot be read is unsupported, not degraded", async t => {
+  const here = await machine(t);
+  // Neither the binary's --version nor the native probe names a version.
+  const adapter = fixtureAdapter({ probe: async () => ({ ...PROBE, clientVersion: null }) });
+  const [entry] = await detectInstallation({ adapters: [adapter], context: here.context,
+    probe: async () => "development build", platform: PLATFORM, pathEnv: here.context.env.PATH });
+  assert.equal(entry.nativeDelivery.state, "unsupported");
+  assert.equal(entry.nativeDelivery.reasonCode, "version_unavailable");
+});
 
 test("detection reports a closed native state and only ever probes", async t => {
   const here = await machine(t);

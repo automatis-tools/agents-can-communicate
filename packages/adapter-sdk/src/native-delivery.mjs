@@ -1,17 +1,22 @@
 import { CONTRACT_ID, FINGERPRINT, HANDSHAKE_KEYS, KNOWN_BAD_REASON, NATIVE_BINDING_MODES,
-  NATIVE_PLATFORMS, PLANNABLE_ACTIVATION_KINDS, PROBE_KEYS, TIMESTAMP, assertModes,
-  assertReasonCode, closed, compareStableVersions, deepFreeze, isPlainObject, isText,
-  parseStableVersion, usage } from "./native-vocabulary.mjs";
+  PLANNABLE_ACTIVATION_KINDS, PROBE_KEYS, TIMESTAMP, assertModes, assertReasonCode, closed,
+  compareStableVersions, deepFreeze, isPlainObject, isText, parseStableVersion, usage }
+  from "./native-vocabulary.mjs";
+import { compareVersionOrder, versionOrder } from "./certification.mjs";
 
-// The native-delivery compatibility contract: a per-platform minimum that is a
-// real passing capture, one or more anchors naming the captured protocol, an
-// explicit denylist, and the activation kinds an adapter may ask the installer
-// for. There is deliberately no maximum: a newer stable client is admitted only
+// The native-delivery compatibility contract: a minimum that is a real passing
+// capture, one or more anchors naming the captured protocol, an explicit
+// denylist, and the activation kinds an adapter may ask the installer for.
+// There is deliberately no maximum: a newer stable client is admitted only
 // when a current read-only probe and a per-session handshake confirm the same
-// protocol contract. Exact-version certification still governs every other
-// capability; this rule is used for native live delivery alone.
+// protocol contract. There is no platform either: a capture records where a
+// behaviour was observed, the minimum it establishes applies everywhere, and
+// the probe and handshake decide on the machine in hand (see
+// docs/design/2026-09-26-native-delivery-across-platforms.md). Certification
+// evidence still governs every other capability; this rule is used for native
+// live delivery alone.
 
-export { NATIVE_ACTIVATION_KINDS, NATIVE_BINDING_MODES, NATIVE_PLATFORMS, NATIVE_REASON_CODES,
+export { NATIVE_ACTIVATION_KINDS, NATIVE_BINDING_MODES, NATIVE_REASON_CODES,
   PLANNABLE_ACTIVATION_KINDS, compareStableVersions, parseStableVersion } from "./native-vocabulary.mjs";
 export { validateNativeActivationPlan } from "./native-activation.mjs";
 
@@ -29,8 +34,16 @@ export function validateNativeDeliveryContract(value, { certification, client })
   // the next-turn hook, which records the offer itself once its stdout carried
   // the body. Recording a wake as offered would hide the body from that hook.
   const offerKind = Object.hasOwn(value ?? {}, "offerKind") ? value.offerKind : "message";
+  // The per-platform shape 0.8.0 and earlier declared. Refused by name: an
+  // adapter built against that SDK should learn what replaced it, not fail on
+  // a generic unknown field.
+  if (Object.hasOwn(value ?? {}, "minimumByPlatform")) {
+    usage("nativeDelivery.minimumByPlatform is no longer declared; a capture's minimum applies on "
+      + "every platform, so declare nativeDelivery.minimum instead "
+      + "(docs/design/2026-09-26-native-delivery-across-platforms.md)");
+  }
   closed({ ...value, policySource, offerKind },
-    ["minimumByPlatform", "anchors", "knownBad", "activationKinds", "policySource", "offerKind"],
+    ["minimum", "anchors", "knownBad", "activationKinds", "policySource", "offerKind"],
     "nativeDelivery");
   if (policySource !== "installation-record") {
     usage("nativeDelivery.policySource must be installation-record");
@@ -38,48 +51,43 @@ export function validateNativeDeliveryContract(value, { certification, client })
   if (!["message", "wake"].includes(offerKind)) {
     usage("nativeDelivery.offerKind must be message or wake");
   }
-  const minimums = value.minimumByPlatform;
-  if (!isPlainObject(minimums) || Object.keys(minimums).length === 0) {
-    usage("nativeDelivery.minimumByPlatform must map at least one captured platform to a version");
-  }
-  for (const [platform, version] of Object.entries(minimums)) {
-    if (!NATIVE_PLATFORMS.includes(platform)) {
-      usage(`nativeDelivery.minimumByPlatform names an unknown platform ${platform}`);
-    }
-    if (parseStableVersion(version) === null) {
-      usage(`nativeDelivery.minimumByPlatform ${platform} must be a stable version`);
-    }
+  const minimum = value.minimum;
+  if (parseStableVersion(minimum) === null) {
+    usage("nativeDelivery.minimum must be a stable version");
   }
   if (!Array.isArray(value.anchors) || value.anchors.length === 0) {
     usage("nativeDelivery.anchors must name at least one passing capture");
   }
   const anchors = value.anchors.map((anchor, index) => {
-    closed(anchor, ["platform", "version", "protocolContract"], "nativeDelivery anchor");
-    const minimum = minimums[anchor.platform];
-    if (minimum === undefined) {
-      usage(`nativeDelivery anchor ${index} platform ${anchor.platform} has no minimum`);
+    if (Object.hasOwn(anchor ?? {}, "platform")) {
+      usage(`nativeDelivery anchor ${index} names a platform; the platform a capture was taken on `
+        + "is recorded by its evidence, and the anchor names the version alone "
+        + "(docs/design/2026-09-26-native-delivery-across-platforms.md)");
     }
-    if (parseStableVersion(anchor.version) === null
-      || compareStableVersions(anchor.version, minimum) < 0) {
-      usage(`nativeDelivery anchor ${index} version must be a stable version at or above the minimum`);
+    closed(anchor, ["version", "protocolContract"], "nativeDelivery anchor");
+    if (parseStableVersion(anchor.version) === null) {
+      usage(`nativeDelivery anchor ${index} version must be a stable version`);
+    }
+    if (compareStableVersions(anchor.version, minimum) < 0) {
+      usage(`nativeDelivery anchor ${index} version ${anchor.version} is below the minimum ${minimum}: `
+        + "the minimum must be the first passing capture");
     }
     if (!isText(anchor.protocolContract) || !CONTRACT_ID.test(anchor.protocolContract)) {
       usage(`nativeDelivery anchor ${index} protocolContract must be a closed identifier`);
     }
+    // Where the capture was taken is provenance the evidence row keeps; the
+    // anchor is proven by a passing capture of this version on any platform.
     const proven = (certification?.evidence ?? []).some(item => item.result === "pass"
       && item.capability === "delivery.livePush" && item.client === client
-      && item.version === anchor.version && item.platform === anchor.platform);
+      && item.version === anchor.version);
     if (!proven) {
-      usage(`nativeDelivery anchor ${anchor.version} on ${anchor.platform} has no passing `
-        + "delivery.livePush certification", { anchor });
+      usage(`nativeDelivery anchor ${anchor.version} has no passing delivery.livePush certification`,
+        { anchor });
     }
     return { ...anchor };
   });
-  for (const [platform, minimum] of Object.entries(minimums)) {
-    if (!anchors.some(anchor => anchor.platform === platform && anchor.version === minimum)) {
-      usage(`nativeDelivery minimum ${minimum} on ${platform} must be the first passing capture: `
-        + "no anchor matches it");
-    }
+  if (!anchors.some(anchor => compareStableVersions(anchor.version, minimum) === 0)) {
+    usage(`nativeDelivery minimum ${minimum} must be the first passing capture: no anchor matches it`);
   }
   if (!Array.isArray(value.knownBad)) usage("nativeDelivery.knownBad must be an array");
   const knownBad = value.knownBad.map(entry => {
@@ -104,24 +112,29 @@ export function validateNativeDeliveryContract(value, { certification, client })
     || kinds.some(kind => !PLANNABLE_ACTIVATION_KINDS.includes(kind))) {
     usage(`nativeDelivery.activationKinds must be unique entries of ${PLANNABLE_ACTIVATION_KINDS.join(", ")}`);
   }
-  return deepFreeze({ minimumByPlatform: { ...minimums }, anchors, knownBad,
-    activationKinds: [...kinds], policySource, offerKind });
+  return deepFreeze({ minimum, anchors, knownBad, activationKinds: [...kinds], policySource,
+    offerKind });
 }
 
-function knownBadHit(contract, version) {
+// `order` is the client's release triple; the denylist names stable versions,
+// so a prerelease of a denylisted release is on it too.
+function knownBadHit(contract, order) {
+  const hit = (left, right) => compareVersionOrder(left, versionOrder(right));
   return contract.knownBad.some(entry => (Object.hasOwn(entry, "version")
-    ? compareStableVersions(version, entry.version) === 0
-    : compareStableVersions(version, entry.from) >= 0 && compareStableVersions(version, entry.to) <= 0));
+    ? hit(order, entry.version) === 0
+    : hit(order, entry.from) >= 0 && hit(order, entry.to) <= 0));
 }
 
 // Judges one reported client version against an adapter's captured
-// native-delivery contract: is the platform captured, is the version at or
-// above the captured minimum, and is it not on the denylist. Returns
+// native-delivery contract: is the version at or above the captured minimum,
+// and is it not on the denylist. Returns
 // { reasonCode, minimumVersion, protocolContract }; reasonCode is null when
 // the version satisfies the contract, otherwise one of
-// "native_delivery_unsupported", "platform_not_captured",
-// "version_unavailable", "prerelease_not_captured", "below_minimum_version",
-// or "known_bad_version".
+// "native_delivery_unsupported", "version_unavailable", "below_minimum_version",
+// or "known_bad_version". The platform the caller runs on plays no part: the
+// minimum was captured somewhere and applies everywhere. A prerelease is
+// judged by its release triple, as hook capabilities are: what admits it is
+// the protocol contract the probe or handshake reports, not the suffix.
 //
 // This is the static half of the rule only: it never contacts the client, so
 // passing here proves nothing about whether a live probe or handshake
@@ -130,38 +143,33 @@ function knownBadHit(contract, version) {
 // validateNativeHandshake below, and the delivery router's own offer check,
 // which uses this function alone because a response already carries no probe
 // or handshake shape to check further).
-export function evaluateVersionContract(adapter, { clientVersion, platform }) {
+export function evaluateVersionContract(adapter, { clientVersion } = {}) {
   const contract = adapter?.nativeDelivery;
-  // `== null` rather than `=== undefined`: a null declaration is as much "no
-  // contract" as a missing one, and reading `contract.minimumByPlatform` off it
-  // threw the very TypeError the guard below exists to prevent. defineAdapter
-  // cannot produce that shape; a hand-built registry entry can.
-  if (contract == null) {
-    return { reasonCode: "native_delivery_unsupported", minimumVersion: null, protocolContract: null };
-  }
-  const uncaptured = { reasonCode: "platform_not_captured", minimumVersion: null,
+  const unsupported = { reasonCode: "native_delivery_unsupported", minimumVersion: null,
     protocolContract: null };
-  // validateNativeDeliveryContract guarantees a minimum map and a matching
-  // anchor, but this function is also handed adapter objects that never went
-  // through it. A declaration missing either half has captured nothing for
-  // this platform, which is a closed answer - not a TypeError raised deep
-  // inside a delivery offer, far from the declaration that caused it. Every
-  // other entry point below already answers malformed input this way.
-  if (typeof platform !== "string" || !isPlainObject(contract.minimumByPlatform)) return uncaptured;
-  const minimumVersion = contract.minimumByPlatform[platform] ?? null;
-  if (minimumVersion === null) return uncaptured;
+  // `== null` rather than `=== undefined`: a null declaration is as much "no
+  // contract" as a missing one, and reading `contract.minimum` off it threw
+  // the very TypeError the guard below exists to prevent. defineAdapter cannot
+  // produce that shape; a hand-built registry entry can.
+  if (contract == null) return unsupported;
+  // validateNativeDeliveryContract guarantees a minimum and a matching anchor,
+  // but this function is also handed adapter objects that never went through
+  // it. A declaration missing either half has captured nothing, which is a
+  // closed answer - not a TypeError raised deep inside a delivery offer, far
+  // from the declaration that caused it. Every other entry point below
+  // already answers malformed input this way.
+  const minimumVersion = isText(contract.minimum) ? contract.minimum : null;
+  if (minimumVersion === null) return unsupported;
   const anchor = (Array.isArray(contract.anchors) ? contract.anchors : [])
-    .find(item => item.platform === platform && item.version === minimumVersion);
-  if (anchor === undefined) return uncaptured;
+    .find(item => item?.version === minimumVersion);
+  if (anchor === undefined) return unsupported;
   const facts = { minimumVersion, protocolContract: anchor.protocolContract };
-  if (!isText(clientVersion)) return { ...facts, reasonCode: "version_unavailable" };
-  if (parseStableVersion(clientVersion) === null) {
-    return { ...facts, reasonCode: "prerelease_not_captured" };
-  }
-  if (compareStableVersions(clientVersion, minimumVersion) < 0) {
+  const order = versionOrder(clientVersion);
+  if (order === null) return { ...facts, reasonCode: "version_unavailable" };
+  if (compareVersionOrder(order, versionOrder(minimumVersion)) < 0) {
     return { ...facts, reasonCode: "below_minimum_version" };
   }
-  if (knownBadHit(contract, clientVersion)) return { ...facts, reasonCode: "known_bad_version" };
+  if (knownBadHit(contract, order)) return { ...facts, reasonCode: "known_bad_version" };
   return { ...facts, reasonCode: null };
 }
 
@@ -184,13 +192,13 @@ function validateNativeProbe(probe) {
   return probe;
 }
 
-export function evaluateNativeEligibility(adapter, { clientVersion, platform, probe }) {
+export function evaluateNativeEligibility(adapter, { clientVersion, probe }) {
   // The probe names the process that will serve the delivery. Judging the
   // detected binary instead refuses a service that satisfies the contract.
   // Only the version is read here; the shape is validated where it always was,
   // so a malformed probe still returns a closed result rather than throwing.
   const serving = isText(probe?.clientVersion) ? probe.clientVersion : clientVersion;
-  const rule = evaluateVersionContract(adapter, { clientVersion: serving, platform });
+  const rule = evaluateVersionContract(adapter, { clientVersion: serving });
   const base = { eligible: false, reasonCode: null, minimumVersion: rule.minimumVersion,
     protocolContract: rule.protocolContract, modes: [] };
   const closedResult = reasonCode => deepFreeze({ ...base, reasonCode });
@@ -242,13 +250,13 @@ function validateNativeHandshakeShape(handshake) {
 // the two records disagreed on every machine where a daemon had updated under
 // its CLI, which is exactly the case the release exists to support. A refused
 // verdict admits nothing and carries null.
-export function validateNativeHandshake(adapter, { clientVersion, platform, handshake }) {
+export function validateNativeHandshake(adapter, { clientVersion, handshake }) {
   // Same rationale as the probe: the handshake names the session that will
   // actually serve, so the static rule is judged against that version. Only
   // the version is read here; the shape is validated where it always was, so
   // a malformed handshake still returns a closed result rather than throwing.
   const serving = isText(handshake?.clientVersion) ? handshake.clientVersion : clientVersion;
-  const rule = evaluateVersionContract(adapter, { clientVersion: serving, platform });
+  const rule = evaluateVersionContract(adapter, { clientVersion: serving });
   const base = { ok: false, reasonCode: null, clientVersion: null,
     protocolContract: rule.protocolContract, modes: [],
     opaqueEndpointRef: null, leaseUntil: null };

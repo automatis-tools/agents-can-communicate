@@ -43,8 +43,8 @@ function holdBindingWriter(store, sessionId) {
 function nativeAdapter(onBind) {
   return {
     id: "fixture",
-    nativeDelivery: { minimumByPlatform: { "darwin-arm64": "1.2.3" },
-      anchors: [{ platform: "darwin-arm64", version: "1.2.3", protocolContract: "fixture-v1" }],
+    nativeDelivery: { minimum: "1.2.3",
+      anchors: [{ version: "1.2.3", protocolContract: "fixture-v1" }],
       knownBad: [] },
     retireNativeSession: async () => {},
     bindNativeSession: async () => {

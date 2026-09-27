@@ -13,7 +13,6 @@ import { loadOwnership } from "@agents-can-communicate/installer";
 const run = promisify(execFile);
 const repo = path.resolve(import.meta.dirname, "..", "..");
 const acc = path.join(repo, "bin", "acc.mjs");
-const capturedPlatform = `${process.platform}-${process.arch}` === "darwin-arm64";
 const shellLiteral = value => `'${String(value).replaceAll("'", "'\"'\"'")}'`;
 
 // This is a fake executable, not a fake LocalDaemon. The disposable CODEX_HOME
@@ -75,8 +74,8 @@ test("the public Codex adapter declares LocalDaemon delivery without native repl
   const adapter = codexModule.createCodexAdapter();
   assert.equal(adapter.capabilities.delivery.livePush, true);
   assert.equal(adapter.capabilities.delivery.replyRoute, false);
-  assert.deepEqual(adapter.nativeDelivery.minimumByPlatform, { "darwin-arm64": "0.152.1" });
-  assert.deepEqual(adapter.nativeDelivery.anchors, [{ platform: "darwin-arm64", version: "0.152.1",
+  assert.equal(adapter.nativeDelivery.minimum, "0.152.1");
+  assert.deepEqual(adapter.nativeDelivery.anchors, [{ version: "0.152.1",
     protocolContract: "codex-app-server-thread-queue-v1" }]);
   assert.equal(adapter.nativeDelivery.policySource, "installation-record");
   for (const method of ["probeNativeDelivery", "planNativeActivation", "bindNativeSession",
@@ -95,8 +94,8 @@ for (const policy of ["actionable", "all"]) {
 
     assert.equal(operation.livePolicy, policy);
     assert.equal(operation.effectiveLivePolicy, "off");
-    assert.match(operation.deliveryDiagnostic, capturedPlatform
-      ? /local delivery service is unavailable/ : /not verified on this platform/);
+    // On every host the reason is the missing daemon, never the platform.
+    assert.match(operation.deliveryDiagnostic, /local delivery service is unavailable/);
     assert.match(operation.deliveryDiagnostic, /fallback: next-turn hooks.*acc inbox/);
 
     const installed = await place.command("install", "--adapter", "codex",
@@ -128,26 +127,23 @@ test("doctor names unavailable fallback without withdrawing captured live delive
   const human = (await place.command("doctor", "--home", place.home)).stdout;
   assert.match(human, /Codex CLI live delivery:.*off/);
   assert.match(human, /fallback: next-turn hooks.*acc inbox/);
-  if (capturedPlatform) {
-    assert.match(human, /local delivery service is unavailable/);
-    assert.match(human, /acc install --adapter codex --delivery actionable/);
-    assert.match(human, /requires codex-cli 0\.154\.0 or newer/);
-    assert.doesNotMatch(human, /codex app-server daemon start|ACC never starts or restarts the daemon/);
-  }
+  assert.match(human, /local delivery service is unavailable/);
+  assert.match(human, /acc install --adapter codex --delivery actionable/);
+  assert.match(human, /requires codex-cli 0\.154\.0 or newer/);
+  assert.doesNotMatch(human, /codex app-server daemon start|ACC never starts or restarts the daemon/);
   await assertOnlyVersionProbes(place);
 
   const body = JSON.parse((await place.command("doctor", "--home", place.home,
     "--json")).stdout).data;
   const codex = body.adapters.find(adapter => adapter.adapterId === "codex");
-  // What a capture proves travels; what a native contract requires does not.
-  // The capability is on everywhere the evidence reaches, while the reason code
-  // below still says this machine's platform was never captured.
+  // What a capture proves travels, and so does the native contract's minimum:
+  // on every host the reason a live route is missing is the missing daemon,
+  // never the platform.
   assert.equal(codex.capabilities.delivery.nextTurn, true);
   assert.equal(codex.capabilities.delivery.livePush, true);
   assert.equal(codex.capabilities.delivery.replyRoute, false);
   assert.match(codex.deliveryDiagnostic, /fallback: next-turn hooks.*acc inbox/);
-  assert.equal(codex.nativeDelivery.reasonCode, capturedPlatform
-    ? "native_endpoint_unavailable" : "platform_not_captured");
+  assert.equal(codex.nativeDelivery.reasonCode, "native_endpoint_unavailable");
   await assertOnlyVersionProbes(place);
 });
 
