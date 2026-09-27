@@ -349,7 +349,9 @@ async function installSkillPlugin(context) {
     await cp(bundle, plugin, { recursive: true });
     await stampPluginVersion({ file: path.join(plugin, "plugin.json"),
       version: await ownVersion(import.meta.url), io: { readFile, writeFile } });
-    await bakeSkillCommand({ root: plugin, cliShim });
+    // Bare when the path allows it: 1.2.12 matched no allow rule against a
+    // command whose first word was quoted (issue #214).
+    await bakeSkillCommand({ root: plugin, cliShim, bareWhenSafe: true });
     await agyFor(context)(["plugin", "install", plugin], { home, env: context.env });
   } finally {
     await rm(stage, { recursive: true, force: true });

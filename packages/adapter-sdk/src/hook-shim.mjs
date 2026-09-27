@@ -85,6 +85,15 @@ const PLACEHOLDER = "{{ACC}}";
 const quote = value => `"${String(value).replace(/(["\\$`])/g, "\\$1")}"`;
 
 /**
+ * Whether a path is one shell word exactly as written: absolute, and made only
+ * of the POSIX portable filename characters and slashes. Nothing in it is
+ * expanded, split or quoted by a shell, so the unquoted text and the word a
+ * shell runs are the same string.
+ */
+export const isShellWord = value => typeof value === "string"
+  && /^\/[A-Za-z0-9._/-]*$/.test(value);
+
+/**
  * Write the small shim a client's hook command points at.
  *
  * Clients disagree about how a hook command may be written - some expand a
@@ -231,13 +240,18 @@ export const defaultCli = () => ownBinary("acc.mjs");
  * JSON, worked out the schema, and wrote records and events by hand - inventing
  * an event type, a harness name, and its own generation tokens. So the command
  * is pinned here for the same reason it is pinned in the shim.
+ *
+ * `bareWhenSafe` names the shim without quotes when it is one shell word. A
+ * client that matches allow rules against the command's first word needs it:
+ * Antigravity CLI 1.2.12 never matched a command whose program word was quoted,
+ * whatever rule was loaded (issue #214). A path that needs quotes keeps them.
  */
-export async function bakeSkillCommand({ root, cliShim }) {
+export async function bakeSkillCommand({ root, cliShim, bareWhenSafe = false }) {
   if (typeof cliShim !== "string" || cliShim === "") {
     throw new AccError(EXIT.DATA, "refusing to bake an empty skill command", { cliShim });
   }
   // A managed data home is "Application Support"; an unquoted path splits.
-  const command = quote(cliShim);
+  const command = bareWhenSafe && isShellWord(cliShim) ? cliShim : quote(cliShim);
   const baked = [];
   const walk = async directory => {
     for (const entry of await readdir(directory, { withFileTypes: true })) {

@@ -41,6 +41,13 @@ work. An MCP connection can have a different participant from the hook session;
 use inbox/reply only for the participant the message addresses. Do not borrow a
 peer's ID, read runtime bindings, or improvise credentials.
 
+### Run each command as written
+
+Start every ACC command with `{{ACC}}` exactly as this skill writes it: add no
+quotes around it and no `sh -c` wrapper. Antigravity CLI decides from a command's
+first word whether it needs approval, and the rule that lets ACC commands run
+without a prompt matches only that form.
+
 ## Start shared work once
 
 After understanding the request, publish one concise intent:
