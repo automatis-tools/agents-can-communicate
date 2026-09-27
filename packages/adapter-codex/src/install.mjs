@@ -161,7 +161,7 @@ const sandboxReview = (config, file, stateRoot) =>
 
 export async function installCodexPlugin({ home, agentsHome = home,
   codexHome = path.join(home, ".codex"), dataHome, stateRoot, runner, node, cli, keepPreviousVersion = null,
-  requestedLivePolicy, livePolicy, clientVersion, platform }) {
+  requestedLivePolicy, livePolicy, clientVersion, platform, receiverSockets }) {
   // Read before writing, so a manifest that will not parse is found before a
   // plugin tree is laid down that nothing will then be able to remove.
   const existing = await readJson(marketplacePath(agentsHome), { name: MARKETPLACE,
@@ -182,7 +182,7 @@ export async function installCodexPlugin({ home, agentsHome = home,
       + "remove it and install again", { config });
   }
   const permissions = prepareLivePermissions(foreign.source, { home, codexHome, stateRoot,
-    file: config, requestedLivePolicy, livePolicy, clientVersion, platform });
+    file: config, requestedLivePolicy, livePolicy, clientVersion, platform, receiverSockets });
   const theirSandbox = permissions.skipLegacy || inspectConfig(permissions.source, config).sandbox;
   const permissionActions = permissions.status?.state === "unverified" ? [permissions.status.diagnostic] : [];
 
@@ -338,7 +338,8 @@ export async function uninstallCodexPlugin({ home, agentsHome = home,
 }
 
 export async function detectCodex({ home, agentsHome = home,
-  codexHome = path.join(home, ".codex"), stateRoot, clientVersion, platform, nativeDelivery }) {
+  codexHome = path.join(home, ".codex"), stateRoot, clientVersion, platform, nativeDelivery,
+  receiverSockets }) {
   const marketplace = await readJson(marketplacePath(agentsHome), null);
   const published = (marketplace?.plugins ?? []).some(entry => entry.name === PLUGIN_NAME);
   const config = await readFile(configPath(codexHome), "utf8").catch(() => "");
@@ -347,7 +348,7 @@ export async function detectCodex({ home, agentsHome = home,
   const cached = await stat(cachePath(codexHome))
     .then(() => true).catch(() => false);
   const outgoingDelivery = outgoingStatus(config, { home, codexHome, stateRoot,
-    file: configPath(codexHome), clientVersion, platform });
+    file: configPath(codexHome), clientVersion, platform, receiverSockets });
   // Saved trust is not readiness. Codex compares every current definition's
   // hash and can disable a trusted hook. Even a commented or stale single record
   // previously suppressed this check. Leave verification to Codex's /hooks;

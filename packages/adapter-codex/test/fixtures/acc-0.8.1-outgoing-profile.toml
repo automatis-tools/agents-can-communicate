@@ -1,0 +1,20 @@
+# ACC native permissions begin selection
+# ACC native permissions restore [{"id":"selection","before":"","table":[],"hash":"130248edf490b704f08ee3bd98664ab2054c3795b9a9937ea2e787b3498baf68"},{"id":"proxy","before":"","table":[],"hash":"b2d500809f8d2990758687d84f050fcac7acd5270a9ce28918fdd147f0ac618a"},{"id":"profile","before":"","table":["features"],"hash":"7cd0a7b8430f9c095daa7998eb94f27f9407f6c3db73e6459d519ec151a291b9"}]
+default_permissions = "acc-workspace"
+# ACC native permissions end selection
+model = "mine"
+# ACC native permissions begin proxy
+[features]
+network_proxy = true
+# ACC native permissions end proxy
+# ACC native permissions begin profile
+[permissions.acc-workspace]
+extends = ":workspace"
+[permissions.acc-workspace.filesystem]
+"/users/test/data/acc" = "write"
+[permissions.acc-workspace.network]
+enabled = true
+[permissions.acc-workspace.network.unix_sockets]
+"/tmp/acc-ch-501" = "allow"
+"/users/test/.codex/app-server-control/app-server-control.sock" = "allow"
+# ACC native permissions end profile
