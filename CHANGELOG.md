@@ -1,5 +1,42 @@
 # Changelog
 
+## Unreleased — native delivery judged by version alone
+
+- Live delivery no longer asks which platform it runs on. The captures behind the Claude Code
+  inbox wake, the Codex LocalDaemon queue and the Antigravity relay were all taken on
+  `darwin-arm64`, and the contract named that platform: on an Intel Mac or on Linux `acc
+  install` recorded consent and activated nothing, `acc doctor` said "native delivery is not
+  verified on this platform", no Claude Code session was woken, no Codex daemon was used,
+  maintained or given its outgoing permissions, and no Antigravity relay bound. The minimum
+  a capture establishes now applies on every platform, and the machine's own probe and
+  per-session handshake decide, as they already did for a newer version. Claude Code on
+  native Windows is still refused by its probe, for its named-pipe transport.
+- A prerelease is judged by its release triple, as hook capabilities have been since 0.6.2:
+  a `0.156.0-alpha.3` Codex daemon above the 0.152.1 minimum is admitted by the queue method
+  it answers with, and a `2.2.0-beta.1` Claude Code with the inbox is eligible. A prerelease
+  below the minimum is `below_minimum_version`. `platform_not_captured` and
+  `prerelease_not_captured` are never produced again; stored records carrying them still read.
+- The adapter contract is one `minimum` plus `anchors` naming a version and a protocol
+  contract. `minimumByPlatform` and an anchor `platform` are refused by name; an anchor is
+  proven by passing `delivery.livePush` evidence at its version, taken on any platform.
+- Codex service verification takes `lsof` from `/usr/sbin/lsof` or `/usr/bin/lsof`, where
+  macOS and Linux keep it, never from `PATH`; a host with neither fails closed with
+  `daemon_socket_unproven`. A test runs this host's real `ps` and `lsof` resolution, so the
+  ubuntu CI job measures Linux.
+- `docs/CAPABILITIES.md` and `docs/ADAPTER_AUTHORING.md` now say the three things that may
+  refuse live delivery: the machine's own probe or handshake failing, a client older than the
+  first passing capture, and a recorded regression in `knownBad`. Nothing else.
+
+| Candidate artifact | Value |
+|---|---|
+| Built from | `389011011dd12b5d5529901485e23f8b7f78ed88` |
+| Tarball | `agents-can-communicate-0.8.0.tgz`, 468,821 bytes, 311 files |
+| sha256 | `d0eb1eb6c6b2194bbe5a047b762f1885fa4161381cde48513057eef489f4ed79` |
+
+This unpublished development archive passed clean installation verification. See
+[native delivery across platforms evidence](docs/release-evidence/unreleased-native-delivery-platforms.md).
+The package version remains `0.8.0` until a release prepares its own.
+
 ## 0.8.0 — release candidate
 
 - Claude Code live delivery wakes a session through the inbox socket Claude Code opens for every
