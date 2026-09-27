@@ -122,7 +122,9 @@ and that line was removed.
 `maintenance host on darwin-arm64: lsof /usr/sbin/lsof`. Whether the ubuntu CI job has
 `lsof` is unknown until the pull request runs; its log prints the same line.
 
-The full suite's result on this record is in the commit that follows it.
+`npm test` on the evidence commit `1d26a8f`: 2,595 tests, 2,594 passing, 0 failing, 1 skipped.
+The skipped test is the existing uninstall check that skips on a machine where Gemini CLI is
+installed, as on `main`. Nothing was re-run.
 
 ## Exact local artifact
 
