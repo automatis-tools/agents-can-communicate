@@ -29,9 +29,9 @@
 
 | Candidate artifact | Value |
 |---|---|
-| Built from | `389011011dd12b5d5529901485e23f8b7f78ed88` |
-| Tarball | `agents-can-communicate-0.8.0.tgz`, 468,821 bytes, 311 files |
-| sha256 | `d0eb1eb6c6b2194bbe5a047b762f1885fa4161381cde48513057eef489f4ed79` |
+| Built from | `ca3fb402641c3ea9df671aac17ac9bb96177836c` |
+| Tarball | `agents-can-communicate-0.8.0.tgz`, 469,017 bytes, 311 files |
+| sha256 | `1c0a0f78a33e6a7d2e4ee3904ad02ab5365017bf0cb5ea660c7fc9abe5c51dce` |
 
 This unpublished development archive passed clean installation verification. See
 [native delivery across platforms evidence](docs/release-evidence/unreleased-native-delivery-platforms.md).

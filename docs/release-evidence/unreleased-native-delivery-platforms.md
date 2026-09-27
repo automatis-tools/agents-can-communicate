@@ -132,17 +132,24 @@ on this platform" there. The macOS suite never reached those branches. They now 
 same on every host, which puts the packed Codex service preparation, its live permissions
 and the Claude consent flow under the ubuntu job for the first time.
 
+That job then found the first real Linux difference: `lsof -Fn` names a Unix socket as
+`/path type=STREAM` on Linux, and the socket proof compared the line whole, so the packed
+service preparation started its daemon and then reported `daemon_socket_unproven`.
+`socketListedIn` now reads the name as the text before the first ` type=`, compared whole;
+the host test binds a socket and finds it in the real `lsof` output of the host it runs on,
+so either shape is measured wherever the suite runs.
+
 `npm test` on the evidence commit `1d26a8f`: 2,595 tests, 2,594 passing, 0 failing, 1 skipped.
 The skipped test is the existing uninstall check that skips on a machine where Gemini CLI is
 installed, as on `main`. Nothing was re-run.
 
 ## Exact local artifact
 
-- Source: clean commit `389011011dd12b5d5529901485e23f8b7f78ed88` on `feat/native-delivery-platforms`, from `main`
+- Source: clean commit `ca3fb402641c3ea9df671aac17ac9bb96177836c` on `feat/native-delivery-platforms`, from `main`
   at `00c5416`.
 - Archive: `agents-can-communicate-0.8.0.tgz`, packed from that commit.
-- Size: 468,821 bytes; 311 packed entries.
-- SHA-256: `d0eb1eb6c6b2194bbe5a047b762f1885fa4161381cde48513057eef489f4ed79`.
+- Size: 469,017 bytes; 311 packed entries.
+- SHA-256: `1c0a0f78a33e6a7d2e4ee3904ad02ab5365017bf0cb5ea660c7fc9abe5c51dce`.
 - Package version remains `0.8.0`; this is an unpublished development artifact.
 
 The exact archive passed `scripts/verify-package.mjs`.
