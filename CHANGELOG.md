@@ -1,5 +1,42 @@
 # Changelog
 
+## 0.8.1 — release candidate
+
+- Native live delivery is judged by the client's version and by the machine's own probe and
+  per-session handshake, on every platform. The `nativeDelivery` contract is one `minimum`
+  plus anchors without a platform; `platform_not_captured` and `prerelease_not_captured` are
+  never produced again, and a prerelease is judged by its release triple as hook capabilities
+  are. What may refuse live delivery is written down: the machine's own probe or handshake, a
+  client older than the first passing capture, a recorded regression. Linux and Intel macOS
+  get Claude Code wakes, the Codex queue and the Antigravity relay; Claude Code on native
+  Windows keeps next-turn delivery because its inbox is a named pipe with an auth line.
+- Codex CLI 0.157.1's daemon is recognised: the symlinked control socket, the resolved releases
+  executable with `--managed-daemon`, the socket proven by either path. A stopped Codex service
+  is recognised and `acc install` starts it in place with the vendor's own
+  `codex app-server daemon start`; under a consent that predates service setup, doctor names
+  `acc install --adapter codex --delivery actionable`. Codex maintenance, service setup and live
+  permissions run on every platform; `lsof` is found where Linux keeps it and its Linux socket
+  names are read.
+- A session pin that names no client no longer holds its generation forever, and the pid-less
+  pins earlier versions left are reaped. A client that runs as a node script, Gemini CLI, is
+  found behind the hook, so its sessions get a pid and a pin. `acc status` lists a closed
+  participant only while its next turn would still show a message.
+- The store format is unchanged, so 0.8.0 and 0.8.1 can share a workspace.
+
+| Candidate artifact | Value |
+|---|---|
+| Built from | `8e263a607547c8885bed61980fbce82402477838` |
+| Tarball | `agents-can-communicate-0.8.1.tgz`, 472,108 bytes, 311 files |
+| sha256 | `e32d414dd49512adbeee3071d696259920f0b5eee3d921d0c869c2a129d0b34a` |
+
+The exact archive passed clean installation, doctor, a workspace with no Git, and client
+install/uninstall, and all 23 managed-update packed checks passed against real installed
+archives. The published 0.8.0 updated itself to these bytes, and the 0.8.0 code and this archive
+read and wrote one store without an error. Real Claude Code 2.1.283 sessions exercised every
+delivery case on the exact archive, six cases and 22 further checks, all passing. See
+[0.8.1 release evidence](docs/release-evidence/v0.8.1.md) for verification and limits. Earlier
+development records below retain their original provenance.
+
 ## Unreleased — native delivery judged by version alone
 
 - Live delivery no longer asks which platform it runs on. The captures behind the Claude Code
