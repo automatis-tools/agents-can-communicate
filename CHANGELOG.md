@@ -1,5 +1,30 @@
 # Changelog
 
+## Unreleased — Codex sessions blocked from waking Claude Code
+
+- A Codex session can wake a Claude Code session. The ACC permission profile for Codex allowed
+  ACC's channel directory and the Codex control socket, and Claude Code has received on its own
+  inbox socket in `/tmp/cc-socks` since 0.8.0. So every live message from a Codex shell to
+  Claude Code ended `transport_permission_denied` ("live offer blocked by sender permissions")
+  and waited for the recipient's next turn. The profile now allows every socket ACC delivers
+  to: each receiving adapter declares its own, and the installer composes them, so installing
+  Codex alone still covers Claude Code (#213).
+- Grants are written with their existing parent resolved (`/private/tmp/...` on macOS).
+  Measured with `codex sandbox` on 0.157.1: Codex keeps a grant for a missing path as written,
+  and the sandbox compares resolved paths, so a `/tmp/cc-socks-<uid>` grant written before
+  that directory existed never matched.
+- `acc doctor` calls Codex outgoing delivery configured only while the profile allows every
+  one of those sockets. It said configured while the Claude Code inbox was missing. A profile
+  from 0.8.0 or 0.8.1 now reads unverified, names the missing paths and
+  `acc install --adapter codex`; that command and `acc update` rewrite ACC's own profile under
+  the recorded policy, `off` included, and uninstall still restores the original file. Start a
+  new Codex session afterwards. A profile you edited stays yours.
+- The consent question says the allowlist reaches other clients' session inboxes.
+
+See [the design](docs/design/2026-09-27-codex-sandbox-claude-inbox.md) and
+[the draft evidence](docs/release-evidence/unreleased-codex-sandbox-claude-inbox.md). A live
+Codex-to-Claude Code wake with the new profile has not been captured yet.
+
 ## Unreleased — idle and working sessions reported as broken
 
 - `acc doctor` asks the receiver whenever a session has a binding, as the router does before
