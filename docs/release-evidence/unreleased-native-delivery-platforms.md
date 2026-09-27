@@ -139,7 +139,7 @@ service preparation started its daemon and then reported `daemon_socket_unproven
 the host test binds a socket and finds it in the real `lsof` output of the host it runs on,
 so either shape is measured wherever the suite runs.
 
-`npm test` on the evidence commit `1d26a8f`: 2,595 tests, 2,594 passing, 0 failing, 1 skipped.
+`npm test` on the evidence commit `9c6fcdb`: 2,596 tests, 2,595 passing, 0 failing, 1 skipped.
 The skipped test is the existing uninstall check that skips on a machine where Gemini CLI is
 installed, as on `main`. Nothing was re-run.
 
