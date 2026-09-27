@@ -131,6 +131,15 @@ export async function observeMaintenanceProcess(pid, paths, run) {
   return { state: "alive", processStartTime: match[1], command: match[2] };
 }
 
+/** Whether `lsof -Fn` output lists the socket at this path. macOS prints the
+ * path alone; Linux appends the socket type (`/path type=STREAM`, measured on
+ * the ubuntu CI job), and a connected peer may carry more after it. The name
+ * is the text before the first ` type=`, compared whole. */
+export function socketListedIn(stdout, socketPath) {
+  return stdout.split("\n").some(line => line.startsWith("n")
+    && line.slice(1).split(" type=")[0] === socketPath);
+}
+
 export async function verifyMaintenanceProcess(snapshot, paths, run, { lsof = resolveLsof } = {}) {
   const process = await observeMaintenanceProcess(snapshot.pid, paths, run);
   const suffix = " app-server --listen unix://";
@@ -143,7 +152,7 @@ export async function verifyMaintenanceProcess(snapshot, paths, run, { lsof = re
   const lsofPath = await lsof();
   if (lsofPath === null) failMaintenance("daemon_socket_unproven");
   const sockets = await run(lsofPath, ["-n", "-a", "-p", String(snapshot.pid), "-U", "-Fn"], paths.options);
-  if (sockets.status !== 0 || !sockets.stdout.split("\n").includes(`n${paths.socketPath}`)) {
+  if (sockets.status !== 0 || !socketListedIn(sockets.stdout, paths.socketPath)) {
     failMaintenance("daemon_socket_unproven");
   }
 }

@@ -1,9 +1,11 @@
 import assert from "node:assert/strict";
-import { access } from "node:fs/promises";
+import { access, mkdtemp, realpath, rm } from "node:fs/promises";
+import net from "node:net";
 import path from "node:path";
 import test from "node:test";
 import { LSOF_CANDIDATES, observeMaintenanceProcess, probeMaintenanceCli, resolveLsof,
-  runMaintenanceCommand, startTimeValid, verifyMaintenanceProcess } from "../src/maintenance-host.mjs";
+  runMaintenanceCommand, socketListedIn, startTimeValid, verifyMaintenanceProcess }
+  from "../src/maintenance-host.mjs";
 import { maintenanceFixture } from "./maintenance-fixture.mjs";
 
 const unixHost = { skip: process.platform === "win32" && "ps and lsof are Unix tools" };
@@ -52,6 +54,24 @@ test("a host without lsof fails socket verification closed", async t => {
   assert.equal(commands.includes("/usr/bin/lsof"), true);
 });
 
+// Linux lsof names a Unix socket with its type appended (`/path type=STREAM`,
+// measured on the ubuntu CI job); macOS prints the path alone. Both name the
+// same socket.
+test("lsof's Linux shape, with the socket type appended, proves the socket", async t => {
+  const h = await maintenanceFixture(t);
+  const snapshot = { ...await h.inspectMaintenance(h.context) };
+  const paths = { codexHome: h.codexHome, socketPath: h.socketPath, managedPath: h.managedPath,
+    options: h.context };
+  const linux = (command, args, options) => command === "/usr/bin/lsof"
+    ? { status: 0, stdout: `p${snapshot.pid}\nf7\nn${h.socketPath} type=STREAM\n`, stderr: "" }
+    : h.run(command, args, options);
+  await verifyMaintenanceProcess(snapshot, paths, linux, { lsof: async () => "/usr/bin/lsof" });
+  assert.equal(socketListedIn(`n${h.socketPath} type=STREAM\n`, h.socketPath), true);
+  assert.equal(socketListedIn(`n${h.socketPath}\n`, h.socketPath), true);
+  assert.equal(socketListedIn(`n${h.socketPath}-other type=STREAM\n`, h.socketPath), false);
+  assert.equal(socketListedIn(`n${path.dirname(h.socketPath)} type=STREAM\n`, h.socketPath), false);
+});
+
 // Measured on the host this runs on, so the ubuntu job of the CI matrix
 // measures Linux: /bin/ps prints this process's start time in the 24-character
 // form the host parses, and lsof resolves to a real executable or to nothing.
@@ -73,4 +93,20 @@ test("the real ps and lsof of this host answer in the shapes the service host ex
       await access(lsof);
     }
     console.log(`maintenance host on ${process.platform}-${process.arch}: lsof ${lsof ?? "absent"}`);
+    if (lsof === null) return;
+    // A socket this process listens on must be found in the real lsof output,
+    // in whatever shape this host's lsof prints it.
+    const root = await realpath(await mkdtemp("/tmp/acc-lsof-"));
+    const socketPath = path.join(root, "s.sock");
+    const server = net.createServer();
+    await new Promise((resolve, reject) => { server.once("error", reject); server.listen(socketPath, resolve); });
+    try {
+      const listed = await runMaintenanceCommand(lsof, ["-n", "-a", "-p", String(process.pid), "-U", "-Fn"],
+        { env: process.env });
+      assert.equal(listed.status, 0, listed.stderr);
+      assert.equal(socketListedIn(listed.stdout, socketPath), true, listed.stdout);
+    } finally {
+      await new Promise(resolve => server.close(resolve));
+      await rm(root, { recursive: true, force: true });
+    }
   });
