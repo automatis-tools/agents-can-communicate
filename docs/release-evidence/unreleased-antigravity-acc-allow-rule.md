@@ -106,6 +106,12 @@ Each was applied alone, the named tests run, and the file restored.
 | detection drops `commandApproval` | installer detect test; the first end-to-end test |
 | `decisionOf` carries `allowCommands`, or rejects a malformed one | record carrying the old answer |
 
+## Suite
+
+`npm test` on the evidence commit `c019206`: 2,687 tests, 2,686 passing, 0 failing, 1 skipped.
+The skipped test is the existing uninstall check that skips on a machine where Gemini CLI is
+installed, as on `main`. Nothing was re-run.
+
 ## Live capture
 
 Run on 2026-09-28 between 00:20 and 00:26 UTC on macOS arm64, with real clients: Antigravity
