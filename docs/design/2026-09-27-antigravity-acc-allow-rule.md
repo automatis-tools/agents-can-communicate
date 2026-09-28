@@ -139,17 +139,14 @@ of the Antigravity integration, as its hooks are.
 The relay start command, `sh "<relay>" start`, is outside this rule. It runs once per
 conversation, when the operator is present to approve it or has a rule of their own for it.
 
-## Live capture still to do
+## Live capture, 2026-09-28
 
-Run with the user through the full end-to-end recipe: the candidate installed into an
-isolated npm prefix with an isolated `ACC_DATA_HOME`, the real `agy`, and the real client homes
-backed up before and restored after. Before install, remove the three capture rules from
-`~/.gemini/antigravity-cli/settings.json`, keeping the operator's relay rule, and note the
-bytes of that file and of `~/.gemini/settings.json`. Install the Antigravity adapter from the
-candidate with no `--delivery` option and confirm it asks no approval-prompt question, that the
-file gained exactly `command(<home>/.gemini/config/acc/acc-cli.sh)` and kept every other key,
-that the claim is under `<ACC_DATA_HOME>/acc/adapter-antigravity/`, and that doctor reports the
-rule as added by ACC. Restart `agy`, start the relay, send a question from a peer while the
-session is idle and nobody is at the terminal, and confirm the agent's ACC commands use the
-bare path, run with no prompt, and record the reply. Then uninstall and confirm both files are
-back to their earlier bytes.
+Run with the user through the full end-to-end recipe: a local build of this change installed
+into an isolated npm prefix with an isolated `ACC_DATA_HOME`, the real `agy`, and the real
+client homes backed up before and restored after. Install asked no question and added exactly
+`command(<home>/.gemini/config/acc/acc-cli.sh)`, keeping every other key. An `agy` session
+woken by the relay while idle and unattended ran its ACC commands with the bare path and no
+prompt and recorded its reply six seconds after the send. Uninstall returned both files to their
+earlier bytes. Details: `docs/release-evidence/unreleased-antigravity-acc-allow-rule.md`.
+Still not captured: print mode with the rule, a settings file ACC created from nothing, and the
+client's own rewrites of the file.

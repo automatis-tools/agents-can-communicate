@@ -690,12 +690,17 @@ doctor says why. Detection reports the rule as `allowed`, `prompts` (absent: ACC
 not write it or it was removed, and doctor asks for `acc install --adapter antigravity`),
 `unmatchable` or `unreadable`.
 
+**Captured 2026-09-28** (1.2.12, macOS arm64, a local build of this change installed with an
+isolated data home). Install added exactly `command(<wrapper>)` and asked nothing. An `agy`
+session started afterwards ran `<wrapper> status --json ...` and, woken by the relay while
+idle and unattended, `<wrapper> reply --message ... --body ...` with no approval prompt; the
+reply was recorded six seconds after the send. No agy log after startup contains "Surfacing
+tool confirmation". Uninstall returned the settings file to its earlier bytes. Evidence:
+`docs/release-evidence/unreleased-antigravity-acc-allow-rule.md`.
+
 **Not observed.**
 
-- The bare rule `command(<wrapper>)` that ACC writes, matching an ACC command. The observed
-  match used the quoted one-word form `command("<wrapper>")`.
-- A woken session answering unattended with ACC's rule loaded. No capability is claimed for
-  it; `delivery.livePush` is unchanged.
+- Print mode with ACC's rule loaded.
 - The client reading, and keeping, a `settings.json` that ACC created because none existed.
 - Whether the client rewrites `settings.json` itself and keeps entries it did not write.
 - Whether a model always keeps the bare form rather than adding quotes.
