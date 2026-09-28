@@ -7,8 +7,10 @@ import path from "node:path";
 import { promisify } from "node:util";
 const run = promisify(execFile);
 
-/** Two actual ACC archives; only the candidate's package versions are changed. */
-export async function createUpdateRegistry(t, fixture, version = null) {
+/** Two actual ACC archives; only the candidate's package versions are changed.
+ * `packumentMaxAge` sends the public registry's cache lifetime with the package
+ * document, which npm then serves from its own cache without asking again. */
+export async function createUpdateRegistry(t, fixture, version = null, { packumentMaxAge = null } = {}) {
   const candidate = path.join(fixture.root, "candidate-source");
   const archiveDir = path.join(fixture.root, "candidate-archive");
   await cp(fixture.installed, candidate, { recursive: true });
@@ -27,6 +29,7 @@ export async function createUpdateRegistry(t, fixture, version = null) {
   const integrity = `sha512-${createHash("sha512").update(bytes).digest("base64")}`;
   const requests = [];
   let available = true;
+  let listed = true;
   let discoveryIntegrity = null;
   let base;
   const server = createServer((req, res) => {
@@ -37,9 +40,13 @@ export async function createUpdateRegistry(t, fixture, version = null) {
       dist: { integrity, tarball: `${base}agents-can-communicate/-/agents-can-communicate-${version}.tgz` } };
     if (req.url !== "/agents-can-communicate" && discoveryIntegrity !== null) release.dist.integrity = discoveryIntegrity;
     res.setHeader("content-type", "application/json");
-    res.end(JSON.stringify(req.url === "/agents-can-communicate" ? {
-      name: rootManifest.name, "dist-tags": { latest: version }, versions: { [version]: release },
-    } : release));
+    if (req.url !== "/agents-can-communicate") { res.end(JSON.stringify(release)); return; }
+    if (packumentMaxAge !== null) res.setHeader("cache-control", `public, max-age=${packumentMaxAge}`);
+    // Before the release is listed, the document names only the version installed.
+    const current = { ...rootManifest, dist: { ...release.dist, tarball: `${base}agents-can-communicate/-/agents-can-communicate-${rootManifest.version}.tgz` } };
+    res.end(JSON.stringify(listed
+      ? { name: rootManifest.name, "dist-tags": { latest: version }, versions: { [version]: release } }
+      : { name: rootManifest.name, "dist-tags": { latest: rootManifest.version }, versions: { [rootManifest.version]: current } }));
   });
   server.listen(0, "127.0.0.1");
   await once(server, "listening");
@@ -47,5 +54,6 @@ export async function createUpdateRegistry(t, fixture, version = null) {
   t.after(async () => { server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); });
   return { url: base, version, tarball, integrity, requests,
     setAvailable: value => { available = value; },
+    setListed: value => { listed = value; },
     setDiscoveryIntegrity: value => { discoveryIntegrity = value; } };
 }
