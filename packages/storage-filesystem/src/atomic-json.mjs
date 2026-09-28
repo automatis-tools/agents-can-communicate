@@ -64,7 +64,8 @@ async function replaceHandleBytes(handle, bytes) {
  * @returns {Promise<"published" | "already_published">}
  */
 export async function publishAtomic(destination, bytes,
-  { root, tmpDir, stageDir, replace = false, deadlineAt, afterAccepted }) {
+  { root, tmpDir, stageDir, replace = false, deadlineAt, afterAccepted, afterStageEnsured,
+    afterStageRenamed }) {
   assertPublicationDeadline(deadlineAt);
   // The accepted stage lives apart from the partial a failed publication
   // leaves, so what a file is follows from the directory it was created in
@@ -145,9 +146,8 @@ export async function publishAtomic(destination, bytes,
       // The seam the race test uses, in the manner retainFile already
       // establishes: the window this closes is invisible without one.
       await afterAccepted?.();
-      await ensureManagedDirectory(root, stageDir);
-      await rename(temporary, stage);
-      await syncDirectory(stageDir);
+      await retainAcceptedStage({ root, stageDir, temporary, stage, afterStageEnsured,
+        afterStageRenamed });
     } else {
       // A crash/error before immutable acceptance keeps its unique partial.
       // Retention avoids the unsafe parent-check/unlink pathname window, while
@@ -155,6 +155,32 @@ export async function publishAtomic(destination, bytes,
       await retainFile(temporary, { root });
     }
   }
+}
+
+// The sweep can take `stage` between any two of these steps: it renames the
+// directory aside, and a store still opening publishes here without the writer
+// mutex the sweep holds (CI on #217). The bytes are already published, so the
+// retained copy goes to whichever directory carries the name when it moves, and
+// a copy the sweep took along with the directory needs no sync here - the sweep
+// discards that directory. The two callbacks are seams for the race tests.
+const STAGE_RETRIES = 4;
+
+async function retainAcceptedStage({ root, stageDir, temporary, stage, afterStageEnsured,
+  afterStageRenamed }) {
+  for (let attempt = 0; ; attempt += 1) {
+    await ensureManagedDirectory(root, stageDir);
+    await afterStageEnsured?.();
+    try {
+      await rename(temporary, stage);
+      break;
+    } catch (error) {
+      if (error.code !== "ENOENT" || attempt >= STAGE_RETRIES) throw error;
+    }
+  }
+  await afterStageRenamed?.();
+  await syncDirectory(stageDir).catch(error => {
+    if (error.code !== "ENOENT") throw error;
+  });
 }
 
 // The opener is the seam the race tests use, and stays last so callers that do

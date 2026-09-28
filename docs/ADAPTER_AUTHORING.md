@@ -29,6 +29,7 @@ export function createExampleAdapter() {
     detect, install, uninstall, doctor,
     planInstall,                      // what install would write
     preflightUninstall,               // optional read-only removal validation
+    inboundSockets,                   // optional: socket paths a live sender connects to
     normalizeHook,                    // client payload -> normalised event
     renderContext,                    // SyncResult -> text
     renderContextResult,              // text + ids of complete rendered groups
@@ -226,6 +227,19 @@ current session, generation, retirement, uniqueness and policy before publishing
 the refreshed lease. Refresh is not a heartbeat and cannot extend presence beyond
 its own expiry. Optional `retireNativeSession()` cleans adapter-owned endpoint state
 after confirmed core retirement; it must remain bounded and fail open for hooks.
+
+An adapter whose `offerMessage()` connects to a Unix socket in the recipient's session
+declares where those sockets live with the optional `inboundSockets(context)`. It returns
+absolute paths, directories or sockets, derived from `context.env`, `context.platform` and
+the client homes in the context. It runs synchronously, once per install, doctor or refresh
+command, and must never throw. It may read the adapter's own records under
+`context.stateRoot` when a session can bind outside what the environment implies. Claude Code
+reads its endpoint records there, and keeps each read bounded. The installer
+composes every known adapter's declaration into `context.receiverSockets`. An adapter whose
+client sandboxes the sender's shell allows exactly that list, and reports its outgoing
+permissions configured only while every entry is allowed. It never names another vendor's
+paths itself. Codex does this in its permission profile. Declare a new receiving transport
+here, or every Codex sender gets `transport_permission_denied` against it.
 
 A package-shipped passing Codex installed-hook capture additionally references its
 complete real product matrix through the selected provenance record's

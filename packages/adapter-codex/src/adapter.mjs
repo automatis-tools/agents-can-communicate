@@ -11,6 +11,7 @@ import { allowOutcome, denyOutcome, injectOutcome, normalizeCodexHook }
   from "./hooks.mjs";
 import { planCodexInstall, detectCodex, installCodexPlugin, preflightCodexUninstall,
   uninstallCodexPlugin } from "./install.mjs";
+import { controlSocket } from "./live-permissions.mjs";
 // Public native wiring is enabled only with installed-product capture evidence.
 
 // Re-exported so existing importers of CODEX_QUEUE_MINIMUM keep resolving; the
@@ -67,6 +68,8 @@ export function createCodexAdapter() {
     },
     probeNativeDelivery, planNativeActivation, bindNativeSession,
     refreshNativeSession, retireNativeSession, offerMessage,
+    // A Codex sender reaches another Codex session through its control socket.
+    inboundSockets: context => [controlSocket(context)],
     ...createCodexMaintenance(),
     ...createCodexServiceSetup(),
     startSession: async () => ({ ok: true, changes: [], diagnostics: [] }),

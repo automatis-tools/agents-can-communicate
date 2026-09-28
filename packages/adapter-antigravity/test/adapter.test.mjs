@@ -179,3 +179,12 @@ test("the adapter continues a turn from the captured Stop payload, once", async 
   assert.equal(adapter.continueTurnOutcome({ reason: "x", payload: undefined }).stdout, "",
     "no payload is not a reason to hold the turn");
 });
+
+// A sandboxed sender is allowed the sockets each receiving adapter declares.
+// The relay binds in ACC's own channel directory; left undeclared, a Codex
+// session could no longer reach an Antigravity conversation.
+test("the relay's socket directory is declared for sandboxed senders", async () => {
+  const { channelSocketDirectory } = await import("@agents-can-communicate/adapter-sdk");
+  assert.deepEqual(createAntigravityAdapter().inboundSockets({ env: {} }),
+    [channelSocketDirectory()]);
+});

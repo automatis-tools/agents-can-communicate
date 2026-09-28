@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { realpathSync } from "node:fs";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -34,7 +35,9 @@ test("consent configures outbound permissions even before the daemon is availabl
   assert.match(source, /^\[permissions\.acc-workspace\]$/m);
   assert.match(source, /^extends = ":workspace"$/m);
   assert.ok(source.includes(`${JSON.stringify(f.context.stateRoot)} = "write"`));
-  assert.ok(source.includes(`${JSON.stringify(path.join(f.context.codexHome,
+  // Spelled as the kernel resolves the existing Codex home (macOS keeps temporary
+  // directories behind the /var -> /private/var link); the socket keeps its name.
+  assert.ok(source.includes(`${JSON.stringify(path.join(realpathSync.native(f.context.codexHome),
     "app-server-control", "app-server-control.sock"))} = "allow"`));
   assert.doesNotMatch(source, /^\[sandbox_workspace_write\]$/m);
   assert.match(source, /model = "user-model"/);
@@ -153,4 +156,21 @@ test("detected version and platform reach applied permissions and subsequent dia
   assert.match(await f.read(), /default_permissions = "acc-workspace"/);
   const after = await detect();
   assert.equal(after[0].outgoingDelivery.state, "configured");
+});
+
+// Issue #213: the receivers reach the profile through install, and detection
+// holds the profile to the same list - one more receiver makes it unverified.
+test("install allows, and detection requires, every socket ACC delivers to", async t => {
+  const f = await fixture(t);
+  const inbox = path.join(f.context.home, "cc-socks");
+  const other = path.join(f.context.home, "other-receiver");
+  await f.adapter.install({ ...f.context, receiverSockets: [inbox] });
+  const granted = path.join(realpathSync.native(f.context.home), "cc-socks");
+  assert.ok((await f.read()).includes(`${JSON.stringify(granted)} = "allow"`));
+  const detected = await f.adapter.detect({ ...f.context, receiverSockets: [inbox] });
+  assert.equal(detected.outgoingDelivery.state, "configured");
+  const wider = await f.adapter.detect({ ...f.context, receiverSockets: [inbox, other] });
+  assert.equal(wider.outgoingDelivery.state, "unverified");
+  assert.ok(wider.needsAction.some(line => line.includes("other-receiver")
+    && line.includes("run acc install --adapter codex")), wider.needsAction.join("\n"));
 });

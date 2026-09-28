@@ -116,7 +116,7 @@ export async function diagnoseAdapters({ options, runtime, detect = detectInstal
     env: runtime?.env ?? {} });
   // The same environment install reads, so detection probes the same client.
   const clients = clientContext(home, path.join(dataHome, "acc"),
-    { env: runtime?.env ?? {} });
+    { env: runtime?.env ?? {}, platform: runtime?.platform });
   const adapters = ALL_ADAPTERS();
   const detected = await detect({ adapters, context: clients,
     probeTimeoutMs: probeTimeout(runtime?.env) });

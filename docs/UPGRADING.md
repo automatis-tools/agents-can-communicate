@@ -165,7 +165,7 @@ keeps holding activation across an uninstall until it exits.
 
 ## Confirmed client service maintenance
 
-On macOS arm64, `acc update` can ask once to restart a verified Codex service that holds a
+`acc update` can ask once to restart a verified Codex service that holds a
 native binding blocking activation, or that is serving a version outside the captured
 native-delivery contract. A serving version that satisfies that contract is left alone,
 even when the installed CLI has moved to a newer build. The captured maintenance contract

@@ -21,6 +21,8 @@ const own = info => typeof process.getuid !== "function" || info.uid === process
 const invalid = () => new Error("invalid Claude inbox endpoint registration");
 
 export const newEndpointId = () => `claude_inbox_${randomBytes(16).toString("hex")}`;
+// Where, under a workspace runtime directory, the records live.
+export const ENDPOINTS_DIRECTORY = "claude-inbox-endpoints";
 
 function valid(record) {
   return record !== null && typeof record === "object" && !Array.isArray(record)
@@ -41,7 +43,7 @@ async function directory(runtimeDir, create = false) {
   if (!absolute(runtimeDir)) throw invalid();
   if (create) await mkdir(runtimeDir, { recursive: true, mode: 0o700 });
   const root = await realpath(runtimeDir);
-  const dir = path.join(root, "claude-inbox-endpoints");
+  const dir = path.join(root, ENDPOINTS_DIRECTORY);
   if (create) await mkdir(dir, { mode: 0o700 }).catch(error => {
     if (error.code !== "EEXIST") throw error;
   });

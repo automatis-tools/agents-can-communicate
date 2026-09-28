@@ -1,5 +1,6 @@
+import { realpathSync } from "node:fs";
 import path from "node:path";
-import { channelSocketDirectory, tomlString } from "@agents-can-communicate/adapter-sdk";
+import { tomlString } from "@agents-can-communicate/adapter-sdk";
 import { compareVersions } from "./app-server-client.mjs";
 import { addPermissions, inspectPermissions } from "./permission-ownership.mjs";
 import { scanConfig } from "./toml-scan.mjs";
@@ -23,8 +24,12 @@ const configured = (source, context) => {
     && value(["features", "network_proxy"]) === "true"
     && value(["permissions", profile, "network", "enabled"]) === "true"
     && literal(value(["permissions", profile, "filesystem", context.stateRoot])) === "write"
-    && sockets(context).every(socket => literal(value(["permissions", profile, "network", "unix_sockets", socket])) === "allow");
+    && missingSockets(entries, profile, context).length === 0;
 };
+// The grants a profile lacks for the sockets ACC delivers to.
+const missingSockets = (entries, profile, context) => sockets(context).filter(socket =>
+  literal(entries.find(entry => !entry.header
+    && equal(entry.keys, ["permissions", profile, "network", "unix_sockets", socket]))?.value) !== "allow");
 
 const hasCustomPolicy = (source, context) => {
   const ownership = inspectPermissions(source);
@@ -48,10 +53,37 @@ const hasCustomPolicy = (source, context) => {
     || proxies.length > 1 || proxies.some(entry => entry.header || !["true", "false"].includes(entry.value));
 };
 
-// Match the channel's per-user temporary directory and Codex's actual home.
-// Grants cover only ACC's local channel namespace, never arbitrary Unix sockets.
-const sockets = context => [channelSocketDirectory(),
-  path.join(context.codexHome ?? path.join(context.home, ".codex"), "app-server-control", "app-server-control.sock")];
+// Where this adapter's own sessions receive: the app-server control socket in
+// Codex's actual home.
+export const controlSocket = context => path.join(context.codexHome ?? path.join(context.home, ".codex"),
+  "app-server-control", "app-server-control.sock");
+
+// Codex 0.157.1 on macOS, measured with `codex sandbox -P` (2026-09-27): a
+// granted path that exists when Codex builds the sandbox policy is compared in
+// its resolved form, and one that does not is kept as written, while Seatbelt
+// checks the path the kernel resolved. A `/tmp/cc-socks-501` grant made before
+// that directory existed never matched `/private/tmp/cc-socks-501/<pid>.sock`;
+// `/private/tmp/cc-socks-501` did, both before and after. So the existing
+// parent is resolved the way the kernel will, and the last component is kept as
+// spelled: a socket that is a link - Codex's own control socket - must keep
+// naming the link, because its target changes with every daemon.
+export function grantPath(target, realpath = realpathSync.native) {
+  const tail = [path.basename(target)];
+  for (let parent = path.dirname(target); ; parent = path.dirname(parent)) {
+    try {
+      return path.join(realpath(parent), ...tail);
+    } catch {
+      if (parent === path.dirname(parent)) return target;
+      tail.unshift(path.basename(parent));
+    }
+  }
+}
+
+// Every socket ACC delivers to - Codex's own and each receiving adapter's
+// declaration, composed by the installer as `receiverSockets` - and nothing
+// else: grants cover ACC's local receivers, never arbitrary Unix sockets.
+const sockets = context => [...new Set([controlSocket(context), ...(context.receiverSockets ?? [])]
+  .map(socket => grantPath(socket, context.realpath)))].sort();
 
 export function outgoingStatus(source, context) {
   const state = inspectPermissions(source).state;
@@ -62,8 +94,10 @@ export function outgoingStatus(source, context) {
       : ready ? null : "sender_permissions_unverified";
   return { state: reasonCode === null ? "configured" : "unverified", reasonCode,
     setup: supported(context)
-      ? "Codex outgoing setup: default workspace settings gain ACC state write access and an ACC local socket allowlist "
-        + "through the network proxy (external network stays denied); custom policies are preserved. Start a new session after installation."
+      ? "Codex outgoing setup: default workspace settings gain ACC state write access and an allowlist of the "
+        + "local sockets ACC delivers to - ACC's own channel, the Codex control socket and other clients' session "
+        + "inboxes - through the network proxy (external network stays denied); custom policies are preserved. "
+        + "Start a new session after installation."
       : null,
     diagnostic: reasonCode === null
       ? "outgoing live delivery: local socket permissions configured for new sessions; active session overrides remain unverified"
@@ -73,8 +107,21 @@ export function outgoingStatus(source, context) {
           : custom
             ? "custom permission policy was preserved; manually allow ACC state and local sockets "
               + "through the network proxy in the effective workspace profile"
-            : "ACC outgoing grants are absent; run acc install --adapter codex --delivery actionable, "
-              + "then start a new session") };
+            : state === "owned"
+              ? `${incomplete(source, context)}; run acc install --adapter codex, then start a new session`
+              : "ACC outgoing grants are absent; run acc install --adapter codex --delivery actionable, "
+                + "then start a new session") };
+}
+
+// An owned profile ACC wrote for fewer receivers - 0.8.1 predates the Claude
+// Code inbox grant - or for another state root. Reinstalling rewrites it.
+function incomplete(source, context) {
+  const entries = scanConfig(source);
+  const profile = literal(entries.find(entry => !entry.header && equal(entry.keys, ["default_permissions"]))?.value);
+  const missing = typeof profile === "string" ? missingSockets(entries, profile, context) : [];
+  return missing.length > 0
+    ? `ACC outgoing grants do not cover every socket ACC delivers to; missing ${missing.join(", ")}`
+    : "ACC outgoing grants are out of date";
 }
 
 export function prepareLivePermissions(source, context) {
@@ -85,10 +132,15 @@ export function prepareLivePermissions(source, context) {
   // Once ACC owns a valid outgoing profile, turning incoming requests off must
   // not revoke the already approved ability to use ACC from the sandbox. A
   // fresh off install still creates no grants because it has no owned unit.
-  if (!requested && owned.state === "owned") {
+  // An owned unit written for fewer receivers is brought up to date even so:
+  // the approval was for ACC's local sockets, and without this `acc install`
+  // under a recorded off could never repair a profile an older ACC wrote.
+  const stale = owned.state === "owned" && supported(context) && Boolean(context.stateRoot)
+    && !configured(source, context) && !hasCustomPolicy(owned.source, context);
+  if (!requested && owned.state === "owned" && !stale) {
     return { source, skipLegacy: true, status: outgoingStatus(source, context) };
   }
-  if (!requested) return { source: owned.source, skipLegacy: hasPermissions(scanConfig(owned.source)) };
+  if (!requested && !stale) return { source: owned.source, skipLegacy: hasPermissions(scanConfig(owned.source)) };
   if (!supported(context) || !context.stateRoot) {
     return { source, skipLegacy: hasPermissions(scanConfig(source)), status: outgoingStatus(source, context) };
   }

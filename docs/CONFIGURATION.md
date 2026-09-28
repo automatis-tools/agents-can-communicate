@@ -131,8 +131,9 @@ The allowed values are `off`, `actionable`, and `all`; the default is `off`. Thi
 does not belong in `acc.workspace.json`, where a pull request could opt someone else into
 spending a turn. It also cannot create a capability. Every adapter reads live-delivery
 consent from this installation record, and only from it. Exact-version evidence governs
-ordinary hook features. Claude Code live delivery separately requires macOS arm64, version
-2.1.282 or newer, and a current feature probe before installation applies the requested
+ordinary hook features. Claude Code live delivery separately requires version 2.1.282 or
+newer on macOS or Linux (on native Windows its inbox is a named pipe, so delivery stays
+next-turn), and a current feature probe before installation applies the requested
 policy. If those install-time checks fail, effective policy remains `off` and the installer
 reports next-turn or inbox fallback. Each later session must also pass its own
 generation-bound handshake. A failed session handshake clears or refuses that binding and
@@ -146,7 +147,7 @@ each wake for your approval unless its `crossSessionInbound` setting is `accept`
 never overrides them. See
 [held or dropped wakes](TROUBLESHOOTING.md#a-claude-code-session-holds-or-drops-acc-wakes).
 
-Codex LocalDaemon delivery separately requires macOS arm64, Codex 0.152.1 or newer, a
+Codex LocalDaemon delivery separately requires Codex 0.152.1 or newer, a
 current feature probe, and exact thread, canonical cwd, process, version and protocol
 checks. On Codex 0.154.0 or newer, explicit complete setup can download a missing matching
 standalone package and prepare a definitely absent service. The setup choice names the
@@ -160,15 +161,47 @@ Unavailable or ineligible sessions retain durable inbox fallback. Use
 ### Codex outgoing permissions
 
 Receiving a native message and sending from the agent's sandbox are separate operations.
-On Codex 0.153.4 or newer on macOS arm64, live opt-in also configures outgoing access
+On Codex 0.153.4 or newer, live opt-in also configures outgoing access
 for default workspace permissions. This happens even when the daemon is not yet available.
 Installation, its preview, and the interactive consent question disclose this change.
 
 ACC selects a permission profile named `acc-workspace`, extending `:workspace`. It grants
-write access to the ACC state directory and allows only the local ACC channel directory
-(`/tmp/acc-ch-<uid>`) and the Codex home control socket. The profile enables networking
-through `features.network_proxy = true`, with no external domains allowed. The proxy and
-socket grants must stay together: enabling networking without the proxy changes its scope.
+write access to the ACC state directory and allows only the Unix sockets ACC delivers to.
+Each receiving adapter declares its own, and the profile lists all of them even when an
+install names Codex alone:
+
+| Receiver | Allowed path |
+|---|---|
+| Codex | the control socket, `<CODEX_HOME>/app-server-control/app-server-control.sock` |
+| Antigravity CLI relay | the ACC channel directory, `/tmp/acc-ch-<uid>` on macOS |
+| Claude Code inbox | `/tmp/cc-socks`, `/tmp/cc-socks-<uid>`, `$XDG_RUNTIME_DIR/cc-socks` or else `$CLAUDE_CODE_TMPDIR/cc-socks` when set, `/run/user/<uid>/cc-socks` on Linux, and the directory of every Claude Code inbox ACC has bound on this machine |
+
+ACC writes each path with its existing parent resolved, so on macOS the entries read
+`/private/tmp/...`. Codex resolves a granted path only if it exists when Codex builds the
+sandbox policy, and the sandbox compares resolved paths: a `/tmp/cc-socks-<uid>` entry
+written before that directory existed never matched. A socket that is a link, such as the
+Codex control socket, keeps its own name.
+
+A command in the Codex sandbox can therefore connect to any of your Claude Code sessions'
+inbox sockets. Claude Code's own inbound settings still decide what a received frame may do,
+and ACC checks Claude Code's session registry before each wake it sends.
+
+The profile enables networking through `features.network_proxy = true`, with no external
+domains allowed. The proxy and socket grants must stay together: enabling networking
+without the proxy changes its scope.
+
+Doctor reports outgoing delivery as configured only while the profile allows every socket
+above. A profile that ACC 0.8.0 or 0.8.1 wrote lacks the Claude Code inbox directories;
+doctor names the missing paths and `acc install --adapter codex`. That command and
+`acc update` rewrite ACC's own profile under the recorded delivery policy, `off` included.
+Start a new Codex session afterwards.
+
+The environment variables above are read from the process that runs `acc install` or
+`acc doctor`. A Claude Code session started with its own `CLAUDE_CODE_TMPDIR` or
+`XDG_RUNTIME_DIR` binds its inbox elsewhere. ACC learns that directory when its hooks first
+bind the session, from its own endpoint record. From then on doctor names the directory
+until `acc install --adapter codex` or `acc update` adds it. Only a directory named as Claude
+Code names its inboxes, `cc-socks` or `cc-socks-<uid>`, is taken from a record.
 
 An existing legacy workspace-write configuration is migrated only when its sole writable
 root is ACC's state directory. Custom permission/configuration profiles, additional roots,

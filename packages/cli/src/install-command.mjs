@@ -7,7 +7,7 @@ import { createCodexAdapter } from "@agents-can-communicate/adapter-codex";
 import { createGeminiCliAdapter } from "@agents-can-communicate/adapter-gemini-cli";
 import { createGrokAdapter } from "@agents-can-communicate/adapter-grok";
 import { createKimiAdapter } from "@agents-can-communicate/adapter-kimi";
-import { applyPlan, detectInstallation, loadOwnership, planInstallation }
+import { applyPlan, detectInstallation, loadOwnership, planInstallation, receiverSockets }
   from "@agents-can-communicate/installer";
 import { AccError, EXIT } from "@agents-can-communicate/protocol";
 
@@ -28,7 +28,7 @@ export { decideDelivery } from "./install-delivery-consent.mjs";
 // pointed at the home itself writes beside them rather than inside them. That
 // install reports success and the client never reads a byte of it.
 export const clientContext = (home, stateRoot,
-  { env = {}, dataHome, cwd = process.cwd() } = {}) => ({
+  { env = {}, dataHome, cwd = process.cwd(), platform } = {}) => withReceivers({
   home,
   ...(dataHome === undefined ? {} : { dataHome }),
   configDir: path.join(home, ".claude"),
@@ -59,7 +59,14 @@ export const clientContext = (home, stateRoot,
   // roster and record nothing, every write failing with EPERM on the writer
   // lock. Measured with `codex exec`, which is how an agent actually runs.
   stateRoot,
-});
+}, platform);
+
+// Every socket ACC can deliver to, as each receiving adapter declares it, for
+// the one sender that sandboxes its shell: the Codex permission profile is
+// written and diagnosed from this list, so it covers Claude Code's inbox even
+// when an install names Codex alone (issue #213).
+const withReceivers = (context, platform) => ({ ...context,
+  receiverSockets: receiverSockets(ALL_ADAPTERS(), { ...context, platform }) });
 
 export const ALL_ADAPTERS = () => [createAntigravityAdapter(), createClaudeCodeAdapter(),
   createCodexAdapter(), createGeminiCliAdapter(), createGrokAdapter(), createKimiAdapter()];
@@ -222,7 +229,7 @@ export async function runInstallCommand({ options, runtime, action = "install" }
   const { data: dataHome } = platformPaths({ platform: runtime.platform,
     env: runtime.env ?? {} });
   const context = clientContext(home, path.join(dataHome, "acc"),
-    { env: runtime.env ?? {}, dataHome });
+    { env: runtime.env ?? {}, dataHome, platform: runtime.platform });
 
   const detected = await detectInstallation({ adapters, context,
     probeTimeoutMs: probeTimeout(runtime.env) });

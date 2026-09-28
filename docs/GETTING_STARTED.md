@@ -43,7 +43,7 @@ session after that review; changed hook definitions may require trust again.
 
 For Codex live delivery, follow the outgoing-permission and local-service instructions
 from install/doctor, then start a new session. Default workspace permissions can be
-configured automatically on Codex 0.153.4 or newer on macOS arm64. Custom settings are
+configured automatically on Codex 0.153.4 or newer. Custom settings are
 preserved; see [outgoing permissions](CONFIGURATION.md#codex-outgoing-permissions).
 With legacy sandbox settings, the named ACC state directory must also be in
 `sandbox_workspace_write.writable_roots` in the config the installer identifies.
@@ -58,7 +58,7 @@ hooks wherever the client is at or after a captured version.
 An interactive install asks one default-No question for all selected clients that need a
 choice. Use `--delivery actionable|all` for explicit noninteractive consent. Use
 `--delivery off` to disable incoming automatic requests. A dry run does not ask, write
-configuration, download Codex, or start a service. On macOS arm64 with Codex 0.154.0 or newer,
+configuration, download Codex, or start a service. On macOS or Linux with Codex 0.154.0 or newer,
 the choice includes downloading a missing standalone package from OpenAI. ACC selects the
 matching version and keeps your existing npm or Homebrew command and shell profiles.
 When supported Codex service preparation succeeds, it

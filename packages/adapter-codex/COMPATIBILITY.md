@@ -1140,3 +1140,57 @@ list, `/usr/sbin/lsof` then `/usr/bin/lsof`, never from PATH; a host with neithe
 verification closed with `daemon_socket_unproven`. Linux and Intel macOS have no capture of
 their own, and the test that runs this host's real `ps` and `lsof` resolution also runs in
 the ubuntu CI job. Maintenance keeps every identity check and never stops a busy service.
+
+## Outgoing grants for every receiver — Codex 0.157.1, 2026-09-27
+
+Issue #213. On ACC 0.8.1 a Codex session answered a Claude Code session with `acc reply`
+and got "live offer blocked by sender permissions; message remains queued": the connect to
+Claude Code's inbox socket in `/tmp/cc-socks` returned EPERM inside the Codex sandbox. The
+profile allowed `/tmp/acc-ch-<uid>` and the Codex control socket, the only receivers before
+Claude Code moved to its own inbox in 0.8.0, and doctor compared the profile with that same
+list and called it configured.
+
+`codex sandbox -P <profile> -- <command>` runs a command under a named permissions profile
+from `CODEX_HOME/config.toml` without a model session. Measured on Codex CLI 0.157.1,
+macOS arm64, with a temporary `CODEX_HOME` holding ACC's profile shape (`extends =
+":workspace"`, `network_proxy = true`, `network.enabled = true`) and throwaway sockets in
+temporary directories under `/tmp` - never in `/tmp/cc-socks`:
+
+| Granted path | Directory when Codex built the policy | Connect via `/tmp/...` | Connect via `/private/tmp/...` |
+|---|---|---|---|
+| `/tmp/d` | present | allowed | allowed |
+| `/private/tmp/d` | present | allowed | allowed |
+| none | present | EPERM | EPERM |
+| `/tmp/d` | created during the run | EPERM | EPERM |
+| `/tmp/d` | created before a second run | allowed | allowed |
+| `/private/tmp/d` | created during the run | allowed | allowed |
+| `/private/tmp/d/s.sock` (socket) | created during the run | allowed | allowed |
+| `/tmp/d/s.sock` (socket) | created during the run | EPERM | EPERM |
+| a link to a socket | target present | allowed through the link | - |
+| a link to a socket | target created during the run | EPERM through the link | - |
+
+So Codex resolves a granted path that exists when it builds the policy and keeps a missing
+one as written, and the sandbox compares the path the kernel resolved: a missing `/tmp/...`
+grant never matches. ACC now writes every grant with its existing parent resolved
+(`/private/tmp/...` on macOS) and keeps the last component, so the control socket still
+names its link. Whether a Codex TUI session builds the policy once per session or for every
+command was not measured; the resolved spelling works either way.
+
+Then, from this change's `acc install --adapter codex --delivery actionable` in temporary
+homes (a version shim answered `codex-cli 0.157.1`, so no service was prepared), with
+`CLAUDE_CODE_TMPDIR` pointing at a temporary directory: the profile listed
+`/private/tmp/acc-ch-501`, the control socket, `/private/tmp/cc-socks`,
+`/private/tmp/cc-socks-501` and `<CLAUDE_CODE_TMPDIR, resolved>/cc-socks`; doctor printed
+`outgoing live delivery: local socket permissions configured`; the real `codex sandbox -P
+acc-workspace` connected to a listener at `$CLAUDE_CODE_TMPDIR/cc-socks/4242.sock`, including
+when that directory was created after the policy was built. The same connect under a
+profile with 0.8.1's two grants returned EPERM.
+
+Captured 2026-09-28 with a local build of this change and real clients (Claude Code 2.1.283):
+a new Codex TUI session's `acc message` to a Claude Code session idle for 18 minutes printed
+`woke claude_code-… via claude-inbox`; Claude Code took a turn 0.6 s after the send and answered.
+A message from the same Codex session to an Antigravity relay under `/private/tmp/acc-ch-501`
+was offered live and answered. Evidence: `docs/release-evidence/unreleased-codex-sandbox-claude-inbox.md`.
+
+Not measured: Linux (Codex's Linux sandbox was not exercised) and the grants for
+`XDG_RUNTIME_DIR`. `unix_sockets` entries on Linux remain as uncaptured as they were in 0.8.1.

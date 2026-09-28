@@ -1,5 +1,64 @@
 # Changelog
 
+## Unreleased — Codex sessions blocked from waking Claude Code
+
+- A Codex session can wake a Claude Code session. The ACC permission profile for Codex allowed
+  ACC's channel directory and the Codex control socket, and Claude Code has received on its own
+  inbox socket in `/tmp/cc-socks` since 0.8.0. So every live message from a Codex shell to
+  Claude Code ended `transport_permission_denied` ("live offer blocked by sender permissions")
+  and waited for the recipient's next turn. The profile now allows every socket ACC delivers
+  to: each receiving adapter declares its own, and the installer composes them, so installing
+  Codex alone still covers Claude Code (#213).
+- Grants are written with their existing parent resolved (`/private/tmp/...` on macOS).
+  Measured with `codex sandbox` on 0.157.1: Codex keeps a grant for a missing path as written,
+  and the sandbox compares resolved paths, so a `/tmp/cc-socks-<uid>` grant written before
+  that directory existed never matched.
+- `acc doctor` calls Codex outgoing delivery configured only while the profile allows every
+  one of those sockets. It said configured while the Claude Code inbox was missing. A profile
+  from 0.8.0 or 0.8.1 now reads unverified, names the missing paths and
+  `acc install --adapter codex`; that command and `acc update` rewrite ACC's own profile under
+  the recorded policy, `off` included, and uninstall still restores the original file. Start a
+  new Codex session afterwards. A profile you edited stays yours.
+- The consent question says the allowlist reaches other clients' session inboxes.
+- A Claude Code session started with its own `CLAUDE_CODE_TMPDIR` or `XDG_RUNTIME_DIR` is
+  covered too. The grant list came only from the environment of the install or doctor process,
+  so such a session's inbox was outside it and doctor still said configured. The Claude Code
+  adapter now also declares the directory of every inbox ACC has bound on this machine, read
+  from its own endpoint records. `acc install` and `acc update` grant it once a session there
+  has been bound; until then doctor names it with `acc install --adapter codex` (review of
+  #217).
+- Every bound Claude Code inbox record is read. The scan stopped at 1,024 workspaces and 256
+  records per workspace, so an inbox that sorted past either count was left out and doctor
+  called the profile configured (review of #217).
+
+- Client detection runs the version probe on the PATH it is given, as its native probes already
+  did. A caller passing its own environment - the managed refresh does - saw the client as absent
+  when that PATH was the only place it was, and the refresh then left an old Codex profile as it
+  was.
+- Current docs stop naming macOS arm64 as a requirement for Codex and Claude Code live
+  delivery; 0.8.1 applies both on every platform, and Claude Code on native Windows keeps
+  next-turn delivery.
+- Concurrent first starts in a new workspace no longer fail on Linux with
+  `ENOENT ... realpath '<store>/stage'`. One store open swept `stage` - renamed it aside and
+  recreated it - while another open, which checks `stage` without the writer mutex, was between
+  its check and its `realpath`. A create-mode directory check now creates and resolves such a
+  directory again, a bounded number of times and with every containment check applied, and an
+  accepted publication follows `stage` if it is taken between the check and the move. Measured
+  under `node:24` on Linux with eight concurrent first opens: 11 failed runs in 4,000 before,
+  0 in 4,000 after (CI on #217).
+
+| Candidate artifact | Value |
+|---|---|
+| Built from | `bd5c40af53bf95dddcdf571ef711bbfca0a529ce` |
+| Tarball | `agents-can-communicate-0.8.1.tgz`, 486,063 bytes, 315 files |
+| sha256 | `e840e5ccf0b91f1359b4fb7bffad8c6ea78b7b4e472e9f03c6cbcc690b01476f` |
+
+This unpublished development archive passed clean installation verification. A new Codex TUI
+session woke a Claude Code session idle for 18 minutes through `claude-inbox`, with a local
+build of this change and real clients. See [the design](docs/design/2026-09-27-codex-sandbox-claude-inbox.md)
+and [the evidence](docs/release-evidence/unreleased-codex-sandbox-claude-inbox.md).
+The package version remains `0.8.1` until a release prepares its own.
+
 ## Unreleased — a first doctor in a new project
 
 - A first `acc doctor` in a new project no longer begins "store healthy (history from

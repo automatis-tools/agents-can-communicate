@@ -1,4 +1,4 @@
-import { defineAdapter, projectContext, projectContextResult }
+import { channelSocketDirectory, defineAdapter, projectContext, projectContextResult }
   from "@agents-can-communicate/adapter-sdk";
 import certification from "../certification.json" with { type: "json" };
 
@@ -82,6 +82,8 @@ export function createAntigravityAdapter() {
     },
     probeNativeDelivery, planNativeActivation, bindNativeSession, refreshNativeSession,
     offerMessage,
+    // The relay binds in ACC's own channel directory; a sandboxed sender is allowed it.
+    inboundSockets: () => [channelSocketDirectory()],
     deliveryFallback: { diagnostic:
       `Antigravity CLI next-turn and live delivery are certified from ${ANTIGRAVITY_CLI_VERSION} `
       + "onward; live delivery also needs the agent to start ACC's relay once per conversation, "

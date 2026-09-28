@@ -968,3 +968,26 @@ A prerelease build is judged by its release triple, so `2.2.0-beta.1` with the i
 admitted and `2.1.281-rc.1` is below the minimum. Linux and Intel macOS have no capture of
 their own; what admits them is the probe and the handshake, and a wake that fails there is
 recorded as a failed offer with the durable fallback, as it is here when the socket is gone.
+
+## Where the inbox socket lives, and who may connect, 2026-09-27
+
+Read from the Claude Code 2.1.283 executable: a session binds its inbox at
+`${XDG_RUNTIME_DIR || CLAUDE_CODE_TMPDIR || "/tmp"}/cc-socks/<pid>.sock`, and at
+`/tmp/cc-socks-<uid>/<pid>.sock` (`$PREFIX/tmp` under Termux) when that path is longer than
+103 bytes. Claude Code's own list of default socket directories is `/tmp/cc-socks(-<uid>)`,
+`/private/tmp/cc-socks(-<uid>)`, `/run/user/<uid>/cc-socks` and the Termux one. Observed on
+macOS arm64: `/tmp/cc-socks/<pid>.sock`, with no `XDG_RUNTIME_DIR` set.
+
+The adapter declares these directories as `inboundSockets` (`src/inbox-socket-directories.mjs`):
+the primary one from the environment, `/tmp/cc-socks`, the `-<uid>` fallback, and
+`/run/user/<uid>/cc-socks` on Linux; nothing on native Windows. It also declares the
+directory of every inbox ACC has bound on this machine, from the `socketPath` of its endpoint
+records (`src/inbox-observed-directories.mjs`). A session started with its own
+`CLAUDE_CODE_TMPDIR` or `XDG_RUNTIME_DIR` binds outside the installer's directories (review
+of #217). Only a directory named `cc-socks` or `cc-socks-<uid>` is taken from a record. A
+sender that runs in a sandbox is allowed exactly these. Issue #213: ACC 0.8.0 and 0.8.1 did not declare them, the
+Codex profile allowed only ACC's channel directory and the Codex control socket, and
+every `acc reply` from a Codex shell to a Claude Code session ended `transport_permission_denied`
+and waited for the recipient's next turn. The Codex adapter's COMPATIBILITY.md has the
+sandbox measurements. A live Codex-to-idle-Claude-Code wake with the new profile is not yet
+captured.

@@ -121,8 +121,12 @@ export async function openFilesystemStore({ root, clock, ids, workspaceId, failA
   // must not roll the same journal forward concurrently.
   await recoverOpenJournals();
 
-  // Sweeping is a write, so it holds the same mutex recovery does and no
-  // publisher is in flight while the stage directory is detached. It is bounded
+  // Sweeping is a write, so it holds the same mutex recovery does, and no
+  // transaction publishes while the stage directory is detached. A store that is
+  // still opening beside it does: the identity record, the directory checks and
+  // the journal's first slot above run without the mutex, so the managed
+  // directory checks and publishAtomic take a `stage` that left its name once
+  // more rather than failing (CI on #217). It is bounded
   // per pass: a store carrying a large accumulation drains over several opens
   // rather than spending one hook's whole budget on it. The mutex is taken only
   // on the opens that actually sweep - see sweepIfDue, which decides before it

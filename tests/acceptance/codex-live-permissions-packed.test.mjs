@@ -4,6 +4,9 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import test from "node:test";
 import { promisify } from "node:util";
+import { realpathSync } from "node:fs";
+import { prepareLivePermissions, removeLivePermissions }
+  from "../../packages/adapter-codex/src/live-permissions.mjs";
 import { createPackedAcc } from "../helpers/packed-acc.mjs";
 
 const run = promisify(execFile);
@@ -23,6 +26,10 @@ test("installed live setup discloses permissions, diagnoses them, and reverses o
   assert.match((await human(args)).stdout, /network proxy/);
   const generated = await readFile(config, "utf8");
   assert.match(generated, /default_permissions = "acc-workspace"/);
+  // Issue #213: Claude Code's inbox is one of the receivers, spelled as the
+  // kernel resolves it (`/private/tmp` on macOS), even though only Codex was named.
+  assert.ok(generated.includes(`${JSON.stringify(path.join(realpathSync.native("/tmp"), "cc-socks"))} = "allow"`),
+    generated);
   const doctor = await packed.acc(["doctor", "--home", packed.clientHome]);
   assert.equal(doctor.adapters.find(entry => entry.adapterId === "codex").outgoingDelivery.state, "configured");
   assert.match((await human(["doctor"])).stdout, /outgoing live delivery: local socket permissions configured/);
@@ -34,6 +41,22 @@ test("installed live setup discloses permissions, diagnoses them, and reverses o
   assert.equal((await human(["doctor"])).stdout.split("sender permissions unverified").length - 1, 0);
   await human(["install", "--adapter", "codex", "--delivery", "off"]);
   assert.match(await readFile(config, "utf8"), /default_permissions = "acc-workspace"/);
+  // A profile an older ACC wrote for fewer receivers (0.8.1 had no Claude Code
+  // inbox grant) is unverified, names what it lacks and the fix, and the named
+  // command repairs it under the recorded off policy without calling it custom.
+  const older = prepareLivePermissions(removeLivePermissions(generated).source, {
+    home: packed.clientHome, codexHome: path.dirname(config), file: config,
+    stateRoot: path.join(packed.dataHome, "acc"), requestedLivePolicy: "actionable",
+    clientVersion: "0.153.4", receiverSockets: [] });
+  assert.equal(older.status.state, "configured");
+  await writeFile(config, older.source);
+  const olderDoctor = (await human(["doctor"])).stdout;
+  assert.match(olderDoctor, /sender permissions unverified[^\n]*do not cover every socket ACC delivers to; missing [^\n]*cc-socks/);
+  assert.match(olderDoctor, /run acc install --adapter codex, then start a new session/);
+  assert.doesNotMatch(olderDoctor, /custom permission policy/);
+  await human(["install", "--adapter", "codex"]);
+  assert.equal((await packed.acc(["doctor", "--home", packed.clientHome])).adapters
+    .find(entry => entry.adapterId === "codex").outgoingDelivery.state, "configured");
   await writeFile(config, generated.replace("network_proxy = true", "network_proxy = false"));
   const modifiedDoctor = (await human(["doctor"])).stdout;
   assert.match(modifiedDoctor, /outgoing live delivery: sender permissions unverified/);

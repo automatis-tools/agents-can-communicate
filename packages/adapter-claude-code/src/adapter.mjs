@@ -5,6 +5,8 @@ import certification from "../certification.json" with { type: "json" };
 import { denyOutcome, injectOutcome, injectStartOwnerOutcome, normalizeClaudeHook } from "./hooks.mjs";
 import { MIN_VERSION, PROTOCOL_CONTRACT, bindNativeSession, offerMessage, planNativeActivation,
   probeNativeDelivery, refreshNativeSession, retireNativeSession } from "./inbox-delivery.mjs";
+import { observedInboxDirectories } from "./inbox-observed-directories.mjs";
+import { inboxSocketDirectories } from "./inbox-socket-directories.mjs";
 import { planClaudeInstall, detectClaude, installClaudePlugin, uninstallClaudePlugin } from "./install.mjs";
 
 export const CLAUDE_CODE_VERSION = "2.1.233";
@@ -92,6 +94,13 @@ export function createClaudeCodeAdapter() {
     refreshNativeSession,
     retireNativeSession,
     offerMessage,
+    // Where a sender connects to wake a session; a sandboxed sender is allowed these:
+    // the directories this environment implies, and those of every inbox bound here.
+    inboundSockets: context => [
+      ...inboxSocketDirectories({ env: context?.env, platform: context?.platform, uid: context?.uid }),
+      // Ownership is this process's own uid, never the context's naming override.
+      ...observedInboxDirectories({ stateRoot: context?.stateRoot }),
+    ],
 
     denyOutcome,
     injectOutcome,

@@ -138,8 +138,16 @@ client-owned hook and trust review.
 If a reply stays queued with `transport_permission_denied`, the sender's permissions
 blocked local transport. This is distinct from an unavailable recipient. The message was
 recorded successfully; the error does not mean it was read or acknowledged.
-On Codex 0.153.4 or newer on macOS arm64, rerun `acc install --adapter codex` with existing
+On Codex 0.153.4 or newer, rerun `acc install --adapter codex` with existing
 live consent. Add `--delivery actionable` when new consent is required, then start a new session.
+With ACC 0.8.0 or 0.8.1, every live offer from a Codex session to Claude Code failed this way:
+the Codex profile did not allow Claude Code's inbox directories, and doctor still reported it
+configured. Doctor now names the missing paths. `acc install --adapter codex` or `acc update`
+rewrites the profile; start a new Codex session so it runs under the new one.
+A Claude Code session started with its own `CLAUDE_CODE_TMPDIR` or `XDG_RUNTIME_DIR` binds its
+inbox outside the directories your shell's environment implies. After ACC first binds that
+session, doctor names its directory. Run `acc install --adapter codex` again, then start a new
+Codex session.
 Doctor's `outgoingDelivery` reports the installed permission configuration separately
 from `nativeDelivery.runtime`: an active receiving channel does not establish outgoing
 access. Custom policies and active-session overrides remain unverified; inspect the config
