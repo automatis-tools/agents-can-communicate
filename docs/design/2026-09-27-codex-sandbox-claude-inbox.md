@@ -92,8 +92,13 @@ doctor's comparison kept the old list.
    - **Synchronous.** `inboundSockets`, `receiverSockets` and `clientContext` stay
      synchronous, and the adapter reads its records with synchronous calls. This is the least
      invasive shape: `clientContext` has 28 callers, most in tests that read its fields
-     directly. It runs once per install, doctor or refresh command, never in a hook. The
-     reads are bounded: 1,024 workspaces, 256 records each, 8 KiB a record.
+     directly. It runs once per install, doctor or refresh command, never in a hook.
+   - **Every record, each one bounded.** Every workspace and every matching record is read,
+     each record up to 8 KiB. The first version stopped at 1,024 workspaces and 256 records
+     per workspace, so an inbox that sorted past either count was dropped while doctor
+     called the profile configured (review comment 4124708146; Mykola chose to scan
+     everything). The cost grows with the records on disk. A record is swept once its
+     process is gone, so the count follows the sessions this machine has run.
    - **Never throws, and grants only inbox directories.** A record that is not a regular
      file this user owns, is reached through a link, does not parse or has no absolute
      `socketPath` adds nothing. A grant widens the Codex sandbox, so a directory is taken

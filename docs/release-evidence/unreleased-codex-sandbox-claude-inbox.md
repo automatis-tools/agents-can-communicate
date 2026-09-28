@@ -113,6 +113,35 @@ because a real `codex` is on its PATH; run with `env -i` there, it failed the sa
 version probe now runs with the given environment, and `packages/installer/test/detect.test.mjs`
 gains "the version probe finds the client on the PATH detection was given", which failed first.
 
+A later ubuntu run failed in `tests/acceptance/hook-session-concurrency-packed.test.mjs`,
+"concurrent first starts and reattachments share a usable binding", with `ENOENT: no such file
+or directory, realpath '<store>/stage'`; macOS passed. The race predates #217. Three first
+starts open one fresh store. One open holds the writer mutex and runs the first stage sweep,
+which renames `stage` aside and recreates it. Another open is still publishing its identity
+record, checking its directories or writing the journal's first slot, all without the mutex.
+`ensureManagedDirectory` checked `stage`, the sweep renamed it, and `realpath` of the gone name
+threw ENOENT. The same window exists in `publishAtomic` between its stage check and the move
+of the accepted copy, and between that move and the sync.
+
+Reproduced before the fix, in `node:24-bookworm` (linux-arm64, node 24.21.0) with the worktree
+mounted: eight concurrent first opens of one fresh store, each started after 0-20 ms, failed in
+2 of 1,000 runs and 9 of 3,000. That is 11 of 4,000, all `ENOENT ... realpath '<store>/stage'`.
+The same script on the macOS host failed 0 of 1,000. A create-mode check now creates and
+resolves a segment that went away between its check and its `realpath` again, at most four more
+times, and applies every containment and identity check to the attempt that settles. Assert
+mode is unchanged. `publishAtomic` repeats the check and the move of an accepted copy when the
+move finds `stage` gone, and a sync that finds it gone after the move leaves the copy to the
+sweep that took it. `packages/storage-filesystem/test/stage-swept-mid-check.test.mjs` places the
+rename in each window through the new `afterInspect`, `afterStageEnsured` and
+`afterStageRenamed` seams. Four of its tests failed on the old logic on both macOS and Linux:
+the window, the bounded retry, the move and the sync. After the fix, the same script in the same image failed 0 of 4,000 runs. Mutations
+caught: no retry, an unbounded retry in either place (the test times out), assert mode
+creating a directory, containment skipped after a retry, no retry of the move, and the sync
+not tolerating a moved directory. The other create-mode directories - `tmp`, the journal, the
+destination directories, `locks`, doomed directories and the root - are never renamed by
+another process. Lock directories are renamed, but only read in assert mode, where a vanished
+directory reads as absent.
+
 ## Found by review on the pull request
 
 Review comment 4123782059 on #217 (medium): the grant list came only from the environment
@@ -122,8 +151,8 @@ sandbox gets EPERM, and doctor still says configured because it checks the same 
 fix: cover the inboxes ACC has bound. The Claude Code adapter's `inboundSockets` also returns
 the directory of every `socketPath` in its endpoint records under
 `<stateRoot>/workspaces/*/claude-inbox-endpoints/`
-(`packages/adapter-claude-code/src/inbox-observed-directories.mjs`). The reads are synchronous
-and bounded, and they never throw. A directory is taken only when named `cc-socks` or
+(`packages/adapter-claude-code/src/inbox-observed-directories.mjs`). The reads are synchronous,
+each bounded to one 8 KiB record, and they never throw. A directory is taken only when named `cc-socks` or
 `cc-socks-<uid>`. `packages/cli/test/codex-grants-observed-inbox.test.mjs` binds a session
 under its own directory through the adapter's record writer. Doctor then names that directory
 with `acc install --adapter codex`, and the next install grants it. Without the new
@@ -135,6 +164,16 @@ each caught: the adapter ignoring the records, or checking ownership against the
 uid; the module accepting any directory name, any file name, a link, any size, any owner, a
 relative or non-string socket path, or a relative state root; a listing error that throws;
 and the socket path granted instead of its directory.
+
+Review comment 4124708146 on #217 (medium): that scan stopped at 1,024 workspaces and 256
+records per workspace, so an inbox that sorted past either count was dropped and doctor called
+the profile configured. Chosen fix: read every workspace and every matching record, and keep the
+8 KiB bound on each record and every other guard. Two new tests were seen failing on the capped
+code. In the first, 256 records name one directory and the record naming a second sorts last,
+257th; the capped scan returned only the first directory. In the second, a record in the
+1,025th workspace was left out. Putting either cap back is caught, and so is dropping the size
+bound.
+
 
 ## Suite
 

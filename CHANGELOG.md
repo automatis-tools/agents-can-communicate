@@ -27,6 +27,9 @@
   from its own endpoint records. `acc install` and `acc update` grant it once a session there
   has been bound; until then doctor names it with `acc install --adapter codex` (review of
   #217).
+- Every bound Claude Code inbox record is read. The scan stopped at 1,024 workspaces and 256
+  records per workspace, so an inbox that sorted past either count was left out and doctor
+  called the profile configured (review of #217).
 
 - Client detection runs the version probe on the PATH it is given, as its native probes already
   did. A caller passing its own environment - the managed refresh does - saw the client as absent
@@ -35,6 +38,14 @@
 - Current docs stop naming macOS arm64 as a requirement for Codex and Claude Code live
   delivery; 0.8.1 applies both on every platform, and Claude Code on native Windows keeps
   next-turn delivery.
+- Concurrent first starts in a new workspace no longer fail on Linux with
+  `ENOENT ... realpath '<store>/stage'`. One store open swept `stage` - renamed it aside and
+  recreated it - while another open, which checks `stage` without the writer mutex, was between
+  its check and its `realpath`. A create-mode directory check now creates and resolves such a
+  directory again, a bounded number of times and with every containment check applied, and an
+  accepted publication follows `stage` if it is taken between the check and the move. Measured
+  under `node:24` on Linux with eight concurrent first opens: 11 failed runs in 4,000 before,
+  0 in 4,000 after (CI on #217).
 
 | Candidate artifact | Value |
 |---|---|
