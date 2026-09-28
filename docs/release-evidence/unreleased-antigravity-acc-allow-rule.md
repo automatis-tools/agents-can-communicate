@@ -116,9 +116,9 @@ added after it": it failed on the old code, and putting back a single-copy remov
 
 ## Suite
 
-`npm test` on the previous candidate record `c019206`, before the review fix: 2,687 tests,
-2,686 passing, 0 failing, 1 skipped (the existing uninstall check that skips where Gemini CLI
-is installed).
+`npm test` on the evidence commit `0453ba4`, after the review fix: 2,688 tests, 2,687 passing,
+0 failing, 1 skipped. The skipped test is the existing uninstall check that skips on a machine
+where Gemini CLI is installed, as on `main`. Nothing was re-run.
 
 ## Live capture
 
