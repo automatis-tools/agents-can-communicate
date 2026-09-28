@@ -145,4 +145,13 @@ Not captured: Linux and `XDG_RUNTIME_DIR`, whether one Codex TUI session builds 
 or per command, and the `acc update` refresh on the real managed runtime (covered by
 `managed-runtime-refresh.test.mjs`).
 
-## Exact local artifact (pending)
+## Exact local artifact
+
+- Source: clean commit `3f2131bbaf38128977f6a9a0c6e80663ca0d2507` on
+  `fix/codex-sandbox-claude-inbox`, over `main` at `259fdc3`.
+- Archive: `agents-can-communicate-0.8.1.tgz`, packed from that commit.
+- Size: 477,606 bytes; 313 packed entries.
+- SHA-256: `69ca5d87b1610ead0885946af8f405b7ac0eef92455334a0fd5f51546a913821`.
+- Package version remains `0.8.1`; this is an unpublished development artifact.
+
+The exact archive passed `scripts/verify-package.mjs`.
