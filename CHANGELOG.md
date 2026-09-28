@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.8.3 — release candidate
+
+- `acc update` right after a release installs the release that discovery found. The download
+  asks npm to revalidate its cached package document with the registry, so a document cached
+  before the registry listed the release no longer fails the update with `ETARGET` (#221).
+- An install on 0.8.2 or older downloads this update with its own code. If it meets
+  `ETARGET` right after the release, `npm_config_prefer_online=true acc update` avoids it.
+- The store format is unchanged, so 0.8.2 and 0.8.3 can share a workspace.
+
+| Candidate artifact | Value |
+|---|---|
+| Built from | `34eacc0b484676918a1f7ed5ac5912ba94ac35c1` |
+| Tarball | `agents-can-communicate-0.8.3.tgz`, 486,699 bytes, 315 files |
+| sha256 | `6047fba45684018f89af81e3397a9f4745a2395d39018aa189fbd6e0175127d6` |
+
+The exact archive passed clean installation verification and all 24 managed-update packed
+checks. The published 0.8.2 updated itself to these bytes, and the 0.8.2 code and this archive
+read and wrote one store. See [0.8.3 release evidence](docs/release-evidence/v0.8.3.md) for
+verification and limits. Earlier development records below retain their original provenance.
+
 ## Unreleased — an update right after a release
 
 - `acc update` right after a release stops failing with `ETARGET` when npm had cached the
