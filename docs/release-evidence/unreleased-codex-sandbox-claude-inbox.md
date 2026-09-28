@@ -138,10 +138,8 @@ and the socket path granted instead of its directory.
 
 ## Suite
 
-`npm test` on the evidence commit `5820e44`, run under `env -i` with only `HOME`, `USER`,
-`TMPDIR` and a PATH of system directories plus node, so no real client is reachable, as in CI:
-2,680 tests, 2,679 passing, 0 failing, 1 skipped. The skipped test is the existing uninstall check
-that skips on a machine where Gemini CLI is installed, as on `main`. Nothing was re-run.
+`npm test` on the previous candidate record `5820e44`, before `main` with #218 was merged in,
+under `env -i`: 2,680 tests, 2,679 passing, 0 failing, 1 skipped.
 
 The earlier run on `88f8ebb`, in the capture machine's own shell, passed because its PATH holds a
 real `codex`.
@@ -186,11 +184,11 @@ or per command, and the `acc update` refresh on the real managed runtime (covere
 
 ## Exact local artifact
 
-- Source: clean commit `62fd0a8c33ac8e70fed98b63d2b025ee0dc9b2fc` on
-  `fix/codex-sandbox-claude-inbox`, over `main` at `259fdc3`.
+- Source: clean commit `bdc7a6725d36f5096765c1c978532729484f03f6` on
+  `fix/codex-sandbox-claude-inbox`, with `main` at `c6bffb0` (#218) merged in.
 - Archive: `agents-can-communicate-0.8.1.tgz`, packed from that commit.
-- Size: 479,036 bytes; 314 packed entries.
-- SHA-256: `1aac0b16f6b1cc8dbc2a9ee95cc3b02206fe7c71711352672e5258f8ede41a34`.
+- Size: 484,957 bytes; 315 packed entries.
+- SHA-256: `4c25804bb01a29dc5219b816a66b41dcd2b1e29a3aff1ba17b742939fe89f3e7`.
 - Package version remains `0.8.1`; this is an unpublished development artifact.
 
 The exact archive passed `scripts/verify-package.mjs`.
