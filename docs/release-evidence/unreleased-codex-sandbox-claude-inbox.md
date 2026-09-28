@@ -102,6 +102,17 @@ Each was applied alone, caught by the tests named, and reverted:
 | install or detection drops `receiverSockets` | live-permissions-install |
 | refresh context without receivers | managed-runtime-refresh |
 
+## Found by CI on the pull request
+
+The first CI run of #217 failed on macOS and ubuntu in "a background refresh brings an older
+ACC's Codex grants up to date": the refresh left the 0.8.1 grants in place. `detectInstallation`
+read `context.env.PATH` for its native probes but ran the version probe on the test process's
+PATH, so the stub `codex` on the PATH given to the refresh was never found, the version read as
+null and the Codex profile counted as unsupported. The test passed on the capture machine only
+because a real `codex` is on its PATH; run with `env -i` there, it failed the same way. The
+version probe now runs with the given environment, and `packages/installer/test/detect.test.mjs`
+gains "the version probe finds the client on the PATH detection was given", which failed first.
+
 ## Suite
 
 `npm test` on the evidence commit `88f8ebb`: 2,672 tests, 2,671 passing, 0 failing, 1 skipped.

@@ -21,6 +21,10 @@
   new Codex session afterwards. A profile you edited stays yours.
 - The consent question says the allowlist reaches other clients' session inboxes.
 
+- Client detection runs the version probe on the PATH it is given, as its native probes already
+  did. A caller passing its own environment - the managed refresh does - saw the client as absent
+  when that PATH was the only place it was, and the refresh then left an old Codex profile as it
+  was.
 - Current docs stop naming macOS arm64 as a requirement for Codex and Claude Code live
   delivery; 0.8.1 applies both on every platform, and Claude Code on native Windows keeps
   next-turn delivery.
