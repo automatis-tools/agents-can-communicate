@@ -1,5 +1,21 @@
 # Changelog
 
+## Unreleased — an update right after a release
+
+- `acc update` right after a release stops failing with `ETARGET` when npm had cached the
+  package document before the registry listed the release. The download asks npm to revalidate
+  the document with the registry, so npm finds the version that discovery found (#221).
+
+| Candidate artifact | Value |
+|---|---|
+| Built from | `2fff1e9178906f1ff4712e9ce7aeaf03a51fde68` |
+| Tarball | `agents-can-communicate-0.8.2.tgz`, 486,544 bytes, 315 files |
+| sha256 | `fb14d6fada097e43c0bd2cce870e5d7e1fe1908ce45b4786e9ddbc02ed340a77` |
+
+This unpublished development archive passed clean installation verification. See
+[the evidence](docs/release-evidence/unreleased-update-stale-npm-cache.md).
+The package version remains `0.8.2` until a release prepares its own.
+
 ## 0.8.2 — release candidate
 
 - A Codex session wakes a Claude Code session live. ACC's Codex permission profile also allows
