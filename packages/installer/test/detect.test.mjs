@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtemp, readdir, realpath, rm } from "node:fs/promises";
+import { chmod, mkdtemp, readdir, realpath, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -196,4 +196,24 @@ test("the report is ordered by adapter id, so two runs can be compared", async t
 
   assert.deepEqual(detected.map(entry => entry.adapterId),
     ["claude_code", "codex", "kimi"]);
+});
+
+test("the version probe finds the client on the PATH detection was given", async t => {
+  // Detection already read `context.env.PATH` for the native probes, and ran
+  // the version probe on this process's PATH instead. A caller that passes its
+  // own environment - the managed refresh does - saw the client as absent,
+  // unless the same command happened to be on this process's PATH too: the
+  // #213 refresh test passed on a machine with a real `codex` there and failed
+  // in CI, where the only `codex` was the stub on the given PATH.
+  const bin = await home(t);
+  const command = "acc-detect-stub-client";
+  await writeFile(path.join(bin, command), "#!/bin/sh\necho 'stub 0.147.0'\n");
+  await chmod(path.join(bin, command), 0o755);
+  const context = { home: await home(t), dataHome: await home(t),
+    env: { PATH: `${bin}${path.delimiter}/usr/bin${path.delimiter}/bin` } };
+
+  const [entry] = await detectInstallation({ adapters: [adapter(command)], context });
+
+  assert.equal(entry.present, true, entry.error ?? "the stub on the given PATH was not found");
+  assert.equal(entry.version, "0.147.0");
 });

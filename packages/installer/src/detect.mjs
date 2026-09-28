@@ -31,8 +31,10 @@ const VERSION = /(?:^|[^0-9A-Za-z])v?(\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?)(?:\b
  * has: nothing is written, and a client that is not installed simply fails to
  * start.
  */
-export const spawnProbe = async (command, args) => {
-  const { stdout, stderr } = await run(command, args);
+// `env` decides where the command is looked up, so detection given an
+// environment finds the client on that environment's PATH.
+export const spawnProbe = async (command, args, { env } = {}) => {
+  const { stdout, stderr } = await run(command, args, env === undefined ? {} : { env });
   return `${stdout}${stderr}`.trim();
 };
 
@@ -122,8 +124,11 @@ export async function detectInstallation({ adapters, context, probe = spawnProbe
         const output = await withTimeout(
           // The declared binary, never the adapter id. Guessing the id made
           // every client whose command differs from it look uninstalled.
+          // On the PATH the native probes below use: a caller that passes its
+          // own environment must not find a different client, or none.
           Promise.resolve(probe(adapter.client.command,
-            adapter.client.versionArgs ?? ["--version"])),
+            adapter.client.versionArgs ?? ["--version"],
+            { env: context?.env === undefined ? undefined : { ...process.env, ...context.env } })),
           probeTimeoutMs, `${adapter.id} version probe`);
         if (typeof output === "string" && output !== "") {
           entry.present = true;
