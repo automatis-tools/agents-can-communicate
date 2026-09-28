@@ -10,18 +10,18 @@ import { ENDPOINTS_DIRECTORY } from "./inbox-endpoint.mjs";
 // its own absolute CLAUDE_CODE_TMPDIR or XDG_RUNTIME_DIR binds elsewhere, and
 // the hook that bound it wrote down where.
 //
-// Synchronous and bounded: install, doctor and the managed refresh compose the
-// grant list while building one context, once per command. Nothing here
-// throws; a record that cannot be read or cannot be a Claude Code inbox adds
-// nothing. A grant widens the Codex sandbox, so a directory is taken only when
+// Synchronous: install, doctor and the managed refresh compose the grant list
+// while building one context, once per command. Every workspace and every
+// matching record is read - a count cap dropped whatever sorted past it, and
+// doctor then called the profile configured (review of #217) - and each read
+// is bounded to one small record. Nothing here throws; a record that cannot be
+// read or cannot be a Claude Code inbox adds nothing. A grant widens the Codex sandbox, so a directory is taken only when
 // it is named as Claude Code names its inbox directories (2.1.283:
 // `cc-socks` or `cc-socks-<uid>`), whatever a file on disk says.
 
 const RECORD = /^claude_inbox_[a-f0-9]{32}\.json$/;
 const INBOX_DIRECTORY = /^cc-socks(?:-\d+)?$/;
 const MAX_BYTES = 8_192;
-const MAX_WORKSPACES = 1_024;
-const MAX_RECORDS = 256;
 
 const list = directory => {
   try {
@@ -49,9 +49,9 @@ export function observedInboxDirectories({ stateRoot, uid = process.getuid?.() ?
   if (typeof stateRoot !== "string" || !path.isAbsolute(stateRoot)) return [];
   const workspaces = path.join(stateRoot, "workspaces");
   const found = new Set();
-  for (const workspace of list(workspaces).slice(0, MAX_WORKSPACES)) {
+  for (const workspace of list(workspaces)) {
     const records = path.join(workspaces, workspace, ENDPOINTS_DIRECTORY);
-    for (const name of list(records).filter(item => RECORD.test(item)).slice(0, MAX_RECORDS)) {
+    for (const name of list(records).filter(item => RECORD.test(item))) {
       const socketPath = socketPathIn(path.join(records, name), uid);
       if (typeof socketPath !== "string" || !path.isAbsolute(socketPath) || socketPath.includes("\0")) continue;
       const directory = path.dirname(path.normalize(socketPath));

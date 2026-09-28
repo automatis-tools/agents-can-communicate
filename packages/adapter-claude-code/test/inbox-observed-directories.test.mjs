@@ -118,3 +118,26 @@ test("a relative state root is not read against the working directory", t => {
     process.chdir(before);
   }
 });
+
+// Review of #217: a count cap dropped whatever sorted past it, and doctor then
+// called the profile configured. Every matching record and workspace is read.
+test("a bound inbox past any record count is covered", t => {
+  const f = fixture(t);
+  for (let index = 0; index < 256; index += 1) {
+    f.place("w1", `claude_inbox_${index.toString(16).padStart(32, "0")}.json`,
+      JSON.stringify(record("/usual/cc-socks/1.sock")));
+  }
+  f.place("w1", `claude_inbox_${"f".repeat(32)}.json`, JSON.stringify(record("/late/cc-socks/1.sock")));
+  assert.deepEqual(observedInboxDirectories({ stateRoot: f.stateRoot }),
+    ["/late/cc-socks", "/usual/cc-socks"]);
+});
+
+test("a bound inbox past any workspace count is covered", t => {
+  const f = fixture(t);
+  for (let index = 0; index < 1_024; index += 1) {
+    mkdirSync(path.join(f.stateRoot, "workspaces", `workspace_${index.toString(16).padStart(32, "0")}`),
+      { recursive: true });
+  }
+  f.place(`workspace_${"f".repeat(32)}`, name(), JSON.stringify(record("/last/cc-socks/1.sock")));
+  assert.deepEqual(observedInboxDirectories({ stateRoot: f.stateRoot }), ["/last/cc-socks"]);
+});
