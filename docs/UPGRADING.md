@@ -1,5 +1,33 @@
 # Upgrading to 0.5.0
 
+## From 0.8.x
+
+Update as usual:
+
+```bash
+acc update
+acc version
+acc doctor
+```
+
+The update refreshes every installed integration with its recorded policy. Two of them change
+a client's own settings:
+
+- **Codex.** ACC's permission profile in `~/.codex/config.toml` also allows the Claude Code
+  inbox socket directories, so a Codex session can wake a Claude Code session live. Grants are
+  written in their resolved form, such as `/private/tmp/cc-socks` on macOS. A profile you
+  edited stays yours: doctor then names the missing grants and `acc install --adapter codex`.
+  Start a new Codex session after the update; a session already open keeps its old policy.
+- **Antigravity CLI.** The install adds `command(<wrapper>)` to `permissions.allow` in
+  `~/.gemini/antigravity-cli/settings.json`, and the skill calls the wrapper without quotes, so
+  a woken session runs its ACC commands without an approval prompt. Restart `agy`: it reads
+  the file only at startup. `acc uninstall` removes every copy of that rule.
+
+`acc doctor` and `acc status` describe an idle session by what a message sent to it meets
+(`idle, wake on send`, `idle until next turn`, `idle, inbox only`), and each status row carries
+`processTracked`, `liveDelivery` and `liveLeaseCurrent`. This release adds no store event type
+or field, so a store it writes stays readable by 0.8.x.
+
 ## From 0.7.x
 
 Claude Code live delivery wakes each session through the inbox socket that Claude Code opens
