@@ -89,7 +89,9 @@ matched `sh "<relay>" start`, where the quotes are around an argument. The concl
 7. **Ownership is recorded in ACC's data home**, beside the existing `created-*` markers:
    `<data home>/acc/adapter-antigravity/allow-rule-<base64url of the settings path>`, a JSON
    record of the file, the exact rule, and which of the file, `permissions` and
-   `permissions.allow` ACC had to create. The claim is written before the rule, so a crash
+   `permissions.allow` ACC had to create at the write that added the rule; a later install that
+   adds the rule again records only what it creates itself, since a file ACC made earlier cannot
+   be told from one the operator put in its place (review of #218). The claim is written before the rule, so a crash
    between the two leaves a claim uninstall drops rather than a rule nobody can attribute.
    Uninstall removes every copy of the recorded rule - a copy in the same words cannot be told
    from ACC's, and the client has duplicated grants itself (review of #218) - then removes a

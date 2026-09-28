@@ -140,6 +140,23 @@ test("a settings file that did not exist is created, then removed again", async 
   assert.equal(await fixture.exists(), false, "uninstall left the settings file ACC created");
 });
 
+test("a settings file the operator put in place of ACC's is never taken for ACC's", async t => {
+  // ACC created the file; the operator deleted it and wrote their own. The
+  // next install adds the rule to a file that already exists, so it records no
+  // file of its own - and uninstall leaves the operator's file. Carrying the
+  // first install's "created" over deleted it as empty (review of #218).
+  const fixture = await agyHome(t);
+  await installAntigravity(fixture.context);
+  await fixture.write({});
+  const theirs = await fixture.read();
+
+  await installAntigravity(fixture.context);
+  await uninstallAntigravity(fixture.context);
+
+  assert.equal(await fixture.exists(), true, "uninstall deleted the operator's settings file");
+  assert.deepEqual(JSON.parse(await fixture.read()), JSON.parse(theirs));
+});
+
 test("containers ACC created go only while nothing of the operator's is in them", async t => {
   const fixture = await agyHome(t);
   await fixture.write({ colorScheme: "dark" });

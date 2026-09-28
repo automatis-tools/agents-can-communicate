@@ -129,11 +129,15 @@ export async function inspectAllowRule(context) {
 async function addRule(context, found) {
   const settings = await readSettings(found.file);
   const claimFile = claimPath(context, found.file);
-  const previous = (await readClaim(claimFile))?.created ?? {};
+  // Only what this write creates. A file or container that is already there is
+  // the operator's as far as ACC can tell: one ACC made earlier cannot be told
+  // from one they put in its place, and carrying the old flags over deleted
+  // their file at uninstall (review of #218). The cost is an empty container
+  // ACC once made staying after uninstall, never the operator's file going.
   const created = {
-    file: previous.file === true || settings.state === "missing",
-    permissions: previous.permissions === true || settings.value.permissions === undefined,
-    allow: previous.allow === true || settings.value.permissions?.allow === undefined,
+    file: settings.state === "missing",
+    permissions: settings.value.permissions === undefined,
+    allow: settings.value.permissions?.allow === undefined,
   };
   // The claim first: a crash between the two leaves a claim with no rule, which
   // uninstall drops, rather than a rule nobody can tell is ACC's.

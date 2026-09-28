@@ -114,6 +114,13 @@ itself - left ACC commands running unasked after uninstall. Uninstall now remove
 `allow-rule-install.test.mjs` gains "uninstall leaves no copy of ACC's rule, however many were
 added after it": it failed on the old code, and putting back a single-copy removal fails it again.
 
+The second review found that an install adding the rule again kept the first install's record
+of having created the settings file. When the operator had replaced that file with their own,
+uninstall deleted it as empty. The install now records only what its own write creates.
+`allow-rule-install.test.mjs` gains "a settings file the operator put in place of ACC's is never
+taken for ACC's", which failed on the old code. The cost: a container ACC made earlier, from which
+the rule was removed by hand, stays after uninstall.
+
 ## Suite
 
 `npm test` on the evidence commit `0453ba4`, after the review fix: 2,688 tests, 2,687 passing,
