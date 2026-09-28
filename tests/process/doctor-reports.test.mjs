@@ -77,6 +77,24 @@ test("doctor prints what to run next, not only the summary", async t => {
     "the remediation was computed and shown only to --json");
 });
 
+test("a first doctor in a new project says nothing about a history it does not have", async t => {
+  const place = await machine(t);
+  // No store exists before the first command that needs one. Doctor answers
+  // that case with a report of its own, and the history boundary was missing
+  // from it: every first `acc doctor` in a new project began "store healthy
+  // (history from undefined)" - measured on 0.8.1.
+  const text = await place.doctor();
+  assert.match(text.split("\n")[0], /^store healthy; /);
+  assert.doesNotMatch(text, /undefined/);
+
+  // The same report reaches --json readers, who should see "no boundary".
+  const { stdout } = await run(process.execPath,
+    [acc, "doctor", "--cwd", place.project, "--json"],
+    { env: { ...process.env, HOME: place.home, ACC_DATA_HOME: place.dataHome,
+      ACC_NO_UPDATE_CHECK: "1", GIT_DIR: "", GIT_WORK_TREE: "" } });
+  assert.equal(JSON.parse(stdout).data.store.trimmedThrough, null);
+});
+
 test("doctor says when a client is wired to an older acc than the one running", async t => {
   const place = await machine(t);
   // What an upgrade leaves behind: `npm install -g` replaces the CLI and the
