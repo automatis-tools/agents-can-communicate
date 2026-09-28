@@ -184,6 +184,38 @@ generated permission component is unchanged.
 If any component was edited or another setting depends on it, ACC preserves the entire
 bundle and reports it for review. Plugin registration can still be removed independently.
 
+### Antigravity CLI command approval
+
+Antigravity CLI asks for approval before each shell command, ACC's included. A session that
+live delivery wakes while you are away would therefore stop at the agent's first ACC command,
+and the peer would get no answer until someone approved it. So when `acc install` installs
+the Antigravity adapter, it always adds one rule to the client's own settings:
+
+```text
+~/.gemini/antigravity-cli/settings.json
+  permissions.allow: command(<home>/.gemini/config/acc/acc-cli.sh)
+```
+
+A one-word rule is a prefix: every command that starts with that path runs without asking.
+The agent then runs every ACC command without asking you, including one a peer's message
+prompts; every other command still asks. Install does not ask about the rule, and the
+delivery policy does not change it: it is part of ACC's Antigravity integration, as its hooks
+are.
+
+ACC keeps every other key and rule in the file, leaves a rule you already had as yours, and
+records what it added in its own data home. `acc uninstall` removes every copy of that rule (one
+in the same words cannot be told from ACC's), and a
+container or file ACC created only if nothing else is in it. A rule removed by hand comes back
+at the next `acc install` or automatic refresh; uninstall is what keeps it out. A file that is
+not valid JSON, or whose `permissions.allow` is not a list, is left as it is and reported. The
+client reads the file when it starts, so restart `agy` after install.
+
+The rule matches only a command whose first word is the path without quotes, so ACC's skill
+for this client writes the path without quotes. When your home path contains a space or a
+shell metacharacter, the path needs quotes, no rule can match it, and ACC adds none.
+`acc doctor` reports the rule as present, absent, or unable to apply, and asks for
+`acc install --adapter antigravity` when ACC's rule is missing.
+
 ## Override local paths and identity
 
 Nothing in `acc.workspace.json` says where state is stored, and nothing there can — that is

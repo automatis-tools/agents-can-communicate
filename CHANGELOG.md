@@ -17,6 +17,40 @@ This unpublished development archive passed clean installation verification. See
 [the evidence](docs/release-evidence/unreleased-doctor-first-run-history.md).
 The package version remains `0.8.1` until a release prepares its own.
 
+## Unreleased — ACC commands without an approval prompt in Antigravity CLI
+
+- Antigravity CLI asks before each shell command, so a session that live delivery woke on
+  1.2.12 stopped at the agent's first ACC command and the peer got no answer (#214).
+  `acc install` now writes one prefix rule whenever it installs the Antigravity adapter:
+  `command(<home>/.gemini/config/acc/acc-cli.sh)` in `permissions.allow` of
+  `~/.gemini/antigravity-cli/settings.json`. Nothing asks about it and the delivery policy does
+  not change it: the user decided on 2026-09-27 that it is always on.
+- Every other key and rule in the file is kept, and a rule the operator already had stays
+  theirs. `acc uninstall` removes every copy of the rule ACC recorded adding, and a container or file
+  ACC created only if nothing else is in it. A rule removed by hand comes back at the next
+  install. A settings file that does not parse, or whose `permissions.allow` is not a list, is
+  never rewritten and is reported.
+- The Antigravity skill names ACC's wrapper without quotes when the path is one shell word
+  and asks the model to start each command exactly as written: on 1.2.12 a command whose first
+  word was quoted matched no allow rule at all. A wrapper path that needs quotes, such as a
+  home with a space, keeps them and gets no rule. Every other client's skill is unchanged.
+- `acc doctor` prints `Antigravity CLI inbound:` with the rule present, absent or unable to
+  apply, the file, and what a live wake meets without it; the remedy for a missing rule is
+  `acc install --adapter antigravity`.
+
+| Candidate artifact | Value |
+|---|---|
+| Built from | `d77855eeed9eb27b74848ff46a2b9cf66504dfb0` |
+| Tarball | `agents-can-communicate-0.8.1.tgz`, 479,931 bytes, 312 files |
+| sha256 | `239d9968cc2c163a6e7c30993661bc7b53f1e5bfe08b7f592b4ec4f32db755c8` |
+
+This unpublished development archive passed clean installation verification. With a local
+build of this change and real Antigravity CLI 1.2.12, a session woken by the relay while idle
+and unattended ran its ACC commands with no approval prompt and answered six seconds after the
+send. See the [design](docs/design/2026-09-27-antigravity-acc-allow-rule.md) and
+[evidence](docs/release-evidence/unreleased-antigravity-acc-allow-rule.md).
+The package version remains `0.8.1` until a release prepares its own.
+
 ## Unreleased — idle and working sessions reported as broken
 
 - `acc doctor` asks the receiver whenever a session has a binding, as the router does before

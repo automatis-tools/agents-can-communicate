@@ -35,11 +35,37 @@ test("install gives this client its own ACC skill, through agy plugin install", 
   // The command it teaches is ACC's own, under the Antigravity shim directory -
   // never the Gemini CLI extension's, which is what the copy this client makes
   // by itself points at, and which is gone the moment Gemini CLI is retired.
-  const commands = [...skill.matchAll(/"([^"]+acc-cli\.sh)"/g)].map(match => match[1]);
+  // Bare where the path is one shell word, quoted where it is not (issue #214).
+  const commands = [...skill.matchAll(/"([^"]+acc-cli\.sh)"|(?<![\w"])(\/[^\s"`]+acc-cli\.sh)/g)]
+    .map(match => match[1] ?? match[2]);
   assert.equal(commands.length > 0, true, "the skill teaches no runnable command");
   for (const command of new Set(commands)) {
     assert.equal(command, path.join(home, ".gemini", "config", "acc", "acc-cli.sh"));
     assert.equal(await exists(command), true, `${command} does not exist`);
+  }
+});
+
+test("the skill names the wrapper bare when its path is one shell word", async t => {
+  // Antigravity CLI 1.2.12 matched no allow rule against a command whose first
+  // word was quoted, so a quoted wrapper always stops at an approval prompt
+  // (issue #214). A path that needs quotes to stay one word keeps them.
+  for (const [prefix, bare] of [["acc-agy-skill-", true], ["acc agy skill ", false]]) {
+    const home = await realpath(await mkdtemp(path.join(tmpdir(), prefix)));
+    t.after(() => rm(home, { recursive: true, force: true }));
+    await mkdir(path.join(home, ".gemini", "config"), { recursive: true });
+    const wrapper = path.join(home, ".gemini", "config", "acc", "acc-cli.sh");
+
+    await installAntigravity({ home, dataHome: path.join(home, "acc-data"),
+      runAgy: fakeAgy().run });
+
+    const skill = await readFile(installedSkill(home), "utf8");
+    assert.equal(skill.includes(`"${wrapper}"`), !bare, home);
+    assert.equal(skill.includes(bare ? `\`${wrapper} status` : `\`"${wrapper}" status`), true,
+      home);
+    // A model that adds quotes of its own, or wraps the call in `sh -c`, is back
+    // at the prompt, so the skill says to keep the first word as it is written.
+    assert.match(skill, /exactly as this skill writes it/);
+    assert.match(skill, /first word/);
   }
 });
 
