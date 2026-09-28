@@ -19,10 +19,20 @@
   home with a space, keeps them and gets no rule. Every other client's skill is unchanged.
 - `acc doctor` prints `Antigravity CLI inbound:` with the rule present, absent or unable to
   apply, the file, and what a live wake meets without it; the remedy for a missing rule is
-  `acc install --adapter antigravity`. The live capture of a woken session answering with no
-  prompt under ACC's rule is still to be recorded. See the
-  [design](docs/design/2026-09-27-antigravity-acc-allow-rule.md) and
-  [evidence draft](docs/release-evidence/unreleased-antigravity-acc-allow-rule.md).
+  `acc install --adapter antigravity`.
+
+| Candidate artifact | Value |
+|---|---|
+| Built from | `4f29432789661f17da543459953a68fbb0e14989` |
+| Tarball | `agents-can-communicate-0.8.1.tgz`, 479,734 bytes, 312 files |
+| sha256 | `d90137f592237d9f4411709b0d45bc926adf37e11b7fe9b0412f9d89d32bbc59` |
+
+This unpublished development archive passed clean installation verification. With a local
+build of this change and real Antigravity CLI 1.2.12, a session woken by the relay while idle
+and unattended ran its ACC commands with no approval prompt and answered six seconds after the
+send. See the [design](docs/design/2026-09-27-antigravity-acc-allow-rule.md) and
+[evidence](docs/release-evidence/unreleased-antigravity-acc-allow-rule.md).
+The package version remains `0.8.1` until a release prepares its own.
 
 ## Unreleased — idle and working sessions reported as broken
 

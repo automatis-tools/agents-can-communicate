@@ -142,4 +142,11 @@ nothing, and agy's own rewrites of the file keeping ACC's entry.
 
 ## Exact local artifact
 
-Pending: measured after the live capture.
+- Source: clean commit `4f29432789661f17da543459953a68fbb0e14989` on
+  `feat/antigravity-acc-allow-rule`, over `main` at `259fdc3`.
+- Archive: `agents-can-communicate-0.8.1.tgz`, packed from that commit.
+- Size: 479,734 bytes; 312 packed entries.
+- SHA-256: `d90137f592237d9f4411709b0d45bc926adf37e11b7fe9b0412f9d89d32bbc59`.
+- Package version remains `0.8.1`; this is an unpublished development artifact.
+
+The exact archive passed `scripts/verify-package.mjs`.
