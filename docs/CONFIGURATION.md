@@ -203,7 +203,8 @@ delivery policy does not change it: it is part of ACC's Antigravity integration,
 are.
 
 ACC keeps every other key and rule in the file, leaves a rule you already had as yours, and
-records what it added in its own data home. `acc uninstall` removes exactly that rule, and a
+records what it added in its own data home. `acc uninstall` removes every copy of that rule (one
+in the same words cannot be told from ACC's), and a
 container or file ACC created only if nothing else is in it. A rule removed by hand comes back
 at the next `acc install` or automatic refresh; uninstall is what keeps it out. A file that is
 not valid JSON, or whose `permissions.allow` is not a list, is left as it is and reported. The

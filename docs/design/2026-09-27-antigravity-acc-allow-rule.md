@@ -91,7 +91,9 @@ matched `sh "<relay>" start`, where the quotes are around an argument. The concl
    record of the file, the exact rule, and which of the file, `permissions` and
    `permissions.allow` ACC had to create. The claim is written before the rule, so a crash
    between the two leaves a claim uninstall drops rather than a rule nobody can attribute.
-   Uninstall removes one copy of the recorded rule, then removes a container ACC created only
+   Uninstall removes every copy of the recorded rule - a copy in the same words cannot be told
+   from ACC's, and the client has duplicated grants itself (review of #218) - then removes a
+   container ACC created only
    if it is empty, and the file ACC created only if nothing is left in it. A rule the
    operator already had is never claimed.
 8. **The operator's file is never rewritten when ACC cannot read it.** A file that does not

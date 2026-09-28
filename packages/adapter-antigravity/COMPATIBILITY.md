@@ -685,7 +685,7 @@ grant is matched as a full word.
 exactly as written. Every install of this adapter adds `command(<wrapper>)` to
 `permissions.allow` and records the claim in `<data home>/acc/adapter-antigravity/`, whatever
 the delivery policy and with no question: the user decided on 2026-09-27 that it is always on.
-Uninstall takes back exactly that rule. A wrapper path that needs quotes gets no rule, and
+Uninstall takes back every copy of that rule. A wrapper path that needs quotes gets no rule, and
 doctor says why. Detection reports the rule as `allowed`, `prompts` (absent: ACC's install did
 not write it or it was removed, and doctor asks for `acc install --adapter antigravity`),
 `unmatchable` or `unreadable`.

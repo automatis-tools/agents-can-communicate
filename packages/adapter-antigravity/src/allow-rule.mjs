@@ -147,8 +147,11 @@ async function addRule(context, found) {
 
 /**
  * Take back the rule ACC recorded adding, and the containers it created if they
- * are empty. Anything else in the file stays, including a rule the operator
- * added in the same words after ACC's was gone.
+ * are empty. Every copy of it goes: one in the same words cannot be told from
+ * ACC's, and the client itself has duplicated grants across reloads, so taking
+ * one back left ACC commands running unasked after uninstall (review of #218).
+ * Anything else in the file stays, and a rule the operator had before ACC came
+ * was never claimed.
  */
 export async function withdrawAllowRule(context) {
   const file = agySettingsPath(context.home);
@@ -161,12 +164,12 @@ export async function withdrawAllowRule(context) {
     return { changes: [], diagnostics: [], needsAction: [`${file} ${settings.reason}; ACC `
       + `left it as it is and still has to remove its ${claim.rule} from permissions.allow`] };
   }
-  const at = settings.allow.lastIndexOf(claim.rule);
-  if (at === -1) {
+  if (!settings.allow.includes(claim.rule)) {
     await rm(claimFile, { force: true });
     return { changes: [], diagnostics: [], needsAction: [] };
   }
-  const permissions = { ...settings.value.permissions, allow: settings.allow.toSpliced(at, 1) };
+  const permissions = { ...settings.value.permissions,
+    allow: settings.allow.filter(rule => rule !== claim.rule) };
   if (claim.created?.allow === true && permissions.allow.length === 0) delete permissions.allow;
   const next = { ...settings.value, permissions };
   if (claim.created?.permissions === true && Object.keys(permissions).length === 0) {

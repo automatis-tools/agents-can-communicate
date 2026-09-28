@@ -9,7 +9,7 @@
   `~/.gemini/antigravity-cli/settings.json`. Nothing asks about it and the delivery policy does
   not change it: the user decided on 2026-09-27 that it is always on.
 - Every other key and rule in the file is kept, and a rule the operator already had stays
-  theirs. `acc uninstall` removes exactly the rule ACC recorded adding, and a container or file
+  theirs. `acc uninstall` removes every copy of the rule ACC recorded adding, and a container or file
   ACC created only if nothing else is in it. A rule removed by hand comes back at the next
   install. A settings file that does not parse, or whose `permissions.allow` is not a list, is
   never rewritten and is reported.

@@ -106,6 +106,14 @@ Each was applied alone, the named tests run, and the file restored.
 | detection drops `commandApproval` | installer detect test; the first end-to-end test |
 | `decisionOf` carries `allowCommands`, or rejects a malformed one | record carrying the old answer |
 
+## Review of the pull request
+
+The review of #218 found that uninstall took back only the last copy of ACC's rule, so a copy
+in the same words added after it - by the operator or by the client, which has duplicated grants
+itself - left ACC commands running unasked after uninstall. Uninstall now removes every copy.
+`allow-rule-install.test.mjs` gains "uninstall leaves no copy of ACC's rule, however many were
+added after it": it failed on the old code, and putting back a single-copy removal fails it again.
+
 ## Suite
 
 `npm test` on the evidence commit `c019206`: 2,687 tests, 2,686 passing, 0 failing, 1 skipped.

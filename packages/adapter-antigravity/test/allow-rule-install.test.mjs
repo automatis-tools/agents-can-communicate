@@ -61,6 +61,29 @@ test("uninstall takes back exactly the rule ACC added", async t => {
   assert.equal(result.changes.includes(fixture.settings), true);
 });
 
+test("uninstall leaves no copy of ACC's rule, however many were added after it", async t => {
+  // A copy in the same words cannot be told from ACC's own: the client has
+  // accumulated duplicate grants across reloads itself (vendor changelog). Taking
+  // one copy back left the other, and ACC commands still ran unasked after
+  // uninstall (review of #218). A rule the operator had before ACC came is never
+  // claimed, so it is untouched.
+  const fixture = await agyHome(t);
+  await fixture.write(fixture.theirs);
+  const before = await fixture.read();
+  await installAntigravity(fixture.context);
+  const installed = JSON.parse(await fixture.read());
+  await fixture.write({ ...installed, permissions: { ...installed.permissions,
+    allow: [...installed.permissions.allow, "command(git status)", fixture.rule] } });
+
+  await uninstallAntigravity(fixture.context);
+
+  const after = JSON.parse(await fixture.read());
+  assert.equal(after.permissions.allow.includes(fixture.rule), false,
+    "a copy of ACC's rule survived uninstall");
+  assert.deepEqual(after.permissions.allow,
+    [...JSON.parse(before).permissions.allow, "command(git status)"]);
+});
+
 test("a rule the operator already has stays theirs through install and uninstall", async t => {
   // The bare form ACC writes, and the quoted one-word form 1.2.12 was captured
   // matching: either one already allows every ACC command.
