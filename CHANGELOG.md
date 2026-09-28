@@ -1,5 +1,35 @@
 # Changelog
 
+## 0.8.2 — release candidate
+
+- A Codex session wakes a Claude Code session live. ACC's Codex permission profile also allows
+  the Claude Code inbox directories, from Claude Code's environment and from every inbox ACC has
+  bound, written in resolved form; `acc update` rewrites an ACC-owned profile, and doctor
+  reports configured only when every receiver socket is granted (#213).
+- An Antigravity CLI session woken while nobody is at its terminal answers without an approval
+  prompt: every install adds `command(<wrapper>)` to Antigravity CLI's `permissions.allow`, the
+  skill calls the wrapper without quotes, and uninstall removes every copy of the rule (#214).
+- Doctor and status stop calling a working or idle session broken: a lapsed lease is
+  re-verified as the router does, a stale session is described by what a message meets, and a
+  turn spent in shell commands keeps the session online (#209, #210, #215).
+- Client detection runs its version probe on the PATH it is given, and a store opening beside
+  the stage sweep no longer fails with ENOENT on Linux. A first doctor in a new project stops
+  printing `history from undefined`.
+- The store format is unchanged, so 0.8.1 and 0.8.2 can share a workspace.
+
+| Candidate artifact | Value |
+|---|---|
+| Built from | `7d111c0f0c960965db3bcab340455541817acca4` |
+| Tarball | `agents-can-communicate-0.8.2.tgz`, 486,472 bytes, 315 files |
+| sha256 | `7a8c4f47636b2cf00844f1b3e558565cbd1a9abda30d0223723a3fedde1a615f` |
+
+The exact archive passed clean installation verification and all 23 managed-update packed
+checks. The published 0.8.1 updated itself to these bytes, widened its Codex profile on the
+refresh, and the 0.8.1 code and this archive read and wrote one store. Real Claude Code, Codex
+and Antigravity CLI sessions exercised the new delivery paths on a local build of the same
+changes before their review fixes. See [0.8.2 release evidence](docs/release-evidence/v0.8.2.md)
+for verification and limits. Earlier development records below retain their original provenance.
+
 ## Unreleased — Codex sessions blocked from waking Claude Code
 
 - A Codex session can wake a Claude Code session. The ACC permission profile for Codex allowed
