@@ -123,9 +123,8 @@ the rule was removed by hand, stays after uninstall.
 
 ## Suite
 
-`npm test` on the evidence commit `0453ba4`, after the review fix: 2,688 tests, 2,687 passing,
-0 failing, 1 skipped. The skipped test is the existing uninstall check that skips on a machine
-where Gemini CLI is installed, as on `main`. Nothing was re-run.
+`npm test` on the previous candidate record `0453ba4`, after the first review fix and before
+the second: 2,688 tests, 2,687 passing, 0 failing, 1 skipped.
 
 ## Live capture
 
@@ -163,11 +162,11 @@ nothing, and agy's own rewrites of the file keeping ACC's entry.
 
 ## Exact local artifact
 
-- Source: clean commit `8f871a3e7cde0ac417caaa526cbbb24ca85833bb` on
+- Source: clean commit `d77855eeed9eb27b74848ff46a2b9cf66504dfb0` on
   `feat/antigravity-acc-allow-rule`, over `main` at `259fdc3`.
 - Archive: `agents-can-communicate-0.8.1.tgz`, packed from that commit.
-- Size: 479,823 bytes; 312 packed entries.
-- SHA-256: `97c9bf3b2a9d16cd361a73f95436d3ad4838d5240377948f767a3d03965b299b`.
+- Size: 479,931 bytes; 312 packed entries.
+- SHA-256: `239d9968cc2c163a6e7c30993661bc7b53f1e5bfe08b7f592b4ec4f32db755c8`.
 - Package version remains `0.8.1`; this is an unpublished development artifact.
 
 The exact archive passed `scripts/verify-package.mjs`.
