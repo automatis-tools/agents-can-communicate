@@ -52,7 +52,9 @@ export async function downloadRelease(root, release, { env = process.env } = {})
   const temporary = await mkdtemp(path.join(downloads, ".download-"));
   try {
     await writeFile(path.join(temporary, "package.json"), JSON.stringify({ private: true, name: "acc-runtime-download", version: "1.0.0" }));
-    await exec(process.execPath, [await npmCli(env), "install", "--ignore-scripts", "--omit=dev",
+    // Discovery asked the registry itself; --prefer-online makes npm ask too,
+    // instead of trusting a package document it cached before the release (#221).
+    await exec(process.execPath, [await npmCli(env), "install", "--prefer-online", "--ignore-scripts", "--omit=dev",
       "--global=false", "--prefix", temporary, "--package-lock=true",
       "--package-lock-only=false", "--dry-run=false", "--workspaces=false",
       "--include-workspace-root=false", "--no-audit", "--no-fund", "--save=true", "--save-exact", "--registry", release.registry,
