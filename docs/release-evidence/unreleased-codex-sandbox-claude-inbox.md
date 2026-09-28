@@ -104,8 +104,9 @@ Each was applied alone, caught by the tests named, and reverted:
 
 ## Suite
 
-Pending: `npm test` on the evidence commit. `tests/acceptance/recorded-candidate.test.mjs`
-fails until the candidate is re-measured.
+`npm test` on the evidence commit `88f8ebb`: 2,672 tests, 2,671 passing, 0 failing, 1 skipped.
+The skipped test is the existing uninstall check that skips on a machine where Gemini CLI is
+installed, as on `main`. Nothing was re-run.
 
 ## Live capture
 
