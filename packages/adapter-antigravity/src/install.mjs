@@ -5,11 +5,13 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 
-import { bakeSkillCommand, blankJson, defaultAntigravityRelay, ownVersion, removeIfEmpty,
-  stampPluginVersion, writeCliShim, writeForeignJson, writeHookShim }
+import { bakeSkillCommand, blankJson, defaultAntigravityRelay, isShellWord, ownVersion,
+  removeIfEmpty, stampPluginVersion, writeCliShim, writeForeignJson, writeHookShim }
   from "@agents-can-communicate/adapter-sdk";
 import { AccError, EXIT } from "@agents-can-communicate/protocol";
 
+import { agySettingsPath, cliWrapperPath, ensureAllowRule, inspectAllowRule,
+  withdrawAllowRule } from "./allow-rule.mjs";
 import { relayShimPath, runningRelays, stopRelays } from "./relays.mjs";
 
 const run = promisify(execFile);
@@ -349,7 +351,9 @@ async function installSkillPlugin(context) {
     await cp(bundle, plugin, { recursive: true });
     await stampPluginVersion({ file: path.join(plugin, "plugin.json"),
       version: await ownVersion(import.meta.url), io: { readFile, writeFile } });
-    await bakeSkillCommand({ root: plugin, cliShim });
+    // Bare when the path allows it: 1.2.12 matched no allow rule against a
+    // command whose first word was quoted (issue #214).
+    await bakeSkillCommand({ root: plugin, cliShim, bareWhenSafe: true });
     await agyFor(context)(["plugin", "install", plugin], { home, env: context.env });
   } finally {
     await rm(stage, { recursive: true, force: true });
@@ -399,10 +403,13 @@ export async function installAntigravity(context) {
     await writeFile(createdMarker(context, file), `${file}\n`);
   }
   await installSkillPlugin(context);
-  const changes = [shimDir(home), file, pluginInstallPath(home), vendorManifestPath(home)];
+  // After the skill, whose wrapper the rule names. Always on (#214, 2026-09-27).
+  const allow = await ensureAllowRule(context);
+  const changes = [shimDir(home), file, pluginInstallPath(home), vendorManifestPath(home),
+    ...allow.changes];
 
-  const diagnostics = [];
-  const needsAction = [];
+  const diagnostics = [...allow.diagnostics];
+  const needsAction = [...allow.needsAction];
   if (locationOf(context) === "workspace") {
     diagnostics.push("a workspace registration loads only while this project is an open "
       + `Antigravity workspace; in print mode pass --add-dir ${context.antigravityWorkspace}`);
@@ -524,8 +531,14 @@ export async function uninstallAntigravity(context) {
     await rm(manifestMarker, { force: true });
   }
 
+  // The allow rule ACC recorded adding, and nothing else in the operator's file.
+  const allow = await withdrawAllowRule(context);
+  changes.push(...allow.changes);
+  diagnostics.push(...allow.diagnostics);
+
   if (!keep.includes(shimDir(home))) await rm(shimDir(home), { recursive: true, force: true });
-  return { ok: true, changes, diagnostics };
+  return { ok: true, changes, diagnostics,
+    ...(allow.needsAction.length > 0 ? { needsAction: allow.needsAction } : {}) };
 }
 
 /**
@@ -560,6 +573,12 @@ export async function detectAntigravity(context) {
   const needsAction = [];
   const blocked = locationChoice(context);
   const imported = await exists(importedPluginPath(context.home));
+  // Read from files only, so it is known for a client ACC did not run. It is
+  // the client's own approval control over what a woken session can answer.
+  const commandApproval = await inspectAllowRule(context);
+  const approval = { commandApproval,
+    inboundDelivery: { state: commandApproval.state, diagnostic: commandApproval.diagnostic } };
+  diagnostics.push(commandApproval.diagnostic);
   // The installer runs every adapter's detect and passes a null version for a
   // client it did not find. Asking agy then would spawn a binary the installer
   // could not run a moment ago, or - where it does exist but did not answer -
@@ -568,7 +587,8 @@ export async function detectAntigravity(context) {
     diagnostics.push("acc hooks not registered: Antigravity CLI was not found, so it was "
       + "not asked what it has loaded");
     if (blocked !== null) diagnostics.push(blocked.reason);
-    return { ok: true, changes: [], diagnostics, ...(blocked === null ? {} : { blocked }) };
+    return { ok: true, changes: [], diagnostics, ...approval,
+      ...(blocked === null ? {} : { blocked }) };
   }
   let readback = null;
   try {
@@ -622,11 +642,22 @@ export async function detectAntigravity(context) {
       + "first run and loads its skill, but none of its hook names, so no ACC hook runs here "
       + "(issue #176)");
   }
+  // Every install writes the rule, so where ACC's wrapper is on disk a missing
+  // or unreadable rule is an install to finish, whatever the delivery policy.
+  if (await exists(cliWrapperPath(context.home))) {
+    if (commandApproval.state === "prompts") {
+      needsAction.push(`acc install --adapter antigravity  # ${commandApproval.rule} is missing `
+        + `from permissions.allow in ${commandApproval.file}, so each ACC command waits for `
+        + "approval");
+    } else if (commandApproval.state === "unreadable") {
+      needsAction.push(commandApproval.diagnostic);
+    }
+  }
   if (blocked !== null) {
     diagnostics.push(blocked.reason);
     needsAction.push(blocked.reason);
   }
-  return { ok: true, changes: [], diagnostics,
+  return { ok: true, changes: [], diagnostics, ...approval,
     ...(blocked === null ? {} : { blocked }),
     ...(needsAction.length > 0 ? { needsAction } : {}) };
 }
@@ -678,8 +709,12 @@ export function planAntigravityInstall(context) {
   // installer leaves to the adapter - so the installer never deletes the copy
   // ahead of `agy plugin uninstall` and strands its manifest entry. That exact
   // ordering, with the shim directory, once left `{}` behind in the user's home.
+  // The operator's own settings, edited for ACC's allow rule wherever one can
+  // match: a wrapper path that needs quotes gets none.
   const plugin = [{ path: pluginInstallPath(context.home), kind: "merge" },
-    { path: vendorManifestPath(context.home), kind: "merge" }];
+    { path: vendorManifestPath(context.home), kind: "merge" },
+    ...(isShellWord(cliWrapperPath(context.home))
+      ? [{ path: agySettingsPath(context.home), kind: "merge" }] : [])];
   if (locationChoice(context) !== null) {
     return [shim, ...plugin,
       { path: globalHooksPath(context.home), kind: "merge" },
