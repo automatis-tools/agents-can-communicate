@@ -123,8 +123,10 @@ the rule was removed by hand, stays after uninstall.
 
 ## Suite
 
-`npm test` on the previous candidate record `0453ba4`, after the first review fix and before
-the second: 2,688 tests, 2,687 passing, 0 failing, 1 skipped.
+`npm test` on the evidence commit `be9fae0`, run under `env -i` with only `HOME`, `USER`,
+`TMPDIR` and a PATH of system directories plus node, so no real client is reachable, as in CI:
+2,689 tests, 2,688 passing, 0 failing, 1 skipped. The skipped test is the existing uninstall check
+that skips on a machine where Gemini CLI is installed, as on `main`. Nothing was re-run.
 
 ## Live capture
 
