@@ -131,8 +131,9 @@ The allowed values are `off`, `actionable`, and `all`; the default is `off`. Thi
 does not belong in `acc.workspace.json`, where a pull request could opt someone else into
 spending a turn. It also cannot create a capability. Every adapter reads live-delivery
 consent from this installation record, and only from it. Exact-version evidence governs
-ordinary hook features. Claude Code live delivery separately requires macOS arm64, version
-2.1.282 or newer, and a current feature probe before installation applies the requested
+ordinary hook features. Claude Code live delivery separately requires version 2.1.282 or
+newer on macOS or Linux (on native Windows its inbox is a named pipe, so delivery stays
+next-turn), and a current feature probe before installation applies the requested
 policy. If those install-time checks fail, effective policy remains `off` and the installer
 reports next-turn or inbox fallback. Each later session must also pass its own
 generation-bound handshake. A failed session handshake clears or refuses that binding and
@@ -146,7 +147,7 @@ each wake for your approval unless its `crossSessionInbound` setting is `accept`
 never overrides them. See
 [held or dropped wakes](TROUBLESHOOTING.md#a-claude-code-session-holds-or-drops-acc-wakes).
 
-Codex LocalDaemon delivery separately requires macOS arm64, Codex 0.152.1 or newer, a
+Codex LocalDaemon delivery separately requires Codex 0.152.1 or newer, a
 current feature probe, and exact thread, canonical cwd, process, version and protocol
 checks. On Codex 0.154.0 or newer, explicit complete setup can download a missing matching
 standalone package and prepare a definitely absent service. The setup choice names the
@@ -160,7 +161,7 @@ Unavailable or ineligible sessions retain durable inbox fallback. Use
 ### Codex outgoing permissions
 
 Receiving a native message and sending from the agent's sandbox are separate operations.
-On Codex 0.153.4 or newer on macOS arm64, live opt-in also configures outgoing access
+On Codex 0.153.4 or newer, live opt-in also configures outgoing access
 for default workspace permissions. This happens even when the daemon is not yet available.
 Installation, its preview, and the interactive consent question disclose this change.
 
