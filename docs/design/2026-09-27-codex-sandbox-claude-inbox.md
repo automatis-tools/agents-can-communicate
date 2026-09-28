@@ -79,6 +79,31 @@ doctor's comparison kept the old list.
    (`customized`), or when a policy the user added beside it makes `hasCustomPolicy` true. A
    fresh `off` install still adds nothing.
 
+7. **Inboxes ACC has bound are covered too** (review of #217, Mykola's decision: "cover
+   observed inboxes"). The environment-derived directories come from the process that runs
+   install or doctor. A Claude Code session started with its own absolute
+   `CLAUDE_CODE_TMPDIR` or `XDG_RUNTIME_DIR` binds elsewhere, the Codex sandbox got EPERM
+   waking it, and doctor, checking the same list, said configured. The Claude Code adapter's
+   declaration now adds the directory of each `socketPath` in its own endpoint records,
+   `<stateRoot>/workspaces/*/claude-inbox-endpoints/`. The adapter owns that location, and the
+   Antigravity adapter already walks the same `workspaces` tree for its relays. Install and
+   the managed refresh grant a directory once a session there has been bound. Until then
+   doctor names it with `acc install --adapter codex`.
+   - **Synchronous.** `inboundSockets`, `receiverSockets` and `clientContext` stay
+     synchronous, and the adapter reads its records with synchronous calls. This is the least
+     invasive shape: `clientContext` has 28 callers, most in tests that read its fields
+     directly. It runs once per install, doctor or refresh command, never in a hook. The
+     reads are bounded: 1,024 workspaces, 256 records each, 8 KiB a record.
+   - **Never throws, and grants only inbox directories.** A record that is not a regular
+     file this user owns, is reached through a link, does not parse or has no absolute
+     `socketPath` adds nothing. A grant widens the Codex sandbox, so a directory is taken
+     only when it is named as Claude Code names its inboxes, `cc-socks` or `cc-socks-<uid>`.
+     A record naming `~/.ssh/agent.sock` grants nothing.
+   - **Stale records count.** A directory a session once bound in is likely to be used again,
+     and a record is swept only once its process is gone. A grant that outlives every session
+     costs nothing: the socket in it must still be a live Claude Code inbox, and ACC checks
+     the registry before each wake.
+
 ## What was measured
 
 With `codex sandbox -P <profile>` (Codex 0.157.1, macOS arm64) and a temporary `CODEX_HOME`
@@ -117,8 +142,13 @@ profile. Details: `docs/release-evidence/unreleased-codex-sandbox-claude-inbox.m
   resolver only.
 - Termux and a relative `XDG_RUNTIME_DIR` or `CLAUDE_CODE_TMPDIR` are taken from the
   executable, not observed.
+- A session with its own inbox directory is covered only after the next `acc install` or
+  `acc update`, and a Codex session started after that. Until then its first live wake from
+  Codex still gets EPERM and waits for its next turn, and doctor says why. Nothing re-runs
+  install when a binding appears.
 
 ## Out of scope
 
-- `docs/CONFIGURATION.md` still says outgoing setup runs on macOS arm64 only, while 0.8.1
-  applies it on every platform. That text predates this change.
+- The current docs said outgoing setup and Claude Code live delivery run on macOS arm64 only,
+  while 0.8.1 applies both on every platform. That text predated this change and was
+  corrected on this branch in 3f2131b.

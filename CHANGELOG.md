@@ -20,6 +20,13 @@
   the recorded policy, `off` included, and uninstall still restores the original file. Start a
   new Codex session afterwards. A profile you edited stays yours.
 - The consent question says the allowlist reaches other clients' session inboxes.
+- A Claude Code session started with its own `CLAUDE_CODE_TMPDIR` or `XDG_RUNTIME_DIR` is
+  covered too. The grant list came only from the environment of the install or doctor process,
+  so such a session's inbox was outside it and doctor still said configured. The Claude Code
+  adapter now also declares the directory of every inbox ACC has bound on this machine, read
+  from its own endpoint records. `acc install` and `acc update` grant it once a session there
+  has been bound; until then doctor names it with `acc install --adapter codex` (review of
+  #217).
 
 - Client detection runs the version probe on the PATH it is given, as its native probes already
   did. A caller passing its own environment - the managed refresh does - saw the client as absent

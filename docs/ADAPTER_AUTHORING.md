@@ -231,7 +231,10 @@ after confirmed core retirement; it must remain bounded and fail open for hooks.
 An adapter whose `offerMessage()` connects to a Unix socket in the recipient's session
 declares where those sockets live with the optional `inboundSockets(context)`. It returns
 absolute paths, directories or sockets, derived from `context.env`, `context.platform` and
-the client homes in the context, and it must not touch the filesystem. The installer
+the client homes in the context. It runs synchronously, once per install, doctor or refresh
+command, and must never throw. It may read the adapter's own records under
+`context.stateRoot` when a session can bind outside what the environment implies. Claude Code
+reads its endpoint records there, and keeps each read bounded. The installer
 composes every known adapter's declaration into `context.receiverSockets`. An adapter whose
 client sandboxes the sender's shell allows exactly that list, and reports its outgoing
 permissions configured only while every entry is allowed. It never names another vendor's

@@ -980,8 +980,12 @@ macOS arm64: `/tmp/cc-socks/<pid>.sock`, with no `XDG_RUNTIME_DIR` set.
 
 The adapter declares these directories as `inboundSockets` (`src/inbox-socket-directories.mjs`):
 the primary one from the environment, `/tmp/cc-socks`, the `-<uid>` fallback, and
-`/run/user/<uid>/cc-socks` on Linux; nothing on native Windows. A sender that runs in a
-sandbox is allowed exactly these. Issue #213: ACC 0.8.0 and 0.8.1 did not declare them, the
+`/run/user/<uid>/cc-socks` on Linux; nothing on native Windows. It also declares the
+directory of every inbox ACC has bound on this machine, from the `socketPath` of its endpoint
+records (`src/inbox-observed-directories.mjs`). A session started with its own
+`CLAUDE_CODE_TMPDIR` or `XDG_RUNTIME_DIR` binds outside the installer's directories (review
+of #217). Only a directory named `cc-socks` or `cc-socks-<uid>` is taken from a record. A
+sender that runs in a sandbox is allowed exactly these. Issue #213: ACC 0.8.0 and 0.8.1 did not declare them, the
 Codex profile allowed only ACC's channel directory and the Codex control socket, and
 every `acc reply` from a Codex shell to a Claude Code session ended `transport_permission_denied`
 and waited for the recipient's next turn. The Codex adapter's COMPATIBILITY.md has the

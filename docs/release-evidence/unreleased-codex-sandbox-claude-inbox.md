@@ -113,6 +113,29 @@ because a real `codex` is on its PATH; run with `env -i` there, it failed the sa
 version probe now runs with the given environment, and `packages/installer/test/detect.test.mjs`
 gains "the version probe finds the client on the PATH detection was given", which failed first.
 
+## Found by review on the pull request
+
+Review comment 4123782059 on #217 (medium): the grant list came only from the environment
+of the process that runs install or doctor. A Claude Code session started with its own
+absolute `CLAUDE_CODE_TMPDIR` or `XDG_RUNTIME_DIR` binds its inbox outside it, the Codex
+sandbox gets EPERM, and doctor still says configured because it checks the same list. Chosen
+fix: cover the inboxes ACC has bound. The Claude Code adapter's `inboundSockets` also returns
+the directory of every `socketPath` in its endpoint records under
+`<stateRoot>/workspaces/*/claude-inbox-endpoints/`
+(`packages/adapter-claude-code/src/inbox-observed-directories.mjs`). The reads are synchronous
+and bounded, and they never throw. A directory is taken only when named `cc-socks` or
+`cc-socks-<uid>`. `packages/cli/test/codex-grants-observed-inbox.test.mjs` binds a session
+under its own directory through the adapter's record writer. Doctor then names that directory
+with `acc install --adapter codex`, and the next install grants it. Without the new
+declaration, this test fails at doctor still reading `configured`.
+`packages/adapter-claude-code/test/inbox-observed-directories.test.mjs` covers every workspace
+and the records that must add nothing: unparsable, relative, non-inbox directory, wrong file
+name, oversized, a link, another owner, and a relative state root. Twelve mutations were
+each caught: the adapter ignoring the records, or checking ownership against the context's
+uid; the module accepting any directory name, any file name, a link, any size, any owner, a
+relative or non-string socket path, or a relative state root; a listing error that throws;
+and the socket path granted instead of its directory.
+
 ## Suite
 
 `npm test` on the evidence commit `802cfe4`, run under `env -i` with only `HOME`, `USER`,

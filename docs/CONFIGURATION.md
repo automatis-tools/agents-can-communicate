@@ -174,7 +174,7 @@ install names Codex alone:
 |---|---|
 | Codex | the control socket, `<CODEX_HOME>/app-server-control/app-server-control.sock` |
 | Antigravity CLI relay | the ACC channel directory, `/tmp/acc-ch-<uid>` on macOS |
-| Claude Code inbox | `/tmp/cc-socks`, `/tmp/cc-socks-<uid>`, `$XDG_RUNTIME_DIR/cc-socks` or else `$CLAUDE_CODE_TMPDIR/cc-socks` when set, and `/run/user/<uid>/cc-socks` on Linux |
+| Claude Code inbox | `/tmp/cc-socks`, `/tmp/cc-socks-<uid>`, `$XDG_RUNTIME_DIR/cc-socks` or else `$CLAUDE_CODE_TMPDIR/cc-socks` when set, `/run/user/<uid>/cc-socks` on Linux, and the directory of every Claude Code inbox ACC has bound on this machine |
 
 ACC writes each path with its existing parent resolved, so on macOS the entries read
 `/private/tmp/...`. Codex resolves a granted path only if it exists when Codex builds the
@@ -195,6 +195,13 @@ above. A profile that ACC 0.8.0 or 0.8.1 wrote lacks the Claude Code inbox direc
 doctor names the missing paths and `acc install --adapter codex`. That command and
 `acc update` rewrite ACC's own profile under the recorded delivery policy, `off` included.
 Start a new Codex session afterwards.
+
+The environment variables above are read from the process that runs `acc install` or
+`acc doctor`. A Claude Code session started with its own `CLAUDE_CODE_TMPDIR` or
+`XDG_RUNTIME_DIR` binds its inbox elsewhere. ACC learns that directory when its hooks first
+bind the session, from its own endpoint record. From then on doctor names the directory
+until `acc install --adapter codex` or `acc update` adds it. Only a directory named as Claude
+Code names its inboxes, `cc-socks` or `cc-socks-<uid>`, is taken from a record.
 
 An existing legacy workspace-write configuration is migrated only when its sole writable
 root is ACC's state directory. Custom permission/configuration profiles, additional roots,
