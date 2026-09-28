@@ -25,17 +25,16 @@ The existing test that ran doctor on a fresh data home matched only `/store heal
 
 ## Suite
 
-`npm test` on the evidence commit `75dfe4f`: 2,647 tests, 2,646 passing, 0 failing, 1 skipped.
-The skipped test is the existing uninstall check that skips on a machine where Gemini CLI is
-installed, as on `main`. Nothing was re-run.
+`npm test` on the previous candidate record `75dfe4f`, before `main` with #218 was merged in:
+2,647 tests, 2,646 passing, 0 failing, 1 skipped.
 
 ## Exact local artifact
 
-- Source: clean commit `159e6948ae8a27617adba0b397cfd148136ef038` on
-  `fix/doctor-first-run-history`, over `main` at `259fdc3`.
+- Source: clean commit `ed33fff3e668430ba7250294e5f079655153fd2e` on
+  `fix/doctor-first-run-history`, with `main` at `c6bffb0` (#218) merged in.
 - Archive: `agents-can-communicate-0.8.1.tgz`, packed from that commit.
-- Size: 474,017 bytes; 311 packed entries.
-- SHA-256: `fc93d86c2a3d3efb3220f56874d148778986212dc56bfe3803209f069df122a1`.
+- Size: 480,041 bytes; 312 packed entries.
+- SHA-256: `9f5279cee9aab453f09dc98e9abb1ac3d7a3fd61efce3dff3c06a2378295bc61`.
 - Package version remains `0.8.1`; this is an unpublished development artifact.
 
 The exact archive passed `scripts/verify-package.mjs`.

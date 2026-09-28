@@ -9,9 +9,9 @@
 
 | Candidate artifact | Value |
 |---|---|
-| Built from | `159e6948ae8a27617adba0b397cfd148136ef038` |
-| Tarball | `agents-can-communicate-0.8.1.tgz`, 474,017 bytes, 311 files |
-| sha256 | `fc93d86c2a3d3efb3220f56874d148778986212dc56bfe3803209f069df122a1` |
+| Built from | `ed33fff3e668430ba7250294e5f079655153fd2e` |
+| Tarball | `agents-can-communicate-0.8.1.tgz`, 480,041 bytes, 312 files |
+| sha256 | `9f5279cee9aab453f09dc98e9abb1ac3d7a3fd61efce3dff3c06a2378295bc61` |
 
 This unpublished development archive passed clean installation verification. See
 [the evidence](docs/release-evidence/unreleased-doctor-first-run-history.md).
