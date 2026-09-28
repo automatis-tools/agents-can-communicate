@@ -115,9 +115,9 @@ gains "the version probe finds the client on the PATH detection was given", whic
 
 ## Suite
 
-`npm test` on the evidence commit `88f8ebb`: 2,672 tests, 2,671 passing, 0 failing, 1 skipped.
-The skipped test is the existing uninstall check that skips on a machine where Gemini CLI is
-installed, as on `main`. Nothing was re-run.
+`npm test` on the previous candidate record `88f8ebb`, before the detection fix: 2,672 tests,
+2,671 passing, 0 failing, 1 skipped - run on the capture machine, whose PATH holds a real
+`codex`, which is why it passed where CI failed.
 
 ## Live capture
 
@@ -159,11 +159,11 @@ or per command, and the `acc update` refresh on the real managed runtime (covere
 
 ## Exact local artifact
 
-- Source: clean commit `3f2131bbaf38128977f6a9a0c6e80663ca0d2507` on
+- Source: clean commit `ad23679fc73500b36db8956cd22b96979b1773d6` on
   `fix/codex-sandbox-claude-inbox`, over `main` at `259fdc3`.
 - Archive: `agents-can-communicate-0.8.1.tgz`, packed from that commit.
-- Size: 477,606 bytes; 313 packed entries.
-- SHA-256: `69ca5d87b1610ead0885946af8f405b7ac0eef92455334a0fd5f51546a913821`.
+- Size: 477,738 bytes; 313 packed entries.
+- SHA-256: `e99bc506041a261f80f17d0c31b311f174227f0d6a035df0ee9b1d24e2e571b0`.
 - Package version remains `0.8.1`; this is an unpublished development artifact.
 
 The exact archive passed `scripts/verify-package.mjs`.
