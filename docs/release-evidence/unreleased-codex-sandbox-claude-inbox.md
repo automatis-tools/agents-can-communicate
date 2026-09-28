@@ -115,9 +115,13 @@ gains "the version probe finds the client on the PATH detection was given", whic
 
 ## Suite
 
-`npm test` on the previous candidate record `88f8ebb`, before the detection fix: 2,672 tests,
-2,671 passing, 0 failing, 1 skipped - run on the capture machine, whose PATH holds a real
-`codex`, which is why it passed where CI failed.
+`npm test` on the evidence commit `802cfe4`, run under `env -i` with only `HOME`, `USER`,
+`TMPDIR` and a PATH of system directories plus node, so no real client is reachable, as in CI:
+2,673 tests, 2,672 passing, 0 failing, 1 skipped. The skipped test is the existing uninstall check
+that skips on a machine where Gemini CLI is installed, as on `main`. Nothing was re-run.
+
+The earlier run on `88f8ebb`, in the capture machine's own shell, passed because its PATH holds a
+real `codex`.
 
 ## Live capture
 
