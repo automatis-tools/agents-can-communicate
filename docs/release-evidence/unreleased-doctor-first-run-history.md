@@ -23,6 +23,12 @@ a history it does not have": the first line starts `store healthy; `, the text c
 unchanged code with the measured line, and removing `trimmedThrough: null` fails it again.
 The existing test that ran doctor on a fresh data home matched only `/store healthy/`.
 
+## Suite
+
+`npm test` on the evidence commit `75dfe4f`: 2,647 tests, 2,646 passing, 0 failing, 1 skipped.
+The skipped test is the existing uninstall check that skips on a machine where Gemini CLI is
+installed, as on `main`. Nothing was re-run.
+
 ## Exact local artifact
 
 - Source: clean commit `159e6948ae8a27617adba0b397cfd148136ef038` on
