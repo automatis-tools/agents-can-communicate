@@ -116,9 +116,9 @@ added after it": it failed on the old code, and putting back a single-copy remov
 
 ## Suite
 
-`npm test` on the evidence commit `c019206`: 2,687 tests, 2,686 passing, 0 failing, 1 skipped.
-The skipped test is the existing uninstall check that skips on a machine where Gemini CLI is
-installed, as on `main`. Nothing was re-run.
+`npm test` on the previous candidate record `c019206`, before the review fix: 2,687 tests,
+2,686 passing, 0 failing, 1 skipped (the existing uninstall check that skips where Gemini CLI
+is installed).
 
 ## Live capture
 
@@ -156,11 +156,11 @@ nothing, and agy's own rewrites of the file keeping ACC's entry.
 
 ## Exact local artifact
 
-- Source: clean commit `4f29432789661f17da543459953a68fbb0e14989` on
+- Source: clean commit `8f871a3e7cde0ac417caaa526cbbb24ca85833bb` on
   `feat/antigravity-acc-allow-rule`, over `main` at `259fdc3`.
 - Archive: `agents-can-communicate-0.8.1.tgz`, packed from that commit.
-- Size: 479,734 bytes; 312 packed entries.
-- SHA-256: `d90137f592237d9f4411709b0d45bc926adf37e11b7fe9b0412f9d89d32bbc59`.
+- Size: 479,823 bytes; 312 packed entries.
+- SHA-256: `97c9bf3b2a9d16cd361a73f95436d3ad4838d5240377948f767a3d03965b299b`.
 - Package version remains `0.8.1`; this is an unpublished development artifact.
 
 The exact archive passed `scripts/verify-package.mjs`.

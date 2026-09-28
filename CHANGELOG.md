@@ -23,9 +23,9 @@
 
 | Candidate artifact | Value |
 |---|---|
-| Built from | `4f29432789661f17da543459953a68fbb0e14989` |
-| Tarball | `agents-can-communicate-0.8.1.tgz`, 479,734 bytes, 312 files |
-| sha256 | `d90137f592237d9f4411709b0d45bc926adf37e11b7fe9b0412f9d89d32bbc59` |
+| Built from | `8f871a3e7cde0ac417caaa526cbbb24ca85833bb` |
+| Tarball | `agents-can-communicate-0.8.1.tgz`, 479,823 bytes, 312 files |
+| sha256 | `97c9bf3b2a9d16cd361a73f95436d3ad4838d5240377948f767a3d03965b299b` |
 
 This unpublished development archive passed clean installation verification. With a local
 build of this change and real Antigravity CLI 1.2.12, a session woken by the relay while idle
