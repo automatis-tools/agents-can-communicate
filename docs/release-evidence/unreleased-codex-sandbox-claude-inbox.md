@@ -138,8 +138,10 @@ and the socket path granted instead of its directory.
 
 ## Suite
 
-`npm test` on the previous candidate record `5820e44`, before `main` with #218 was merged in,
-under `env -i`: 2,680 tests, 2,679 passing, 0 failing, 1 skipped.
+`npm test` on the evidence commit `7bae904`, with `main` at `c6bffb0` merged in, run under
+`env -i` with only `HOME`, `USER`, `TMPDIR` and a PATH of system directories plus node, as in CI:
+2,723 tests, 2,722 passing, 0 failing, 1 skipped. The skipped test is the existing uninstall check
+that skips on a machine where Gemini CLI is installed, as on `main`. Nothing was re-run.
 
 The earlier run on `88f8ebb`, in the capture machine's own shell, passed because its PATH holds a
 real `codex`.
