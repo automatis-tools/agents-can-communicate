@@ -138,8 +138,10 @@ and the socket path granted instead of its directory.
 
 ## Suite
 
-`npm test` on the previous candidate record `802cfe4`, before the review fix for bound
-inboxes, under `env -i`: 2,673 tests, 2,672 passing, 0 failing, 1 skipped.
+`npm test` on the evidence commit `5820e44`, run under `env -i` with only `HOME`, `USER`,
+`TMPDIR` and a PATH of system directories plus node, so no real client is reachable, as in CI:
+2,680 tests, 2,679 passing, 0 failing, 1 skipped. The skipped test is the existing uninstall check
+that skips on a machine where Gemini CLI is installed, as on `main`. Nothing was re-run.
 
 The earlier run on `88f8ebb`, in the capture machine's own shell, passed because its PATH holds a
 real `codex`.
