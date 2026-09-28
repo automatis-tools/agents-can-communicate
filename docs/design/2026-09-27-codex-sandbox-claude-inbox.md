@@ -99,10 +99,16 @@ holding ACC's profile shape, never in `/tmp/cc-socks`:
   `$CLAUDE_CODE_TMPDIR/cc-socks`, also when that directory was created after the policy was
   built. A profile with 0.8.1's two grants got EPERM for the same connect.
 
+## Live capture, 2026-09-28
+
+With a local build of this change and real clients, a new Codex TUI session woke a Claude Code
+session that had been idle for 18 minutes: its `acc message` printed `woke … via
+claude-inbox`, and Claude Code answered. The same session's message to an Antigravity relay
+was offered live. The build's doctor named the three missing grants on the restored 0.8.1
+profile. Details: `docs/release-evidence/unreleased-codex-sandbox-claude-inbox.md`.
+
 ## What remains unverified
 
-- A live message from a new Codex TUI session to an idle Claude Code session, with the new
-  profile. The parent session captures this with Mykola.
 - Whether a Codex TUI session builds its sandbox policy once or per command. The resolved
   spelling makes either work for the directories. The control-socket link still depends on a
   daemon running when the policy is built, as it did before this change.

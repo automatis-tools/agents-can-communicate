@@ -1,7 +1,7 @@
 # Unreleased Codex sessions blocked from waking Claude Code
 
 Implements [the 2026-09-27 design](../design/2026-09-27-codex-sandbox-claude-inbox.md) for
-#213. Draft: the live capture and the candidate artifact are pending.
+#213.
 
 ## What was measured before the change
 
@@ -107,11 +107,42 @@ Each was applied alone, caught by the tests named, and reverted:
 Pending: `npm test` on the evidence commit. `tests/acceptance/recorded-candidate.test.mjs`
 fails until the candidate is re-measured.
 
-## Live capture (pending)
+## Live capture
 
-A new Codex TUI session, started after the refreshed profile, sends to an idle Claude Code
-session. Expected: the send reports a wake through `claude-inbox`, not
-`transport_permission_denied`. The idle Claude Code session starts a turn without input and
-receives the body, and doctor reports Codex outgoing delivery configured.
+Run on 2026-09-28 between 00:20 and 00:26 UTC on macOS arm64, with real clients: Claude Code
+2.1.283, Codex 0.157.1 (TUI and the shared app-server daemon) and Antigravity CLI 1.2.12.
+
+- **Build.** A local branch merged this branch (`bae17fe`) and the #214 branch (`b7dfd41`) over
+  `main` (`259fdc3`) and changed only the version, to `0.8.99`, so the Claude Code plugin cache
+  of the sessions already open stayed untouched. Tarball sha256
+  `ea2f81eb063548246615fe78685f6787748cd3149cfef12d65efb82f6e2ca37e`. It was installed into an
+  isolated npm prefix with an isolated `ACC_DATA_HOME`. The client-home paths that install
+  changes (13 paths, 40 files) were backed up first and restored afterwards; every file matched
+  its sha256 afterwards.
+- **Install.** `acc install --adapter codex --delivery actionable` wrote `unix_sockets` for the
+  Codex control socket, `/private/tmp/acc-ch-501`, `/private/tmp/cc-socks` and
+  `/private/tmp/cc-socks-501`. Doctor reported "local socket permissions configured".
+- **Codex to an idle Claude Code session.** The Claude Code session had had no turn for 18
+  minutes; doctor read it as `idle, lease lapsed; receiver verified`. A new Codex TUI session
+  was asked by a CLI participant to send it a question. Its `acc message`, run inside the Codex
+  sandbox, printed:
+  `recorded message_aMIbrsDx04otS5sgRR86Ww; woke claude_code-46c2Qj via claude-inbox; the message arrives with its next turn`.
+  The event log shows the question recorded at 00:22:45.273, its body shown to Claude Code at
+  00:22:45.838 (the woken turn), and the answer recorded at 00:22:56.901. There was no
+  `message.offer_failed`. On 0.8.1, the same send from a Codex 0.157.1 session reported "live
+  offer blocked by sender permissions" (2026-09-27).
+- **Regressions.** Claude Code's answer reached Codex live through `codex-app-server` at
+  00:22:57.127. Codex to Antigravity: `recorded message_JkGpcKzn5DG8f5hnIHZijA; live offered to
+  antigravity-GpVoJU via live-adapter`, through the relay socket granted as
+  `/private/tmp/acc-ch-501`; Antigravity answered at 00:24:49.
+- **Upgrade message.** With the 0.8.1 profile bytes restored, the build's doctor printed:
+  `sender permissions unverified in /Users/mmykola87/.codex/config.toml; ACC outgoing grants do
+  not cover every socket ACC delivers to; missing /private/tmp/acc-ch-501, /private/tmp/cc-socks,
+  /private/tmp/cc-socks-501; run acc install --adapter codex, then start a new session`. It did
+  not call the profile custom.
+
+Not captured: Linux and `XDG_RUNTIME_DIR`, whether one Codex TUI session builds its policy once
+or per command, and the `acc update` refresh on the real managed runtime (covered by
+`managed-runtime-refresh.test.mjs`).
 
 ## Exact local artifact (pending)

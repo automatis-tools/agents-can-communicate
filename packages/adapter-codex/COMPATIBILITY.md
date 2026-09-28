@@ -1186,6 +1186,11 @@ acc-workspace` connected to a listener at `$CLAUDE_CODE_TMPDIR/cc-socks/4242.soc
 when that directory was created after the policy was built. The same connect under a
 profile with 0.8.1's two grants returned EPERM.
 
-Not measured: a Codex TUI session sending a live message to an idle Claude Code session with
-the new profile, Linux (Codex's Linux sandbox was not exercised), and the grants for
+Captured 2026-09-28 with a local build of this change and real clients (Claude Code 2.1.283):
+a new Codex TUI session's `acc message` to a Claude Code session idle for 18 minutes printed
+`woke claude_code-… via claude-inbox`; Claude Code took a turn 0.6 s after the send and answered.
+A message from the same Codex session to an Antigravity relay under `/private/tmp/acc-ch-501`
+was offered live and answered. Evidence: `docs/release-evidence/unreleased-codex-sandbox-claude-inbox.md`.
+
+Not measured: Linux (Codex's Linux sandbox was not exercised) and the grants for
 `XDG_RUNTIME_DIR`. `unix_sockets` entries on Linux remain as uncaptured as they were in 0.8.1.
