@@ -177,9 +177,10 @@ bound.
 
 ## Suite
 
-`npm test` on the previous candidate record `7bae904`, before the review and CI fixes above
-and before `main` with #219 was merged in, under `env -i`: 2,723 tests, 2,722 passing,
-0 failing, 1 skipped.
+`npm test` on the evidence commit `bcdcc8d`, with `main` at `010fe79` merged in, run under
+`env -i` with only `HOME`, `USER`, `TMPDIR` and a PATH of system directories plus node, as in CI:
+2,733 tests, 2,732 passing, 0 failing, 1 skipped. The skipped test is the existing uninstall check
+that skips on a machine where Gemini CLI is installed, as on `main`. Nothing was re-run.
 
 The earlier run on `88f8ebb`, in the capture machine's own shell, passed because its PATH holds a
 real `codex`.
