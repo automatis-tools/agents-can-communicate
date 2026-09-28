@@ -138,10 +138,8 @@ and the socket path granted instead of its directory.
 
 ## Suite
 
-`npm test` on the evidence commit `802cfe4`, run under `env -i` with only `HOME`, `USER`,
-`TMPDIR` and a PATH of system directories plus node, so no real client is reachable, as in CI:
-2,673 tests, 2,672 passing, 0 failing, 1 skipped. The skipped test is the existing uninstall check
-that skips on a machine where Gemini CLI is installed, as on `main`. Nothing was re-run.
+`npm test` on the previous candidate record `802cfe4`, before the review fix for bound
+inboxes, under `env -i`: 2,673 tests, 2,672 passing, 0 failing, 1 skipped.
 
 The earlier run on `88f8ebb`, in the capture machine's own shell, passed because its PATH holds a
 real `codex`.
@@ -186,11 +184,11 @@ or per command, and the `acc update` refresh on the real managed runtime (covere
 
 ## Exact local artifact
 
-- Source: clean commit `ad23679fc73500b36db8956cd22b96979b1773d6` on
+- Source: clean commit `62fd0a8c33ac8e70fed98b63d2b025ee0dc9b2fc` on
   `fix/codex-sandbox-claude-inbox`, over `main` at `259fdc3`.
 - Archive: `agents-can-communicate-0.8.1.tgz`, packed from that commit.
-- Size: 477,738 bytes; 313 packed entries.
-- SHA-256: `e99bc506041a261f80f17d0c31b311f174227f0d6a035df0ee9b1d24e2e571b0`.
+- Size: 479,036 bytes; 314 packed entries.
+- SHA-256: `1aac0b16f6b1cc8dbc2a9ee95cc3b02206fe7c71711352672e5258f8ede41a34`.
 - Package version remains `0.8.1`; this is an unpublished development artifact.
 
 The exact archive passed `scripts/verify-package.mjs`.

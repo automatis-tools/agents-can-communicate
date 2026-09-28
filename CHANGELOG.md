@@ -38,9 +38,9 @@
 
 | Candidate artifact | Value |
 |---|---|
-| Built from | `ad23679fc73500b36db8956cd22b96979b1773d6` |
-| Tarball | `agents-can-communicate-0.8.1.tgz`, 477,738 bytes, 313 files |
-| sha256 | `e99bc506041a261f80f17d0c31b311f174227f0d6a035df0ee9b1d24e2e571b0` |
+| Built from | `62fd0a8c33ac8e70fed98b63d2b025ee0dc9b2fc` |
+| Tarball | `agents-can-communicate-0.8.1.tgz`, 479,036 bytes, 314 files |
+| sha256 | `1aac0b16f6b1cc8dbc2a9ee95cc3b02206fe7c71711352672e5258f8ede41a34` |
 
 This unpublished development archive passed clean installation verification. A new Codex TUI
 session woke a Claude Code session idle for 18 minutes through `claude-inbox`, with a local
