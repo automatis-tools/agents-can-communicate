@@ -309,10 +309,11 @@ agy -p "/skills" --output-format json
 
 An agent that receives a peer message in print mode (`agy -p`) cannot answer it on its own.
 It forms the right `acc reply` command from the skill, and print mode denies every command
-because it cannot ask for approval; the client says so on stderr. The TUI asks instead.
-ACC does not grant itself that permission. To let headless agents answer, allow the ACC
-command yourself under `permissions.allow` in the client's settings, in the `command(...)`
-form its message names.
+because it cannot ask for approval; the client says so on stderr and names
+`permissions.allow` in its settings. The TUI asks instead. The one rule ACC's install adds
+there is described in
+[Antigravity CLI command approval](CONFIGURATION.md#antigravity-cli-command-approval); it was
+captured in the TUI, and print mode with it has not been captured.
 
 ## Antigravity never wakes while idle
 
@@ -329,6 +330,24 @@ Live delivery needs four things, and `acc doctor` shows each:
 `acc doctor` reports how many relays are running and, per session, whether a live transport is
 active. A relay ends with its client; nothing is left running after the TUI exits or after
 `acc uninstall`.
+
+## Antigravity wakes and never answers
+
+A woken session that stops at an approval prompt answers only once someone approves its
+first ACC command. `acc doctor` prints an `Antigravity CLI inbound:` line with what it found in
+`~/.gemini/antigravity-cli/settings.json`:
+
+- **No rule.** Each ACC command waits for approval. ACC's install writes the rule, so it was
+  removed since or the install did not reach this file: run `acc install --adapter antigravity`,
+  then restart `agy`. Doctor lists this under what to run next.
+- **The rule is present.** The client reads it at startup, so a session started before it was
+  added still asks; restart `agy`. If a prompt still appears, check the command the agent
+  ran: a path in quotes, or a command wrapped in `sh -c`, matches no rule.
+- **The rule cannot apply.** The path to ACC's wrapper contains a space or a shell
+  metacharacter, so it needs quotes, and a quoted first word matches no rule. ACC adds no
+  rule and approvals stay manual.
+- **The file cannot be read.** ACC leaves an invalid `settings.json` as it is. Repair it, then
+  run `acc install --adapter antigravity` again.
 
 ## Grok shows no injected message
 

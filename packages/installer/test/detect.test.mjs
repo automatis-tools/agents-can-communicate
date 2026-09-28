@@ -217,3 +217,18 @@ test("the version probe finds the client on the PATH detection was given", async
   assert.equal(entry.present, true, entry.error ?? "the stub on the given PATH was not found");
   assert.equal(entry.version, "0.147.0");
 });
+
+test("a client's own command-approval state reaches the installer", async t => {
+  // What the consent question and doctor read: whether the client will ask
+  // before each ACC command, and what would change that.
+  const commandApproval = { state: "prompts", rule: "command(/x/acc-cli.sh)",
+    file: "/x/settings.json", setup: "add command(/x/acc-cli.sh)", diagnostic: "asks" };
+  const context = { home: await home(t), dataHome: await home(t) };
+
+  const [entry] = await detectInstallation({
+    adapters: [adapter("agy", { detect: async () => ({ ok: true, changes: [],
+      diagnostics: [], commandApproval }) })],
+    probe: probeFor({ agy: "1.2.12" }), context });
+
+  assert.deepEqual(entry.commandApproval, commandApproval);
+});

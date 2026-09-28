@@ -9,7 +9,7 @@ export { NATIVE_ACTIVATION_KINDS, NATIVE_BINDING_MODES, NATIVE_REASON_CODES,
   validateNativeActivationPlan, validateNativeDeliveryContract, validateNativeHandshake }
   from "./native-delivery.mjs";
 export { EVENT_KINDS, NORMALIZED_EVENT_KEYS, normalizedEvent } from "./events.mjs";
-export { assertRunner, bakeSkillCommand, defaultAntigravityRelay, defaultCli,
+export { assertRunner, bakeSkillCommand, defaultAntigravityRelay, defaultCli, isShellWord,
   defaultRunner, removeInstalledTree, runnerExists, writeCliShim, writeHookShim }
   from "./hook-shim.mjs";
 export { BEGIN, END, removeTomlBlock, renderBlock, stripBlock, tomlString, writeTomlBlock }
