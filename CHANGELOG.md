@@ -1,5 +1,22 @@
 # Changelog
 
+## Unreleased — a first doctor in a new project
+
+- A first `acc doctor` in a new project no longer begins "store healthy (history from
+  undefined)". Doctor answers a store that does not exist yet with a report of its own, and it
+  lacked the history boundary; it now has the storage report's full shape, so `--json` readers
+  see `trimmedThrough: null` too.
+
+| Candidate artifact | Value |
+|---|---|
+| Built from | `ed33fff3e668430ba7250294e5f079655153fd2e` |
+| Tarball | `agents-can-communicate-0.8.1.tgz`, 480,041 bytes, 312 files |
+| sha256 | `9f5279cee9aab453f09dc98e9abb1ac3d7a3fd61efce3dff3c06a2378295bc61` |
+
+This unpublished development archive passed clean installation verification. See
+[the evidence](docs/release-evidence/unreleased-doctor-first-run-history.md).
+The package version remains `0.8.1` until a release prepares its own.
+
 ## Unreleased — ACC commands without an approval prompt in Antigravity CLI
 
 - Antigravity CLI asks before each shell command, so a session that live delivery woke on

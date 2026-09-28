@@ -192,8 +192,12 @@ export async function runDoctor({ options, context, runtime }) {
   // "unreadable protocol.json" and a person's first `acc doctor` in a new
   // project would answer that their store is broken.
   const started = await stat(path.join(root, "protocol.json")).then(() => true, () => false);
+  // Shaped like the storage report, so a reader of one finds every field of
+  // the other: without `trimmedThrough` the summary said "history from
+  // undefined" on every first doctor in a new project.
   const report = !started
-    ? { healthy: true, blocked: [], corrupt: [], repaired: [] }
+    ? { healthy: true, blocked: [], corrupt: [], repaired: [], swept: 0, staged: 0, partials: 0,
+      retired: 0, trimmedThrough: null }
     : options.repair === true
       ? await repairFilesystemStore({ root, clock })
       : await diagnoseFilesystemStore({ root });
