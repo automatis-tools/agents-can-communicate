@@ -25,8 +25,10 @@ The existing test that ran doctor on a fresh data home matched only `/store heal
 
 ## Suite
 
-`npm test` on the previous candidate record `75dfe4f`, before `main` with #218 was merged in:
-2,647 tests, 2,646 passing, 0 failing, 1 skipped.
+`npm test` on the evidence commit `77c5d53`, run under `env -i` with only `HOME`, `USER`,
+`TMPDIR` and a PATH of system directories plus node, as in CI: 2,690 tests, 2,689 passing,
+0 failing, 1 skipped. The skipped test is the existing uninstall check that skips on a machine
+where Gemini CLI is installed, as on `main`. Nothing was re-run.
 
 ## Exact local artifact
 
