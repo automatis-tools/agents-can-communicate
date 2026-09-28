@@ -38,6 +38,13 @@ update activates the release and that the download asked the registry for the do
 On the unchanged code it failed with the measured error: `npm error code ETARGET`, `No matching
 version found for agents-can-communicate@0.8.3`.
 
+## Suite
+
+`npm test` on the evidence commit `ec816f6`, run under `env -i` with only `HOME`, `USER`,
+`TMPDIR` and a PATH of system directories plus node, as in CI: 2,734 tests, 2,733 passing,
+0 failing, 1 skipped. The skipped test is the existing uninstall check that skips on a machine
+where Gemini CLI is installed, as on `main`. Nothing was re-run.
+
 ## Exact local artifact
 
 - Source: clean commit `2fff1e9178906f1ff4712e9ce7aeaf03a51fde68` on
