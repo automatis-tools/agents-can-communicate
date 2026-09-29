@@ -1,5 +1,6 @@
 import { lstat, realpath } from "node:fs/promises";
 import path from "node:path";
+import { compareVersions } from "./app-server-client.mjs";
 import { readySocketPath, socketIsReady } from "./native-endpoint.mjs";
 import { probeNativeDelivery } from "./native-delivery.mjs";
 import { installCodexStandalone } from "./standalone-install.mjs";
@@ -13,6 +14,9 @@ const keys = ["home", "codexHome", "cliPath", "cliVersion", "managedPath", "mana
 const prerequisiteKeys = ["home", "codexHome", "cliPath", "cliVersion", "cliIdentity", "socketPath", "pidPath", "platform"];
 const same = (a, b, fields = keys) => fields.every(key => a?.[key] === b?.[key]);
 const own = info => typeof process.getuid !== "function" || info.uid === process.getuid();
+// The first CLI measured installing the daemon's own package in a home that
+// has none (2026-09-26; again on 0.159.0, 2026-09-29).
+const SELF_INSTALL_MINIMUM = "0.157.1";
 const sessionNeeded = "Codex service ready; open a new Codex session to establish its delivery binding and review client hooks and permissions";
 const diagnostics = {
   native_endpoint_unavailable: "Prepare the missing Codex service with codex app-server daemon start, then open a new Codex session",
@@ -102,9 +106,43 @@ export function createCodexServiceSetup({ run = runMaintenanceCommand, probe = p
     const installation = await probeMaintenanceCli({ ...paths,
       options: { ...paths.options, cwd: paths.options.env.HOME } }, run);
     const cli = await executableIdentity(installation.cliPath);
-    return report("needed", "managed_install_missing", { requiresInstall: true,
-      home: paths.options.env.HOME, codexHome: paths.codexHome, cliIdentity: cli.identity,
-      socketPath: paths.socketPath, pidPath: paths.pidPath, platform: paths.platform, ...installation });
+    const facts = { home: paths.options.env.HOME, codexHome: paths.codexHome, cliIdentity: cli.identity,
+      socketPath: paths.socketPath, pidPath: paths.pidPath, platform: paths.platform, ...installation };
+    // A CLI that installs the daemon's own package at its first start needs
+    // no standalone download: starting the service is the whole setup (#205).
+    if (compareVersions(installation.cliVersion, SELF_INSTALL_MINIMUM) >= 0) {
+      return report("needed", "native_endpoint_unavailable", { ...facts, selfInstall: true,
+        ...await launchStart(run, paths, facts) });
+    }
+    return report("needed", "managed_install_missing", { requiresInstall: true, ...facts });
+  }
+  // The service a self-installing CLI prepares: start it, then verify the
+  // package and daemon it installed exactly as an existing one is verified.
+  async function startSelfInstalling(context, plan) {
+    let started = false;
+    try {
+      if (plan.state !== "needed" || !prerequisiteKeys.every(key => typeof plan[key] === "string")) {
+        failMaintenance("invalid_service_setup_plan");
+      }
+      const current = await inspect(context, { strict: true });
+      if (current.state !== "needed" || current.selfInstall !== true || !same(plan, current, prerequisiteKeys)) {
+        failMaintenance("service_identity_changed");
+      }
+      started = true;
+      const result = await run(plan.cliPath, ["app-server", "daemon", "start"], {
+        cwd: plan.codexHome, env: { ...(context?.env ?? process.env), HOME: plan.home, CODEX_HOME: plan.codexHome },
+        timeout: 15_000,
+      });
+      if (result.status !== 0) failMaintenance("daemon_start_failed");
+      const paths = await contextPaths(context);
+      const facts = await installed(paths);
+      if (!same(plan, facts, ["codexHome", "cliPath", "cliVersion", "cliIdentity", "socketPath"])) {
+        failMaintenance("service_identity_changed");
+      }
+      return { ...await verify(paths, facts), started };
+    } catch (error) {
+      return { ...report(started ? "failed" : "blocked", error.reasonCode ?? "daemon_start_failed"), started };
+    }
   }
   async function verify(paths, facts) {
     if (!await readySocketPath(paths.socketPath)) failMaintenance("daemon_socket_unproven");
@@ -180,6 +218,7 @@ export function createCodexServiceSetup({ run = runMaintenanceCommand, probe = p
   }
   async function prepareNativeServiceSetup({ context, plan, installPrerequisites, download } = {}) {
     if (plan?.requiresInstall === true) return preparePrerequisite(context, plan, installPrerequisites, download);
+    if (plan?.selfInstall === true) return startSelfInstalling(context, plan);
     let started = false;
     try {
       if (plan?.state === "ready") {

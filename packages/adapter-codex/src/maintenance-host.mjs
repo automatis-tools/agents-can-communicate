@@ -12,8 +12,19 @@ export const failMaintenance = reasonCode => { throw Object.assign(new Error(rea
 const own = info => typeof process.getuid !== "function" || info.uid === process.getuid();
 export const startTimeValid = value => typeof value === "string"
   && /^[A-Z][a-z]{2} [A-Z][a-z]{2} [ \d]\d \d\d:\d\d:\d\d \d{4}$/.test(value);
-export const managedExecutablePaths = codexHome => ["bin/codex", "codex"].map(name =>
-  path.join(codexHome, "packages/standalone/current", name));
+// The two packages a Codex daemon runs from, measured. The standalone install
+// keeps its PID in app-server.pid (0.154.0-0.159.0); a home with no standalone
+// package gets the daemon's own package from `app-server daemon start` on
+// 0.157.1 and newer, with its PID in daemon.pid (0.159.0, 2026-09-29). A home
+// that has the standalone package keeps using it, so it is looked for first.
+const DAEMON_LAYOUTS = Object.freeze([
+  { name: "standalone", packageDir: "packages/standalone", executables: ["current/bin/codex", "current/codex"],
+    pidFile: "app-server-daemon/app-server.pid" },
+  { name: "self-installed", packageDir: "packages/app-server-daemon", executables: ["current/bin/codex"],
+    pidFile: "app-server-daemon/daemon.pid" },
+]);
+export const managedExecutablePaths = codexHome => DAEMON_LAYOUTS.flatMap(layout =>
+  layout.executables.map(name => path.join(codexHome, layout.packageDir, name)));
 
 // Where lsof lives: /usr/sbin on macOS, /usr/bin on Linux. A fixed list of
 // absolute paths, never PATH, so a directory an operator can write to cannot
@@ -57,13 +68,26 @@ export async function maintenanceContext(context = {}) {
   let codexHome = env.CODEX_HOME ?? path.join(home, ".codex");
   if (!absolute(home) || !absolute(codexHome)) failMaintenance("invalid_service_home");
   codexHome = await canonicalFuturePath(codexHome);
-  const [binPath, legacyPath] = managedExecutablePaths(codexHome);
-  const managedPath = await metadataExists(binPath) ? binPath : legacyPath;
+  const { layout, managedPath } = await installedLayout(codexHome);
   return { codexHome, socketPath: path.join(codexHome, "app-server-control/app-server-control.sock"),
-    pidPath: path.join(codexHome, "app-server-daemon/app-server.pid"),
+    pidPath: path.join(codexHome, layout.pidFile), layout: layout.name,
+    packageDir: path.join(codexHome, layout.packageDir),
     managedPath,
     platform: context.platform ?? `${process.platform}-${process.arch}`,
     options: { cwd: codexHome, env: { ...env, HOME: home, CODEX_HOME: codexHome } } };
+}
+
+// The first layout whose executable exists. With none installed, the
+// standalone layout's legacy path, which service setup reports as missing.
+async function installedLayout(codexHome) {
+  for (const layout of DAEMON_LAYOUTS) {
+    for (const name of layout.executables) {
+      const managedPath = path.join(codexHome, layout.packageDir, name);
+      if (await metadataExists(managedPath)) return { layout, managedPath };
+    }
+  }
+  const [standalone] = DAEMON_LAYOUTS;
+  return { layout: standalone, managedPath: path.join(codexHome, standalone.packageDir, "current/codex") };
 }
 
 export async function metadataExists(file) {
@@ -143,16 +167,16 @@ export function socketListedIn(stdout, socketPaths) {
 
 // The daemon's command line as measured: 0.154.0 ran `<current path> app-server
 // --listen unix://`; 0.157.1 runs the resolved releases path with
-// `--managed-daemon` appended. The executable must live in the standalone tree
-// and be the managed binary itself, however the tree names it.
+// `--managed-daemon` appended. The executable must live in the package tree of
+// the installed layout and be the managed binary itself, however it is named.
 const DAEMON_COMMAND = /^(\/.+?) app-server --listen unix:\/\/(?: --managed-daemon)?$/;
 
 export async function verifyMaintenanceProcess(snapshot, paths, run, { lsof = resolveLsof } = {}) {
   const process = await observeMaintenanceProcess(snapshot.pid, paths, run);
   const executable = DAEMON_COMMAND.exec(process.command ?? "")?.[1] ?? null;
-  const standalone = path.join(paths.codexHome, "packages", "standalone") + path.sep;
+  const packages = (paths.packageDir ?? path.join(paths.codexHome, "packages", "standalone")) + path.sep;
   if (process.state !== "alive" || process.processStartTime !== snapshot.processStartTime
-    || executable === null || !executable.startsWith(standalone)
+    || executable === null || !executable.startsWith(packages)
     || await realpath(executable).catch(() => null) !== await realpath(paths.managedPath)) {
     failMaintenance("daemon_identity_unavailable");
   }
