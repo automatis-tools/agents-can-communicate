@@ -104,6 +104,9 @@ const failures = {
   session_generation_stale: "the session was replaced during the handshake",
   workspace_identity_unavailable: "the bound client session is no longer in this workspace; "
     + "start a new client session here",
+  // It stays embedded until it closes; a later service never adopts it.
+  client_session_embedded: "the client runs this session on its own embedded service, which "
+    + "peers cannot reach; start a new client session while its local delivery service runs",
 };
 
 function describeAttempt(attempt) {

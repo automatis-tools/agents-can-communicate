@@ -12,6 +12,8 @@ const REASONS = Object.freeze({
   probe_version_mismatch: "the local service and CLI versions differ",
   protocol_mismatch: "the local service did not confirm the required protocol",
   unsupported_shell: "automatic launch setup requires zsh",
+  client_session_embedded: "the client runs this session on its own embedded service, which peers "
+    + "cannot reach",
 });
 
 export function describeNativeReason(reason, { clientVersion, minimumVersion } = {}) {

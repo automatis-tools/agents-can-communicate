@@ -157,3 +157,12 @@ test("a lapsed lease on an adapter that cannot re-verify stays degraded", async 
   assert.equal(adapters[0].nativeDelivery.sessions[0].runtime, "degraded");
   assert.equal(adapters[0].nativeDelivery.runtime, "degraded");
 });
+
+test("a session that runs embedded names the cause and what to do about it", () => {
+  const [line] = nativeSessionLines([{ displayName: "Codex CLI", nativeDelivery: { sessions: [{
+    participantId: "codex-x", sessionId: "session_x", runtime: "unbound", delivery: null,
+    lastAttempt: { at: NOW, event: "beforeTurn", state: "degraded",
+      reasonCode: "client_session_embedded" } }] } }]);
+  assert.match(line, /last attempt .*: the client runs this session on its own embedded service/);
+  assert.match(line, /start a new client session while its local delivery service runs/);
+});
