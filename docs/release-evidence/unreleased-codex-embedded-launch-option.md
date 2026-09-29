@@ -100,3 +100,7 @@ ran on the first candidate, `338b080`; the fix changes only command lines that c
 `TMPDIR` and a PATH of system directories plus node, as in CI: 2,793 tests, 2,792 passing,
 0 failing, 1 skipped (the existing uninstall check that skips on a machine where Gemini CLI is
 installed), in 9.4 minutes.
+
+On `8e54fce`, the record after the review fix, the same run gave 2,793 tests, 2,792 passing,
+0 failing, 1 skipped (the same check), in 8.4 minutes. The count is unchanged because the new
+cases joined an existing test.
