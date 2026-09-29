@@ -1,5 +1,33 @@
 # Changelog
 
+## 0.8.4 — release candidate
+
+- A new Codex chat is addressable before anyone types in it. `acc status`, `acc doctor` and the
+  MCP `acc_status` tool register chats that Codex's daemon holds, where ACC's hooks are enabled
+  and trusted; the chat's first turn continues that session (#167).
+- A Codex chat that started without the app-server daemon, and so runs embedded with no live
+  delivery, is told once; a sender sees the cause beside `no live transport`, and doctor names
+  it. After a reboot, doctor advises opening Codex when Codex starts its own service (#224).
+- A new `CODEX_HOME` on Codex 0.157.1 or newer needs no standalone download: ACC resolves the
+  daemon package Codex installs for itself (#205).
+- A closed Codex TUI closes its ACC session about a minute later, when the daemon unloads the
+  thread; the documentation said it stayed open (#212).
+- A fix to how old runtime generations are reclaimed takes effect on the release that ships it.
+  After the update from 0.8.3, the first client hook or agent command starts the new version's
+  worker once to reclaim with the new rule (#208).
+- The store format is unchanged, so 0.8.3 and 0.8.4 can share a workspace.
+
+| Candidate artifact | Value |
+|---|---|
+| Built from | `fe25de3d81b4e552617a6c1cd3bda67061aae1ff` |
+| Tarball | `agents-can-communicate-0.8.4.tgz`, 496,214 bytes, 318 files |
+| sha256 | `04d1a12dbef2434497f434e319dfe5bf90d9d89c9d63c3d2b8ec0fc2bcca2f10` |
+
+The exact archive passed clean installation verification and all 24 managed-update packed
+checks. The published 0.8.3 updated itself to these bytes, and the 0.8.3 code and this archive
+read and wrote one store. See [0.8.4 release evidence](docs/release-evidence/v0.8.4.md) for
+verification and limits. Earlier development records below retain their original provenance.
+
 ## Unreleased — the Codex daemon a new home installs, and reclaim on the release that fixes it
 
 - A new `CODEX_HOME` on Codex 0.157.1 or newer works without a standalone download. Codex
