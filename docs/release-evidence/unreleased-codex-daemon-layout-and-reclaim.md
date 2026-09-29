@@ -92,6 +92,14 @@ with the launch advice, then started by the setup through the real `daemon start
 `ready`. The maintainer's own home still resolved to the standalone layout. Both temporary homes,
 their daemons and helper processes were removed afterwards.
 
+## Suite
+
+`npm test` on the candidate commit `9fdd1db`, run under `env -i` with only `HOME`, `USER`,
+`TMPDIR` and a PATH of system directories plus node, as in CI: 2,777 tests, 2,776 passing,
+0 failing, 1 skipped, in 8.3 minutes, leaving no test directory behind. The skipped test is the
+existing uninstall check that skips on a machine where Gemini CLI is installed, as on `main`.
+Nothing was re-run.
+
 ## Exact local artifact
 
 - Source: clean commit `9fdd1db7dcc63b09ebd7ed48cc530621704fa045` on
