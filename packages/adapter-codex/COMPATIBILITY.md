@@ -1194,3 +1194,32 @@ was offered live and answered. Evidence: `docs/release-evidence/unreleased-codex
 
 Not measured: Linux (Codex's Linux sandbox was not exercised) and the grants for
 `XDG_RUNTIME_DIR`. `unix_sockets` entries on Linux remain as uncaptured as they were in 0.8.1.
+
+## A chat without the daemon — Codex 0.155.1 to 0.158.0, 2026-09-29
+
+The daemon runs on the `pid` backend. No launchd or systemd unit keeps it, and
+`app-server daemon bootstrap` is for SSH use, so a reboot leaves no daemon. Measured on
+darwin-arm64 after a reboot: `acc doctor` reported `the client's local delivery service is
+unavailable` and advised `acc install --adapter codex`. A 0.158.0 TUI opened in that state
+started the daemon within one second and served its requests over `rpc.transport="unix_socket"`;
+`locateCodexThread` found its thread. The feature is `daemon_auto_start`: `codex features list`
+shows it stable and on in 0.157.1 and 0.158.0, and 0.155.1 does not have it.
+
+A TUI that finds no daemon and does not start one hosts an embedded app server for its whole
+life. The maintainer's Codex logs show a 0.155.1 TUI that started at 2026-09-26 23:50Z, before
+any daemon, and served every request `in-process` until it closed at 2026-09-28 21:23Z, while
+two daemons ran. `codex --no-daemon`, `daemon_auto_start = false` and a failed auto-start
+("local daemon connection failed; starting embedded app server") give the same.
+
+The hook process tells the two apart. A daemon thread's hook runs under
+`codex app-server --listen unix:// --managed-daemon`, and its session records the daemon's pid.
+An embedded chat's hook runs under the TUI: measured, `ps -o args=` printed
+`codex --no-daemon`, and the 0.155.1 session above recorded the TUI's pid. When a handshake
+fails and the host is an interactive TUI (no subcommand, `resume`, `fork` or a prompt), the
+adapter reports `client_session_embedded`, told the chat once through its activation hint,
+the sender through `nativeReasonCode`, and doctor through the session line. Doctor asks
+`codex features list` before advising `acc install` for an absent or stopped service.
+
+Measured with this change against the real processes: the worktree's `bindNativeSession`
+returned `client_session_embedded` for the `codex --no-daemon` TUI and kept `protocol_mismatch`
+for the daemon's pid. The notice reaching a model in a real embedded chat was not captured.
