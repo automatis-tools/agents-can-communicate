@@ -39,6 +39,22 @@ npm_config_prefer_online=true acc update
 
 From 0.8.3, the download does this itself.
 
+0.8.4 changes what you see around Codex and after an update:
+
+- **A new Codex chat is addressable before anyone types in it.** `acc status`, `acc doctor` and
+  the MCP `acc_status` tool register chats that Codex's daemon holds, when ACC's hooks are
+  enabled and trusted in their directory. The chat's first turn continues that session.
+- **A Codex chat that runs without the daemon says so.** It is told once that live delivery is
+  off; a sender sees the cause beside `no live transport`. After a reboot, doctor advises
+  opening Codex rather than `acc install` when Codex starts its own service.
+- **A new `CODEX_HOME` on Codex 0.157.1 or newer needs no standalone download.** `acc install`
+  only starts the service; Codex installs its own package.
+- **One background pass after the update from 0.8.3.** The first ACC command after the update
+  starts the new version's update worker once, even with automatic updates off, to reclaim old
+  runtime generations with the new rule. It records `reclaim.json` in the runtime directory.
+
+This release adds no store event type or field.
+
 ## From 0.7.x
 
 Claude Code live delivery wakes each session through the inbox socket that Claude Code opens
