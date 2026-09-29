@@ -86,7 +86,7 @@ const reports = version => async () => ({ accepted: true, transport: "codex-app-
 const recordedPolicy = async ({ binding }) => binding.livePolicy;
 
 async function fixture({ adapter = certifiedAdapter(), secondRecipientSession = false,
-  readLivePolicy = recordedPolicy } = {}) {
+  readLivePolicy = recordedPolicy, readNativeReason } = {}) {
   const clock = createFakeClock(NOW);
   const ids = createFakeIds();
   const store = createMemoryStore({ clock, ids, workspaceId: WORKSPACE });
@@ -102,7 +102,7 @@ async function fixture({ adapter = certifiedAdapter(), secondRecipientSession = 
     workspaceId: WORKSPACE, participantId: "models", sessionId: "session_models_two",
     harness: "fixture", heartbeatCadenceMs: 30_000 }));
   const router = createDeliveryRouter({ service, adapters: { fixture_adapter: adapter }, clock,
-    readLivePolicy });
+    readLivePolicy, ...(readNativeReason ? { readNativeReason } : {}) });
   return { adapter, clock, router, sender, service, sessions, store };
 }
 
@@ -397,6 +397,28 @@ test("an online recipient with no live transport is queued as such, not as unava
   const message = await send(f.service, f.sender, "question", "cli_recipient");
   assert.deepEqual(await f.router.offer(message), durable("no_live_transport"));
   assert.equal((await receipt(f.store, message.messageId)).state, "queued");
+});
+
+// Measured 2026-09-29: a Codex chat that runs embedded binds nothing, and the
+// sender used to learn only that there was no live transport.
+test("a recipient with no live transport carries its session's last native reason", async () => {
+  const asked = [];
+  const f = await fixture({ readNativeReason: async input => { asked.push(input);
+    return "client_session_embedded"; } });
+  const message = await send(f.service, f.sender, "question", "embedded_recipient");
+  assert.deepEqual(await f.router.offer(message), [{ ...durable("no_live_transport")[0],
+    nativeReasonCode: "client_session_embedded" }]);
+  assert.deepEqual(asked, [{ sessionId: f.sessions[0].sessionId,
+    generation: f.sessions[0].generation }]);
+});
+
+test("a reason that cannot be read leaves the queued answer as it was", async () => {
+  for (const readNativeReason of [async () => null, async () => "not a reason",
+    async () => { throw new Error("unreadable"); }]) {
+    const f = await fixture({ readNativeReason });
+    const message = await send(f.service, f.sender, "question", "unknown_reason");
+    assert.deepEqual(await f.router.offer(message), durable("no_live_transport"));
+  }
 });
 
 test("off, missing reachability, and live-incapable adapters stay queued for distinct reasons",

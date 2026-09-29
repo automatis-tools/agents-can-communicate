@@ -43,7 +43,11 @@ export function nativeRemediation(entry) {
   }
   if (native.reasonCode === "native_endpoint_unavailable") {
     if (["blocked", "unsupported"].includes(service?.state)) steps.push(service.diagnostic);
-    else if (service?.state === "needed" && native.configured) {
+    else if (service?.state === "needed" && service.startsOnLaunch === true) {
+      // The client starts it itself when its next session opens.
+      steps.push(`${entry.displayName}: its local delivery service starts with the next `
+        + `${entry.displayName} session; open one, then run acc doctor here`);
+    } else if (service?.state === "needed" && native.configured) {
       steps.push(service.requiresInstall && entry.deliveryDecision?.installPrerequisites === false
         ? `acc install --adapter ${entry.adapterId} --delivery ${native.policy === "all" ? "all" : "actionable"}`
           + "  # allow the official Codex download and complete service setup"
