@@ -26,6 +26,17 @@ export async function hostArgv(pid) {
   return result.stdout.trim().split(/\s+/).filter(Boolean);
 }
 
+// The arguments after Codex itself, or null for any process that is not Codex:
+// `codex ...`, or a node script named codex, as `node [options] codex.js ...`.
+function codexArguments(argv) {
+  const [program, ...rest] = argv;
+  if (path.basename(program ?? "") === "codex") return rest;
+  if (path.basename(program ?? "") !== "node") return null;
+  const script = rest.findIndex(word => !word.startsWith("-"));
+  return script >= 0 && path.basename(rest[script]).replace(/\.[mc]?js$/, "") === "codex"
+    ? rest.slice(script + 1) : null;
+}
+
 /**
  * Whether this command line is an interactive Codex TUI: no subcommand,
  * `resume`, `fork`, or a prompt. `ps` drops quoting, so a prompt whose first
@@ -33,15 +44,15 @@ export async function hostArgv(pid) {
  * only withholds a notice.
  */
 export function interactiveHost(argv) {
-  // A client shipped as a node script runs as `node <script> ...`.
-  const words = path.basename(argv[0] ?? "") === "node" ? argv.slice(2) : argv.slice(1);
+  const words = codexArguments(argv);
+  if (words === null) return false;
   let value = false;
   for (const word of words) {
     if (value) { value = false; continue; }
     if (word.startsWith("-")) { value = VALUE_OPTIONS.has(word); continue; }
     return !NOT_INTERACTIVE.has(word);
   }
-  return argv.length > 0;
+  return true;
 }
 
 /** True only when the host was read and is an interactive TUI; never throws. */

@@ -292,6 +292,9 @@ test("a failed handshake keeps its reason for a daemon, a non-interactive run or
     assert.notEqual(baseline, "client_session_embedded");
     for (const argvOf of [async () => ["codex", "exec", "task"],
       async () => ["node", "/opt/codex/bin/codex.js", "exec", "task"],
+      // Only Codex itself is a Codex chat: a test runner or any other process is not.
+      async () => ["/usr/local/bin/node", "--test", "--test-concurrency=4", "/repo/a.test.mjs"],
+      async () => ["/usr/bin/python3", "codex"], async () => ["codex-helper"], async () => [],
       async () => ["codex", "e", "task"], async () => ["codex", "review"],
       async () => { throw new Error("ps unavailable"); }]) {
       const result = await native.bindNativeSession({ ...h, argvOf });
