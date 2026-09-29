@@ -102,6 +102,11 @@ export async function maintenanceFixture(t, { binLayout = false } = {}) {
         turns: state.turns ?? [], preview: "PRIVATE CONTENT MUST NOT ESCAPE" } };
     }
     if (method === "thread/queue/list") return state.queueResponse ?? { data: state.queued, nextCursor: null };
+    if (method === "hooks/list") {
+      if (state.hooksError) throw state.hooksError;
+      return { data: (params.cwds ?? []).map(cwd => ({ cwd, hooks: state.hooks?.[cwd] ?? [],
+        warnings: [], errors: [] })) };
+    }
     throw new Error(`Unexpected maintenance RPC: ${method}`);
   } });
   return { ...createCodexMaintenance({ run, open }), context, state, commands, requests,

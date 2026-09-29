@@ -32,6 +32,8 @@ const PLUGIN_NAME = "agents-can-communicate";
 // again to confirm a root of ACC's own is accepted and reported enabled.
 const MARKETPLACE = "acc-local";
 const QUALIFIED = `${PLUGIN_NAME}@${MARKETPLACE}`;
+// The id Codex reports for ACC's plugin, in `hooks/list` among other places.
+export const CODEX_PLUGIN_ID = QUALIFIED;
 const HOOK_REVIEW = "hook readiness unverified: open codex; check ACC is enabled in /plugins; in /hooks, review "
   + "each ACC hook and enable/trust its current definition if needed, then restart the session";
 

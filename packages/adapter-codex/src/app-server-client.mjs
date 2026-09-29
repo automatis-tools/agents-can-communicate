@@ -9,7 +9,7 @@ import { openWebSocketPeer } from "./ws-json-rpc.mjs";
 // The Codex App Server queue protocol, captured on codex-cli 0.152.1. Every
 // method here is official and present in the generated schema: initialize,
 // thread/loaded/list, thread/list, metadata-only thread/read, thread/queue/list,
-// thread/queue/add. Thread history is never requested; metadata reads explicitly
+// thread/queue/add, hooks/list. Thread history is never requested; metadata reads explicitly
 // exclude turns. Closed safe results only; no vendor string escapes to core.
 
 export const PROTOCOL_CONTRACT = "codex-app-server-thread-queue-v1";
@@ -107,6 +107,29 @@ function threadEntries(items) {
   if (items.some(item => item === null || typeof item !== "object" || Array.isArray(item)
     || typeof item.id !== "string" || item.id === "")) throw protocolError();
   return items;
+}
+
+// What discovery may know about a loaded thread, and nothing more: never the
+// preview, never a turn. A thread the daemon cannot describe is left out.
+const THREAD_METADATA = ["id", "cwd", "status", "parentThreadId", "ephemeral"];
+export async function loadedThreadMetadata(peer) {
+  const threads = [];
+  for (const threadId of await pageAll(peer, "thread/loaded/list", {})) {
+    if (typeof threadId !== "string" || threadId === "") throw protocolError();
+    const thread = (await peer.request("thread/read", { threadId, includeTurns: false }))?.thread;
+    if (thread?.id !== threadId) continue;
+    threads.push(Object.fromEntries(THREAD_METADATA.map(key => [key, thread[key] ?? null])));
+  }
+  return threads;
+}
+
+// Each directory's hooks as this daemon would run them, with their enablement
+// and trust (`hooks/list`, present in the 0.158.0 generated schema).
+export async function hooksForDirectories(peer, cwds) {
+  const response = await peer.request("hooks/list", { cwds });
+  if (!Array.isArray(response?.data)) throw protocolError();
+  return response.data.map(entry => ({ cwd: entry?.cwd,
+    hooks: Array.isArray(entry?.hooks) ? entry.hooks : [] }));
 }
 
 export async function canonicalCwd(cwd) {
