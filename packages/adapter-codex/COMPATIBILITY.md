@@ -1194,3 +1194,24 @@ was offered live and answered. Evidence: `docs/release-evidence/unreleased-codex
 
 Not measured: Linux (Codex's Linux sandbox was not exercised) and the grants for
 `XDG_RUNTIME_DIR`. `unix_sockets` entries on Linux remain as uncaptured as they were in 0.8.1.
+
+## An empty chat registered before its first turn — Codex 0.158.0, 2026-09-29
+
+A new TUI loads its thread in the shared daemon at startup, idle, with the project `cwd`, while
+`SessionStart` waits for the first turn. `acc status`, `acc doctor` and the MCP `acc_status`
+tool now register such a chat. The adapter's discovery proves the daemon's pid from its PID
+record with `ps` and `lsof`, lists loaded threads by metadata only (`id`, `cwd`, `status`,
+`parentThreadId`, `ephemeral`; never the preview or a turn), keeps idle threads that are not
+subagents or ephemeral, and asks `hooks/list` with those directories as `cwds`. A chat
+registers only where ACC's `sessionStart`, `sessionEnd` and `userPromptSubmit` hooks are
+enabled and `trusted` or `managed`. The hook runner then writes what `SessionStart` writes,
+without a pin, and the chat's first real hook resumes that session.
+
+Measured on darwin-arm64 against the running daemon, with ACC 0.8.3 installed and this
+change's status run from a worktree: discovery took 198 ms and returned only the new TUI's
+thread; another user's active chat and its subagent were left out. Status registered
+`codex-l_7tsX` at 05:21:04.6Z. The installed 0.8.3 `acc status` listed it `online` with a
+current live binding, and doctor printed `local transport active; receiver verified`. A
+request sent at 05:21:29.3Z was offered through `codex-app-server` 0.5 s later; the chat's
+first turn answered `OK` at 05:21:46.3Z from the same session, and no second session opened.
+Ctrl-C at 05:22:15Z closed it through `SessionEnd` when the daemon unloaded the thread.
