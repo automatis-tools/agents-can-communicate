@@ -72,6 +72,13 @@ With the worktree's `bindNativeSession` against the running daemon (pid 12317): 
 `protocol_mismatch`, as before. The real `codex features list` output matched the auto-start
 rule. The notice reaching a model in a real embedded chat was not captured here.
 
+## Suite
+
+`npm test` on the candidate commit `05a0246`, run under `env -i` with only `HOME`, `USER`,
+`TMPDIR` and a PATH of system directories plus node, as in CI: 2,752 tests, 2,751 passing,
+0 failing, 1 skipped. The skipped test is the existing uninstall check that skips on a machine
+where Gemini CLI is installed, as on `main`. Nothing was re-run.
+
 ## Exact local artifact
 
 - Source: clean commit `05a024683d524e073f4b3a4b72dce2057c504352` on
