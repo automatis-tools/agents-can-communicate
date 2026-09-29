@@ -10,9 +10,9 @@
 
 | Candidate artifact | Value |
 |---|---|
-| Built from | `f82c1387c864d60c23eb95284fa4be6081a0a0c6` |
-| Tarball | `agents-can-communicate-0.8.3.tgz`, 486,785 bytes, 315 files |
-| sha256 | `ef5d4f4ecf598a3894423ce0827c6b71fea88064c56246aced36be6a8136337a` |
+| Built from | `522bb1d629b56db59c530dcd4704787afb324e0c` |
+| Tarball | `agents-can-communicate-0.8.3.tgz`, 489,766 bytes, 317 files |
+| sha256 | `21470ad09afe7a05149ed5ac6de012300e7bb33908d2cb46a0c7a1025dae6d75` |
 
 This unpublished development archive passed clean installation verification. See
 [the evidence](docs/release-evidence/unreleased-codex-session-closes-on-unload.md).

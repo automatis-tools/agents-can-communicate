@@ -38,11 +38,11 @@ where Gemini CLI is installed, as on `main`. Nothing was re-run.
 
 ## Exact local artifact
 
-- Source: clean commit `f82c1387c864d60c23eb95284fa4be6081a0a0c6` on
-  `fix/codex-session-closes-on-unload`, from `main` at `3051920` (0.8.3).
+- Source: clean commit `522bb1d629b56db59c530dcd4704787afb324e0c` on
+  `fix/codex-session-closes-on-unload`, merging `main` at `b478c02` (after #225).
 - Archive: `agents-can-communicate-0.8.3.tgz`, packed from that commit.
-- Size: 486,785 bytes; 315 packed entries.
-- SHA-256: `ef5d4f4ecf598a3894423ce0827c6b71fea88064c56246aced36be6a8136337a`.
+- Size: 489,766 bytes; 317 packed entries.
+- SHA-256: `21470ad09afe7a05149ed5ac6de012300e7bb33908d2cb46a0c7a1025dae6d75`.
 - Package version remains `0.8.3`; this is an unpublished development artifact.
 
 The exact archive passed `scripts/verify-package.mjs`.
