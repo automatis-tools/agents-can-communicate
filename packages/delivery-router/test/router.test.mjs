@@ -404,7 +404,7 @@ test("an online recipient with no live transport is queued as such, not as unava
 test("a recipient with no live transport carries its session's last native reason", async () => {
   const asked = [];
   const f = await fixture({ readNativeReason: async input => { asked.push(input);
-    return "client_session_embedded"; } });
+    return { reasonCode: "client_session_embedded" }; } });
   const message = await send(f.service, f.sender, "question", "embedded_recipient");
   assert.deepEqual(await f.router.offer(message), [{ ...durable("no_live_transport")[0],
     nativeReasonCode: "client_session_embedded" }]);
@@ -412,8 +412,26 @@ test("a recipient with no live transport carries its session's last native reaso
     generation: f.sessions[0].generation }]);
 });
 
+// Measured 2026-09-29 on Codex 0.159.1: `codex --search` runs embedded while
+// the daemon runs, and the sender's advice has to name that option.
+test("the launch option behind the reason reaches the sender beside it", async () => {
+  const f = await fixture({ readNativeReason: async () => ({ reasonCode: "client_session_embedded",
+    launchOption: "--search" }) });
+  const message = await send(f.service, f.sender, "question", "option_recipient");
+  assert.deepEqual(await f.router.offer(message), [{ ...durable("no_live_transport")[0],
+    nativeReasonCode: "client_session_embedded", nativeLaunchOption: "--search" }]);
+  for (const launchOption of ["search", "--search; rm", null]) {
+    const g = await fixture({ readNativeReason: async () => ({
+      reasonCode: "client_session_embedded", launchOption }) });
+    const other = await send(g.service, g.sender, "question", "bad_option_recipient");
+    assert.deepEqual(await g.router.offer(other), [{ ...durable("no_live_transport")[0],
+      nativeReasonCode: "client_session_embedded" }], String(launchOption));
+  }
+});
+
 test("a reason that cannot be read leaves the queued answer as it was", async () => {
-  for (const readNativeReason of [async () => null, async () => "not a reason",
+  for (const readNativeReason of [async () => null, async () => ({ reasonCode: "not a reason" }),
+    async () => "client_session_embedded", async () => ({ launchOption: "--search" }),
     async () => { throw new Error("unreadable"); }]) {
     const f = await fixture({ readNativeReason });
     const message = await send(f.service, f.sender, "question", "unknown_reason");

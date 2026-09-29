@@ -167,6 +167,16 @@ test("a session that runs embedded names the cause and what to do about it", () 
   assert.match(line, /start a new client session while its local delivery service runs/);
 });
 
+test("doctor names the launch option that kept a session embedded, and the fix", () => {
+  const [line] = nativeSessionLines([{ displayName: "Codex CLI", nativeDelivery: { sessions: [{
+    participantId: "codex-x", sessionId: "session_x", runtime: "unbound", delivery: null,
+    lastAttempt: { at: NOW, event: "beforeTurn", state: "degraded",
+      reasonCode: "client_session_embedded", launchOption: "--profile" } }] } }]);
+  assert.match(line, /last attempt .*: the client was started with --profile, which runs this session on its own embedded service/);
+  assert.match(line, /start a new client session without --profile/);
+  assert.doesNotMatch(line, /while its local delivery service runs/);
+});
+
 test("doctor sends the operator to Codex, not acc install, when Codex starts its service at launch",
   () => {
     const absent = startsOnLaunch => ({ ...entry("waiting"),

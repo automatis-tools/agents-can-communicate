@@ -138,15 +138,25 @@ export function allowOutcome() {
 /**
  * Context for the next turn.
  *
- * This client wraps nothing: a UserPromptSubmit hook's stdout arrives at the
- * model as a `developer` role message, verbatim. So the injection is plain
- * text - emitting Claude Code's JSON envelope would put the envelope itself
- * into the conversation, the same mistake it would be on Kimi Code.
+ * This client wraps nothing: a UserPromptSubmit hook's plain stdout arrives at
+ * the model as a `developer` role message, verbatim, so the ordinary injection
+ * is plain text. Codex also parses a JSON answer - 0.147.0, 0.155.1 and 0.159.1
+ * took `hookSpecificOutput.additionalContext` into the same developer message
+ * and kept the envelope out of the conversation, measured 2026-09-29 - which
+ * is how a notice for the user rides beside the context.
  *
  * The developer role is the most direct channel of the four, which is a reason
  * to be careful with what goes into it: anything a peer wrote must stay framed
  * as data, because at this role the model reads text as instruction.
  */
-export function injectOutcome(context) {
-  return { stdout: context, stderr: "", exitCode: 0 };
+export function injectOutcome(context, notice) {
+  if (typeof notice?.userMessage !== "string") return { stdout: context, stderr: "", exitCode: 0 };
+  // A line the user must see rides as the hook's systemMessage, which Codex
+  // shows in the chat and never sends to the model; the context goes to the
+  // model as additionalContext, the same developer message plain text becomes.
+  // Measured with a probe hook on 0.147.0, 0.155.1 and 0.159.1. Only the ask's
+  // one turn prints JSON; every other turn keeps the plain text above.
+  return { stdout: JSON.stringify({ systemMessage: notice.userMessage,
+    hookSpecificOutput: { hookEventName: "UserPromptSubmit", additionalContext: context } }),
+  stderr: "", exitCode: 0 };
 }

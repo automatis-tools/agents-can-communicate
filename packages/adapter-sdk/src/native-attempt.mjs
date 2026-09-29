@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { Worker } from "node:worker_threads";
 
-import { NATIVE_REASON_CODES, TIMESTAMP } from "./native-vocabulary.mjs";
+import { NATIVE_REASON_CODES, TIMESTAMP, isLaunchOption } from "./native-vocabulary.mjs";
 
 // Optional diagnostic metadata beside the hook-owner file, never an event
 // history or injected context. Copy only closed values: vendor errors, prompts,
@@ -18,9 +18,13 @@ export function nativeAttemptFrom(value) {
     || !["bootstrap-environment", "installation-record"].includes(value.policySource)
     || !["enabled", "off", "missing", "invalid", "unavailable"].includes(value.policyStatus)
     || !["identified", "unknown"].includes(value.clientProcess)) return null;
+  // The option a refusal named is optional and closed to a bare option token;
+  // anything else is dropped and the attempt itself kept.
   return { at: value.at, event: value.event, state: value.state, reasonCode: value.reasonCode,
     policy: value.policy, policySource: value.policySource, policyStatus: value.policyStatus,
-    clientProcess: value.clientProcess };
+    clientProcess: value.clientProcess,
+    ...(value.state !== "active" && isLaunchOption(value.launchOption)
+      ? { launchOption: value.launchOption } : {}) };
 }
 
 const keyFor = harnessSessionId => createHash("sha256").update(String(harnessSessionId))

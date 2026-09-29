@@ -520,8 +520,8 @@ test("context injection is declared, because it was finally observed", () => {
 
 test("injection is plain text, because this client wraps nothing", () => {
   // No envelope of any kind: whatever the hook prints becomes the message.
-  // Emitting Claude Code's JSON envelope here would put the envelope itself
-  // into the conversation, exactly as it would on Kimi Code.
+  // Only a turn that also carries a notice for the user prints JSON; see
+  // embedded-notice.test.mjs.
   assert.deepEqual(injectOutcome("2 peers"),
     { stdout: "2 peers", stderr: "", exitCode: 0 });
   assert.deepEqual(injectOutcome(""), { stdout: "", stderr: "", exitCode: 0 });

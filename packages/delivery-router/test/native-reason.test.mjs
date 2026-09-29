@@ -8,9 +8,9 @@ import { storeNativeAttempt, storeSessionBinding } from "@agents-can-communicate
 
 import { lastNativeReason } from "../src/native-reason.mjs";
 
-const attempt = (state, reasonCode) => ({ at: "2026-09-29T04:00:00.000Z", event: "beforeTurn",
-  state, reasonCode, policy: "actionable", policySource: "installation-record",
-  policyStatus: "enabled", clientProcess: "identified" });
+const attempt = (state, reasonCode, extra = {}) => ({ at: "2026-09-29T04:00:00.000Z",
+  event: "beforeTurn", state, reasonCode, policy: "actionable", policySource: "installation-record",
+  policyStatus: "enabled", clientProcess: "identified", ...extra });
 
 async function runtime(t) {
   const runtimeDir = await realpath(await mkdtemp(path.join(tmpdir(), "acc-reason-")));
@@ -25,8 +25,22 @@ test("the reason is the recipient session's last native attempt", async t => {
   const owner = await runtime(t);
   assert.equal(await storeNativeAttempt({ ...owner,
     nativeAttempt: attempt("degraded", "client_session_embedded") }), true);
-  assert.equal(await lastNativeReason({ runtimeDir: owner.runtimeDir,
-    sessionId: "session_one", generation: "generation_one" }), "client_session_embedded");
+  assert.deepEqual(await lastNativeReason({ runtimeDir: owner.runtimeDir,
+    sessionId: "session_one", generation: "generation_one" }),
+  { reasonCode: "client_session_embedded" });
+});
+
+test("the reason keeps the launch option its attempt recorded, and only an option token", async t => {
+  const owner = await runtime(t);
+  const read = () => lastNativeReason({ runtimeDir: owner.runtimeDir, sessionId: "session_one",
+    generation: "generation_one" });
+  await storeNativeAttempt({ ...owner, nativeAttempt: attempt("degraded", "client_session_embedded",
+    { launchOption: "--profile" }) });
+  assert.deepEqual(await read(), { reasonCode: "client_session_embedded", launchOption: "--profile" });
+  // A value, a vendor string or a shell word never survives the record.
+  await storeNativeAttempt({ ...owner, nativeAttempt: attempt("degraded", "client_session_embedded",
+    { launchOption: "--profile work" }) });
+  assert.deepEqual(await read(), { reasonCode: "client_session_embedded" });
 });
 
 test("no reason for another generation, an active attempt, no attempt or no runtime", async t => {

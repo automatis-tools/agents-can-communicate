@@ -238,8 +238,8 @@ async function openContext({ event, adapterId, dataHome, runtime, env, deadline 
 // offered. Runs after the heartbeat and the bounded native retry.
 // `render` is how the projected text reaches this client: before a turn it is
 // the adapter's context envelope, at the end of one it is a continuation.
-async function projectTurn({ binding, context, adapter, adapterId,
-  render = text => adapter.injectOutcome?.(text), activationHint = null, repeats = true }) {
+async function projectTurn({ binding, context, adapter, adapterId, render = null,
+  activationHint = null, activationNotice = null, repeats = true }) {
   const sync = await context.service.sync({ sessionId: binding.accSessionId,
     cursor: null, scope: "delta" });
 
@@ -283,11 +283,17 @@ async function projectTurn({ binding, context, adapter, adapterId,
   const owner = hintFits ? `${header}\n${activationHint}` : header;
   const withHint = (outcome, attached) => ({ ...outcome,
     activationHintIncluded: attached === true && outcome.stdout !== "" });
+  // The ask's line for the user travels with its line for the model, or not
+  // at all: the adapter shows it where the client shows a hook's message.
+  const notice = hintFits && activationNotice !== null ? { userMessage: activationNotice } : null;
+  const inject = text => notice === null ? adapter.injectOutcome?.(text)
+    : adapter.injectOutcome?.(text, notice);
+  const renderText = render ?? inject;
   // A peer can join after this prompt has begun. The current turn must already
   // have its own arguments when it needs inbox/reply, without reattaching or
   // waiting for another user prompt. Solo emits identity, not a peer notice.
   if (sync.solo && messages.length === 0) {
-    return withHint(ownerOnlyOutcome(text => adapter.injectOutcome?.(text), owner, totalBudget),
+    return withHint(ownerOnlyOutcome(inject, owner, totalBudget),
       hintFits);
   }
 
@@ -336,7 +342,7 @@ async function projectTurn({ binding, context, adapter, adapterId,
   // Own claims make sync non-solo but produce no peer context. They cannot
   // remove this turn's identity or consume a nonexistent body separator.
   if (body === "" && messages.length === 0) {
-    return withHint(ownerOnlyOutcome(text => adapter.injectOutcome?.(text), owner, totalBudget),
+    return withHint(ownerOnlyOutcome(inject, owner, totalBudget),
       hintFits);
   }
   const projected = body === "" ? "" : ownerFits ? `${owner}\n${body}` : body;
@@ -361,7 +367,7 @@ async function projectTurn({ binding, context, adapter, adapterId,
   // The entry point owns the transport boundary. This handler only prepares
   // offer inputs; recording them here would claim delivery before stdout's
   // callback proves that the bytes crossed.
-  const outcome = { stdout: "", ...render(projected) };
+  const outcome = { stdout: "", ...renderText(projected) };
   const writableOffers = outcome.stdout === "" ? [] : offerInputs;
   return withHint({ ...outcome,
     stderr: [outcome.stderr, ownerWarning, degradation].filter(Boolean).join("\n"),
@@ -373,7 +379,8 @@ async function projectTurn({ binding, context, adapter, adapterId,
 // so the reservation goes with it.
 async function projectActivation(input, offered) {
   try {
-    const turn = await projectTurn({ ...input, activationHint: offered?.line ?? null });
+    const turn = await projectTurn({ ...input, activationHint: offered?.line ?? null,
+      activationNotice: offered?.userMessage ?? null });
     const included = turn.activationHintIncluded === true;
     delete turn.activationHintIncluded;
     if (!offered) return turn;

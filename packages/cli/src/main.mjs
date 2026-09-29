@@ -164,7 +164,8 @@ export function recordedText(message, delivery) {
         ? "live offer blocked by sender permissions; message remains queued; run acc doctor in the sending session"
         : item.errorCode === "no_live_transport"
           ? `${item.recipientParticipantId} has no live transport`
-            + `${item.nativeReasonCode ? ` (${describeNativeReason(item.nativeReasonCode)})` : ""}`
+            + `${item.nativeReasonCode ? ` (${describeNativeReason(item.nativeReasonCode,
+              { launchOption: item.nativeLaunchOption })})` : ""}`
             + "; the message waits in its inbox"
         : item.errorCode === "recipient_offline" && item.endReason === "clear"
           ? `${item.recipientParticipantId}'s conversation was cleared (/clear); the message waits `

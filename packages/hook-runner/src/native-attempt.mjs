@@ -45,6 +45,7 @@ export async function bindNative({ adapter, event, hookBinding, clientVersion, p
         reasonCode: result.reasonCode, policy, policySource, policyStatus,
         clientProcess: Number.isInteger(hookBinding.clientPid) && hookBinding.clientPid > 0
           ? "identified" : "unknown",
+        ...(result.launchOption === undefined ? {} : { launchOption: result.launchOption }),
       } }).catch(() => {});
   }
   return result;
@@ -57,6 +58,7 @@ function asHint(value) {
   if (typeof value === "string") return { line: value, release: async () => {} };
   if (value !== null && typeof value === "object" && typeof value.line === "string") {
     return { line: value.line,
+      ...(usableHint(value.userMessage) ? { userMessage: value.userMessage } : {}),
       release: typeof value.release === "function" ? value.release : async () => {} };
   }
   if (value !== null && typeof value === "object" && typeof value.release === "function") {
@@ -66,7 +68,8 @@ function asHint(value) {
 }
 
 function usableHint(line) {
-  return line !== "" && !/[\r\n]/.test(line) && Buffer.byteLength(line, "utf8") <= HINT_MAX_BYTES;
+  return typeof line === "string" && line !== "" && !/[\r\n]/.test(line)
+    && Buffer.byteLength(line, "utf8") <= HINT_MAX_BYTES;
 }
 
 // An adapter may release with a synchronous function. Calling `.catch` on its
@@ -91,6 +94,8 @@ export function callRelease(release) {
  * A string has nothing reserved. `{ line, release }` has reserved an ask; this
  * function calls `release` when it drops the line, including when the adapter
  * answers after the budget. The caller releases a line it does not deliver.
+ * `{ line, userMessage }` also asks for a line the user sees and the model
+ * does not, held to the same bound; one that does not fit is dropped alone.
  */
 export async function nativeActivationHintFor({ adapter, event, nativeBinding, binding, context,
   paths, deadline }) {
