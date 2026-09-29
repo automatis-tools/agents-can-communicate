@@ -6,6 +6,7 @@ import { AccError, CONFIG_FILENAME, EXIT, GENERIC_MESSAGE_KINDS, VALID_OBLIGATIO
   failure, ok }
   from "@agents-can-communicate/protocol";
 import { createCoordinationService } from "@agents-can-communicate/core";
+import { describeNativeReason } from "@agents-can-communicate/installer";
 import { openFilesystemStore } from "@agents-can-communicate/storage-filesystem";
 
 import { parseArgs, positiveNumber } from "./args.mjs";
@@ -150,7 +151,9 @@ export function recordedText(message, delivery) {
       ? item.errorCode === "transport_permission_denied"
         ? "live offer blocked by sender permissions; message remains queued; run acc doctor in the sending session"
         : item.errorCode === "no_live_transport"
-          ? `${item.recipientParticipantId} has no live transport; the message waits in its inbox`
+          ? `${item.recipientParticipantId} has no live transport`
+            + `${item.nativeReasonCode ? ` (${describeNativeReason(item.nativeReasonCode)})` : ""}`
+            + "; the message waits in its inbox"
         : item.errorCode === "recipient_offline" && item.endReason === "clear"
           ? `${item.recipientParticipantId}'s conversation was cleared (/clear); the message waits `
             + "until that conversation resumes"

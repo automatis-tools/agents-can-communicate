@@ -34,6 +34,9 @@ export const NATIVE_REASON_CODES = Object.freeze([
   // The current session's canonical workspace identity could not be verified.
   // This is a per-session refusal, not a universal vendor limitation.
   "workspace_identity_unavailable",
+  // The client runs this session on its own embedded service, which no sender
+  // can reach, instead of the shared local one; it stays so until it closes.
+  "client_session_embedded",
 ]);
 
 export const STABLE_VERSION = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:\+[0-9A-Za-z.-]+)?$/;

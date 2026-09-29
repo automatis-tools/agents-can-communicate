@@ -1,6 +1,7 @@
 import { defineAdapter, projectContext, projectContextResult }
   from "@agents-can-communicate/adapter-sdk";
-import { probeNativeDelivery, planNativeActivation, bindNativeSession, refreshNativeSession, retireNativeSession, offerMessage } from "./native-delivery.mjs";
+import { probeNativeDelivery, planNativeActivation, bindNativeSession, refreshNativeSession, retireNativeSession, offerMessage,
+  nativeActivationHint } from "./native-delivery.mjs";
 import certification from "../certification.json" with { type: "json" };
 import { createCodexServiceSetup } from "./service-setup.mjs";
 import { createCodexMaintenance } from "./maintenance.mjs";
@@ -68,6 +69,8 @@ export function createCodexAdapter() {
     },
     probeNativeDelivery, planNativeActivation, bindNativeSession,
     refreshNativeSession, retireNativeSession, offerMessage,
+    // A chat that runs embedded is told once why nothing reaches it live.
+    nativeActivationHint,
     // A Codex sender reaches another Codex session through its control socket.
     inboundSockets: context => [controlSocket(context)],
     ...createCodexMaintenance(),
