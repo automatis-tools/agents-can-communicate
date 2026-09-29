@@ -14,9 +14,9 @@
 
 | Candidate artifact | Value |
 |---|---|
-| Built from | `c9daa93237713f20f32d2cf56ef56d18172aa28a` |
-| Tarball | `agents-can-communicate-0.8.3.tgz`, 489,533 bytes, 317 files |
-| sha256 | `3b1ee63b1a68b7f80f9d2fd90a25d1fc1daf23a69eedee9b1213681c0ca7fd40` |
+| Built from | `05a024683d524e073f4b3a4b72dce2057c504352` |
+| Tarball | `agents-can-communicate-0.8.3.tgz`, 489,678 bytes, 317 files |
+| sha256 | `beee685342ad321a00bf32633881d79a71b836397490bbdeda360bd90bf8062e` |
 
 This unpublished development archive passed clean installation verification. See
 [the evidence](docs/release-evidence/unreleased-codex-embedded-chat.md).

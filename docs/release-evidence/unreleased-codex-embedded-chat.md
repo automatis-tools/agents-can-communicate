@@ -42,8 +42,8 @@ advised `acc install --adapter codex`.
 
 - `packages/adapter-codex/test/native-delivery.test.mjs`: an interactive TUI host names the chat
   as embedded; a daemon, `exec`, `e`, `review` and an unreadable host keep the handshake's own
-  reason; a successful handshake never reads the host. The first failed on the unchanged code
-  with `protocol_mismatch`.
+  reason, and so does any process that is not Codex; a successful handshake never reads the
+  host. The first failed on the unchanged code with `protocol_mismatch`.
 - `packages/adapter-codex/test/embedded-notice.test.mjs`: one delivered notice per chat, offered
   again after a release, none for any other state.
 - `packages/delivery-router/test/router.test.mjs`, `native-reason.test.mjs`: the reason rides on
@@ -54,6 +54,17 @@ advised `acc install --adapter codex`.
   stopped service when the feature is on; none when it is off, missing or unreadable, and an
   explicit install still starts the service.
 
+## A suite failure the first candidate had
+
+The first candidate, `c9daa93`, failed one test in the full suite under `env -i`:
+`tests/process/codex-native-delivery.test.mjs`, "with the daemon down the binding and offer fall
+back durably", got `client_session_embedded` where `handshake_failed` was expected. That test
+names its own pid as the client, and the host check read any `node` process as a Codex script:
+the test runner's `node --test ... a.test.mjs` passed as an interactive TUI. The host must now be
+Codex itself, `codex ...` or `node [options] codex.js ...`; any other process keeps the
+handshake's reason. A test for a test runner, a python process, `codex-helper` and an empty
+command line failed before the fix and passes after it.
+
 ## Real processes
 
 With the worktree's `bindNativeSession` against the running daemon (pid 12317): a real
@@ -63,11 +74,11 @@ rule. The notice reaching a model in a real embedded chat was not captured here.
 
 ## Exact local artifact
 
-- Source: clean commit `c9daa93237713f20f32d2cf56ef56d18172aa28a` on
+- Source: clean commit `05a024683d524e073f4b3a4b72dce2057c504352` on
   `fix/codex-embedded-notice`, from `main` at `3051920` (0.8.3).
 - Archive: `agents-can-communicate-0.8.3.tgz`, packed from that commit.
-- Size: 489,533 bytes; 317 packed entries.
-- SHA-256: `3b1ee63b1a68b7f80f9d2fd90a25d1fc1daf23a69eedee9b1213681c0ca7fd40`.
+- Size: 489,678 bytes; 317 packed entries.
+- SHA-256: `beee685342ad321a00bf32633881d79a71b836397490bbdeda360bd90bf8062e`.
 - Package version remains `0.8.3`; this is an unpublished development artifact.
 
 The exact archive passed `scripts/verify-package.mjs`.
