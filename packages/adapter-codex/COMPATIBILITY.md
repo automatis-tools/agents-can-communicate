@@ -101,12 +101,14 @@ its offer. Hook and skill commands pin the installed ACC data home even when a
 daemon predates opt-in and has no ACC environment variables.
 
 Messages accepted while a turn is running wait for it to finish. An idle thread
-can start an automatic turn and spend tokens. Closing the TUI can leave the thread
-loaded: both tested versions executed an opted-in synthetic ACC question and
-replied after terminal exit. A loaded resume may emit fresh UserPromptSubmit
-without a new SessionStart. Actual archive and SessionEnd retire the binding;
-terminal exit alone is not an opt-out. Delivery off or uninstall blocks new offers
-but cannot withdraw a queue entry the vendor already accepted.
+can start an automatic turn and spend tokens. Closing the TUI leaves the thread
+loaded for about a minute: both tested versions executed an opted-in synthetic ACC
+question and replied after terminal exit. A loaded resume may emit fresh
+UserPromptSubmit without a new SessionStart. Archive retires the binding at once;
+the daemon's unload of an idle thread with no subscribers runs SessionEnd and
+retires it about a minute after the TUI exits (measured 2026-09-29, below).
+Delivery off or uninstall blocks new offers but cannot withdraw a queue entry the
+vendor already accepted.
 
 Codex can insert its own project-trust and other tables between ACC config
 markers. Reinstall and uninstall preserve those foreign settings. Ambiguous
@@ -1223,3 +1225,27 @@ the sender through `nativeReasonCode`, and doctor through the session line. Doct
 Measured with this change against the real processes: the worktree's `bindNativeSession`
 returned `client_session_embedded` for the `codex --no-daemon` TUI and kept `protocol_mismatch`
 for the daemon's pid. The notice reaching a model in a real embedded chat was not captured.
+
+## A closed TUI closes its session — Codex 0.158.0, 2026-09-29
+
+Measured on darwin-arm64 with ACC 0.8.3 and real TUIs driven in a pseudo-terminal, each
+registered through a queued prompt that started one turn:
+
+| TUI exit | Exit | `session.closed` | Delay |
+|---|---|---|---|
+| Ctrl-C twice after a turn | 03:51:31.4Z | 03:52:31.97Z | 60.6 s |
+| `kill -9` after a turn | 03:55:18Z | 03:56:18.8Z | 60.8 s |
+| Ctrl-C with no turn | 03:56:43Z | SessionEnd hook ran at 03:57:43Z | 60 s |
+
+The daemon unloads an idle thread with no subscribers after `thread_unload_delay_secs`, a
+top-level `config.toml` key, and runs SessionEnd as it does so, even for a thread that never had
+a turn. ACC then closes the session and retires its binding. A thread with an open TUI stayed
+loaded while idle for more than 20 minutes (2026-09-28). The session's pid is the daemon's,
+because the hook runs under it; the daemon outlives every TUI, and the close does not depend
+on that pid.
+
+An earlier observation read an ordinary exit as leaving the session open: a `codex archive` ran
+60 seconds after the exit and coincided with the unload. The residual window is about a minute
+after the TUI exits. In it the thread looks the same as one with an open TUI (the metadata-only
+`thread/read` returns the same fields), and a live offer can start a turn that no terminal
+shows. ACC does not shorten it.

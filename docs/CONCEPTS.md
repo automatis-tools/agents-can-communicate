@@ -134,8 +134,8 @@ The durable inbox is universal. An adapter whose captures reach the installed cl
 also offer messages at the next normal turn. Codex LocalDaemon and the Claude Code inbox
 wake add experimental live delivery, off by default and subject to recipient policy and
 current reachability. A Claude Code wake makes the session run a turn, and that turn's
-next-turn hook shows the message. Codex can retain an eligible daemon thread after its
-terminal exits. [Capabilities](CAPABILITIES.md) gives the current limits.
+next-turn hook shows the message. Codex can retain an eligible daemon thread for about a minute
+after its terminal exits. [Capabilities](CAPABILITIES.md) gives the current limits.
 
 ## Handoffs preserve explicit context
 

@@ -147,12 +147,13 @@ until a running turn finishes. A busy Claude Code session takes the wake between
 calls. Claude Code requires 2.1.282 or newer and recorded opt-in, and it wakes through the
 inbox that each session opens itself. Codex requires 0.152.1 or newer, LocalDaemon
 infrastructure, recorded opt-in, and a verified session. Supported explicit setup can
-prepare a missing service. Start the client with your normal command. A loaded daemon thread can receive
-messages after its terminal exits. Antigravity CLI 1.2.7 and later has one too: with delivery enabled,
-ACC's context asks the agent to start a relay from its own shell, up to three times while
-none is running, and you approve that command at the client's prompt. Antigravity also asks
-before each shell command, so install adds a rule that lets ACC's own commands run without
-that prompt, and a woken session can answer while you are away; see
+prepare a missing service. Start the client with your normal command. A loaded daemon
+thread can receive messages for about a minute after its terminal exits, until the daemon
+unloads it and ACC closes its session. Antigravity CLI 1.2.7 and later has one too: with
+delivery enabled, ACC's context asks the agent to start a relay from its own shell, up to
+three times while none is running, and you approve that command at the client's prompt.
+Antigravity also asks before each shell command, so install adds a rule that lets ACC's own
+commands run without that prompt, and a woken session can answer while you are away; see
 [Antigravity CLI command approval](CONFIGURATION.md#antigravity-cli-command-approval).
 [Capabilities](CAPABILITIES.md) explains policy, versions and fallback.
 
