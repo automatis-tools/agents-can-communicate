@@ -63,20 +63,31 @@ opened in a pseudo-terminal and nothing was typed:
 
 MCP `acc_status` shares the composition but was exercised only by the existing MCP suite.
 
+## A review finding the first candidate had
+
+The pull request review found that `registerDiscoveredSessions` awaited each adapter's
+discovery with no bound of its own: an adapter that ignored its timeout would hold `acc status`,
+`acc doctor` and MCP `acc_status`. Codex's discovery had the same gap inside, since its `ps` and
+`lsof` checks ran before its peer timeout, with the command runner's 20-second default. Now
+each adapter's answer is raced against the remaining budget, Codex's whole discovery is raced
+against its timeout, and every process check it starts carries that timeout. Tests for a
+discovery that never answers, a `ps` that never answers, and the timeout on each process check
+failed before the fix and pass after it.
+
 ## Suite
 
-`npm test` on the candidate commit `667389c`, run under `env -i` with only `HOME`, `USER`,
+`npm test` on the first candidate commit `667389c`, run under `env -i` with only `HOME`, `USER`,
 `TMPDIR` and a PATH of system directories plus node, as in CI: 2,746 tests, 2,745 passing,
 0 failing, 1 skipped. The skipped test is the existing uninstall check that skips on a machine
 where Gemini CLI is installed, as on `main`. Nothing was re-run.
 
 ## Exact local artifact
 
-- Source: clean commit `667389cae5254e6e272daef606b506960b098e75` on
+- Source: clean commit `b88201b567f5e2077466e4afc7e548e3420d1c3e` on
   `feat/codex-empty-chat-registration`, from `main` at `3051920` (0.8.3).
 - Archive: `agents-can-communicate-0.8.3.tgz`, packed from that commit.
-- Size: 490,236 bytes; 316 packed entries.
-- SHA-256: `cc6816a19fd3d0cc86d31246147460b918d55a08452c45aedb2080d6d2ddf3bf`.
+- Size: 490,513 bytes; 316 packed entries.
+- SHA-256: `f3a34ba5d5f3418d89c0b503fe124b1f89dd5581f4653e241c87f436b4e102bf`.
 - Package version remains `0.8.3`; this is an unpublished development artifact.
 
 The exact archive passed `scripts/verify-package.mjs`.

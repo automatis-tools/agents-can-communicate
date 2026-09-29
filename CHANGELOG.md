@@ -13,9 +13,9 @@
 
 | Candidate artifact | Value |
 |---|---|
-| Built from | `667389cae5254e6e272daef606b506960b098e75` |
-| Tarball | `agents-can-communicate-0.8.3.tgz`, 490,236 bytes, 316 files |
-| sha256 | `cc6816a19fd3d0cc86d31246147460b918d55a08452c45aedb2080d6d2ddf3bf` |
+| Built from | `b88201b567f5e2077466e4afc7e548e3420d1c3e` |
+| Tarball | `agents-can-communicate-0.8.3.tgz`, 490,513 bytes, 316 files |
+| sha256 | `f3a34ba5d5f3418d89c0b503fe124b1f89dd5581f4653e241c87f436b4e102bf` |
 
 This unpublished development archive passed clean installation verification. See
 [the evidence](docs/release-evidence/unreleased-codex-empty-chat-registration.md).
