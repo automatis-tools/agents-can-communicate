@@ -43,3 +43,9 @@ The same preflight on a 0.8.5-versioned copy of the change: right after the upda
 said `complete: false` and both generations were kept; npm's `acc status` and the launcher's
 started no worker. With `attemptedAt` moved two hours back, the next launcher `acc status`
 started the worker, which removed the 0.8.4 generation and recorded `complete: true`.
+
+## Suite
+
+`npm test` on `e115212`, under `env -i` with only `HOME`, `USER`, `TMPDIR` and a PATH of system
+directories plus node, as in CI: 2,795 tests, 2,794 passing, 0 failing, 1 skipped (the existing
+uninstall check that skips on a machine where Gemini CLI is installed), in 9.1 minutes.
