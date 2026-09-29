@@ -43,9 +43,15 @@ function spawnStub(kind) {
 function runStub(kind, input) {
   const child = spawnStub(kind);
   let stdout = "";
+  let stdinError = null;
   child.stdout.on("data", chunk => { stdout += chunk; });
+  // The bootstrap stub never reads its input, so it can exit while this write
+  // is still in flight; the pipe then reports EPIPE, which says nothing about
+  // the stub. Any other stdin error still fails the test.
+  child.stdin.on("error", error => { if (error.code !== "EPIPE") stdinError = error; });
   child.stdin.end(input);
-  return new Promise(resolve => child.on("close", code => resolve({ code, stdout })));
+  return new Promise((resolve, reject) => child.on("close",
+    code => (stdinError ? reject(stdinError) : resolve({ code, stdout }))));
 }
 
 test("an old shim reaching the bootstrap stub runs the vendor command unchanged", async () => {
