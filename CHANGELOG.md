@@ -1,5 +1,23 @@
 # Changelog
 
+## Unreleased — a closed Codex TUI closes its session
+
+- The Codex documentation said that a closed TUI leaves its ACC session open. Measured, the
+  daemon unloads the idle thread about a minute after the TUI exits, by Ctrl-C or `kill -9`,
+  and runs SessionEnd, so ACC closes the session and retires its binding. Only that minute
+  remains in which a live offer can start a turn that no terminal shows (#212).
+- Documentation only; the store format and every code path are unchanged.
+
+| Candidate artifact | Value |
+|---|---|
+| Built from | `f82c1387c864d60c23eb95284fa4be6081a0a0c6` |
+| Tarball | `agents-can-communicate-0.8.3.tgz`, 486,785 bytes, 315 files |
+| sha256 | `ef5d4f4ecf598a3894423ce0827c6b71fea88064c56246aced36be6a8136337a` |
+
+This unpublished development archive passed clean installation verification. See
+[the evidence](docs/release-evidence/unreleased-codex-session-closes-on-unload.md).
+The package version remains `0.8.3` until a release prepares its own.
+
 ## 0.8.3 — release candidate
 
 - `acc update` right after a release installs the release that discovery found. The download
