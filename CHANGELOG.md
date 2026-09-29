@@ -11,7 +11,7 @@
 
 | Candidate artifact | Value |
 |---|---|
-| Built from | `34eacc0b484676918a1f7ed5ac5912ba94ac35c1` |
+| Built from | `3dcd155d685b167770f7bf79c23d282ada663809` |
 | Tarball | `agents-can-communicate-0.8.3.tgz`, 486,699 bytes, 315 files |
 | sha256 | `6047fba45684018f89af81e3397a9f4745a2395d39018aa189fbd6e0175127d6` |
 
