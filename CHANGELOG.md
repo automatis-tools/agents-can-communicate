@@ -9,16 +9,17 @@
   through 0.157.0 still get the standalone download (#205).
 - A fix to how old runtime generations are reclaimed now takes effect on the release that
   ships it. An update is run by the installed code, so the reclaim after an activation follows
-  the older rule; the new generation's own update worker reclaims again on its first pass,
-  started for it even with automatic updates off, and on every later pass. An install
-  reclaims as the generation it activates itself (#208).
+  the older rule. Activation now runs the activated generation's own reclaim right after it,
+  from that generation's files; an update from 0.8.3 or older, whose code does not do this,
+  leaves it to the new generation's update worker, started for it even with automatic updates
+  off. An install reclaims as the generation it activates itself (#208).
 - The store format is unchanged.
 
 | Candidate artifact | Value |
 |---|---|
-| Built from | `f623c9882b1d8591ff35db70d38855cec2faa7fd` |
-| Tarball | `agents-can-communicate-0.8.3.tgz`, 495,321 bytes, 318 files |
-| sha256 | `9aa58c02844364319ffd0e10eff22dbb3b70b2d0c89848513aace6c83aa47a85` |
+| Built from | `9fdd1db7dcc63b09ebd7ed48cc530621704fa045` |
+| Tarball | `agents-can-communicate-0.8.3.tgz`, 495,523 bytes, 318 files |
+| sha256 | `4f73a7be9b060762f9a9c3c2631367cfe76adbc0ee81055611ee8ff75ccde664` |
 
 This unpublished development archive passed clean installation verification. See
 [the evidence](docs/release-evidence/unreleased-codex-daemon-layout-and-reclaim.md).

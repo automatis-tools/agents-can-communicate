@@ -29,6 +29,10 @@ release, although the fix was already active.
   newer is planned as starting the service (`selfInstall`), with doctor's launch advice when
   `daemon_auto_start` is on; setup starts it and then verifies the installed package and daemon
   as any existing service. Older CLIs keep the standalone download.
+- `packages/cli/src/managed-runtime/activation.mjs`: after an activation and its own reclaim,
+  the activated generation's `reclaimAsActive` runs from that generation's files.
+- `packages/cli/src/managed-runtime/install.mjs`: an install reclaims as the generation it
+  activates, after its fence, then schedules only work that is due.
 - `packages/cli/src/managed-runtime/worker.mjs`, `schedule.mjs`, `bin/acc-update-worker.mjs`:
   the worker passes its own generation root; after each pass, the active generation's worker
   reclaims with its own rule and records `reclaim.json` naming that root. The scheduler starts a
@@ -48,6 +52,8 @@ release, although the fix was already active.
   it has. The first and third failed before the change.
 - `packages/cli/test/managed-runtime-install-failure.test.mjs`: a completed install removes a
   stale generation, records the reclaim for its generation, and leaves nothing due.
+- `packages/cli/test/managed-runtime-retention.test.mjs`: an activation runs the activated
+  generation's own `reclaimAsActive` from that generation's files.
 
 ## A suite failure the first candidate had
 
@@ -61,6 +67,22 @@ activates, so it now reclaims as that generation after its fence and records it,
 schedules only work that is due. A test for an install that leaves a stale generation behind
 failed before the fix and passes after it; the five tests and the packed update tests pass.
 
+## A second suite failure, after an update
+
+The second candidate, `f623c98`, failed `packed update retains delivery consent while native
+services and capabilities are unavailable` in the full suite, and that test file then never
+exited. Run alone it passed; four parallel runs failed twice, each with `ENOTEMPTY` while
+removing `data/acc/runtime`, and each failed process stayed alive with a pending promise. After
+`acc update`, the next `acc doctor` found `reclaim.json` naming the previous generation and
+started the new generation's worker, which wrote into the runtime directory while the test
+removed it. Outside tests that worker is harmless, but it is also later than the fix needs to
+be. `activatePending` now runs the activated generation's own `reclaimAsActive` right after
+its own reclaim, loaded from that generation's files as its refresh already is, so a
+generation activated by code that knows this records its reclaim at once and no worker is
+started for it. An update from 0.8.3 or older still relies on the worker. A test that the
+activation calls the activated generation's own reclaim failed before the fix; the same four
+parallel runs then passed, and the directories the failed runs had left were removed.
+
 ## Real Codex
 
 With this change against real temporary homes: the self-installed daemon from the capture was
@@ -72,11 +94,11 @@ their daemons and helper processes were removed afterwards.
 
 ## Exact local artifact
 
-- Source: clean commit `f623c9882b1d8591ff35db70d38855cec2faa7fd` on
+- Source: clean commit `9fdd1db7dcc63b09ebd7ed48cc530621704fa045` on
   `fix/reclaim-and-codex-daemon-layout`, from `main` at `f9937e7`.
 - Archive: `agents-can-communicate-0.8.3.tgz`, packed from that commit.
-- Size: 495,321 bytes; 318 packed entries.
-- SHA-256: `9aa58c02844364319ffd0e10eff22dbb3b70b2d0c89848513aace6c83aa47a85`.
+- Size: 495,523 bytes; 318 packed entries.
+- SHA-256: `4f73a7be9b060762f9a9c3c2631367cfe76adbc0ee81055611ee8ff75ccde664`.
 - Package version remains `0.8.3`; this is an unpublished development artifact.
 
 The exact archive passed `scripts/verify-package.mjs`.
