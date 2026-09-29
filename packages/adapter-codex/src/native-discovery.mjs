@@ -39,8 +39,18 @@ async function withPeer(open, socketPath, timeoutMs, run) {
 export function createCodexDiscovery({ run = runMaintenanceCommand, open = openCodexAppServer,
   contextPaths = maintenanceContext } = {}) {
   async function discoverNativeSessions({ env = process.env, home, timeoutMs = 1_500 } = {}) {
+    // The whole answer, process checks included, within the caller's timeout.
+    let timer;
+    return Promise.race([discover({ env, home, timeoutMs }), new Promise(resolve => {
+      timer = setTimeout(resolve, Math.max(1, timeoutMs), []);
+    })]).finally(() => clearTimeout(timer));
+  }
+  async function discover({ env, home, timeoutMs }) {
     try {
-      const paths = await contextPaths({ env, home });
+      const found = await contextPaths({ env, home });
+      // A process check that outlives the answer would still keep the
+      // caller's process alive until its own timeout, so it gets this one.
+      const paths = { ...found, options: { ...found.options, timeout: Math.max(1, timeoutMs) } };
       const socketPath = await readySocketPath(paths.socketPath);
       if (socketPath === null) return [];
       const daemon = await readMaintenancePid(paths.pidPath);

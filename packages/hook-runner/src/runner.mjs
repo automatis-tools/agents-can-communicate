@@ -839,6 +839,14 @@ export async function registerDiscoveredSessions({ adapters, workspaceId, dataHo
   budgetMs = 2_500, runtime, probeClientVersion, platform }) {
   const deadline = Date.now() + budgetMs;
   const remaining = () => Math.max(0, deadline - Date.now());
+  // An adapter that ignores its timeout must not hold status: its answer is
+  // raced against what is left of the budget, and a late one is dropped.
+  const withinBudget = work => {
+    let timer;
+    return Promise.race([Promise.resolve().then(work).catch(() => []),
+      new Promise(resolve => { timer = setTimeout(resolve, remaining(), []); })])
+      .finally(() => clearTimeout(timer));
+  };
   const registered = [];
   let installed;
   try {
@@ -848,8 +856,8 @@ export async function registerDiscoveredSessions({ adapters, workspaceId, dataHo
   }
   for (const adapter of Object.values(adapters ?? {})) {
     if (typeof adapter?.discoverNativeSessions !== "function" || !installed.has(adapter.id)) continue;
-    const found = await Promise.resolve()
-      .then(() => adapter.discoverNativeSessions({ env, timeoutMs: remaining() })).catch(() => []);
+    const found = await withinBudget(() => adapter.discoverNativeSessions({ env,
+      timeoutMs: remaining() }));
     for (const candidate of Array.isArray(found) ? found : []) {
       if (remaining() === 0) return registered;
       const result = await registerNativeSession({ adapterId: adapter.id, adapters,

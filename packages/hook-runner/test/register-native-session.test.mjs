@@ -132,3 +132,13 @@ test("discovery asks no adapter that is not installed and survives one that fail
   assert.deepEqual(await registerDiscoveredSessions({ adapters: { hosted: failing },
     dataHome: h.dataHome, env: {} }), []);
 });
+
+test("an adapter whose discovery never answers cannot hold status past the budget", async t => {
+  const h = await setup(t);
+  const stalled = { ...daemonHosted(h.binds), discoverNativeSessions: () => new Promise(() => {}) };
+  const started = Date.now();
+  const result = await registerDiscoveredSessions({ adapters: { hosted: stalled },
+    dataHome: h.dataHome, env: {}, budgetMs: 200 });
+  assert.deepEqual(result, []);
+  assert.ok(Date.now() - started < 1_000, `returned after ${Date.now() - started} ms`);
+});

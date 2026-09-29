@@ -73,3 +73,26 @@ test("nothing is found without a daemon whose process and socket are proven", as
   await f.stop();
   assert.deepEqual(await discover(), [], "no daemon");
 });
+
+test("a process check that never answers cannot hold discovery past its timeout", async t => {
+  const { f } = await discovery(t);
+  const stalled = async (command, args, options) => command === "/bin/ps"
+    ? new Promise(() => {}) : f.run(command, args, options);
+  const { discoverNativeSessions } = createCodexDiscovery({ run: stalled, open: f.open });
+  const started = Date.now();
+  assert.deepEqual(await discoverNativeSessions({ env: f.context.env, home: f.context.home,
+    timeoutMs: 200 }), []);
+  assert.ok(Date.now() - started < 1_000, `returned after ${Date.now() - started} ms`);
+});
+
+test("every process check discovery starts is bounded by its timeout", async t => {
+  const { f, discover } = await discovery(t);
+  const timeouts = [];
+  const { discoverNativeSessions } = createCodexDiscovery({ open: f.open,
+    run: async (command, args, options) => { timeouts.push(options?.timeout);
+      return f.run(command, args, options); } });
+  await discoverNativeSessions({ env: f.context.env, home: f.context.home, timeoutMs: 300 });
+  assert.ok(timeouts.length >= 2, "ps and lsof both ran");
+  assert.deepEqual([...new Set(timeouts)], [300]);
+  assert.equal((await discover()).length, 1);
+});
