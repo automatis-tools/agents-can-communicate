@@ -76,10 +76,11 @@ failed before the fix and pass after it.
 
 ## Suite
 
-`npm test` on the first candidate commit `667389c`, run under `env -i` with only `HOME`, `USER`,
-`TMPDIR` and a PATH of system directories plus node, as in CI: 2,746 tests, 2,745 passing,
+`npm test` on the candidate commit `b88201b`, run under `env -i` with only `HOME`, `USER`,
+`TMPDIR` and a PATH of system directories plus node, as in CI: 2,749 tests, 2,748 passing,
 0 failing, 1 skipped. The skipped test is the existing uninstall check that skips on a machine
-where Gemini CLI is installed, as on `main`. Nothing was re-run.
+where Gemini CLI is installed, as on `main`. Nothing was re-run. The first candidate, `667389c`,
+had passed 2,746 tests the same way.
 
 ## Exact local artifact
 
