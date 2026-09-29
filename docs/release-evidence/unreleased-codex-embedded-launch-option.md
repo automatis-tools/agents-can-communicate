@@ -85,8 +85,18 @@ cannot reach); the message waits in its inbox`, and doctor's session line ended 
 client session without --search`. The next prompt showed no notice. Every process started from
 the isolated directories was stopped and the directories deleted.
 
+## The review fix
+
+The PR review found that the option scan read past `--`: for `codex -- --search`, `--search` is
+prompt text, yet the refusal named it. `--` now ends the scan (`8e12504`), with the case added to
+`embedded-host.test.mjs`, which failed before the fix. The candidate was packed and verified again
+from `8e12504`: 498,822 bytes, 318 files, sha256
+`62ac29fdc85aa4ad0a60e981122eb40d0f051a6cd57bfbf8e6a1e7c8d6b28b32`. The real-client check above
+ran on the first candidate, `338b080`; the fix changes only command lines that contain `--`.
+
 ## Suite
 
-`npm test` on `e0c5f0b`, under `env -i` with only `HOME`, `USER`, `TMPDIR` and a PATH of system
-directories plus node, as in CI: 2,793 tests, 2,792 passing, 0 failing, 1 skipped (the existing
-uninstall check that skips on a machine where Gemini CLI is installed), in 9.4 minutes.
+`npm test` on `e0c5f0b`, the first candidate's record, under `env -i` with only `HOME`, `USER`,
+`TMPDIR` and a PATH of system directories plus node, as in CI: 2,793 tests, 2,792 passing,
+0 failing, 1 skipped (the existing uninstall check that skips on a machine where Gemini CLI is
+installed), in 9.4 minutes.

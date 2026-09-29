@@ -16,9 +16,9 @@
 
 | Candidate artifact | Value |
 |---|---|
-| Built from | `338b08020b5363ae8aa2e4b047b64f7863c58c4d` |
-| Tarball | `agents-can-communicate-0.8.4.tgz`, 498,780 bytes, 318 files |
-| sha256 | `91e48406e13f61aacdebda94f605625f6b617bc0d86bbd7c63213ed18f08284e` |
+| Built from | `8e12504fe17bde15536427d4776f6a003a0835e0` |
+| Tarball | `agents-can-communicate-0.8.4.tgz`, 498,822 bytes, 318 files |
+| sha256 | `62ac29fdc85aa4ad0a60e981122eb40d0f051a6cd57bfbf8e6a1e7c8d6b28b32` |
 
 This unpublished development archive passed clean installation verification. See
 [the evidence](docs/release-evidence/unreleased-codex-embedded-launch-option.md).
