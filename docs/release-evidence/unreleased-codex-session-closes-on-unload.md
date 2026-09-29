@@ -31,10 +31,11 @@ about a minute. No code changed, so no test was added.
 
 ## Suite
 
-`npm test` on the candidate commit `f82c138`, run under `env -i` with only `HOME`, `USER`,
-`TMPDIR` and a PATH of system directories plus node, as in CI: 2,734 tests, 2,733 passing,
-0 failing, 1 skipped. The skipped test is the existing uninstall check that skips on a machine
-where Gemini CLI is installed, as on `main`. Nothing was re-run.
+`npm test` on the candidate commit `522bb1d`, which merges `main` after #225, run under
+`env -i` with only `HOME`, `USER`, `TMPDIR` and a PATH of system directories plus node, as in
+CI: 2,752 tests, 2,751 passing, 0 failing, 1 skipped. The skipped test is the existing
+uninstall check that skips on a machine where Gemini CLI is installed, as on `main`. Nothing
+was re-run. Before the merge, `f82c138` had passed 2,734 tests the same way.
 
 ## Exact local artifact
 
