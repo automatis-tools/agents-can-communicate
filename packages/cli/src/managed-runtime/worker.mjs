@@ -1,7 +1,10 @@
-import { activatePending } from "./activation.mjs";
+import { realpath } from "node:fs/promises";
+import path from "node:path";
+
+import { activatePending, reclaimGenerations } from "./activation.mjs";
 import { downloadRelease, fetchRelease, newerVersion } from "./download.mjs";
 import { withManagerLock } from "./mutex.mjs";
-import { readControl, writeControl } from "./state.mjs";
+import { readControl, writeControl, writeManagedJson } from "./state.mjs";
 import { releaseStagingHold } from "./staging.mjs";
 import { MAINTENANCE_ACTIVE, maintenanceNotice, maintenanceReport, readMaintenance } from "./maintenance-state.mjs";
 import { requestMaintenance } from "./maintenance.mjs";
@@ -62,8 +65,37 @@ export async function performUpdate(root, { force = false, check = false, env = 
   return { ...checked, pending: generation.version, ...await activate(root, { env, ignorePid }) };
 }
 
+/**
+ * Reclaim with this generation's own rule, when it is the active one (#208).
+ *
+ * An update is run by the older installed code, so the reclaim right after an
+ * activation applies the older rule, and a fix to that rule used to take
+ * effect only one release later. The active generation's worker runs this on
+ * its first pass, which the scheduler starts for a generation that has not
+ * recorded it yet, and on every later pass. A reclaim that finds an unknown
+ * holder still postpones itself; the next pass tries again.
+ */
+export const RECLAIM_MARKER = "reclaim.json";
+async function reclaimAsActive(root, generationRoot) {
+  if (typeof generationRoot !== "string") return;
+  try {
+    const control = await readControl(root);
+    if (control === null || await realpath(generationRoot) !== await realpath(control.active.root)) return;
+    await reclaimGenerations({ root });
+    await writeManagedJson(path.join(root, RECLAIM_MARKER), { schemaVersion: 1,
+      activeRoot: control.active.root });
+  } catch { /* Best effort; the next pass reclaims again. */ }
+}
+
 /** One poller may wait; the update lock stays available between its passes. */
-export async function runWorker(root, { force = false, env = process.env, wait = false, ignorePid = null } = {}) {
+export async function runWorker(root, { force = false, env = process.env, wait = false, ignorePid = null,
+  generationRoot = null } = {}) {
+  const result = await pass(root, { force, env, wait, ignorePid });
+  await reclaimAsActive(root, generationRoot);
+  return result;
+}
+
+async function pass(root, { force, env, wait, ignorePid }) {
   const poll = async () => {
     for (;;) {
       const result = await withManagerLock(`${root}/worker`,
