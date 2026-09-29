@@ -149,8 +149,9 @@ never overrides them. See
 
 Codex LocalDaemon delivery separately requires Codex 0.152.1 or newer, a
 current feature probe, and exact thread, canonical cwd, process, version and protocol
-checks. On Codex 0.154.0 or newer, explicit complete setup can download a missing matching
-standalone package and prepare a definitely absent service. The setup choice names the
+checks. On Codex 0.154.0 through 0.157.0, explicit complete setup can download a missing
+matching standalone package and prepare a definitely absent service. Codex 0.157.1 and newer
+install the service's own package when it first starts, so setup only starts it. The setup choice names the
 download. Existing service-start consent alone does not permit it. Codex files remain
 under the selected `CODEX_HOME`; the existing CLI command and shell profiles are preserved.
 Message delivery does not install Codex, start it, or stop it.

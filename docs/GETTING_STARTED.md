@@ -58,8 +58,9 @@ hooks wherever the client is at or after a captured version.
 An interactive install asks one default-No question for all selected clients that need a
 choice. Use `--delivery actionable|all` for explicit noninteractive consent. Use
 `--delivery off` to disable incoming automatic requests. A dry run does not ask, write
-configuration, download Codex, or start a service. On macOS or Linux with Codex 0.154.0 or newer,
-the choice includes downloading a missing standalone package from OpenAI. ACC selects the
+configuration, download Codex, or start a service. On macOS or Linux with Codex 0.154.0 through
+0.157.0, the choice includes downloading a missing standalone package from OpenAI; Codex
+0.157.1 and newer install the service's own package when it first starts. ACC selects the
 matching version and keeps your existing npm or Homebrew command and shell profiles.
 When supported Codex service preparation succeeds, it
 means the infrastructure is ready. Start a Codex session and complete the client's hook and

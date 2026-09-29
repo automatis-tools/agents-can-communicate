@@ -1122,12 +1122,10 @@ the reported path once and holds the socket at its end to the same rule; the exe
 must live in the standalone tree and be the managed binary; the trailing
 `--managed-daemon` is accepted; the socket is proven by either path.
 
-Measured and not supported: in a `CODEX_HOME` with no standalone package, 0.157.1's
+Measured at the time: in a `CODEX_HOME` with no standalone package, 0.157.1's
 `daemon start` installs its own `packages/app-server-daemon/` and keeps its records as
 `app-server-daemon/daemon.pid` and `daemon-updater.*`, with `managedCodexPath`
-`packages/app-server-daemon/current/bin/codex`. ACC's service setup still expects the
-standalone package and its file names, so a fresh 0.157.1 home reports the standalone
-prerequisite. That layout needs its own capture.
+`packages/app-server-daemon/current/bin/codex`. Supported since the 2026-09-29 capture below.
 
 ## The LocalDaemon minimum applies on every platform, 2026-09-26
 
@@ -1270,3 +1268,27 @@ current live binding, and doctor printed `local transport active; receiver verif
 request sent at 05:21:29.3Z was offered through `codex-app-server` 0.5 s later; the chat's
 first turn answered `OK` at 05:21:46.3Z from the same session, and no second session opened.
 Ctrl-C at 05:22:15Z closed it through `SessionEnd` when the daemon unloaded the thread.
+
+## The daemon package a new home installs — Codex 0.159.0, 2026-09-29
+
+In a fresh temporary `CODEX_HOME`, `codex app-server daemon start` printed `Installing daemon
+from CLI version 0.159.0 into <CODEX_HOME>/packages/app-server-daemon...` and started in about
+two seconds, with no download. The package holds `releases/0.159.0-aarch64-apple-darwin/` with
+`bin/codex`, a `current` link to that release, `auto-update-version` and `install.lock`. The
+daemon's records are `app-server-daemon/daemon.pid` (the same JSON as `app-server.pid`:
+`pid`, `processStartTime`, `processIdentity`, `executableIdentity`), `daemon-updater.pid`,
+`daemon.lock` and their logs. Its command line is
+`<CODEX_HOME>/packages/app-server-daemon/releases/<release>/bin/codex app-server --listen unix:// --managed-daemon`,
+`daemon version` reports `managedCodexPath` `<CODEX_HOME>/packages/app-server-daemon/current/bin/codex`,
+and the control socket is the same symlink into `/private/tmp/codex-daemon-<uid>/`. A SIGTERM
+removed the symlink and left `daemon.pid`; the next start reused the package without
+installing again.
+
+ACC now resolves the layout from the package that exists, the standalone one first: the managed
+executable, the PID record, and the package tree the daemon's executable must live in. A home
+with neither package, on a CLI of 0.157.1 or newer, plans setup as starting the service, with
+no standalone download; older CLIs keep the download. Measured with this change: the service in
+the temporary home was inspected `ready` for maintenance and for setup, its pid was proven with
+`ps` and `lsof`, and a second fresh home was planned as a start (with doctor advising to open
+Codex, since `daemon_auto_start` is on), started by the setup, and verified `ready`. The
+maintainer's own home still resolved to the standalone layout.
