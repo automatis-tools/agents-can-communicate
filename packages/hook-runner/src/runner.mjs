@@ -5,12 +5,14 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { capabilityEvidence, clearNativeAttempt, clearSessionBinding, effectiveCapabilities,
-  loadSessionBinding, storeSessionBinding }
+  loadSessionBinding, normalizedEvent, storeSessionBinding }
   from "@agents-can-communicate/adapter-sdk";
 import { createCoordinationService } from "@agents-can-communicate/core";
+import { loadOwnership } from "@agents-can-communicate/installer";
 import { AccError, createId } from "@agents-can-communicate/protocol";
 import { openFilesystemStore } from "@agents-can-communicate/storage-filesystem";
-import { clearPin, createGitProbe, resolveHookWorkspace, platformDataHome, runtimePaths, writePin }
+import { clearPin, createGitProbe, resolveHookWorkspace, platformDataHome, runtimePaths,
+  writePin as writeRuntimePin }
   from "@agents-can-communicate/cli";
 
 import { resolveClientPid } from "./client-pid.mjs";
@@ -388,11 +390,16 @@ async function projectActivation(input, offered) {
 }
 
 const HANDLERS = {
+  // `knownClientPid` and `pins: false` are registration's (#167): it runs in
+  // a peer's process, so the client's pid is handed over rather than found in
+  // this process's ancestry, and it pins nothing because no hook code of any
+  // generation runs for the session until its first real hook pins its own.
   async sessionStart({ event, context, adapter, adapterId, binding, paths,
-    readProcessTable, probeClientVersion, platform, deadline }) {
+    readProcessTable, probeClientVersion, platform, deadline, knownClientPid, pins = true }) {
     // Where this session's pin lives, resolved once and reused at every write
     // below. Beside `paths.root`, never inside it: see `managerRootFor`.
     const pinRoot = managerRootFor(context.dataHome);
+    const writePin = pins === false ? async () => {} : writeRuntimePin;
     // A repeated start refreshes the client's version/platform. Remove the old
     // certified facts before any probe, PID lookup, resume, or open can fail;
     // keep only the generation identity needed for a successful resume.
@@ -414,7 +421,8 @@ const HANDLERS = {
     // null, and the session is then judged by age alone - which is exactly the
     // behaviour every session had before this existed.
     const command = adapter.client?.command ?? null;
-    const pid = command === null ? null
+    const pid = Number.isInteger(knownClientPid) && knownClientPid > 0 ? knownClientPid
+      : command === null ? null
       : resolveClientPid({ table: await readProcessTable({
         timeoutMs: Math.max(1, Math.min(1_000, deadline - Date.now())) }), from: process.pid, command });
     assertHookBudget(deadline);
@@ -766,4 +774,94 @@ export async function runHook({ adapterId, payload, adapters, dataHome, env,
   } finally {
     clearTimeout(timer);
   }
+}
+
+/**
+ * Register a client session before its first turn (#167).
+ *
+ * Exactly what SessionStart writes - binding, session, native binding and its
+ * diagnostic - under the same per-session lifecycle lock, so the chat's first
+ * real hook finds the binding and resumes this session instead of opening a
+ * second one. The caller is a peer's process, so the client's pid is handed
+ * over, the caller's own ACC_PARTICIPANT never names the chat, and nothing is
+ * pinned or printed. A session that already has a binding is left alone.
+ * Never throws: status must not fail because of it.
+ */
+export async function registerNativeSession({ adapterId, adapters, event: target, clientPid,
+  workspaceId, dataHome, env = {}, runtime = defaultRuntime(), budgetMs = DEFAULT_BUDGET_MS,
+  probeClientVersion = defaultProbeClientVersion, platform = `${process.platform}-${process.arch}` }) {
+  const deadline = Date.now() + budgetMs;
+  const skipped = reason => ({ registered: false, reason });
+  const register = async () => {
+    const adapter = adapters?.[adapterId];
+    if (adapter === undefined || !Number.isInteger(clientPid) || clientPid <= 0) return skipped("unsupported");
+    const event = normalizedEvent({ kind: "sessionStart", sessionId: target?.sessionId, cwd: target?.cwd });
+    const { ACC_PARTICIPANT: _callerName, ...hostEnv } = env;
+    const context = await openContext({ event, adapterId, dataHome, runtime, env: hostEnv, deadline });
+    if (workspaceId !== undefined && context.descriptor.id !== workspaceId) return skipped("other_workspace");
+    return withSessionLifecycle({ root: context.paths.root, sessionId: event.sessionId,
+      clock: runtime.clock, deadlineAt: deadline }, async () => {
+      // As in runHook: recover a write a previous holder journalled before
+      // interpreting the binding.
+      const store = await openFilesystemStore({ root: context.paths.root, clock: runtime.clock,
+        ids: runtime.ids, workspaceId: context.descriptor.id, deadlineAt: deadline });
+      context.service = createCoordinationService({ store, clock: runtime.clock, ids: runtime.ids });
+      if (await loadSessionBinding({ runtimeDir: context.paths.root,
+        harnessSessionId: event.sessionId }) !== null) return skipped("known");
+      const started = await HANDLERS.sessionStart({ event, context, adapter, adapterId, binding: null,
+        paths: context.paths, readProcessTable: async () => new Map(), probeClientVersion,
+        platform, deadline, knownClientPid: clientPid, pins: false });
+      const session = await context.service.locateSession(started.accSessionId);
+      return { registered: true, sessionId: started.accSessionId,
+        participantId: session?.record.participantId ?? null, workspaceId: context.descriptor.id,
+        nativeBinding: started.nativeBinding };
+    });
+  };
+  let timer;
+  try {
+    return await Promise.race([register(), new Promise(resolve => {
+      timer = setTimeout(() => resolve(skipped("timed_out")), Math.max(0, deadline - Date.now()));
+    })]);
+  } catch {
+    return skipped("failed");
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/**
+ * What a peer runs before it reads status (#167): ask every installed adapter
+ * that can see its client's sessions for the ones ACC could register, and
+ * register those in this workspace. Bounded by one budget and fail-open; the
+ * answer lists what was registered and is otherwise informational.
+ */
+export async function registerDiscoveredSessions({ adapters, workspaceId, dataHome, env = {},
+  budgetMs = 2_500, runtime, probeClientVersion, platform }) {
+  const deadline = Date.now() + budgetMs;
+  const remaining = () => Math.max(0, deadline - Date.now());
+  const registered = [];
+  let installed;
+  try {
+    installed = new Set((await loadOwnership({ dataHome })).installs.map(entry => entry.adapterId));
+  } catch {
+    return registered;
+  }
+  for (const adapter of Object.values(adapters ?? {})) {
+    if (typeof adapter?.discoverNativeSessions !== "function" || !installed.has(adapter.id)) continue;
+    const found = await Promise.resolve()
+      .then(() => adapter.discoverNativeSessions({ env, timeoutMs: remaining() })).catch(() => []);
+    for (const candidate of Array.isArray(found) ? found : []) {
+      if (remaining() === 0) return registered;
+      const result = await registerNativeSession({ adapterId: adapter.id, adapters,
+        event: { sessionId: candidate?.sessionId, cwd: candidate?.cwd }, clientPid: candidate?.clientPid,
+        workspaceId, dataHome, env, budgetMs: remaining(),
+        ...(runtime ? { runtime } : {}), ...(probeClientVersion ? { probeClientVersion } : {}),
+        ...(platform ? { platform } : {}) });
+      if (result.registered) {
+        registered.push({ adapterId: adapter.id, participantId: result.participantId,
+          sessionId: result.sessionId });
+      }
+    }
+  }
+  return registered;
 }
