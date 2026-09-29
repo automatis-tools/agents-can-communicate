@@ -85,11 +85,11 @@ was re-run. Before the merge, `b88201b` had passed 2,749 tests and the first can
 
 ## Exact local artifact
 
-- Source: clean commit `71eada2b95694fea98426da855827836a8370ac4` on
-  `feat/codex-empty-chat-registration`, merging `main` at `b478c02` (after #225).
+- Source: clean commit `bb5af0b9398abd5690ea243aee0cd39743b648db` on
+  `feat/codex-empty-chat-registration`, merging `main` at `9e58334` (after #225 and #226).
 - Archive: `agents-can-communicate-0.8.3.tgz`, packed from that commit.
-- Size: 493,489 bytes; 318 packed entries.
-- SHA-256: `618479431f726086b80c72fd39ba1f0b4241461e6f2227c1b1eb80a3b6cc3ef5`.
+- Size: 493,539 bytes; 318 packed entries.
+- SHA-256: `64c6a62a48e8fe13445cc2cf2aa1c3c9757d2e6b00bfe6abc0eac97429fb0a44`.
 - Package version remains `0.8.3`; this is an unpublished development artifact.
 
 The exact archive passed `scripts/verify-package.mjs`.
