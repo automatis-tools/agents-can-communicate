@@ -39,6 +39,8 @@ test("a command line without such an option names none", () => {
     ["codex", "-m", "--search"], ["codex", "-C", "--oss"],
     // Words after the prompt starts are the prompt: `ps` drops the quotes.
     ["codex", "fix", "the", "--search", "flag"], ["codex", "resume", "0199a", "--oss"],
+    // `--` ends the options: what follows is the prompt, however it reads.
+    ["codex", "--", "--search", "is", "broken"], ["codex", "-m", "gpt", "--", "--oss"],
     ["codex", "--searching"], ["codex", "exec", "--search", "task"],
     ["/usr/bin/python3", "codex", "--search"], []]) {
     assert.equal(embeddingOption(argv), null, argv.join(" "));

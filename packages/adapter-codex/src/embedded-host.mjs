@@ -80,6 +80,8 @@ export function embeddingOption(argv) {
   let opened = false;
   for (const word of words) {
     if (value) { value = false; continue; }
+    // `--` ends the options: what follows is the prompt, however it reads.
+    if (word === "--") return null;
     if (word.startsWith("-")) {
       if (EMBEDDING_OPTIONS.has(optionName(word))) return optionName(word);
       value = VALUE_OPTIONS.has(word);
