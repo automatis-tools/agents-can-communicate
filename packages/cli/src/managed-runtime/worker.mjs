@@ -76,7 +76,7 @@ export async function performUpdate(root, { force = false, check = false, env = 
  * holder still postpones itself; the next pass tries again.
  */
 export const RECLAIM_MARKER = "reclaim.json";
-async function reclaimAsActive(root, generationRoot) {
+export async function reclaimAsActive(root, generationRoot) {
   if (typeof generationRoot !== "string") return;
   try {
     const control = await readControl(root);
