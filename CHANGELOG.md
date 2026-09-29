@@ -12,14 +12,15 @@
   the older rule. Activation now runs the activated generation's own reclaim right after it,
   from that generation's files; an update from 0.8.3 or older, whose code does not do this,
   leaves it to the new generation's update worker, started for it even with automatic updates
-  off. An install reclaims as the generation it activates itself (#208).
+  off. An install reclaims as the generation it activates itself. A reclaim an unknown holder
+  postponed is recorded as unfinished and retried at most hourly (#208).
 - The store format is unchanged.
 
 | Candidate artifact | Value |
 |---|---|
-| Built from | `9fdd1db7dcc63b09ebd7ed48cc530621704fa045` |
-| Tarball | `agents-can-communicate-0.8.3.tgz`, 495,523 bytes, 318 files |
-| sha256 | `4f73a7be9b060762f9a9c3c2631367cfe76adbc0ee81055611ee8ff75ccde664` |
+| Built from | `fbb9a3e66a196cb899f26d66a52f31da65a18360` |
+| Tarball | `agents-can-communicate-0.8.3.tgz`, 495,821 bytes, 318 files |
+| sha256 | `ad113b4e96b67248e060e5a95fbecd95f62c5ba32382abd590639fc798c34242` |
 
 This unpublished development archive passed clean installation verification. See
 [the evidence](docs/release-evidence/unreleased-codex-daemon-layout-and-reclaim.md).

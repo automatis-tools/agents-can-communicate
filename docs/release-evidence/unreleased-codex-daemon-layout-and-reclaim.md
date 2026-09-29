@@ -83,6 +83,16 @@ started for it. An update from 0.8.3 or older still relies on the worker. A test
 activation calls the activated generation's own reclaim failed before the fix; the same four
 parallel runs then passed, and the directories the failed runs had left were removed.
 
+## A review finding
+
+The pull request review found that `reclaim.json` was written even when an unknown holder had
+postponed the reclaim. With automatic updates off nothing else would have retried it. Every
+postponement path of `reclaimGenerations` now says `postponed: true`; the marker records
+`complete` and `attemptedAt`, and the scheduler treats an unfinished pass as due again after an
+hour, so a holder that never becomes readable cannot start a worker on every entry. A test with
+an unreadable lease failed before the fix and passes after it: the pass is recorded as
+unfinished, is not due at once, is due an hour later, and completes once the lease is gone.
+
 ## Real Codex
 
 With this change against real temporary homes: the self-installed daemon from the capture was
@@ -102,11 +112,11 @@ Nothing was re-run.
 
 ## Exact local artifact
 
-- Source: clean commit `9fdd1db7dcc63b09ebd7ed48cc530621704fa045` on
+- Source: clean commit `fbb9a3e66a196cb899f26d66a52f31da65a18360` on
   `fix/reclaim-and-codex-daemon-layout`, from `main` at `f9937e7`.
 - Archive: `agents-can-communicate-0.8.3.tgz`, packed from that commit.
-- Size: 495,523 bytes; 318 packed entries.
-- SHA-256: `4f73a7be9b060762f9a9c3c2631367cfe76adbc0ee81055611ee8ff75ccde664`.
+- Size: 495,821 bytes; 318 packed entries.
+- SHA-256: `ad113b4e96b67248e060e5a95fbecd95f62c5ba32382abd590639fc798c34242`.
 - Package version remains `0.8.3`; this is an unpublished development artifact.
 
 The exact archive passed `scripts/verify-package.mjs`.
