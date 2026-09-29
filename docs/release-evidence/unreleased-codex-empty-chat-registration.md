@@ -84,11 +84,11 @@ had passed 2,746 tests the same way.
 
 ## Exact local artifact
 
-- Source: clean commit `b88201b567f5e2077466e4afc7e548e3420d1c3e` on
-  `feat/codex-empty-chat-registration`, from `main` at `3051920` (0.8.3).
+- Source: clean commit `71eada2b95694fea98426da855827836a8370ac4` on
+  `feat/codex-empty-chat-registration`, merging `main` at `b478c02` (after #225).
 - Archive: `agents-can-communicate-0.8.3.tgz`, packed from that commit.
-- Size: 490,513 bytes; 316 packed entries.
-- SHA-256: `f3a34ba5d5f3418d89c0b503fe124b1f89dd5581f4653e241c87f436b4e102bf`.
+- Size: 493,489 bytes; 318 packed entries.
+- SHA-256: `618479431f726086b80c72fd39ba1f0b4241461e6f2227c1b1eb80a3b6cc3ef5`.
 - Package version remains `0.8.3`; this is an unpublished development artifact.
 
 The exact archive passed `scripts/verify-package.mjs`.
