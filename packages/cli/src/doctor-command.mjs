@@ -12,7 +12,7 @@ export { describeNative } from "./native-delivery-status.mjs";
 import { nativeSessionLines, updateNativeSessions } from "./native-session-diagnostics.mjs";
 import { ALL_ADAPTERS, clientContext, probeTimeout } from "./install-command.mjs";
 import { decisionOf } from "./install-delivery-consent.mjs";
-import { describePresence, presenceBreakdown } from "./main.mjs";
+import { describePresence, presenceBreakdown, registerNativeSessions } from "./main.mjs";
 import { platformPaths } from "./platform-paths.mjs";
 import { noticeUpdate } from "./update-check.mjs";
 import { managedUpdateDiagnostic } from "./managed-runtime/diagnostics.mjs";
@@ -233,6 +233,7 @@ export async function runDoctor({ options, context, runtime }) {
   // context built for this command opens the store on request rather than up
   // front.
   const service = context.service ?? await context.openService();
+  await registerNativeSessions(runtime, context);
   const status = await service.collectStatus({});
   updateNativeRuntime(adapters, status.deliveryBindings);
   // The runtime state above is read from the binding records alone. The

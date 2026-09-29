@@ -5,6 +5,7 @@ import { EXIT, createId } from "@agents-can-communicate/protocol";
 import { createCoordinationService } from "@agents-can-communicate/core";
 import { readInstalledLivePolicy } from "@agents-can-communicate/installer";
 import { createDeliveryRouter } from "@agents-can-communicate/delivery-router";
+import { registerDiscoveredSessions } from "@agents-can-communicate/hook-runner";
 import { openFilesystemStore } from "@agents-can-communicate/storage-filesystem";
 import { ALL_ADAPTERS, createGitProbe, discoverWorkspace, platformDataHome, runtimePaths }
   from "@agents-can-communicate/cli";
@@ -60,6 +61,8 @@ await serve({
     participantId,
     descriptor,
     runtimeDir: paths.root,
+    registerNativeSessions: () => registerDiscoveredSessions({ adapters,
+      workspaceId: descriptor.id, dataHome, env: process.env }),
   },
 });
 

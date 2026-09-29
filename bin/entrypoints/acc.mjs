@@ -5,6 +5,7 @@ import { readFile } from "node:fs/promises";
 import { createId } from "@agents-can-communicate/protocol";
 import { readInstalledLivePolicy } from "@agents-can-communicate/installer";
 import { createDeliveryRouter } from "@agents-can-communicate/delivery-router";
+import { registerDiscoveredSessions } from "@agents-can-communicate/hook-runner";
 import { ALL_ADAPTERS, askConfirmation, main as runCli } from "@agents-can-communicate/cli";
 
 export async function main({ managerRoot = null, packageRoot, managementOnly = false } = {}) {
@@ -27,6 +28,10 @@ const runtime = {
     createDeliveryRouter({ service, adapters, clock,
       readLivePolicy: ({ adapter }) => readInstalledLivePolicy({ dataHome,
         adapterId: adapter.id }) }),
+  // Chats a client holds before their first turn, registered before status
+  // is read so a peer can address them (#167).
+  registerNativeSessions: ({ workspaceId, dataHome }) =>
+    registerDiscoveredSessions({ adapters, workspaceId, dataHome, env: process.env }),
   // Asked only by `acc config init`, and only when stdout is a terminal. There
   // was no port here at all, so the question went to the fallback that always
   // answers no: in a real terminal the command printed "not written" and never
