@@ -120,7 +120,7 @@ test("a resumed conversation binds while the registry still names the previous o
   assert.equal(f.received(), "");
 
   f.writeRegistry();
-  const closed = closedOrSettled(f);
+  const closed = delivered(f);
   assert.equal((await offerMessage({ binding, message: message(), runtimeDir: f.runtime })).accepted, true);
   await closed;
   assert.equal(wakeLines(f), 1);
@@ -154,8 +154,14 @@ test("the offer writes one wake line with no peer byte and no auth line", async 
 
 const settle = () => new Promise(resolve => setTimeout(resolve, 150));
 const wakeLines = f => f.received().split("\n").filter(Boolean).length;
-// A wake that never comes must fail the test, not hang it.
-const closedOrSettled = f => Promise.race([f.nextClose(), settle()]);
+// Waits for a wake the test expects, however slow the machine is: the offer
+// itself can take longer than settle() under load. The deadline only turns a
+// wake that never comes into a failure instead of a hang.
+function delivered(f) {
+  let timer;
+  return Promise.race([f.nextClose(), new Promise(resolve => { timer = setTimeout(resolve, 5_000); })])
+    .finally(() => clearTimeout(timer));
+}
 
 // A replayed send finds the receipt still queued until the receiver's hook
 // commits the offer, so the router offers it again. The session must still
@@ -182,7 +188,7 @@ test("a wake that failed to write does not stop a later one", async t => {
   };
   const failed = await offerMessage({ binding, message: message(), runtimeDir: f.runtime, connect: refusing });
   assert.equal(failed.accepted, false);
-  const closed = closedOrSettled(f);
+  const closed = delivered(f);
   assert.equal((await offerMessage({ binding, message: message(), runtimeDir: f.runtime })).accepted, true);
   await closed;
   assert.equal(wakeLines(f), 1);
@@ -195,7 +201,7 @@ test("a new binding of the session wakes it again for the same message", async t
   await offerMessage({ binding: first, message: message(), runtimeDir: f.runtime });
   await closed;
   const second = await bound(f);
-  closed = closedOrSettled(f);
+  closed = delivered(f);
   assert.equal((await offerMessage({ binding: second, message: message(), runtimeDir: f.runtime })).accepted, true);
   await closed;
   assert.equal(wakeLines(f), 2);
@@ -262,7 +268,7 @@ async function reception(t, { mode = null, user = null, project = null, local = 
     managedSettingsPath, readClientArgs: async () => clientArgs });
   assert.equal(handshake.supported, true, handshake.reasonCode);
   const binding = { clientVersion: handshake.clientVersion, opaqueEndpointRef: handshake.opaqueEndpointRef };
-  const closed = closedOrSettled(f);
+  const closed = delivered(f);
   const result = await offerMessage({ binding, message: message(), runtimeDir: f.runtime });
   await closed;
   return { result, wakes: wakeLines(f) };
