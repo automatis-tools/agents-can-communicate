@@ -115,7 +115,8 @@ All recipients have the same durable record, but adapters expose different accel
   minimum of 0.152.1 plus a current probe and exact session checks allow delivery
   to an independently opened thread. It is experimental, off by default, and can
   spend tokens. Messages wait for a running turn to finish; a daemon-retained
-  thread can receive them after its terminal exits. ACC adds no launch arguments
+  thread can receive them for about a minute after its terminal exits, until the
+  daemon unloads it and ACC closes its session. ACC adds no launch arguments
   and does not manage the vendor daemon during message delivery. Separately,
   [confirmed update maintenance](UPGRADING.md#confirmed-client-service-maintenance) can restart it.
 
