@@ -23,6 +23,13 @@ test("a wake held for the receiver's approval is reported as held, not as woken"
     + "because it bypasses permission prompts; the message arrives with its next turn");
 });
 
+test("a recipient with no live transport is told why when its session said", () => {
+  assert.equal(recordedText(message, [{ recipientParticipantId: "codex-x", outcome: "queued",
+    transport: "durable", errorCode: "no_live_transport", nativeReasonCode: "client_session_embedded" }]),
+  "recorded message_a; codex-x has no live transport (the client runs this session on its own "
+    + "embedded service, which peers cannot reach); the message waits in its inbox");
+});
+
 test("a recipient with no live transport is reported as reading its inbox", () => {
   assert.equal(recordedText(message, [{ recipientParticipantId: "models", outcome: "queued",
     transport: "durable", errorCode: "no_live_transport" }]),

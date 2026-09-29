@@ -1,5 +1,6 @@
-import { evaluateVersionContract } from "@agents-can-communicate/adapter-sdk";
+import { NATIVE_REASON_CODES, evaluateVersionContract } from "@agents-can-communicate/adapter-sdk";
 
+import { lastNativeReason } from "./native-reason.mjs";
 import { refreshExpiredBinding } from "./refresh-binding.mjs";
 
 const SAFE_ERRORS = new Set(["ambiguous_recipient_sessions", "delivery_disabled",
@@ -45,8 +46,19 @@ function safeTransport(value, opaqueEndpointRef) {
   return opaqueEndpointRef === "live-adapter" ? "native-live" : "live-adapter";
 }
 
-export function createDeliveryRouter({ service, adapters, clock, readLivePolicy }) {
+export function createDeliveryRouter({ service, adapters, clock, readLivePolicy,
+  readNativeReason = input => lastNativeReason({ runtimeDir: service.store?.root, ...input }) }) {
   const registry = adaptersById(adapters);
+
+  // A session that bound no live transport may have said why: the reason its
+  // own last native attempt recorded, from the closed vocabulary only.
+  async function withoutLiveTransport(participantId, target) {
+    const reason = await Promise.resolve()
+      .then(() => readNativeReason({ sessionId: target.sessionId, generation: target.generation }))
+      .catch(() => null);
+    return { ...durable(participantId, "no_live_transport"),
+      ...(NATIVE_REASON_CODES.includes(reason) ? { nativeReasonCode: reason } : {}) };
+  }
 
   // Read at offer time, not from the binding: consent withdrawn after a session
   // bound must stop the next offer, not the next rebind.
@@ -94,7 +106,7 @@ export function createDeliveryRouter({ service, adapters, clock, readLivePolicy 
         && binding.generation === target.generation);
     // Online, with nothing to push through: a CLI participant, or a client
     // that bound no live transport. It reads its inbox, so it is not gone.
-    if (bindings.length === 0) return durable(participantId, "no_live_transport");
+    if (bindings.length === 0) return withoutLiveTransport(participantId, target);
     const evaluated = await Promise.all(bindings.map(async binding => {
       const adapter = registry.get(binding.adapterId);
       return { binding, adapter, policy: await policyFor(adapter, binding) };

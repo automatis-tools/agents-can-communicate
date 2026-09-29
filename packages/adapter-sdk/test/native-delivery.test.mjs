@@ -4,7 +4,8 @@ import test from "node:test";
 import { EXIT } from "@agents-can-communicate/protocol";
 
 import { defineAdapter } from "../src/capabilities.mjs";
-import { NATIVE_ACTIVATION_KINDS, NATIVE_BINDING_MODES, PLANNABLE_ACTIVATION_KINDS, compareStableVersions,
+import { NATIVE_ACTIVATION_KINDS, NATIVE_BINDING_MODES, NATIVE_REASON_CODES, PLANNABLE_ACTIVATION_KINDS,
+  compareStableVersions,
   evaluateNativeEligibility, evaluateVersionContract, validateNativeActivationPlan,
   validateNativeDeliveryContract, validateNativeHandshake } from "../src/native-delivery.mjs";
 
@@ -412,4 +413,13 @@ test("an activation plan is closed, frozen, and never shell source", () => {
   assert.throws(bad({ eligible: true, reasonCode: null, mechanisms: [{ kind: "launchd" }] }), /kind/);
   assert.deepEqual(validateNativeActivationPlan({ eligible: false, reasonCode: "unsupported_shell",
     mechanisms: [] }), { eligible: false, reasonCode: "unsupported_shell", mechanisms: [] });
+});
+
+test("an embedded client session is a closed reason every reader accepts", () => {
+  assert.equal(NATIVE_REASON_CODES.includes("client_session_embedded"), true);
+  assert.deepEqual(validateNativeHandshake(adapter(), { clientVersion: "2.1.258",
+    handshake: handshake({ supported: false, modes: [], opaqueEndpointRef: null, leaseUntil: null,
+      reasonCode: "client_session_embedded" }) }),
+  { ok: false, reasonCode: "client_session_embedded", clientVersion: null,
+    protocolContract: "fixture-native-v1", modes: [], opaqueEndpointRef: null, leaseUntil: null });
 });

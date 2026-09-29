@@ -75,6 +75,11 @@ export async function maintenanceFixture(t, { binLayout = false } = {}) {
     const argsText = args.join(" ");
     if (argsText === "--version") return ok(`codex-cli ${command === cliPath ? state.cliVersion : state.managedVersion}\n`);
     if (argsText === "app-server daemon --help") return ok("Commands:\n  start Start\n  stop Stop\n  restart Restart\n  version Version\n");
+    // `codex features list` as 0.158.0 prints it; unset means a CLI without it.
+    if (argsText === "features list") {
+      return state.featuresList === undefined ? { status: 2, stdout: "", stderr: "unrecognized subcommand" }
+        : ok(state.featuresList);
+    }
     const action = args.at(-1);
     if (action === "stop") { commands.push(action);
       if (state.stopThrows) throw new Error("private vendor command failure");

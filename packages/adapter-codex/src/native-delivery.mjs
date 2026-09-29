@@ -1,3 +1,7 @@
+import { createHash } from "node:crypto";
+import { mkdir, rm, writeFile } from "node:fs/promises";
+import path from "node:path";
+
 import { decisionBody } from "@agents-can-communicate/adapter-sdk";
 
 import { CODEX_QUEUE_MINIMUM, MINIMUM_VERSION, PROTOCOL_CONTRACT, QUEUE_MODES,
@@ -6,6 +10,7 @@ import { CODEX_QUEUE_MINIMUM, MINIMUM_VERSION, PROTOCOL_CONTRACT, QUEUE_MODES,
   versionOrder } from "./app-server-client.mjs";
 import { newEndpointId, readNativeEndpoint, readySocketPath, removeNativeEndpoint, socketIsReady,
   writeNativeEndpoint } from "./native-endpoint.mjs";
+import { hostArgv, runsEmbedded } from "./embedded-host.mjs";
 
 // The receiver's hook supplies thread and cwd. Core holds only a random endpoint
 // reference; sender environment never decides which daemon receives the message.
@@ -99,7 +104,17 @@ export async function verifyReceiver(peer, endpoint, { probe = probeCodexQueue,
         servingVersion: null };
 }
 
-export async function bindNativeSession({ event, clientPid, clientVersion, runtimeDir,
+// A chat that runs embedded has no receiver for any check below to find. Its
+// host process is read only after a check failed, so a bound session never pays
+// for it, and the reason then names the cause instead of the symptom.
+export async function bindNativeSession({ argvOf = hostArgv, ...options } = {}) {
+  const result = await bindAttempt(options);
+  if (result.supported || !Number.isInteger(options.clientPid) || options.clientPid <= 0) return result;
+  return await runsEmbedded(options.clientPid, argvOf)
+    ? closed(options.clientVersion, "client_session_embedded") : result;
+}
+
+async function bindAttempt({ event, clientPid, clientVersion, runtimeDir,
   env = process.env, timeoutMs = 750, now = Date.now, open = openCodexAppServer } = {}) {
   const rejected = reason => closed(clientVersion, reason);
   if (!Number.isInteger(clientPid) || clientPid <= 0) return rejected("client_process_unknown");
@@ -192,6 +207,28 @@ export async function offerMessage({ binding, message, runtimeDir, timeoutMs = 5
 
 export const retireNativeSession = ({ binding, runtimeDir }) =>
   removeNativeEndpoint({ runtimeDir, endpointId: binding?.opaqueEndpointRef });
+
+const EMBEDDED_NOTICE = "ACC: live peer delivery is off in this Codex chat. It runs on its own "
+  + "embedded app server, so peer messages reach it only with the user's next prompt. Tell the "
+  + "user once: for live delivery, open a new Codex chat; if Codex does not start its app-server "
+  + "daemon itself, run `codex app-server daemon start` first.";
+
+// One delivered notice per chat. The marker is created exclusively, so a
+// second turn finds it; a notice the runner did not deliver gives it back.
+export async function nativeActivationHint({ event, nativeBinding, runtimeDir }) {
+  if (nativeBinding?.state !== "degraded" || nativeBinding.reasonCode !== "client_session_embedded"
+    || typeof event?.sessionId !== "string" || event.sessionId === ""
+    || typeof runtimeDir !== "string") return null;
+  const dir = path.join(runtimeDir, "codex-embedded-notices");
+  const marker = path.join(dir, createHash("sha256").update(event.sessionId).digest("hex"));
+  try {
+    await mkdir(dir, { recursive: true, mode: 0o700 });
+    await writeFile(marker, "", { flag: "wx", mode: 0o600 });
+  } catch {
+    return null;
+  }
+  return { line: EMBEDDED_NOTICE, release: () => rm(marker, { force: true }) };
+}
 
 function renderText(message) {
   const lines = [

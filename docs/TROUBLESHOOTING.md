@@ -135,6 +135,14 @@ doctor. Download failure keeps the installed integration and its inbox fallback.
 service is infrastructure only. Open a new Codex session afterward and complete the
 client-owned hook and trust review.
 
+After a reboot no Codex service runs. Codex 0.157.1 and newer start it when the next Codex
+session opens (`daemon_auto_start`), and doctor then says so instead of advising `acc install`.
+A Codex chat that started without the service runs on its own embedded service until it closes,
+and no peer can reach it live. ACC reports it as `client_session_embedded`: the chat is told once,
+a sender sees the cause beside `no live transport`, and doctor names it on the session line.
+Open a new Codex chat while the service runs; start it with `codex app-server daemon start` if
+Codex does not.
+
 If a reply stays queued with `transport_permission_denied`, the sender's permissions
 blocked local transport. This is distinct from an unavailable recipient. The message was
 recorded successfully; the error does not mean it was read or acknowledged.

@@ -286,3 +286,45 @@ for (const loadedData of [[null], [123], [{}], [""], ["valid-thread", null]]) {
     assert.equal(f.requests.includes("thread/queue/list"), false);
   });
 }
+
+// Measured 2026-09-29 on 0.158.0: after a reboot no daemon runs, and the next
+// TUI starts one itself because `daemon_auto_start` is on (the default since
+// 0.157.1). Doctor must not send the operator to `acc install` for that.
+const features = enabled => "apps                                     stable             true\n"
+  + `daemon_auto_start                        stable             ${enabled}\n`
+  + "hooks                                    stable             true\n";
+
+test("an absent service that Codex starts at launch says so", async t => {
+  const f = await serviceFixture(t, { binLayout: true });
+  f.state.featuresList = features(true);
+  const plan = await f.inspectNativeServiceSetup(f.context);
+  assert.equal(plan.state, "needed");
+  assert.equal(plan.reasonCode, "native_endpoint_unavailable");
+  assert.equal(plan.startsOnLaunch, true);
+  assert.match(plan.diagnostic, /starts .*with the next Codex session/);
+  // An explicit install with setup consent still starts it at once.
+  const result = await apply(f, plan);
+  assert.equal(result.state, "ready");
+  assert.equal(f.starts.length, 1);
+});
+
+test("an absent service is left to acc install when Codex does not start it at launch", async t => {
+  for (const featuresList of [features(false), "apps  stable  true\n", undefined]) {
+    const f = await serviceFixture(t, { binLayout: true });
+    f.state.featuresList = featuresList;
+    const plan = await f.inspectNativeServiceSetup(f.context);
+    assert.equal(plan.state, "needed");
+    assert.equal(plan.startsOnLaunch, undefined);
+    assert.doesNotMatch(plan.diagnostic, /next Codex session/);
+  }
+});
+
+test("a stopped service that Codex starts at launch says so too", async t => {
+  const f = await serviceFixture(t);
+  await f.writePid();
+  f.state.featuresList = features(true);
+  const plan = await f.inspectNativeServiceSetup(f.context);
+  assert.equal(plan.reasonCode, "service_stopped");
+  assert.equal(plan.startsOnLaunch, true);
+  assert.match(plan.diagnostic, /next Codex session/);
+});
