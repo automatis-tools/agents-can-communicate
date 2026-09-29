@@ -28,6 +28,17 @@ a client's own settings:
 `processTracked`, `liveDelivery` and `liveLeaseCurrent`. This release adds no store event type
 or field, so a store it writes stays readable by 0.8.x.
 
+The installed version performs the download. If `acc update` from 0.8.2 or earlier fails with
+`ETARGET` and `No matching version found` right after a release, npm is answering from a
+package document it cached before the registry listed the release. Run the update so that
+npm asks the registry again:
+
+```bash
+npm_config_prefer_online=true acc update
+```
+
+From 0.8.3, the download does this itself.
+
 ## From 0.7.x
 
 Claude Code live delivery wakes each session through the inbox socket that Claude Code opens
