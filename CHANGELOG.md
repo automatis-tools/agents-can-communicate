@@ -1,5 +1,29 @@
 # Changelog
 
+## Unreleased — the launch option that keeps a Codex chat embedded
+
+- Codex runs a chat on its own embedded app server, with no live delivery, when it starts with
+  `-c`/`--config`, `--enable`, `--disable`, `--search`, `-p`/`--profile`, `--oss`,
+  `--strict-config`, `--dangerously-bypass-hook-trust` or `--no-daemon` - even while its daemon
+  runs. ACC now names that option in the chat's notice, the sender's line and doctor, and
+  advises starting Codex without it, moving a setting into `config.toml` (#230).
+- The notice reaches the user directly: on its one turn the Codex hook prints it as a
+  `systemMessage`, which Codex shows in the chat and never sends to the model. Measured on Codex
+  0.147.0, 0.155.1 and 0.159.1. Every other turn keeps plain-text output.
+- A refused native handshake may carry `launchOption`, a bare option token, and the delivery JSON
+  carries it as `nativeLaunchOption`. The store format is unchanged; an older ACC reading the
+  native-attempt record drops the field and keeps its own advice.
+
+| Candidate artifact | Value |
+|---|---|
+| Built from | `338b08020b5363ae8aa2e4b047b64f7863c58c4d` |
+| Tarball | `agents-can-communicate-0.8.4.tgz`, 498,780 bytes, 318 files |
+| sha256 | `91e48406e13f61aacdebda94f605625f6b617bc0d86bbd7c63213ed18f08284e` |
+
+This unpublished development archive passed clean installation verification. See
+[the evidence](docs/release-evidence/unreleased-codex-embedded-launch-option.md).
+The package version remains `0.8.4` until a release prepares its own.
+
 ## 0.8.4 — release candidate
 
 - A new Codex chat is addressable before anyone types in it. `acc status`, `acc doctor` and the
