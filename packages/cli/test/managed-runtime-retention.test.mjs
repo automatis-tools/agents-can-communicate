@@ -446,3 +446,27 @@ test("a staging hold racing reclaim never loses, across many jittered interleavi
     }
   }
 });
+
+// #208: the code that activates is the older one; the activated generation's
+// own rule runs right after, from its own files, and records it.
+test("activatePending runs the activated generation's own reclaim", async t => {
+  const dataHome = await realpath(await fixtureRoot(t, "acc-retain-own-rule-"));
+  const root = path.join(dataHome, "acc", "runtime");
+  const active = { version: "0.4.0", root: path.join(root, "generations", "old-gen") };
+  const pending = { version: "0.4.1", root: path.join(root, "generations", "new-gen") };
+  await mkdir(active.root, { recursive: true });
+  const managed = path.join(pending.root, "node_modules", "@agents-can-communicate", "cli", "src",
+    "managed-runtime");
+  await mkdir(managed, { recursive: true });
+  await writeFile(path.join(managed, "worker.mjs"), `import { writeFile } from "node:fs/promises";
+export async function reclaimAsActive(root, generationRoot) {
+  await writeFile(${JSON.stringify(path.join(dataHome, "own-rule.json"))}, JSON.stringify({ root, generationRoot }));
+}
+`);
+  await writeControl(root, { schemaVersion: 1, active, pending, phase: "ready", auto: true,
+    pin: null, checkedAt: null, home: dataHome, targets: [], notice: null });
+  const result = await activatePending(root, { prepare: async () => async () => ({ failed: [] }) });
+  assert.equal(result.activated, true);
+  assert.deepEqual(JSON.parse(await readFile(path.join(dataHome, "own-rule.json"), "utf8")),
+    { root, generationRoot: pending.root });
+});

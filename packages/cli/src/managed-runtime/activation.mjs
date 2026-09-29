@@ -319,6 +319,19 @@ export async function activatePending(root, { prepare = prepareCandidate, env = 
   if (outcome.activated) {
     try { await reclaimGenerations({ root, active: activatedRoot, pidIsAlive }); }
     catch { /* Best effort; never fails an activation that already succeeded. */ }
+    // The reclaim above is this, older, code's rule (#208). The activated
+    // generation's own rule runs next, from its own files as its refresh did,
+    // and records that it ran. A target without it (an older release) is left
+    // to its own worker; nothing here can fail the activation.
+    try { await reclaimAsActivated(root, activatedRoot); }
+    catch { /* Best effort, as above. */ }
   }
   return outcome;
+}
+
+async function reclaimAsActivated(root, activatedRoot) {
+  const file = path.join(activatedRoot, "node_modules", "@agents-can-communicate", "cli", "src",
+    "managed-runtime", "worker.mjs");
+  const { reclaimAsActive } = await import(pathToFileURL(file).href);
+  if (typeof reclaimAsActive === "function") await reclaimAsActive(root, activatedRoot);
 }
