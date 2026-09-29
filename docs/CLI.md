@@ -122,7 +122,13 @@ participant for it again. A waiting participant's latest session stays listed as
 with that number as `waiting`, and with `endReason` when the client said why the session
 ended, such as `"clear"` for Claude Code's `/clear`. The text line names each one:
 `waiting for a closed session: claude_code-b (cleared, 2)`. `acc status --all` lists every
-session. Default `sync` reads
+session.
+
+Before it reads, `status` registers chats a client already holds but ACC has not seen, so a
+peer can address a new Codex chat before anyone types in it. Codex's shared app-server daemon
+lists them; a chat is registered when it is idle, is not a subagent, and ACC's hooks are enabled
+and trusted in its directory. Its first turn, whether typed or started by a peer's message,
+continues that session. `acc doctor` and the MCP `acc_status` tool do the same. Default `sync` reads
 events after a 16-digit event cursor (100 by
 default, up to 500). `--scope history` discovers historical message headers and reads
 selected records; `--scope full` adds an unbounded snapshot for explicit workspace forensics.

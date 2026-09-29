@@ -104,6 +104,18 @@ async function openContext(options, runtime) {
 }
 
 /**
+ * Before a peer reads status, chats its clients hold but ACC has not seen yet
+ * are registered, so the peer can address them before their first turn
+ * (#167). Bounded and fail-open inside the port; status never waits on it
+ * beyond its budget or fails because of it.
+ */
+export async function registerNativeSessions(runtime, context) {
+  if (typeof runtime?.registerNativeSessions !== "function") return [];
+  return Promise.resolve().then(() => runtime.registerNativeSessions({
+    workspaceId: context.descriptor.id, dataHome: context.dataHome })).catch(() => []);
+}
+
+/**
  * A context for the one command that has to survive an unopenable store.
  *
  * `runDoctor` already refused to read records before diagnosing them - fixed
@@ -409,7 +421,8 @@ const HANDLERS = Object.freeze({
       text: recordedText(handoff.message, routed.delivery) };
   },
 
-  status: async ({ options, context }) => {
+  status: async ({ options, context, runtime }) => {
+    await registerNativeSessions(runtime, context);
     const status = await context.service.collectStatus({
       participantId: options.participant, all: options.all === true });
     return { data: status, text: describeStatus(status) };

@@ -165,3 +165,23 @@ test("CLI delivery follows current recorded off, actionable, all, reader failure
     assert.equal(f.offers(), expected === "offered" ? 1 : 0, `${policy} ${kind}`);
   }
 });
+
+// #167: a chat a client holds before its first turn is registered before a
+// peer reads status, so the status that peer reads can already name it.
+test("status registers a client's unseen chats before it reads, and survives a failure", async t => {
+  const cwd = await realpath(await mkdtemp(path.join(tmpdir(), "acc-register-cwd-")));
+  const dataHome = await realpath(await mkdtemp(path.join(tmpdir(), "acc-register-data-")));
+  t.after(() => Promise.all([cwd, dataHome]
+    .map(directory => rm(directory, { recursive: true, force: true }))));
+  const output = { write: (_text, done) => { done?.(); return true; } };
+  const run = registerNativeSessions => main(["status", "--cwd", cwd, "--json"], {
+    cwd, env: { HOME: cwd, ACC_DATA_HOME: dataHome }, platform: process.platform,
+    stdout: output, stderr: output, clock: { now: () => "2026-09-29T12:00:00.000Z" },
+    ids: { next: kind => `${kind}_register` }, registerNativeSessions });
+  const asked = [];
+  assert.equal(await run(async input => { asked.push(input); return []; }), 0);
+  assert.equal(asked.length, 1);
+  assert.equal(asked[0].dataHome, dataHome);
+  assert.match(asked[0].workspaceId, /^workspace_/);
+  assert.equal(await run(async () => { throw new Error("discovery failed"); }), 0);
+});

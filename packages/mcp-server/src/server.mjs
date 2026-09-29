@@ -118,6 +118,9 @@ async function callTool(name, args, context) {
 
   switch (name) {
     case "acc_status":
+      // Chats a client holds before their first turn, registered so this
+      // caller can address them (#167). Fail-open: status is read regardless.
+      await Promise.resolve().then(() => context.registerNativeSessions?.()).catch(() => null);
       return service.collectStatus({});
     case "acc_sync":
       return service.sync({ ...owner, cursor: args.cursor ?? null,

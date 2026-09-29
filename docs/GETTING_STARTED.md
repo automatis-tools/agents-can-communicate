@@ -146,7 +146,8 @@ Apple Silicon macOS. They are experimental and can spend tokens. Codex queues a 
 until a running turn finishes. A busy Claude Code session takes the wake between two tool
 calls. Claude Code requires 2.1.282 or newer and recorded opt-in, and it wakes through the
 inbox that each session opens itself. Codex requires 0.152.1 or newer, LocalDaemon
-infrastructure, recorded opt-in, and a verified session. Supported explicit setup can
+infrastructure, recorded opt-in, and a verified session. A new Codex chat becomes
+addressable before its first message: `acc status` registers it. Supported explicit setup can
 prepare a missing service. Start the client with your normal command. A loaded daemon
 thread can receive messages for about a minute after its terminal exits, until the daemon
 unloads it and ACC closes its session. Antigravity CLI 1.2.7 and later has one too: with

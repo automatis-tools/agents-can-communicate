@@ -5,6 +5,7 @@ import { probeNativeDelivery, planNativeActivation, bindNativeSession, refreshNa
 import certification from "../certification.json" with { type: "json" };
 import { createCodexServiceSetup } from "./service-setup.mjs";
 import { createCodexMaintenance } from "./maintenance.mjs";
+import { createCodexDiscovery } from "./native-discovery.mjs";
 export { sameMaintenanceIdentity } from "./maintenance.mjs";
 
 import { CODEX_QUEUE_MINIMUM, PROTOCOL_CONTRACT } from "./app-server-client.mjs";
@@ -75,6 +76,8 @@ export function createCodexAdapter() {
     inboundSockets: context => [controlSocket(context)],
     ...createCodexMaintenance(),
     ...createCodexServiceSetup(),
+    // Chats the daemon holds before their first turn, for registration (#167).
+    ...createCodexDiscovery(),
     startSession: async () => ({ ok: true, changes: [], diagnostics: [] }),
     endSession: async () => ({ ok: true, changes: [], diagnostics: [] }),
     guardWrite: async () => ({ ok: true, changes: [], diagnostics: [] }),
