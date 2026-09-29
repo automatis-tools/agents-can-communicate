@@ -49,9 +49,11 @@ From 0.8.3, the download does this itself.
   opening Codex rather than `acc install` when Codex starts its own service.
 - **A new `CODEX_HOME` on Codex 0.157.1 or newer needs no standalone download.** `acc install`
   only starts the service; Codex installs its own package.
-- **One background pass after the update from 0.8.3.** The first ACC command after the update
-  starts the new version's update worker once, even with automatic updates off, to reclaim old
-  runtime generations with the new rule. It records `reclaim.json` in the runtime directory.
+- **One background pass after the update from 0.8.3.** The first client hook or agent command
+  after the update starts the new version's update worker once, even with automatic updates
+  off, to reclaim old runtime generations with the new rule, and records `reclaim.json` in the
+  runtime directory. These run through ACC's own launchers; an `acc` that npm installed
+  globally keeps the entry of the version npm installed, so it does not start this pass.
 
 This release adds no store event type or field.
 
