@@ -1,5 +1,26 @@
 # Changelog
 
+## Unreleased — an empty Codex chat is addressable
+
+- A new Codex chat can be addressed before anyone types in it. `acc status`, `acc doctor` and
+  the MCP `acc_status` tool register chats that Codex's shared daemon holds but ACC has not
+  seen: idle, not a subagent, and in a directory where ACC's hooks are enabled and trusted. A
+  peer's request then starts the chat's first turn, which continues the registered session (#167).
+- Registration writes what `SessionStart` writes, under the same lock, and pins nothing. A chat
+  whose TUI closes is closed by `SessionEnd` when the daemon unloads it.
+- The store format is unchanged. An older ACC's first hook in a registered chat resumes the
+  registered session as it resumes any bound one.
+
+| Candidate artifact | Value |
+|---|---|
+| Built from | `667389cae5254e6e272daef606b506960b098e75` |
+| Tarball | `agents-can-communicate-0.8.3.tgz`, 490,236 bytes, 316 files |
+| sha256 | `cc6816a19fd3d0cc86d31246147460b918d55a08452c45aedb2080d6d2ddf3bf` |
+
+This unpublished development archive passed clean installation verification. See
+[the evidence](docs/release-evidence/unreleased-codex-empty-chat-registration.md).
+The package version remains `0.8.3` until a release prepares its own.
+
 ## 0.8.3 — release candidate
 
 - `acc update` right after a release installs the release that discovery found. The download
