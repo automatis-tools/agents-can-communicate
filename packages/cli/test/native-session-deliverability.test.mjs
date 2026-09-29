@@ -166,3 +166,18 @@ test("a session that runs embedded names the cause and what to do about it", () 
   assert.match(line, /last attempt .*: the client runs this session on its own embedded service/);
   assert.match(line, /start a new client session while its local delivery service runs/);
 });
+
+test("doctor sends the operator to Codex, not acc install, when Codex starts its service at launch",
+  () => {
+    const absent = startsOnLaunch => ({ ...entry("waiting"),
+      deliveryDecision: { completeSetup: true },
+      nativeDelivery: { ...entry("waiting").nativeDelivery, eligibility: "degraded",
+        reasonCode: "native_endpoint_unavailable" },
+      nativeServiceSetup: { state: "needed", reasonCode: "native_endpoint_unavailable",
+        ...(startsOnLaunch ? { startsOnLaunch: true } : {}) } });
+    const launched = nativeRemediation(absent(true)).join("\n");
+    assert.doesNotMatch(launched, /acc install/);
+    assert.match(launched, /Codex CLI: its local delivery service starts with the next Codex CLI session/);
+    assert.match(nativeRemediation(absent(false)).join("\n"),
+      /acc install --adapter codex {2}# prepare the missing supported local service/);
+  });

@@ -26,11 +26,23 @@ const diagnostics = {
   managed_binary_mismatch: "Codex CLI and managed standalone versions differ; repair the vendor installation, then retry acc install",
   maintenance_cli_unsupported: "Codex cold service preparation requires codex-cli 0.154.0 or newer with daemon commands; update the vendor installation, then retry acc install",
 };
+const startsOnLaunch = "The Codex service is not running; Codex starts it with the next Codex session "
+  + "(daemon_auto_start), so open Codex, or run acc install to start it now";
 function report(state, reasonCode, facts = {}) {
   return { ...facts, state, reasonCode, diagnostic: state === "ready"
     ? reasonCode === "native_session_unavailable" ? sessionNeeded
       : "Codex service infrastructure is ready; current session binding is reported separately"
+    : facts.startsOnLaunch === true ? startsOnLaunch
     : diagnostics[reasonCode] ?? `Codex service preparation could not verify ${reasonCode}; inspect the vendor service and retry acc install` };
+}
+
+// Since 0.157.1 a TUI that finds no service starts one (`daemon_auto_start`,
+// stable and on by default). `codex features list` reports the effective value
+// after config and profiles; any other answer leaves the start to acc install.
+const AUTO_START = /^daemon_auto_start\s+\S+\s+true\s*$/m;
+async function launchStart(run, paths, facts) {
+  const listed = await run(facts.cliPath, ["features", "list"], paths.options).catch(() => null);
+  return listed?.status === 0 && AUTO_START.test(listed.stdout) ? { startsOnLaunch: true } : {};
 }
 
 export function createCodexServiceSetup({ run = runMaintenanceCommand, probe = probeNativeDelivery,
@@ -129,9 +141,12 @@ export function createCodexServiceSetup({ run = runMaintenanceCommand, probe = p
       if (!await info(paths.managedPath)) return await missingPrerequisite(paths);
       const facts = await installed(paths);
       if (!await info(paths.socketPath) && !await info(paths.pidPath)) {
-        return report("needed", "native_endpoint_unavailable", facts);
+        return report("needed", "native_endpoint_unavailable",
+          { ...facts, ...await launchStart(run, paths, facts) });
       }
-      if (await serviceStopped(paths)) return report("needed", "service_stopped", facts);
+      if (await serviceStopped(paths)) {
+        return report("needed", "service_stopped", { ...facts, ...await launchStart(run, paths, facts) });
+      }
       return await verify(paths, facts);
     } catch (error) {
       const reason = error.reasonCode ?? "service_inspection_failed";
