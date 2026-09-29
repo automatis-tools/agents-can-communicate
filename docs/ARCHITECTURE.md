@@ -231,10 +231,13 @@ store contract this one does, and run the active generation otherwise. Apart fro
 `SessionEnd`, only the client's confirmed death releases a pin, so a session whose client
 process cannot be found is not pinned, and a pin that names no client is reaped. A
 generation directory is reclaimed once no control pointer, live lease, live pin or staging
-hold names it. An update is run by the installed code, so the reclaim after an activation
-follows the older rule; the new generation's own worker reclaims again on its first pass,
-recorded in `reclaim.json`, and on every later pass. Parsed help, version, and update recovery remain available when workspace
-admission is unavailable.
+hold names it. An update is run by the installed code, so right after an activation the
+activated generation's own reclaim runs from its files, and its worker reclaims on every later
+pass; each pass is recorded in `reclaim.json`. The updating process still runs from the
+generation it replaced, and its lease keeps that one through the pass. Such a pass, like one an
+unknown holder postponed, is recorded as unfinished, and the next ACC command an hour or more
+later starts the worker that finishes it. Parsed help, version, and update recovery remain
+available when workspace admission is unavailable.
 
 An independent worker downloads npm packages with lifecycle scripts disabled, checks exact
 stable package identity and the discovered integrity, and health-checks the staged runtime.

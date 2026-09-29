@@ -2,6 +2,7 @@ import { realpath } from "node:fs/promises";
 import path from "node:path";
 
 import { activatePending, reclaimGenerations } from "./activation.mjs";
+import { listRuntimeHolds } from "./leases.mjs";
 import { downloadRelease, fetchRelease, newerVersion } from "./download.mjs";
 import { withManagerLock } from "./mutex.mjs";
 import { readControl, writeControl, writeManagedJson } from "./state.mjs";
@@ -82,10 +83,24 @@ export async function reclaimAsActive(root, generationRoot) {
     const control = await readControl(root);
     if (control === null || await realpath(generationRoot) !== await realpath(control.active.root)) return;
     const result = await reclaimGenerations({ root });
-    // A postponed pass is recorded as unfinished, so the scheduler tries again
-    // (hourly) even with automatic updates off.
+    // The process that activated this generation still runs from the one it
+    // replaced, and its own lease keeps that generation through this pass -
+    // measured in the 0.8.5 upgrade preflight. That pass is unfinished, so the
+    // hourly retry removes the old generation once the process has exited. A
+    // worker started at once would race every command right after an update.
+    const active = await realpath(control.active.root);
+    const own = await listRuntimeHolds(root).then(async holds => {
+      for (const hold of holds) {
+        if (hold.pid === process.pid && await realpath(hold.runtime.root).catch(() => null) !== active) {
+          return true;
+        }
+      }
+      return false;
+    }, () => false);
+    // A postponed pass is recorded as unfinished too, so the scheduler tries
+    // again (hourly) even with automatic updates off.
     await writeManagedJson(path.join(root, RECLAIM_MARKER), { schemaVersion: 1,
-      activeRoot: control.active.root, complete: result?.postponed !== true,
+      activeRoot: control.active.root, complete: result?.postponed !== true && !own,
       attemptedAt: new Date().toISOString() });
   } catch { /* Best effort; the next pass reclaims again. */ }
 }

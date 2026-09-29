@@ -197,3 +197,41 @@ test("a postponed reclaim is recorded as unfinished and is due again after an ho
   assert.deepEqual(await readdir(path.join(f.root, "generations")), ["old"]);
   assert.equal(JSON.parse(await readFile(path.join(f.root, "reclaim.json"), "utf8")).complete, true);
 });
+
+// Measured in the 0.8.5 upgrade preflight: `acc update` from 0.8.4 runs from
+// the 0.8.4 generation and holds a lease on it while it activates 0.8.5 and
+// runs 0.8.5's reclaim, so that pass cannot remove 0.8.4. Recorded as done, it
+// left 0.8.4 in place until some later pass.
+test("a reclaim held back by its own process's lease is unfinished and retried an hour later", async t => {
+  const f = await fixture(t, { auto: false, checkedAt: new Date().toISOString() });
+  await acquireRuntime(f.root, { kind: "acc" });
+  const next = { version: "0.4.1", root: path.join(f.root, "generations", "new") };
+  await mkdir(path.join(next.root, "bin"), { recursive: true });
+  await writeFile(path.join(next.root, "bin", "acc-update-worker.mjs"), "process.exit(0);\n");
+  const control = await writeControl(f.root, { ...await readControl(f.root), active: next });
+  await runWorker(f.root, { env: {}, generationRoot: control.active.root });
+  assert.deepEqual((await readdir(path.join(f.root, "generations"))).sort(), ["new", "old"],
+    "this process still runs from the old generation");
+  const marker = JSON.parse(await readFile(path.join(f.root, "reclaim.json"), "utf8"));
+  assert.equal(marker.activeRoot, control.active.root);
+  assert.equal(marker.complete, false);
+  const env = { env: { ACC_NO_UPDATE_CHECK: "1" } };
+  assert.equal(await scheduleWorker(f.root, control, env), false,
+    "commands right after an update start no worker");
+  await writeFile(path.join(f.root, "reclaim.json"), JSON.stringify({ ...marker,
+    attemptedAt: new Date(Date.now() - 2 * 60 * 60_000).toISOString() }));
+  assert.equal(await scheduleWorker(f.root, control, env), true, "due again an hour later");
+});
+
+test("a reclaim that only live sessions or other processes held back is complete", async t => {
+  const f = await fixture(t, { auto: false });
+  const other = spawn(process.execPath, ["-e", "setTimeout(() => {}, 30_000)"]);
+  t.after(() => other.kill());
+  await acquireRuntime(f.root, { pid: other.pid, kind: "mcp" });
+  const next = { version: "0.4.1", root: path.join(f.root, "generations", "new") };
+  await mkdir(next.root, { recursive: true });
+  const control = await writeControl(f.root, { ...await readControl(f.root), active: next });
+  await runWorker(f.root, { env: {}, generationRoot: control.active.root });
+  assert.deepEqual((await readdir(path.join(f.root, "generations"))).sort(), ["new", "old"]);
+  assert.equal(JSON.parse(await readFile(path.join(f.root, "reclaim.json"), "utf8")).complete, true);
+});
