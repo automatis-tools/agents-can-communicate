@@ -261,3 +261,49 @@ test("a dead service's leftover socket still leads detection to the daemon start
       platform: "darwin-arm64", nativeDelivery: await native.probeNativeDelivery({ env }) });
     assert.match(detected.nativeSetup ?? "", /codex app-server daemon start/);
   });
+
+// Measured 2026-09-29: a hook for a daemon-hosted thread runs under
+// `codex app-server --listen unix:// --managed-daemon`; a TUI that found no
+// daemon hosts its own app server and runs the hook itself.
+const DAEMON_HOST = ["/opt/codex/bin/codex", "app-server", "--listen", "unix://", "--managed-daemon"];
+
+test("a failed handshake from an interactive TUI names the chat as embedded", async t => {
+  const h = await nativeFixture(t);
+  h.state.loaded = [];
+  for (const argv of [["codex"], ["/opt/codex/bin/codex", "resume", "--last"],
+    ["codex", "-c", "model=\"o3\"", "fork"], ["codex", "-m", "gpt", "fix", "the", "bug"],
+    ["node", "/opt/codex/bin/codex.js"]]) {
+    const result = await native.bindNativeSession({ ...h, argvOf: async () => argv });
+    assert.equal(result.supported, false);
+    assert.equal(result.reasonCode, "client_session_embedded", argv.join(" "));
+  }
+  const absent = await native.bindNativeSession({ ...h,
+    env: { CODEX_HOME: path.join(h.root, "absent") }, argvOf: async () => ["codex"] });
+  assert.equal(absent.reasonCode, "client_session_embedded", "no daemon at all");
+});
+
+test("a failed handshake keeps its reason for a daemon, a non-interactive run or an unreadable host",
+  async t => {
+    const h = await nativeFixture(t);
+    h.state.loaded = [];
+    const baseline = (await native.bindNativeSession({ ...h,
+      argvOf: async () => DAEMON_HOST })).reasonCode;
+    assert.notEqual(baseline, null);
+    assert.notEqual(baseline, "client_session_embedded");
+    for (const argvOf of [async () => ["codex", "exec", "task"],
+      async () => ["node", "/opt/codex/bin/codex.js", "exec", "task"],
+      async () => ["codex", "e", "task"], async () => ["codex", "review"],
+      async () => { throw new Error("ps unavailable"); }]) {
+      const result = await native.bindNativeSession({ ...h, argvOf });
+      assert.equal(result.reasonCode, baseline);
+    }
+  });
+
+test("a successful handshake never reads the host process", async t => {
+  const h = await nativeFixture(t);
+  let read = 0;
+  const handshake = await native.bindNativeSession({ ...h,
+    argvOf: async () => { read += 1; return ["codex"]; } });
+  assert.equal(handshake.supported, true);
+  assert.equal(read, 0);
+});
