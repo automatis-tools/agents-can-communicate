@@ -81,9 +81,12 @@ export async function reclaimAsActive(root, generationRoot) {
   try {
     const control = await readControl(root);
     if (control === null || await realpath(generationRoot) !== await realpath(control.active.root)) return;
-    await reclaimGenerations({ root });
+    const result = await reclaimGenerations({ root });
+    // A postponed pass is recorded as unfinished, so the scheduler tries again
+    // (hourly) even with automatic updates off.
     await writeManagedJson(path.join(root, RECLAIM_MARKER), { schemaVersion: 1,
-      activeRoot: control.active.root });
+      activeRoot: control.active.root, complete: result?.postponed !== true,
+      attemptedAt: new Date().toISOString() });
   } catch { /* Best effort; the next pass reclaims again. */ }
 }
 

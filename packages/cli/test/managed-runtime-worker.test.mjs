@@ -170,3 +170,30 @@ test("a generation that has not reclaimed yet gets a worker even with nothing to
   assert.equal(await scheduleWorker(f.root, control, { env: { ACC_NO_UPDATE_CHECK: "1" } }), true,
     "a marker left by an earlier generation is due again");
 });
+
+// Review of #228: a reclaim postponed by an unknown holder is not done; with
+// automatic updates off, nothing else would ever try again.
+test("a postponed reclaim is recorded as unfinished and is due again after an hour", async t => {
+  const f = await fixture(t, { auto: false, checkedAt: new Date().toISOString() });
+  await mkdir(path.join(f.root, "generations", "orphan"), { recursive: true });
+  await mkdir(path.join(f.root, "leases"), { recursive: true });
+  await writeFile(path.join(f.root, "leases", "broken.json"), "{ not json");
+  await runWorker(f.root, { env: {}, generationRoot: f.active.root });
+  assert.deepEqual((await readdir(path.join(f.root, "generations"))).sort(), ["old", "orphan"],
+    "an unreadable lease is an unknown holder, so nothing is removed");
+  const marker = JSON.parse(await readFile(path.join(f.root, "reclaim.json"), "utf8"));
+  assert.equal(marker.activeRoot, f.active.root);
+  assert.equal(marker.complete, false);
+  await mkdir(path.join(f.active.root, "bin"), { recursive: true });
+  await writeFile(path.join(f.active.root, "bin", "acc-update-worker.mjs"), "process.exit(0);\n");
+  const control = await readControl(f.root);
+  const env = { env: { ACC_NO_UPDATE_CHECK: "1" } };
+  assert.equal(await scheduleWorker(f.root, control, env), false, "not again right away");
+  await writeFile(path.join(f.root, "reclaim.json"), JSON.stringify({ ...marker,
+    attemptedAt: new Date(Date.now() - 2 * 60 * 60_000).toISOString() }));
+  assert.equal(await scheduleWorker(f.root, control, env), true, "due again an hour later");
+  await rm(path.join(f.root, "leases", "broken.json"));
+  await runWorker(f.root, { env: {}, generationRoot: f.active.root });
+  assert.deepEqual(await readdir(path.join(f.root, "generations")), ["old"]);
+  assert.equal(JSON.parse(await readFile(path.join(f.root, "reclaim.json"), "utf8")).complete, true);
+});

@@ -154,6 +154,10 @@ async function resolveCandidate(value) {
  * Takes its own manager lock, so a caller already holding one (activation)
  * must call this only after releasing it.
  */
+// An unknown holder postpones the whole pass; callers that record having
+// reclaimed need to tell that from a pass that found nothing to remove.
+const POSTPONED = Object.freeze({ removed: [], postponed: true });
+
 export async function reclaimGenerations({ root, active = null, pidIsAlive = defaultPidIsAlive } = {}) {
   root = await canonicalManagerRoot(root);
   return withManagerLock(root, async () => {
@@ -186,19 +190,19 @@ export async function reclaimGenerations({ root, active = null, pidIsAlive = def
     // readControl already throws on, and every real caller of this function
     // treats that throw as reason to postpone. Match that here explicitly:
     // an absent control.json is not proof there is nothing to protect.
-    if (control === null) return { removed: [] };
+    if (control === null) return POSTPONED;
     const referenced = new Set();
     for (const candidate of [active, control.active.root, control.pending?.root]) {
       const resolved = await resolveCandidate(candidate);
-      if (!resolved.ok) return { removed: [] };
+      if (!resolved.ok) return POSTPONED;
       if (resolved.root) referenced.add(resolved.root);
     }
     let holds;
     try { holds = await listRuntimeHolds(root, { pidIsAlive }); }
-    catch { return { removed: [] }; } // An unreadable lease is an unknown holder.
+    catch { return POSTPONED; } // An unreadable lease is an unknown holder.
     for (const lease of holds) {
       const resolved = await resolveCandidate(lease.runtime?.root);
-      if (!resolved.ok) return { removed: [] };
+      if (!resolved.ok) return POSTPONED;
       if (resolved.root) referenced.add(resolved.root);
     }
     // A client that exits without a clean session end leaves its pin behind;
@@ -212,9 +216,9 @@ export async function reclaimGenerations({ root, active = null, pidIsAlive = def
         const record = await readManagedJson(path.join(pins, name)).catch(() => null);
         if (record === undefined) continue; // Concurrent pin removal, not a holder.
         if (!record || record.schemaVersion !== 1 || typeof record.runtimeRoot !== "string"
-          || record.runtimeRoot === "") return { removed: [] }; // Malformed pin: unknown holder.
+          || record.runtimeRoot === "") return POSTPONED; // Malformed pin: unknown holder.
         const resolved = await resolveCandidate(record.runtimeRoot);
-        if (!resolved.ok) return { removed: [] };
+        if (!resolved.ok) return POSTPONED;
         referenced.add(resolved.root);
       }
     }
@@ -231,9 +235,9 @@ export async function reclaimGenerations({ root, active = null, pidIsAlive = def
         const record = await readManagedJson(path.join(staging, name)).catch(() => null);
         if (record === undefined) continue; // Concurrent hold release, not a holder.
         if (!record || record.schemaVersion !== 1 || typeof record.generationRoot !== "string"
-          || record.generationRoot === "") return { removed: [] }; // Malformed hold: unknown holder.
+          || record.generationRoot === "") return POSTPONED; // Malformed hold: unknown holder.
         const resolved = await resolveCandidate(record.generationRoot);
-        if (!resolved.ok) return { removed: [] };
+        if (!resolved.ok) return POSTPONED;
         referenced.add(resolved.root);
       }
     }
