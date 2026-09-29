@@ -1,5 +1,27 @@
 # Changelog
 
+## Unreleased — a Codex chat without the app-server daemon
+
+- A Codex chat that started while no Codex service ran keeps its own embedded service until it
+  closes, and no peer can reach it live. ACC now reports it as `client_session_embedded`: the
+  chat is told once that live delivery is off and how to get it, a sender sees the cause beside
+  "no live transport", and doctor names it on the session line (#224).
+- After a reboot, doctor says that Codex 0.157.1 and newer start their service with the next
+  Codex session, instead of advising `acc install`, when `codex features list` shows
+  `daemon_auto_start` on (#224).
+- The store format is unchanged. An older ACC that reads the new reason in a native-attempt
+  record reports no attempt for that session.
+
+| Candidate artifact | Value |
+|---|---|
+| Built from | `c9daa93237713f20f32d2cf56ef56d18172aa28a` |
+| Tarball | `agents-can-communicate-0.8.3.tgz`, 489,533 bytes, 317 files |
+| sha256 | `3b1ee63b1a68b7f80f9d2fd90a25d1fc1daf23a69eedee9b1213681c0ca7fd40` |
+
+This unpublished development archive passed clean installation verification. See
+[the evidence](docs/release-evidence/unreleased-codex-embedded-chat.md).
+The package version remains `0.8.3` until a release prepares its own.
+
 ## 0.8.3 — release candidate
 
 - `acc update` right after a release installs the release that discovery found. The download
