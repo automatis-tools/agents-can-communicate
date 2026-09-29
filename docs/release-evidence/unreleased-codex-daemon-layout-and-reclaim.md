@@ -104,9 +104,10 @@ their daemons and helper processes were removed afterwards.
 
 ## Suite
 
-`npm test` on the candidate commit `9fdd1db`, run under `env -i` with only `HOME`, `USER`,
-`TMPDIR` and a PATH of system directories plus node, as in CI: 2,777 tests, 2,776 passing,
-0 failing, 1 skipped, in 8.3 minutes, leaving no test directory behind. The skipped test is the
+`npm test` on the candidate commit `fbb9a3e`, run under `env -i` with only `HOME`, `USER`,
+`TMPDIR` and a PATH of system directories plus node, as in CI: 2,778 tests, 2,777 passing,
+0 failing, 1 skipped, in 9.3 minutes, leaving no test directory behind. Before the review fix,
+`9fdd1db` had passed 2,777 tests the same way. The skipped test is the
 existing uninstall check that skips on a machine where Gemini CLI is installed, as on `main`.
 Nothing was re-run.
 
