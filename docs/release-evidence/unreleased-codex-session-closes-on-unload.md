@@ -29,6 +29,13 @@ new measured section), `docs/CONCEPTS.md`, `docs/GETTING_STARTED.md` and `docs/H
 which said that a daemon thread can receive messages after its terminal exits, now say for
 about a minute. No code changed, so no test was added.
 
+## Suite
+
+`npm test` on the candidate commit `f82c138`, run under `env -i` with only `HOME`, `USER`,
+`TMPDIR` and a PATH of system directories plus node, as in CI: 2,734 tests, 2,733 passing,
+0 failing, 1 skipped. The skipped test is the existing uninstall check that skips on a machine
+where Gemini CLI is installed, as on `main`. Nothing was re-run.
+
 ## Exact local artifact
 
 - Source: clean commit `f82c1387c864d60c23eb95284fa4be6081a0a0c6` on
