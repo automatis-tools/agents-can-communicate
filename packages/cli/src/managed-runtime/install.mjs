@@ -9,6 +9,7 @@ import { stageOwnGeneration } from "./generation.mjs";
 import { writeLaunchers } from "./launchers.mjs";
 import { canonicalManagerRoot, readControl, writeControl } from "./state.mjs";
 import { scheduleWorker } from "./schedule.mjs";
+import { reclaimAsActive } from "./worker.mjs";
 import { releaseStagingHold } from "./staging.mjs";
 import { withManagerLock } from "./mutex.mjs";
 import { retireManagedHolds } from "./retire.mjs";
@@ -36,7 +37,8 @@ export async function installManaged({ packageRoot, managerRoot, dataHome, home,
   // writes below) or abandoned (any throw between here and there).
   try {
     await verifyGeneration(candidate, { env });
-    return await withManagerLock(root, async () => {
+    let ready = null;
+    const installed = await withManagerLock(root, async () => {
       const previous = await readControl(root);
       if (previous !== null && previous.home !== home) {
         throw new Error("this ACC data home manages another client home; use a separate ACC_DATA_HOME");
@@ -67,13 +69,21 @@ export async function installManaged({ packageRoot, managerRoot, dataHome, home,
       const integrationFailed = result.failed.some(failure => failure.stage !== "service-setup"
         || !result.operations?.some(operation => operation.adapterId === failure.adapterId && operation.applied === true));
       if (!integrationFailed) {
-        const ready = await writeControl(root, { ...control, phase: "ready", pending: null });
-        await scheduleWorker(root, ready, { env });
+        ready = await writeControl(root, { ...control, phase: "ready", pending: null });
       } else {
         await writeControl(root, { ...control, notice: "Integration refresh is incomplete; run acc update to recover." });
       }
       return result;
     });
+    if (ready !== null) {
+      // This install runs the code of the generation it activated, so its
+      // reclaim is that generation's rule (#208). It takes the manager lock
+      // itself, hence after the fence; a worker is then started only for work
+      // that is actually due.
+      await reclaimAsActive(root, candidate.root);
+      await scheduleWorker(root, ready, { env });
+    }
+    return installed;
   } finally {
     await releaseStagingHold(candidate.hold);
   }

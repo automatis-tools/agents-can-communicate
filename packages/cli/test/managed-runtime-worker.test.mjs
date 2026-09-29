@@ -1,11 +1,11 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { once } from "node:events";
-import { mkdir, mkdtemp, readFile, realpath, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, readdir, realpath, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { tmpdir } from "node:os";
 import test from "node:test";
-import { performUpdate } from "../src/managed-runtime/worker.mjs";
+import { performUpdate, runWorker } from "../src/managed-runtime/worker.mjs";
 import { readControl, writeControl } from "../src/managed-runtime/state.mjs";
 import { acquireRuntime } from "../src/managed-runtime/leases.mjs";
 import { withManagerLock } from "../src/managed-runtime/mutex.mjs";
@@ -131,4 +131,69 @@ test("read-only update check reports an approved job without restarting its miss
   assert.equal(result.maintenance.status, "recovery");
   assert.equal(await readFile(file, "utf8"), bytes, "--check must leave the missing worker untouched");
   assert.deepEqual(f.calls, []);
+});
+
+// #208: an update is run by the older code, so the reclaim right after an
+// activation is the older rule. The new generation's own worker reclaims on
+// its first pass and on every later one, and records that it did.
+test("the active generation's worker reclaims with its own rule and records it", async t => {
+  const f = await fixture(t, { auto: false });
+  const orphan = path.join(f.root, "generations", "orphan");
+  await mkdir(orphan, { recursive: true });
+  await runWorker(f.root, { env: {}, generationRoot: f.active.root });
+  assert.deepEqual(await readdir(path.join(f.root, "generations")), ["old"]);
+  const marker = JSON.parse(await readFile(path.join(f.root, "reclaim.json"), "utf8"));
+  assert.equal(marker.activeRoot, f.active.root);
+});
+
+test("a worker that is not the active generation leaves reclaim to the one that is", async t => {
+  const f = await fixture(t, { auto: false });
+  const orphan = path.join(f.root, "generations", "orphan");
+  await mkdir(orphan, { recursive: true });
+  await runWorker(f.root, { env: {}, generationRoot: path.join(f.root, "generations", "orphan") });
+  assert.deepEqual((await readdir(path.join(f.root, "generations"))).sort(), ["old", "orphan"]);
+  await assert.rejects(readFile(path.join(f.root, "reclaim.json")), { code: "ENOENT" });
+});
+
+test("a generation that has not reclaimed yet gets a worker even with nothing to update", async t => {
+  const f = await fixture(t, { auto: false, checkedAt: new Date().toISOString() });
+  await mkdir(path.join(f.active.root, "bin"), { recursive: true });
+  await writeFile(path.join(f.active.root, "bin", "acc-update-worker.mjs"), "process.exit(0);\n");
+  const control = await readControl(f.root);
+  assert.equal(await scheduleWorker(f.root, control, { env: { ACC_NO_UPDATE_CHECK: "1" } }), true);
+  await writeFile(path.join(f.root, "reclaim.json"), JSON.stringify({ schemaVersion: 1,
+    activeRoot: f.active.root }));
+  assert.equal(await scheduleWorker(f.root, control, { env: { ACC_NO_UPDATE_CHECK: "1" } }), false,
+    "once this generation has reclaimed, nothing is due");
+  await writeFile(path.join(f.root, "reclaim.json"), JSON.stringify({ schemaVersion: 1,
+    activeRoot: path.join(f.root, "generations", "previous") }));
+  assert.equal(await scheduleWorker(f.root, control, { env: { ACC_NO_UPDATE_CHECK: "1" } }), true,
+    "a marker left by an earlier generation is due again");
+});
+
+// Review of #228: a reclaim postponed by an unknown holder is not done; with
+// automatic updates off, nothing else would ever try again.
+test("a postponed reclaim is recorded as unfinished and is due again after an hour", async t => {
+  const f = await fixture(t, { auto: false, checkedAt: new Date().toISOString() });
+  await mkdir(path.join(f.root, "generations", "orphan"), { recursive: true });
+  await mkdir(path.join(f.root, "leases"), { recursive: true });
+  await writeFile(path.join(f.root, "leases", "broken.json"), "{ not json");
+  await runWorker(f.root, { env: {}, generationRoot: f.active.root });
+  assert.deepEqual((await readdir(path.join(f.root, "generations"))).sort(), ["old", "orphan"],
+    "an unreadable lease is an unknown holder, so nothing is removed");
+  const marker = JSON.parse(await readFile(path.join(f.root, "reclaim.json"), "utf8"));
+  assert.equal(marker.activeRoot, f.active.root);
+  assert.equal(marker.complete, false);
+  await mkdir(path.join(f.active.root, "bin"), { recursive: true });
+  await writeFile(path.join(f.active.root, "bin", "acc-update-worker.mjs"), "process.exit(0);\n");
+  const control = await readControl(f.root);
+  const env = { env: { ACC_NO_UPDATE_CHECK: "1" } };
+  assert.equal(await scheduleWorker(f.root, control, env), false, "not again right away");
+  await writeFile(path.join(f.root, "reclaim.json"), JSON.stringify({ ...marker,
+    attemptedAt: new Date(Date.now() - 2 * 60 * 60_000).toISOString() }));
+  assert.equal(await scheduleWorker(f.root, control, env), true, "due again an hour later");
+  await rm(path.join(f.root, "leases", "broken.json"));
+  await runWorker(f.root, { env: {}, generationRoot: f.active.root });
+  assert.deepEqual(await readdir(path.join(f.root, "generations")), ["old"]);
+  assert.equal(JSON.parse(await readFile(path.join(f.root, "reclaim.json"), "utf8")).complete, true);
 });

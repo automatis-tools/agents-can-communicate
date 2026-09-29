@@ -13,6 +13,14 @@ export async function maintenanceFixture(t, { binLayout = false } = {}) {
   const managedPath = path.join(codexHome, `packages/standalone/current/${binLayout ? "bin/" : ""}codex`);
   const socketPath = path.join(codexHome, "app-server-control/app-server-control.sock");
   const pidPath = path.join(codexHome, "app-server-daemon/app-server.pid");
+  // Codex 0.157.1+ in a home with no standalone package installs its own
+  // (measured on 0.159.0, 2026-09-29): releases under
+  // packages/app-server-daemon, `current` linking the release, PID in daemon.pid.
+  const selfRelease = path.join(codexHome, "packages/app-server-daemon/releases/0.159.0-aarch64-apple-darwin");
+  const selfManagedPath = path.join(codexHome, "packages/app-server-daemon/current/bin/codex");
+  const selfPidPath = path.join(codexHome, "app-server-daemon/daemon.pid");
+  const layoutManaged = () => state.layout === "self-installed" ? selfManagedPath : managedPath;
+  const layoutPid = () => state.layout === "self-installed" ? selfPidPath : pidPath;
   for (const file of [cliPath, managedPath, socketPath, pidPath]) {
     await mkdir(path.dirname(file), { recursive: true });
   }
@@ -23,7 +31,7 @@ export async function maintenanceFixture(t, { binLayout = false } = {}) {
     threads: [{ id: "private-thread", status: { type: "idle" } }], queued: [],
     processUnknown: false, processCommand: null, socketOwned: true, backend: "pid" };
   let socket;
-  const writePid = () => writeFile(pidPath, JSON.stringify({ pid: state.pid,
+  const writePid = () => writeFile(layoutPid(), JSON.stringify({ pid: state.pid,
     processStartTime: state.processStartTime }));
   async function start() {
     // Codex 0.155.1 `app-server daemon start` replaces the socket file a
@@ -32,6 +40,15 @@ export async function maintenanceFixture(t, { binLayout = false } = {}) {
     const listenPath = state.listenPath ?? socketPath;
     // 0.157.1 likewise replaces a stale socket at the path it listens on (measured).
     await rm(listenPath, { force: true });
+    if (state.layout === "self-installed") {
+      // `daemon start` installs the package from the CLI when it is missing.
+      await mkdir(path.join(selfRelease, "bin"), { recursive: true });
+      await writeFile(path.join(selfRelease, "bin", "codex"), "fixture", { mode: 0o755 });
+      await symlink(selfRelease, path.join(codexHome, "packages/app-server-daemon/current")).catch(error => {
+        if (error.code !== "EEXIST") throw error; });
+      await mkdir(path.dirname(selfPidPath), { recursive: true });
+      state.processCommand = `${await realpath(path.join(selfRelease, "bin", "codex"))} app-server --listen unix:// --managed-daemon`;
+    }
     socket = net.createServer();
     await new Promise((resolve, reject) => { socket.once("error", reject); socket.listen(listenPath, resolve); });
     if (listenPath !== socketPath) await symlink(listenPath, socketPath);
@@ -53,9 +70,18 @@ export async function maintenanceFixture(t, { binLayout = false } = {}) {
     state.processCommand = `${await realpath(managedPath)} app-server --listen unix:// --managed-daemon`;
     await start();
   }
+  // A home that never had the standalone package, on a CLI that installs
+  // the daemon's own package at its first start.
+  async function selfInstalledLayout({ started = true } = {}) {
+    await stop();
+    await rm(path.join(codexHome, "packages/standalone"), { recursive: true, force: true });
+    state.layout = "self-installed";
+    state.cliVersion = state.managedVersion = state.serverVersion = "0.159.0";
+    if (started) await start();
+  }
   async function stop() {
     if (socket) { await new Promise(resolve => socket.close(resolve)); socket = null; }
-    state.running = false; await rm(pidPath, { force: true });
+    state.running = false; await rm(layoutPid(), { force: true });
   }
   t.after(async () => { await stop(); await rm(root, { recursive: true, force: true }); });
   await start();
@@ -70,7 +96,7 @@ export async function maintenanceFixture(t, { binLayout = false } = {}) {
     }
     // Wherever this host keeps lsof: /usr/sbin on macOS, /usr/bin on Linux.
     if (path.basename(command) === "lsof") return ok(state.socketOwned ? `p${state.pid}\nn${state.listenPath ?? socketPath}\n` : "");
-    assert.ok([cliPath, managedPath].includes(command), "never execute an approved job's arbitrary path");
+    assert.ok([cliPath, layoutManaged()].includes(command), "never execute an approved job's arbitrary path");
     assert.equal(options.env.CODEX_HOME, codexHome);
     const argsText = args.join(" ");
     if (argsText === "--version") return ok(`codex-cli ${command === cliPath ? state.cliVersion : state.managedVersion}\n`);
@@ -93,7 +119,7 @@ export async function maintenanceFixture(t, { binLayout = false } = {}) {
     }
     assert.equal(action, "version");
     if (!state.running) return { status: 1, stdout: "", stderr: "No such file or directory (os error 2)" };
-    return ok(JSON.stringify({ status: "running", backend: state.backend, managedCodexPath: managedPath,
+    return ok(JSON.stringify({ status: "running", backend: state.backend, managedCodexPath: layoutManaged(),
       managedCodexVersion: state.managedVersion, socketPath, cliVersion: state.cliVersion,
       appServerVersion: state.serverVersion }));
   };
@@ -115,5 +141,6 @@ export async function maintenanceFixture(t, { binLayout = false } = {}) {
     throw new Error(`Unexpected maintenance RPC: ${method}`);
   } });
   return { ...createCodexMaintenance({ run, open }), context, state, commands, requests,
-    root, cliPath, managedPath, codexHome, socketPath, pidPath, writePid, stop, start, daemonLayout157, run, open };
+    root, cliPath, managedPath, codexHome, socketPath, pidPath, writePid, stop, start, daemonLayout157, run, open,
+    selfManagedPath, selfPidPath, selfInstalledLayout };
 }

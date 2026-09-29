@@ -125,8 +125,9 @@ ambiguous recipients or failed identity checks retain durable inbox access.
 `native_endpoint_unavailable` means the local service endpoint is missing or is not a safe socket;
 `native_session_unavailable` means the service answered but has no loaded thread to probe.
 An interactive install can save consent in either case. ACC preserves it through a temporary
-outage. On Codex 0.154.0 or newer, an explicit install can download the missing official
-standalone package and prepare a missing service. The single setup choice covers the
+outage. On Codex 0.154.0 through 0.157.0, an explicit install can download the missing official
+standalone package and prepare a missing service. Codex 0.157.1 and newer install the
+service's own package at its first start, and an explicit install only starts it. The single setup choice covers the
 download. Older consent for service start receives one expanded choice. To change a saved
 download refusal, run `acc install --adapter codex --delivery actionable` (or `all` to retain
 that policy). ACC preserves an existing npm or Homebrew command and shell profiles.

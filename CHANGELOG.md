@@ -1,5 +1,31 @@
 # Changelog
 
+## Unreleased — the Codex daemon a new home installs, and reclaim on the release that fixes it
+
+- A new `CODEX_HOME` on Codex 0.157.1 or newer works without a standalone download. Codex
+  installs the daemon's own package under `packages/app-server-daemon` at its first start, with
+  its PID in `daemon.pid`. ACC now resolves that layout for service setup, `acc update`
+  maintenance and chat discovery, and `acc install` only starts the service. Codex 0.154.0
+  through 0.157.0 still get the standalone download (#205).
+- A fix to how old runtime generations are reclaimed now takes effect on the release that
+  ships it. An update is run by the installed code, so the reclaim after an activation follows
+  the older rule. Activation now runs the activated generation's own reclaim right after it,
+  from that generation's files; an update from 0.8.3 or older, whose code does not do this,
+  leaves it to the new generation's update worker, started for it even with automatic updates
+  off. An install reclaims as the generation it activates itself. A reclaim an unknown holder
+  postponed is recorded as unfinished and retried at most hourly (#208).
+- The store format is unchanged.
+
+| Candidate artifact | Value |
+|---|---|
+| Built from | `fbb9a3e66a196cb899f26d66a52f31da65a18360` |
+| Tarball | `agents-can-communicate-0.8.3.tgz`, 495,821 bytes, 318 files |
+| sha256 | `ad113b4e96b67248e060e5a95fbecd95f62c5ba32382abd590639fc798c34242` |
+
+This unpublished development archive passed clean installation verification. See
+[the evidence](docs/release-evidence/unreleased-codex-daemon-layout-and-reclaim.md).
+The package version remains `0.8.3` until a release prepares its own.
+
 ## Unreleased — an empty Codex chat is addressable
 
 - A new Codex chat can be addressed before anyone types in it. `acc status`, `acc doctor` and

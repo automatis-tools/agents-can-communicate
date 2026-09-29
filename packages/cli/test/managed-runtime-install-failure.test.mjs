@@ -1,11 +1,12 @@
 import assert from "node:assert/strict";
-import { mkdir, mkdtemp, realpath, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, readdir, realpath, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { STORE_VERSION } from "@agents-can-communicate/storage-filesystem";
 import { installManaged } from "../src/managed-runtime/install.mjs";
 import { readControl } from "../src/managed-runtime/state.mjs";
+import { scheduleWorker } from "../src/managed-runtime/schedule.mjs";
 
 const serviceFailure = { adapterId: "codex", stage: "service-setup", error: "download failed" };
 const integrationFailure = { adapterId: "claude_code", error: "config write failed" };
@@ -40,4 +41,31 @@ for (const entry of cases) test(entry.name, async t => {
   assert.equal(control.phase, entry.phase);
   assert.equal(control.pending === null, entry.phase === "ready");
   if (entry.phase === "activating") assert.match(control.notice, /Integration refresh is incomplete/);
+});
+
+// #208: an install runs the code of the generation it activates, so it
+// reclaims with that rule itself and records it, and starts no background
+// worker just to find nothing left to reclaim.
+test("a completed install reclaims as its own generation and records it", async t => {
+  const base = await realpath(await mkdtemp(path.join(tmpdir(), "acc-install-reclaim-")));
+  t.after(() => rm(base, { recursive: true, force: true }));
+  const source = path.join(base, "source"), dataHome = path.join(base, "data");
+  const managerRoot = path.join(dataHome, "acc", "runtime");
+  await mkdir(path.join(source, "bin"), { recursive: true });
+  await writeFile(path.join(source, "package.json"), JSON.stringify({ name: "agents-can-communicate",
+    version: "0.5.6", files: ["bin/"], bundleDependencies: [],
+    accManagedUpdateProtocol: 2, accStoreVersion: STORE_VERSION }));
+  await writeFile(path.join(source, "bin/acc.mjs"),
+    'if (process.argv[2] === "version") console.log(JSON.stringify({ data: { version: "0.5.6" } }));\n');
+  const leftover = path.join(managerRoot, "generations", "leftover");
+  await mkdir(leftover, { recursive: true });
+  await installManaged({ packageRoot: source, managerRoot, dataHome, home: base,
+    targets: ["codex"], env: { HOME: base, ACC_NO_UPDATE_CHECK: "1" }, cwd: base,
+    apply: async () => ({ operations: [{ adapterId: "codex", applied: true }], failed: [] }) });
+  const control = await readControl(managerRoot);
+  const marker = JSON.parse(await readFile(path.join(managerRoot, "reclaim.json"), "utf8"));
+  assert.equal(marker.activeRoot, control.active.root);
+  assert.deepEqual(await readdir(path.join(managerRoot, "generations")), [path.basename(control.active.root)]);
+  assert.equal(await scheduleWorker(managerRoot, control, { env: { ACC_NO_UPDATE_CHECK: "1" } }), false,
+    "nothing is due after an install");
 });
