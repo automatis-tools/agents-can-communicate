@@ -76,12 +76,12 @@ failed before the fix and pass after it.
 
 ## Suite
 
-`npm test` on the candidate commit `71eada2`, which merges `main` after #225, run under
-`env -i` with only `HOME`, `USER`, `TMPDIR` and a PATH of system directories plus node, as in
-CI: 2,767 tests, 2,766 passing, 0 failing, 1 skipped. The skipped test is the existing
+`npm test` on the candidate commit `bb5af0b`, which merges `main` after #225 and #226, run
+under `env -i` with only `HOME`, `USER`, `TMPDIR` and a PATH of system directories plus node, as
+in CI: 2,767 tests, 2,766 passing, 0 failing, 1 skipped. The skipped test is the existing
 uninstall check that skips on a machine where Gemini CLI is installed, as on `main`. Nothing
-was re-run. Before the merge, `b88201b` had passed 2,749 tests and the first candidate,
-`667389c`, 2,746, the same way.
+was re-run. `71eada2`, merging `main` after #225 only, had passed 2,767 tests; before any
+merge, `b88201b` had passed 2,749 and the first candidate, `667389c`, 2,746, the same way.
 
 ## Exact local artifact
 
