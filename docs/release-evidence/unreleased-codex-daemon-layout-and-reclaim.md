@@ -46,6 +46,20 @@ release, although the fix was already active.
   unreferenced generation and records it; a worker that is not the active generation reclaims
   nothing; the scheduler starts a worker for a generation that has not reclaimed, and not once
   it has. The first and third failed before the change.
+- `packages/cli/test/managed-runtime-install-failure.test.mjs`: a completed install removes a
+  stale generation, records the reclaim for its generation, and leaves nothing due.
+
+## A suite failure the first candidate had
+
+The first candidate, `34d6448`, failed five tests in the full suite under `env -i`, each with
+`ENOTEMPTY` while removing a test's `data/acc/runtime`: three packed install tests and two
+process tests that install through the CLI. A fresh install had no `reclaim.json`, so the
+scheduler started a background worker right after it, even with updates off, and that worker
+wrote into the runtime directory while the test removed it. Outside tests it would have started
+one needless process after every install. An install runs the code of the generation it
+activates, so it now reclaims as that generation after its fence and records it, and then
+schedules only work that is due. A test for an install that leaves a stale generation behind
+failed before the fix and passes after it; the five tests and the packed update tests pass.
 
 ## Real Codex
 
@@ -58,11 +72,11 @@ their daemons and helper processes were removed afterwards.
 
 ## Exact local artifact
 
-- Source: clean commit `34d644859a73334b3b5bcb6c8193eb2cf7d42d88` on
+- Source: clean commit `f623c9882b1d8591ff35db70d38855cec2faa7fd` on
   `fix/reclaim-and-codex-daemon-layout`, from `main` at `f9937e7`.
 - Archive: `agents-can-communicate-0.8.3.tgz`, packed from that commit.
-- Size: 495,172 bytes; 318 packed entries.
-- SHA-256: `2cb234368acc38a6695f8a671bcb064fee3a1c4d2491fe4f65307bcf0f22f6cb`.
+- Size: 495,321 bytes; 318 packed entries.
+- SHA-256: `9aa58c02844364319ffd0e10eff22dbb3b70b2d0c89848513aace6c83aa47a85`.
 - Package version remains `0.8.3`; this is an unpublished development artifact.
 
 The exact archive passed `scripts/verify-package.mjs`.
