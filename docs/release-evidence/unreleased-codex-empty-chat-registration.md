@@ -63,6 +63,13 @@ opened in a pseudo-terminal and nothing was typed:
 
 MCP `acc_status` shares the composition but was exercised only by the existing MCP suite.
 
+## Suite
+
+`npm test` on the candidate commit `667389c`, run under `env -i` with only `HOME`, `USER`,
+`TMPDIR` and a PATH of system directories plus node, as in CI: 2,746 tests, 2,745 passing,
+0 failing, 1 skipped. The skipped test is the existing uninstall check that skips on a machine
+where Gemini CLI is installed, as on `main`. Nothing was re-run.
+
 ## Exact local artifact
 
 - Source: clean commit `667389cae5254e6e272daef606b506960b098e75` on
