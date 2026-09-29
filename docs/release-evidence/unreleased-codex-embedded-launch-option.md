@@ -84,3 +84,9 @@ client was started with --search, which runs this session on its own embedded se
 cannot reach); the message waits in its inbox`, and doctor's session line ended `start a new
 client session without --search`. The next prompt showed no notice. Every process started from
 the isolated directories was stopped and the directories deleted.
+
+## Suite
+
+`npm test` on `e0c5f0b`, under `env -i` with only `HOME`, `USER`, `TMPDIR` and a PATH of system
+directories plus node, as in CI: 2,793 tests, 2,792 passing, 0 failing, 1 skipped (the existing
+uninstall check that skips on a machine where Gemini CLI is installed), in 9.4 minutes.
