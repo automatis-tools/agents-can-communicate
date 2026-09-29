@@ -423,3 +423,23 @@ test("an embedded client session is a closed reason every reader accepts", () =>
   { ok: false, reasonCode: "client_session_embedded", clientVersion: null,
     protocolContract: "fixture-native-v1", modes: [], opaqueEndpointRef: null, leaseUntil: null });
 });
+
+test("a refused handshake may name the launch option behind it, as an option token only", () => {
+  const refused = patch => validateNativeHandshake(adapter(), { clientVersion: "2.1.258",
+    handshake: handshake({ supported: false, modes: [], opaqueEndpointRef: null, leaseUntil: null,
+      reasonCode: "client_session_embedded", ...patch }) });
+  assert.deepEqual(refused({ launchOption: "--search" }),
+    { ok: false, reasonCode: "client_session_embedded", clientVersion: null,
+      protocolContract: "fixture-native-v1", modes: [], opaqueEndpointRef: null, leaseUntil: null,
+      launchOption: "--search" });
+  assert.equal(refused({ launchOption: "-c" }).launchOption, "-c");
+  assert.equal(Object.hasOwn(refused({}), "launchOption"), false, "optional");
+  // A vendor string, a value or a shell word is not an option token.
+  for (const launchOption of ["search", "--config=model=o3", "--search; rm -rf /", "-", "--",
+    "--Search", `--${"x".repeat(60)}`, null, 7]) {
+    assert.throws(() => refused({ launchOption }), /launchOption/, String(launchOption));
+  }
+  // Only a refusal carries one: a working handshake has nothing to explain.
+  assert.throws(() => validateNativeHandshake(adapter(), { clientVersion: "2.1.258",
+    handshake: handshake({ launchOption: "--search" }) }), /launchOption/);
+});

@@ -1,7 +1,7 @@
-import { CONTRACT_ID, FINGERPRINT, HANDSHAKE_KEYS, KNOWN_BAD_REASON, NATIVE_BINDING_MODES,
-  PLANNABLE_ACTIVATION_KINDS, PROBE_KEYS, TIMESTAMP, assertModes, assertReasonCode, closed,
-  compareStableVersions, deepFreeze, isPlainObject, isText, parseStableVersion, usage }
-  from "./native-vocabulary.mjs";
+import { CONTRACT_ID, FINGERPRINT, HANDSHAKE_KEYS, HANDSHAKE_OPTIONAL_KEYS, KNOWN_BAD_REASON,
+  NATIVE_BINDING_MODES, PLANNABLE_ACTIVATION_KINDS, PROBE_KEYS, TIMESTAMP, assertModes,
+  assertReasonCode, closed, compareStableVersions, deepFreeze, isLaunchOption, isPlainObject, isText,
+  parseStableVersion, usage } from "./native-vocabulary.mjs";
 import { compareVersionOrder, versionOrder } from "./certification.mjs";
 
 // The native-delivery compatibility contract: a minimum that is a real passing
@@ -17,7 +17,8 @@ import { compareVersionOrder, versionOrder } from "./certification.mjs";
 // live delivery alone.
 
 export { NATIVE_ACTIVATION_KINDS, NATIVE_BINDING_MODES, NATIVE_REASON_CODES,
-  PLANNABLE_ACTIVATION_KINDS, compareStableVersions, parseStableVersion } from "./native-vocabulary.mjs";
+  PLANNABLE_ACTIVATION_KINDS, compareStableVersions, isLaunchOption, parseStableVersion }
+  from "./native-vocabulary.mjs";
 export { validateNativeActivationPlan } from "./native-activation.mjs";
 
 const orderedModes = modes => NATIVE_BINDING_MODES.filter(mode => modes.includes(mode));
@@ -214,7 +215,7 @@ export function evaluateNativeEligibility(adapter, { clientVersion, probe }) {
 }
 
 function validateNativeHandshakeShape(handshake) {
-  closed(handshake, HANDSHAKE_KEYS, "native handshake");
+  closed(handshake, HANDSHAKE_KEYS, "native handshake", HANDSHAKE_OPTIONAL_KEYS);
   if (typeof handshake.supported !== "boolean") usage("native handshake supported must be a boolean");
   if (handshake.clientVersion !== null && !isText(handshake.clientVersion)) {
     usage("native handshake clientVersion must be a string or null");
@@ -235,6 +236,12 @@ function validateNativeHandshakeShape(handshake) {
     }
   } else if (handshake.opaqueEndpointRef !== null || handshake.leaseUntil !== null) {
     usage("an unsupported native handshake carries no endpoint or lease");
+  }
+  if (Object.hasOwn(handshake, "launchOption")) {
+    if (handshake.supported) usage("only a refused native handshake names a launchOption");
+    if (!isLaunchOption(handshake.launchOption)) {
+      usage("native handshake launchOption must be a bare command-line option");
+    }
   }
   return handshake;
 }
@@ -264,7 +271,10 @@ export function validateNativeHandshake(adapter, { clientVersion, handshake }) {
   if (rule.reasonCode !== null) return closedResult(rule.reasonCode);
   if (handshake === null || handshake === undefined) return closedResult("handshake_failed");
   const facts = validateNativeHandshakeShape(handshake);
-  if (facts.supported !== true) return closedResult(facts.reasonCode ?? "handshake_failed");
+  if (facts.supported !== true) {
+    return deepFreeze({ ...base, reasonCode: facts.reasonCode ?? "handshake_failed",
+      ...(Object.hasOwn(facts, "launchOption") ? { launchOption: facts.launchOption } : {}) });
+  }
   if (facts.protocolContract !== rule.protocolContract) return closedResult("protocol_mismatch");
   const modes = orderedModes(facts.modes);
   if (!modes.includes("livePush")) return closedResult("handshake_failed");

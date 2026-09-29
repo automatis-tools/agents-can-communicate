@@ -282,6 +282,24 @@ test("a failed handshake from an interactive TUI names the chat as embedded", as
   assert.equal(absent.reasonCode, "client_session_embedded", "no daemon at all");
 });
 
+// Measured on 0.159.1: `codex --search` and `codex -c ...` run embedded while
+// the daemon runs. The refusal names the option, so the advice can.
+test("an embedded chat's refusal names the launch option that kept it embedded", async t => {
+  const h = await nativeFixture(t);
+  h.state.loaded = [];
+  for (const [argv, option] of [[["codex", "--search"], "--search"],
+    [["codex", "-c", "model_reasoning_effort=low"], "-c"],
+    [["/opt/codex/bin/codex", "--profile", "work", "resume", "--last"], "--profile"],
+    [["codex", "--no-daemon"], "--no-daemon"]]) {
+    const result = await native.bindNativeSession({ ...h, argvOf: async () => argv });
+    assert.equal(result.reasonCode, "client_session_embedded", argv.join(" "));
+    assert.equal(result.launchOption, option, argv.join(" "));
+  }
+  const plain = await native.bindNativeSession({ ...h, argvOf: async () => ["codex"] });
+  assert.equal(plain.reasonCode, "client_session_embedded");
+  assert.equal(Object.hasOwn(plain, "launchOption"), false, "no option, no field");
+});
+
 test("a failed handshake keeps its reason for a daemon, a non-interactive run or an unreadable host",
   async t => {
     const h = await nativeFixture(t);

@@ -1,7 +1,9 @@
 import { listSessionBindings, loadNativeAttempt } from "@agents-can-communicate/adapter-sdk";
 
 /**
- * Why a session has no live transport, as its own last native attempt said.
+ * Why a session has no live transport, as its own last native attempt said:
+ * `{ reasonCode, launchOption? }`, the option being the client launch option
+ * that attempt named as the cause.
  *
  * The same record `acc doctor` reads, found through the hook-owner file that
  * names this exact session generation. Null when none says: an attempt that
@@ -14,5 +16,7 @@ export async function lastNativeReason({ runtimeDir, sessionId, generation }) {
   if (owners.length !== 1) return null;
   const attempt = await loadNativeAttempt({ runtimeDir,
     harnessSessionId: owners[0].harnessSessionId, accSessionId: sessionId, generation });
-  return attempt !== null && attempt.state !== "active" ? attempt.reasonCode : null;
+  if (attempt === null || attempt.state === "active") return null;
+  return { reasonCode: attempt.reasonCode,
+    ...(attempt.launchOption ? { launchOption: attempt.launchOption } : {}) };
 }

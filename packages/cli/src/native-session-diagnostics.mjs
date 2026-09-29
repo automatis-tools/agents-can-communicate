@@ -120,7 +120,10 @@ function describeAttempt(attempt) {
         : attempt.policyStatus === "unavailable" ? `${source} delivery policy could not be read`
           : `${source} delivery policy was off`;
   } else if (attempt.state === "active") detail = "local handshake succeeded";
-  else detail = failures[attempt.reasonCode] ?? describeNativeReason(attempt.reasonCode);
+  else if (attempt.reasonCode === "client_session_embedded" && attempt.launchOption) {
+    detail = `${describeNativeReason(attempt.reasonCode, { launchOption: attempt.launchOption })}; `
+      + `start a new client session without ${attempt.launchOption}`;
+  } else detail = failures[attempt.reasonCode] ?? describeNativeReason(attempt.reasonCode);
   return `last attempt ${attempt.at}: ${detail}`;
 }
 

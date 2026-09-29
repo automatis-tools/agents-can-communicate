@@ -1,3 +1,5 @@
+import { isLaunchOption } from "@agents-can-communicate/adapter-sdk";
+
 // Shared presentation of observed delivery facts. Vendor probes provide closed
 // reasons; installation and doctor must not turn a version floor into readiness.
 const REASONS = Object.freeze({
@@ -16,9 +18,15 @@ const REASONS = Object.freeze({
     + "cannot reach",
 });
 
-export function describeNativeReason(reason, { clientVersion, minimumVersion } = {}) {
+export function describeNativeReason(reason, { clientVersion, minimumVersion, launchOption } = {}) {
   if (reason === "below_minimum_version" && clientVersion && minimumVersion) {
     return `client ${clientVersion} needs version ${minimumVersion} or newer for native delivery`;
+  }
+  // A client can run embedded because of how it was started - Codex does for
+  // `--search`, `-c`, `--profile` and others while its daemon runs.
+  if (reason === "client_session_embedded" && isLaunchOption(launchOption)) {
+    return `the client was started with ${launchOption}, which runs this session on its own `
+      + "embedded service that peers cannot reach";
   }
   return REASONS[reason] ?? reason ?? "readiness is unverified";
 }

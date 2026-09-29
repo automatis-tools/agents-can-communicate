@@ -1292,3 +1292,37 @@ the temporary home was inspected `ready` for maintenance and for setup, its pid 
 `ps` and `lsof`, and a second fresh home was planned as a start (with doctor advising to open
 Codex, since `daemon_auto_start` is on), started by the setup, and verified `ready`. The
 maintainer's own home still resolved to the standalone layout.
+
+## A launch option keeps a chat embedded — Codex 0.147.0 to 0.159.1, 2026-09-29
+
+With the daemon running on the maintainer's machine, a 0.159.1 TUI started as
+`codex -c model_reasoning_effort=low` and one started as `codex --search` each served every
+request `in-process`, while one started as plain `codex` used the daemon. Codex says why only
+behind its status line (`⚠ 2 warnings · f2 to view`): "Running without the shared background
+server: command-line configuration overrides (-c, --enable, --disable, or --search) requires
+embedded mode." The binary gives the other reasons that sentence can carry: a custom
+configuration loader, `--dangerously-bypass-hook-trust`, `--strict-config`, executor selection
+(`CODEX_EXEC_SERVER_URL`), `--profile`, workload identity, `--oss`, `--no-daemon` and a code-mode
+host fallback policy.
+
+ACC 0.8.4 recognised such a chat as `client_session_embedded`, but its advice (open a new chat,
+start the daemon) fits only a chat that started while no daemon ran; a new chat with the same
+option is embedded again. Its notice reached the model as a `developer` message, and
+GPT-6-Astra at low effort, asked "Say hello in one short sentence.", answered "Hello!" without it.
+
+A probe hook that printed `{"systemMessage": ..., "hookSpecificOutput": {"hookEventName": ...,
+"additionalContext": ...}}` for `SessionStart` and `UserPromptSubmit` was handled the same way
+on 0.147.0, 0.155.1 and 0.159.1: the TUI showed the `systemMessage` to the user ("↳ Hook · …";
+"• UserPromptSubmit (completed) says: …" on 0.147.0), and the model received only
+`additionalContext` as a `developer` message. The JSON envelope never reached the conversation.
+The hook output schemas of every release from 0.144.1 to 0.159.1 accept both fields.
+
+The adapter now names the first of `--no-daemon`, `-c`/`--config`, `--enable`, `--disable`,
+`--search`, `-p`/`--profile`, `--oss`, `--strict-config` and `--dangerously-bypass-hook-trust`
+it finds on the embedded chat's command line, before the prompt starts. The refusal carries it
+as `launchOption`, the native-attempt record keeps it, doctor's session line and the sender's
+line name it, and the delivery JSON carries it as `nativeLaunchOption`. The advice is to start
+Codex without the option, moving a setting it sets into `config.toml`. The chat's one notice is
+now also printed as the hook's `systemMessage`, so the user sees it whatever the model answers;
+every other turn keeps plain-text output. An environment variable or a configuration loader
+does not appear on the command line, so those chats keep the advice for a missing daemon.

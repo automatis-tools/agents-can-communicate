@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { mkdir, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 
-import { decisionBody } from "@agents-can-communicate/adapter-sdk";
+import { decisionBody, isLaunchOption } from "@agents-can-communicate/adapter-sdk";
 
 import { CODEX_QUEUE_MINIMUM, MINIMUM_VERSION, PROTOCOL_CONTRACT, QUEUE_MODES,
   addCodexQueueMessage, canonicalCwd, compareVersions, controlSocketPath,
@@ -10,7 +10,7 @@ import { CODEX_QUEUE_MINIMUM, MINIMUM_VERSION, PROTOCOL_CONTRACT, QUEUE_MODES,
   versionOrder } from "./app-server-client.mjs";
 import { newEndpointId, readNativeEndpoint, readySocketPath, removeNativeEndpoint, socketIsReady,
   writeNativeEndpoint } from "./native-endpoint.mjs";
-import { hostArgv, runsEmbedded } from "./embedded-host.mjs";
+import { embeddedHost, hostArgv } from "./embedded-host.mjs";
 
 // The receiver's hook supplies thread and cwd. Core holds only a random endpoint
 // reference; sender environment never decides which daemon receives the message.
@@ -110,8 +110,10 @@ export async function verifyReceiver(peer, endpoint, { probe = probeCodexQueue,
 export async function bindNativeSession({ argvOf = hostArgv, ...options } = {}) {
   const result = await bindAttempt(options);
   if (result.supported || !Number.isInteger(options.clientPid) || options.clientPid <= 0) return result;
-  return await runsEmbedded(options.clientPid, argvOf)
-    ? closed(options.clientVersion, "client_session_embedded") : result;
+  const host = await embeddedHost(options.clientPid, argvOf);
+  if (host === null) return result;
+  const refusal = closed(options.clientVersion, "client_session_embedded");
+  return host.launchOption === null ? refusal : { ...refusal, launchOption: host.launchOption };
 }
 
 async function bindAttempt({ event, clientPid, clientVersion, runtimeDir,
@@ -208,10 +210,30 @@ export async function offerMessage({ binding, message, runtimeDir, timeoutMs = 5
 export const retireNativeSession = ({ binding, runtimeDir }) =>
   removeNativeEndpoint({ runtimeDir, endpointId: binding?.opaqueEndpointRef });
 
-const EMBEDDED_NOTICE = "ACC: live peer delivery is off in this Codex chat. It runs on its own "
-  + "embedded app server, so peer messages reach it only with the user's next prompt. Tell the "
-  + "user once: for live delivery, open a new Codex chat; if Codex does not start its app-server "
-  + "daemon itself, run `codex app-server daemon start` first.";
+const OPEN_A_CHAT = "open a new Codex chat; if Codex does not start its app-server daemon itself, "
+  + "run `codex app-server daemon start` first";
+// Options a setting in config.toml can replace; the rest are simply left off.
+const SETTING_OPTIONS = new Set(["-c", "--config", "--enable", "--disable", "--search", "-p",
+  "--profile"]);
+
+// What the chat is told: one line for the model, one the client shows the user
+// (Codex prints a hook's systemMessage, which never reaches the model).
+function embeddedNotice(launchOption) {
+  if (!isLaunchOption(launchOption)) {
+    return { line: "ACC: live peer delivery is off in this Codex chat. It runs on its own embedded "
+      + "app server, so peer messages reach it only with the user's next prompt. ACC has shown the "
+      + `user how to get it: ${OPEN_A_CHAT}.`,
+    userMessage: "ACC: live peer delivery is off in this chat, which runs on its own app server. "
+      + `For live delivery, ${OPEN_A_CHAT}.` };
+  }
+  const advice = `start Codex without \`${launchOption}\``
+    + (SETTING_OPTIONS.has(launchOption) ? " and move what it sets into config.toml" : "");
+  return { line: `ACC: live peer delivery is off in this Codex chat. It was started with `
+    + `\`${launchOption}\`, so it runs on its own embedded app server and peer messages reach it `
+    + `only with the user's next prompt. ACC has shown the user how to get it: ${advice}.`,
+  userMessage: `ACC: live peer delivery is off in this chat: \`${launchOption}\` makes Codex run `
+    + `it on its own app server. For live delivery, ${advice}.` };
+}
 
 // One delivered notice per chat. The marker is created exclusively, so a
 // second turn finds it; a notice the runner did not deliver gives it back.
@@ -227,7 +249,7 @@ export async function nativeActivationHint({ event, nativeBinding, runtimeDir })
   } catch {
     return null;
   }
-  return { line: EMBEDDED_NOTICE, release: () => rm(marker, { force: true }) };
+  return { ...embeddedNotice(nativeBinding.launchOption), release: () => rm(marker, { force: true }) };
 }
 
 function renderText(message) {

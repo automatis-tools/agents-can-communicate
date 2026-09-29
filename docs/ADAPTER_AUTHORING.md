@@ -192,6 +192,9 @@ transport that is technically different on some platform is the probe's fact to 
 `docs/design/2026-09-26-native-delivery-across-platforms.md` in the repository.
 - Native methods return closed facts (`validateNativeActivationPlan()` closes the
   activation plan) and never put vendor data - endpoints, sockets, raw errors - into core.
+  A refused handshake may add `launchOption`: the bare command-line option, such as
+  `--search`, that made the client refuse. Doctor and the sender name it; a value, a vendor
+  string or anything but an option token is rejected.
 
 `nativeDelivery.policySource` accepts only `"installation-record"`, which is also the
 default. Hooks and senders read the current recorded recipient consent, independently of

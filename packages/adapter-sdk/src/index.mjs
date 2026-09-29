@@ -5,7 +5,8 @@ export { capabilityEvidence, compareVersionOrder, effectiveCapabilities, validat
   versionOrder }
   from "./certification.mjs";
 export { NATIVE_ACTIVATION_KINDS, NATIVE_BINDING_MODES, NATIVE_REASON_CODES,
-  compareStableVersions, evaluateNativeEligibility, evaluateVersionContract, parseStableVersion,
+  compareStableVersions, evaluateNativeEligibility, evaluateVersionContract, isLaunchOption,
+  parseStableVersion,
   validateNativeActivationPlan, validateNativeDeliveryContract, validateNativeHandshake }
   from "./native-delivery.mjs";
 export { EVENT_KINDS, NORMALIZED_EVENT_KEYS, normalizedEvent } from "./events.mjs";

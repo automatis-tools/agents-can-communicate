@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtemp, realpath, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readdir, readFile, realpath, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -14,7 +14,12 @@ const ASK = "ACC: live delivery is not running here; run the relay once.";
 
 // A client whose native endpoint the agent must start itself. Its handshake
 // finds nothing, so every turn's binding is degraded and the ask is due.
-function relayed(nativeActivationHint) {
+const REFUSED = Object.freeze({ supported: false, clientVersion: "1.0.0",
+  protocolContract: "relayed-v1", modes: [], opaqueEndpointRef: null, leaseUntil: null,
+  reasonCode: "native_session_unavailable" });
+
+function relayed(nativeActivationHint, { handshake = REFUSED,
+  injectOutcome = text => ({ stdout: text, stderr: "", exitCode: 0 }) } = {}) {
   return {
     id: "relayed",
     client: { command: "relayed", certificationName: "relayed", versionArgs: ["--version"] },
@@ -24,18 +29,23 @@ function relayed(nativeActivationHint) {
     nativeDelivery: { minimum: "1.0.0",
       anchors: [{ version: "1.0.0", protocolContract: "relayed-v1" }], knownBad: [],
       activationKinds: ["native-config"], policySource: "installation-record" },
-    bindNativeSession: async () => ({ supported: false, clientVersion: "1.0.0",
-      protocolContract: "relayed-v1", modes: [], opaqueEndpointRef: null, leaseUntil: null,
-      reasonCode: "native_session_unavailable" }),
+    bindNativeSession: async () => handshake,
     nativeActivationHint,
     normalizeHook: payload => payload,
-    injectOutcome: text => ({ stdout: text, stderr: "", exitCode: 0 }),
+    injectOutcome,
     renderContext: () => "",
     renderContextResult: () => ({ text: "", offeredMessageIds: [], includedAttentionIds: [] }),
   };
 }
 
-async function turn(t, nativeActivationHint, { policy = "actionable", contextBudgetBytes } = {}) {
+// A process table in which this hook runs under a live `relayed` client, so the
+// runner resolves a client pid and hands the handshake to the adapter.
+const clientTable = async () => new Map([
+  [process.pid, { ppid: process.ppid, comm: "node", args: "node acc-hook.mjs relayed" }],
+  [process.ppid, { ppid: 1, comm: "relayed", args: "relayed" }]]);
+
+async function turn(t, nativeActivationHint, { policy = "actionable", contextBudgetBytes,
+  adapter = {}, readProcessTable = async () => new Map() } = {}) {
   const root = await realpath(await mkdtemp(path.join(tmpdir(), "acc-hint-")));
   const dataHome = await realpath(await mkdtemp(path.join(tmpdir(), "acc-hint-data-")));
   t.after(() => Promise.all([rm(root, { recursive: true, force: true }),
@@ -48,10 +58,11 @@ async function turn(t, nativeActivationHint, { policy = "actionable", contextBud
   }
   await recordInstall({ dataHome, adapterId: "relayed", version: "1.0.0", artifacts: [],
     deliveryPolicy: policy });
-  const invoke = kind => runHook({ adapterId: "relayed", adapters: { relayed: relayed(nativeActivationHint) },
+  const invoke = kind => runHook({ adapterId: "relayed",
+    adapters: { relayed: relayed(nativeActivationHint, adapter) },
     payload: { kind, sessionId: "conversation-1", cwd: root, model: null, parentSessionId: null,
       tool: null, targets: [] },
-    dataHome, env: { HOME: "/Users/someone" }, readProcessTable: async () => new Map(),
+    dataHome, env: { HOME: "/Users/someone" }, readProcessTable,
     probeClientVersion: async () => "1.0.0", platform });
   await invoke("sessionStart");
   return invoke("beforeTurn");
@@ -68,6 +79,51 @@ test("a degraded binding carries the adapter's ask into the turn, beside the own
   assert.equal(asked[0].nativeBinding.state, "degraded");
   assert.equal(asked[0].env.HOME, "/Users/someone");
   assert.equal(typeof asked[0].runtimeDir, "string");
+});
+
+// Measured 2026-09-29 on Codex 0.159.1: a chat started with `--search` runs
+// embedded while the daemon runs, and the advice has to name that option.
+test("the launch option a refusal names reaches the ask and the recorded attempt", async t => {
+  const asked = [];
+  await turn(t, async input => { asked.push(input); return ASK; }, { readProcessTable: clientTable,
+    adapter: { handshake: { ...REFUSED, reasonCode: "client_session_embedded",
+      launchOption: "--search" } } });
+  assert.equal(asked[0].nativeBinding.reasonCode, "client_session_embedded");
+  assert.equal(asked[0].nativeBinding.launchOption, "--search");
+  const dir = path.join(asked[0].runtimeDir, "native-attempts");
+  const [file] = await readdir(dir);
+  const record = JSON.parse(await readFile(path.join(dir, file), "utf8"));
+  assert.equal(record.attempt.launchOption, "--search");
+});
+
+test("a refusal without a launch option records none", async t => {
+  const asked = [];
+  await turn(t, async input => { asked.push(input); return ASK; }, { readProcessTable: clientTable,
+    adapter: { handshake: { ...REFUSED, reasonCode: "client_session_embedded" } } });
+  assert.equal(asked[0].nativeBinding.reasonCode, "client_session_embedded");
+  assert.equal(Object.hasOwn(asked[0].nativeBinding, "launchOption"), false);
+});
+
+// Codex shows a hook's `systemMessage` to the user and never to the model,
+// measured on 0.147.0, 0.155.1 and 0.159.1.
+test("an ask's message for the user reaches the adapter beside the turn's context", async t => {
+  const notices = [];
+  const result = await turn(t, async () => ({ line: ASK, userMessage: "ACC: shown to the user." }),
+    { adapter: { injectOutcome: (text, notice) => { notices.push(notice ?? null);
+      return { stdout: text, stderr: "", exitCode: 0 }; } } });
+  assert.equal(result.stdout.split("\n").includes(ASK), true);
+  assert.deepEqual(notices.at(-1), { userMessage: "ACC: shown to the user." });
+});
+
+test("a message for the user that is not one bounded line is dropped, the ask kept", async t => {
+  for (const userMessage of ["two\nlines", "x".repeat(600), 7, ""]) {
+    const notices = [];
+    const result = await turn(t, async () => ({ line: ASK, userMessage }),
+      { adapter: { injectOutcome: (text, notice) => { notices.push(notice ?? null);
+        return { stdout: text, stderr: "", exitCode: 0 }; } } });
+    assert.equal(result.stdout.split("\n").includes(ASK), true, String(userMessage));
+    assert.equal(notices.at(-1), null, String(userMessage));
+  }
 });
 
 test("nothing is asked while the live policy is off", async t => {

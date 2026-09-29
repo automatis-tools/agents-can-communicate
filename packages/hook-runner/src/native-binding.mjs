@@ -37,8 +37,11 @@ function discardEndpoint(adapter, handshake, runtimeDir) {
 export async function establishNativeBinding({ adapter, event, hookBinding, clientVersion,
   platform, livePolicy, service, runtimeDir, clock, env,
   timeoutMs = DEFAULT_TIMEOUT_MS, heartbeatCadenceMs = DEFAULT_CADENCE_MS }) {
-  const outcome = (state, reasonCode, modes = []) =>
-    Object.freeze({ state, reasonCode, modes: Object.freeze([...modes]) });
+  // A refusal may name the client launch option behind it; see
+  // validateNativeHandshake, which admits only a bare option token.
+  const outcome = (state, reasonCode, modes = [], launchOption = null) =>
+    Object.freeze({ state, reasonCode, modes: Object.freeze([...modes]),
+      ...(launchOption === null ? {} : { launchOption }) });
   const sessionId = hookBinding?.accSessionId;
   const generation = hookBinding?.generation;
   if (typeof sessionId !== "string" || typeof generation !== "string") return outcome("off", null);
@@ -80,7 +83,7 @@ export async function establishNativeBinding({ adapter, event, hookBinding, clie
     if (!verdict.ok) {
       await discardEndpoint(adapter, handshake, runtimeDir);
       return outcome(STATIC_REASONS.has(verdict.reasonCode) ? "unsupported" : "degraded",
-        verdict.reasonCode);
+        verdict.reasonCode, [], verdict.launchOption ?? null);
     }
     const now = Date.parse(clock.now());
     const lease = Date.parse(verdict.leaseUntil);

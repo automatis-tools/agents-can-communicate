@@ -55,11 +55,54 @@ export function interactiveHost(argv) {
   return true;
 }
 
-/** True only when the host was read and is an interactive TUI; never throws. */
-export async function runsEmbedded(pid, argvOf = hostArgv) {
+// Options that make Codex run a chat on its own embedded app server even while
+// the daemon runs. Measured on 0.159.1, which says so only behind its status
+// line: "Running without the shared background server: command-line
+// configuration overrides (-c, --enable, --disable, or --search) requires
+// embedded mode." The same sentence names --profile, --oss, --strict-config,
+// --dangerously-bypass-hook-trust and --no-daemon.
+const EMBEDDING_OPTIONS = new Set(["-c", "--config", "--enable", "--disable", "--search", "-p",
+  "--profile", "--oss", "--strict-config", "--dangerously-bypass-hook-trust", "--no-daemon"]);
+const OPENS_CHAT = new Set(["resume", "fork"]);
+
+// `--config=x` and `-cx` carry their value; both name the option they spell.
+const optionName = word => word.startsWith("--") ? word.split("=", 1)[0] : word.slice(0, 2);
+
+/**
+ * The first option on this interactive command line that keeps the chat
+ * embedded, as typed, or null. Scanning stops at the prompt: `ps` drops quotes,
+ * so a later word may be the prompt's own text.
+ */
+export function embeddingOption(argv) {
+  const words = codexArguments(argv);
+  if (words === null) return null;
+  let value = false;
+  let opened = false;
+  for (const word of words) {
+    if (value) { value = false; continue; }
+    // `--` ends the options: what follows is the prompt, however it reads.
+    if (word === "--") return null;
+    if (word.startsWith("-")) {
+      if (EMBEDDING_OPTIONS.has(optionName(word))) return optionName(word);
+      value = VALUE_OPTIONS.has(word);
+      continue;
+    }
+    if (opened || !OPENS_CHAT.has(word)) return null;
+    opened = true;
+  }
+  return null;
+}
+
+/**
+ * For a host that was read and is an interactive TUI, `{ launchOption }` - the
+ * option that keeps it embedded, or null when its command line shows none.
+ * Null for any other host or an unreadable one; never throws.
+ */
+export async function embeddedHost(pid, argvOf = hostArgv) {
   try {
-    return interactiveHost(await argvOf(pid));
+    const argv = await argvOf(pid);
+    return interactiveHost(argv) ? { launchOption: embeddingOption(argv) } : null;
   } catch {
-    return false;
+    return null;
   }
 }

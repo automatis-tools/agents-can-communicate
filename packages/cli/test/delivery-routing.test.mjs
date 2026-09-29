@@ -30,6 +30,17 @@ test("a recipient with no live transport is told why when its session said", () 
     + "embedded service, which peers cannot reach); the message waits in its inbox");
 });
 
+// Measured 2026-09-29 on Codex 0.159.1: `codex --search` runs embedded while
+// the daemon runs; the sender learns which option did it.
+test("a recipient kept embedded by a launch option is named with that option", () => {
+  assert.equal(recordedText(message, [{ recipientParticipantId: "codex-x", outcome: "queued",
+    transport: "durable", errorCode: "no_live_transport", nativeReasonCode: "client_session_embedded",
+    nativeLaunchOption: "--search" }]),
+  "recorded message_a; codex-x has no live transport (the client was started with --search, which "
+    + "runs this session on its own embedded service that peers cannot reach); the message waits in "
+    + "its inbox");
+});
+
 test("a recipient with no live transport is reported as reading its inbox", () => {
   assert.equal(recordedText(message, [{ recipientParticipantId: "models", outcome: "queued",
     transport: "durable", errorCode: "no_live_transport" }]),

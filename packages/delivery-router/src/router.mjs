@@ -1,4 +1,5 @@
-import { NATIVE_REASON_CODES, evaluateVersionContract } from "@agents-can-communicate/adapter-sdk";
+import { NATIVE_REASON_CODES, evaluateVersionContract, isLaunchOption }
+  from "@agents-can-communicate/adapter-sdk";
 
 import { lastNativeReason } from "./native-reason.mjs";
 import { refreshExpiredBinding } from "./refresh-binding.mjs";
@@ -51,13 +52,16 @@ export function createDeliveryRouter({ service, adapters, clock, readLivePolicy,
   const registry = adaptersById(adapters);
 
   // A session that bound no live transport may have said why: the reason its
-  // own last native attempt recorded, from the closed vocabulary only.
+  // own last native attempt recorded, from the closed vocabulary only, and the
+  // client launch option behind it when the attempt named one.
   async function withoutLiveTransport(participantId, target) {
-    const reason = await Promise.resolve()
+    const found = await Promise.resolve()
       .then(() => readNativeReason({ sessionId: target.sessionId, generation: target.generation }))
       .catch(() => null);
-    return { ...durable(participantId, "no_live_transport"),
-      ...(NATIVE_REASON_CODES.includes(reason) ? { nativeReasonCode: reason } : {}) };
+    const reason = found?.reasonCode;
+    if (!NATIVE_REASON_CODES.includes(reason)) return durable(participantId, "no_live_transport");
+    return { ...durable(participantId, "no_live_transport"), nativeReasonCode: reason,
+      ...(isLaunchOption(found.launchOption) ? { nativeLaunchOption: found.launchOption } : {}) };
   }
 
   // Read at offer time, not from the binding: consent withdrawn after a session

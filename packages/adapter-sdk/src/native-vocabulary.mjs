@@ -50,6 +50,13 @@ export const PROBE_KEYS = ["supported", "clientVersion", "protocolContract", "ex
   "modes", "reasonCode"];
 export const HANDSHAKE_KEYS = ["supported", "clientVersion", "protocolContract", "modes",
   "opaqueEndpointRef", "leaseUntil", "reasonCode"];
+// A refused handshake may name the client launch option that caused it, such
+// as Codex's `--search`. A bare option token, never its value: a value can be
+// anything a user typed.
+export const HANDSHAKE_OPTIONAL_KEYS = ["launchOption"];
+export const LAUNCH_OPTION = /^-(?:[a-z]|-[a-z][a-z0-9]*(?:-[a-z0-9]+)*)$/;
+export const isLaunchOption = value => typeof value === "string" && value.length <= 40
+  && LAUNCH_OPTION.test(value);
 
 export function usage(message, details = {}) {
   throw new AccError(EXIT.USAGE, message, details);
@@ -58,10 +65,10 @@ export function usage(message, details = {}) {
 export const isPlainObject = value => value !== null && typeof value === "object" && !Array.isArray(value);
 export const isText = value => typeof value === "string" && value !== "";
 
-export function closed(value, keys, label) {
+export function closed(value, keys, label, optional = []) {
   if (!isPlainObject(value)) usage(`${label} must be an object`);
   for (const key of Object.keys(value)) {
-    if (!keys.includes(key)) usage(`unknown ${label} field ${key}`, { key });
+    if (!keys.includes(key) && !optional.includes(key)) usage(`unknown ${label} field ${key}`, { key });
   }
   for (const key of keys) {
     if (!Object.hasOwn(value, key)) usage(`${label} requires ${key}`, { key });
