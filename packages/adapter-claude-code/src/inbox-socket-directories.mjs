@@ -21,6 +21,8 @@ import path from "node:path";
 // serves the inbox on a named pipe, which no Unix socket grant covers.
 
 const hostOf = platform => String(platform ?? process.platform).split("-")[0];
+// Every branch below is a POSIX client's layout, built the same on any host.
+const posix = path.posix;
 const set = value => typeof value === "string" && value !== "";
 
 export function inboxSocketDirectories({ env = {}, platform, uid } = {}) {
@@ -30,12 +32,12 @@ export function inboxSocketDirectories({ env = {}, platform, uid } = {}) {
   // Claude Code's `||`: an empty value falls through to the next one.
   const root = [env.XDG_RUNTIME_DIR, env.CLAUDE_CODE_TMPDIR].find(set) ?? "/tmp";
   const fallbackRoot = set(env.TERMUX_VERSION) && set(env.PREFIX)
-    ? path.join(env.PREFIX, "tmp") : "/tmp";
+    ? posix.join(env.PREFIX, "tmp") : "/tmp";
   const directories = [
-    path.join(root, "cc-socks"),
+    posix.join(root, "cc-socks"),
     "/tmp/cc-socks",
     ...(host === "linux" ? [`/run/user/${user}/cc-socks`] : []),
-    path.join(fallbackRoot, `cc-socks-${user}`),
+    posix.join(fallbackRoot, `cc-socks-${user}`),
   ];
-  return [...new Set(directories.filter(directory => path.isAbsolute(directory)))];
+  return [...new Set(directories.filter(directory => posix.isAbsolute(directory)))];
 }
