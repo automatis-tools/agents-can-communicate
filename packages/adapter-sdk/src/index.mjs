@@ -34,3 +34,4 @@ export { resolveExecutable, runExecutable } from "./executables.mjs";
 export { pathOf } from "./executables.mjs";
 export { windowsHookCommand } from "./windows-command.mjs";
 export { shortPath } from "./windows-command.mjs";
+export { mergeEnv } from "./executables.mjs";

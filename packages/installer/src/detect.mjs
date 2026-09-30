@@ -1,7 +1,7 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 
-import { capabilityEvidence, effectiveCapabilities, evaluateNativeEligibility, pathOf,
+import { capabilityEvidence, effectiveCapabilities, evaluateNativeEligibility, mergeEnv, pathOf,
   resolveExecutable as resolveOnPath, runExecutable, validateNativeActivationPlan }
   from "@agents-can-communicate/adapter-sdk";
 
@@ -136,7 +136,7 @@ export async function detectInstallation({ adapters, context, probe = spawnProbe
           // own environment must not find a different client, or none.
           Promise.resolve(probe(adapter.client.command,
             adapter.client.versionArgs ?? ["--version"],
-            { env: context?.env === undefined ? undefined : { ...process.env, ...context.env } })),
+            { env: context?.env === undefined ? undefined : mergeEnv(process.env, context.env) })),
           probeTimeoutMs, `${adapter.id} version probe`);
         if (typeof output === "string" && output !== "") {
           entry.present = true;

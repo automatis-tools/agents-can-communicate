@@ -5,7 +5,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 
-import { bakeSkillCommand, blankJson, defaultAntigravityRelay, isShellWord, ownVersion,
+import { bakeSkillCommand, blankJson, defaultAntigravityRelay, isShellWord, mergeEnv, ownVersion,
   removeIfEmpty, shortPath, stampPluginVersion, windowsHookCommand, writeCliShim, writeForeignJson,
   writeHookShim }
   from "@agents-can-communicate/adapter-sdk";
@@ -231,7 +231,7 @@ export function registeredSource(readback) {
  */
 async function runAgy(args, { home, env, timeoutMs = 60_000 } = {}) {
   return run("agy", args, { timeout: timeoutMs,
-    env: { ...process.env, ...env, ...(typeof home === "string" ? { HOME: home } : {}) } });
+    env: mergeEnv(process.env, { ...env, ...(typeof home === "string" ? { HOME: home } : {}) }) });
 }
 
 const agyFor = context => context.runAgy ?? runAgy;

@@ -78,3 +78,14 @@ test("an absolute command is used as it is, on either platform", async () => {
   assert.equal(await resolveExecutable("C:\\Tools\\missing.exe", { platform: "win32", exists,
     pathEnv: "C:\\Windows" }), null);
 });
+
+// Measured on windows-latest: a copy of process.env keeps `Path`, a caller's
+// environment names `PATH`, and a plain spread kept both, so the lookup read the
+// machine's PATH and never found the caller's client.
+test("windows: an environment laid over another replaces a variable whatever its case", async () => {
+  const { mergeEnv, pathOf } = await import("../src/executables.mjs");
+  const merged = mergeEnv({ Path: "C:\\Windows", ComSpec: "cmd" }, { PATH: "C:\\stub" }, "win32");
+  assert.equal(pathOf(merged), "C:\\stub");
+  assert.equal(merged.ComSpec, "cmd");
+  assert.deepEqual(mergeEnv({ Path: "/a" }, { PATH: "/b" }, "linux"), { Path: "/a", PATH: "/b" });
+});

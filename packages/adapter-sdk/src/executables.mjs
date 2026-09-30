@@ -10,6 +10,15 @@ import { promisify } from "node:util";
 const execFileAsync = promisify(execFile);
 const DEFAULT_PATHEXT = ".COM;.EXE;.BAT;.CMD";
 
+/** `override` laid over `base`. Windows variable names ignore case, so there an
+ * override replaces the base's variable however either spells it. */
+export function mergeEnv(base, override, platform = process.platform) {
+  if (platform !== "win32") return { ...base, ...override };
+  const replaced = new Set(Object.keys(override ?? {}).map(name => name.toUpperCase()));
+  const kept = Object.entries(base ?? {}).filter(([name]) => !replaced.has(name.toUpperCase()));
+  return { ...Object.fromEntries(kept), ...override };
+}
+
 /** An environment's search path. A copy of Windows' process.env keeps the
  * variable's own spelling, usually `Path`, and a copy is case-sensitive. */
 export const pathOf = env => Object.entries(env ?? {})
