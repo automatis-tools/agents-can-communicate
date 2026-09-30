@@ -38,7 +38,8 @@ test("install gives this client its own ACC skill, through agy plugin install", 
   // by itself points at, and which is gone the moment Gemini CLI is retired.
   // Bare where the path is one shell word, quoted where it is not (issue #214).
   const commands = [...skill.matchAll(/"([^"]+acc-cli\.sh)"|(?<![\w"])(\/[^\s"`]+acc-cli\.sh)/g)]
-    .map(match => match[1] ?? match[2]);
+    // A shell double-quoted word: `\` escapes the next character.
+    .map(match => match[1]?.replace(/\\(.)/g, "$1") ?? match[2]);
   assert.equal(commands.length > 0, true, "the skill teaches no runnable command");
   for (const command of new Set(commands)) {
     assert.equal(command, path.join(home, ".gemini", "config", "acc", "acc-cli.sh"));

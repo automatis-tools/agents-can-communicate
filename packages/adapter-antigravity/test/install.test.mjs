@@ -109,7 +109,7 @@ test("install writes the namespaced schema, which is the only one that loads", a
     // Quoted, because a home directory may contain a space, and absolute,
     // because a hook environment carries no PATH. A quoted command loads:
     // captured on 1.2.7 with a space in the path.
-    assert.match(actions[0].command, /^sh "\/[^"]+\/acc-hook\.sh" /,
+    assert.match(actions[0].command, /^sh "(?:\/|[A-Za-z]:\\)[^"]+acc-hook\.sh" /,
       "the shim must be named by an absolute, quoted path");
     assert.equal("matcher" in actions[0], false,
       "matcher is a Gemini CLI field; this client drops an entry that carries it");
