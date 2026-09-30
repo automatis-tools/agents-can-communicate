@@ -146,12 +146,15 @@ runtime, because launcher modules may import only their siblings.
 
 ### 3. Process identity
 
-On Windows ACC reads `Win32_Process` through one PowerShell call per question, never a full
-scan: a full scan cost 1.07 s in the PowerShell that every Windows has. The hook already knows
-its parent (`process.ppid`), so one fixed script walks up from there with filtered queries
-(`-Filter "ProcessId=<n>"`) and prints pid, ppid, creation time (FILETIME) and image name for
-each hop, plus the command line when the caller asks for it. `pwsh.exe` is used when present,
-because it starts faster; `powershell.exe` otherwise.
+On Windows ACC reads `Win32_Process` through WMI, one filtered query per hop from the asking
+process upward, never a full scan. Windows Script Host runs the walk: `cscript.exe` with a
+JScript file that ships in the package (`windows-process-chain.wsf`). It printed the chain in
+145 ms on windows-latest, against 580 ms for the same walk in PowerShell 7, and 258 ms against
+1,080 ms with four hooks reading at once, because it starts no .NET runtime. Each hop carries
+pid, ppid, image name, command line and WMI's creation time, which ACC turns into a FILETIME.
+Non-ASCII characters are escaped in the output, so no code page can change it. A machine can
+switch Script Host off by policy; the same walk then runs in PowerShell (`pwsh.exe` when
+present, `powershell.exe` otherwise), within the same deadline.
 
 - **Matching a client.** Image names are compared without `.exe` and case-insensitively, and
   `node.exe` counts as the script host that `node` is on POSIX.
@@ -160,9 +163,15 @@ because it starts faster; `powershell.exe` otherwise.
 - **Depth.** Claude Code's exec-form hooks make the client the hook's direct parent. PowerShell-
   and cmd-hosted hooks put one shell between them. The walk stops at the client or after a small
   fixed number of hops.
-- **Budget.** The first PowerShell start on a machine took 3.8 s, and a hook has 5 s. On Windows
-  the read at SessionStart gets up to 3 s. A read that still times out fails open, as today, and
-  the next user-turn hook binds the session. Later hooks reuse the pid the binding recorded.
+- **Budget.** A session start begins the read as soon as its event is known, while the store
+  opens, so the walk costs no time of its own; it gets up to 3 s. A read that still times out
+  fails open, as today, and the next user-turn hook binds the session. Later hooks reuse the pid
+  the binding recorded.
+- **Client version.** npm installs a Windows client as a `.cmd` that runs node on the package's
+  script, and asking it for `--version` starts cmd.exe, node and, for Codex, the native binary:
+  11.5 s on a fresh runner. ACC reads the version from the package whose `bin` is the script the
+  `.cmd` runs, which is what `--version` prints, and runs the client only when the `.cmd` is no
+  such shim.
 - **Identity.** Where POSIX compares `ps lstart`, Windows compares the creation FILETIME. That
   covers the Codex daemon pid file and the legacy worker check.
 - **Leases and pins** keep "process death is the only expiry" on both platforms. A reused pid only

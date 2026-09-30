@@ -25,8 +25,9 @@ Work in progress for #234. The design is in
 - A workspace config root that starts with a separator or a drive letter is refused on every
   platform, which includes `\\host\share` and `D:x`. A backslash separates the segments of a
   `file:` claim.
-- On Windows the hook runner reads the chain of processes above it through one PowerShell call,
-  and a client's image name matches without `.exe`.
+- On Windows the hook runner reads the chain of processes above it through WMI in Windows Script
+  Host, and through PowerShell where Script Host is switched off; a client's image name matches
+  without `.exe`. Measured on windows-latest, the walk took 145 ms against PowerShell's 580.
 - On Windows a client binary is found through `PATHEXT`, a `.cmd` shim runs through `cmd.exe`,
   updates run npm's own `npm-cli.js`, and background workers open no console window. Live
   delivery on Windows is reported as `native_delivery_unsupported` for now; next-turn delivery
@@ -45,9 +46,11 @@ Work in progress for #234. The design is in
   through `taskkill /T`. cmd.exe starts the batch file's program as a child of its own, and
   after killing cmd.exe, execFile waited for that child's pipes, so a hung
   `claude.cmd --version` held a version probe past its limit.
-- A session start reads the process table while the client reports its version. On Windows
-  one of them starts the client and the other starts PowerShell, and one after the other they
-  took most of a loaded runner's hook budget.
+- A session start reads the process table from the moment its event is known, while the store
+  opens and the client reports its version, rather than after them. On Windows the version of an
+  npm-installed client is read from the package its `.cmd` runs, instead of starting cmd.exe,
+  node and the client. A Windows session start in one hook process went from 1.45 s to 0.95 s on
+  windows-latest.
 - The reason shown for a client without live delivery reads "this client has no live delivery
   channel ACC supports here", which is also true of Claude Code, Codex and Antigravity CLI on
   Windows.
