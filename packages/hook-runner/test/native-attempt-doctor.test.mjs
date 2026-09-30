@@ -3,12 +3,12 @@ import { execFile } from "node:child_process";
 import { mkdir, mkdtemp, readdir, readFile, realpath, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import test from "node:test";
 import { promisify } from "node:util";
 
 import { createClaudeCodeAdapter } from "@agents-can-communicate/adapter-claude-code";
 import { recordInstall } from "@agents-can-communicate/installer";
 import { runHook } from "../src/runner.mjs";
+import { posixTransportTest as test } from "../../../tests/helpers/platform-scope.mjs";
 
 const exec = promisify(execFile);
 const binary = path.resolve(import.meta.dirname, "../../../bin/acc.mjs");
