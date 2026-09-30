@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { promisify } from "node:util";
+import { writeFakeClient } from "../helpers/fake-client.mjs";
 
 const run = promisify(execFile);
 const repo = path.resolve(import.meta.dirname, "..", "..");
@@ -32,8 +33,7 @@ async function machine(t) {
   // installed - which is how a test about an install comes to prove nothing
   // there while passing on the machine it was written on.
   const claude = path.join(bin, "claude");
-  await writeFile(claude, "#!/bin/sh\necho \"2.1.233 (Claude Code)\"\n");
-  await chmod(claude, 0o755);
+  await writeFakeClient(bin, "claude", { output: "2.1.233 (Claude Code)" });
 
   // Detection spawns the client's binary, and the default three seconds is not
   // always enough while the rest of the suite is running: the stub looked absent

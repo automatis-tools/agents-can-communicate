@@ -5,6 +5,7 @@ import path from "node:path";
 import test from "node:test";
 
 import { detectInstallation } from "../src/detect.mjs";
+import { fakePath, writeFakeClient } from "../../../tests/helpers/fake-client.mjs";
 
 // Adapters reduced to what detection uses. The real ones are exercised in the
 // install tests; here the point is the detection rules themselves.
@@ -207,10 +208,9 @@ test("the version probe finds the client on the PATH detection was given", async
   // in CI, where the only `codex` was the stub on the given PATH.
   const bin = await home(t);
   const command = "acc-detect-stub-client";
-  await writeFile(path.join(bin, command), "#!/bin/sh\necho 'stub 0.147.0'\n");
-  await chmod(path.join(bin, command), 0o755);
+  await writeFakeClient(bin, command, { output: "stub 0.147.0" });
   const context = { home: await home(t), dataHome: await home(t),
-    env: { PATH: `${bin}${path.delimiter}/usr/bin${path.delimiter}/bin` } };
+    env: { PATH: fakePath(bin) } };
 
   const [entry] = await detectInstallation({ adapters: [adapter(command)], context });
 

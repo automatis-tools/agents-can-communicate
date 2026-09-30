@@ -13,6 +13,7 @@ import { channelSocketDirectory } from "@agents-can-communicate/adapter-sdk";
 
 import { askConfirmation } from "../src/confirm.mjs";
 import { clientContext, decideDelivery, runInstallCommand } from "../src/install-command.mjs";
+import { writeFakeClient } from "../../../tests/helpers/fake-client.mjs";
 
 // Kept cohesive above 300 lines because each case drives the same installer
 // command boundary and machine-home fixture; splitting would duplicate consent,
@@ -252,8 +253,7 @@ test("the install tells an adapter where ACC keeps its state", async t => {
   // like it worked here and found nothing on a machine without Codex.
   const bin = path.join(home, "bin");
   await makeDir(bin, { recursive: true });
-  await writeFile(path.join(bin, "codex"), "#!/bin/sh\necho \"codex-cli 0.147.0\"\n");
-  await chmod(path.join(bin, "codex"), 0o755);
+  await writeFakeClient(bin, "codex", { output: "codex-cli 0.147.0" });
   const previous = process.env.PATH;
   process.env.PATH = `${bin}${path.delimiter}${previous}`;
   t.after(() => { process.env.PATH = previous; });

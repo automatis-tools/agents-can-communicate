@@ -12,6 +12,7 @@ import { CLAUDE_PLUGIN, pluginVersion } from "../../../tests/helpers/plugin-vers
 import { outgoingStatus, prepareLivePermissions }
   from "../../adapter-codex/src/live-permissions.mjs";
 import { prepareRefresh } from "../src/managed-runtime/refresh.mjs";
+import { writeFakeClient } from "../../../tests/helpers/fake-client.mjs";
 
 test("automatic integration refresh retains recorded delivery provenance", async t => {
   const base = await realpath(await mkdtemp(path.join(tmpdir(), "acc-refresh-decision-")));
@@ -90,8 +91,7 @@ test("a background refresh brings an older ACC's Codex grants up to date", async
   const codexHome = path.join(home, ".codex");
   const config = path.join(codexHome, "config.toml");
   await mkdir(bin, { recursive: true });
-  await writeFile(path.join(bin, "codex"), "#!/bin/sh\necho 'codex-cli 0.157.1'\n");
-  await chmod(path.join(bin, "codex"), 0o755);
+  await writeFakeClient(bin, "codex", { output: "codex-cli 0.157.1" });
   const permissions = { home, codexHome, stateRoot: path.join(dataHome, "acc"), file: config,
     requestedLivePolicy: "actionable", clientVersion: "0.157.1" };
   const older = prepareLivePermissions('model = "mine"\n', { ...permissions, receiverSockets: [] });
