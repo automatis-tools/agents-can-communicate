@@ -257,3 +257,18 @@ test("the hook template is not shipped into the installed extension", async t =>
     "the template shipped, so every event has a second entry that cannot run");
   assert.equal(present.includes("acc-hook.sh"), true, "the shim is missing");
 });
+
+// Gemini CLI runs hooks through PowerShell on Windows: the pinned node on the
+// Node shim, by the call operator.
+test("windows: each hook command is the PowerShell call of the pinned node on the Node shim", async t => {
+  const { context, read } = await fixture(t);
+  await createGeminiCliAdapter().install({ ...context, hostPlatform: "win32",
+    node: "C:\\Program Files\\nodejs\\node.exe" });
+  const settings = await read();
+  const commands = Object.values(settings.hooks).flatMap(groups => groups.flatMap(group => group.hooks))
+    .filter(hook => hook.name?.startsWith("acc-")).map(hook => hook.command);
+  assert.equal(commands.length > 0, true);
+  for (const command of commands) {
+    assert.match(command, /^& 'C:\\Program Files\\nodejs\\node\.exe' '.+acc-hook\.mjs' \w+; exit \$LASTEXITCODE$/);
+  }
+});

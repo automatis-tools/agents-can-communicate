@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 
 import { acccreatedFile, bakeSkillCommand, blankJson, ownVersion, removeIfEmpty,
   removeInstalledTree,
-  stampPluginVersion, writeCliShim, writeForeignJson, writeHookShim }
+  stampPluginVersion, windowsHookCommand, writeCliShim, writeForeignJson, writeHookShim }
   from "@agents-can-communicate/adapter-sdk";
 
 const bundle = fileURLToPath(new URL("../extension", import.meta.url));
