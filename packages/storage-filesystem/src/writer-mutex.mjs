@@ -38,7 +38,11 @@ async function prepareCandidate(paths, root, owner, platform) {
         await handle.writeFile(encode(owner));
         await handle.sync();
       });
-    await syncEntry(candidate, path.join(candidate, OWNER), { platform });
+    // POSIX makes the record's name durable by syncing the directory. On
+    // Windows the record's own flush above already committed NTFS's journal up
+    // to its last change, which includes creating it, and a second flush of the
+    // same file would only cost another 8 ms (measured on windows-latest).
+    if (!isWindows(platform)) await syncEntry(candidate, path.join(candidate, OWNER), { platform });
     return candidate;
   } catch (error) {
     await removeTree(candidate, { platform });
