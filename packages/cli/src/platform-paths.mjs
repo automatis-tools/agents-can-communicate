@@ -48,8 +48,8 @@ function requireHome(env) {
 }
 
 // POSIX paths are built with path.posix whatever the host: the resolution is a
-// pure function of platform and environment, and a Windows host would join
-// `/Users/dana` into `\Users\dana`.
+// pure function of platform and environment, and a Windows host would turn
+// every forward slash of a POSIX home into a backslash.
 function macosPaths(env) {
   const support = path.posix.join(env.HOME, "Library", "Application Support");
   // XDG variables are deliberately ignored here. They are common on a machine
