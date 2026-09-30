@@ -176,3 +176,24 @@ test("this host: a directory rename onto an existing directory reports EEXIST or
   await assert.rejects(renameEntry(from, to, { deadlineAt: later() }),
     error => ["EEXIST", "ENOTEMPTY"].includes(error.code));
 });
+
+// Measured on windows-latest: opening a file in a directory another process is
+// removing fails EPERM, and the name is gone right after. That is the file
+// being absent, as ENOENT says on Linux. A file that is still there keeps EPERM.
+test("windows: an open refused because the name is being deleted reads as absent", async () => {
+  let deleted = false;
+  const lstat = async () => {
+    if (deleted) throw Object.assign(new Error("ENOENT"), { code: "ENOENT" });
+    return { isSymbolicLink: () => false, dev: 1n, ino: 7n };
+  };
+  const open = async () => {
+    deleted = true;
+    throw Object.assign(new Error("EPERM: operation not permitted, open"), { code: "EPERM" });
+  };
+  await assert.rejects(openNoFollow("owner.json", 0, { platform: "win32", lstat, open }),
+    error => error.code === "ENOENT" && error.cause?.code === "EPERM");
+
+  const present = async () => ({ isSymbolicLink: () => false, dev: 1n, ino: 7n });
+  await assert.rejects(openNoFollow("owner.json", 0, { platform: "win32", lstat: present, open }),
+    { code: "EPERM" });
+});

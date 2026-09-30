@@ -118,25 +118,38 @@ async function inspectManagedDirectory(rootPath, directoryPath, create,
   return { directory, stat: details };
 }
 
+// Where NTFS keeps a directory deleted while something still has it open.
+const DELETED = /^(?:\\\\\?\\)?[A-Za-z]:\\\$Extend\\\$Deleted\\/i;
+
 // null when the name went away and the caller may take it again.
 async function resolveSegment(current, retry, { resolve, platform }) {
+  let resolved;
   try {
-    return await resolve(current);
+    resolved = await resolve(current);
   } catch (error) {
-    const gone = goneWhileResolving(error, platform);
+    const gone = await goneWhileResolving(error, current, platform);
     if (gone === null) throw error;
     if (retry) return null;
     throw gone;
   }
+  if (platform !== "win32" || !DELETED.test(resolved)) return resolved;
+  if (retry) return null;
+  throw Object.assign(new Error(`ENOENT: ${current} was deleted while it resolved`),
+    { code: "ENOENT", syscall: "realpath", path: current });
 }
 
-// Linux realpath fails ENOENT on a name renamed away while it resolves. Windows
-// fails EBADF in that window (measured on windows-latest, a directory renamed
-// back and forth), and it is the same fact: the name went away. Anywhere else
-// EBADF stays what it says.
-function goneWhileResolving(error, platform) {
+// Linux realpath fails ENOENT on a name removed or renamed away while it
+// resolves. Windows, measured on windows-latest, answers that window with EBADF,
+// with EPERM while the name is being deleted, or with the directory's place in
+// $Extend\$Deleted (above): the same fact, the name went away. EPERM on a name
+// that is still there, and EBADF anywhere else, stay what they say.
+async function goneWhileResolving(error, current, platform) {
   if (error.code === "ENOENT") return error;
-  if (error.code !== "EBADF" || platform !== "win32") return null;
+  if (platform !== "win32") return null;
+  if (error.code === "EPERM") {
+    const present = await lstat(current).then(() => true, missing => missing.code !== "ENOENT");
+    if (present) return null;
+  } else if (error.code !== "EBADF") return null;
   return Object.assign(new Error(error.message, { cause: error }),
     { code: "ENOENT", syscall: error.syscall, path: error.path });
 }

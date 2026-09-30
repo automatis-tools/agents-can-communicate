@@ -74,6 +74,9 @@ export async function renameEntry(from, to, { platform = process.platform,
   }, error => BUSY.has(error.code), { deadlineAt, sleep });
 }
 
+const gone = (file, lstat) => lstat(file).then(() => false,
+  error => error.code === "ENOENT");
+
 const refusedLink = file => Object.assign(
   new Error(`ELOOP: too many symbolic links encountered, open '${file}'`),
   { code: "ELOOP", syscall: "open", path: file });
@@ -98,7 +101,14 @@ export async function openNoFollow(file, flags, { mode, platform = process.platf
   // A scanner that opened the file without read sharing refuses every reader
   // with EBUSY until it lets go.
   const handle = await retrying(() => open(file, flags, mode), error => error.code === "EBUSY",
-    { deadlineAt, sleep });
+    { deadlineAt, sleep }).catch(async error => {
+    // A name another process is deleting refuses the open with EPERM and is
+    // gone right after (measured on windows-latest): that is ENOENT, as Linux
+    // says it. A name that is still there keeps its EPERM.
+    if (error.code !== "EPERM" || !await gone(file, lstat)) throw error;
+    throw Object.assign(new Error(`ENOENT: no such file or directory, open '${file}'`,
+      { cause: error }), { code: "ENOENT", syscall: "open", path: file });
+  });
   try {
     const opened = await handle.stat({ bigint: true });
     const named = before ?? await lstat(file, { bigint: true });

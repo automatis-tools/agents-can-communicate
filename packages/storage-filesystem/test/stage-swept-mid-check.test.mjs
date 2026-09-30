@@ -145,3 +145,35 @@ test("windows: a directory whose realpath fails EBADF mid-rename has gone away",
   await assert.rejects(assertManagedDirectory(root, paths.stage, { platform: "linux", realpath: resolve }),
     error => error.code === "EBADF");
 });
+
+// Measured on windows-latest, a directory another process removes while it
+// resolves: realpath answers with where NTFS keeps a deleted directory that is
+// still open, `C:\$Extend\$Deleted\<id>`, or fails EPERM with the name already
+// gone. Both are the name going away; EPERM on a name still there is not.
+test("windows: a directory resolved into $Extend\\$Deleted, or refused while it goes, has gone away",
+  async t => {
+    const { root, paths } = await store(t);
+    const deleted = async () => "C:\\$Extend\\$Deleted\\0004000000046F6F0760FC9B";
+    await assert.rejects(assertManagedDirectory(root, paths.stage, { platform: "win32",
+      realpath: async current => (current === paths.stage ? deleted() : realpath(current)) }),
+    error => error.code === "ENOENT");
+    await assert.rejects(assertManagedDirectory(root, paths.stage, { platform: "linux",
+      realpath: async current => (current === paths.stage ? deleted() : realpath(current)) }),
+    /escapes the canonical store root/);
+
+    let refused = false;
+    const refusedWhileGoing = async current => {
+      if (current !== paths.stage || refused) return realpath(current);
+      refused = true;
+      await rm(paths.stage, { recursive: true, force: true });
+      throw Object.assign(new Error("EPERM: operation not permitted, realpath"), { code: "EPERM" });
+    };
+    assert.equal(await ensureManagedDirectory(root, paths.stage,
+      { platform: "win32", realpath: refusedWhileGoing }), paths.stage);
+    const refusedInPlace = async current => {
+      if (current !== paths.stage) return realpath(current);
+      throw Object.assign(new Error("EPERM: operation not permitted, realpath"), { code: "EPERM" });
+    };
+    await assert.rejects(assertManagedDirectory(root, paths.stage,
+      { platform: "win32", realpath: refusedInPlace }), { code: "EPERM" });
+  });
