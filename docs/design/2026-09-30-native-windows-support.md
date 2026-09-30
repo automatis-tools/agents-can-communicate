@@ -207,21 +207,18 @@ engine range; it starts the baked node only when it does not.
 | Claude Code | exec form: `{"command": "<node.exe>", "args": ["<plugin>/hooks/acc-hook.mjs", "<event>"]}` |
 | Codex | `commandWindows`: `& "<node.exe>" "<shim>" <event>; exit $LASTEXITCODE` |
 | Gemini CLI, Grok | `node "<shim with forward slashes>" <event>`, valid in PowerShell, Git Bash and cmd |
-| Antigravity CLI | `node <shim> <event>` with no quotes; the 8.3 form of the path when it contains a space |
+| Antigravity CLI | `node <shim> <event>` with no quotes; the 8.3 form of the path when it contains a space, and refused when it holds what cmd acts on bare: `& \| < > ^ ( ) , ; = !` |
 | Kimi Code | today's `"<node.exe>" "<runner>" kimi <kind>`, valid for cmd |
 
 - **The skill command** becomes `node "<forward-slash path>/acc-cli.mjs"`, which works in bash,
   PowerShell and cmd, whichever shell the client uses for the model.
-- **The owner header** double-quotes `--cwd` and `--workspace`, which bash, PowerShell and cmd
-  read alike. PowerShell also takes U+201C to U+201E as double quotes and U+2018 to U+201B as
-  single quotes, and NTFS allows them in names. A value with a double quote of either kind, `$`,
-  a backtick or `%` gets single quotes instead, which bash and PowerShell read literally. cmd
-  reads no single quotes, so a single-quoted value may carry none of `& | < > ^ %`. A value that
-  fits neither is refused: bash reads `'\''` inside single quotes and PowerShell reads `''`, and
-  the bash spelling leaves the rest of the value bare to PowerShell, where `$(...)` runs. The
-  refusal comes before the session opens, so no peer sees a session that could never be told its
-  arguments. The hook fails open and names the directory to rename. Windows file names cannot
-  contain an ASCII `"`.
+- **The owner header** double-quotes `--cwd` and `--workspace`, the one quoting that bash,
+  PowerShell and cmd read alike, for a value with nothing one of them acts on inside double
+  quotes: a double quote (PowerShell also ends a string at U+201C to U+201E, which NTFS allows
+  in names), `$` and a backtick, which PowerShell and bash expand, and `%`, which cmd expands.
+  Single quotes are no answer, because cmd takes them as part of the path. A value with any of
+  these is refused before the session opens, so no peer sees a session that could never be
+  told its arguments. The hook fails open and names the directory to rename.
 - **Doctor** recognises the Node shims and Windows paths when it names the wired version.
 
 ### 6. Managed runtime and updates

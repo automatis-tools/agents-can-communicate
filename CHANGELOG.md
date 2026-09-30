@@ -39,11 +39,13 @@ Work in progress for #234. The design is in
   PowerShell for Gemini CLI, a form PowerShell, Git Bash and cmd all read for Grok, an unquoted
   8.3 path for Antigravity CLI, and a cmd command for Kimi Code. The skill runs
   `node "<path>/acc-cli.mjs"`, and the owner header quotes for cmd.
-- On Windows the owner header double-quotes a path, and single-quotes one that has a double
-  quote of either kind, `$`, a backtick or `%`; PowerShell's typographic quotes count as quotes.
-  A path that fits neither quoting gets no header: a single quote with one of those, or a
-  single-quoted value with `& | < > ^ %`, which cmd acts on. The session is then not opened at
-  all, and the hook tells the user to rename the directory, without printing the path.
+- On Windows the owner header double-quotes a path, which bash, PowerShell and cmd read alike. A
+  path with a double quote of either kind (PowerShell's typographic quotes count), `$`, a
+  backtick or `%` has no quoting all three read alike, so it gets no header and no session. The
+  hook tells the user to rename the directory, without printing the path.
+- The unquoted hook path Antigravity CLI needs on Windows refuses what cmd acts on outside
+  quotes (`& | < > ^ ( ) , ; = !`), so a directory name cannot run a command. Doctor reads a
+  runner path with an apostrophe, such as `C:\Users\O'Neil`, whole.
 - A client `.cmd` that outlives its timeout on Windows is stopped with everything it started,
   through `taskkill /T`. cmd.exe starts the batch file's program as a child of its own, and
   after killing cmd.exe, execFile waited for that child's pipes, so a hung
