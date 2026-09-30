@@ -100,10 +100,15 @@ runtime, because launcher modules may import only their siblings.
   `rmdir` cannot remove a lock that has an owner in it. Reclaiming a dead owner still moves
   the whole directory, because Node's rename replaces an existing file on Windows: a late
   reclaimer that moved `owner.json` could take a successor's record.
-- **A name that goes away while it resolves.** `realpath` of a directory that another process
-  renames fails `EBADF` on Windows, where Linux reports `ENOENT` for the same window. The store's
-  directory walk reads both as "gone", so a read of a lock that changed hands returns nothing
-  and does not report an unsafe path.
+- **A name that goes away while it resolves.** Linux reports `ENOENT` when a directory is
+  renamed or removed while `realpath` resolves it. Windows answers the same window in four ways
+  (measured with a second process renaming or removing the directory in a loop): `ENOENT`,
+  `EBADF`, `EPERM` with the name already gone, or a path in `C:\$Extend\$Deleted\`, where NTFS
+  keeps a directory that was deleted while something still had it open. The store's directory
+  walk reads all of them as "gone", so a read of a lock that changed hands returns nothing and
+  does not report an unsafe path. `EPERM` on a name that is still there stays a refusal. Opening
+  a file in a directory being removed fails `EPERM` the same way, and reads as absent once the
+  name is gone.
 - **Creating a file exclusively.** `open(…, "wx")` follows a dangling symlink on Windows and
   creates its target. ACC creates such files only under random names inside its own private
   directories, where planting a link already requires the user's own access, so the rule holds.

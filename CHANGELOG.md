@@ -14,8 +14,10 @@ Work in progress for #234. The design is in
 - On Windows the store's writer lock is released by moving its owner record out of the lock
   directory. Windows cannot rename a directory while a file inside it is open, and writers
   waiting for the lock read that record: eight of them held a release back until one gave up.
-  A directory whose `realpath` fails `EBADF` while another process renames it counts as gone,
-  as `ENOENT` does on Linux. A transaction journal names its files with forward slashes on
+  A directory counts as gone when `realpath` answers a concurrent rename or removal with
+  `EBADF`, with `EPERM` after the name has disappeared, or with a path in
+  `C:\$Extend\$Deleted\`, all measured on Windows where Linux says `ENOENT`. A file that
+  cannot be opened because its directory is being removed reads as absent. A transaction journal names its files with forward slashes on
   every platform.
 - On Windows an environment that a caller passes replaces the machine's variables whatever
   their case, so detection finds a client on the supplied `PATH` instead of the inherited `Path`.
