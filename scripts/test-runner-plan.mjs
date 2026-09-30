@@ -4,7 +4,14 @@
 // writer cannot be scheduled inside its hook-safe acquisition deadline.
 // Bounding only file-level concurrency preserves the concurrency inside those
 // tests while keeping the release gate deterministic.
-export const TEST_FILE_CONCURRENCY = 4;
+//
+// Windows takes two. A process there starts in about five times the time and a
+// flush takes 8 to 23 ms against a fraction of one (measured on windows-latest),
+// and four heavy files at once on its four vCPUs - npm installs, packed tarballs -
+// left a hook in another file past its five-second budget. The suite still ran
+// in 35 minutes at four; two keeps it well inside the job's limit.
+export const fileConcurrency = (platform = process.platform) => (platform === "win32" ? 2 : 4);
+export const TEST_FILE_CONCURRENCY = fileConcurrency();
 
 // CI sets ACC_TEST_TIMEOUT_MS so that one hung test fails with its name instead
 // of holding the whole job until the runner's own limit.

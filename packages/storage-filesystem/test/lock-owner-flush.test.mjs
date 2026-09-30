@@ -39,7 +39,9 @@ test("windows: taking the writer lock flushes its owner record once", async t =>
   assert.deepEqual(flushes, [], "the owner record was flushed a second time");
 });
 
-test("posix: taking the writer lock still syncs the candidate's directory", async t => {
+test("posix: taking the writer lock still syncs the candidate's directory",
+  { skip: process.platform === "win32" && "Windows refuses a flush on a directory handle" },
+  async t => {
   const directories = (await acquire(t, "linux")).filter(([file]) => file.endsWith(".lock"));
   assert.equal(directories.length > 0, true, "the candidate directory was not synced");
 });

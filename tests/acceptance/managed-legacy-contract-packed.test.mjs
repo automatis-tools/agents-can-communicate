@@ -6,7 +6,10 @@ import { createPackedAcc } from "../helpers/packed-acc.mjs";
 import { createUpdateRegistry } from "../helpers/update-registry.mjs";
 import { connectMcp } from "../helpers/mcp-client.mjs";
 
-test("packed launchers recover legacy admission and update with two live MCP servers", { timeout: 90_000 }, async t => {
+// A bound for a hang, not a speed test: 8 s on ubuntu-latest, 13 s on
+// macos-latest, and 65 to 74 s on windows-latest, where it met the old 90 s.
+test("packed launchers recover legacy admission and update with two live MCP servers",
+  { timeout: process.platform === "win32" ? 240_000 : 90_000 }, async t => {
   const f = await createPackedAcc(t);
   const registry = await createUpdateRegistry(t, f);
   await f.setClientVersions({ claude: "2.1.266", codex: "0.135.0" });

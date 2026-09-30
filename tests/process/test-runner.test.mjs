@@ -4,7 +4,7 @@ import path from "node:path";
 import test from "node:test";
 import { promisify } from "node:util";
 
-import { COMMAND_LINE_LIMIT, TEST_FILE_CONCURRENCY, commandLineLength, nodeTestArguments,
+import { COMMAND_LINE_LIMIT, TEST_FILE_CONCURRENCY, commandLineLength, fileConcurrency, nodeTestArguments,
   testBatches } from "../../scripts/test-runner-plan.mjs";
 
 const run = promisify(execFile);
@@ -50,10 +50,17 @@ test("the runner bounds file concurrency without weakening process races", t => 
   });
   delete process.env.ACC_TEST_TIMEOUT_MS;
   delete process.env.ACC_TEST_FORCE_EXIT;
-  assert.equal(TEST_FILE_CONCURRENCY, 4);
+  // Windows starts a process and flushes a file several times slower, and four
+  // heavy files at once on a four-vCPU windows-latest runner left a hook in one
+  // of them past its budget.
+  assert.equal(fileConcurrency("linux"), 4);
+  assert.equal(fileConcurrency("darwin"), 4);
+  assert.equal(fileConcurrency("win32"), 2);
+  assert.equal(TEST_FILE_CONCURRENCY, fileConcurrency(process.platform));
+  const concurrency = `--test-concurrency=${TEST_FILE_CONCURRENCY}`;
   assert.deepEqual(nodeTestArguments(["first.test.mjs", "second.test.mjs"]), [
     "--test",
-    "--test-concurrency=4",
+    concurrency,
     "first.test.mjs",
     "second.test.mjs",
   ]);
@@ -61,7 +68,7 @@ test("the runner bounds file concurrency without weakening process races", t => 
   process.env.ACC_TEST_TIMEOUT_MS = "600000";
   process.env.ACC_TEST_FORCE_EXIT = "1";
   assert.deepEqual(nodeTestArguments(["first.test.mjs"]),
-    ["--test", "--test-concurrency=4", "--test-timeout=600000", "--test-force-exit", "first.test.mjs"]);
+    ["--test", concurrency, "--test-timeout=600000", "--test-force-exit", "first.test.mjs"]);
 });
 
 // Measured on windows-latest: 345 absolute test paths make a command line past
