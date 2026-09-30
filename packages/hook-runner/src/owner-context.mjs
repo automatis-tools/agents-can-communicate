@@ -2,26 +2,19 @@ import { AccError, EXIT, assertPortableId } from "@agents-can-communicate/protoc
 
 const posixQuote = value => `'${value.replaceAll("'", "'\\''")}'`;
 // The model appends the header in whatever shell its client gives it, and on
-// Windows that can be cmd.exe, which reads double quotes only. A value that a
-// double-quoting shell would expand keeps single quotes, which PowerShell and
-// Git Bash read literally - unless it holds a single quote too: sh reads '\''
-// inside single quotes and PowerShell reads '', so the sh spelling leaves the
-// rest of the value bare to PowerShell, where `$(...)` runs. No spelling reads
-// the same in all three, and the value is refused rather than handed over.
-//
-// PowerShell also takes U+2018 to U+201B as single quotes and U+201C to U+201E
-// as double quotes, and NTFS allows them in names: `x”;calc;”` in double quotes
-// ends the string at `”`. cmd reads no single quotes at all, so a single-quoted
-// value must carry nothing cmd acts on: & | < > ^, and % it expands anywhere.
-const DOUBLE_QUOTES = /["\u201C-\u201E]/;
-const SINGLE_QUOTES = /['\u2018-\u201B]/;
-const CMD_ACTS_ON = /[&|<>^%]/;
+// Windows that can be cmd.exe, PowerShell or Git Bash. Double quotes are the one
+// quoting all three read alike, for a value with none of what one of them acts
+// on inside double quotes: a double quote - PowerShell also ends a string at
+// U+201C to U+201E, which NTFS allows in names - $ and a backtick, which
+// PowerShell and bash expand, and %, which cmd expands. Single quotes are no
+// answer: cmd takes them as part of the path. Such a value is refused rather
+// than handed to a model that would read it as something else.
+const DOUBLE_QUOTE_BREAKERS = /["\u201C-\u201E$`%]/;
 const windowsQuote = value => {
-  if (!DOUBLE_QUOTES.test(value) && !/[$`%]/.test(value)) return `"${value}"`;
-  if (!SINGLE_QUOTES.test(value) && !CMD_ACTS_ON.test(value)) return `'${value}'`;
-  throw new AccError(EXIT.USAGE, `${value} mixes quotes, $, \`, % or a cmd operator so that `
-    + "no quoting reads it alike in cmd, PowerShell and Git Bash, and ACC's hooks will not hand "
-    + "the model a command line it would read differently; rename the directory",
+  if (!DOUBLE_QUOTE_BREAKERS.test(value)) return `"${value}"`;
+  throw new AccError(EXIT.USAGE, `${value} has a double quote, $, \` or % in it, which no quoting `
+    + "reads alike in cmd, PowerShell and Git Bash, and ACC's hooks will not hand the model a "
+    + "command line it would read differently; rename the directory",
   { value, reasonCode: "workspace_path_unquotable" });
 };
 

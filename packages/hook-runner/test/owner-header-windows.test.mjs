@@ -17,9 +17,11 @@ test("windows: the directory is double-quoted, which cmd, PowerShell and Git Bas
       + "--cwd \"C:\\Users\\First Last\\work\\acc\" --workspace \"acc://abc\"");
 });
 
-test("windows: a directory a double-quoting shell would expand keeps single quotes", () => {
-  assert.equal(ownerHeader(binding, "C:\\work\\$budget", undefined, "win32"),
-    "ACC CLI (append): --session session_a --generation generation_b --cwd 'C:\\work\\$budget'");
+// Single quotes are no answer for such a value: cmd reads no single quotes and
+// would take them as part of the path (PR #235 review).
+test("windows: a directory a double-quoting shell would expand gets no header", () => {
+  assert.throws(() => ownerHeader(binding, "C:\\work\\$budget", undefined, "win32"),
+    error => error.details?.reasonCode === "workspace_path_unquotable");
 });
 
 test("posix: single quotes, as before", () => {
@@ -37,7 +39,7 @@ test("windows: a directory with a single quote and $, ` or % has no header", () 
     assert.throws(() => ownerHeader(binding, cwd, "acc://abc", "win32"),
       error => error.code === 2 && error.details.value === cwd
         && error.details.reasonCode === "workspace_path_unquotable"
-        && /no quoting reads it alike in cmd, PowerShell and Git Bash/.test(error.message), cwd);
+        && /no quoting reads alike in cmd, PowerShell and Git Bash/.test(error.message), cwd);
   }
   assert.equal(ownerHeader(binding, "C:\\Users\\o'brien", undefined, "win32"),
     "ACC CLI (append): --session session_a --generation generation_b --cwd \"C:\\Users\\o'brien\"");
@@ -61,7 +63,7 @@ test("a refused header tells the user what to rename, without the path", async (
     stderr: { write(output, callback) { written.push(["stderr", output]); callback?.(); } },
   });
   const stderr = written.filter(([stream]) => stream === "stderr").map(([, text]) => text).join("");
-  assert.match(stderr, /mixes quotes, \$, `, % or a cmd operator/);
+  assert.match(stderr, /has a double quote, \$, ` or %/);
   assert.match(stderr, /rename it and restart the client/);
   assert.equal(stderr.includes("it's"), false, "the hook reflected the path");
 });
@@ -78,10 +80,9 @@ test("windows: typographic quotes and cmd's operators get no header either", () 
   }
   assert.equal(ownerHeader(binding, "C:\\w\\it\u2019s", undefined, "win32"),
     "ACC CLI (append): --session session_a --generation generation_b --cwd \"C:\\w\\it\u2019s\"");
-  // A typographic double quote keeps the string single-quoted, which every one
-  // of them reads literally.
-  assert.equal(ownerHeader(binding, "C:\\w\\x\u201d;calc;\u201d", undefined, "win32"),
-    "ACC CLI (append): --session session_a --generation generation_b --cwd 'C:\\w\\x\u201d;calc;\u201d'");
+  // A typographic double quote ends PowerShell's double-quoted string.
+  assert.throws(() => ownerHeader(binding, "C:\\w\\x\u201d;calc;\u201d", undefined, "win32"),
+    error => error.details?.reasonCode === "workspace_path_unquotable");
   assert.equal(ownerHeader(binding, "C:\\w\\a&b", undefined, "win32"),
     "ACC CLI (append): --session session_a --generation generation_b --cwd \"C:\\w\\a&b\"");
 });
