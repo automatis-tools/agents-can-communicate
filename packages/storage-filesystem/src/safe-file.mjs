@@ -4,13 +4,14 @@ import path from "node:path";
 
 import { AccError, EXIT } from "@agents-can-communicate/protocol";
 
+import { openNoFollow } from "./portable-fs.mjs";
 import { assertManagedDirectory } from "./safe-directory.mjs";
 
 function sameDirectory(left, right) {
   return left.dev === right.dev && left.ino === right.ino;
 }
 
-// The operation runs through the opened handle only after O_NOFOLLOW and the
+// The operation runs through the opened handle only after the no-follow open and the
 // before/after parent identity check agree. Replacing the pathname after that
 // point cannot redirect a read or append through the already-open descriptor.
 export async function withRegularNoFollow(filePath, root, flags, operation, openFile = open) {
@@ -18,7 +19,7 @@ export async function withRegularNoFollow(filePath, root, flags, operation, open
   const before = await assertManagedDirectory(root, parent);
   let handle;
   try {
-    handle = await openFile(filePath, flags | constants.O_NOFOLLOW);
+    handle = await openNoFollow(filePath, flags, { open: openFile });
   } catch (error) {
     if (error.code === "ENOENT") throw error;
     throw new AccError(EXIT.DATA, "cannot safely open regular file",

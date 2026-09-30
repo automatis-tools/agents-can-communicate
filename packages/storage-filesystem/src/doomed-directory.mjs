@@ -1,8 +1,9 @@
 import { randomUUID } from "node:crypto";
-import { open, rename, rm, rmdir } from "node:fs/promises";
+import { rmdir } from "node:fs/promises";
 import path from "node:path";
 
 import { listDirectoryEntries } from "./atomic-json.mjs";
+import { removeTree, renameEntry } from "./portable-fs.mjs";
 import { assertManagedDirectory, ensureManagedDirectory } from "./safe-directory.mjs";
 
 // The store never unlinks a live name: Node exposes unlink only by pathname, so
@@ -20,15 +21,6 @@ const DOOMED = "stage.sweeping-";
 // path that opens the store must stop rather than fail the open. What is left
 // is reported as remaining, and the next pass adopts it.
 export const expired = deadlineAt => deadlineAt !== undefined && Date.now() >= deadlineAt;
-
-export async function syncDirectory(directory) {
-  const handle = await open(directory, "r");
-  try {
-    await handle.sync();
-  } finally {
-    await handle.close();
-  }
-}
 
 export async function doomedDirectories(root) {
   return (await listDirectoryEntries(root, { root }))
@@ -56,7 +48,7 @@ export async function detachDoomed(root) {
  * discarded whole, so the names inside it carry no meaning.
  */
 export async function condemn(filePath, doomed) {
-  await rename(filePath, path.join(doomed, `${randomUUID()}.doomed`));
+  await renameEntry(filePath, path.join(doomed, `${randomUUID()}.doomed`));
 }
 
 /**
@@ -69,7 +61,7 @@ export async function discard(directory, root, budget, deadlineAt) {
   await assertManagedDirectory(root, directory);
   for (const entry of await listDirectoryEntries(directory, { root })) {
     if (spent >= budget || expired(deadlineAt)) return { spent, drained: false };
-    await rm(path.join(directory, entry.name), { recursive: true, force: true });
+    await removeTree(path.join(directory, entry.name));
     spent += 1;
   }
   await rmdir(directory).catch(error => {

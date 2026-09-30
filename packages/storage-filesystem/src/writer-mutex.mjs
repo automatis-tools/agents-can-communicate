@@ -1,12 +1,13 @@
 import { createHash, randomUUID } from "node:crypto";
 import { constants } from "node:fs";
-import { mkdir, open, rename, rm } from "node:fs/promises";
+import { mkdir } from "node:fs/promises";
 import path from "node:path";
 import { performance } from "node:perf_hooks";
 
 import { AccError, EXIT } from "@agents-can-communicate/protocol";
 
 import { encode, readJsonIfPresent } from "./atomic-json.mjs";
+import { removeTree, renameEntry, syncEntry } from "./portable-fs.mjs";
 import { ensureManagedDirectory } from "./safe-directory.mjs";
 import { withRegularNoFollow } from "./safe-file.mjs";
 
@@ -27,15 +28,6 @@ function defaultPidIsAlive(pid) {
   }
 }
 
-async function syncDirectory(directory) {
-  const handle = await open(directory, "r");
-  try {
-    await handle.sync();
-  } finally {
-    await handle.close();
-  }
-}
-
 async function prepareCandidate(paths, root, owner) {
   const identity = createHash("sha256").update(owner.token).digest("hex");
   const candidate = path.join(paths.locks, `writer.candidate-${identity}.lock`);
@@ -46,10 +38,10 @@ async function prepareCandidate(paths, root, owner) {
         await handle.writeFile(encode(owner));
         await handle.sync();
       });
-    await syncDirectory(candidate);
+    await syncEntry(candidate, path.join(candidate, OWNER));
     return candidate;
   } catch (error) {
-    await rm(candidate, { recursive: true, force: true });
+    await removeTree(candidate);
     throw error;
   }
 }
@@ -65,12 +57,14 @@ async function releaseCanonical(directory, root, owner, openFile) {
     .digest("hex");
   const retired = path.join(path.dirname(directory), `writer.released-${identity}.lock`);
   try {
-    await rename(directory, retired);
+    // A contender reading owner.json holds a file inside; Windows refuses the
+    // move until it lets go, and renameEntry waits for that.
+    await renameEntry(directory, retired);
   } catch (error) {
     if (["ENOENT", "EEXIST", "ENOTEMPTY"].includes(error.code)) return;
     throw error;
   }
-  await rm(retired, { recursive: true, force: true });
+  await removeTree(retired);
 }
 
 /**
@@ -140,7 +134,7 @@ async function takeStaleOwnership(directory, root, owner, now, pidIsAlive) {
     .digest("hex");
   const reclaimed = path.join(path.dirname(directory), `writer.reclaimed-${identity}.lock`);
   try {
-    await rename(directory, reclaimed);
+    await renameEntry(directory, reclaimed);
     return true;
   } catch (error) {
     if (["ENOENT", "EEXIST", "ENOTEMPTY"].includes(error.code)) return false;
@@ -175,9 +169,12 @@ export async function withWriterMutex(paths, options, operation) {
         // lock left by the old mkdir-then-publish sequence. A live publisher
         // either fills it first (so rename fails) or loses its no-replace owner
         // publication after this complete candidate wins.
-        await rename(candidate, directory);
+        // Windows reports the taken name as EPERM; renameEntry turns that into
+        // the EEXIST this loop waits on, and waits out a busy source itself.
+        await renameEntry(candidate, directory,
+          { deadlineAt: wallNow() + Math.max(0, deadline - monotonicNow()) });
         ownsCanonical = true;
-        await syncDirectory(paths.locks);
+        await syncEntry(paths.locks, directory);
       } catch (error) {
         if (!["EEXIST", "ENOTEMPTY"].includes(error.code)) throw error;
         const current = await readOwner(directory, root, openFile);
@@ -197,7 +194,7 @@ export async function withWriterMutex(paths, options, operation) {
     } else {
       const current = await readOwner(candidate, root, openFile);
       if (current?.token === token) {
-        await rm(candidate, { recursive: true, force: true });
+        await removeTree(candidate);
       }
     }
   }

@@ -18,7 +18,8 @@ test("atomic publication checks its deadline after preparing bytes", async t => 
     const result = nextLoad(url, context);
     if (url.endsWith("/atomic-json.mjs")) {
       const source = Buffer.from(result.source).toString();
-      const needle = "      await rename(temporary, destination);\n      await syncDirectory(destinationDir);";
+      const needle = "      await renameReplacing(temporary, destination, { deadlineAt });\n"
+        + "      await syncEntry(destinationDir, destination, { deadlineAt });";
       assert.equal(source.split(needle).length, 2);
       return { ...result, source: source.replace(needle,
         `${needle}\n      await globalThis.accAtomicPublished?.(destination);`) };
