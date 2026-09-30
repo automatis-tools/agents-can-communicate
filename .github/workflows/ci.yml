@@ -42,7 +42,7 @@ jobs:
         run: npm test
         env:
           # One hung test fails by name; see scripts/test-runner-plan.mjs.
-          ACC_TEST_TIMEOUT_MS: '600000'
+          ACC_TEST_TIMEOUT_MS: '300000'
           # Git exports these into every child process. The suite spawns git in
           # temporary fixture repositories, and inheriting them makes those
           # commands operate on this checkout instead. This repository has been
