@@ -79,15 +79,20 @@ test("a failed owned-directory cleanup keeps authority until a retry succeeds", 
   });
   await mkdir(home);
 
-  // POSIX refuses the removal through the parent's mode. Windows has no mode
+  // The adapter's uninstall runs after ACC removed the plugin tree and before
+  // it removes the directories it created, so what fails is `plugins`, now
+  // empty. POSIX refuses that through the parent's mode. Windows has no mode
   // bits there; a directory that is a live process's working directory is
   // refused instead (EBUSY, measured on windows-latest).
   let holder = null;
   const block = async () => {
     if (process.platform !== "win32") return chmod(parent, 0o500);
     holder = spawn(process.execPath, ["-e", "setInterval(() => {}, 1000)"],
-      { cwd: plugin, stdio: "ignore", windowsHide: true });
-    await new Promise(resolve => { holder.once("spawn", resolve); });
+      { cwd: path.dirname(plugin), stdio: "ignore", windowsHide: true });
+    await new Promise((resolve, reject) => {
+      holder.once("spawn", resolve);
+      holder.once("error", reject);
+    });
   };
   const unblock = async () => {
     if (process.platform !== "win32") return chmod(parent, 0o700);

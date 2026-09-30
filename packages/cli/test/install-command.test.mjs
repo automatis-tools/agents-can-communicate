@@ -177,7 +177,8 @@ test("a removal can be previewed, the same way an install can", async t => {
     action: "uninstall" });
 
   assert.match(text, /^would uninstall:/);
-  assert.match(text, new RegExp(`remove ${extension}`));
+  // A literal: a Windows path read as a pattern turns `\r` and `\U` into escapes.
+  assert.ok(text.includes(`remove ${extension}`), text);
   // The whole point of a preview.
   assert.equal((await readFile(path.join(extension, "gemini-extension.json"), "utf8"))
     .includes("acc"), true, "the dry run removed the thing it was previewing");

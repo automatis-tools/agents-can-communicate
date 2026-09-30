@@ -53,7 +53,8 @@ test("install writes only under .grok and leaves Claude Code alone", async t => 
   // script in each; the interpreter is still pinned, one level down, so a
   // machine without `node` on PATH still runs the command the skill teaches.
   const cliShim = path.join(skillPath(grokHome), "acc-cli.sh");
-  assert.match(skill, new RegExp(cliShim.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+  // As sh reads it in double quotes, which escape a Windows host's backslashes.
+  assert.ok(skill.includes(`"${cliShim.replace(/(["\\$`])/g, "\\$1")}"`), skill);
   assert.doesNotMatch(skill, /\/usr\/bin\/node/, "the skill still repeats the interpreter");
   assert.match(await readFile(cliShim, "utf8"), /\/usr\/bin\/node/);
 });

@@ -11,13 +11,13 @@ import { createUpdateRegistry } from "../helpers/update-registry.mjs";
 import { connectMcp } from "../helpers/mcp-client.mjs";
 const run = promisify(execFile);
 
-async function until(predicate, label, timeout = 20_000) {
+async function until(predicate, label, timeout = 20_000, evidence = async () => "") {
   const deadline = Date.now() + timeout;
   while (Date.now() < deadline) {
     if (await predicate()) return;
     await new Promise(resolve => setTimeout(resolve, 30));
   }
-  assert.fail(`timed out: ${label}`);
+  assert.fail(`timed out: ${label}${await evidence()}`);
 }
 const managerOf = f => path.join(f.dataHome, "acc", "runtime");
 const readState = f => readFile(path.join(managerOf(f), "control.json"), "utf8").then(JSON.parse);
@@ -222,8 +222,15 @@ test("normal installation enables a detached update that downloads and activates
   f.defer(() => stopBackground(f));
   await f.setClientVersions({ claude: "2.1.259", codex: "0.135.0" });
   await f.acc(["install", "--adapter", "claude_code"], env);
+  // A background update downloads and verifies a package: 6 s of this test on
+  // Linux, while on windows-latest a manual update took most of 90. The window
+  // follows the slower machine, and a miss says where the worker stopped.
   await until(async () => (await readState(f)).active.version === registry.version,
-    "background candidate activation");
+    "background candidate activation", 90_000, async () => {
+      const worker = await readdir(path.join(managerOf(f), "worker")).catch(error => error.code);
+      return `\ncontrol: ${JSON.stringify(await readState(f).catch(error => error.code))}`
+        + `\nworker: ${JSON.stringify(worker)}\nrequests: ${JSON.stringify(registry.requests)}`;
+    });
   assert.equal((await readState(f)).auto, true);
   assert.equal(registry.requests.some(url => url.endsWith("/latest")), true);
   assert.equal(registry.requests.some(url => url.includes(".tgz")), true);
