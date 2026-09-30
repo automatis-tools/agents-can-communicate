@@ -46,7 +46,7 @@ test("install writes only under .grok and leaves Claude Code alone", async t => 
   assert.equal(await claude(), beforeClaude, "install touched ~/.claude");
   assert.equal(await foreign(), beforeForeign, "install rewrote a foreign hook file");
   await stat(hooksFile(grokHome));
-  await stat(shimPath(grokHome));
+  await stat(shimPath(grokHome, POSIX_FORM));
   const skill = await readFile(path.join(skillPath(grokHome), "SKILL.md"), "utf8");
   assert.equal(skill.includes("{{ACC}}"), false, "skill still has the placeholder");
   // The examples name one shim rather than repeating an interpreter and a
@@ -77,7 +77,7 @@ test("install is idempotent and uninstall restores the user's files", async t =>
 
   await stat(path.join(grokHome, "hooks", "other.json"));
   await assert.rejects(stat(hooksFile(grokHome)), { code: "ENOENT" });
-  await assert.rejects(stat(shimPath(grokHome)), { code: "ENOENT" });
+  await assert.rejects(stat(shimPath(grokHome, POSIX_FORM)), { code: "ENOENT" });
   await assert.rejects(stat(skillPath(grokHome)), { code: "ENOENT" });
   assert.equal(await claude(), beforeClaude);
   assert.equal(await foreign(), beforeForeign);
@@ -89,7 +89,7 @@ test("the hook file points at the shim with this adapter id", async t => {
   await createGrokAdapter().install(context);
 
   const wired = JSON.parse(await readFile(hooksFile(grokHome), "utf8"));
-  const shim = await readFile(shimPath(grokHome), "utf8");
+  const shim = await readFile(shimPath(grokHome, POSIX_FORM), "utf8");
   assert.match(shim, /"\$ACC_RUNNER" grok "\$@"/);
   const matcher = wired.hooks.PreToolUse[0].matcher;
   assert.match(matcher, /write/);
@@ -209,7 +209,7 @@ test("planInstall never names ~/.claude", () => {
 
   for (const artifact of artifacts) {
     assert.equal(artifact.path.includes(".claude"), false, artifact.path);
-    assert.equal(artifact.path.startsWith(`${home}/.grok/`), true, artifact.path);
+    assert.equal(artifact.path.startsWith(path.join(home, ".grok") + path.sep), true, artifact.path);
   }
 });
 
@@ -219,4 +219,24 @@ test("doctor names the independence from Claude Code", async t => {
 
   assert.match(report.diagnostics.join("\n"), /Claude Code is a separate adapter/);
   assert.match(report.diagnostics.join("\n"), /acc hooks not registered/);
+});
+
+// Grok runs hooks through the shell it detects on Windows - pwsh, Git Bash or
+// cmd - so its command is the one form all three read.
+test("windows: each hook runs node from PATH on the Node shim, in a form every Windows shell reads", async t => {
+  const { context } = await fixture(t);
+  await createGrokAdapter().install({ ...context, hostPlatform: "win32" });
+  const wiring = JSON.parse(await readFile(hooksFile(context.grokHome), "utf8"));
+  const commands = Object.values(wiring.hooks).flatMap(groups => groups.flatMap(group => group.hooks))
+    .map(hook => hook.command);
+  assert.equal(commands.length > 0, true);
+  for (const command of commands) assert.match(command, /^node ".+\/acc-hook\.mjs" \w+$/);
+});
+
+test("windows: detection recognises the Node shim ACC wires there", async t => {
+  const { context } = await fixture(t);
+  const adapter = createGrokAdapter();
+  await adapter.install({ ...context, hostPlatform: "win32" });
+  const found = await adapter.detect({ ...context, hostPlatform: "win32" });
+  assert.deepEqual(found.diagnostics, ["acc hooks registered"]);
 });

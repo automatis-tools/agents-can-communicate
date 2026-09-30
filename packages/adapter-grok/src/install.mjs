@@ -82,10 +82,10 @@ export async function installGrokHooks({ grokHome, home, runner, cli, node,
   return { ok: true, changes: [hooksFile(root), shim, skills], diagnostics: [] };
 }
 
-export async function uninstallGrokHooks({ grokHome, home, keep = [] }) {
+export async function uninstallGrokHooks({ grokHome, home, keep = [], hostPlatform }) {
   const root = grokHome ?? grokHomeOf({ home, grokHome });
   const changes = [];
-  for (const target of [hooksFile(root), shimPath(root), skillPath(root)]) {
+  for (const target of [hooksFile(root), shimPath(root, hostPlatform), skillPath(root)]) {
     if (await removeInstalledTree(target, keep)) changes.push(target);
   }
   return { ok: true, changes, diagnostics: [] };
@@ -96,7 +96,8 @@ export async function detectGrok({ grokHome, home }) {
   const wired = await readJson(hooksFile(root), null);
   const installed = typeof wired?.hooks?.SessionStart?.[0]?.hooks?.[0]?.command
     === "string"
-    && wired.hooks.SessionStart[0].hooks[0].command.includes(SHIM_NAME);
+    // The shell shim on POSIX, the Node shim on Windows.
+    && /acc-hook\.(?:sh|mjs)\b/.test(wired.hooks.SessionStart[0].hooks[0].command);
   return { ok: true, changes: [],
     diagnostics: [installed ? "acc hooks registered" : "acc hooks not registered"] };
 }
@@ -105,7 +106,7 @@ export function planGrokInstall(context) {
   const root = grokHomeOf(context);
   return [
     { path: hooksFile(root), kind: "tree" },
-    { path: shimPath(root), kind: "tree" },
+    { path: shimPath(root, context.hostPlatform), kind: "tree" },
     { path: skillPath(root), kind: "tree" },
   ];
 }

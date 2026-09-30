@@ -125,7 +125,8 @@ const registerPlugin = (registry, root) => {
     plugins: [...plugins, { id: PLUGIN_NAME, root, source: "local", enabled: true }] };
 };
 
-export async function installKimiPlugin({ home, runner = defaultRunner(), node, cli }) {
+export async function installKimiPlugin({ home, runner = defaultRunner(), node, cli,
+  hostPlatform = process.platform }) {
   // A hook whose command does not exist fails silently, on every event, for as
   // long as it stays installed: the client reports nothing and ACC simply never
   // sees a session. Writing that entry and hoping is worse than refusing.
@@ -143,8 +144,8 @@ export async function installKimiPlugin({ home, runner = defaultRunner(), node, 
     version: await ownVersion(import.meta.url), io: { readFile, writeFile } });
   // The skill ships with a placeholder where the command belongs: `acc` is
   // not on PATH everywhere, and an agent that cannot run it improvises.
-  const cliShim = await writeCliShim({ dir: target, cli, node });
-  await bakeSkillCommand({ root: target, cliShim });
+  const cliShim = await writeCliShim({ dir: target, cli, node, platform: hostPlatform });
+  await bakeSkillCommand({ root: target, cliShim, platform: hostPlatform });
 
   const file = configPath(home);
   const existing = await readText(file, "");
@@ -153,7 +154,7 @@ export async function installKimiPlugin({ home, runner = defaultRunner(), node, 
   // user's last section cannot swallow our entries.
   const separator = withoutOurs === "" || withoutOurs.endsWith("\n") ? "" : "\n";
   await mkdir(path.dirname(file), { recursive: true });
-  await writeFile(file, `${withoutOurs}${separator}${renderBlock(runner, node)}\n`);
+  await writeFile(file, `${withoutOurs}${separator}${renderBlock(runner, node, hostPlatform)}\n`);
 
   const registry = registryPath(home);
   await mkdir(path.dirname(registry), { recursive: true });
