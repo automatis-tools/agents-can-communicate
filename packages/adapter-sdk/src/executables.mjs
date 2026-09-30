@@ -83,7 +83,8 @@ const CMD_UNSAFE = /["%^&|<>\r\n!]/;
 // Not async: the promise execFile returns carries `.child`, and a caller that
 // must close the child's stdin needs it.
 export function runExecutable(file, args, options = {},
-  { platform = process.platform, run = execFileAsync, env = process.env } = {}) {
+  { platform = process.platform, run = execFileAsync, env = process.env,
+    killTree = killProcessTree } = {}) {
   if (platform !== "win32" || !/\.(cmd|bat)$/i.test(file)) {
     return run(file, args, { windowsHide: true, ...options });
   }
@@ -94,6 +95,36 @@ export function runExecutable(file, args, options = {},
   }
   const line = [file, ...args].map(word => `"${word}"`).join(" ");
   const comspec = env.ComSpec ?? env.COMSPEC ?? "cmd.exe";
-  return run(comspec, ["/d", "/s", "/c", `"${line}"`],
-    { windowsHide: true, windowsVerbatimArguments: true, ...options });
+  const { timeout, ...rest } = options;
+  const outcome = run(comspec, ["/d", "/s", "/c", `"${line}"`],
+    { windowsHide: true, windowsVerbatimArguments: true, ...rest });
+  if (!(timeout > 0)) return outcome;
+  // cmd.exe starts the batch file's program as a child of its own, and killing
+  // cmd.exe leaves that program running with this process's pipes open - which
+  // is what execFile waits on after its own timeout. So the timeout is kept
+  // here: the whole tree goes, and this side of the pipes is closed.
+  const { child } = outcome;
+  let timer;
+  const expired = new Promise((resolve, reject) => {
+    timer = setTimeout(() => {
+      killTree(child?.pid);
+      child?.stdout?.destroy();
+      child?.stderr?.destroy();
+      reject(Object.assign(new Error(`${file} timed out after ${timeout}ms`),
+        { code: "ETIMEDOUT", killed: true }));
+    }, timeout);
+  });
+  // Once the timeout has answered, the batch's own failure is expected.
+  outcome.catch(() => {});
+  const settled = Promise.race([outcome, expired]).finally(() => clearTimeout(timer));
+  return Object.assign(settled, { child });
+}
+
+// taskkill /T ends a process and everything it started, which is the only way
+// Windows has to reach a grandchild. Best effort: the tree may already be gone.
+function killProcessTree(pid, env = process.env) {
+  if (!Number.isInteger(pid) || pid <= 0) return;
+  const root = env.SystemRoot ?? env.SYSTEMROOT ?? "C:\\Windows";
+  execFile(path.win32.join(root, "System32", "taskkill.exe"), ["/pid", String(pid), "/T", "/F"],
+    { windowsHide: true }, () => {});
 }

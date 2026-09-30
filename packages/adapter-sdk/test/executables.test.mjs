@@ -39,8 +39,53 @@ test("windows: a .cmd shim runs through cmd.exe with a command line ACC quotes",
   assert.deepEqual(calls[0].args, ["/d", "/s", "/c", "\"\"C:\\npm\\prefix\\codex.cmd\" \"--version\"\""]);
   assert.equal(calls[0].options.windowsVerbatimArguments, true);
   assert.equal(calls[0].options.windowsHide, true);
-  assert.equal(calls[0].options.timeout, 1000);
+  // The timeout is ACC's own, below: execFile's would wait for the batch's child.
+  assert.equal(calls[0].options.timeout, undefined);
 });
+
+// cmd.exe starts the batch file's program as a child of its own. execFile's
+// timeout kills cmd.exe and then waits for the pipes to close, which that child
+// still holds, so a hung `claude.cmd --version` outlived its probe's limit.
+test("windows: a .cmd that outlives its timeout is stopped with everything it started", async () => {
+  const destroyed = [];
+  const stream = name => ({ destroy: () => { destroyed.push(name); } });
+  const run = () => Object.assign(new Promise(() => {}),
+    { child: { pid: 4242, stdout: stream("stdout"), stderr: stream("stderr") } });
+  const killed = [];
+  const started = Date.now();
+  const outcome = runExecutable("C:\\npm\\prefix\\claude.cmd", ["--version"], { timeout: 50 },
+    { platform: "win32", run, env: {}, killTree: pid => { killed.push(pid); } });
+  assert.equal(outcome.child.pid, 4242);
+  await assert.rejects(outcome, { code: "ETIMEDOUT", killed: true });
+  assert.ok(Date.now() - started < 1_000);
+  assert.deepEqual(killed, [4242]);
+  assert.deepEqual(destroyed.sort(), ["stderr", "stdout"]);
+});
+
+test("windows: a hung .cmd client is stopped at its timeout, with its node child",
+  { skip: process.platform !== "win32" && "cmd.exe runs a .cmd only on Windows" }, async t => {
+    const { mkdtemp, readFile, rm } = await import("node:fs/promises");
+    const { tmpdir } = await import("node:os");
+    const path = await import("node:path");
+    const { writeFakeClient } = await import("../../../tests/helpers/fake-client.mjs");
+    const directory = await mkdtemp(path.join(tmpdir(), "acc-hung-cmd-"));
+    t.after(() => rm(directory, { recursive: true, force: true, maxRetries: 10 }));
+    const pidFile = path.join(directory, "pid");
+    const file = await writeFakeClient(directory, "hung", { script:
+      `import { writeFileSync } from "node:fs";\n`
+      + `writeFileSync(${JSON.stringify(pidFile)}, String(process.pid));\n`
+      + "setTimeout(() => {}, 30000);\n" });
+    const started = Date.now();
+    await assert.rejects(runExecutable(file, ["--version"], { timeout: 3_000 }),
+      { code: "ETIMEDOUT" });
+    assert.ok(Date.now() - started < 8_000, `the probe took ${Date.now() - started}ms`);
+    const pid = Number(await readFile(pidFile, "utf8"));
+    const alive = () => { try { process.kill(pid, 0); return true; } catch { return false; } };
+    for (const deadline = Date.now() + 5_000; alive() && Date.now() < deadline;) {
+      await new Promise(resolve => { setTimeout(resolve, 100); });
+    }
+    assert.equal(alive(), false, "the node the .cmd started outlived the probe");
+  });
 
 test("windows: an argument cmd.exe would expand is refused, not escaped", async () => {
   const run = async () => ({ stdout: "" });
