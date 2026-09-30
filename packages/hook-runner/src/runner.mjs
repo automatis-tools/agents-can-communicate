@@ -35,9 +35,10 @@ const DEFAULT_BUDGET_MS = 5_000;
 // Failures the hook output explains with advice of its own; any other error
 // text stays out of what the client shows.
 const KNOWN_FAILURES = new Set(["workspace_contains_runtime", "workspace_path_unquotable"]);
-// Windows reads the table through PowerShell, whose first start on a machine
-// took 3.8 s on a windows-latest runner; later ones take about 0.3 s. It gets
-// more of the budget there, and leaves the rest for the write that follows.
+// Windows reads the table through WMI in Script Host, 145 ms on a
+// windows-latest runner, and through PowerShell where Script Host is off, whose
+// first start on a machine took 3.8 s. It gets more of the budget there, and
+// leaves the rest for the write that follows.
 const WINDOWS = process.platform === "win32";
 const PROCESS_TABLE_MS = WINDOWS ? 3_000 : 1_000;
 const TABLE_RESERVE_MS = WINDOWS ? 500 : 0;
@@ -436,8 +437,9 @@ const HANDLERS = {
     const command = adapter.client?.command ?? null;
     const known = Number.isInteger(knownClientPid) && knownClientPid > 0;
     // Read while the client reports its version: neither needs the other, and
-    // on Windows one starts the client and the other PowerShell. Handled here
-    // so a probe that fails first leaves no rejection unobserved.
+    // each can start a program. A session start began the read already, when
+    // its event was known. Handled here so a probe that fails first leaves no
+    // rejection unobserved.
     const tableRead = known || command === null ? null : started ?? Promise.resolve(readProcessTable({
       timeoutMs: Math.max(1, Math.min(PROCESS_TABLE_MS, deadline - Date.now() - TABLE_RESERVE_MS)) }));
     tableRead?.catch(() => {});
