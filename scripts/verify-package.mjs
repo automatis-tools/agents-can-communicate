@@ -57,12 +57,13 @@ function fail(message, detail = "") {
 
 async function packTarball(into) {
   const { stdout } = await runNpm(["pack", "--pack-destination", into], { cwd: repo });
-  return path.join(into, stdout.trim().split("\n").at(-1));
+  return path.join(into, stdout.trim().split(/\r?\n/).at(-1));
 }
 
+// Windows' tar.exe ends each line with CRLF; a kept `\r` failed every `$`.
 async function entries(tarball) {
   const { stdout } = await run("tar", ["-tzf", tarball]);
-  return stdout.split("\n").filter(Boolean).map(entry => entry.replace(/^package\//, ""));
+  return stdout.split(/\r?\n/).filter(Boolean).map(entry => entry.replace(/^package\//, ""));
 }
 
 async function readTarJson(tarball, entry) {
@@ -222,7 +223,13 @@ async function main() {
 
     const env = { ...process.env, ACC_DATA_HOME: dataHome, HOME: clientHome,
       GIT_DIR: "", GIT_WORK_TREE: "" };
-    const acc = (...argv) => run(path.join(bin, "acc"), [...argv, "--json"], { env });
+    // What a user runs: the `acc` npm links, which on Windows is `acc.cmd` and
+    // starts only through cmd.exe.
+    const acc = (...argv) => (isWindows
+      ? run(process.env.ComSpec ?? "cmd.exe", ["/d", "/s", "/c",
+        `"${[path.join(bin, "acc.cmd"), ...argv, "--json"].map(word => `"${word}"`).join(" ")}"`],
+      { env, windowsVerbatimArguments: true })
+      : run(path.join(bin, "acc"), [...argv, "--json"], { env }));
 
     step("doctor");
     const doctor = JSON.parse((await acc("doctor", "--cwd", project,
