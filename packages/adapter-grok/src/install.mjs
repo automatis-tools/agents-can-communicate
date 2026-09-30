@@ -3,7 +3,8 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { AccError, EXIT } from "@agents-can-communicate/protocol";
-import { bakeSkillCommand, removeInstalledTree, windowsHookCommand, writeCliShim, writeHookShim }
+import { bakeSkillCommand, removeInstalledTree, shellQuote, windowsHookCommand, writeCliShim,
+  writeHookShim }
   from "@agents-can-communicate/adapter-sdk";
 
 const bundle = fileURLToPath(new URL("../plugin", import.meta.url));
@@ -57,7 +58,7 @@ const withShim = (wiring, shim, windowsNode = null) => ({
       ...entry,
       hooks: entry.hooks.map(hook => {
         const kind = hook.command.split(" ").pop();
-        return { ...hook, command: windowsNode === null ? `sh "${shim}" ${kind}`
+        return { ...hook, command: windowsNode === null ? `sh ${shellQuote(shim)} ${kind}`
           : windowsHookCommand("portable", { node: windowsNode, shim, args: [kind] }) };
       }),
     }))])),

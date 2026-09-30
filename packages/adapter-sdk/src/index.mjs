@@ -11,7 +11,7 @@ export { NATIVE_ACTIVATION_KINDS, NATIVE_BINDING_MODES, NATIVE_REASON_CODES,
   from "./native-delivery.mjs";
 export { EVENT_KINDS, NORMALIZED_EVENT_KEYS, normalizedEvent } from "./events.mjs";
 export { assertRunner, bakeSkillCommand, defaultAntigravityRelay, defaultCli, isShellWord,
-  defaultRunner, removeInstalledTree, runnerExists, writeCliShim, writeHookShim }
+  defaultRunner, removeInstalledTree, runnerExists, shellQuote, writeCliShim, writeHookShim }
   from "./hook-shim.mjs";
 export { BEGIN, END, removeTomlBlock, renderBlock, stripBlock, tomlString, writeTomlBlock }
   from "./toml-block.mjs";

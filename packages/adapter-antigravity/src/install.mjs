@@ -6,8 +6,8 @@ import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 
 import { bakeSkillCommand, blankJson, defaultAntigravityRelay, isShellWord, mergeEnv, ownVersion,
-  removeIfEmpty, shortPath, stampPluginVersion, windowsHookCommand, writeCliShim, writeForeignJson,
-  writeHookShim }
+  removeIfEmpty, shellQuote, shortPath, stampPluginVersion, windowsHookCommand, writeCliShim,
+  writeForeignJson, writeHookShim }
   from "@agents-can-communicate/adapter-sdk";
 import { AccError, EXIT } from "@agents-can-communicate/protocol";
 
@@ -188,7 +188,7 @@ export function accHookConfig(shim, { platform = process.platform } = {}) {
   // antigravity-cli#222). The command therefore carries no quotes at all.
   const command = event => (platform === "win32"
     ? windowsHookCommand("unquoted", { node: process.execPath, shim, args: [event] })
-    : `sh "${shim}" ${event}`);
+    : `sh ${shellQuote(shim)} ${event}`);
   return { [ACC_NAMESPACE]: Object.fromEntries(ACC_REGISTERED_EVENTS.map(event =>
     [event, [{ type: "command", command: command(event), timeout: 10 }]])) };
 }
@@ -315,8 +315,6 @@ const importedCopy = readback => (Array.isArray(readback?.skills) ? readback.ski
  * directory, so it outlives the Gemini CLI integration this client otherwise
  * borrows from.
  */
-const shellQuote = value => `"${String(value).replace(/(["\\$`])/g, "\\$1")}"`;
-
 /**
  * The command ACC's context line and skill tell the agent to run once per
  * conversation. It has to run in the agent's own shell - that is the only

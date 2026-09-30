@@ -81,8 +81,9 @@ export async function assertRunner(runner) {
 const PLACEHOLDER = "{{ACC}}";
 
 // Shell metacharacters in a path are the caller's problem to survive, not the
-// shell's to interpret.
-const quote = value => `"${String(value).replace(/(["\\$`])/g, "\\$1")}"`;
+// shell's to interpret. A hook command in the POSIX form quotes its shim the
+// same way, since each client runs it through /bin/sh.
+export const shellQuote = value => `"${String(value).replace(/(["\\$`])/g, "\\$1")}"`;
 
 /**
  * Whether a path is one shell word exactly as written: absolute, and made only
@@ -162,9 +163,9 @@ export async function writeHookShim({ dir, adapterId, runner = defaultRunner(),
     "# packages live in, and a shim naming the old ones failed on every event",
     "# with nothing to read but exit 126 - no presence, no claims, no messages,",
     "# and nothing anywhere saying why.",
-    `ACC_NODE=${quote(node)}`,
-    `ACC_RUNNER=${quote(runner)}`,
-    ...(dataHome === undefined ? [] : [`export ACC_DATA_HOME=${quote(dataHome)}`]),
+    `ACC_NODE=${shellQuote(node)}`,
+    `ACC_RUNNER=${shellQuote(runner)}`,
+    ...(dataHome === undefined ? [] : [`export ACC_DATA_HOME=${shellQuote(dataHome)}`]),
     'if [ -x "$ACC_NODE" ] && [ -f "$ACC_RUNNER" ]; then',
     `  exec "$ACC_NODE" "$ACC_RUNNER" ${adapterId} "$@"`,
     "fi",
@@ -226,9 +227,9 @@ export async function writeCliShim({ dir, cli = defaultCli(), node = process.exe
     "# hook shim pins them: a node version manager moves both the interpreter and",
     "# the directory global packages live in, so the pinned pair is tried first",
     "# and then asked for.",
-    `ACC_NODE=${quote(node)}`,
-    `ACC_CLI=${quote(cli)}`,
-    ...(dataHome === undefined ? [] : [`export ACC_DATA_HOME=${quote(dataHome)}`]),
+    `ACC_NODE=${shellQuote(node)}`,
+    `ACC_CLI=${shellQuote(cli)}`,
+    ...(dataHome === undefined ? [] : [`export ACC_DATA_HOME=${shellQuote(dataHome)}`]),
     'if [ -x "$ACC_NODE" ] && [ -f "$ACC_CLI" ]; then',
     '  exec "$ACC_NODE" "$ACC_CLI" "$@"',
     "fi",
@@ -306,7 +307,7 @@ export async function bakeSkillCommand({ root, cliShim, bareWhenSafe = false,
   // Windows names node and the Node shim: `node "C:/…/acc-cli.mjs"` runs the same
   // in PowerShell, Git Bash and cmd, whichever the client gives its model.
   const command = platform === "win32" ? `node "${cliShim.replaceAll("\\", "/")}"`
-    : bareWhenSafe && isShellWord(cliShim) ? cliShim : quote(cliShim);
+    : bareWhenSafe && isShellWord(cliShim) ? cliShim : shellQuote(cliShim);
   const baked = [];
   const walk = async directory => {
     for (const entry of await readdir(directory, { withFileTypes: true })) {

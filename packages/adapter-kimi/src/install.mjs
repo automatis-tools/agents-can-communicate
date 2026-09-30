@@ -5,8 +5,8 @@ import { AccError, EXIT } from "@agents-can-communicate/protocol";
 import { fileURLToPath } from "node:url";
 
 import { assertRunner, bakeSkillCommand, blankText, defaultRunner, ownVersion, removeIfEmpty,
-  removeInstalledTree, runnerExists, stampPluginVersion, windowsHookCommand, writeCliShim,
-  writeForeignJson }
+  removeInstalledTree, runnerExists, shellQuote, stampPluginVersion, windowsHookCommand,
+  writeCliShim, writeForeignJson }
   from "@agents-can-communicate/adapter-sdk";
 
 const bundle = fileURLToPath(new URL("../plugin", import.meta.url));
@@ -109,7 +109,7 @@ export function renderBlock(runner, node = process.execPath, platform = process.
     // backslash doubled.
     const command = platform === "win32"
       ? windowsHookCommand("cmd", { node, shim: runner, args: ["kimi", kind] })
-      : `${tomlString(node)} ${tomlString(runner)} kimi ${kind}`;
+      : `${shellQuote(node)} ${shellQuote(runner)} kimi ${kind}`;
     const lines = ["[[hooks]]", `event = ${tomlString(event)}`,
       `command = ${tomlString(command)}`];
     if (matcher !== undefined) lines.push(`matcher = ${tomlString(matcher)}`);

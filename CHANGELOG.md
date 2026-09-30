@@ -46,6 +46,12 @@ Work in progress for #234. The design is in
 - The unquoted hook path Antigravity CLI needs on Windows refuses what cmd acts on outside
   quotes (`& | < > ^ ( ) , ; = !`), so a directory name cannot run a command. Doctor reads a
   runner path with an apostrophe, such as `C:\Users\O'Neil`, whole.
+- On macOS and Linux, Gemini CLI, Grok, Antigravity CLI and Kimi Code run a hook command through
+  `/bin/sh`, and the command now escapes a quote, a backslash, `$` and a backtick in its paths,
+  as the shim already did. A directory named with `$` or a backtick changed the path the shell
+  read, or ran a command. Doctor reads each form the way its own shell does: a Windows path in
+  a shell script keeps its backslashes, a quote in a POSIX path stays in it, and a UNC path in
+  Kimi's Windows command keeps its leading `\\`.
 - A client `.cmd` that outlives its timeout on Windows is stopped with everything it started,
   through `taskkill /T`. cmd.exe starts the batch file's program as a child of its own, and
   after killing cmd.exe, execFile waited for that child's pipes, so a hung

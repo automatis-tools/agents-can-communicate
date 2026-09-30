@@ -12,6 +12,7 @@ import { allowResponse, denyResponse, injectResponse, normalizeGrokHook }
   from "../src/hooks.mjs";
 import { hooksFile, shimPath, skillPath } from "../src/install.mjs";
 import { POSIX_FORM } from "../../../tests/helpers/platform-scope.mjs";
+import { POSIX_SH, SHELL_HOSTILE, shWords } from "../../../tests/helpers/posix-sh.mjs";
 
 async function fixture(t) {
   const home = await realpath(await mkdtemp(path.join(tmpdir(), "acc-grok-")));
@@ -240,4 +241,22 @@ test("windows: detection recognises the Node shim ACC wires there", async t => {
   await adapter.install({ ...context, hostPlatform: "win32" });
   const found = await adapter.detect({ ...context, hostPlatform: "win32" });
   assert.deepEqual(found.diagnostics, ["acc hooks registered"]);
+});
+
+test("posix: the shell reads the shim's path exactly as written", { skip: POSIX_SH }, async t => {
+  const home = await realpath(await mkdtemp(path.join(tmpdir(), SHELL_HOSTILE)));
+  t.after(() => rm(home, { recursive: true, force: true }));
+  const grokHome = path.join(home, ".grok");
+  const runner = path.join(home, "acc-hook.mjs");
+  await writeFile(runner, "// stand-in for the runner\n");
+  await createGrokAdapter().install({ home, grokHome, runner, node: "/usr/bin/node",
+    hostPlatform: POSIX_FORM });
+  const wired = JSON.parse(await readFile(hooksFile(grokHome), "utf8"));
+
+  const commands = Object.values(wired.hooks).flat().flatMap(entry => entry.hooks)
+    .map(hook => hook.command);
+  assert.notEqual(commands.length, 0);
+  for (const command of commands) {
+    assert.equal(shWords(command)[0], shimPath(grokHome, POSIX_FORM), command);
+  }
 });

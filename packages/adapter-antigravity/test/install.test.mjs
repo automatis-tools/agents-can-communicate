@@ -12,6 +12,7 @@ import { ACC_NAMESPACE, ACC_REGISTERED_EVENTS, HOOK_LOCATIONS, detectAntigravity
   doctorAntigravity, globalHooksPath, installAntigravity, planAntigravityInstall,
   registeredEvents, uninstallAntigravity, workspaceHooksPath } from "../src/install.mjs";
 import { POSIX_FORM } from "../../../tests/helpers/platform-scope.mjs";
+import { POSIX_SH, SHELL_HOSTILE, shWords } from "../../../tests/helpers/posix-sh.mjs";
 
 const captured = async name => JSON.parse(await readFile(
   new URL(`../fixtures/${name}.json`, import.meta.url), "utf8"));
@@ -338,5 +339,13 @@ test("windows: each hook command is unquoted, with the shim's forward-slash 8.3 
     { platform: "win32" });
   for (const [event, [action]] of Object.entries(Object.values(config)[0])) {
     assert.equal(action.command, `node C:/Users/ANNONE~1/.gemini/config/acc/acc-hook.mjs ${event}`);
+  }
+});
+
+test("posix: the shell reads the shim's path exactly as written", { skip: POSIX_SH }, async () => {
+  const { accHookConfig } = await import("../src/install.mjs");
+  const shim = `/home/${SHELL_HOSTILE}/.gemini/config/acc/acc-hook.sh`;
+  for (const [event, [hook]] of Object.entries(accHookConfig(shim, { platform: POSIX_FORM })[ACC_NAMESPACE])) {
+    assert.deepEqual(shWords(hook.command), [shim, event]);
   }
 });

@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 
 import { acccreatedFile, bakeSkillCommand, blankJson, ownVersion, removeIfEmpty,
   removeInstalledTree,
-  stampPluginVersion, windowsHookCommand, writeCliShim, writeForeignJson, writeHookShim }
+  shellQuote, stampPluginVersion, windowsHookCommand, writeCliShim, writeForeignJson, writeHookShim }
   from "@agents-can-communicate/adapter-sdk";
 
 const bundle = fileURLToPath(new URL("../extension", import.meta.url));
@@ -53,7 +53,7 @@ const withShim = (wiring, shim, windowsNode = null) => ({ hooks: Object.fromEntr
     ...entry,
     hooks: entry.hooks.map(hook => {
       const kind = hook.command.split(" ").pop();
-      return { ...hook, command: windowsNode === null ? `sh "${shim}" ${kind}`
+      return { ...hook, command: windowsNode === null ? `sh ${shellQuote(shim)} ${kind}`
         : windowsHookCommand("powershell", { node: windowsNode, shim, args: [kind] }) };
     }),
   }))])) });

@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import test from "node:test";
 
 import { renderBlock } from "../src/install.mjs";
@@ -21,4 +22,17 @@ test("posix: the command keeps its shell-quoted paths", () => {
   const line = block.split("\n").find(text => text.startsWith("command = "));
   assert.match(JSON.parse(line.slice("command = ".length)),
     /^"\/usr\/local\/bin\/node" "\/opt\/acc\/bin\/acc-hook\.mjs" kimi /);
+});
+
+// On POSIX that shell is /bin/sh, which expands $ and a backtick inside double
+// quotes: a directory named with either would change the path, or run a command.
+test("posix: the shell reads each path exactly as written", {
+  skip: process.platform === "win32" ? "the POSIX form runs through /bin/sh" : false,
+}, () => {
+  const runner = "/opt/acc $HOME `echo x` \\ \"q\"/bin/acc-hook.mjs";
+  const block = renderBlock(runner, "/bin/echo", "linux");
+  const line = block.split("\n").find(text => text.startsWith("command = "));
+  const command = JSON.parse(line.slice("command = ".length));
+  assert.equal(execFileSync("/bin/sh", ["-c", command], { encoding: "utf8" }),
+    `${runner} kimi sessionStart\n`);
 });
