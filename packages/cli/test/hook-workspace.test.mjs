@@ -76,3 +76,31 @@ test("saved room selectors reject path escape, missing records, symlinks and a c
   await assert.rejects(resolveSavedHookWorkspace({ ...options, reference: room.workspaceRef }),
     /invalid native workspace binding/);
 });
+
+// Git names its common directory the way the cwd spelled it: through a symlink
+// on POSIX, with forward slashes and the typed case on Windows. The room keeps
+// that spelling, so comparing it with a realpath alone never matched and a
+// linked worktree lost its repository-relative claims.
+test("a linked worktree is recognised however Git spelled the common directory", async t => {
+  const root = await realpath(await mkdtemp(path.join(tmpdir(), "acc-room-spelling-")));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const repo = path.join(root, "repo");
+  const linked = path.join(root, "linked");
+  const sub = path.join(repo, "src");
+  const commonDir = path.join(repo, ".git");
+  for (const directory of [sub, commonDir, linked]) await mkdir(directory, { recursive: true });
+  const alias = path.join(root, "alias");
+  await symlink(root, alias, "junction");
+  const aliasCommonDir = path.join(alias, "repo", ".git");
+  const gitProbe = async ({ cwd }) => (cwd.startsWith(linked)
+    ? { commonDir, worktreeRoot: linked }
+    : { commonDir: aliasCommonDir, worktreeRoot: repo });
+  const options = { adapterId: "fixture", dataHome: path.join(root, "data"), env: {},
+    clock: { now: () => new Date().toISOString() }, deadlineAt: Date.now() + 10_000 };
+  const initial = await resolveHookWorkspace({ ...options,
+    event: { kind: "sessionStart", sessionId: "native", cwd: sub }, gitProbe });
+  const next = await resolveHookWorkspace({ ...options,
+    event: { kind: "beforeTurn", sessionId: "native", cwd: linked }, gitProbe });
+  assert.equal(next.descriptor.id, initial.descriptor.id);
+  assert.equal(next.descriptor.git.worktreeRoot, linked);
+});
