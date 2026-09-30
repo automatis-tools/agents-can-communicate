@@ -109,6 +109,15 @@ runtime, because launcher modules may import only their siblings.
   does not report an unsafe path. `EPERM` on a name that is still there stays a refusal. Opening
   a file in a directory being removed fails `EPERM` the same way, and reads as absent once the
   name is gone.
+- **A lone record without the journal.** A session's heartbeat, every turn, replaces one record
+  and appends no event, and it went through the whole journal: an entry prepared, activated, the
+  record published, a completion marker and the journal set idle, five atomic writes and ten
+  flushes on Windows, where one flush cost 8 to 23 ms on windows-latest. One record needs no
+  journal to appear at once: the rename replaces it atomically, with the bytes flushed before and
+  the name after. It is published directly only while the active journal is idle. An open one,
+  left by a writer that died, would later roll its own bytes over the record, and it refuses a
+  journalled write as well, so that case keeps the journalled path and its refusal. Any
+  transaction with an event, a removal or a second record keeps the journal.
 - **Validating a store directory once.** Every record read walked its directory from the store
   root twice, `lstat` and `realpath` for each level: about a thousand calls a hook, 130 ms of one
   on windows-latest. A directory validated once is now known by its identity (volume and file

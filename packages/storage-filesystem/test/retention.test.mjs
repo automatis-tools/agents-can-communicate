@@ -65,7 +65,13 @@ test("retention cannot unlink outside after its validated parent is replaced", a
 
 test("journal retirement is logical and retains the decided transaction", async t => {
   const { root, store } = await fixture(t);
-  await store.transaction(async tx => { tx.put("workspace", WORKSPACE, workspaceRecord()); });
+  // A record and an event go through the journal; one record alone does not.
+  await store.transaction(async tx => {
+    tx.put("workspace", WORKSPACE, workspaceRecord());
+    tx.append({ schemaVersion: SCHEMA_VERSION, eventId: "event_journalled",
+    workspaceId: WORKSPACE, actorSessionId: "session_a", type: "workspace.materialised",
+    occurredAt: NOW, payload: {} });
+  });
 
   assert.deepEqual(await readOpenJournals(store.paths, root), []);
   assert.deepEqual((await readdir(store.paths.journal)).filter(name => name.endsWith(".json")),

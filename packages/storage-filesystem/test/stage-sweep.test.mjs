@@ -285,7 +285,13 @@ async function liveStore(t) {
 
 test("a record stays readable after its accepted stage is swept", async t => {
   const { root, store, paths } = await liveStore(t);
-  await store.transaction(async tx => { tx.put("workspace", WORKSPACE, workspaceRecord()); });
+  // A record and an event go through the journal, which stages; one record alone does not.
+  await store.transaction(async tx => {
+    tx.put("workspace", WORKSPACE, workspaceRecord());
+    tx.append({ schemaVersion: SCHEMA_VERSION, eventId: "event_journalled",
+    workspaceId: WORKSPACE, actorSessionId: "session_a", type: "workspace.materialised",
+    occurredAt: NOW, payload: {} });
+  });
   assert.ok((await readdir(paths.stage)).length > 0,
     "the publication should have left an accepted stage");
 

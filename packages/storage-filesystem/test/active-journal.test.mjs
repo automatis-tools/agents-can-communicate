@@ -58,9 +58,16 @@ async function currentActive(root) {
   return slots.at(-1);
 }
 
+// A record and an event: the journal carries them together. One record alone
+// is published without the journal, and these tests are about the journal.
+let events = 0;
 async function putWorkspace(store, displayName = "Example", expectedGeneration = null) {
-  return store.transaction(async tx =>
-    tx.put("workspace", WORKSPACE, workspaceRecord(displayName), expectedGeneration));
+  return store.transaction(async tx => {
+    events += 1;
+    tx.append({ schemaVersion: SCHEMA_VERSION, eventId: `event_${events}`, workspaceId: WORKSPACE,
+      actorSessionId: "session_a", type: "workspace.materialised", occurredAt: NOW, payload: {} });
+    return tx.put("workspace", WORKSPACE, workspaceRecord(displayName), expectedGeneration);
+  });
 }
 
 test("a prepared journal is ignored until an atomic open authority commits it", async t => {
@@ -233,7 +240,8 @@ test("completed historical journal volume never enters the active lookup", async
   }
   await Promise.all(writes);
 
-  assert.deepEqual((await store.eventsSince(WORKSPACE, null, 10)).events, []);
+  assert.deepEqual((await store.eventsSince(WORKSPACE, null, 10)).events
+    .map(event => event.type), ["workspace.materialised"]);
   const reopened = await openFilesystemStore({ root, clock: createFakeClock(NOW),
     ids: createFakeIds(), workspaceId: WORKSPACE });
   assert.deepEqual(await readOpenJournals(reopened.paths, root), []);
