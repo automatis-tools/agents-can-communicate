@@ -52,8 +52,10 @@ flowchart TB
 
 ## Try one handoff
 
-You’ll need **macOS or Linux, Node.js 24 or newer**, and supported coding clients on the same
-machine and operating-system user.
+You’ll need **macOS, Linux or Windows 10/11, Node.js 24 or newer**, and supported coding
+clients on the same machine and operating-system user. On Windows, ACC runs natively, with no
+WSL; messages arrive on the recipient's next turn there, and live delivery follows in a later
+release. See [Windows](docs/GETTING_STARTED.md#windows).
 
 ```bash
 npm install -g agents-can-communicate

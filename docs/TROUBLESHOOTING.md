@@ -381,6 +381,25 @@ session becomes offline by presence rules rather than a clean end signal. The de
 status hides offline sessions; `acc status --all` intentionally retains attribution and
 checkout history.
 
+## On Windows
+
+- **A session attaches only on its first prompt.** ACC reads the process tree through
+  PowerShell, and the first start after boot can take several seconds. A hook that runs out of
+  time continues without ACC, and the next user prompt attaches the session.
+- **A hook reports `node` is not recognized.** Grok and Antigravity CLI hooks start `node` from
+  `PATH`. Add Node.js to the `PATH` the client sees, then restart the client.
+- **Claude Code hooks do nothing.** ACC wires Claude Code's hooks in exec form, which needs
+  Claude Code 2.1.139 or later. Update Claude Code and run `acc install` again.
+- **`acc install` refuses Antigravity CLI because of a space.** Antigravity CLI cannot run a
+  quoted hook path, so ACC writes the 8.3 short name of a path with a space. A volume with 8.3
+  names turned off has none; turn them on (`fsutil 8dot3name set C: 0`, as an administrator)
+  and run `acc install` again.
+- **A write through Claude Code's PowerShell tool was not guarded.** The guard reads POSIX shell
+  commands only. Claims are advisory by default, and a write through Claude Code's Write, Edit or
+  Bash tool is still checked.
+- **Live delivery is `native_delivery_unsupported`.** Live delivery on Windows is not available
+  yet; messages arrive on the recipient's next turn.
+
 ## A write was blocked
 
 Exit code `5` names the overlapping claim and owner. Ask the owner or wait for release. If

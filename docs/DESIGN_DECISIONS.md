@@ -90,8 +90,10 @@ where a guard stops behaves better than one that believes it absolute.
 4. **Multi-root discovery rules** beyond the current `roots` list.
 5. **Default claim lease length** for hook-only adapters. A hook-only session cannot sustain
    a short renewal cadence, so lease policy must not assume one.
-6. **Windows.** Measured as not working, not merely untested — see the
-   [repository changelog](https://github.com/automatis-tools/agents-can-communicate/blob/main/CHANGELOG.md).
+6. **Live delivery on Windows.** ACC runs natively on Windows with next-turn delivery. The
+   Claude Code inbox pipe, the Codex daemon (through its stdio proxy) and the Antigravity relay
+   follow; see
+   [the design](https://github.com/automatis-tools/agents-can-communicate/blob/main/docs/design/2026-09-30-native-windows-support.md).
 
 ---
 
