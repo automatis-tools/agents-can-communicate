@@ -9,7 +9,7 @@ import { EXIT } from "@agents-can-communicate/protocol";
 
 import { PassThrough } from "node:stream";
 
-import { channelSocketDirectory } from "@agents-can-communicate/adapter-sdk";
+import { channelSocketDirectory, tomlString } from "@agents-can-communicate/adapter-sdk";
 
 import { askConfirmation } from "../src/confirm.mjs";
 import { clientContext, decideDelivery, runInstallCommand } from "../src/install-command.mjs";
@@ -19,14 +19,18 @@ import { writeFakeClient } from "../../../tests/helpers/fake-client.mjs";
 // command boundary and machine-home fixture; splitting would duplicate consent,
 // ownership, and reporting setup while hiding their round-trip behavior.
 
+// The context joins with the host's own separator: on Windows the supplied
+// home is a Windows path, and `/supplied/home` joins to `\supplied\home\.codex`.
+const underHome = (...parts) => path.join("/supplied/home", ...parts);
+
 test("the Codex home respects an explicit CODEX_HOME and otherwise follows the supplied home", () => {
   assert.equal(clientContext("/supplied/home", "/state", {
     env: { HOME: "/ambient/home", CODEX_HOME: "/explicit/codex" } }).codexHome,
   "/explicit/codex");
   assert.equal(clientContext("/supplied/home", "/state", {
-    env: { HOME: "/ambient/home" } }).codexHome, "/supplied/home/.codex");
+    env: { HOME: "/ambient/home" } }).codexHome, underHome(".codex"));
   assert.equal(clientContext("/supplied/home", "/state", {
-    env: { CODEX_HOME: "" } }).codexHome, "/supplied/home/.codex");
+    env: { CODEX_HOME: "" } }).codexHome, underHome(".codex"));
 });
 
 // Issue #213: the Codex permission profile allowed ACC's channel directory and
@@ -37,13 +41,13 @@ test("every receiving adapter's sockets reach the context a sandboxed sender is 
   const linux = clientContext("/supplied/home", "/state", { platform: "linux",
     env: { XDG_RUNTIME_DIR: "/run/user/1000", CODEX_HOME: "/explicit/codex" } }).receiverSockets;
   for (const expected of ["/run/user/1000/cc-socks", "/tmp/cc-socks", channelSocketDirectory(),
-    "/explicit/codex/app-server-control/app-server-control.sock"]) {
+    path.join("/explicit/codex", "app-server-control", "app-server-control.sock")]) {
     assert.ok(linux.includes(expected), `${expected} in ${linux.join(", ")}`);
   }
   const darwin = clientContext("/supplied/home", "/state", { platform: "darwin", env: {} })
     .receiverSockets;
   assert.ok(darwin.includes("/tmp/cc-socks"));
-  assert.ok(darwin.includes("/supplied/home/.codex/app-server-control/app-server-control.sock"));
+  assert.ok(darwin.includes(underHome(".codex", "app-server-control", "app-server-control.sock")));
   assert.equal(darwin.some(item => item.startsWith("/run/user/")), false);
   // Claude Code on native Windows receives on a named pipe: nothing to allow.
   const windows = clientContext("/supplied/home", "/state", { platform: "win32", env: {} })
@@ -101,8 +105,9 @@ test("uninstall is planned from the record, not only from the machine", async t 
 
   const { data, error } = await runInstallCommand({
     options: { home, adapter: "gemini_cli", yes: true },
+    // LOCALAPPDATA is where Windows resolves configuration and cache from.
     runtime: { platform: process.platform,
-      env: { HOME: home, ACC_DATA_HOME: dataHome } },
+      env: { HOME: home, LOCALAPPDATA: dataHome, ACC_DATA_HOME: dataHome } },
     action: "uninstall" });
 
   assert.equal(error ?? null, null);
@@ -166,8 +171,9 @@ test("a removal can be previewed, the same way an install can", async t => {
 
   const { text } = await runInstallCommand({
     options: { home, adapter: "gemini_cli", dryRun: true },
+    // LOCALAPPDATA is where Windows resolves configuration and cache from.
     runtime: { platform: process.platform,
-      env: { HOME: home, ACC_DATA_HOME: dataHome } },
+      env: { HOME: home, LOCALAPPDATA: dataHome, ACC_DATA_HOME: dataHome } },
     action: "uninstall" });
 
   assert.match(text, /^would uninstall:/);
@@ -270,7 +276,9 @@ test("the install tells an adapter where ACC keeps its state", async t => {
   // that state is cannot declare it, and an agent there writes nothing.
   const config = await readFile(path.join(home, ".codex", "config.toml"), "utf8");
   assert.match(config, /\[sandbox_workspace_write\]/);
-  assert.match(config, new RegExp(`writable_roots = \\["${dataHome}/acc"\\]`));
+  // As TOML writes it: a Windows path is escaped, C:\\Users rather than C:\Users.
+  assert.ok(config.includes(`writable_roots = [${tomlString(path.join(dataHome, "acc"))}]`),
+    config);
 });
 
 test("the status line says when the sessions it counts are not answering", async () => {

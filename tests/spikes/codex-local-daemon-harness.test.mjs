@@ -19,6 +19,7 @@ import { scenario }
   from "../../scripts/e2e/codex-local-daemon-observations.mjs";
 import { finalizeHarnessRun }
   from "../../scripts/e2e/codex-local-daemon-runner.mjs";
+import { POSIX_LIVE_TRANSPORT } from "../helpers/platform-scope.mjs";
 
 const execute = promisify(execFile);
 const python = async () => (await execute("/usr/bin/env", ["python3", "-c",
@@ -51,7 +52,11 @@ test("client environment strips inherited agent state and exposes only isolated 
   assert.equal(env.CODEX_HOME, path.join(root, "cx"));
 });
 
-test("prerequisites name a missing supplied Codex binary and missing Python PTY support", async t => {
+// The harness drives Codex's TUI through Python's pty module, reaches its LocalDaemon
+// over a Unix socket and verifies the POSIX form of installed commands; its runs
+// are POSIX-only until Windows live delivery (0.9.x) has a harness of its own.
+test("prerequisites name a missing supplied Codex binary and missing Python PTY support",
+  { skip: POSIX_LIVE_TRANSPORT }, async t => {
   const root = await fixture(t);
   const tarball = path.join(root, "candidate.tgz");
   const codex = path.join(root, "codex");
@@ -65,7 +70,8 @@ test("prerequisites name a missing supplied Codex binary and missing Python PTY 
     python: path.join(root, "missing-python") }), /prerequisite: Python PTY support unavailable/);
 });
 
-test("installed command verification accepts the isolated package and rejects repository targets", async t => {
+test("installed command verification accepts the isolated package and rejects repository targets",
+  { skip: POSIX_LIVE_TRANSPORT }, async t => {
   const root = await fixture(t);
   const prefix = path.join(root, "prefix");
   const packageRoot = path.join(prefix, "node_modules", "agents-can-communicate");
@@ -96,7 +102,8 @@ test("installed command verification accepts the isolated package and rejects re
     /skill CLI resolves outside isolated npm prefix/);
 });
 
-test("PTY shutdown acknowledges cleanup, exits the driver, and reaps its owned client", async t => {
+test("PTY shutdown acknowledges cleanup, exits the driver, and reaps its owned client",
+  { skip: POSIX_LIVE_TRANSPORT }, async t => {
   const pty = createPtyDriver({ python: await python() });
   t.after(() => pty.close().catch(() => null));
   const { pid } = await pty.request({ action: "launch", role: "child",
@@ -106,7 +113,8 @@ test("PTY shutdown acknowledges cleanup, exits the driver, and reaps its owned c
   assert.equal(alive(pid), false);
 });
 
-test("cwd selection is recognized and trust chooses the existing session directory", async t => {
+test("cwd selection is recognized and trust chooses the existing session directory",
+  { skip: POSIX_LIVE_TRANSPORT }, async t => {
   const root = await fixture(t);
   const marker = path.join(root, "choice.txt");
   const program = [
@@ -132,7 +140,8 @@ test("cwd selection is recognized and trust chooses the existing session directo
   assert.equal(await readFile(marker, "utf8"), "1");
 });
 
-test("unexpected argument text is a launch error only when the vendor exits", async t => {
+test("unexpected argument text is a launch error only when the vendor exits",
+  { skip: POSIX_LIVE_TRANSPORT }, async t => {
   const py = await python();
   const pty = createPtyDriver({ python: py });
   t.after(() => pty.close().catch(() => null));
@@ -200,7 +209,8 @@ test("setup prerequisite failures still write closed incomplete evidence", async
   assert.equal(JSON.parse(await readFile(path.join(output, "incomplete-evidence.json"), "utf8")).complete, false);
 });
 
-test("owned-tool setup failures remove the allocated root and close the receipt", async t => {
+test("owned-tool setup failures remove the allocated root and close the receipt",
+  { skip: POSIX_LIVE_TRANSPORT }, async t => {
   const root = await fixture(t);
   const tarball = path.join(root, "candidate.tgz");
   const output = path.join(root, "output");
@@ -226,7 +236,8 @@ test("owned-tool setup failures remove the allocated root and close the receipt"
   assert.equal(JSON.parse(await readFile(path.join(output, "incomplete-evidence.json"), "utf8")).complete, false);
 });
 
-test("root canonicalization failures remove the earliest owned allocation and close the receipt", async t => {
+test("root canonicalization failures remove the earliest owned allocation and close the receipt",
+  { skip: POSIX_LIVE_TRANSPORT }, async t => {
   const root = await fixture(t);
   const tarball = path.join(root, "candidate.tgz");
   const output = path.join(root, "output");

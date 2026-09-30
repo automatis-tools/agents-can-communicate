@@ -19,8 +19,11 @@ async function diagnosed(t, deliveryDecision) {
   await writeFile(record, `${JSON.stringify({ schemaVersion: 1, installs }, null, 2)}\n`);
   const permissionDiagnostic = "outgoing live delivery: sender permissions unverified in config; "
     + "ACC outgoing grants are absent";
+  // The host's platform: the data home is a path of this machine, and the
+  // decision provenance under test does not depend on where doctor runs.
   const [entry] = await diagnoseAdapters({ options: { home }, runtime: {
-    platform: "darwin", env: { HOME: home, ACC_DATA_HOME: dataHome },
+    platform: process.platform,
+    env: { HOME: home, LOCALAPPDATA: home, ACC_DATA_HOME: dataHome },
   }, detect: async () => [{
     adapterId: "codex", displayName: "Codex CLI", present: true,
     installed: deliveryDecision !== false,

@@ -44,16 +44,18 @@ const ADAPTER_IDS = new Set([createAntigravityAdapter(), createClaudeCodeAdapter
 const isPlaceholder = value => value.startsWith("<") && value.endsWith(">");
 const isParticipantId = value => [...ADAPTER_IDS].some(id => value.startsWith(`${id}-`));
 
+// Each file is named repository-relative with forward slashes on every host,
+// so a name is matched and reported the same way on Windows.
 async function documents() {
   const files = ["README.md"];
   for (const root of ["docs", "examples"]) {
     for (const entry of await readdir(path.join(repo, root))) {
-      if (entry.endsWith(".md")) files.push(path.join(root, entry));
+      if (entry.endsWith(".md")) files.push(path.posix.join(root, entry));
     }
   }
   for (const pkg of await readdir(path.join(repo, "packages"))) {
     for (const shape of ["plugin/skills/acc/SKILL.md", "extension/skills/acc/SKILL.md"]) {
-      const file = path.join("packages", pkg, shape);
+      const file = path.posix.join("packages", pkg, shape);
       const source = await readFile(path.join(repo, file), "utf8").catch(() => null);
       if (source !== null) files.push(file);
     }

@@ -40,7 +40,10 @@ console.log("codex-cli 0.153.4");
     .map(directory => rm(directory, { recursive: true, force: true }))));
   // The ACC process needs only this disposable fake client plus system shell
   // tools. Do not inherit operator ACC, Codex, or Node environment state.
+  // Windows resolves configuration and cache from LOCALAPPDATA, as POSIX does
+  // from HOME; it is this fixture's home there too, never the runner's own.
   const env = { ...platformEnv(), PATH: fakePath(bin), HOME: home,
+    ...(process.platform === "win32" ? { LOCALAPPDATA: path.join(home, "AppData", "Local") } : {}),
     CODEX_HOME: codexHome, ACC_DATA_HOME: dataHome, ACC_NO_UPDATE_CHECK: "1",
     ACC_PROBE_TIMEOUT_MS: "30000", GIT_DIR: "", GIT_WORK_TREE: "" };
   const command = (...args) => run(process.execPath, [acc, ...args, "--cwd", project, "--json"],

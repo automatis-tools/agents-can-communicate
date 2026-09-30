@@ -6,10 +6,13 @@ import test from "node:test";
 import { controlledCodexDaemon, THREAD } from "../helpers/codex-daemon.mjs";
 import { connectMcp, PROTOCOL_META } from "../helpers/mcp-client.mjs";
 import { createPackedAcc } from "../helpers/packed-acc.mjs";
+import { POSIX_LIVE_TRANSPORT } from "../helpers/platform-scope.mjs";
 
 // Controlled Unix transport, not a vendor capability capture: execute the actual
-// packed entrypoint and adapter against an exact receiver-owned endpoint.
-test("installed MCP routes with consent from its nondefault data home", { timeout: 60_000 }, async t => {
+// packed entrypoint and adapter against an exact receiver-owned endpoint. On
+// Windows Codex's daemon is reached through its stdio proxy, in 0.9.x.
+test("installed MCP routes with consent from its nondefault data home",
+  { timeout: 60_000, skip: POSIX_LIVE_TRANSPORT }, async t => {
   const packed = await createPackedAcc(t);
   const module = (name, file = "index") => import(pathToFileURL(path.join(packed.installed,
     "node_modules", "@agents-can-communicate", name, "src", `${file}.mjs`)));

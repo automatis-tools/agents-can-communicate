@@ -10,6 +10,7 @@ import { MINIMUM_VERSION, PROTOCOL_CONTRACT, addCodexQueueMessage, compareStable
   probeCodexQueue, runCodexQueueCapture, serverVersionOf }
   from "../../scripts/spikes/codex-existing-session.mjs";
 import { runProcess } from "../helpers/run-process.mjs";
+import { POSIX_LIVE_TRANSPORT } from "../helpers/platform-scope.mjs";
 
 // Kept cohesive above 300 lines because every case drives the same disposable
 // queue probe against one fake App Server; splitting would duplicate the peer.
@@ -270,7 +271,10 @@ test("a complete capture never reads transcript content", async () => {
   assert.equal(JSON.stringify(result).includes(SECRET_PREVIEW), false);
 });
 
-test("the command-line capture prints one closed JSON result from a fake client", async () => {
+// The capture command reaches Codex's App Server over a Unix socket and starts the
+// client by name, as a POSIX executable; Windows live delivery arrives in 0.9.x.
+test("the command-line capture prints one closed JSON result from a fake client",
+  { skip: POSIX_LIVE_TRANSPORT }, async () => {
   const tempDir = mkdtempSync(path.join(os.tmpdir(), "acc-codex-spike-"));
   const command = path.join(tempDir, "fake-codex.mjs");
   writeFileSync(command, `#!/usr/bin/env node
