@@ -91,9 +91,6 @@ async function exchange(packed, { from, to, subject, body, answer, key }) {
 
 test("packed release completes scripted cross-vendor fallback with explicit owners", {
   timeout: 120_000,
-  skip: process.platform === "win32"
-    ? "ACC supports macOS/Linux; its native captures and POSIX client probes do not certify Windows"
-    : false,
 }, async t => {
   const packed = await createPackedAcc(t);
   const expectedVersion = (await readJson(path.join(packed.repo, "package.json"))).version;
