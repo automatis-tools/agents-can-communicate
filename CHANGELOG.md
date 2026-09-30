@@ -26,6 +26,13 @@ Work in progress for #234. The design is in
   PowerShell for Gemini CLI, a form PowerShell, Git Bash and cmd all read for Grok, an unquoted
   8.3 path for Antigravity CLI, and a cmd command for Kimi Code. The skill runs
   `node "<path>/acc-cli.mjs"`, and the owner header quotes for cmd.
+- A CI job runs real Claude Code and Codex, installed from npm, against a model stub on
+  127.0.0.1, on Windows and Linux. Their hooks attach both sessions through the installed
+  package, and a message reaches each client's model on its next turn.
+- The package check runs on Windows: it reads `tar.exe` listings that end in CRLF and runs the
+  `acc.cmd` npm links.
+- The README, getting started, configuration, security model and troubleshooting pages describe
+  Windows.
 
 | Candidate artifact | Value |
 |---|---|
