@@ -39,6 +39,10 @@ Work in progress for #234. The design is in
   a quote inside single quotes differently, and the bash spelling leaves `$(...)` bare to
   PowerShell. The hook continues without context and tells the user to rename the directory,
   without printing the path.
+- A client `.cmd` that outlives its timeout on Windows is stopped with everything it started,
+  through `taskkill /T`. cmd.exe starts the batch file's program as a child of its own, and
+  after killing cmd.exe, execFile waited for that child's pipes, so a hung
+  `claude.cmd --version` held a version probe past its limit.
 - A session start reads the process table while the client reports its version. On Windows
   one of them starts the client and the other starts PowerShell, and one after the other they
   took most of a loaded runner's hook budget.
