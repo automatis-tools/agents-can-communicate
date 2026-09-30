@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { readdir, rm } from "node:fs/promises";
+import { readdir } from "node:fs/promises";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { assertPortableId } from "@agents-can-communicate/protocol";
@@ -8,6 +8,7 @@ import { listRuntimeHolds } from "./leases.mjs";
 import { confirmedDead, defaultPidIsAlive, withManagerLock } from "./mutex.mjs";
 import { reapPins } from "./pins.mjs";
 import { reapStagingHolds } from "./staging.mjs";
+import { removeTree } from "./portable-fs.mjs";
 import { canonicalManagerRoot, managedDirectory, readControl, readManagedJson, syncDirectory, writeControl } from "./state.mjs";
 
 /** The staged generation states its own contract in its manifest, so the
@@ -250,7 +251,7 @@ export async function reclaimGenerations({ root, active = null, pidIsAlive = def
       if (!entry.isDirectory() || entry.name.startsWith(".")) continue;
       const directory = path.join(generations, entry.name);
       if (referenced.has(directory)) continue;
-      await rm(directory, { recursive: true, force: true });
+      await removeTree(directory);
       removed.push(entry.name);
     }
     if (removed.length) await syncDirectory(generations);

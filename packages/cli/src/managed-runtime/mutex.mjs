@@ -1,7 +1,8 @@
 import { createHash, randomUUID } from "node:crypto";
-import { lstat, mkdir, readdir, rename, rm } from "node:fs/promises";
+import { lstat, mkdir, readdir } from "node:fs/promises";
 import path from "node:path";
 import { performance } from "node:perf_hooks";
+import { removeTree, renameEntry } from "./portable-fs.mjs";
 import { canonicalManagerRoot, managedDirectory, readManagedJson, syncDirectory, writeManagedJson } from "./state.mjs";
 
 export function defaultPidIsAlive(pid) {
@@ -49,7 +50,7 @@ async function readOwner(directory) {
 }
 
 async function retire(directory, target) {
-  try { await rename(directory, target); return true; }
+  try { await renameEntry(directory, target); return true; }
   catch (error) {
     if (["ENOENT", "EEXIST", "ENOTEMPTY"].includes(error.code)) return false;
     throw error;
@@ -81,10 +82,10 @@ async function compactQuiescentLocks(root, pidIsAlive) {
       const tombstone = path.join(root, name);
       const owner = await readOwner(tombstone);
       if (owner && name === `manager.reclaimed-${identity(owner)}.lock`) {
-        await rm(tombstone, { recursive: true, force: true });
+        await removeTree(tombstone);
       }
     }
-    for (const candidate of dead) await rm(candidate, { recursive: true, force: true });
+    for (const candidate of dead) await removeTree(candidate);
     await syncDirectory(root);
   } catch {
     // Maintenance is best effort. Unreadable/malformed preparation keeps the
@@ -118,7 +119,7 @@ export async function withManagerLock(root, operation, { timeoutMs = 1000, pidIs
         }
       } else {
         try {
-          await rename(candidate, directory);
+          await renameEntry(candidate, directory);
           owned = true;
           await syncDirectory(root);
           await compactQuiescentLocks(root, pidIsAlive);
@@ -140,6 +141,6 @@ export async function withManagerLock(root, operation, { timeoutMs = 1000, pidIs
         const released = path.join(root, `manager.reclaimed-${identity(owner)}.lock`);
         if (await retire(directory, released)) await syncDirectory(root);
       }
-    } else await rm(candidate, { recursive: true, force: true });
+    } else await removeTree(candidate);
   }
 }

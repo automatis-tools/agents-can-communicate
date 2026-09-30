@@ -1,8 +1,9 @@
 import { randomUUID } from "node:crypto";
 import { constants } from "node:fs";
-import { lstat, mkdir, open, realpath, rename, rm } from "node:fs/promises";
+import { lstat, mkdir, open, realpath, rm } from "node:fs/promises";
 import path from "node:path";
 import { collectFile, fingerprint } from "./generation-files.mjs";
+import { isWindows, openNoFollow, renameReplacing, syncEntry } from "./portable-fs.mjs";
 
 /** Resolve existing ancestors without creating an uninitialized manager. */
 export async function canonicalManagerRoot(root) {
@@ -27,7 +28,7 @@ export async function managedDirectory(directory, { create = false } = {}) {
     const info = await lstat(directory);
     if (!info.isDirectory() || info.isSymbolicLink()) throw new Error("managed directory is not a regular directory");
     if (create) {
-      const handle = await open(directory, constants.O_RDONLY | constants.O_NOFOLLOW);
+      const handle = await openNoFollow(directory, constants.O_RDONLY);
       try { await handle.chmod(0o700); } finally { await handle.close(); }
     }
     return true;
@@ -37,7 +38,11 @@ export async function managedDirectory(directory, { create = false } = {}) {
   }
 }
 
+/** Make removals and directory renames in `directory` durable. Windows refuses a
+ * flush on a directory handle; a record written by writeManagedJson is flushed
+ * itself there, and a removal that a power cut undoes only keeps a hold longer. */
 export async function syncDirectory(directory) {
+  if (isWindows()) return;
   const handle = await open(directory, constants.O_RDONLY | constants.O_NOFOLLOW);
   try { await handle.sync(); } finally { await handle.close(); }
 }
@@ -46,7 +51,7 @@ export async function syncDirectory(directory) {
 export async function readManagedJson(file) {
   let handle;
   try {
-    handle = await open(file, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
+    handle = await openNoFollow(file, constants.O_RDONLY | (constants.O_NONBLOCK ?? 0));
     if (!(await handle.stat()).isFile()) throw new Error("managed record must be a regular file");
     return JSON.parse(await handle.readFile("utf8"));
   } catch (error) {
@@ -59,13 +64,14 @@ export async function writeManagedJson(file, value) {
   const temporary = path.join(path.dirname(file), `.record-${randomUUID()}.tmp`);
   let handle;
   try {
-    handle = await open(temporary, constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW, 0o600);
+    handle = await openNoFollow(temporary, constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL,
+      { mode: 0o600 });
     await handle.writeFile(`${JSON.stringify(value)}\n`);
     await handle.sync();
     await handle.close();
     handle = null;
-    await rename(temporary, file);
-    await syncDirectory(path.dirname(file));
+    await renameReplacing(temporary, file);
+    await syncEntry(path.dirname(file), file);
   } finally {
     await handle?.close();
     await rm(temporary, { force: true });
