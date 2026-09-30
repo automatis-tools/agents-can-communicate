@@ -1,11 +1,20 @@
-import { assertPortableId } from "@agents-can-communicate/protocol";
+import { AccError, EXIT, assertPortableId } from "@agents-can-communicate/protocol";
 
 const posixQuote = value => `'${value.replaceAll("'", "'\\''")}'`;
 // The model appends the header in whatever shell its client gives it, and on
 // Windows that can be cmd.exe, which reads double quotes only. A value that a
 // double-quoting shell would expand keeps single quotes, which PowerShell and
-// Git Bash read literally.
-const windowsQuote = value => (/["$`%]/.test(value) ? posixQuote(value) : `"${value}"`);
+// Git Bash read literally - unless it holds a single quote too: sh reads '\''
+// inside single quotes and PowerShell reads '', so the sh spelling leaves the
+// rest of the value bare to PowerShell, where `$(...)` runs. No spelling reads
+// the same in all three, and the value is refused rather than handed over.
+const windowsQuote = value => {
+  if (!/["$`%]/.test(value)) return `"${value}"`;
+  if (!value.includes("'")) return `'${value}'`;
+  throw new AccError(EXIT.USAGE, `${value} has a single quote and one of $, \` or %: there is `
+    + "no quoting that every Windows shell reads the same, and ACC's hooks will not hand the "
+    + "model a command line it would read differently; rename the directory", { value });
+};
 
 export const ownerHeader = (binding, cwd, workspaceRef, platform = process.platform) => {
   const quote = platform === "win32" ? windowsQuote : posixQuote;

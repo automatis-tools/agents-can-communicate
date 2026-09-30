@@ -194,8 +194,13 @@ engine range; it starts the baked node only when it does not.
 
 - **The skill command** becomes `node "<forward-slash path>/acc-cli.mjs"`, which works in bash,
   PowerShell and cmd, whichever shell the client uses for the model.
-- **The owner header** quotes `--cwd` with single quotes, valid in bash and PowerShell. A path
-  that contains a quote is emitted in double quotes when it contains no `$` or backtick.
+- **The owner header** double-quotes `--cwd` and `--workspace`, which bash, PowerShell and cmd
+  read alike. A value with `$`, a backtick or `%` is expanded by one of them inside double
+  quotes, and gets single quotes instead, which bash and PowerShell read literally. A value
+  that also contains a single quote is refused: bash reads `'\''` inside single quotes and
+  PowerShell reads `''`, so no spelling reads the same in both, and the bash one leaves the rest
+  of the value bare to PowerShell, where `$(...)` runs. The hook then fails open and names the
+  directory to rename. Windows file names cannot contain `"`.
 - **Doctor** recognises the Node shims and Windows paths when it names the wired version.
 
 ### 6. Managed runtime and updates

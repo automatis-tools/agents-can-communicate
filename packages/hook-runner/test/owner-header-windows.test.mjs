@@ -22,3 +22,18 @@ test("posix: single quotes, as before", () => {
   assert.equal(ownerHeader(binding, "/Users/ann/it's", undefined, "darwin"),
     "ACC CLI (append): --session session_a --generation generation_b --cwd '/Users/ann/it'\\''s'");
 });
+
+// Inside single quotes sh reads '\'' as a quote and PowerShell reads '', so the
+// sh spelling of `o'brien\$(calc)` leaves `$(calc)` bare to PowerShell, which
+// runs it. With a single quote and a character that double quotes expand, no
+// spelling reads the same in sh, PowerShell and cmd, and the header is refused
+// by name rather than handed to the model.
+test("windows: a directory with a single quote and $, ` or % has no header", () => {
+  for (const cwd of ["C:\\Users\\o'brien\\$(calc)", "C:\\it's\\`n", "C:\\it's\\100%"]) {
+    assert.throws(() => ownerHeader(binding, cwd, "acc://abc", "win32"),
+      error => error.code === 2 && error.details.value === cwd
+        && /no quoting that every Windows shell reads the same/.test(error.message), cwd);
+  }
+  assert.equal(ownerHeader(binding, "C:\\Users\\o'brien", undefined, "win32"),
+    "ACC CLI (append): --session session_a --generation generation_b --cwd \"C:\\Users\\o'brien\"");
+});
