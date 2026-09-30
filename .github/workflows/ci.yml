@@ -47,6 +47,34 @@ jobs:
           GIT_DIR: ''
           GIT_WORK_TREE: ''
 
+  real-clients:
+    name: real clients · ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        # Claude Code and Codex from npm, against a model stub on 127.0.0.1:
+        # their own hook runners start ACC's hooks, in each platform's form.
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24'
+      - run: npm ci
+      - name: Install the clients
+        run: npm install --global @anthropic-ai/claude-code @openai/codex
+      - name: Versions
+        run: |
+          claude --version
+          codex --version
+      - name: Hooks, attachment and next-turn delivery through real clients
+        run: node --test tests/acceptance/real-clients-stub.test.mjs
+        env:
+          ACC_REAL_CLIENTS: '1'
+          GIT_DIR: ''
+          GIT_WORK_TREE: ''
+
   package:
     name: package · ${{ matrix.os }}
     runs-on: ${{ matrix.os }}

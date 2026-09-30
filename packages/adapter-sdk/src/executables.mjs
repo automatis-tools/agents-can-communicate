@@ -64,13 +64,17 @@ const CMD_UNSAFE = /["%^&|<>\r\n!]/;
  * or `.bat` without cmd.exe (Node refuses with EINVAL since CVE-2024-27980), so
  * those go through `cmd.exe /d /s /c` with a command line ACC builds itself.
  */
-export async function runExecutable(file, args, options = {},
+// Not async: the promise execFile returns carries `.child`, and a caller that
+// must close the child's stdin needs it.
+export function runExecutable(file, args, options = {},
   { platform = process.platform, run = execFileAsync, env = process.env } = {}) {
   if (platform !== "win32" || !/\.(cmd|bat)$/i.test(file)) {
     return run(file, args, { windowsHide: true, ...options });
   }
   for (const word of [file, ...args]) {
-    if (CMD_UNSAFE.test(word)) throw Object.assign(new Error("argument unsafe for cmd.exe"), { code: "EINVAL" });
+    if (CMD_UNSAFE.test(word)) {
+      return Promise.reject(Object.assign(new Error("argument unsafe for cmd.exe"), { code: "EINVAL" }));
+    }
   }
   const line = [file, ...args].map(word => `"${word}"`).join(" ");
   const comspec = env.ComSpec ?? env.COMSPEC ?? "cmd.exe";
