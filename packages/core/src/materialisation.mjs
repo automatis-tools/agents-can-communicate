@@ -70,8 +70,14 @@ export async function materialise({ store, clock, ids },
         payload: { reason } });
     }
 
+    // The opening session's own ephemeral copy - left by a process that died
+    // mid-open - is what the opening replaces, not a session to promote first:
+    // promoting it would record the session opening twice.
+    const own = opening === null ? null : staged.find(entry => entry.kind === "session")
+      .records.find(record => record.sessionId === opening.session.sessionId) ?? null;
     for (const entry of staged) {
       for (const record of entry.records) {
+        if (record === own) continue;
         // Whoever got here first may have promoted this record already, and
         // promoting is a copy: the ephemeral and durable shapes are the same,
         // so the one already there is the one this would write.
@@ -86,7 +92,7 @@ export async function materialise({ store, clock, ids },
 
     if (opening !== null) {
       const { participant, session } = opening;
-      const current = tx.get("session", session.sessionId);
+      const current = tx.get("session", session.sessionId) ?? own;
       opening.assertAvailable(current);
       if (tx.get("participant", participant.participantId) === null) {
         tx.put("participant", participant.participantId, participant);

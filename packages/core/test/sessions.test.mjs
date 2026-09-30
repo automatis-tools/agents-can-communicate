@@ -412,3 +412,26 @@ test("an opener whose partner closed before the lock stays ephemeral", async () 
   assert.deepEqual((await store.ephemeral.list("session")).map(item => item.sessionId),
     [session.sessionId]);
 });
+
+// A session that reopens while its own ephemeral copy is still there - its
+// process died mid-open, before it materialised - and another live session is
+// here: materialisation promoted that copy, with a session.opened event, and
+// the opening then replaced it with a second one. One session opened once.
+test("a joining session that replaces its own ephemeral copy is opened once", async () => {
+  const { clock, store } = makeService();
+  const service = createCoordinationService({ store, clock, ids: createFakeIds(),
+    pidIsAlive: pid => pid !== 42 });
+  const partner = await service.openSession(opening({ participantId: "participant_b",
+    harness: "claude-code" }));
+  const stale = { ...partner, sessionId: "session_reopened", participantId: "participant_a",
+    generation: "generation_stale", pid: 42 };
+  await store.ephemeral.put("session", stale.sessionId, stale);
+
+  const reopened = await service.openSession(opening({ sessionId: "session_reopened", pid: 7 }));
+
+  assert.notEqual(reopened.generation, stale.generation);
+  const opened = (await store.eventsSince(WORKSPACE, null, 20)).events
+    .filter(event => event.type === "session.opened" && event.actorSessionId === "session_reopened");
+  assert.equal(opened.length, 1, JSON.stringify(opened));
+  assert.equal(opened[0].payload.replaced, "generation_stale");
+});
