@@ -43,6 +43,9 @@ jobs:
         env:
           # One hung test fails by name; see scripts/test-runner-plan.mjs.
           ACC_TEST_TIMEOUT_MS: '300000'
+          # On Windows a child a failed test leaves behind can hold a file's
+          # process open; its concurrency slot is released when its tests end.
+          ACC_TEST_FORCE_EXIT: ${{ matrix.os == 'windows-latest' && '1' || '0' }}
           # Git exports these into every child process. The suite spawns git in
           # temporary fixture repositories, and inheriting them makes those
           # commands operate on this checkout instead. This repository has been

@@ -1,7 +1,6 @@
 import assert from "node:assert/strict";
 import { mkdtemp, realpath, rm } from "node:fs/promises";
 import path from "node:path";
-import test from "node:test";
 
 import { createAntigravityAdapter } from "@agents-can-communicate/adapter-antigravity";
 import { createRelay } from "@agents-can-communicate/adapter-antigravity/relay";
@@ -13,6 +12,7 @@ import { openFilesystemStore } from "@agents-can-communicate/storage-filesystem"
 
 import { activateAntigravityRelay } from "../../bin/entrypoints/antigravity-relay-binding.mjs";
 import { createFakeIds } from "../helpers/memory-store.mjs";
+import { posixTransportTest as test } from "../helpers/platform-scope.mjs";
 
 const CONVERSATION = "3ed65ea5-31f2-4ddf-b6c7-e3c85a9a3c29";
 

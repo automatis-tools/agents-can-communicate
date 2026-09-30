@@ -42,10 +42,14 @@ test("file discovery does not depend on the shell", async () => {
 });
 
 test("the runner bounds file concurrency without weakening process races", t => {
-  const saved = process.env.ACC_TEST_TIMEOUT_MS;
-  t.after(() => { if (saved === undefined) delete process.env.ACC_TEST_TIMEOUT_MS;
-    else process.env.ACC_TEST_TIMEOUT_MS = saved; });
+  const saved = { timeout: process.env.ACC_TEST_TIMEOUT_MS, exit: process.env.ACC_TEST_FORCE_EXIT };
+  t.after(() => {
+    for (const [name, value] of [["ACC_TEST_TIMEOUT_MS", saved.timeout], ["ACC_TEST_FORCE_EXIT", saved.exit]]) {
+      if (value === undefined) delete process.env[name]; else process.env[name] = value;
+    }
+  });
   delete process.env.ACC_TEST_TIMEOUT_MS;
+  delete process.env.ACC_TEST_FORCE_EXIT;
   assert.equal(TEST_FILE_CONCURRENCY, 4);
   assert.deepEqual(nodeTestArguments(["first.test.mjs", "second.test.mjs"]), [
     "--test",
@@ -55,8 +59,9 @@ test("the runner bounds file concurrency without weakening process races", t => 
   ]);
   // CI names a per-test limit, so a hung test fails by name.
   process.env.ACC_TEST_TIMEOUT_MS = "600000";
+  process.env.ACC_TEST_FORCE_EXIT = "1";
   assert.deepEqual(nodeTestArguments(["first.test.mjs"]),
-    ["--test", "--test-concurrency=4", "--test-timeout=600000", "first.test.mjs"]);
+    ["--test", "--test-concurrency=4", "--test-timeout=600000", "--test-force-exit", "first.test.mjs"]);
 });
 
 // Measured on windows-latest: 345 absolute test paths make a command line past

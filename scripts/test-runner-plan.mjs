@@ -13,10 +13,15 @@ const perTestTimeout = () => {
   return Number.isSafeInteger(value) && value > 0 ? [`--test-timeout=${value}`] : [];
 };
 
+// ACC_TEST_FORCE_EXIT ends a file's process once its tests are done, so a child
+// process a failed test left behind cannot hold a concurrency slot for good.
+const forceExit = () => (process.env.ACC_TEST_FORCE_EXIT === "1" ? ["--test-force-exit"] : []);
+
 export const nodeTestArguments = files => [
   "--test",
   `--test-concurrency=${TEST_FILE_CONCURRENCY}`,
   ...perTestTimeout(),
+  ...forceExit(),
   ...files,
 ];
 

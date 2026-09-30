@@ -2,10 +2,10 @@ import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
 import { chmod, mkdir, mkdtemp, readFile, realpath, rm, symlink, writeFile } from "node:fs/promises";
 import path from "node:path";
-import test from "node:test";
 import { pathToFileURL } from "node:url";
 
 import { createPackedAcc } from "../helpers/packed-acc.mjs";
+import { posixTransportTest as test } from "../helpers/platform-scope.mjs";
 
 const quoted = value => `'${String(value).replaceAll("'", "'\\\"'\\\"'")}'`;
 
