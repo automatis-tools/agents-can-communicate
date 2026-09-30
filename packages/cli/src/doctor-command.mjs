@@ -53,19 +53,43 @@ import { diagnoseFilesystemStore, repairFilesystemStore }
 /**
  * The package directory of the runner a shim or config names, or null.
  *
- * ACC writes the runner quoted in every form: a shell shim, the Node shim
- * Windows gets (JSON-escaped), and Kimi's config (a TOML string holding a
- * quoted command). One level of escaping is undone, and the path runs back to
- * its opening quote, so a Windows path with spaces in it is read whole.
+ * ACC writes the runner in double quotes in every form: a shell shim
+ * (`ACC_RUNNER="..."`), the Node shim Windows gets (a JSON string) and Kimi's
+ * config (a TOML string holding a command, whose own quotes are cmd's on
+ * Windows and TOML's elsewhere). The quoted strings are read as strings, one
+ * level of escaping undone, and a string holding quotes is read again as it
+ * stands - so an apostrophe in a path, as in C:\Users\O'Neil, is part of it.
+ * An unquoted path is read to the whitespace before it.
  */
-export function runnerRoot(text) {
-  const flat = String(text).replaceAll("\\\\", "\\");
-  const match = /[\\/]agents-can-communicate(?=[\\/]bin[\\/]acc-hook\.mjs)/.exec(flat);
+const RUNNER = /[\\/]agents-can-communicate(?=[\\/]bin[\\/]acc-hook\.mjs)/;
+const absoluteRoot = value => {
+  const match = RUNNER.exec(value);
   if (match === null) return null;
-  const before = flat.slice(0, match.index);
-  const start = Math.max(before.lastIndexOf("\""), before.lastIndexOf("'"), before.lastIndexOf("\n")) + 1;
-  const root = flat.slice(start, match.index + match[0].length);
+  const root = value.slice(0, match.index + match[0].length);
   return /^(?:[A-Za-z]:)?[\\/]/.test(root) ? root : null;
+};
+
+export function runnerRoot(text) {
+  let level = [String(text)];
+  for (let depth = 0; depth < 2 && level.length > 0; depth += 1) {
+    const next = [];
+    for (const current of level) {
+      const strings = depth === 0
+        ? [...current.matchAll(/"((?:[^"\\]|\\[\s\S])*)"/g)].map(found =>
+          found[1].replace(/\\([\s\S])/g, "$1"))
+        : [...current.matchAll(/"([^"]*)"/g)].map(found => found[1]);
+      for (const value of strings) {
+        if (value.includes("\"")) next.push(value);
+        else if (absoluteRoot(value) !== null) return absoluteRoot(value);
+      }
+    }
+    level = next;
+  }
+  const flat = String(text);
+  const match = RUNNER.exec(flat);
+  if (match === null) return null;
+  const start = flat.slice(0, match.index).search(/\S+$/);
+  return start < 0 ? null : absoluteRoot(flat.slice(start));
 }
 
 export async function wiredVersion(shimPath) {

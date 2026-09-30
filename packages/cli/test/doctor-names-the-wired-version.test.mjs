@@ -136,3 +136,17 @@ test("the runner's package is found in every form ACC writes it, Windows ones in
     "/usr/local/lib/node_modules/agents-can-communicate");
   assert.equal(runnerRoot("nothing here"), null);
 });
+
+// An apostrophe is common in a Windows user name - C:\Users\O'Neil - and every
+// form ACC writes quotes the runner with double quotes: read as the opening
+// quote, it cut the path at `O'` and doctor could not read a working install.
+test("the runner's package is found when its path has an apostrophe", async () => {
+  const { runnerRoot } = await import("../src/doctor-command.mjs");
+  const windows = "C:\\Users\\O'Neil\\AppData\\Roaming\\npm\\node_modules\\agents-can-communicate";
+  assert.equal(runnerRoot(`const ACC_TARGET = ${JSON.stringify(`${windows}\\bin\\acc-hook.mjs`)};`),
+    windows);
+  const cmd = `"C:\\Program Files\\nodejs\\node.exe" "${windows}\\bin\\acc-hook.mjs" kimi sessionStart`;
+  assert.equal(runnerRoot(`command = ${JSON.stringify(cmd)}`), windows);
+  const posix = "/Users/o'neil/.npm-global/lib/node_modules/agents-can-communicate";
+  assert.equal(runnerRoot(`ACC_RUNNER="${posix}/bin/acc-hook.mjs"`), posix);
+});
