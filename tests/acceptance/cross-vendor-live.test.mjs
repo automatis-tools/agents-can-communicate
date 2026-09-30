@@ -90,7 +90,10 @@ async function exchange(packed, { from, to, subject, body, answer, key }) {
 }
 
 test("packed release completes scripted cross-vendor fallback with explicit owners", {
-  timeout: 120_000,
+  // A bound for a hang, not a speed test: the flow took 19 s on ubuntu-latest,
+  // 37 s on macos-latest and 85 s on windows-latest, where each of its many
+  // processes costs more.
+  timeout: process.platform === "win32" ? 300_000 : 120_000,
 }, async t => {
   const packed = await createPackedAcc(t);
   const expectedVersion = (await readJson(path.join(packed.repo, "package.json"))).version;
