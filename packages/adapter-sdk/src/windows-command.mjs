@@ -12,6 +12,8 @@ const defaultRun = promisify(execFile);
 // Characters one of those shells expands or ends a quoted word on. A path that
 // carries one is refused: writing it would run something other than the shim.
 const EXPANDED = /[$`"%]/;
+// What cmd acts on in a word outside quotes, whitespace included.
+const UNQUOTED_UNSAFE = /[\s&|<>^(),;=!]/;
 
 const powershellLiteral = value => `'${String(value).replaceAll("'", "''")}'`;
 const forward = value => String(value).replaceAll("\\", "/");
@@ -38,8 +40,12 @@ export function windowsHookCommand(shell, { node, shim, args }) {
       return `node "${forward(shim)}" ${tail}`;
     case "cmd":
       return `"${node}" "${shim}" ${tail}`;
+    // The path reaches cmd bare: & | < > ^ ( ) run as cmd's own operators and
+    // , ; = split the word the way a space does, so none may be in it.
     case "unquoted":
-      if (/\s/.test(shim)) throw new Error(`a hook command cannot name ${shim} unquoted: it has a space`);
+      if (UNQUOTED_UNSAFE.test(shim)) {
+        throw new Error(`a hook command cannot name ${shim} unquoted: it has a space or a character cmd acts on`);
+      }
       return `node ${forward(shim)} ${tail}`;
     default:
       throw new Error(`unknown Windows hook shell: ${shell}`);

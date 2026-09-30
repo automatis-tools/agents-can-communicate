@@ -52,3 +52,19 @@ test("a path with a space is asked for its 8.3 name through cmd's %~s", async ()
   assert.equal(await shortPath("C:\\NoSpace\\x.mjs", { run: async () => { throw new Error("unused"); } }),
     "C:\\NoSpace\\x.mjs");
 });
+
+// Antigravity's runner cannot pass a quoted path, so the path reaches cmd bare:
+// `node C:/Users/Ann/A&calc&B/...` runs calc, and , ; = split the word the way a
+// space does. A path with none of these has nothing cmd acts on.
+test("an unquoted command refuses what cmd acts on outside quotes", () => {
+  for (const shim of ["C:\\Users\\Ann\\A&calc&B\\acc-hook.mjs", "C:\\a|b\\acc-hook.mjs",
+    "C:\\a<b\\acc-hook.mjs", "C:\\a>b\\acc-hook.mjs", "C:\\a^b\\acc-hook.mjs",
+    "C:\\a(b)\\acc-hook.mjs", "C:\\a,b\\acc-hook.mjs", "C:\\a;b\\acc-hook.mjs",
+    "C:\\a=b\\acc-hook.mjs", "C:\\a!b\\acc-hook.mjs"]) {
+    assert.throws(() => windowsHookCommand("unquoted", { node: "node", shim, args: ["start"] }),
+      /cannot name .* unquoted/, shim);
+  }
+  assert.equal(windowsHookCommand("unquoted", { node: "node",
+    shim: "C:\\Users\\O'Neil\\PROGRA~1\\acc-hook.mjs", args: ["start"] }),
+  "node C:/Users/O'Neil/PROGRA~1/acc-hook.mjs start");
+});
