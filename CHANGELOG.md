@@ -51,6 +51,16 @@ Work in progress for #234. The design is in
   npm-installed client is read from the package its `.cmd` runs, instead of starting cmd.exe,
   node and the client. A Windows session start in one hook process went from 1.45 s to 0.95 s on
   windows-latest.
+- A hook does less work on every turn, measured on windows-latest where each call costs more:
+  - A store directory validated once is checked again by its identity (volume and file id)
+    with one `lstat`. Before, each record read walked its path from the root twice, which cost
+    about a thousand calls a hook.
+  - A hook no longer takes the writer lock to clear a delivery binding that is absent or
+    already retired. A heartbeat of a durable session goes straight to its durable record.
+    Together this removes two lock round trips from each turn.
+  - On Windows, taking the writer lock flushes its owner record once instead of twice.
+  - A hook process loads its own client's adapter and the parts of the CLI and installer that
+    a hook calls: 123 modules instead of 195.
 - The reason shown for a client without live delivery reads "this client has no live delivery
   channel ACC supports here", which is also true of Claude Code, Codex and Antigravity CLI on
   Windows.
