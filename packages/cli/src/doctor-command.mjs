@@ -56,10 +56,14 @@ import { diagnoseFilesystemStore, repairFilesystemStore }
  * ACC writes the runner in double quotes in every form: a shell shim
  * (`ACC_RUNNER="..."`), the Node shim Windows gets (a JSON string) and Kimi's
  * config (a TOML string holding a command, whose own quotes are cmd's on
- * Windows and TOML's elsewhere). The quoted strings are read as strings, one
- * level of escaping undone, and a string holding quotes is read again as it
- * stands - so an apostrophe in a path, as in C:\Users\O'Neil, is part of it.
- * An unquoted path is read to the whitespace before it.
+ * Windows and TOML's elsewhere). Each quoted string is read the way a shell
+ * reads one: a backslash escapes only a quote, a backslash, $ or a backtick,
+ * which is all the shim escapes and all a path needs undone in JSON or TOML,
+ * so an unescaped C:\Users\... in a shell script stays that path. A string
+ * holding quotes is a command: its own quoted words are read as they stand,
+ * then, when none names the runner, the string whole - a POSIX path may hold a
+ * quote. An apostrophe, as in C:\Users\O'Neil, is part of a path. An unquoted
+ * path is read to the whitespace before it.
  */
 const RUNNER = /[\\/]agents-can-communicate(?=[\\/]bin[\\/]acc-hook\.mjs)/;
 const absoluteRoot = value => {
@@ -69,21 +73,19 @@ const absoluteRoot = value => {
   return /^(?:[A-Za-z]:)?[\\/]/.test(root) ? root : null;
 };
 
+const commandRoot = command => {
+  for (const [, word] of command.matchAll(/"([^"]*)"/g)) {
+    const root = absoluteRoot(word);
+    if (root !== null) return root;
+  }
+  return absoluteRoot(command);
+};
+
 export function runnerRoot(text) {
-  let level = [String(text)];
-  for (let depth = 0; depth < 2 && level.length > 0; depth += 1) {
-    const next = [];
-    for (const current of level) {
-      const strings = depth === 0
-        ? [...current.matchAll(/"((?:[^"\\]|\\[\s\S])*)"/g)].map(found =>
-          found[1].replace(/\\([\s\S])/g, "$1"))
-        : [...current.matchAll(/"([^"]*)"/g)].map(found => found[1]);
-      for (const value of strings) {
-        if (value.includes("\"")) next.push(value);
-        else if (absoluteRoot(value) !== null) return absoluteRoot(value);
-      }
-    }
-    level = next;
+  for (const [, quoted] of String(text).matchAll(/"((?:[^"\\]|\\[\s\S])*)"/g)) {
+    const value = quoted.replace(/\\(["\\$`])/g, "$1");
+    const root = value.includes("\"") ? commandRoot(value) : absoluteRoot(value);
+    if (root !== null) return root;
   }
   const flat = String(text);
   const match = RUNNER.exec(flat);

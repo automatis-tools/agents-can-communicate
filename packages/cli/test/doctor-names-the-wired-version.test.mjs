@@ -150,3 +150,15 @@ test("the runner's package is found when its path has an apostrophe", async () =
   const posix = "/Users/o'neil/.npm-global/lib/node_modules/agents-can-communicate";
   assert.equal(runnerRoot(`ACC_RUNNER="${posix}/bin/acc-hook.mjs"`), posix);
 });
+
+// A shell reads a backslash inside double quotes as itself unless a quote,
+// backslash, $ or backtick follows it, so a Windows path written into a shell
+// script unescaped is still that path - and a path the shim escaped is read back.
+test("the runner's package is read from a shell script the way the shell reads it", async () => {
+  const { runnerRoot } = await import("../src/doctor-command.mjs");
+  const windows = "C:\\Users\\RUNNER~1\\AppData\\Local\\Temp\\acc-wired-x\\agents-can-communicate";
+  assert.equal(runnerRoot(`#!/bin/sh\nexec "C:\\Program Files\\nodejs\\node.exe" "${
+    windows}\\bin\\acc-hook.mjs" claude_code "$@"\n`), windows);
+  const posix = "/Users/a$b`c\"d/lib/node_modules/agents-can-communicate";
+  assert.equal(runnerRoot(`ACC_RUNNER="${posix.replace(/(["\\$`])/g, "\\$1")}/bin/acc-hook.mjs"`), posix);
+});
