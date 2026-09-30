@@ -40,7 +40,7 @@ async function inspectRealDirectory(directory, root, create) {
   for (let attempt = 0; ; attempt += 1) {
     let details;
     try {
-      details = await lstat(directory);
+      details = await lstat(directory, { bigint: true });
     } catch (error) {
       if (error.code !== "ENOENT") {
         throw invalidDirectory("cannot inspect managed directory", directory, root, error.message);
@@ -64,11 +64,46 @@ async function inspectRealDirectory(directory, root, create) {
   }
 }
 
-async function inspectManagedDirectory(rootPath, directoryPath, create,
-  { afterInspect, realpath: resolve = realpath, platform = process.platform } = {}) {
+// A directory validated once is known by its identity: volume and file id, as
+// bigint because an NTFS file id does not fit a double. The same name is
+// checked again with one lstat, which follows every ancestor, so an ancestor
+// replaced by a link lands on another directory and anything but the identity
+// that was validated takes the whole walk again. What is not repeated is
+// finding the same directory under the same name: every record read walked
+// its path from the root twice, about a thousand calls a hook and 130 ms of one
+// on windows-latest. The one case the walk would still refuse is the store's
+// own directory moved elsewhere with a link left at its name - the same data in
+// another place (decided 2026-09-30). The seams bypass it: the race tests
+// exercise the walk itself.
+const VALIDATED = new Map();
+const VALIDATED_LIMIT = 512;
+
+async function validatedEarlier(key, directory) {
+  const known = VALIDATED.get(key);
+  if (known === undefined) return null;
+  const current = await lstat(directory, { bigint: true }).catch(() => null);
+  if (current !== null && current.isDirectory() && !current.isSymbolicLink()
+    && current.dev === known.dev && current.ino === known.ino) return current;
+  VALIDATED.delete(key);
+  return null;
+}
+
+function remember(key, details) {
+  if (VALIDATED.size >= VALIDATED_LIMIT) VALIDATED.clear();
+  VALIDATED.set(key, { dev: details.dev, ino: details.ino });
+}
+
+async function inspectManagedDirectory(rootPath, directoryPath, create, options = {}) {
+  const { afterInspect, realpath: resolve = realpath, platform = process.platform } = options;
   const root = absolutePath(rootPath, "managed root");
   const directory = absolutePath(directoryPath, "managed directory", root);
   const relative = relativeWithin(root, directory);
+  const key = options.afterInspect === undefined && options.realpath === undefined
+    && options.platform === undefined ? `${root}\u0000${directory}` : null;
+  if (key !== null) {
+    const known = await validatedEarlier(key, directory);
+    if (known !== null) return { directory, stat: known };
+  }
   let details = await inspectRealDirectory(root, root, create);
   const canonicalRoot = await realpath(root);
   let current = root;
@@ -115,6 +150,7 @@ async function inspectManagedDirectory(rootPath, directoryPath, create,
     }
     canonicalParent = resolved;
   }
+  if (key !== null) remember(key, details);
   return { directory, stat: details };
 }
 
@@ -155,7 +191,7 @@ async function goneWhileResolving(error, current, platform) {
 }
 
 async function stillTheSameDirectory(details, resolved, current, root) {
-  const served = await stat(resolved).then(found => found, error => {
+  const served = await stat(resolved, { bigint: true }).then(found => found, error => {
     if (error.code === "ENOENT") return null;
     throw invalidDirectory("cannot inspect managed directory", current, root, error.message);
   });

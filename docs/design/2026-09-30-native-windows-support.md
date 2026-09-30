@@ -109,6 +109,15 @@ runtime, because launcher modules may import only their siblings.
   does not report an unsafe path. `EPERM` on a name that is still there stays a refusal. Opening
   a file in a directory being removed fails `EPERM` the same way, and reads as absent once the
   name is gone.
+- **Validating a store directory once.** Every record read walked its directory from the store
+  root twice, `lstat` and `realpath` for each level: about a thousand calls a hook, 130 ms of one
+  on windows-latest. A directory validated once is now known by its identity (volume and file
+  id, read as bigint because an NTFS file id does not fit a double), and a later check of the
+  same name is one `lstat`. `lstat` follows every ancestor, so an ancestor replaced by a link
+  lands on another directory, and anything but the validated identity takes the whole walk
+  again. The one case the walk would still refuse and the check does not is the store's own
+  directory moved elsewhere with a link left at its name: the same data in another place.
+  Decided with the maintainer on 2026-09-30, for every platform.
 - **Creating a file exclusively.** `open(…, "wx")` follows a dangling symlink on Windows and
   creates its target. ACC creates such files only under random names inside its own private
   directories, where planting a link already requires the user's own access, so the rule holds.

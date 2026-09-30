@@ -277,7 +277,8 @@ test("an ancestor swapped for a symlink cannot serve another directory in the st
     const decoy = path.join(root, "decoy");
     for (const base of [asked, decoy]) await mkdir(path.join(base, ...depth), { recursive: true });
     const leaf = path.join(asked, ...depth);
-    const decoyLeaf = await stat(path.join(decoy, ...depth));
+    // The walk reports identity as bigint; so must the decoy, or no match is possible.
+    const decoyLeaf = await stat(path.join(decoy, ...depth), { bigint: true });
     const turn = () => new Promise(resolve => { setImmediate(resolve); });
     // `admitted` counts a walk that fits between two flips. A fixed 2 ms quiet
     // window was shorter than one three-level walk on a loaded runner, so no
