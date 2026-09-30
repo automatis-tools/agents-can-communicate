@@ -157,37 +157,48 @@ async function inspectManagedDirectory(rootPath, directoryPath, create, options 
 // Where NTFS keeps a directory deleted while something still has it open.
 const DELETED = /^(?:\\\\\?\\)?[A-Za-z]:\\\$Extend\\\$Deleted\\/i;
 
-// null when the name went away and the caller may take it again.
-async function resolveSegment(current, retry, { resolve, platform }) {
-  let resolved;
-  try {
-    resolved = await resolve(current);
-  } catch (error) {
-    const gone = await goneWhileResolving(error, current, platform);
-    if (gone === null) throw error;
-    if (retry) return null;
-    throw gone;
-  }
-  if (platform !== "win32" || !DELETED.test(resolved)) return resolved;
-  if (retry) return null;
-  throw Object.assign(new Error(`ENOENT: ${current} was deleted while it resolved`),
-    { code: "ENOENT", syscall: "realpath", path: current });
-}
+// How many times a name answered with a directory leaving it is resolved again.
+const LEAVING_RETRIES = 3;
 
+// null when the name went away and the caller may take it again.
+//
 // Linux realpath fails ENOENT on a name removed or renamed away while it
-// resolves. Windows, measured on windows-latest, answers that window with EBADF,
-// with EPERM while the name is being deleted, or with the directory's place in
-// $Extend\$Deleted (above): the same fact, the name went away. EPERM on a name
-// that is still there, and EBADF anywhere else, stay what they say.
-async function goneWhileResolving(error, current, platform) {
-  if (error.code === "ENOENT") return error;
-  if (platform !== "win32") return null;
-  if (error.code === "EPERM") {
+// resolves. Windows, measured on windows-latest, answers that window with
+// EBADF, with EPERM, or with the directory's place in $Extend\$Deleted (above):
+// the handle it took was to a directory leaving the name. The name itself may
+// already hold a new one - `stage` does, right after a sweep - so it is resolved
+// again. A directory there is the answer, no directory there is gone, and a
+// name that keeps answering that way while present fails as it always did:
+// read as gone, a directory would read as holding no records.
+async function resolveSegment(current, retry, { resolve, platform }) {
+  for (let attempt = 1; ; attempt += 1) {
+    let resolved = null;
+    let failure = null;
+    try {
+      resolved = await resolve(current);
+    } catch (error) {
+      failure = error;
+    }
+    const leaving = platform === "win32" && (failure === null ? DELETED.test(resolved)
+      : ["EBADF", "EPERM"].includes(failure.code));
+    if (failure === null && !leaving) return resolved;
+    if (failure?.code === "ENOENT") {
+      if (retry) return null;
+      throw failure;
+    }
+    if (!leaving) throw failure;
+    if (attempt < LEAVING_RETRIES) continue;
     const present = await lstat(current).then(() => true, missing => missing.code !== "ENOENT");
-    if (present) return null;
-  } else if (error.code !== "EBADF") return null;
-  return Object.assign(new Error(error.message, { cause: error }),
-    { code: "ENOENT", syscall: error.syscall, path: error.path });
+    // Present: a deleted directory's place is refused by the containment check
+    // that follows, and an error stays what it says.
+    if (present) {
+      if (failure !== null) throw failure;
+      return resolved;
+    }
+    if (retry) return null;
+    throw Object.assign(new Error(`ENOENT: ${current} left its name while it resolved`,
+      failure === null ? {} : { cause: failure }), { code: "ENOENT", syscall: "realpath", path: current });
+  }
 }
 
 async function stillTheSameDirectory(details, resolved, current, root) {

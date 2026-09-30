@@ -120,60 +120,61 @@ test("an accepted stage taken on every attempt ends the publication", { timeout:
   assert.ok(taken >= 2 && taken <= 10, `retried a bounded number of times, took ${taken}`);
 });
 
-// Measured on windows-latest: realpath of a directory another process renames
-// back and forth fails EBADF there, where Linux says ENOENT for the same window,
-// and a read of the writer lock's owner record failed as unsafe instead of
-// finding the lock gone.
-test("windows: a directory whose realpath fails EBADF mid-rename has gone away", async t => {
-  const { root, paths } = await store(t);
-  const failing = new Set();
-  const resolve = async current => {
-    if (failing.delete(current)) {
-      throw Object.assign(new Error(`EBADF: bad file descriptor, realpath '${current}'`),
-        { code: "EBADF", syscall: "realpath" });
-    }
-    return realpath(current);
-  };
+// Measured on windows-latest, a directory another process removes or renames
+// while it resolves: realpath fails EBADF, fails EPERM, or answers with where
+// NTFS keeps a deleted directory that is still open, `C:\$Extend\$Deleted\<id>`.
+// Each means the handle it took was to a directory leaving that name - and the
+// name may already hold a new directory, as `stage` does after a sweep. So the
+// name is resolved again: a directory there is the answer, no directory is
+// gone, and a name that keeps answering that way while present is refused, as
+// it was before any of this: reading it as absent would read its records as none.
+const DELETED_PATH = "C:\\$Extend\\$Deleted\\0004000000046F6F0760FC9B";
+const answer = (kind, current) => {
+  if (kind === "deleted") return DELETED_PATH;
+  throw Object.assign(new Error(`${kind}: realpath '${current}'`), { code: kind, syscall: "realpath" });
+};
 
-  failing.add(paths.stage);
-  assert.equal(await ensureManagedDirectory(root, paths.stage, { platform: "win32", realpath: resolve }),
-    paths.stage);
-  failing.add(paths.stage);
-  await assert.rejects(assertManagedDirectory(root, paths.stage, { platform: "win32", realpath: resolve }),
-    error => error.code === "ENOENT" && error.cause?.code === "EBADF");
-  failing.add(paths.stage);
-  await assert.rejects(assertManagedDirectory(root, paths.stage, { platform: "linux", realpath: resolve }),
-    error => error.code === "EBADF");
-});
-
-// Measured on windows-latest, a directory another process removes while it
-// resolves: realpath answers with where NTFS keeps a deleted directory that is
-// still open, `C:\$Extend\$Deleted\<id>`, or fails EPERM with the name already
-// gone. Both are the name going away; EPERM on a name still there is not.
-test("windows: a directory resolved into $Extend\\$Deleted, or refused while it goes, has gone away",
-  async t => {
+for (const kind of ["EBADF", "EPERM", "deleted"]) {
+  test(`windows: ${kind} while a directory changes hands resolves the name again`, async t => {
     const { root, paths } = await store(t);
-    const deleted = async () => "C:\\$Extend\\$Deleted\\0004000000046F6F0760FC9B";
-    await assert.rejects(assertManagedDirectory(root, paths.stage, { platform: "win32",
-      realpath: async current => (current === paths.stage ? deleted() : realpath(current)) }),
-    error => error.code === "ENOENT");
-    await assert.rejects(assertManagedDirectory(root, paths.stage, { platform: "linux",
-      realpath: async current => (current === paths.stage ? deleted() : realpath(current)) }),
-    /escapes the canonical store root/);
-
-    let refused = false;
-    const refusedWhileGoing = async current => {
-      if (current !== paths.stage || refused) return realpath(current);
-      refused = true;
-      await rm(paths.stage, { recursive: true, force: true });
-      throw Object.assign(new Error("EPERM: operation not permitted, realpath"), { code: "EPERM" });
+    let answered = false;
+    const once = async current => {
+      if (current !== paths.stage || answered) return realpath(current);
+      answered = true;
+      return answer(kind, current);
     };
-    assert.equal(await ensureManagedDirectory(root, paths.stage,
-      { platform: "win32", realpath: refusedWhileGoing }), paths.stage);
-    const refusedInPlace = async current => {
-      if (current !== paths.stage) return realpath(current);
-      throw Object.assign(new Error("EPERM: operation not permitted, realpath"), { code: "EPERM" });
+    const found = await assertManagedDirectory(root, paths.stage, { platform: "win32", realpath: once });
+    assert.equal(found.directory, paths.stage, "a directory still under the name was read as gone");
+  });
+
+  test(`windows: ${kind} for a directory that left its name is gone`, async t => {
+    const { root, paths } = await store(t);
+    const leaving = () => {
+      let answered = false;
+      return async current => {
+        if (current !== paths.stage || answered) return realpath(current);
+        answered = true;
+        await rm(paths.stage, { recursive: true, force: true });
+        return answer(kind, current);
+      };
     };
     await assert.rejects(assertManagedDirectory(root, paths.stage,
-      { platform: "win32", realpath: refusedInPlace }), { code: "EPERM" });
+      { platform: "win32", realpath: leaving() }), error => error.code === "ENOENT");
+    assert.equal(await ensureManagedDirectory(root, paths.stage,
+      { platform: "win32", realpath: leaving() }), paths.stage);
   });
+
+  test(`windows: ${kind} for a directory that stays is refused, never read as gone`, async t => {
+    const { root, paths } = await store(t);
+    const stuck = async current => (current === paths.stage ? answer(kind, current) : realpath(current));
+    await assert.rejects(assertManagedDirectory(root, paths.stage,
+      { platform: "win32", realpath: stuck }), error => error.code !== "ENOENT");
+  });
+}
+
+test("linux: EBADF from realpath stays what it says", async t => {
+  const { root, paths } = await store(t);
+  const failing = async current => (current === paths.stage ? answer("EBADF", current) : realpath(current));
+  await assert.rejects(assertManagedDirectory(root, paths.stage, { platform: "linux", realpath: failing }),
+    error => error.code === "EBADF");
+});
