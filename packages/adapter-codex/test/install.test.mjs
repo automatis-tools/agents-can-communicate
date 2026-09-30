@@ -13,6 +13,7 @@ import { EXIT } from "@agents-can-communicate/protocol";
 
 import { createCodexAdapter } from "../src/adapter.mjs";
 import { CODEX_HOOK_EVENTS, injectOutcome, normalizeCodexHook } from "../src/hooks.mjs";
+import { POSIX_FORM } from "../../../tests/helpers/platform-scope.mjs";
 
 const run = promisify(execFile);
 
@@ -52,7 +53,7 @@ async function fixture(t) {
   const ours = path.join(root, ".agents", "plugins", "marketplace.json");
   const read = async () => JSON.parse(await readFile(ours, "utf8"));
   const plugin = path.join(root, "plugins", "agents-can-communicate");
-  return { context: { home, codexHome: path.join(home, ".codex") },
+  return { context: { home, codexHome: path.join(home, ".codex"), hostPlatform: POSIX_FORM },
     marketplace: ours, read, theirs, root, plugin };
 }
 

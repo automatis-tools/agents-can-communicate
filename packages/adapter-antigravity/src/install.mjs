@@ -658,7 +658,7 @@ export async function detectAntigravity(context) {
   }
   // Every install writes the rule, so where ACC's wrapper is on disk a missing
   // or unreadable rule is an install to finish, whatever the delivery policy.
-  if (await exists(cliWrapperPath(context.home))) {
+  if (await exists(cliWrapperPath(context.home, context.hostPlatform))) {
     if (commandApproval.state === "prompts") {
       needsAction.push(`acc install --adapter antigravity  # ${commandApproval.rule} is missing `
         + `from permissions.allow in ${commandApproval.file}, so each ACC command waits for `
@@ -727,7 +727,7 @@ export function planAntigravityInstall(context) {
   // match: a wrapper path that needs quotes gets none.
   const plugin = [{ path: pluginInstallPath(context.home), kind: "merge" },
     { path: vendorManifestPath(context.home), kind: "merge" },
-    ...(isShellWord(cliWrapperPath(context.home))
+    ...(isShellWord(cliWrapperPath(context.home, context.hostPlatform))
       ? [{ path: agySettingsPath(context.home), kind: "merge" }] : [])];
   if (locationChoice(context) !== null) {
     return [shim, ...plugin,

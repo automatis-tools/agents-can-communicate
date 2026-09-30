@@ -31,7 +31,10 @@ import { blankJson, isShellWord, removeIfEmpty, writeForeignJson }
  */
 export const agySettingsPath = home => path.join(home, ".gemini", "antigravity-cli",
   "settings.json");
-export const cliWrapperPath = home => path.join(home, ".gemini", "config", "acc", "acc-cli.sh");
+// Windows runs a Node shim where POSIX runs `acc-cli.sh`.
+export const cliWrapperPath = (home, platform = process.platform) => (platform === "win32"
+  ? path.win32.join(home, ".gemini", "config", "acc", "acc-cli.mjs")
+  : path.join(home, ".gemini", "config", "acc", "acc-cli.sh"));
 export const accAllowRule = wrapper => `command(${wrapper})`;
 
 // Forms that already allow every command starting with the bare wrapper: the
@@ -91,9 +94,16 @@ const RESTART = "Antigravity CLI reads it at startup, so a session started befor
 /** What the rule's state is on this machine, in words doctor can print. */
 export async function inspectAllowRule(context) {
   const file = agySettingsPath(context.home);
-  const wrapper = cliWrapperPath(context.home);
+  const hostPlatform = context.hostPlatform ?? process.platform;
+  const wrapper = cliWrapperPath(context.home, hostPlatform);
   const rule = accAllowRule(wrapper);
   const base = { file, wrapper, rule, owned: false };
+  if (hostPlatform === "win32") {
+    return { ...base, state: "unmatchable", diagnostic: "On Windows ACC adds no allow rule, so "
+      + "Antigravity CLI asks before each ACC command. The skill runs `node` on the CLI shim, and "
+      + "this client matches a rule against a command's first word: a rule on `node` would let "
+      + "every node command through without asking" };
+  }
   if (!isShellWord(wrapper)) {
     return { ...base, state: "unmatchable", diagnostic: "each ACC command waits for approval, "
       + "so a live wake stops at the agent's first ACC command until someone answers the "

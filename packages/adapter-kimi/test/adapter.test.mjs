@@ -14,6 +14,7 @@ import { createKimiAdapter } from "../src/adapter.mjs";
 import { allowResponse, denyResponse, injectResponse, normalizeKimiHook }
   from "../src/hooks.mjs";
 import { BEGIN, END, renderBlock, stripBlock } from "../src/install.mjs";
+import { POSIX_FORM } from "../../../tests/helpers/platform-scope.mjs";
 
 // A config the user owns: comments, formatting, their own hook, and a table at
 // the very end - the position where an appended block is most likely to be
@@ -38,7 +39,7 @@ async function fixture(t) {
   const runner = path.join(home, "acc-hook.mjs");
   await writeFile(runner, "// stand-in for the runner\n");
   const read = () => readFile(path.join(home, "config.toml"), "utf8");
-  return { context: { home, runner, node: "/usr/bin/node" }, read };
+  return { context: { home, runner, node: "/usr/bin/node", hostPlatform: POSIX_FORM }, read };
 }
 
 const captured = async name => JSON.parse(await readFile(

@@ -12,6 +12,7 @@ import { EXIT } from "@agents-can-communicate/protocol";
 import { createClaudeCodeAdapter } from "../src/adapter.mjs";
 import { allowResponse, denyResponse, injectResponse, normalizeClaudeHook }
   from "../src/hooks.mjs";
+import { POSIX_FORM } from "../../../tests/helpers/platform-scope.mjs";
 
 // Settings the user already owns, including a hook of their own that looks a
 // lot like one of ours.
@@ -28,7 +29,7 @@ async function fixture(t) {
     `${JSON.stringify(EXISTING, null, 2)}\n`);
   const read = async () => JSON.parse(await readFile(
     path.join(configDir, "settings.json"), "utf8"));
-  return { context: { configDir }, read };
+  return { context: { configDir, hostPlatform: POSIX_FORM }, read };
 }
 
 const captured = async name => JSON.parse(await readFile(

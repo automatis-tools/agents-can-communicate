@@ -10,6 +10,8 @@ import test from "node:test";
 
 import { installClaudePlugin } from "../src/install.mjs";
 
+// The installer passes `platform` as a detection label ("win32-x64"); the shim
+// form follows the host, named hostPlatform, as in every other adapter.
 test("windows: every plugin hook starts the pinned node on the Node shim, with no shell", async t => {
   const root = await realpath(await mkdtemp(path.join(tmpdir(), "acc-claude-win-")));
   t.after(() => rm(root, { recursive: true, force: true }));
@@ -19,7 +21,7 @@ test("windows: every plugin hook starts the pinned node on the Node shim, with n
   await writeFile(cli, "");
   const node = "C:\\Program Files\\nodejs\\node.exe";
   await installClaudePlugin({ configDir: path.join(root, ".claude"), runner, cli,
-    node, platform: "win32" });
+    node, hostPlatform: "win32" });
   const cache = path.join(root, ".claude", "plugins", "cache", "acc-local", "agents-can-communicate");
   const [version] = await readdir(cache);
   const hooks = JSON.parse(await readFile(path.join(cache, version, "hooks", "hooks.json"), "utf8"));
@@ -34,4 +36,17 @@ test("windows: every plugin hook starts the pinned node on the Node shim, with n
   assert.deepEqual(commands.map(hook => hook.args[1]),
     ["sessionStart", "beforeTurn", "guard", "finish", "sessionEnd"]);
   await readFile(path.join(cache, version, "hooks", "acc-hook.mjs"), "utf8");
+});
+
+test("a detection label in `platform` does not choose the shim form", async t => {
+  const root = await realpath(await mkdtemp(path.join(tmpdir(), "acc-claude-label-")));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const runner = path.join(root, "acc-hook.mjs");
+  await writeFile(runner, "");
+  await installClaudePlugin({ configDir: path.join(root, ".claude"), runner, cli: runner,
+    platform: "win32-x64", hostPlatform: "linux" });
+  const cache = path.join(root, ".claude", "plugins", "cache", "acc-local", "agents-can-communicate");
+  const [version] = await readdir(cache);
+  const hooks = await readdir(path.join(cache, version, "hooks"));
+  assert.equal(hooks.includes("acc-hook.sh"), true, hooks.join(", "));
 });

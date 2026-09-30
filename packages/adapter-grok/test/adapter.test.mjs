@@ -11,6 +11,7 @@ import { createGrokAdapter } from "../src/adapter.mjs";
 import { allowResponse, denyResponse, injectResponse, normalizeGrokHook }
   from "../src/hooks.mjs";
 import { hooksFile, shimPath, skillPath } from "../src/install.mjs";
+import { POSIX_FORM } from "../../../tests/helpers/platform-scope.mjs";
 
 async function fixture(t) {
   const home = await realpath(await mkdtemp(path.join(tmpdir(), "acc-grok-")));
@@ -29,7 +30,7 @@ async function fixture(t) {
   const claude = () => readFile(path.join(claudeDir, "settings.json"), "utf8");
   const foreign = () => readFile(path.join(grokHome, "hooks", "other.json"), "utf8");
   return { home, grokHome, claudeDir, claude, foreign,
-    context: { home, grokHome, runner, node: "/usr/bin/node" } };
+    context: { home, grokHome, runner, node: "/usr/bin/node", hostPlatform: POSIX_FORM } };
 }
 
 const captured = async name => JSON.parse(await readFile(

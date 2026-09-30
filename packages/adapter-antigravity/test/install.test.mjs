@@ -11,6 +11,7 @@ import { fakeAgy } from "./fake-agy.mjs";
 import { ACC_NAMESPACE, ACC_REGISTERED_EVENTS, HOOK_LOCATIONS, detectAntigravity,
   doctorAntigravity, globalHooksPath, installAntigravity, planAntigravityInstall,
   registeredEvents, uninstallAntigravity, workspaceHooksPath } from "../src/install.mjs";
+import { POSIX_FORM } from "../../../tests/helpers/platform-scope.mjs";
 
 const captured = async name => JSON.parse(await readFile(
   new URL(`../fixtures/${name}.json`, import.meta.url), "utf8"));
@@ -45,7 +46,7 @@ async function fixture(t, { location } = {}) {
   const dataHome = path.join(home, "acc-data");
   // agy itself is never run from a test: this one reproduces what 1.2.7 was
   // captured doing, and the hook read-back is answered by probeHooks above.
-  const context = { home, dataHome, antigravityWorkspace: workspace,
+  const context = { home, dataHome, antigravityWorkspace: workspace, hostPlatform: POSIX_FORM,
     ...(location === undefined ? {} : { antigravityHookLocation: location }), probeHooks,
     runAgy: fakeAgy().run };
   const geminiTree = async () => ({

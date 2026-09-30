@@ -10,6 +10,7 @@ import { effectiveCapabilities } from "@agents-can-communicate/adapter-sdk";
 import { createGeminiCliAdapter } from "../src/adapter.mjs";
 import { allowResponse, denyResponse, injectResponse, normalizeGeminiHook }
   from "../src/hooks.mjs";
+import { POSIX_FORM } from "../../../tests/helpers/platform-scope.mjs";
 
 // The user already has a hook of their own on an event ACC also uses, with a
 // command string that is easy to confuse for ours.
@@ -26,7 +27,7 @@ async function fixture(t) {
     `${JSON.stringify(EXISTING, null, 2)}\n`);
   const read = async () => JSON.parse(await readFile(
     path.join(home, ".gemini", "settings.json"), "utf8"));
-  return { context: { home }, read };
+  return { context: { home, hostPlatform: POSIX_FORM }, read };
 }
 
 const captured = async name => JSON.parse(await readFile(

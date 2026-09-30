@@ -14,3 +14,14 @@ export function posixTransportTest(name, ...rest) {
   const options = rest[0] ?? {};
   return nodeTest(name, { ...options, skip: options.skip ?? POSIX_LIVE_TRANSPORT }, fn);
 }
+
+// Install tests that check file names and command strings pin the POSIX form,
+// so one expectation holds on every host; each adapter's Windows form has its
+// own tests, and real clients run it on the Windows CI runner.
+export const POSIX_FORM = "linux";
+
+// Antigravity CLI matches an allow rule against a command's first word. On
+// Windows the skill runs `node "<path>"`, and a rule on `node` would allow every
+// node command, so ACC writes none there and each ACC command asks.
+export const NO_ALLOW_RULE_ON_WINDOWS = process.platform === "win32"
+  ? "Windows writes no allow rule: the command's first word is node" : false;

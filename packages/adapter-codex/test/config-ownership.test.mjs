@@ -5,11 +5,12 @@ import path from "node:path";
 import test from "node:test";
 import { createCodexAdapter } from "../src/adapter.mjs";
 import { rewrittenCodexConfig, clientTables } from "../../../tests/helpers/codex-config.mjs";
+import { POSIX_FORM } from "../../../tests/helpers/platform-scope.mjs";
 
 async function fixture(t) {
   const home = await mkdtemp(path.join(tmpdir(), "acc-config-ownership-"));
   t.after(() => rm(home, { recursive: true, force: true }));
-  const context = { home, stateRoot: path.join(home, "data", "acc") };
+  const context = { home, stateRoot: path.join(home, "data", "acc"), hostPlatform: POSIX_FORM };
   const file = path.join(home, ".codex", "config.toml");
   await mkdir(path.dirname(file), { recursive: true });
   return { context, file, adapter: createCodexAdapter() };

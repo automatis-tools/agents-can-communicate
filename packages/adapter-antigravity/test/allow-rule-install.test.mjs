@@ -1,9 +1,13 @@
 import assert from "node:assert/strict";
 import { readdir } from "node:fs/promises";
-import test from "node:test";
+import nodeTest from "node:test";
 
 import { installAntigravity, uninstallAntigravity } from "../src/install.mjs";
 import { ANY_POLICY, agyHome } from "./agy-home.mjs";
+import { NO_ALLOW_RULE_ON_WINDOWS } from "../../../tests/helpers/platform-scope.mjs";
+
+const test = (name, ...rest) => { const fn = rest.pop(); const options = rest[0] ?? {};
+  return nodeTest(name, { ...options, skip: options.skip ?? NO_ALLOW_RULE_ON_WINDOWS }, fn); };
 
 /**
  * The allow rule that lets a woken Antigravity session answer unattended.

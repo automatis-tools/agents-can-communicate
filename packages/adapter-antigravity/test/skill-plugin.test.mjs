@@ -8,6 +8,7 @@ import { ACC_PLUGIN_NAME, ACC_SKILL_ID, detectAntigravity, doctorAntigravity,
   installAntigravity, planAntigravityInstall, pluginInstallPath, uninstallAntigravity,
   vendorManifestPath } from "../src/install.mjs";
 import { fakeAgy } from "./fake-agy.mjs";
+import { POSIX_FORM } from "../../../tests/helpers/platform-scope.mjs";
 
 const exists = async target => stat(target).then(() => true, () => false);
 
@@ -17,7 +18,7 @@ async function machine(t, agyOptions) {
   await mkdir(path.join(home, ".gemini", "config"), { recursive: true });
   const agy = fakeAgy(agyOptions);
   const context = { home, dataHome: path.join(home, "acc-data"),
-    antigravityWorkspace: path.join(home, "project"), runAgy: agy.run };
+    antigravityWorkspace: path.join(home, "project"), runAgy: agy.run, hostPlatform: POSIX_FORM };
   return { home, context, agy };
 }
 
@@ -45,7 +46,8 @@ test("install gives this client its own ACC skill, through agy plugin install", 
   }
 });
 
-test("the skill names the wrapper bare when its path is one shell word", async t => {
+test("the skill names the wrapper bare when its path is one shell word",
+  { skip: process.platform === "win32" ? "a Windows path is never one POSIX shell word" : false }, async t => {
   // Antigravity CLI 1.2.12 matched no allow rule against a command whose first
   // word was quoted, so a quoted wrapper always stops at an approval prompt
   // (issue #214). A path that needs quotes to stay one word keeps them.
