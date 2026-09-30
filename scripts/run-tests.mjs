@@ -10,7 +10,7 @@ import { spawn } from "node:child_process";
 import { readdir } from "node:fs/promises";
 import path from "node:path";
 
-import { TEST_FILE_CONCURRENCY, nodeTestArguments } from "./test-runner-plan.mjs";
+import { TEST_FILE_CONCURRENCY, nodeTestArguments, testBatches } from "./test-runner-plan.mjs";
 
 const repo = path.resolve(import.meta.dirname, "..");
 
@@ -48,6 +48,20 @@ if (process.argv.includes("--list")) {
   process.exit(0);
 }
 
-const child = spawn(process.execPath, nodeTestArguments(files),
-  { stdio: "inherit", cwd: repo });
-child.on("exit", code => { process.exitCode = code ?? 1; });
+// Relative to the repository, and in batches: see testBatches. A suite that fits
+// one command line, as it does on POSIX, runs as a single batch.
+const batches = testBatches(files.map(file => path.relative(repo, file)));
+const failed = [];
+for (const [index, batch] of batches.entries()) {
+  const code = await new Promise(resolve => {
+    spawn(process.execPath, nodeTestArguments(batch), { stdio: "inherit", cwd: repo })
+      .on("error", () => resolve(1))
+      .on("exit", exitCode => resolve(exitCode ?? 1));
+  });
+  if (code !== 0) failed.push(index + 1);
+}
+if (batches.length > 1) {
+  console.log(failed.length === 0 ? `all ${batches.length} batches passed`
+    : `batch(es) ${failed.join(", ")} of ${batches.length} failed`);
+}
+process.exitCode = failed.length === 0 ? 0 : 1;

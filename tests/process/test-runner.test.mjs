@@ -4,8 +4,8 @@ import path from "node:path";
 import test from "node:test";
 import { promisify } from "node:util";
 
-import { TEST_FILE_CONCURRENCY, nodeTestArguments }
-  from "../../scripts/test-runner-plan.mjs";
+import { COMMAND_LINE_LIMIT, TEST_FILE_CONCURRENCY, commandLineLength, nodeTestArguments,
+  testBatches } from "../../scripts/test-runner-plan.mjs";
 
 const run = promisify(execFile);
 const repo = path.resolve(import.meta.dirname, "..", "..");
@@ -49,4 +49,24 @@ test("the runner bounds file concurrency without weakening process races", () =>
     "first.test.mjs",
     "second.test.mjs",
   ]);
+});
+
+// Measured on windows-latest: 345 absolute test paths make a command line past
+// Windows' 32,767-character limit, and the whole suite failed to start with
+// "The filename or extension is too long".
+test("no batch of test files makes a command line longer than Windows allows", () => {
+  const files = Array.from({ length: 700 },
+    (_, index) => `packages/adapter-something/test/a-fairly-long-test-name-${index}.test.mjs`);
+  const batches = testBatches(files);
+
+  assert.deepEqual(batches.flat(), files, "every file runs once, in order");
+  assert.equal(batches.length > 1, true);
+  for (const batch of batches) {
+    assert.equal(commandLineLength([process.execPath, ...nodeTestArguments(batch)])
+      <= COMMAND_LINE_LIMIT, true);
+  }
+});
+
+test("a suite that fits one command line runs as one batch", () => {
+  assert.deepEqual(testBatches(["a.test.mjs", "b.test.mjs"]), [["a.test.mjs", "b.test.mjs"]]);
 });
