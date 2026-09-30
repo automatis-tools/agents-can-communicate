@@ -343,3 +343,21 @@ test("the last session of a participant is found whether it is open or closed", 
   assert.equal(last.endReason, "clear");
   assert.equal(await service.lastSessionOf({ participantId: "nobody" }), null);
 });
+
+// A heartbeat tried the ephemeral record first, under the writer lock, and in a
+// materialised workspace found nothing there before taking the lock again for
+// the durable record: every turn paid for a lock that wrote nothing.
+test("a durable session's heartbeat never takes the lock for an ephemeral record", async () => {
+  const { clock, service: opener, store } = makeService();
+  const first = await opener.openSession(opening());
+  await opener.openSession(opening({ participantId: "participant_b", harness: "claude-code" }));
+  let updates = 0;
+  const counting = { ...store, ephemeral: { ...store.ephemeral,
+    update: (...args) => { updates += 1; return store.ephemeral.update(...args); } } };
+  const service = createCoordinationService({ store: counting, clock, ids: createFakeIds() });
+
+  const beaten = await service.heartbeatSession({ sessionId: first.sessionId,
+    generation: first.generation });
+  assert.equal(beaten.state, "open");
+  assert.equal(updates, 0);
+});

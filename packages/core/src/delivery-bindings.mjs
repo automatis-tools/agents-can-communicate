@@ -91,6 +91,13 @@ export function createDeliveryBindingService(ports, sessions) {
   async function clearDeliveryBinding(input) {
     const { sessionId, generation } = input;
     const endpointScoped = Object.hasOwn(input, "opaqueEndpointRef");
+    // Every hook clears when live delivery is not running, and on Windows that
+    // is every hook. Absent, or retired for this generation, is a state the
+    // update below leaves exactly as it is, so it is read first without the
+    // writer lock; a record read this way is as current as one read under it.
+    const seen = await store.ephemeral.get("deliveryBinding", sessionId);
+    if (seen === null || seen === undefined) return;
+    if (seen.generation === generation && seen.retiredAt !== null && seen.retiredAt !== undefined) return;
     await store.ephemeral.update("deliveryBinding", sessionId, async current => {
       if (current === null || current === undefined) return null;
       if (current.generation !== generation) throw conflict(sessionId);
