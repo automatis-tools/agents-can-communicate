@@ -3,6 +3,7 @@ import path from "node:path";
 import { AccError, EXIT, assertPortableId } from "@agents-can-communicate/protocol";
 
 import { encode, listJsonFiles, publishAtomic, readJsonIfPresent } from "./atomic-json.mjs";
+import { publicationPath } from "./publication-path.mjs";
 
 const RETENTION_VERSION = 1;
 const SEQUENCE_WIDTH = 16;
@@ -40,8 +41,8 @@ function stateMarker(paths, kind, id, generation) {
 
 export function stateDeletionPublication(paths, root, kind, id, generation, retainedPath) {
   const marker = stateMarker(paths, kind, id, generation);
-  return { path: path.relative(root, marker.filePath), bytes: encode(marker.record),
-    replace: false, retainedPath: path.relative(root, retainedPath) };
+  return { path: publicationPath(root, marker.filePath), bytes: encode(marker.record),
+    replace: false, retainedPath: publicationPath(root, retainedPath) };
 }
 
 export async function stateGenerationIsDeleted(paths, root, kind, id, generation) {

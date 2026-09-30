@@ -7,6 +7,7 @@ import { AccError, EXIT, assertPortableId, validateRecord }
 import { encode, listDirectoryEntries, listJsonFiles, publishAtomic, readJsonIfPresent,
   retainFile } from "./atomic-json.mjs";
 import { initialiseActiveJournal } from "./active-journal.mjs";
+import { publicationPath } from "./publication-path.mjs";
 import { assertPublicationDeadline } from "./deadline.mjs";
 import { requireStoreIdentity } from "./identity.mjs";
 import { journalEntry, readJournalCeiling, readOpenJournals, rollForward, writeJournalEntry }
@@ -251,7 +252,7 @@ export async function openFilesystemStore({ root, clock, ids, workspaceId, failA
       // ceiling in eventsSince has to hide.
       const publications = [
         ...events.map(event => ({
-          path: path.relative(root, eventPath(paths, event.sequence)),
+          path: publicationPath(root, eventPath(paths, event.sequence)),
           bytes: encode(event),
           replace: false,
         })),
@@ -259,7 +260,7 @@ export async function openFilesystemStore({ root, clock, ids, workspaceId, failA
           ? stateDeletionPublication(paths, root, entry.kind, entry.id, entry.generation,
             statePath(paths, entry.kind, entry.id))
           : {
-            path: path.relative(root, statePath(paths, entry.kind, entry.id)),
+            path: publicationPath(root, statePath(paths, entry.kind, entry.id)),
             bytes: encode(stateEnvelope(entry.kind, entry.id, entry.generation, entry.record)),
             replace: true,
           })),
