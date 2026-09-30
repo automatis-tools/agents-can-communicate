@@ -1,5 +1,33 @@
 # Changelog
 
+## Unreleased — native Windows
+
+Work in progress for #234. The design is in
+[docs/design/2026-09-30-native-windows-support.md](docs/design/2026-09-30-native-windows-support.md).
+
+- `package.json` no longer declares `"os": ["darwin", "linux"]`, and CI runs the suite and the
+  package check on `windows-latest` beside macOS and Linux.
+- The store and the managed runtime go through portable filesystem primitives. On Windows they
+  flush the renamed file instead of its directory, retry a rename or read that another handle
+  holds, report a taken directory name as `EEXIST`, and refuse a symlink or junction at the last
+  path component without `O_NOFOLLOW`.
+- Windows keeps ACC state in `%LOCALAPPDATA%`, never in the roaming profile.
+- A workspace config root that starts with a separator or a drive letter is refused on every
+  platform, which includes `\\host\share` and `D:x`. A backslash separates the segments of a
+  `file:` claim.
+- On Windows the hook runner reads the chain of processes above it through one PowerShell call,
+  and a client's image name matches without `.exe`.
+
+| Candidate artifact | Value |
+|---|---|
+| Built from | `d5c77fd599a0ccaed4aed5b9fcdaabfdd9f3818f` |
+| Tarball | `agents-can-communicate-0.8.5.tgz`, 505,497 bytes, 321 files |
+| sha256 | `40a0e51e9b86008c468137ba034f9b2257323539e945d5091bcc9e2b1b193b2c` |
+
+This unpublished development archive was measured with `npm pack`. See
+[the evidence](docs/release-evidence/unreleased-windows-support.md).
+The package version remains `0.8.5` until a release prepares its own.
+
 ## 0.8.5 — release candidate
 
 - A Codex chat that a launch option keeps embedded is told which option: `-c`/`--config`,
