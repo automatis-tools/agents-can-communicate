@@ -28,15 +28,17 @@ const usage = (message, details) => {
   throw new AccError(EXIT.USAGE, message, details);
 };
 
+// Pids, locks and pipe names belong to one machine, so state and cache live in
+// local app data. A roaming profile would carry them to another machine, where
+// every recorded pid names something else; there is no roaming fallback.
 function windowsPaths(env) {
-  if (!set(env.APPDATA)) {
-    usage("cannot resolve the Windows application data directory");
+  if (!set(env.LOCALAPPDATA)) {
+    usage("cannot resolve the Windows local application data directory");
   }
   return {
-    data: env.APPDATA,
-    config: env.APPDATA,
-    // Roaming is the honest fallback: a cache that roams is wasteful, not wrong.
-    cache: set(env.LOCALAPPDATA) ? env.LOCALAPPDATA : env.APPDATA,
+    data: env.LOCALAPPDATA,
+    config: set(env.APPDATA) ? env.APPDATA : env.LOCALAPPDATA,
+    cache: env.LOCALAPPDATA,
   };
 }
 

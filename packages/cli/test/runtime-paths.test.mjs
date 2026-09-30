@@ -114,8 +114,12 @@ test("the platform data home follows the macOS and Windows conventions", () => {
   assert.equal(platformDataHome({ platform: "darwin", env: { HOME: "/Users/example" } }),
     path.join("/Users/example", "Library", "Application Support"));
   assert.equal(platformDataHome({ platform: "win32",
+    env: { APPDATA: "C:\\Users\\example\\AppData\\Roaming",
+      LOCALAPPDATA: "C:\\Users\\example\\AppData\\Local" } }),
+  "C:\\Users\\example\\AppData\\Local");
+  assert.throws(() => platformDataHome({ platform: "win32",
     env: { APPDATA: "C:\\Users\\example\\AppData\\Roaming" } }),
-  "C:\\Users\\example\\AppData\\Roaming");
+  error => error.code === EXIT.USAGE);
 });
 
 test("an explicit override wins over every platform default", () => {

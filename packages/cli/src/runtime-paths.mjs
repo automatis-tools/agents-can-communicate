@@ -54,9 +54,10 @@ export function platformDataHome({ platform = process.platform, env = process.en
   if (typeof env.ACC_DATA_HOME === "string" && env.ACC_DATA_HOME.length > 0) {
     return env.ACC_DATA_HOME;
   }
+  // Machine-local: see windowsPaths in platform-paths.mjs.
   if (platform === "win32") {
-    if (typeof env.APPDATA === "string" && env.APPDATA.length > 0) return env.APPDATA;
-    throw new AccError(EXIT.USAGE, "cannot resolve the Windows application data directory");
+    if (typeof env.LOCALAPPDATA === "string" && env.LOCALAPPDATA.length > 0) return env.LOCALAPPDATA;
+    throw new AccError(EXIT.USAGE, "cannot resolve the Windows local application data directory");
   }
   if (typeof env.XDG_DATA_HOME === "string" && env.XDG_DATA_HOME.length > 0
     && platform !== "darwin") {

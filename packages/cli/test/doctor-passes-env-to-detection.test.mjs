@@ -17,7 +17,7 @@ test("doctor hands detection the runtime environment it resolves the client from
   let seen = null;
   const detect = async ({ context }) => { seen = context; return []; };
   const runtime = { platform: process.platform,
-    env: { HOME: home, APPDATA: home, SHELL: "/bin/zsh" } };
+    env: { HOME: home, LOCALAPPDATA: home, SHELL: "/bin/zsh" } };
 
   await diagnoseAdapters({ options: {}, runtime, detect });
 
@@ -39,7 +39,7 @@ test("doctor hands detection every receiving adapter's sockets for the runtime p
   assert.ok(seen.receiverSockets.includes(
     path.join(home, ".codex", "app-server-control", "app-server-control.sock")));
   await diagnoseAdapters({ options: {}, runtime: { platform: "win32",
-    env: { HOME: home, APPDATA: home } }, detect });
+    env: { HOME: home, LOCALAPPDATA: home } }, detect });
   assert.equal(seen.receiverSockets.some(item => item.includes("cc-socks")), false,
     "the runtime platform, not the host's, decides what the receivers declare");
 });
