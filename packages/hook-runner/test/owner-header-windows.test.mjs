@@ -85,3 +85,37 @@ test("windows: typographic quotes and cmd's operators get no header either", () 
   assert.equal(ownerHeader(binding, "C:\\w\\a&b", undefined, "win32"),
     "ACC CLI (append): --session session_a --generation generation_b --cwd \"C:\\w\\a&b\"");
 });
+
+// Refused after the session opened, the header left a session its peers saw
+// live and could send to, whose every turn then failed before their messages.
+// It is refused before anything opens.
+test("windows: a directory whose header is refused opens no session", async t => {
+  const { mkdir, mkdtemp, readdir, realpath, rm } = await import("node:fs/promises");
+  const { tmpdir } = await import("node:os");
+  const path = await import("node:path");
+  const base = await realpath(await mkdtemp(path.join(tmpdir(), "acc-unquotable-")));
+  t.after(() => rm(base, { recursive: true, force: true }));
+  const cwd = path.join(base, "o'brien$x");
+  await mkdir(cwd);
+  const dataHome = path.join(base, "data");
+  const adapter = { id: "fixture", client: { command: "fixture" }, capabilities: {},
+    normalizeHook: payload => payload,
+    injectOutcome: context => ({ stdout: context, stderr: "", exitCode: 0 }), renderContext: () => "" };
+
+  const result = await runHook({ adapterId: adapter.id, adapters: { [adapter.id]: adapter },
+    dataHome, platform: "win32-x64", readProcessTable: async () => new Map(),
+    probeClientVersion: async () => "1.0.0",
+    payload: { kind: "sessionStart", sessionId: "unquotable", cwd, targets: [] } });
+
+  assert.equal(result.failureCode, "workspace_path_unquotable");
+  const sessions = [];
+  const walk = async directory => {
+    for (const entry of await readdir(directory, { withFileTypes: true }).catch(() => [])) {
+      const full = path.join(directory, entry.name);
+      if (entry.isDirectory()) await walk(full);
+      else if (/[\\/](ephemeral|state)[\\/]session[\\/]/.test(full)) sessions.push(full);
+    }
+  };
+  await walk(dataHome);
+  assert.deepEqual(sessions, [], "a refused header still opened a session");
+});

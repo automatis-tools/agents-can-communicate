@@ -25,6 +25,15 @@ const windowsQuote = value => {
   { value, reasonCode: "workspace_path_unquotable" });
 };
 
+// Before anything opens: a session that attached and could then never be told
+// its CLI arguments would look live to its peers, and every one of its turns
+// would fail before their messages reached it.
+export function assertOwnerQuotable(cwd, workspaceRef, platform = process.platform) {
+  if (platform !== "win32") return;
+  windowsQuote(cwd);
+  if (workspaceRef !== undefined) windowsQuote(workspaceRef);
+}
+
 export const ownerHeader = (binding, cwd, workspaceRef, platform = process.platform) => {
   const quote = platform === "win32" ? windowsQuote : posixQuote;
   return "ACC CLI (append): --session "

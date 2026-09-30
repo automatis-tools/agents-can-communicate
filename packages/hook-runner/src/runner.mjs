@@ -21,7 +21,8 @@ import { bindNative, callRelease, nativeActivationHintFor, nativeDiagnosticDeadl
   from "./native-attempt.mjs";
 import { readProcessTable as defaultReadProcessTable } from "./process-table.mjs";
 import { withSessionLifecycle } from "./session-lifecycle.mjs";
-import { appendStartOwner, appendToolOwner, ownerHeader, ownerOnlyOutcome } from "./owner-context.mjs";
+import { appendStartOwner, appendToolOwner, assertOwnerQuotable, ownerHeader, ownerOnlyOutcome }
+  from "./owner-context.mjs";
 
 // Kept cohesive above 300 lines because every handler shares one fail-open
 // hook boundary, binding lifecycle, and client-specific outcome contract.
@@ -734,6 +735,7 @@ export async function runHook({ adapterId, payload, adapters, dataHome, env,
         Math.min(PROCESS_TABLE_MS, deadline - Date.now() - TABLE_RESERVE_MS)) }));
     tableRead?.catch(() => {});
     const context = await openContext({ event, adapterId, dataHome, runtime, env, deadline });
+    assertOwnerQuotable(context.workspaceCwd, context.workspaceRef, String(platform).split("-")[0]);
     const handler = HANDLERS[event.kind];
     const lifecycle = ["sessionStart", "sessionEnd", "beforeTurn"].includes(event.kind);
     const invoke = async () => {
