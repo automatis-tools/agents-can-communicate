@@ -75,10 +75,12 @@ test("the refusal names the directory, the state, and what to do about it", () =
 test("a sibling directory sharing a name prefix is not treated as inside", () => {
   // "/demo-runtime" must not count as inside "/demo": prefix comparison on raw
   // strings is the classic way this check goes wrong.
-  const paths = runtimePaths({ dataHome: "/home/example/projects/demo-runtime",
-    workspaceId: WORKSPACE, workspaceRoots: ["/home/example/projects/demo"] });
+  // Absolute on this host: a drive-rooted path on Windows.
+  const dataHome = path.resolve("/home/example/projects/demo-runtime");
+  const paths = runtimePaths({ dataHome,
+    workspaceId: WORKSPACE, workspaceRoots: [path.resolve("/home/example/projects/demo")] });
 
-  assert.equal(paths.root.startsWith("/home/example/projects/demo-runtime"), true);
+  assert.equal(paths.root.startsWith(dataHome), true);
 });
 
 test("the ephemeral area is separate from durable state", () => {
