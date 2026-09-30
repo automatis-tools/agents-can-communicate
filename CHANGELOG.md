@@ -17,12 +17,21 @@ Work in progress for #234. The design is in
   `file:` claim.
 - On Windows the hook runner reads the chain of processes above it through one PowerShell call,
   and a client's image name matches without `.exe`.
+- On Windows a client binary is found through `PATHEXT`, a `.cmd` shim runs through `cmd.exe`,
+  updates run npm's own `npm-cli.js`, and background workers open no console window. Live
+  delivery on Windows is reported as `native_delivery_unsupported` for now; next-turn delivery
+  works.
+- On Windows each client's hooks run a Node shim instead of an `sh` script, in the form that
+  client's hook shell reads: Claude Code's exec form, a Codex `commandWindows` for PowerShell,
+  PowerShell for Gemini CLI, a form PowerShell, Git Bash and cmd all read for Grok, an unquoted
+  8.3 path for Antigravity CLI, and a cmd command for Kimi Code. The skill runs
+  `node "<path>/acc-cli.mjs"`, and the owner header quotes for cmd.
 
 | Candidate artifact | Value |
 |---|---|
-| Built from | `d5c77fd599a0ccaed4aed5b9fcdaabfdd9f3818f` |
-| Tarball | `agents-can-communicate-0.8.5.tgz`, 505,497 bytes, 321 files |
-| sha256 | `40a0e51e9b86008c468137ba034f9b2257323539e945d5091bcc9e2b1b193b2c` |
+| Built from | `cf9a1d10c100ff5c2b8a42cad82128c122681464` |
+| Tarball | `agents-can-communicate-0.8.5.tgz`, 511,790 bytes, 323 files |
+| sha256 | `c9d94ddd70bf5b2a0d3eeb894b6ca153b855c603361fe960f82afbd14d452d3a` |
 
 This unpublished development archive was measured with `npm pack`. See
 [the evidence](docs/release-evidence/unreleased-windows-support.md).
