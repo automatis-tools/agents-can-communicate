@@ -66,3 +66,15 @@ test("the PATH of an environment copy is found whatever its case", async () => {
   assert.equal(pathOf({ PATH: "/usr/bin" }), "/usr/bin");
   assert.equal(pathOf({}), "");
 });
+
+test("an absolute command is used as it is, on either platform", async () => {
+  const exists = disk(["C:\\Tools\\node.exe", "/opt/bin/codex"]);
+  assert.equal(await resolveExecutable("C:\\Tools\\node.exe", { platform: "win32", exists,
+    pathEnv: "C:\\Windows" }), "C:\\Tools\\node.exe");
+  assert.equal(await resolveExecutable("C:\\Tools\\node", { platform: "win32", exists,
+    pathEnv: "C:\\Windows" }), "C:\\Tools\\node.exe");
+  assert.equal(await resolveExecutable("/opt/bin/codex", { platform: "darwin", exists,
+    pathEnv: "/usr/bin" }), "/opt/bin/codex");
+  assert.equal(await resolveExecutable("C:\\Tools\\missing.exe", { platform: "win32", exists,
+    pathEnv: "C:\\Windows" }), null);
+});

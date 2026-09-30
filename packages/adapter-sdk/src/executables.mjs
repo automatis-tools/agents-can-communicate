@@ -32,6 +32,13 @@ export async function resolveExecutable(command, { pathEnv = pathOf(process.env)
   const excluded = exclude.filter(Boolean).map(key);
   const extensions = platform === "win32" && flavour.extname(command) === ""
     ? orderedExtensions(pathExt) : [""];
+  // A path is used as it is, not looked up: the caller already knows the file.
+  if (flavour.isAbsolute(command)) {
+    for (const extension of extensions) {
+      if (await exists(`${command}${extension}`, platform)) return `${command}${extension}`;
+    }
+    return null;
+  }
   for (const directory of String(pathEnv).split(delimiter).filter(Boolean)) {
     if (excluded.includes(key(directory))) continue;
     for (const extension of extensions) {
