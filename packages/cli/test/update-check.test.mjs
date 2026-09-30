@@ -105,7 +105,7 @@ test("the switch means nothing is asked, not that nothing is newer", async t => 
 
 const runtimeFor = (dataHome, { version = "0.1.1", latest = "0.1.1", env = {}, spawn } = {}) => ({
   platform: process.platform,
-  env: { HOME: dataHome, ACC_DATA_HOME: dataHome, ...env },
+  env: { HOME: dataHome, LOCALAPPDATA: dataHome, ACC_DATA_HOME: dataHome, ...env },
   version: async () => version,
   clock: { now: () => "2026-08-25T12:00:00.000Z" },
   fetch: answers(latest),
