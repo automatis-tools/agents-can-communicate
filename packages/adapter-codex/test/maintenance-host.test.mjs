@@ -2,11 +2,12 @@ import assert from "node:assert/strict";
 import { access, mkdtemp, realpath, rm } from "node:fs/promises";
 import net from "node:net";
 import path from "node:path";
-import test from "node:test";
+import nodeTest from "node:test";
 import { LSOF_CANDIDATES, observeMaintenanceProcess, probeMaintenanceCli, resolveLsof,
   runMaintenanceCommand, socketListedIn, startTimeValid, verifyMaintenanceProcess }
   from "../src/maintenance-host.mjs";
 import { maintenanceFixture } from "./maintenance-fixture.mjs";
+import { posixTransportTest as test } from "../../../tests/helpers/platform-scope.mjs";
 
 const unixHost = { skip: process.platform === "win32" && "ps and lsof are Unix tools" };
 

@@ -505,6 +505,9 @@ test("a session is not warned about its own claim", async t => {
  * drive an injected realpath rather than the filesystem, because the branch
  * that matters - how far up the walk goes - is otherwise invisible.
  */
+// Absolute on this host: a drive-rooted path on Windows, `/…` elsewhere.
+const abs = value => path.resolve(value);
+
 const fakeRealpath = existing => async target => {
   if (existing.has(target)) return existing.get(target);
   const error = new Error(`ENOENT: ${target}`);
@@ -513,23 +516,23 @@ const fakeRealpath = existing => async target => {
 };
 
 test("a path whose leaf does not exist resolves through its deepest real parent", async () => {
-  const resolve = fakeRealpath(new Map([["/link/project", "/real/project"]]));
+  const resolve = fakeRealpath(new Map([[abs("/link/project"), abs("/real/project")]]));
 
-  assert.equal(await canonicalTarget(resolve, "/link/project/src/store/index.mjs"),
-    "/real/project/src/store/index.mjs");
+  assert.equal(await canonicalTarget(resolve, abs("/link/project/src/store/index.mjs")),
+    abs("/real/project/src/store/index.mjs"));
 });
 
 test("an existing path resolves outright", async () => {
-  const resolve = fakeRealpath(new Map([["/link/a.mjs", "/real/a.mjs"]]));
+  const resolve = fakeRealpath(new Map([[abs("/link/a.mjs"), abs("/real/a.mjs")]]));
 
-  assert.equal(await canonicalTarget(resolve, "/link/a.mjs"), "/real/a.mjs");
+  assert.equal(await canonicalTarget(resolve, abs("/link/a.mjs")), abs("/real/a.mjs"));
 });
 
 test("nothing resolvable leaves the path as given rather than inventing one", async () => {
   // Not a silent empty string: `resourceFor` still gets a real path to judge,
   // and rejects it if it is outside the workspace.
-  assert.equal(await canonicalTarget(fakeRealpath(new Map()), "/nowhere/at/all.mjs"),
-    "/nowhere/at/all.mjs");
+  assert.equal(await canonicalTarget(fakeRealpath(new Map()), abs("/nowhere/at/all.mjs")),
+    abs("/nowhere/at/all.mjs"));
 });
 
 test("an error that is not absence stops the walk instead of climbing past it", async () => {
@@ -542,7 +545,7 @@ test("an error that is not absence stops the walk instead of climbing past it", 
     throw error;
   };
 
-  assert.equal(await canonicalTarget(resolve, "/guarded/src/a.mjs"), "/guarded/src/a.mjs");
+  assert.equal(await canonicalTarget(resolve, abs("/guarded/src/a.mjs")), abs("/guarded/src/a.mjs"));
 });
 
 test("a session opened by a hook names the client process", async t => {

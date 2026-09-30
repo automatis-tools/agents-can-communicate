@@ -4,11 +4,12 @@ import { once } from "node:events";
 import { lstat, mkdir, mkdtemp, readFile, readdir, realpath, rename, rm, symlink, writeFile }
   from "node:fs/promises";
 import path from "node:path";
-import test from "node:test";
+import nodeTest from "node:test";
 
 import { detectCodex } from "../src/install.mjs";
 import * as native from "../src/native-delivery.mjs";
 import { nativeFixture, THREAD } from "./native-fixture.mjs";
+import { posixTransportTest as test } from "../../../tests/helpers/platform-scope.mjs";
 
 const message = { messageId: "message_1", kind: "question", subject: "Synthetic",
   body: "diagnostic peer message" };
@@ -332,7 +333,7 @@ test("a successful handshake never reads the host process", async t => {
 // Codex's Windows daemon listens on AF_UNIX, which Node cannot reach there; live
 // delivery on Windows arrives with the app-server proxy in 0.9.x. Until then a
 // Windows install and session say so, and keep next-turn delivery.
-test("windows: live delivery is reported unsupported, never attempted", async () => {
+nodeTest("windows: live delivery is reported unsupported, never attempted", async () => {
   const { probeNativeDelivery, bindNativeSession } = await import("../src/native-delivery.mjs");
   let opened = false;
   const open = async () => { opened = true; throw new Error("must not connect"); };

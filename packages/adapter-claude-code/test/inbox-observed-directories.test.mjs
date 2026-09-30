@@ -2,11 +2,12 @@ import assert from "node:assert/strict";
 import { chmodSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import net from "node:net";
 import path from "node:path";
-import test from "node:test";
+import nodeTest from "node:test";
 
 import { createClaudeCodeAdapter } from "../src/adapter.mjs";
 import { newEndpointId, writeInboxEndpoint } from "../src/inbox-endpoint.mjs";
 import { observedInboxDirectories } from "../src/inbox-observed-directories.mjs";
+import { posixTransportTest as test } from "../../../tests/helpers/platform-scope.mjs";
 
 // Review of #217: the grant list came from the installer's environment alone,
 // so a session started with its own absolute CLAUDE_CODE_TMPDIR or

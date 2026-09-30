@@ -1,10 +1,11 @@
 import assert from "node:assert/strict";
 import { mkdir } from "node:fs/promises";
 import path from "node:path";
-import test from "node:test";
+import nodeTest from "node:test";
 
 import { createCodexDiscovery } from "../src/native-discovery.mjs";
 import { maintenanceFixture } from "./maintenance-fixture.mjs";
+import { posixTransportTest as test } from "../../../tests/helpers/platform-scope.mjs";
 
 const PLUGIN = "agents-can-communicate@acc-local";
 // What `hooks/list` returns for ACC's plugin on 0.158.0, one entry per event.

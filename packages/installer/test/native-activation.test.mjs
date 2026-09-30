@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { mkdir, mkdtemp, readFile, realpath, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import test from "node:test";
+import nodeTest from "node:test";
 
 import { applyPlan } from "../src/apply.mjs";
 import { detectInstallation } from "../src/detect.mjs";
@@ -10,6 +10,7 @@ import { applyNativeActivation, livePolicyOf, shimDirFor } from "../src/native-a
 import { loadOwnership, recordInstall } from "../src/ownership.mjs";
 import { planInstallation } from "../src/plan.mjs";
 import { SHIM_MARKER, writeLegacyShellActivation } from "../../../tests/helpers/legacy-shell-bootstrap.mjs";
+import { posixTransportTest as test } from "../../../tests/helpers/platform-scope.mjs";
 
 // Kept cohesive above 300 lines because every case drives one fixture
 // adapter through detection, planning, apply, and ownership on one temporary

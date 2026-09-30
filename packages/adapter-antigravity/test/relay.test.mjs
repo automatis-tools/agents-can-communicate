@@ -4,10 +4,11 @@ import { mkdtemp, realpath, rm, stat } from "node:fs/promises";
 import net from "node:net";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import test from "node:test";
+import nodeTest from "node:test";
 
 import { createRelay, renderMessage } from "../src/relay.mjs";
 import { listRegistrations, readRegistration } from "../src/relay-endpoint.mjs";
+import { posixTransportTest as test } from "../../../tests/helpers/platform-scope.mjs";
 
 const CONVERSATION = "3ed65ea5-31f2-4ddf-b6c7-e3c85a9a3c29";
 

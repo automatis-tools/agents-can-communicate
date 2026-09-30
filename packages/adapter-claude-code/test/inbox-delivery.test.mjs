@@ -2,12 +2,13 @@ import assert from "node:assert/strict";
 import { chmodSync, mkdirSync, mkdtempSync, renameSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import net from "node:net";
 import path from "node:path";
-import test from "node:test";
+import nodeTest from "node:test";
 
 import { INBOX_MODES, MIN_VERSION, PROTOCOL_CONTRACT, TRANSPORT, bindNativeSession, offerMessage,
   planNativeActivation, probeNativeDelivery, refreshNativeSession, retireNativeSession, wakeText }
   from "../src/inbox-delivery.mjs";
 import { readInboxEndpoint } from "../src/inbox-endpoint.mjs";
+import { posixTransportTest as test } from "../../../tests/helpers/platform-scope.mjs";
 
 // A real Unix socket and a real registry file in a short private directory:
 // the checks under test are about files, owners, modes and links, which a
