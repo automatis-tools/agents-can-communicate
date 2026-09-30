@@ -66,8 +66,8 @@ async function releaseCanonical(directory, root, owner, openFile, { platform, re
   }
   const retired = path.join(path.dirname(directory), `writer.released-${identity}.lock`);
   try {
-    // A contender reading owner.json holds a file inside; Windows refuses the
-    // move until it lets go, and renameEntry waits for that.
+    // POSIX moves the whole lock aside; Windows released it above, by its
+    // owner record, because a reader inside holds the directory in place.
     await renameEntry(directory, retired, { platform, rename });
   } catch (error) {
     if (["ENOENT", "EEXIST", "ENOTEMPTY"].includes(error.code)) return;
@@ -159,7 +159,8 @@ async function readOwner(directory, root, openFile) {
  * than any write here takes - the hook budget is five - so a holder that old is
  * not a writer that is still going.
  */
-async function takeStaleOwnership(directory, root, owner, now, pidIsAlive, { platform, rename }) {
+async function takeStaleOwnership(directory, root, owner, now, pidIsAlive,
+  { platform, rename, deadlineAt }) {
   if (owner === null) return false;
   const age = Date.parse(now) - Date.parse(owner.acquiredAt);
   if (pidIsAlive(owner.pid) && !(age > STALE_MS)) return false;
@@ -173,10 +174,14 @@ async function takeStaleOwnership(directory, root, owner, now, pidIsAlive, { pla
     .digest("hex");
   const reclaimed = path.join(path.dirname(directory), `writer.reclaimed-${identity}.lock`);
   try {
-    await renameEntry(directory, reclaimed, { platform, rename });
+    await renameEntry(directory, reclaimed, { platform, rename, deadlineAt });
     return true;
   } catch (error) {
     if (["ENOENT", "EEXIST", "ENOTEMPTY"].includes(error.code)) return false;
+    // Windows refuses the move while a waiting writer has the owner record
+    // open, and it was retried up to this writer's deadline: not reclaimed
+    // this time, which the loop reports as the conflict it is.
+    if (isWindows(platform) && ["EPERM", "EACCES", "EBUSY"].includes(error.code)) return false;
     throw error;
   }
 }
@@ -227,7 +232,7 @@ export async function withWriterMutex(paths, options, operation) {
         if (current === null && isWindows(platform)
           && await rmdir(directory).then(() => true, () => false)) continue;
         if (!await takeStaleOwnership(directory, root, current, clock.now(), pidIsAlive,
-          fsOptions)) {
+          { ...fsOptions, deadlineAt: wallNow() + Math.max(0, deadline - monotonicNow()) })) {
           const remaining = deadline - monotonicNow();
           if (remaining <= 0) break;
           await sleep(Math.min(waitMs, remaining));
