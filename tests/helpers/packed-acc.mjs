@@ -58,7 +58,12 @@ export async function treeSnapshot(root) {
 }
 
 async function writeClientShim(directory, command, output) {
-  if (isWindows) return;
+  // A client npm installs on Windows is a `.cmd`; ACC finds it through PATHEXT.
+  if (isWindows) {
+    if (/[%^&|<>!"]/.test(output)) throw new Error(`cmd cannot echo ${output}`);
+    await writeFile(path.join(directory, `${command}.cmd`), `@echo off\r\necho ${output}\r\n`, "utf8");
+    return;
+  }
   const file = path.join(directory, command);
   const safe = output.replaceAll("'", "'\\''");
   await writeFile(file, `#!/bin/sh\nprintf '%s\\n' '${safe}'\n`, "utf8");
