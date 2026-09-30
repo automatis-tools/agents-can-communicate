@@ -1,5 +1,29 @@
 # Changelog
 
+## 0.8.5 — release candidate
+
+- A Codex chat that a launch option keeps embedded is told which option: `-c`/`--config`,
+  `--enable`, `--disable`, `--search`, `-p`/`--profile`, `--oss`, `--strict-config`,
+  `--dangerously-bypass-hook-trust` or `--no-daemon`. The notice, a sender's line and doctor
+  advise starting Codex without it, with a setting moved into `config.toml` (#230).
+- The notice reaches the user directly: Codex shows it once in the chat as a hook message, and
+  the model receives its own line (#230).
+- After an update, the previous runtime generation is removed by the first ACC command an hour
+  or more later, with automatic updates on or off; the update's own reclaim could not remove the
+  generation it runs from (#232).
+- The store format is unchanged, so 0.8.4 and 0.8.5 can share a workspace.
+
+| Candidate artifact | Value |
+|---|---|
+| Built from | `2745dcbd745d1a4e609be1f974058168fd6ba147` |
+| Tarball | `agents-can-communicate-0.8.5.tgz`, 499,566 bytes, 318 files |
+| sha256 | `f593a339dbdfb6406a9f21ec7cf7d94c5526549dbd11a24c6538f514257fa428` |
+
+The exact archive passed clean installation verification and all 24 managed-update packed
+checks. The published 0.8.4 updated itself to these bytes, and the 0.8.4 code and this archive
+read and wrote one store. See [0.8.5 release evidence](docs/release-evidence/v0.8.5.md) for
+verification and limits. Earlier development records below retain their original provenance.
+
 ## Unreleased — a reclaim the updating process held back is retried
 
 - After an update, the old runtime generation is removed. The update runs from that generation

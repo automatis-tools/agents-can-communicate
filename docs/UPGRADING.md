@@ -57,6 +57,23 @@ From 0.8.3, the download does this itself.
 
 This release adds no store event type or field.
 
+0.8.5 changes what a Codex chat that runs without the daemon is told:
+
+- **The launch option that caused it is named.** Codex also runs a chat embedded, even while
+  its daemon runs, when it starts with `-c`/`--config`, `--enable`, `--disable`, `--search`,
+  `-p`/`--profile`, `--oss`, `--strict-config`, `--dangerously-bypass-hook-trust` or
+  `--no-daemon`. The notice, a sender's line and doctor name the option and advise starting
+  Codex without it; put a setting you need in `config.toml` instead.
+- **You see the notice yourself.** Codex shows it once in the chat as a hook message
+  (`↳ Hook · ACC: …`); the model receives its own line, as before.
+- **The previous runtime generation goes an hour after the update.** `acc update` runs from
+  the generation it replaces, so it cannot remove that one itself. It records the reclaim as
+  unfinished in `reclaim.json`, and the first ACC command an hour or more later removes the old
+  generation, with automatic updates on or off.
+
+This release adds no store event type or field. A sender's delivery JSON may carry
+`nativeLaunchOption` beside `nativeReasonCode`.
+
 ## From 0.7.x
 
 Claude Code live delivery wakes each session through the inbox socket that Claude Code opens
