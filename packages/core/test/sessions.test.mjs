@@ -361,3 +361,54 @@ test("a durable session's heartbeat never takes the lock for an ephemeral record
   assert.equal(beaten.state, "open");
   assert.equal(updates, 0);
 });
+
+// The second live session wrote an ephemeral participant and session of its
+// own, each under the writer lock with a retention marker, only for the
+// materialising transaction to copy them and retire them one lock at a time:
+// about twenty flushes on Windows, where one cost 8 to 23 ms on windows-latest.
+// It now opens durably in the transaction that materialises.
+test("a second live session opens in the materialising transaction, with no ephemeral copy", async () => {
+  const { clock, service: opener, store } = makeService();
+  const first = await opener.openSession(opening());
+  const written = [];
+  const counting = { ...store, ephemeral: { ...store.ephemeral,
+    put: (kind, ...rest) => { written.push(kind); return store.ephemeral.put(kind, ...rest); },
+    update: (kind, ...rest) => { written.push(kind); return store.ephemeral.update(kind, ...rest); } } };
+  const service = createCoordinationService({ store: counting, clock, ids: createFakeIds() });
+
+  const second = await service.openSession(opening({ participantId: "participant_b",
+    displayName: "models", harness: "claude-code" }));
+
+  assert.deepEqual(written, [], "the second session wrote an ephemeral copy of itself");
+  const snapshot = await store.snapshot(WORKSPACE);
+  assert.notEqual(snapshot.workspace, null);
+  assert.deepEqual(snapshot.sessions.map(item => item.sessionId).sort(),
+    [first.sessionId, second.sessionId].sort());
+  assert.deepEqual(snapshot.participants.map(item => item.participantId).sort(),
+    ["participant_a", "participant_b"]);
+  assert.deepEqual(await store.ephemeral.list("session"), []);
+  const types = (await store.eventsSince(WORKSPACE, null, 20)).events.map(event => event.type);
+  assert.deepEqual(types.filter(type => type === "session.opened").length, 2);
+  assert.equal(types.filter(type => type === "workspace.materialised").length, 1);
+});
+
+// The session seen live before the lock may have closed by the time the lock is
+// taken. The opener is then the only session, and a lone session leaves no
+// durable trace: it opens ephemerally, as it always did.
+test("an opener whose partner closed before the lock stays ephemeral", async () => {
+  const { clock, store } = makeService();
+  const gone = { schemaVersion: 1, sessionId: "session_gone", state: "open" };
+  let asked = 0;
+  const stale = { ...store, ephemeral: { ...store.ephemeral,
+    list: async kind => {
+      const records = await store.ephemeral.list(kind);
+      return kind === "session" && asked++ === 0 ? [...records, gone] : records;
+    } } };
+  const service = createCoordinationService({ store: stale, clock, ids: createFakeIds() });
+
+  const session = await service.openSession(opening());
+
+  assert.equal((await store.snapshot(WORKSPACE)).workspace, null);
+  assert.deepEqual((await store.ephemeral.list("session")).map(item => item.sessionId),
+    [session.sessionId]);
+});
