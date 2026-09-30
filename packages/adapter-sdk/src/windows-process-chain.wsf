@@ -1,0 +1,45 @@
+<?xml version="1.0" ?>
+<!--
+  The chain of processes from one pid upward, read through WMI by Windows Script
+  Host: cscript //Nologo windows-process-chain.wsf <pid> <hops>. Prints a JSON
+  array of { pid, ppid, name, created, cmd }, created in WMI's own date form.
+  JScript here predates JSON, so strings are escaped by hand, and everything
+  outside printable ASCII as \uXXXX: the output never depends on a code page.
+-->
+<job>
+<script language="JScript"><![CDATA[
+var next = parseInt(WScript.Arguments(0), 10);
+var hops = parseInt(WScript.Arguments(1), 10);
+var wmi = GetObject("winmgmts:{impersonationLevel=impersonate}!\\\\.\\root\\cimv2");
+
+function text(value) {
+  if (value === null || typeof value === "undefined") return "null";
+  var source = String(value);
+  var out = "\"";
+  for (var index = 0; index < source.length; index++) {
+    var code = source.charCodeAt(index);
+    if (code === 34) out += "\\\"";
+    else if (code === 92) out += "\\\\";
+    else if (code < 32 || code > 126) {
+      var hex = code.toString(16);
+      out += "\\u" + "0000".substr(hex.length) + hex;
+    } else out += source.charAt(index);
+  }
+  return out + "\"";
+}
+
+var chain = [];
+for (var hop = 0; hop < hops && next > 0; hop++) {
+  var found = new Enumerator(wmi.ExecQuery("SELECT ProcessId,ParentProcessId,Name,CommandLine,"
+    + "CreationDate FROM Win32_Process WHERE ProcessId=" + next));
+  if (found.atEnd()) break;
+  var process = found.item();
+  chain.push("{\"pid\":" + process.ProcessId + ",\"ppid\":" + process.ParentProcessId
+    + ",\"name\":" + text(process.Name) + ",\"created\":" + text(process.CreationDate)
+    + ",\"cmd\":" + text(process.CommandLine) + "}");
+  if (process.ParentProcessId === 0 || process.ParentProcessId === next) break;
+  next = process.ParentProcessId;
+}
+WScript.StdOut.Write("[" + chain.join(",") + "]");
+]]></script>
+</job>

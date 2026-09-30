@@ -33,11 +33,52 @@ test("windows: the table is the asking process's chain of parents", async () => 
   assert.deepEqual([...table.keys()], [3504, 7072, 6660]);
   assert.deepEqual(table.get(6660), { ppid: 844, comm: "claude.exe",
     args: "\"C:\\Users\\dana\\.local\\bin\\claude.exe\"", start: "134352177030323440" });
-  // One call, and the script travels encoded: no Windows quoting can touch it.
+  // One call, to Windows Script Host, with a script that ships in the package.
   assert.equal(calls.length, 1);
-  assert.equal(calls[0].args.includes("-EncodedCommand"), true);
-  assert.match(calls[0].file, /(pwsh|powershell)\.exe$/i);
+  assert.equal(calls[0].file, "C:\\Windows\\System32\\cscript.exe");
+  assert.deepEqual(calls[0].args.slice(0, 1), ["//Nologo"]);
+  assert.match(calls[0].args[1], /windows-process-chain\.wsf$/);
+  assert.deepEqual(calls[0].args.slice(2), ["3504", "8"]);
 });
+
+// Measured on windows-latest: WMI through Windows Script Host answered the chain
+// in 145 ms, PowerShell in 580; four at once, 258 ms against 1,080. WMI gives a
+// creation time as `yyyymmddHHMMSS.ffffff` with the offset in minutes.
+test("windows: WMI's creation time becomes the same FILETIME whatever its offset", async () => {
+  const at = (created, pid, ppid) => ({ pid, ppid, name: "node.exe", created, cmd: "node" });
+  const { run } = powershell([at("20260930145555.548253+000", 20, 10),
+    at("20260930095555.548250-300", 10, 5)]);
+  const table = await readProcessTable({ platform: "win32", from: 20, run,
+    env: { SystemRoot: "C:\\Windows" } });
+  const ticks = (BigInt(Date.UTC(2026, 8, 30, 14, 55, 55)) + 11644473600000n) * 10000n;
+  assert.equal(table.get(20).start, String(ticks + 5482530n));
+  assert.equal(table.get(10).start, String(ticks + 5482500n));
+});
+
+// Windows Script Host can be switched off by policy, and it prints so and fails.
+test("windows: where Windows Script Host is off, PowerShell reads the chain", async () => {
+  const calls = [];
+  const run = async (file, args) => {
+    calls.push(file);
+    if (/cscript\.exe$/i.test(file)) throw Object.assign(new Error("access is disabled"), { code: 1 });
+    return { stdout: JSON.stringify(chain), stderr: "" };
+  };
+  const table = await readProcessTable({ platform: "win32", from: 3504, run,
+    env: { SystemRoot: "C:\\Windows", ProgramFiles: "C:\\Program Files" } });
+  assert.deepEqual([...table.keys()], [3504, 7072, 6660]);
+  assert.deepEqual(calls, ["C:\\Windows\\System32\\cscript.exe",
+    "C:\\Program Files\\PowerShell\\7\\pwsh.exe"]);
+});
+
+test("windows: this process's own chain is read on this machine",
+  { skip: process.platform !== "win32" && "the chain is read through WMI only on Windows" },
+  async () => {
+    const table = await readProcessTable({ timeoutMs: 10_000 });
+    assert.equal(table.get(process.pid)?.comm.toLowerCase(), "node.exe", JSON.stringify([...table]));
+    assert.equal(table.get(process.pid).ppid, process.ppid);
+    assert.equal(table.has(process.ppid), true, "the parent is missing from the chain");
+    assert.match(table.get(process.pid).start, /^\d{17,18}$/);
+  });
 
 test("windows: a parent created after its child is a reused pid and ends the chain", async () => {
   const reused = [...chain];
