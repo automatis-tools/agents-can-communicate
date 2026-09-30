@@ -4,6 +4,7 @@ import path from "node:path";
 
 import { AccError, CONFIG_FILENAME, EXIT, createId, defaultProjectConfig,
   validateProjectConfig } from "@agents-can-communicate/protocol";
+import { openNoFollow } from "@agents-can-communicate/storage-filesystem";
 
 const configPathIn = cwd => path.join(cwd, CONFIG_FILENAME);
 
@@ -32,7 +33,7 @@ async function readConfig(cwd) {
   try {
     // Same rule as discovery: a config reached through a symlink may point
     // anywhere, so it is refused rather than followed.
-    handle = await open(file, constants.O_RDONLY | constants.O_NOFOLLOW);
+    handle = await openNoFollow(file, constants.O_RDONLY);
   } catch (error) {
     if (error.code === "ENOENT") return null;
     throw new AccError(EXIT.DATA, "cannot safely read the workspace config",
