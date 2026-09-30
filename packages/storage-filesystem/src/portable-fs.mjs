@@ -81,44 +81,55 @@ const refusedLink = file => Object.assign(
   new Error(`ELOOP: too many symbolic links encountered, open '${file}'`),
   { code: "ELOOP", syscall: "open", path: file });
 
+// How many times a name that keeps changing hands is opened afresh.
+const SWAPS = 3;
+
 /**
  * Open a file without following a symlink at its final component.
  *
  * Windows has no O_NOFOLLOW: the flag is undefined there and an open through a
  * file symlink succeeds. The rule is kept by checking the name first, refusing a
- * symlink or junction (Node reports both as symbolic links), and then comparing
- * the opened handle's identity with that check, so a name swapped in between is
- * refused as well. A file that did not exist is checked after it was created.
+ * symlink or junction (Node reports both as symbolic links), and after the open
+ * checking the name again: it must be no link, and name the very file the handle
+ * holds. A name another process replaced in between - a lock changing hands, a
+ * record renamed over - then names what was opened, as POSIX's O_NOFOLLOW open
+ * would have taken it; a name that moved on again is opened afresh, a few times.
  */
 export async function openNoFollow(file, flags, { mode, platform = process.platform,
   open = fs.open, lstat = fs.lstat, deadlineAt, sleep } = {}) {
   if (!isWindows(platform)) return open(file, flags | constants.O_NOFOLLOW, mode);
-  const before = await lstat(file, { bigint: true }).catch(error => {
-    if (error.code === "ENOENT") return null;
-    throw error;
-  });
-  if (before?.isSymbolicLink()) throw refusedLink(file);
-  // A scanner that opened the file without read sharing refuses every reader
-  // with EBUSY until it lets go.
-  const handle = await retrying(() => open(file, flags, mode), error => error.code === "EBUSY",
-    { deadlineAt, sleep }).catch(async error => {
-    // A name another process is deleting refuses the open with EPERM and is
-    // gone right after (measured on windows-latest): that is ENOENT, as Linux
-    // says it. A name that is still there keeps its EPERM.
-    if (error.code !== "EPERM" || !await gone(file, lstat)) throw error;
-    throw Object.assign(new Error(`ENOENT: no such file or directory, open '${file}'`,
-      { cause: error }), { code: "ENOENT", syscall: "open", path: file });
-  });
-  try {
-    const opened = await handle.stat({ bigint: true });
-    const named = before ?? await lstat(file, { bigint: true });
-    if (named.isSymbolicLink() || named.dev !== opened.dev || named.ino !== opened.ino) {
-      throw refusedLink(file);
+  for (let attempt = 1; ; attempt += 1) {
+    const before = await lstat(file, { bigint: true }).catch(error => {
+      if (error.code === "ENOENT") return null;
+      throw error;
+    });
+    if (before?.isSymbolicLink()) throw refusedLink(file);
+    // A scanner that opened the file without read sharing refuses every reader
+    // with EBUSY until it lets go.
+    const handle = await retrying(() => open(file, flags, mode), error => error.code === "EBUSY",
+      { deadlineAt, sleep }).catch(async error => {
+      // A name another process is deleting refuses the open with EPERM and is
+      // gone right after (measured on windows-latest): that is ENOENT, as Linux
+      // says it. A name that is still there, or a create that was refused,
+      // keeps its EPERM.
+      if (error.code !== "EPERM" || before === null || !await gone(file, lstat)) throw error;
+      throw Object.assign(new Error(`ENOENT: no such file or directory, open '${file}'`,
+        { cause: error }), { code: "ENOENT", syscall: "open", path: file });
+    });
+    try {
+      const opened = await handle.stat({ bigint: true });
+      const named = await lstat(file, { bigint: true }).catch(error => {
+        if (error.code === "ENOENT") return null;
+        throw error;
+      });
+      if (named?.isSymbolicLink()) throw refusedLink(file);
+      if (named !== null && named.dev === opened.dev && named.ino === opened.ino) return handle;
+      if (attempt >= SWAPS) throw refusedLink(file);
+    } catch (error) {
+      await handle.close();
+      throw error;
     }
-    return handle;
-  } catch (error) {
     await handle.close();
-    throw error;
   }
 }
 

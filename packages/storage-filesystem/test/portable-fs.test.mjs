@@ -197,3 +197,35 @@ test("windows: an open refused because the name is being deleted reads as absent
   await assert.rejects(openNoFollow("owner.json", 0, { platform: "win32", lstat: present, open }),
     { code: "EPERM" });
 });
+
+// A lock changing hands renames a new owner record in between the check and the
+// open: the open gets the new file, which is no link and is what the name now
+// names. POSIX's O_NOFOLLOW open takes it; Windows refused it as a swapped link,
+// and a writer waiting for the lock failed instead of looking again.
+test("windows: a file replaced between the check and the open is the one now named", async () => {
+  let checks = 0;
+  const lstat = async () => ({ isSymbolicLink: () => false, dev: 1n, ino: checks++ === 0 ? 7n : 8n });
+  const handle = { stat: async () => ({ dev: 1n, ino: 8n }), close: async () => {} };
+  assert.equal(await openNoFollow("owner.json", 0, { platform: "win32", lstat,
+    open: async () => handle }), handle);
+});
+
+test("windows: a name that became a link after the open is refused", async () => {
+  let checks = 0;
+  const lstat = async () => (checks++ === 0 ? { isSymbolicLink: () => false, dev: 1n, ino: 7n }
+    : { isSymbolicLink: () => true, dev: 1n, ino: 9n });
+  let closed = false;
+  const handle = { stat: async () => ({ dev: 1n, ino: 8n }), close: async () => { closed = true; } };
+  await assert.rejects(openNoFollow("owner.json", 0, { platform: "win32", lstat,
+    open: async () => handle }), { code: "ELOOP" });
+  assert.equal(closed, true);
+});
+
+// Controlled Folder Access or an ACL refuses a create with EPERM, and the name
+// is then absent because it never existed: that is still a refusal.
+test("windows: a refused create keeps its EPERM", async () => {
+  const lstat = async () => { throw Object.assign(new Error("ENOENT"), { code: "ENOENT" }); };
+  const open = async () => { throw Object.assign(new Error("EPERM"), { code: "EPERM" }); };
+  await assert.rejects(openNoFollow("new.json", 0, { platform: "win32", lstat, open }),
+    { code: "EPERM" });
+});
