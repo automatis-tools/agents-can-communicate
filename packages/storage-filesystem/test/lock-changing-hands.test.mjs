@@ -9,6 +9,7 @@ import { EXIT } from "@agents-can-communicate/protocol";
 
 import { storePaths } from "../src/index.mjs";
 import { withWriterMutex } from "../src/writer-mutex.mjs";
+import { performance } from "node:perf_hooks";
 
 /**
  * A lock changing hands is not an attack.
@@ -278,6 +279,13 @@ test("an ancestor swapped for a symlink cannot serve another directory in the st
     const leaf = path.join(asked, ...depth);
     const decoyLeaf = await stat(path.join(decoy, ...depth));
     const turn = () => new Promise(resolve => { setImmediate(resolve); });
+    // `admitted` counts a walk that fits between two flips. A fixed 2 ms quiet
+    // window was shorter than one three-level walk on a loaded runner, so no
+    // walk was ever admitted and the proof of exercise failed with nothing
+    // wrong. The window is several walks as measured here.
+    const started = performance.now();
+    for (let i = 0; i < 20; i += 1) await assertManagedDirectory(root, leaf);
+    const quietMs = Math.max(2, Math.ceil(((performance.now() - started) / 20) * 4));
 
     let flips = 0;
     let churning = true;
@@ -290,7 +298,7 @@ test("an ancestor swapped for a symlink cannot serve another directory in the st
           for (let i = 0; i < 6; i += 1) await turn();
           await unlink(asked);
           await rename(parked, asked);
-          await new Promise(resolve => { setTimeout(resolve, 2); });
+          await new Promise(resolve => { setTimeout(resolve, quietMs); });
         } catch { /* losing the race against ourselves is expected */ }
       }
     })();
@@ -320,7 +328,7 @@ test("an ancestor swapped for a symlink cannot serve another directory in the st
       await churn;
     }
 
-    const report = JSON.stringify({ flips, ...counts });
+    const report = JSON.stringify({ flips, quietMs, ...counts });
     assert.equal(counts.redirected, 0, `another directory in the store was served: ${report}`);
     assert.ok(flips > 0 && counts.admitted > 0 && counts.notReal > 0,
       `the race never ran, so nothing was proven: ${report}`);
