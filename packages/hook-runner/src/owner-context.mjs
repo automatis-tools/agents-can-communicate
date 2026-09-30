@@ -1,11 +1,19 @@
 import { assertPortableId } from "@agents-can-communicate/protocol";
 
-const shellQuote = value => `'${value.replaceAll("'", "'\\''")}'`;
+const posixQuote = value => `'${value.replaceAll("'", "'\\''")}'`;
+// The model appends the header in whatever shell its client gives it, and on
+// Windows that can be cmd.exe, which reads double quotes only. A value that a
+// double-quoting shell would expand keeps single quotes, which PowerShell and
+// Git Bash read literally.
+const windowsQuote = value => (/["$`%]/.test(value) ? posixQuote(value) : `"${value}"`);
 
-export const ownerHeader = (binding, cwd, workspaceRef) => "ACC CLI (append): --session "
-  + assertPortableId(binding.accSessionId, "sessionId") + " --generation "
-  + assertPortableId(binding.generation, "generation") + " --cwd " + shellQuote(cwd)
-  + (workspaceRef === undefined ? "" : " --workspace " + shellQuote(workspaceRef));
+export const ownerHeader = (binding, cwd, workspaceRef, platform = process.platform) => {
+  const quote = platform === "win32" ? windowsQuote : posixQuote;
+  return "ACC CLI (append): --session "
+    + assertPortableId(binding.accSessionId, "sessionId") + " --generation "
+    + assertPortableId(binding.generation, "generation") + " --cwd " + quote(cwd)
+    + (workspaceRef === undefined ? "" : " --workspace " + quote(workspaceRef));
+};
 
 export function ownerOnlyOutcome(inject, owner, budgetBytes) {
   if (Buffer.byteLength(owner, "utf8") > budgetBytes) {

@@ -32,3 +32,5 @@ export { channelSocketDirectory } from "./channel-directory.mjs";
 export { readProcessArgs, readProcessTable, splitWindowsCommandLine } from "./process-table.mjs";
 export { resolveExecutable, runExecutable } from "./executables.mjs";
 export { pathOf } from "./executables.mjs";
+export { windowsHookCommand } from "./windows-command.mjs";
+export { shortPath } from "./windows-command.mjs";

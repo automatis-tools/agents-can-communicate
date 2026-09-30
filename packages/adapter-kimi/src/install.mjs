@@ -4,9 +4,9 @@ import path from "node:path";
 import { AccError, EXIT } from "@agents-can-communicate/protocol";
 import { fileURLToPath } from "node:url";
 
-import { assertRunner, bakeSkillCommand, blankText, defaultRunner, removeIfEmpty,
-  ownVersion, stampPluginVersion,
-  removeInstalledTree, runnerExists, writeCliShim, writeForeignJson }
+import { assertRunner, bakeSkillCommand, blankText, defaultRunner, ownVersion, removeIfEmpty,
+  removeInstalledTree, runnerExists, stampPluginVersion, windowsHookCommand, writeCliShim,
+  writeForeignJson }
   from "@agents-can-communicate/adapter-sdk";
 
 const bundle = fileURLToPath(new URL("../plugin", import.meta.url));
@@ -99,13 +99,17 @@ export function stripBlock(source) {
   return kept.join("\n");
 }
 
-export function renderBlock(runner, node = process.execPath) {
+export function renderBlock(runner, node = process.execPath, platform = process.platform) {
   const entries = WIRING.map(({ event, kind, matcher }) => {
     // Both paths are shell-quoted inside the TOML string: a hook runs through a
     // shell, and a space in either path would otherwise split the command.
     // The interpreter is named outright rather than left to PATH, which a hook's
-    // environment does not reliably carry.
-    const command = `${tomlString(node)} ${tomlString(runner)} kimi ${kind}`;
+    // environment does not reliably carry. On Windows that shell is cmd.exe, and
+    // a TOML-escaped path inside the command would reach it with every
+    // backslash doubled.
+    const command = platform === "win32"
+      ? windowsHookCommand("cmd", { node, shim: runner, args: ["kimi", kind] })
+      : `${tomlString(node)} ${tomlString(runner)} kimi ${kind}`;
     const lines = ["[[hooks]]", `event = ${tomlString(event)}`,
       `command = ${tomlString(command)}`];
     if (matcher !== undefined) lines.push(`matcher = ${tomlString(matcher)}`);

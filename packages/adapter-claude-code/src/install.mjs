@@ -156,19 +156,44 @@ async function removeChannelConfig(versionsRoot) {
     { force: true })));
 }
 
+// The bundle's commands are `sh "${CLAUDE_PLUGIN_ROOT}/hooks/acc-hook.sh" <event>`.
+const SHELL_HOOK = /^sh "\$\{CLAUDE_PLUGIN_ROOT\}\/hooks\/acc-hook\.sh" (\w+)$/;
+
+/**
+ * Claude Code on Windows runs a hook's shell form through Git Bash, or through
+ * PowerShell where Git is absent, and neither can be relied on to have `sh`.
+ * The exec form - `command` plus `args`, Claude Code 2.1.139 and later - starts
+ * the pinned node directly on the Node shim, with no shell to quote for.
+ */
+async function execFormHooks(file, node) {
+  const document = JSON.parse(await readFile(file, "utf8"));
+  for (const groups of Object.values(document.hooks)) {
+    for (const group of groups) {
+      group.hooks = group.hooks.map(hook => {
+        const [, event] = SHELL_HOOK.exec(hook.command ?? "") ?? [];
+        if (event === undefined) return hook;
+        return { type: "command", command: node,
+          args: ["${CLAUDE_PLUGIN_ROOT}/hooks/acc-hook.mjs", event] };
+      });
+    }
+  }
+  await writeFile(file, `${JSON.stringify(document, null, 2)}\n`);
+}
+
 /** A plugin tree with the shim written and the skill's command baked in. */
-async function layOutPlugin(target, { runner, node, cli }) {
+async function layOutPlugin(target, { runner, node, cli, platform }) {
   await rm(target, { recursive: true, force: true });
   await cp(bundle, target, { recursive: true });
   // The skill ships with a placeholder where the command belongs: `acc` is not
   // on PATH everywhere, and an agent that cannot run it improvises. The shim
   // carries the pinning so each example can name one path. No data home is
   // pinned here: an operator's own ACC_DATA_HOME still wins for this client.
-  const cliShim = await writeCliShim({ dir: target, cli, node });
-  await bakeSkillCommand({ root: target, cliShim });
+  const cliShim = await writeCliShim({ dir: target, cli, node, platform });
+  await bakeSkillCommand({ root: target, cliShim, platform });
   // The bundle's hooks.json names this script, and nothing else writes it.
   await writeHookShim({ dir: path.join(target, "hooks"), adapterId: "claude_code",
-    runner, node });
+    runner, node, platform });
+  if (platform === "win32") await execFormHooks(path.join(target, "hooks", "hooks.json"), node);
   // The copy the client reads says which ACC wrote it. The shipped manifest
   // carries no version, so there is nothing in the repository to fall out of
   // step - which is how every client came to report 0.1.6 while running 0.1.9.
@@ -177,7 +202,7 @@ async function layOutPlugin(target, { runner, node, cli }) {
 }
 
 export async function installClaudePlugin({ configDir, runner, cli, keepPreviousVersion = null,
-  node = process.execPath, now = new Date() }) {
+  node = process.execPath, now = new Date(), platform = process.platform }) {
   // Everything this will merge into, read before a byte is written. A settings
   // file that will not parse used to be discovered after the plugin tree was
   // already on disk, and the install then failed with nineteen files left
@@ -194,12 +219,12 @@ export async function installClaudePlugin({ configDir, runner, cli, keepPrevious
   const source = sourceDir(configDir);
   const cached = cachePath(configDir, version);
 
-  await layOutPlugin(source, { runner, node, cli });
+  await layOutPlugin(source, { runner, node, cli, platform });
   await writeJson(marketplaceFile(configDir), marketplaceManifest());
   // The copy the client runs from. Written here rather than asking the user to
   // run `claude plugin install`, exactly as the Codex adapter does, because the
   // command's only effect is this copy plus the two registry entries below.
-  await layOutPlugin(cached, { runner, node, cli });
+  await layOutPlugin(cached, { runner, node, cli, platform });
   // The copy just written, plus the one an upgrade moved off. A client caches a
   // plugin under its version, so every upgrade would otherwise leave the previous
   // release's tree beside this one - invisible while the version never moved,

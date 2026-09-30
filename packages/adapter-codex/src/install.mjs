@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 
 import { bakeSkillCommand, blankJson, blankText, removeIfEmpty, removeInstalledTree,
   keepVersions, ownVersion, stampPluginVersion,
-  tomlString, writeCliShim, writeForeignJson, writeHookShim }
+  tomlString, windowsHookCommand, writeCliShim, writeForeignJson, writeHookShim }
   from "@agents-can-communicate/adapter-sdk";
 import { AccError, EXIT } from "@agents-can-communicate/protocol";
 import { inspectConfig, readConfig, sandboxOwnership, writeTomlBlock } from "./config-block.mjs";
@@ -92,11 +92,18 @@ async function readJson(file, fallback) {
 // client copies an installed plugin into a cache of its own, so the command has
 // to be absolute: a path relative to the bundle would not survive the copy.
 const shellLiteral = value => `'${String(value).replaceAll("'", "'\\''")}'`;
-const withShim = (wiring, shim) => ({ ...wiring, hooks: Object.fromEntries(
+// On Windows Codex runs `commandWindows` in place of `command`, through
+// PowerShell: the pinned node on the Node shim.
+const withShim = (wiring, shim, windows = null) => ({ ...wiring, hooks: Object.fromEntries(
   Object.entries(wiring.hooks).map(([event, entries]) => [event, entries.map(entry => ({
     ...entry,
-    hooks: entry.hooks.map(hook => ({ ...hook,
-      command: `sh ${shellLiteral(shim)} ${hook.command.split(" ").pop()}` })),
+    hooks: entry.hooks.map(hook => {
+      const event = hook.command.split(" ").pop();
+      if (windows === null) return { ...hook, command: `sh ${shellLiteral(shim)} ${event}` };
+      return { ...hook,
+        command: windowsHookCommand("portable", { node: windows.node, shim, args: [event] }),
+        commandWindows: windowsHookCommand("powershell", { node: windows.node, shim, args: [event] }) };
+    }),
   }))])) });
 
 const writeJson = async (file, value) => {
@@ -163,7 +170,8 @@ const sandboxReview = (config, file, stateRoot) =>
 
 export async function installCodexPlugin({ home, agentsHome = home,
   codexHome = path.join(home, ".codex"), dataHome, stateRoot, runner, node, cli, keepPreviousVersion = null,
-  requestedLivePolicy, livePolicy, clientVersion, platform, receiverSockets }) {
+  requestedLivePolicy, livePolicy, clientVersion, platform, receiverSockets,
+  hostPlatform = process.platform }) {
   // Read before writing, so a manifest that will not parse is found before a
   // plugin tree is laid down that nothing will then be able to remove.
   const existing = await readJson(marketplacePath(agentsHome), { name: MARKETPLACE,
@@ -194,12 +202,13 @@ export async function installCodexPlugin({ home, agentsHome = home,
   // The skill ships with a placeholder where the command belongs: `acc` is
   // not on PATH everywhere, and an agent that cannot run it improvises. The
   // shim carries the pinning so each example can name one path.
-  const cliShim = await writeCliShim({ dir: target, cli, node, dataHome });
-  await bakeSkillCommand({ root: target, cliShim });
+  const cliShim = await writeCliShim({ dir: target, cli, node, dataHome, platform: hostPlatform });
+  await bakeSkillCommand({ root: target, cliShim, platform: hostPlatform });
   const shim = await writeHookShim({ dir: target, adapterId: "codex",
-    dataHome, runner, node });
+    dataHome, runner, node, platform: hostPlatform });
   await writeJson(path.join(target, "hooks.json"),
-    withShim(await readJson(path.join(bundle, "hooks.json"), { hooks: {} }), shim));
+    withShim(await readJson(path.join(bundle, "hooks.json"), { hooks: {} }), shim,
+      hostPlatform === "win32" ? { node: node ?? process.execPath } : null));
 
   const file = marketplacePath(agentsHome);
   // Ownership is the entry's own name. Recording it as an extra key beside the

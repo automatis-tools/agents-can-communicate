@@ -6,7 +6,8 @@ import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 
 import { bakeSkillCommand, blankJson, defaultAntigravityRelay, isShellWord, ownVersion,
-  removeIfEmpty, stampPluginVersion, writeCliShim, writeForeignJson, writeHookShim }
+  removeIfEmpty, shortPath, stampPluginVersion, windowsHookCommand, writeCliShim, writeForeignJson,
+  writeHookShim }
   from "@agents-can-communicate/adapter-sdk";
 import { AccError, EXIT } from "@agents-can-communicate/protocol";
 
@@ -181,9 +182,15 @@ const exists = async target => {
  * Each command carries its own event name, because the payload does not. The
  * same shim answers every event and is told which one it is running as.
  */
-export function accHookConfig(shim) {
+export function accHookConfig(shim, { platform = process.platform } = {}) {
+  // On Windows this client runs a hook through Go's `cmd /c`, which escapes an
+  // inner quote as `\"` - a form cmd does not read (google-antigravity/
+  // antigravity-cli#222). The command therefore carries no quotes at all.
+  const command = event => (platform === "win32"
+    ? windowsHookCommand("unquoted", { node: process.execPath, shim, args: [event] })
+    : `sh "${shim}" ${event}`);
   return { [ACC_NAMESPACE]: Object.fromEntries(ACC_REGISTERED_EVENTS.map(event =>
-    [event, [{ type: "command", command: `sh "${shim}" ${event}`, timeout: 10 }]])) };
+    [event, [{ type: "command", command: command(event), timeout: 10 }]])) };
 }
 
 /**
@@ -341,9 +348,9 @@ async function writeRelayShim({ home, relay = defaultAntigravityRelay(), node = 
 }
 
 async function installSkillPlugin(context) {
-  const { home, cli, node } = context;
+  const { home, cli, node, hostPlatform = process.platform } = context;
   const manifestExisted = await exists(vendorManifestPath(home));
-  const cliShim = await writeCliShim({ dir: shimDir(home), cli, node });
+  const cliShim = await writeCliShim({ dir: shimDir(home), cli, node, platform: hostPlatform });
   await writeRelayShim({ home, relay: context.antigravityRelay, node });
   const stage = await mkdtemp(path.join(tmpdir(), "acc-antigravity-plugin-"));
   try {
@@ -353,7 +360,7 @@ async function installSkillPlugin(context) {
       version: await ownVersion(import.meta.url), io: { readFile, writeFile } });
     // Bare when the path allows it: 1.2.12 matched no allow rule against a
     // command whose first word was quoted (issue #214).
-    await bakeSkillCommand({ root: plugin, cliShim, bareWhenSafe: true });
+    await bakeSkillCommand({ root: plugin, cliShim, bareWhenSafe: true, platform: hostPlatform });
     await agyFor(context)(["plugin", "install", plugin], { home, env: context.env });
   } finally {
     await rm(stage, { recursive: true, force: true });
@@ -382,14 +389,21 @@ async function installSkillPlugin(context) {
  * unverified - never as registered.
  */
 export async function installAntigravity(context) {
-  const { home, runner, node } = context;
+  const { home, runner, node, hostPlatform = process.platform } = context;
   const file = hooksPathFor(context);
   const found = await readJson(file, null);
   const existing = found ?? {};
 
-  const shim = await writeHookShim({ dir: shimDir(home), adapterId: "antigravity",
-    runner, node });
-  const merged = { ...existing, ...accHookConfig(shim) };
+  const written = await writeHookShim({ dir: shimDir(home), adapterId: "antigravity",
+    runner, node, platform: hostPlatform });
+  // A profile path with a space ("C:\Users\First Last") goes in by its 8.3 name.
+  const shim = hostPlatform === "win32" ? await shortPath(written) : written;
+  if (hostPlatform === "win32" && /\s/.test(shim)) {
+    throw new AccError(EXIT.DATA, "Antigravity CLI cannot run a hook whose path has a space, and "
+      + `this volume gives ${written} no 8.3 name; enable 8.3 names on it `
+      + "(fsutil 8dot3name set <drive>: 0) and run acc install again", { shim: written });
+  }
+  const merged = { ...existing, ...accHookConfig(shim, { platform: hostPlatform }) };
   await mkdir(path.dirname(file), { recursive: true });
   await writeForeignJson(file, merged, { readFile, writeFile, mkdir });
   // Recorded beside the shim, never inside the client's file. A file holding

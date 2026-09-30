@@ -3,7 +3,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { AccError, EXIT } from "@agents-can-communicate/protocol";
-import { bakeSkillCommand, removeInstalledTree, writeCliShim, writeHookShim }
+import { bakeSkillCommand, removeInstalledTree, windowsHookCommand, writeCliShim, writeHookShim }
   from "@agents-can-communicate/adapter-sdk";
 
 const bundle = fileURLToPath(new URL("../plugin", import.meta.url));
@@ -15,7 +15,9 @@ export const grokHomeOf = context =>
   context.grokHome ?? path.join(context.home, ".grok");
 
 export const hooksFile = home => path.join(home, "hooks", HOOKS_NAME);
-export const shimPath = home => path.join(home, "hooks", SHIM_NAME);
+// Windows gets the Node shim: no Windows client can be relied on to have `sh`.
+export const shimPath = (home, platform = process.platform) => path.join(home, "hooks",
+  platform === "win32" ? SHIM_NAME.replace(/\.sh$/, ".mjs") : SHIM_NAME);
 export const skillPath = home => path.join(home, "skills", "acc");
 
 async function readJson(file, fallback) {
@@ -46,30 +48,37 @@ const writeJson = async (file, value) => {
 // for plugins; we install into ~/.grok/hooks, which is always trusted and does
 // not need [plugins].enabled. The shim's absolute path is written in at install
 // time, the same lesson Codex taught: a relative hook command fails silently.
-const withShim = (wiring, shim) => ({
+// On Windows this client runs hooks through the shell it detects - pwsh, Git
+// Bash or cmd - so the command is written in the one form all three read.
+const withShim = (wiring, shim, windowsNode = null) => ({
   description: wiring.description,
   hooks: Object.fromEntries(Object.entries(wiring.hooks).map(([event, entries]) =>
     [event, entries.map(entry => ({
       ...entry,
-      hooks: entry.hooks.map(hook => ({ ...hook,
-        command: `sh "${shim}" ${hook.command.split(" ").pop()}` })),
+      hooks: entry.hooks.map(hook => {
+        const kind = hook.command.split(" ").pop();
+        return { ...hook, command: windowsNode === null ? `sh "${shim}" ${kind}`
+          : windowsHookCommand("portable", { node: windowsNode, shim, args: [kind] }) };
+      }),
     }))])),
 });
 
-export async function installGrokHooks({ grokHome, home, runner, cli, node }) {
+export async function installGrokHooks({ grokHome, home, runner, cli, node,
+  hostPlatform = process.platform }) {
   const root = grokHome ?? grokHomeOf({ home, grokHome });
   const template = await readJson(path.join(bundle, "hooks", "hooks.json"), { hooks: {} });
   const shim = await writeHookShim({ dir: path.join(root, "hooks"), adapterId: "grok",
-    runner, node, name: SHIM_NAME });
+    runner, node, name: SHIM_NAME, platform: hostPlatform });
 
   const skills = skillPath(root);
   await rm(skills, { recursive: true, force: true });
   await mkdir(path.dirname(skills), { recursive: true });
   await cp(path.join(bundle, "skills", "acc"), skills, { recursive: true });
-  const cliShim = await writeCliShim({ dir: skills, cli, node });
-  await bakeSkillCommand({ root: skills, cliShim });
+  const cliShim = await writeCliShim({ dir: skills, cli, node, platform: hostPlatform });
+  await bakeSkillCommand({ root: skills, cliShim, platform: hostPlatform });
 
-  await writeJson(hooksFile(root), withShim(template, shim));
+  await writeJson(hooksFile(root), withShim(template, shim,
+    hostPlatform === "win32" ? node ?? process.execPath : null));
   return { ok: true, changes: [hooksFile(root), shim, skills], diagnostics: [] };
 }
 

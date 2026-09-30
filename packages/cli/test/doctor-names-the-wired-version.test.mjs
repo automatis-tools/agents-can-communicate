@@ -123,3 +123,16 @@ test("a stale bundle names the skills, not the runtime, and reports its version"
   assert.equal(entry.remediation.some(one => /\bplugin is\b/.test(one)), false,
     "a remediation still calls the whole plugin stale when only the bundle is");
 })
+
+// On Windows the runner appears JSON-escaped in the Node shim and TOML-escaped in
+// Kimi's config, and a profile path carries spaces.
+test("the runner's package is found in every form ACC writes it, Windows ones included", async () => {
+  const { runnerRoot } = await import("../src/doctor-command.mjs");
+  const root = "C:\\Users\\First Last\\AppData\\Roaming\\npm\\node_modules\\agents-can-communicate";
+  assert.equal(runnerRoot(`const ACC_TARGET = ${JSON.stringify(`${root}\\bin\\acc-hook.mjs`)};`), root);
+  assert.equal(runnerRoot(`command = "\\"C:\\\\Program Files\\\\nodejs\\\\node.exe\\" \\"${
+    root.replaceAll("\\", "\\\\")}\\\\bin\\\\acc-hook.mjs\\" kimi sessionStart"`), root);
+  assert.equal(runnerRoot('ACC_RUNNER="/usr/local/lib/node_modules/agents-can-communicate/bin/acc-hook.mjs"'),
+    "/usr/local/lib/node_modules/agents-can-communicate");
+  assert.equal(runnerRoot("nothing here"), null);
+});

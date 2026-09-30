@@ -328,3 +328,14 @@ test("a file ACC created is removed even after the installer deleted the shim fi
   assert.equal(await missing(globalHooksPath(home)), true,
     "uninstall left behind a file that only existed because ACC created it");
 });
+
+// On Windows Antigravity CLI runs hooks through Go's `cmd /c`, which escapes an
+// inner quote in a form cmd does not read: the command carries no quotes.
+test("windows: each hook command is unquoted, with the shim's forward-slash 8.3 path", async () => {
+  const { accHookConfig } = await import("../src/install.mjs");
+  const config = accHookConfig("C:\\Users\\ANNONE~1\\.gemini\\config\\acc\\acc-hook.mjs",
+    { platform: "win32" });
+  for (const [event, [action]] of Object.entries(Object.values(config)[0])) {
+    assert.equal(action.command, `node C:/Users/ANNONE~1/.gemini/config/acc/acc-hook.mjs ${event}`);
+  }
+});

@@ -714,3 +714,25 @@ test("an install with no previous version to hold leaves one copy", async t => {
 
   assert.deepEqual(await readdir(cache), [version]);
 });
+
+// Codex runs a hook's `commandWindows` on Windows, through PowerShell, which
+// has no `sh`: the pinned node runs the Node shim there.
+test("windows: each hook carries a PowerShell commandWindows beside a portable command", async t => {
+  const { context, plugin } = await fixture(t);
+  const { installCodexPlugin } = await import("../src/install.mjs");
+  const runner = path.join(context.home, "acc-hook.mjs");
+  await writeFile(runner, "");
+  await installCodexPlugin({ ...context, runner, cli: runner, node: "C:\\Program Files\\nodejs\\node.exe",
+    hostPlatform: "win32" });
+  assert.equal((await readdir(plugin)).includes("acc-hook.mjs"), true);
+  const hooks = JSON.parse(await readFile(path.join(plugin, "hooks.json"), "utf8")).hooks;
+  const shim = path.join(plugin, "acc-hook.mjs");
+  for (const [event, groups] of Object.entries(hooks)) {
+    for (const hook of groups.flatMap(group => group.hooks)) {
+      const kind = hook.command.split(" ").pop();
+      assert.equal(hook.commandWindows,
+        `& 'C:\\Program Files\\nodejs\\node.exe' '${shim}' ${kind}; exit $LASTEXITCODE`, event);
+      assert.equal(hook.command, `node "${shim.replaceAll("\\", "/")}" ${kind}`, event);
+    }
+  }
+});

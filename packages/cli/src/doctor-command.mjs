@@ -50,13 +50,31 @@ import { diagnoseFilesystemStore, repairFilesystemStore }
  *
  * Null for anything unreadable. "Might be old" on every run is not a diagnosis.
  */
+/**
+ * The package directory of the runner a shim or config names, or null.
+ *
+ * ACC writes the runner quoted in every form: a shell shim, the Node shim
+ * Windows gets (JSON-escaped), and Kimi's config (a TOML string holding a
+ * quoted command). One level of escaping is undone, and the path runs back to
+ * its opening quote, so a Windows path with spaces in it is read whole.
+ */
+export function runnerRoot(text) {
+  const flat = String(text).replaceAll("\\\\", "\\");
+  const match = /[\\/]agents-can-communicate(?=[\\/]bin[\\/]acc-hook\.mjs)/.exec(flat);
+  if (match === null) return null;
+  const before = flat.slice(0, match.index);
+  const start = Math.max(before.lastIndexOf("\""), before.lastIndexOf("'"), before.lastIndexOf("\n")) + 1;
+  const root = flat.slice(start, match.index + match[0].length);
+  return /^(?:[A-Za-z]:)?[\\/]/.test(root) ? root : null;
+}
+
 export async function wiredVersion(shimPath) {
   if (typeof shimPath !== "string" || shimPath === "") return null;
   const text = await readFile(shimPath, "utf8").catch(() => null);
   if (text === null) return null;
-  const runner = /["']?(\/[^"'\s]*\/agents-can-communicate)\/bin\/acc-hook\.mjs["']?/.exec(text);
-  if (runner === null) return null;
-  const manifest = await readFile(path.join(runner[1], "package.json"), "utf8")
+  const root = runnerRoot(text);
+  if (root === null) return null;
+  const manifest = await readFile(path.join(root, "package.json"), "utf8")
     .catch(() => null);
   if (manifest === null) return null;
   try {
@@ -103,7 +121,10 @@ async function findShims(root, depth) {
   for (const entry of entries) {
     const target = path.join(root, entry.name);
     if (entry.isDirectory()) found.push(...await findShims(target, depth - 1));
-    else if (entry.name.endsWith(".sh")) found.push(target);
+    // The shell shim on POSIX, the Node shim on Windows.
+    else if (/^acc-(?:hook|cli)\.(?:sh|mjs)$/.test(entry.name) || entry.name.endsWith(".sh")) {
+      found.push(target);
+    }
   }
   return found;
 }
