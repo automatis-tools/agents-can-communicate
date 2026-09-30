@@ -11,11 +11,14 @@ import { readOpenJournals } from "../src/journal.mjs";
 import { openFilesystemStore } from "../src/store.mjs";
 
 const WORKSPACE = "workspace_deadline";
-// Each case moves the deadline past one seam, and everything before that seam
-// has to fit inside it. On a loaded windows-latest runner a one-second budget
-// expired while the case was still waiting for the writer lock, before the seam
-// the case is about.
-const BUDGET_MS = process.platform === "win32" ? 5_000 : 1_000;
+// Shorter than the writer lock's own 2.5 s acquire timeout, so a caller waiting
+// for another writer meets the store deadline first.
+const BUDGET_MS = 1_000;
+// A case that crosses the deadline at a journal seam needs everything before
+// that seam to fit inside it. On a loaded windows-latest runner one second
+// expired while the case was still taking the uncontended writer lock, before
+// the seam the case is about.
+const SEAM_BUDGET_MS = process.platform === "win32" ? 5_000 : 1_000;
 const participant = displayName => ({ schemaVersion: SCHEMA_VERSION,
   participantId: "participant_a", workspaceId: WORKSPACE, displayName,
   kind: "agent", createdAt: "2026-09-07T00:00:00.000Z" });
@@ -31,14 +34,14 @@ async function crossDeadline(deadlineAt) {
   while (Date.now() <= deadlineAt) await delay(Math.max(1, deadlineAt - Date.now() + 1));
 }
 
-async function fixture(t, failAt) {
+async function fixture(t, failAt, budgetMs = BUDGET_MS) {
   const root = await realpath(await mkdtemp(path.join(tmpdir(), "acc-store-deadline-")));
   t.after(() => rm(root, { recursive: true, force: true }));
   const options = { root, workspaceId: WORKSPACE,
     clock: { now: () => new Date().toISOString() }, ids: { next: kind => createId(kind) } };
   // Prepare the directory before starting this operation's explicit budget.
   const observer = await openFilesystemStore(options);
-  const deadlineAt = Date.now() + BUDGET_MS;
+  const deadlineAt = Date.now() + budgetMs;
   const store = await openFilesystemStore({ ...options, deadlineAt,
     failAt: where => failAt?.(where, deadlineAt) });
   const inspect = async current => ({ snapshot: await current.snapshot(WORKSPACE),
@@ -133,7 +136,7 @@ test("a prepared journal cannot become committed after its deadline", async t =>
     if (where !== "after-journal-prepared") return;
     prepared = true;
     await crossDeadline(deadlineAt);
-  });
+  }, SEAM_BUDGET_MS);
   const before = await f.inspect(f.observer);
   // Explicit transaction deadlines already exist; preparation must not turn
   // that existing limit into permission to activate a journal after expiry.
@@ -153,7 +156,7 @@ for (const outcome of ["complete", "recover"]) {
       activated = true;
       await crossDeadline(deadlineAt);
       if (outcome === "recover") throw crash;
-    });
+    }, SEAM_BUDGET_MS);
     const committed = f.store.transaction(stageParticipant,
       { kinds: ["participant"], deadlineAt: f.deadlineAt });
     if (outcome === "recover") await assert.rejects(committed, error => error === crash);

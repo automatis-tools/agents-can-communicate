@@ -32,6 +32,10 @@ const noProcessTable = async () => new Map();
 // late continuation still held the store lock the next step waited on. Cases
 // about the budget pass their own.
 const SETUP = { budgetMs: 30_000 };
+// A turn whose case reads and asserts between the turn and its offer commit:
+// the commit has to land inside the turn's budget, and on a loaded windows-latest
+// runner the case's own checks used the default five seconds up first.
+const UNHURRIED = { budgetMs: 30_000 };
 const event = (kind, cwd, sessionId) => ({ kind, cwd, sessionId,
   model: null, parentSessionId: null, tool: null, targets: [] });
 
@@ -79,7 +83,7 @@ test("next-turn offer stays queued until the stdout writer completes", async t =
       "the receipt advanced while stdout was still crossing its boundary");
   };
 
-  const result = await invoke("beforeTurn", "recipient-session");
+  const result = await invoke("beforeTurn", "recipient-session", UNHURRIED);
   assert.equal((await receipt()).state, "queued");
   await writeOutput(result.stdout);
   assert.equal((await receipt()).state, "queued");
@@ -236,7 +240,7 @@ test("one turn offers every fitting addressed and already-present room receipt o
   const shared = await send("client_shared", [recipientId, otherId], "shared");
   const room = await send("client_room", [], "room-only");
 
-  const result = await invoke("beforeTurn", "recipient-session");
+  const result = await invoke("beforeTurn", "recipient-session", UNHURRIED);
   assert.match(result.stdout, new RegExp(direct.messageId));
   assert.match(result.stdout, new RegExp(shared.messageId));
   assert.match(result.stdout, new RegExp(room.messageId));
