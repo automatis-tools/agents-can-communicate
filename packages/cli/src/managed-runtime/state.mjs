@@ -27,7 +27,9 @@ export async function managedDirectory(directory, { create = false } = {}) {
   try {
     const info = await lstat(directory);
     if (!info.isDirectory() || info.isSymbolicLink()) throw new Error("managed directory is not a regular directory");
-    if (create) {
+    // Mode bits are POSIX privacy. Windows refuses fchmod on a directory
+    // handle, and privacy there is the profile ACL the directory inherits.
+    if (create && !isWindows()) {
       const handle = await openNoFollow(directory, constants.O_RDONLY);
       try { await handle.chmod(0o700); } finally { await handle.close(); }
     }

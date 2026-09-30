@@ -47,18 +47,21 @@ function requireHome(env) {
   return env;
 }
 
+// POSIX paths are built with path.posix whatever the host: the resolution is a
+// pure function of platform and environment, and a Windows host would join
+// `/Users/dana` into `\Users\dana`.
 function macosPaths(env) {
-  const support = path.join(env.HOME, "Library", "Application Support");
+  const support = path.posix.join(env.HOME, "Library", "Application Support");
   // XDG variables are deliberately ignored here. They are common on a machine
   // that also runs Linux tooling, and letting one relocate macOS state would
   // move a user's sessions the day they install something unrelated.
   return { data: support, config: support,
-    cache: path.join(env.HOME, "Library", "Caches") };
+    cache: path.posix.join(env.HOME, "Library", "Caches") };
 }
 
 function xdgPaths(env) {
-  const fallback = { data: path.join(env.HOME, ".local", "share"),
-    config: path.join(env.HOME, ".config"), cache: path.join(env.HOME, ".cache") };
+  const fallback = { data: path.posix.join(env.HOME, ".local", "share"),
+    config: path.posix.join(env.HOME, ".config"), cache: path.posix.join(env.HOME, ".cache") };
   return Object.fromEntries(AREAS.map(area =>
     [area, set(env[XDG[area]]) ? env[XDG[area]] : fallback[area]]));
 }
