@@ -34,6 +34,17 @@ Work in progress for #234. The design is in
   PowerShell for Gemini CLI, a form PowerShell, Git Bash and cmd all read for Grok, an unquoted
   8.3 path for Antigravity CLI, and a cmd command for Kimi Code. The skill runs
   `node "<path>/acc-cli.mjs"`, and the owner header quotes for cmd.
+- On Windows the owner header double-quotes a path, and single-quotes one that has `$`, a
+  backtick or `%`. A path that also has a single quote gets no header: bash and PowerShell read
+  a quote inside single quotes differently, and the bash spelling leaves `$(...)` bare to
+  PowerShell. The hook continues without context and tells the user to rename the directory,
+  without printing the path.
+- A session start reads the process table while the client reports its version. On Windows
+  one of them starts the client and the other starts PowerShell, and one after the other they
+  took most of a loaded runner's hook budget.
+- The reason shown for a client without live delivery reads "this client has no live delivery
+  channel ACC supports here", which is also true of Claude Code, Codex and Antigravity CLI on
+  Windows.
 - A CI job runs real Claude Code and Codex, installed from npm, against a model stub on
   127.0.0.1, on Windows and Linux. Their hooks attach both sessions through the installed
   package, and a message reaches each client's model on its next turn.
