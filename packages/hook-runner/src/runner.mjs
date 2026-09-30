@@ -425,20 +425,25 @@ const HANDLERS = {
       await writePin({ root: pinRoot, harnessSessionId: event.sessionId, runtimeRoot: facts.runtimeRoot,
         version: facts.version, storeVersion: facts.storeVersion, clientPid: binding.clientPid });
     }
+    // Once per session, never per turn. A client that cannot be found yields
+    // null, and the session is then judged by age alone - which is exactly the
+    // behaviour every session had before this existed.
+    const command = adapter.client?.command ?? null;
+    const known = Number.isInteger(knownClientPid) && knownClientPid > 0;
+    // Read while the client reports its version: neither needs the other, and
+    // on Windows one starts the client and the other PowerShell. Handled here
+    // so a probe that fails first leaves no rejection unobserved.
+    const tableRead = known || command === null ? null : Promise.resolve(readProcessTable({
+      timeoutMs: Math.max(1, Math.min(PROCESS_TABLE_MS, deadline - Date.now() - TABLE_RESERVE_MS)) }));
+    tableRead?.catch(() => {});
     const clientVersion = await probeClientVersion(adapter,
       { timeoutMs: Math.max(1, Math.min(1_000, deadline - Date.now())) });
     assertHookBudget(deadline);
     const clientFacts = { clientVersion, platform };
     const capabilities = effectiveCapabilities(adapter, clientFacts);
-    // Once per session, never per turn. A client that cannot be found yields
-    // null, and the session is then judged by age alone - which is exactly the
-    // behaviour every session had before this existed.
-    const command = adapter.client?.command ?? null;
-    const pid = Number.isInteger(knownClientPid) && knownClientPid > 0 ? knownClientPid
-      : command === null ? null
-      : resolveClientPid({ table: await readProcessTable({
-        timeoutMs: Math.max(1, Math.min(PROCESS_TABLE_MS, deadline - Date.now() - TABLE_RESERVE_MS)) }),
-      from: process.pid, command, clientPackage: adapter.client?.package });
+    const pid = known ? knownClientPid : command === null ? null
+      : resolveClientPid({ table: await tableRead, from: process.pid, command,
+        clientPackage: adapter.client?.package });
     assertHookBudget(deadline);
     const clientPid = Number.isInteger(pid) && pid > 0 ? pid : undefined;
     const native = hookBinding => bindNative({ adapter, event, hookBinding, ...clientFacts,
