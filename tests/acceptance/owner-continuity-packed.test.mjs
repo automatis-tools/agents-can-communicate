@@ -4,6 +4,8 @@ import { access, mkdir } from "node:fs/promises";
 import path from "node:path";
 import test from "node:test";
 import { promisify } from "node:util";
+import { modelShells, runInShell } from "../helpers/host-shells.mjs";
+import { parseOwnerHeader } from "../helpers/owner-header.mjs";
 import { createPackedAcc } from "../helpers/packed-acc.mjs";
 import { hermeticEnv } from "../../packages/cli/src/git-probe.mjs";
 
@@ -17,9 +19,26 @@ const ownerLine = stdout => {
 };
 const cli = async (packed, args, cwd = packed.project) => JSON.parse((await run(process.execPath,
   [packed.accBin, ...args, "--json"], { cwd, env: packed.env })).stdout);
-const shellCli = async (packed, suffix, cwd) => JSON.parse((await run("/bin/sh",
-  ["-c", '"$TEST_NODE" "$TEST_ACC" status --json ' + suffix],
-  { cwd, env: { ...packed.env, TEST_NODE: process.execPath, TEST_ACC: packed.accBin } })).stdout).data;
+// The header appended to an ACC command in each shell a model's shell tool runs
+// on this host - sh on POSIX; Git Bash, PowerShell and cmd on Windows - and the
+// `data` of each answer.
+const inShells = async (packed, command, suffix, cwd, { env = {} } = {}) => {
+  const answers = [];
+  for (const model of await modelShells()) {
+    const line = model.call([model.ref("TEST_NODE"), model.ref("TEST_ACC"), command, "--json", suffix]);
+    const { stdout } = await runInShell(model.shell, line, { cwd,
+      env: { ...packed.env, ...env, TEST_NODE: process.execPath, TEST_ACC: packed.accBin } });
+    answers.push(JSON.parse(stdout).data);
+  }
+  assert.notEqual(answers.length, 0, "no model shell ran the header");
+  return answers;
+};
+const room = status => status.participants.map(p => p.sessionId).sort();
+const shellCli = async (packed, suffix, cwd, options) => {
+  const [first, ...rest] = await inShells(packed, "status", suffix, cwd, options);
+  for (const other of rest) assert.deepEqual(room(other), room(first), "two shells read one header differently");
+  return first;
+};
 
 test("the installed turn header keeps its workspace after shell cwd changes", async t => {
   const packed = await createPackedAcc(t);
@@ -30,9 +49,17 @@ test("the installed turn header keeps its workspace after shell cwd changes", as
     session_id: "native-owner", cwd: project }, { ACC_PARTICIPANT: "original" });
   const turn = await packed.hook("claude_code", { hook_event_name: "UserPromptSubmit",
     session_id: "native-owner", cwd: project });
-  const status = await shellCli(packed, ownerLine(turn.stdout), packed.project);
-  assert.ok(status.participants.some(p => p.participantId === "original"),
-    "the original owner's header silently read another, empty workspace");
+  if (process.platform === "win32") {
+    // A quote and `$` in one path: Git Bash reads '\'' inside single quotes and
+    // PowerShell reads '', so no spelling reads alike, and the hook hands the
+    // model no header at all and names what to rename.
+    assert.equal(turn.stdout, "", "a header no Windows shell reads alike reached the model");
+    assert.match(turn.stderr, /no Windows shell quotes alike; rename it and restart the client/);
+  } else {
+    const status = await shellCli(packed, ownerLine(turn.stdout), packed.project);
+    assert.ok(status.participants.some(p => p.participantId === "original"),
+      "the original owner's header silently read another, empty workspace");
+  }
   await assert.rejects(access(path.join(packed.project, "injected")), { code: "ENOENT" });
 });
 
@@ -49,10 +76,9 @@ test("a compact SessionStart restores the same owner without another user prompt
   const status = await shellCli(packed, suffix, packed.consumer);
   assert.equal(status.participants.filter(p => p.participantId === "reader").length, 1);
   assert.equal(status.participants.find(p => p.participantId === "reader").sessionId, reader.sessionId);
-  const result = JSON.parse((await run("/bin/sh", ["-c",
-    '"$TEST_NODE" "$TEST_ACC" inbox --json ' + suffix], { cwd: packed.consumer,
-      env: { ...packed.env, TEST_NODE: process.execPath, TEST_ACC: packed.accBin } })).stdout).data;
-  assert.equal(result.items[0].message.messageId, request.message.messageId);
+  for (const result of await inShells(packed, "inbox", suffix, packed.consumer)) {
+    assert.equal(result.items[0].message.messageId, request.message.messageId);
+  }
   assert.equal((await packed.receipt(sender.sessionId, request.message.messageId, "reader")).state,
     "queued", "restoring identity must not claim peer-message delivery");
 });
@@ -94,17 +120,16 @@ test("installed native hooks keep their launch room across nested Git repositori
     const status = await shellCli(packed, ownerLine(turn.stdout), cwd);
     assert.deepEqual(status.participants.map(p => p.sessionId).sort(),
       [claude.sessionId, codex.sessionId].sort());
-    assert.ok(ownerLine(turn.stdout).includes(`--cwd '${packed.project}'`));
+    assert.equal(parseOwnerHeader(`ACC CLI (append): ${ownerLine(turn.stdout)}`).cwd, packed.project);
   }
   await hook("codex", "UserPromptSubmit", "native-sender", api);
   const compact = await packed.hook("claude_code", { hook_event_name: "SessionStart",
     session_id: "native-reader", source: "compact", cwd: linked }, extraEnv);
   const suffix = ownerLine(compact.stdout);
   assert.ok(suffix.includes(`--session ${claude.sessionId} --generation ${claudeOwner.ACC_GENERATION}`));
-  const inbox = JSON.parse((await run("/bin/sh", ["-c",
-    '"$TEST_NODE" "$TEST_ACC" inbox --json ' + suffix], { cwd: api,
-    env: { ...packed.env, TEST_NODE: process.execPath, TEST_ACC: packed.accBin } })).stdout).data;
-  assert.equal(inbox.items[0].message.messageId, request.message.messageId);
+  for (const inbox of await inShells(packed, "inbox", suffix, api)) {
+    assert.equal(inbox.items[0].message.messageId, request.message.messageId);
+  }
   await hook("claude_code", "SessionEnd", "native-reader", web);
   const history = await packed.acc(["sync", "--session", codex.sessionId, "--scope", "full"]);
   assert.equal(history.snapshot.sessions.find(s => s.sessionId === claude.sessionId).state, "closed");
@@ -125,17 +150,16 @@ test("the installed owner header still selects its room after git init changes d
   const turn = await packed.hook("claude_code", { hook_event_name: "UserPromptSubmit",
     session_id: "native-reader", cwd: packed.project }, extraEnv);
   assert.equal(ownerLine(turn.stdout), suffix);
-  const status = JSON.parse((await run("/bin/sh", ["-c",
-    '"$TEST_NODE" "$TEST_ACC" status --json ' + suffix], { cwd: packed.project,
-    env: { ...packed.env, ...extraEnv, TEST_NODE: process.execPath, TEST_ACC: packed.accBin } })).stdout).data;
+  const status = await shellCli(packed, suffix, packed.project, { env: extraEnv });
   assert.ok(status.participants.some(p => p.sessionId === owner.sessionId));
-  const inbox = JSON.parse((await run("/bin/sh", ["-c",
-    '"$TEST_NODE" "$TEST_ACC" inbox --json ' + suffix], { cwd: packed.project,
-    env: { ...packed.env, ...extraEnv, TEST_NODE: process.execPath, TEST_ACC: packed.accBin } })).stdout).data;
-  assert.equal(inbox.items[0].message.messageId, request.message.messageId);
+  for (const inbox of await inShells(packed, "inbox", suffix, packed.project, { env: extraEnv })) {
+    assert.equal(inbox.items[0].message.messageId, request.message.messageId);
+  }
   const roomOnly = suffix.replace(/^--session \S+ --generation \S+ /, "");
-  await assert.rejects(run("/bin/sh", ["-c",
-    '"$TEST_NODE" "$TEST_ACC" inbox --json ' + roomOnly], { cwd: packed.project,
+  for (const model of await modelShells()) {
+    await assert.rejects(runInShell(model.shell, model.call([model.ref("TEST_NODE"),
+      model.ref("TEST_ACC"), "inbox", "--json", roomOnly]), { cwd: packed.project,
     env: { ...packed.env, ...extraEnv, TEST_NODE: process.execPath, TEST_ACC: packed.accBin } }),
-  error => JSON.parse(error.stdout).error.details.reasonCode === "caller_identity_unresolved");
+    error => JSON.parse(error.stdout).error.details.reasonCode === "caller_identity_unresolved");
+  }
 });

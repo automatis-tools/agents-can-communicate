@@ -3,6 +3,7 @@ import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import test from "node:test";
 
+import { parseOwnerHeader } from "../helpers/owner-header.mjs";
 import { createPackedAcc } from "../helpers/packed-acc.mjs";
 
 // These are process/packaging contracts, not evidence that a model uses the
@@ -10,9 +11,10 @@ import { createPackedAcc } from "../helpers/packed-acc.mjs";
 function ownerFlags(context) {
   const match = /^ACC CLI \(append\): --session (\S+) --generation (\S+) --cwd .+$/m.exec(context);
   assert.ok(match, `the hook gave its session no usable owner arguments:\n${context}`);
-  const room = /--workspace '(acc:\/\/[a-f0-9]{64})'/.exec(match[0]);
-  assert.ok(room, "the hook omitted its saved room reference");
-  return ["--session", match[1], "--generation", match[2], "--workspace", room[1]];
+  // Read as the model's shell reads it: quoted one way on POSIX, another on Windows.
+  const room = parseOwnerHeader(context).workspace;
+  assert.match(room ?? "", /^acc:\/\/[a-f0-9]{64}$/, "the hook omitted its saved room reference");
+  return ["--session", match[1], "--generation", match[2], "--workspace", room];
 }
 
 async function setBudget(packed, bytes) {

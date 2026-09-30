@@ -10,6 +10,8 @@ import { ALL_ADAPTERS, clientContext } from "@agents-can-communicate/cli";
 import { applyPlan, detectInstallation, loadOwnership, planInstallation }
   from "@agents-can-communicate/installer";
 
+import { NO_ALLOW_RULE_ON_WINDOWS } from "../helpers/platform-scope.mjs";
+
 /**
  * Issue #214 through the whole install path: detection, the delivery decision,
  * the plan, the adapter's write, the record, a reinstall and an uninstall - the
@@ -20,8 +22,11 @@ import { applyPlan, detectInstallation, loadOwnership, planInstallation }
  * One run starts from the record 0.8.1 leaves for an operator who accepted live
  * delivery - the machine the capture was taken on - and one from nothing, with
  * delivery off and nobody at the terminal.
+ *
+ * `hostPlatform` names the platform whose form ACC writes; left out, it is this
+ * host's.
  */
-async function machine(t) {
+async function machine(t, hostPlatform) {
   const home = await realpath(await mkdtemp(path.join(tmpdir(), "acc-agy-e2e-")));
   t.after(() => rm(home, { recursive: true, force: true }));
   const dataHome = path.join(home, "data");
@@ -35,6 +40,7 @@ async function machine(t) {
   const agy = fakeAgy();
   const context = { ...clientContext(home, path.join(dataHome, "acc"),
     { env: {}, dataHome, cwd: path.join(home, "project") }), runAgy: agy.run,
+  ...(hostPlatform === undefined ? {} : { hostPlatform }),
   probeHooks: async () => ({ hooks: [{ name: "acc", enabled: true,
     actions: ["SessionStart", "PreInvocation", "Stop"].map(event => ({ event })) }] }) };
   const adapters = ALL_ADAPTERS().filter(adapter => adapter.id === "antigravity");
@@ -66,7 +72,7 @@ const ON_0_8_1 = [{ adapterId: "antigravity", deliveryPolicy: "actionable",
   deliveryDecision: { source: "interactive-accepted", completeSetup: true } }];
 
 test("reinstalling over 0.8.1 adds the rule once, asks nothing, and uninstall takes it back",
-  async t => {
+  { skip: NO_ALLOW_RULE_ON_WINDOWS }, async t => {
     const fixture = await machine(t);
     const before = await fixture.read();
 
@@ -93,7 +99,8 @@ test("reinstalling over 0.8.1 adds the rule once, asks nothing, and uninstall ta
     assert.equal(await fixture.read(), before);
   });
 
-test("delivery off and nobody at the terminal still get the rule", async t => {
+test("delivery off and nobody at the terminal still get the rule",
+  { skip: NO_ALLOW_RULE_ON_WINDOWS }, async t => {
   const fixture = await machine(t);
   const before = await fixture.read();
 
@@ -106,3 +113,40 @@ test("delivery off and nobody at the terminal still get the rule", async t => {
   await fixture.run({ action: "uninstall", recorded: await fixture.recorded() });
   assert.equal(await fixture.read(), before);
 });
+
+// Windows writes no rule (a rule on `node` would allow every node command), so
+// there the same two starts ask nothing and leave the user's settings byte for
+// byte, through a reinstall and an uninstall. The Windows form is named outright,
+// so every host checks it.
+test("on Windows ACC adds no rule, asks nothing, and leaves the settings as it found them",
+  async t => {
+    const fixture = await machine(t, "win32");
+    const before = await fixture.read();
+
+    const first = await fixture.run({ recorded: ON_0_8_1 });
+    assert.deepEqual(first.questions, []);
+    assert.equal(await fixture.read(), before);
+    const [record] = await fixture.recorded();
+    assert.deepEqual(record.deliveryDecision,
+      { source: "interactive-accepted", completeSetup: true });
+    assert.equal(record.artifacts.some(item => item.path === fixture.settings), false,
+      "the record claims an edit ACC did not make");
+    const [after] = await fixture.detect();
+    assert.equal(after.commandApproval.state, "unmatchable");
+    assert.match(after.inboundDelivery.diagnostic, /On Windows ACC adds no allow rule/);
+
+    const second = await fixture.run({ recorded: await fixture.recorded() });
+    assert.deepEqual(second.questions, []);
+    assert.equal(await fixture.read(), before);
+    await fixture.run({ action: "uninstall", recorded: await fixture.recorded() });
+    assert.equal(await fixture.read(), before);
+
+    const off = await machine(t, "win32");
+    const untouched = await off.read();
+    const { questions } = await off.run({ recorded: [], interactive: false,
+      options: { delivery: "off" } });
+    assert.deepEqual(questions, []);
+    assert.equal(await off.read(), untouched);
+    await off.run({ action: "uninstall", recorded: await off.recorded() });
+    assert.equal(await off.read(), untouched);
+  });

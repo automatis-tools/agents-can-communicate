@@ -1,12 +1,12 @@
 import assert from "node:assert/strict";
-import { execFile } from "node:child_process";
 import { mkdir, mkdtemp, readFile, realpath, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
 
+import { runInShell } from "../helpers/host-shells.mjs";
+import { shellWords } from "../helpers/owner-header.mjs";
 import { CLAUDE_PLUGIN, pluginVersion } from "../helpers/plugin-version.mjs";
-import { promisify } from "node:util";
 
 import { createClaudeCodeAdapter } from "@agents-can-communicate/adapter-claude-code";
 import { createCodexAdapter } from "@agents-can-communicate/adapter-codex";
@@ -16,7 +16,12 @@ import { createGeminiCliAdapter } from "@agents-can-communicate/adapter-gemini-c
 import { createGrokAdapter } from "@agents-can-communicate/adapter-grok";
 import { createKimiAdapter } from "@agents-can-communicate/adapter-kimi";
 
-const run = promisify(execFile);
+const windows = process.platform === "win32";
+// The shell a client runs its hook command in on this host: sh on POSIX, and on
+// Windows the one each client picked (tests/helpers/host-shells.mjs).
+const onHost = (windowsShell, command) => ({ shell: windows ? windowsShell : "sh", command });
+const hooksIn = wired => Object.values(wired.hooks)
+  .flatMap(entries => entries.flatMap(entry => entry.hooks));
 
 /**
  * The regression this file exists for.
@@ -38,8 +43,9 @@ const ADAPTERS = [
       // looked, and enabled an id it never forms.
       const wired = JSON.parse(await readFile(path.join(home, ".agents", "acc-local",
         "plugins", "agents-can-communicate", "hooks.json"), "utf8"));
-      return Object.values(wired.hooks)
-        .flatMap(entries => entries.flatMap(entry => entry.hooks.map(h => h.command)));
+      // On Windows Codex runs `commandWindows` in place of `command`, in PowerShell.
+      return hooksIn(wired).map(h => onHost("pwsh", windows ? h.commandWindows ?? h.command
+        : h.command));
     } },
   { name: "claude_code", create: createClaudeCodeAdapter,
     context: home => ({ configDir: home }),
@@ -50,9 +56,12 @@ const ADAPTERS = [
         "agents-can-communicate", await pluginVersion(CLAUDE_PLUGIN));
       const wired = JSON.parse(await readFile(path.join(root, "hooks", "hooks.json"),
         "utf8"));
-      return Object.values(wired.hooks)
-        .flatMap(entries => entries.flatMap(entry => entry.hooks.map(h =>
-          h.command.replaceAll("${CLAUDE_PLUGIN_ROOT}", root))));
+      const expand = text => text.replaceAll("${CLAUDE_PLUGIN_ROOT}", root);
+      // A hook with `args` is the exec form, run with no shell; a plain command
+      // runs in sh, or in Git Bash on Windows.
+      return hooksIn(wired).map(h => (Array.isArray(h.args)
+        ? { shell: "exec", command: expand(h.command), args: h.args.map(expand) }
+        : onHost("bash", expand(h.command))));
     } },
   { name: "gemini_cli", create: createGeminiCliAdapter,
     context: home => ({ home }),
@@ -61,15 +70,15 @@ const ADAPTERS = [
         path.join(home, ".gemini", "settings.json"), "utf8"));
       return Object.values(settings.hooks)
         .flatMap(entries => entries.flatMap(entry => entry.hooks
-          .filter(h => h.name?.startsWith("acc-")).map(h => h.command)));
+          .filter(h => h.name?.startsWith("acc-")).map(h => onHost("powershell", h.command))));
     } },
   { name: "kimi", create: createKimiAdapter,
     context: home => ({ home }),
     commands: async home => {
       const config = await readFile(path.join(home, "config.toml"), "utf8");
       return config.split("\n").filter(line => line.startsWith("command = "))
-        .map(line => line.slice(line.indexOf('"') + 1, line.lastIndexOf('"'))
-          .replace(/\\(["\\])/g, "$1"));
+        .map(line => onHost("cmd", line.slice(line.indexOf('"') + 1, line.lastIndexOf('"'))
+          .replace(/\\(["\\])/g, "$1")));
     } },
   { name: "antigravity", create: createAntigravityAdapter,
     // A location has to be named: this client registers either machine-wide or
@@ -83,7 +92,8 @@ const ADAPTERS = [
     commands: async home => {
       const wired = JSON.parse(await readFile(
         path.join(home, ".gemini", "config", "hooks.json"), "utf8"));
-      return Object.values(wired.acc).flatMap(actions => actions.map(action => action.command));
+      return Object.values(wired.acc)
+        .flatMap(actions => actions.map(action => onHost("go-cmd", action.command)));
     },
     // This client sends no `hook_event_name`; the event is the argument the
     // registered command carries, and the session is a `conversationId`.
@@ -95,10 +105,41 @@ const ADAPTERS = [
     commands: async home => {
       const wired = JSON.parse(await readFile(
         path.join(home, ".grok", "hooks", "acc.json"), "utf8"));
-      return Object.values(wired.hooks)
-        .flatMap(entries => entries.flatMap(entry => entry.hooks.map(h => h.command)));
+      return hooksIn(wired).map(h => onHost("pwsh", h.command));
     } },
 ];
+
+/**
+ * The files an installed hook names, each of which must exist.
+ *
+ * POSIX: the executable, which is the first quoted path or, for a bare command,
+ * the first word, and has to be absolute. An exec-form hook names its program and
+ * its script. A Windows shell form starts either an absolute node or the `node`
+ * PATH finds - the portable and unquoted forms take it from PATH on purpose - and
+ * every absolute path in it has to exist, the shim or runner among them.
+ */
+function namedFiles(name, hook) {
+  if (hook.shell === "exec") {
+    for (const file of [hook.command, hook.args[0]]) {
+      assert.equal(path.isAbsolute(file), true, `${name} wired a relative command: ${file}`);
+    }
+    return [hook.command, hook.args[0]];
+  }
+  const { command } = hook;
+  if (!windows) {
+    const quoted = command.match(/"([^"]+)"|'([^']+)'/);
+    const executable = quoted === null ? command.split(" ")[0] : (quoted[1] ?? quoted[2]);
+    assert.equal(path.isAbsolute(executable), true, `${name} wired a relative command: ${command}`);
+    return [executable];
+  }
+  // PowerShell's call operator is not part of the program.
+  const words = shellWords(command.replace(/^& /, "").replace(/;.*$/, ""));
+  assert.ok(path.win32.isAbsolute(words[0]) || words[0] === "node",
+    `${name} wired a program that is neither absolute nor node: ${command}`);
+  const files = words.filter(word => path.win32.isAbsolute(word));
+  assert.ok(files.some(file => /\.mjs$/.test(file)), `${name} names no script: ${command}`);
+  return files;
+}
 
 async function home(t, name) {
   const dir = await realpath(await mkdtemp(path.join(tmpdir(), `acc-wiring-${name}-`)));
@@ -123,15 +164,11 @@ for (const adapter of ADAPTERS) {
       const commands = await adapter.commands(dir);
 
       assert.equal(commands.length > 0, true, "install wired no hooks at all");
-      for (const command of commands) {
-        // The executable is the first quoted path, or the first word for a
-        // bare command. Either way it must exist on disk.
-        const quoted = command.match(/"([^"]+)"|'([^']+)'/);
-        const executable = quoted === null ? command.split(" ")[0] : (quoted[1] ?? quoted[2]);
-        assert.equal(path.isAbsolute(executable), true,
-          `${adapter.name} wired a relative command: ${command}`);
-        const info = await stat(executable);
-        assert.equal(info.isFile(), true, `${executable} is not a file`);
+      for (const hook of commands) {
+        for (const file of namedFiles(adapter.name, hook)) {
+          const info = await stat(file);
+          assert.equal(info.isFile(), true, `${file} is not a file`);
+        }
       }
     });
 
@@ -142,18 +179,16 @@ for (const adapter of ADAPTERS) {
       t.after(() => rm(dataHome, { recursive: true, force: true }));
 
       await adapter.create().install(adapter.context(dir));
-      const [command] = await adapter.commands(dir);
+      const [hook] = await adapter.commands(dir);
 
-      // Run it exactly as the client would: through a shell, with the payload
-      // on stdin. Exit 0 is the contract - a hook must never break a session.
-      const child = run("/bin/sh", ["-c", command], {
+      // Run it exactly as the client would: in the client's shell on this host,
+      // or with none for an exec-form hook, with the payload on stdin. Exit 0 is
+      // the contract - a hook must never break a session.
+      const { stdout } = await runInShell(hook.shell, hook.command, { args: hook.args,
         env: { ...process.env, ACC_DATA_HOME: dataHome },
-      });
-      child.child.stdin.end(JSON.stringify(adapter.payload?.(dir)
-        ?? { hook_event_name: "SessionStart", session_id: `probe-${adapter.name}`,
-          cwd: dir, source: "startup" }));
-
-      const { stdout } = await child;
+        input: JSON.stringify(adapter.payload?.(dir)
+          ?? { hook_event_name: "SessionStart", session_id: `probe-${adapter.name}`,
+            cwd: dir, source: "startup" }) });
       assert.equal(typeof stdout, "string");
     });
 }

@@ -25,3 +25,9 @@ export const POSIX_FORM = "linux";
 // node command, so ACC writes none there and each ACC command asks.
 export const NO_ALLOW_RULE_ON_WINDOWS = process.platform === "win32"
   ? "Windows writes no allow rule: the command's first word is node" : false;
+
+// ACC 0.7.x wrote `sh` shims and shell-profile blocks, and it never installed on
+// Windows: its package's `os` field refused win32 with EBADPLATFORM (issue #234).
+// A Windows machine holds no 0.7.x artefact for a current ACC to meet.
+export const NO_LEGACY_ON_WINDOWS = process.platform === "win32"
+  ? "ACC 0.7.x never installed on Windows, so no 0.7.x shim exists there" : false;

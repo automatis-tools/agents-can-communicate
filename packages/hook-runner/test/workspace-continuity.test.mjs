@@ -8,6 +8,7 @@ import { promisify } from "node:util";
 import { projectContextResult } from "@agents-can-communicate/adapter-sdk";
 import { hermeticEnv } from "@agents-can-communicate/cli";
 import { runHook } from "../src/runner.mjs";
+import { parseOwnerHeader } from "../../../tests/helpers/owner-header.mjs";
 
 const exec = promisify(execFile);
 const platform = `${process.platform}-${process.arch}`;
@@ -59,7 +60,7 @@ for (const parentGit of [false, true]) {
         [first.accSessionId, second.accSessionId].sort(), "cwd created another ACC room or owner");
       assert.match(turn.stdout, new RegExp(message.messageId), "the original inbox must remain reachable");
       assert.match(turn.stdout, new RegExp(`--session ${second.accSessionId} --generation ${second.generation}`));
-      assert.ok(turn.stdout.includes(`--cwd '${f.parent}'`));
+      assert.equal(parseOwnerHeader(turn.stdout)?.cwd, f.parent);
     }
     const compact = await f.hook("sessionStart", "second", f.api);
     assert.equal(compact.accSessionId, second.accSessionId);
@@ -125,7 +126,7 @@ test("moving to another worktree keeps the room and repository-relative guard pa
   assert.equal(result.failed, undefined, result.reason);
   assert.equal(result.decision, "deny");
   const turn = await f.hook("beforeTurn", "writer", linked);
-  assert.ok(turn.stdout.includes(`--cwd '${f.parent}'`));
+  assert.equal(parseOwnerHeader(turn.stdout)?.cwd, f.parent);
   assert.match(turn.stdout, new RegExp(`--session ${writer.accSessionId}`));
 });
 
