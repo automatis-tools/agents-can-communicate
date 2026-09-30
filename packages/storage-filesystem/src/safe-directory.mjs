@@ -64,7 +64,8 @@ async function inspectRealDirectory(directory, root, create) {
   }
 }
 
-async function inspectManagedDirectory(rootPath, directoryPath, create, { afterInspect } = {}) {
+async function inspectManagedDirectory(rootPath, directoryPath, create,
+  { afterInspect, realpath: resolve = realpath, platform = process.platform } = {}) {
   const root = absolutePath(rootPath, "managed root");
   const directory = absolutePath(directoryPath, "managed directory", root);
   const relative = relativeWithin(root, directory);
@@ -85,7 +86,8 @@ async function inspectManagedDirectory(rootPath, directoryPath, create, { afterI
       // between the check and the resolution leaves realpath nothing to resolve
       // (ENOENT), so it is checked and created again, then resolved again; every
       // check below applies to whichever attempt settles.
-      resolved = await resolveSegment(current, create && attempt < VANISHED_RETRIES);
+      resolved = await resolveSegment(current, create && attempt < VANISHED_RETRIES,
+        { resolve, platform });
       if (resolved !== null) break;
     }
     // realpath answers with the name the directory carries *now*, which is not
@@ -117,13 +119,26 @@ async function inspectManagedDirectory(rootPath, directoryPath, create, { afterI
 }
 
 // null when the name went away and the caller may take it again.
-async function resolveSegment(current, retry) {
+async function resolveSegment(current, retry, { resolve, platform }) {
   try {
-    return await realpath(current);
+    return await resolve(current);
   } catch (error) {
-    if (error.code === "ENOENT" && retry) return null;
-    throw error;
+    const gone = goneWhileResolving(error, platform);
+    if (gone === null) throw error;
+    if (retry) return null;
+    throw gone;
   }
+}
+
+// Linux realpath fails ENOENT on a name renamed away while it resolves. Windows
+// fails EBADF in that window (measured on windows-latest, a directory renamed
+// back and forth), and it is the same fact: the name went away. Anywhere else
+// EBADF stays what it says.
+function goneWhileResolving(error, platform) {
+  if (error.code === "ENOENT") return error;
+  if (error.code !== "EBADF" || platform !== "win32") return null;
+  return Object.assign(new Error(error.message, { cause: error }),
+    { code: "ENOENT", syscall: error.syscall, path: error.path });
 }
 
 async function stillTheSameDirectory(details, resolved, current, root) {
@@ -135,7 +150,8 @@ async function stillTheSameDirectory(details, resolved, current, root) {
 }
 
 // `afterInspect` is the seam the race tests use: it runs between a segment's
-// check and its resolution, the window a concurrent rename lands in.
+// check and its resolution, the window a concurrent rename lands in. `realpath`
+// and `platform` let them put a platform's answer in that window.
 export async function assertManagedDirectory(rootPath, directoryPath, options) {
   return inspectManagedDirectory(rootPath, directoryPath, false, options);
 }

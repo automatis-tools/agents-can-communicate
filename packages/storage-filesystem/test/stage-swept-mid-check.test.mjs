@@ -119,3 +119,29 @@ test("an accepted stage taken on every attempt ends the publication", { timeout:
     { root, tmpDir: paths.tmp, stageDir: paths.stage, afterStageEnsured }).catch(() => null);
   assert.ok(taken >= 2 && taken <= 10, `retried a bounded number of times, took ${taken}`);
 });
+
+// Measured on windows-latest: realpath of a directory another process renames
+// back and forth fails EBADF there, where Linux says ENOENT for the same window,
+// and a read of the writer lock's owner record failed as unsafe instead of
+// finding the lock gone.
+test("windows: a directory whose realpath fails EBADF mid-rename has gone away", async t => {
+  const { root, paths } = await store(t);
+  const failing = new Set();
+  const resolve = async current => {
+    if (failing.delete(current)) {
+      throw Object.assign(new Error(`EBADF: bad file descriptor, realpath '${current}'`),
+        { code: "EBADF", syscall: "realpath" });
+    }
+    return realpath(current);
+  };
+
+  failing.add(paths.stage);
+  assert.equal(await ensureManagedDirectory(root, paths.stage, { platform: "win32", realpath: resolve }),
+    paths.stage);
+  failing.add(paths.stage);
+  await assert.rejects(assertManagedDirectory(root, paths.stage, { platform: "win32", realpath: resolve }),
+    error => error.code === "ENOENT" && error.cause?.code === "EBADF");
+  failing.add(paths.stage);
+  await assert.rejects(assertManagedDirectory(root, paths.stage, { platform: "linux", realpath: resolve }),
+    error => error.code === "EBADF");
+});
