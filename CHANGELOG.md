@@ -59,6 +59,13 @@ Work in progress for #234. The design is in
     already retired. A heartbeat of a durable session goes straight to its durable record.
     Together this removes two lock round trips from each turn.
   - On Windows, taking the writer lock flushes its owner record once instead of twice.
+  - One record replaced with no event, such as a session's heartbeat on every turn, is published
+    by an atomic rename without the journal, while no other transaction is open. The journal
+    cost five atomic writes for it.
+  - A second live session opens in the transaction that materialises the workspace. Before, it
+    wrote an ephemeral copy of itself that was copied and retired a moment later.
+  - An ephemeral record's first publication writes no retention marker, because a record with no
+    marker is present.
   - A hook process loads its own client's adapter and the parts of the CLI and installer that
     a hook calls: 123 modules instead of 195.
 - The reason shown for a client without live delivery reads "this client has no live delivery

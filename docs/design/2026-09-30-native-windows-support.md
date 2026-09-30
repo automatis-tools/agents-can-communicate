@@ -118,6 +118,14 @@ runtime, because launcher modules may import only their siblings.
   left by a writer that died, would later roll its own bytes over the record, and it refuses a
   journalled write as well, so that case keeps the journalled path and its refusal. Any
   transaction with an event, a removal or a second record keeps the journal.
+- **A second session, and a first publication.** A second live session wrote an ephemeral copy
+  of itself, which the materialising transaction then copied and retired one lock at a time. It
+  now opens in that transaction, and only while the session it joins is still live under the
+  lock: otherwise it is a lone session and opens ephemerally, as before. An ephemeral record's
+  first publication writes no retention marker, because a record with no marker is present.
+  That marker was an atomic write, three flushes on Windows, for each record a new session
+  opened with. Together with the lone-record path, a turn made 24 flushes and syncs on macOS
+  and now makes 8, and a second session's start went from 80 to 52.
 - **Validating a store directory once.** Every record read walked its directory from the store
   root twice, `lstat` and `realpath` for each level: about a thousand calls a hook, 130 ms of one
   on windows-latest. A directory validated once is now known by its identity (volume and file
