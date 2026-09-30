@@ -102,12 +102,14 @@ runtime, because launcher modules may import only their siblings.
   `dev` and `ino` (as bigint) with the `lstat` result. A mismatch means the name was swapped
   between the two calls and is refused. This restores the rule the store, the workspace config and
   the managed runtime rely on, including the race case.
-- **Private files.** POSIX checks `(mode & 0o077) === 0` and the owner uid. Windows has no such
-  bits; privacy comes from the ACL that every file inherits from the user profile. On Windows the
-  check becomes: the file is inside a directory ACC verified once. `acc install` and `acc doctor`
-  read the data home's ACL with `icacls` and refuse a data home that grants access to anyone other
-  than the user, SYSTEM and Administrators. Vendor files that ACC reads (Claude session records and
-  keys, the Codex pid file) must lie inside that vendor's home under the same profile.
+- **Private files.** POSIX creates ACC's directories `0700` and checks `(mode & 0o077) === 0`
+  and the owner uid only on the endpoints and vendor files of live delivery. Windows has no such
+  bits; privacy comes from the ACL every file inherits from the user profile, and
+  `%LOCALAPPDATA%` grants only the user, SYSTEM and Administrators (measured with `icacls`).
+  0.9.0 relies on that inheritance, the parity of what POSIX checks today. The per-file checks
+  arrive with live delivery in 0.9.x: an endpoint or vendor file (Claude session keys, the Codex
+  pid file) must then lie inside the vendor's home under the same profile, and its ACL is read
+  once, by SID so that a localized Windows reads the same.
 
 ### 2. Paths and workspace identity
 
