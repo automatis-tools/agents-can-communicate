@@ -11,7 +11,11 @@ import { readOpenJournals } from "../src/journal.mjs";
 import { openFilesystemStore } from "../src/store.mjs";
 
 const WORKSPACE = "workspace_deadline";
-const BUDGET_MS = 1_000;
+// Each case moves the deadline past one seam, and everything before that seam
+// has to fit inside it. On a loaded windows-latest runner a one-second budget
+// expired while the case was still waiting for the writer lock, before the seam
+// the case is about.
+const BUDGET_MS = process.platform === "win32" ? 5_000 : 1_000;
 const participant = displayName => ({ schemaVersion: SCHEMA_VERSION,
   participantId: "participant_a", workspaceId: WORKSPACE, displayName,
   kind: "agent", createdAt: "2026-09-07T00:00:00.000Z" });
