@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { spawn } from "node:child_process";
 import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -78,6 +79,27 @@ test("a failed owned-directory cleanup keeps authority until a retry succeeds", 
   });
   await mkdir(home);
 
+  // POSIX refuses the removal through the parent's mode. Windows has no mode
+  // bits there; a directory that is a live process's working directory is
+  // refused instead (EBUSY, measured on windows-latest).
+  let holder = null;
+  const block = async () => {
+    if (process.platform !== "win32") return chmod(parent, 0o500);
+    holder = spawn(process.execPath, ["-e", "setInterval(() => {}, 1000)"],
+      { cwd: plugin, stdio: "ignore", windowsHide: true });
+    await new Promise(resolve => { holder.once("spawn", resolve); });
+  };
+  const unblock = async () => {
+    if (process.platform !== "win32") return chmod(parent, 0o700);
+    if (holder !== null) {
+      const exited = new Promise(resolve => { holder.once("exit", resolve); });
+      holder.kill();
+      await exited;
+      holder = null;
+    }
+  };
+  t.after(() => unblock().catch(() => {}));
+
   let blockCleanup = true;
   const adapter = {
     id: "fixture",
@@ -89,7 +111,7 @@ test("a failed owned-directory cleanup keeps authority until a retry succeeds", 
     uninstall: async () => {
       if (blockCleanup) {
         blockCleanup = false;
-        await chmod(parent, 0o500);
+        await block();
       }
       return { changes: [], diagnostics: [] };
     },
@@ -106,7 +128,7 @@ test("a failed owned-directory cleanup keeps authority until a retry succeeds", 
   assert.deepEqual((await loadOwnership({ dataHome })).installs.map(item => item.adapterId),
     ["fixture"], "directory cleanup failure discarded its retry authority");
 
-  await chmod(parent, 0o700);
+  await unblock();
   const retried = await applyPlan({ plan: plan("uninstall"), adapters: [adapter],
     context, dataHome });
   assert.deepEqual(retried.failed, []);

@@ -35,8 +35,12 @@ test("control roundtrip is private and refuses malformed or escaping runtime poi
   const f = await fixture(t);
   await initialize(f);
   assert.deepEqual(await readControl(f.root), f.control);
-  assert.equal((await stat(f.root)).mode & 0o777, 0o700);
-  assert.equal((await stat(path.join(f.root, "control.json"))).mode & 0o777, 0o600);
+  // Mode bits are POSIX privacy; Windows has none, and its privacy is the ACL
+  // the profile directory passes on (docs/design/2026-09-30-native-windows-support.md).
+  if (process.platform !== "win32") {
+    assert.equal((await stat(f.root)).mode & 0o777, 0o700);
+    assert.equal((await stat(path.join(f.root, "control.json"))).mode & 0o777, 0o600);
+  }
   for (const bad of [{ ...f.control, phase: "guess" }, { ...f.control, auto: 1 },
     { ...f.control, autoPreference: "on" },
     { ...f.control, active: { version: "0.4.0", root: f.parent } },
