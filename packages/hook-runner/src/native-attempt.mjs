@@ -1,5 +1,5 @@
 import { storeNativeAttempt } from "@agents-can-communicate/adapter-sdk";
-import { readInstalledLivePolicyState } from "@agents-can-communicate/installer";
+import { readInstalledLivePolicyState } from "@agents-can-communicate/installer/hook-support";
 
 import { establishNativeBinding } from "./native-binding.mjs";
 

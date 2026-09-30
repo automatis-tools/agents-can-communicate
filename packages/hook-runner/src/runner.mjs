@@ -8,12 +8,12 @@ import { capabilityEvidence, clearNativeAttempt, clearSessionBinding, effectiveC
   loadSessionBinding, normalizedEvent, storeSessionBinding }
   from "@agents-can-communicate/adapter-sdk";
 import { createCoordinationService } from "@agents-can-communicate/core";
-import { loadOwnership } from "@agents-can-communicate/installer";
+import { loadOwnership } from "@agents-can-communicate/installer/hook-support";
 import { AccError, createId } from "@agents-can-communicate/protocol";
 import { openFilesystemStore } from "@agents-can-communicate/storage-filesystem";
 import { clearPin, createGitProbe, resolveHookWorkspace, platformDataHome, runtimePaths,
   writePin as writeRuntimePin }
-  from "@agents-can-communicate/cli";
+  from "@agents-can-communicate/cli/hook-support";
 
 import { resolveClientPid } from "./client-pid.mjs";
 import { probeClientVersion as defaultProbeClientVersion } from "./client-version.mjs";
