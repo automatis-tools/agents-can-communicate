@@ -1,13 +1,13 @@
 import { createHash, randomUUID } from "node:crypto";
 import { constants } from "node:fs";
-import { mkdir } from "node:fs/promises";
+import { mkdir, rmdir } from "node:fs/promises";
 import path from "node:path";
 import { performance } from "node:perf_hooks";
 
 import { AccError, EXIT } from "@agents-can-communicate/protocol";
 
 import { encode, readJsonIfPresent } from "./atomic-json.mjs";
-import { removeTree, renameEntry, syncEntry } from "./portable-fs.mjs";
+import { isWindows, removeTree, renameEntry, syncEntry } from "./portable-fs.mjs";
 import { ensureManagedDirectory } from "./safe-directory.mjs";
 import { withRegularNoFollow } from "./safe-file.mjs";
 
@@ -178,6 +178,12 @@ export async function withWriterMutex(paths, options, operation) {
       } catch (error) {
         if (!["EEXIST", "ENOTEMPTY"].includes(error.code)) throw error;
         const current = await readOwner(directory, root, openFile);
+        // POSIX rename replaces the empty lock an older ACC's mkdir-then-publish
+        // left; Windows cannot rename onto any directory. rmdir removes only an
+        // empty one, so the outcome is POSIX's: a publisher still filling it
+        // loses its no-replace owner write, and a complete lock is never touched.
+        if (current === null && isWindows()
+          && await rmdir(directory).then(() => true, () => false)) continue;
         if (!await takeStaleOwnership(directory, root, current, clock.now(), pidIsAlive)) {
           const remaining = deadline - monotonicNow();
           if (remaining <= 0) break;
