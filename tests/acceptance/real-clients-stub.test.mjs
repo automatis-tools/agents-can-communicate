@@ -33,6 +33,24 @@ function ownerArguments(requests) {
   return null;
 }
 
+// What to read when an attach did not happen: the client's own output, how long
+// the turn took, and every line its logs wrote about hooks.
+async function evidence(label, outcome, { logs = null, started }) {
+  const lines = [`${label} took ${Math.round(performance.now() - started)}ms`,
+    `stderr: ${String(outcome.stderr ?? "").slice(-3000)}`,
+    `stdout: ${String(outcome.stdout ?? "").slice(-1500)}`];
+  if (logs !== null) {
+    const { readdir } = await import("node:fs/promises");
+    const files = await readdir(logs, { recursive: true }).catch(() => []);
+    for (const name of files.filter(file => /\.(log|jsonl)$/.test(file))) {
+      const text = await readFile(path.join(logs, name), "utf8").catch(() => "");
+      const hooks = text.split(/\r?\n/).filter(line => /hook/i.test(line)).slice(-40);
+      if (hooks.length > 0) lines.push(`${name}:`, ...hooks.map(line => `  ${line.slice(0, 400)}`));
+    }
+  }
+  return lines.join("\n");
+}
+
 async function client(command, args, { cwd, env, timeout = 180_000 }) {
   const file = await resolveExecutable(command, { pathEnv: env.PATH ?? env.Path });
   assert.notEqual(file, null, `${command} is not on PATH`);
@@ -77,18 +95,23 @@ test("real Claude Code and Codex attach through their hooks and carry a message 
 
     // Claude's first turn: SessionStart attaches it and puts the owner header in
     // front of the model.
-    const claudeFirst = JSON.parse((await client("claude", ["-p", "first turn", "--output-format",
-      "json"], { cwd: packed.project, env })).stdout);
+    const claudeStarted = performance.now();
+    const claudeRun = await client("claude", ["-p", "first turn", "--output-format", "json"],
+      { cwd: packed.project, env });
+    const claudeFirst = JSON.parse(claudeRun.stdout);
     assert.notEqual(ownerArguments(stub.requests.filter(item => item.url.includes("/messages"))), null,
-      "no owner header reached Claude's model: its SessionStart hook did not attach it");
+      "no owner header reached Claude's model: its SessionStart hook did not attach it\n"
+        + await evidence("claude -p", claudeRun, { started: claudeStarted }));
 
     // Codex's first turn attaches it the same way.
+    const codexStarted = performance.now();
     const codexFirst = await client("codex", ["exec", "--skip-git-repo-check",
       "--dangerously-bypass-hook-trust", "first turn"], { cwd: packed.project, env });
     const codexSession = /session id: ([0-9a-f-]{36})/.exec(codexFirst.stderr)?.[1];
     assert.equal(typeof codexSession, "string", codexFirst.stderr);
     assert.notEqual(ownerArguments(stub.requests.filter(item => item.url.includes("/responses"))), null,
-      "no owner header reached Codex's model: its SessionStart hook did not attach it");
+      "no owner header reached Codex's model: its SessionStart hook did not attach it\n"
+        + await evidence("codex exec", codexFirst, { logs: codexHome, started: codexStarted }));
 
     // Both turns have ended, so both sessions are closed, and a message to either
     // waits for its next turn. A manual CLI session sends it, the way an agent in
