@@ -41,7 +41,11 @@ test("file discovery does not depend on the shell", async () => {
   assert.equal(listed.some(file => file.includes("node_modules")), false);
 });
 
-test("the runner bounds file concurrency without weakening process races", () => {
+test("the runner bounds file concurrency without weakening process races", t => {
+  const saved = process.env.ACC_TEST_TIMEOUT_MS;
+  t.after(() => { if (saved === undefined) delete process.env.ACC_TEST_TIMEOUT_MS;
+    else process.env.ACC_TEST_TIMEOUT_MS = saved; });
+  delete process.env.ACC_TEST_TIMEOUT_MS;
   assert.equal(TEST_FILE_CONCURRENCY, 4);
   assert.deepEqual(nodeTestArguments(["first.test.mjs", "second.test.mjs"]), [
     "--test",
@@ -49,6 +53,10 @@ test("the runner bounds file concurrency without weakening process races", () =>
     "first.test.mjs",
     "second.test.mjs",
   ]);
+  // CI names a per-test limit, so a hung test fails by name.
+  process.env.ACC_TEST_TIMEOUT_MS = "600000";
+  assert.deepEqual(nodeTestArguments(["first.test.mjs"]),
+    ["--test", "--test-concurrency=4", "--test-timeout=600000", "first.test.mjs"]);
 });
 
 // Measured on windows-latest: 345 absolute test paths make a command line past

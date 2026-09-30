@@ -6,9 +6,17 @@
 // tests while keeping the release gate deterministic.
 export const TEST_FILE_CONCURRENCY = 4;
 
+// CI sets ACC_TEST_TIMEOUT_MS so that one hung test fails with its name instead
+// of holding the whole job until the runner's own limit.
+const perTestTimeout = () => {
+  const value = Number(process.env.ACC_TEST_TIMEOUT_MS);
+  return Number.isSafeInteger(value) && value > 0 ? [`--test-timeout=${value}`] : [];
+};
+
 export const nodeTestArguments = files => [
   "--test",
   `--test-concurrency=${TEST_FILE_CONCURRENCY}`,
+  ...perTestTimeout(),
   ...files,
 ];
 
