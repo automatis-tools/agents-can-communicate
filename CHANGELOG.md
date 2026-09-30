@@ -74,7 +74,7 @@ Work in progress for #234. The design is in
 
 | Candidate artifact | Value |
 |---|---|
-| Built from | `cc7b4f34762c780e9f9ea0895cd86fe172f441b2` |
+| Built from | `03c93db476e7955d3c165f6ac92d817efbef6a1f` |
 | Tarball | `agents-can-communicate-0.8.5.tgz`, 520,769 bytes, 327 files |
 | sha256 | `9bf0c05b37cb13d1047f82d68e38750beb9147a240051e05a84c6987c32c1352` |
 
