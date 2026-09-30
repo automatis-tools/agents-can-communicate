@@ -107,7 +107,9 @@ export function runExecutable(file, args, options = {},
   let timer;
   const expired = new Promise((resolve, reject) => {
     timer = setTimeout(() => {
-      killTree(child?.pid);
+      // Only a batch still running: once cmd.exe has exited its pid may belong
+      // to another process, and /T would end that one and its tree.
+      if (child?.exitCode === null && child?.signalCode === null) killTree(child.pid);
       child?.stdout?.destroy();
       child?.stderr?.destroy();
       reject(Object.assign(new Error(`${file} timed out after ${timeout}ms`),

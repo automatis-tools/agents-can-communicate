@@ -50,7 +50,8 @@ test("windows: a .cmd that outlives its timeout is stopped with everything it st
   const destroyed = [];
   const stream = name => ({ destroy: () => { destroyed.push(name); } });
   const run = () => Object.assign(new Promise(() => {}),
-    { child: { pid: 4242, stdout: stream("stdout"), stderr: stream("stderr") } });
+    { child: { pid: 4242, exitCode: null, signalCode: null, stdout: stream("stdout"),
+      stderr: stream("stderr") } });
   const killed = [];
   const started = Date.now();
   const outcome = runExecutable("C:\\npm\\prefix\\claude.cmd", ["--version"], { timeout: 50 },
@@ -133,4 +134,16 @@ test("windows: an environment laid over another replaces a variable whatever its
   assert.equal(pathOf(merged), "C:\\stub");
   assert.equal(merged.ComSpec, "cmd");
   assert.deepEqual(mergeEnv({ Path: "/a" }, { PATH: "/b" }, "linux"), { Path: "/a", PATH: "/b" });
+});
+
+// cmd.exe may have exited just before the timeout, and its pid can already
+// belong to another process: taskkill /T would end that one and its tree.
+test("windows: a .cmd that already exited at the timeout has nothing killed", async () => {
+  const run = () => Object.assign(new Promise(() => {}),
+    { child: { pid: 4343, exitCode: 0, signalCode: null, stdout: { destroy() {} },
+      stderr: { destroy() {} } } });
+  const killed = [];
+  await assert.rejects(runExecutable("C:\\npm\\prefix\\claude.cmd", ["--version"], { timeout: 20 },
+    { platform: "win32", run, env: {}, killTree: pid => { killed.push(pid); } }), { code: "ETIMEDOUT" });
+  assert.deepEqual(killed, []);
 });
