@@ -1,5 +1,24 @@
 # Changelog
 
+## Unreleased — a reclaim the updating process held back is retried
+
+- After an update, the old runtime generation is removed. The update runs from that generation
+  and holds a lease on it while it reclaims as the new one, so its reclaim could never remove it,
+  yet recorded the pass as done. The old generation then stayed until the next update check, or,
+  with automatic updates off, until the next update. The pass is now recorded as unfinished, and
+  the next ACC command an hour or more later removes the old generation (#208).
+- The store format is unchanged.
+
+| Candidate artifact | Value |
+|---|---|
+| Built from | `4b3fcd660efba81681c81bdf6b8d548ba3c41615` |
+| Tarball | `agents-can-communicate-0.8.4.tgz`, 499,193 bytes, 318 files |
+| sha256 | `4ef9cf04440055fa9da602ee608318a5401c38a8145911a268b71a010d7b357e` |
+
+This unpublished development archive passed clean installation verification. See
+[the evidence](docs/release-evidence/unreleased-reclaim-after-own-activation.md).
+The package version remains `0.8.4` until a release prepares its own.
+
 ## Unreleased — the launch option that keeps a Codex chat embedded
 
 - Codex runs a chat on its own embedded app server, with no live delivery, when it starts with
