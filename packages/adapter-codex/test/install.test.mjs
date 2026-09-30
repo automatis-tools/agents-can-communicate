@@ -457,6 +457,8 @@ test("the cached copy carries the same absolute hook command", async t => {
 });
 
 test("the installed hook command preserves literal metacharacters and exports its data home",
+  { skip: process.platform === "win32"
+    && "runs the POSIX form through sh; the next test holds Windows' answer for such a path" },
   async t => {
     const base = await realpath(await mkdtemp(path.join(tmpdir(), "acc-codex-command-")));
     t.after(() => rm(base, { recursive: true, force: true }));
@@ -487,6 +489,23 @@ test("the installed hook command preserves literal metacharacters and exports it
     assert.equal(skillRun.stdout, `${dataHome}\n`,
       "the installed skill must reach the same data home without daemon environment exports");
   });
+
+// PowerShell expands `$` and a backtick inside the double-quoted form Codex runs
+// on Windows, so ACC refuses such a path there by name rather than install a
+// hook that would run somewhere else.
+test("on Windows a home PowerShell would expand is refused, by name", async t => {
+  const base = await realpath(await mkdtemp(path.join(tmpdir(), "acc-codex-command-")));
+  t.after(() => rm(base, { recursive: true, force: true }));
+  const home = path.join(base, "space $() `printf tick`");
+  await mkdir(home, { recursive: true });
+  const runner = path.join(base, "acc-hook.mjs");
+  await writeFile(runner, "// runner fixture\n");
+  const context = { home, codexHome: path.join(home, ".codex"), dataHome: path.join(base, "data"),
+    node: process.execPath, runner, hostPlatform: "win32" };
+
+  await assert.rejects(createCodexAdapter().install(context),
+    error => /a Windows shell would expand it/.test(error.message) && error.message.includes(home));
+});
 
 test("detect reports the plugin as installed straight after install", async t => {
   const { context } = await realFixture(t);
