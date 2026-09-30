@@ -14,10 +14,12 @@ Work in progress for #234. The design is in
 - On Windows the store's writer lock is released by moving its owner record out of the lock
   directory. Windows cannot rename a directory while a file inside it is open, and writers
   waiting for the lock read that record: eight of them held a release back until one gave up.
-  A directory counts as gone when `realpath` answers a concurrent rename or removal with
-  `EBADF`, with `EPERM` after the name has disappeared, or with a path in
-  `C:\$Extend\$Deleted\`, all measured on Windows where Linux says `ENOENT`. A file that
-  cannot be opened because its directory is being removed reads as absent. A transaction journal names its files with forward slashes on
+  When `realpath` answers a concurrent rename or removal with `EBADF`, `EPERM` or a path in
+  `C:\$Extend\$Deleted\` (all measured on Windows, where Linux says `ENOENT`), the name is
+  resolved again; it is gone only if no directory is left there. An open on Windows takes the
+  file its name names after the open, so a record renamed over in between is read, not refused.
+  A reclaim of a dead writer's lock ends at the writer's deadline, and a published record's
+  flush no longer reports a failure after the record became visible. A transaction journal names its files with forward slashes on
   every platform.
 - On Windows an environment that a caller passes replaces the machine's variables whatever
   their case, so detection finds a client on the supplied `PATH` instead of the inherited `Path`.
@@ -37,11 +39,11 @@ Work in progress for #234. The design is in
   PowerShell for Gemini CLI, a form PowerShell, Git Bash and cmd all read for Grok, an unquoted
   8.3 path for Antigravity CLI, and a cmd command for Kimi Code. The skill runs
   `node "<path>/acc-cli.mjs"`, and the owner header quotes for cmd.
-- On Windows the owner header double-quotes a path, and single-quotes one that has `$`, a
-  backtick or `%`. A path that also has a single quote gets no header: bash and PowerShell read
-  a quote inside single quotes differently, and the bash spelling leaves `$(...)` bare to
-  PowerShell. The hook continues without context and tells the user to rename the directory,
-  without printing the path.
+- On Windows the owner header double-quotes a path, and single-quotes one that has a double
+  quote of either kind, `$`, a backtick or `%`; PowerShell's typographic quotes count as quotes.
+  A path that fits neither quoting gets no header: a single quote with one of those, or a
+  single-quoted value with `& | < > ^ %`, which cmd acts on. The session is then not opened at
+  all, and the hook tells the user to rename the directory, without printing the path.
 - A client `.cmd` that outlives its timeout on Windows is stopped with everything it started,
   through `taskkill /T`. cmd.exe starts the batch file's program as a child of its own, and
   after killing cmd.exe, execFile waited for that child's pipes, so a hung

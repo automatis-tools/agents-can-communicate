@@ -101,40 +101,18 @@ runtime, because launcher modules may import only their siblings.
   the whole directory, because Node's rename replaces an existing file on Windows: a late
   reclaimer that moved `owner.json` could take a successor's record.
 - **A name that goes away while it resolves.** Linux reports `ENOENT` when a directory is
-  renamed or removed while `realpath` resolves it. Windows answers the same window in four ways
-  (measured with a second process renaming or removing the directory in a loop): `ENOENT`,
-  `EBADF`, `EPERM` with the name already gone, or a path in `C:\$Extend\$Deleted\`, where NTFS
-  keeps a directory that was deleted while something still had it open. The store's directory
-  walk reads all of them as "gone", so a read of a lock that changed hands returns nothing and
-  does not report an unsafe path. `EPERM` on a name that is still there stays a refusal. Opening
-  a file in a directory being removed fails `EPERM` the same way, and reads as absent once the
-  name is gone.
-- **A lone record without the journal.** A session's heartbeat, every turn, replaces one record
-  and appends no event, and it went through the whole journal: an entry prepared, activated, the
-  record published, a completion marker and the journal set idle, five atomic writes and ten
-  flushes on Windows, where one flush cost 8 to 23 ms on windows-latest. One record needs no
-  journal to appear at once: the rename replaces it atomically, with the bytes flushed before and
-  the name after. It is published directly only while the active journal is idle. An open one,
-  left by a writer that died, would later roll its own bytes over the record, and it refuses a
-  journalled write as well, so that case keeps the journalled path and its refusal. Any
-  transaction with an event, a removal or a second record keeps the journal.
-- **A second session, and a first publication.** A second live session wrote an ephemeral copy
-  of itself, which the materialising transaction then copied and retired one lock at a time. It
-  now opens in that transaction, and only while the session it joins is still live under the
-  lock: otherwise it is a lone session and opens ephemerally, as before. An ephemeral record's
-  first publication writes no retention marker, because a record with no marker is present.
-  That marker was an atomic write, three flushes on Windows, for each record a new session
-  opened with. Together with the lone-record path, a turn made 24 flushes and syncs on macOS
-  and now makes 8, and a second session's start went from 80 to 52.
-- **Validating a store directory once.** Every record read walked its directory from the store
-  root twice, `lstat` and `realpath` for each level: about a thousand calls a hook, 130 ms of one
-  on windows-latest. A directory validated once is now known by its identity (volume and file
-  id, read as bigint because an NTFS file id does not fit a double), and a later check of the
-  same name is one `lstat`. `lstat` follows every ancestor, so an ancestor replaced by a link
-  lands on another directory, and anything but the validated identity takes the whole walk
-  again. The one case the walk would still refuse and the check does not is the store's own
-  directory moved elsewhere with a link left at its name: the same data in another place.
-  Decided with the maintainer on 2026-09-30, for every platform.
+  renamed or removed while `realpath` resolves it. Windows answers the same window in three more
+  ways, measured with a second process renaming or removing the directory in a loop: `EBADF`,
+  `EPERM`, or a path in `C:\$Extend\$Deleted\`, where NTFS keeps a directory deleted while
+  something still has it open. Each means the handle was to a directory leaving the name, and
+  the name may already hold a new directory, as `stage` does after a sweep. So the walk resolves
+  the name again: a directory there is the answer, no directory is "gone", and a name that keeps
+  answering that way while present is refused. Read as gone, a present directory would read as
+  holding no records. An open on Windows checks the name again after it: no link, and the same
+  file the handle holds. A record renamed over in between is then the one the name names, as a
+  POSIX `O_NOFOLLOW` open takes it; a name that keeps changing is opened afresh a few times.
+  Opening a file in a directory being removed fails `EPERM`, and reads as absent once the name
+  is gone, never for a create.
 - **Creating a file exclusively.** `open(…, "wx")` follows a dangling symlink on Windows and
   creates its target. ACC creates such files only under random names inside its own private
   directories, where planting a link already requires the user's own access, so the rule holds.
@@ -235,12 +213,15 @@ engine range; it starts the baked node only when it does not.
 - **The skill command** becomes `node "<forward-slash path>/acc-cli.mjs"`, which works in bash,
   PowerShell and cmd, whichever shell the client uses for the model.
 - **The owner header** double-quotes `--cwd` and `--workspace`, which bash, PowerShell and cmd
-  read alike. A value with `$`, a backtick or `%` is expanded by one of them inside double
-  quotes, and gets single quotes instead, which bash and PowerShell read literally. A value
-  that also contains a single quote is refused: bash reads `'\''` inside single quotes and
-  PowerShell reads `''`, so no spelling reads the same in both, and the bash one leaves the rest
-  of the value bare to PowerShell, where `$(...)` runs. The hook then fails open and names the
-  directory to rename. Windows file names cannot contain `"`.
+  read alike. PowerShell also takes U+201C to U+201E as double quotes and U+2018 to U+201B as
+  single quotes, and NTFS allows them in names. A value with a double quote of either kind, `$`,
+  a backtick or `%` gets single quotes instead, which bash and PowerShell read literally. cmd
+  reads no single quotes, so a single-quoted value may carry none of `& | < > ^ %`. A value that
+  fits neither is refused: bash reads `'\''` inside single quotes and PowerShell reads `''`, and
+  the bash spelling leaves the rest of the value bare to PowerShell, where `$(...)` runs. The
+  refusal comes before the session opens, so no peer sees a session that could never be told its
+  arguments. The hook fails open and names the directory to rename. Windows file names cannot
+  contain an ASCII `"`.
 - **Doctor** recognises the Node shims and Windows paths when it names the wired version.
 
 ### 6. Managed runtime and updates
