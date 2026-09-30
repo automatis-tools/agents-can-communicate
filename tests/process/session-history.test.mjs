@@ -38,10 +38,16 @@ async function workspace(t, caller = "keeper") {
   const env = { ...process.env, ACC_DATA_HOME: path.join(base, "data"),
     GIT_DIR: "", GIT_WORK_TREE: "" };
   const event = async (participant, payload) => {
+    const started = performance.now();
     const child = run(process.execPath, [hook, "codex"],
       { env: { ...env, ACC_PARTICIPANT: participant } });
     child.child.stdin.end(JSON.stringify({ cwd: project, ...payload }));
-    const { stdout } = await child;
+    const { stdout, stderr } = await child;
+    // A setup hook that failed open leaves nothing to read, and the case then
+    // fails far from the cause. Its time says which cause: near five seconds is
+    // the hook budget, far less is an error.
+    assert.doesNotMatch(stderr, /coordination unavailable/, `${payload.hook_event_name} for `
+      + `${payload.session_id} failed open after ${Math.round(performance.now() - started)} ms`);
     return stdout;
   };
   const attach = (participant, session) => event(participant,

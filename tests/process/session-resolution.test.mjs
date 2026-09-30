@@ -31,11 +31,17 @@ async function stage(t, { participants }) {
     .catch(async () => { await run("mkdir", ["-p", project]); });
 
   for (const { participant, harness, session } of participants) {
+    const started = performance.now();
     const child = run("node", [hook, harness],
       { env: { ...env, ACC_PARTICIPANT: participant } });
     child.child.stdin.end(JSON.stringify({ hook_event_name: "SessionStart",
       session_id: session, cwd: project, source: "startup" }));
-    await child;
+    const { stderr } = await child;
+    // A setup hook that failed open leaves no binding, and the case then fails
+    // far from the cause. Its time says which cause: near five seconds is the
+    // hook budget, far less is an error.
+    assert.doesNotMatch(stderr, /coordination unavailable/,
+      `setup SessionStart for ${session} failed open after ${Math.round(performance.now() - started)} ms`);
   }
   const cli = (args, extra = {}) => run("node", [acc, ...args],
     { cwd: project, env: { ...env, ...extra } });

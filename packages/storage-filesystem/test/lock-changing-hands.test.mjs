@@ -352,6 +352,11 @@ test("the guard still refuses a record whose parent was swapped", async t => {
     return handle;
   };
 
-  await assert.rejects(readRegularNoFollow(file, root, swapping),
-    /parent directory changed/);
+  // Windows' open checks the name again after it, finds nothing there in the
+  // new directory, and so never hands over the old parent's file: the record is
+  // absent. A file planted under the name in the new directory is refused by the
+  // parent check, as on POSIX.
+  await assert.rejects(readRegularNoFollow(file, root, swapping), error =>
+    /parent directory changed/.test(error.message)
+      || (process.platform === "win32" && error.code === "ENOENT"));
 });
