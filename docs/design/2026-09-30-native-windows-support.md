@@ -113,7 +113,8 @@ runtime, because launcher modules may import only their siblings.
 
 - **Data home.** Windows uses `%LOCALAPPDATA%\acc`, not the roaming `%APPDATA%`: pids, locks and
   pipe names are machine-local and must not follow a roaming profile. No Windows install exists,
-  so nothing migrates. The three data-home resolvers become one.
+  so nothing migrates. Each of the three data-home resolvers changes its Windows branch; they stay
+  separate because the launcher's copy may use Node built-ins only.
 - **Config roots.** `assertRoot` refuses `\x`, `\\server\share` and `D:x` on every platform. Today
   a committed `acc.workspace.json` can name a UNC root, and resolving it on Windows contacts that
   host from a hook. Refusing it everywhere keeps a repository that is safe on POSIX safe on

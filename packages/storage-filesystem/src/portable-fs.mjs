@@ -45,7 +45,7 @@ export async function renameReplacing(from, to, { platform = process.platform,
 }
 
 /**
- * Rename a directory to a new name.
+ * Rename a directory, or move any entry to a name nobody else uses.
  *
  * POSIX reports an occupied name as EEXIST or ENOTEMPTY, and callers treat that
  * as "somebody else got there first". Windows reports it as EPERM, the same code
@@ -53,7 +53,7 @@ export async function renameReplacing(from, to, { platform = process.platform,
  * if it exists the answer is EEXIST, as on POSIX; if not, the source was busy
  * and the rename is retried.
  */
-export async function renameDirectory(from, to, { platform = process.platform,
+export async function renameEntry(from, to, { platform = process.platform,
   rename = fs.rename, lstat = fs.lstat, deadlineAt, sleep } = {}) {
   if (!isWindows(platform)) return rename(from, to);
   return retrying(async () => {

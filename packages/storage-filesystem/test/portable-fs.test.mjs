@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
 
-import { openNoFollow, removeTree, renameDirectory, renameReplacing, syncEntry }
+import { openNoFollow, removeTree, renameEntry, renameReplacing, syncEntry }
   from "../src/portable-fs.mjs";
 
 // Each Windows rule below was measured on a windows-latest runner (see
@@ -53,7 +53,7 @@ test("posix: a failed rename over a file is reported at once", async () => {
 test("windows: a directory renamed onto an existing name reports EEXIST, as POSIX does", async () => {
   const rename = failing("EPERM", Number.POSITIVE_INFINITY);
   const lstat = async () => ({ isDirectory: () => true });
-  await assert.rejects(renameDirectory("candidate", "writer.lock", { platform: "win32", rename,
+  await assert.rejects(renameEntry("candidate", "writer.lock", { platform: "win32", rename,
     lstat, sleep: noSleep, deadlineAt: later() }), { code: "EEXIST" });
   assert.equal(rename.calls(), 1);
 });
@@ -61,7 +61,7 @@ test("windows: a directory renamed onto an existing name reports EEXIST, as POSI
 test("windows: a directory rename refused by an open file inside is retried", async () => {
   const rename = failing("EPERM", 2);
   const lstat = async () => { throw Object.assign(new Error("ENOENT"), { code: "ENOENT" }); };
-  await renameDirectory("writer.lock", "writer.released.lock", { platform: "win32", rename,
+  await renameEntry("writer.lock", "writer.released.lock", { platform: "win32", rename,
     lstat, sleep: noSleep, deadlineAt: later() });
   assert.equal(rename.calls(), 3);
 });
@@ -173,6 +173,6 @@ test("this host: a directory rename onto an existing directory reports EEXIST or
   await writeFile(path.join(from, "owner.json"), "{}");
   await mkdir(to);
   await writeFile(path.join(to, "owner.json"), "{}");
-  await assert.rejects(renameDirectory(from, to, { deadlineAt: later() }),
+  await assert.rejects(renameEntry(from, to, { deadlineAt: later() }),
     error => ["EEXIST", "ENOTEMPTY"].includes(error.code));
 });
