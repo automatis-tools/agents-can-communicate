@@ -13,7 +13,8 @@ const windowsQuote = value => {
   if (!value.includes("'")) return `'${value}'`;
   throw new AccError(EXIT.USAGE, `${value} has a single quote and one of $, \` or %: there is `
     + "no quoting that every Windows shell reads the same, and ACC's hooks will not hand the "
-    + "model a command line it would read differently; rename the directory", { value });
+    + "model a command line it would read differently; rename the directory",
+  { value, reasonCode: "workspace_path_unquotable" });
 };
 
 export const ownerHeader = (binding, cwd, workspaceRef, platform = process.platform) => {

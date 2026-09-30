@@ -56,15 +56,19 @@ function tryWrite(stream, output) {
   }
 }
 
+const RECOVERY = new Map([
+  ["workspace_contains_runtime", ": workspace contains ACC runtime state; open a project"
+    + " directory and restart the client (or set ACC_DATA_HOME outside the workspace)"],
+  ["workspace_path_unquotable", ": this directory's path has a single quote and one of $, ` or %,"
+    + " which no Windows shell quotes alike; rename it and restart the client"],
+]);
+
 export async function completeHookOutput(result,
   { stdout = process.stdout, stderr = process.stderr } = {}) {
   if (result.failed || result.timedOut) {
     // Only a known code selects static recovery advice. Arbitrary payload or
     // filesystem error text must never become client-visible instructions.
-    const recovery = result.failureCode === "workspace_contains_runtime"
-      ? ": workspace contains ACC runtime state; open a project directory and restart the client"
-        + " (or set ACC_DATA_HOME outside the workspace)"
-      : "";
+    const recovery = RECOVERY.get(result.failureCode) ?? "";
     tryWrite(stderr, `acc: coordination unavailable${recovery}; hook continued without context\n`);
   }
   try {

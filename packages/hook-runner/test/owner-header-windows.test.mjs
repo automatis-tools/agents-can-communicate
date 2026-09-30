@@ -1,7 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
+import { AccError, EXIT } from "@agents-can-communicate/protocol";
+
+import { completeHookOutput } from "../../../bin/acc-hook.mjs";
 import { ownerHeader } from "../src/owner-context.mjs";
+import { runHook } from "../src/runner.mjs";
 
 const binding = { accSessionId: "session_a", generation: "generation_b" };
 
@@ -32,8 +36,32 @@ test("windows: a directory with a single quote and $, ` or % has no header", () 
   for (const cwd of ["C:\\Users\\o'brien\\$(calc)", "C:\\it's\\`n", "C:\\it's\\100%"]) {
     assert.throws(() => ownerHeader(binding, cwd, "acc://abc", "win32"),
       error => error.code === 2 && error.details.value === cwd
+        && error.details.reasonCode === "workspace_path_unquotable"
         && /no quoting that every Windows shell reads the same/.test(error.message), cwd);
   }
   assert.equal(ownerHeader(binding, "C:\\Users\\o'brien", undefined, "win32"),
     "ACC CLI (append): --session session_a --generation generation_b --cwd \"C:\\Users\\o'brien\"");
+});
+
+// The hook fails open, and what the user reads is static advice chosen by the
+// reason code: the refused path itself never reaches the client.
+test("a refused header tells the user what to rename, without the path", async () => {
+  const adapter = { id: "fixture", client: { command: null }, capabilities: {},
+    normalizeHook: () => {
+      throw new AccError(EXIT.USAGE, "C:\\it's\\$x cannot be quoted",
+        { value: "C:\\it's\\$x", reasonCode: "workspace_path_unquotable" });
+    } };
+  const result = await runHook({ adapterId: adapter.id, adapters: { [adapter.id]: adapter },
+    dataHome: "/nonexistent", payload: {} });
+  assert.equal(result.failureCode, "workspace_path_unquotable");
+
+  const written = [];
+  await completeHookOutput(result, {
+    stdout: { write(output, callback) { written.push(["stdout", output]); callback?.(); } },
+    stderr: { write(output, callback) { written.push(["stderr", output]); callback?.(); } },
+  });
+  const stderr = written.filter(([stream]) => stream === "stderr").map(([, text]) => text).join("");
+  assert.match(stderr, /a single quote and one of \$, ` or %/);
+  assert.match(stderr, /rename it and restart the client/);
+  assert.equal(stderr.includes("it's"), false, "the hook reflected the path");
 });

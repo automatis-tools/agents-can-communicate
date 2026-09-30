@@ -31,6 +31,9 @@ import { appendStartOwner, appendToolOwner, ownerHeader, ownerOnlyOutcome } from
 // A hook runs in front of the user's turn, so it gets a hard ceiling. Better to
 // let a call through than to make someone's session sit waiting on us.
 const DEFAULT_BUDGET_MS = 5_000;
+// Failures the hook output explains with advice of its own; any other error
+// text stays out of what the client shows.
+const KNOWN_FAILURES = new Set(["workspace_contains_runtime", "workspace_path_unquotable"]);
 // Windows reads the table through PowerShell, whose first start on a machine
 // took 3.8 s on a windows-latest runner; later ones take about 0.3 s. It gets
 // more of the budget there, and leaves the rest for the write that follows.
@@ -787,8 +790,8 @@ export async function runHook({ adapterId, payload, adapters, dataHome, env,
     return await Promise.race([execute(), budget]);
   } catch (error) {
     return { ...fallback, failed: true, reason: error.message,
-      ...(error instanceof AccError && error.details?.reasonCode === "workspace_contains_runtime"
-        ? { failureCode: "workspace_contains_runtime" } : {}),
+      ...(error instanceof AccError && KNOWN_FAILURES.has(error.details?.reasonCode)
+        ? { failureCode: error.details.reasonCode } : {}),
       ...(Date.now() >= deadline ? { timedOut: true } : {}) };
   } finally {
     clearTimeout(timer);
