@@ -22,7 +22,7 @@ test("an unsupported or degraded client names its closed reason and never claims
   assert.equal(describeNative(state({ eligibility: "unsupported",
     reasonCode: "below_minimum_version" })), "unavailable: the client is below the native delivery minimum version; off");
   assert.equal(describeNative(state({ eligibility: "unsupported",
-    reasonCode: "native_delivery_unsupported" })), "unavailable: this adapter has no native delivery channel; off");
+    reasonCode: "native_delivery_unsupported" })), "unavailable: this client has no live delivery channel ACC supports here; off");
   assert.equal(describeNative(state({ eligibility: "degraded", configured: true,
     policy: "actionable", runtime: "degraded", reasonCode: "unsupported_shell" })),
   "readiness unverified: automatic launch setup requires zsh; enabled (actionable); channel unreachable");
