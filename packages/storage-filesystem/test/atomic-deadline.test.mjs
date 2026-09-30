@@ -18,11 +18,10 @@ test("atomic publication checks its deadline after preparing bytes", async t => 
     const result = nextLoad(url, context);
     if (url.endsWith("/atomic-json.mjs")) {
       const source = Buffer.from(result.source).toString();
-      const needle = "      await renameReplacing(temporary, destination, { deadlineAt });\n"
-        + "      await syncEntry(destinationDir, destination, { deadlineAt });";
+      const needle = "      await renameReplacing(temporary, destination, { deadlineAt });\n";
       assert.equal(source.split(needle).length, 2);
       return { ...result, source: source.replace(needle,
-        `${needle}\n      await globalThis.accAtomicPublished?.(destination);`) };
+        `${needle}      await globalThis.accAtomicPublished?.(destination);\n`) };
     }
     if (!url.endsWith("/atomic-json.mjs?deadline-proof")) return result;
     const source = Buffer.from(result.source).toString();
@@ -94,4 +93,23 @@ test("atomic publication checks its deadline after preparing bytes", async t => 
     await pending;
     assert.deepEqual(await observer.ephemeral.get("participant", "participant_a"), record);
   });
+});
+
+// Once the rename or link has put the bytes at their name, the write is decided
+// and visible: a flush that then ran into the caller's deadline - Windows
+// retries a busy flush up to it - reported a failure for a record already
+// published. The flush after publication is bounded by its own wait instead.
+test("the flush after a publication is not bounded by the caller's deadline", async t => {
+  const { publishAtomic } = await import("../src/atomic-json.mjs");
+  const root = await realpath(await mkdtemp(path.join(tmpdir(), "acc-publish-flush-")));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const flushes = [];
+  const sync = async (directory, entry, options = {}) => { flushes.push(options.deadlineAt); };
+  for (const replace of [true, false]) {
+    await publishAtomic(path.join(root, "state", `${replace}.json`), Buffer.from("{}\n"),
+      { root, tmpDir: path.join(root, "tmp"), replace, deadlineAt: Date.now() + 60_000, sync });
+  }
+  assert.equal(flushes.length >= 2, true, JSON.stringify(flushes));
+  assert.deepEqual(flushes.filter(deadline => deadline !== undefined), [],
+    "a flush after the bytes were at their name carried the caller's deadline");
 });

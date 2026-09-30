@@ -57,7 +57,7 @@ async function replaceHandleBytes(handle, bytes) {
  */
 export async function publishAtomic(destination, bytes,
   { root, tmpDir, stageDir, replace = false, deadlineAt, afterAccepted, afterStageEnsured,
-    afterStageRenamed }) {
+    afterStageRenamed, sync = syncEntry }) {
   assertPublicationDeadline(deadlineAt);
   // The accepted stage lives apart from the partial a failed publication
   // leaves, so what a file is follows from the directory it was created in
@@ -99,7 +99,10 @@ export async function publishAtomic(destination, bytes,
       handle = null;
       assertPublicationDeadline(deadlineAt);
       await renameReplacing(temporary, destination, { deadlineAt });
-      await syncEntry(destinationDir, destination, { deadlineAt });
+      // The bytes are at their name now: the write is decided and visible, and
+      // its flush is bounded by its own wait, never by the caller's deadline,
+      // which would report a published record as failed.
+      await sync(destinationDir, destination);
       return "published";
     }
 
@@ -107,7 +110,7 @@ export async function publishAtomic(destination, bytes,
       assertPublicationDeadline(deadlineAt);
       await link(temporary, destination);
       stageAcceptedBytes = true;
-      await syncEntry(destinationDir, destination, { deadlineAt });
+      await sync(destinationDir, destination);
       return "published";
     } catch (error) {
       if (error.code !== "EEXIST") throw error;
