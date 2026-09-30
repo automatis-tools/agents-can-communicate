@@ -30,6 +30,12 @@ async function fixture(t) {
     pin: null, checkedAt: null, home: parent, targets: [], notice: null };
   return { parent, root, control };
 }
+// Windows has no SIGSTOP. Every child stopped here already waits on the test -
+// an idle interval or an IPC message - so it makes no progress either way; POSIX
+// stops it as well, so a stray timer cannot move it on.
+const freeze = proc => { if (process.platform !== "win32") proc.kill("SIGSTOP"); };
+const thaw = proc => { if (process.platform !== "win32") proc.kill("SIGCONT"); };
+
 async function initialize(f) {
   await mkdir(f.control.active.root, { recursive: true });
   await writeControl(f.root, f.control);
@@ -90,7 +96,7 @@ test("a stopped admitted process holds its runtime until actual OS death", { tim
     process.send(lease); setInterval(()=>{},1000);`, f.root);
   const lease = await c.next();
   assert.equal(lease.pid, c.proc.pid);
-  c.proc.kill("SIGSTOP");
+  freeze(c.proc);
   const second = await acquireRuntime(f.root);
   assert.deepEqual(new Set((await listRuntimeHolds(f.root)).map(hold => hold.token)), new Set([lease.token, second.token]));
   c.proc.kill("SIGKILL");
@@ -152,7 +158,7 @@ test("SIGSTOP and an old owner timestamp never allow manager lock reclamation", 
     process.send("locked"); await new Promise(()=>{setInterval(()=>{},1000)});
   });`, f.root);
   assert.equal(await holder.next(), "locked");
-  holder.proc.kill("SIGSTOP");
+  freeze(holder.proc);
   const file = path.join(f.root, "manager.lock", "owner.json");
   const owner = JSON.parse(await readFile(file));
   await writeFile(file, JSON.stringify({ ...owner, acquiredAt: "2000-01-01T00:00:00.000Z" }));
@@ -218,7 +224,7 @@ test("a SIGSTOP registered observer retains old fencing through another admissio
     }}); process.send("unexpected admission");
   } catch(e) { process.send({error:e.message}); } process.disconnect();`, f.root);
   assert.equal(await observer.next(), "observed");
-  observer.proc.kill("SIGSTOP");
+  freeze(observer.proc);
   const candidate = (await readdir(f.root)).find(name => name.startsWith(`manager.candidate-${observer.proc.pid}-`));
   assert.ok(candidate, "observer must publish a PID-identifiable candidate before probing");
   const holderExit = once(holder.proc, "exit");
@@ -233,7 +239,7 @@ test("a SIGSTOP registered observer retains old fencing through another admissio
   await withManagerLock(f.root, async () => {
     const current = await readFile(path.join(f.root, "manager.lock", "owner.json"), "utf8");
     observer.proc.send("resume");
-    observer.proc.kill("SIGCONT");
+    thaw(observer.proc);
     assert.match((await observer.next()).error, /held|timeout/i);
     assert.equal(await readFile(path.join(f.root, "manager.lock", "owner.json"), "utf8"), current);
   });
