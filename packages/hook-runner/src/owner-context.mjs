@@ -8,12 +8,20 @@ const posixQuote = value => `'${value.replaceAll("'", "'\\''")}'`;
 // inside single quotes and PowerShell reads '', so the sh spelling leaves the
 // rest of the value bare to PowerShell, where `$(...)` runs. No spelling reads
 // the same in all three, and the value is refused rather than handed over.
+//
+// PowerShell also takes U+2018 to U+201B as single quotes and U+201C to U+201E
+// as double quotes, and NTFS allows them in names: `x”;calc;”` in double quotes
+// ends the string at `”`. cmd reads no single quotes at all, so a single-quoted
+// value must carry nothing cmd acts on: & | < > ^, and % it expands anywhere.
+const DOUBLE_QUOTES = /["\u201C-\u201E]/;
+const SINGLE_QUOTES = /['\u2018-\u201B]/;
+const CMD_ACTS_ON = /[&|<>^%]/;
 const windowsQuote = value => {
-  if (!/["$`%]/.test(value)) return `"${value}"`;
-  if (!value.includes("'")) return `'${value}'`;
-  throw new AccError(EXIT.USAGE, `${value} has a single quote and one of $, \` or %: there is `
-    + "no quoting that every Windows shell reads the same, and ACC's hooks will not hand the "
-    + "model a command line it would read differently; rename the directory",
+  if (!DOUBLE_QUOTES.test(value) && !/[$`%]/.test(value)) return `"${value}"`;
+  if (!SINGLE_QUOTES.test(value) && !CMD_ACTS_ON.test(value)) return `'${value}'`;
+  throw new AccError(EXIT.USAGE, `${value} mixes quotes, $, \`, % or a cmd operator so that `
+    + "no quoting reads it alike in cmd, PowerShell and Git Bash, and ACC's hooks will not hand "
+    + "the model a command line it would read differently; rename the directory",
   { value, reasonCode: "workspace_path_unquotable" });
 };
 

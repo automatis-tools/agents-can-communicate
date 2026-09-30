@@ -59,7 +59,7 @@ function tryWrite(stream, output) {
 const RECOVERY = new Map([
   ["workspace_contains_runtime", ": workspace contains ACC runtime state; open a project"
     + " directory and restart the client (or set ACC_DATA_HOME outside the workspace)"],
-  ["workspace_path_unquotable", ": this directory's path has a single quote and one of $, ` or %,"
+  ["workspace_path_unquotable", ": this directory's path mixes quotes, $, `, % or a cmd operator,"
     + " which no Windows shell quotes alike; rename it and restart the client"],
 ]);
 
