@@ -177,3 +177,28 @@ test("a platform without ps yields an empty table rather than an error", async (
   const table = await readProcessTable({ run: async () => { throw new Error("ENOENT"); } });
   assert.equal(table.size, 0);
 });
+
+// Windows reports image names with their extension, in whatever case the
+// binary was built with: `claude.exe`, `Codex.EXE`, `node.exe`.
+test("windows: a client's image name matches without its extension or case", () => {
+  const processes = table([[100, 4, "claude.exe"], [150, 100, "pwsh.exe"], [200, 150, "node.exe"]]);
+  assert.equal(resolveClientPid({ table: processes, from: 200, command: "claude" }), 100);
+  const upper = table([[100, 4, "Codex.EXE"], [200, 100, "node.exe"]]);
+  assert.equal(resolveClientPid({ table: upper, from: 200, command: "codex" }), 100);
+});
+
+// An npm-installed client on Windows is node.exe running the package's own
+// entry file - `…\node_modules\@google\gemini-cli\dist\index.js` - so its
+// script is called `index`, not `gemini`. The package directory names it.
+test("windows: a node-hosted client is found by the package its script lives in", () => {
+  const processes = new Map([
+    [100, { ppid: 4, comm: "node.exe", args: "\"C:\\Program Files\\nodejs\\node.exe\" "
+      + "\"C:\\Users\\dana\\AppData\\Roaming\\npm\\node_modules\\@google\\gemini-cli\\dist\\index.js\"" }],
+    [150, { ppid: 100, comm: "powershell.exe" }],
+    [200, { ppid: 150, comm: "node.exe" }],
+  ]);
+  assert.equal(resolveClientPid({ table: processes, from: 200, command: "gemini",
+    clientPackage: "@google/gemini-cli" }), 100);
+  assert.equal(resolveClientPid({ table: processes, from: 200, command: "gemini" }), null,
+    "without the package, index.js names no client");
+});

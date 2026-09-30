@@ -31,6 +31,12 @@ import { appendStartOwner, appendToolOwner, ownerHeader, ownerOnlyOutcome } from
 // A hook runs in front of the user's turn, so it gets a hard ceiling. Better to
 // let a call through than to make someone's session sit waiting on us.
 const DEFAULT_BUDGET_MS = 5_000;
+// Windows reads the table through PowerShell, whose first start on a machine
+// took 3.8 s on a windows-latest runner; later ones take about 0.3 s. It gets
+// more of the budget there, and leaves the rest for the write that follows.
+const WINDOWS = process.platform === "win32";
+const PROCESS_TABLE_MS = WINDOWS ? 3_000 : 1_000;
+const TABLE_RESERVE_MS = WINDOWS ? 500 : 0;
 
 function assertHookBudget(deadline, message = "hook deadline expired") {
   if (Date.now() >= deadline) throw new Error(message);
@@ -431,7 +437,8 @@ const HANDLERS = {
     const pid = Number.isInteger(knownClientPid) && knownClientPid > 0 ? knownClientPid
       : command === null ? null
       : resolveClientPid({ table: await readProcessTable({
-        timeoutMs: Math.max(1, Math.min(1_000, deadline - Date.now())) }), from: process.pid, command });
+        timeoutMs: Math.max(1, Math.min(PROCESS_TABLE_MS, deadline - Date.now() - TABLE_RESERVE_MS)) }),
+      from: process.pid, command, clientPackage: adapter.client?.package });
     assertHookBudget(deadline);
     const clientPid = Number.isInteger(pid) && pid > 0 ? pid : undefined;
     const native = hookBinding => bindNative({ adapter, event, hookBinding, ...clientFacts,

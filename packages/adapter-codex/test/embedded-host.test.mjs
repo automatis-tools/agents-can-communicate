@@ -46,3 +46,12 @@ test("a command line without such an option names none", () => {
     assert.equal(embeddingOption(argv), null, argv.join(" "));
   }
 });
+
+test("a Windows command line names Codex by its image, in any case and with either separator", () => {
+  assert.equal(embeddingOption(["C:\\Users\\dana\\AppData\\Local\\Programs\\OpenAI\\Codex\\bin\\codex.exe",
+    "--search"]), "--search");
+  assert.equal(embeddingOption(["C:/Tools/CODEX.EXE", "-c", "model=o3"]), "-c");
+  assert.equal(embeddingOption(["C:\\Program Files\\nodejs\\node.exe",
+    "C:\\Users\\dana\\AppData\\Roaming\\npm\\node_modules\\@openai\\codex\\bin\\codex.js", "--search"]),
+  "--search");
+});

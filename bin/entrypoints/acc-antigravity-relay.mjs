@@ -2,7 +2,6 @@
 // The relay the agent starts: `start` in its tool shell, `run` detached from it.
 // Fails open everywhere - `start` prints one line and exits 0; `run` answers its
 // ready line and exits quietly when anything it needs is missing.
-import { execFile } from "node:child_process";
 import { randomBytes } from "node:crypto";
 import { appendFile } from "node:fs/promises";
 import path from "node:path";
@@ -11,7 +10,7 @@ import { agentApiCommand, createAgentApi } from "@agents-can-communicate/adapter
 import { createRelay } from "@agents-can-communicate/adapter-antigravity/relay";
 import { listRegistrations, newRelayId, relayDir } from "@agents-can-communicate/adapter-antigravity/relay-endpoint";
 import { findConversation, spawnRelay, startRelay } from "@agents-can-communicate/adapter-antigravity/relay-start";
-import { loadSessionBinding } from "@agents-can-communicate/adapter-sdk";
+import { loadSessionBinding, readProcessArgs } from "@agents-can-communicate/adapter-sdk";
 import { platformDataHome } from "@agents-can-communicate/cli";
 import { createCoordinationService } from "@agents-can-communicate/core";
 import { resolveClientPid } from "@agents-can-communicate/hook-runner/client-pid";
@@ -27,8 +26,7 @@ const ids = { next: kind => createId(kind, randomBytes) };
 const alive = pid => { try { process.kill(pid, 0); return true; } catch { return false; } };
 const READY_MS = 10_000;
 
-const argvOf = pid => new Promise(resolve => execFile("ps", ["-o", "args=", "-p", String(pid)],
-  { timeout: 1_000 }, (_error, out) => resolve(String(out ?? "").trim().split(/\s+/).filter(Boolean))));
+const argvOf = async pid => await readProcessArgs(pid, { timeoutMs: 1_000 }) ?? [];
 
 // Through the launcher that ran `start`, never this module directly: an entry
 // module does not run itself, and under the managed runtime the launcher takes

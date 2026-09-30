@@ -1,6 +1,7 @@
-import { execFile } from "node:child_process";
 import { readdir, rm } from "node:fs/promises";
 import path from "node:path";
+
+import { readProcessArgs } from "@agents-can-communicate/adapter-sdk";
 
 import { listRegistrations, relayDir, removeRegistration } from "./relay-endpoint.mjs";
 
@@ -16,8 +17,7 @@ import { listRegistrations, relayDir, removeRegistration } from "./relay-endpoin
 const RELAY_MARK = "acc-antigravity-relay";
 const RELAY_LOG = /^antigravity_relay_[a-f0-9]{32}\.log$/;
 const defaultAlive = pid => { try { process.kill(pid, 0); return true; } catch { return false; } };
-const psArgv = pid => new Promise(resolve => execFile("ps", ["-o", "args=", "-p", String(pid)],
-  { timeout: 1_000 }, (_error, out) => resolve(String(out ?? "").trim().split(/\s+/).filter(Boolean))));
+const psArgv = async pid => await readProcessArgs(pid, { timeoutMs: 1_000 }) ?? [];
 
 export const relayShimPath = home => path.join(home, ".gemini", "config", "acc", "acc-relay.sh");
 

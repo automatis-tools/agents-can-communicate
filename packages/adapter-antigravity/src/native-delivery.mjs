@@ -5,7 +5,7 @@ import { lstat, mkdir, open, rm } from "node:fs/promises";
 import net from "node:net";
 import path from "node:path";
 
-import { decisionBody } from "@agents-can-communicate/adapter-sdk";
+import { decisionBody, readProcessArgs } from "@agents-can-communicate/adapter-sdk";
 
 import { PROTOCOL_CONTRACT, RELAY_MODES, listRegistrations, readRegistration, relayDir }
   from "./relay-endpoint.mjs";
@@ -22,8 +22,7 @@ const runDefault = (command, args, { timeout }) => new Promise(resolve => {
   execFile(command, args, { timeout, windowsHide: true },
     (_error, stdout, stderr) => resolve({ stdout: `${stdout ?? ""}${stderr ?? ""}` }));
 });
-const argvDefault = async pid => (await runDefault("ps", ["-o", "args=", "-p", String(pid)],
-  { timeout: 1_000 })).stdout.trim().split(/\s+/).filter(Boolean);
+const argvDefault = async pid => await readProcessArgs(pid, { timeoutMs: 1_000 }) ?? [];
 
 export function isPrintMode(argv) {
   return argv.some(arg => arg === "-p" || arg === "--print" || arg.startsWith("--print=")

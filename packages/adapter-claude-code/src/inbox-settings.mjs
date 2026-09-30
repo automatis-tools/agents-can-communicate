@@ -1,6 +1,6 @@
-import { execFile } from "node:child_process";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
+import { readProcessArgs as readArgs } from "@agents-can-communicate/adapter-sdk";
 
 // What Claude Code does with a wake from a sender that attests no permission
 // mode - ACC never attests one. A session that bypasses permission prompts
@@ -67,13 +67,9 @@ export function permissionModeFromArgs(args) {
   return null;
 }
 
-/** A process's arguments as `ps` prints them, split on spaces, or null. */
+/** A process's arguments, or null when they cannot be read. */
 export function readProcessArgs(pid, { timeoutMs = 500 } = {}) {
-  if (!Number.isInteger(pid) || pid <= 0 || process.platform === "win32") return Promise.resolve(null);
-  return new Promise(resolve => {
-    execFile("ps", ["-o", "args=", "-p", String(pid)], { timeout: timeoutMs, maxBuffer: 64 * 1024 },
-      (error, stdout) => resolve(error ? null : String(stdout).trim().split(/\s+/).filter(Boolean)));
-  });
+  return readArgs(pid, { timeoutMs });
 }
 
 export function receptionOf({ permissionMode, crossSessionInbound }) {
