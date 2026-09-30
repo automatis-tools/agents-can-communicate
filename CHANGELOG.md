@@ -11,6 +11,14 @@ Work in progress for #234. The design is in
   flush the renamed file instead of its directory, retry a rename or read that another handle
   holds, report a taken directory name as `EEXIST`, and refuse a symlink or junction at the last
   path component without `O_NOFOLLOW`.
+- On Windows the store's writer lock is released by moving its owner record out of the lock
+  directory. Windows cannot rename a directory while a file inside it is open, and writers
+  waiting for the lock read that record: eight of them held a release back until one gave up.
+  A directory whose `realpath` fails `EBADF` while another process renames it counts as gone,
+  as `ENOENT` does on Linux. A transaction journal names its files with forward slashes on
+  every platform.
+- On Windows an environment that a caller passes replaces the machine's variables whatever
+  their case, so detection finds a client on the supplied `PATH` instead of the inherited `Path`.
 - Windows keeps ACC state in `%LOCALAPPDATA%`, never in the roaming profile.
 - A workspace config root that starts with a separator or a drive letter is refused on every
   platform, which includes `\\host\share` and `D:x`. A backslash separates the segments of a

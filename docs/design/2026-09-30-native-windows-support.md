@@ -91,6 +91,19 @@ runtime, because launcher modules may import only their siblings.
   becomes `EEXIST`, so the writer lock, the manager lock, launchers and generations keep their
   contention logic. Otherwise the `EPERM` came from an open file inside the source, as when a
   contender reads a lock's `owner.json` during release, and the rename is retried.
+- **Releasing the writer lock.** Retrying is not enough for the store's writer lock: every
+  waiting writer polls its `owner.json`, and eight of them on `windows-latest` kept the
+  directory from moving until one of them gave up at the acquire timeout. On Windows the owner
+  moves the record out instead. A file can be renamed while other handles have it open, because
+  Node opens with `FILE_SHARE_DELETE`. The lock is then an empty directory, which a waiting writer
+  removes with `rmdir` before it takes the name, just as POSIX `rename` replaces an empty lock.
+  `rmdir` cannot remove a lock that has an owner in it. Reclaiming a dead owner still moves
+  the whole directory, because Node's rename replaces an existing file on Windows: a late
+  reclaimer that moved `owner.json` could take a successor's record.
+- **A name that goes away while it resolves.** `realpath` of a directory that another process
+  renames fails `EBADF` on Windows, where Linux reports `ENOENT` for the same window. The store's
+  directory walk reads both as "gone", so a read of a lock that changed hands returns nothing
+  and does not report an unsafe path.
 - **Creating a file exclusively.** `open(…, "wx")` follows a dangling symlink on Windows and
   creates its target. ACC creates such files only under random names inside its own private
   directories, where planting a link already requires the user's own access, so the rule holds.
