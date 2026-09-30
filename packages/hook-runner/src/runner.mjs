@@ -411,7 +411,8 @@ const HANDLERS = {
   // this process's ancestry, and it pins nothing because no hook code of any
   // generation runs for the session until its first real hook pins its own.
   async sessionStart({ event, context, adapter, adapterId, binding, paths,
-    readProcessTable, probeClientVersion, platform, deadline, knownClientPid, pins = true }) {
+    readProcessTable, probeClientVersion, platform, deadline, knownClientPid, pins = true,
+    tableRead: started = null }) {
     // Where this session's pin lives, resolved once and reused at every write
     // below. Beside `paths.root`, never inside it: see `managerRootFor`.
     const pinRoot = managerRootFor(context.dataHome);
@@ -436,7 +437,7 @@ const HANDLERS = {
     // Read while the client reports its version: neither needs the other, and
     // on Windows one starts the client and the other PowerShell. Handled here
     // so a probe that fails first leaves no rejection unobserved.
-    const tableRead = known || command === null ? null : Promise.resolve(readProcessTable({
+    const tableRead = known || command === null ? null : started ?? Promise.resolve(readProcessTable({
       timeoutMs: Math.max(1, Math.min(PROCESS_TABLE_MS, deadline - Date.now() - TABLE_RESERVE_MS)) }));
     tableRead?.catch(() => {});
     const clientVersion = await probeClientVersion(adapter,
@@ -725,6 +726,13 @@ export async function runHook({ adapterId, payload, adapters, dataHome, env,
     if (adapter === undefined) throw new Error(`no adapter named ${adapterId}`);
 
     const event = await adapter.normalizeHook(payload, { args });
+    // A session start reads the process table once, and it depends on nothing
+    // below: it starts now, while the store opens. On Windows it is the part
+    // of a start that runs another program.
+    const tableRead = event.kind !== "sessionStart" || (adapter.client?.command ?? null) === null
+      ? null : Promise.resolve(readProcessTable({ timeoutMs: Math.max(1,
+        Math.min(PROCESS_TABLE_MS, deadline - Date.now() - TABLE_RESERVE_MS)) }));
+    tableRead?.catch(() => {});
     const context = await openContext({ event, adapterId, dataHome, runtime, env, deadline });
     const handler = HANDLERS[event.kind];
     const lifecycle = ["sessionStart", "sessionEnd", "beforeTurn"].includes(event.kind);
@@ -744,7 +752,7 @@ export async function runHook({ adapterId, payload, adapters, dataHome, env,
       // that produced it; nothing in core reads it.
       const result = handler === undefined ? {} : await handler({ event, context, adapter, adapterId,
         binding, paths: context.paths, payload,
-        readProcessTable, probeClientVersion, platform, deadline });
+        readProcessTable, probeClientVersion, platform, deadline, tableRead });
       return appendToolOwner(appendStartOwner(result, { event, context, adapter }),
         { event, binding, context, adapter });
     };

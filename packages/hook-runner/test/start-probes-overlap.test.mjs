@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtemp, realpath, rm } from "node:fs/promises";
+import { access, mkdtemp, realpath, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -50,4 +50,38 @@ test("a session start reads the process table while the client reports its versi
   assert.equal(result.sessions.length, 1);
   assert.ok(seen.tableStarted < seen.versionEnded,
     `the process table waited for the version probe: ${JSON.stringify(seen)}`);
+});
+
+// The process table does not depend on the store, and on Windows it is the one
+// part of a session start that starts another program. It is read from the
+// moment the event is known, while the store opens, rather than after.
+test("a session start begins reading the process table before it opens the store", async t => {
+  const root = await realpath(await mkdtemp(path.join(tmpdir(), "acc-start-table-")));
+  const dataHome = await realpath(await mkdtemp(path.join(tmpdir(), "acc-start-table-data-")));
+  t.after(() => Promise.all([rm(root, { recursive: true, force: true }),
+    rm(dataHome, { recursive: true, force: true })]));
+  let storeExisted = null;
+  const adapter = {
+    id: "fixture",
+    client: { command: "fixture" },
+    capabilities: {},
+    normalizeHook: payload => payload,
+    injectOutcome: context => ({ stdout: context, stderr: "", exitCode: 0 }),
+    renderContext: () => "",
+  };
+
+  const result = await runHook({
+    adapterId: adapter.id,
+    adapters: { [adapter.id]: adapter },
+    dataHome,
+    payload: { kind: "sessionStart", sessionId: "early-table", cwd: root, targets: [] },
+    probeClientVersion: async () => "1.0.0",
+    readProcessTable: async () => {
+      storeExisted = await access(path.join(dataHome, "acc")).then(() => true, () => false);
+      return new Map();
+    },
+  });
+
+  assert.equal(result.failed, undefined, result.reason);
+  assert.equal(storeExisted, false, "the process table waited for the store to open");
 });
