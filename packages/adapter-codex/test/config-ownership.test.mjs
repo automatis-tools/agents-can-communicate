@@ -6,6 +6,8 @@ import test from "node:test";
 import { createCodexAdapter } from "../src/adapter.mjs";
 import { rewrittenCodexConfig, clientTables } from "../../../tests/helpers/codex-config.mjs";
 import { POSIX_FORM } from "../../../tests/helpers/platform-scope.mjs";
+// A Windows path is written escaped in TOML: C:\\Users, not C:\Users.
+import { tomlString } from "@agents-can-communicate/adapter-sdk";
 
 async function fixture(t) {
   const home = await mkdtemp(path.join(tmpdir(), "acc-config-ownership-"));
@@ -45,7 +47,7 @@ test("modified new sandbox keeps added keys and changed roots through refresh an
     await adapter.install(context);
     await adapter.uninstall(context);
     const after = await readFile(file, "utf8");
-    assert.ok(after.includes(`"${context.stateRoot}"`), "modified sandbox roots were erased");
+    assert.ok(after.includes(tomlString(context.stateRoot)), "modified sandbox roots were erased");
     if (modified.includes("network_access")) assert.match(after, /network_access = true/);
     else assert.match(after, /"\/user-root"/);
     assert.equal((after.match(/\[sandbox_workspace_write\]/g) ?? []).length, 1);
@@ -100,7 +102,7 @@ test("metadata moved to another table does not authorize sandbox deletion", asyn
   await writeFile(file, moved);
   await adapter.uninstall(context);
   const after = await readFile(file, "utf8");
-  assert.ok(after.includes(`"${context.stateRoot}"`));
+  assert.ok(after.includes(tomlString(context.stateRoot)));
   assert.match(after, /trust_level = "trusted"/);
 });
 
@@ -111,7 +113,7 @@ test("a multiline root string cannot hide the need for ACC's sandbox table", asy
   await adapter.install(context);
   const after = await readFile(file, "utf8");
   assert.match(after, /\[sandbox_workspace_write\]/);
-  assert.ok(after.includes(`"${context.stateRoot}"`));
+  assert.ok(after.includes(tomlString(context.stateRoot)));
   await adapter.uninstall(context);
   assert.equal(await readFile(file, "utf8"), original);
 });

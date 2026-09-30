@@ -469,7 +469,9 @@ test("the installed hook command preserves literal metacharacters and exports it
     await chmod(node, 0o755);
     await writeFile(runner, "// runner fixture\n");
 
-    const context = { home, codexHome: path.join(home, ".codex"), dataHome, node, runner };
+    // POSIX quoting is what this checks; Windows refuses such a path outright.
+    const context = { home, codexHome: path.join(home, ".codex"), dataHome, node, runner,
+      hostPlatform: POSIX_FORM };
     await createCodexAdapter().install(context);
     const cached = JSON.parse(await readFile(path.join(context.codexHome, "plugins", "cache",
       "acc-local", "agents-can-communicate", await pluginVersion(CODEX_PLUGIN), "hooks.json"),
@@ -548,7 +550,8 @@ test("ACC registers a marketplace of its own, not the user's", async t => {
   // The root it names is ACC's own, inside the agents home rather than at the
   // top of it: this client resolves a manifest entry against the root, so
   // joining the user's marketplace would put ACC's tree in `~/plugins/`.
-  assert.match(config, /source = "[^"]*\/\.agents\/acc-local"/);
+  // Either separator; a Windows path is TOML-escaped, `\\`.
+  assert.match(config, /source = "[^"]*(?:\/|\\\\)\.agents(?:\/|\\\\)acc-local"/);
 
   // Which is the whole point: the marketplace this client discovers by itself
   // is the user's, named by its own manifest. ACC merged into it and then
