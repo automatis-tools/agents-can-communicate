@@ -36,9 +36,9 @@ Work in progress for #234. The design is in
 
 | Candidate artifact | Value |
 |---|---|
-| Built from | `431cde64fdd252f62889ccce7b4e876222308573` |
-| Tarball | `agents-can-communicate-0.8.5.tgz`, 513,150 bytes, 323 files |
-| sha256 | `5b06d1bf809d32dad6f8675f13c432f6ca225962b39b03d1b481d8d18314bcb9` |
+| Built from | `d6f3f5907bf700d9e9701f676ebd4a0c0891a320` |
+| Tarball | `agents-can-communicate-0.8.5.tgz`, 513,557 bytes, 323 files |
+| sha256 | `aa1d7a048b89ca342492d708aa77a13990cf66680eac783565fb61d50d454693` |
 
 This unpublished development archive was measured with `npm pack`. See
 [the evidence](docs/release-evidence/unreleased-windows-support.md).
