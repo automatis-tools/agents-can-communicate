@@ -75,7 +75,7 @@ export async function spawnMaintenance({ root, job, packageRoot, env }) {
     throw new Error("maintenance worker implementation is unavailable");
   }
   const child = spawn(process.execPath, [path.join(packageRoot, "bin", "acc-maintenance-worker.mjs"), root, job.id],
-    { env, cwd: root, detached: true, stdio: "ignore" });
+    { env, cwd: root, detached: true, windowsHide: true, stdio: "ignore" });
   await new Promise((resolve, reject) => { child.once("spawn", resolve); child.once("error", reject); });
   child.unref();
   return child.pid;

@@ -1,6 +1,7 @@
 import { execFile } from "node:child_process";
-import { access, constants } from "node:fs/promises";
 import path from "node:path";
+
+import { resolveExecutable as resolveOnPath } from "@agents-can-communicate/adapter-sdk";
 
 import { uninstallShellBootstrap } from "./shell-bootstrap.mjs";
 import { LIVE_POLICIES, livePolicyOf } from "./live-policy.mjs";
@@ -22,19 +23,10 @@ export const shimDirFor = stateRoot => path.join(stateRoot, "bin");
 
 // The vendor executable to probe: the first executable on PATH outside the
 // excluded directories, so a kept 0.7.x shim is never probed as the client.
-export async function resolveExecutable(command, { pathEnv = "", exclude = [] } = {}) {
-  const excluded = exclude.filter(Boolean).map(directory => path.resolve(directory));
-  for (const directory of String(pathEnv).split(path.delimiter).filter(Boolean)) {
-    if (excluded.includes(path.resolve(directory))) continue;
-    const candidate = path.join(directory, command);
-    try {
-      await access(candidate, constants.X_OK);
-      return candidate;
-    } catch {
-      // not here; keep walking PATH
-    }
-  }
-  return null;
+// Windows adds an extension from PATHEXT; see the SDK's resolveExecutable.
+export async function resolveExecutable(command, { pathEnv = "", exclude = [], pathExt } = {}) {
+  return resolveOnPath(command, { pathEnv, exclude,
+    ...(pathExt === undefined ? {} : { pathExt }) });
 }
 
 const defaultExec = (executable, args) => new Promise((resolve, reject) => {

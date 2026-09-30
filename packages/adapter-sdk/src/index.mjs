@@ -30,3 +30,5 @@ export { clearSessionBinding, listSessionBindings, loadSessionBinding,
 export { clearNativeAttempt, loadNativeAttempt, storeNativeAttempt } from "./native-attempt.mjs";
 export { channelSocketDirectory } from "./channel-directory.mjs";
 export { readProcessArgs, readProcessTable, splitWindowsCommandLine } from "./process-table.mjs";
+export { resolveExecutable, runExecutable } from "./executables.mjs";
+export { pathOf } from "./executables.mjs";

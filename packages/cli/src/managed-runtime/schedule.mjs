@@ -32,7 +32,7 @@ export async function scheduleWorker(root, control, { env = process.env } = {}) 
     }
     const child = spawn(process.execPath,
       [path.join(control.active.root, "bin", "acc-update-worker.mjs"), root], {
-        env, detached: true, stdio: "ignore", cwd: root,
+        env, detached: true, windowsHide: true, stdio: "ignore", cwd: root,
       });
     child.on("error", () => {});
     child.unref();

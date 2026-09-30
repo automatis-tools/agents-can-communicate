@@ -328,3 +328,20 @@ test("a successful handshake never reads the host process", async t => {
   assert.equal(handshake.supported, true);
   assert.equal(read, 0);
 });
+
+// Codex's Windows daemon listens on AF_UNIX, which Node cannot reach there; live
+// delivery on Windows arrives with the app-server proxy in 0.9.x. Until then a
+// Windows install and session say so, and keep next-turn delivery.
+test("windows: live delivery is reported unsupported, never attempted", async () => {
+  const { probeNativeDelivery, bindNativeSession } = await import("../src/native-delivery.mjs");
+  let opened = false;
+  const open = async () => { opened = true; throw new Error("must not connect"); };
+  assert.equal((await probeNativeDelivery({ platform: "win32", open })).reasonCode,
+    "native_delivery_unsupported");
+  const bound = await bindNativeSession({ platform: "win32", open, clientPid: 42,
+    clientVersion: "0.159.2", event: { sessionId: "s", cwd: "C:\\work" },
+    argvOf: async () => { throw new Error("must not read argv"); } });
+  assert.equal(bound.supported, false);
+  assert.equal(bound.reasonCode, "native_delivery_unsupported");
+  assert.equal(opened, false);
+});

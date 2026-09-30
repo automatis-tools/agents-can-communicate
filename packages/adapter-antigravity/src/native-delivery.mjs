@@ -80,9 +80,13 @@ const handshake = record => ({ supported: true, clientVersion: record.clientVers
   protocolContract: PROTOCOL_CONTRACT, modes: [...RELAY_MODES],
   opaqueEndpointRef: record.endpointId, leaseUntil: record.leaseUntil, reasonCode: null });
 
-export async function probeNativeDelivery({ timeoutMs = 750, run = runDefault } = {}) {
+export async function probeNativeDelivery({ timeoutMs = 750, run = runDefault,
+  platform = process.platform } = {}) {
   const unsupported = (reasonCode, clientVersion = null) => ({ supported: false, clientVersion,
     protocolContract: PROTOCOL_CONTRACT, executableFingerprint: null, modes: [], reasonCode });
+  // The relay listens on a Unix socket, which Windows refuses. Its named-pipe
+  // transport is not built yet.
+  if (platform === "win32") return unsupported("native_delivery_unsupported");
   try {
     const version = /(\d+\.\d+\.\d+)/.exec((await run("agy", ["--version"],
       { timeout: timeoutMs })).stdout)?.[1] ?? null;
@@ -102,7 +106,8 @@ export function planNativeActivation() {
 }
 
 export async function bindNativeSession({ event, clientPid, clientVersion, runtimeDir,
-  timeoutMs = 750, isAlive = defaultAlive } = {}) {
+  timeoutMs = 750, isAlive = defaultAlive, platform = process.platform } = {}) {
+  if (platform === "win32") return closedHandshake(clientVersion, "native_delivery_unsupported");
   if (!Number.isInteger(clientPid) || clientPid <= 0) return closedHandshake(clientVersion, "client_process_unknown");
   const candidates = (await listRegistrations({ runtimeDir }))
     .filter(record => record.conversationId === event?.sessionId);

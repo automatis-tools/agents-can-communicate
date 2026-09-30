@@ -208,3 +208,15 @@ test("a serving relay is not asked, and an active binding never spends an ask", 
   "a client the contract does not admit gains nothing from a relay");
   assert.equal(await ask(quiet, "other-print", { argvOf: async () => ["agy", "-p", "x"] }), null);
 });
+
+// The relay listens on a Unix socket, which Windows refuses; its named-pipe
+// transport arrives in 0.9.x. Until then Windows keeps next-turn delivery.
+test("windows: the relay is reported unsupported, never probed", async () => {
+  const { probeNativeDelivery, bindNativeSession } = await import("../src/native-delivery.mjs");
+  const run = async () => { throw new Error("must not run agy"); };
+  assert.equal((await probeNativeDelivery({ platform: "win32", run })).reasonCode,
+    "native_delivery_unsupported");
+  const bound = await bindNativeSession({ platform: "win32", clientPid: 42, clientVersion: "1.2.14",
+    event: { sessionId: "s" }, runtimeDir: "C:\\none" });
+  assert.equal(bound.reasonCode, "native_delivery_unsupported");
+});
