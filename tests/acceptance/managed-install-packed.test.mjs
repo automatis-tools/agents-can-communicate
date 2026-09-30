@@ -7,6 +7,14 @@ import { promisify } from "node:util";
 import { createPackedAcc } from "../helpers/packed-acc.mjs";
 
 const run = promisify(execFile);
+
+// The host's forms. POSIX: skills name an sh shim in double quotes, which pins
+// its target as written. Windows: skills run `node "<shim>"` on a Node shim
+// named with forward slashes, which pins its target as a JSON string.
+const windows = process.platform === "win32";
+const SKILL_SHIM = windows ? /node "([^"]*acc-cli\.mjs)"/ : /"([^"]*acc-cli\.sh)"/;
+const HOOK_SHIM = windows ? "acc-hook.mjs" : "acc-hook.sh";
+const pins = (text, file) => text.includes(windows ? JSON.stringify(file) : file);
 test("normal installed ACC enrolls automatic updates and surviving stable integration commands", async t => {
   const f = await createPackedAcc(t);
   await f.setClientVersions({ claude: "2.1.259", codex: "0.135.0" });
@@ -26,15 +34,15 @@ test("normal installed ACC enrolls automatic updates and surviving stable integr
   // managed runtime rather than some other install now lives one level down.
   for (const skill of skills) {
     const text = await readFile(path.join(f.clientHome, skill), "utf8");
-    const [, shim] = /"([^"]*acc-cli\.sh)"/.exec(text) ?? [];
+    const [, shim] = SKILL_SHIM.exec(text) ?? [];
     assert.equal(typeof shim, "string", skill);
-    assert.equal((await readFile(shim, "utf8")).includes(path.join(root, "bin", "acc.mjs")),
+    assert.equal(pins(await readFile(shim, "utf8"), path.join(root, "bin", "acc.mjs")),
       true, shim);
   }
-  const hooks = entries.filter(n => n.endsWith("acc-hook.sh"));
+  const hooks = entries.filter(n => n.endsWith(HOOK_SHIM));
   assert.equal(hooks.length >= 4, true);
-  for (const hook of hooks) assert.equal((await readFile(path.join(f.clientHome, hook), "utf8"))
-    .includes(path.join(root, "bin", "acc-hook.mjs")), true, hook);
+  for (const hook of hooks) assert.equal(pins(await readFile(path.join(f.clientHome, hook), "utf8"),
+    path.join(root, "bin", "acc-hook.mjs")), true, hook);
   for (const name of ["acc", "acc-hook", "acc-mcp", "acc-antigravity-relay"]) {
     assert.match(await readFile(path.join(root, "bin", `${name}.mjs`), "utf8"), /runEntry/);
   }

@@ -11,7 +11,7 @@ test("installed initialized peers exchange and acknowledge linked replies", asyn
   async function peer(participant, protocolVersion) {
     const client = connectMcp({ cwd: packed.project, dataHome: packed.dataHome,
       participant, binary: packed.mcpBin, env: { GIT_DIR: "", GIT_WORK_TREE: "" } });
-    t.after(() => client.close());
+    packed.defer(() => client.close());
     const opened = await client.request("initialize", { protocolVersion,
       capabilities: {}, clientInfo: { name: "protocol-fixture", version: "1.0.0" } });
     assert.equal(opened.error, undefined, JSON.stringify(opened.error));

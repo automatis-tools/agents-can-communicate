@@ -14,7 +14,7 @@ test("installed MCP finish retries preserve the closed owner across process rest
   const connect = () => {
     const client = connectMcp({ cwd: packed.project, dataHome: packed.dataHome,
       binary: packed.mcpBin, env: { GIT_DIR: "", GIT_WORK_TREE: "" } });
-    t.after(() => client.close());
+    packed.defer(() => client.close());
     return { close: client.close, call: (name, args = {}) => client.request("tools/call",
       { name, arguments: args, _meta: PROTOCOL_META(PROTOCOL_VERSION) }) };
   };

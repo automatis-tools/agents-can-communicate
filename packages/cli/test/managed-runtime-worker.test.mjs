@@ -10,10 +10,33 @@ import { readControl, writeControl } from "../src/managed-runtime/state.mjs";
 import { acquireRuntime } from "../src/managed-runtime/leases.mjs";
 import { withManagerLock } from "../src/managed-runtime/mutex.mjs";
 import { scheduleWorker } from "../src/managed-runtime/schedule.mjs";
+import { cleanupStack, removeFixture } from "../../../tests/helpers/fixture-cleanup.mjs";
+
+// The worker scheduleWorker starts is detached: it outlives the call, with its
+// working directory in the runtime root, and Windows refuses to remove that
+// directory until it exits. This stand-in records its pid there, so a test that
+// starts workers waits for each to exit before its fixture is removed.
+const STUB_WORKER = 'import { appendFileSync } from "node:fs";\n'
+  + 'appendFileSync("started-workers", `${process.pid}\\n`);\n';
+const alive = pid => { try { process.kill(pid, 0); return true; } catch (error) { return error.code === "EPERM"; } };
+async function startedWorkersExited(root, count) {
+  const deadline = Date.now() + 20_000;
+  for (;;) {
+    const pids = (await readFile(path.join(root, "started-workers"), "utf8").catch(() => ""))
+      .split("\n").filter(Boolean).map(Number);
+    if (pids.length >= count && !pids.some(alive)) return;
+    if (Date.now() > deadline) {
+      throw new Error(`expected ${count} started workers to have run and exited; recorded ${JSON.stringify(pids)}`);
+    }
+    await new Promise(resolve => setTimeout(resolve, 50));
+  }
+}
+const WORKER_ENV = { env: { ...process.env, ACC_NO_UPDATE_CHECK: "1" } };
 
 async function fixture(t, changes = {}) {
   const root = await realpath(await mkdtemp(path.join(tmpdir(), "acc-worker-")));
-  t.after(() => rm(root, { recursive: true, force: true }));
+  const defer = cleanupStack(t);
+  defer(() => removeFixture(root));
   const active = { version: "0.4.0", root: path.join(root, "generations", "old") };
   await mkdir(active.root, { recursive: true });
   // writeControl normalizes the runtime pointer (e.g. attaching storeVersion),
@@ -21,7 +44,7 @@ async function fixture(t, changes = {}) {
   const control = await writeControl(root, { schemaVersion: 1, active, pending: null, phase: "ready", auto: true,
     pin: null, checkedAt: null, home: root, targets: [], notice: null, ...changes });
   const calls = [];
-  return { root, active: control.active, calls, ports: {
+  return { root, defer, active: control.active, calls, ports: {
     env: {}, discover: async options => { calls.push(["discover", options.pin]); return { version: "0.4.1" }; },
     download: async () => { calls.push(["download"]); return { version: "0.4.1", root: path.join(root, "generations", "new") }; },
     activate: async () => { calls.push(["activate"]); return { activated: false, reason: "processes_active" }; },
@@ -158,16 +181,17 @@ test("a worker that is not the active generation leaves reclaim to the one that 
 test("a generation that has not reclaimed yet gets a worker even with nothing to update", async t => {
   const f = await fixture(t, { auto: false, checkedAt: new Date().toISOString() });
   await mkdir(path.join(f.active.root, "bin"), { recursive: true });
-  await writeFile(path.join(f.active.root, "bin", "acc-update-worker.mjs"), "process.exit(0);\n");
+  await writeFile(path.join(f.active.root, "bin", "acc-update-worker.mjs"), STUB_WORKER);
+  f.defer(() => startedWorkersExited(f.root, 2));
   const control = await readControl(f.root);
-  assert.equal(await scheduleWorker(f.root, control, { env: { ACC_NO_UPDATE_CHECK: "1" } }), true);
+  assert.equal(await scheduleWorker(f.root, control, WORKER_ENV), true);
   await writeFile(path.join(f.root, "reclaim.json"), JSON.stringify({ schemaVersion: 1,
     activeRoot: f.active.root }));
-  assert.equal(await scheduleWorker(f.root, control, { env: { ACC_NO_UPDATE_CHECK: "1" } }), false,
+  assert.equal(await scheduleWorker(f.root, control, WORKER_ENV), false,
     "once this generation has reclaimed, nothing is due");
   await writeFile(path.join(f.root, "reclaim.json"), JSON.stringify({ schemaVersion: 1,
     activeRoot: path.join(f.root, "generations", "previous") }));
-  assert.equal(await scheduleWorker(f.root, control, { env: { ACC_NO_UPDATE_CHECK: "1" } }), true,
+  assert.equal(await scheduleWorker(f.root, control, WORKER_ENV), true,
     "a marker left by an earlier generation is due again");
 });
 
@@ -185,9 +209,10 @@ test("a postponed reclaim is recorded as unfinished and is due again after an ho
   assert.equal(marker.activeRoot, f.active.root);
   assert.equal(marker.complete, false);
   await mkdir(path.join(f.active.root, "bin"), { recursive: true });
-  await writeFile(path.join(f.active.root, "bin", "acc-update-worker.mjs"), "process.exit(0);\n");
+  await writeFile(path.join(f.active.root, "bin", "acc-update-worker.mjs"), STUB_WORKER);
+  f.defer(() => startedWorkersExited(f.root, 1));
   const control = await readControl(f.root);
-  const env = { env: { ACC_NO_UPDATE_CHECK: "1" } };
+  const env = WORKER_ENV;
   assert.equal(await scheduleWorker(f.root, control, env), false, "not again right away");
   await writeFile(path.join(f.root, "reclaim.json"), JSON.stringify({ ...marker,
     attemptedAt: new Date(Date.now() - 2 * 60 * 60_000).toISOString() }));
@@ -207,7 +232,8 @@ test("a reclaim held back by its own process's lease is unfinished and retried a
   await acquireRuntime(f.root, { kind: "acc" });
   const next = { version: "0.4.1", root: path.join(f.root, "generations", "new") };
   await mkdir(path.join(next.root, "bin"), { recursive: true });
-  await writeFile(path.join(next.root, "bin", "acc-update-worker.mjs"), "process.exit(0);\n");
+  await writeFile(path.join(next.root, "bin", "acc-update-worker.mjs"), STUB_WORKER);
+  f.defer(() => startedWorkersExited(f.root, 1));
   const control = await writeControl(f.root, { ...await readControl(f.root), active: next });
   await runWorker(f.root, { env: {}, generationRoot: control.active.root });
   assert.deepEqual((await readdir(path.join(f.root, "generations"))).sort(), ["new", "old"],
@@ -215,7 +241,7 @@ test("a reclaim held back by its own process's lease is unfinished and retried a
   const marker = JSON.parse(await readFile(path.join(f.root, "reclaim.json"), "utf8"));
   assert.equal(marker.activeRoot, control.active.root);
   assert.equal(marker.complete, false);
-  const env = { env: { ACC_NO_UPDATE_CHECK: "1" } };
+  const env = WORKER_ENV;
   assert.equal(await scheduleWorker(f.root, control, env), false,
     "commands right after an update start no worker");
   await writeFile(path.join(f.root, "reclaim.json"), JSON.stringify({ ...marker,

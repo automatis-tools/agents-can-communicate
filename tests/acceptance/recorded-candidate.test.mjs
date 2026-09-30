@@ -5,6 +5,8 @@ import path from "node:path";
 import test from "node:test";
 import { promisify } from "node:util";
 
+import { runNpm } from "../helpers/npm-run.mjs";
+
 const run = promisify(execFile);
 const repo = path.resolve(import.meta.dirname, "..", "..");
 
@@ -124,7 +126,7 @@ test("nothing reaches the tarball that this file would not notice changing", asy
   //
   // Listing entries is portable in a way comparing digests is not: a gzip stream
   // carries mtimes, and the CI matrix builds on two platforms.
-  const { stdout } = await run("npm", ["pack", "--dry-run", "--json"], { cwd: repo });
+  const { stdout } = await runNpm(["pack", "--dry-run", "--json"], { cwd: repo });
   const [packed] = JSON.parse(stdout);
   // Bundled workspaces arrive under `node_modules/` and are built from
   // `packages/`, which the list above already watches.

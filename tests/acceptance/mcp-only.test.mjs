@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
-import { mkdtemp, realpath, rm } from "node:fs/promises";
+import { mkdtemp, realpath } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -10,6 +10,7 @@ import { PROTOCOL_VERSION } from "@agents-can-communicate/mcp-server";
 
 import { runHook } from "@agents-can-communicate/hook-runner";
 
+import { cleanupStack, removeFixture } from "../helpers/fixture-cleanup.mjs";
 import { PROTOCOL_META, connectMcp } from "../helpers/mcp-client.mjs";
 
 const run = promisify(execFile);
@@ -27,9 +28,11 @@ const acc = path.join(repo, "bin", "acc.mjs");
 async function workspace(t) {
   const cwd = await realpath(await mkdtemp(path.join(tmpdir(), "acc-mcponly-")));
   const dataHome = await realpath(await mkdtemp(path.join(tmpdir(), "acc-mcponly-data-")));
-  t.after(() => Promise.all([rm(cwd, { recursive: true, force: true }),
-    rm(dataHome, { recursive: true, force: true })]));
-  return { cwd, dataHome };
+  // The MCP server runs in `cwd`; it is closed through `defer` before the
+  // directories are removed (see fixture-cleanup.mjs).
+  const defer = cleanupStack(t);
+  defer(() => Promise.all([removeFixture(cwd), removeFixture(dataHome)]));
+  return { cwd, dataHome, defer };
 }
 
 const cli = async ({ cwd, dataHome }, args) => {
@@ -43,7 +46,7 @@ const meta = PROTOCOL_META(PROTOCOL_VERSION);
 test("an MCP-only client can read the workspace and take part in it", async t => {
   const place = await workspace(t);
   const client = connectMcp({ ...place, participant: "mcp_reader" });
-  t.after(() => client.close());
+  place.defer(() => client.close());
 
   const synced = await client.request("tools/call",
     { name: "acc_sync", arguments: { scope: "full" }, _meta: meta });
@@ -58,7 +61,7 @@ test("an MCP-only client can read the workspace and take part in it", async t =>
 test("status labels the MCP participant as unguarded and unmanaged", async t => {
   const place = await workspace(t);
   const client = connectMcp({ ...place, participant: "mcp_reader" });
-  t.after(() => client.close());
+  place.defer(() => client.close());
   await client.request("tools/call", { name: "acc_sync", arguments: {}, _meta: meta });
 
   const status = await cli(place, ["status"]);
@@ -97,7 +100,7 @@ test("a guarded workspace degrades to advisory when an MCP client joins", async 
   assert.equal(before.protection, "guarded");
 
   const client = connectMcp({ ...place, participant: "mcp_reader" });
-  t.after(() => client.close());
+  place.defer(() => client.close());
   await client.request("tools/call", { name: "acc_sync", arguments: {}, _meta: meta });
   const after = await cli(place, ["status"]);
 
@@ -117,7 +120,7 @@ test("the MCP client sees the peer's claim, so it can choose to respect it", asy
     "--resource", "file:src/**", "--enforcement", "guarded", "--reason", "porting"]);
 
   const client = connectMcp({ ...place, participant: "mcp_reader" });
-  t.after(() => client.close());
+  place.defer(() => client.close());
   const synced = await client.request("tools/call",
     { name: "acc_sync", arguments: { scope: "full" }, _meta: meta });
 
@@ -139,7 +142,7 @@ test("the MCP client sees the peer's claim, so it can choose to respect it", asy
 async function mailed(t, { kind = "question", obligation } = {}) {
   const place = await workspace(t);
   const client = connectMcp({ ...place, participant: "mcp_reader" });
-  t.after(() => client.close());
+  place.defer(() => client.close());
   const call = async (name, args = {}) => {
     const out = await client.request("tools/call", { name, arguments: args, _meta: meta });
     assert.equal(out.error, undefined, JSON.stringify(out.error));
@@ -208,7 +211,7 @@ test("being shown something is still not agreeing to it", async t => {
 test("an MCP client can ask a peer for work and receive its reply", async t => {
   const place = await workspace(t);
   const client = connectMcp({ ...place, participant: "graphics" });
-  t.after(() => client.close());
+  place.defer(() => client.close());
   const call = async (name, args = {}) => {
     const out = await client.request("tools/call", { name, arguments: args, _meta: meta });
     assert.equal(out.error, undefined, JSON.stringify(out.error));

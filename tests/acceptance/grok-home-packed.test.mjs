@@ -5,6 +5,9 @@ import test from "node:test";
 
 import { createPackedAcc } from "../helpers/packed-acc.mjs";
 
+// The hook shim takes the host's form: a Node script on Windows, sh elsewhere.
+const HOOK_SHIM = process.platform === "win32" ? "acc-hook.mjs" : "acc-hook.sh";
+
 // Reverting clientContext to HOME/.grok makes installation report success in a
 // directory the relocated client never reads. Exercise the installed CLI and
 // its actual files; a direct adapter call already accepted grokHome correctly.
@@ -26,7 +29,7 @@ test("packed install, doctor, and uninstall use the selected Grok home", async t
       await mkdir(path.dirname(foreign), { recursive: true });
       await writeFile(foreign, foreignBytes);
       const expected = [path.join(grokHome, "hooks", "acc.json"),
-        path.join(grokHome, "hooks", "acc-hook.sh"),
+        path.join(grokHome, "hooks", HOOK_SHIM),
         path.join(grokHome, "skills", "acc")];
 
       const installed = await place.acc(["install", "--adapter", "grok",

@@ -21,7 +21,7 @@ test("packed launchers recover legacy admission and update with two live MCP ser
   delete before.active.storeVersion;
   await writeFile(controlFile, JSON.stringify(before));
   const servers = [];
-  t.after(async () => {
+  f.defer(async () => {
     for (const client of servers) {
       if (client.child.exitCode === null) client.child.kill("SIGKILL");
       await client.closed;

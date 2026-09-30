@@ -20,7 +20,7 @@ test("installed CLI and MCP preserve explicit decision changes, forks, and offli
   assert.deepEqual(a.toParticipantIds, ["reader"]);
   const client = connectMcp({ cwd: packed.project, dataHome: packed.dataHome,
     participant: "peer", binary: packed.mcpBin, env: { GIT_DIR: "", GIT_WORK_TREE: "" } });
-  t.after(() => client.close());
+  packed.defer(() => client.close());
   await client.request("initialize", { protocolVersion: "2025-11-25",
     capabilities: {}, clientInfo: { name: "decision-fixture", version: "1.0.0" } });
   client.child.stdin.write(JSON.stringify({ jsonrpc: "2.0", method: "notifications/initialized" }) + "\n");

@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process";
-import { chmod, lstat, mkdir, mkdtemp, readFile, readdir, readlink, realpath, rm,
+import { chmod, lstat, mkdir, mkdtemp, readFile, readdir, readlink, realpath,
   writeFile }
   from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -7,14 +7,13 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { promisify } from "node:util";
 
+import { cleanupStack, removeFixture } from "./fixture-cleanup.mjs";
 import { fixtureOwnerEnv } from "./fixture-owner.mjs";
+import { runNpm } from "./npm-run.mjs";
 
 const run = promisify(execFile);
 const repo = path.resolve(import.meta.dirname, "..", "..");
 const isWindows = process.platform === "win32";
-const runNpm = (args, options = {}) => (isWindows
-  ? run("npm.cmd", args.map(argument => `"${argument}"`), { ...options, shell: true })
-  : run("npm", args, options));
 
 const parsed = stdout => JSON.parse(stdout).data;
 
@@ -83,7 +82,10 @@ async function findBinding(dataHome, harnessSessionId) {
 
 export async function createPackedAcc(t) {
   const root = await realpath(await mkdtemp(path.join(tmpdir(), "acc-v02-packed-")));
-  t.after(() => rm(root, { recursive: true, force: true }));
+  // A test stops what it started in this fixture through `defer`, and those
+  // run before the directory is removed; see fixture-cleanup.mjs.
+  const defer = cleanupStack(t);
+  defer(() => removeFixture(root));
   const pack = path.join(root, "pack");
   const consumer = path.join(root, "consumer");
   const project = path.join(root, "project");
@@ -184,7 +186,7 @@ export async function createPackedAcc(t) {
     });
   };
 
-  return { root, repo, pack, consumer, project, dataHome, clientHome, clientBin,
+  return { root, defer, repo, pack, consumer, project, dataHome, clientHome, clientBin,
     tarball, installed, accBin, hookBin, mcpBin, env, acc, accError, commandTrace,
     hook, start, ownerEnv: nativeId => fixtureOwnerEnv(dataHome, nativeId),
     beforeTurn, receipt, setClientVersions, publishBinding,

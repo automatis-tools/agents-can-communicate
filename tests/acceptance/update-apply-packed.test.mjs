@@ -3,8 +3,10 @@ import { execFile } from "node:child_process";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import test from "node:test";
+import { pathToFileURL } from "node:url";
 import { promisify } from "node:util";
 
+import { writeFakeClient } from "../helpers/fake-client.mjs";
 import { createPackedAcc } from "../helpers/packed-acc.mjs";
 
 const run = promisify(execFile);
@@ -15,19 +17,20 @@ test("installed update reports failed steps as failures and preserves successful
   await mkdir(bin);
   const bootstrap = path.join(p.root, "registry-response.mjs");
   await writeFile(bootstrap, 'globalThis.fetch = async () => ({ ok: true, json: async () => ({ version: "99.0.0" }) });\n');
+  // In the form the platform runs: `npm.cmd` and `acc.cmd` on Windows, as npm
+  // installs them there.
   for (const command of ["npm", "acc"]) {
-    await writeFile(path.join(bin, command), `#!${process.execPath}\n`
-      + 'const fs = require("node:fs");\n'
+    await writeFakeClient(bin, command, { script: 'import fs from "node:fs";\n'
       + `fs.appendFileSync(process.env.ACC_UPDATE_TRACE, JSON.stringify({ command: ${JSON.stringify(command)}, args: process.argv.slice(2) }) + "\\n");\n`
       + `if (process.env.ACC_UPDATE_FAIL === ${JSON.stringify(command)}) { console.error("fixture step refused"); process.exit(23); }\n`
-      + (command === "acc" ? 'console.log("ACTIVATION_SENTINEL: trust the refreshed hooks, then restart the client");\n' : ''),
-    { mode: 0o755 });
+      + (command === "acc" ? 'console.log("ACTIVATION_SENTINEL: trust the refreshed hooks, then restart the client");\n' : '') });
   }
   const invoke = async ({ args = [], failure = "", json = true } = {}) => {
     await writeFile(trace, "");
     const env = { ...p.env, PATH: bin, ACC_NO_UPDATE_CHECK: "0",
       ACC_UPDATE_TRACE: trace, ACC_UPDATE_FAIL: failure };
-    const argv = ["--import", bootstrap, p.accBin, "update", ...args,
+    // --import takes a module specifier; a Windows absolute path is not one.
+    const argv = ["--import", pathToFileURL(bootstrap).href, p.accBin, "update", ...args,
       ...(json ? ["--json"] : [])];
     const result = await run(process.execPath, argv, { env, cwd: p.project })
       .then(output => ({ code: 0, ...output }), e => ({ code: e.code, stdout: e.stdout, stderr: e.stderr }));

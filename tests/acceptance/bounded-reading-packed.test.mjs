@@ -92,7 +92,7 @@ test("installed MCP discovery and public history offer exact reads without a wor
   const { packed, messages, snapshot } = await fixture(t);
   const client = connectMcp({ cwd: packed.project, dataHome: packed.dataHome,
     participant: "mcp-reader", binary: packed.mcpBin, env: { GIT_DIR: "", GIT_WORK_TREE: "" } });
-  t.after(() => client.close());
+  packed.defer(() => client.close());
   await client.request("initialize", { protocolVersion: "2025-11-25",
     capabilities: {}, clientInfo: { name: "bounded-read-fixture", version: "1.0.0" } });
   client.child.stdin.write(JSON.stringify({ jsonrpc: "2.0",

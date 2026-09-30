@@ -6,6 +6,7 @@ import test from "node:test";
 import { createPackedAcc, treeSnapshot } from "../helpers/packed-acc.mjs";
 import { createUpdateRegistry } from "../helpers/update-registry.mjs";
 import { writeLegacyShellActivation } from "../helpers/legacy-shell-bootstrap.mjs";
+import { POSIX_LIVE_TRANSPORT } from "../helpers/platform-scope.mjs";
 
 const ownership = f => readFile(path.join(f.dataHome, "acc", "installs.json"), "utf8").then(JSON.parse);
 const updateEnv = (f, registry) => ({ ...f.env, ACC_NO_UPDATE_CHECK: "0",
@@ -80,9 +81,10 @@ async function leaveChannelInstall(f) {
 
 // An update from 0.7.x must take the whole Channel path back even while the
 // inbox probe fails, keep the recorded consent, and let a later install on a
-// supporting client activate the inbox wake.
+// supporting client activate the inbox wake. Both ends are POSIX transports:
+// 0.7.x never installed on Windows, and the inbox wake there arrives in 0.9.x.
 test("packed update retires a 0.7.x Claude shim and Channel even when the inbox probe fails",
-  async t => {
+  { skip: POSIX_LIVE_TRANSPORT }, async t => {
     const f = await createPackedAcc(t);
     await writeFile(path.join(f.clientHome, ".zshrc"), "export USER_STUFF=1\n");
     await writeClaude(f, false);
