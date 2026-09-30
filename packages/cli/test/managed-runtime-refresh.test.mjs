@@ -13,6 +13,7 @@ import { outgoingStatus, prepareLivePermissions }
   from "../../adapter-codex/src/live-permissions.mjs";
 import { prepareRefresh } from "../src/managed-runtime/refresh.mjs";
 import { writeFakeClient } from "../../../tests/helpers/fake-client.mjs";
+import { POSIX_LIVE_TRANSPORT } from "../../../tests/helpers/platform-scope.mjs";
 
 test("automatic integration refresh retains recorded delivery provenance", async t => {
   const base = await realpath(await mkdtemp(path.join(tmpdir(), "acc-refresh-decision-")));
@@ -82,7 +83,7 @@ test("a background refresh leaves the version it wrote and the one it moved off"
 // written before the Claude Code inbox was one of its receivers - comes to allow
 // it. The ownership check has to read the old unit as ACC's, or the refresh
 // would leave it alone as "customized".
-test("a background refresh brings an older ACC's Codex grants up to date", async t => {
+test("a background refresh brings an older ACC's Codex grants up to date", { skip: POSIX_LIVE_TRANSPORT }, async t => {
   const base = await realpath(await mkdtemp(path.join(tmpdir(), "acc-refresh-grants-")));
   t.after(() => rm(base, { recursive: true, force: true }));
   const dataHome = path.join(base, "data");
