@@ -45,3 +45,12 @@ export function fakePath(directory) {
   return windows ? [directory, path.dirname(process.env.ComSpec ?? "C:\\Windows\\System32\\cmd.exe")]
     .join(path.delimiter) : [directory, "/usr/bin", "/bin"].join(path.delimiter);
 }
+
+/** What a stripped test environment still needs on Windows: node and cmd.exe
+ * resolve through these, and nothing on POSIX does. */
+export function platformEnv() {
+  if (!windows) return {};
+  const keep = ["SystemRoot", "SYSTEMROOT", "ComSpec", "PATHEXT", "TEMP", "TMP", "windir"];
+  return Object.fromEntries(keep.filter(name => process.env[name] !== undefined)
+    .map(name => [name, process.env[name]]));
+}
