@@ -60,10 +60,13 @@ import { diagnoseFilesystemStore, repairFilesystemStore }
  * reads one: a backslash escapes only a quote, a backslash, $ or a backtick,
  * which is all the shim escapes and all a path needs undone in JSON or TOML,
  * so an unescaped C:\Users\... in a shell script stays that path. A string
- * holding quotes is a command: its own quoted words are read as they stand,
- * then, when none names the runner, the string whole - a POSIX path may hold a
- * quote. An apostrophe, as in C:\Users\O'Neil, is part of a path. An unquoted
- * path is read to the whitespace before it.
+ * holding quotes is a command. A Windows path in it is cmd's, which has no
+ * escape character, so it is read as it stands and a UNC path keeps its leading
+ * \\; other words are read the shell's way, since Kimi's POSIX command escapes a
+ * quote in a path; then, when no word names the runner, the string is read
+ * whole, since a POSIX path may hold a quote.
+ * An apostrophe, as in C:\Users\O'Neil, is part of a path. An unquoted path is
+ * read to the whitespace before it.
  */
 const RUNNER = /[\\/]agents-can-communicate(?=[\\/]bin[\\/]acc-hook\.mjs)/;
 const absoluteRoot = value => {
@@ -73,8 +76,15 @@ const absoluteRoot = value => {
   return /^(?:[A-Za-z]:)?[\\/]/.test(root) ? root : null;
 };
 
+const quotedStrings = text => [...text.matchAll(/"((?:[^"\\]|\\[\s\S])*)"/g)]
+  .map(([, quoted]) => quoted.replace(/\\(["\\$`])/g, "$1"));
+
 const commandRoot = command => {
   for (const [, word] of command.matchAll(/"([^"]*)"/g)) {
+    const root = /^(?:[A-Za-z]:\\|\\\\)/.test(word) ? absoluteRoot(word) : null;
+    if (root !== null) return root;
+  }
+  for (const word of quotedStrings(command)) {
     const root = absoluteRoot(word);
     if (root !== null) return root;
   }
@@ -82,8 +92,7 @@ const commandRoot = command => {
 };
 
 export function runnerRoot(text) {
-  for (const [, quoted] of String(text).matchAll(/"((?:[^"\\]|\\[\s\S])*)"/g)) {
-    const value = quoted.replace(/\\(["\\$`])/g, "$1");
+  for (const value of quotedStrings(String(text))) {
     const root = value.includes("\"") ? commandRoot(value) : absoluteRoot(value);
     if (root !== null) return root;
   }

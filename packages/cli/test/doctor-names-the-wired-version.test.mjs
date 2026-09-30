@@ -162,3 +162,20 @@ test("the runner's package is read from a shell script the way the shell reads i
   const posix = "/Users/a$b`c\"d/lib/node_modules/agents-can-communicate";
   assert.equal(runnerRoot(`ACC_RUNNER="${posix.replace(/(["\\$`])/g, "\\$1")}/bin/acc-hook.mjs"`), posix);
 });
+
+// Kimi's command quotes each path inside the TOML string, so on POSIX a quote in
+// the runner's path is escaped twice: once for the command, once for TOML.
+test("the runner's package is read from the Kimi config its installer writes", async () => {
+  const { runnerRoot } = await import("../src/doctor-command.mjs");
+  const { renderBlock } = await import("../../adapter-kimi/src/install.mjs");
+  const posix = "/tmp/a\"b/lib/node_modules/agents-can-communicate";
+  assert.equal(runnerRoot(renderBlock(`${posix}/bin/acc-hook.mjs`, "/usr/bin/node", "linux")), posix);
+  const windows = "C:\\Users\\O'Neil Ann\\AppData\\Roaming\\npm\\node_modules\\agents-can-communicate";
+  assert.equal(runnerRoot(renderBlock(`${windows}\\bin\\acc-hook.mjs`,
+    "C:\\Program Files\\nodejs\\node.exe", "win32")), windows);
+  // cmd has no escape character: a redirected profile's UNC path keeps both of
+  // its leading backslashes.
+  const unc = "\\\\fileserver\\users\\ann\\AppData\\Roaming\\npm\\node_modules\\agents-can-communicate";
+  assert.equal(runnerRoot(renderBlock(`${unc}\\bin\\acc-hook.mjs`,
+    "C:\\Program Files\\nodejs\\node.exe", "win32")), unc);
+});
