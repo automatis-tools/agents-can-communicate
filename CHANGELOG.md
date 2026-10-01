@@ -34,6 +34,9 @@ Work in progress for #234. The design is in
   without `.exe`. Measured on windows-latest, the walk took 145 ms against PowerShell's 580.
 - On Windows a client binary is found through `PATHEXT`, a `.cmd` shim runs through `cmd.exe`,
   updates run npm's own `npm-cli.js`, and background workers open no console window.
+- A hook that runs out of its budget names the step that held it: "acc: coordination unavailable
+  (timed out while reading the process table); hook continued without context". The step is
+  one of a fixed set of phrases the runner itself sets; nothing from the hook's input is written.
 - Live delivery reaches an idle Claude Code session on Windows. Measured with Claude Code 2.1.286:
   the inbox is a named pipe, `\\.\pipe\LOCAL\cc-msg-<32 hex>`, that drops a frame without an
   auth line, so ACC authenticates with the peer key Claude Code publishes beside the session
