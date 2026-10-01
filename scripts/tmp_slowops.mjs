@@ -5,6 +5,7 @@
 import childProcess from "node:child_process";
 import fs from "node:fs";
 import { syncBuiltinESMExports } from "node:module";
+import { promisify } from "node:util";
 
 const LOG = process.env.TMP_SLOWOPS_LOG;
 const LIMIT = Number(process.env.TMP_SLOWOPS_MS ?? 250);
@@ -51,12 +52,25 @@ for (const name of ["sync", "datasync", "close", "read", "write", "readFile", "w
 }
 for (const name of ["spawn", "execFile"]) {
   const original = childProcess[name];
-  childProcess[name] = function (file, args, ...rest) {
+  const describe = (file, args) => `${file} ${Array.isArray(args) ? args.slice(0, 5).join(" ") : ""}`;
+  const wrapper = function (file, args, ...rest) {
     const started = performance.now();
     const child = original.call(this, file, args, ...rest);
-    const command = `${file} ${Array.isArray(args) ? args.slice(0, 5).join(" ") : ""}`;
-    child?.once?.("exit", () => record(performance.now() - started, `child.${name}`, command));
+    child?.once?.("exit", () => record(performance.now() - started, `child.${name}`, describe(file, args)));
     return child;
   };
+  // promisify(execFile) resolves {stdout, stderr} and carries .child through
+  // this symbol; a wrapper without it breaks every caller that uses it.
+  const custom = original[promisify.custom];
+  if (typeof custom === "function") {
+    wrapper[promisify.custom] = function (file, args, ...rest) {
+      const started = performance.now();
+      const pending = custom.call(this, file, args, ...rest);
+      pending?.child?.once?.("exit", () => record(performance.now() - started, `child.${name}`,
+        describe(file, args)));
+      return pending;
+    };
+  }
+  childProcess[name] = wrapper;
 }
 syncBuiltinESMExports();

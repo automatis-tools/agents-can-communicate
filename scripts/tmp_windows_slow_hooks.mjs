@@ -20,7 +20,11 @@ const run = file => new Promise(resolve => {
   let out = "";
   child.stdout.on("data", data => { out += data; });
   child.stderr.on("data", data => { out += data; });
-  child.on("exit", code => resolve({ file, code, ms: Math.round(performance.now() - started), out }));
+  // A file that does not finish in six minutes is stopped and reported, so the
+  // summary is always printed.
+  const timer = setTimeout(() => child.kill(), 360_000);
+  child.on("exit", code => { clearTimeout(timer);
+    resolve({ file, code, ms: Math.round(performance.now() - started), out }); });
 });
 let failures = 0;
 for (let round = 0; round < ROUNDS; round += 1) {
