@@ -167,8 +167,11 @@ export async function sweepIfDue(paths,
     if (result.remaining || expired(deadlineAt)) {
       return { swept: result.swept, remaining: true };
     }
+    // Without a flush: sweptAt reads a damaged or missing marker as a pass
+    // that is due, so a crash costs one more sweep.
     await publishAtomic(markerPath(paths), encode({ sweptAt: clock.now() }),
-      { root, tmpDir: paths.tmp, stageDir: paths.stage, replace: true, deadlineAt });
+      { root, tmpDir: paths.tmp, stageDir: paths.stage, replace: true, durability: "none",
+        deadlineAt });
     return result;
   });
 }

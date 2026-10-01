@@ -81,6 +81,16 @@ runtime, because launcher modules may import only their siblings.
   rename as metadata, and flushing a file on NTFS commits that journal up to the file's last
   change, which includes the rename. A power cut cannot be reproduced in CI, so this rests on
   documented NTFS behaviour, not on a measurement.
+- **What is flushed.** A flush waits for the whole disk. On `windows-latest` beside the full suite
+  one took 15 ms at the median and up to 5.8 s with the CPU idle, and the two hooks of about 1,120
+  that ran past their budget spent 72-78% of it flushing (2026-10-01). A publication therefore
+  states what a crash may cost it: `full` (the default) flushes the bytes and the name; `bytes`
+  flushes the bytes and leaves the name, so a reader finds the previous version and never a
+  torn one; `none` flushes nothing. Ephemeral records are `bytes`, because a crash ends the
+  session they describe. The sweep's marker is `none`, because its reader treats damage as a
+  pass that is due. The retained copy of an accepted write is never flushed, because it is never
+  read. The writer lock flushes nothing: it guards live processes, and an owner record a crash
+  left unreadable is reclaimed once it is older than a minute, as a dead owner is.
 - **Replacing a file.** `rename` over an existing file retries `EPERM`, `EACCES` and `EBUSY` with a
   short backoff until the caller's deadline. The cause is measured: any open handle on the target
   refuses the rename, whether it belongs to an ACC reader, an antivirus scan or an indexer. A read

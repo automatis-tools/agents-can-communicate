@@ -25,7 +25,7 @@ test("atomic publication checks its deadline after preparing bytes", async t => 
     }
     if (!url.endsWith("/atomic-json.mjs?deadline-proof")) return result;
     const source = Buffer.from(result.source).toString();
-    const needle = "    await handle.writeFile(bytes);\n    await handle.sync();";
+    const needle = "    await handle.writeFile(bytes);\n    if (durability !== \"none\") await handle.sync();";
     assert.equal(source.split(needle).length, 2);
     return { ...result, source: source.replace(needle,
       `${needle}\n    await globalThis.accAtomicDeadlinePause();`) };
