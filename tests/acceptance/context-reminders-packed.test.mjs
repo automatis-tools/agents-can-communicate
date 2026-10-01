@@ -5,6 +5,8 @@ import test from "node:test";
 import { pathToFileURL } from "node:url";
 
 import { createPackedAcc } from "../helpers/packed-acc.mjs";
+import { publishBacklogFixture } from "../helpers/backlog-fixture.mjs";
+import { createMemoryStore } from "../helpers/memory-store.mjs";
 
 // A real installed hook process with a version-only client shim. This checks
 // projection and receipts, not whether a native model notices the reminder.
@@ -28,7 +30,8 @@ test(`an installed hook preserves a prior backlog with client ${clientVersion}`,
     workspaceRoots: descriptor.roots });
   const store = await openFilesystemStore({ root: paths.root, clock, ids,
     workspaceId: descriptor.id });
-  const service = createCoordinationService({ store, clock, ids });
+  const memory = createMemoryStore({ clock, ids, workspaceId: descriptor.id });
+  const service = createCoordinationService({ store: memory, clock, ids });
   const open = participantId => service.openSession({ participantId, harness: "cli",
     heartbeatCadenceMs: 30_000, descriptor, workspaceId: descriptor.id });
   const owner = session => ({ sessionId: session.sessionId, generation: session.generation });
@@ -49,6 +52,7 @@ test(`an installed hook preserves a prior backlog with client ${clientVersion}`,
   }
   await service.closeSession(owner(reader));
   await service.closeSession(owner(sender));
+  await publishBacklogFixture({ memory, store, workspaceId: descriptor.id });
   await packed.start({ adapterId: "claude_code", participantId: "reader",
     harnessSessionId: "native-reader" });
   const freshSender = await packed.acc(["attach", "--participant", "sender"]);
