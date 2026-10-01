@@ -1,13 +1,13 @@
 import { createHash } from "node:crypto";
 import { execFile } from "node:child_process";
 import { constants } from "node:fs";
-import { lstat, mkdir, open, rm } from "node:fs/promises";
+import { lstat, mkdir, open, readdir, rm } from "node:fs/promises";
 import net from "node:net";
 import path from "node:path";
 
-import { decisionBody, readProcessArgs } from "@agents-can-communicate/adapter-sdk";
+import { decisionBody, isWindowsPlatform, readProcessArgs } from "@agents-can-communicate/adapter-sdk";
 
-import { PROTOCOL_CONTRACT, RELAY_MODES, listRegistrations, readRegistration, relayDir }
+import { PROTOCOL_CONTRACT, RELAY_MODES, listRegistrations, readRegistration, relayDir, relayPipeName }
   from "./relay-endpoint.mjs";
 
 /**
@@ -29,7 +29,17 @@ export function isPrintMode(argv) {
     || arg.startsWith("-p="));
 }
 
-export async function isSocketSafe(socketPath) {
+const listPipesOfMachine = () => readdir("\\\\.\\pipe\\");
+
+/** A relay socket only this user can open; on Windows a relay pipe the machine lists. */
+export async function isSocketSafe(socketPath, { platform = process.platform,
+  listPipes = listPipesOfMachine } = {}) {
+  if (isWindowsPlatform(platform)) {
+    const name = relayPipeName(socketPath);
+    if (name === null) return false;
+    const pipes = await Promise.resolve().then(listPipes).catch(() => []);
+    return pipes.some(pipe => String(pipe).toLowerCase() === name);
+  }
   try {
     const info = await lstat(socketPath);
     return info.isSocket() && (typeof process.getuid !== "function" || info.uid === process.getuid())
