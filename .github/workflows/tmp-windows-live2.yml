@@ -1,40 +1,40 @@
 name: tmp windows live 2
 
-# Measurement only, on a throwaway branch: the live Claude Code check on
-# Windows, and where a hook's time goes when the hook-heavy tests run together.
+# Measurement only, on a throwaway branch: the whole suite as CI runs it on
+# Windows, with every hook's phases and every file flush timed.
 on:
   push:
     branches: ['measure/windows-live2']
 
 jobs:
-  claude-live:
+  suite-cost:
     runs-on: windows-latest
-    timeout-minutes: 20
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: '24'
       - run: npm ci
-      - run: npm install --global @anthropic-ai/claude-code
-      - run: python -m pip install --quiet pywinpty
-      - name: live delivery wakes an idle interactive Claude Code session
-        timeout-minutes: 10
-        run: node --test --test-reporter=tap tests/acceptance/real-claude-live-stub.test.mjs
+      - name: the whole suite, timed
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          $env:NODE_OPTIONS = "--import=file:///$((Resolve-Path scripts/tmp_hookcost.mjs).Path -replace '\\','/')"
+          $env:TMP_HOOKCOST_LOG = "$PWD\hookcost.log"
+          npm test 2>&1 | Select-String -Pattern "^ℹ |✖|failed open|coordination unavailable" | Select-Object -First 80
         env:
-          ACC_REAL_CLIENTS: '1'
+          ACC_TEST_TIMEOUT_MS: '300000'
+          ACC_TEST_FORCE_EXIT: '1'
           GIT_DIR: ''
           GIT_WORK_TREE: ''
-
-  hook-phases:
-    runs-on: windows-latest
-    timeout-minutes: 40
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+      - name: where hook time went
+        if: always()
+        run: node scripts/tmp_hookcost_summary.mjs hookcost.log
+      - name: the log
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          node-version: '24'
-      - run: npm ci
-      - name: hook-heavy tests beside a packed test, every hook timed
-        timeout-minutes: 30
-        run: node scripts/tmp_windows_hook_phases.mjs 3
+          name: hookcost
+          path: hookcost.log
+          if-no-files-found: ignore

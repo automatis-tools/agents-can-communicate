@@ -730,7 +730,8 @@ export async function runHook({ adapterId, payload, adapters, dataHome, env,
     commitOffers: async () => {} };
   // Where the hook is, so a budget that runs out can say which step held it.
   const trail = { phase: "reading the hook event" };
-  const mark = phase => { trail.phase = phase; };
+  (globalThis.__accPhaseTimes ??= []).push(["reading the hook event", performance.now()]);
+  const mark = phase => { trail.phase = phase; globalThis.__accPhaseTimes.push([phase, performance.now()]); };
   const execute = async () => {
     assertHookBudget(deadline);
     const adapter = adapters?.[adapterId];
