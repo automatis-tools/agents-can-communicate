@@ -51,13 +51,15 @@ for (const name of listing.filter(file => /\.pid$|\.lock$|\.sock$|settings\.json
     say("  content:", JSON.stringify(await readFile(full, "utf8")));
   }
 }
-const pidFile = listing.find(name => /app-server\.pid$/.test(name));
+const pidFile = listing.find(name => /(^|[\\/])daemon\.pid$/.test(name));
 if (pidFile) {
   const pid = /\d+/.exec(await readFile(path.join(codexHome, pidFile), "utf8"))?.[0];
   try {
     say("WMI of the daemon pid:", execFileSync("powershell.exe", ["-NoProfile", "-Command",
       `Get-CimInstance Win32_Process -Filter "ProcessId=${pid}" | ForEach-Object { `
-      + "\"$($_.CreationDate.ToFileTimeUtc()) | $($_.CommandLine)\" }"]).toString().trim());
+      + "\"$($_.CreationDate.ToFileTimeUtc()) | $($_.ParentProcessId) | $($_.ExecutablePath) | $($_.CommandLine)\" }"])
+      .toString().trim());
+    say("WMI of the proxy's parent chain is read below; daemon command line above.");
   } catch (error) {
     say("WMI failed:", error.message);
   }
