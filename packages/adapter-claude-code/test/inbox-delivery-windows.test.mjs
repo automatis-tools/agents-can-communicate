@@ -36,7 +36,7 @@ async function machine(t, { pipe = `\\\\.\\pipe\\LOCAL\\cc-msg-${randomBytes(16)
   }
   const listed = pipe.replace(/^\\\\\.\\pipe\\/, "");
   return { root, configDir, runtimeDir, pipe,
-    system: { platform: "win32", listPipes: async () => [listed] },
+    system: { platform: "win32", listPipes: async () => [listed], profileDir: root },
     env: { CLAUDE_CODE_MESSAGING_SOCKET: pipe, CLAUDE_CONFIG_DIR: configDir,
       CLAUDE_CODE_MESSAGING_TOKEN: CHILD_TOKEN } };
 }
@@ -145,4 +145,17 @@ test("windows: the probe reads the executable an npm shim runs", async () => {
   assert.equal((await probe({ realExecutable: "C:\\Users\\Ann\\.local\\bin\\claude.exe" })).supported, true);
   assert.deepEqual(scanned, ["C:\\Users\\Ann\\.local\\bin\\claude.exe"]);
   assert.equal((await probe({ readVersion: async () => "2.1.281" })).reasonCode, "below_minimum_version");
+});
+
+// On Windows the profile's ACL keeps Claude's session files to their user, so
+// a configuration directory outside the profile - CLAUDE_CONFIG_DIR on a shared
+// drive - is not trusted for a peer key; its messages wait for the next turn.
+test("windows: a Claude configuration outside the user's profile is not bound", async t => {
+  const place = await machine(t);
+  const elsewhere = await mkdtemp(path.join(tmpdir(), "acc-profile-"));
+  t.after(() => rm(elsewhere, { recursive: true, force: true }));
+  const refused = await bind(place, { profileDir: elsewhere });
+  assert.equal(refused.supported, false);
+  assert.equal(refused.reasonCode, "native_endpoint_unavailable");
+  assert.equal((await bind(place)).supported, true);
 });

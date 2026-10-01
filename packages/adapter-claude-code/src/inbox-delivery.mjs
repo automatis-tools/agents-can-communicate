@@ -138,7 +138,8 @@ const handshake = (endpoint, now) => ({ supported: true, clientVersion: endpoint
  */
 export async function bindNativeSession({ event, clientPid, clientVersion, runtimeDir,
   env = process.env, now = Date.now, managedSettingsPath = MANAGED_SETTINGS[process.platform],
-  readClientArgs = readProcessArgs, platform = process.platform, listPipes = listPipesOfMachine } = {}) {
+  readClientArgs = readProcessArgs, platform = process.platform, listPipes = listPipesOfMachine,
+  profileDir } = {}) {
   if (!Number.isInteger(clientPid) || clientPid <= 0) return closed(clientVersion, "client_process_unknown");
   if (typeof event?.sessionId !== "string" || event.sessionId === "") {
     return closed(clientVersion, "handshake_failed");
@@ -155,7 +156,7 @@ export async function bindNativeSession({ event, clientPid, clientVersion, runti
   await sweepDeadEndpoints({ runtimeDir, platform });
   const configDir = claudeConfigDir(env);
   const refused = await verifyInbox({ configDir, clientPid, sessionId: event.sessionId, socketPath,
-    anyConversation: true, platform, listPipes });
+    anyConversation: true, platform, listPipes, ...(profileDir === undefined ? {} : { profileDir }) });
   if (refused !== null) return closed(clientVersion, refused);
   // Project settings sit where the session was started, which the registry
   // records; the hook's cwd follows the shell.
@@ -192,8 +193,9 @@ async function verifiedEndpoint(binding, runtimeDir, system) {
 // The router calls this when a lease ran out, so a session that sits idle
 // between turns stays reachable. The id never changes on a refresh.
 export async function refreshNativeSession({ binding, runtimeDir, now = Date.now,
-  platform = process.platform, listPipes = listPipesOfMachine } = {}) {
-  const endpoint = await verifiedEndpoint(binding, runtimeDir, { platform, listPipes });
+  platform = process.platform, listPipes = listPipesOfMachine, profileDir } = {}) {
+  const endpoint = await verifiedEndpoint(binding, runtimeDir, { platform, listPipes,
+    ...(profileDir === undefined ? {} : { profileDir }) });
   return endpoint === null ? closed(binding?.clientVersion, "handshake_failed") : handshake(endpoint, now);
 }
 
@@ -207,13 +209,15 @@ export const retireNativeSession = ({ binding, runtimeDir, platform = process.pl
  * receiver's own hook.
  */
 export async function offerMessage({ binding, message, runtimeDir, timeoutMs = 2_000,
-  connect = net.createConnection, platform = process.platform, listPipes = listPipesOfMachine } = {}) {
+  connect = net.createConnection, platform = process.platform, listPipes = listPipesOfMachine,
+  profileDir } = {}) {
   const rejected = safeErrorCode => ({ accepted: false, transport: TRANSPORT,
     clientVersion: binding?.clientVersion ?? null, safeErrorCode });
   if (typeof message?.messageId !== "string" || !MESSAGE_ID.test(message.messageId)) {
     return rejected("transport_rejected");
   }
-  const endpoint = await verifiedEndpoint(binding, runtimeDir, { platform, listPipes });
+  const endpoint = await verifiedEndpoint(binding, runtimeDir, { platform, listPipes,
+    ...(profileDir === undefined ? {} : { profileDir }) });
   if (endpoint === null) return rejected("recipient_unavailable");
   // Read per offer and kept nowhere: the key of the process the record names now.
   const peerToken = isWindowsPlatform(platform) ? await readPeerKey({ configDir: endpoint.configDir,

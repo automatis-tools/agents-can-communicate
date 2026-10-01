@@ -25,6 +25,13 @@ export const claudeConfigDir = env => typeof env?.CLAUDE_CONFIG_DIR === "string"
   && path.isAbsolute(env.CLAUDE_CONFIG_DIR)
   ? env.CLAUDE_CONFIG_DIR : path.join(os.homedir(), ".claude");
 
+/** Whether a directory lies inside the user's profile, compared as Windows compares paths. */
+export function insideProfile(directory, profileDir) {
+  if (typeof directory !== "string" || typeof profileDir !== "string") return false;
+  const relative = path.win32.relative(profileDir.toLowerCase(), directory.toLowerCase());
+  return relative !== "" && !relative.startsWith("..") && !path.win32.isAbsolute(relative);
+}
+
 /** Whether a value names a Claude Code inbox pipe. */
 export const isInboxPipe = value => typeof value === "string" && INBOX_PIPE.test(value);
 
@@ -92,7 +99,15 @@ export async function inboxSocketIsSafe(socketPath, { platform = process.platfor
  * socket are the proof; every offer and refresh still requires the session id.
  */
 export async function verifyInbox({ configDir, clientPid, sessionId, socketPath, anyConversation = false,
-  platform = process.platform, listPipes = listPipesOfMachine }) {
+  platform = process.platform, listPipes = listPipesOfMachine, profileDir = os.homedir() }) {
+  // The profile's ACL is what keeps the session files on Windows to their user,
+  // so a configuration directory outside it is not trusted for a peer key. Both
+  // are resolved first: TEMP and a hand-set CLAUDE_CONFIG_DIR may use 8.3 names.
+  if (isWindows(platform)) {
+    const [config, profile] = await Promise.all([configDir, profileDir]
+      .map(directory => realpath(directory).catch(() => null)));
+    if (!insideProfile(config, profile)) return "native_endpoint_unavailable";
+  }
   if (!await inboxSocketIsSafe(socketPath, { platform, listPipes })) return "native_endpoint_unavailable";
   const record = await readSessionRecord({ configDir, clientPid, platform });
   if (record === null || (!anyConversation && record.sessionId !== sessionId)) {

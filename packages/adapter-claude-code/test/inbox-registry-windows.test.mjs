@@ -17,7 +17,7 @@ const LISTED = "LOCAL\\cc-msg-6a0c9aff38e833fc0a2331be49fcad43";
 const PROC_START = "134352993201904476";
 const TOKEN = "0123456789abcdef0123456789abcdef";
 const keyName = (pid, pipe) => `${pid}.${createHash("sha256").update(pipe.toLowerCase()).digest("hex")}.key`;
-const win32 = { platform: "win32", listPipes: async () => [LISTED] };
+const win32 = { platform: "win32", listPipes: async () => [LISTED], profileDir: tmpdir() };
 
 async function config(t, { record = {}, key = {} } = {}) {
   const configDir = await mkdtemp(path.join(tmpdir(), "acc-claude-win-"));
@@ -64,10 +64,10 @@ test("windows: the record has to name the pipe the hook was given", async t => {
   assert.equal(await verifyInbox({ configDir, clientPid: 1524, sessionId: "another",
     socketPath: PIPE, ...win32 }), "native_session_unavailable");
   assert.equal(await verifyInbox({ configDir, clientPid: 1524, sessionId, socketPath: PIPE,
-    platform: "win32", listPipes: async () => [] }), "native_endpoint_unavailable");
+    ...win32, listPipes: async () => [] }), "native_endpoint_unavailable");
   const other = "\\\\.\\pipe\\LOCAL\\cc-msg-ffffffffffffffffffffffffffffffff";
   assert.equal(await verifyInbox({ configDir, clientPid: 1524, sessionId, socketPath: other,
-    platform: "win32", listPipes: async () => [LISTED, "LOCAL\\cc-msg-ffffffffffffffffffffffffffffffff"] }),
+    ...win32, listPipes: async () => [LISTED, "LOCAL\\cc-msg-ffffffffffffffffffffffffffffffff"] }),
   "native_session_unavailable");
 });
 
