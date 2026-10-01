@@ -172,6 +172,18 @@ for (const kind of ["EBADF", "EPERM", "deleted"]) {
   });
 }
 
+// A writer lock renamed aside and back without a pause (lock-changing-hands, PR
+// #242's Windows run): one read in about three thousand found its name present
+// while every answer was a deleted directory's place. That directory moved within
+// the store, and calling it an escape failed a read that its next look would
+// have made; it is refused as a directory that changed while it resolved.
+test("windows: a present name that answers only with a deleted directory has moved, not escaped", async t => {
+  const { root, paths } = await store(t);
+  const stuck = async current => (current === paths.stage ? DELETED_PATH : realpath(current));
+  await assert.rejects(assertManagedDirectory(root, paths.stage, { platform: "win32", realpath: stuck }),
+    error => /parent directory changed/.test(error.message) && !/escapes/.test(error.message));
+});
+
 test("linux: EBADF from realpath stays what it says", async t => {
   const { root, paths } = await store(t);
   const failing = async current => (current === paths.stage ? answer("EBADF", current) : realpath(current));

@@ -7,11 +7,12 @@ import { AccError, EXIT } from "@agents-can-communicate/protocol";
 // path is validated segment by segment against the canonical root, so a
 // symlinked ancestor cannot redirect a read or a publication - neither outside
 // the store, nor to another directory inside it.
-function invalidDirectory(message, directory, root, cause) {
+function invalidDirectory(message, directory, root, cause, resolved) {
   return new AccError(EXIT.DATA, message, {
     directory,
     root,
     ...(cause === undefined ? {} : { cause }),
+    ...(resolved === undefined ? {} : { resolved }),
   });
 }
 
@@ -122,7 +123,7 @@ async function inspectManagedDirectory(rootPath, directoryPath, create, options 
       // (ENOENT), so it is checked and created again, then resolved again; every
       // check below applies to whichever attempt settles.
       resolved = await resolveSegment(current, create && attempt < VANISHED_RETRIES,
-        { resolve, platform });
+        { resolve, platform, root });
       if (resolved !== null) break;
     }
     // realpath answers with the name the directory carries *now*, which is not
@@ -146,7 +147,8 @@ async function inspectManagedDirectory(rootPath, directoryPath, create, options 
     if (path.dirname(resolved) !== canonicalParent
       || (path.basename(resolved) !== segment
         && !await stillTheSameDirectory(details, resolved, current, root))) {
-      throw invalidDirectory("managed directory escapes the canonical store root", current, root);
+      throw invalidDirectory("managed directory escapes the canonical store root", current, root,
+        undefined, resolved);
     }
     canonicalParent = resolved;
   }
@@ -170,7 +172,7 @@ const LEAVING_RETRIES = 3;
 // again. A directory there is the answer, no directory there is gone, and a
 // name that keeps answering that way while present fails as it always did:
 // read as gone, a directory would read as holding no records.
-async function resolveSegment(current, retry, { resolve, platform }) {
+async function resolveSegment(current, retry, { resolve, platform, root }) {
   for (let attempt = 1; ; attempt += 1) {
     let resolved = null;
     let failure = null;
@@ -189,11 +191,15 @@ async function resolveSegment(current, retry, { resolve, platform }) {
     if (!leaving) throw failure;
     if (attempt < LEAVING_RETRIES) continue;
     const present = await lstat(current).then(() => true, missing => missing.code !== "ENOENT");
-    // Present: a deleted directory's place is refused by the containment check
-    // that follows, and an error stays what it says.
+    // Present: refused, never read as gone - its records would read as none. An
+    // error stays what it says. Only deleted directories' places, while the name
+    // stays, is a directory moving in and out of the name - the writer lock does
+    // so for a living - so it is refused as changed, which a reader takes as a
+    // reason to look again, and never as an escape: nothing left the store.
     if (present) {
       if (failure !== null) throw failure;
-      return resolved;
+      throw invalidDirectory("managed parent directory changed while it resolved", current, root,
+        undefined, resolved);
     }
     if (retry) return null;
     throw Object.assign(new Error(`ENOENT: ${current} left its name while it resolved`,
