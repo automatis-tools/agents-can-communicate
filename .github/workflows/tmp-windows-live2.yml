@@ -1,40 +1,31 @@
 name: tmp windows live 2
 
-# Measurement only, on a throwaway branch: the whole suite as CI runs it on
-# Windows, with every hook's phases and every file flush timed.
+# Measurement only, on a throwaway branch: every flush and rename of a first
+# session start, a second live session's start, a turn and a third start on
+# Windows - alone, and beside a packed test that flushes thousands of times.
 on:
   push:
     branches: ['measure/windows-live2']
 
 jobs:
-  suite-cost:
+  session-start-trace:
     runs-on: windows-latest
-    timeout-minutes: 60
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: '24'
       - run: npm ci
-      - name: the whole suite, timed
-        continue-on-error: true
+      - name: alone
+        run: |
+          node scripts/tmp_session_start_trace.mjs 5
+          node scripts/tmp_trace_summary.mjs fsync-trace.log
+      - name: beside a packed test
         shell: pwsh
         run: |
-          $env:NODE_OPTIONS = "--import=file:///$((Resolve-Path scripts/tmp_hookcost.mjs).Path -replace '\\','/')"
-          $env:TMP_HOOKCOST_LOG = "$PWD\hookcost.log"
-          npm test 2>&1 | Select-String -Pattern "^ℹ |✖|failed open|coordination unavailable" | Select-Object -First 80
-        env:
-          ACC_TEST_TIMEOUT_MS: '300000'
-          ACC_TEST_FORCE_EXIT: '1'
-          GIT_DIR: ''
-          GIT_WORK_TREE: ''
-      - name: where hook time went
-        if: always()
-        run: node scripts/tmp_hookcost_summary.mjs hookcost.log
-      - name: the log
-        if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: hookcost
-          path: hookcost.log
-          if-no-files-found: ignore
+          $packed = Start-Process -PassThru -NoNewWindow node -ArgumentList '--test','tests/acceptance/context-reminders-packed.test.mjs'
+          Start-Sleep -Seconds 20
+          node scripts/tmp_session_start_trace.mjs 5
+          node scripts/tmp_trace_summary.mjs fsync-trace.log
+          Stop-Process -Id $packed.Id -ErrorAction SilentlyContinue
