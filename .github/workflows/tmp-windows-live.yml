@@ -1,14 +1,14 @@
 name: tmp windows live
 
-# Measurement only, on a throwaway branch: what Claude Code's inbox pipe, the
-# Codex app-server daemon and a detached worker do on windows-latest, before
-# 0.9.x relies on any of it.
+# Measurement only, on a throwaway branch: the Codex app-server daemon on
+# windows-latest, started by a standard user since the runner's account is
+# elevated, and a queued message through `codex app-server proxy`.
 on:
   push:
     branches: ['measure/windows-live']
 
 jobs:
-  probe:
+  codex-user:
     runs-on: windows-latest
     timeout-minutes: 30
     steps:
@@ -17,38 +17,9 @@ jobs:
         with:
           node-version: '24'
       - run: npm ci
-      - name: Install the clients and a ConPTY binding
-        run: |
-          npm install --global @anthropic-ai/claude-code @openai/codex
-          python -m pip install --quiet pywinpty
-      - name: Versions
-        run: |
-          claude --version
-          codex --version
-          python --version
-      - name: detached worker
+      - run: npm install --global @openai/codex
+      - name: a standard user runs the Codex daemon and a queued message
         continue-on-error: true
-        timeout-minutes: 3
-        run: node scripts/tmp_windows_detached.mjs
-      - name: Claude Code inbox pipe
-        continue-on-error: true
-        timeout-minutes: 8
-        run: node scripts/tmp_windows_live_claude.mjs
-      - name: Codex app-server daemon and proxy
-        continue-on-error: true
-        timeout-minutes: 8
-        run: node scripts/tmp_windows_live_codex.mjs
-
-  slow-hooks:
-    runs-on: windows-latest
-    timeout-minutes: 40
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        with:
-          node-version: '24'
-      - run: npm ci
-      - name: three hook-heavy test files at once, slow operations logged
-        continue-on-error: true
-        timeout-minutes: 35
-        run: node scripts/tmp_windows_slow_hooks.mjs 6
+        timeout-minutes: 20
+        shell: pwsh
+        run: ./scripts/tmp_windows_codex_user.ps1
