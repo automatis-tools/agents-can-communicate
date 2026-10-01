@@ -73,3 +73,57 @@ test("windows: a relay listens on its pipe and answers its own nonce", {
   const refused = await askRelay(socketPath, { nonce: "e".repeat(64), ping: true }, 2_000);
   assert.notEqual(refused.accepted, true);
 });
+
+// The agent starts the relay from its own shell, which on Windows is no `sh`:
+// the command is node on a forward-slash path, read alike by PowerShell, cmd
+// and Git Bash, and the shim it names is a Node script.
+test("windows: the relay is started with node on its Node shim", async t => {
+  const { relayShimPath, relayStartCommand } = await import("../src/relays.mjs");
+  const home = "C:\\Users\\Ann";
+  assert.equal(relayShimPath(home, "win32"), path.win32.join(home, ".gemini", "config", "acc", "acc-relay.mjs"));
+  assert.equal(relayStartCommand(home, "win32"),
+    'node "C:/Users/Ann/.gemini/config/acc/acc-relay.mjs" start');
+  assert.equal(relayStartCommand("/home/ann", "linux"), 'sh "/home/ann/.gemini/config/acc/acc-relay.sh" start');
+});
+
+test("windows: the hint names the profile's relay shim, with no HOME set", async t => {
+  const { nativeActivationHint } = await import("../src/native-delivery.mjs");
+  const runtimeDir = await mkdtemp(path.join(tmpdir(), "acc-relay-hint-"));
+  t.after(() => rm(runtimeDir, { recursive: true, force: true }));
+  const hint = await nativeActivationHint({ event: { sessionId: "conversation-1" },
+    nativeBinding: { state: "degraded" }, runtimeDir, clientPid: 4242,
+    env: { USERPROFILE: "C:\\Users\\Ann" }, argvOf: async () => ["agy.exe"], isAlive: () => false,
+    platform: "win32" });
+  assert.match(hint?.line ?? "", /node "C:\/Users\/Ann\/\.gemini\/config\/acc\/acc-relay\.mjs" start/);
+});
+
+test("windows: the probe and the bind no longer refuse the platform", async () => {
+  const { bindNativeSession, probeNativeDelivery } = await import("../src/native-delivery.mjs");
+  const run = async (_command, args) => ({ stdout: args[0] === "--version" ? "agy 1.2.7"
+    : "Usage: agy agentapi send-message get-conversation-metadata" });
+  const probe = await probeNativeDelivery({ run, platform: "win32" });
+  assert.equal(probe.supported, true, probe.reasonCode);
+  const runtimeDir = await mkdtemp(path.join(tmpdir(), "acc-relay-bind-"));
+  const bound = await bindNativeSession({ event: { sessionId: "conversation-1" }, clientPid: 4242,
+    clientVersion: "1.2.7", runtimeDir, platform: "win32" });
+  await rm(runtimeDir, { recursive: true, force: true });
+  assert.equal(bound.reasonCode, "native_session_unavailable", "no relay is serving yet, which is all");
+});
+
+// The relay hands agy the rendered peer message as an argument, so agy has to
+// start without a shell: on Windows that is agy.exe itself, never a .cmd that
+// cmd.exe would read the message through.
+test("windows: the relay runs the agy.exe the agent's shell names", async t => {
+  const { agentApiCommand } = await import("../src/agentapi.mjs");
+  const { chmod: chmodFile, writeFile } = await import("node:fs/promises");
+  const dir = await mkdtemp(path.join(tmpdir(), "acc-agy-"));
+  t.after(() => rm(dir, { recursive: true, force: true }));
+  for (const name of ["agy.exe", "agy.cmd"]) {
+    await writeFile(path.join(dir, name), "");
+    await chmodFile(path.join(dir, name), 0o755);
+  }
+  assert.equal(agentApiCommand({ ANTIGRAVITY_AGENTAPI_EXE: path.join(dir, "agy.exe") }, { platform: "win32" }),
+    path.join(dir, "agy.exe"));
+  assert.equal(agentApiCommand({ ANTIGRAVITY_AGENTAPI_EXE: path.join(dir, "agy.cmd") }, { platform: "win32" }),
+    "agy");
+});

@@ -1,7 +1,8 @@
 import { readdir, rm } from "node:fs/promises";
 import path from "node:path";
 
-import { readProcessArgs } from "@agents-can-communicate/adapter-sdk";
+import { isWindowsPlatform, readProcessArgs, shellQuote, windowsHookCommand }
+  from "@agents-can-communicate/adapter-sdk";
 
 import { listRegistrations, relayDir, removeRegistration } from "./relay-endpoint.mjs";
 
@@ -19,7 +20,16 @@ const RELAY_LOG = /^antigravity_relay_[a-f0-9]{32}\.log$/;
 const defaultAlive = pid => { try { process.kill(pid, 0); return true; } catch { return false; } };
 const psArgv = async pid => await readProcessArgs(pid, { timeoutMs: 1_000 }) ?? [];
 
-export const relayShimPath = home => path.join(home, ".gemini", "config", "acc", "acc-relay.sh");
+// Windows runs no `sh`: there the shim is a Node script, started with node on a
+// forward-slash path that PowerShell, cmd and Git Bash read alike.
+export const relayShimPath = (home, platform = process.platform) => (isWindowsPlatform(platform)
+  ? path.win32.join(home, ".gemini", "config", "acc", "acc-relay.mjs")
+  : path.join(home, ".gemini", "config", "acc", "acc-relay.sh"));
+
+/** The command the agent runs once per conversation to start live delivery. */
+export const relayStartCommand = (home, platform = process.platform) => (isWindowsPlatform(platform)
+  ? windowsHookCommand("portable", { node: "node", shim: relayShimPath(home, platform), args: ["start"] })
+  : `sh ${shellQuote(relayShimPath(home, platform))} start`);
 
 async function workspaceDirs(dataHome, list = readdir) {
   if (typeof dataHome !== "string" || dataHome === "") return [];

@@ -7,13 +7,13 @@ import { promisify } from "node:util";
 
 import { bakeSkillCommand, blankJson, defaultAntigravityRelay, isShellWord, mergeEnv, ownVersion,
   removeIfEmpty, shellQuote, shortPath, stampPluginVersion, windowsHookCommand, writeCliShim,
-  writeForeignJson, writeHookShim }
+  writeForeignJson, writeHookShim, writeNodeShim }
   from "@agents-can-communicate/adapter-sdk";
 import { AccError, EXIT } from "@agents-can-communicate/protocol";
 
 import { agySettingsPath, cliWrapperPath, ensureAllowRule, inspectAllowRule,
   withdrawAllowRule } from "./allow-rule.mjs";
-import { relayShimPath, runningRelays, stopRelays } from "./relays.mjs";
+import { relayShimPath, relayStartCommand, runningRelays, stopRelays } from "./relays.mjs";
 
 const run = promisify(execFile);
 
@@ -322,8 +322,13 @@ const importedCopy = readback => (Array.isArray(readback?.skills) ? readback.ski
  * not something ACC could start on its behalf. It never falls back to `acc`
  * on the PATH the way the CLI shim does: `acc start` is not a command.
  */
-async function writeRelayShim({ home, relay = defaultAntigravityRelay(), node = process.execPath }) {
-  const target = relayShimPath(home);
+async function writeRelayShim({ home, relay = defaultAntigravityRelay(), node = process.execPath,
+  platform = process.platform }) {
+  if (platform === "win32") {
+    return writeNodeShim({ file: relayShimPath(home, platform), target: relay, node, goneExit: 0,
+      gone: "ACC: live delivery is not installed here; run acc install --adapter antigravity" });
+  }
+  const target = relayShimPath(home, platform);
   await mkdir(path.dirname(target), { recursive: true });
   await writeFile(target, [
     "#!/bin/sh",
@@ -349,7 +354,7 @@ async function installSkillPlugin(context) {
   const { home, cli, node, hostPlatform = process.platform } = context;
   const manifestExisted = await exists(vendorManifestPath(home));
   const cliShim = await writeCliShim({ dir: shimDir(home), cli, node, platform: hostPlatform });
-  await writeRelayShim({ home, relay: context.antigravityRelay, node });
+  await writeRelayShim({ home, relay: context.antigravityRelay, node, platform: hostPlatform });
   const stage = await mkdtemp(path.join(tmpdir(), "acc-antigravity-plugin-"));
   try {
     const plugin = path.join(stage, ACC_PLUGIN_NAME);
@@ -696,8 +701,8 @@ export async function doctorAntigravity(context) {
   if (locationOf(context) === "workspace") {
     diagnostics.push("registered per workspace; a session opened anywhere else loads nothing");
   }
-  diagnostics.push(`live delivery starts when the agent runs sh "${relayShimPath(context.home)}" `
-    + "start once in a conversation; while none is serving, ACC asks for that in its context "
+  diagnostics.push(`live delivery starts when the agent runs ${relayStartCommand(context.home,
+    context.hostPlatform)} once in a conversation; while none is serving, ACC asks for that in its context `
     + "line, up to three times, when the policy is on");
   diagnostics.push(`antigravity relays running on this machine: ${await runningRelays({
     dataHome: context.dataHome })}`);

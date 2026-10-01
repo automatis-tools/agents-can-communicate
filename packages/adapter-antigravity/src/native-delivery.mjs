@@ -1,12 +1,13 @@
 import { createHash } from "node:crypto";
-import { execFile } from "node:child_process";
 import { constants } from "node:fs";
 import { lstat, mkdir, open, readdir, rm } from "node:fs/promises";
 import net from "node:net";
 import path from "node:path";
 
-import { decisionBody, isWindowsPlatform, readProcessArgs } from "@agents-can-communicate/adapter-sdk";
+import { decisionBody, isWindowsPlatform, readProcessArgs, resolveExecutable, runExecutable }
+  from "@agents-can-communicate/adapter-sdk";
 
+import { relayStartCommand } from "./relays.mjs";
 import { PROTOCOL_CONTRACT, RELAY_MODES, listRegistrations, readRegistration, relayDir, relayPipeName }
   from "./relay-endpoint.mjs";
 
@@ -18,10 +19,13 @@ import { PROTOCOL_CONTRACT, RELAY_MODES, listRegistrations, readRegistration, re
  */
 const TRANSPORT = "antigravity-relay";
 const defaultAlive = pid => { try { process.kill(pid, 0); return true; } catch { return false; } };
-const runDefault = (command, args, { timeout }) => new Promise(resolve => {
-  execFile(command, args, { timeout, windowsHide: true },
-    (_error, stdout, stderr) => resolve({ stdout: `${stdout ?? ""}${stderr ?? ""}` }));
-});
+// agy is found the way the platform finds it, and a .cmd starts through cmd.exe.
+const runDefault = async (command, args, { timeout }) => {
+  const file = await resolveExecutable(command) ?? command;
+  return runExecutable(file, args, { timeout }).then(
+    ({ stdout, stderr }) => ({ stdout: `${stdout ?? ""}${stderr ?? ""}` }),
+    error => ({ stdout: `${error?.stdout ?? ""}${error?.stderr ?? ""}` }));
+};
 const argvDefault = async pid => await readProcessArgs(pid, { timeoutMs: 1_000 }) ?? [];
 
 export function isPrintMode(argv) {
@@ -72,12 +76,12 @@ const closedHandshake = (clientVersion, reasonCode) => ({ supported: false,
   clientVersion: clientVersion ?? null, protocolContract: PROTOCOL_CONTRACT, modes: [],
   opaqueEndpointRef: null, leaseUntil: null, reasonCode });
 
-async function serving(record, { timeoutMs, isAlive, clientPid }) {
+async function serving(record, { timeoutMs, isAlive, clientPid, platform = process.platform }) {
   if (record === null || record.protocolContract !== PROTOCOL_CONTRACT) return "native_session_unavailable";
   if (clientPid !== undefined && record.agyPid !== clientPid) return "native_session_unavailable";
   if (!isAlive(record.agyPid) || !isAlive(record.relayPid)) return "native_session_unavailable";
   if (Date.parse(record.leaseUntil) <= Date.now()) return "native_session_unavailable";
-  if (!await isSocketSafe(record.socketPath)) return "native_session_unavailable";
+  if (!await isSocketSafe(record.socketPath, { platform })) return "native_session_unavailable";
   try {
     const pong = await askRelay(record.socketPath, { nonce: record.nonce, ping: true }, timeoutMs);
     return pong?.accepted === true && pong.ping === true ? null : "handshake_failed";
@@ -94,9 +98,6 @@ export async function probeNativeDelivery({ timeoutMs = 750, run = runDefault,
   platform = process.platform } = {}) {
   const unsupported = (reasonCode, clientVersion = null) => ({ supported: false, clientVersion,
     protocolContract: PROTOCOL_CONTRACT, executableFingerprint: null, modes: [], reasonCode });
-  // The relay listens on a Unix socket, which Windows refuses. Its named-pipe
-  // transport is not built yet.
-  if (platform === "win32") return unsupported("native_delivery_unsupported");
   try {
     const version = /(\d+\.\d+\.\d+)/.exec((await run("agy", ["--version"],
       { timeout: timeoutMs })).stdout)?.[1] ?? null;
@@ -117,12 +118,11 @@ export function planNativeActivation() {
 
 export async function bindNativeSession({ event, clientPid, clientVersion, runtimeDir,
   timeoutMs = 750, isAlive = defaultAlive, platform = process.platform } = {}) {
-  if (platform === "win32") return closedHandshake(clientVersion, "native_delivery_unsupported");
   if (!Number.isInteger(clientPid) || clientPid <= 0) return closedHandshake(clientVersion, "client_process_unknown");
-  const candidates = (await listRegistrations({ runtimeDir }))
+  const candidates = (await listRegistrations({ runtimeDir, platform }))
     .filter(record => record.conversationId === event?.sessionId);
   for (const record of candidates) {
-    if (await serving(record, { timeoutMs, isAlive, clientPid }) === null) return handshake(record);
+    if (await serving(record, { timeoutMs, isAlive, clientPid, platform }) === null) return handshake(record);
   }
   return closedHandshake(clientVersion, "native_session_unavailable");
 }
@@ -160,9 +160,8 @@ export async function offerMessage({ binding, message, runtimeDir, timeoutMs = 8
 }
 
 const ASK_LIMIT = 3;
-const HINT = home => "ACC: live delivery is on but not running in this conversation. To let "
-  + `peers reach you while idle, run once: sh "${path.join(home, ".gemini", "config", "acc",
-    "acc-relay.sh")}" start`;
+const HINT = (home, platform) => "ACC: live delivery is on but not running in this conversation. "
+  + `To let peers reach you while idle, run once: ${relayStartCommand(home, platform)}`;
 
 // Each ask is its own file, created exclusively. A counter read and then
 // rewritten lets overlapping calls all observe the same count and each return
@@ -205,13 +204,14 @@ async function relayAlreadyServing({ runtimeDir, conversationId, clientPid, isAl
 }
 
 export async function nativeActivationHint({ event, nativeBinding, runtimeDir, clientPid, env,
-  argvOf = argvDefault, isAlive = defaultAlive }) {
+  argvOf = argvDefault, isAlive = defaultAlive, platform = process.platform }) {
   // Only a degraded binding can be helped by starting a relay: "off" means the
   // live policy is off, "unsupported" that the contract does not admit this
   // client, and "active" that a relay already serves it. Those calls spend
   // none of the asks recorded below.
   if (nativeBinding?.state !== "degraded") return null;
-  const home = env?.HOME;
+  // Windows keeps the profile in USERPROFILE; HOME is set only by Git Bash.
+  const home = isWindowsPlatform(platform) ? env?.USERPROFILE ?? env?.HOME : env?.HOME;
   if (typeof event?.sessionId !== "string" || typeof home !== "string" || home === "") return null;
   if (!Number.isInteger(clientPid) || isPrintMode(await argvOf(clientPid).catch(() => []))) return null;
   // The runner asks only when its own handshake failed. A relay can still be
@@ -226,5 +226,14 @@ export async function nativeActivationHint({ event, nativeBinding, runtimeDir, c
   // the number now; release gives it back when the runner does not deliver.
   const slot = await claimAsk(asked, marker);
   if (slot === null) return null;
-  return { line: HINT(home), release: () => releaseAsk(slot) };
+  let line;
+  try {
+    line = HINT(home, platform);
+  } catch {
+    // A profile path no shell reads alike gets no command to run; the message
+    // still arrives on the next turn.
+    await releaseAsk(slot);
+    return null;
+  }
+  return { line, release: () => releaseAsk(slot) };
 }

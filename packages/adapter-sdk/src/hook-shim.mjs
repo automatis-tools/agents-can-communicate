@@ -249,6 +249,17 @@ export async function writeCliShim({ dir, cli = defaultCli(), node = process.exe
 }
 
 /**
+ * A Node shim at `file` that runs `target` with the pinned node, for an entry
+ * point a Windows shell starts as `node "<file>"`. `gone` is what it prints when
+ * neither is there any more, and `goneExit` the exit code it leaves.
+ */
+export async function writeNodeShim({ file, target, node = process.execPath, gone, goneExit = 0 }) {
+  await mkdir(path.dirname(file), { recursive: true });
+  await writeFile(file, nodeShim({ node, target, lead: [], gone, goneExit }));
+  return file;
+}
+
+/**
  * Remove a directory this adapter installed, unless it has been kept back.
  *
  * The installer decides what may be deleted by comparing what is on disk
