@@ -13,7 +13,7 @@ import { AccError, EXIT } from "@agents-can-communicate/protocol";
 
 import { agySettingsPath, cliWrapperPath, ensureAllowRule, inspectAllowRule,
   withdrawAllowRule } from "./allow-rule.mjs";
-import { relayShimPath, relayStartCommand, runningRelays, stopRelays } from "./relays.mjs";
+import { relayShimName, relayStartCommand, runningRelays, stopRelays } from "./relays.mjs";
 
 const run = promisify(execFile);
 
@@ -324,11 +324,11 @@ const importedCopy = readback => (Array.isArray(readback?.skills) ? readback.ski
  */
 async function writeRelayShim({ home, relay = defaultAntigravityRelay(), node = process.execPath,
   platform = process.platform }) {
+  const target = path.join(shimDir(home), relayShimName(platform));
   if (platform === "win32") {
-    return writeNodeShim({ file: relayShimPath(home, platform), target: relay, node, goneExit: 0,
+    return writeNodeShim({ file: target, target: relay, node, goneExit: 0,
       gone: "ACC: live delivery is not installed here; run acc install --adapter antigravity" });
   }
-  const target = relayShimPath(home, platform);
   await mkdir(path.dirname(target), { recursive: true });
   await writeFile(target, [
     "#!/bin/sh",
