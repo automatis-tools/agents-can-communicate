@@ -1,31 +1,60 @@
 name: tmp windows live 2
 
-# Measurement only, on a throwaway branch: every flush and rename of a first
-# session start, a second live session's start, a turn and a third start on
-# Windows - alone, and beside a packed test that flushes thousands of times.
+# Measurement only, on a throwaway branch: the whole suite as CI runs it on
+# Windows, three times at once on three runners, to catch a hook that runs past
+# its budget and see what it - and the machine - was doing at that moment.
 on:
   push:
     branches: ['measure/windows-live2']
 
 jobs:
-  session-start-trace:
+  suite-tail:
     runs-on: windows-latest
-    timeout-minutes: 30
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        run: [1, 2, 3]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: '24'
       - run: npm ci
-      - name: alone
-        run: |
-          node scripts/tmp_session_start_trace.mjs 5
-          node scripts/tmp_trace_summary.mjs fsync-trace.log
-      - name: beside a packed test
+      - name: the machine
+        continue-on-error: true
         shell: pwsh
         run: |
-          $packed = Start-Process -PassThru -NoNewWindow node -ArgumentList '--test','tests/acceptance/context-reminders-packed.test.mjs'
-          Start-Sleep -Seconds 20
-          node scripts/tmp_session_start_trace.mjs 5
-          node scripts/tmp_trace_summary.mjs fsync-trace.log
-          Stop-Process -Id $packed.Id -ErrorAction SilentlyContinue
+          Get-MpComputerStatus | Select-Object AntivirusEnabled,RealTimeProtectionEnabled,OnAccessProtectionEnabled | Format-List
+          Get-CimInstance Win32_ComputerSystem | Select-Object NumberOfLogicalProcessors,TotalPhysicalMemory | Format-List
+          Get-PhysicalDisk | Select-Object FriendlyName,MediaType,BusType | Format-List
+      - name: the whole suite, with a canary beside it
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          $canary = Start-Process -PassThru -NoNewWindow node -ArgumentList 'scripts/tmp_canary.mjs',"$PWD\canary.log"
+          $env:NODE_OPTIONS = "--import=file:///$((Resolve-Path scripts/tmp_hookcost.mjs).Path -replace '\\','/')"
+          $env:TMP_HOOKCOST_LOG = "$PWD\hookcost.log"
+          npm test 2>&1 | Tee-Object -FilePath suite.out | Select-String -Pattern "^ℹ |✖|failed open|coordination unavailable"
+          $env:NODE_OPTIONS = ''
+          New-Item -ItemType File "$PWD\canary.log.stop" | Out-Null
+          Start-Sleep -Seconds 2
+          Stop-Process -Id $canary.Id -ErrorAction SilentlyContinue
+        env:
+          ACC_TEST_TIMEOUT_MS: '300000'
+          ACC_TEST_FORCE_EXIT: '1'
+          GIT_DIR: ''
+          GIT_WORK_TREE: ''
+      - name: slow hooks and the machine around them
+        if: always()
+        run: node scripts/tmp_tail_summary.mjs hookcost.log canary.log 3000
+      - name: the logs
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: tail-${{ matrix.run }}
+          path: |
+            hookcost.log
+            canary.log
+            suite.out
+          if-no-files-found: ignore
