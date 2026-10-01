@@ -203,10 +203,10 @@ test("a trailer in a comment or in the `git commit -v` diff is not the message",
 });
 
 // The real pre-push hook, with a stub npm standing in for the eight-minute suite.
-async function stubNpmPath(t) {
+async function stubNpmPath(t, script = "#!/bin/sh\nexit 0\n") {
   const stub = await mkdtemp(path.join(tmpdir(), "acc-attribution-npm-"));
   t.after(() => rm(stub, { recursive: true, force: true }));
-  await writeFile(path.join(stub, "npm"), "#!/bin/sh\nexit 0\n");
+  await writeFile(path.join(stub, "npm"), script);
   await chmod(path.join(stub, "npm"), 0o755);
   // Windows has no /usr/bin: git, and the sh and xargs the hook runs, are where
   // the machine's own PATH finds them, behind the stub.
@@ -250,12 +250,8 @@ test("a new branch cannot carry an attributed commit that another remote branch 
 // is merged or packed: its push runs the attribution and lint gates, not the
 // suite. The stub npm fails, so a push that ran the suite would be refused.
 test("a push of measurement branches alone skips the suite, and nothing else does", async t => {
-  const stub = await mkdtemp(path.join(tmpdir(), "acc-attribution-npm-"));
-  t.after(() => rm(stub, { recursive: true, force: true }));
-  await writeFile(path.join(stub, "npm"), "#!/bin/sh\necho 'suite ran' >&2\nexit 1\n");
-  await chmod(path.join(stub, "npm"), 0o755);
   const { git, commit } = await scratch(t,
-    { PATH: [stub, path.dirname(process.execPath), "/usr/bin", "/bin"].join(path.delimiter) });
+    { PATH: await stubNpmPath(t, "#!/bin/sh\necho 'suite ran' >&2\nexit 1\n") });
 
   const probe = await git(["push", "-q", "origin", "HEAD:refs/heads/measure/probe"]);
   assert.equal(probe.code, 0, probe.stderr);
