@@ -6,7 +6,9 @@ $root = "C:\ap"
 New-Item -ItemType Directory -Force $root | Out-Null
 $user = "accprobe"
 $pw = "Ap-" + ([guid]::NewGuid().ToString("N").Substring(0, 20)) + "!9"
-net user $user $pw /add | Out-Host
+# net user asks Y/N for a password over 14 characters; New-LocalUser asks nothing.
+New-LocalUser -Name $user -Password (ConvertTo-SecureString $pw -AsPlainText -Force) `
+  -PasswordNeverExpires -AccountNeverExpires | Out-Host
 
 # A scheduled task with a stored password logs on as a batch job.
 secedit /export /cfg "$root\sec.inf" /areas USER_RIGHTS | Out-Null
@@ -23,7 +25,8 @@ secedit /configure /db "$root\sec.sdb" /cfg "$root\sec.inf" /areas USER_RIGHTS |
 
 $repo = (Get-Location).Path
 $node = (Get-Command node).Source
-$codex = (Get-Command codex).Source
+# PowerShell resolves `codex` to npm's codex.ps1; ACC runs the .cmd.
+$codex = (Get-Command codex.cmd).Source
 icacls $root /grant "${user}:(OI)(CI)F" | Out-Null
 foreach ($dir in @($repo, (Split-Path $codex), (Split-Path $node))) {
   icacls $dir /grant "${user}:(OI)(CI)RX" /T /Q | Out-Null
