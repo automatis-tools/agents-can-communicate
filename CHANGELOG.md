@@ -16,7 +16,10 @@ Work in progress for #234. The design is in
   waiting for the lock read that record: eight of them held a release back until one gave up.
   When `realpath` answers a concurrent rename or removal with `EBADF`, `EPERM` or a path in
   `C:\$Extend\$Deleted\` (all measured on Windows, where Linux says `ENOENT`), the name is
-  resolved again; it is gone only if no directory is left there. An open on Windows takes the
+  resolved again; it is gone only if no directory is left there. An answer outside the store
+  is an escape only when that place holds the directory: under a lock renamed aside and back,
+  Windows once named a path under another store's root that no longer existed. Such an answer
+  is asked again, and a name that keeps giving it is refused as changed. An open on Windows takes the
   file its name names after the open, so a record renamed over in between is read, not refused.
   A read refused with `EPERM` on a name absent just before and just after it reads as absent:
   eight writers electing one failed on it in 1 run of 60 on windows-latest.
