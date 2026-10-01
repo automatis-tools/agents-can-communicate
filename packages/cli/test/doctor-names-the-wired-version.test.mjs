@@ -123,3 +123,59 @@ test("a stale bundle names the skills, not the runtime, and reports its version"
   assert.equal(entry.remediation.some(one => /\bplugin is\b/.test(one)), false,
     "a remediation still calls the whole plugin stale when only the bundle is");
 })
+
+// On Windows the runner appears JSON-escaped in the Node shim and TOML-escaped in
+// Kimi's config, and a profile path carries spaces.
+test("the runner's package is found in every form ACC writes it, Windows ones included", async () => {
+  const { runnerRoot } = await import("../src/doctor-command.mjs");
+  const root = "C:\\Users\\First Last\\AppData\\Roaming\\npm\\node_modules\\agents-can-communicate";
+  assert.equal(runnerRoot(`const ACC_TARGET = ${JSON.stringify(`${root}\\bin\\acc-hook.mjs`)};`), root);
+  assert.equal(runnerRoot(`command = "\\"C:\\\\Program Files\\\\nodejs\\\\node.exe\\" \\"${
+    root.replaceAll("\\", "\\\\")}\\\\bin\\\\acc-hook.mjs\\" kimi sessionStart"`), root);
+  assert.equal(runnerRoot('ACC_RUNNER="/usr/local/lib/node_modules/agents-can-communicate/bin/acc-hook.mjs"'),
+    "/usr/local/lib/node_modules/agents-can-communicate");
+  assert.equal(runnerRoot("nothing here"), null);
+});
+
+// An apostrophe is common in a Windows user name - C:\Users\O'Neil - and every
+// form ACC writes quotes the runner with double quotes: read as the opening
+// quote, it cut the path at `O'` and doctor could not read a working install.
+test("the runner's package is found when its path has an apostrophe", async () => {
+  const { runnerRoot } = await import("../src/doctor-command.mjs");
+  const windows = "C:\\Users\\O'Neil\\AppData\\Roaming\\npm\\node_modules\\agents-can-communicate";
+  assert.equal(runnerRoot(`const ACC_TARGET = ${JSON.stringify(`${windows}\\bin\\acc-hook.mjs`)};`),
+    windows);
+  const cmd = `"C:\\Program Files\\nodejs\\node.exe" "${windows}\\bin\\acc-hook.mjs" kimi sessionStart`;
+  assert.equal(runnerRoot(`command = ${JSON.stringify(cmd)}`), windows);
+  const posix = "/Users/o'neil/.npm-global/lib/node_modules/agents-can-communicate";
+  assert.equal(runnerRoot(`ACC_RUNNER="${posix}/bin/acc-hook.mjs"`), posix);
+});
+
+// A shell reads a backslash inside double quotes as itself unless a quote,
+// backslash, $ or backtick follows it, so a Windows path written into a shell
+// script unescaped is still that path - and a path the shim escaped is read back.
+test("the runner's package is read from a shell script the way the shell reads it", async () => {
+  const { runnerRoot } = await import("../src/doctor-command.mjs");
+  const windows = "C:\\Users\\RUNNER~1\\AppData\\Local\\Temp\\acc-wired-x\\agents-can-communicate";
+  assert.equal(runnerRoot(`#!/bin/sh\nexec "C:\\Program Files\\nodejs\\node.exe" "${
+    windows}\\bin\\acc-hook.mjs" claude_code "$@"\n`), windows);
+  const posix = "/Users/a$b`c\"d/lib/node_modules/agents-can-communicate";
+  assert.equal(runnerRoot(`ACC_RUNNER="${posix.replace(/(["\\$`])/g, "\\$1")}/bin/acc-hook.mjs"`), posix);
+});
+
+// Kimi's command quotes each path inside the TOML string, so on POSIX a quote in
+// the runner's path is escaped twice: once for the command, once for TOML.
+test("the runner's package is read from the Kimi config its installer writes", async () => {
+  const { runnerRoot } = await import("../src/doctor-command.mjs");
+  const { renderBlock } = await import("../../adapter-kimi/src/install.mjs");
+  const posix = "/tmp/a\"b/lib/node_modules/agents-can-communicate";
+  assert.equal(runnerRoot(renderBlock(`${posix}/bin/acc-hook.mjs`, "/usr/bin/node", "linux")), posix);
+  const windows = "C:\\Users\\O'Neil Ann\\AppData\\Roaming\\npm\\node_modules\\agents-can-communicate";
+  assert.equal(runnerRoot(renderBlock(`${windows}\\bin\\acc-hook.mjs`,
+    "C:\\Program Files\\nodejs\\node.exe", "win32")), windows);
+  // cmd has no escape character: a redirected profile's UNC path keeps both of
+  // its leading backslashes.
+  const unc = "\\\\fileserver\\users\\ann\\AppData\\Roaming\\npm\\node_modules\\agents-can-communicate";
+  assert.equal(runnerRoot(renderBlock(`${unc}\\bin\\acc-hook.mjs`,
+    "C:\\Program Files\\nodejs\\node.exe", "win32")), unc);
+});

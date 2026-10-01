@@ -1,13 +1,14 @@
 import assert from "node:assert/strict";
 import { mkdir } from "node:fs/promises";
 import path from "node:path";
-import test from "node:test";
+import nodeTest from "node:test";
 
 import { createCodexMaintenance } from "../src/maintenance.mjs";
 import { maintenanceContext } from "../src/maintenance-host.mjs";
 import { createCodexDiscovery } from "../src/native-discovery.mjs";
 import { maintenanceFixture } from "./maintenance-fixture.mjs";
 import { serviceFixture } from "./service-setup-fixture.mjs";
+import { posixTransportTest as test } from "../../../tests/helpers/platform-scope.mjs";
 
 // #205, measured on Codex 0.159.0 (2026-09-29): in a home with no standalone
 // package, `codex app-server daemon start` installs the daemon's own package

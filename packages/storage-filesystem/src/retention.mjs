@@ -3,6 +3,7 @@ import path from "node:path";
 import { AccError, EXIT, assertPortableId } from "@agents-can-communicate/protocol";
 
 import { encode, listJsonFiles, publishAtomic, readJsonIfPresent } from "./atomic-json.mjs";
+import { publicationPath } from "./publication-path.mjs";
 
 const RETENTION_VERSION = 1;
 const SEQUENCE_WIDTH = 16;
@@ -40,8 +41,8 @@ function stateMarker(paths, kind, id, generation) {
 
 export function stateDeletionPublication(paths, root, kind, id, generation, retainedPath) {
   const marker = stateMarker(paths, kind, id, generation);
-  return { path: path.relative(root, marker.filePath), bytes: encode(marker.record),
-    replace: false, retainedPath: path.relative(root, retainedPath) };
+  return { path: publicationPath(root, marker.filePath), bytes: encode(marker.record),
+    replace: false, retainedPath: publicationPath(root, retainedPath) };
 }
 
 export async function stateGenerationIsDeleted(paths, root, kind, id, generation) {
@@ -99,8 +100,10 @@ export async function markEphemeral(paths, options, kind, id, state) {
   const previous = await latestEphemeralMarker(paths, options.root, kind, id);
   // A marker that repeats the current state changes nothing, and every renewal
   // of a live record used to append one. History now grows only with a real
-  // change: published after a deletion, or deleted.
-  if (previous?.state === state) return previous;
+  // change: published after a deletion, or deleted. A record with no marker is
+  // present, so its first publication is no change either - it cost every new
+  // session an atomic write, three flushes on Windows, per ephemeral record.
+  if (previous?.state === state || (previous === null && state === "present")) return previous;
   const sequence = pad(previous === null ? 1n : BigInt(previous.sequence) + 1n);
   const record = { retentionVersion: RETENTION_VERSION, area: "ephemeral", kind, id,
     sequence, state };

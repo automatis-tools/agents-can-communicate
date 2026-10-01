@@ -258,7 +258,7 @@ that resolves inside a workspace.
 
 | Variable | Purpose |
 |---|---|
-| `ACC_DATA_HOME` | Base directory under which ACC creates `acc/` for runtime and coordination state. Defaults: `~/Library/Application Support` on macOS; `~/.local/share` on Linux, or `XDG_DATA_HOME` |
+| `ACC_DATA_HOME` | Base directory under which ACC creates `acc/` for runtime and coordination state. Defaults: `~/Library/Application Support` on macOS; `~/.local/share` on Linux, or `XDG_DATA_HOME`; `%LOCALAPPDATA%` on Windows |
 | `ACC_CONFIG_HOME` | Parsed and validated path override; no current configuration-storage consumer |
 | `ACC_CACHE_HOME` | Parsed and validated path override; no current cache-storage consumer |
 | `ACC_PARTICIPANT` | Which participant a session belongs to, when the client does not say |

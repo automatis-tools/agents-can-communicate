@@ -8,6 +8,23 @@ import { platformDataHome } from "../../packages/cli/src/index.mjs";
 import { createPackedAcc } from "../helpers/packed-acc.mjs";
 import { createUpdateRegistry } from "../helpers/update-registry.mjs";
 const run = promisify(execFile);
+const windows = process.platform === "win32";
+
+// The installed hook shim and the skill's command, run as the platform runs
+// them. POSIX: an sh shim, and the model's shell. Windows: a Node shim, and the
+// skill's `node "<cli>"` in PowerShell, the shell Codex gives its model there,
+// with node found on PATH as it is on a machine that installed ACC through npm.
+function runShim(shim, args, options) {
+  return windows ? run(process.execPath, [shim, ...args], options) : run("/bin/sh", [shim, ...args], options);
+}
+function runSkillCommand(command, { env, ...options }) {
+  if (!windows) return run("/bin/sh", ["-c", command], { env, ...options });
+  const powershell = path.join(env.SystemRoot ?? env.SYSTEMROOT ?? "C:\\Windows", "System32",
+    "WindowsPowerShell", "v1.0", "powershell.exe");
+  const encoded = Buffer.from(command, "utf16le").toString("base64");
+  return run(powershell, ["-NoProfile", "-NonInteractive", "-EncodedCommand", encoded],
+    { env: { ...env, PATH: `${env.PATH}${path.delimiter}${path.dirname(process.execPath)}` }, ...options });
+}
 const workspaces = home => readdir(path.join(home, "acc", "workspaces"))
   .catch(error => { if (error.code === "ENOENT") return []; throw error; });
 
@@ -30,7 +47,7 @@ test("managed refresh keeps generated Codex hooks and skills in the enrolled dat
   assert.equal(result.activated, true, JSON.stringify(result));
   assert.equal(await policy(), consent);
   const plugin = path.join(f.clientHome, ".agents", "acc-local", "plugins", "agents-can-communicate");
-  const shim = path.join(plugin, "acc-hook.sh");
+  const shim = path.join(plugin, windows ? "acc-hook.mjs" : "acc-hook.sh");
   const skill = await readFile(path.join(plugin, "skills", "acc", "SKILL.md"), "utf8");
   const statusCommand = skill.match(/`([^`\n]+ status --json)`/)[1];
   for (const inherited of [undefined, path.join(f.root, "wrong-data")]) {
@@ -43,14 +60,14 @@ test("managed refresh keeps generated Codex hooks and skills in the enrolled dat
     const wrongHome = inherited ?? platformDataHome({ platform: process.platform, env });
     const nativeId = `refresh-home-${inherited === undefined ? "absent" : "wrong"}`;
     const startedAt = Date.now();
-    const pending = run("/bin/sh", [shim, "session-start"], { cwd: f.project, env });
+    const pending = runShim(shim, ["session-start"], { cwd: f.project, env });
     pending.child.stdin.end(JSON.stringify({ hook_event_name: "SessionStart", session_id: nativeId,
       cwd: f.project, source: "startup" }));
     const output = await pending;
     const binding = await f.findBinding(nativeId);
     assert.ok(binding, "regenerated hook must persist its binding in the enrolled data home: "
       + JSON.stringify({ nativeId, elapsedMs: Date.now() - startedAt, ...output }));
-    const status = JSON.parse((await run("/bin/sh", ["-c", statusCommand], { cwd: f.project, env })).stdout);
+    const status = JSON.parse((await runSkillCommand(statusCommand, { cwd: f.project, env })).stdout);
     assert.ok(status.data.participants.some(peer => peer.sessionId === binding.accSessionId),
       "regenerated skill must read the same hook workspace");
     assert.deepEqual(await workspaces(f.dataHome), before, "refresh must preserve the existing workspace");

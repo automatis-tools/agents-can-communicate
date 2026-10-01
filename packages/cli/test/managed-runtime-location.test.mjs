@@ -32,3 +32,14 @@ test("managed install permits external data from HOME and root but honors explic
   await writeFile(path.join(base, "acc.workspace.json"), "malformed");
   await assert.rejects(installManaged(options), /outside.*workspace/);
 });
+
+// The launcher resolves the manager with Node built-ins only, so it carries its
+// own copy of the data-home rule; it has to agree with platformDataHome.
+test("on Windows the launcher finds the manager under local, not roaming, app data", async () => {
+  const { managerLocation } = await import("../src/managed-runtime/entry.mjs");
+  assert.equal(managerLocation({ platform: "win32", env: {
+    APPDATA: "C:\\Users\\dana\\AppData\\Roaming", LOCALAPPDATA: "C:\\Users\\dana\\AppData\\Local" } }),
+  "C:\\Users\\dana\\AppData\\Local\\acc\\runtime");
+  assert.throws(() => managerLocation({ platform: "win32",
+    env: { APPDATA: "C:\\Users\\dana\\AppData\\Roaming" } }), /cannot resolve ACC data home/);
+});

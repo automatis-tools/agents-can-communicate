@@ -11,6 +11,8 @@ import { fakeAgy } from "./fake-agy.mjs";
 import { ACC_NAMESPACE, ACC_REGISTERED_EVENTS, HOOK_LOCATIONS, detectAntigravity,
   doctorAntigravity, globalHooksPath, installAntigravity, planAntigravityInstall,
   registeredEvents, uninstallAntigravity, workspaceHooksPath } from "../src/install.mjs";
+import { POSIX_FORM } from "../../../tests/helpers/platform-scope.mjs";
+import { POSIX_SH, SHELL_HOSTILE, shWords } from "../../../tests/helpers/posix-sh.mjs";
 
 const captured = async name => JSON.parse(await readFile(
   new URL(`../fixtures/${name}.json`, import.meta.url), "utf8"));
@@ -45,7 +47,7 @@ async function fixture(t, { location } = {}) {
   const dataHome = path.join(home, "acc-data");
   // agy itself is never run from a test: this one reproduces what 1.2.7 was
   // captured doing, and the hook read-back is answered by probeHooks above.
-  const context = { home, dataHome, antigravityWorkspace: workspace,
+  const context = { home, dataHome, antigravityWorkspace: workspace, hostPlatform: POSIX_FORM,
     ...(location === undefined ? {} : { antigravityHookLocation: location }), probeHooks,
     runAgy: fakeAgy().run };
   const geminiTree = async () => ({
@@ -108,7 +110,7 @@ test("install writes the namespaced schema, which is the only one that loads", a
     // Quoted, because a home directory may contain a space, and absolute,
     // because a hook environment carries no PATH. A quoted command loads:
     // captured on 1.2.7 with a space in the path.
-    assert.match(actions[0].command, /^sh "\/[^"]+\/acc-hook\.sh" /,
+    assert.match(actions[0].command, /^sh "(?:\/|[A-Za-z]:\\)[^"]+acc-hook\.sh" /,
       "the shim must be named by an absolute, quoted path");
     assert.equal("matcher" in actions[0], false,
       "matcher is a Gemini CLI field; this client drops an entry that carries it");
@@ -327,4 +329,23 @@ test("a file ACC created is removed even after the installer deleted the shim fi
 
   assert.equal(await missing(globalHooksPath(home)), true,
     "uninstall left behind a file that only existed because ACC created it");
+});
+
+// On Windows Antigravity CLI runs hooks through Go's `cmd /c`, which escapes an
+// inner quote in a form cmd does not read: the command carries no quotes.
+test("windows: each hook command is unquoted, with the shim's forward-slash 8.3 path", async () => {
+  const { accHookConfig } = await import("../src/install.mjs");
+  const config = accHookConfig("C:\\Users\\ANNONE~1\\.gemini\\config\\acc\\acc-hook.mjs",
+    { platform: "win32" });
+  for (const [event, [action]] of Object.entries(Object.values(config)[0])) {
+    assert.equal(action.command, `node C:/Users/ANNONE~1/.gemini/config/acc/acc-hook.mjs ${event}`);
+  }
+});
+
+test("posix: the shell reads the shim's path exactly as written", { skip: POSIX_SH }, async () => {
+  const { accHookConfig } = await import("../src/install.mjs");
+  const shim = `/home/${SHELL_HOSTILE}/.gemini/config/acc/acc-hook.sh`;
+  for (const [event, [hook]] of Object.entries(accHookConfig(shim, { platform: POSIX_FORM })[ACC_NAMESPACE])) {
+    assert.deepEqual(shWords(hook.command), [shim, event]);
+  }
 });

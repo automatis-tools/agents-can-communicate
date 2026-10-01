@@ -1,5 +1,106 @@
 # Changelog
 
+## Unreleased — native Windows
+
+Work in progress for #234. The design is in
+[docs/design/2026-09-30-native-windows-support.md](docs/design/2026-09-30-native-windows-support.md).
+
+- `package.json` no longer declares `"os": ["darwin", "linux"]`, and CI runs the suite and the
+  package check on `windows-latest` beside macOS and Linux.
+- The store and the managed runtime go through portable filesystem primitives. On Windows they
+  flush the renamed file instead of its directory, retry a rename or read that another handle
+  holds, report a taken directory name as `EEXIST`, and refuse a symlink or junction at the last
+  path component without `O_NOFOLLOW`.
+- On Windows the store's writer lock is released by moving its owner record out of the lock
+  directory. Windows cannot rename a directory while a file inside it is open, and writers
+  waiting for the lock read that record: eight of them held a release back until one gave up.
+  When `realpath` answers a concurrent rename or removal with `EBADF`, `EPERM` or a path in
+  `C:\$Extend\$Deleted\` (all measured on Windows, where Linux says `ENOENT`), the name is
+  resolved again; it is gone only if no directory is left there. An open on Windows takes the
+  file its name names after the open, so a record renamed over in between is read, not refused.
+  A read refused with `EPERM` on a name absent just before and just after it reads as absent:
+  eight writers electing one failed on it in 1 run of 60 on windows-latest.
+  A reclaim of a dead writer's lock ends at the writer's deadline, and a published record's
+  flush no longer reports a failure after the record became visible. A transaction journal names its files with forward slashes on
+  every platform.
+- On Windows an environment that a caller passes replaces the machine's variables whatever
+  their case, so detection finds a client on the supplied `PATH` instead of the inherited `Path`.
+- Windows keeps ACC state in `%LOCALAPPDATA%`, never in the roaming profile.
+- A workspace config root that starts with a separator or a drive letter is refused on every
+  platform, which includes `\\host\share` and `D:x`. A backslash separates the segments of a
+  `file:` claim.
+- On Windows the hook runner reads the chain of processes above it through WMI in Windows Script
+  Host, and through PowerShell where Script Host is switched off; a client's image name matches
+  without `.exe`. Measured on windows-latest, the walk took 145 ms against PowerShell's 580.
+- On Windows a client binary is found through `PATHEXT`, a `.cmd` shim runs through `cmd.exe`,
+  updates run npm's own `npm-cli.js`, and background workers open no console window. Live
+  delivery on Windows is reported as `native_delivery_unsupported` for now; next-turn delivery
+  works.
+- On Windows each client's hooks run a Node shim instead of an `sh` script, in the form that
+  client's hook shell reads: Claude Code's exec form, a Codex `commandWindows` for PowerShell,
+  PowerShell for Gemini CLI, a form PowerShell, Git Bash and cmd all read for Grok, an unquoted
+  8.3 path for Antigravity CLI, and a cmd command for Kimi Code. The skill runs
+  `node "<path>/acc-cli.mjs"`, and the owner header quotes for cmd.
+- On Windows the owner header double-quotes a path, which bash, PowerShell and cmd read alike. A
+  path with a double quote of either kind (PowerShell's typographic quotes count), `$`, a
+  backtick or `%` has no quoting all three read alike, so it gets no header and no session. The
+  hook tells the user to rename the directory, without printing the path.
+- The unquoted hook path Antigravity CLI needs on Windows refuses what cmd acts on outside
+  quotes (`& | < > ^ ( ) , ; = !`), so a directory name cannot run a command. Doctor reads a
+  runner path with an apostrophe, such as `C:\Users\O'Neil`, whole.
+- On macOS and Linux, Gemini CLI, Grok, Antigravity CLI and Kimi Code run a hook command through
+  `/bin/sh`, and the command now escapes a quote, a backslash, `$` and a backtick in its paths,
+  as the shim already did. A directory named with `$` or a backtick changed the path the shell
+  read, or ran a command. Doctor reads each form the way its own shell does: a Windows path in
+  a shell script keeps its backslashes, a quote in a POSIX path stays in it, and a UNC path in
+  Kimi's Windows command keeps its leading `\\`.
+- A client `.cmd` that outlives its timeout on Windows is stopped with everything it started,
+  through `taskkill /T`. cmd.exe starts the batch file's program as a child of its own, and
+  after killing cmd.exe, execFile waited for that child's pipes, so a hung
+  `claude.cmd --version` held a version probe past its limit.
+- A session start reads the process table from the moment its event is known, while the store
+  opens and the client reports its version, rather than after them. On Windows the version of an
+  npm-installed client is read from the package its `.cmd` runs, instead of starting cmd.exe,
+  node and the client. A Windows session start in one hook process went from 1.45 s to 0.95 s on
+  windows-latest.
+- A hook does less work on every turn, measured on windows-latest where each call costs more:
+  - A store directory validated once is checked again by its identity (volume and file id)
+    with one `lstat`. Before, each record read walked its path from the root twice, which cost
+    about a thousand calls a hook.
+  - A hook no longer takes the writer lock to clear a delivery binding that is absent or
+    already retired. A heartbeat of a durable session goes straight to its durable record.
+    Together this removes two lock round trips from each turn.
+  - On Windows, taking the writer lock flushes its owner record once instead of twice.
+  - One record replaced with no event, such as a session's heartbeat on every turn, is published
+    by an atomic rename without the journal, while no other transaction is open. The journal
+    cost five atomic writes for it.
+  - A second live session opens in the transaction that materialises the workspace. Before, it
+    wrote an ephemeral copy of itself that was copied and retired a moment later.
+  - An ephemeral record's first publication writes no retention marker, because a record with no
+    marker is present.
+  - A hook process loads its own client's adapter and the parts of the CLI and installer that
+    a hook calls: 123 modules instead of 195.
+- The reason shown for a client without live delivery reads "this client has no live delivery
+  channel ACC supports here", which is also true of Claude Code, Codex and Antigravity CLI on
+  Windows.
+- A CI job runs real Claude Code and Codex, installed from npm, against a model stub on
+  127.0.0.1, on Windows and Linux. Their hooks attach both sessions through the installed
+  package, and a message reaches each client's model on its next turn.
+- The package check runs on Windows: it reads `tar.exe` listings that end in CRLF and runs the
+  `acc.cmd` npm links.
+- The README, getting started, configuration, security model and troubleshooting pages describe
+  Windows.
+
+| Candidate artifact | Value |
+|---|---|
+| Built from | `de9700a79ccef096eda9d7e6c24d9e7bafd4c782` |
+| Tarball | `agents-can-communicate-0.8.5.tgz`, 523,146 bytes, 327 files |
+| sha256 | `dcaf8234fa987c016286431c49a0dc91c98d64542336293decc0c8a13270f1e8` |
+
+This unpublished development archive was measured with `npm pack`. See
+[the evidence](docs/release-evidence/unreleased-windows-support.md).
+The package version remains `0.8.5` until a release prepares its own.
+
 ## 0.8.5 — release candidate
 
 - A Codex chat that a launch option keeps embedded is told which option: `-c`/`--config`,

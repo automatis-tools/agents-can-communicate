@@ -8,17 +8,12 @@ import test from "node:test";
 import { pathToFileURL } from "node:url";
 import { promisify } from "node:util";
 
+import { resolveExecutable, runExecutable } from "@agents-can-communicate/adapter-sdk";
+
+import { runNpm } from "../helpers/npm-run.mjs";
+
 const run = promisify(execFile);
 const repo = path.resolve(import.meta.dirname, "..", "..");
-
-// Node 20.12 and later refuse to spawn a .cmd or .bat without a shell (the
-// CVE-2024-27980 fix), and npm on Windows is exactly that - a .cmd shim. So npm
-// runs through a shell there, with arguments quoted because a temp path can
-// contain spaces.
-const isWindows = process.platform === "win32";
-const runNpm = (args, options = {}) => (isWindows
-  ? run("npm.cmd", args.map(argument => `"${argument}"`), { ...options, shell: true })
-  : run("npm", args, options));
 
 /** Files under a directory whose contents contain `needle`. */
 async function filesContaining(root, needle) {
@@ -59,8 +54,9 @@ async function packed(t) {
 const manifestOf = async tarball => JSON.parse((await run("tar",
   ["-xzOf", tarball, "package/package.json"])).stdout);
 
+// Windows' tar.exe ends each listed entry with CRLF.
 const entriesOf = async tarball => (await run("tar", ["-tzf", tarball])).stdout
-  .split("\n").filter(Boolean).map(entry => entry.replace(/^package\//, ""));
+  .split(/\r?\n/).filter(Boolean).map(entry => entry.replace(/^package\//, ""));
 
 test("the tarball carries the workspaces where imports can find them", async t => {
   const { tarball } = await packed(t);
@@ -189,15 +185,20 @@ test("a clean install runs the CLI and attaches a session", async t => {
   // The whole point: installed from a tarball, with no workspace anywhere.
   const env = { ...process.env, ACC_DATA_HOME: dataHome,
     GIT_DIR: "", GIT_WORK_TREE: "" };
-  const acc = path.join(consumer, "node_modules", ".bin", "acc");
-  const hook = path.join(consumer, "node_modules", ".bin", "acc-hook");
+  // The commands npm linked, found and started as the platform does: on Windows
+  // npm links `acc.cmd`, which only cmd.exe can start.
+  const bin = path.join(consumer, "node_modules", ".bin");
+  const acc = await resolveExecutable("acc", { pathEnv: bin });
+  const hook = await resolveExecutable("acc-hook", { pathEnv: bin });
+  assert.notEqual(acc, null, `npm linked no acc command into ${bin}`);
+  assert.notEqual(hook, null, `npm linked no acc-hook command into ${bin}`);
 
-  const child = run(hook, ["kimi", "sessionStart"], { cwd: consumer, env });
+  const child = runExecutable(hook, ["kimi", "sessionStart"], { cwd: consumer, env });
   child.child.stdin.end(JSON.stringify({ hook_event_name: "SessionStart",
     session_id: "packaged-probe", cwd: consumer, source: "startup" }));
   await child;
 
-  const { stdout } = await run(acc, ["status", "--cwd", consumer, "--json"], { env });
+  const { stdout } = await runExecutable(acc, ["status", "--cwd", consumer, "--json"], { env });
   const status = JSON.parse(stdout).data;
   assert.equal(status.participants.length, 1, "the installed hook runtime never attached");
   assert.equal(status.participants[0].harness, "kimi");

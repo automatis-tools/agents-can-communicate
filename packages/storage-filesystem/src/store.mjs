@@ -6,7 +6,8 @@ import { AccError, EXIT, assertPortableId, validateRecord }
 
 import { encode, listDirectoryEntries, listJsonFiles, publishAtomic, readJsonIfPresent,
   retainFile } from "./atomic-json.mjs";
-import { initialiseActiveJournal } from "./active-journal.mjs";
+import { initialiseActiveJournal, readActiveJournal } from "./active-journal.mjs";
+import { publicationPath } from "./publication-path.mjs";
 import { assertPublicationDeadline } from "./deadline.mjs";
 import { requireStoreIdentity } from "./identity.mjs";
 import { journalEntry, readJournalCeiling, readOpenJournals, rollForward, writeJournalEntry }
@@ -251,7 +252,7 @@ export async function openFilesystemStore({ root, clock, ids, workspaceId, failA
       // ceiling in eventsSince has to hide.
       const publications = [
         ...events.map(event => ({
-          path: path.relative(root, eventPath(paths, event.sequence)),
+          path: publicationPath(root, eventPath(paths, event.sequence)),
           bytes: encode(event),
           replace: false,
         })),
@@ -259,12 +260,28 @@ export async function openFilesystemStore({ root, clock, ids, workspaceId, failA
           ? stateDeletionPublication(paths, root, entry.kind, entry.id, entry.generation,
             statePath(paths, entry.kind, entry.id))
           : {
-            path: path.relative(root, statePath(paths, entry.kind, entry.id)),
+            path: publicationPath(root, statePath(paths, entry.kind, entry.id)),
             bytes: encode(stateEnvelope(entry.kind, entry.id, entry.generation, entry.record)),
             replace: true,
           })),
       ];
       if (publications.length === 0) return result;
+
+      // One record replaced and nothing appended - a session's heartbeat, every
+      // turn - needs no journal to appear at once: the rename replaces it
+      // atomically, and the bytes are flushed before and after it. The journal
+      // cost five atomic writes for it, ten flushes on Windows at 8 to 23 ms
+      // each (windows-latest). Only while no other transaction is open: an open
+      // one would later roll its own bytes over this record, and it refuses a
+      // journalled write too, which the path below keeps.
+      const [only] = staged.values();
+      if (events.length === 0 && staged.size === 1 && only.removed !== true
+        && (await readActiveJournal(paths, root)).state === "idle") {
+        assertPublicationDeadline(deadlineAt);
+        await publishAtomic(statePath(paths, only.kind, only.id), publications[0].bytes,
+          { ...publishOptions, replace: true, deadlineAt });
+        return result;
+      }
 
       // Preparation is still cancellable. The active journal's atomic
       // publication decides the write; roll-forward must then finish even if

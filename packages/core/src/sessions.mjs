@@ -92,8 +92,14 @@ export function createSessionService(ports) {
     // presence transitions surface through cursor sync. Read and validate under
     // the writer lock, so a pending heartbeat cannot restore an old generation.
     // Promoted copies may await cleanup; their durable record already owns writes.
-    const ephemeral = await store.ephemeral.update("session", sessionId, async current =>
-      current !== null && !await isMaterialised(store, current.workspaceId) ? beat(current) : null);
+    // The update below writes only a lone session's ephemeral record. A session
+    // with none, or in a materialised workspace, is durable - and stays so: a
+    // workspace never returns to ephemeral - so it goes straight to the durable
+    // record rather than taking the writer lock to find nothing.
+    const seen = await store.ephemeral.get("session", sessionId);
+    const ephemeral = seen === null || await isMaterialised(store, seen.workspaceId) ? null
+      : await store.ephemeral.update("session", sessionId, async current =>
+        current !== null && !await isMaterialised(store, current.workspaceId) ? beat(current) : null);
     if (ephemeral !== null) return ephemeral;
     return store.transaction(tx => {
       const beaten = beat(tx.get("session", sessionId));

@@ -4,11 +4,11 @@ import { chmod, mkdir, mkdtemp, readFile, readdir, realpath, rm, stat, writeFile
   from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import test from "node:test";
 import { promisify } from "node:util";
 
 import * as codexModule from "@agents-can-communicate/adapter-codex";
 import { loadOwnership } from "@agents-can-communicate/installer";
+import { posixTransportTest as test } from "../helpers/platform-scope.mjs";
 
 const run = promisify(execFile);
 const repo = path.resolve(import.meta.dirname, "..", "..");

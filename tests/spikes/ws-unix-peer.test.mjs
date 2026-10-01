@@ -3,10 +3,10 @@ import { mkdtempSync, rmSync } from "node:fs";
 import http from "node:http";
 import os from "node:os";
 import path from "node:path";
-import test from "node:test";
 
 import { acceptKey, decodeFrames, encodeFrame, openWebSocketPeer }
   from "../../scripts/spikes/ws-unix-peer.mjs";
+import { posixTransportTest as test } from "../helpers/platform-scope.mjs";
 
 // A fake app-server daemon: HTTP upgrade on a Unix socket, then one JSON-RPC
 // message per text frame, exactly as codex-cli 0.152.1 answered.

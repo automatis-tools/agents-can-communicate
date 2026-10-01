@@ -3,6 +3,7 @@ import { execFile } from "node:child_process";
 import { readFile, readdir } from "node:fs/promises";
 import path from "node:path";
 import test from "node:test";
+import { pathToFileURL } from "node:url";
 import { promisify } from "node:util";
 import { createPackedAcc } from "../helpers/packed-acc.mjs";
 import { createUpdateRegistry } from "../helpers/update-registry.mjs";
@@ -16,8 +17,9 @@ test("installed manual update proceeds after slow uncontended worker lock prepar
   await f.acc(["update", "--auto", "off"]);
   const manager = path.join(f.dataHome, "acc", "runtime");
   const probe = path.join(f.root, "sync-probe");
+  // --import takes a module specifier; a Windows absolute path is not one.
   const { stdout } = await run(process.execPath, ["--import",
-    path.resolve(import.meta.dirname, "../helpers/delay-worker-lock-sync.mjs"),
+    pathToFileURL(path.resolve(import.meta.dirname, "../helpers/delay-worker-lock-sync.mjs")).href,
     f.accBin, "update", "--json"], { cwd: f.project,
     env: { ...f.env, ACC_NO_UPDATE_CHECK: "0", npm_config_registry: registry.url, npm_config_cache: path.join(f.root, "update-cache"),
       ACC_TEST_HANDLE_FILE: probe } });

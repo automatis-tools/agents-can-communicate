@@ -72,7 +72,7 @@ test("installed MCP preserves unanswered obligations and permits a reply after h
   const sender = await packed.acc(["attach", "--participant", "sender"]);
   const client = connectMcp({ cwd: packed.project, dataHome: packed.dataHome,
     binary: packed.mcpBin, participant: "reader", env: packed.env });
-  t.after(() => client.close());
+  packed.defer(() => client.close());
   const call = (name, args = {}) => client.request("tools/call",
     { name, arguments: args, _meta: PROTOCOL_META(PROTOCOL_VERSION) });
   const value = response => {

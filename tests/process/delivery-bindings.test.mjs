@@ -13,6 +13,7 @@ import { runtimePaths } from "@agents-can-communicate/cli";
 
 import { recordAndOffer } from "../../packages/cli/src/main.mjs";
 
+import { fakePath, platformEnv, writeFakeClient } from "../helpers/fake-client.mjs";
 import { createFakeIds } from "../helpers/memory-store.mjs";
 
 const run = promisify(execFile);
@@ -29,17 +30,20 @@ async function machine(t) {
   const argvLog = path.join(home, "fake-codex-argv.log");
   await Promise.all([mkdir(project), mkdir(codexHome, { recursive: true }), mkdir(bin)]);
   await writeFile(path.join(codexHome, "config.toml"), 'model = "gpt-5"\n');
-  const codex = path.join(bin, "codex");
-  await writeFile(codex, `#!/bin/sh
-printf '%s|%s|%s\\n' "$CODEX_HOME" "$#" "$*" >> ${shellLiteral(argvLog)}
-printf '%s\\n' 'codex-cli 0.153.4'
-`);
-  await chmod(codex, 0o755);
+  await writeFakeClient(bin, "codex", { script: `import { appendFileSync } from "node:fs";
+const args = process.argv.slice(2);
+appendFileSync(${JSON.stringify(argvLog)},
+  [process.env.CODEX_HOME, args.length, args.join(" ")].join("|") + "\\n");
+console.log("codex-cli 0.153.4");
+` });
   t.after(() => Promise.all([home, dataHome]
     .map(directory => rm(directory, { recursive: true, force: true }))));
   // The ACC process needs only this disposable fake client plus system shell
   // tools. Do not inherit operator ACC, Codex, or Node environment state.
-  const env = { PATH: [bin, "/usr/bin", "/bin"].join(path.delimiter), HOME: home,
+  // Windows resolves configuration and cache from LOCALAPPDATA, as POSIX does
+  // from HOME; it is this fixture's home there too, never the runner's own.
+  const env = { ...platformEnv(), PATH: fakePath(bin), HOME: home,
+    ...(process.platform === "win32" ? { LOCALAPPDATA: path.join(home, "AppData", "Local") } : {}),
     CODEX_HOME: codexHome, ACC_DATA_HOME: dataHome, ACC_NO_UPDATE_CHECK: "1",
     ACC_PROBE_TIMEOUT_MS: "30000", GIT_DIR: "", GIT_WORK_TREE: "" };
   const command = (...args) => run(process.execPath, [acc, ...args, "--cwd", project, "--json"],

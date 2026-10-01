@@ -72,7 +72,13 @@ export async function resolveHookWorkspace({ adapterId, event, room, cwd, dataHo
     let current = descriptor;
     if (descriptor.source === "git" && path.resolve(event.cwd) !== workspaceCwd) {
       const git = await gitProbe({ cwd: event.cwd }).catch(() => null);
-      if (git !== null && await realpath(git.commonDir) === descriptor.git.commonDir) {
+      // Both sides canonical: Git spells the directory the way the cwd did
+      // (through a symlink, or `C:/…` on Windows), and the room kept that
+      // spelling.
+      const same = git !== null && await Promise.all([git.commonDir, descriptor.git.commonDir]
+        .map(directory => realpath(directory).catch(() => null)))
+        .then(([here, room]) => here !== null && here === room);
+      if (same) {
         current = { ...descriptor, git };
       }
     }

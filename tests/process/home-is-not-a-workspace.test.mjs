@@ -22,9 +22,13 @@ async function home(t) {
   const directory = await realpath(await mkdtemp(path.join(tmpdir(), "acc-home-")));
   t.after(() => rm(directory, { recursive: true, force: true }));
   // No ACC_DATA_HOME, so the platform default applies - which is what a person
-  // has. XDG is cleared for the same reason on Linux.
+  // has. XDG is cleared for the same reason on Linux. On Windows that default is
+  // the profile's own AppData\Local, inside the home as it is for every user.
   const env = { ...process.env, HOME: directory, ACC_DATA_HOME: "", XDG_DATA_HOME: "",
-    GIT_DIR: "", GIT_WORK_TREE: "" };
+    GIT_DIR: "", GIT_WORK_TREE: "",
+    ...(process.platform === "win32" ? { USERPROFILE: directory,
+      LOCALAPPDATA: path.join(directory, "AppData", "Local"),
+      APPDATA: path.join(directory, "AppData", "Roaming") } : {}) };
   return { directory, env };
 }
 

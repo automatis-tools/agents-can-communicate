@@ -9,6 +9,7 @@ import { PROTOCOL_CONTRACT, buildGrokCapture, inspectGrokSurface }
   from "../../scripts/spikes/grok-leader-capture.mjs";
 import { validateCapture } from "../../scripts/spikes/delivery-capture.mjs";
 import { runProcess } from "../helpers/run-process.mjs";
+import { POSIX_LIVE_TRANSPORT } from "../helpers/platform-scope.mjs";
 
 const script = fileURLToPath(new URL("../../scripts/spikes/grok-leader-capture.mjs",
   import.meta.url));
@@ -53,8 +54,10 @@ test("the capture is an honest fail with a measured timestamp", () => {
   /capture version is a stable semantic version/);
 });
 
+// The capture command starts the client by name, as a POSIX executable, to record
+// its leader-socket surface; Windows live delivery arrives in 0.9.x.
 test("the command prints one capture from a fake client and refuses an unavailable one",
-  async () => {
+  { skip: POSIX_LIVE_TRANSPORT }, async () => {
     const dir = mkdtempSync(path.join(os.tmpdir(), "acc-grok-spike-"));
     const fake = path.join(dir, "fake-grok.mjs");
     writeFileSync(fake, `#!/usr/bin/env node

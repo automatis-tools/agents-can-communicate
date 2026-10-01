@@ -9,6 +9,7 @@ import { EXIT } from "@agents-can-communicate/protocol";
 
 import { storePaths } from "../src/index.mjs";
 import { withWriterMutex } from "../src/writer-mutex.mjs";
+import { performance } from "node:perf_hooks";
 
 /**
  * A lock changing hands is not an attack.
@@ -276,8 +277,16 @@ test("an ancestor swapped for a symlink cannot serve another directory in the st
     const decoy = path.join(root, "decoy");
     for (const base of [asked, decoy]) await mkdir(path.join(base, ...depth), { recursive: true });
     const leaf = path.join(asked, ...depth);
-    const decoyLeaf = await stat(path.join(decoy, ...depth));
+    // The walk reports identity as bigint; so must the decoy, or no match is possible.
+    const decoyLeaf = await stat(path.join(decoy, ...depth), { bigint: true });
     const turn = () => new Promise(resolve => { setImmediate(resolve); });
+    // `admitted` counts a walk that fits between two flips. A fixed 2 ms quiet
+    // window was shorter than one three-level walk on a loaded runner, so no
+    // walk was ever admitted and the proof of exercise failed with nothing
+    // wrong. The window is several walks as measured here.
+    const started = performance.now();
+    for (let i = 0; i < 20; i += 1) await assertManagedDirectory(root, leaf);
+    const quietMs = Math.max(2, Math.ceil(((performance.now() - started) / 20) * 4));
 
     let flips = 0;
     let churning = true;
@@ -290,7 +299,7 @@ test("an ancestor swapped for a symlink cannot serve another directory in the st
           for (let i = 0; i < 6; i += 1) await turn();
           await unlink(asked);
           await rename(parked, asked);
-          await new Promise(resolve => { setTimeout(resolve, 2); });
+          await new Promise(resolve => { setTimeout(resolve, quietMs); });
         } catch { /* losing the race against ourselves is expected */ }
       }
     })();
@@ -320,7 +329,7 @@ test("an ancestor swapped for a symlink cannot serve another directory in the st
       await churn;
     }
 
-    const report = JSON.stringify({ flips, ...counts });
+    const report = JSON.stringify({ flips, quietMs, ...counts });
     assert.equal(counts.redirected, 0, `another directory in the store was served: ${report}`);
     assert.ok(flips > 0 && counts.admitted > 0 && counts.notReal > 0,
       `the race never ran, so nothing was proven: ${report}`);
@@ -343,6 +352,11 @@ test("the guard still refuses a record whose parent was swapped", async t => {
     return handle;
   };
 
-  await assert.rejects(readRegularNoFollow(file, root, swapping),
-    /parent directory changed/);
+  // Windows' open checks the name again after it, finds nothing there in the
+  // new directory, and so never hands over the old parent's file: the record is
+  // absent. A file planted under the name in the new directory is refused by the
+  // parent check, as on POSIX.
+  await assert.rejects(readRegularNoFollow(file, root, swapping), error =>
+    /parent directory changed/.test(error.message)
+      || (process.platform === "win32" && error.code === "ENOENT"));
 });

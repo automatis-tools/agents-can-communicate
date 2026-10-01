@@ -28,15 +28,17 @@ const usage = (message, details) => {
   throw new AccError(EXIT.USAGE, message, details);
 };
 
+// Pids, locks and pipe names belong to one machine, so state and cache live in
+// local app data. A roaming profile would carry them to another machine, where
+// every recorded pid names something else; there is no roaming fallback.
 function windowsPaths(env) {
-  if (!set(env.APPDATA)) {
-    usage("cannot resolve the Windows application data directory");
+  if (!set(env.LOCALAPPDATA)) {
+    usage("cannot resolve the Windows local application data directory");
   }
   return {
-    data: env.APPDATA,
-    config: env.APPDATA,
-    // Roaming is the honest fallback: a cache that roams is wasteful, not wrong.
-    cache: set(env.LOCALAPPDATA) ? env.LOCALAPPDATA : env.APPDATA,
+    data: env.LOCALAPPDATA,
+    config: set(env.APPDATA) ? env.APPDATA : env.LOCALAPPDATA,
+    cache: env.LOCALAPPDATA,
   };
 }
 
@@ -45,18 +47,21 @@ function requireHome(env) {
   return env;
 }
 
+// POSIX paths are built with path.posix whatever the host: the resolution is a
+// pure function of platform and environment, and a Windows host would turn
+// every forward slash of a POSIX home into a backslash.
 function macosPaths(env) {
-  const support = path.join(env.HOME, "Library", "Application Support");
+  const support = path.posix.join(env.HOME, "Library", "Application Support");
   // XDG variables are deliberately ignored here. They are common on a machine
   // that also runs Linux tooling, and letting one relocate macOS state would
   // move a user's sessions the day they install something unrelated.
   return { data: support, config: support,
-    cache: path.join(env.HOME, "Library", "Caches") };
+    cache: path.posix.join(env.HOME, "Library", "Caches") };
 }
 
 function xdgPaths(env) {
-  const fallback = { data: path.join(env.HOME, ".local", "share"),
-    config: path.join(env.HOME, ".config"), cache: path.join(env.HOME, ".cache") };
+  const fallback = { data: path.posix.join(env.HOME, ".local", "share"),
+    config: path.posix.join(env.HOME, ".config"), cache: path.posix.join(env.HOME, ".cache") };
   return Object.fromEntries(AREAS.map(area =>
     [area, set(env[XDG[area]]) ? env[XDG[area]] : fallback[area]]));
 }

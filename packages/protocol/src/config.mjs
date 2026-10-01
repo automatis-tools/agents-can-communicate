@@ -53,8 +53,12 @@ function assertRoot(root, source) {
   if (typeof root !== "string" || root === "") {
     data("each workspace root must be a non-empty string", { source, root });
   }
-  // Absolute is one machine's layout committed to a shared repository.
-  if (root.startsWith("/") || /^[A-Za-z]:[\\/]/.test(root)) {
+  // Absolute is one machine's layout committed to a shared repository. On
+  // Windows a leading separator is rooted on the current drive, `\\host\share`
+  // reaches another machine and `D:x` is relative to another drive's current
+  // directory, so a drive letter or a leading separator is refused on every
+  // platform: a config that is harmless on POSIX travels to Windows unchanged.
+  if (/^[\\/]/.test(root) || /^[A-Za-z]:/.test(root)) {
     data("a workspace root must be relative to the config", { source, root });
   }
   // Checked on the segments rather than the string: `packages/../../escape`

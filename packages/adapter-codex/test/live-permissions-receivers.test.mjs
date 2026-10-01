@@ -1,11 +1,12 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import test from "node:test";
+import nodeTest from "node:test";
 
 import { createCodexAdapter } from "../src/adapter.mjs";
 import { grantPath, outgoingStatus, prepareLivePermissions, removeLivePermissions }
   from "../src/live-permissions.mjs";
+import { posixTransportTest as test } from "../../../tests/helpers/platform-scope.mjs";
 
 // Issue #213. The profile allowed ACC's channel directory and the Codex control
 // socket; Claude Code receives in `/tmp/cc-socks`, so every `acc reply` from a

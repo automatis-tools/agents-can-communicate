@@ -65,7 +65,13 @@ test("retention cannot unlink outside after its validated parent is replaced", a
 
 test("journal retirement is logical and retains the decided transaction", async t => {
   const { root, store } = await fixture(t);
-  await store.transaction(async tx => { tx.put("workspace", WORKSPACE, workspaceRecord()); });
+  // A record and an event go through the journal; one record alone does not.
+  await store.transaction(async tx => {
+    tx.put("workspace", WORKSPACE, workspaceRecord());
+    tx.append({ schemaVersion: SCHEMA_VERSION, eventId: "event_journalled",
+    workspaceId: WORKSPACE, actorSessionId: "session_a", type: "workspace.materialised",
+    occurredAt: NOW, payload: {} });
+  });
 
   assert.deepEqual(await readOpenJournals(store.paths, root), []);
   assert.deepEqual((await readdir(store.paths.journal)).filter(name => name.endsWith(".json")),
@@ -162,7 +168,10 @@ test("ephemeral markers are selected by numeric sequence rather than filename or
 });
 
 const markerCount = async (root, kind, id) => (await readdir(
-  path.join(root, "retained", "ephemeral", kind, id))).length;
+  path.join(root, "retained", "ephemeral", kind, id)).catch(error => {
+  if (error.code === "ENOENT") return [];
+  throw error;
+})).length;
 
 test("renewing a present record adds no marker: history grows only with real changes",
   async t => {
@@ -174,13 +183,16 @@ test("renewing a present record adds no marker: history grows only with real cha
       await store.ephemeral.put("deliveryBinding", "session_a", binding());
       await store.ephemeral.update("deliveryBinding", "session_a", current => current);
     }
-    assert.equal(await markerCount(root, "deliveryBinding", "session_a"), 1);
+    // A record with no marker is present, so its first publication records
+    // nothing either: a new session paid an atomic write, three flushes on
+    // Windows, for each ephemeral record it opened with.
+    assert.equal(await markerCount(root, "deliveryBinding", "session_a"), 0);
 
     await store.ephemeral.delete("deliveryBinding", "session_a");
     await store.ephemeral.put("deliveryBinding", "session_a", binding());
     await store.ephemeral.put("deliveryBinding", "session_a", binding());
-    assert.equal(await markerCount(root, "deliveryBinding", "session_a"), 3,
-      "present, deleted, present: one marker per change of state");
+    assert.equal(await markerCount(root, "deliveryBinding", "session_a"), 2,
+      "deleted, present: one marker per change of state");
     assert.deepEqual(await store.ephemeral.get("deliveryBinding", "session_a"), binding());
   });
 
@@ -191,6 +203,7 @@ test("only the newest marker decides, so an older one is never read back", async
   // lookup no longer opens it: unreadable bytes there are never reached.
   const older = path.join(root, "retained", "ephemeral", "deliveryBinding", "session_a",
     "0000000000000001.json");
+  await mkdir(path.dirname(older), { recursive: true });
   await writeFile(older, "{ not json");
   await writeEphemeralMarker(root, "0000000000000002", "deleted");
 

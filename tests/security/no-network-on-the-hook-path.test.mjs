@@ -40,7 +40,7 @@ const NATIVE_TRANSPORT = new Set(["inbox-delivery.mjs", "native-delivery.mjs", "
 // socket (node:net) is forbidden too, except in the named native-transport
 // files.
 const BOOTSTRAP_MODULES = ["entry.mjs", "command-prefix.mjs", "state.mjs", "generation-files.mjs",
-    "mutex.mjs", "leases.mjs", "schedule.mjs", "policy.mjs"];
+    "mutex.mjs", "leases.mjs", "schedule.mjs", "policy.mjs", "portable-fs.mjs"];
 const bootstrap = path.join(repo, "packages", "cli", "src", "managed-runtime");
 
 const REMOTE = [

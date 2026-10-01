@@ -2,9 +2,10 @@ import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { lstat, readFile } from "node:fs/promises";
 import path from "node:path";
-import test from "node:test";
+import nodeTest from "node:test";
 import { CODEX_INSTALLER, installCodexStandalone } from "../src/standalone-install.mjs";
 import { downloadVerifiedInstaller } from "../../installer/src/verified-download.mjs";
+import { posixTransportTest as test } from "../../../tests/helpers/platform-scope.mjs";
 
 const install = (plan, { fetch, ...options }) => installCodexStandalone(plan,
   { ...options, download: source => downloadVerifiedInstaller(source, { fetch }) });

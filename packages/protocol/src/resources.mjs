@@ -14,6 +14,10 @@
  */
 const GLOB = "/**";
 
+// A Windows agent separates segments with a backslash. Only the path part of a
+// `file:` resource is converted; see normaliseResource.
+const slashes = value => value.replaceAll("\\", "/");
+
 function normalisePath(value) {
   const segments = [];
   for (const segment of value.split("/")) {
@@ -44,7 +48,7 @@ function normalisePath(value) {
  */
 export function assertMatchableResource(resource, fail) {
   if (typeof resource !== "string" || !resource.startsWith("file:")) return resource;
-  const rest = resource.slice("file:".length);
+  const rest = slashes(resource.slice("file:".length));
   if (rest.endsWith("/") && rest !== "/") {
     fail(`${resource} names a directory; claim ${resource}** to cover what is in it`);
   }
@@ -61,7 +65,7 @@ export function normaliseResource(resource) {
   const colon = resource.indexOf(":");
   if (colon === -1 || resource.slice(0, colon) !== "file") return resource;
 
-  const rest = resource.slice(colon + 1);
+  const rest = slashes(resource.slice(colon + 1));
   const glob = rest.endsWith(GLOB);
   const body = glob ? rest.slice(0, -GLOB.length) : rest;
   // An absolute path keeps its leading slash: it names a different thing from

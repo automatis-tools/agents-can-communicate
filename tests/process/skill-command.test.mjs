@@ -9,7 +9,10 @@ import { promisify } from "node:util";
 
 import { ALL_ADAPTERS, clientContext } from "@agents-can-communicate/cli";
 
+import { modelShells, runInShell } from "../helpers/host-shells.mjs";
+
 const run = promisify(execFile);
+const windows = process.platform === "win32";
 const repo = path.resolve(import.meta.dirname, "..", "..");
 const acc = path.join(repo, "bin", "acc.mjs");
 
@@ -44,12 +47,19 @@ async function installed(t, adapterId, relative) {
 /**
  * The shim an installed skill names. Quoted on most clients; bare on Antigravity
  * CLI where the path is one shell word, because 1.2.12 matched no allow rule
- * against a command whose first word was quoted (issue #214).
+ * against a command whose first word was quoted (issue #214). On Windows every
+ * client gets `node "<shim with forward slashes>"`, which bash, PowerShell and
+ * cmd all read; `command` is that whole text.
  */
 const shimIn = text => {
+  if (windows) {
+    const match = /(node "([A-Za-z]:\/[^"]*acc-cli\.mjs)")/.exec(text);
+    return match === null ? undefined : match[2];
+  }
   const match = /"([^"]*acc-cli\.sh)"|(?<![\w"])(\/[^\s"`]+acc-cli\.sh)/.exec(text);
   return match === null ? undefined : match[1] ?? match[2];
 };
+const commandIn = text => /node "[A-Za-z]:\/[^"]*acc-cli\.mjs"/.exec(text)?.[0];
 
 const ADAPTERS = [
   ["kimi", ".kimi-code/plugins/managed/agents-can-communicate/skills/acc/SKILL.md"],
@@ -75,7 +85,10 @@ for (const [adapter, relative] of ADAPTERS) {
     // a script: the shim holds the pinning, so nothing here is found on PATH.
     const shim = shimIn(text);
     assert.equal(typeof shim, "string", "the skill carries no path to the CLI at all");
-    assert.equal(((await stat(shim)).mode & 0o111) !== 0, true,
+    // Windows has no execute bit: the command there names node, which runs the
+    // shim as a script.
+    const info = await stat(shim);
+    assert.equal(windows ? info.isFile() : (info.mode & 0o111) !== 0, true,
       "the skill names a command the agent cannot execute");
   });
 }
@@ -93,11 +106,20 @@ for (const [adapter, relative] of [ADAPTERS[0], ADAPTERS[5]]) {
 
     const project = path.join(home, "project");
     await mkdir(project, { recursive: true });
-    const { stdout } = await run(shim, ["status", "--cwd", project, "--json"],
-      { env: { ...process.env, ACC_DATA_HOME: path.join(home, "data"),
-        GIT_DIR: "", GIT_WORK_TREE: "" } });
-
-    assert.equal(JSON.parse(stdout).ok, true);
+    const env = { ...process.env, ACC_DATA_HOME: path.join(home, "data"),
+      GIT_DIR: "", GIT_WORK_TREE: "" };
+    if (!windows) {
+      const { stdout } = await run(shim, ["status", "--cwd", project, "--json"], { env });
+      assert.equal(JSON.parse(stdout).ok, true);
+      return;
+    }
+    // Windows: the command as the skill writes it, in each shell a model's
+    // shell tool runs there.
+    for (const model of await modelShells()) {
+      const { stdout } = await runInShell(model.shell, model.call([commandIn(text), "status",
+        "--cwd", model.ref("TEST_PROJECT"), "--json"]), { env: { ...env, TEST_PROJECT: project } });
+      assert.equal(JSON.parse(stdout).ok, true, `${model.shell} did not run ${commandIn(text)}`);
+    }
   });
 }
 

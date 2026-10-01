@@ -1,9 +1,11 @@
-import { lstat, mkdir, mkdtemp, open, readFile, readdir, realpath, rename, rm }
+import { lstat, mkdir, mkdtemp, open, readFile, readdir, realpath }
   from "node:fs/promises";
 import path from "node:path";
 
 import { collectFile, fingerprint } from "./generation-files.mjs";
+import { removeTree, renameEntry } from "./portable-fs.mjs";
 import { attachStagingTemp, holdStagedGeneration, releaseStagingHold } from "./staging.mjs";
+import { syncDirectory } from "./state.mjs";
 
 const NAME = "agents-can-communicate";
 const STABLE = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/;
@@ -144,19 +146,17 @@ export async function stageOwnGeneration({ packageRoot, managerRoot }) {
         } finally { await handle.close(); }
       }
       for (const directory of [...directories].sort((a, b) => b.length - a.length)) {
-        const handle = await open(directory, "r");
-        try { await handle.sync(); } finally { await handle.close(); }
+        await syncDirectory(directory);
       }
       try {
-        await rename(staging, target);
+        await renameEntry(staging, target);
       } catch (error) {
         if (!["EEXIST", "ENOTEMPTY"].includes(error.code) || !await existingMatches(target, files)) throw error;
       }
-      const handle = await open(generations, "r");
-      try { await handle.sync(); } finally { await handle.close(); }
+      await syncDirectory(generations);
       return { ...result, hold };
     } finally {
-      await rm(staging, { recursive: true, force: true });
+      await removeTree(staging);
     }
   } catch (error) {
     await releaseStagingHold(hold);

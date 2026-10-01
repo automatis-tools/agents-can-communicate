@@ -10,6 +10,7 @@ import { archive, selectLaunchHook }
   from "../../scripts/e2e/codex-local-daemon-actions.mjs";
 import { createPtyDriver }
   from "../../scripts/e2e/codex-local-daemon-harness.mjs";
+import { POSIX_LIVE_TRANSPORT } from "../helpers/platform-scope.mjs";
 
 const execute = promisify(execFile);
 const python = async () => (await execute("/usr/bin/env", ["python3", "-c",
@@ -30,7 +31,10 @@ test("loaded resumes require a fresh exact UserPromptSubmit while new launches r
   assert.equal(selectLaunchHook([start], { startedAt }), start);
 });
 
-test("archive confirmation requires every observed popup literal", async t => {
+// These drive the harness's Python PTY, which is POSIX-only; Windows live delivery
+// (0.9.x) gets a harness of its own.
+test("archive confirmation requires every observed popup literal",
+  { skip: POSIX_LIVE_TRANSPORT }, async t => {
   const root = await mkdtemp(path.join(os.tmpdir(), "codex-archive-guard-"));
   t.after(() => rm(root, { recursive: true, force: true }));
   const pty = createPtyDriver({ python: await python() });
@@ -42,7 +46,8 @@ test("archive confirmation requires every observed popup literal", async t => {
   assert.equal((await pty.request({ action: "status", role: "receiver-b1" })).archiveConfirmation, false);
 });
 
-test("archive confirms the precise popup by selecting its second item", async t => {
+test("archive confirms the precise popup by selecting its second item",
+  { skip: POSIX_LIVE_TRANSPORT }, async t => {
   const root = await mkdtemp(path.join(os.tmpdir(), "codex-archive-test-"));
   t.after(() => rm(root, { recursive: true, force: true }));
   const marker = path.join(root, "archive-keys.bin");

@@ -17,12 +17,14 @@ export const RETIRED_ENTRY_KINDS = Object.freeze(["acc-bootstrap", "acc-claude-c
 
 // Bootstrap resolution deliberately needs only Node built-ins: no selected
 // generation is imported until admission and its actual PID lease are durable.
+// The same rule as platformDataHome, which this module may not import.
 export function managerLocation({ env = process.env, platform = process.platform } = {}) {
-  const data = env.ACC_DATA_HOME || (platform === "win32" ? env.APPDATA
-    : platform === "darwin" ? env.HOME && path.join(env.HOME, "Library", "Application Support")
-      : env.XDG_DATA_HOME || env.HOME && path.join(env.HOME, ".local", "share"));
-  if (typeof data !== "string" || !path.isAbsolute(data)) throw new Error("cannot resolve ACC data home");
-  return path.join(data, "acc", "runtime");
+  const flavour = platform === "win32" ? path.win32 : path.posix;
+  const data = env.ACC_DATA_HOME || (platform === "win32" ? env.LOCALAPPDATA
+    : platform === "darwin" ? env.HOME && flavour.join(env.HOME, "Library", "Application Support")
+      : env.XDG_DATA_HOME || env.HOME && flavour.join(env.HOME, ".local", "share"));
+  if (typeof data !== "string" || !flavour.isAbsolute(data)) throw new Error("cannot resolve ACC data home");
+  return flavour.join(data, "acc", "runtime");
 }
 
 export function invokedDirectly(url) {

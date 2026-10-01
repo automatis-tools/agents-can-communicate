@@ -2,11 +2,12 @@ import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
 import { chmod, readFile, rename, stat, symlink, writeFile } from "node:fs/promises";
 import path from "node:path";
-import test from "node:test";
+import nodeTest from "node:test";
 
 import { bindNativeSession, retireNativeSession } from "../src/native-delivery.mjs";
 import { readNativeEndpoint, writeNativeEndpoint } from "../src/native-endpoint.mjs";
 import { nativeFixture } from "./native-fixture.mjs";
+import { posixTransportTest as test } from "../../../tests/helpers/platform-scope.mjs";
 
 async function registered(t) {
   const h = await nativeFixture(t);

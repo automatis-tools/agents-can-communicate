@@ -1,21 +1,13 @@
 import { createHash, randomUUID } from "node:crypto";
-import { link, open, readdir, rename } from "node:fs/promises";
+import { link, open, readdir } from "node:fs/promises";
 import path from "node:path";
 
 import { AccError, EXIT } from "@agents-can-communicate/protocol";
 
 import { assertPublicationDeadline } from "./deadline.mjs";
+import { renameReplacing, syncEntry } from "./portable-fs.mjs";
 import { assertManagedDirectory, ensureManagedDirectory } from "./safe-directory.mjs";
 import { readRegularNoFollow } from "./safe-file.mjs";
-
-async function syncDirectory(directory) {
-  const handle = await open(directory, "r");
-  try {
-    await handle.sync();
-  } finally {
-    await handle.close();
-  }
-}
 
 export function encode(value) {
   const serialised = JSON.stringify(value, null, 2);
@@ -65,7 +57,7 @@ async function replaceHandleBytes(handle, bytes) {
  */
 export async function publishAtomic(destination, bytes,
   { root, tmpDir, stageDir, replace = false, deadlineAt, afterAccepted, afterStageEnsured,
-    afterStageRenamed }) {
+    afterStageRenamed, sync = syncEntry }) {
   assertPublicationDeadline(deadlineAt);
   // The accepted stage lives apart from the partial a failed publication
   // leaves, so what a file is follows from the directory it was created in
@@ -106,8 +98,11 @@ export async function publishAtomic(destination, bytes,
       await handle.close();
       handle = null;
       assertPublicationDeadline(deadlineAt);
-      await rename(temporary, destination);
-      await syncDirectory(destinationDir);
+      await renameReplacing(temporary, destination, { deadlineAt });
+      // The bytes are at their name now: the write is decided and visible, and
+      // its flush is bounded by its own wait, never by the caller's deadline,
+      // which would report a published record as failed.
+      await sync(destinationDir, destination);
       return "published";
     }
 
@@ -115,7 +110,7 @@ export async function publishAtomic(destination, bytes,
       assertPublicationDeadline(deadlineAt);
       await link(temporary, destination);
       stageAcceptedBytes = true;
-      await syncDirectory(destinationDir);
+      await sync(destinationDir, destination);
       return "published";
     } catch (error) {
       if (error.code !== "EEXIST") throw error;
@@ -171,14 +166,14 @@ async function retainAcceptedStage({ root, stageDir, temporary, stage, afterStag
     await ensureManagedDirectory(root, stageDir);
     await afterStageEnsured?.();
     try {
-      await rename(temporary, stage);
+      await renameReplacing(temporary, stage);
       break;
     } catch (error) {
       if (error.code !== "ENOENT" || attempt >= STAGE_RETRIES) throw error;
     }
   }
   await afterStageRenamed?.();
-  await syncDirectory(stageDir).catch(error => {
+  await syncEntry(stageDir, stage).catch(error => {
     if (error.code !== "ENOENT") throw error;
   });
 }

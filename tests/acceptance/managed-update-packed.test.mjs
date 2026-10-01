@@ -11,13 +11,13 @@ import { createUpdateRegistry } from "../helpers/update-registry.mjs";
 import { connectMcp } from "../helpers/mcp-client.mjs";
 const run = promisify(execFile);
 
-async function until(predicate, label, timeout = 20_000) {
+async function until(predicate, label, timeout = 20_000, evidence = async () => "") {
   const deadline = Date.now() + timeout;
   while (Date.now() < deadline) {
     if (await predicate()) return;
     await new Promise(resolve => setTimeout(resolve, 30));
   }
-  assert.fail(`timed out: ${label}`);
+  assert.fail(`timed out: ${label}${await evidence()}`);
 }
 const managerOf = f => path.join(f.dataHome, "acc", "runtime");
 const readState = f => readFile(path.join(managerOf(f), "control.json"), "utf8").then(JSON.parse);
@@ -59,7 +59,14 @@ function writeForeignHold(f, workspaceId, storeVersion) {
 async function stopBackground(f) {
   const file = path.join(managerOf(f), "worker", "manager.lock", "owner.json");
   const owner = await readFile(file, "utf8").then(JSON.parse).catch(() => null);
-  if (owner?.pid) { try { process.kill(owner.pid, "SIGTERM"); } catch { /* Already finished. */ } }
+  if (!owner?.pid) return;
+  try { process.kill(owner.pid, "SIGTERM"); } catch { return; /* Already finished. */ }
+  // Its working directory is the runtime root, which Windows cannot remove
+  // while it runs; wait for it to go before the fixture is removed.
+  for (const deadline = Date.now() + 10_000; Date.now() < deadline;) {
+    try { process.kill(owner.pid, 0); } catch { return; }
+    await new Promise(resolve => setTimeout(resolve, 50));
+  }
 }
 
 test("installed manual update verifies an archive, waits for a hold it cannot judge, then switches past a matching one with reusable continuity", async t => {
@@ -98,7 +105,10 @@ test("installed manual update verifies an archive, waits for a hold it cannot ju
     const client = connectMcp({ cwd: f.project, dataHome: f.dataHome,
       binary: f.mcpBin, env: { ...f.env, ACC_MCP_PARTICIPANT: "update_peer",
         ACC_MCP_WORKSPACE: f.project }, participant: "update_peer" });
-    t.after(() => { if (client.child.exitCode === null) client.child.kill("SIGKILL"); });
+    f.defer(async () => {
+      if (client.child.exitCode === null) client.child.kill("SIGKILL");
+      await client.closed;
+    });
     return client;
   };
   const initialize = async client => {
@@ -120,7 +130,7 @@ test("installed manual update verifies an archive, waits for a hold it cannot ju
     "node_modules", "@agents-can-communicate", "cli", "src", "managed-runtime", "mutex.mjs")));
   const entered = Promise.withResolvers();
   const released = Promise.withResolvers();
-  t.after(() => released.resolve());
+  f.defer(() => released.resolve());
   const holder = withManagerLock(path.join(managerOf(f), "worker"), async () => {
     entered.resolve();
     await released.promise;
@@ -209,11 +219,18 @@ test("normal installation enables a detached update that downloads and activates
   const registry = await createUpdateRegistry(t, f);
   const env = { ...f.env, ACC_NO_UPDATE_CHECK: "0", npm_config_registry: registry.url,
     npm_config_cache: path.join(f.root, "update-cache") };
-  t.after(() => stopBackground(f));
+  f.defer(() => stopBackground(f));
   await f.setClientVersions({ claude: "2.1.259", codex: "0.135.0" });
   await f.acc(["install", "--adapter", "claude_code"], env);
+  // A background update downloads and verifies a package: 6 s of this test on
+  // Linux, while on windows-latest a manual update took most of 90. The window
+  // follows the slower machine, and a miss says where the worker stopped.
   await until(async () => (await readState(f)).active.version === registry.version,
-    "background candidate activation");
+    "background candidate activation", 90_000, async () => {
+      const worker = await readdir(path.join(managerOf(f), "worker")).catch(error => error.code);
+      return `\ncontrol: ${JSON.stringify(await readState(f).catch(error => error.code))}`
+        + `\nworker: ${JSON.stringify(worker)}\nrequests: ${JSON.stringify(registry.requests)}`;
+    });
   assert.equal((await readState(f)).auto, true);
   assert.equal(registry.requests.some(url => url.endsWith("/latest")), true);
   assert.equal(registry.requests.some(url => url.includes(".tgz")), true);

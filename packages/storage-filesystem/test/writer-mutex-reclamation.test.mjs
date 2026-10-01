@@ -223,3 +223,60 @@ async function runWorker() {
     }
   }
 }
+
+// Windows refuses to rename a directory while a file inside it is open, and
+// every waiting writer opens the lock's owner.json to see who holds it. Eight
+// writers polling one lock on windows-latest held its release back until one of
+// them gave up at the acquire timeout. `rename` below refuses the move the way
+// Windows does whenever a reader could be inside.
+if (!workerMode) test("windows: a reader inside the lock cannot hold its release back", async t => {
+  const { root, paths, directory } = await ownerlessLock(t);
+  const { rename, rm: remove } = await import("node:fs/promises");
+  await remove(directory, { recursive: true });
+  const refusingDirectoryMoves = async (from, to) => {
+    if (from === directory) {
+      throw Object.assign(new Error(`EPERM: operation not permitted, rename '${from}' -> '${to}'`),
+        { code: "EPERM", syscall: "rename" });
+    }
+    return rename(from, to);
+  };
+  const write = () => withWriterMutex(paths, {
+    root,
+    clock: { now: () => new Date().toISOString() },
+    platform: "win32",
+    rename: refusingDirectoryMoves,
+    acquireTimeoutMs: 1_000,
+    waitMs: 1,
+  }, async () => "written");
+
+  const started = Date.now();
+  assert.equal(await write(), "written");
+  assert.equal(await write(), "written");
+  assert.ok(Date.now() - started < 1_000, "a release waited on the directory move");
+  assert.deepEqual(await readdir(paths.locks), []);
+});
+
+// Reclaiming a dead owner moves the lock directory, which Windows refuses while
+// any waiting writer has the owner record open. The move was retried for two
+// seconds of its own, past the acquire deadline, and then surfaced a raw EPERM.
+if (!workerMode) test("windows: a reclaim the readers hold back ends at the acquire deadline, as a conflict", async t => {
+  const { root, paths, directory } = await ownerlessLock(t);
+  await writeFile(path.join(directory, "owner.json"),
+    JSON.stringify({ pid: DEAD_PID, token: "dead", acquiredAt: new Date().toISOString() }));
+  const { rename } = await import("node:fs/promises");
+  const refusingDirectoryMoves = async (from, to) => {
+    if (from === directory) {
+      throw Object.assign(new Error(`EPERM: operation not permitted, rename '${from}'`),
+        { code: "EPERM", syscall: "rename" });
+    }
+    return rename(from, to);
+  };
+  const started = Date.now();
+  const outcome = await withWriterMutex(paths, {
+    root, clock: { now: () => new Date().toISOString() }, platform: "win32",
+    rename: refusingDirectoryMoves, pidIsAlive: () => false, acquireTimeoutMs: 400, waitMs: 5,
+  }, async () => "written").then(() => null, error => error);
+
+  assert.equal(outcome?.code, EXIT.CONFLICT, `${outcome?.code}: ${outcome?.message}`);
+  assert.ok(Date.now() - started < 1_500, `the reclaim held the writer ${Date.now() - started} ms`);
+});

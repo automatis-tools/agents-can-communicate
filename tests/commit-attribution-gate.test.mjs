@@ -36,8 +36,21 @@ function gitEnv(extra = {}) {
     GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@example.invalid",
     GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@example.invalid", ...extra };
   for (const name of GIT_VARIABLES) delete env[name];
+  // Windows names ignore case: the inherited `Path` would stand beside a `PATH`
+  // given here, so the one given here is the only one left.
+  if (process.platform === "win32") {
+    for (const name of Object.keys(extra)) {
+      for (const key of Object.keys(env)) {
+        if (key !== name && key.toUpperCase() === name.toUpperCase()) delete env[key];
+      }
+    }
+  }
   return env;
 }
+
+// git starts the editor through sh, which reads a backslash as an escape: a
+// Windows path reaches it with forward slashes, which Windows accepts as well.
+const editorCommand = file => (process.platform === "win32" ? file.replaceAll("\\", "/") : file);
 
 async function attempt(file, args, options) {
   try {
@@ -116,8 +129,10 @@ test("an editor session that keeps comments cannot hide a trailer in one", async
   const editor = path.join(base, "editor.sh");
   await writeFile(editor, '#!/bin/sh\nprintf "fix: z\\n\\n# Claude-Session: https://claude.ai/code/session_x\\n" > "$1"\n');
   await chmod(editor, 0o755);
-  const result = await attempt("git", ["-C", root, "commit", "-q"], { env: gitEnv({ GIT_EDITOR: editor }) });
+  const result = await attempt("git", ["-C", root, "commit", "-q"], { env: gitEnv({ GIT_EDITOR: editorCommand(editor) }) });
   assert.notEqual(result.code, 0, "verbatim cleanup stored a commented trailer");
+  // The gate refused it, rather than an editor that never ran.
+  assert.match(result.stderr, /Claude attribution/);
 });
 
 test("a scissors line typed in the editor, with no diff below it, hides nothing", async t => {
@@ -128,8 +143,9 @@ test("a scissors line typed in the editor, with no diff below it, hides nothing"
   await writeFile(editor, "#!/bin/sh\nprintf \"fix: w\\n\\n# ------------------------ >8 ------------------------\\n"
     + 'Claude-Session: https://claude.ai/code/session_x\\n" > "$1"\n');
   await chmod(editor, 0o755);
-  const result = await attempt("git", ["-C", root, "commit", "-q"], { env: gitEnv({ GIT_EDITOR: editor }) });
+  const result = await attempt("git", ["-C", root, "commit", "-q"], { env: gitEnv({ GIT_EDITOR: editorCommand(editor) }) });
   assert.notEqual(result.code, 0, "a trailer below a typed scissors line was committed");
+  assert.match(result.stderr, /Claude attribution/);
 });
 
 // git builds its scissors line and recognises comments from core.commentChar.
@@ -142,7 +158,7 @@ test("with another comment character, only that character marks comments and sci
     await chmod(editor, 0o755);
     await writeFile(path.join(root, `${name}.txt`), `${name}\n`);
     await git(["add", `${name}.txt`]);
-    return attempt("git", ["-C", root, "commit", "-q"], { env: gitEnv({ GIT_EDITOR: editor }) });
+    return attempt("git", ["-C", root, "commit", "-q"], { env: gitEnv({ GIT_EDITOR: editorCommand(editor) }) });
   };
 
   const dropped = await editorWriting("dropped", "fix: c\\n\\n; Claude-Session: https://claude.ai/code/session_x\\n");
@@ -153,6 +169,7 @@ test("with another comment character, only that character marks comments and sci
   const kept = await editorWriting("kept", "fix: d\\n\\n# ------------------------ >8 ------------------------\\n"
     + "Claude-Session: https://claude.ai/code/session_x\\n");
   assert.notEqual(kept.code, 0, "a `#` scissors line hid a trailer git keeps under `;` comments");
+  assert.match(kept.stderr, /Claude attribution/);
 });
 
 test("under scissors cleanup an editor session loses everything below the line, so it passes", async t => {
@@ -164,7 +181,7 @@ test("under scissors cleanup an editor session loses everything below the line, 
   await writeFile(editor, "#!/bin/sh\nprintf \"fix: s\\n\\n# ------------------------ >8 ------------------------\\n"
     + 'Claude-Session: https://claude.ai/code/session_x\\n" > "$1"\n');
   await chmod(editor, 0o755);
-  const result = await attempt("git", ["-C", root, "commit", "-q"], { env: gitEnv({ GIT_EDITOR: editor }) });
+  const result = await attempt("git", ["-C", root, "commit", "-q"], { env: gitEnv({ GIT_EDITOR: editorCommand(editor) }) });
   assert.equal(result.code, 0, result.stderr);
   assert.equal((await git(["log", "-1", "--format=%B"])).stdout.trim(), "fix: s");
 });
@@ -181,7 +198,7 @@ test("a trailer in a comment or in the `git commit -v` diff is not the message",
     + ' | cat - "$1" > "$1.new"\nmv "$1.new" "$1"\n');
   await chmod(editor, 0o755);
   const result = await attempt("git", ["-C", root, "commit", "-q", "-v"],
-    { env: gitEnv({ GIT_EDITOR: editor }) });
+    { env: gitEnv({ GIT_EDITOR: editorCommand(editor) }) });
   assert.equal(result.code, 0, result.stderr);
 });
 
@@ -191,7 +208,11 @@ async function stubNpmPath(t) {
   t.after(() => rm(stub, { recursive: true, force: true }));
   await writeFile(path.join(stub, "npm"), "#!/bin/sh\nexit 0\n");
   await chmod(path.join(stub, "npm"), 0o755);
-  return [stub, path.dirname(process.execPath), "/usr/bin", "/bin"].join(path.delimiter);
+  // Windows has no /usr/bin: git, and the sh and xargs the hook runs, are where
+  // the machine's own PATH finds them, behind the stub.
+  const system = process.platform === "win32"
+    ? (process.env.PATH ?? process.env.Path ?? "").split(path.delimiter) : ["/usr/bin", "/bin"];
+  return [stub, path.dirname(process.execPath), ...system].join(path.delimiter);
 }
 
 test("the pre-push hook refuses attributed commits before the suite runs", async t => {

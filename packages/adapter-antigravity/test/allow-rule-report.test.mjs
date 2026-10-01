@@ -1,10 +1,14 @@
 import assert from "node:assert/strict";
 import path from "node:path";
-import test from "node:test";
+import nodeTest from "node:test";
 
 import { detectAntigravity, doctorAntigravity, installAntigravity,
   planAntigravityInstall } from "../src/install.mjs";
 import { agyHome } from "./agy-home.mjs";
+import { NO_ALLOW_RULE_ON_WINDOWS } from "../../../tests/helpers/platform-scope.mjs";
+
+const test = (name, ...rest) => { const fn = rest.pop(); const options = rest[0] ?? {};
+  return nodeTest(name, { ...options, skip: options.skip ?? NO_ALLOW_RULE_ON_WINDOWS }, fn); };
 
 /**
  * What ACC says about the approval prompt, before and after the rule exists.
@@ -140,4 +144,13 @@ test("the plan names the settings file whenever a rule can be written", async t 
   assert.equal(artifact.kind, "merge");
   assert.equal(unsafe.some(item => item.path === quoted.settings), false,
     "the plan promises an edit that a quoted wrapper path never gets");
+});
+
+nodeTest("windows: no rule is written, and doctor says why and what that costs", async () => {
+  const { inspectAllowRule } = await import("../src/allow-rule.mjs");
+  const report = await inspectAllowRule({ home: "C:\\Users\\Ann", hostPlatform: "win32" });
+  assert.equal(report.state, "unmatchable");
+  assert.equal(report.wrapper.endsWith("acc-cli.mjs"), true, report.wrapper);
+  assert.match(report.diagnostic, /Windows/);
+  assert.match(report.diagnostic, /node/);
 });

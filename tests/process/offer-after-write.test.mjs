@@ -27,10 +27,20 @@ const adapter = {
 };
 
 const noProcessTable = async () => new Map();
+// Setup starts sessions and is no subject of any case here: a start that missed
+// the five-second hook budget on a loaded Windows runner failed open, and its
+// late continuation still held the store lock the next step waited on. Cases
+// about the budget pass their own.
+const SETUP = { budgetMs: 30_000 };
+// A turn whose case reads and asserts between the turn and its offer commit:
+// the commit has to land inside the turn's budget, and on a loaded windows-latest
+// runner the case's own checks used the default five seconds up first.
+const UNHURRIED = { budgetMs: 30_000 };
 const event = (kind, cwd, sessionId) => ({ kind, cwd, sessionId,
   model: null, parentSessionId: null, tool: null, targets: [] });
 
-async function fixture(t, { clientVersion = "1.0.0", selectedAdapter = adapter } = {}) {
+async function fixture(t, { clientVersion = "1.0.0", selectedAdapter = adapter,
+  setup = SETUP } = {}) {
   const root = await realpath(await mkdtemp(path.join(tmpdir(), "acc-offer-write-")));
   const dataHome = await realpath(await mkdtemp(path.join(tmpdir(), "acc-offer-data-")));
   t.after(() => Promise.all([rm(root, { recursive: true, force: true }),
@@ -39,8 +49,8 @@ async function fixture(t, { clientVersion = "1.0.0", selectedAdapter = adapter }
     payload: event(kind, root, sessionId), adapters: { test: selectedAdapter }, dataHome,
     readProcessTable: noProcessTable, probeClientVersion: async () => clientVersion,
     ...options });
-  const recipient = await invoke("sessionStart", "recipient-session");
-  const sender = await invoke("sessionStart", "sender-session");
+  const recipient = await invoke("sessionStart", "recipient-session", setup);
+  const sender = await invoke("sessionStart", "sender-session", setup);
   const recipientId = recipient.sessions
     .find(item => item.sessionId === recipient.accSessionId).participantId;
   const message = await sender.service.sendMessage({ sessionId: sender.accSessionId,
@@ -73,7 +83,7 @@ test("next-turn offer stays queued until the stdout writer completes", async t =
       "the receipt advanced while stdout was still crossing its boundary");
   };
 
-  const result = await invoke("beforeTurn", "recipient-session");
+  const result = await invoke("beforeTurn", "recipient-session", UNHURRIED);
   assert.equal((await receipt()).state, "queued");
   await writeOutput(result.stdout);
   assert.equal((await receipt()).state, "queued");
@@ -157,7 +167,8 @@ test("committing the same prepared offers twice is idempotent", async t => {
 });
 
 test("a rejected offer commit leaves that receipt queued", async t => {
-  const { invoke, receipt, recipient } = await fixture(t);
+  // The default budget at startup: this case expires it on purpose, below.
+  const { invoke, receipt, recipient } = await fixture(t, { setup: {} });
   const result = await invoke("beforeTurn", "recipient-session");
   // The startup hook's service is scoped to its five-second budget. Expire it
   // deliberately: under suite load the old fixture accidentally exercised that
@@ -219,7 +230,7 @@ test("an offered obligation becomes a pending count without another offer", asyn
 
 test("one turn offers every fitting addressed and already-present room receipt once", async t => {
   const { invoke, recipient, recipientId, sender } = await fixture(t);
-  const other = await invoke("sessionStart", "other-recipient-session");
+  const other = await invoke("sessionStart", "other-recipient-session", SETUP);
   const otherId = other.sessions.find(item => item.sessionId === other.accSessionId).participantId;
   const send = (clientMessageId, toParticipantIds, subject) => sender.service.sendMessage({
     sessionId: sender.accSessionId, generation: sender.generation, clientMessageId,
@@ -229,7 +240,7 @@ test("one turn offers every fitting addressed and already-present room receipt o
   const shared = await send("client_shared", [recipientId, otherId], "shared");
   const room = await send("client_room", [], "room-only");
 
-  const result = await invoke("beforeTurn", "recipient-session");
+  const result = await invoke("beforeTurn", "recipient-session", UNHURRIED);
   assert.match(result.stdout, new RegExp(direct.messageId));
   assert.match(result.stdout, new RegExp(shared.messageId));
   assert.match(result.stdout, new RegExp(room.messageId));

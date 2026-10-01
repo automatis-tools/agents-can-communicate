@@ -2,11 +2,11 @@ import assert from "node:assert/strict";
 import { mkdtemp, realpath, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import test from "node:test";
 
 import { bindNativeSession, offerMessage }
   from "../../packages/adapter-codex/src/native-delivery.mjs";
 import { controlledCodexDaemon as daemon, THREAD } from "../helpers/codex-daemon.mjs";
+import { posixTransportTest as test } from "../helpers/platform-scope.mjs";
 const shortTmp = () => (process.platform === "win32" ? tmpdir() : "/tmp");
 
 async function directory(t) {

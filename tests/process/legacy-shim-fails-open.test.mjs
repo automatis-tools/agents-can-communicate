@@ -7,6 +7,7 @@ import test from "node:test";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { renderCommandShim } from "../helpers/legacy-shell-bootstrap.mjs";
+import { NO_LEGACY_ON_WINDOWS } from "../helpers/platform-scope.mjs";
 
 // A `claude` shim that ACC 0.7.x wrote stays on a user's PATH until the next
 // `acc install` or `acc update` retires it. Until then it must launch the plain
@@ -69,7 +70,8 @@ async function shimIn(place, { node = process.execPath, bootstrap = place.bootst
   return file;
 }
 
-test("a 0.7.x shim whose launcher ACC removed runs the vendor command untouched", async t => {
+test("a 0.7.x shim whose launcher ACC removed runs the vendor command untouched",
+  { skip: NO_LEGACY_ON_WINDOWS }, async t => {
   const here = await place(t);
   const shim = await shimIn(here, { bootstrap: path.join(here.root, "removed", "acc-bootstrap.mjs"),
     prefixArgs: ["--dangerously-load-development-channels", "plugin:agents-can-communicate@acc-local"] });
@@ -80,7 +82,8 @@ test("a 0.7.x shim whose launcher ACC removed runs the vendor command untouched"
   assert.deepEqual(seen.args, USER_ARGS, "no development-channel flag may be added");
 });
 
-test("a 0.7.x launcher that reaches the bootstrap stub runs the vendor command untouched", async t => {
+test("a 0.7.x launcher that reaches the bootstrap stub runs the vendor command untouched",
+  { skip: NO_LEGACY_ON_WINDOWS }, async t => {
   const here = await place(t);
   // What a 0.7.x managed launcher does with the active generation's entrypoint.
   const launcher = path.join(here.root, "acc-bootstrap-launcher.mjs");

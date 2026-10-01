@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readdir, writeFile } from "node:fs/promises";
+import { readFile, readdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import test from "node:test";
 import { setTimeout as delay } from "node:timers/promises";
@@ -141,8 +141,27 @@ test("installed lifecycle hooks keep one ACC owner per native session", async t 
     assert.equal(binding.accSessionId, rows[0].sessionId);
     await packed.acc(["heartbeat", "--session", binding.accSessionId,
       "--generation", binding.generation]);
-    await packed.hook("claude_code", { ...payload, hook_event_name: "SessionEnd" });
-    assert.equal(await packed.findBinding("native-process"), null);
+    const ending = performance.now();
+    const ended = await packed.hook("claude_code", { ...payload, hook_event_name: "SessionEnd" });
+    const endedMs = Math.round(performance.now() - ending);
+    // What to read when the detach did not happen: how the hook ended, and every
+    // lock the store still holds, with its owner.
+    const locks = async () => {
+      const found = [];
+      const walk = async directory => {
+        for (const entry of await readdir(directory, { withFileTypes: true }).catch(() => [])) {
+          const full = path.join(directory, entry.name);
+          if (entry.isDirectory()) await walk(full);
+          else if (/lock/.test(full)) found.push(`${path.relative(packed.dataHome, full)}: `
+            + (await readFile(full, "utf8").catch(error => error.code)).slice(0, 200));
+        }
+        if (/\.lock$/.test(directory)) found.push(`${path.relative(packed.dataHome, directory)}/`);
+      };
+      await walk(packed.dataHome);
+      return found.join("\n");
+    };
+    assert.equal(await packed.findBinding("native-process"), null,
+      `SessionEnd took ${endedMs} ms, stderr ${JSON.stringify(ended.stderr)}\n${await locks()}`);
     assert.equal((await packed.acc(["status"])).participants
       .filter(p => p.participantId === "process-writer" && p.presence !== "offline").length, 0);
     assert.deepEqual(await readdir(packed.project), []);

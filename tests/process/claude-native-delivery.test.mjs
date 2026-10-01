@@ -3,7 +3,6 @@ import { chmodSync, mkdirSync, writeFileSync } from "node:fs";
 import { mkdtemp, realpath, rm } from "node:fs/promises";
 import net from "node:net";
 import path from "node:path";
-import test from "node:test";
 
 import { createClaudeCodeAdapter } from "@agents-can-communicate/adapter-claude-code";
 import { createKimiAdapter } from "@agents-can-communicate/adapter-kimi";
@@ -11,6 +10,7 @@ import { createDeliveryRouter } from "@agents-can-communicate/delivery-router";
 import { readInstalledLivePolicy, recordInstall } from "@agents-can-communicate/installer";
 
 import { runHook } from "../../packages/hook-runner/src/runner.mjs";
+import { posixTransportTest as test } from "../helpers/platform-scope.mjs";
 
 // The installed path end to end, short of the vendor: the real hook binds a
 // Claude Code session to its inbox, the real router offers a peer's question

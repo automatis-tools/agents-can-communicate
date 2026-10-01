@@ -119,3 +119,62 @@ test("an accepted stage taken on every attempt ends the publication", { timeout:
     { root, tmpDir: paths.tmp, stageDir: paths.stage, afterStageEnsured }).catch(() => null);
   assert.ok(taken >= 2 && taken <= 10, `retried a bounded number of times, took ${taken}`);
 });
+
+// Measured on windows-latest, a directory another process removes or renames
+// while it resolves: realpath fails EBADF, fails EPERM, or answers with where
+// NTFS keeps a deleted directory that is still open, `C:\$Extend\$Deleted\<id>`.
+// Each means the handle it took was to a directory leaving that name - and the
+// name may already hold a new directory, as `stage` does after a sweep. So the
+// name is resolved again: a directory there is the answer, no directory is
+// gone, and a name that keeps answering that way while present is refused, as
+// it was before any of this: reading it as absent would read its records as none.
+const DELETED_PATH = "C:\\$Extend\\$Deleted\\0004000000046F6F0760FC9B";
+const answer = (kind, current) => {
+  if (kind === "deleted") return DELETED_PATH;
+  throw Object.assign(new Error(`${kind}: realpath '${current}'`), { code: kind, syscall: "realpath" });
+};
+
+for (const kind of ["EBADF", "EPERM", "deleted"]) {
+  test(`windows: ${kind} while a directory changes hands resolves the name again`, async t => {
+    const { root, paths } = await store(t);
+    let answered = false;
+    const once = async current => {
+      if (current !== paths.stage || answered) return realpath(current);
+      answered = true;
+      return answer(kind, current);
+    };
+    const found = await assertManagedDirectory(root, paths.stage, { platform: "win32", realpath: once });
+    assert.equal(found.directory, paths.stage, "a directory still under the name was read as gone");
+  });
+
+  test(`windows: ${kind} for a directory that left its name is gone`, async t => {
+    const { root, paths } = await store(t);
+    const leaving = () => {
+      let answered = false;
+      return async current => {
+        if (current !== paths.stage || answered) return realpath(current);
+        answered = true;
+        await rm(paths.stage, { recursive: true, force: true });
+        return answer(kind, current);
+      };
+    };
+    await assert.rejects(assertManagedDirectory(root, paths.stage,
+      { platform: "win32", realpath: leaving() }), error => error.code === "ENOENT");
+    assert.equal(await ensureManagedDirectory(root, paths.stage,
+      { platform: "win32", realpath: leaving() }), paths.stage);
+  });
+
+  test(`windows: ${kind} for a directory that stays is refused, never read as gone`, async t => {
+    const { root, paths } = await store(t);
+    const stuck = async current => (current === paths.stage ? answer(kind, current) : realpath(current));
+    await assert.rejects(assertManagedDirectory(root, paths.stage,
+      { platform: "win32", realpath: stuck }), error => error.code !== "ENOENT");
+  });
+}
+
+test("linux: EBADF from realpath stays what it says", async t => {
+  const { root, paths } = await store(t);
+  const failing = async current => (current === paths.stage ? answer("EBADF", current) : realpath(current));
+  await assert.rejects(assertManagedDirectory(root, paths.stage, { platform: "linux", realpath: failing }),
+    error => error.code === "EBADF");
+});

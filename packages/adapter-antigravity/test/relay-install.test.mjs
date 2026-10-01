@@ -3,12 +3,13 @@ import { randomBytes } from "node:crypto";
 import { mkdir, mkdtemp, readFile, realpath, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import test from "node:test";
+import nodeTest from "node:test";
 
 import { doctorAntigravity, installAntigravity, uninstallAntigravity } from "../src/install.mjs";
 import { listRegistrations, newRelayId, writeRegistration } from "../src/relay-endpoint.mjs";
 import { relayShimPath } from "../src/relays.mjs";
 import { fakeAgy } from "./fake-agy.mjs";
+import { posixTransportTest as test } from "../../../tests/helpers/platform-scope.mjs";
 
 const RELAY_BINARY = "/opt/acc/bin/acc-antigravity-relay.mjs";
 

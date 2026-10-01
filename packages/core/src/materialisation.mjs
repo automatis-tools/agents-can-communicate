@@ -21,15 +21,32 @@ export async function isMaterialised(store, workspaceId) {
   return (await store.snapshot(workspaceId, { kinds: ["workspace"] })).workspace !== null;
 }
 
-export async function materialise({ store, clock, ids }, { workspaceId, descriptor, reason }) {
+/**
+ * `opening` is a second live session that opens here, in the transaction that
+ * materialises, instead of first writing an ephemeral copy of itself to be
+ * copied and retired a moment later. It opens only while the session it joins
+ * is still live under the lock; otherwise it would be a lone session, which
+ * leaves no durable trace, and nothing is written: the result is false and the
+ * caller opens it ephemerally.
+ */
+export async function materialise({ store, clock, ids },
+  { workspaceId, descriptor, reason, opening = null }) {
   const now = clock.now();
   const staged = [];
+  let joined = true;
 
   await store.transaction(async tx => {
     // Ephemeral writers use this same mutex. Reading before taking it could
     // resurrect a closed owner or replace an intent with an older snapshot.
     for (const entry of EPHEMERAL_KINDS) {
       staged.push({ ...entry, records: await store.ephemeral.list(entry.kind) });
+    }
+    if (opening !== null && tx.get("workspace", workspaceId) === null
+      && !staged.find(entry => entry.kind === "session").records.some(record =>
+        record.state === "open" && record.sessionId !== opening.session.sessionId)) {
+      joined = false;
+      staged.length = 0;
+      return;
     }
     const actorSessionId = staged.find(entry => entry.kind === "session")?.records.at(-1)?.sessionId
       ?? "session_bootstrap";
@@ -53,8 +70,14 @@ export async function materialise({ store, clock, ids }, { workspaceId, descript
         payload: { reason } });
     }
 
+    // The opening session's own ephemeral copy - left by a process that died
+    // mid-open - is what the opening replaces, not a session to promote first:
+    // promoting it would record the session opening twice.
+    const own = opening === null ? null : staged.find(entry => entry.kind === "session")
+      .records.find(record => record.sessionId === opening.session.sessionId) ?? null;
     for (const entry of staged) {
       for (const record of entry.records) {
+        if (record === own) continue;
         // Whoever got here first may have promoted this record already, and
         // promoting is a copy: the ephemeral and durable shapes are the same,
         // so the one already there is the one this would write.
@@ -66,11 +89,25 @@ export async function materialise({ store, clock, ids }, { workspaceId, descript
           payload: { sessionId: record.sessionId } });
       }
     }
+
+    if (opening !== null) {
+      const { participant, session } = opening;
+      const current = tx.get("session", session.sessionId) ?? own;
+      opening.assertAvailable(current);
+      if (tx.get("participant", participant.participantId) === null) {
+        tx.put("participant", participant.participantId, participant);
+      }
+      tx.put("session", session.sessionId, session, tx.generationOf("session", session.sessionId));
+      tx.append({ schemaVersion: SCHEMA_VERSION, eventId: ids.next("event"), workspaceId,
+        actorSessionId: session.sessionId, type: "session.opened", occurredAt: now,
+        payload: { replaced: current?.generation ?? null } });
+    }
   // The promoted kinds are named by the loop above, not written literally in
   // the body, so they are derived rather than repeated: a new ephemeral kind
   // added to that list is read here without anyone remembering to say so.
   }, { kinds: ["workspace", ...EPHEMERAL_KINDS.map(entry => entry.kind)] });
 
+  if (!joined) return false;
   // The ephemeral copies are retired only after the durable transaction
   // committed, so a crash in between leaves a recoverable duplicate rather than
   // a hole.
@@ -79,6 +116,7 @@ export async function materialise({ store, clock, ids }, { workspaceId, descript
       await store.ephemeral.delete(entry.kind, record[entry.key]);
     }
   }
+  return true;
 }
 
 export async function ensureMaterialised(ports, { workspaceId, descriptor, reason }) {

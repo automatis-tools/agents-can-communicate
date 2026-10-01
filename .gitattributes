@@ -1,0 +1,5 @@
+# Every text file is LF in every checkout. Git for Windows converts to CRLF by
+# default, which changed the bytes of audited capture fixtures (their digests
+# stopped matching on windows-latest) and would put CRLF into a tarball packed
+# on Windows.
+* text=auto eol=lf

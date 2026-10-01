@@ -64,6 +64,12 @@ test("a binding naming a relative runtimeRoot is left alone regardless of the ca
   // absolute runtimeRoot, this would be misclassified as owned purely because
   // of where the test happens to run from.
   const relative = path.relative(process.cwd(), owned);
+  // Windows cannot relativise across drives: with the checkout on another drive
+  // than the temporary directory, no relative path reaches the generation.
+  if (path.isAbsolute(relative)) {
+    t.skip("the temporary directory is on another drive than the working directory");
+    return;
+  }
   await writeFile(path.join(bindings, "cccc.json"), JSON.stringify({ schemaVersion: 1,
     harnessSessionId: "h3", accSessionId: "session_c", generation: "generation_c",
     clientVersion: "2.1.267", platform: "darwin-arm64", clientPid: process.pid,

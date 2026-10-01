@@ -43,7 +43,8 @@ export function createGeminiCliAdapter() {
     // The binary this client actually installs. Probed for a version to
     // decide whether the client is on this machine, so it has to be the
     // real command rather than the adapter id: `0.57.0`.
-    client: { command: "gemini", certificationName: "gemini-cli", versionArgs: ["--version"] },
+    client: { command: "gemini", package: "@google/gemini-cli", certificationName: "gemini-cli",
+      versionArgs: ["--version"] },
     certification,
     capabilities: {
       lifecycle: { sessionStart: true, sessionEnd: true },

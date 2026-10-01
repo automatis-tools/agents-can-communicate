@@ -9,6 +9,7 @@ import { createCoordinationService } from "@agents-can-communicate/core";
 import { createDeliveryRouter } from "@agents-can-communicate/delivery-router";
 import { bindNativeSession, offerMessage } from "../packages/adapter-claude-code/src/inbox-delivery.mjs";
 import { createFakeClock, createFakeIds, createMemoryStore } from "./helpers/memory-store.mjs";
+import { POSIX_LIVE_TRANSPORT } from "./helpers/platform-scope.mjs";
 
 // A real inbox endpoint: a listening socket, Claude's registry entry for it,
 // and ACC's endpoint record, so the only failure left is the connection.
@@ -34,7 +35,9 @@ async function inboxEndpoint(t) {
 }
 
 for (const code of ["EPERM", "EACCES"]) {
-  test(`${code} while connecting preserves a permission diagnosis through router and receipts`, async t => {
+  // Claude Code's Unix-socket inbox; on Windows it is a named pipe (0.9.x).
+  test(`${code} while connecting preserves a permission diagnosis through router and receipts`,
+    { skip: POSIX_LIVE_TRANSPORT }, async t => {
     const endpoint = await inboxEndpoint(t);
     const clock = createFakeClock(new Date().toISOString());
     const ids = createFakeIds();

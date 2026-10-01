@@ -3,12 +3,13 @@ import { mkdtempSync, realpathSync, rmSync } from "node:fs";
 import http from "node:http";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import test from "node:test";
+import nodeTest from "node:test";
 
 import { addCodexQueueMessage, compareVersions, isMethodMissing, locateCodexThread,
   openCodexAppServer, probeCodexQueue, safeReason, serverVersionOf }
   from "../src/app-server-client.mjs";
 import { acceptKey, decodeFrames, encodeFrame } from "../src/ws-json-rpc.mjs";
+import { posixTransportTest as test } from "../../../tests/helpers/platform-scope.mjs";
 
 const THREAD = "01a063ed-a384-7fe2-b443-7fedf1593f6b";
 const CWD = realpathSync(tmpdir());

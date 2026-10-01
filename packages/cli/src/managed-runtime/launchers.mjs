@@ -1,11 +1,12 @@
 import { createHash, randomUUID } from "node:crypto";
-import { lstat, mkdtemp, open, readFile, rename, rm } from "node:fs/promises";
+import { lstat, mkdtemp, open, readFile, rm } from "node:fs/promises";
 import path from "node:path";
 import { ENTRY_KINDS, RETIRED_ENTRY_KINDS } from "./entry.mjs";
+import { removeTree, renameEntry, renameReplacing } from "./portable-fs.mjs";
 import { managedDirectory, syncDirectory } from "./state.mjs";
 
 const MODULES = ["entry.mjs", "command-prefix.mjs", "state.mjs", "generation-files.mjs",
-  "mutex.mjs", "leases.mjs", "schedule.mjs", "policy.mjs"];
+  "mutex.mjs", "leases.mjs", "schedule.mjs", "policy.mjs", "portable-fs.mjs"];
 async function durableFile(file, bytes, mode = 0o600) {
   const handle = await open(file, "wx", mode);
   try { await handle.writeFile(bytes); await handle.sync(); }
@@ -34,7 +35,7 @@ export async function writeLaunchers(root, packageRoot) {
   try {
     for (const [name, bytes] of modules) await durableFile(path.join(staging, name), bytes);
     await syncDirectory(staging);
-    try { await rename(staging, directory); }
+    try { await renameEntry(staging, directory); }
     catch (error) { if (!["EEXIST", "ENOTEMPTY"].includes(error.code)) throw error; }
     await managedDirectory(directory);
     for (const [name, bytes] of modules) {
@@ -43,7 +44,7 @@ export async function writeLaunchers(root, packageRoot) {
         || !(await readFile(file)).equals(bytes)) throw new Error("managed launcher integrity changed");
     }
     await syncDirectory(parent);
-  } finally { await rm(staging, { recursive: true, force: true }); }
+  } finally { await removeTree(staging); }
   const bin = path.join(root, "bin");
   await managedDirectory(bin, { create: true });
   for (const kind of ENTRY_KINDS) {
@@ -52,7 +53,9 @@ export async function writeLaunchers(root, packageRoot) {
     const temporary = path.join(bin, `.${randomUUID()}.tmp`);
     try {
       await durableFile(temporary, bytes, 0o700);
-      await rename(temporary, path.join(bin, `${kind}.mjs`));
+      // A launcher starting right now may still hold this file open; Windows
+      // refuses the replacement until it lets go.
+      await renameReplacing(temporary, path.join(bin, `${kind}.mjs`));
     } finally { await rm(temporary, { force: true }); }
   }
   // A 0.7.x `claude` shim or plugin copy that still reaches for one of these

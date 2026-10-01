@@ -2,10 +2,11 @@ import assert from "node:assert/strict";
 import { mkdtemp, readFile, realpath, rm, stat, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import test from "node:test";
+import nodeTest from "node:test";
 
 import { PROTOCOL_CONTRACT, RELAY_MODES, listRegistrations, newRelayId, readRegistration,
   relayDir, removeRegistration, writeRegistration } from "../src/relay-endpoint.mjs";
+import { posixTransportTest as test } from "../../../tests/helpers/platform-scope.mjs";
 
 async function runtime(t) {
   const dir = await realpath(await mkdtemp(path.join(tmpdir(), "acc-relay-reg-")));

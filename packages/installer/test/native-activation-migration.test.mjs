@@ -4,7 +4,7 @@ import { diagnoseAdapters } from "../../cli/src/doctor-command.mjs";
 import { mkdir, mkdtemp, readFile, realpath, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import test from "node:test";
+import nodeTest from "node:test";
 import { applyPlan } from "../src/apply.mjs";
 import { detectInstallation } from "../src/detect.mjs";
 import { planActivationRetirements } from "../src/native-activation.mjs";
@@ -12,6 +12,7 @@ import { loadOwnership, recordInstall } from "../src/ownership.mjs";
 import { planInstallation } from "../src/plan.mjs";
 import { planNativeActivation } from "../../adapter-codex/src/native-delivery.mjs";
 import { writeLegacyShellActivation } from "../../../tests/helpers/legacy-shell-bootstrap.mjs";
+import { posixTransportTest as test } from "../../../tests/helpers/platform-scope.mjs";
 
 const service = { kind: "native-service", serviceId: "codex-app-server", preExisting: true,
   applyCommand: null, teardownCommand: null };

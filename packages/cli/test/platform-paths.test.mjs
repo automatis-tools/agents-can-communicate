@@ -29,7 +29,7 @@ test("each platform resolves to its own conventional locations", () => {
     cache: "/home/dana/.cache",
   });
   assert.deepEqual(platformPaths(WINDOWS), {
-    data: "C:\\Users\\dana\\AppData\\Roaming",
+    data: "C:\\Users\\dana\\AppData\\Local",
     config: "C:\\Users\\dana\\AppData\\Roaming",
     cache: "C:\\Users\\dana\\AppData\\Local",
   });
@@ -50,11 +50,13 @@ test("XDG variables are honoured on Linux and ignored on macOS", () => {
     "/Users/dana/Library/Application Support");
 });
 
-test("Windows falls back to roaming when there is no local app data", () => {
+// Pids, locks and pipe names belong to one machine. A roaming profile would
+// carry them to another, where every pid names something else.
+test("Windows keeps machine-local state out of the roaming profile", () => {
   const roamingOnly = { platform: "win32",
     env: { APPDATA: "C:\\Users\\dana\\AppData\\Roaming" } };
 
-  assert.equal(platformPaths(roamingOnly).cache, "C:\\Users\\dana\\AppData\\Roaming");
+  assert.throws(() => platformPaths(roamingOnly), error => error.code === EXIT.USAGE);
 });
 
 test("an explicit override wins on every platform", () => {

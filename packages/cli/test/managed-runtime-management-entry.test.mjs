@@ -1,16 +1,17 @@
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
-import { mkdir, mkdtemp, readdir, realpath, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readdir, realpath, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { promisify } from "node:util";
 import { writeControl } from "../src/managed-runtime/state.mjs";
+import { removeFixture } from "../../../tests/helpers/fixture-cleanup.mjs";
 
 const entry = new URL("../src/managed-runtime/entry.mjs", import.meta.url).href;
 async function fixture(t) {
   const data = await realpath(await mkdtemp(path.join(tmpdir(), "acc-management-entry-")));
-  t.after(() => rm(data, { recursive: true, force: true }));
+  t.after(() => removeFixture(data));
   const root = path.join(data, "acc", "runtime");
   async function runtime(label, version, directory, protocol = 2) {
     await mkdir(path.join(directory, "bin", "entrypoints"), { recursive: true });
@@ -26,6 +27,11 @@ async function fixture(t) {
   const control = { schemaVersion: 1, active, pending, phase: "ready", auto: false,
     pin: null, checkedAt: null, home: path.join(data, "home"), targets: [], notice: null };
   await writeControl(root, control);
+  // The active generation has reclaimed already, so admission starts no
+  // background worker. One would be detached with its working directory in the
+  // runtime root, which Windows then refuses to remove until it exits.
+  await writeFile(path.join(root, "reclaim.json"), JSON.stringify({ schemaVersion: 1,
+    activeRoot: active.root }));
   const run = async (args, packageRoot = installed.root) => {
     const code = `process.argv = [process.execPath, "acc", ...${JSON.stringify(args)}];
       const { runEntry } = await import(${JSON.stringify(entry)});

@@ -3,12 +3,17 @@ import { execFile } from "node:child_process";
 import { chmod, mkdir, mkdtemp, realpath, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import test from "node:test";
+import nodeTest from "node:test";
 import { promisify } from "node:util";
 
 import { removeInstalledTree, writeCliShim, writeHookShim } from "../src/hook-shim.mjs";
 
 const run = promisify(execFile);
+
+// These are the POSIX shell shims. Windows writes the Node shim instead, and
+// node-shim.test.mjs runs it on every host.
+const test = (name, fn) => nodeTest(name, { skip: process.platform === "win32"
+  ? "Windows runs the Node shim (node-shim.test.mjs), not this shell script" : false }, fn);
 
 /**
  * The shim outliving the node that was current when it was written.
@@ -247,7 +252,7 @@ test("a CLI path with a space in it survives being written into a shell script",
 
 // Ownership keeps a tree someone put their own work into. Removing a directory
 // inside it, or one that holds it, deletes that work just the same.
-test("a tree kept by ownership survives removal of a directory inside it or around it", async t => {
+nodeTest("a tree kept by ownership survives removal of a directory inside it or around it", async t => {
   const root = await realpath(await mkdtemp(path.join(tmpdir(), "acc-keep-")));
   t.after(() => rm(root, { recursive: true, force: true }));
   const marketplace = path.join(root, "marketplaces", "acc-local");

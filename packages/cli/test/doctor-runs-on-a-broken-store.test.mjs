@@ -84,8 +84,10 @@ test("machine mode carries the diagnosis, not just the failure", async t => {
 
   assert.equal(body.ok, false);
   assert.equal(body.error.code, EXIT.DATA);
-  assert.equal(JSON.stringify(body.error.details).includes(header), true,
-    `the details name no file: ${JSON.stringify(body.error.details)}`);
+  // Compared as JSON text on both sides: a Windows path's backslashes are
+  // escaped there, so the raw path never appears inside the serialized details.
+  assert.equal(JSON.stringify(body.error.details).includes(JSON.stringify(header).slice(1, -1)),
+    true, `the details name no file: ${JSON.stringify(body.error.details)}`);
 });
 
 test("a healthy store is still diagnosed the same way", async t => {

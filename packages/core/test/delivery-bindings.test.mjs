@@ -209,6 +209,7 @@ test("a delayed endpoint-scoped clear cannot retire a same-generation successor"
   const clearMayContinue = new Promise(resolve => { releaseClear = resolve; });
   let updates = 0;
   const store = { ephemeral: {
+    get: async () => stored,
     list: async () => [stored],
     update: async (_kind, _id, updater) => {
       updates += 1;
@@ -329,4 +330,28 @@ test("a stale generation cannot extend a successor's lease", async () => {
   await assert.rejects(service.refreshDeliveryBinding({ sessionId: first.sessionId,
     generation: first.generation, leaseUntil: "2026-09-01T20:05:00.000Z" }),
   /open session generation/);
+});
+
+// Every hook clears the session's binding when live delivery is not running,
+// which on Windows is every hook. Each clear took the writer lock - an owner
+// record written and flushed, a rename in and a rename out - to find that there
+// was nothing to clear. A binding that is absent, or already retired for this
+// generation, is left without the lock; one that needs retiring still takes it.
+test("clearing a binding that is absent or already retired takes no writer lock", async () => {
+  const { clock, store, service: opener } = fixture();
+  const session = await open(opener, "fixture_peer", "session_clear_free");
+  let updates = 0;
+  const counting = { ...store, ephemeral: { ...store.ephemeral,
+    update: (...args) => { updates += 1; return store.ephemeral.update(...args); } } };
+  const service = createCoordinationService({ store: counting, clock, ids: createFakeIds(),
+    pidIsAlive: () => true });
+
+  await service.clearDeliveryBinding({ sessionId: session.sessionId, generation: session.generation });
+  assert.equal(updates, 0, "an absent binding took the writer lock");
+
+  await service.publishDeliveryBinding(binding(session));
+  await service.clearDeliveryBinding({ sessionId: session.sessionId, generation: session.generation });
+  assert.equal(updates, 2, "a live binding must still be retired under the lock");
+  await service.clearDeliveryBinding({ sessionId: session.sessionId, generation: session.generation });
+  assert.equal(updates, 2, "a retired binding took the writer lock again");
 });

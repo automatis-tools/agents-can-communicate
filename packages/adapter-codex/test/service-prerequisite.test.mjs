@@ -1,9 +1,10 @@
 import assert from "node:assert/strict";
 import { chmod, mkdir, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import path from "node:path";
-import test from "node:test";
+import nodeTest from "node:test";
 import { createCodexServiceSetup } from "../src/service-setup.mjs";
 import { serviceFixture } from "./service-setup-fixture.mjs";
+import { posixTransportTest as test } from "../../../tests/helpers/platform-scope.mjs";
 
 async function fixture(t) {
   const f = await serviceFixture(t, { binLayout: true });

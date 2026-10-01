@@ -50,7 +50,7 @@ test("stops after the hop limit", () => {
 test("parses a ps table, including commands containing spaces", async () => {
   const stdout = "  100     1 claude\n  150   100 /bin/zsh\n"
     + "  200   150 /Applications/Some App.app/Contents/MacOS/app\n";
-  const table = await readProcessTable({ run: async () => ({ stdout }) });
+  const table = await readProcessTable({ platform: "darwin", run: async () => ({ stdout }) });
 
   assert.equal(table.get(100).comm, "claude");
   assert.equal(table.get(150).ppid, 100);
@@ -144,7 +144,7 @@ const fakePs = ({ tree, args }) => async (file, argv, options) => {
 };
 
 test("reads each process's command line beside its parent and executable", async () => {
-  const table = await readProcessTable({ run: fakePs({
+  const table = await readProcessTable({ platform: "darwin", run: fakePs({
     tree: `46006     1 node\n46032 46006 ${NODE}\n`,
     args: `46006 node ${GEMINI} -p hello\n`
       + `46032 ${NODE} --max-old-space-size=65536 ${GEMINI} -p "two words"\n` }) });
@@ -154,7 +154,7 @@ test("reads each process's command line beside its parent and executable", async
 });
 
 test("a failed command-line read leaves the table as it was before", async () => {
-  const table = await readProcessTable({ run: fakePs({
+  const table = await readProcessTable({ platform: "darwin", run: fakePs({
     tree: "  100     1 claude\n  200   100 node\n", args: new Error("ENOMEM") }) });
 
   assert.deepEqual(table.get(100), { ppid: 1, comm: "claude" });
@@ -163,7 +163,7 @@ test("a failed command-line read leaves the table as it was before", async () =>
 
 test("both reads share the caller's timeout", async () => {
   const seen = [];
-  await readProcessTable({ timeoutMs: 250, run: async (file, argv, options) => {
+  await readProcessTable({ platform: "darwin", timeoutMs: 250, run: async (file, argv, options) => {
     seen.push({ args: argv.join(" ").includes("args="), timeout: options.timeout,
       maxBuffer: options.maxBuffer });
     return { stdout: "" };
@@ -174,6 +174,31 @@ test("both reads share the caller's timeout", async () => {
 });
 
 test("a platform without ps yields an empty table rather than an error", async () => {
-  const table = await readProcessTable({ run: async () => { throw new Error("ENOENT"); } });
+  const table = await readProcessTable({ platform: "darwin", run: async () => { throw new Error("ENOENT"); } });
   assert.equal(table.size, 0);
+});
+
+// Windows reports image names with their extension, in whatever case the
+// binary was built with: `claude.exe`, `Codex.EXE`, `node.exe`.
+test("windows: a client's image name matches without its extension or case", () => {
+  const processes = table([[100, 4, "claude.exe"], [150, 100, "pwsh.exe"], [200, 150, "node.exe"]]);
+  assert.equal(resolveClientPid({ table: processes, from: 200, command: "claude" }), 100);
+  const upper = table([[100, 4, "Codex.EXE"], [200, 100, "node.exe"]]);
+  assert.equal(resolveClientPid({ table: upper, from: 200, command: "codex" }), 100);
+});
+
+// An npm-installed client on Windows is node.exe running the package's own
+// entry file - `…\node_modules\@google\gemini-cli\dist\index.js` - so its
+// script is called `index`, not `gemini`. The package directory names it.
+test("windows: a node-hosted client is found by the package its script lives in", () => {
+  const processes = new Map([
+    [100, { ppid: 4, comm: "node.exe", args: "\"C:\\Program Files\\nodejs\\node.exe\" "
+      + "\"C:\\Users\\dana\\AppData\\Roaming\\npm\\node_modules\\@google\\gemini-cli\\dist\\index.js\"" }],
+    [150, { ppid: 100, comm: "powershell.exe" }],
+    [200, { ppid: 150, comm: "node.exe" }],
+  ]);
+  assert.equal(resolveClientPid({ table: processes, from: 200, command: "gemini",
+    clientPackage: "@google/gemini-cli" }), 100);
+  assert.equal(resolveClientPid({ table: processes, from: 200, command: "gemini" }), null,
+    "without the package, index.js names no client");
 });

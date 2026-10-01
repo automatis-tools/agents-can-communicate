@@ -2,12 +2,13 @@ import assert from "node:assert/strict";
 import { chmodSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync } from "node:fs";
 import net from "node:net";
 import path from "node:path";
-import test from "node:test";
+import nodeTest from "node:test";
 import { fileURLToPath } from "node:url";
 
 import { newEndpointId, writeInboxEndpoint }
   from "../../adapter-claude-code/src/inbox-endpoint.mjs";
 import { ALL_ADAPTERS, clientContext } from "../src/install-command.mjs";
+import { posixTransportTest as test } from "../../../tests/helpers/platform-scope.mjs";
 
 // Review of #217: a Claude Code session started with its own absolute
 // CLAUDE_CODE_TMPDIR binds its inbox outside the directories the installer's

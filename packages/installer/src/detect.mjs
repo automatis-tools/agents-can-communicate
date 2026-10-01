@@ -1,8 +1,8 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 
-import { capabilityEvidence, effectiveCapabilities, evaluateNativeEligibility,
-  validateNativeActivationPlan }
+import { capabilityEvidence, effectiveCapabilities, evaluateNativeEligibility, mergeEnv, pathOf,
+  resolveExecutable as resolveOnPath, runExecutable, validateNativeActivationPlan }
   from "@agents-can-communicate/adapter-sdk";
 
 import { resolveExecutable, shimDirFor } from "./native-activation.mjs";
@@ -34,6 +34,14 @@ const VERSION = /(?:^|[^0-9A-Za-z])v?(\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?)(?:\b
 // `env` decides where the command is looked up, so detection given an
 // environment finds the client on that environment's PATH.
 export const spawnProbe = async (command, args, { env } = {}) => {
+  // Windows finds `codex.cmd` or `claude.exe`, never the bare name, and starts a
+  // .cmd only through cmd.exe.
+  if (process.platform === "win32") {
+    const file = await resolveOnPath(command, { pathEnv: pathOf(env ?? process.env) });
+    if (file === null) throw Object.assign(new Error(`${command} is not on PATH`), { code: "ENOENT" });
+    const { stdout, stderr } = await runExecutable(file, args, env === undefined ? {} : { env });
+    return `${stdout}${stderr}`.trim();
+  }
   const { stdout, stderr } = await run(command, args, env === undefined ? {} : { env });
   return `${stdout}${stderr}`.trim();
 };
@@ -128,7 +136,7 @@ export async function detectInstallation({ adapters, context, probe = spawnProbe
           // own environment must not find a different client, or none.
           Promise.resolve(probe(adapter.client.command,
             adapter.client.versionArgs ?? ["--version"],
-            { env: context?.env === undefined ? undefined : { ...process.env, ...context.env } })),
+            { env: context?.env === undefined ? undefined : mergeEnv(process.env, context.env) })),
           probeTimeoutMs, `${adapter.id} version probe`);
         if (typeof output === "string" && output !== "") {
           entry.present = true;

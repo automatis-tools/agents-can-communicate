@@ -4,9 +4,9 @@ import { chmod, mkdir, readFile, rm, symlink, writeFile } from "node:fs/promises
 import path from "node:path";
 import { promisify } from "node:util";
 import { pathToFileURL } from "node:url";
-import test from "node:test";
 
 import { createPackedAcc } from "../helpers/packed-acc.mjs";
+import { posixTransportTest as test } from "../helpers/platform-scope.mjs";
 
 const run = promisify(execFile);
 const human = (p, args) => run(process.execPath, [p.accBin, ...args],

@@ -6,8 +6,12 @@ import test from "node:test";
 import { stageOwnGeneration } from "../../packages/cli/src/managed-runtime/generation.mjs";
 import { writeLaunchers } from "../../packages/cli/src/managed-runtime/launchers.mjs";
 import { buildClientEnvironment, verifyInstalledCommands } from "../../scripts/e2e/codex-local-daemon-harness.mjs";
+import { POSIX_LIVE_TRANSPORT } from "../helpers/platform-scope.mjs";
 
-test("native harness verifies managed launchers and their exact installed generation", async t => {
+// The LocalDaemon harness's check reads the POSIX form of installed commands;
+// Windows live delivery (0.9.x) gets a harness of its own.
+test("native harness verifies managed launchers and their exact installed generation",
+  { skip: POSIX_LIVE_TRANSPORT }, async t => {
   const root = await realpath(await mkdtemp(path.join(os.tmpdir(), "acc-managed-commands-")));
   t.after(() => rm(root, { recursive: true, force: true }));
   const packageRoot = path.join(root, "package");
@@ -21,7 +25,8 @@ test("native harness verifies managed launchers and their exact installed genera
   // The generated immutable modules must also match this installed artifact.
   const moduleRoot = path.join(packageRoot, "node_modules", "@agents-can-communicate", "cli", "src", "managed-runtime");
   await mkdir(moduleRoot, { recursive: true });
-  for (const name of ["entry", "command-prefix", "state", "generation-files", "mutex", "leases", "schedule", "policy"]) {
+  for (const name of ["entry", "command-prefix", "state", "generation-files", "mutex", "leases", "schedule", "policy",
+    "portable-fs"]) {
     await cp(new URL(`../../packages/cli/src/managed-runtime/${name}.mjs`, import.meta.url),
       path.join(moduleRoot, `${name}.mjs`));
   }

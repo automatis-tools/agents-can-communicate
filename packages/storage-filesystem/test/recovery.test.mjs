@@ -12,6 +12,7 @@ import { EXIT, SCHEMA_VERSION } from "@agents-can-communicate/protocol";
 import { diagnoseFilesystemStore, repairFilesystemStore } from "../src/recovery.mjs";
 import { activateJournal } from "../src/active-journal.mjs";
 import { JOURNAL_VERSION, readOpenJournals } from "../src/journal.mjs";
+import { publicationPath } from "../src/publication-path.mjs";
 import { openFilesystemStore, storePaths } from "../src/store.mjs";
 import { createFakeClock, createFakeIds } from "../../../tests/helpers/memory-store.mjs";
 
@@ -346,4 +347,14 @@ test("diagnosis counts the staging directory without changing it", async t => {
   assert.equal(diagnosis.staged, 1);
   assert.equal(diagnosis.partials, 1);
   assert.deepEqual(await readdir(paths.stage), ["a.published"]);
+});
+
+// Measured on windows-latest: the journal recorded `events\\0000000000000001.json`,
+// the form path.relative gives there, so an entry meant something different
+// depending on where it was written.
+test("a journal names each publication with forward slashes on every platform", () => {
+  assert.equal(publicationPath("C:\\data\\acc", "C:\\data\\acc\\events\\0000000000000001.json",
+    path.win32), "events/0000000000000001.json");
+  assert.equal(publicationPath("/data/acc", "/data/acc/retained/state/session/s/g.json", path.posix),
+    "retained/state/session/s/g.json");
 });

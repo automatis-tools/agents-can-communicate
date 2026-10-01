@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 
 import { acccreatedFile, bakeSkillCommand, blankJson, ownVersion, removeIfEmpty,
   removeInstalledTree,
-  stampPluginVersion, writeCliShim, writeForeignJson, writeHookShim }
+  shellQuote, stampPluginVersion, windowsHookCommand, writeCliShim, writeForeignJson, writeHookShim }
   from "@agents-can-communicate/adapter-sdk";
 
 const bundle = fileURLToPath(new URL("../extension", import.meta.url));
@@ -46,11 +46,16 @@ const writeJson = (file, value) => writeForeignJson(file, value,
 const isOurs = hook => typeof hook?.name === "string" && hook.name.startsWith(OWNER_PREFIX);
 
 // Replace the bundle's placeholder command with the shim that was just written.
-const withShim = (wiring, shim) => ({ hooks: Object.fromEntries(
+// On Windows this client runs hooks through PowerShell, which has no `sh`: the
+// pinned node runs the Node shim there.
+const withShim = (wiring, shim, windowsNode = null) => ({ hooks: Object.fromEntries(
   Object.entries(wiring.hooks).map(([event, entries]) => [event, entries.map(entry => ({
     ...entry,
-    hooks: entry.hooks.map(hook => ({ ...hook,
-      command: `sh "${shim}" ${hook.command.split(" ").pop()}` })),
+    hooks: entry.hooks.map(hook => {
+      const kind = hook.command.split(" ").pop();
+      return { ...hook, command: windowsNode === null ? `sh ${shellQuote(shim)} ${kind}`
+        : windowsHookCommand("powershell", { node: windowsNode, shim, args: [kind] }) };
+    }),
   }))])) });
 
 /**
@@ -62,7 +67,8 @@ const withShim = (wiring, shim) => ({ hooks: Object.fromEntries(
  * No environment variable is copied or persisted. The extension declares what
  * it needs; secrets stay where the user put them.
  */
-export async function installGeminiExtension({ home, runner, cli, node }) {
+export async function installGeminiExtension({ home, runner, cli, node,
+  hostPlatform = process.platform }) {
   // Read before writing: a settings file that will not parse must not be found
   // out after the extension tree is already on disk.
   const found = await readJson(settingsPath(home), null);
@@ -82,15 +88,15 @@ export async function installGeminiExtension({ home, runner, cli, node }) {
   await rm(path.join(target, "hooks", "hooks.json"), { force: true });
   // The skill ships with a placeholder where the command belongs: `acc` is
   // not on PATH everywhere, and an agent that cannot run it improvises.
-  const cliShim = await writeCliShim({ dir: target, cli, node });
-  await bakeSkillCommand({ root: target, cliShim });
+  const cliShim = await writeCliShim({ dir: target, cli, node, platform: hostPlatform });
+  await bakeSkillCommand({ root: target, cliShim, platform: hostPlatform });
   // This client offers no plugin-root variable in a hook command, so the shim's
   // absolute path is written in at install time.
   const shim = await writeHookShim({ dir: path.join(target, "hooks"),
-    adapterId: "gemini_cli", runner, node });
+    adapterId: "gemini_cli", runner, node, platform: hostPlatform });
 
   const ours = withShim(await readJson(path.join(bundle, "hooks", "hooks.json"),
-    { hooks: {} }), shim);
+    { hooks: {} }), shim, hostPlatform === "win32" ? node ?? process.execPath : null);
   const file = settingsPath(home);
   const merged = { ...existing, hooks: { ...(existing.hooks ?? {}) } };
   // Recorded now: afterwards a settings file holding `{}` looks the same

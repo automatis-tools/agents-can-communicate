@@ -64,6 +64,19 @@ test("a root that leaves the workspace is refused", () => {
     error => error.code === EXIT.DATA);
 });
 
+// On Windows each of these resolves outside the checkout even though none
+// starts with a drive and a separator: `\\x` is rooted on the current drive,
+// `D:x` is relative to another drive's current directory, and a UNC root makes
+// every hook contact that host (and offer it the user's NTLM credentials). A
+// repository committed on POSIX, where they are harmless names, must not carry
+// one to a Windows machine.
+test("a root that is rooted, drive-relative or on another host is refused everywhere", () => {
+  for (const root of ["\\x", "\\\\server\\share", "//server/share", "D:x", "C:\\x", "c:x"]) {
+    assert.throws(() => validateProjectConfig(valid({ roots: [root] })),
+      error => error.code === EXIT.DATA, root);
+  }
+});
+
 test("claim policy accepts only the two modes that exist", () => {
   assert.equal(validateProjectConfig(valid({
     policy: { claimMode: "guarded", contextBudgetBytes: 6000 } }))

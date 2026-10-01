@@ -14,6 +14,7 @@ import { createKimiAdapter } from "../src/adapter.mjs";
 import { allowResponse, denyResponse, injectResponse, normalizeKimiHook }
   from "../src/hooks.mjs";
 import { BEGIN, END, renderBlock, stripBlock } from "../src/install.mjs";
+import { POSIX_FORM } from "../../../tests/helpers/platform-scope.mjs";
 
 // A config the user owns: comments, formatting, their own hook, and a table at
 // the very end - the position where an appended block is most likely to be
@@ -38,7 +39,7 @@ async function fixture(t) {
   const runner = path.join(home, "acc-hook.mjs");
   await writeFile(runner, "// stand-in for the runner\n");
   const read = () => readFile(path.join(home, "config.toml"), "utf8");
-  return { context: { home, runner, node: "/usr/bin/node" }, read };
+  return { context: { home, runner, node: "/usr/bin/node", hostPlatform: POSIX_FORM }, read };
 }
 
 const captured = async name => JSON.parse(await readFile(
@@ -104,7 +105,7 @@ test("paths with quotes or spaces survive into the command the shell runs", () =
   const runner = '/opt/my "acc" dir/acc-hook.mjs';
   const node = "/usr/local/my node/bin/node";
 
-  const block = renderBlock(runner, node);
+  const block = renderBlock(runner, node, POSIX_FORM);
 
   const command = decodeToml(block.split("\n").find(line => line.startsWith("command")));
   // Two layers: escaped for TOML, then quoted for the shell. An unescaped quote
@@ -115,7 +116,7 @@ test("paths with quotes or spaces survive into the command the shell runs", () =
 });
 
 test("hook entries carry a timeout in the unit this client uses", () => {
-  const block = renderBlock("/opt/acc/bin/acc-hook.mjs", "/usr/bin/node");
+  const block = renderBlock("/opt/acc/bin/acc-hook.mjs", "/usr/bin/node", POSIX_FORM);
 
   // Seconds, and this client's schema caps the field at 600 - a ceiling that
   // only makes sense in seconds. Gemini's 10000 is correct on Gemini, where the
@@ -130,7 +131,7 @@ test("hook entries carry a timeout in the unit this client uses", () => {
 });
 
 test("the guard matcher names the tools this client actually uses", () => {
-  const block = renderBlock("/opt/acc/bin/acc-hook.mjs", "/usr/bin/node");
+  const block = renderBlock("/opt/acc/bin/acc-hook.mjs", "/usr/bin/node", POSIX_FORM);
   const matcher = block.split("\n").find(line => line.startsWith("matcher"));
 
   // Read out of a real request. "NoSuchTool" was observed never firing while

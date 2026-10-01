@@ -6,10 +6,12 @@ import path from "node:path";
 import { tmpdir } from "node:os";
 import test from "node:test";
 
+import { removeFixture } from "../../../tests/helpers/fixture-cleanup.mjs";
+
 const entry = new URL("../src/managed-runtime/entry.mjs", import.meta.url).href;
 async function fixture(t) {
   const root = await realpath(await mkdtemp(path.join(tmpdir(), "acc-entry-")));
-  t.after(() => rm(root, { recursive: true, force: true }));
+  t.after(() => removeFixture(root));
   const managerRoot = path.join(root, "acc", "runtime");
   const runtime = { version: "0.4.0", root: path.join(managerRoot, "generations", "0.4.0-test") };
   await mkdir(path.join(runtime.root, "bin", "entrypoints"), { recursive: true });
@@ -30,6 +32,11 @@ async function fixture(t) {
   const control = { schemaVersion: 1, active: runtime, pending: null, phase: "ready", auto: false,
     pin: null, checkedAt: null, home: root, targets: [], notice: null };
   await writeFile(path.join(managerRoot, "control.json"), JSON.stringify(control));
+  // This generation has reclaimed already, so an entry starts no background
+  // worker. One would be detached from the entry with its working directory in
+  // the runtime root, which Windows then refuses to remove until it exits.
+  await writeFile(path.join(managerRoot, "reclaim.json"), JSON.stringify({ schemaVersion: 1,
+    activeRoot: runtime.root }));
   return { root, managerRoot, runtime, marker, control };
 }
 function child(t, f, kind) {

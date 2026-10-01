@@ -3,9 +3,10 @@ import { spawn } from "node:child_process";
 import { once } from "node:events";
 import { chmod, lstat, mkdir, realpath, rm, symlink, writeFile } from "node:fs/promises";
 import path from "node:path";
-import test from "node:test";
+import nodeTest from "node:test";
 import { createCodexServiceSetup } from "../src/service-setup.mjs";
 import { serviceFixture } from "./service-setup-fixture.mjs";
+import { posixTransportTest as test } from "../../../tests/helpers/platform-scope.mjs";
 
 const apply = (f, plan, context = f.context) => f.prepareNativeServiceSetup({ context, plan });
 

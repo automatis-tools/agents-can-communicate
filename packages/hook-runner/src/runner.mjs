@@ -8,12 +8,12 @@ import { capabilityEvidence, clearNativeAttempt, clearSessionBinding, effectiveC
   loadSessionBinding, normalizedEvent, storeSessionBinding }
   from "@agents-can-communicate/adapter-sdk";
 import { createCoordinationService } from "@agents-can-communicate/core";
-import { loadOwnership } from "@agents-can-communicate/installer";
+import { loadOwnership } from "@agents-can-communicate/installer/hook-support";
 import { AccError, createId } from "@agents-can-communicate/protocol";
 import { openFilesystemStore } from "@agents-can-communicate/storage-filesystem";
 import { clearPin, createGitProbe, resolveHookWorkspace, platformDataHome, runtimePaths,
   writePin as writeRuntimePin }
-  from "@agents-can-communicate/cli";
+  from "@agents-can-communicate/cli/hook-support";
 
 import { resolveClientPid } from "./client-pid.mjs";
 import { probeClientVersion as defaultProbeClientVersion } from "./client-version.mjs";
@@ -21,7 +21,8 @@ import { bindNative, callRelease, nativeActivationHintFor, nativeDiagnosticDeadl
   from "./native-attempt.mjs";
 import { readProcessTable as defaultReadProcessTable } from "./process-table.mjs";
 import { withSessionLifecycle } from "./session-lifecycle.mjs";
-import { appendStartOwner, appendToolOwner, ownerHeader, ownerOnlyOutcome } from "./owner-context.mjs";
+import { appendStartOwner, appendToolOwner, assertOwnerQuotable, ownerHeader, ownerOnlyOutcome }
+  from "./owner-context.mjs";
 
 // Kept cohesive above 300 lines because every handler shares one fail-open
 // hook boundary, binding lifecycle, and client-specific outcome contract.
@@ -31,6 +32,16 @@ import { appendStartOwner, appendToolOwner, ownerHeader, ownerOnlyOutcome } from
 // A hook runs in front of the user's turn, so it gets a hard ceiling. Better to
 // let a call through than to make someone's session sit waiting on us.
 const DEFAULT_BUDGET_MS = 5_000;
+// Failures the hook output explains with advice of its own; any other error
+// text stays out of what the client shows.
+const KNOWN_FAILURES = new Set(["workspace_contains_runtime", "workspace_path_unquotable"]);
+// Windows reads the table through WMI in Script Host, 145 ms on a
+// windows-latest runner, and through PowerShell where Script Host is off, whose
+// first start on a machine took 3.8 s. It gets more of the budget there, and
+// leaves the rest for the write that follows.
+const WINDOWS = process.platform === "win32";
+const PROCESS_TABLE_MS = WINDOWS ? 3_000 : 1_000;
+const TABLE_RESERVE_MS = WINDOWS ? 500 : 0;
 
 function assertHookBudget(deadline, message = "hook deadline expired") {
   if (Date.now() >= deadline) throw new Error(message);
@@ -402,7 +413,8 @@ const HANDLERS = {
   // this process's ancestry, and it pins nothing because no hook code of any
   // generation runs for the session until its first real hook pins its own.
   async sessionStart({ event, context, adapter, adapterId, binding, paths,
-    readProcessTable, probeClientVersion, platform, deadline, knownClientPid, pins = true }) {
+    readProcessTable, probeClientVersion, platform, deadline, knownClientPid, pins = true,
+    tableRead: started = null }) {
     // Where this session's pin lives, resolved once and reused at every write
     // below. Beside `paths.root`, never inside it: see `managerRootFor`.
     const pinRoot = managerRootFor(context.dataHome);
@@ -419,19 +431,26 @@ const HANDLERS = {
       await writePin({ root: pinRoot, harnessSessionId: event.sessionId, runtimeRoot: facts.runtimeRoot,
         version: facts.version, storeVersion: facts.storeVersion, clientPid: binding.clientPid });
     }
+    // Once per session, never per turn. A client that cannot be found yields
+    // null, and the session is then judged by age alone - which is exactly the
+    // behaviour every session had before this existed.
+    const command = adapter.client?.command ?? null;
+    const known = Number.isInteger(knownClientPid) && knownClientPid > 0;
+    // Read while the client reports its version: neither needs the other, and
+    // each can start a program. A session start began the read already, when
+    // its event was known. Handled here so a probe that fails first leaves no
+    // rejection unobserved.
+    const tableRead = known || command === null ? null : started ?? Promise.resolve(readProcessTable({
+      timeoutMs: Math.max(1, Math.min(PROCESS_TABLE_MS, deadline - Date.now() - TABLE_RESERVE_MS)) }));
+    tableRead?.catch(() => {});
     const clientVersion = await probeClientVersion(adapter,
       { timeoutMs: Math.max(1, Math.min(1_000, deadline - Date.now())) });
     assertHookBudget(deadline);
     const clientFacts = { clientVersion, platform };
     const capabilities = effectiveCapabilities(adapter, clientFacts);
-    // Once per session, never per turn. A client that cannot be found yields
-    // null, and the session is then judged by age alone - which is exactly the
-    // behaviour every session had before this existed.
-    const command = adapter.client?.command ?? null;
-    const pid = Number.isInteger(knownClientPid) && knownClientPid > 0 ? knownClientPid
-      : command === null ? null
-      : resolveClientPid({ table: await readProcessTable({
-        timeoutMs: Math.max(1, Math.min(1_000, deadline - Date.now())) }), from: process.pid, command });
+    const pid = known ? knownClientPid : command === null ? null
+      : resolveClientPid({ table: await tableRead, from: process.pid, command,
+        clientPackage: adapter.client?.package });
     assertHookBudget(deadline);
     const clientPid = Number.isInteger(pid) && pid > 0 ? pid : undefined;
     const native = hookBinding => bindNative({ adapter, event, hookBinding, ...clientFacts,
@@ -710,7 +729,15 @@ export async function runHook({ adapterId, payload, adapters, dataHome, env,
     if (adapter === undefined) throw new Error(`no adapter named ${adapterId}`);
 
     const event = await adapter.normalizeHook(payload, { args });
+    // A session start reads the process table once, and it depends on nothing
+    // below: it starts now, while the store opens. On Windows it is the part
+    // of a start that runs another program.
+    const tableRead = event.kind !== "sessionStart" || (adapter.client?.command ?? null) === null
+      ? null : Promise.resolve(readProcessTable({ timeoutMs: Math.max(1,
+        Math.min(PROCESS_TABLE_MS, deadline - Date.now() - TABLE_RESERVE_MS)) }));
+    tableRead?.catch(() => {});
     const context = await openContext({ event, adapterId, dataHome, runtime, env, deadline });
+    assertOwnerQuotable(context.workspaceCwd, context.workspaceRef, String(platform).split("-")[0]);
     const handler = HANDLERS[event.kind];
     const lifecycle = ["sessionStart", "sessionEnd", "beforeTurn"].includes(event.kind);
     const invoke = async () => {
@@ -729,7 +756,7 @@ export async function runHook({ adapterId, payload, adapters, dataHome, env,
       // that produced it; nothing in core reads it.
       const result = handler === undefined ? {} : await handler({ event, context, adapter, adapterId,
         binding, paths: context.paths, payload,
-        readProcessTable, probeClientVersion, platform, deadline });
+        readProcessTable, probeClientVersion, platform, deadline, tableRead });
       return appendToolOwner(appendStartOwner(result, { event, context, adapter }),
         { event, binding, context, adapter });
     };
@@ -775,8 +802,8 @@ export async function runHook({ adapterId, payload, adapters, dataHome, env,
     return await Promise.race([execute(), budget]);
   } catch (error) {
     return { ...fallback, failed: true, reason: error.message,
-      ...(error instanceof AccError && error.details?.reasonCode === "workspace_contains_runtime"
-        ? { failureCode: "workspace_contains_runtime" } : {}),
+      ...(error instanceof AccError && KNOWN_FAILURES.has(error.details?.reasonCode)
+        ? { failureCode: error.details.reasonCode } : {}),
       ...(Date.now() >= deadline ? { timedOut: true } : {}) };
   } finally {
     clearTimeout(timer);

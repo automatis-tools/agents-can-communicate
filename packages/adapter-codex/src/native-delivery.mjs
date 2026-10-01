@@ -36,9 +36,12 @@ async function usingPeer(socketPath, timeoutMs, open, run) {
 }
 
 export async function probeNativeDelivery({ timeoutMs = 750, env = process.env,
-  open = openCodexAppServer } = {}) {
+  open = openCodexAppServer, platform = process.platform } = {}) {
   const unsupported = (reasonCode, clientVersion = null) => ({ supported: false, clientVersion,
     protocolContract: PROTOCOL_CONTRACT, executableFingerprint: null, modes: [], reasonCode });
+  // The Windows daemon listens on AF_UNIX, which Node cannot reach there. Its
+  // stdio proxy is the Windows transport, and it is not built yet.
+  if (platform === "win32") return unsupported("native_delivery_unsupported");
   const socketPath = await readySocketPath(controlSocketPath(env));
   if (socketPath === null) return unsupported("native_endpoint_unavailable");
   try {
@@ -107,7 +110,9 @@ export async function verifyReceiver(peer, endpoint, { probe = probeCodexQueue,
 // A chat that runs embedded has no receiver for any check below to find. Its
 // host process is read only after a check failed, so a bound session never pays
 // for it, and the reason then names the cause instead of the symptom.
-export async function bindNativeSession({ argvOf = hostArgv, ...options } = {}) {
+export async function bindNativeSession({ argvOf = hostArgv, platform = process.platform,
+  ...options } = {}) {
+  if (platform === "win32") return closed(options.clientVersion, "native_delivery_unsupported");
   const result = await bindAttempt(options);
   if (result.supported || !Number.isInteger(options.clientPid) || options.clientPid <= 0) return result;
   const host = await embeddedHost(options.clientPid, argvOf);

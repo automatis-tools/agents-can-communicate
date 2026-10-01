@@ -100,6 +100,17 @@ export function createSessionOpener(ports, locate) {
     };
     if (await isMaterialised(store, workspaceId)) return openDurable();
 
+    // Another live session already here makes this the second, which
+    // materialises the workspace: this one opens in that same transaction
+    // rather than as an ephemeral copy to be copied and retired at once. The
+    // look is taken without the lock; materialise asks again under it.
+    const joining = (await store.ephemeral.list("session")).some(item => item.state === "open"
+      && item.sessionId !== sessionId);
+    if (joining && await materialise(ports, { workspaceId, descriptor: input.descriptor,
+      reason: "second_live_session", opening: { participant, session, assertAvailable } })) {
+      return session;
+    }
+
     // Preparing a participant must not rename one that already exists, or
     // recreate an ephemeral copy after promotion has taken ownership.
     await store.ephemeral.update("participant", participant.participantId, async current =>

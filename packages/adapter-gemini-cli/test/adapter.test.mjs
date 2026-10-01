@@ -10,6 +10,8 @@ import { effectiveCapabilities } from "@agents-can-communicate/adapter-sdk";
 import { createGeminiCliAdapter } from "../src/adapter.mjs";
 import { allowResponse, denyResponse, injectResponse, normalizeGeminiHook }
   from "../src/hooks.mjs";
+import { POSIX_FORM } from "../../../tests/helpers/platform-scope.mjs";
+import { POSIX_SH, SHELL_HOSTILE, shWords } from "../../../tests/helpers/posix-sh.mjs";
 
 // The user already has a hook of their own on an event ACC also uses, with a
 // command string that is easy to confuse for ours.
@@ -26,7 +28,7 @@ async function fixture(t) {
     `${JSON.stringify(EXISTING, null, 2)}\n`);
   const read = async () => JSON.parse(await readFile(
     path.join(home, ".gemini", "settings.json"), "utf8"));
-  return { context: { home }, read };
+  return { context: { home, hostPlatform: POSIX_FORM }, read };
 }
 
 const captured = async name => JSON.parse(await readFile(
@@ -255,4 +257,35 @@ test("the hook template is not shipped into the installed extension", async t =>
   assert.equal(present.includes("hooks.json"), false,
     "the template shipped, so every event has a second entry that cannot run");
   assert.equal(present.includes("acc-hook.sh"), true, "the shim is missing");
+});
+
+// Gemini CLI runs hooks through PowerShell on Windows: the pinned node on the
+// Node shim, by the call operator.
+test("windows: each hook command is the PowerShell call of the pinned node on the Node shim", async t => {
+  const { context, read } = await fixture(t);
+  await createGeminiCliAdapter().install({ ...context, hostPlatform: "win32",
+    node: "C:\\Program Files\\nodejs\\node.exe" });
+  const settings = await read();
+  const commands = Object.values(settings.hooks).flatMap(groups => groups.flatMap(group => group.hooks))
+    .filter(hook => hook.name?.startsWith("acc-")).map(hook => hook.command);
+  assert.equal(commands.length > 0, true);
+  for (const command of commands) {
+    assert.match(command, /^& 'C:\\Program Files\\nodejs\\node\.exe' '.+acc-hook\.mjs' \w+; exit \$LASTEXITCODE$/);
+  }
+});
+
+test("posix: the shell reads the shim's path exactly as written", { skip: POSIX_SH }, async t => {
+  const home = await realpath(await mkdtemp(path.join(tmpdir(), SHELL_HOSTILE)));
+  t.after(() => rm(home, { recursive: true, force: true }));
+  await createGeminiCliAdapter().install({ home, hostPlatform: POSIX_FORM });
+  const settings = JSON.parse(await readFile(path.join(home, ".gemini", "settings.json"), "utf8"));
+
+  const commands = Object.values(settings.hooks).flat().flatMap(entry => entry.hooks)
+    .filter(hook => hook.name?.startsWith("acc-")).map(hook => hook.command);
+  assert.notEqual(commands.length, 0);
+  for (const command of commands) {
+    const [shim] = shWords(command);
+    assert.equal(shim.startsWith(`${home}${path.sep}`), true, `${command} -> ${shim}`);
+    await readFile(shim);
+  }
 });

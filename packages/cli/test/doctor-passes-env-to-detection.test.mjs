@@ -17,7 +17,7 @@ test("doctor hands detection the runtime environment it resolves the client from
   let seen = null;
   const detect = async ({ context }) => { seen = context; return []; };
   const runtime = { platform: process.platform,
-    env: { HOME: home, APPDATA: home, SHELL: "/bin/zsh" } };
+    env: { HOME: home, LOCALAPPDATA: home, SHELL: "/bin/zsh" } };
 
   await diagnoseAdapters({ options: {}, runtime, detect });
 
@@ -33,13 +33,17 @@ test("doctor hands detection every receiving adapter's sockets for the runtime p
   t.after(() => rm(home, { recursive: true, force: true }));
   let seen = null;
   const detect = async ({ context }) => { seen = context; return []; };
+  // A Linux runtime resolves its data home from a POSIX HOME, which a Windows
+  // host's temporary directory is not; there the Linux home is a POSIX name
+  // that exists nowhere, and nothing under it is read into the answer.
+  const linuxHome = process.platform === "win32" ? "/home/acc-doctor-receivers" : home;
   await diagnoseAdapters({ options: {}, runtime: { platform: "linux",
-    env: { HOME: home, XDG_RUNTIME_DIR: "/run/user/4242" } }, detect });
+    env: { HOME: linuxHome, XDG_RUNTIME_DIR: "/run/user/4242" } }, detect });
   assert.ok(seen.receiverSockets.includes("/run/user/4242/cc-socks"));
   assert.ok(seen.receiverSockets.includes(
-    path.join(home, ".codex", "app-server-control", "app-server-control.sock")));
+    path.join(linuxHome, ".codex", "app-server-control", "app-server-control.sock")));
   await diagnoseAdapters({ options: {}, runtime: { platform: "win32",
-    env: { HOME: home, APPDATA: home } }, detect });
+    env: { HOME: home, LOCALAPPDATA: home } }, detect });
   assert.equal(seen.receiverSockets.some(item => item.includes("cc-socks")), false,
     "the runtime platform, not the host's, decides what the receivers declare");
 });

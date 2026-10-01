@@ -1,6 +1,5 @@
-import path from "node:path";
+import { readProcessArgs } from "@agents-can-communicate/adapter-sdk";
 
-import { runMaintenanceCommand } from "./maintenance-host.mjs";
 
 // Which process runs a hook tells a daemon-hosted thread from an embedded chat.
 // Measured on 0.158.0: a daemon thread's hook runs under
@@ -20,20 +19,23 @@ const VALUE_OPTIONS = new Set(["-c", "--config", "-m", "--model", "-p", "--profi
   "--disable", "--local-provider"]);
 
 export async function hostArgv(pid) {
-  const result = await runMaintenanceCommand("/bin/ps", ["-o", "args=", "-p", String(pid)],
-    { timeout: 500 });
-  if (result.status !== 0) throw new Error("host process unreadable");
-  return result.stdout.trim().split(/\s+/).filter(Boolean);
+  const argv = await readProcessArgs(pid, { ps: "/bin/ps", timeoutMs: 500 });
+  if (argv === null) throw new Error("host process unreadable");
+  return argv;
 }
+
+// Either separator, and Windows' `.exe` in any case: `codex`, `/usr/local/bin/codex`,
+// `C:\Users\dana\AppData\Local\Programs\OpenAI\Codex\bin\codex.exe`.
+const programName = word => (word ?? "").split(/[\\/]/).at(-1).replace(/\.exe$/i, "").toLowerCase();
 
 // The arguments after Codex itself, or null for any process that is not Codex:
 // `codex ...`, or a node script named codex, as `node [options] codex.js ...`.
 function codexArguments(argv) {
   const [program, ...rest] = argv;
-  if (path.basename(program ?? "") === "codex") return rest;
-  if (path.basename(program ?? "") !== "node") return null;
+  if (programName(program) === "codex") return rest;
+  if (programName(program) !== "node") return null;
   const script = rest.findIndex(word => !word.startsWith("-"));
-  return script >= 0 && path.basename(rest[script]).replace(/\.[mc]?js$/, "") === "codex"
+  return script >= 0 && programName(rest[script]).replace(/\.[mc]?js$/, "") === "codex"
     ? rest.slice(script + 1) : null;
 }
 

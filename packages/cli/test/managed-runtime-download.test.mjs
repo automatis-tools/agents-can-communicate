@@ -20,3 +20,19 @@ test("automatic release discovery accepts only exact stable package identity and
   body.dist.integrity = `sha512-${Buffer.alloc(64).toString('base64')}`; body.name = "other";
   await assert.rejects(fetchRelease({ get, env: {} }), /identity/);
 });
+
+// On Windows the `npm` beside node.exe is a shell script; node ran it as
+// JavaScript and every download failed. npm's own entry is npm-cli.js.
+test("windows: the download runs npm's own script, not the shell script named npm", async () => {
+  const { npmCli } = await import("../src/managed-runtime/download.mjs");
+  const found = [];
+  const realpath = async file => {
+    found.push(file);
+    if (file === "C:\\Program Files\\nodejs\\node_modules\\npm\\bin\\npm-cli.js") return file;
+    throw Object.assign(new Error("ENOENT"), { code: "ENOENT" });
+  };
+  assert.equal(await npmCli({ Path: "C:\\Windows" }, { platform: "win32",
+    execPath: "C:\\Program Files\\nodejs\\node.exe", realpath }),
+  "C:\\Program Files\\nodejs\\node_modules\\npm\\bin\\npm-cli.js");
+  assert.equal(found.some(file => /\\npm$/.test(file)), false);
+});

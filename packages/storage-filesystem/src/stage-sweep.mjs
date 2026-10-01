@@ -1,11 +1,11 @@
-import { rename } from "node:fs/promises";
 import path from "node:path";
 
 import { EXIT } from "@agents-can-communicate/protocol";
 
 import { encode, listDirectoryEntries, publishAtomic, readJsonIfPresent } from "./atomic-json.mjs";
-import { discard, discardLeftovers, doomedName, expired, syncDirectory }
+import { discard, discardLeftovers, doomedName, expired }
   from "./doomed-directory.mjs";
+import { renameEntry, syncEntry } from "./portable-fs.mjs";
 import { reclaimRetired } from "./reclaim.mjs";
 import { ensureManagedDirectory } from "./safe-directory.mjs";
 
@@ -30,7 +30,7 @@ async function reclaimLegacy(paths, root, detached, budget, deadlineAt) {
   for (const entry of await listDirectoryEntries(paths.tmp, { root })) {
     if (spent >= budget || expired(deadlineAt)) return { spent, drained: false };
     if (!entry.isFile() || !entry.name.endsWith(".published")) continue;
-    await rename(path.join(paths.tmp, entry.name), path.join(detached, entry.name));
+    await renameEntry(path.join(paths.tmp, entry.name), path.join(detached, entry.name));
     spent += 1;
   }
   return { spent, drained: true };
@@ -69,9 +69,9 @@ export async function sweepAcceptedStages(paths,
   // the ordinary case rather than an error, and such a store is exactly the one
   // whose accepted stages are all still in tmp for the reclamation below.
   await ensureManagedDirectory(root, paths.stage);
-  await rename(paths.stage, detached);
+  await renameEntry(paths.stage, detached);
   await ensureManagedDirectory(root, paths.stage);
-  await syncDirectory(root);
+  await syncEntry(root, detached);
 
   const reclaimed = await reclaimLegacy(paths, root, detached, limit - spent, deadlineAt);
   spent += reclaimed.spent;

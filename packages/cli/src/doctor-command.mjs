@@ -50,13 +50,66 @@ import { diagnoseFilesystemStore, repairFilesystemStore }
  *
  * Null for anything unreadable. "Might be old" on every run is not a diagnosis.
  */
+/**
+ * The package directory of the runner a shim or config names, or null.
+ *
+ * ACC writes the runner in double quotes in every form: a shell shim
+ * (`ACC_RUNNER="..."`), the Node shim Windows gets (a JSON string) and Kimi's
+ * config (a TOML string holding a command, whose own quotes are cmd's on
+ * Windows and TOML's elsewhere). Each quoted string is read the way a shell
+ * reads one: a backslash escapes only a quote, a backslash, $ or a backtick,
+ * which is all the shim escapes and all a path needs undone in JSON or TOML,
+ * so an unescaped C:\Users\... in a shell script stays that path. A string
+ * holding quotes is a command. A Windows path in it is cmd's, which has no
+ * escape character, so it is read as it stands and a UNC path keeps its leading
+ * \\; other words are read the shell's way, since Kimi's POSIX command escapes a
+ * quote in a path; then, when no word names the runner, the string is read
+ * whole, since a POSIX path may hold a quote.
+ * An apostrophe, as in C:\Users\O'Neil, is part of a path. An unquoted path is
+ * read to the whitespace before it.
+ */
+const RUNNER = /[\\/]agents-can-communicate(?=[\\/]bin[\\/]acc-hook\.mjs)/;
+const absoluteRoot = value => {
+  const match = RUNNER.exec(value);
+  if (match === null) return null;
+  const root = value.slice(0, match.index + match[0].length);
+  return /^(?:[A-Za-z]:)?[\\/]/.test(root) ? root : null;
+};
+
+const quotedStrings = text => [...text.matchAll(/"((?:[^"\\]|\\[\s\S])*)"/g)]
+  .map(([, quoted]) => quoted.replace(/\\(["\\$`])/g, "$1"));
+
+const commandRoot = command => {
+  for (const [, word] of command.matchAll(/"([^"]*)"/g)) {
+    const root = /^(?:[A-Za-z]:\\|\\\\)/.test(word) ? absoluteRoot(word) : null;
+    if (root !== null) return root;
+  }
+  for (const word of quotedStrings(command)) {
+    const root = absoluteRoot(word);
+    if (root !== null) return root;
+  }
+  return absoluteRoot(command);
+};
+
+export function runnerRoot(text) {
+  for (const value of quotedStrings(String(text))) {
+    const root = value.includes("\"") ? commandRoot(value) : absoluteRoot(value);
+    if (root !== null) return root;
+  }
+  const flat = String(text);
+  const match = RUNNER.exec(flat);
+  if (match === null) return null;
+  const start = flat.slice(0, match.index).search(/\S+$/);
+  return start < 0 ? null : absoluteRoot(flat.slice(start));
+}
+
 export async function wiredVersion(shimPath) {
   if (typeof shimPath !== "string" || shimPath === "") return null;
   const text = await readFile(shimPath, "utf8").catch(() => null);
   if (text === null) return null;
-  const runner = /["']?(\/[^"'\s]*\/agents-can-communicate)\/bin\/acc-hook\.mjs["']?/.exec(text);
-  if (runner === null) return null;
-  const manifest = await readFile(path.join(runner[1], "package.json"), "utf8")
+  const root = runnerRoot(text);
+  if (root === null) return null;
+  const manifest = await readFile(path.join(root, "package.json"), "utf8")
     .catch(() => null);
   if (manifest === null) return null;
   try {
@@ -103,7 +156,10 @@ async function findShims(root, depth) {
   for (const entry of entries) {
     const target = path.join(root, entry.name);
     if (entry.isDirectory()) found.push(...await findShims(target, depth - 1));
-    else if (entry.name.endsWith(".sh")) found.push(target);
+    // The shell shim on POSIX, the Node shim on Windows.
+    else if (/^acc-(?:hook|cli)\.(?:sh|mjs)$/.test(entry.name) || entry.name.endsWith(".sh")) {
+      found.push(target);
+    }
   }
   return found;
 }

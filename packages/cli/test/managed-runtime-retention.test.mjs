@@ -411,39 +411,43 @@ test("attachStagingTemp does nothing when the hold it would attach to is already
 // earlier, noisier one: at p=3%, 200 trials detects ~99.75% of the time
 // (1 - 0.97^200); this file's own run below is additional, independent
 // evidence on top of that calibration run, not a replacement for it.
-test("a staging hold racing reclaim never loses, across many jittered interleavings", async () => {
+test("a staging hold racing reclaim never loses, across many jittered interleavings", async t => {
   const TRIALS = 200;
   const DECOYS = 40;
   const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+  // The decoys are the same in every trial, and building their holds is where
+  // the time went: each is a durable write, 40 of them 0.3 s on macOS, and 200
+  // trials of that ran past the five-minute test limit on windows-latest. They
+  // are built once; each trial races on a fresh target and then removes it and
+  // its hold, so every reclaim still reads all 40 decoys while the hold lands.
+  const root = await mkdtemp(path.join(tmpdir(), "acc-retain-race-"));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const activeRoot = path.join(root, "generations", "0.4.0-active");
+  await mkdir(activeRoot, { recursive: true });
+  await fixtureControl(root, { active: activeRoot });
+  for (let decoy = 0; decoy < DECOYS; decoy++) {
+    const decoyRoot = path.join(root, "generations", `decoy-${decoy}`);
+    await mkdir(decoyRoot, { recursive: true });
+    await holdStagedGeneration({ root, generationRoot: decoyRoot, pid: process.pid });
+  }
   for (let trial = 0; trial < TRIALS; trial++) {
-    // Each trial builds 41 generations plus their holds. Deferring cleanup to
-    // the end of the test would hold all 200 trials at once, so a trial clears
-    // its own fixture and peak usage stays at one.
-    const root = await mkdtemp(path.join(tmpdir(), `acc-retain-race-${trial}-`));
-    try {
-      const activeRoot = path.join(root, "generations", "0.4.0-active");
-      await mkdir(activeRoot, { recursive: true });
-      await fixtureControl(root, { active: activeRoot });
-      for (let decoy = 0; decoy < DECOYS; decoy++) {
-        const decoyRoot = path.join(root, "generations", `decoy-${decoy}`);
-        await mkdir(decoyRoot, { recursive: true });
-        await holdStagedGeneration({ root, generationRoot: decoyRoot, pid: process.pid });
-      }
-      const targetName = "0.4.9-racing";
-      const target = path.join(root, "generations", targetName);
-      const writer = (async () => {
-        await sleep(8 + Math.random() * 15);
-        await holdStagedGeneration({ root, generationRoot: target, pid: process.pid });
-        await mkdir(target, { recursive: true }); // stands in for stageOwnGeneration's rename
-      })();
-      const reclaim = reclaimGenerations({ root, active: null, pidIsAlive: () => true });
-      await Promise.all([writer, reclaim]);
-      const survivors = await readdir(path.join(root, "generations"));
-      assert.ok(survivors.includes(targetName),
-        `trial ${trial}: the racing generation was deleted while its hold was landing`);
-    } finally {
-      await rm(root, { recursive: true, force: true });
-    }
+    const targetName = `0.4.9-racing-${trial}`;
+    const target = path.join(root, "generations", targetName);
+    let hold = null;
+    const writer = (async () => {
+      await sleep(8 + Math.random() * 15);
+      hold = await holdStagedGeneration({ root, generationRoot: target, pid: process.pid });
+      await mkdir(target, { recursive: true }); // stands in for stageOwnGeneration's rename
+    })();
+    const reclaim = reclaimGenerations({ root, active: null, pidIsAlive: () => true });
+    await Promise.all([writer, reclaim]);
+    const survivors = await readdir(path.join(root, "generations"));
+    assert.ok(survivors.includes(targetName),
+      `trial ${trial}: the racing generation was deleted while its hold was landing`);
+    assert.equal(survivors.filter(name => name.startsWith("decoy-")).length, DECOYS,
+      `trial ${trial}: a held decoy was deleted`);
+    await releaseStagingHold(hold);
+    await rm(target, { recursive: true, force: true });
   }
 });
 

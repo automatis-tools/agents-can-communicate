@@ -40,7 +40,7 @@ async function inspectRealDirectory(directory, root, create) {
   for (let attempt = 0; ; attempt += 1) {
     let details;
     try {
-      details = await lstat(directory);
+      details = await lstat(directory, { bigint: true });
     } catch (error) {
       if (error.code !== "ENOENT") {
         throw invalidDirectory("cannot inspect managed directory", directory, root, error.message);
@@ -64,10 +64,46 @@ async function inspectRealDirectory(directory, root, create) {
   }
 }
 
-async function inspectManagedDirectory(rootPath, directoryPath, create, { afterInspect } = {}) {
+// A directory validated once is known by its identity: volume and file id, as
+// bigint because an NTFS file id does not fit a double. The same name is
+// checked again with one lstat, which follows every ancestor, so an ancestor
+// replaced by a link lands on another directory and anything but the identity
+// that was validated takes the whole walk again. What is not repeated is
+// finding the same directory under the same name: every record read walked
+// its path from the root twice, about a thousand calls a hook and 130 ms of one
+// on windows-latest. The one case the walk would still refuse is the store's
+// own directory moved elsewhere with a link left at its name - the same data in
+// another place (decided 2026-09-30). The seams bypass it: the race tests
+// exercise the walk itself.
+const VALIDATED = new Map();
+const VALIDATED_LIMIT = 512;
+
+async function validatedEarlier(key, directory) {
+  const known = VALIDATED.get(key);
+  if (known === undefined) return null;
+  const current = await lstat(directory, { bigint: true }).catch(() => null);
+  if (current !== null && current.isDirectory() && !current.isSymbolicLink()
+    && current.dev === known.dev && current.ino === known.ino) return current;
+  VALIDATED.delete(key);
+  return null;
+}
+
+function remember(key, details) {
+  if (VALIDATED.size >= VALIDATED_LIMIT) VALIDATED.clear();
+  VALIDATED.set(key, { dev: details.dev, ino: details.ino });
+}
+
+async function inspectManagedDirectory(rootPath, directoryPath, create, options = {}) {
+  const { afterInspect, realpath: resolve = realpath, platform = process.platform } = options;
   const root = absolutePath(rootPath, "managed root");
   const directory = absolutePath(directoryPath, "managed directory", root);
   const relative = relativeWithin(root, directory);
+  const key = options.afterInspect === undefined && options.realpath === undefined
+    && options.platform === undefined ? `${root}\u0000${directory}` : null;
+  if (key !== null) {
+    const known = await validatedEarlier(key, directory);
+    if (known !== null) return { directory, stat: known };
+  }
   let details = await inspectRealDirectory(root, root, create);
   const canonicalRoot = await realpath(root);
   let current = root;
@@ -85,7 +121,8 @@ async function inspectManagedDirectory(rootPath, directoryPath, create, { afterI
       // between the check and the resolution leaves realpath nothing to resolve
       // (ENOENT), so it is checked and created again, then resolved again; every
       // check below applies to whichever attempt settles.
-      resolved = await resolveSegment(current, create && attempt < VANISHED_RETRIES);
+      resolved = await resolveSegment(current, create && attempt < VANISHED_RETRIES,
+        { resolve, platform });
       if (resolved !== null) break;
     }
     // realpath answers with the name the directory carries *now*, which is not
@@ -113,21 +150,59 @@ async function inspectManagedDirectory(rootPath, directoryPath, create, { afterI
     }
     canonicalParent = resolved;
   }
+  if (key !== null) remember(key, details);
   return { directory, stat: details };
 }
 
+// Where NTFS keeps a directory deleted while something still has it open.
+const DELETED = /^(?:\\\\\?\\)?[A-Za-z]:\\\$Extend\\\$Deleted\\/i;
+
+// How many times a name answered with a directory leaving it is resolved again.
+const LEAVING_RETRIES = 3;
+
 // null when the name went away and the caller may take it again.
-async function resolveSegment(current, retry) {
-  try {
-    return await realpath(current);
-  } catch (error) {
-    if (error.code === "ENOENT" && retry) return null;
-    throw error;
+//
+// Linux realpath fails ENOENT on a name removed or renamed away while it
+// resolves. Windows, measured on windows-latest, answers that window with
+// EBADF, with EPERM, or with the directory's place in $Extend\$Deleted (above):
+// the handle it took was to a directory leaving the name. The name itself may
+// already hold a new one - `stage` does, right after a sweep - so it is resolved
+// again. A directory there is the answer, no directory there is gone, and a
+// name that keeps answering that way while present fails as it always did:
+// read as gone, a directory would read as holding no records.
+async function resolveSegment(current, retry, { resolve, platform }) {
+  for (let attempt = 1; ; attempt += 1) {
+    let resolved = null;
+    let failure = null;
+    try {
+      resolved = await resolve(current);
+    } catch (error) {
+      failure = error;
+    }
+    const leaving = platform === "win32" && (failure === null ? DELETED.test(resolved)
+      : ["EBADF", "EPERM"].includes(failure.code));
+    if (failure === null && !leaving) return resolved;
+    if (failure?.code === "ENOENT") {
+      if (retry) return null;
+      throw failure;
+    }
+    if (!leaving) throw failure;
+    if (attempt < LEAVING_RETRIES) continue;
+    const present = await lstat(current).then(() => true, missing => missing.code !== "ENOENT");
+    // Present: a deleted directory's place is refused by the containment check
+    // that follows, and an error stays what it says.
+    if (present) {
+      if (failure !== null) throw failure;
+      return resolved;
+    }
+    if (retry) return null;
+    throw Object.assign(new Error(`ENOENT: ${current} left its name while it resolved`,
+      failure === null ? {} : { cause: failure }), { code: "ENOENT", syscall: "realpath", path: current });
   }
 }
 
 async function stillTheSameDirectory(details, resolved, current, root) {
-  const served = await stat(resolved).then(found => found, error => {
+  const served = await stat(resolved, { bigint: true }).then(found => found, error => {
     if (error.code === "ENOENT") return null;
     throw invalidDirectory("cannot inspect managed directory", current, root, error.message);
   });
@@ -135,7 +210,8 @@ async function stillTheSameDirectory(details, resolved, current, root) {
 }
 
 // `afterInspect` is the seam the race tests use: it runs between a segment's
-// check and its resolution, the window a concurrent rename lands in.
+// check and its resolution, the window a concurrent rename lands in. `realpath`
+// and `platform` let them put a platform's answer in that window.
 export async function assertManagedDirectory(rootPath, directoryPath, options) {
   return inspectManagedDirectory(rootPath, directoryPath, false, options);
 }

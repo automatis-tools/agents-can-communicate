@@ -13,6 +13,7 @@ import { EXIT } from "@agents-can-communicate/protocol";
 
 import { createCodexAdapter } from "../src/adapter.mjs";
 import { CODEX_HOOK_EVENTS, injectOutcome, normalizeCodexHook } from "../src/hooks.mjs";
+import { POSIX_FORM } from "../../../tests/helpers/platform-scope.mjs";
 
 const run = promisify(execFile);
 
@@ -52,7 +53,7 @@ async function fixture(t) {
   const ours = path.join(root, ".agents", "plugins", "marketplace.json");
   const read = async () => JSON.parse(await readFile(ours, "utf8"));
   const plugin = path.join(root, "plugins", "agents-can-communicate");
-  return { context: { home, codexHome: path.join(home, ".codex") },
+  return { context: { home, codexHome: path.join(home, ".codex"), hostPlatform: POSIX_FORM },
     marketplace: ours, read, theirs, root, plugin };
 }
 
@@ -456,6 +457,8 @@ test("the cached copy carries the same absolute hook command", async t => {
 });
 
 test("the installed hook command preserves literal metacharacters and exports its data home",
+  { skip: process.platform === "win32"
+    && "runs the POSIX form through sh; the next test holds Windows' answer for such a path" },
   async t => {
     const base = await realpath(await mkdtemp(path.join(tmpdir(), "acc-codex-command-")));
     t.after(() => rm(base, { recursive: true, force: true }));
@@ -468,7 +471,9 @@ test("the installed hook command preserves literal metacharacters and exports it
     await chmod(node, 0o755);
     await writeFile(runner, "// runner fixture\n");
 
-    const context = { home, codexHome: path.join(home, ".codex"), dataHome, node, runner };
+    // POSIX quoting is what this checks; Windows refuses such a path outright.
+    const context = { home, codexHome: path.join(home, ".codex"), dataHome, node, runner,
+      hostPlatform: POSIX_FORM };
     await createCodexAdapter().install(context);
     const cached = JSON.parse(await readFile(path.join(context.codexHome, "plugins", "cache",
       "acc-local", "agents-can-communicate", await pluginVersion(CODEX_PLUGIN), "hooks.json"),
@@ -484,6 +489,23 @@ test("the installed hook command preserves literal metacharacters and exports it
     assert.equal(skillRun.stdout, `${dataHome}\n`,
       "the installed skill must reach the same data home without daemon environment exports");
   });
+
+// PowerShell expands `$` and a backtick inside the double-quoted form Codex runs
+// on Windows, so ACC refuses such a path there by name rather than install a
+// hook that would run somewhere else.
+test("on Windows a home PowerShell would expand is refused, by name", async t => {
+  const base = await realpath(await mkdtemp(path.join(tmpdir(), "acc-codex-command-")));
+  t.after(() => rm(base, { recursive: true, force: true }));
+  const home = path.join(base, "space $() `printf tick`");
+  await mkdir(home, { recursive: true });
+  const runner = path.join(base, "acc-hook.mjs");
+  await writeFile(runner, "// runner fixture\n");
+  const context = { home, codexHome: path.join(home, ".codex"), dataHome: path.join(base, "data"),
+    node: process.execPath, runner, hostPlatform: "win32" };
+
+  await assert.rejects(createCodexAdapter().install(context),
+    error => /a Windows shell would expand it/.test(error.message) && error.message.includes(home));
+});
 
 test("detect reports the plugin as installed straight after install", async t => {
   const { context } = await realFixture(t);
@@ -547,7 +569,8 @@ test("ACC registers a marketplace of its own, not the user's", async t => {
   // The root it names is ACC's own, inside the agents home rather than at the
   // top of it: this client resolves a manifest entry against the root, so
   // joining the user's marketplace would put ACC's tree in `~/plugins/`.
-  assert.match(config, /source = "[^"]*\/\.agents\/acc-local"/);
+  // Either separator; a Windows path is TOML-escaped, `\\`.
+  assert.match(config, /source = "[^"]*(?:\/|\\\\)\.agents(?:\/|\\\\)acc-local"/);
 
   // Which is the whole point: the marketplace this client discovers by itself
   // is the user's, named by its own manifest. ACC merged into it and then
@@ -713,4 +736,26 @@ test("an install with no previous version to hold leaves one copy", async t => {
   await createCodexAdapter().install({ ...context, keepPreviousVersion: null });
 
   assert.deepEqual(await readdir(cache), [version]);
+});
+
+// Codex runs a hook's `commandWindows` on Windows, through PowerShell, which
+// has no `sh`: the pinned node runs the Node shim there.
+test("windows: each hook carries a PowerShell commandWindows beside a portable command", async t => {
+  const { context, plugin } = await fixture(t);
+  const { installCodexPlugin } = await import("../src/install.mjs");
+  const runner = path.join(context.home, "acc-hook.mjs");
+  await writeFile(runner, "");
+  await installCodexPlugin({ ...context, runner, cli: runner, node: "C:\\Program Files\\nodejs\\node.exe",
+    hostPlatform: "win32" });
+  assert.equal((await readdir(plugin)).includes("acc-hook.mjs"), true);
+  const hooks = JSON.parse(await readFile(path.join(plugin, "hooks.json"), "utf8")).hooks;
+  const shim = path.join(plugin, "acc-hook.mjs");
+  for (const [event, groups] of Object.entries(hooks)) {
+    for (const hook of groups.flatMap(group => group.hooks)) {
+      const kind = hook.command.split(" ").pop();
+      assert.equal(hook.commandWindows,
+        `& 'C:\\Program Files\\nodejs\\node.exe' '${shim}' ${kind}; exit $LASTEXITCODE`, event);
+      assert.equal(hook.command, `node "${shim.replaceAll("\\", "/")}" ${kind}`, event);
+    }
+  }
 });

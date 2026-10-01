@@ -32,7 +32,8 @@ export function createKimiAdapter() {
     // The binary this client actually installs. Probed for a version to
     // decide whether the client is on this machine, so it has to be the
     // real command rather than the adapter id: `0.36.1`.
-    client: { command: "kimi", certificationName: "kimi", versionArgs: ["--version"] },
+    client: { command: "kimi", package: "@moonshot-ai/kimi-code", certificationName: "kimi",
+      versionArgs: ["--version"] },
     certification,
     capabilities: {
       lifecycle: { sessionStart: true, heartbeat: true },

@@ -47,9 +47,11 @@ test("installed opening preserves the owner that acquired the session first", as
           winner = await service.openSession(opening("writer", sessionId));
           checkpoint = await inspect();
         };
+        // A second live session writes first through the transaction that
+        // materialises, so that is where promotion overtakes it.
         const racingStore = { ...store, ephemeral: { ...store.ephemeral },
           transaction: async (callback, options) => {
-            if (mode === "durable") await intervene();
+            if (mode === "durable" || mode === "promotion") await intervene();
             return store.transaction(callback, options);
           } };
         for (const method of ["put", "update"]) {
@@ -169,17 +171,27 @@ test("installed opening preserves the owner that acquired the session first", as
     });
   }
 
-  for (const boundary of ["participant", "session"]) {
+  // A late session that finds a live one writes first through the transaction
+  // that materialises; one that finds none writes its participant, then its
+  // session. Promotion by another opener lands before each.
+  for (const boundary of ["transaction", "participant", "session"]) {
     await t.test(`distinct attach survives promotion before its ${boundary} write`, async () => {
-      const { store, service } = await fixture(`distinct-${boundary}`, "promotion");
+      const { store, service } = await fixture(`distinct-${boundary}`,
+        boundary === "transaction" ? "promotion" : "ephemeral");
       let armed = true;
-      const racingStore = { ...store, ephemeral: { ...store.ephemeral } };
+      const overtake = async () => {
+        armed = false;
+        if (boundary !== "transaction") await service.openSession(opening("peer1"));
+        await service.openSession(opening("peer2"));
+      };
+      const racingStore = { ...store, ephemeral: { ...store.ephemeral },
+        transaction: async (callback, options) => {
+          if (armed && boundary === "transaction") await overtake();
+          return store.transaction(callback, options);
+        } };
       for (const method of ["put", "update"]) {
         racingStore.ephemeral[method] = async (kind, ...args) => {
-          if (armed && kind === boundary) {
-            armed = false;
-            await service.openSession(opening("peer2"));
-          }
+          if (armed && kind === boundary) await overtake();
           return store.ephemeral[method](kind, ...args);
         };
       }

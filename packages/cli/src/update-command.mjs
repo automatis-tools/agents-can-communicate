@@ -2,6 +2,7 @@ import { execFile } from "node:child_process";
 import { mkdir, writeFile } from "node:fs/promises";
 import { promisify } from "node:util";
 
+import { pathOf, resolveExecutable, runExecutable } from "@agents-can-communicate/adapter-sdk";
 import { AccError, EXIT } from "@agents-can-communicate/protocol";
 
 import { platformPaths } from "./platform-paths.mjs";
@@ -10,6 +11,15 @@ import { checkingIsOff, fetchLatest, isNewer, writeCachedCheck } from "./update-
 import { runManagedUpdate, validateUpdateOptions } from "./managed-runtime/command.mjs";
 
 const execFileAsync = promisify(execFile);
+
+// npm and acc are .cmd shims on Windows: found through PATHEXT, and started
+// through cmd.exe. POSIX runs them by name as before.
+async function runStep(command, argv, env) {
+  if (process.platform !== "win32") return execFileAsync(command, argv, { env });
+  const file = await resolveExecutable(command, { pathEnv: pathOf(env) });
+  if (file === null) throw new Error(`${command} is not on PATH`);
+  return runExecutable(file, argv, { env });
+}
 
 /**
  * The two commands an upgrade takes, and why it is two.
@@ -76,7 +86,7 @@ export async function runUpdateCommand({ options, runtime }) {
       ...steps.map(spell), "", "or run: acc update"].join("\n") };
   }
 
-  const spawn = runtime.spawn ?? ((command, argv) => execFileAsync(command, argv, { env }));
+  const spawn = runtime.spawn ?? ((command, argv) => runStep(command, argv, env));
   const done = [];
   let installation = { stdout: "", stderr: "" };
   for (const [command, argv] of steps) {

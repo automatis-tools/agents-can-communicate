@@ -2,7 +2,6 @@ import assert from "node:assert/strict";
 import { mkdtemp, realpath, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import test from "node:test";
 
 import { createCodexAdapter } from "@agents-can-communicate/adapter-codex";
 import { createCoordinationService } from "@agents-can-communicate/core";
@@ -12,6 +11,7 @@ import { openFilesystemStore } from "@agents-can-communicate/storage-filesystem"
 import { establishNativeBinding } from "../../packages/hook-runner/src/native-binding.mjs";
 import { controlledCodexDaemon, THREAD } from "../helpers/codex-daemon.mjs";
 import { createFakeIds } from "../helpers/memory-store.mjs";
+import { posixTransportTest as test } from "../helpers/platform-scope.mjs";
 
 // The seam this file exists for: the hook runner publishes the delivery
 // binding, the Codex adapter writes the endpoint record, and the receiver

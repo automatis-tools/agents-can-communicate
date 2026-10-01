@@ -1,11 +1,10 @@
-import { execFile } from "node:child_process";
 import { createHash } from "node:crypto";
 import { once } from "node:events";
 import { cp, mkdir, readFile, writeFile } from "node:fs/promises";
 import { createServer } from "node:http";
 import path from "node:path";
-import { promisify } from "node:util";
-const run = promisify(execFile);
+
+import { runNpm } from "./npm-run.mjs";
 
 /** Two actual ACC archives; only the candidate's package versions are changed.
  * `packumentMaxAge` sends the public registry's cache lifetime with the package
@@ -23,7 +22,7 @@ export async function createUpdateRegistry(t, fixture, version = null, { packume
     const manifest = JSON.parse(await readFile(file, "utf8"));
     await writeFile(file, JSON.stringify({ ...manifest, version }, null, 2) + "\n");
   }
-  const { stdout } = await run("npm", ["pack", "--pack-destination", archiveDir], { cwd: candidate });
+  const { stdout } = await runNpm(["pack", "--pack-destination", archiveDir], { cwd: candidate });
   const tarball = path.join(archiveDir, stdout.trim().split("\n").at(-1));
   const bytes = await readFile(tarball);
   const integrity = `sha512-${createHash("sha512").update(bytes).digest("base64")}`;

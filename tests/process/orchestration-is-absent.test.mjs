@@ -9,6 +9,7 @@ import { Readable, Writable } from "node:stream";
 import test, { after } from "node:test";
 
 import { createFakeClock, createFakeIds, createMemoryStore } from "../helpers/memory-store.mjs";
+import { runNpm } from "../helpers/npm-run.mjs";
 
 const run = promisify(execFile);
 const repo = path.resolve(import.meta.dirname, "..", "..");
@@ -46,12 +47,15 @@ async function listMcpSurface(serve, protocolVersion) {
 }
 
 async function loadPackedSurface() {
-  const npm = process.platform === "win32" ? "npm.cmd" : "npm";
-  const { stdout } = await run(npm, ["pack", "--json", "--cache",
+  // npm's own script under this node: Windows' npm.cmd cannot be started by
+  // execFile without a shell.
+  const { stdout } = await runNpm(["pack", "--json", "--cache",
     path.join(temporary, "npm-cache"), "--pack-destination", temporary],
     { cwd: repo, maxBuffer: 10 * 1024 * 1024 });
   const [{ filename }] = JSON.parse(stdout);
-  await run("tar", ["-xzf", path.join(temporary, filename), "-C", temporary]);
+  // Relative names: a tar that reads `C:` in an archive name as a remote host
+  // then has nothing to misread.
+  await run("tar", ["-xzf", filename, "-C", "."], { cwd: temporary });
 
   const packageRoot = path.join(temporary, "package");
   const modules = path.join(packageRoot, "node_modules", "@agents-can-communicate");

@@ -13,7 +13,8 @@ pair or session-bound ACC MCP tools. See [CLI ownership](CLI.md#coordinate-from-
 
 ## 1. Install once on this machine
 
-ACC requires macOS or Linux and Node.js 24 or newer.
+ACC requires Node.js 24 or newer on macOS, Linux, or Windows 10 or 11. On Windows, read
+[Windows](#windows) below first.
 
 Already using ACC? Follow the [upgrade guide](UPGRADING.md) for the 0.4.x → 0.5.0
 update or the data-format boundary when upgrading from 0.3.1.
@@ -198,6 +199,32 @@ acc uninstall
 
 Uninstall removes only bytes ACC wrote that still match its install record. User edits are
 reported and preserved.
+
+## Windows
+
+ACC runs natively on Windows 10 and 11, with no WSL. Install it the same way, in PowerShell or
+in a Command Prompt:
+
+```powershell
+npm install -g agents-can-communicate
+acc install
+```
+
+What is different on Windows:
+
+- ACC keeps its state in `%LOCALAPPDATA%\acc`, never in the roaming profile.
+- Each client's hooks run a small Node script instead of a shell script, in the form that
+  client's hook runner reads. `node` must be on `PATH` for Grok and Antigravity CLI hooks.
+  Claude Code needs 2.1.139 or later.
+- Messages reach the recipient on its next turn. Live delivery into a running session (the
+  Claude Code inbox, the Codex daemon, the Antigravity relay) is not available on Windows yet,
+  and doctor reports it as `native_delivery_unsupported`.
+- Antigravity CLI cannot run a hook whose path is quoted. When your profile path has a space,
+  ACC writes the path's 8.3 short name. ACC adds no allow rule on Windows, so Antigravity CLI
+  asks before each ACC command.
+- The first hook after the machine starts can take a few seconds, because ACC reads the
+  process tree through PowerShell. If it runs out of time, the session attaches on the first
+  prompt instead.
 
 Next: [Why ACC](WHY_ACC.md) · [Capabilities](CAPABILITIES.md) · [CLI](CLI.md) ·
 [Troubleshooting](TROUBLESHOOTING.md)

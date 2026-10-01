@@ -1,10 +1,11 @@
 import { createHash } from "node:crypto";
 import { constants } from "node:fs";
-import { open, realpath } from "node:fs/promises";
+import { realpath } from "node:fs/promises";
 import path from "node:path";
 
 import { AccError, CONFIG_FILENAME, EXIT, validateProjectConfig }
   from "@agents-can-communicate/protocol";
+import { openNoFollow } from "@agents-can-communicate/storage-filesystem";
 
 /**
  * @typedef {{ id: string, roots: string[], source: "config" | "git" | "directory",
@@ -17,7 +18,8 @@ const stableId = value =>
 async function readConfigNoFollow(configPath) {
   let handle;
   try {
-    handle = await open(configPath, constants.O_RDONLY | constants.O_NOFOLLOW);
+    // Windows has no O_NOFOLLOW; openNoFollow keeps the refusal there too.
+    handle = await openNoFollow(configPath, constants.O_RDONLY);
   } catch (error) {
     if (error.code === "ENOENT") return null;
     // ELOOP is what O_NOFOLLOW reports for a symlink. A config reached through

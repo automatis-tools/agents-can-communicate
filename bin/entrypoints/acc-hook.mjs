@@ -10,25 +10,35 @@ import { pathToFileURL } from "node:url";
 
 import { createId } from "@agents-can-communicate/protocol";
 import { runHook } from "@agents-can-communicate/hook-runner";
-import { hookEntrypointFor, resolvePinnedGeneration } from "@agents-can-communicate/cli";
+import { hookEntrypointFor, resolvePinnedGeneration }
+  from "@agents-can-communicate/cli/hook-support";
 
-import { createAntigravityAdapter } from "@agents-can-communicate/adapter-antigravity";
-import { createClaudeCodeAdapter } from "@agents-can-communicate/adapter-claude-code";
-import { createCodexAdapter } from "@agents-can-communicate/adapter-codex";
-import { createGeminiCliAdapter } from "@agents-can-communicate/adapter-gemini-cli";
-import { createGrokAdapter } from "@agents-can-communicate/adapter-grok";
-import { createKimiAdapter } from "@agents-can-communicate/adapter-kimi";
-
-const adapters = {
+// A hook runs one client's adapter, and loads only that one: every other
+// adapter was a set of modules loaded on each turn and never run, about a
+// millisecond each on windows-latest.
+const ADAPTERS = {
   // Registered like any other client. Its hook commands carry an extra
   // argument - the event name - because this client's payload has none.
-  antigravity: createAntigravityAdapter(),
-  claude_code: createClaudeCodeAdapter(),
-  codex: createCodexAdapter(),
-  gemini_cli: createGeminiCliAdapter(),
-  grok: createGrokAdapter(),
-  kimi: createKimiAdapter(),
+  antigravity: () => import("@agents-can-communicate/adapter-antigravity")
+    .then(module => module.createAntigravityAdapter()),
+  claude_code: () => import("@agents-can-communicate/adapter-claude-code")
+    .then(module => module.createClaudeCodeAdapter()),
+  codex: () => import("@agents-can-communicate/adapter-codex")
+    .then(module => module.createCodexAdapter()),
+  gemini_cli: () => import("@agents-can-communicate/adapter-gemini-cli")
+    .then(module => module.createGeminiCliAdapter()),
+  grok: () => import("@agents-can-communicate/adapter-grok")
+    .then(module => module.createGrokAdapter()),
+  kimi: () => import("@agents-can-communicate/adapter-kimi")
+    .then(module => module.createKimiAdapter()),
 };
+
+// The adapters this hook can use: its own, or none for an id nobody registered,
+// which runHook answers the way it always has.
+async function adaptersFor(adapterId) {
+  if (!Object.hasOwn(ADAPTERS, adapterId)) return {};
+  return { [adapterId]: await ADAPTERS[adapterId]() };
+}
 
 const readStdin = () => new Promise(resolve => {
   // A hook is always given its payload on stdin, but a client that closes it
@@ -50,7 +60,7 @@ import { completeHookOutput } from "./hook-output.mjs";
 // a hook that has no pin to look up pays nothing beyond it. Any adapter or
 // payload that will not yield a session id simply has no pin to find, same as
 // today's no-pin behaviour.
-async function harnessSessionIdFor(adapterId, payload, args) {
+async function harnessSessionIdFor(adapters, adapterId, payload, args) {
   try {
     const event = await adapters[adapterId]?.normalizeHook(payload, { args });
     return typeof event?.sessionId === "string" ? event.sessionId : null;
@@ -75,9 +85,10 @@ async function harnessSessionIdFor(adapterId, payload, args) {
 // mid-resolution by another hook for the same session, or simply wrong)
 // could say. Unbounded delegation would be a hang, worse than any of the
 // failures this file already falls open from.
-async function delegateToPin({ managerRoot, packageRoot, adapterId, payload, args, delegated }) {
+async function delegateToPin({ managerRoot, packageRoot, adapters, adapterId, payload, args,
+  delegated }) {
   if (delegated || managerRoot === null || packageRoot === null) return false;
-  const harnessSessionId = await harnessSessionIdFor(adapterId, payload, args);
+  const harnessSessionId = await harnessSessionIdFor(adapters, adapterId, payload, args);
   if (harnessSessionId === null) return false;
   const pinned = await resolvePinnedGeneration({ root: managerRoot, harnessSessionId, active: packageRoot });
   if (pinned === null) return false;
@@ -103,7 +114,10 @@ export async function main({ managerRoot = null, packageRoot = null, payload, de
     }
   }
 
-  if (await delegateToPin({ managerRoot, packageRoot, adapterId, payload, args, delegated })) return;
+  // A broken adapter module fails the hook open like any other error here.
+  const adapters = await adaptersFor(adapterId).catch(() => ({}));
+  if (await delegateToPin({ managerRoot, packageRoot, adapters, adapterId, payload, args,
+    delegated })) return;
 
   const result = await runHook({ adapterId, payload, args, adapters,
     runtime: { clock: { now: () => new Date().toISOString() },

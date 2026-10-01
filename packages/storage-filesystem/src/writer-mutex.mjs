@@ -1,12 +1,13 @@
 import { createHash, randomUUID } from "node:crypto";
 import { constants } from "node:fs";
-import { mkdir, open, rename, rm } from "node:fs/promises";
+import { mkdir, rmdir } from "node:fs/promises";
 import path from "node:path";
 import { performance } from "node:perf_hooks";
 
 import { AccError, EXIT } from "@agents-can-communicate/protocol";
 
 import { encode, readJsonIfPresent } from "./atomic-json.mjs";
+import { isWindows, removeTree, renameEntry, syncEntry } from "./portable-fs.mjs";
 import { ensureManagedDirectory } from "./safe-directory.mjs";
 import { withRegularNoFollow } from "./safe-file.mjs";
 
@@ -27,16 +28,7 @@ function defaultPidIsAlive(pid) {
   }
 }
 
-async function syncDirectory(directory) {
-  const handle = await open(directory, "r");
-  try {
-    await handle.sync();
-  } finally {
-    await handle.close();
-  }
-}
-
-async function prepareCandidate(paths, root, owner) {
+async function prepareCandidate(paths, root, owner, platform) {
   const identity = createHash("sha256").update(owner.token).digest("hex");
   const candidate = path.join(paths.locks, `writer.candidate-${identity}.lock`);
   await mkdir(candidate);
@@ -46,15 +38,19 @@ async function prepareCandidate(paths, root, owner) {
         await handle.writeFile(encode(owner));
         await handle.sync();
       });
-    await syncDirectory(candidate);
+    // POSIX makes the record's name durable by syncing the directory. On
+    // Windows the record's own flush above already committed NTFS's journal up
+    // to its last change, which includes creating it, and a second flush of the
+    // same file would only cost another 8 ms (measured on windows-latest).
+    if (!isWindows(platform)) await syncEntry(candidate, path.join(candidate, OWNER), { platform });
     return candidate;
   } catch (error) {
-    await rm(candidate, { recursive: true, force: true });
+    await removeTree(candidate, { platform });
     throw error;
   }
 }
 
-async function releaseCanonical(directory, root, owner, openFile) {
+async function releaseCanonical(directory, root, owner, openFile, { platform, rename }) {
   const current = await readOwner(directory, root, openFile);
   if (current?.token !== owner.token) return;
   // Recursive removal would first unlink owner.json and briefly expose an
@@ -63,14 +59,51 @@ async function releaseCanonical(directory, root, owner, openFile) {
   const identity = createHash("sha256")
     .update(JSON.stringify([owner.pid, owner.token, owner.acquiredAt]))
     .digest("hex");
+  if (isWindows(platform)) {
+    await releaseByOwnerRecord(directory,
+      path.join(path.dirname(directory), `writer.released-${identity}.json`), { platform, rename });
+    return;
+  }
   const retired = path.join(path.dirname(directory), `writer.released-${identity}.lock`);
   try {
-    await rename(directory, retired);
+    // POSIX moves the whole lock aside; Windows released it above, by its
+    // owner record, because a reader inside holds the directory in place.
+    await renameEntry(directory, retired, { platform, rename });
   } catch (error) {
     if (["ENOENT", "EEXIST", "ENOTEMPTY"].includes(error.code)) return;
     throw error;
   }
-  await rm(retired, { recursive: true, force: true });
+  await removeTree(retired, { platform });
+}
+
+/**
+ * Release on Windows, where a directory cannot be renamed while a file inside
+ * it is open - and every waiting writer opens owner.json to see who holds the
+ * lock. Eight writers polling one lock on windows-latest held the move back
+ * until one of them gave up at the acquire timeout.
+ *
+ * A file can be renamed while it is open (Node opens with FILE_SHARE_DELETE),
+ * so the owner record leaves first, in one rename, and the lock is an empty
+ * directory from then on. On Windows an empty lock is a released one: the
+ * acquiring loop removes it with rmdir, which cannot remove a lock that has an
+ * owner in it, and so does this owner. A reader that opened the record before
+ * it left sees this owner once more and looks again.
+ *
+ * Reclaiming a dead owner still moves the whole directory. Node's rename
+ * replaces an existing file on Windows, so a late reclaimer moving owner.json
+ * could take a successor's record; a directory never lands on another one.
+ */
+async function releaseByOwnerRecord(directory, retiredOwner, { platform, rename }) {
+  try {
+    await renameEntry(path.join(directory, OWNER), retiredOwner, { platform, rename });
+  } catch (error) {
+    if (error.code === "ENOENT") return;
+    throw error;
+  }
+  // ENOENT: a waiting writer removed it first. ENOTEMPTY: a successor is in.
+  // Busy: somebody is looking at it, and the next writer removes it instead.
+  await rmdir(directory).catch(() => null);
+  await removeTree(retiredOwner, { platform });
 }
 
 /**
@@ -126,7 +159,8 @@ async function readOwner(directory, root, openFile) {
  * than any write here takes - the hook budget is five - so a holder that old is
  * not a writer that is still going.
  */
-async function takeStaleOwnership(directory, root, owner, now, pidIsAlive) {
+async function takeStaleOwnership(directory, root, owner, now, pidIsAlive,
+  { platform, rename, deadlineAt }) {
   if (owner === null) return false;
   const age = Date.parse(now) - Date.parse(owner.acquiredAt);
   if (pidIsAlive(owner.pid) && !(age > STALE_MS)) return false;
@@ -140,10 +174,14 @@ async function takeStaleOwnership(directory, root, owner, now, pidIsAlive) {
     .digest("hex");
   const reclaimed = path.join(path.dirname(directory), `writer.reclaimed-${identity}.lock`);
   try {
-    await rename(directory, reclaimed);
+    await renameEntry(directory, reclaimed, { platform, rename, deadlineAt });
     return true;
   } catch (error) {
     if (["ENOENT", "EEXIST", "ENOTEMPTY"].includes(error.code)) return false;
+    // Windows refuses the move while a waiting writer has the owner record
+    // open, and it was retried up to this writer's deadline: not reclaimed
+    // this time, which the loop reports as the conflict it is.
+    if (isWindows(platform) && ["EPERM", "EACCES", "EBUSY"].includes(error.code)) return false;
     throw error;
   }
 }
@@ -152,7 +190,9 @@ export async function withWriterMutex(paths, options, operation) {
   const { root, clock, pidIsAlive = defaultPidIsAlive, uuid = randomUUID,
     attempts = Number.POSITIVE_INFINITY, waitMs = 20, openFile,
     acquireTimeoutMs = ACQUIRE_TIMEOUT_MS, monotonicNow = () => performance.now(),
-    wallNow = Date.now, deadlineAt, sleep = sleepFor } = options;
+    wallNow = Date.now, deadlineAt, sleep = sleepFor, platform = process.platform,
+    rename } = options;
+  const fsOptions = { platform, rename };
   const directory = path.join(paths.locks, "writer.lock");
   // Wall time can jump while a process waits. A monotonic absolute deadline
   // bounds all owner reads and retries, leaving half the hook's five-second
@@ -164,7 +204,7 @@ export async function withWriterMutex(paths, options, operation) {
   await ensureManagedDirectory(root, paths.locks);
   const token = uuid();
   const owner = { pid: process.pid, token, acquiredAt: clock.now() };
-  const candidate = await prepareCandidate(paths, root, owner);
+  const candidate = await prepareCandidate(paths, root, owner, platform);
   let ownsCanonical = false;
 
   try {
@@ -175,13 +215,24 @@ export async function withWriterMutex(paths, options, operation) {
         // lock left by the old mkdir-then-publish sequence. A live publisher
         // either fills it first (so rename fails) or loses its no-replace owner
         // publication after this complete candidate wins.
-        await rename(candidate, directory);
+        // Windows reports the taken name as EPERM; renameEntry turns that into
+        // the EEXIST this loop waits on, and waits out a busy source itself.
+        await renameEntry(candidate, directory,
+          { ...fsOptions, deadlineAt: wallNow() + Math.max(0, deadline - monotonicNow()) });
         ownsCanonical = true;
-        await syncDirectory(paths.locks);
+        await syncEntry(paths.locks, directory, { platform });
       } catch (error) {
         if (!["EEXIST", "ENOTEMPTY"].includes(error.code)) throw error;
         const current = await readOwner(directory, root, openFile);
-        if (!await takeStaleOwnership(directory, root, current, clock.now(), pidIsAlive)) {
+        // POSIX rename replaces the empty lock an older ACC's mkdir-then-publish
+        // left; Windows cannot rename onto any directory, and an owner there
+        // releases by leaving an empty one. rmdir removes only an empty one, so
+        // the outcome is POSIX's: a publisher still filling it loses its
+        // no-replace owner write, and a complete lock is never touched.
+        if (current === null && isWindows(platform)
+          && await rmdir(directory).then(() => true, () => false)) continue;
+        if (!await takeStaleOwnership(directory, root, current, clock.now(), pidIsAlive,
+          { ...fsOptions, deadlineAt: wallNow() + Math.max(0, deadline - monotonicNow()) })) {
           const remaining = deadline - monotonicNow();
           if (remaining <= 0) break;
           await sleep(Math.min(waitMs, remaining));
@@ -193,11 +244,11 @@ export async function withWriterMutex(paths, options, operation) {
     }
   } finally {
     if (ownsCanonical) {
-      await releaseCanonical(directory, root, owner, openFile);
+      await releaseCanonical(directory, root, owner, openFile, fsOptions);
     } else {
       const current = await readOwner(candidate, root, openFile);
       if (current?.token === token) {
-        await rm(candidate, { recursive: true, force: true });
+        await removeTree(candidate, { platform });
       }
     }
   }

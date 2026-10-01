@@ -40,7 +40,7 @@ test("a path of portable filename characters is one shell word", () => {
 test("the default bake quotes the command, as every other client has it", async t => {
   const { root, skill } = await bundle(t);
 
-  await bakeSkillCommand({ root, cliShim: "/home/dana/.gemini/config/acc/acc-cli.sh" });
+  await bakeSkillCommand({ root, cliShim: "/home/dana/.gemini/config/acc/acc-cli.sh", platform: "linux" });
 
   assert.equal(await readFile(skill, "utf8"),
     "\"/home/dana/.gemini/config/acc/acc-cli.sh\" status --json\n"
@@ -50,7 +50,7 @@ test("the default bake quotes the command, as every other client has it", async 
 test("a bare bake names a one-word path without quotes", async t => {
   const { root, skill } = await bundle(t);
 
-  await bakeSkillCommand({ root, cliShim: "/home/dana/.gemini/config/acc/acc-cli.sh",
+  await bakeSkillCommand({ root, cliShim: "/home/dana/.gemini/config/acc/acc-cli.sh", platform: "linux",
     bareWhenSafe: true });
 
   assert.equal(await readFile(skill, "utf8"),
@@ -62,7 +62,7 @@ test("a bare bake keeps the quotes a path needs to stay one word", async t => {
   const { root, skill } = await bundle(t);
   const shim = "/Users/Dana Smith/.gemini/config/acc/acc-cli.sh";
 
-  await bakeSkillCommand({ root, cliShim: shim, bareWhenSafe: true });
+  await bakeSkillCommand({ root, cliShim: shim, bareWhenSafe: true, platform: "linux" });
 
   assert.equal(await readFile(skill, "utf8"),
     `"${shim}" status --json\nThen \`"${shim}" inbox\`.\n`);

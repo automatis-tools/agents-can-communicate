@@ -86,7 +86,8 @@ export function spawnRelay({ command, args, env, payload, readyMs = 10_000, spaw
   return new Promise(resolve => {
     let child;
     try {
-      child = spawn(command, args, { env, detached: true, stdio: ["pipe", "pipe", "ignore"] });
+      child = spawn(command, args, { env, detached: true, windowsHide: true,
+        stdio: ["pipe", "pipe", "ignore"] });
     } catch {
       resolve({ ok: false, reason: "could not start" });
       return;

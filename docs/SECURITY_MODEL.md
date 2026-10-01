@@ -125,7 +125,14 @@ from operating merely because its own state is unavailable.
 ## Filesystem and installation
 
 - Runtime state, bindings, sockets, and install ownership records stay outside repositories.
-- Managed paths are checked for containment and symlink escape.
+- Managed paths are checked for containment and symlink escape. Windows has no `O_NOFOLLOW`:
+  ACC refuses a symlink or junction at the last component by name, then checks that the
+  opened handle is the file it checked.
+- On Windows, ACC state lives in `%LOCALAPPDATA%`, whose ACL grants only the user, SYSTEM and
+  Administrators; files inherit it. Mode bits do not exist there.
+- A workspace config root that starts with a separator or a drive letter is refused on every
+  platform. On Windows such a root could name another drive or a network share (`\\host\share`),
+  which a hook would then contact.
 - Store publication uses atomic no-replace behavior, journaling, and writer locks.
 - Corrupt or incompatible store versions fail closed before mutation.
 - Client installers preserve unrelated settings and record content hashes.

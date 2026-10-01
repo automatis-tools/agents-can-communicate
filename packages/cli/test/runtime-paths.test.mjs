@@ -75,10 +75,12 @@ test("the refusal names the directory, the state, and what to do about it", () =
 test("a sibling directory sharing a name prefix is not treated as inside", () => {
   // "/demo-runtime" must not count as inside "/demo": prefix comparison on raw
   // strings is the classic way this check goes wrong.
-  const paths = runtimePaths({ dataHome: "/home/example/projects/demo-runtime",
-    workspaceId: WORKSPACE, workspaceRoots: ["/home/example/projects/demo"] });
+  // Absolute on this host: a drive-rooted path on Windows.
+  const dataHome = path.resolve("/home/example/projects/demo-runtime");
+  const paths = runtimePaths({ dataHome,
+    workspaceId: WORKSPACE, workspaceRoots: [path.resolve("/home/example/projects/demo")] });
 
-  assert.equal(paths.root.startsWith("/home/example/projects/demo-runtime"), true);
+  assert.equal(paths.root.startsWith(dataHome), true);
 });
 
 test("the ephemeral area is separate from durable state", () => {
@@ -114,8 +116,12 @@ test("the platform data home follows the macOS and Windows conventions", () => {
   assert.equal(platformDataHome({ platform: "darwin", env: { HOME: "/Users/example" } }),
     path.join("/Users/example", "Library", "Application Support"));
   assert.equal(platformDataHome({ platform: "win32",
+    env: { APPDATA: "C:\\Users\\example\\AppData\\Roaming",
+      LOCALAPPDATA: "C:\\Users\\example\\AppData\\Local" } }),
+  "C:\\Users\\example\\AppData\\Local");
+  assert.throws(() => platformDataHome({ platform: "win32",
     env: { APPDATA: "C:\\Users\\example\\AppData\\Roaming" } }),
-  "C:\\Users\\example\\AppData\\Roaming");
+  error => error.code === EXIT.USAGE);
 });
 
 test("an explicit override wins over every platform default", () => {

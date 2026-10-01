@@ -96,3 +96,52 @@ test(`the installed hook bounds its ${command} probe when it ignores SIGTERM`, {
   }
 });
 }
+
+// The Windows side of the same bound. npm installs a client as a `.cmd`, which
+// cmd.exe runs by starting node as a child of its own; a version probe that hangs
+// there outlived its limit while execFile waited for that child's pipes.
+test("windows: the installed hook bounds a hung claude.cmd version probe",
+  { skip: process.platform !== "win32" && "npm installs a client as a .cmd only on Windows" },
+  async t => {
+    const { writeFakeClient } = await import("../helpers/fake-client.mjs");
+    const packed = await createPackedAcc(t);
+    const pidFile = path.join(packed.root, "owned-probe-pids");
+    await writeFakeClient(packed.clientBin, "claude", { script:
+      `import { appendFileSync } from "node:fs";\n`
+      + `appendFileSync(${JSON.stringify(pidFile)}, process.pid + "\\n");\n`
+      + "setTimeout(() => {}, 30000);\n" });
+    const sessionId = "hung-claude-cmd";
+    const started = performance.now();
+    const child = spawn(process.execPath, [packed.hookBin, "claude_code"], {
+      cwd: packed.project, env: { ...packed.env, ACC_PARTICIPANT: "hung-cmd-writer" },
+      stdio: ["pipe", "pipe", "pipe"], windowsHide: true,
+    });
+    let stdout = "";
+    child.stdout.on("data", chunk => { stdout += chunk; });
+    child.stderr.resume();
+    const exited = once(child, "exit");
+    const watchdog = setTimeout(() => child.kill(), 15_000);
+    child.stdin.end(JSON.stringify({ hook_event_name: "SessionStart", session_id: sessionId,
+      cwd: packed.project, source: "startup" }));
+    const result = await exited;
+    const elapsedMs = performance.now() - started;
+    clearTimeout(watchdog);
+
+    const pids = (await readFile(pidFile, "utf8").catch(() => "")).trim().split(/\s+/)
+      .filter(Boolean).map(Number);
+    const alive = pid => { try { process.kill(pid, 0); return true; } catch { return false; } };
+    for (const deadline = Date.now() + 5_000; pids.some(alive) && Date.now() < deadline;) {
+      await new Promise(resolve => { setTimeout(resolve, 100); });
+    }
+    const survivors = pids.filter(alive);
+    for (const pid of survivors) process.kill(pid);
+
+    assert.ok(pids.length > 0, "the hung claude.cmd probe never ran");
+    assert.deepEqual(survivors, [], "the node claude.cmd started outlived the hook");
+    assert.deepEqual(result, [0, null]);
+    assert.ok(elapsedMs < 7_000, `the five-second hook budget took ${elapsedMs}ms`);
+    const binding = await packed.findBinding(sessionId);
+    assert.ok(binding, "a hung optional probe prevented the session from attaching");
+    assert.equal(binding.clientVersion, undefined);
+    assert.notEqual(stdout, "", "the attached session's owner context is missing");
+  });

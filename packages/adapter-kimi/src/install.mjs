@@ -4,9 +4,9 @@ import path from "node:path";
 import { AccError, EXIT } from "@agents-can-communicate/protocol";
 import { fileURLToPath } from "node:url";
 
-import { assertRunner, bakeSkillCommand, blankText, defaultRunner, removeIfEmpty,
-  ownVersion, stampPluginVersion,
-  removeInstalledTree, runnerExists, writeCliShim, writeForeignJson }
+import { assertRunner, bakeSkillCommand, blankText, defaultRunner, ownVersion, removeIfEmpty,
+  removeInstalledTree, runnerExists, shellQuote, stampPluginVersion, windowsHookCommand,
+  writeCliShim, writeForeignJson }
   from "@agents-can-communicate/adapter-sdk";
 
 const bundle = fileURLToPath(new URL("../plugin", import.meta.url));
@@ -99,13 +99,17 @@ export function stripBlock(source) {
   return kept.join("\n");
 }
 
-export function renderBlock(runner, node = process.execPath) {
+export function renderBlock(runner, node = process.execPath, platform = process.platform) {
   const entries = WIRING.map(({ event, kind, matcher }) => {
     // Both paths are shell-quoted inside the TOML string: a hook runs through a
     // shell, and a space in either path would otherwise split the command.
     // The interpreter is named outright rather than left to PATH, which a hook's
-    // environment does not reliably carry.
-    const command = `${tomlString(node)} ${tomlString(runner)} kimi ${kind}`;
+    // environment does not reliably carry. On Windows that shell is cmd.exe, and
+    // a TOML-escaped path inside the command would reach it with every
+    // backslash doubled.
+    const command = platform === "win32"
+      ? windowsHookCommand("cmd", { node, shim: runner, args: ["kimi", kind] })
+      : `${shellQuote(node)} ${shellQuote(runner)} kimi ${kind}`;
     const lines = ["[[hooks]]", `event = ${tomlString(event)}`,
       `command = ${tomlString(command)}`];
     if (matcher !== undefined) lines.push(`matcher = ${tomlString(matcher)}`);
@@ -121,7 +125,8 @@ const registerPlugin = (registry, root) => {
     plugins: [...plugins, { id: PLUGIN_NAME, root, source: "local", enabled: true }] };
 };
 
-export async function installKimiPlugin({ home, runner = defaultRunner(), node, cli }) {
+export async function installKimiPlugin({ home, runner = defaultRunner(), node, cli,
+  hostPlatform = process.platform }) {
   // A hook whose command does not exist fails silently, on every event, for as
   // long as it stays installed: the client reports nothing and ACC simply never
   // sees a session. Writing that entry and hoping is worse than refusing.
@@ -139,8 +144,8 @@ export async function installKimiPlugin({ home, runner = defaultRunner(), node, 
     version: await ownVersion(import.meta.url), io: { readFile, writeFile } });
   // The skill ships with a placeholder where the command belongs: `acc` is
   // not on PATH everywhere, and an agent that cannot run it improvises.
-  const cliShim = await writeCliShim({ dir: target, cli, node });
-  await bakeSkillCommand({ root: target, cliShim });
+  const cliShim = await writeCliShim({ dir: target, cli, node, platform: hostPlatform });
+  await bakeSkillCommand({ root: target, cliShim, platform: hostPlatform });
 
   const file = configPath(home);
   const existing = await readText(file, "");
@@ -149,7 +154,7 @@ export async function installKimiPlugin({ home, runner = defaultRunner(), node, 
   // user's last section cannot swallow our entries.
   const separator = withoutOurs === "" || withoutOurs.endsWith("\n") ? "" : "\n";
   await mkdir(path.dirname(file), { recursive: true });
-  await writeFile(file, `${withoutOurs}${separator}${renderBlock(runner, node)}\n`);
+  await writeFile(file, `${withoutOurs}${separator}${renderBlock(runner, node, hostPlatform)}\n`);
 
   const registry = registryPath(home);
   await mkdir(path.dirname(registry), { recursive: true });

@@ -1,11 +1,39 @@
-import { assertPortableId } from "@agents-can-communicate/protocol";
+import { AccError, EXIT, assertPortableId } from "@agents-can-communicate/protocol";
 
-const shellQuote = value => `'${value.replaceAll("'", "'\\''")}'`;
+const posixQuote = value => `'${value.replaceAll("'", "'\\''")}'`;
+// The model appends the header in whatever shell its client gives it, and on
+// Windows that can be cmd.exe, PowerShell or Git Bash. Double quotes are the one
+// quoting all three read alike, for a value with none of what one of them acts
+// on inside double quotes: a double quote - PowerShell also ends a string at
+// U+201C to U+201E, which NTFS allows in names - $ and a backtick, which
+// PowerShell and bash expand, and %, which cmd expands. Single quotes are no
+// answer: cmd takes them as part of the path. Such a value is refused rather
+// than handed to a model that would read it as something else.
+const DOUBLE_QUOTE_BREAKERS = /["\u201C-\u201E$`%]/;
+const windowsQuote = value => {
+  if (!DOUBLE_QUOTE_BREAKERS.test(value)) return `"${value}"`;
+  throw new AccError(EXIT.USAGE, `${value} has a double quote, $, \` or % in it, which no quoting `
+    + "reads alike in cmd, PowerShell and Git Bash, and ACC's hooks will not hand the model a "
+    + "command line it would read differently; rename the directory",
+  { value, reasonCode: "workspace_path_unquotable" });
+};
 
-export const ownerHeader = (binding, cwd, workspaceRef) => "ACC CLI (append): --session "
-  + assertPortableId(binding.accSessionId, "sessionId") + " --generation "
-  + assertPortableId(binding.generation, "generation") + " --cwd " + shellQuote(cwd)
-  + (workspaceRef === undefined ? "" : " --workspace " + shellQuote(workspaceRef));
+// Before anything opens: a session that attached and could then never be told
+// its CLI arguments would look live to its peers, and every one of its turns
+// would fail before their messages reached it.
+export function assertOwnerQuotable(cwd, workspaceRef, platform = process.platform) {
+  if (platform !== "win32") return;
+  windowsQuote(cwd);
+  if (workspaceRef !== undefined) windowsQuote(workspaceRef);
+}
+
+export const ownerHeader = (binding, cwd, workspaceRef, platform = process.platform) => {
+  const quote = platform === "win32" ? windowsQuote : posixQuote;
+  return "ACC CLI (append): --session "
+    + assertPortableId(binding.accSessionId, "sessionId") + " --generation "
+    + assertPortableId(binding.generation, "generation") + " --cwd " + quote(cwd)
+    + (workspaceRef === undefined ? "" : " --workspace " + quote(workspaceRef));
+};
 
 export function ownerOnlyOutcome(inject, owner, budgetBytes) {
   if (Buffer.byteLength(owner, "utf8") > budgetBytes) {

@@ -69,7 +69,8 @@ test("uninstall refuses a modified block and keeps a modified shim", async t => 
 
 // The rc file is the user's. Retiring ACC's block takes the block and leaves
 // the file's permissions as they are, rather than tightening them to 0600.
-test("retiring the block keeps the rc file's own permissions", async t => {
+test("retiring the block keeps the rc file's own permissions",
+  { skip: process.platform === "win32" ? "a shell rc file and its mode bits are POSIX" : false }, async t => {
   const place = await home(t);
   await writeFile(place.rcFile, "export FOO=1\n");
   const owned = await installShellBootstrap({ plan: plan(place) });

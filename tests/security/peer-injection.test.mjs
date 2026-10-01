@@ -38,8 +38,9 @@ import net from "node:net";
 import nodePath from "node:path";
 import { bindNativeSession, offerMessage }
   from "@agents-can-communicate/adapter-claude-code/inbox-delivery";
+import { POSIX_LIVE_TRANSPORT } from "../helpers/platform-scope.mjs";
 
-test("the inbox wake carries no byte a peer wrote", async () => {
+test("the inbox wake carries no byte a peer wrote", { skip: POSIX_LIVE_TRANSPORT }, async () => {
   // Claude Code frames every inbox message as a teammate's request to act on,
   // so nothing a peer chose may reach that frame: the body arrives later,
   // inside the untrusted block of the next-turn projection.
