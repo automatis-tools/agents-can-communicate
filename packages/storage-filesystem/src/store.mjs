@@ -27,6 +27,11 @@ import { withWriterMutex } from "./writer-mutex.mjs";
 // make it easy to reintroduce separate locks and resurrect replaced sessions.
 
 const SEQUENCE_WIDTH = 16;
+// An ephemeral record describes a live session. A crash of the machine ends
+// every session it describes, and a session whose record comes back as its
+// previous version, or not at all, is recovered by its next hook. Its bytes are
+// still flushed, so no reader finds a torn record.
+const EPHEMERAL = "bytes";
 export const ZERO_CURSOR = "0".repeat(SEQUENCE_WIDTH);
 // No quarantine area. One was created in every workspace, named in the path
 // typedef, and written to by nothing: repair deliberately refuses to move a
@@ -389,7 +394,7 @@ export async function openFilesystemStore({ root, clock, ids, workspaceId, failA
       validateRecord(kind, record);
       return withWriterMutex(paths, { ...publishOptions, deadlineAt: storeDeadline }, async () => {
         await publishAtomic(ephemeralPath(kind, id), encode(record),
-          { root, tmpDir: paths.tmp, replace: true, deadlineAt: storeDeadline });
+          { root, tmpDir: paths.tmp, replace: true, durability: EPHEMERAL, deadlineAt: storeDeadline });
         // Once record bytes are accepted, finish the same logical publication.
         await markEphemeral(paths, publishOptions, kind, id, "present");
         return record;
@@ -403,7 +408,7 @@ export async function openFilesystemStore({ root, clock, ids, workspaceId, failA
         validateRecord(kind, next);
         assertPublicationDeadline(deadlineAt);
         await publishAtomic(ephemeralPath(kind, id), encode(next),
-          { root, tmpDir: paths.tmp, replace: true, deadlineAt });
+          { root, tmpDir: paths.tmp, replace: true, durability: EPHEMERAL, deadlineAt });
         await markEphemeral(paths, publishOptions, kind, id, "present");
         return next;
       });

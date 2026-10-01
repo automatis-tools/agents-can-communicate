@@ -89,7 +89,17 @@ Work in progress for #234. The design is in
   - A hook no longer takes the writer lock to clear a delivery binding that is absent or
     already retired. A heartbeat of a durable session goes straight to its durable record.
     Together this removes two lock round trips from each turn.
-  - On Windows, taking the writer lock flushes its owner record once instead of twice.
+  - A write flushes only what a crash of the machine would otherwise lose. On windows-latest
+    beside the full suite one flush took 15 ms at the median and up to 5.8 s, with the CPU
+    idle, and the hooks that ran past their budget spent most of it flushing.
+    - Taking the writer lock flushes nothing, where it flushed once on Windows and three times
+      on POSIX. The lock guards live processes, and a crash leaves none. An owner record a crash
+      left unreadable is reclaimed once it is older than a minute, as a dead owner is; before,
+      it stopped every write in the workspace.
+    - The retained copy of an accepted write and the sweep's marker are written without a
+      flush. The copy is never read, and a lost marker costs one more sweep.
+    - An ephemeral record flushes its bytes and leaves its new name to the next flush. A crash
+      can bring it back as its previous version, which the session's next hook recovers.
   - One record replaced with no event, such as a session's heartbeat on every turn, is published
     by an atomic rename without the journal, while no other transaction is open. The journal
     cost five atomic writes for it.

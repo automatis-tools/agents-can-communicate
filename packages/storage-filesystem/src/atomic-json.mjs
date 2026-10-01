@@ -33,6 +33,8 @@ function retainedStage(destination, root, stageDir) {
   return path.join(stageDir, `${identity}.published`);
 }
 
+const DURABILITY = new Set(["full", "bytes", "none"]);
+
 async function replaceHandleBytes(handle, bytes) {
   await handle.truncate(0);
   let offset = 0;
@@ -53,11 +55,22 @@ async function replaceHandleBytes(handle, bytes) {
  * state is mutable by design, which is what generations exist for, so it is
  * published by rename(). Conflating the two makes every state update fail.
  *
+ * `durability` is what a crash of the machine may cost the record, since every
+ * flush waits for the whole disk - on windows-latest from 15 ms to 5.8 s:
+ * - "full" (the default): nothing; its bytes are flushed before they take the
+ *   name, and the name is flushed before this returns;
+ * - "bytes": the name, so a reader finds the previous version and never torn
+ *   bytes - for a record whose loss its owner recovers from;
+ * - "none": everything - for a record whose reader treats damage as absence.
+ *
  * @returns {Promise<"published" | "already_published">}
  */
 export async function publishAtomic(destination, bytes,
-  { root, tmpDir, stageDir, replace = false, deadlineAt, afterAccepted, afterStageEnsured,
-    afterStageRenamed, sync = syncEntry }) {
+  { root, tmpDir, stageDir, replace = false, durability = "full", deadlineAt, afterAccepted,
+    afterStageEnsured, afterStageRenamed, sync = syncEntry }) {
+  if (!DURABILITY.has(durability)) {
+    throw new AccError(EXIT.USAGE, "unknown publication durability", { durability });
+  }
   assertPublicationDeadline(deadlineAt);
   // The accepted stage lives apart from the partial a failed publication
   // leaves, so what a file is follows from the directory it was created in
@@ -93,7 +106,7 @@ export async function publishAtomic(destination, bytes,
   let stageAcceptedBytes = false;
   try {
     await handle.writeFile(bytes);
-    await handle.sync();
+    if (durability !== "none") await handle.sync();
     if (replace) {
       await handle.close();
       handle = null;
@@ -102,7 +115,7 @@ export async function publishAtomic(destination, bytes,
       // The bytes are at their name now: the write is decided and visible, and
       // its flush is bounded by its own wait, never by the caller's deadline,
       // which would report a published record as failed.
-      await sync(destinationDir, destination);
+      if (durability === "full") await sync(destinationDir, destination);
       return "published";
     }
 
@@ -110,7 +123,7 @@ export async function publishAtomic(destination, bytes,
       assertPublicationDeadline(deadlineAt);
       await link(temporary, destination);
       stageAcceptedBytes = true;
-      await sync(destinationDir, destination);
+      if (durability === "full") await sync(destinationDir, destination);
       return "published";
     } catch (error) {
       if (error.code !== "EEXIST") throw error;
@@ -155,9 +168,10 @@ export async function publishAtomic(destination, bytes,
 // The sweep can take `stage` between any two of these steps: it renames the
 // directory aside, and a store still opening publishes here without the writer
 // mutex the sweep holds (CI on #217). The bytes are already published, so the
-// retained copy goes to whichever directory carries the name when it moves, and
-// a copy the sweep took along with the directory needs no sync here - the sweep
-// discards that directory. The two callbacks are seams for the race tests.
+// retained copy goes to whichever directory carries the name when it moves. The
+// copy is never flushed: it is never read, and the sweep discards it. A crash
+// that loses its move leaves the temporary in tmp, which is what tmp holds. The
+// two callbacks are seams for the race tests.
 const STAGE_RETRIES = 4;
 
 async function retainAcceptedStage({ root, stageDir, temporary, stage, afterStageEnsured,
@@ -173,9 +187,6 @@ async function retainAcceptedStage({ root, stageDir, temporary, stage, afterStag
     }
   }
   await afterStageRenamed?.();
-  await syncEntry(stageDir, stage).catch(error => {
-    if (error.code !== "ENOENT") throw error;
-  });
 }
 
 // The opener is the seam the race tests use, and stays last so callers that do
