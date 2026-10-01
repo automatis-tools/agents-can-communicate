@@ -133,11 +133,15 @@ test("cwd selection is recognized and trust chooses the existing session directo
   await pty.request({ action: "launch", role: "receiver",
     argv: [await python(), "-c", program], cwd: root, env: process.env });
   const h = { pty, roles: { receiver: { hookTrusted: false } }, debugStatus: false };
-  await new Promise(resolve => setTimeout(resolve, 150));
+  // trust() reads the screen once, as the scenario loop calls it; a loaded
+  // machine starts Python and draws the prompt later than any fixed pause.
+  const deadline = { timeoutMs: 5_000, intervalMs: 20 };
+  await until("cwd selection prompt", async () =>
+    (await pty.request({ action: "status", role: "receiver" })).cwdSelection, deadline);
   const status = await trust(h, "receiver");
   assert.equal(status.cwdSelection, true);
-  await new Promise(resolve => setTimeout(resolve, 150));
-  assert.equal(await readFile(marker, "utf8"), "1");
+  assert.equal(await until("cwd choice written", () => readFile(marker, "utf8").catch(() => ""),
+    deadline), "1");
 });
 
 test("unexpected argument text is a launch error only when the vendor exits",

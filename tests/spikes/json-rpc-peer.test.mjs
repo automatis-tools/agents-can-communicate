@@ -10,10 +10,12 @@ const isFixtureServer = process.argv.includes("--fixture-server");
 
 if (isFixtureServer) serveFixture();
 else test("the peer correlates responses while retaining notifications", async () => {
+  // The bound only catches a hang: the first request also waits for the
+  // fixture's node to start, which a loaded machine took over 500 ms to do.
   const peer = openJsonRpcPeer({
     command: process.execPath,
     args: [fixtureServer, "--fixture-server"],
-    timeoutMs: 500,
+    timeoutMs: 10_000,
   });
 
   try {
