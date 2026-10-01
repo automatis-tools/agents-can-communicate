@@ -69,7 +69,9 @@ test("a question wakes an idle Claude Code session through its inbox", { skip, t
   const sender = await acc(["attach", "--participant", "e2e-sender"]);
   const owner = ["--session", sender.sessionId, "--generation", sender.generation];
 
-  const argv = /\.(cmd|bat)$/i.test(claude) ? ["cmd.exe", "/d", "/s", "/c", claude] : [claude];
+  // cmd.exe by its full path: the client's isolated PATH does not hold System32.
+  const argv = /\.(cmd|bat)$/i.test(claude)
+    ? [process.env.ComSpec ?? "C:\\Windows\\System32\\cmd.exe", "/d", "/s", "/c", claude] : [claude];
   const terminal = await startTerminal(argv, { cwd: packed.project, env,
     log: path.join(packed.clientHome, "claude-screen.log") });
   packed.defer(() => terminal.close());
