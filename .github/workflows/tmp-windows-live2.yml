@@ -1,7 +1,8 @@
 name: tmp windows live 2
 
-# Measurement only, on a throwaway branch: the writer lock renamed aside and
-# back while owner reads resolve it, four copies at once, on the code before and
+# Measurement only, on a throwaway branch: the lock tests, the writer lock
+# renamed aside and back while owner reads resolve it among them, four copies
+# of the file at once, on the code before and
 # after an answer outside the store needs the directory to be there to count as
 # an escape.
 on:
@@ -31,7 +32,9 @@ jobs:
           $files = (Get-ChildItem packages/storage-filesystem/test/tmp_churn*.test.mjs).FullName
           $escapes = 0
           for ($round = 1; $round -le 30; $round++) {
-            node --test --test-name-pattern="renamed aside under an owner read" $files *> churn.out
+            # The whole file: on CI the answer named the store of a test that
+            # ran before this one in the same file.
+            node --test $files *> churn.out
             # A failure is printed twice, in place and in the summary.
             $found = @(Select-String -Path churn.out -Pattern 'called an escape: (.*)' |
               ForEach-Object { $_.Matches[0].Groups[1].Value } | Sort-Object -Unique)
@@ -39,4 +42,4 @@ jobs:
             foreach ($sample in $found) { "round ${round}: $sample" }
             Select-String -Path churn.out -Pattern '^ℹ (pass|fail) ' | ForEach-Object { "round ${round}: $($_.Line)" }
           }
-          "code ${{ matrix.code }}: $escapes failed reads called an escape in 120 runs"
+          "code ${{ matrix.code }}: $escapes failed reads called an escape in 120 runs of the file"
