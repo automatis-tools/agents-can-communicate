@@ -83,14 +83,17 @@ test("a failed owned-directory cleanup keeps authority until a retry succeeds", 
   // it removes the directories it created, so what fails is `plugins`, now
   // empty. POSIX refuses that through the parent's mode. Windows has no mode
   // bits there; a directory that is a live process's working directory is
-  // refused instead (EBUSY, measured on windows-latest).
+  // refused instead (EBUSY, measured on windows-latest). The child holds its
+  // working directory only once it has started: right after `spawn` fired,
+  // the directory was removed 60 times in 60, and after the child's first
+  // output 0 times in 60 (measured on windows-latest).
   let holder = null;
   const block = async () => {
     if (process.platform !== "win32") return chmod(parent, 0o500);
-    holder = spawn(process.execPath, ["-e", "setInterval(() => {}, 1000)"],
-      { cwd: path.dirname(plugin), stdio: "ignore", windowsHide: true });
+    holder = spawn(process.execPath, ["-e", "process.stdout.write('ready'); setInterval(() => {}, 1000)"],
+      { cwd: path.dirname(plugin), stdio: ["ignore", "pipe", "ignore"], windowsHide: true });
     await new Promise((resolve, reject) => {
-      holder.once("spawn", resolve);
+      holder.stdout.once("data", resolve);
       holder.once("error", reject);
     });
   };
