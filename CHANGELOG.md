@@ -33,9 +33,16 @@ Work in progress for #234. The design is in
   Host, and through PowerShell where Script Host is switched off; a client's image name matches
   without `.exe`. Measured on windows-latest, the walk took 145 ms against PowerShell's 580.
 - On Windows a client binary is found through `PATHEXT`, a `.cmd` shim runs through `cmd.exe`,
-  updates run npm's own `npm-cli.js`, and background workers open no console window. Live
-  delivery on Windows is reported as `native_delivery_unsupported` for now; next-turn delivery
-  works.
+  updates run npm's own `npm-cli.js`, and background workers open no console window.
+- Live delivery reaches an idle Claude Code session on Windows. Measured with Claude Code 2.1.286:
+  the inbox is a named pipe, `\\.\pipe\LOCAL\cc-msg-<32 hex>`, that drops a frame without an
+  auth line, so ACC authenticates with the peer key Claude Code publishes beside the session
+  record for other sessions of the same user, and the recipient's inbound settings apply as on
+  POSIX. ACC never reads the session's own messaging token. The probe reads the `claude.exe` an
+  npm `.cmd` runs. Endpoint records keep their mode checks on POSIX; on Windows, where every
+  file reads as `0o666`, the profile's ACL is the boundary. The real-clients CI job wakes an idle
+  interactive Claude Code on Linux and Windows. Codex and Antigravity CLI keep next-turn delivery
+  on Windows for now.
 - On Windows each client's hooks run a Node shim instead of an `sh` script, in the form that
   client's hook shell reads: Claude Code's exec form, a Codex `commandWindows` for PowerShell,
   PowerShell for Gemini CLI, a form PowerShell, Git Bash and cmd all read for Grok, an unquoted

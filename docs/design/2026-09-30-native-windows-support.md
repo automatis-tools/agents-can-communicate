@@ -233,20 +233,33 @@ different installation.
 
 ### 7. Live delivery (0.9.x)
 
-- **Claude Code.** Claude binds `\\.\pipe\cc-msg-<32 hex>` and requires an auth line on Windows.
-  It publishes a per-session peer key for other sessions of the same user in
-  `<config>/sessions/<pid>.<sha256(canonical pipe name)>.key` as `{peerToken, procStartFt,
-  pidDomain}`. A frame authenticated with it is classified `peer`, so the recipient's inbound
-  settings (`crossSessionInbound`, the bypass-mode hold) apply as they do on POSIX. ACC reads that
-  key, checks that `procStartFt` equals the recipient process's creation time, sends
-  `{"type":"auth","token":<peerToken>}` and then the fixed wake line. ACC never reads the child
-  token `CLAUDE_CODE_MESSAGING_TOKEN`, which would skip those settings.
+- **Claude Code.** Measured on `windows-latest` with Claude Code 2.1.286 in a ConPTY:
+  - the session record `<config>/sessions/<pid>.json` names the inbox as
+    `\\.\pipe\LOCAL\cc-msg-<32 hex>` and carries `procStart` (a FILETIME string) and
+    `pidDomain` (`win32:<host>`); the hook's `CLAUDE_CODE_MESSAGING_SOCKET` names the same pipe;
+  - beside it, `<pid>.<sha256 of the lowercased pipe path>.key` holds `{peerToken (32 hex),
+    procStartFt, pidDomain}`, with `procStartFt` equal to the record's `procStart`;
+  - a frame with no auth line, or with a wrong token, is dropped and the pipe closed; after
+    `{"type":"auth","token":<peerToken>}` the same wake line runs a turn the session shows as
+    another session's message, and the pipe answers nothing.
+
+  ACC reads the key named by the pid and the pipe, uses it only when its process start and pid
+  domain are the record's, reads it per offer and stores it nowhere. It never reads the child
+  token `CLAUDE_CODE_MESSAGING_TOKEN`, which would skip the recipient's inbound settings. The
+  probe reads the executable an npm `.cmd` runs (`bin\claude.exe`); the pipe counts while the
+  machine lists it in `\\.\pipe\`. WMI reports a process's creation time in microseconds, one
+  digit short of the FILETIME Claude records, so the two are not compared.
 - **Codex.** The Windows daemon listens on a real AF_UNIX socket,
   `%CODEX_HOME%\app-server-control\app-server-control.sock`, and Node cannot connect to AF_UNIX
-  on Windows. Codex ships `codex app-server proxy`, which relays stdio to that socket. ACC starts
-  it per offer and speaks the same WebSocket JSON-RPC over the child's stdio. Daemon identity uses
-  the pid file, the creation time and the command line; the socket directory has a user-only DACL
-  that Codex sets itself, which replaces the `lsof` proof.
+  on Windows. Codex ships `codex app-server proxy` ("proxy stdio bytes to the running app-server
+  control socket", 0.159.3), so ACC starts it per offer and speaks the same WebSocket JSON-RPC
+  over the child's stdio. Daemon identity uses the pid file, the creation time and the command
+  line; the socket directory has a user-only DACL that Codex sets itself, which replaces the
+  `lsof` proof. Measured on 0.159.3: `daemon start` refuses a token whose `TokenIsElevated` is
+  set ("start the Windows daemon from a non-elevated terminal"), and `runas /trustlevel:0x20000`
+  does not clear it; the proxy refuses a socket path longer than `SUN_LEN`, so a deep
+  `CODEX_HOME` cannot share the daemon; the daemon runs a managed copy under
+  `CODEX_HOME\packages\app-server-daemon\current\bin\codex.exe`.
 - **Antigravity CLI.** The relay listens on `\\.\pipe\acc-relay-<random>`. The random name is kept
   in the private registration. The agent API is localhost TCP and works unchanged.
 - **Router.** Windows transports keep their names (`claude-inbox`, `codex-app-server`), so status
@@ -286,7 +299,8 @@ different installation.
 These change details, not the design. The implementation measures them in its own Windows CI
 tests before it relies on them:
 
-1. Whether a detached, hidden worker outlives its parent (the first probe's case was malformed).
+1. Measured: a worker started `detached` (hidden or not) outlives a parent that exits at once; one
+   started without `detached` was gone with its parent on the runner.
 2. What `codex app-server daemon start` writes on Windows under a non-elevated token: the pid file
    format and the socket file's `lstat` result.
 3. The Claude Code and Codex command lines as `Win32_Process` reports them, launched through their

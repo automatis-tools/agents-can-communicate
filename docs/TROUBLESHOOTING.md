@@ -397,8 +397,12 @@ checkout history.
 - **A write through Claude Code's PowerShell tool was not guarded.** The guard reads POSIX shell
   commands only. Claims are advisory by default, and a write through Claude Code's Write, Edit or
   Bash tool is still checked.
-- **Live delivery is `native_delivery_unsupported`.** Live delivery on Windows is not available
-  yet; messages arrive on the recipient's next turn.
+- **Live delivery is `native_delivery_unsupported`.** On Windows live delivery reaches Claude Code
+  only; Codex and Antigravity CLI messages arrive on the recipient's next turn.
+- **A Claude Code session is not woken on Windows.** The wake authenticates with the key Claude
+  Code publishes beside its session record (`<config>\sessions\<pid>.<hash>.key`). Run
+  `acc doctor`: a session without that key, or whose pipe the machine no longer lists, waits for
+  its next turn.
 
 ## A write was blocked
 

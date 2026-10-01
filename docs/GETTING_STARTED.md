@@ -216,9 +216,10 @@ What is different on Windows:
 - Each client's hooks run a small Node script instead of a shell script, in the form that
   client's hook runner reads. `node` must be on `PATH` for Grok and Antigravity CLI hooks.
   Claude Code needs 2.1.139 or later.
-- Messages reach the recipient on its next turn. Live delivery into a running session (the
-  Claude Code inbox, the Codex daemon, the Antigravity relay) is not available on Windows yet,
-  and doctor reports it as `native_delivery_unsupported`.
+- Live delivery reaches a running Claude Code session through its inbox pipe, as on macOS and
+  Linux. The Codex daemon and the Antigravity relay are not available on Windows yet: doctor
+  reports them as `native_delivery_unsupported`, and their messages arrive on the recipient's
+  next turn.
 - Antigravity CLI cannot run a hook whose path is quoted. When your profile path has a space,
   ACC writes the path's 8.3 short name. ACC adds no allow rule on Windows, so Antigravity CLI
   asks before each ACC command.

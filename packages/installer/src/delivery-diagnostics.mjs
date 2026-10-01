@@ -4,7 +4,7 @@ import { isLaunchOption } from "@agents-can-communicate/adapter-sdk";
 // reasons; installation and doctor must not turn a version floor into readiness.
 const REASONS = Object.freeze({
   // Said of a client with no live channel, and of Claude Code, Codex and Antigravity CLI on
-  // Windows, whose live delivery arrives in 0.9.x.
+  // Codex and Antigravity CLI on Windows, whose live delivery arrives in 0.9.x.
   native_delivery_unsupported: "this client has no live delivery channel ACC supports here",
   version_unavailable: "the client version could not be verified",
   below_minimum_version: "the client is below the native delivery minimum version",
