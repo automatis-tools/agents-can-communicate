@@ -1,5 +1,6 @@
 import net from "node:net";
-import { compareVersionOrder, isWindowsPlatform, versionOrder } from "@agents-can-communicate/adapter-sdk";
+import { compareVersionOrder, isWindowsPlatform, npmShimTarget, runExecutable, versionOrder }
+  from "@agents-can-communicate/adapter-sdk";
 
 import { INBOX_MODES, MIN_VERSION, PROTOCOL_CONTRACT, TRANSPORT } from "./inbox-contract.mjs";
 import { claimWake, newEndpointId, readInboxEndpoint, releaseWake, removeInboxEndpoint,
@@ -73,16 +74,11 @@ async function executableHasInbox(realExecutable) {
   }
 }
 
+// runExecutable starts an npm .cmd through cmd.exe, which execFile refuses.
 function defaultReadVersion(realExecutable, timeoutMs) {
-  return new Promise(resolve => {
-    import("node:child_process").then(({ execFile }) => {
-      execFile(realExecutable, ["--version"], { timeout: timeoutMs, windowsHide: true },
-        (error, stdout, stderr) => {
-          if (error !== null) return resolve(null);
-          resolve(/(\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?)/.exec(`${stdout}${stderr}`)?.[1] ?? null);
-        });
-    });
-  });
+  return runExecutable(realExecutable, ["--version"], { timeout: timeoutMs })
+    .then(({ stdout, stderr }) => /(\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?)/.exec(`${stdout}${stderr}`)?.[1] ?? null,
+      () => null);
 }
 
 function withTimeout(work, ms) {
@@ -95,22 +91,23 @@ function withTimeout(work, ms) {
 }
 
 /**
- * Read-only: a version at or above the capture, a platform whose inbox is a
- * Unix socket, and an executable that writes the inbox into its session
- * registry. Never launches a session. Native Windows serves a named pipe that
- * demands an auth line; nothing there is captured, so it keeps hook delivery.
+ * Read-only: a version at or above the capture and an executable that writes
+ * the inbox into its session registry. Never launches a session. On Windows an
+ * npm install puts a .cmd on PATH; the inbox is looked for in the file it runs.
  */
 export async function probeNativeDelivery({ realExecutable, timeoutMs = 750, platform = process.platform,
-  hasInbox = executableHasInbox, readVersion = defaultReadVersion } = {}) {
+  hasInbox = executableHasInbox, readVersion = defaultReadVersion, shimTarget = npmShimTarget } = {}) {
   const unsupported = (reasonCode, clientVersion = null) => ({ supported: false, clientVersion,
     protocolContract: PROTOCOL_CONTRACT, executableFingerprint: null, modes: [], reasonCode });
-  if (platform === "win32") return unsupported("native_delivery_unsupported");
   if (typeof realExecutable !== "string" || realExecutable === "") return unsupported("feature_probe_failed");
+  const scanned = isWindowsPlatform(platform) && /\.(cmd|bat)$/i.test(realExecutable)
+    ? await shimTarget(realExecutable) : realExecutable;
+  if (scanned === null) return unsupported("feature_probe_failed");
   const clientVersion = await withTimeout(Promise.resolve(readVersion(realExecutable, timeoutMs)), timeoutMs)
     .catch(() => null);
   if (versionOrder(clientVersion) === null) return unsupported("feature_probe_failed", clientVersion);
   if (belowMinimum(clientVersion)) return unsupported("below_minimum_version", clientVersion);
-  const present = await withTimeout(Promise.resolve(hasInbox(realExecutable)), timeoutMs).catch(() => false);
+  const present = await withTimeout(Promise.resolve(hasInbox(scanned)), timeoutMs).catch(() => false);
   if (!present) return unsupported("protocol_mismatch", clientVersion);
   return { supported: true, clientVersion, protocolContract: PROTOCOL_CONTRACT,
     executableFingerprint: null, modes: [...INBOX_MODES], reasonCode: null };

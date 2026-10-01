@@ -7,7 +7,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
 
-import { bindNativeSession, offerMessage, wakeText } from "../src/inbox-delivery.mjs";
+import { bindNativeSession, offerMessage, probeNativeDelivery, wakeText } from "../src/inbox-delivery.mjs";
 import { ENDPOINTS_DIRECTORY, readInboxEndpoint } from "../src/inbox-endpoint.mjs";
 
 // Claude Code on Windows (2.1.286, measured on windows-latest): the inbox is
@@ -127,4 +127,22 @@ test("windows: a real pipe receives the auth line and the wake", {
   const lines = received[0].split("\n").filter(Boolean).map(line => JSON.parse(line));
   assert.deepEqual(lines.map(line => line.type), ["auth", "user"]);
   assert.equal(lines[0].token, TOKEN);
+});
+
+// npm installs Claude Code as claude.cmd running bin\claude.exe; the native
+// installer puts claude.exe on PATH itself. The inbox is looked for in the
+// executable, never in the .cmd text.
+test("windows: the probe reads the executable an npm shim runs", async () => {
+  const exe = "C:\\npm\\prefix\\node_modules\\@anthropic-ai\\claude-code\\bin\\claude.exe";
+  const scanned = [];
+  const probe = overrides => probeNativeDelivery({ realExecutable: "C:\\npm\\prefix\\claude.cmd",
+    platform: "win32", readVersion: async () => "2.1.286", shimTarget: async () => exe,
+    hasInbox: async file => { scanned.push(file); return true; }, ...overrides });
+  assert.equal((await probe()).supported, true);
+  assert.deepEqual(scanned, [exe]);
+  assert.equal((await probe({ shimTarget: async () => null })).reasonCode, "feature_probe_failed");
+  scanned.length = 0;
+  assert.equal((await probe({ realExecutable: "C:\\Users\\Ann\\.local\\bin\\claude.exe" })).supported, true);
+  assert.deepEqual(scanned, ["C:\\Users\\Ann\\.local\\bin\\claude.exe"]);
+  assert.equal((await probe({ readVersion: async () => "2.1.281" })).reasonCode, "below_minimum_version");
 });
