@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
+import { randomBytes } from "node:crypto";
 import { chmod, mkdir, mkdtemp, readdir, realpath, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -10,7 +11,7 @@ import { openCodexAppServer } from "../src/app-server-client.mjs";
 import { probeNativeDelivery } from "../src/native-delivery.mjs";
 import { newEndpointId, readNativeEndpoint, readySocketPath, socketIsReady, writeNativeEndpoint }
   from "../src/native-endpoint.mjs";
-import { controlledCodexDaemon } from "../../../tests/helpers/codex-daemon.mjs";
+import { startCodexDaemonServer } from "../../../tests/helpers/codex-daemon.mjs";
 
 // Measured on windows-latest with Codex 0.159.3: Node's lstat refuses the
 // daemon's AF_UNIX socket file with EACCES, so on Windows the socket counts
@@ -50,11 +51,24 @@ test("windows: endpoint records are read where every file reports mode 0o666", a
 
 const fakeProxy = fileURLToPath(new URL("../../../tests/helpers/fake-codex-proxy.mjs", import.meta.url));
 
+// The daemon's socket counts while its directory lists it, and the proxy is
+// what reaches it. A test server cannot listen on a Windows file path, so there
+// it listens on a pipe the fake proxy relays to, and the control directory
+// holds the name.
 test("windows: the probe reaches the daemon through the proxy", async t => {
-  const daemon = await controlledCodexDaemon(t, { cwd: tmpdir() });
+  const home = await realpath(await mkdtemp(path.join(process.platform === "win32" ? tmpdir() : "/tmp",
+    "acc-cxp-")));
+  const control = path.join(home, "app-server-control");
+  await mkdir(control);
+  const socketPath = path.join(control, "app-server-control.sock");
+  const listening = process.platform === "win32"
+    ? `\\\\.\\pipe\\acc-test-${randomBytes(8).toString("hex")}` : socketPath;
+  if (process.platform === "win32") await writeFile(socketPath, "");
+  const daemon = await startCodexDaemonServer({ socketPath: listening, cwd: tmpdir() });
+  t.after(async () => { await daemon.close(); await rm(home, { recursive: true, force: true }); });
   const open = options => openCodexAppServer({ ...options, platform: "win32",
-    spawnProxy: target => spawn(process.execPath, [fakeProxy, "app-server", "proxy", "--sock", target],
+    spawnProxy: () => spawn(process.execPath, [fakeProxy, "app-server", "proxy", "--sock", listening],
       { stdio: ["pipe", "pipe", "ignore"] }) });
-  const probe = await probeNativeDelivery({ env: daemon.env, platform: "win32", open, timeoutMs: 5_000 });
+  const probe = await probeNativeDelivery({ env: { CODEX_HOME: home }, platform: "win32", open, timeoutMs: 5_000 });
   assert.equal(probe.supported, true, probe.reasonCode);
 });

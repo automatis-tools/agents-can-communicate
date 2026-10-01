@@ -24,7 +24,7 @@ const psArgv = async pid => await readProcessArgs(pid, { timeoutMs: 1_000 }) ?? 
 // forward-slash path that PowerShell, cmd and Git Bash read alike.
 export const relayShimPath = (home, platform = process.platform) => (isWindowsPlatform(platform)
   ? path.win32.join(home, ".gemini", "config", "acc", "acc-relay.mjs")
-  : path.join(home, ".gemini", "config", "acc", "acc-relay.sh"));
+  : path.posix.join(home, ".gemini", "config", "acc", "acc-relay.sh"));
 
 /** The command the agent runs once per conversation to start live delivery. */
 export const relayStartCommand = (home, platform = process.platform) => (isWindowsPlatform(platform)

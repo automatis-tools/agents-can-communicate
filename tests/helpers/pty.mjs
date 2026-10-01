@@ -5,6 +5,8 @@ import { readFile, writeFile } from "node:fs/promises";
 import { createInterface } from "node:readline";
 import { fileURLToPath } from "node:url";
 
+import { resolveExecutable } from "../../packages/adapter-sdk/src/executables.mjs";
+
 const DRIVER = fileURLToPath(new URL("./pty-driver.py", import.meta.url));
 const PYTHON = process.platform === "win32" ? "python" : "python3";
 
@@ -14,7 +16,11 @@ export const plainScreen = text => text.replace(/\x1b\][^\x07]*(\x07|\x1b\\)/g, 
 
 export async function startTerminal(argv, { cwd, env, log }) {
   await writeFile(log, "");
-  const driver = spawn(PYTHON, [DRIVER, JSON.stringify(argv), log, cwd], { env,
+  // Python is found on this process's PATH: a client's environment may carry
+  // only the client's own directories, and the driver hands it on unchanged.
+  const python = await resolveExecutable(PYTHON);
+  if (python === null) throw new Error(`${PYTHON} is not on PATH; the terminal driver needs it`);
+  const driver = spawn(python, [DRIVER, JSON.stringify(argv), log, cwd], { env,
     stdio: ["pipe", "pipe", "inherit"], windowsHide: true });
   const first = await new Promise((resolve, reject) => {
     createInterface({ input: driver.stdout }).once("line", resolve);
