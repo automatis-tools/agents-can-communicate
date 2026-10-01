@@ -8,6 +8,7 @@ import test from "node:test";
 import { promisify } from "node:util";
 
 import { needsRefresh } from "@agents-can-communicate/hook-runner";
+import { processFixtureEnv } from "../helpers/process-env.mjs";
 
 const run = promisify(execFile);
 const repo = path.resolve(import.meta.dirname, "..", "..");
@@ -31,8 +32,7 @@ async function workspace(t) {
   t.after(() => rm(base, { recursive: true, force: true }));
   const project = path.join(base, "project");
   await mkdir(project, { recursive: true });
-  const env = { ...process.env, ACC_DATA_HOME: path.join(base, "data"),
-    GIT_DIR: "", GIT_WORK_TREE: "" };
+  const env = await processFixtureEnv(base);
   const fire = async (participant, payload) => {
     const child = run(process.execPath, [hook, "codex"],
       { env: { ...env, ACC_PARTICIPANT: participant } });

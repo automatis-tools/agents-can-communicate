@@ -6,7 +6,8 @@ import path from "node:path";
 import test from "node:test";
 import { promisify } from "node:util";
 
-import { loadSessionBinding } from "@agents-can-communicate/adapter-sdk";
+import { fixtureOwnerEnv } from "../helpers/fixture-owner.mjs";
+import { processFixtureEnv } from "../helpers/process-env.mjs";
 
 const run = promisify(execFile);
 const repo = path.resolve(import.meta.dirname, "..", "..");
@@ -19,8 +20,7 @@ async function workspace(t) {
   t.after(() => rm(base, { recursive: true, force: true }));
   const project = path.join(base, "game");
   await mkdir(project, { recursive: true });
-  const env = { ...process.env, ACC_DATA_HOME: path.join(base, "data"),
-    GIT_DIR: "", GIT_WORK_TREE: "" };
+  const env = await processFixtureEnv(base);
   return { project, env };
 }
 
@@ -39,10 +39,8 @@ async function hookEvent({ env, project }, adapter, clientSessionId, participant
 async function attach(place, adapter, clientSessionId, participant) {
   await hookEvent(place, adapter, clientSessionId, participant, "sessionStart",
     { hook_event_name: "SessionStart", source: "startup" });
-  const { stdout } = await run(process.execPath,
-    [acc, "doctor", "--cwd", place.project, "--json"], { env: place.env });
-  return loadSessionBinding({ runtimeDir: JSON.parse(stdout).data.runtimeRoot,
-    harnessSessionId: clientSessionId });
+  const owner = await fixtureOwnerEnv(place.env.ACC_DATA_HOME, clientSessionId);
+  return { accSessionId: owner.ACC_SESSION, generation: owner.ACC_GENERATION };
 }
 
 async function turn(place, adapter, clientSessionId, participant) {
