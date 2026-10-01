@@ -22,9 +22,13 @@ const psArgv = async pid => await readProcessArgs(pid, { timeoutMs: 1_000 }) ?? 
 
 // Windows runs no `sh`: there the shim is a Node script, started with node on a
 // forward-slash path that PowerShell, cmd and Git Bash read alike.
+export const relayShimName = platform => (isWindowsPlatform(platform) ? "acc-relay.mjs" : "acc-relay.sh");
+
+// The path in the platform's own spelling, for the command the agent is told to
+// run. The file itself is written where this host spells the same path.
 export const relayShimPath = (home, platform = process.platform) => (isWindowsPlatform(platform)
-  ? path.win32.join(home, ".gemini", "config", "acc", "acc-relay.mjs")
-  : path.posix.join(home, ".gemini", "config", "acc", "acc-relay.sh"));
+  ? path.win32.join(home, ".gemini", "config", "acc", relayShimName(platform))
+  : path.posix.join(home, ".gemini", "config", "acc", relayShimName(platform)));
 
 /** The command the agent runs once per conversation to start live delivery. */
 export const relayStartCommand = (home, platform = process.platform) => (isWindowsPlatform(platform)
