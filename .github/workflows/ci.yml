@@ -80,6 +80,17 @@ jobs:
           ACC_REAL_CLIENTS: '1'
           GIT_DIR: ''
           GIT_WORK_TREE: ''
+      # An interactive client needs a terminal: a ConPTY through pywinpty on
+      # Windows, Python's own pty module elsewhere.
+      - name: A terminal for interactive clients
+        if: runner.os == 'Windows'
+        run: python -m pip install --quiet pywinpty
+      - name: Live delivery wakes an idle interactive Claude Code session
+        run: node --test tests/acceptance/real-claude-live-stub.test.mjs
+        env:
+          ACC_REAL_CLIENTS: '1'
+          GIT_DIR: ''
+          GIT_WORK_TREE: ''
 
   package:
     name: package · ${{ matrix.os }}
