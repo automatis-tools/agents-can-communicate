@@ -91,7 +91,10 @@ Work in progress for #234. The design is in
     Together this removes two lock round trips from each turn.
   - A write flushes only what a crash of the machine would otherwise lose. On windows-latest
     beside the full suite one flush took 15 ms at the median and up to 5.8 s, with the CPU
-    idle, and the hooks that ran past their budget spent most of it flushing.
+    idle, and the hooks that ran past their budget spent most of it flushing. A first, second
+    and third session start now flush 8, 30 and 16 times instead of 19, 42 and 22, and a turn
+    twice instead of four times. Across three full Windows suites at once no hook ran past its
+    budget, where two of about 1,120 had before.
     - Taking the writer lock flushes nothing, where it flushed once on Windows and three times
       on POSIX. The lock guards live processes, and a crash leaves none. An owner record a crash
       left unreadable is reclaimed once it is older than a minute, as a dead owner is; before,
