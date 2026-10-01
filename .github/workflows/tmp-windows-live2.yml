@@ -1,75 +1,42 @@
 name: tmp windows live 2
 
-# Measurement only, on a throwaway branch: the flushes of each session start on
-# Windows, and the whole suite as CI runs it, three times at once on three
-# runners, to catch a hook that runs past its budget and see what it - and the
-# machine - was doing at that moment.
+# Measurement only, on a throwaway branch: the writer lock renamed aside and
+# back while owner reads resolve it, four copies at once, on the code before and
+# after an answer outside the store needs the directory to be there to count as
+# an escape.
 on:
   push:
     branches: ['measure/windows-live2']
 
 jobs:
-  session-start-trace:
+  lock-churn:
     runs-on: windows-latest
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        with:
-          node-version: '24'
-      - run: npm ci
-      - name: each flush of a session start, alone
-        run: |
-          node scripts/tmp_session_start_trace.mjs 5
-          node scripts/tmp_trace_summary.mjs fsync-trace.log
-
-  suite-tail:
-    runs-on: windows-latest
-    timeout-minutes: 60
+    timeout-minutes: 40
     strategy:
       fail-fast: false
       matrix:
-        run: [1, 2, 3]
+        code: [before, after]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ matrix.code == 'after' && github.sha || 'f6ff0c1339427088aa6fed194b78694ebd8e5173' }}
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: '24'
       - run: npm ci
-      - name: the machine
-        continue-on-error: true
+      - name: the churn, four at once, 30 rounds
         shell: pwsh
         run: |
-          Get-MpComputerStatus | Select-Object AntivirusEnabled,RealTimeProtectionEnabled,OnAccessProtectionEnabled | Format-List
-          Get-CimInstance Win32_ComputerSystem | Select-Object NumberOfLogicalProcessors,TotalPhysicalMemory | Format-List
-          Get-PhysicalDisk | Select-Object FriendlyName,MediaType,BusType | Format-List
-      - name: the whole suite, with a canary beside it
-        continue-on-error: true
-        shell: pwsh
-        run: |
-          $canary = Start-Process -PassThru -NoNewWindow node -ArgumentList 'scripts/tmp_canary.mjs',"$PWD\canary.log"
-          $env:NODE_OPTIONS = "--import=file:///$((Resolve-Path scripts/tmp_hookcost.mjs).Path -replace '\\','/')"
-          $env:TMP_HOOKCOST_LOG = "$PWD\hookcost.log"
-          npm test 2>&1 | Tee-Object -FilePath suite.out | Select-String -Pattern "^ℹ |✖|failed open|coordination unavailable"
-          $env:NODE_OPTIONS = ''
-          New-Item -ItemType File "$PWD\canary.log.stop" | Out-Null
-          Start-Sleep -Seconds 2
-          Stop-Process -Id $canary.Id -ErrorAction SilentlyContinue
-        env:
-          ACC_TEST_TIMEOUT_MS: '300000'
-          ACC_TEST_FORCE_EXIT: '1'
-          GIT_DIR: ''
-          GIT_WORK_TREE: ''
-      - name: slow hooks and the machine around them
-        if: always()
-        run: node scripts/tmp_tail_summary.mjs hookcost.log canary.log 3000
-      - name: the logs
-        if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: tail-${{ matrix.run }}
-          path: |
-            hookcost.log
-            canary.log
-            suite.out
-          if-no-files-found: ignore
+          1..4 | ForEach-Object { Copy-Item packages/storage-filesystem/test/lock-changing-hands.test.mjs "packages/storage-filesystem/test/tmp_churn$_.test.mjs" }
+          $files = (Get-ChildItem packages/storage-filesystem/test/tmp_churn*.test.mjs).FullName
+          $escapes = 0
+          for ($round = 1; $round -le 30; $round++) {
+            node --test --test-name-pattern="renamed aside under an owner read" $files *> churn.out
+            # A failure is printed twice, in place and in the summary.
+            $found = @(Select-String -Path churn.out -Pattern 'called an escape: (.*)' |
+              ForEach-Object { $_.Matches[0].Groups[1].Value } | Sort-Object -Unique)
+            $escapes += $found.Count
+            foreach ($sample in $found) { "round ${round}: $sample" }
+            Select-String -Path churn.out -Pattern '^ℹ (pass|fail) ' | ForEach-Object { "round ${round}: $($_.Line)" }
+          }
+          "code ${{ matrix.code }}: $escapes failed reads called an escape in 120 runs"
