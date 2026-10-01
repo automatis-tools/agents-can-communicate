@@ -1,0 +1,40 @@
+name: tmp windows live 2
+
+# Measurement only, on a throwaway branch: the live Claude Code check on
+# Windows, and where a hook's time goes when the hook-heavy tests run together.
+on:
+  push:
+    branches: ['measure/windows-live2']
+
+jobs:
+  claude-live:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24'
+      - run: npm ci
+      - run: npm install --global @anthropic-ai/claude-code
+      - run: python -m pip install --quiet pywinpty
+      - name: live delivery wakes an idle interactive Claude Code session
+        timeout-minutes: 10
+        run: node --test --test-reporter=tap tests/acceptance/real-claude-live-stub.test.mjs
+        env:
+          ACC_REAL_CLIENTS: '1'
+          GIT_DIR: ''
+          GIT_WORK_TREE: ''
+
+  hook-phases:
+    runs-on: windows-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24'
+      - run: npm ci
+      - name: hook-heavy tests beside a packed test, every hook timed
+        timeout-minutes: 30
+        run: node scripts/tmp_windows_hook_phases.mjs 3
