@@ -43,10 +43,19 @@ else:
     def write(text):
         os.write(fd, text.encode("utf-8"))
 
+    # pty.fork makes the program a session leader, so its own children - the
+    # hooks it runs - are in its process group, and stopping it stops them.
     def stop():
         try:
-            os.kill(pid, signal.SIGKILL)
-        except ProcessLookupError:
+            os.killpg(pid, signal.SIGKILL)
+        except (ProcessLookupError, PermissionError):
+            try:
+                os.kill(pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+        try:
+            os.waitpid(pid, 0)
+        except ChildProcessError:
             pass
 
 print(json.dumps({"pid": pid}), flush=True)

@@ -34,7 +34,11 @@ async function until(label, read, { timeoutMs, intervalMs = 500, evidence }) {
 test("a question wakes an idle Claude Code session through its inbox", { skip, timeout: 600_000 }, async t => {
   const packed = await createPackedAcc(t);
   const stub = await startModelStub({ reply: "noted" });
-  t.after(() => stub.close());
+  // Stopped before the fixture directory goes, newest first: the client, whose
+  // hooks write into the data home while it lives, the stub, and then whatever
+  // runtime worker those hooks started.
+  packed.defer(() => packed.workersQuiet());
+  packed.defer(() => stub.close());
   const claude = await resolveExecutable("claude");
   assert.notEqual(claude, null, "claude is not on PATH");
   const system = process.platform === "win32" ? [] : ["/usr/bin", "/bin"];
@@ -68,7 +72,7 @@ test("a question wakes an idle Claude Code session through its inbox", { skip, t
   const argv = /\.(cmd|bat)$/i.test(claude) ? ["cmd.exe", "/d", "/s", "/c", claude] : [claude];
   const terminal = await startTerminal(argv, { cwd: packed.project, env,
     log: path.join(packed.clientHome, "claude-screen.log") });
-  t.after(() => terminal.close());
+  packed.defer(() => terminal.close());
   const evidence = async () => {
     const doctor = await acc(["doctor"]).catch(error => ({ error: String(error.stderr ?? error) }));
     const claudeDoctor = (doctor.adapters ?? []).find(item => item.adapterId === "claude_code") ?? doctor;
@@ -78,7 +82,8 @@ test("a question wakes an idle Claude Code session through its inbox", { skip, t
 
   // SessionStart attaches the session and binds it to its inbox.
   const participant = await until("the Claude Code session never attached", async () => {
-    const status = await acc(["status", ...owner]);
+    const status = await acc(["status", ...owner]).catch(() => null);
+    if (status === null) return null;
     const live = JSON.stringify(status);
     const found = (status.participants ?? []).find(item => item?.harness === "claude_code"
       || item?.client === "claude_code");
