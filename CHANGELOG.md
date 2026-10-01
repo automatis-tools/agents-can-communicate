@@ -44,8 +44,17 @@ Work in progress for #234. The design is in
   POSIX. ACC never reads the session's own messaging token. The probe reads the `claude.exe` an
   npm `.cmd` runs. Endpoint records keep their mode checks on POSIX; on Windows, where every
   file reads as `0o666`, the profile's ACL is the boundary. The real-clients CI job wakes an idle
-  interactive Claude Code on Linux and Windows. Codex and Antigravity CLI keep next-turn delivery
-  on Windows for now.
+  interactive Claude Code on Linux and Windows.
+- Live delivery reaches Codex on Windows through `codex app-server proxy`, which relays stdio to
+  the daemon's AF_UNIX socket that Node cannot open there; ACC speaks the same WebSocket JSON-RPC
+  over the stdio of the managed `codex.exe` the daemon runs from. Measured with Codex 0.159.3
+  under a standard user: a queued message reached the model. The daemon is proven without `ps`
+  or `lsof`: its pid record's FILETIME against WMI's creation time, its command line, and the
+  socket its directory lists (Node's `lstat` refuses the socket file with `EACCES`). Codex starts
+  its daemon only from a non-elevated terminal.
+- Live delivery reaches Antigravity CLI on Windows: the relay listens on
+  `\\.\pipe\acc-relay-<32 hex>`, the agent starts it with `node "<…>/acc-relay.mjs" start`, and
+  the relay runs `agy.exe` itself, never a `.cmd`, since the message reaches agy as an argument.
 - On Windows each client's hooks run a Node shim instead of an `sh` script, in the form that
   client's hook shell reads: Claude Code's exec form, a Codex `commandWindows` for PowerShell,
   PowerShell for Gemini CLI, a form PowerShell, Git Bash and cmd all read for Grok, an unquoted

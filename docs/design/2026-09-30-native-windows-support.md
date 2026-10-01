@@ -259,7 +259,12 @@ different installation.
   set ("start the Windows daemon from a non-elevated terminal"), and `runas /trustlevel:0x20000`
   does not clear it; the proxy refuses a socket path longer than `SUN_LEN`, so a deep
   `CODEX_HOME` cannot share the daemon; the daemon runs a managed copy under
-  `CODEX_HOME\packages\app-server-daemon\current\bin\codex.exe`.
+  `CODEX_HOME\packages\app-server-daemon\current\bin\codex.exe`. Run as a standard user,
+  `daemon.pid` records `{pid, processStartTime}` with the start as a FILETIME string, WMI reports
+  the same creation time to the microsecond, and the command line is the quoted, `\\?\`-prefixed
+  release `codex.exe` running `app-server --listen unix:// --managed-daemon`. Node's `lstat`
+  refuses the socket file with `EACCES`, so the socket counts while its directory lists it. A
+  queued message through the proxy reached the model.
 - **Antigravity CLI.** The relay listens on `\\.\pipe\acc-relay-<random>`. The random name is kept
   in the private registration. The agent API is localhost TCP and works unchanged.
 - **Router.** Windows transports keep their names (`claude-inbox`, `codex-app-server`), so status

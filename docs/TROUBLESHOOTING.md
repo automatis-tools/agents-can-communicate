@@ -397,8 +397,11 @@ checkout history.
 - **A write through Claude Code's PowerShell tool was not guarded.** The guard reads POSIX shell
   commands only. Claims are advisory by default, and a write through Claude Code's Write, Edit or
   Bash tool is still checked.
-- **Live delivery is `native_delivery_unsupported`.** On Windows live delivery reaches Claude Code
-  only; Codex and Antigravity CLI messages arrive on the recipient's next turn.
+- **Codex is not woken on Windows.** Codex refuses to start its app-server daemon from an
+  elevated terminal ("start the Windows daemon from a non-elevated terminal"). Start Codex from a
+  terminal that is not running as administrator, and keep `CODEX_HOME` short: the daemon's socket
+  path has to fit 108 bytes, or Codex runs the chat on its own embedded server, which no peer can
+  reach.
 - **A Claude Code session is not woken on Windows.** The wake authenticates with the key Claude
   Code publishes beside its session record (`<config>\sessions\<pid>.<hash>.key`). Run
   `acc doctor`: a session without that key, or whose pipe the machine no longer lists, waits for
