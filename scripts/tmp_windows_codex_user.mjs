@@ -38,7 +38,13 @@ const listing = await readdir(codexHome, { recursive: true }).catch(() => []);
 say("CODEX_HOME:", listing.filter(name => !/^(log|sessions|tmp|packages[\\/]app-server-daemon[\\/].+[\\/])/.test(name)));
 for (const name of listing.filter(file => /\.pid$|\.lock$|\.sock$|settings\.json$/.test(file))) {
   const full = path.join(codexHome, name);
-  const stat = lstatSync(full, { throwIfNoEntry: false });
+  let stat;
+  try {
+    stat = lstatSync(full, { throwIfNoEntry: false });
+  } catch (error) {
+    say(name, `lstat ${error.code}`);
+    continue;
+  }
   if (stat === undefined) continue;
   say(name, { file: stat.isFile(), socket: stat.isSocket(), link: stat.isSymbolicLink(), size: stat.size });
   if (stat.isFile() && stat.size < 4096 && !/\.lock$/.test(name)) {
