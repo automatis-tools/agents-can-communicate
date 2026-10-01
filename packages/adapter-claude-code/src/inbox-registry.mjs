@@ -1,8 +1,8 @@
 import { createHash } from "node:crypto";
-import { constants } from "node:fs";
-import { lstat, open, readdir, realpath } from "node:fs/promises";
+import { lstat, readdir, realpath } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import { isWindowsPlatform as isWindows, openRegularNoFollow } from "@agents-can-communicate/adapter-sdk";
 
 // Claude Code's own record of a live session: `<config>/sessions/<pid>.json`
 // names the session id and the inbox it listens on. On POSIX the inbox is a
@@ -19,31 +19,16 @@ const KEY_MAX_BYTES = 4_096;
 const INBOX_PIPE = /^\\\\\.\\pipe\\((?:LOCAL\\)?cc-msg-[0-9a-f]{32})$/i;
 const PEER_TOKEN = /^[0-9a-f]{32}$/;
 const own = info => typeof process.getuid !== "function" || info.uid === process.getuid();
-const isWindows = platform => String(platform).startsWith("win32");
 const text = value => (typeof value === "string" && value !== "" ? value : null);
 
 export const claudeConfigDir = env => typeof env?.CLAUDE_CONFIG_DIR === "string"
   && path.isAbsolute(env.CLAUDE_CONFIG_DIR)
   ? env.CLAUDE_CONFIG_DIR : path.join(os.homedir(), ".claude");
 
-// Windows has no O_NOFOLLOW: the name is checked first, and the handle after
-// the open has to hold the file the name named.
-async function openRegular(file, platform) {
-  if (!isWindows(platform)) {
-    return open(file, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
-  }
-  const named = await lstat(file, { bigint: true });
-  if (!named.isFile()) throw Object.assign(new Error(`not a regular file: ${file}`), { code: "EINVAL" });
-  const handle = await open(file, constants.O_RDONLY);
-  const opened = await handle.stat({ bigint: true }).catch(() => null);
-  if (opened?.dev !== named.dev || opened?.ino !== named.ino) {
-    await handle.close().catch(() => null);
-    throw Object.assign(new Error(`replaced while opening: ${file}`), { code: "EINVAL" });
-  }
-  return handle;
-}
+/** Whether a value names a Claude Code inbox pipe. */
+export const isInboxPipe = value => typeof value === "string" && INBOX_PIPE.test(value);
 
-const listPipesOfMachine = () => readdir("\\\\.\\pipe\\");
+export const listPipesOfMachine = () => readdir("\\\\.\\pipe\\");
 
 /** The registry entry for one pid, or null. Bounded, owner-checked, never through a link. */
 export async function readSessionRecord({ configDir, clientPid, platform = process.platform }) {
@@ -52,7 +37,8 @@ export async function readSessionRecord({ configDir, clientPid, platform = proce
   const paths = windows ? path.win32 : path;
   let handle;
   try {
-    handle = await openRegular(path.join(configDir, "sessions", `${clientPid}.json`), platform);
+    handle = await openRegularNoFollow(path.join(configDir, "sessions", `${clientPid}.json`),
+      undefined, { platform });
     const info = await handle.stat();
     if (!info.isFile() || !own(info) || info.size > MAX_BYTES) return null;
     const record = JSON.parse(await handle.readFile("utf8"));
@@ -134,7 +120,8 @@ export async function readPeerKey({ configDir, record }) {
   const digest = createHash("sha256").update(record.messagingSocketPath.toLowerCase()).digest("hex");
   let handle;
   try {
-    handle = await openRegular(path.join(configDir, "sessions", `${record.pid}.${digest}.key`), "win32");
+    handle = await openRegularNoFollow(path.join(configDir, "sessions", `${record.pid}.${digest}.key`),
+      undefined, { platform: "win32" });
     const info = await handle.stat();
     if (!info.isFile() || info.size > KEY_MAX_BYTES) return null;
     const key = JSON.parse(await handle.readFile("utf8"));

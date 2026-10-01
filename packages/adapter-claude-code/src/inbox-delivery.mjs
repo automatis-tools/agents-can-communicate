@@ -1,10 +1,11 @@
 import net from "node:net";
-import { compareVersionOrder, versionOrder } from "@agents-can-communicate/adapter-sdk";
+import { compareVersionOrder, isWindowsPlatform, versionOrder } from "@agents-can-communicate/adapter-sdk";
 
 import { INBOX_MODES, MIN_VERSION, PROTOCOL_CONTRACT, TRANSPORT } from "./inbox-contract.mjs";
 import { claimWake, newEndpointId, readInboxEndpoint, releaseWake, removeInboxEndpoint,
   sweepDeadEndpoints, writeInboxEndpoint } from "./inbox-endpoint.mjs";
-import { claudeConfigDir, readSessionRecord, verifyInbox } from "./inbox-registry.mjs";
+import { claudeConfigDir, listPipesOfMachine, readPeerKey, readSessionRecord, verifyInbox }
+  from "./inbox-registry.mjs";
 import { MANAGED_SETTINGS, permissionModeFromArgs, readInboundSettings, readProcessArgs, receptionOf }
   from "./inbox-settings.mjs";
 
@@ -19,9 +20,12 @@ import { MANAGED_SETTINGS, permissionModeFromArgs, readInboundSettings, readProc
 // Claude Code frames every inbox message as a teammate's request to act on,
 // and the only thing a wake gives it to act on is ACC's own notice.
 //
-// The connection sends no auth line, and this module never reads the
-// session's messaging token or key file. A frame carrying that token would
-// pass as the session's own child and skip the inbound controls its user set.
+// On POSIX the connection sends no auth line: the socket is this user's alone.
+// Windows refuses a frame without one (measured on 2.1.286), so there the
+// offer authenticates with the peer key Claude publishes for other sessions of
+// the same user, and the wake is classified a peer's. This module never reads
+// the session's own messaging token: a frame carrying it would pass as the
+// session's child and skip the inbound controls its user set.
 
 const LEASE_MS = 120_000;
 const MESSAGE_ID = /^[A-Za-z0-9_-]{1,200}$/;
@@ -137,7 +141,7 @@ const handshake = (endpoint, now) => ({ supported: true, clientVersion: endpoint
  */
 export async function bindNativeSession({ event, clientPid, clientVersion, runtimeDir,
   env = process.env, now = Date.now, managedSettingsPath = MANAGED_SETTINGS[process.platform],
-  readClientArgs = readProcessArgs } = {}) {
+  readClientArgs = readProcessArgs, platform = process.platform, listPipes = listPipesOfMachine } = {}) {
   if (!Number.isInteger(clientPid) || clientPid <= 0) return closed(clientVersion, "client_process_unknown");
   if (typeof event?.sessionId !== "string" || event.sessionId === "") {
     return closed(clientVersion, "handshake_failed");
@@ -151,14 +155,14 @@ export async function bindNativeSession({ event, clientPid, clientVersion, runti
   if (typeof socketPath !== "string" || socketPath === "") {
     return closed(clientVersion, "native_endpoint_unavailable");
   }
-  await sweepDeadEndpoints({ runtimeDir });
+  await sweepDeadEndpoints({ runtimeDir, platform });
   const configDir = claudeConfigDir(env);
   const refused = await verifyInbox({ configDir, clientPid, sessionId: event.sessionId, socketPath,
-    anyConversation: true });
+    anyConversation: true, platform, listPipes });
   if (refused !== null) return closed(clientVersion, refused);
   // Project settings sit where the session was started, which the registry
   // records; the hook's cwd follows the shell.
-  const record = await readSessionRecord({ configDir, clientPid });
+  const record = await readSessionRecord({ configDir, clientPid, platform });
   const settings = await readInboundSettings({ configDir, projectDir: record?.cwd ?? event.cwd,
     managedSettingsPath });
   // The hook's mode is current. SessionStart carries none, so until the first
@@ -172,30 +176,32 @@ export async function bindNativeSession({ event, clientPid, clientVersion, runti
     sessionId: event.sessionId, clientVersion, protocolContract: PROTOCOL_CONTRACT,
     leaseUntil: new Date(now() + LEASE_MS).toISOString(), reception };
   try {
-    await writeInboxEndpoint({ runtimeDir, record: endpoint });
+    await writeInboxEndpoint({ runtimeDir, record: endpoint, platform, listPipes });
   } catch {
     return closed(clientVersion, "handshake_failed");
   }
   return handshake(endpoint, now);
 }
 
-async function verifiedEndpoint(binding, runtimeDir) {
-  const endpoint = await readInboxEndpoint({ runtimeDir, endpointId: binding?.opaqueEndpointRef });
+async function verifiedEndpoint(binding, runtimeDir, system) {
+  const endpoint = await readInboxEndpoint({ runtimeDir, endpointId: binding?.opaqueEndpointRef,
+    platform: system.platform });
   if (endpoint === null) return null;
   const refused = await verifyInbox({ configDir: endpoint.configDir, clientPid: endpoint.clientPid,
-    sessionId: endpoint.sessionId, socketPath: endpoint.socketPath });
+    sessionId: endpoint.sessionId, socketPath: endpoint.socketPath, ...system });
   return refused === null ? endpoint : null;
 }
 
 // The router calls this when a lease ran out, so a session that sits idle
 // between turns stays reachable. The id never changes on a refresh.
-export async function refreshNativeSession({ binding, runtimeDir, now = Date.now } = {}) {
-  const endpoint = await verifiedEndpoint(binding, runtimeDir);
+export async function refreshNativeSession({ binding, runtimeDir, now = Date.now,
+  platform = process.platform, listPipes = listPipesOfMachine } = {}) {
+  const endpoint = await verifiedEndpoint(binding, runtimeDir, { platform, listPipes });
   return endpoint === null ? closed(binding?.clientVersion, "handshake_failed") : handshake(endpoint, now);
 }
 
-export const retireNativeSession = ({ binding, runtimeDir }) =>
-  removeInboxEndpoint({ runtimeDir, endpointId: binding?.opaqueEndpointRef });
+export const retireNativeSession = ({ binding, runtimeDir, platform = process.platform }) =>
+  removeInboxEndpoint({ runtimeDir, endpointId: binding?.opaqueEndpointRef, platform });
 
 /**
  * Sender side: re-verify the receiver, then write one wake line. The socket
@@ -204,20 +210,25 @@ export const retireNativeSession = ({ binding, runtimeDir }) =>
  * receiver's own hook.
  */
 export async function offerMessage({ binding, message, runtimeDir, timeoutMs = 2_000,
-  connect = net.createConnection } = {}) {
+  connect = net.createConnection, platform = process.platform, listPipes = listPipesOfMachine } = {}) {
   const rejected = safeErrorCode => ({ accepted: false, transport: TRANSPORT,
     clientVersion: binding?.clientVersion ?? null, safeErrorCode });
   if (typeof message?.messageId !== "string" || !MESSAGE_ID.test(message.messageId)) {
     return rejected("transport_rejected");
   }
-  const endpoint = await verifiedEndpoint(binding, runtimeDir);
+  const endpoint = await verifiedEndpoint(binding, runtimeDir, { platform, listPipes });
   if (endpoint === null) return rejected("recipient_unavailable");
+  // Read per offer and kept nowhere: the key of the process the record names now.
+  const peerToken = isWindowsPlatform(platform) ? await readPeerKey({ configDir: endpoint.configDir,
+    record: await readSessionRecord({ configDir: endpoint.configDir, clientPid: endpoint.clientPid, platform }) })
+    : null;
+  if (isWindowsPlatform(platform) && peerToken === null) return rejected("recipient_unavailable");
   // The receiver's own crossSessionInbound refuses unattested wakes; one would
   // be dropped, so none is sent and the message waits for its next turn.
   if (endpoint.reception === "refused") return rejected("delivery_disabled");
   const accepted = { accepted: true, transport: TRANSPORT, clientVersion: endpoint.clientVersion,
     ...(endpoint.reception === "held" ? { pendingApproval: true } : {}) };
-  const wake = { runtimeDir, endpointId: endpoint.endpointId, messageId: message.messageId };
+  const wake = { runtimeDir, endpointId: endpoint.endpointId, messageId: message.messageId, platform };
   // Claude Code delivers a repeated msg_id again, so the dedupe is ours.
   let first;
   try {
@@ -226,7 +237,8 @@ export async function offerMessage({ binding, message, runtimeDir, timeoutMs = 2
     return rejected("transport_error");
   }
   if (!first) return accepted;
-  const frame = `${JSON.stringify({ type: "user",
+  const auth = peerToken === null ? "" : `${JSON.stringify({ type: "auth", token: peerToken })}\n`;
+  const frame = `${auth}${JSON.stringify({ type: "user",
     message: { role: "user", content: wakeText(message.messageId) },
     msg_id: `acc-wake-${message.messageId}` })}\n`;
   const result = await new Promise(resolve => {
