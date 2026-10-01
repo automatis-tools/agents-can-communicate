@@ -40,12 +40,17 @@ async function machine(t) {
       nativeDelivery: { ...claudeCodeAdapter.nativeDelivery,
         ...(policySource ? { policySource } : {}) },
       ...(bindNativeSession ? { bindNativeSession } : {}) };
+    // The tests write through the service a hook returns after running
+    // `acc doctor` several times, and that service's store keeps the hook's
+    // deadline: with the five-second default, a loaded machine spent it on the
+    // doctor runs and the next write refused with "transaction deadline expired".
+    // The budget outlives the test; the hook's own work is the same.
     const result = await runHook({ adapterId: adapter.id, adapters: { [adapter.id]: adapter },
       payload: { hook_event_name: kind, session_id: name, cwd: project,
         prompt: "secret-prompt-must-not-be-recorded" }, dataHome, env,
       readProcessTable: async () => pid
         ? new Map([[process.pid, { ppid: 1, comm: "claude" }]]) : new Map(),
-      probeClientVersion: async () => "2.1.282", platform: "darwin-arm64" });
+      probeClientVersion: async () => "2.1.282", platform: "darwin-arm64", budgetMs: 60_000 });
     assert.equal(result.failed, undefined, result.reason);
     assert.equal(result.timedOut, undefined);
     return result;
