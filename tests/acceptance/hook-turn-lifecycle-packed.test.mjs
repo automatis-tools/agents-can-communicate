@@ -119,15 +119,18 @@ test("missing owners recover while stale generations and heartbeats cannot alloc
     let probes = 0;
     const result = await f.invoke(state === "heartbeat" ? "heartbeat" : "beforeTurn", state,
       { probeClientVersion: async () => { probes += 1; return "1.0.0"; } });
+    const diagnostic = JSON.stringify({ state, timedOut: result.timedOut === true,
+      failed: result.failed === true, reason: result.reason,
+      stdout: result.stdout, stderr: result.stderr });
     assert.equal(result.exitCode, 0);
     if (state === "missing") {
       const fresh = await f.packed.findBinding(state);
-      assert.equal(result.failed, undefined, result.reason);
+      assert.equal(result.failed, undefined, diagnostic);
       assert.equal(probes, 1);
       assert.notEqual(fresh.accSessionId, "session_not_created");
       assert.notEqual(fresh.generation, "generation_stale");
-      assert.ok(result.stdout.includes(fresh.accSessionId));
-      assert.ok(result.stdout.includes(fresh.generation));
+      assert.ok(result.stdout.includes(fresh.accSessionId), diagnostic);
+      assert.ok(result.stdout.includes(fresh.generation), diagnostic);
       assert.equal(result.stdout.includes("generation_stale"), false);
       await f.packed.acc(["heartbeat", "--session", fresh.accSessionId,
         "--generation", fresh.generation]);
