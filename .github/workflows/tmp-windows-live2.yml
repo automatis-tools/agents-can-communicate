@@ -1,13 +1,28 @@
 name: tmp windows live 2
 
-# Measurement only, on a throwaway branch: the whole suite as CI runs it on
-# Windows, three times at once on three runners, to catch a hook that runs past
-# its budget and see what it - and the machine - was doing at that moment.
+# Measurement only, on a throwaway branch: the flushes of each session start on
+# Windows, and the whole suite as CI runs it, three times at once on three
+# runners, to catch a hook that runs past its budget and see what it - and the
+# machine - was doing at that moment.
 on:
   push:
     branches: ['measure/windows-live2']
 
 jobs:
+  session-start-trace:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24'
+      - run: npm ci
+      - name: each flush of a session start, alone
+        run: |
+          node scripts/tmp_session_start_trace.mjs 5
+          node scripts/tmp_trace_summary.mjs fsync-trace.log
+
   suite-tail:
     runs-on: windows-latest
     timeout-minutes: 60
