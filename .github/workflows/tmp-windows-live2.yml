@@ -41,5 +41,8 @@ jobs:
             $escapes += $found.Count
             foreach ($sample in $found) { "round ${round}: $sample" }
             Select-String -Path churn.out -Pattern '^ℹ (pass|fail) ' | ForEach-Object { "round ${round}: $($_.Line)" }
+            $lines = Get-Content churn.out
+            $at = [array]::IndexOf($lines, ($lines | Where-Object { $_ -match '^✖ failing tests' } | Select-Object -First 1))
+            if ($at -ge 0) { $lines[$at..([math]::Min($at + 40, $lines.Count - 1))] | ForEach-Object { "round ${round} | $_" } }
           }
           "code ${{ matrix.code }}: $escapes failed reads called an escape in 120 runs of the file"
