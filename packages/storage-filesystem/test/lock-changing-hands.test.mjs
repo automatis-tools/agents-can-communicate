@@ -283,15 +283,19 @@ test("an ancestor swapped for a symlink cannot serve another directory in the st
     // `admitted` counts a walk that fits between two flips. A fixed 2 ms quiet
     // window was shorter than one three-level walk on a loaded runner, so no
     // walk was ever admitted and the proof of exercise failed with nothing
-    // wrong. The window is several walks as measured here.
+    // wrong. The window is several walks as measured here, and doubles after a
+    // window no walk fitted in: the load can rise after it was measured - four
+    // copies of this file at once on windows-latest left 2 ms admitting none.
     const started = performance.now();
     for (let i = 0; i < 20; i += 1) await assertManagedDirectory(root, leaf);
-    const quietMs = Math.max(2, Math.ceil(((performance.now() - started) / 20) * 4));
+    let quietMs = Math.max(2, Math.ceil(((performance.now() - started) / 20) * 4));
 
+    const counts = { admitted: 0, redirected: 0, absent: 0, escaped: 0, notReal: 0, other: 0 };
     let flips = 0;
     let churning = true;
     const churn = (async () => {
       while (churning) {
+        const seen = counts.admitted;
         try {
           await rename(asked, parked);
           await symlink(decoy, asked);
@@ -301,10 +305,10 @@ test("an ancestor swapped for a symlink cannot serve another directory in the st
           await rename(parked, asked);
           await new Promise(resolve => { setTimeout(resolve, quietMs); });
         } catch { /* losing the race against ourselves is expected */ }
+        if (counts.admitted === seen) quietMs = Math.min(quietMs * 2, 250);
       }
     })();
 
-    const counts = { admitted: 0, redirected: 0, absent: 0, escaped: 0, notReal: 0, other: 0 };
     const deadline = Date.now() + 2_500;
     const reader = async () => {
       while (Date.now() < deadline) {
