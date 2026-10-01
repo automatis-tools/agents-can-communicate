@@ -18,6 +18,8 @@ Work in progress for #234. The design is in
   `C:\$Extend\$Deleted\` (all measured on Windows, where Linux says `ENOENT`), the name is
   resolved again; it is gone only if no directory is left there. An open on Windows takes the
   file its name names after the open, so a record renamed over in between is read, not refused.
+  A read refused with `EPERM` on a name absent just before and just after it reads as absent:
+  eight writers electing one failed on it in 1 run of 60 on windows-latest.
   A reclaim of a dead writer's lock ends at the writer's deadline, and a published record's
   flush no longer reports a failure after the record became visible. A transaction journal names its files with forward slashes on
   every platform.

@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { constants } from "node:fs";
 import { mkdir, mkdtemp, open, readFile, realpath, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -226,6 +227,17 @@ test("windows: a name that became a link after the open is refused", async () =>
 test("windows: a refused create keeps its EPERM", async () => {
   const lstat = async () => { throw Object.assign(new Error("ENOENT"), { code: "ENOENT" }); };
   const open = async () => { throw Object.assign(new Error("EPERM"), { code: "EPERM" }); };
-  await assert.rejects(openNoFollow("new.json", 0, { platform: "win32", lstat, open }),
-    { code: "EPERM" });
+  await assert.rejects(openNoFollow("new.json", constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL,
+    { platform: "win32", lstat, open }), { code: "EPERM" });
+});
+
+// Measured on windows-latest, eight writers electing one: a waiting writer's
+// read of owner.json found no name, was refused with EPERM while the lock
+// changed hands, and found no name again. A read of a name absent on both
+// sides is a read of an absent file, as Linux reports it; the writer looks again.
+test("windows: a read refused between two absent observations reads as absent", async () => {
+  const lstat = async () => { throw Object.assign(new Error("ENOENT"), { code: "ENOENT" }); };
+  const open = async () => { throw Object.assign(new Error("EPERM"), { code: "EPERM" }); };
+  await assert.rejects(openNoFollow("owner.json", constants.O_RDONLY, { platform: "win32", lstat, open }),
+    error => error.code === "ENOENT" && error.cause?.code === "EPERM");
 });

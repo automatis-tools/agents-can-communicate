@@ -108,11 +108,14 @@ export async function openNoFollow(file, flags, { mode, platform = process.platf
     // with EBUSY until it lets go.
     const handle = await retrying(() => open(file, flags, mode), error => error.code === "EBUSY",
       { deadlineAt, sleep }).catch(async error => {
-      // A name another process is deleting refuses the open with EPERM and is
-      // gone right after (measured on windows-latest): that is ENOENT, as Linux
-      // says it. A name that is still there, or a create that was refused,
-      // keeps its EPERM.
-      if (error.code !== "EPERM" || before === null || !await gone(file, lstat)) throw error;
+      // A name another process is deleting, or a lock changing hands around
+      // it, refuses the open with EPERM, and the name is gone right after
+      // (measured on windows-latest, for a name present before the open and
+      // for one absent before it): that is ENOENT, as Linux says it. A name
+      // that is still there keeps its EPERM, and so does a create on a name
+      // that was free, which is a refused create.
+      const refusedCreate = before === null && (flags & constants.O_CREAT) !== 0;
+      if (error.code !== "EPERM" || refusedCreate || !await gone(file, lstat)) throw error;
       throw Object.assign(new Error(`ENOENT: no such file or directory, open '${file}'`,
         { cause: error }), { code: "ENOENT", syscall: "open", path: file });
     });

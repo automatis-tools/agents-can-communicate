@@ -111,8 +111,9 @@ runtime, because launcher modules may import only their siblings.
   holding no records. An open on Windows checks the name again after it: no link, and the same
   file the handle holds. A record renamed over in between is then the one the name names, as a
   POSIX `O_NOFOLLOW` open takes it; a name that keeps changing is opened afresh a few times.
-  Opening a file in a directory being removed fails `EPERM`, and reads as absent once the name
-  is gone, never for a create.
+  Opening a file in a directory being removed, or while a lock changes hands around its name,
+  fails `EPERM`. A read takes that as absent once the name is gone, whether the name was there
+  before the open or not (both measured); a create on a name that was free keeps its `EPERM`.
 - **Creating a file exclusively.** `open(…, "wx")` follows a dangling symlink on Windows and
   creates its target. ACC creates such files only under random names inside its own private
   directories, where planting a link already requires the user's own access, so the rule holds.
