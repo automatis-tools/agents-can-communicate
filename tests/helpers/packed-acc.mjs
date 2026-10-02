@@ -9,7 +9,7 @@ import { promisify } from "node:util";
 
 import { cleanupStack, removeFixture } from "./fixture-cleanup.mjs";
 import { fixtureOwnerEnv } from "./fixture-owner.mjs";
-import { runNpm } from "./npm-run.mjs";
+import { preparePackedConsumer } from "./packed-template.mjs";
 
 const run = promisify(execFile);
 const repo = path.resolve(import.meta.dirname, "..", "..");
@@ -80,7 +80,7 @@ async function findBinding(dataHome, harnessSessionId) {
   return null;
 }
 
-export async function createPackedAcc(t) {
+export async function createPackedAcc(t, options = {}) {
   const root = await realpath(await mkdtemp(path.join(tmpdir(), "acc-v02-packed-")));
   // A test stops what it started in this fixture through `defer`, and those
   // run before the directory is removed; see fixture-cleanup.mjs.
@@ -95,12 +95,7 @@ export async function createPackedAcc(t) {
   for (const directory of [pack, consumer, project, dataHome, clientHome, clientBin]) {
     await mkdir(directory, { recursive: true });
   }
-  await writeFile(path.join(consumer, "package.json"),
-    '{"name":"packed-v02-consumer","version":"1.0.0","private":true}\n');
-  const { stdout } = await runNpm(["pack", "--pack-destination", pack],
-    { cwd: repo, env: { ...process.env } });
-  const tarball = path.join(pack, stdout.trim().split("\n").at(-1));
-  await runNpm(["install", "--offline", "--silent", tarball], { cwd: consumer });
+  const tarball = await preparePackedConsumer(root, options);
 
   const installed = path.join(consumer, "node_modules", "agents-can-communicate");
   const accBin = path.join(installed, "bin", "acc.mjs");
