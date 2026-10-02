@@ -3,9 +3,8 @@ import path from "node:path";
 import { AccError, EXIT, assertPortableId } from "@agents-can-communicate/protocol";
 
 import { activateJournal, idleJournal, readActiveJournal } from "./active-journal.mjs";
-import { encode, publishAtomic, readJsonIfPresent, retainFile }
+import { encode, nameCommittedLater, publishAtomic, readJsonIfPresent, retainFile }
   from "./atomic-json.mjs";
-import { isWindows } from "./portable-fs.mjs";
 
 export const JOURNAL_VERSION = 2;
 
@@ -23,7 +22,7 @@ export const JOURNAL_VERSION = 2;
 // rolling it forward again changes nothing. A flush took 15 ms at the median and
 // up to 5.8 s on windows-latest beside the suite (2026-10-01).
 const ENTRY = "bytes";
-const linked = platform => (isWindows(platform) ? "bytes" : "full");
+const linked = nameCommittedLater;
 
 // A journal entry is prepared only after the transaction callback has
 // succeeded and every byte is known. The subsequent synced active-log record

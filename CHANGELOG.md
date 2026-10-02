@@ -108,7 +108,8 @@ Work in progress for #234. The design is in
       leave with their entries. The entry's name is made durable by the pointer that opens
       it. On Windows, where flushing a file commits NTFS's metadata journal up to that point,
       a transaction flushes only the bytes it publishes; its renames are committed by the
-      flushes after them.
+      flushes after them. A new store's identity, its journal's first pointer and the room a
+      native session chose leave their names to the next flush there in the same way.
   - One record replaced with no event, such as a session's heartbeat on every turn, is published
     by an atomic rename without the journal, while no other transaction is open. The journal
     cost five atomic writes for it.

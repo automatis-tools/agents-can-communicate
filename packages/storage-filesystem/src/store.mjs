@@ -106,7 +106,7 @@ async function nextSequence(paths, root) {
 }
 
 export async function openFilesystemStore({ root, clock, ids, workspaceId, failAt,
-  deadlineAt: storeDeadline }) {
+  deadlineAt: storeDeadline, platform = process.platform }) {
   assertPublicationDeadline(storeDeadline);
   const paths = storePaths(root);
   // The caller owns the root path, so its ancestors are created here. Inside the
@@ -115,9 +115,9 @@ export async function openFilesystemStore({ root, clock, ids, workspaceId, failA
   await mkdir(root, { recursive: true });
   // Identity is settled before any read or write. Adopting a directory that
   // already belongs to another workspace is the failure this fails closed on.
-  await requireStoreIdentity(paths, { workspaceId, clock });
+  await requireStoreIdentity(paths, { workspaceId, clock, platform });
   for (const name of DIRECTORIES) await ensureManagedDirectory(root, paths[name]);
-  const publishOptions = { root, tmpDir: paths.tmp, clock, failAt };
+  const publishOptions = { root, tmpDir: paths.tmp, clock, failAt, platform };
   await initialiseActiveJournal(paths, publishOptions);
 
   // Any journal left behind by a crashed writer is completed before the store

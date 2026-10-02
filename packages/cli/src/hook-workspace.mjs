@@ -12,7 +12,7 @@ import { runtimePaths } from "./runtime-paths.mjs";
 // this survives client exit: resuming the same native conversation keeps its
 // room. Adapter + native id distinguish independent conversations.
 export async function resolveHookWorkspace({ adapterId, event, room, cwd, dataHome, env = {},
-  gitProbe, clock, deadlineAt }) {
+  gitProbe, clock, deadlineAt, platform = process.platform }) {
   const identityKey = (adapter, native) => createHash("sha256")
     .update(JSON.stringify([adapter, native])).digest("hex");
   if (room !== undefined && !/^[a-f0-9]{64}$/.test(room)) {
@@ -103,13 +103,16 @@ export async function resolveHookWorkspace({ adapterId, event, room, cwd, dataHo
       const raced = await read();
       if (raced !== null) return discover(raced);
       deadline();
+      // On Windows the session this hook opens next flushes, and that commits
+      // this name with NTFS's journal; a crash before it leaves the room to be
+      // chosen again by the session's next hook.
       await writeManagedJson(file, { schemaVersion: 1, adapterId,
         nativeSessionId: event.sessionId, cwd: context.workspaceCwd,
         workspaceId: context.descriptor.id, source: context.descriptor.source,
         ...(context.descriptor.source === "git" ? { git: {
           commonDir: await realpath(context.descriptor.git.commonDir),
           worktreeRoot: await realpath(context.descriptor.git.worktreeRoot),
-        } } : {}) });
+        } } : {}) }, { flushName: platform !== "win32" });
       return { ...context, workspaceRef: `acc://${key}` };
     });
 }
