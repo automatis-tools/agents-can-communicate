@@ -12,7 +12,12 @@ import { createPackedAcc } from "../helpers/packed-acc.mjs";
 // still run. Resuming after the timeout exposes background side effects.
 test("installed hooks bound the whole invocation and cancel undecided writes", async t => {
   const packed = await createPackedAcc(t);
-  let active;
+  let active, controlledBudget;
+  globalThis.accDeadlineTimer = (callback, milliseconds) => {
+    if (controlledBudget === undefined) return setTimeout(callback, milliseconds);
+    assert.equal(controlledBudget.callback, undefined, "one hook budget timer");
+    controlledBudget.callback = callback;
+  };
   globalThis.accDeadlineCheckpoint = async point => {
     const checkpoint = active;
     if (point !== checkpoint?.point) return;
@@ -31,6 +36,11 @@ test("installed hooks bound the whole invocation and cancel undecided writes", a
     ] : [];
     if (seams.length === 0) return result;
     let source = Buffer.from(result.source).toString();
+    if (url.endsWith("/hook-runner/src/runner.mjs")) {
+      const timer = "timer = setTimeout(() => resolve({ ...fallback, timedOut: true }),";
+      assert.equal(source.split(timer).length, 2, "one installed hook budget timer");
+      source = source.replace(timer, timer.replace("setTimeout", "globalThis.accDeadlineTimer"));
+    }
     for (const [needle, point] of seams) {
       assert.equal(source.split(needle).length, 2, `one installed ${point} boundary`);
       const checkpoint = `await globalThis.accDeadlineCheckpoint(${JSON.stringify(point)});`;
@@ -39,7 +49,11 @@ test("installed hooks bound the whole invocation and cancel undecided writes", a
     }
     return { ...result, source };
   } });
-  t.after(() => { instrumentation.deregister(); delete globalThis.accDeadlineCheckpoint; });
+  t.after(() => {
+    instrumentation.deregister();
+    delete globalThis.accDeadlineCheckpoint;
+    delete globalThis.accDeadlineTimer;
+  });
   const load = (name, file = "index.mjs") => import(pathToFileURL(path.join(packed.installed,
     "node_modules", "@agents-can-communicate", name, "src", file)).href);
   const { runHook } = await load("hook-runner", "runner.mjs");
@@ -62,7 +76,8 @@ test("installed hooks bound the whole invocation and cancel undecided writes", a
     let reached, release;
     const entered = new Promise(resolve => { reached = resolve; });
     const paused = new Promise(resolve => { release = resolve; });
-    const checkpoint = { point, reached, paused,
+    const checkpoint = { point, paused,
+      reached() { checkpoint.didEnter = true; reached(); },
       release() {
         if (active === checkpoint) active = null;
         release();
@@ -71,6 +86,7 @@ test("installed hooks bound the whole invocation and cancel undecided writes", a
         const outcome = await Promise.race([
           entered.then(() => ({ entered: true })),
           running.then(result => ({ result })),
+          delay(5000, { result: { reason: "checkpoint setup exceeded 5 s" } }, { ref: false }),
         ]);
         const diagnostic = JSON.stringify(outcome.result,
           ["timedOut", "failed", "reason", "phase", "stdout", "stderr", "exitCode", "decision", "deadlineAt"]);
@@ -82,14 +98,39 @@ test("installed hooks bound the whole invocation and cancel undecided writes", a
     child.after(() => checkpoint.release());
     return checkpoint;
   };
+  // These cases test writes resumed after expiry, so first reach the real
+  // storage boundary without spending their budget on machine-dependent I/O.
+  // The whole-invocation cases below retain real time and the same 1 s budget.
+  const controlExpiry = (child, checkpoint, id) => {
+    // Only the hook's budget timer is controlled. Mutex retry timers stay real
+    // so draining the released continuation cannot wait for a mocked sleep.
+    child.mock.timers.enable({ apis: ["Date"], now: Date.now() });
+    controlledBudget = {};
+    const reset = () => { controlledBudget = undefined; child.mock.timers.reset(); };
+    child.after(async () => {
+      checkpoint.release();
+      try { if (checkpoint.didEnter) await drain(id); }
+      finally { reset(); }
+    });
+    return {
+      expire() {
+        assert.equal(typeof controlledBudget.callback, "function", "hook scheduled its budget");
+        child.mock.timers.tick(1000);
+        controlledBudget.callback();
+      },
+      reset,
+    };
+  };
 
   await t.test("a delayed version probe cannot create an owner after returning timeout", async t => {
     const id = "late-probe";
     const checkpoint = hold("probe", t);
+    const budget = controlExpiry(t, checkpoint, id);
     const running = invoke(id, { probeClientVersion: async () => {
       await globalThis.accDeadlineCheckpoint("probe"); return null;
     } });
     await checkpoint.wait(running);
+    budget.expire();
     const result = await running;
     const before = (await packed.acc(["status"])).participants;
     checkpoint.release();
@@ -129,8 +170,10 @@ test("installed hooks bound the whole invocation and cancel undecided writes", a
   await t.test("a binding prepared before timeout cannot publish afterward", async t => {
     const id = "late-binding";
     const checkpoint = hold("binding", t);
+    const budget = controlExpiry(t, checkpoint, id);
     const running = invoke(id);
     await checkpoint.wait(running);
+    budget.expire();
     const result = await running;
     const before = (await packed.acc(["status"])).participants;
     checkpoint.release();
@@ -139,6 +182,7 @@ test("installed hooks bound the whole invocation and cancel undecided writes", a
     assert.equal(await packed.findBinding(id), null);
     assert.deepEqual((await packed.acc(["status"])).participants, before);
     // This unblocked recovery is a positive control, not another forced expiry.
+    budget.reset();
     const retry = await invoke(id, { budgetMs: 5_000 });
     assert.notEqual(retry.timedOut, true, "recovery exhausted its normal hook budget");
     assert.equal(retry.failed, undefined, retry.reason);
@@ -148,10 +192,12 @@ test("installed hooks bound the whole invocation and cancel undecided writes", a
   await t.test("expiry after pre-binding cannot create its session and retry uses a fresh pair", async t => {
     const id = "late-core-open";
     const checkpoint = hold("core-open", t);
+    const budget = controlExpiry(t, checkpoint, id);
     const running = invoke(id);
     await checkpoint.wait(running);
     const pending = await packed.findBinding(id);
     assert.ok(pending?.generation);
+    budget.expire();
     const result = await running;
     const before = (await packed.acc(["status"])).participants;
     checkpoint.release();
@@ -159,6 +205,7 @@ test("installed hooks bound the whole invocation and cancel undecided writes", a
     assert.equal(result.timedOut, true);
     assert.deepEqual((await packed.acc(["status"])).participants, before);
     assert.deepEqual(await packed.findBinding(id), pending);
+    budget.reset();
     const retry = await invoke(id, { budgetMs: 5_000 });
     assert.notEqual(retry.timedOut, true, "recovery exhausted its normal hook budget");
     assert.equal(retry.failed, undefined, retry.reason);
