@@ -55,16 +55,22 @@ test("a completed journal entry leaves with its completion marker", async t => {
   assert.equal(result.reclaimed, 2);
 });
 
-test("an entry with no completion marker stays", async t => {
+test("an entry the pointer does not name leaves, with or without a marker", async t => {
   const { root, paths } = await fixture(t);
-  await writeFile(path.join(paths.journal, "transaction_open.json"), "{}\n");
+  await writeFile(path.join(paths.journal, "transaction_done.json"), "{}\n");
+  await completed(paths, "transaction_older");
+  await writeFile(path.join(paths.retained, "journal", "transaction_gone.json"), "{}\n");
 
   const result = await reclaimRetired(paths, { root });
 
-  // No marker means the transaction was never retired, and recovery may still
-  // have to roll it forward.
-  assert.equal(result.reclaimed, 0);
-  assert.deepEqual(await journalEntries(paths), ["transaction_open.json"]);
+  // The reclaimer runs under the writer lock, so no transaction is between
+  // preparing its entry and opening it: an entry the pointer does not name is
+  // finished, or was never decided, and recovery reads only the one it names.
+  // A completion marker is what an older ACC wrote; it leaves as well.
+  assert.equal(result.remaining, false);
+  assert.deepEqual(await journalEntries(paths), []);
+  assert.deepEqual(await completionMarkers(paths), []);
+  assert.equal(result.reclaimed, 4);
 });
 
 test("the active journal entry stays even when a marker says it completed", async t => {
@@ -75,9 +81,9 @@ test("the active journal entry stays even when a marker says it completed", asyn
 
   const result = await reclaimRetired(paths, { root });
 
-  // `retireJournalEntry` writes the marker before it idles the pointer, so a
-  // crash between the two leaves exactly this state. Moving the entry would
-  // make readOpenJournals throw on a store that is merely mid-retirement.
+  // An older ACC wrote the marker before it idled the pointer, so a crash
+  // between the two leaves exactly this state. Moving the entry would make
+  // readOpenJournals throw on a store that is merely mid-retirement.
   assert.equal(result.reclaimed, 0);
   assert.deepEqual(await journalEntries(paths), ["transaction_live.json"]);
 });

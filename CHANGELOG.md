@@ -103,6 +103,12 @@ Work in progress for #234. The design is in
       flush. The copy is never read, and a lost marker costs one more sweep.
     - An ephemeral record flushes its bytes and leaves its new name to the next flush. A crash
       can bring it back as its previous version, which the session's next hook recovers.
+    - A journalled transaction writes no completion marker: every journal entry the pointer
+      does not name open is finished, and the reclaimer retires it. An older ACC's markers
+      leave with their entries. The entry's name is made durable by the pointer that opens
+      it. On Windows, where flushing a file commits NTFS's metadata journal up to that point,
+      a transaction flushes only the bytes it publishes; its renames are committed by the
+      flushes after them.
   - One record replaced with no event, such as a session's heartbeat on every turn, is published
     by an atomic rename without the journal, while no other transaction is open. The journal
     cost five atomic writes for it.
