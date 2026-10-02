@@ -5,7 +5,7 @@ import path from "node:path";
 import { AccError, EXIT } from "@agents-can-communicate/protocol";
 
 import { assertPublicationDeadline } from "./deadline.mjs";
-import { renameReplacing, syncEntry } from "./portable-fs.mjs";
+import { isWindows, renameReplacing, syncEntry } from "./portable-fs.mjs";
 import { assertManagedDirectory, ensureManagedDirectory } from "./safe-directory.mjs";
 import { readRegularNoFollow } from "./safe-file.mjs";
 
@@ -34,6 +34,18 @@ function retainedStage(destination, root, stageDir) {
 }
 
 const DURABILITY = new Set(["full", "bytes", "none"]);
+
+/**
+ * The durability of a publication that another flush follows.
+ *
+ * On Windows flushing a file commits NTFS's metadata journal up to that file's
+ * last change, and that journal is one sequence: the next flush commits this
+ * rename too, so only the bytes are flushed here. A crash before that flush
+ * leaves the previous version, or nothing, and nothing written after it can be
+ * durable without it (docs/design/2026-09-30-native-windows-support.md, "What
+ * is flushed"). POSIX syncs the name's own directory.
+ */
+export const nameCommittedLater = platform => (isWindows(platform) ? "bytes" : "full");
 
 async function replaceHandleBytes(handle, bytes) {
   await handle.truncate(0);

@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
 
-import { flushesDuring } from "./flush-recorder.mjs";
+import { flushesDuring } from "../../../tests/helpers/flush-recorder.mjs";
 
 const { storePaths } = await import("../src/index.mjs");
 const { withWriterMutex } = await import("../src/writer-mutex.mjs");

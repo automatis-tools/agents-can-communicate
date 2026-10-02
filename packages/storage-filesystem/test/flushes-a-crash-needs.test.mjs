@@ -6,7 +6,7 @@ import test from "node:test";
 
 import { createId, SCHEMA_VERSION } from "@agents-can-communicate/protocol";
 
-import { flushesDuring } from "./flush-recorder.mjs";
+import { flushesDuring } from "../../../tests/helpers/flush-recorder.mjs";
 
 const { publishAtomic } = await import("../src/atomic-json.mjs");
 const { openFilesystemStore, storePaths } = await import("../src/store.mjs");
@@ -107,3 +107,25 @@ test("a journalled transaction flushes the bytes it publishes, and names only wh
     assert.deepEqual(await readdir(path.join(paths.retained, "journal")).catch(() => []), [],
       "a completion marker was written");
   });
+
+// A new store's identity and the journal's first pointer. On Windows their
+// names are committed by the flush after them, which the first record of any
+// write makes: a crash before it leaves a store with neither, which the next
+// open creates again. Both forms are named outright, so every host checks
+// both; POSIX keeps each name's own directory sync.
+for (const [platform, flushes] of [["win32", 1], ["linux", 2]]) {
+  test(`${platform}: a store's identity and first journal pointer flush ${flushes === 1 ? "only their bytes" : "bytes and name"}`,
+    async t => {
+      const { requireStoreIdentity } = await import("../src/identity.mjs");
+      const { initialiseActiveJournal } = await import("../src/active-journal.mjs");
+      const root = await scratch(t);
+      const paths = storePaths(root);
+      for (const name of ["journal", "tmp"]) await mkdir(paths[name], { recursive: true });
+      const identity = await flushesDuring(() => requireStoreIdentity(paths,
+        { workspaceId: WORKSPACE, clock: { now: () => new Date().toISOString() }, platform }));
+      const pointer = await flushesDuring(() => initialiseActiveJournal(paths,
+        { root, tmpDir: paths.tmp, platform }));
+      assert.equal(identity.length, flushes, `identity flushed ${JSON.stringify(identity)}`);
+      assert.equal(pointer.length, flushes, `pointer flushed ${JSON.stringify(pointer)}`);
+    });
+}

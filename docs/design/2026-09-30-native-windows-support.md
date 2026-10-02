@@ -104,6 +104,10 @@ runtime, because launcher modules may import only their siblings.
   the writer lock, as every transaction does, so every entry the pointer does not name open is
   finished or was never decided. Generations are random identifiers, so a replay cannot tell an
   older record from a newer one; POSIX therefore keeps the idle pointer's own sync.
+- **A first start.** The same rule applies on Windows wherever another flush follows in the same
+  hook: a new store's identity and its journal's first pointer, and the room a native session
+  chose. Each flushes its bytes, and the next flush commits its name. A crash before that leaves
+  a directory the next open initialises, or a room the session's next hook chooses again.
 - **Replacing a file.** `rename` over an existing file retries `EPERM`, `EACCES` and `EBUSY` with a
   short backoff until the caller's deadline. The cause is measured: any open handle on the target
   refuses the rename, whether it belongs to an ACC reader, an antivirus scan or an indexer. A read
