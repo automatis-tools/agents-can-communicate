@@ -1,57 +1,61 @@
 name: tmp windows live 2
 
-# Measurement only, on a throwaway branch: beside the whole suite, how long a
-# 4 KB record takes to reach the disk on C: (where the suite's temporary files
-# are) and on D: (the workspace), written plain, flushed, and written through -
-# on two runners at once.
+# Measurement only, on a throwaway branch: the whole suite with its temporary
+# files on D: (the runner's local disk) instead of C: (its remote system disk),
+# three runners at once, every hook timed and a canary flushing beside it.
 on:
   push:
     branches: ['measure/windows-live2']
 
 jobs:
-  flush-variants:
+  suite-on-d:
     runs-on: windows-latest
     timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix:
-        run: [1, 2]
+        run: [1, 2, 3]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: '24'
       - run: npm ci
-      - name: the disks
+      - name: 'temporary files on D:'
+        shell: pwsh
+        run: |
+          $dir = Join-Path $env:RUNNER_TEMP 'tmp'
+          New-Item -ItemType Directory -Force $dir | Out-Null
+          "TEMP=$dir" >> $env:GITHUB_ENV
+          "TMP=$dir" >> $env:GITHUB_ENV
+      - name: the whole suite, with a canary beside it
         continue-on-error: true
         shell: pwsh
         run: |
-          Get-PhysicalDisk | Select-Object DeviceId,FriendlyName,MediaType,BusType,Size | Format-Table
-          Get-Volume | Where-Object DriveLetter | Select-Object DriveLetter,FileSystem,Size,SizeRemaining | Format-Table
-          "tmpdir: $([System.IO.Path]::GetTempPath())  RUNNER_TEMP: $env:RUNNER_TEMP"
-      - name: the whole suite, with the variants beside it
-        continue-on-error: true
-        shell: pwsh
-        run: |
-          $probe = Start-Process -PassThru -NoNewWindow node -ArgumentList 'scripts/tmp_flush_variants.mjs',"$PWD\variants.log",([System.IO.Path]::GetTempPath() + 'tmp-variants'),"$env:RUNNER_TEMP\tmp-variants"
+          node -p "'tmpdir: ' + require('os').tmpdir()"
+          $canary = Start-Process -PassThru -NoNewWindow node -ArgumentList 'scripts/tmp_canary.mjs',"$PWD\canary.log"
+          $env:NODE_OPTIONS = "--import=file:///$((Resolve-Path scripts/tmp_hookcost.mjs).Path -replace '\\','/')"
+          $env:TMP_HOOKCOST_LOG = "$PWD\hookcost.log"
           npm test 2>&1 | Tee-Object -FilePath suite.out | Select-String -Pattern "^ℹ |✖ "
-          New-Item -ItemType File "$PWD\variants.log.stop" | Out-Null
+          $env:NODE_OPTIONS = ''
+          New-Item -ItemType File "$PWD\canary.log.stop" | Out-Null
           Start-Sleep -Seconds 2
-          Stop-Process -Id $probe.Id -ErrorAction SilentlyContinue
+          Stop-Process -Id $canary.Id -ErrorAction SilentlyContinue
         env:
           ACC_TEST_TIMEOUT_MS: '300000'
           ACC_TEST_FORCE_EXIT: '1'
           GIT_DIR: ''
           GIT_WORK_TREE: ''
-      - name: each disk and way of writing
+      - name: slow hooks and the machine around them
         if: always()
-        run: node scripts/tmp_flush_variants_summary.mjs variants.log
+        run: node scripts/tmp_tail_summary.mjs hookcost.log canary.log 3000
       - name: the logs
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: variants-${{ matrix.run }}
+          name: on-d-${{ matrix.run }}
           path: |
-            variants.log
+            hookcost.log
+            canary.log
             suite.out
           if-no-files-found: ignore
