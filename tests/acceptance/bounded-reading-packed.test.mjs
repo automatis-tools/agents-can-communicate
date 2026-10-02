@@ -6,6 +6,8 @@ import { pathToFileURL } from "node:url";
 
 import { createPackedAcc } from "../helpers/packed-acc.mjs";
 import { connectMcp } from "../helpers/mcp-client.mjs";
+import { publishBacklogFixture } from "../helpers/backlog-fixture.mjs";
+import { createMemoryStore } from "../helpers/memory-store.mjs";
 
 async function fixture(t) {
   const packed = await createPackedAcc(t);
@@ -23,7 +25,8 @@ async function fixture(t) {
     workspaceRoots: descriptor.roots });
   const store = await openFilesystemStore({ root: paths.root, clock, ids,
     workspaceId: descriptor.id });
-  const service = createCoordinationService({ store, clock, ids });
+  const memory = createMemoryStore({ clock, ids, workspaceId: descriptor.id });
+  const service = createCoordinationService({ store: memory, clock, ids });
   const owner = session => ({ sessionId: session.sessionId, generation: session.generation });
   const open = participantId => service.openSession({ participantId, harness: "cli",
     heartbeatCadenceMs: 30_000, descriptor, workspaceId: descriptor.id });
@@ -37,6 +40,7 @@ async function fixture(t) {
       subject: `Earlier finding ${i}`, body: `HISTORICAL_BODY_${i}: ${"x".repeat(3_000)}` }));
   }
   for (const session of [sender, reader, mcp]) await service.closeSession(owner(session));
+  await publishBacklogFixture({ memory, store, workspaceId: descriptor.id });
   const current = await packed.acc(["attach", "--participant", "reader"]);
   const flags = ["--session", current.sessionId, "--generation", current.generation];
   const snapshot = async () => (await packed.acc(["sync", "--scope", "full"])).snapshot;
