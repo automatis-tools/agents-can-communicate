@@ -91,6 +91,19 @@ runtime, because launcher modules may import only their siblings.
   pass that is due. The retained copy of an accepted write is never flushed, because it is never
   read. The writer lock flushes nothing: it guards live processes, and an owner record a crash
   left unreadable is reclaimed once it is older than a minute, as a dead owner is.
+- **A journalled transaction.** Its entry flushes its bytes, and the pointer that opens it,
+  published beside it in `journal/`, makes the entry's name durable: POSIX syncs that directory,
+  and on Windows the pointer's flush commits NTFS's journal past the entry. That journal is one
+  sequence, so on Windows every flush also commits each rename logged before it: inside a
+  transaction each record's own flush commits the rename before it, and the pointer going idle
+  commits the last record's. There only bytes are flushed. A crash that loses the idle pointer's
+  rename leaves the transaction open; nothing written after it can be durable without that
+  rename, so rolling it forward again changes nothing. This extends the statement above about
+  NTFS from a file's own rename to the renames before it, and like it rests on documented NTFS
+  behaviour, not on a power cut in CI. No completion marker is written: the reclaimer runs under
+  the writer lock, as every transaction does, so every entry the pointer does not name open is
+  finished or was never decided. Generations are random identifiers, so a replay cannot tell an
+  older record from a newer one; POSIX therefore keeps the idle pointer's own sync.
 - **Replacing a file.** `rename` over an existing file retries `EPERM`, `EACCES` and `EBUSY` with a
   short backoff until the caller's deadline. The cause is measured: any open handle on the target
   refuses the rename, whether it belongs to an ACC reader, an antivirus scan or an indexer. A read

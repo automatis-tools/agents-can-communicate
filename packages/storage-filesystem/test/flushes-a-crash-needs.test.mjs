@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdir, mkdtemp, realpath, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, readdir, realpath, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -77,3 +77,33 @@ test("the sweep records its pass without a flush", async t => {
   // The marker lives in locks/ and is written through tmp/.
   assert.deepEqual(flushed.filter(file => inside(paths.locks, file) || inside(paths.tmp, file)), []);
 });
+
+// A journalled transaction: its entry, the pointer opening it, each record it
+// publishes and the pointer going idle. The entry's name is made durable by the
+// pointer's publication beside it in journal/: POSIX syncs that directory, and
+// on Windows a flush commits NTFS's metadata journal up to that file's last
+// change, every earlier rename included. On Windows each later flush likewise
+// commits the rename before it, so only bytes are flushed there; a crash that
+// loses the last rename leaves the transaction open, and rolling it forward
+// again changes nothing. No completion marker is written: the reclaimer, which
+// runs under the writer lock, retires every entry but the open one.
+test("a journalled transaction flushes the bytes it publishes, and names only where they need it",
+  async t => {
+    const root = await scratch(t);
+    const paths = storePaths(root);
+    const store = await openFilesystemStore({ root, workspaceId: WORKSPACE,
+      clock: { now: () => new Date().toISOString() }, ids: { next: kind => createId(kind) } });
+    const now = new Date().toISOString();
+    const flushed = await flushesDuring(() => store.transaction(tx => {
+      tx.put("workspace", WORKSPACE, { schemaVersion: SCHEMA_VERSION, workspaceId: WORKSPACE,
+        displayName: "a", source: "directory", roots: [root], createdAt: now });
+      tx.append({ schemaVersion: SCHEMA_VERSION, eventId: createId("event"), workspaceId: WORKSPACE,
+        actorSessionId: "session_a", type: "workspace.materialised", occurredAt: now, payload: {} });
+    }, { kinds: ["workspace"] }));
+    // Entry, open, two records, idle: bytes each, plus every name on POSIX
+    // except the entry's.
+    const expected = process.platform === "win32" ? 5 : 9;
+    assert.equal(flushed.length, expected, `flushed ${JSON.stringify(flushed)}`);
+    assert.deepEqual(await readdir(path.join(paths.retained, "journal")).catch(() => []), [],
+      "a completion marker was written");
+  });
