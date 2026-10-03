@@ -211,13 +211,15 @@ async function resolveSegment(current, retry, { resolve, platform, root }) {
     if (!leaving) throw failure;
     if (attempt < LEAVING_RETRIES) continue;
     const present = await lstat(current).then(() => true, missing => missing.code !== "ENOENT");
-    // Present: refused, never read as gone - its records would read as none. An
-    // error stays what it says. Only deleted directories' places, while the name
-    // stays, is a directory moving in and out of the name - the writer lock does
-    // so for a living - so it is refused as changed, which a reader takes as a
-    // reason to look again, and never as an escape: nothing left the store.
+    // Present: refused, never read as gone - its records would read as none.
+    // Deleted directories' places, or EBADF - a handle taken to a directory
+    // leaving the name - while the name stays, is a directory moving in and out
+    // of the name; the writer lock does so for a living. It is refused as
+    // changed, which a reader takes as a reason to look again, and never as an
+    // escape: nothing left the store. EPERM can be a refusal in earnest and
+    // stays what it says.
     if (present) {
-      if (failure !== null) throw failure;
+      if (failure !== null && failure.code !== "EBADF") throw failure;
       throw invalidDirectory("managed parent directory changed while it resolved", current, root,
         undefined, resolved);
     }
