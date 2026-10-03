@@ -3,7 +3,7 @@
 // can start a .cmd or .bat only through cmd.exe.
 import { execFile } from "node:child_process";
 import { constants } from "node:fs";
-import { access } from "node:fs/promises";
+import { access, readFile as readText } from "node:fs/promises";
 import path from "node:path";
 import { promisify } from "node:util";
 
@@ -129,4 +129,21 @@ function killProcessTree(pid, env = process.env) {
   const root = env.SystemRoot ?? env.SYSTEMROOT ?? "C:\\Windows";
   execFile(path.win32.join(root, "System32", "taskkill.exe"), ["/pid", String(pid), "/T", "/F"],
     { windowsHide: true }, () => {});
+}
+
+// The file an npm .cmd shim runs: `"%dp0%\<path inside the prefix>"`.
+const SHIM_TARGET = /"%dp0%\\([^"%]+)"/gi;
+
+/**
+ * The file an npm .cmd shim runs - a native binary or a package script - or
+ * null when the file is no such shim. A probe reads that file; the .cmd says
+ * nothing about the client behind it.
+ */
+export async function npmShimTarget(file, { readFile = readText } = {}) {
+  try {
+    const targets = [...String(await readFile(file, "utf8")).matchAll(SHIM_TARGET)];
+    return targets.length === 1 ? path.win32.join(path.win32.dirname(file), targets[0][1]) : null;
+  } catch {
+    return null;
+  }
 }

@@ -1,16 +1,17 @@
 import { randomBytes } from "node:crypto";
-import { constants } from "node:fs";
 import { lstat, mkdir, open, readdir, realpath, rename, rm } from "node:fs/promises";
 import path from "node:path";
-import { versionOrder } from "@agents-can-communicate/adapter-sdk";
+import { closedTo, isWindowsPlatform, openRegularNoFollow, versionOrder } from "@agents-can-communicate/adapter-sdk";
 
 import { PROTOCOL_CONTRACT } from "./inbox-contract.mjs";
-import { inboxSocketIsSafe } from "./inbox-registry.mjs";
+import { inboxSocketIsSafe, isInboxPipe, listPipesOfMachine } from "./inbox-registry.mjs";
 import { isReception } from "./inbox-settings.mjs";
 
 // One private record per hook binding, the way the Codex adapter keeps its
 // daemon endpoints: core holds only the random id, and the socket path, pid and
-// session id stay in a 0600 file under the workspace runtime directory.
+// session id stay in a 0600 file under the workspace runtime directory. On
+// Windows the file and its directory carry no mode bits; the profile's ACL keeps
+// them to this user, and the inbox is a named pipe rather than a socket path.
 
 const KEYS = ["schemaVersion", "endpointId", "socketPath", "configDir", "clientPid", "sessionId",
   "clientVersion", "protocolContract", "leaseUntil", "reception"];
@@ -24,11 +25,12 @@ export const newEndpointId = () => `claude_inbox_${randomBytes(16).toString("hex
 // Where, under a workspace runtime directory, the records live.
 export const ENDPOINTS_DIRECTORY = "claude-inbox-endpoints";
 
-function valid(record) {
+function valid(record, platform) {
   return record !== null && typeof record === "object" && !Array.isArray(record)
     && Object.keys(record).length === KEYS.length && KEYS.every(key => Object.hasOwn(record, key))
     && record.schemaVersion === 1 && ENDPOINT.test(record.endpointId)
-    && absolute(record.socketPath) && absolute(record.configDir)
+    && (isWindowsPlatform(platform) ? isInboxPipe(record.socketPath) : absolute(record.socketPath))
+    && absolute(record.configDir)
     && Number.isInteger(record.clientPid) && record.clientPid > 0
     && typeof record.sessionId === "string" && record.sessionId !== "" && record.sessionId.length <= 200
     && typeof record.clientVersion === "string" && versionOrder(record.clientVersion) !== null
@@ -39,7 +41,7 @@ function valid(record) {
     && isReception(record.reception);
 }
 
-async function directory(runtimeDir, create = false) {
+async function directory(runtimeDir, create = false, platform = process.platform) {
   if (!absolute(runtimeDir)) throw invalid();
   if (create) await mkdir(runtimeDir, { recursive: true, mode: 0o700 });
   const root = await realpath(runtimeDir);
@@ -48,15 +50,20 @@ async function directory(runtimeDir, create = false) {
     if (error.code !== "EEXIST") throw error;
   });
   const info = await lstat(dir);
-  if (!info.isDirectory() || info.isSymbolicLink() || !own(info) || (info.mode & 0o022) !== 0) throw invalid();
+  if (!info.isDirectory() || info.isSymbolicLink() || !own(info) || !closedTo(info, 0o022, { platform })) {
+    throw invalid();
+  }
   return dir;
 }
 
-export async function writeInboxEndpoint({ runtimeDir, record }) {
-  if (!valid(record) || !await inboxSocketIsSafe(record.socketPath)) throw invalid();
+export async function writeInboxEndpoint({ runtimeDir, record, platform = process.platform,
+  listPipes = listPipesOfMachine }) {
+  if (!valid(record, platform) || !await inboxSocketIsSafe(record.socketPath, { platform, listPipes })) {
+    throw invalid();
+  }
   const text = `${JSON.stringify(record)}\n`;
   if (Buffer.byteLength(text) > MAX_BYTES) throw invalid();
-  const dir = await directory(runtimeDir, true);
+  const dir = await directory(runtimeDir, true, platform);
   const file = path.join(dir, `${record.endpointId}.json`);
   const temporary = path.join(dir, `.${record.endpointId}.${randomBytes(8).toString("hex")}.tmp`);
   let handle;
@@ -72,17 +79,18 @@ export async function writeInboxEndpoint({ runtimeDir, record }) {
 }
 
 // An expired record is metadata for re-verification, never proof of reach.
-export async function readInboxEndpoint({ runtimeDir, endpointId }) {
+export async function readInboxEndpoint({ runtimeDir, endpointId, platform = process.platform }) {
   if (typeof endpointId !== "string" || !ENDPOINT.test(endpointId)) return null;
   let handle;
   try {
-    const dir = await directory(runtimeDir);
-    handle = await open(path.join(dir, `${endpointId}.json`),
-      constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
+    const dir = await directory(runtimeDir, false, platform);
+    handle = await openRegularNoFollow(path.join(dir, `${endpointId}.json`), undefined, { platform });
     const info = await handle.stat();
-    if (!info.isFile() || !own(info) || info.size > MAX_BYTES || (info.mode & 0o077) !== 0) return null;
+    if (!info.isFile() || !own(info) || info.size > MAX_BYTES || !closedTo(info, 0o077, { platform })) {
+      return null;
+    }
     const record = JSON.parse(await handle.readFile("utf8"));
-    return valid(record) && record.endpointId === endpointId ? record : null;
+    return valid(record, platform) && record.endpointId === endpointId ? record : null;
   } catch {
     return null;
   } finally {
@@ -90,14 +98,15 @@ export async function readInboxEndpoint({ runtimeDir, endpointId }) {
   }
 }
 
-export async function removeInboxEndpoint({ runtimeDir, endpointId }) {
+export async function removeInboxEndpoint({ runtimeDir, endpointId, platform = process.platform }) {
   if (typeof endpointId !== "string" || !ENDPOINT.test(endpointId)) return;
   try {
-    const dir = await directory(runtimeDir);
+    const dir = await directory(runtimeDir, false, platform);
     await rm(path.join(dir, `${endpointId}.json`), { force: true });
   } catch { /* retirement is already recorded; cleanup is best effort */ }
   try {
-    await rm(path.join(await wakesDirectory(runtimeDir), endpointId), { recursive: true, force: true });
+    await rm(path.join(await wakesDirectory(runtimeDir, false, platform), endpointId),
+      { recursive: true, force: true });
   } catch { /* the same */ }
 }
 
@@ -115,17 +124,18 @@ const processExists = pid => {
  * retired. Only a record whose process is gone is removed: a live session whose
  * registry briefly names another conversation (right after /resume) keeps its own.
  */
-export async function sweepDeadEndpoints({ runtimeDir, exists = processExists, limit = 64 }) {
+export async function sweepDeadEndpoints({ runtimeDir, exists = processExists, limit = 64,
+  platform = process.platform }) {
   let names;
   try {
-    names = await readdir(await directory(runtimeDir));
+    names = await readdir(await directory(runtimeDir, false, platform));
   } catch {
     return;
   }
   for (const name of names.filter(item => /^claude_inbox_[a-f0-9]{32}\.json$/.test(item)).slice(0, limit)) {
     const endpointId = name.slice(0, -".json".length);
-    const record = await readInboxEndpoint({ runtimeDir, endpointId });
-    if (record !== null && !exists(record.clientPid)) await removeInboxEndpoint({ runtimeDir, endpointId });
+    const record = await readInboxEndpoint({ runtimeDir, endpointId, platform });
+    if (record !== null && !exists(record.clientPid)) await removeInboxEndpoint({ runtimeDir, endpointId, platform });
   }
 }
 
@@ -134,20 +144,22 @@ export async function sweepDeadEndpoints({ runtimeDir, exists = processExists, l
 // transport again; the marker keeps it to one wake per message and binding.
 const WAKE_MESSAGE = /^[A-Za-z0-9_-]{1,200}$/;
 
-async function wakesDirectory(runtimeDir, create = false) {
-  const dir = path.join(path.dirname(await directory(runtimeDir, create)), "claude-inbox-wakes");
+async function wakesDirectory(runtimeDir, create = false, platform = process.platform) {
+  const dir = path.join(path.dirname(await directory(runtimeDir, create, platform)), "claude-inbox-wakes");
   if (create) await mkdir(dir, { mode: 0o700 }).catch(error => {
     if (error.code !== "EEXIST") throw error;
   });
   const info = await lstat(dir);
-  if (!info.isDirectory() || info.isSymbolicLink() || !own(info) || (info.mode & 0o022) !== 0) throw invalid();
+  if (!info.isDirectory() || info.isSymbolicLink() || !own(info) || !closedTo(info, 0o022, { platform })) {
+    throw invalid();
+  }
   return dir;
 }
 
 /** True when this call is the first to wake the binding for the message. */
-export async function claimWake({ runtimeDir, endpointId, messageId }) {
+export async function claimWake({ runtimeDir, endpointId, messageId, platform = process.platform }) {
   if (!ENDPOINT.test(endpointId) || !WAKE_MESSAGE.test(messageId)) throw invalid();
-  const dir = path.join(await wakesDirectory(runtimeDir, true), endpointId);
+  const dir = path.join(await wakesDirectory(runtimeDir, true, platform), endpointId);
   await mkdir(dir, { mode: 0o700 }).catch(error => {
     if (error.code !== "EEXIST") throw error;
   });
@@ -160,9 +172,10 @@ export async function claimWake({ runtimeDir, endpointId, messageId }) {
   }
 }
 
-export async function releaseWake({ runtimeDir, endpointId, messageId }) {
+export async function releaseWake({ runtimeDir, endpointId, messageId, platform = process.platform }) {
   if (!ENDPOINT.test(endpointId) || !WAKE_MESSAGE.test(messageId)) return;
   try {
-    await rm(path.join(await wakesDirectory(runtimeDir), endpointId, messageId), { force: true });
+    await rm(path.join(await wakesDirectory(runtimeDir, false, platform), endpointId, messageId),
+      { force: true });
   } catch { /* a marker left behind only suppresses a repeat wake */ }
 }

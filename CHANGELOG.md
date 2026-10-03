@@ -16,7 +16,10 @@ Work in progress for #234. The design is in
   waiting for the lock read that record: eight of them held a release back until one gave up.
   When `realpath` answers a concurrent rename or removal with `EBADF`, `EPERM` or a path in
   `C:\$Extend\$Deleted\` (all measured on Windows, where Linux says `ENOENT`), the name is
-  resolved again; it is gone only if no directory is left there. An open on Windows takes the
+  resolved again; it is gone only if no directory is left there. An answer outside the store
+  is an escape only when that place holds the directory: under a lock renamed aside and back,
+  Windows once named a path under another store's root that no longer existed. Such an answer
+  is asked again, and a name that keeps giving it is refused as changed. An open on Windows takes the
   file its name names after the open, so a record renamed over in between is read, not refused.
   A read refused with `EPERM` on a name absent just before and just after it reads as absent:
   eight writers electing one failed on it in 1 run of 60 on windows-latest.
@@ -33,9 +36,28 @@ Work in progress for #234. The design is in
   Host, and through PowerShell where Script Host is switched off; a client's image name matches
   without `.exe`. Measured on windows-latest, the walk took 145 ms against PowerShell's 580.
 - On Windows a client binary is found through `PATHEXT`, a `.cmd` shim runs through `cmd.exe`,
-  updates run npm's own `npm-cli.js`, and background workers open no console window. Live
-  delivery on Windows is reported as `native_delivery_unsupported` for now; next-turn delivery
-  works.
+  updates run npm's own `npm-cli.js`, and background workers open no console window.
+- A hook that runs out of its budget names the step that held it: "acc: coordination unavailable
+  (timed out while reading the process table); hook continued without context". The step is
+  one of a fixed set of phrases the runner itself sets; nothing from the hook's input is written.
+- Live delivery reaches an idle Claude Code session on Windows. Measured with Claude Code 2.1.286:
+  the inbox is a named pipe, `\\.\pipe\LOCAL\cc-msg-<32 hex>`, that drops a frame without an
+  auth line, so ACC authenticates with the peer key Claude Code publishes beside the session
+  record for other sessions of the same user, and the recipient's inbound settings apply as on
+  POSIX. ACC never reads the session's own messaging token. The probe reads the `claude.exe` an
+  npm `.cmd` runs. Endpoint records keep their mode checks on POSIX; on Windows, where every
+  file reads as `0o666`, the profile's ACL is the boundary. The real-clients CI job wakes an idle
+  interactive Claude Code on Linux and Windows.
+- Live delivery reaches Codex on Windows through `codex app-server proxy`, which relays stdio to
+  the daemon's AF_UNIX socket that Node cannot open there; ACC speaks the same WebSocket JSON-RPC
+  over the stdio of the managed `codex.exe` the daemon runs from. Measured with Codex 0.159.3
+  under a standard user: a queued message reached the model. The daemon is proven without `ps`
+  or `lsof`: its pid record's FILETIME against WMI's creation time, its command line, and the
+  socket its directory lists (Node's `lstat` refuses the socket file with `EACCES`). Codex starts
+  its daemon only from a non-elevated terminal.
+- Live delivery reaches Antigravity CLI on Windows: the relay listens on
+  `\\.\pipe\acc-relay-<32 hex>`, the agent starts it with `node "<…>/acc-relay.mjs" start`, and
+  the relay runs `agy.exe` itself, never a `.cmd`, since the message reaches agy as an argument.
 - On Windows each client's hooks run a Node shim instead of an `sh` script, in the form that
   client's hook shell reads: Claude Code's exec form, a Codex `commandWindows` for PowerShell,
   PowerShell for Gemini CLI, a form PowerShell, Git Bash and cmd all read for Grok, an unquoted
@@ -70,7 +92,27 @@ Work in progress for #234. The design is in
   - A hook no longer takes the writer lock to clear a delivery binding that is absent or
     already retired. A heartbeat of a durable session goes straight to its durable record.
     Together this removes two lock round trips from each turn.
-  - On Windows, taking the writer lock flushes its owner record once instead of twice.
+  - A write flushes only what a crash of the machine would otherwise lose. On windows-latest
+    beside the full suite one flush took 15 ms at the median and up to 5.8 s, with the CPU
+    idle, and the hooks that ran past their budget spent most of it flushing. A first, second
+    and third session start on Windows now flush 5, 16 and 7 times instead of 19, 42 and 22, and
+    a turn twice instead of four times. Beside the full suite on the runner's slow system disk
+    the longest hook took 2.0 s, where hooks had run past their five seconds.
+    - Taking the writer lock flushes nothing, where it flushed once on Windows and three times
+      on POSIX. The lock guards live processes, and a crash leaves none. An owner record a crash
+      left unreadable is reclaimed once it is older than a minute, as a dead owner is; before,
+      it stopped every write in the workspace.
+    - The retained copy of an accepted write and the sweep's marker are written without a
+      flush. The copy is never read, and a lost marker costs one more sweep.
+    - An ephemeral record flushes its bytes and leaves its new name to the next flush. A crash
+      can bring it back as its previous version, which the session's next hook recovers.
+    - A journalled transaction writes no completion marker: every journal entry the pointer
+      does not name open is finished, and the reclaimer retires it. An older ACC's markers
+      leave with their entries. The entry's name is made durable by the pointer that opens
+      it. On Windows, where flushing a file commits NTFS's metadata journal up to that point,
+      a transaction flushes only the bytes it publishes; its renames are committed by the
+      flushes after them. A new store's identity, its journal's first pointer and the room a
+      native session chose leave their names to the next flush there in the same way.
   - One record replaced with no event, such as a session's heartbeat on every turn, is published
     by an atomic rename without the journal, while no other transaction is open. The journal
     cost five atomic writes for it.
@@ -86,6 +128,8 @@ Work in progress for #234. The design is in
 - A CI job runs real Claude Code and Codex, installed from npm, against a model stub on
   127.0.0.1, on Windows and Linux. Their hooks attach both sessions through the installed
   package, and a message reaches each client's model on its next turn.
+- The Windows test job keeps the suite's temporary files on the runner's local disk. Its
+  system disk is remote, and a flush there took up to 1.5 s.
 - The package check runs on Windows: it reads `tar.exe` listings that end in CRLF and runs the
   `acc.cmd` npm links.
 - The README, getting started, configuration, security model and troubleshooting pages describe
@@ -93,9 +137,9 @@ Work in progress for #234. The design is in
 
 | Candidate artifact | Value |
 |---|---|
-| Built from | `de9700a79ccef096eda9d7e6c24d9e7bafd4c782` |
-| Tarball | `agents-can-communicate-0.8.5.tgz`, 523,146 bytes, 327 files |
-| sha256 | `dcaf8234fa987c016286431c49a0dc91c98d64542336293decc0c8a13270f1e8` |
+| Built from | `ba48e214a7f2bd7059392c8aad53ea8c166cdb98` |
+| Tarball | `agents-can-communicate-0.8.5.tgz`, 532,081 bytes, 328 files |
+| sha256 | `565b48437d8572a28bae32424a4c76aa7586037f46d7140f3224426dcbe6657c` |
 
 This unpublished development archive was measured with `npm pack`. See
 [the evidence](docs/release-evidence/unreleased-windows-support.md).

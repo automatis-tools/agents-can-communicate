@@ -81,6 +81,36 @@ runtime, because launcher modules may import only their siblings.
   rename as metadata, and flushing a file on NTFS commits that journal up to the file's last
   change, which includes the rename. A power cut cannot be reproduced in CI, so this rests on
   documented NTFS behaviour, not on a measurement.
+- **What is flushed.** A flush waits for the whole disk. On `windows-latest` beside the full suite
+  one took 15 ms at the median and up to 5.8 s with the CPU idle, and the two hooks of about 1,120
+  that ran past their budget spent 72-78% of it flushing (2026-10-01). A publication therefore
+  states what a crash may cost it. On the same runner the remote system disk C: flushed in
+  10-33 ms at the median and up to 1.5 s, the local disk D: in 0.5 ms and at most 27 ms
+  (2026-10-02): the cost is the disk's, and it is paid per flush. `full` (the default) flushes
+  the bytes and the name; `bytes`
+  flushes the bytes and leaves the name, so a reader finds the previous version and never a
+  torn one; `none` flushes nothing. Ephemeral records are `bytes`, because a crash ends the
+  session they describe. The sweep's marker is `none`, because its reader treats damage as a
+  pass that is due. The retained copy of an accepted write is never flushed, because it is never
+  read. The writer lock flushes nothing: it guards live processes, and an owner record a crash
+  left unreadable is reclaimed once it is older than a minute, as a dead owner is.
+- **A journalled transaction.** Its entry flushes its bytes, and the pointer that opens it,
+  published beside it in `journal/`, makes the entry's name durable: POSIX syncs that directory,
+  and on Windows the pointer's flush commits NTFS's journal past the entry. That journal is one
+  sequence, so on Windows every flush also commits each rename logged before it: inside a
+  transaction each record's own flush commits the rename before it, and the pointer going idle
+  commits the last record's. There only bytes are flushed. A crash that loses the idle pointer's
+  rename leaves the transaction open; nothing written after it can be durable without that
+  rename, so rolling it forward again changes nothing. This extends the statement above about
+  NTFS from a file's own rename to the renames before it, and like it rests on documented NTFS
+  behaviour, not on a power cut in CI. No completion marker is written: the reclaimer runs under
+  the writer lock, as every transaction does, so every entry the pointer does not name open is
+  finished or was never decided. Generations are random identifiers, so a replay cannot tell an
+  older record from a newer one; POSIX therefore keeps the idle pointer's own sync.
+- **A first start.** The same rule applies on Windows wherever another flush follows in the same
+  hook: a new store's identity and its journal's first pointer, and the room a native session
+  chose. Each flushes its bytes, and the next flush commits its name. A crash before that leaves
+  a directory the next open initialises, or a room the session's next hook chooses again.
 - **Replacing a file.** `rename` over an existing file retries `EPERM`, `EACCES` and `EBUSY` with a
   short backoff until the caller's deadline. The cause is measured: any open handle on the target
   refuses the rename, whether it belongs to an ACC reader, an antivirus scan or an indexer. A read
@@ -233,20 +263,38 @@ different installation.
 
 ### 7. Live delivery (0.9.x)
 
-- **Claude Code.** Claude binds `\\.\pipe\cc-msg-<32 hex>` and requires an auth line on Windows.
-  It publishes a per-session peer key for other sessions of the same user in
-  `<config>/sessions/<pid>.<sha256(canonical pipe name)>.key` as `{peerToken, procStartFt,
-  pidDomain}`. A frame authenticated with it is classified `peer`, so the recipient's inbound
-  settings (`crossSessionInbound`, the bypass-mode hold) apply as they do on POSIX. ACC reads that
-  key, checks that `procStartFt` equals the recipient process's creation time, sends
-  `{"type":"auth","token":<peerToken>}` and then the fixed wake line. ACC never reads the child
-  token `CLAUDE_CODE_MESSAGING_TOKEN`, which would skip those settings.
+- **Claude Code.** Measured on `windows-latest` with Claude Code 2.1.286 in a ConPTY:
+  - the session record `<config>/sessions/<pid>.json` names the inbox as
+    `\\.\pipe\LOCAL\cc-msg-<32 hex>` and carries `procStart` (a FILETIME string) and
+    `pidDomain` (`win32:<host>`); the hook's `CLAUDE_CODE_MESSAGING_SOCKET` names the same pipe;
+  - beside it, `<pid>.<sha256 of the lowercased pipe path>.key` holds `{peerToken (32 hex),
+    procStartFt, pidDomain}`, with `procStartFt` equal to the record's `procStart`;
+  - a frame with no auth line, or with a wrong token, is dropped and the pipe closed; after
+    `{"type":"auth","token":<peerToken>}` the same wake line runs a turn the session shows as
+    another session's message, and the pipe answers nothing.
+
+  ACC reads the key named by the pid and the pipe, uses it only when its process start and pid
+  domain are the record's, reads it per offer and stores it nowhere. It never reads the child
+  token `CLAUDE_CODE_MESSAGING_TOKEN`, which would skip the recipient's inbound settings. The
+  probe reads the executable an npm `.cmd` runs (`bin\claude.exe`); the pipe counts while the
+  machine lists it in `\\.\pipe\`. WMI reports a process's creation time in microseconds, one
+  digit short of the FILETIME Claude records, so the two are not compared.
 - **Codex.** The Windows daemon listens on a real AF_UNIX socket,
   `%CODEX_HOME%\app-server-control\app-server-control.sock`, and Node cannot connect to AF_UNIX
-  on Windows. Codex ships `codex app-server proxy`, which relays stdio to that socket. ACC starts
-  it per offer and speaks the same WebSocket JSON-RPC over the child's stdio. Daemon identity uses
-  the pid file, the creation time and the command line; the socket directory has a user-only DACL
-  that Codex sets itself, which replaces the `lsof` proof.
+  on Windows. Codex ships `codex app-server proxy` ("proxy stdio bytes to the running app-server
+  control socket", 0.159.3), so ACC starts it per offer and speaks the same WebSocket JSON-RPC
+  over the child's stdio. Daemon identity uses the pid file, the creation time and the command
+  line; the socket directory has a user-only DACL that Codex sets itself, which replaces the
+  `lsof` proof. Measured on 0.159.3: `daemon start` refuses a token whose `TokenIsElevated` is
+  set ("start the Windows daemon from a non-elevated terminal"), and `runas /trustlevel:0x20000`
+  does not clear it; the proxy refuses a socket path longer than `SUN_LEN`, so a deep
+  `CODEX_HOME` cannot share the daemon; the daemon runs a managed copy under
+  `CODEX_HOME\packages\app-server-daemon\current\bin\codex.exe`. Run as a standard user,
+  `daemon.pid` records `{pid, processStartTime}` with the start as a FILETIME string, WMI reports
+  the same creation time to the microsecond, and the command line is the quoted, `\\?\`-prefixed
+  release `codex.exe` running `app-server --listen unix:// --managed-daemon`. Node's `lstat`
+  refuses the socket file with `EACCES`, so the socket counts while its directory lists it. A
+  queued message through the proxy reached the model.
 - **Antigravity CLI.** The relay listens on `\\.\pipe\acc-relay-<random>`. The random name is kept
   in the private registration. The agent API is localhost TCP and works unchanged.
 - **Router.** Windows transports keep their names (`claude-inbox`, `codex-app-server`), so status
@@ -286,7 +334,8 @@ different installation.
 These change details, not the design. The implementation measures them in its own Windows CI
 tests before it relies on them:
 
-1. Whether a detached, hidden worker outlives its parent (the first probe's case was malformed).
+1. Measured: a worker started `detached` (hidden or not) outlives a parent that exits at once; one
+   started without `detached` was gone with its parent on the runner.
 2. What `codex app-server daemon start` writes on Windows under a non-elevated token: the pid file
    format and the socket file's `lstat` result.
 3. The Claude Code and Codex command lines as `Win32_Process` reports them, launched through their

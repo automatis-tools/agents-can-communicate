@@ -7,8 +7,11 @@ set -e
 # The attribution gate runs before anything else: it reads the ref lines git sends
 # on stdin, and it refuses a push in a second rather than after the whole suite.
 # A commit made with --no-verify, or one rebased from an old branch, stops here.
+# The ref lines are read once and handed to it, since the suite gate below reads
+# them too.
+refs=$(cat)
 echo "pre-push: refusing Claude attribution in pushed commits"
-node "$(dirname "$0")/../scripts/check-commit-attribution.mjs" --pre-push "$1"
+printf '%s\n' "$refs" | node "$(dirname "$0")/../scripts/check-commit-attribution.mjs" --pre-push "$1"
 
 # The lint step runs next, while git's own repository variables are still set,
 # so `git ls-files` resolves this repository without relying on discovery.
@@ -22,6 +25,28 @@ git ls-files -z '*.mjs' | xargs -0 -n1 node --check
 # forgets cannot damage the working repository.
 unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_COMMON_DIR GIT_OBJECT_DIRECTORY
 unset GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_PREFIX GIT_QUARANTINE_PATH
+
+# A push of throwaway measurement branches alone (refs/heads/measure/...) runs
+# the gates above and not the suite: what such a branch adds is a probe that
+# runs on a CI runner, and nothing on it is merged or packed. Every other push,
+# and any push that also names another branch, runs the suite.
+measure_only=no
+if [ -n "$refs" ]; then
+  measure_only=yes
+  while read -r _local_ref _local_sha remote_ref _remote_sha; do
+    case "$remote_ref" in
+      refs/heads/measure/*) ;;
+      *) measure_only=no ;;
+    esac
+  done <<EOF
+$refs
+EOF
+fi
+if [ "$measure_only" = yes ]; then
+  echo "pre-push: measurement branches only; the suite runs on every other push"
+  echo "pre-push: all gates passed"
+  exit 0
+fi
 
 # The runner resolves its own file list and fails on an empty one, so this gate
 # cannot report success having run nothing - which is exactly what the Windows

@@ -83,8 +83,10 @@ export async function startModelStub({ reply = "ok" } = {}) {
   });
   await new Promise(resolve => server.listen(0, "127.0.0.1", resolve));
   const { port } = server.address();
+  // A live client keeps its connections open, and close() alone would wait for
+  // them for as long as the client lives.
   return { url: `http://127.0.0.1:${port}`, requests,
-    close: () => new Promise(resolve => server.close(resolve)) };
+    close: () => new Promise(resolve => { server.close(resolve); server.closeAllConnections(); }) };
 }
 
 /** Every text a request carried to the model, flattened. */

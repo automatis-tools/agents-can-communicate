@@ -82,13 +82,15 @@ export function createAgentApi({ endpoint, baseEnv = process.env, run: runner = 
  * and preferring it keeps a push working for a client started by a full path
  * that is not on the PATH. Only an absolute, executable file named agy is
  * taken, because the relay calls it as `agy agentapi ...`; anything else falls
- * back to the PATH.
+ * back to the PATH. On Windows that file is agy.exe: the message goes to agy as
+ * an argument, and a .cmd would hand it to cmd.exe to read; a bare `agy` there
+ * starts only an .exe or .com, for the same reason.
  */
-export function agentApiCommand(env) {
+export function agentApiCommand(env, { platform = process.platform } = {}) {
   const named = env?.ANTIGRAVITY_AGENTAPI_EXE;
-  if (typeof named !== "string" || !path.isAbsolute(named) || path.basename(named) !== "agy") {
-    return "agy";
-  }
+  const base = typeof named === "string" ? path.basename(named) : "";
+  const isAgy = platform === "win32" ? base.toLowerCase() === "agy.exe" : base === "agy";
+  if (typeof named !== "string" || !path.isAbsolute(named) || !isAgy) return "agy";
   try {
     accessSync(named, constants.X_OK);
     return statSync(named).isFile() ? named : "agy";

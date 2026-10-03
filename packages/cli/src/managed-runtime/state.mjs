@@ -62,7 +62,9 @@ export async function readManagedJson(file) {
   } finally { await handle?.close(); }
 }
 
-export async function writeManagedJson(file, value) {
+// `flushName: false` leaves the name to the next flush, for a record whose loss
+// on a crash is recovered by writing it again. The bytes are always flushed.
+export async function writeManagedJson(file, value, { flushName = true } = {}) {
   const temporary = path.join(path.dirname(file), `.record-${randomUUID()}.tmp`);
   let handle;
   try {
@@ -73,7 +75,7 @@ export async function writeManagedJson(file, value) {
     await handle.close();
     handle = null;
     await renameReplacing(temporary, file);
-    await syncEntry(path.dirname(file), file);
+    if (flushName) await syncEntry(path.dirname(file), file);
   } finally {
     await handle?.close();
     await rm(temporary, { force: true });

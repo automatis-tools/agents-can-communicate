@@ -1,8 +1,10 @@
+import { spawn } from "node:child_process";
+import { EventEmitter } from "node:events";
 import os from "node:os";
 import path from "node:path";
 import { realpath, stat } from "node:fs/promises";
 
-import { compareVersionOrder, versionOrder } from "@agents-can-communicate/adapter-sdk";
+import { compareVersionOrder, isWindowsPlatform, versionOrder } from "@agents-can-communicate/adapter-sdk";
 
 import { openWebSocketPeer } from "./ws-json-rpc.mjs";
 
@@ -42,8 +44,47 @@ export function isMethodMissing(error) {
     || (error?.code === INVALID_REQUEST && /unknown variant/.test(String(error?.message ?? "")));
 }
 
-export function openCodexAppServer({ socketPath, timeoutMs = 5_000 }) {
-  return openWebSocketPeer({ socketPath, timeoutMs, retainNotifications: false });
+/**
+ * Windows: the command that relays stdio to the control socket. The daemon runs
+ * from the copy Codex installs under CODEX_HOME (measured on 0.159.3), so that
+ * copy exists whenever there is a daemon to reach, and as an .exe it starts
+ * without cmd.exe whatever the socket path holds.
+ */
+export function proxyCommand(socketPath) {
+  const codexHome = path.win32.dirname(path.win32.dirname(socketPath));
+  return { file: path.win32.join(codexHome, "packages", "app-server-daemon", "current", "bin", "codex.exe"),
+    args: ["app-server", "proxy", "--sock", socketPath] };
+}
+
+const startProxy = socketPath => {
+  const { file, args } = proxyCommand(socketPath);
+  return spawn(file, args, { stdio: ["pipe", "pipe", "ignore"], windowsHide: true });
+};
+
+// A child's stdio as the duplex the WebSocket peer speaks over.
+function proxyStream(child) {
+  const stream = new EventEmitter();
+  stream.destroyed = false;
+  stream.write = data => (stream.destroyed ? false : child.stdin.write(data));
+  stream.destroy = () => {
+    if (stream.destroyed) return;
+    stream.destroyed = true;
+    child.stdin.destroy();
+    child.kill();
+  };
+  child.once("spawn", () => stream.emit("connect"));
+  child.stdout.on("data", data => stream.emit("data", data));
+  child.stdin.on("error", error => stream.emit("error", error));
+  child.once("error", error => stream.emit("error", error));
+  child.once("exit", () => stream.emit("close"));
+  return stream;
+}
+
+export function openCodexAppServer({ socketPath, timeoutMs = 5_000, platform = process.platform,
+  spawnProxy = startProxy }) {
+  if (!isWindowsPlatform(platform)) return openWebSocketPeer({ socketPath, timeoutMs, retainNotifications: false });
+  return openWebSocketPeer({ timeoutMs, retainNotifications: false,
+    connect: () => proxyStream(spawnProxy(socketPath)) });
 }
 
 export async function initializeCodex(peer) {

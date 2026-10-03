@@ -189,7 +189,8 @@ session again, so the next ordinary prompt retries a failed binding.
 - Claude Code 2.1.224 and later open the inbox, but ACC's captured minimum is 2.1.282. An
   older version reports `below_minimum_version` and keeps next-turn delivery.
 - On native Windows, Claude Code serves its inbox on a named pipe that requires an auth
-  line. ACC has no capture of that inbox, so Windows keeps next-turn delivery.
+  line. ACC sends the key Claude Code publishes for other sessions of the same user; see
+  [On Windows](#on-windows).
 - Linux is uncaptured for live delivery. A Linux session keeps next-turn delivery.
 - A wake that reached the session can still wait for your approval. See
   [the next section](#a-claude-code-session-holds-or-drops-acc-wakes).
@@ -397,8 +398,22 @@ checkout history.
 - **A write through Claude Code's PowerShell tool was not guarded.** The guard reads POSIX shell
   commands only. Claims are advisory by default, and a write through Claude Code's Write, Edit or
   Bash tool is still checked.
-- **Live delivery is `native_delivery_unsupported`.** Live delivery on Windows is not available
-  yet; messages arrive on the recipient's next turn.
+- **Codex is not woken on Windows.** Codex refuses to start its app-server daemon from an
+  elevated terminal ("start the Windows daemon from a non-elevated terminal"). Start Codex from a
+  terminal that is not running as administrator, and keep `CODEX_HOME` short: the daemon's socket
+  path has to fit 108 bytes, or Codex runs the chat on its own embedded server, which no peer can
+  reach.
+- **Hooks run out of time on a cloud machine.** A Windows flush waits for the whole disk to
+  write out its cache. On a GitHub `windows-latest` runner, whose system disk is remote, a 4 KB
+  flush took 10-33 ms at the median and up to 1.5 s, against 0.5 ms and at most 27 ms on its
+  local disk. A session start flushes 5 to 16 times, so a disk like that can run a hook out of
+  its five seconds; the session then attaches on a later prompt. Point `ACC_DATA_HOME` at a
+  directory on a local disk that only your account can read, for every client, and restart
+  them.
+- **A Claude Code session is not woken on Windows.** The wake authenticates with the key Claude
+  Code publishes beside its session record (`<config>\sessions\<pid>.<hash>.key`). Run
+  `acc doctor`: a session without that key, or whose pipe the machine no longer lists, waits for
+  its next turn.
 
 ## A write was blocked
 
