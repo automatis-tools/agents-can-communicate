@@ -1,20 +1,35 @@
 name: tmp windows live 2
 
-# Measurement only, on a throwaway branch: the whole suite with its temporary
-# files on D: (the runner's local disk) instead of C: (its remote system disk),
-# three runners at once, every hook timed and a canary flushing beside it.
+# Measurement only, on a throwaway branch: the flushes of each session start on
+# Windows, and the whole suite with its temporary files on C: (the runner's
+# remote system disk) twice and on D: (its local disk) once, at once, every hook
+# timed and a canary flushing beside it.
 on:
   push:
     branches: ['measure/windows-live2']
 
 jobs:
-  suite-on-d:
+  session-start-trace:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24'
+      - run: npm ci
+      - name: each flush of a session start, alone
+        run: |
+          node scripts/tmp_session_start_trace.mjs 5
+          node scripts/tmp_trace_summary.mjs fsync-trace.log
+
+  suite:
     runs-on: windows-latest
     timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix:
-        run: [1, 2, 3]
+        disk: [C1, C2, D]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
@@ -22,6 +37,7 @@ jobs:
           node-version: '24'
       - run: npm ci
       - name: 'temporary files on D:'
+        if: matrix.disk == 'D'
         shell: pwsh
         run: |
           $dir = Join-Path $env:RUNNER_TEMP 'tmp'
@@ -53,7 +69,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: on-d-${{ matrix.run }}
+          name: suite-${{ matrix.disk }}
           path: |
             hookcost.log
             canary.log
