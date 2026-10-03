@@ -221,3 +221,15 @@ test("a name that answers only with a place without it has changed, not escaped"
   await assert.rejects(assertManagedDirectory(root, paths.stage, { realpath: stuck }),
     error => /parent directory changed/.test(error.message) && !/escapes/.test(error.message));
 });
+
+// On a faster disk the same churn (lock-changing-hands, windows-latest with the
+// suite's files on D:) had every look answer EBADF while the name stayed: the
+// handle each one took was to a directory leaving the name. That is a directory
+// moving in and out of it, as the deleted place above is, so it has changed
+// while it resolved. EPERM can be a refusal in earnest and stays what it says.
+test("windows: a present name that answers only EBADF has changed, not failed", async t => {
+  const { root, paths } = await store(t);
+  const stuck = async current => (current === paths.stage ? answer("EBADF", current) : realpath(current));
+  await assert.rejects(assertManagedDirectory(root, paths.stage, { platform: "win32", realpath: stuck }),
+    error => /parent directory changed/.test(error.message));
+});

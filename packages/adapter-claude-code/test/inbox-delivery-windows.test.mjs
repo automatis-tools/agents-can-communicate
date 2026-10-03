@@ -114,12 +114,16 @@ test("windows: a real pipe receives the auth line and the wake", {
   await new Promise(resolve => server.listen(pipe, resolve));
   t.after(() => new Promise(resolve => server.close(resolve)));
   const place = await machine(t, { pipe });
+  // The real platform and pipe listing; only the profile is named, because the
+  // fixture lives wherever the temporary directory is, inside the profile or not.
+  const { profileDir } = place.system;
   const bound = await bindNativeSession({ event: { sessionId: SESSION, cwd: place.root }, clientPid: 1524,
     clientVersion: "2.1.286", runtimeDir: place.runtimeDir, env: place.env,
-    managedSettingsPath: path.join(place.root, "none.json"), readClientArgs: async () => ["claude.exe"] });
+    managedSettingsPath: path.join(place.root, "none.json"), readClientArgs: async () => ["claude.exe"],
+    profileDir });
   assert.equal(bound.supported, true, bound.reasonCode);
   const offered = await offerMessage({ binding: { ...bound, clientVersion: "2.1.286" },
-    message: { messageId: "message_real" }, runtimeDir: place.runtimeDir });
+    message: { messageId: "message_real" }, runtimeDir: place.runtimeDir, profileDir });
   assert.equal(offered.accepted, true, offered.safeErrorCode);
   for (let waited = 0; waited < 2000 && received.length === 0; waited += 50) {
     await new Promise(resolve => setTimeout(resolve, 50));
