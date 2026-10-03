@@ -32,6 +32,21 @@ jobs:
       - name: Syntax
         run: npm run check
 
+      # The suite's temporary files on the runner's local disk. Its system disk,
+      # C:, is remote: beside the suite a 4 KB flush there took 10-33 ms at the
+      # median and up to 1.5 s, and on D: 0.5 ms and at most 27 ms
+      # (windows-latest, 2026-10-02). The hook budget is the product's; that
+      # disk is the runner's, and docs/TROUBLESHOOTING.md says what a machine
+      # with one does.
+      - name: Temporary files on the local disk
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $dir = Join-Path $env:RUNNER_TEMP 'tmp'
+          New-Item -ItemType Directory -Force $dir | Out-Null
+          "TEMP=$dir" >> $env:GITHUB_ENV
+          "TMP=$dir" >> $env:GITHUB_ENV
+
       - name: Tests
         # Unit, process, conformance, docs, security, and packaging - the whole
         # suite, because splitting it invites a job nobody notices is skipped.

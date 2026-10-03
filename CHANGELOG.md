@@ -95,9 +95,9 @@ Work in progress for #234. The design is in
   - A write flushes only what a crash of the machine would otherwise lose. On windows-latest
     beside the full suite one flush took 15 ms at the median and up to 5.8 s, with the CPU
     idle, and the hooks that ran past their budget spent most of it flushing. A first, second
-    and third session start now flush 8, 30 and 16 times instead of 19, 42 and 22, and a turn
-    twice instead of four times. Across three full Windows suites at once no hook ran past its
-    budget, where two of about 1,120 had before.
+    and third session start on Windows now flush 5, 16 and 7 times instead of 19, 42 and 22, and
+    a turn twice instead of four times. Beside the full suite on the runner's slow system disk
+    the longest hook took 2.0 s, where hooks had run past their five seconds.
     - Taking the writer lock flushes nothing, where it flushed once on Windows and three times
       on POSIX. The lock guards live processes, and a crash leaves none. An owner record a crash
       left unreadable is reclaimed once it is older than a minute, as a dead owner is; before,
@@ -128,6 +128,8 @@ Work in progress for #234. The design is in
 - A CI job runs real Claude Code and Codex, installed from npm, against a model stub on
   127.0.0.1, on Windows and Linux. Their hooks attach both sessions through the installed
   package, and a message reaches each client's model on its next turn.
+- The Windows test job keeps the suite's temporary files on the runner's local disk. Its
+  system disk is remote, and a flush there took up to 1.5 s.
 - The package check runs on Windows: it reads `tar.exe` listings that end in CRLF and runs the
   `acc.cmd` npm links.
 - The README, getting started, configuration, security model and troubleshooting pages describe

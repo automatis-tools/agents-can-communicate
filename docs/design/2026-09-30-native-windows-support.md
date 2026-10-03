@@ -84,7 +84,10 @@ runtime, because launcher modules may import only their siblings.
 - **What is flushed.** A flush waits for the whole disk. On `windows-latest` beside the full suite
   one took 15 ms at the median and up to 5.8 s with the CPU idle, and the two hooks of about 1,120
   that ran past their budget spent 72-78% of it flushing (2026-10-01). A publication therefore
-  states what a crash may cost it: `full` (the default) flushes the bytes and the name; `bytes`
+  states what a crash may cost it. On the same runner the remote system disk C: flushed in
+  10-33 ms at the median and up to 1.5 s, the local disk D: in 0.5 ms and at most 27 ms
+  (2026-10-02): the cost is the disk's, and it is paid per flush. `full` (the default) flushes
+  the bytes and the name; `bytes`
   flushes the bytes and leaves the name, so a reader finds the previous version and never a
   torn one; `none` flushes nothing. Ephemeral records are `bytes`, because a crash ends the
   session they describe. The sweep's marker is `none`, because its reader treats damage as a
