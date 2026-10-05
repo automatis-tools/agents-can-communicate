@@ -343,3 +343,19 @@ test("an install with no previous version to hold leaves one copy", async t => {
 
   assert.deepEqual(await readdir(cache), [version]);
 });
+
+// The reinstall doctor advised after an update, while the version it moved off
+// carried a running session's in-use marker (2.1.286, 2026-10-05, #257).
+test("a reinstall keeps the version a running session marks in use", async t => {
+  const { context } = await fixture(t);
+  const version = await pluginVersion(CLAUDE_PLUGIN);
+  const cache = path.join(context.configDir, "plugins", "cache", "acc-local",
+    "agents-can-communicate");
+  await mkdir(path.join(cache, "0.0.2", ".in_use"), { recursive: true });
+  await writeFile(path.join(cache, "0.0.2", ".in_use", String(process.pid)),
+    JSON.stringify({ pid: process.pid, procStart: "Mon Oct  5 02:59:17 2026" }));
+
+  await createClaudeCodeAdapter().install({ ...context, keepPreviousVersion: null });
+
+  assert.deepEqual((await readdir(cache)).sort(), ["0.0.2", version].sort());
+});
