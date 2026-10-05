@@ -1,4 +1,4 @@
-# Upgrading to 0.5.0
+# Upgrading
 
 ## From 0.8.x
 
@@ -75,6 +75,33 @@ This release adds no store event type or field.
 This release adds no store event type or field. A sender's delivery JSON may carry
 `nativeLaunchOption` beside `nativeReasonCode`.
 
+0.9.0 adds Windows and the Antigravity desktop app, and changes what `acc uninstall` removes:
+
+- **Windows.** ACC installs and runs natively on Windows 10 and 11, with no WSL, and keeps its
+  state in `%LOCALAPPDATA%\acc`. Live delivery reaches Claude Code through its inbox pipe, Codex
+  through `codex app-server proxy`, and Antigravity CLI through ACC's relay. Codex starts its
+  daemon only from a terminal that is not elevated. On Windows the Antigravity install adds no
+  allow rule, so Antigravity CLI asks before each ACC command. See
+  [Windows](GETTING_STARTED.md#windows).
+- **The Antigravity desktop app.** Antigravity 2.19.1 or later gets live delivery through the
+  app's own language server, with no relay and no command from the agent. The install adds
+  ACC's grant to `~/.gemini/config/config.json` when the app has created that file. If you
+  open the app for the first time after the update, `acc doctor` asks you to run
+  `acc install --adapter antigravity` once.
+- **A session's version is the running client's.** `acc doctor` and `acc status` show the
+  version of the client that runs the session, which can differ from the `claude` or `codex`
+  on `PATH`.
+- **A chat in the Codex app** is reported as `client_session_embedded`. The app runs each
+  window on its own app server, so its chats receive messages at their next turn.
+- **`acc uninstall` without `--adapter` removes only what this data home installed.** A client
+  that another data home wired is skipped by name. `acc uninstall --adapter <client>` still
+  removes it.
+
+This release adds no store event type or field, and `STORE_VERSION` stays 6. A journalled
+transaction no longer writes a completion marker: 0.9.0 retires every journal entry that the
+pointer does not name, and an older ACC's markers leave with their entries. 0.8.x keeps
+working on a store that 0.9.0 wrote.
+
 ## From 0.7.x
 
 Claude Code live delivery wakes each session through the inbox socket that Claude Code opens
@@ -106,10 +133,10 @@ recorded policy. ACC ignores `ACC_NATIVE_DELIVERY_POLICY`, `ACC_BYPASS` and
 A Claude Code session that started through the old shim keeps its Channel until it exits.
 Its next turn binds the inbox. Start new sessions with your ordinary `claude` command.
 
-The Claude Code live-delivery minimum is now 2.1.282 on Apple Silicon macOS. With an older
+The Claude Code live-delivery minimum is now 2.1.282. With an older
 Claude Code, live delivery stays off and the recorded policy is kept. Update Claude Code and
 start a new session: the recorded policy applies to it, with nothing to install again.
-`acc doctor` reports the state. Native Windows keeps next-turn delivery.
+`acc doctor` reports the state.
 
 This release adds no new store event type or field, so a store it writes stays readable by
 0.7.x. The Channel captures remain as history in

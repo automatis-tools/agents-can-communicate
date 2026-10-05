@@ -1,5 +1,39 @@
 # Changelog
 
+## 0.9.0 — release candidate
+
+- ACC installs and runs natively on Windows 10 and 11, with no WSL (#234). The store and the
+  managed runtime use portable filesystem primitives, each client's hooks run a Node shim in the
+  form that client's hook shell reads, and state lives in `%LOCALAPPDATA%\acc` (#235).
+- Live delivery reaches Claude Code, Codex and Antigravity CLI on Windows: Claude Code through
+  its inbox pipe with the peer key it publishes, Codex through `codex app-server proxy`, and
+  Antigravity CLI through ACC's relay on a named pipe (#243).
+- A hook does less work on every turn, measured on windows-latest: a write flushes only what a
+  crash of the machine would otherwise lose, and a journalled transaction writes no completion
+  marker (#243).
+- Antigravity 2.0, the desktop app, gets live delivery through its own language server, with no
+  relay and no stored token. A session's version comes from the client that runs it, a turn
+  after a client restart binds the session to the client running now, and Codex app chats are
+  reported as `client_session_embedded` (#171, #254).
+- The Antigravity install also allows the command that starts the relay, so an unattended
+  Antigravity CLI session starts live delivery without an approval prompt (#252).
+- `acc uninstall` without `--adapter` takes back only what the current data home installed
+  (#253, #255).
+- The docs describe live delivery on Windows and Linux, and no longer name Apple Silicon macOS
+  as the only live platform.
+- The store format is unchanged, so 0.8.5 and 0.9.0 can share a workspace.
+
+| Candidate artifact | Value |
+|---|---|
+| Built from | `cc3540fcb1ae8dc22543af50dd2d55aeb6f1ca77` |
+| Tarball | `agents-can-communicate-0.9.0.tgz`, 554,565 bytes, 336 files |
+| sha256 | `df4700148f5710536155af47b05a0f211d5c8a5d09dee5c945e2b5a5303881c6` |
+
+The exact archive passed clean installation verification and all 24 managed-update packed
+checks. The published 0.8.5 updated itself to these bytes, and the 0.8.5 code and this archive
+read and wrote one store. See [0.9.0 release evidence](docs/release-evidence/v0.9.0.md) for
+verification and limits. Earlier development records below retain their original provenance.
+
 ## Unreleased — the desktop apps of Antigravity, Claude Code and Codex
 
 - Antigravity 2.0, the desktop app, gets live delivery. It runs the same hooks under its own

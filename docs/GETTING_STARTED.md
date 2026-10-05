@@ -229,8 +229,8 @@ What is different on Windows:
   ACC writes the path's 8.3 short name. ACC adds no allow rule on Windows, so Antigravity CLI
   asks before each ACC command.
 - The first hook after the machine starts can take a few seconds, because ACC reads the
-  process tree through PowerShell. If it runs out of time, the session attaches on the first
-  prompt instead.
+  process tree through WMI, in Windows Script Host or, where Script Host is off, PowerShell.
+  If it runs out of time, the session attaches on the first prompt instead.
 
 Next: [Why ACC](WHY_ACC.md) · [Capabilities](CAPABILITIES.md) · [CLI](CLI.md) ·
 [Troubleshooting](TROUBLESHOOTING.md)

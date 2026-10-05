@@ -925,9 +925,9 @@ Facts that shape the adapter:
   `darwin-arm64`, with no maximum. The protocol contract is `claude-code-inbox-socket-v1`.
 - Uncaptured: a receiver in `bypassPermissions` mode, where Claude Code's documentation and
   the text of the 2.1.282 client say each unattested wake is held for approval unless
-  `crossSessionInbound` is `accept`. Also uncaptured: `darwin-x64`, Linux, and native Windows,
-  where the inbox is a named pipe that requires an auth line. Native Windows keeps next-turn
-  delivery.
+  `crossSessionInbound` is `accept`. Also uncaptured by this capture: `darwin-x64`, Linux, and
+  native Windows, where the inbox is a named pipe that requires an auth line. Windows and Linux
+  were measured later; see [Native Windows and Linux, 2026-09-30](#native-windows-and-linux-2026-09-30).
 
 The product capture of the installed candidate is recorded below.
 
@@ -1016,3 +1016,29 @@ Captured on Claude.app 2.19675.0 (macOS 27.0 arm64) with ACC 0.8.5 and Claude Co
   host, and Cowork in a Linux VM; scheduled runs and side chats set `CLAUDE_CODE_HARBOR_KITE=0`,
   which turns the inbox off. A session in `bypassPermissions` mode was not captured in the app,
   which cannot show the approval dialog a held wake waits for.
+
+## Native Windows and Linux, 2026-09-30
+
+Measured on `windows-latest` with Claude Code 2.1.286 in a ConPTY (#243):
+
+- The session record `<config>/sessions/<pid>.json` names the inbox as
+  `\\.\pipe\LOCAL\cc-msg-<32 hex>` and carries `procStart` (a FILETIME string) and `pidDomain`
+  (`win32:<host>`). The hook's `CLAUDE_CODE_MESSAGING_SOCKET` names the same pipe.
+- Beside the record, `<pid>.<sha256 of the lowercased pipe path>.key` holds `peerToken`,
+  `procStartFt` and `pidDomain`; `procStartFt` equals the record's `procStart`.
+- The pipe drops a frame with no auth line or a wrong token and closes. After
+  `{"type":"auth","token":<peerToken>}`, the same wake line runs a turn that the session shows
+  as another session's message, and the pipe answers nothing.
+
+ACC reads that key per offer, only when its process start and pid domain are the record's, and
+stores it nowhere. It never reads the session's own `CLAUDE_CODE_MESSAGING_TOKEN`, which would
+skip the recipient's inbound settings. The probe reads the `claude.exe` an npm `.cmd` runs. On
+Windows, where every file reads as `0o666`, the profile's ACL is the boundary for the endpoint
+records instead of their mode. For the same reason ACC reads a key only from a configuration
+directory inside the user's profile: a `CLAUDE_CONFIG_DIR` elsewhere reads as
+`native_endpoint_unavailable`, and the session keeps next-turn delivery.
+
+The real-clients CI job runs Claude Code installed from npm against a model stub on 127.0.0.1,
+on Linux and on Windows, with live delivery on: a question from another session wakes the idle
+interactive session through its inbox, a Unix socket on Linux and the named pipe on Windows,
+and the model reads it with no one typing.
