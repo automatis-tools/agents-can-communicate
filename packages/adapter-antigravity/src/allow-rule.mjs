@@ -43,7 +43,7 @@ export const accAllowRule = wrapper => `command(${wrapper})`;
 
 // Forms that already allow every command starting with the bare wrapper: the
 // one ACC writes, and the quoted one-word form 1.2.12 was captured matching.
-const allowingForms = wrapper => [accAllowRule(wrapper), `command("${wrapper}")`];
+export const allowingForms = wrapper => [accAllowRule(wrapper), `command("${wrapper}")`];
 
 // Beside the `created-*` markers, for the same reason: the installer removes the
 // shim directory before uninstall runs. `acc doctor` passes the state root.
@@ -53,12 +53,12 @@ const claimDir = ({ dataHome, stateRoot, home }) => typeof dataHome === "string"
     ? path.join(stateRoot, "adapter-antigravity")
     : path.join(home, ".gemini", "config", "acc");
 // One claim per rule, so an older ACC keeps reading the one it wrote.
-const claimPath = (context, file, kind = "cli") => path.join(claimDir(context),
+export const claimPath = (context, file, kind = "cli") => path.join(claimDir(context),
   `allow-rule-${kind === "cli" ? "" : `${kind}-`}${Buffer.from(file).toString("base64url")}`);
 
 const isObject = value => value !== null && typeof value === "object" && !Array.isArray(value);
 
-async function readClaim(file) {
+export async function readClaim(file) {
   try {
     const claim = JSON.parse(await readFile(file, "utf8"));
     return typeof claim?.rule === "string" ? claim : null;

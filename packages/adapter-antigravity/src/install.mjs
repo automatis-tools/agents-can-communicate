@@ -13,6 +13,7 @@ import { AccError, EXIT } from "@agents-can-communicate/protocol";
 
 import { agySettingsPath, cliWrapperPath, ensureAllowRule, inspectAllowRule, inspectRelayRule,
   withdrawAllowRule } from "./allow-rule.mjs";
+import { ensureDesktopRule, inspectDesktopRule, withdrawDesktopRule } from "./desktop-allow-rule.mjs";
 import { relayShimName, relayStartCommand, runningRelays, stopRelays } from "./relays.mjs";
 
 const run = promisify(execFile);
@@ -422,11 +423,13 @@ export async function installAntigravity(context) {
   await installSkillPlugin(context);
   // After the skill, whose wrapper the rule names. Always on (#214, 2026-09-27).
   const allow = await ensureAllowRule(context);
+  // Antigravity 2.0 keeps grants of its own, read only where it has run.
+  const desktop = await ensureDesktopRule(context);
   const changes = [shimDir(home), file, pluginInstallPath(home), vendorManifestPath(home),
-    ...allow.changes];
+    ...allow.changes, ...desktop.changes];
 
-  const diagnostics = [...allow.diagnostics];
-  const needsAction = [...allow.needsAction];
+  const diagnostics = [...allow.diagnostics, ...desktop.diagnostics];
+  const needsAction = [...allow.needsAction, ...desktop.needsAction];
   if (locationOf(context) === "workspace") {
     diagnostics.push("a workspace registration loads only while this project is an open "
       + `Antigravity workspace; in print mode pass --add-dir ${context.antigravityWorkspace}`);
@@ -550,12 +553,14 @@ export async function uninstallAntigravity(context) {
 
   // The allow rule ACC recorded adding, and nothing else in the operator's file.
   const allow = await withdrawAllowRule(context);
-  changes.push(...allow.changes);
-  diagnostics.push(...allow.diagnostics);
+  const desktop = await withdrawDesktopRule(context);
+  changes.push(...allow.changes, ...desktop.changes);
+  diagnostics.push(...allow.diagnostics, ...desktop.diagnostics);
+  const needsAction = [...allow.needsAction, ...desktop.needsAction];
 
   if (!keep.includes(shimDir(home))) await rm(shimDir(home), { recursive: true, force: true });
   return { ok: true, changes, diagnostics,
-    ...(allow.needsAction.length > 0 ? { needsAction: allow.needsAction } : {}) };
+    ...(needsAction.length > 0 ? { needsAction } : {}) };
 }
 
 /**
@@ -594,10 +599,12 @@ export async function detectAntigravity(context) {
   // the client's own approval control over what a woken session can answer.
   const commandApproval = await inspectAllowRule(context);
   const relayApproval = await inspectRelayRule(context);
+  const desktopApproval = await inspectDesktopRule(context);
   const approval = { commandApproval, relayApproval,
     inboundDelivery: { state: commandApproval.state, diagnostic: commandApproval.diagnostic } };
   diagnostics.push(commandApproval.diagnostic);
   if (relayApproval.state !== "unreadable") diagnostics.push(relayApproval.diagnostic);
+  if (desktopApproval.diagnostic !== null) diagnostics.push(desktopApproval.diagnostic);
   // The installer runs every adapter's detect and passes a null version for a
   // client it did not find. Asking agy then would spawn a binary the installer
   // could not run a moment ago, or - where it does exist but did not answer -
