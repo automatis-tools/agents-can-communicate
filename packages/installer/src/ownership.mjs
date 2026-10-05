@@ -29,6 +29,7 @@ export async function fingerprint(file) {
 }
 
 const CLIENT_ORPHAN_MARKER = ".orphaned_at";
+const CLIENT_IN_USE_DIR = ".in_use";
 
 /**
  * Fingerprint of a whole directory ACC created.
@@ -50,8 +51,11 @@ export async function treeFingerprint(root) {
   // Claude Code marks a plugin cache version its registry no longer names with
   // `.orphaned_at`, and removes the marker again if the version comes back. That
   // is the client's own bookkeeping inside a copy ACC keeps on purpose, never an
-  // edit, and ACC never writes a file by that name.
-  const files = entries.filter(entry => entry.isFile() && entry.name !== CLIENT_ORPHAN_MARKER)
+  // edit, and ACC never writes a file by that name. A running session's
+  // `.in_use/<pid>` is the same kind of bookkeeping (2.1.286): after an update it
+  // stood in the previous version ACC keeps on purpose.
+  const files = entries.filter(entry => entry.isFile() && entry.name !== CLIENT_ORPHAN_MARKER
+    && path.basename(entry.parentPath ?? entry.path) !== CLIENT_IN_USE_DIR)
     .map(entry => path.relative(root, path.join(entry.parentPath ?? entry.path, entry.name)))
     .sort();
   const hash = createHash("sha256");

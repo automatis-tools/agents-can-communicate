@@ -75,13 +75,39 @@ export async function stampPluginVersion({ file, version, io }) {
  * holds every plugin installed from that marketplace, and removing that root
  * once took a plugin the user had installed themselves - so a sibling here is
  * an older ACC, and a sibling one level up is somebody else's.
+ *
+ * A version a running session marks in use stays whatever `keep` says. Claude
+ * Code puts `.in_use/<pid>`, named after a running session, into a cached
+ * version and drops the file when that session exits (2.1.286). A reinstall
+ * after an update names only the active version, so it removed a copy the
+ * client had marked (#257). A marker whose process has exited holds nothing; a
+ * reused pid at worst keeps a copy until the next install.
  */
-export async function keepVersions({ root, keep, io }) {
+const IN_USE = ".in_use";
+const PID = /^[1-9]\d*$/;
+
+// `kill(pid, 0)` delivers nothing; EPERM means the process exists under another user.
+function processAlive(pid) {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    return error.code === "EPERM";
+  }
+}
+
+async function markedInUse(directory, io, alive) {
+  const markers = await io.readdir(path.join(directory, IN_USE)).catch(() => []);
+  return markers.some(name => PID.test(name) && alive(Number(name)));
+}
+
+export async function keepVersions({ root, keep, io, alive = processAlive }) {
   const wanted = new Set(keep.filter(version => typeof version === "string" && version !== ""));
   const entries = await io.readdir(root, { withFileTypes: true }).catch(() => []);
   const removed = [];
   for (const entry of entries) {
     if (!entry.isDirectory() || wanted.has(entry.name)) continue;
+    if (await markedInUse(path.join(root, entry.name), io, alive)) continue;
     await io.rm(path.join(root, entry.name), { recursive: true, force: true });
     removed.push(entry.name);
   }

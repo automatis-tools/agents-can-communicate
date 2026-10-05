@@ -1042,3 +1042,28 @@ The real-clients CI job runs Claude Code installed from npm against a model stub
 on Linux and on Windows, with live delivery on: a question from another session wakes the idle
 interactive session through its inbox, a Unix socket on Linux and the named pipe on Windows,
 and the model reads it with no one typing.
+
+## The plugin cache's in-use markers, 2026-10-05
+
+Observed on macOS arm64 with Claude.app's local Code session (bundled Claude Code 2.1.286), while
+ACC updated from 0.8.5 to 0.9.0 (#257):
+
+- Seven seconds after the update installed the 0.9.0 copy,
+  `plugins/cache/acc-local/agents-can-communicate/0.8.5/.in_use/<pid>` appeared, named after the
+  running session and holding its `pid` and `procStart` in the form of its session record.
+- When the session exited, its file went and the empty `.in_use` directory stayed.
+- The same markers stand in other plugins' version directories, named after terminal sessions
+  and written from under a minute to six minutes after each session started.
+
+ACC's ownership fingerprint of the cache counted the marker as an edit, so doctor advised
+`acc install --adapter claude_code`, and that reinstall keeps only the active version. The
+fingerprint now leaves out files in `.in_use`, as it leaves out `.orphaned_at`, and an install
+keeps every version whose marker names a live process.
+
+Five isolated runs the same day, each a real session started on the published 0.9.0 copy and then
+updated to a candidate: Claude Code 2.1.289 in its terminal (marker awaited 30 s, 7 min, and 5 min
+with background traffic allowed), 2.1.289 over stream-json, and Claude.app's 2.1.286 executable
+over stream-json outside the app. None of them wrote a marker. In each, a reinstall removed the
+old copy while the session ran, and the session still took a message afterwards, with ACC's hook
+output: the session read its hooks from the new copy. What writes the marker on the maintainer's
+machine, a session open for many hours or Claude.app itself, is unmeasured.

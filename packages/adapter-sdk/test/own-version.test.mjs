@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import { mkdir, mkdtemp, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -61,6 +62,46 @@ test("a file beside the versions is not a version", async t => {
   await keepVersions({ root, keep: ["0.5.8"], io });
 
   assert.deepEqual((await readdir(root)).sort(), ["0.5.8", "README"]);
+});
+
+// Claude Code marks a cached version with `.in_use/<pid>`, named after a running
+// session (2.1.286, 2026-10-05). A reinstall after an update names only the
+// active version, so without this it removed a copy the client had marked (#257).
+async function markInUse(root, version, pid) {
+  await mkdir(path.join(root, version, ".in_use"), { recursive: true });
+  await writeFile(path.join(root, version, ".in_use", String(pid)),
+    JSON.stringify({ pid, procStart: "Mon Oct  5 02:59:17 2026" }));
+}
+
+test("a version a running session marks in use stays", async t => {
+  const root = await cacheWith(t, ["0.8.5", "0.9.0"]);
+  await markInUse(root, "0.8.5", process.pid);
+
+  const removed = await keepVersions({ root, keep: ["0.9.0", null], io });
+
+  assert.deepEqual(removed, []);
+  assert.deepEqual((await readdir(root)).sort(), ["0.8.5", "0.9.0"]);
+});
+
+test("a marker whose process has exited holds nothing", async t => {
+  const root = await cacheWith(t, ["0.8.5", "0.9.0"]);
+  const { pid } = spawnSync(process.execPath, ["-e", ""]);
+  await markInUse(root, "0.8.5", pid);
+  // Its own marker gone, the session leaves an empty directory behind.
+  await mkdir(path.join(root, "0.8.4", ".in_use"), { recursive: true });
+
+  const removed = await keepVersions({ root, keep: ["0.9.0", null], io });
+
+  assert.deepEqual(removed.sort(), ["0.8.4", "0.8.5"]);
+  assert.deepEqual(await readdir(root), ["0.9.0"]);
+});
+
+test("a file in the marker directory that names no pid holds nothing", async t => {
+  const root = await cacheWith(t, ["0.8.5", "0.9.0"]);
+  await mkdir(path.join(root, "0.8.5", ".in_use"), { recursive: true });
+  await writeFile(path.join(root, "0.8.5", ".in_use", "README"), "not a pid\n");
+
+  assert.deepEqual(await keepVersions({ root, keep: ["0.9.0", null], io }), ["0.8.5"]);
 });
 
 test("a cache directory that is not there yet removes nothing", async t => {
