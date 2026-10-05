@@ -15,8 +15,9 @@ import { clearPin, createGitProbe, resolveHookWorkspace, platformDataHome, runti
   writePin as writeRuntimePin }
   from "@agents-can-communicate/cli/hook-support";
 
-import { resolveClientPid } from "./client-pid.mjs";
-import { probeClientVersion as defaultProbeClientVersion } from "./client-version.mjs";
+import { resolveClient } from "./client-pid.mjs";
+import { ownExecutable, probeClientVersion as defaultProbeClientVersion, probeExecutableVersion }
+  from "./client-version.mjs";
 import { bindNative, callRelease, nativeActivationHintFor, nativeDiagnosticDeadline }
   from "./native-attempt.mjs";
 import { readProcessTable as defaultReadProcessTable } from "./process-table.mjs";
@@ -407,6 +408,50 @@ async function projectActivation(input, offered) {
   }
 }
 
+const STABLE_OR_PRERELEASE = /^\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$/;
+const isVersion = value => typeof value === "string" && STABLE_OR_PRERELEASE.test(value);
+
+/**
+ * Which of its products the adapter recognised the client as. A variant name
+ * the adapter does not declare is ignored together with the version it came
+ * with: that version counts on a line ACC has no evidence for.
+ */
+function declaredProduct(adapter, client) {
+  const name = client?.certificationName;
+  if (typeof name !== "string") return { clientName: undefined, version: client?.version };
+  const primary = adapter.client?.certificationName ?? adapter.client?.command;
+  if (name === primary) return { clientName: undefined, version: client.version };
+  const declared = (adapter.client?.variants ?? []).some(variant => variant?.certificationName === name);
+  return declared ? { clientName: name, version: client.version }
+    : { clientName: undefined, version: undefined };
+}
+
+/**
+ * The version the session's own client runs, or null to fall back to the PATH
+ * probe: what its command line named, then the adapter's reading of the
+ * running client (Claude Code's session registry), then the client's own
+ * executable when `ps` names it by full path. Each step is bounded by the
+ * hook's budget and fails open.
+ */
+async function runningClientVersion({ adapter, client, product, env, deadline }) {
+  if (client === null || client === undefined) return null;
+  if (isVersion(product.version)) return product.version;
+  const remaining = cap => Math.max(1, Math.min(cap, deadline - Date.now() - TABLE_RESERVE_MS));
+  if (typeof adapter.clientVersionOf === "function" && client.entry !== undefined) {
+    let timer;
+    const read = await Promise.race([
+      Promise.resolve().then(() => adapter.clientVersionOf({ pid: client.pid, entry: client.entry, env }))
+        .catch(() => null),
+      new Promise(resolve => { timer = setTimeout(() => resolve(null), remaining(500)); }),
+    ]).finally(() => clearTimeout(timer));
+    if (isVersion(read)) return read;
+  }
+  const file = ownExecutable(client.entry, adapter.client?.command);
+  if (file === null) return null;
+  return probeExecutableVersion(file, adapter.client?.versionArgs ?? ["--version"],
+    { timeoutMs: remaining(1_000) });
+}
+
 const HANDLERS = {
   // `knownClientPid` and `pins: false` are registration's (#167): it runs in
   // a peer's process, so the client's pid is handed over rather than found in
@@ -443,17 +488,24 @@ const HANDLERS = {
     const tableRead = known || command === null ? null : started ?? Promise.resolve(readProcessTable({
       timeoutMs: Math.max(1, Math.min(PROCESS_TABLE_MS, deadline - Date.now() - TABLE_RESERVE_MS)) }));
     tableRead?.catch(() => {});
-    mark("probing the client version");
-    const clientVersion = await probeClientVersion(adapter,
+    // The binary on PATH answers in parallel, as the fallback: the version the
+    // running client names for itself, when it names one, wins below.
+    const pathVersion = probeClientVersion(adapter,
       { timeoutMs: Math.max(1, Math.min(1_000, deadline - Date.now())) });
-    assertHookBudget(deadline);
-    const clientFacts = { clientVersion, platform };
-    const capabilities = effectiveCapabilities(adapter, clientFacts);
     mark("reading the process table");
-    const pid = known ? knownClientPid : command === null ? null
-      : resolveClientPid({ table: await tableRead, from: process.pid, command,
-        clientPackage: adapter.client?.package });
+    const client = known ? { pid: knownClientPid } : command === null ? null
+      : resolveClient({ table: await tableRead, from: process.pid, command,
+        clientPackage: adapter.client?.package, identify: adapter.identifyClientProcess });
     assertHookBudget(deadline);
+    mark("probing the client version");
+    const product = declaredProduct(adapter, client);
+    const clientVersion = await runningClientVersion({ adapter, client, product, env: context.env,
+      deadline }) ?? await pathVersion;
+    assertHookBudget(deadline);
+    const clientFacts = { clientVersion, platform,
+      ...(product.clientName === undefined ? {} : { clientName: product.clientName }) };
+    const capabilities = effectiveCapabilities(adapter, clientFacts);
+    const pid = client?.pid ?? null;
     mark("opening the session");
     const clientPid = Number.isInteger(pid) && pid > 0 ? pid : undefined;
     const native = hookBinding => {

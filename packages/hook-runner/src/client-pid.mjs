@@ -69,17 +69,49 @@ function scriptsOf(entry, clientPackage) {
  * Null is a first-class answer: it means judge this session by age alone.
  */
 export function resolveClientPid({ table, from, command, clientPackage, maxHops = MAX_HOPS }) {
+  return resolveClient({ table, from, command, clientPackage, maxHops })?.pid ?? null;
+}
+
+// What an adapter's identifyClientProcess said about one ancestor, or null.
+// It reads a vendor's command line, so a throw is a "no", never a failed hook.
+function recognised(identify, entry) {
+  if (typeof identify !== "function") return null;
+  try {
+    const answer = identify({ comm: entry.comm, args: typeof entry.args === "string" ? entry.args : "" });
+    return answer !== null && typeof answer === "object" ? answer : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The client this hook runs under: its pid, its process-table entry, and what
+ * the adapter recognised it as - another product it serves, and that
+ * product's version when the process names it. Null when nobody knows.
+ *
+ * At each ancestor the adapter's own identifier is asked first; the declared
+ * command still matches whatever it does not recognise. Antigravity 2.0 runs
+ * hooks under a language server that names its version on its command line,
+ * where Antigravity CLI runs them under `agy`.
+ */
+export function resolveClient({ table, from, command, clientPackage, identify,
+  maxHops = MAX_HOPS }) {
   const seen = new Set();
   let current = from;
   for (let hop = 0; hop < maxHops; hop += 1) {
     const entry = table.get(current);
     if (entry === undefined || seen.has(current)) return null;
     seen.add(current);
+    const product = recognised(identify, entry);
+    if (product !== null) {
+      return { pid: current, entry, certificationName: product.certificationName,
+        version: product.version };
+    }
     // `ps` reports some entries bare (`claude`) and some with a path
     // (`/bin/zsh`), so the comparison has to be on the basename.
     if (imageName(entry.comm) === command
       || scriptsOf(entry, clientPackage).some(name => name === command || name === CLIENT_PACKAGE)) {
-      return current;
+      return { pid: current, entry, certificationName: undefined, version: undefined };
     }
     if (entry.ppid === current || entry.ppid <= 1) return null;
     current = entry.ppid;
