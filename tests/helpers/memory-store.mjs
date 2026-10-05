@@ -1,4 +1,4 @@
-import { AccError, EXIT, validateRecord } from "@agents-can-communicate/protocol";
+import { AccError, EXIT, assertPortableId, validateRecord } from "@agents-can-communicate/protocol";
 
 const SEQUENCE_WIDTH = 16;
 export const ZERO_CURSOR = "0".repeat(SEQUENCE_WIDTH);
@@ -17,71 +17,104 @@ export function createMemoryStore({ clock, ids, workspaceId }) {
   // `kinds` is enforced here exactly as the filesystem store enforces it. A
   // double that waves the declaration through lets a transaction reach for
   // something it never read, pass every test, and find nothing in production.
-  async function transaction(callback, { kinds } = {}) {
+  async function transaction(callback, { kinds, exactKinds = [] } = {}) {
     const wanted = kinds === undefined ? null : new Set(kinds);
-    const declared = kind => {
-      if (wanted !== null && !wanted.has(kind)) {
-        throw new AccError(EXIT.DATA,
-          `this transaction did not declare ${kind}, so it was never read`,
-          { kind, declared: [...wanted] });
-      }
-    };
-    // Staged copies, swapped in only on success. A failed callback must leave
-    // neither a record nor an event behind.
-    const staged = new Map(committed);
-    const stagedEvents = [];
-    let sequence = nextSequence;
+    if (!Array.isArray(exactKinds) || exactKinds.some(kind => wanted === null || !wanted.has(kind))) {
+      throw new AccError(EXIT.DATA, "exactKinds must be a subset of explicit transaction kinds",
+        { kinds, exactKinds });
+    }
+    return withWriter(async () => {
+      const exact = new Set(exactKinds), loadedIds = new Set();
+      let accepting = true;
+      const declared = (kind, id) => {
+        if (wanted !== null && !wanted.has(kind)) {
+          throw new AccError(EXIT.DATA,
+            `this transaction did not declare ${kind}, so it was never read`,
+            { kind, declared: [...wanted] });
+        }
+        if (id !== undefined && exact.has(kind) && !loadedIds.has(key(kind, id))) {
+          throw new AccError(EXIT.DATA, "an exact transaction record must be loaded before access", { kind, id });
+        }
+      };
+      // Staged copies, swapped in only on success. A failed callback must leave
+      // neither a record nor an event behind.
+      const staged = new Map(committed);
+      const stagedEvents = [];
+      let sequence = nextSequence;
 
-    const tx = Object.freeze({
-      get(kind, id) {
-        declared(kind);
-        return staged.get(key(kind, id))?.record ?? null;
-      },
-      generationOf(kind, id) {
-        declared(kind);
-        return staged.get(key(kind, id))?.generation ?? null;
-      },
-      list(kind, predicate = () => true) {
-        declared(kind);
-        return [...staged.values()]
-          .filter(entry => entry.kind === kind && predicate(entry.record))
-          .map(entry => entry.record);
-      },
-      put(kind, id, record, expectedGeneration = null) {
-        declared(kind);
-        const actual = staged.get(key(kind, id))?.generation ?? null;
-        if (actual !== expectedGeneration) {
-          throw new AccError(EXIT.CONFLICT, `${kind} ${id} changed under this transaction`,
-            { kind, id, expectedGeneration, actualGeneration: actual });
-        }
-        validateRecord(kind, record);
-        const generation = ids.next("generation");
-        staged.set(key(kind, id), { kind, id, record, generation });
-        return generation;
-      },
-      remove(kind, id, expectedGeneration = null) {
-        declared(kind);
-        const actual = staged.get(key(kind, id))?.generation ?? null;
-        if (actual !== expectedGeneration) {
-          throw new AccError(EXIT.CONFLICT, `${kind} ${id} changed under this transaction`,
-            { kind, id, expectedGeneration, actualGeneration: actual });
-        }
-        staged.delete(key(kind, id));
-      },
-      append(event) {
-        const stamped = { ...event, sequence: pad(sequence) };
-        sequence += 1;
-        validateRecord("event", stamped);
-        stagedEvents.push(stamped);
-        return stamped;
-      },
+      const tx = Object.freeze({
+        async load(kind, id) {
+          if (!accepting) throw new AccError(EXIT.DATA, "transaction async reads are closed");
+          declared(kind);
+          assertPortableId(kind, "record kind");
+          assertPortableId(id, "record id");
+          const entry = staged.get(key(kind, id));
+          if (entry !== undefined) {
+            validateRecord(kind, entry.record);
+            if (entry.record.workspaceId !== workspaceId) {
+              throw new AccError(EXIT.DATA, "state record belongs to a different workspace");
+            }
+          }
+          loadedIds.add(key(kind, id));
+          return entry?.record ?? null;
+        },
+        async lookup() {
+          if (!accepting) throw new AccError(EXIT.DATA, "transaction async reads are closed");
+          throw new AccError(EXIT.USAGE, "the transaction store does not support indexed lookup");
+        },
+        get(kind, id) {
+          declared(kind, id);
+          return staged.get(key(kind, id))?.record ?? null;
+        },
+        generationOf(kind, id) {
+          declared(kind, id);
+          return staged.get(key(kind, id))?.generation ?? null;
+        },
+        list(kind, predicate = () => true) {
+          declared(kind);
+          if (exact.has(kind)) throw new AccError(EXIT.DATA, "an exact transaction kind cannot be listed", { kind });
+          return [...staged.values()]
+            .filter(entry => entry.kind === kind && predicate(entry.record))
+            .map(entry => entry.record);
+        },
+        put(kind, id, record, expectedGeneration = null) {
+          declared(kind, id);
+          const actual = staged.get(key(kind, id))?.generation ?? null;
+          if (actual !== expectedGeneration) {
+            throw new AccError(EXIT.CONFLICT, `${kind} ${id} changed under this transaction`,
+              { kind, id, expectedGeneration, actualGeneration: actual });
+          }
+          validateRecord(kind, record);
+          const generation = ids.next("generation");
+          staged.set(key(kind, id), { kind, id, record, generation });
+          return generation;
+        },
+        remove(kind, id, expectedGeneration = null) {
+          declared(kind, id);
+          const actual = staged.get(key(kind, id))?.generation ?? null;
+          if (actual !== expectedGeneration) {
+            throw new AccError(EXIT.CONFLICT, `${kind} ${id} changed under this transaction`,
+              { kind, id, expectedGeneration, actualGeneration: actual });
+          }
+          staged.delete(key(kind, id));
+        },
+        append(event) {
+          const stamped = { ...event, sequence: pad(sequence) };
+          sequence += 1;
+          validateRecord("event", stamped);
+          stagedEvents.push(stamped);
+          return stamped;
+        },
+      });
+
+      let result;
+      try { result = await callback(tx); }
+      finally { accepting = false; }
+      committed = staged;
+      events = [...events, ...stagedEvents];
+      nextSequence = sequence;
+      return result;
     });
-
-    const result = await callback(tx);
-    committed = staged;
-    events = [...events, ...stagedEvents];
-    nextSequence = sequence;
-    return result;
   }
 
   async function eventsSince(workspaceId, cursor, limit) {
@@ -130,13 +163,15 @@ export function createMemoryStore({ clock, ids, workspaceId }) {
   // Trimming drops events at or below a boundary and reports where the log now
   // starts, exactly as the filesystem store does.
   async function trimHistory(boundary) {
-    trimmedThrough = trimmedThrough === null || boundary > trimmedThrough
-      ? boundary : trimmedThrough;
-    const before = events.length;
-    for (let index = events.length - 1; index >= 0; index -= 1) {
-      if (events[index].sequence <= boundary) events.splice(index, 1);
-    }
-    return { reclaimed: before - events.length, trimmedThrough, remaining: false };
+    return withWriter(async () => {
+      trimmedThrough = trimmedThrough === null || boundary > trimmedThrough
+        ? boundary : trimmedThrough;
+      const before = events.length;
+      for (let index = events.length - 1; index >= 0; index -= 1) {
+        if (events[index].sequence <= boundary) events.splice(index, 1);
+      }
+      return { reclaimed: before - events.length, trimmedThrough, remaining: false };
+    });
   }
 
   // The envelope generation, which `snapshot` deliberately withholds. Reclaiming
@@ -152,31 +187,33 @@ export function createMemoryStore({ clock, ids, workspaceId }) {
   // caller pass its tests and lose a renewed claim in the only place that
   // matters, so the generation check is real here too.
   async function reclaimRecords(plan) {
-    // A function is decided here rather than by the caller, exactly as the
-    // filesystem store decides it under the writer mutex.
-    const entries = typeof plan === "function" ? await plan() : plan;
-    let reclaimed = 0;
-    let skipped = 0;
-    for (const entry of entries) {
-      const found = committed.get(key(entry.kind, entry.id));
-      if (found === undefined || found.generation !== entry.generation) {
-        skipped += 1;
-        continue;
+    return withWriter(async () => {
+      // A function is decided here rather than by the caller, exactly as the
+      // filesystem store decides it under the writer mutex.
+      const entries = typeof plan === "function" ? await plan() : plan;
+      let reclaimed = 0;
+      let skipped = 0;
+      for (const entry of entries) {
+        const found = committed.get(key(entry.kind, entry.id));
+        if (found === undefined || found.generation !== entry.generation) {
+          skipped += 1;
+          continue;
+        }
+        committed.delete(key(entry.kind, entry.id));
+        reclaimed += 1;
       }
-      committed.delete(key(entry.kind, entry.id));
-      reclaimed += 1;
-    }
-    return { reclaimed, skipped, remaining: false };
+      return { reclaimed, skipped, remaining: false };
+    });
   }
 
   // Ephemeral records live outside transactions and outside the event log:
   // they are presence and Intent for a workspace that has not materialised.
   const volatile = new Map();
-  let ephemeralTail = Promise.resolve();
-  const withEphemeralWriter = async callback => {
-    const previous = ephemeralTail;
+  let writerTail = Promise.resolve();
+  const withWriter = async callback => {
+    const previous = writerTail;
     let release;
-    ephemeralTail = new Promise(resolve => { release = resolve; });
+    writerTail = new Promise(resolve => { release = resolve; });
     await previous;
     try {
       return await callback();
@@ -188,13 +225,13 @@ export function createMemoryStore({ clock, ids, workspaceId }) {
     async get(kind, id) { return volatile.get(key(kind, id)) ?? null; },
     async put(kind, id, record) {
       validateRecord(kind, record);
-      return withEphemeralWriter(async () => {
+      return withWriter(async () => {
         volatile.set(key(kind, id), record);
         return record;
       });
     },
     async update(kind, id, updater) {
-      return withEphemeralWriter(async () => {
+      return withWriter(async () => {
         const current = volatile.get(key(kind, id)) ?? null;
         const next = await updater(current);
         if (next === null) return null;
@@ -204,7 +241,7 @@ export function createMemoryStore({ clock, ids, workspaceId }) {
       });
     },
     async delete(kind, id, guard = () => true) {
-      return withEphemeralWriter(async () => {
+      return withWriter(async () => {
         const current = volatile.get(key(kind, id)) ?? null;
         if (current === null || !await guard(current)) return;
         volatile.delete(key(kind, id));
