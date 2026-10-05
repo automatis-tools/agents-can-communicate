@@ -2,9 +2,9 @@
 
 | Candidate artifact | Value |
 |---|---|
-| Built from | `30f1340479b222151b0ba5573f149348946f71e6` |
-| Tarball | `agents-can-communicate-0.8.5.tgz`, 533,656 bytes, 329 files |
-| sha256 | `3242143cd3e295ea932cca9c8b73ff71165b4608ee4adbbe92eb5694ef30551f` |
+| Built from | `1c1adace3c47472b5d9e6a66cd7810bdc9635073` |
+| Tarball | `agents-can-communicate-0.8.5.tgz`, 533,774 bytes, 329 files |
+| sha256 | `93eb2e9b4434f9ea4a58478d34554a9c51add798d51b0bf2a2e1726dd908ebb7` |
 
 Follows [#214](unreleased-antigravity-acc-allow-rule.md), which allowed ACC's wrapper.
 
