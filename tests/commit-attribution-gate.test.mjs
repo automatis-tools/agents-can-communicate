@@ -203,10 +203,10 @@ test("a trailer in a comment or in the `git commit -v` diff is not the message",
 });
 
 // The real pre-push hook, with a stub npm standing in for the eight-minute suite.
-async function stubNpmPath(t) {
+async function stubNpmPath(t, script = "#!/bin/sh\nexit 0\n") {
   const stub = await mkdtemp(path.join(tmpdir(), "acc-attribution-npm-"));
   t.after(() => rm(stub, { recursive: true, force: true }));
-  await writeFile(path.join(stub, "npm"), "#!/bin/sh\nexit 0\n");
+  await writeFile(path.join(stub, "npm"), script);
   await chmod(path.join(stub, "npm"), 0o755);
   // Windows has no /usr/bin: git, and the sh and xargs the hook runs, are where
   // the machine's own PATH finds them, behind the stub.
@@ -244,6 +244,27 @@ test("a new branch cannot carry an attributed commit that another remote branch 
   // Deleting the attributed branch pushes nothing and must stay possible.
   const deleted = await git(["push", "-q", "origin", ":refs/heads/legacy"]);
   assert.equal(deleted.code, 0, deleted.stderr);
+});
+
+// A throwaway measurement branch carries a probe for a CI runner, nothing that
+// is merged or packed: its push runs the attribution and lint gates, not the
+// suite. The stub npm fails, so a push that ran the suite would be refused.
+test("a push of measurement branches alone skips the suite, and nothing else does", async t => {
+  const { git, commit } = await scratch(t,
+    { PATH: await stubNpmPath(t, "#!/bin/sh\necho 'suite ran' >&2\nexit 1\n") });
+
+  const probe = await git(["push", "-q", "origin", "HEAD:refs/heads/measure/probe"]);
+  assert.equal(probe.code, 0, probe.stderr);
+  assert.doesNotMatch(probe.stderr, /suite ran/);
+  const feature = await git(["push", "-q", "origin", "HEAD:refs/heads/feature"]);
+  assert.notEqual(feature.code, 0, "a feature branch was pushed without the suite");
+  assert.match(feature.stderr, /suite ran/);
+  const both = await git(["push", "-q", "origin", "HEAD:refs/heads/measure/two", "HEAD:refs/heads/other"]);
+  assert.notEqual(both.code, 0, "a push naming another branch skipped the suite");
+
+  assert.equal((await commit(ATTRIBUTED["a session trailer"], "--no-verify")).code, 0);
+  const attributed = await git(["push", "-q", "origin", "HEAD:refs/heads/measure/attributed"]);
+  assert.notEqual(attributed.code, 0, "a measurement branch carried an attributed commit");
 });
 
 test("the Lint mode refuses attributed history and accepts a clean one", async t => {

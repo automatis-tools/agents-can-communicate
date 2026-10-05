@@ -1,47 +1,72 @@
 import assert from "node:assert/strict";
-import fs from "node:fs";
-import { mkdir, mkdtemp, rm } from "node:fs/promises";
-import { syncBuiltinESMExports } from "node:module";
+import { mkdir, mkdtemp, rm, utimes, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
 
-// Measured on windows-latest: a flush costs about 8 ms there, and a hook takes
-// the writer lock several times. Taking it wrote the owner record, flushed it,
-// and then flushed the same file again as the record's directory entry. On NTFS
-// flushing a file commits the metadata journal up to the file's last change,
-// which includes its creation (docs/design/2026-09-30-native-windows-support.md,
-// "Directory sync"), so the first flush already made the entry durable. POSIX
-// still syncs the candidate directory: a file's fsync does not cover its name.
-const opens = [];
-const original = fs.promises.open;
-fs.promises.open = async (file, flags, ...rest) => {
-  opens.push([String(file), flags]);
-  return original(file, flags, ...rest);
-};
-syncBuiltinESMExports();
+import { flushesDuring } from "../../../tests/helpers/flush-recorder.mjs";
+
 const { storePaths } = await import("../src/index.mjs");
 const { withWriterMutex } = await import("../src/writer-mutex.mjs");
 
-async function acquire(t, platform) {
+// The writer lock guards live processes, and a crash of the machine leaves none:
+// whatever the lock directory holds afterwards guards nobody. Taking it used to
+// flush the owner record, and on POSIX the candidate's directory and the locks
+// directory too - three flushes per acquisition, five acquisitions in a session
+// start. On windows-latest one flush took 15 ms at the median and up to 5.8 s
+// beside the suite, and the hooks that ran past their budget spent most of it
+// flushing (2026-10-01). Nothing is flushed now. The one thing the flush
+// prevented - an owner record a crash left unreadable - is reclaimed like a dead
+// owner once it is older than any write takes.
+const clock = { now: () => new Date().toISOString() };
+
+async function lockRoot(t) {
   const root = await mkdtemp(path.join(tmpdir(), "acc-owner-flush-"));
   t.after(() => rm(root, { recursive: true, force: true }));
   const paths = storePaths(root);
   await mkdir(paths.locks, { recursive: true });
-  opens.length = 0;
-  await withWriterMutex(paths, { root, clock: { now: () => new Date().toISOString() }, platform },
-    async () => {});
-  return opens.filter(([file]) => path.basename(file) === "owner.json" || file.endsWith(".lock"));
+  return { root, paths };
 }
 
-test("windows: taking the writer lock flushes its owner record once", async t => {
-  const flushes = (await acquire(t, "win32")).filter(([, flags]) => flags === "r+");
-  assert.deepEqual(flushes, [], "the owner record was flushed a second time");
-});
+for (const platform of ["win32", "linux"]) {
+  test(`${platform}: taking the writer lock flushes nothing`,
+    { skip: platform !== "win32" && process.platform === "win32"
+      && "a POSIX lock renames over an empty directory, which Windows refuses" },
+    async t => {
+      const { root, paths } = await lockRoot(t);
+      const flushed = await flushesDuring(() => withWriterMutex(paths,
+        { root, clock, platform }, async () => {}));
+      assert.deepEqual(flushed, []);
+    });
+}
 
-test("posix: taking the writer lock still syncs the candidate's directory",
-  { skip: process.platform === "win32" && "Windows refuses a flush on a directory handle" },
+// What a crash leaves: the lock directory with an owner record whose bytes
+// never reached the disk - empty, or zeros where NTFS kept the length.
+async function crashedLock(paths, ageMs) {
+  const lock = path.join(paths.locks, "writer.lock");
+  await mkdir(lock);
+  const owner = path.join(lock, "owner.json");
+  await writeFile(owner, Buffer.alloc(96));
+  const then = new Date(Date.now() - ageMs);
+  await utimes(owner, then, then);
+  return lock;
+}
+
+test("an owner record a crash left unreadable is reclaimed once it is older than any write",
   async t => {
-  const directories = (await acquire(t, "linux")).filter(([file]) => file.endsWith(".lock"));
-  assert.equal(directories.length > 0, true, "the candidate directory was not synced");
-});
+    const { root, paths } = await lockRoot(t);
+    await crashedLock(paths, 120_000);
+    let ran = false;
+    await withWriterMutex(paths, { root, clock, acquireTimeoutMs: 1_000 }, async () => { ran = true; });
+    assert.equal(ran, true);
+  });
+
+test("an unreadable owner record younger than that is waited for, never taken",
+  async t => {
+    const { root, paths } = await lockRoot(t);
+    const lock = await crashedLock(paths, 0);
+    await assert.rejects(withWriterMutex(paths, { root, clock, acquireTimeoutMs: 200 },
+      async () => { throw new Error("the lock was taken from under an owner still writing"); }),
+    { message: /another writer holds the store lock/ });
+    assert.deepEqual((await import("node:fs")).readdirSync(lock), ["owner.json"]);
+  });

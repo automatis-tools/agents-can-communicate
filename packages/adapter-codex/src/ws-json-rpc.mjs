@@ -75,8 +75,10 @@ export function refusesConnections(socketPath, { timeoutMs = 1_000 } = {}) {
   });
 }
 
+// `connect` returns the byte stream to speak over: a socket by default, or on
+// Windows the stdio of `codex app-server proxy`, which relays to the same server.
 export function openWebSocketPeer({ socketPath, timeoutMs, path = "/", host = "localhost",
-  retainNotifications = true }) {
+  retainNotifications = true, connect = () => net.createConnection(socketPath) }) {
   const notifications = [];
   const pending = new Map();
   const key = randomBytes(16).toString("base64");
@@ -90,7 +92,7 @@ export function openWebSocketPeer({ socketPath, timeoutMs, path = "/", host = "l
   const ready = new Promise((resolve, reject) => { resolveReady = resolve; rejectReady = reject; });
   ready.catch(() => {});
 
-  const socket = net.createConnection(socketPath);
+  const socket = connect();
   socket.on("connect", () => socket.write(`GET ${path} HTTP/1.1\r\nHost: ${host}\r\n`
     + `Upgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Key: ${key}\r\n`
     + "Sec-WebSocket-Version: 13\r\n\r\n"));

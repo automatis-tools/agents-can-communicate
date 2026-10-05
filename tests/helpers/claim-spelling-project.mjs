@@ -1,10 +1,12 @@
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
-import { mkdtemp, realpath, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, realpath, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
+import { resolveExecutable } from "@agents-can-communicate/adapter-sdk";
 import { fixtureOwnerEnv } from "./fixture-owner.mjs";
+import { processFixtureEnv } from "./process-env.mjs";
 const run = promisify(execFile);
 const repo = path.resolve(import.meta.dirname, "..", "..");
 const acc = path.join(repo, "bin", "acc.mjs");
@@ -23,17 +25,21 @@ const hook = path.join(repo, "bin", "acc-hook.mjs");
 export async function claimSpellingProject(t, { owner = "hook", hookEnv = {} } = {}) {
   const base = await realpath(await mkdtemp(path.join(tmpdir(), "acc-spelling-")));
   t.after(() => rm(base, { recursive: true, force: true }));
-  const env = { ...process.env, ACC_DATA_HOME: path.join(base, "data"),
-    GIT_DIR: "", GIT_WORK_TREE: "" };
-  const bare = { ...process.env };
+  const env = await processFixtureEnv(base);
+  const git = await resolveExecutable("git");
+  assert.notEqual(git, null, "claim fixture: Git is required to create its repository");
+  // Git for Windows lives outside cmd.exe's directory. Keep client shims first,
+  // but make this exact Git available to ACC's real workspace discovery too.
+  env.PATH += path.delimiter + path.dirname(git);
+  const bare = { ...env };
   for (const name of ["GIT_DIR", "GIT_WORK_TREE"]) delete bare[name];
 
   const root = path.join(base, "repo");
-  await run("mkdir", ["-p", path.join(root, "src")]);
+  await mkdir(path.join(root, "src"), { recursive: true });
   await writeFile(path.join(root, "src", "physics.mjs"), "export const y = 0;\n");
-  await run("git", ["-c", "init.defaultBranch=main", "init", "-q", root], { env: bare });
-  await run("git", ["-C", root, "add", "-A"], { env: bare });
-  await run("git", ["-C", root, "-c", "user.email=a@b", "-c", "user.name=t",
+  await run(git, ["-c", "init.defaultBranch=main", "init", "-q", root], { env: bare });
+  await run(git, ["-C", root, "add", "-A"], { env: bare });
+  await run(git, ["-C", root, "-c", "user.email=a@b", "-c", "user.name=t",
     "commit", "-q", "-m", "init"], { env: bare });
 
   const owners = {};
@@ -83,4 +89,3 @@ export async function claimSpellingProject(t, { owner = "hook", hookEnv = {} } =
   };
   return { root, env, claim, write };
 }
-

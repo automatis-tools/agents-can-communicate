@@ -1,13 +1,13 @@
 import { createHash, randomUUID } from "node:crypto";
 import { constants } from "node:fs";
-import { mkdir, rmdir } from "node:fs/promises";
+import { lstat, mkdir, rmdir } from "node:fs/promises";
 import path from "node:path";
 import { performance } from "node:perf_hooks";
 
 import { AccError, EXIT } from "@agents-can-communicate/protocol";
 
 import { encode, readJsonIfPresent } from "./atomic-json.mjs";
-import { isWindows, removeTree, renameEntry, syncEntry } from "./portable-fs.mjs";
+import { isWindows, removeTree, renameEntry } from "./portable-fs.mjs";
 import { ensureManagedDirectory } from "./safe-directory.mjs";
 import { withRegularNoFollow } from "./safe-file.mjs";
 
@@ -17,8 +17,15 @@ const OWNER = "owner.json";
 const sleepFor = duration => new Promise(resolve => { setTimeout(resolve, duration); });
 
 // A fully prepared directory is the atomic primitive. Publishing the owner
-// with the directory means a crash can leave an unused candidate, but never an
-// ownerless canonical lock that blocks every later writer.
+// with the directory means a process that dies can leave an unused candidate,
+// but never an ownerless canonical lock that blocks every later writer.
+//
+// Nothing here is flushed. The lock guards live processes, and a crash of the
+// machine leaves none: whatever it left in the lock guards nobody. A flush cost
+// up to 5.8 s on windows-latest beside the suite (2026-10-01), three of them per
+// acquisition on POSIX, and the only thing they bought was an owner record that
+// stays readable through a crash. An unreadable one is reclaimed instead, once
+// it is older than any write takes (takeStaleOwnership).
 function defaultPidIsAlive(pid) {
   try {
     process.kill(pid, 0);
@@ -36,13 +43,7 @@ async function prepareCandidate(paths, root, owner, platform) {
     await withRegularNoFollow(path.join(candidate, OWNER), root,
       constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL, async handle => {
         await handle.writeFile(encode(owner));
-        await handle.sync();
       });
-    // POSIX makes the record's name durable by syncing the directory. On
-    // Windows the record's own flush above already committed NTFS's journal up
-    // to its last change, which includes creating it, and a second flush of the
-    // same file would only cost another 8 ms (measured on windows-latest).
-    if (!isWindows(platform)) await syncEntry(candidate, path.join(candidate, OWNER), { platform });
     return candidate;
   } catch (error) {
     await removeTree(candidate, { platform });
@@ -126,13 +127,21 @@ async function releaseByOwnerRecord(directory, retiredOwner, { platform, rename 
  * refuses everywhere a parent has no business changing.
  */
 async function readOwner(directory, root, openFile) {
+  const file = path.join(directory, OWNER);
   try {
-    const found = await readJsonIfPresent(path.join(directory, OWNER), root, openFile);
+    const found = await readJsonIfPresent(file, root, openFile);
     return found?.value ?? null;
   } catch (error) {
     if (error instanceof AccError && error.code === EXIT.DATA
       && /parent directory changed/.test(error.message)) {
       return null;
+    }
+    // Bytes a crash kept from the disk: an empty record, or zeros where NTFS
+    // kept its length. Its age is all that is left to judge it by.
+    if (error instanceof AccError && error.code === EXIT.DATA
+      && /^invalid JSON record/.test(error.message)) {
+      const stat = await lstat(file).catch(() => null);
+      return stat === null ? null : { unreadable: true, modifiedMs: stat.mtimeMs };
     }
     throw error;
   }
@@ -158,19 +167,29 @@ async function readOwner(directory, root, openFile) {
  * unrelated, and then `pidIsAlive` says yes forever. Sixty seconds is far longer
  * than any write here takes - the hook budget is five - so a holder that old is
  * not a writer that is still going.
+ *
+ * An owner record nobody can read is judged by the same age, on the clock that
+ * stamped its file. Only a crash of the machine leaves one: a live writer's
+ * record is complete before the lock carries it, and an older ACC that wrote
+ * into the lock directly takes microseconds to finish.
  */
 async function takeStaleOwnership(directory, root, owner, now, pidIsAlive,
-  { platform, rename, deadlineAt }) {
+  { platform, rename, deadlineAt, wallNow }) {
   if (owner === null) return false;
-  const age = Date.parse(now) - Date.parse(owner.acquiredAt);
-  if (pidIsAlive(owner.pid) && !(age > STALE_MS)) return false;
+  if (owner.unreadable === true) {
+    if (!(wallNow() - owner.modifiedMs > STALE_MS)) return false;
+  } else {
+    const age = Date.parse(now) - Date.parse(owner.acquiredAt);
+    if (pidIsAlive(owner.pid) && !(age > STALE_MS)) return false;
+  }
   // Every contender that observed this owner names the same retained target.
   // rename() moves the whole lock atomically; exactly one contender can put it
   // there. The target is deliberately left non-empty. A late contender cannot
   // rename a successor over it, so a stale pathname observation never becomes
   // permission to remove the writer that acquired the lock afterwards.
   const identity = createHash("sha256")
-    .update(JSON.stringify([owner.pid, owner.token, owner.acquiredAt]))
+    .update(JSON.stringify(owner.unreadable === true ? ["unreadable", owner.modifiedMs]
+      : [owner.pid, owner.token, owner.acquiredAt]))
     .digest("hex");
   const reclaimed = path.join(path.dirname(directory), `writer.reclaimed-${identity}.lock`);
   try {
@@ -220,7 +239,6 @@ export async function withWriterMutex(paths, options, operation) {
         await renameEntry(candidate, directory,
           { ...fsOptions, deadlineAt: wallNow() + Math.max(0, deadline - monotonicNow()) });
         ownsCanonical = true;
-        await syncEntry(paths.locks, directory, { platform });
       } catch (error) {
         if (!["EEXIST", "ENOTEMPTY"].includes(error.code)) throw error;
         const current = await readOwner(directory, root, openFile);
@@ -232,7 +250,8 @@ export async function withWriterMutex(paths, options, operation) {
         if (current === null && isWindows(platform)
           && await rmdir(directory).then(() => true, () => false)) continue;
         if (!await takeStaleOwnership(directory, root, current, clock.now(), pidIsAlive,
-          { ...fsOptions, deadlineAt: wallNow() + Math.max(0, deadline - monotonicNow()) })) {
+          { ...fsOptions, wallNow,
+            deadlineAt: wallNow() + Math.max(0, deadline - monotonicNow()) })) {
           const remaining = deadline - monotonicNow();
           if (remaining <= 0) break;
           await sleep(Math.min(waitMs, remaining));

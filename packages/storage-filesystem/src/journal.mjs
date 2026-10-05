@@ -3,11 +3,26 @@ import path from "node:path";
 import { AccError, EXIT, assertPortableId } from "@agents-can-communicate/protocol";
 
 import { activateJournal, idleJournal, readActiveJournal } from "./active-journal.mjs";
-import { encode, publishAtomic, readJsonIfPresent, retainFile }
+import { encode, nameCommittedLater, publishAtomic, readJsonIfPresent, retainFile }
   from "./atomic-json.mjs";
-import { completeJournal } from "./retention.mjs";
 
 export const JOURNAL_VERSION = 2;
+
+// What a publication inside a transaction leaves to the flush after it.
+//
+// The entry's name is made durable by the pointer that opens it, which is
+// published beside it in journal/: POSIX syncs that directory, and on Windows
+// flushing a file commits NTFS's metadata journal up to that file's last change
+// (docs/design/2026-09-30-native-windows-support.md, "What is flushed"). That
+// journal is one sequence, so on Windows every rename logged before a flush is
+// committed with it: each record's own flush commits the rename before it, and
+// the pointer going idle commits the last record's. Only bytes are flushed
+// there. A crash that loses the idle pointer's rename leaves the transaction
+// open, and nothing written after it can be durable without that rename, so
+// rolling it forward again changes nothing. A flush took 15 ms at the median and
+// up to 5.8 s on windows-latest beside the suite (2026-10-01).
+const ENTRY = "bytes";
+const linked = nameCommittedLater;
 
 // A journal entry is prepared only after the transaction callback has
 // succeeded and every byte is known. The subsequent synced active-log record
@@ -62,17 +77,19 @@ export function journalEntry(transactionId, firstSequence, publications, started
 }
 
 export async function writeJournalEntry(paths, options, entry) {
-  await publishAtomic(journalPath(paths, entry.transactionId), encode(entry), options);
+  await publishAtomic(journalPath(paths, entry.transactionId), encode(entry),
+    { ...options, durability: ENTRY });
   await options.failAt?.("after-journal-prepared");
-  await activateJournal(paths, options, entry);
+  await activateJournal(paths, { ...options, durability: linked(options.platform) }, entry);
   return entry;
 }
 
+// The entry stays where it is; the reclaimer retires every entry the pointer
+// does not name.
 export async function retireJournalEntry(paths, options, transactionId) {
   await retainFile(journalPath(paths, transactionId), { root: paths.root });
-  await completeJournal(paths, options, transactionId);
   await options.failAt?.("before-journal-idle");
-  await idleJournal(paths, options, transactionId);
+  await idleJournal(paths, { ...options, durability: linked(options.platform) }, transactionId);
 }
 
 export async function readOpenJournals(paths, root) {
@@ -124,7 +141,7 @@ export async function rollForward(paths, options, entry) {
     }
     const bytes = Buffer.from(publication.bytes, "base64");
     const outcome = await publishAtomic(destination, bytes,
-      { ...options, replace: publication.replace === true });
+      { ...options, replace: publication.replace === true, durability: linked(options.platform) });
     if (outcome === "published") published.push(publication.path);
     // Seam for the crash-window tests: abort between two publications of the
     // same decided transaction.

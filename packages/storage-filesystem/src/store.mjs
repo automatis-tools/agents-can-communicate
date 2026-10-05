@@ -27,6 +27,11 @@ import { withWriterMutex } from "./writer-mutex.mjs";
 // make it easy to reintroduce separate locks and resurrect replaced sessions.
 
 const SEQUENCE_WIDTH = 16;
+// An ephemeral record describes a live session. A crash of the machine ends
+// every session it describes, and a session whose record comes back as its
+// previous version, or not at all, is recovered by its next hook. Its bytes are
+// still flushed, so no reader finds a torn record.
+const EPHEMERAL = "bytes";
 export const ZERO_CURSOR = "0".repeat(SEQUENCE_WIDTH);
 // No quarantine area. One was created in every workspace, named in the path
 // typedef, and written to by nothing: repair deliberately refuses to move a
@@ -101,7 +106,7 @@ async function nextSequence(paths, root) {
 }
 
 export async function openFilesystemStore({ root, clock, ids, workspaceId, failAt,
-  deadlineAt: storeDeadline }) {
+  deadlineAt: storeDeadline, platform = process.platform }) {
   assertPublicationDeadline(storeDeadline);
   const paths = storePaths(root);
   // The caller owns the root path, so its ancestors are created here. Inside the
@@ -110,9 +115,9 @@ export async function openFilesystemStore({ root, clock, ids, workspaceId, failA
   await mkdir(root, { recursive: true });
   // Identity is settled before any read or write. Adopting a directory that
   // already belongs to another workspace is the failure this fails closed on.
-  await requireStoreIdentity(paths, { workspaceId, clock });
+  await requireStoreIdentity(paths, { workspaceId, clock, platform });
   for (const name of DIRECTORIES) await ensureManagedDirectory(root, paths[name]);
-  const publishOptions = { root, tmpDir: paths.tmp, clock, failAt };
+  const publishOptions = { root, tmpDir: paths.tmp, clock, failAt, platform };
   await initialiseActiveJournal(paths, publishOptions);
 
   // Any journal left behind by a crashed writer is completed before the store
@@ -389,7 +394,7 @@ export async function openFilesystemStore({ root, clock, ids, workspaceId, failA
       validateRecord(kind, record);
       return withWriterMutex(paths, { ...publishOptions, deadlineAt: storeDeadline }, async () => {
         await publishAtomic(ephemeralPath(kind, id), encode(record),
-          { root, tmpDir: paths.tmp, replace: true, deadlineAt: storeDeadline });
+          { root, tmpDir: paths.tmp, replace: true, durability: EPHEMERAL, deadlineAt: storeDeadline });
         // Once record bytes are accepted, finish the same logical publication.
         await markEphemeral(paths, publishOptions, kind, id, "present");
         return record;
@@ -403,7 +408,7 @@ export async function openFilesystemStore({ root, clock, ids, workspaceId, failA
         validateRecord(kind, next);
         assertPublicationDeadline(deadlineAt);
         await publishAtomic(ephemeralPath(kind, id), encode(next),
-          { root, tmpDir: paths.tmp, replace: true, deadlineAt });
+          { root, tmpDir: paths.tmp, replace: true, durability: EPHEMERAL, deadlineAt });
         await markEphemeral(paths, publishOptions, kind, id, "present");
         return next;
       });

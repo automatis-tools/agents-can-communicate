@@ -63,13 +63,18 @@ const RECOVERY = new Map([
     + " no Windows shell quotes alike; rename it and restart the client"],
 ]);
 
+// The step a hook was in when its budget ran out, as the runner names it: a few
+// plain words, never text from the hook's input.
+const PHASE = /^[a-z][a-z ]{0,59}$/;
+
 export async function completeHookOutput(result,
   { stdout = process.stdout, stderr = process.stderr } = {}) {
   if (result.failed || result.timedOut) {
     // Only a known code selects static recovery advice. Arbitrary payload or
     // filesystem error text must never become client-visible instructions.
     const recovery = RECOVERY.get(result.failureCode) ?? "";
-    tryWrite(stderr, `acc: coordination unavailable${recovery}; hook continued without context\n`);
+    const held = result.timedOut && PHASE.test(result.phase ?? "") ? ` (timed out while ${result.phase})` : "";
+    tryWrite(stderr, `acc: coordination unavailable${recovery}${held}; hook continued without context\n`);
   }
   try {
     await writeOutput(stdout, result.stdout ?? "", { deadlineAt: result.deadlineAt });

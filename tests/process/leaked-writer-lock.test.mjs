@@ -10,6 +10,7 @@ import { EXIT } from "@agents-can-communicate/protocol";
 import { withWriterMutex } from "../../packages/storage-filesystem/src/writer-mutex.mjs";
 
 import { fixtureOwnerEnv } from "../helpers/fixture-owner.mjs";
+import { processFixtureEnv } from "../helpers/process-env.mjs";
 
 const run = promisify(execFile);
 const repo = path.resolve(import.meta.dirname, "..", "..");
@@ -92,8 +93,7 @@ async function workspace(t) {
   t.after(() => rm(base, { recursive: true, force: true }));
   const project = path.join(base, "project");
   await mkdir(project, { recursive: true });
-  const env = { ...process.env, ACC_DATA_HOME: path.join(base, "data"),
-    GIT_DIR: "", GIT_WORK_TREE: "" };
+  const env = await processFixtureEnv(base);
   const attach = async participant => {
     const child = run(process.execPath, [hook, "codex"],
       { env: { ...env, ACC_PARTICIPANT: participant } });

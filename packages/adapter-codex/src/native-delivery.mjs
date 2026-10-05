@@ -39,10 +39,9 @@ export async function probeNativeDelivery({ timeoutMs = 750, env = process.env,
   open = openCodexAppServer, platform = process.platform } = {}) {
   const unsupported = (reasonCode, clientVersion = null) => ({ supported: false, clientVersion,
     protocolContract: PROTOCOL_CONTRACT, executableFingerprint: null, modes: [], reasonCode });
-  // The Windows daemon listens on AF_UNIX, which Node cannot reach there. Its
-  // stdio proxy is the Windows transport, and it is not built yet.
-  if (platform === "win32") return unsupported("native_delivery_unsupported");
-  const socketPath = await readySocketPath(controlSocketPath(env));
+  // Windows reaches the daemon's AF_UNIX socket through `codex app-server proxy`
+  // (openCodexAppServer); everything past the transport is the same.
+  const socketPath = await readySocketPath(controlSocketPath(env), { platform });
   if (socketPath === null) return unsupported("native_endpoint_unavailable");
   try {
     return await usingPeer(socketPath, timeoutMs, open, async peer => {
@@ -112,8 +111,7 @@ export async function verifyReceiver(peer, endpoint, { probe = probeCodexQueue,
 // for it, and the reason then names the cause instead of the symptom.
 export async function bindNativeSession({ argvOf = hostArgv, platform = process.platform,
   ...options } = {}) {
-  if (platform === "win32") return closed(options.clientVersion, "native_delivery_unsupported");
-  const result = await bindAttempt(options);
+  const result = await bindAttempt({ ...options, platform });
   if (result.supported || !Number.isInteger(options.clientPid) || options.clientPid <= 0) return result;
   const host = await embeddedHost(options.clientPid, argvOf);
   if (host === null) return result;
@@ -122,14 +120,15 @@ export async function bindNativeSession({ argvOf = hostArgv, platform = process.
 }
 
 async function bindAttempt({ event, clientPid, clientVersion, runtimeDir,
-  env = process.env, timeoutMs = 750, now = Date.now, open = openCodexAppServer } = {}) {
+  env = process.env, timeoutMs = 750, now = Date.now, open = openCodexAppServer,
+  platform = process.platform } = {}) {
   const rejected = reason => closed(clientVersion, reason);
   if (!Number.isInteger(clientPid) || clientPid <= 0) return rejected("client_process_unknown");
   if (versionOrder(clientVersion) === null) return rejected("version_unavailable");
   if (typeof event?.sessionId !== "string" || event.sessionId === "") return rejected("handshake_failed");
   const cwd = await canonicalCwd(event.cwd);
   if (cwd === null) return rejected("workspace_identity_unavailable");
-  const socketPath = await readySocketPath(controlSocketPath(env));
+  const socketPath = await readySocketPath(controlSocketPath(env), { platform });
   if (socketPath === null) return rejected("handshake_failed");
   try {
     return await usingPeer(socketPath, timeoutMs, open, async peer => {
@@ -143,7 +142,7 @@ async function bindAttempt({ event, clientPid, clientVersion, runtimeDir,
       // answered so the binding and its later reads reflect the serving
       // process, not the caller's claim.
       const verified = { ...endpoint, clientVersion: servingVersion };
-      await writeNativeEndpoint({ runtimeDir, record: verified });
+      await writeNativeEndpoint({ runtimeDir, record: verified, platform });
       return handshake(verified, now);
     });
   } catch (error) {
@@ -168,15 +167,15 @@ async function bindAttempt({ event, clientPid, clientVersion, runtimeDir,
 // support: the endpoint records what the daemon serves, the binding recorded
 // what `codex --version` printed, and a daemon that had updated under its CLI
 // was refused here on that difference alone.
-async function receiverFor(binding, runtimeDir) {
-  const endpoint = await readNativeEndpoint({ runtimeDir, endpointId: binding?.opaqueEndpointRef });
-  return endpoint !== null && await socketIsReady(endpoint.socketPath) ? endpoint : null;
+async function receiverFor(binding, runtimeDir, platform = process.platform) {
+  const endpoint = await readNativeEndpoint({ runtimeDir, endpointId: binding?.opaqueEndpointRef, platform });
+  return endpoint !== null && await socketIsReady(endpoint.socketPath, { platform }) ? endpoint : null;
 }
 
 export async function refreshNativeSession({ binding, runtimeDir, timeoutMs = 750,
-  now = Date.now, open = openCodexAppServer } = {}) {
+  now = Date.now, open = openCodexAppServer, platform = process.platform } = {}) {
   const rejected = reason => closed(binding?.clientVersion, reason);
-  const endpoint = await receiverFor(binding, runtimeDir);
+  const endpoint = await receiverFor(binding, runtimeDir, platform);
   if (endpoint === null) return rejected("handshake_failed");
   try {
     return await usingPeer(endpoint.socketPath, timeoutMs, open, async peer => {
@@ -190,10 +189,10 @@ export async function refreshNativeSession({ binding, runtimeDir, timeoutMs = 75
 }
 
 export async function offerMessage({ binding, message, runtimeDir, timeoutMs = 5_000,
-  open = openCodexAppServer } = {}) {
+  open = openCodexAppServer, platform = process.platform } = {}) {
   const rejected = safeErrorCode => ({ accepted: false, transport: "codex-app-server",
     clientVersion: binding?.clientVersion ?? null, safeErrorCode });
-  const endpoint = await receiverFor(binding, runtimeDir);
+  const endpoint = await receiverFor(binding, runtimeDir, platform);
   if (endpoint === null) return rejected("recipient_unavailable");
   try {
     return await usingPeer(endpoint.socketPath, timeoutMs, open, async peer => {
@@ -212,8 +211,8 @@ export async function offerMessage({ binding, message, runtimeDir, timeoutMs = 5
   }
 }
 
-export const retireNativeSession = ({ binding, runtimeDir }) =>
-  removeNativeEndpoint({ runtimeDir, endpointId: binding?.opaqueEndpointRef });
+export const retireNativeSession = ({ binding, runtimeDir, platform = process.platform }) =>
+  removeNativeEndpoint({ runtimeDir, endpointId: binding?.opaqueEndpointRef, platform });
 
 const OPEN_A_CHAT = "open a new Codex chat; if Codex does not start its app-server daemon itself, "
   + "run `codex app-server daemon start` first";
