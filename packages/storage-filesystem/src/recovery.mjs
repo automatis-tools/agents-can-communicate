@@ -5,6 +5,7 @@ import { AccError, EXIT, validateRecord } from "@agents-can-communicate/protocol
 import { listDirectoryEntries, listJsonFiles, readJsonIfPresent } from "./atomic-json.mjs";
 import { readEventFloor } from "./event-floor.mjs";
 import { readStoreIdentity } from "./identity.mjs";
+import { readActiveJournal } from "./active-journal.mjs";
 import { readOpenJournals, rollForward } from "./journal.mjs";
 import { assertEventBinding, assertStateBinding } from "./record-id.mjs";
 import { reclaimRetired } from "./reclaim.mjs";
@@ -45,12 +46,13 @@ async function countStaging(paths, root) {
   const staged = (await entries(paths.stage)).filter(entry => entry.isFile()
     && accepted(entry.name)).length;
   const inTmp = await entries(paths.tmp);
-  // A retired journal entry is one the store keeps and never reads again, so
-  // counting them is what tells an operator the automatic pass has work left.
-  const completed = new Set((await entries(path.join(paths.retained, "journal")))
-    .filter(entry => entry.isFile()).map(entry => entry.name));
+  // A retired journal entry is one the store keeps and never reads again - any
+  // the pointer does not name open - so counting them is what tells an operator
+  // the automatic pass has work left.
+  const open = await readActiveJournal(paths, root)
+    .then(active => (active.state === "open" ? `${active.transactionId}.json` : null), () => null);
   const retired = (await entries(paths.journal))
-    .filter(entry => entry.isFile() && completed.has(entry.name)).length;
+    .filter(entry => entry.isFile() && entry.name.endsWith(".json") && entry.name !== open).length;
   return {
     staged: staged + inTmp.filter(entry => accepted(entry.name)).length,
     partials: inTmp.filter(entry => entry.name.endsWith(".tmp")).length,

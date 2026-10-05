@@ -53,6 +53,19 @@ test("install writes the one command the agent runs to start live delivery", asy
   assert.match(text, /exit 0\n$/, "a missing relay is one line, never a failed tool call");
 });
 
+// The Windows form is named outright, so every host checks it. The shim is a
+// file on this machine: it lands in the home it was given, under this host's
+// separators. Spelled with Windows separators on macOS it became one file named
+// "\private\tmp\…" in whatever directory the install ran from.
+nodeTest("install in the Windows form writes the relay shim inside the home", async t => {
+  const { home, context } = await machine(t);
+
+  await installAntigravity({ ...context, hostPlatform: "win32" });
+
+  const shim = path.join(home, ".gemini", "config", "acc", "acc-relay.mjs");
+  assert.match(await readFile(shim, "utf8"), new RegExp(RELAY_BINARY.replaceAll("/", "[\\\\/]+")));
+});
+
 test("uninstall stops every relay it started, and never a process that merely reused the pid",
   async t => {
     const { context, signalled } = await machine(t);

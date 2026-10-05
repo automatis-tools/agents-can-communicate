@@ -88,7 +88,8 @@ test("the relay runs the agy the client names, and falls back to the PATH", asyn
   const path = (await import("node:path")).default;
   const dir = await mkdtemp(path.join(tmpdir(), "acc-agy-exe-"));
   t.after(() => rm(dir, { recursive: true, force: true }));
-  const agy = path.join(dir, "agy");
+  // On Windows the client's binary is agy.exe, the one name the relay runs there.
+  const agy = path.join(dir, process.platform === "win32" ? "agy.exe" : "agy");
   await writeFile(agy, "#!/bin/sh\n");
   await chmod(agy, 0o755);
   const other = path.join(dir, "agentapi");

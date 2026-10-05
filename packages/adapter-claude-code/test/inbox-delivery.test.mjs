@@ -423,7 +423,7 @@ test("the registry is read from CLAUDE_CONFIG_DIR", async t => {
   assert.equal((await bind(f)).supported, true);
 });
 
-test("the probe needs a captured version, a non-Windows platform and the inbox in the executable", async () => {
+test("the probe needs a captured version and the inbox in the executable", async () => {
   const probe = overrides => probeNativeDelivery({ realExecutable: "/x/claude", platform: "darwin",
     readVersion: async () => MIN_VERSION, hasInbox: async () => true, ...overrides });
   const supported = await probe();
@@ -438,7 +438,6 @@ test("the probe needs a captured version, a non-Windows platform and the inbox i
     clientVersion: "2.2.0-beta.1" });
   assert.equal((await probe({ readVersion: async () => "2.1.281-rc.1" })).reasonCode,
     "below_minimum_version");
-  assert.equal((await probe({ platform: "win32" })).reasonCode, "native_delivery_unsupported");
   assert.equal((await probe({ hasInbox: async () => false })).reasonCode, "protocol_mismatch");
   assert.equal((await probe({ realExecutable: "" })).reasonCode, "feature_probe_failed");
 });

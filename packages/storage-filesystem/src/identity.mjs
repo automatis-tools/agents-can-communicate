@@ -2,7 +2,7 @@ import path from "node:path";
 
 import { AccError, EXIT, assertPortableId } from "@agents-can-communicate/protocol";
 
-import { encode, publishAtomic, readJsonIfPresent } from "./atomic-json.mjs";
+import { encode, nameCommittedLater, publishAtomic, readJsonIfPresent } from "./atomic-json.mjs";
 
 export const STORE_VERSION = 6;
 
@@ -29,7 +29,8 @@ function assertIdentity(record, workspaceId, filePath) {
  * foreign store is the failure the reconciled prototype fails closed on, and
  * the same rule applies here.
  */
-export async function requireStoreIdentity(paths, { workspaceId, clock, create = true }) {
+export async function requireStoreIdentity(paths, { workspaceId, clock, create = true,
+  platform }) {
   assertPortableId(workspaceId, "workspace id");
   const filePath = identityPath(paths);
   const found = await readJsonIfPresent(filePath, paths.root);
@@ -39,7 +40,10 @@ export async function requireStoreIdentity(paths, { workspaceId, clock, create =
   }
   const record = { storeVersion: STORE_VERSION, workspaceId, initialisedAt: clock.now() };
   try {
-    await publishAtomic(filePath, encode(record), { root: paths.root, tmpDir: paths.tmp });
+    // The journal's first pointer, published next, commits this name on
+    // Windows; a crash before it leaves a directory the next open initialises.
+    await publishAtomic(filePath, encode(record), { root: paths.root, tmpDir: paths.tmp,
+      durability: nameCommittedLater(platform) });
   } catch (error) {
     // Losing this race is not a failure. Two agents starting together in a
     // workspace neither has opened before is the ordinary case, and the two

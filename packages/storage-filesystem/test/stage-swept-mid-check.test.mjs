@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { randomUUID } from "node:crypto";
 import { lstat, mkdir, mkdtemp, readdir, realpath, rename, rm, symlink } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -172,9 +173,63 @@ for (const kind of ["EBADF", "EPERM", "deleted"]) {
   });
 }
 
+// A writer lock renamed aside and back without a pause (lock-changing-hands, PR
+// #242's Windows run): one read in about three thousand found its name present
+// while every answer was a deleted directory's place. That directory moved within
+// the store, and calling it an escape failed a read that its next look would
+// have made; it is refused as a directory that changed while it resolved.
+test("windows: a present name that answers only with a deleted directory has moved, not escaped", async t => {
+  const { root, paths } = await store(t);
+  const stuck = async current => (current === paths.stage ? DELETED_PATH : realpath(current));
+  await assert.rejects(assertManagedDirectory(root, paths.stage, { platform: "win32", realpath: stuck }),
+    error => /parent directory changed/.test(error.message) && !/escapes/.test(error.message));
+});
+
 test("linux: EBADF from realpath stays what it says", async t => {
   const { root, paths } = await store(t);
   const failing = async current => (current === paths.stage ? answer("EBADF", current) : realpath(current));
   await assert.rejects(assertManagedDirectory(root, paths.stage, { platform: "linux", realpath: failing }),
     error => error.code === "EBADF");
+});
+
+// The same churn on PR #243's Windows run, one read in about two thousand:
+// realpath named the lock under another store's root, one an earlier test had
+// already removed. An answer says where the directory lives only when that
+// place holds this directory. A place holding nothing, or another directory, is
+// asked again, and a name that keeps answering that way has changed while it
+// resolved - which a reader takes as a reason to look again. A place that does
+// hold it outside the root is still an escape (the link test above).
+const elsewhere = () => path.join(tmpdir(), `acc-gone-elsewhere-${randomUUID()}`, "stage");
+
+test("an answer naming a place without the directory is asked again, never an escape", async t => {
+  const { root, paths } = await store(t);
+  const gone = elsewhere();
+  let answered = false;
+  const once = async current => {
+    if (current !== paths.stage || answered) return realpath(current);
+    answered = true;
+    return gone;
+  };
+  const found = await assertManagedDirectory(root, paths.stage, { realpath: once });
+  assert.equal(found.directory, paths.stage);
+});
+
+test("a name that answers only with a place without it has changed, not escaped", async t => {
+  const { root, paths } = await store(t);
+  const gone = elsewhere();
+  const stuck = async current => (current === paths.stage ? gone : realpath(current));
+  await assert.rejects(assertManagedDirectory(root, paths.stage, { realpath: stuck }),
+    error => /parent directory changed/.test(error.message) && !/escapes/.test(error.message));
+});
+
+// On a faster disk the same churn (lock-changing-hands, windows-latest with the
+// suite's files on D:) had every look answer EBADF while the name stayed: the
+// handle each one took was to a directory leaving the name. That is a directory
+// moving in and out of it, as the deleted place above is, so it has changed
+// while it resolved. EPERM can be a refusal in earnest and stays what it says.
+test("windows: a present name that answers only EBADF has changed, not failed", async t => {
+  const { root, paths } = await store(t);
+  const stuck = async current => (current === paths.stage ? answer("EBADF", current) : realpath(current));
+  await assert.rejects(assertManagedDirectory(root, paths.stage, { platform: "win32", realpath: stuck }),
+    error => /parent directory changed/.test(error.message));
 });

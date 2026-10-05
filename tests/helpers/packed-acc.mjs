@@ -186,7 +186,29 @@ export async function createPackedAcc(t) {
     });
   };
 
-  return { root, defer, repo, pack, consumer, project, dataHome, clientHome, clientBin,
+  // An entry point can start ACC's detached runtime worker (#208 reclaim, an
+  // update), which outlives the command by design and writes under the data
+  // home. A test whose client ran hooks waits for it before the directory goes:
+  // no worker process for this data home, and no manager lock held.
+  const workersQuiet = async (timeoutMs = 30_000) => {
+    const runtime = path.join(dataHome, "acc", "runtime");
+    const locks = [path.join(runtime, "worker", "manager.lock"),
+      path.join(runtime, "worker", "poller", "manager.lock")];
+    const running = async () => {
+      if (process.platform === "win32") return false;
+      const { stdout } = await run("ps", ["-Ao", "args="]).catch(() => ({ stdout: "" }));
+      return stdout.split("\n").some(line => line.includes("acc-update-worker.mjs")
+        && line.includes(runtime));
+    };
+    const end = Date.now() + timeoutMs;
+    while (Date.now() < end) {
+      const held = await Promise.all(locks.map(lock => lstat(lock).then(() => true, () => false)));
+      if (!held.some(Boolean) && !await running()) return;
+      await new Promise(resolve => setTimeout(resolve, 200));
+    }
+  };
+
+  return { root, defer, repo, pack, consumer, project, dataHome, clientHome, clientBin, workersQuiet,
     tarball, installed, accBin, hookBin, mcpBin, env, acc, accError, commandTrace,
     hook, start, ownerEnv: nativeId => fixtureOwnerEnv(dataHome, nativeId),
     beforeTurn, receipt, setClientVersions, publishBinding,

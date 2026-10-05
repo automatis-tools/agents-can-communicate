@@ -1,9 +1,12 @@
+import { spawn } from "node:child_process";
+import { EventEmitter } from "node:events";
 import os from "node:os";
 import path from "node:path";
 import { realpath, stat } from "node:fs/promises";
 
-import { compareVersionOrder, versionOrder } from "@agents-can-communicate/adapter-sdk";
+import { compareVersionOrder, isWindowsPlatform, versionOrder } from "@agents-can-communicate/adapter-sdk";
 
+import { DAEMON_LAYOUTS } from "./daemon-layouts.mjs";
 import { openWebSocketPeer } from "./ws-json-rpc.mjs";
 
 // The Codex App Server queue protocol, captured on codex-cli 0.152.1. Every
@@ -42,8 +45,70 @@ export function isMethodMissing(error) {
     || (error?.code === INVALID_REQUEST && /unknown variant/.test(String(error?.message ?? "")));
 }
 
-export function openCodexAppServer({ socketPath, timeoutMs = 5_000 }) {
-  return openWebSocketPeer({ socketPath, timeoutMs, retainNotifications: false });
+const fileExists = file => stat(file).then(found => found.isFile(), () => false);
+
+/**
+ * Windows: the command that relays stdio to the control socket, run from the
+ * package the daemon runs from, found the way maintenance finds it: the
+ * standalone install when the home has one, else the copy `app-server daemon
+ * start` installs (measured on 0.159.3). An .exe, so it starts without cmd.exe
+ * whatever the socket path holds. Null when the home holds neither.
+ */
+export async function proxyCommand(socketPath, { exists = fileExists } = {}) {
+  const codexHome = path.win32.dirname(path.win32.dirname(socketPath));
+  for (const layout of DAEMON_LAYOUTS) {
+    for (const name of layout.executables.filter(item => item.endsWith(".exe"))) {
+      const file = path.win32.join(codexHome, ...layout.packageDir.split("/"), ...name.split("/"));
+      if (await exists(file)) return { file, args: ["app-server", "proxy", "--sock", socketPath] };
+    }
+  }
+  return null;
+}
+
+// `spawnProxy` is the seam the tests start a stand-in with.
+async function startProxy(socketPath, { resolveProxy, spawnProxy }) {
+  if (spawnProxy !== undefined) return spawnProxy(socketPath);
+  const command = await resolveProxy(socketPath);
+  if (command === null) {
+    throw Object.assign(new Error(`no codex.exe under ${path.win32.dirname(path.win32.dirname(socketPath))}`
+      + " to relay to its daemon"), { code: "ENOENT" });
+  }
+  return spawn(command.file, command.args, { stdio: ["pipe", "pipe", "ignore"], windowsHide: true });
+}
+
+// A child's stdio, once it is started, as the duplex the WebSocket peer speaks
+// over. The peer writes only after "connect".
+function proxyStream(started) {
+  const stream = new EventEmitter();
+  stream.destroyed = false;
+  let child = null;
+  stream.write = data => (stream.destroyed || child === null ? false : child.stdin.write(data));
+  stream.destroy = () => {
+    if (stream.destroyed) return;
+    stream.destroyed = true;
+    child?.stdin.destroy();
+    child?.kill();
+  };
+  Promise.resolve(started).then(running => {
+    child = running;
+    if (stream.destroyed) {
+      child.kill();
+      return;
+    }
+    child.once("spawn", () => stream.emit("connect"));
+    child.stdout.on("data", data => stream.emit("data", data));
+    child.stdin.on("error", error => stream.emit("error", error));
+    child.once("error", error => stream.emit("error", error));
+    child.once("exit", () => stream.emit("close"));
+  }, error => stream.emit("error", error));
+  return stream;
+}
+
+export function openCodexAppServer({ socketPath, timeoutMs = 5_000, platform = process.platform,
+  spawnProxy, resolveProxy = proxyCommand }) {
+  if (!isWindowsPlatform(platform)) return openWebSocketPeer({ socketPath, timeoutMs, retainNotifications: false });
+  return openWebSocketPeer({ timeoutMs, retainNotifications: false,
+    connect: () => proxyStream(startProxy(socketPath, { resolveProxy, spawnProxy })) });
 }
 
 export async function initializeCodex(peer) {

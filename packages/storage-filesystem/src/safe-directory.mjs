@@ -7,11 +7,12 @@ import { AccError, EXIT } from "@agents-can-communicate/protocol";
 // path is validated segment by segment against the canonical root, so a
 // symlinked ancestor cannot redirect a read or a publication - neither outside
 // the store, nor to another directory inside it.
-function invalidDirectory(message, directory, root, cause) {
+function invalidDirectory(message, directory, root, cause, resolved) {
   return new AccError(EXIT.DATA, message, {
     directory,
     root,
     ...(cause === undefined ? {} : { cause }),
+    ...(resolved === undefined ? {} : { resolved }),
   });
 }
 
@@ -114,16 +115,33 @@ async function inspectManagedDirectory(rootPath, directoryPath, create, options 
   for (const segment of relative.split(path.sep).filter(Boolean)) {
     current = path.join(current, segment);
     let resolved;
-    for (let attempt = 0; ; attempt += 1) {
-      details = await inspectRealDirectory(current, root, create);
-      await afterInspect?.(current);
-      // A create-mode caller uses this name next. A directory renamed away
-      // between the check and the resolution leaves realpath nothing to resolve
-      // (ENOENT), so it is checked and created again, then resolved again; every
-      // check below applies to whichever attempt settles.
-      resolved = await resolveSegment(current, create && attempt < VANISHED_RETRIES,
-        { resolve, platform });
-      if (resolved !== null) break;
+    for (let look = 1; ; look += 1) {
+      for (let attempt = 0; ; attempt += 1) {
+        details = await inspectRealDirectory(current, root, create);
+        await afterInspect?.(current);
+        // A create-mode caller uses this name next. A directory renamed away
+        // between the check and the resolution leaves realpath nothing to
+        // resolve (ENOENT), so it is checked and created again, then resolved
+        // again; every check below applies to whichever attempt settles.
+        resolved = await resolveSegment(current, create && attempt < VANISHED_RETRIES,
+          { resolve, platform, root });
+        if (resolved !== null) break;
+      }
+      if (path.dirname(resolved) === canonicalParent) break;
+      // An answer outside the parent says where the directory lives only when
+      // that place holds this directory. On windows-latest, a lock renamed
+      // aside and back without a pause was once answered with its name under
+      // another store's root, which an earlier test had already removed (PR
+      // #243). A place holding nothing, or another directory, is asked again;
+      // a name that keeps answering that way has changed while it resolved.
+      if (await sameDirectoryAt(details, resolved, current, root)) {
+        throw invalidDirectory("managed directory escapes the canonical store root", current, root,
+          undefined, resolved);
+      }
+      if (look >= ELSEWHERE_RETRIES) {
+        throw invalidDirectory("managed parent directory changed while it resolved", current, root,
+          undefined, resolved);
+      }
     }
     // realpath answers with the name the directory carries *now*, which is not
     // always the name that was asked for: on Darwin it resolves by opening the
@@ -143,10 +161,10 @@ async function inspectManagedDirectory(rootPath, directoryPath, create, options 
     // swapped in under this name is not. ENOENT on the re-stat means it moved
     // again between the two calls, which cannot redirect anything: whatever
     // the caller opens through this path next fails the same way.
-    if (path.dirname(resolved) !== canonicalParent
-      || (path.basename(resolved) !== segment
-        && !await stillTheSameDirectory(details, resolved, current, root))) {
-      throw invalidDirectory("managed directory escapes the canonical store root", current, root);
+    if (path.basename(resolved) !== segment
+      && !await stillTheSameDirectory(details, resolved, current, root)) {
+      throw invalidDirectory("managed directory escapes the canonical store root", current, root,
+        undefined, resolved);
     }
     canonicalParent = resolved;
   }
@@ -160,6 +178,10 @@ const DELETED = /^(?:\\\\\?\\)?[A-Za-z]:\\\$Extend\\\$Deleted\\/i;
 // How many times a name answered with a directory leaving it is resolved again.
 const LEAVING_RETRIES = 3;
 
+// How many times a name answered with a place that does not hold it is looked
+// at again.
+const ELSEWHERE_RETRIES = 3;
+
 // null when the name went away and the caller may take it again.
 //
 // Linux realpath fails ENOENT on a name removed or renamed away while it
@@ -170,7 +192,7 @@ const LEAVING_RETRIES = 3;
 // again. A directory there is the answer, no directory there is gone, and a
 // name that keeps answering that way while present fails as it always did:
 // read as gone, a directory would read as holding no records.
-async function resolveSegment(current, retry, { resolve, platform }) {
+async function resolveSegment(current, retry, { resolve, platform, root }) {
   for (let attempt = 1; ; attempt += 1) {
     let resolved = null;
     let failure = null;
@@ -189,16 +211,32 @@ async function resolveSegment(current, retry, { resolve, platform }) {
     if (!leaving) throw failure;
     if (attempt < LEAVING_RETRIES) continue;
     const present = await lstat(current).then(() => true, missing => missing.code !== "ENOENT");
-    // Present: a deleted directory's place is refused by the containment check
-    // that follows, and an error stays what it says.
+    // Present: refused, never read as gone - its records would read as none.
+    // Deleted directories' places, or EBADF - a handle taken to a directory
+    // leaving the name - while the name stays, is a directory moving in and out
+    // of the name; the writer lock does so for a living. It is refused as
+    // changed, which a reader takes as a reason to look again, and never as an
+    // escape: nothing left the store. EPERM can be a refusal in earnest and
+    // stays what it says.
     if (present) {
-      if (failure !== null) throw failure;
-      return resolved;
+      if (failure !== null && failure.code !== "EBADF") throw failure;
+      throw invalidDirectory("managed parent directory changed while it resolved", current, root,
+        undefined, resolved);
     }
     if (retry) return null;
     throw Object.assign(new Error(`ENOENT: ${current} left its name while it resolved`,
       failure === null ? {} : { cause: failure }), { code: "ENOENT", syscall: "realpath", path: current });
   }
+}
+
+// Whether `resolved` holds the directory `details` describes. A place that
+// holds nothing is not where it lives.
+async function sameDirectoryAt(details, resolved, current, root) {
+  const served = await stat(resolved, { bigint: true }).then(found => found, error => {
+    if (["ENOENT", "ENOTDIR"].includes(error.code)) return null;
+    throw invalidDirectory("cannot inspect managed directory", current, root, error.message);
+  });
+  return served !== null && served.dev === details.dev && served.ino === details.ino;
 }
 
 async function stillTheSameDirectory(details, resolved, current, root) {

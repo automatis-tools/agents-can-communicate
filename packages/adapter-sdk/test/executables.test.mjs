@@ -147,3 +147,21 @@ test("windows: a .cmd that already exited at the timeout has nothing killed", as
     { platform: "win32", run, env: {}, killTree: pid => { killed.push(pid); } }), { code: "ETIMEDOUT" });
   assert.deepEqual(killed, []);
 });
+
+// npm writes a .cmd per bin: `"%dp0%\<path inside the prefix>" %*` for a native
+// binary, `"%_prog%" "%dp0%\<script>.js" %*` for a script. The file it runs is
+// what a probe reads; the .cmd itself says nothing about the client.
+test("an npm .cmd shim names the file it runs", async () => {
+  const { npmShimTarget } = await import("../src/executables.mjs");
+  const shim = body => ({ readFile: async () => `@ECHO off\r\nGOTO start\r\n:start\r\nSETLOCAL\r\n${body}\r\n` });
+  assert.equal(await npmShimTarget("C:\\npm\\prefix\\claude.cmd",
+    shim('"%dp0%\\node_modules\\@anthropic-ai\\claude-code\\bin\\claude.exe"   %*')),
+  "C:\\npm\\prefix\\node_modules\\@anthropic-ai\\claude-code\\bin\\claude.exe");
+  assert.equal(await npmShimTarget("C:\\npm\\prefix\\codex.cmd",
+    shim('"%_prog%"  "%dp0%\\node_modules\\@openai\\codex\\bin\\codex.js" %*')),
+  "C:\\npm\\prefix\\node_modules\\@openai\\codex\\bin\\codex.js");
+  assert.equal(await npmShimTarget("C:\\x\\tool.cmd", shim("echo hello")), null);
+  assert.equal(await npmShimTarget("C:\\x\\tool.cmd", shim('"%dp0%\\a.js" "%dp0%\\b.js"')), null);
+  assert.equal(await npmShimTarget("C:\\x\\tool.cmd", { readFile: async () => { throw new Error("gone"); } }),
+    null);
+});
