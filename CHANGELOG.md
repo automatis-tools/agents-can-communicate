@@ -15,9 +15,9 @@
 
 | Candidate artifact | Value |
 |---|---|
-| Built from | `1c1adace3c47472b5d9e6a66cd7810bdc9635073` |
-| Tarball | `agents-can-communicate-0.8.5.tgz`, 533,774 bytes, 329 files |
-| sha256 | `93eb2e9b4434f9ea4a58478d34554a9c51add798d51b0bf2a2e1726dd908ebb7` |
+| Built from | `0942541108f105e0997eae2b5b53e5347b36697c` |
+| Tarball | `agents-can-communicate-0.8.5.tgz`, 534,260 bytes, 329 files |
+| sha256 | `5acf7157525bfdae7966494cbbbed9ce5ccea4038f999a8f6ad49bd6e1116007` |
 
 This unpublished development archive was measured with `npm pack`. See
 [the evidence](docs/release-evidence/unreleased-antigravity-relay-allow-rule.md).
