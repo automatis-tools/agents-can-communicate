@@ -23,8 +23,8 @@ out with CRLF.
 
 | Candidate artifact | Value |
 |---|---|
-| Built from | `ba48e214a7f2bd7059392c8aad53ea8c166cdb98` |
-| Tarball | `agents-can-communicate-0.8.5.tgz`, 532,081 bytes, 328 files |
-| sha256 | `565b48437d8572a28bae32424a4c76aa7586037f46d7140f3224426dcbe6657c` |
+| Built from | `e036841719f3d6db2a7f163c295db2e40dece042` |
+| Tarball | `agents-can-communicate-0.8.5.tgz`, 532,531 bytes, 329 files |
+| sha256 | `a0878a745f5375d973af48642ab44c55e17f93be8db04ac65123f2078c82689b` |
 
 Measured with `npm pack` on macOS. Verification on Windows is in progress.
