@@ -2,9 +2,9 @@
 
 | Candidate artifact | Value |
 |---|---|
-| Built from | `9cd6cb873a85a15c914a178d9421ddde5b3be795` |
-| Tarball | `agents-can-communicate-0.8.5.tgz`, 553,139 bytes, 336 files |
-| sha256 | `d45d7624f16d0b96ab9a44e6ce3fa0522dcae7f2420dd277b044883d870c119b` |
+| Built from | `4707197d8117944e6bb7ba4ebfd5cdcf7ab33197` |
+| Tarball | `agents-can-communicate-0.8.5.tgz`, 553,210 bytes, 336 files |
+| sha256 | `8b0e70611d609703cb004d1feb45082a080201059f10da866e3d1ab5149b8cf4` |
 
 Design: [2026-10-04-desktop-clients](../design/2026-10-04-desktop-clients.md). Follows issue
 #171, whose reporter pushed into a desktop Antigravity conversation with the language server's
