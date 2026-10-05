@@ -167,7 +167,8 @@ test("uninstall removes ACC and leaves the rest of the file alone", async t => {
     detected: detected(adapters, ["kimi"]), context }), adapters, context, dataHome });
 
   const result = await applyPlan({ plan: planInstallation({ adapters,
-    detected: detected(adapters, ["kimi"]), context, action: "uninstall" }),
+    detected: detected(adapters, ["kimi"]), context, action: "uninstall",
+    recorded: (await loadOwnership({ dataHome })).installs }),
     adapters, context, dataHome });
 
   assert.equal(result.operations[0].action, "uninstall");

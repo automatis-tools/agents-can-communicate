@@ -117,7 +117,8 @@ test("install and uninstall restore a foreign config byte for byte", async t => 
   await applyPlan({ plan: planInstallation({ adapters,
     detected: [{ adapterId: "kimi", displayName: "Kimi Code", present: true,
       version: "0.36.1", installed: true, diagnostics: [], capabilities: {},
-      error: null }], context, action: "uninstall" }),
+      error: null }], context, action: "uninstall",
+    recorded: (await loadOwnership({ dataHome })).installs }),
     adapters, context, dataHome });
 
   // The user's settings are the asset here. A tool that edits them must be able
