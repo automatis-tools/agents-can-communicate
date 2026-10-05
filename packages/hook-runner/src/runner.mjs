@@ -452,6 +452,19 @@ async function runningClientVersion({ adapter, client, product, env, deadline })
     { timeoutMs: remaining(1_000) });
 }
 
+// Whether the client process a binding names has exited. Signal 0 delivers
+// nothing; EPERM means the process exists under another user.
+function clientGone(binding) {
+  const pid = binding?.clientPid;
+  if (!Number.isInteger(pid) || pid <= 0) return false;
+  try {
+    process.kill(pid, 0);
+    return false;
+  } catch (error) {
+    return error?.code === "ESRCH";
+  }
+}
+
 const HANDLERS = {
   // `knownClientPid` and `pins: false` are registration's (#167): it runs in
   // a peer's process, so the client's pid is handed over rather than found in
@@ -459,7 +472,7 @@ const HANDLERS = {
   // generation runs for the session until its first real hook pins its own.
   async sessionStart({ event, context, adapter, adapterId, binding, paths,
     readProcessTable, probeClientVersion, platform, deadline, knownClientPid, pins = true,
-    tableRead: started = null, mark = () => {} }) {
+    tableRead: started = null, mark = () => {}, clientRestarted = false }) {
     // Where this session's pin lives, resolved once and reused at every write
     // below. Beside `paths.root`, never inside it: see `managerRootFor`.
     const pinRoot = managerRootFor(context.dataHome);
@@ -522,13 +535,15 @@ const HANDLERS = {
     };
     if (event.kind === "beforeTurn" && binding !== null) {
       // A genuine prompt can resume after an ephemeral removal or a durable
-      // close. Recheck after probes: a CLI replacement can run outside the
-      // native lifecycle lock. Never adopt that replacement's identity.
+      // close, or carry on a session whose client restarted. Recheck after
+      // probes: a CLI replacement can run outside the native lifecycle lock.
+      // Never adopt that replacement's identity.
       const previous = await context.service.locateSession(binding.accSessionId);
-      if (previous !== null && (previous.record.state !== "closed"
-        || previous.record.generation !== binding.generation)) {
-        throw new Error("the completed hook owner changed during turn registration");
-      }
+      const expected = clientRestarted
+        ? previous?.record.state === "open" && previous.record.generation === binding.generation
+        : previous === null || (previous.record.state === "closed"
+          && previous.record.generation === binding.generation);
+      if (!expected) throw new Error("the completed hook owner changed during turn registration");
     }
     if (binding !== null) {
       const resumed = await context.service.resumeSession({
@@ -640,6 +655,21 @@ const HANDLERS = {
       // the crash-safe opening path, retaining its full published client facts
       // and its single native handshake rather than binding a second time.
       const started = await HANDLERS.sessionStart(input);
+      const fresh = await loadSessionBinding({ runtimeDir: paths.root,
+        harnessSessionId: event.sessionId });
+      const offered = await nativeActivationHintFor({ adapter, event,
+        nativeBinding: started.nativeBinding, binding: fresh, context, paths, deadline });
+      const turn = await projectActivation({ ...input, binding: fresh }, offered);
+      return { ...turn, nativeBinding: started.nativeBinding };
+    }
+    if (clientGone(binding)) {
+      // The client this session was bound to has exited, and a turn arrived
+      // anyway: the client restarted under the same conversation. Antigravity
+      // 2.0 reopens a conversation without a second SessionStart, so without
+      // this the session stayed bound to a dead process and lost live delivery
+      // for good. The start path finds the client running now, keeps this ACC
+      // session and generation, and binds again.
+      const started = await HANDLERS.sessionStart({ ...input, clientRestarted: true });
       const fresh = await loadSessionBinding({ runtimeDir: paths.root,
         harnessSessionId: event.sessionId });
       const offered = await nativeActivationHintFor({ adapter, event,

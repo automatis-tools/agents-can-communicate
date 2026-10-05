@@ -155,3 +155,54 @@ test("a client started by full path answers for itself", { skip: process.platfor
 
     assert.equal(session.clientVersion, "0.159.2");
   });
+
+// Antigravity 2.0 keeps a conversation across app restarts and runs no
+// SessionStart for it again: on 2026-10-05 a reopened app's first turn reached
+// the hooks with the binding still naming the language server that had exited,
+// so the session stayed bound to a dead pid and live delivery never returned.
+test("a turn after the client restarted binds the session to the client running now", async t => {
+  const { spawnSync } = await import("node:child_process");
+  const gone = spawnSync(process.execPath, ["-e", ""]).pid;
+  const { root, dataHome } = await place(t);
+  const fixture = adapter({ identifyClientProcess: identifyDesktop });
+  const run = (kind, table) => runHook({ adapterId: fixture.id, adapters: { [fixture.id]: fixture },
+    dataHome, readProcessTable: async () => table, probeClientVersion: async () => "1.2.16",
+    payload: { kind, sessionId: "restarted-client", cwd: root, targets: [] } });
+  const tableWith = pid => new Map([
+    [process.pid, { ppid: pid, comm: "node", args: "node /data/acc-hook.mjs fixture PreInvocation" }],
+    [pid, { ppid: 1, comm: "/Applications/Fixture.app/Contents/Resources/bin/language_server",
+      args: SERVER_ARGS }]]);
+  const binding = async () => {
+    const workspaces = path.join(dataHome, "acc", "workspaces");
+    const [workspace] = await readdir(workspaces);
+    return loadSessionBinding({ runtimeDir: path.join(workspaces, workspace), harnessSessionId: "restarted-client" });
+  };
+
+  assert.equal((await run("sessionStart", tableWith(gone))).failed, undefined);
+  assert.equal((await binding()).clientPid, gone);
+  const turn = await run("beforeTurn", tableWith(process.ppid));
+
+  assert.equal(turn.failed, undefined, turn.reason);
+  const after = await binding();
+  assert.equal(after.clientPid, process.ppid);
+  assert.equal(after.clientName, "fixture-desktop");
+  assert.equal(after.accSessionId, (await binding()).accSessionId);
+});
+
+test("a turn while the client still runs keeps the client the session started with", async t => {
+  const { root, dataHome } = await place(t);
+  const fixture = adapter({ identifyClientProcess: identifyDesktop });
+  let reads = 0;
+  const run = kind => runHook({ adapterId: fixture.id, adapters: { [fixture.id]: fixture }, dataHome,
+    readProcessTable: async () => { reads += 1; return new Map([
+      [process.pid, { ppid: process.ppid, comm: "node" }],
+      [process.ppid, { ppid: 1, comm: "/Applications/Fixture.app/Contents/Resources/bin/language_server",
+        args: SERVER_ARGS }]]); },
+    probeClientVersion: async () => "1.2.16",
+    payload: { kind, sessionId: "live-client", cwd: root, targets: [] } });
+
+  await run("sessionStart");
+  const before = reads;
+  assert.equal((await run("beforeTurn")).failed, undefined);
+  assert.equal(reads, before, "a live client is not looked up again on every turn");
+});
