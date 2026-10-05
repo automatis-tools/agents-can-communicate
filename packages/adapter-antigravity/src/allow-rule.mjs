@@ -4,8 +4,12 @@ import path from "node:path";
 import { blankJson, isShellWord, removeIfEmpty, writeForeignJson }
   from "@agents-can-communicate/adapter-sdk";
 
+import { relayStartCommand } from "./relays.mjs";
+
 /**
- * The one allow rule ACC may add to Antigravity CLI's settings, with consent.
+ * The allow rules ACC adds to Antigravity CLI's settings: this one for its
+ * wrapper, and the one for the command that starts live delivery
+ * (`inspectRelayRule`).
  *
  * Antigravity CLI asks before every shell command. On 1.2.12 a live push woke an
  * idle session and its first ACC command waited at an approval prompt with
@@ -48,8 +52,9 @@ const claimDir = ({ dataHome, stateRoot, home }) => typeof dataHome === "string"
   : typeof stateRoot === "string" && stateRoot !== ""
     ? path.join(stateRoot, "adapter-antigravity")
     : path.join(home, ".gemini", "config", "acc");
-const claimPath = (context, file) => path.join(claimDir(context),
-  `allow-rule-${Buffer.from(file).toString("base64url")}`);
+// One claim per rule, so an older ACC keeps reading the one it wrote.
+const claimPath = (context, file, kind = "cli") => path.join(claimDir(context),
+  `allow-rule-${kind === "cli" ? "" : `${kind}-`}${Buffer.from(file).toString("base64url")}`);
 
 const isObject = value => value !== null && typeof value === "object" && !Array.isArray(value);
 
@@ -136,9 +141,9 @@ export async function inspectAllowRule(context) {
       + "--adapter antigravity, then restart agy" };
 }
 
-async function addRule(context, found) {
+async function addRule(context, found, kind = "cli") {
   const settings = await readSettings(found.file);
-  const claimFile = claimPath(context, found.file);
+  const claimFile = claimPath(context, found.file, kind);
   // Only what this write creates. A file or container that is already there is
   // the operator's as far as ACC can tell: one ACC made earlier cannot be told
   // from one they put in its place, and carrying the old flags over deleted
@@ -167,9 +172,9 @@ async function addRule(context, found) {
  * Anything else in the file stays, and a rule the operator had before ACC came
  * was never claimed.
  */
-export async function withdrawAllowRule(context) {
+async function withdrawRule(context, kind) {
   const file = agySettingsPath(context.home);
-  const claimFile = claimPath(context, file);
+  const claimFile = claimPath(context, file, kind);
   const claim = await readClaim(claimFile);
   if (claim === null) return { changes: [], diagnostics: [], needsAction: [] };
   const settings = await readSettings(file);
@@ -198,17 +203,83 @@ export async function withdrawAllowRule(context) {
     needsAction: [] };
 }
 
-/** Put ACC's rule in place, at every install. */
-export async function ensureAllowRule(context) {
-  const found = await inspectAllowRule(context);
+// In the reverse of the order install adds them: the wrapper's rule is the one
+// that may have created the file, so it is the last to leave.
+export async function withdrawAllowRule(context) {
+  const results = [await withdrawRule(context, "relay"), await withdrawRule(context, "cli")];
+  return { changes: [...new Set(results.flatMap(result => result.changes))],
+    diagnostics: results.flatMap(result => result.diagnostics),
+    needsAction: results.flatMap(result => result.needsAction) };
+}
+
+/**
+ * The rule for the command that starts live delivery.
+ *
+ * The hook tells the agent to start its relay once per conversation with
+ * `relayStartCommand`, and Antigravity CLI asks before running it: in a session
+ * nobody watches, the relay never starts and the session is never woken (e2e
+ * on Antigravity CLI 1.2.16, 2026-10-04). The rule is that command in the exact
+ * words the client persists itself when the operator picks "always allow" -
+ * its first word, `sh`, is bare, and the quoted path is an argument. It is
+ * written and taken back beside the wrapper's, under a claim of its own.
+ */
+export async function inspectRelayRule(context) {
+  const file = agySettingsPath(context.home);
+  const hostPlatform = context.hostPlatform ?? process.platform;
+  const command = relayStartCommand(context.home, hostPlatform);
+  const rule = accAllowRule(command);
+  const base = { file, rule, owned: false };
+  if (hostPlatform === "win32") {
+    return { ...base, state: "unmatchable", diagnostic: "On Windows ACC adds no allow rule "
+      + "for the command that starts live delivery either: it runs `node`, and a rule on "
+      + "`node` would let every node command through without asking" };
+  }
+  // Without the wrapper's rule the agent still asks before each ACC command, so
+  // this one would only move the prompt one command later.
+  if (!isShellWord(cliWrapperPath(context.home, hostPlatform))) {
+    return { ...base, state: "unmatchable", diagnostic: "ACC adds no allow rule for the command "
+      + "that starts live delivery where it can add none for its wrapper: the agent would "
+      + "still ask before each ACC command" };
+  }
+  const settings = await readSettings(file);
+  if (settings.state === "unreadable") {
+    return { ...base, state: "unreadable", diagnostic: `${file} ${settings.reason}, so ACC `
+      + `cannot add ${rule}; the agent then asks before it starts live delivery` };
+  }
+  if (settings.allow.includes(rule)) {
+    const owned = (await readClaim(claimPath(context, file, "relay")))?.rule === rule;
+    return { ...base, state: "allowed", owned, diagnostic: "live delivery starts without an "
+      + `approval prompt: permissions.allow in ${file} holds ${rule}${owned ? ", added by ACC" : ""}`
+      + `. ${RESTART}` };
+  }
+  return { ...base, state: "prompts", diagnostic: "the agent asks before it starts live "
+    + "delivery, so a session nobody watches is never woken. ACC's install adds "
+    + `${rule} to permissions.allow in ${file}, and it is not there: run acc install `
+    + "--adapter antigravity, then restart agy" };
+}
+
+async function ensureRule(context, found, kind, added) {
   if (found.state === "unmatchable" || found.state === "unreadable") {
     return { changes: [], diagnostics: [found.diagnostic], needsAction: [found.diagnostic] };
   }
   if (found.state === "allowed") {
     return { changes: [], diagnostics: [found.diagnostic], needsAction: [] };
   }
-  await addRule(context, found);
+  await addRule(context, found, kind);
   return { changes: [found.file], needsAction: [], diagnostics: [`added ${found.rule} to `
-    + `permissions.allow in ${found.file}: ACC commands run without an approval prompt in `
-    + "Antigravity sessions started from now on; restart agy for a session already open"] };
+    + `permissions.allow in ${found.file}: ${added} without an approval prompt in Antigravity `
+    + "sessions started from now on; restart agy for a session already open"] };
+}
+
+/** Put ACC's rules in place, at every install. */
+export async function ensureAllowRule(context) {
+  const cli = await ensureRule(context, await inspectAllowRule(context), "cli",
+    "ACC commands run");
+  // A settings file that does not read is reported once, by the wrapper's rule.
+  const relayFound = await inspectRelayRule(context);
+  const relay = relayFound.state === "unreadable" ? { changes: [], diagnostics: [], needsAction: [] }
+    : await ensureRule(context, relayFound, "relay", "live delivery starts");
+  return { changes: [...new Set([...cli.changes, ...relay.changes])],
+    diagnostics: [...cli.diagnostics, ...relay.diagnostics],
+    needsAction: [...cli.needsAction, ...relay.needsAction] };
 }

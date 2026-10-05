@@ -1,5 +1,28 @@
 # Changelog
 
+## Unreleased — Antigravity starts its relay without asking
+
+- The Antigravity install also adds `command(sh "<home>/.gemini/config/acc/acc-relay.sh" start)`
+  to `permissions.allow`. The hook tells the agent to start its relay with that command, and
+  Antigravity CLI asked before running it: a session nobody watched never started its relay
+  and was never woken (end to end on Antigravity CLI 1.2.16, 2026-10-04). The rule is the
+  command in the words the client itself saves for "always allow". It has a claim of its own,
+  so an older ACC still reads the one it wrote, and uninstall removes it before the wrapper's.
+  `acc doctor` reports it and asks for `acc install --adapter antigravity` when it is missing.
+  Windows adds neither rule: the relay starts with `node`, and a rule on `node` would allow
+  every node command. Nor does a home whose wrapper path needs quotes, where the wrapper's
+  rule cannot match: the agent would still ask before each ACC command.
+
+| Candidate artifact | Value |
+|---|---|
+| Built from | `0942541108f105e0997eae2b5b53e5347b36697c` |
+| Tarball | `agents-can-communicate-0.8.5.tgz`, 534,260 bytes, 329 files |
+| sha256 | `5acf7157525bfdae7966494cbbbed9ce5ccea4038f999a8f6ad49bd6e1116007` |
+
+This unpublished development archive was measured with `npm pack`. See
+[the evidence](docs/release-evidence/unreleased-antigravity-relay-allow-rule.md).
+The package version remains `0.8.5` until a release prepares its own.
+
 ## Unreleased — an uninstall takes back only what its own data home installed
 
 - `acc uninstall` without `--adapter` skips a client that the current ACC data home did not

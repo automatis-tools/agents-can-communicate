@@ -131,6 +131,21 @@ test("a wrapper path that needs quotes gets no rule, and doctor says why", async
     "install was asked for the rule and did not say it could not add it");
 });
 
+// Where the wrapper's rule cannot match, the relay's would only move the prompt
+// one command later: the agent still asks before each ACC command. Neither is
+// written, so the settings file is the plan's to name exactly when one is.
+test("where the wrapper's rule cannot match, the relay's is not written either", async t => {
+  const fixture = await agyHome(t, { name: "acc agy relay " });
+  await fixture.write({ ...fixture.theirs, permissions: { allow: [] } });
+  const before = await fixture.read();
+
+  await installAntigravity(fixture.context);
+  const detected = await detectAntigravity(fixture.context);
+
+  assert.equal(await fixture.read(), before, "a relay rule was written beside no wrapper rule");
+  assert.equal(detected.relayApproval.state, "unmatchable");
+});
+
 test("the plan names the settings file whenever a rule can be written", async t => {
   const fixture = await agyHome(t);
   const quoted = await agyHome(t, { name: "acc agy plan " });

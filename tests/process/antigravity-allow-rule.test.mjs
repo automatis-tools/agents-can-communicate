@@ -26,7 +26,7 @@ import { NO_ALLOW_RULE_ON_WINDOWS } from "../helpers/platform-scope.mjs";
  * `hostPlatform` names the platform whose form ACC writes; left out, it is this
  * host's.
  */
-async function machine(t, hostPlatform) {
+async function machine(t, hostPlatform, { operatorRelayRule = true } = {}) {
   const home = await realpath(await mkdtemp(path.join(tmpdir(), "acc-agy-e2e-")));
   t.after(() => rm(home, { recursive: true, force: true }));
   const dataHome = path.join(home, "data");
@@ -35,8 +35,8 @@ async function machine(t, hostPlatform) {
   await mkdir(path.join(home, "project"), { recursive: true });
   const relay = `command(sh "${home}/.gemini/config/acc/acc-relay.sh" start)`;
   await writeFile(settings, `${JSON.stringify({ colorScheme: "dark",
-    trustedWorkspaces: [path.join(home, "project")], permissions: { allow: [relay] } },
-  null, 2)}\n`);
+    trustedWorkspaces: [path.join(home, "project")],
+    permissions: { allow: operatorRelayRule ? [relay] : [] } }, null, 2)}\n`);
   const agy = fakeAgy();
   const context = { ...clientContext(home, path.join(dataHome, "acc"),
     { env: {}, dataHome, cwd: path.join(home, "project") }), runAgy: agy.run,
@@ -63,7 +63,7 @@ async function machine(t, hostPlatform) {
     return { questions, detected, result };
   };
   return { home, settings, dataHome, run, detect,
-    rule: `command(${home}/.gemini/config/acc/acc-cli.sh)`,
+    rule: `command(${home}/.gemini/config/acc/acc-cli.sh)`, relay,
     read: () => readFile(settings, "utf8"),
     recorded: async () => (await loadOwnership({ dataHome })).installs };
 }
@@ -118,6 +118,30 @@ test("delivery off and nobody at the terminal still get the rule",
 // there the same two starts ask nothing and leave the user's settings byte for
 // byte, through a reinstall and an uninstall. The Windows form is named outright,
 // so every host checks it.
+// The hook tells the agent to start its relay once per conversation, with the
+// command `sh "<home>/.gemini/config/acc/acc-relay.sh" start`, and Antigravity CLI
+// asks before running it. In a session nobody watches, the relay never starts
+// and the session is never woken (e2e on Antigravity CLI 1.2.16, 2026-10-04).
+// The rule in those exact words is the one the client itself persists when the
+// operator picks "always allow"; ACC writes it beside the wrapper's, on every
+// install, and takes back only what it added.
+test("a fresh install also allows the command that starts live delivery, and uninstall takes it back",
+  { skip: NO_ALLOW_RULE_ON_WINDOWS }, async t => {
+    const fixture = await machine(t, undefined, { operatorRelayRule: false });
+    const before = await fixture.read();
+
+    const { questions } = await fixture.run({ recorded: [] });
+    assert.deepEqual(questions, []);
+    assert.deepEqual(JSON.parse(await fixture.read()).permissions.allow,
+      [fixture.rule, fixture.relay]);
+    const [after] = await fixture.detect();
+    assert.equal(after.relayApproval.state, "allowed");
+    assert.equal(after.relayApproval.owned, true);
+
+    await fixture.run({ action: "uninstall", recorded: await fixture.recorded() });
+    assert.equal(await fixture.read(), before);
+  });
+
 test("on Windows ACC adds no rule, asks nothing, and leaves the settings as it found them",
   async t => {
     const fixture = await machine(t, "win32");

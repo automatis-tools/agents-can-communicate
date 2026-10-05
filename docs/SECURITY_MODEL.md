@@ -103,10 +103,11 @@ unchanged; edited or newly referenced settings remain intact. See
 [Codex outgoing permissions](CONFIGURATION.md#codex-outgoing-permissions). Configuration
 readiness does not prove that an active session's overrides permit a live offer.
 
-Antigravity CLI asks before each shell command. Installing its adapter adds one prefix rule
-to that client's `permissions.allow`, for ACC's own wrapper path only. The agent then runs
-every ACC command without a prompt, including one that a peer's message prompts. Every other
-command still asks. ACC records the one rule it added and uninstall removes only that rule.
+Antigravity CLI asks before each shell command. Installing its adapter adds two rules to that
+client's `permissions.allow`: a prefix rule for ACC's own wrapper path, and the exact command
+that starts the relay. The agent then runs every ACC command, and starts live delivery,
+without a prompt, including when a peer's message prompts it. Every other command still asks.
+ACC records the rules it added and uninstall removes only those.
 It never writes a settings file that it cannot parse. See
 [Antigravity CLI command approval](CONFIGURATION.md#antigravity-cli-command-approval).
 

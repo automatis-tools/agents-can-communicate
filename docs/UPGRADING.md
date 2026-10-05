@@ -20,8 +20,9 @@ a client's own settings:
   Start a new Codex session after the update; a session already open keeps its old policy.
 - **Antigravity CLI.** The install adds `command(<wrapper>)` to `permissions.allow` in
   `~/.gemini/antigravity-cli/settings.json`, and the skill calls the wrapper without quotes, so
-  a woken session runs its ACC commands without an approval prompt. Restart `agy`: it reads
-  the file only at startup. `acc uninstall` removes every copy of that rule.
+  a woken session runs its ACC commands without an approval prompt. It also adds the command
+  that starts the relay, so the agent starts live delivery without one. Restart `agy`: it reads
+  the file only at startup. `acc uninstall` removes every copy of each rule.
 
 `acc doctor` and `acc status` describe an idle session by what a message sent to it meets
 (`idle, wake on send`, `idle until next turn`, `idle, inbox only`), and each status row carries

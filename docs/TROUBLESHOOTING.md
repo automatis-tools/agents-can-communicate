@@ -341,8 +341,9 @@ Live delivery needs four things, and `acc doctor` shows each:
 - the session attached to ACC at all (see the section above);
 - the agent started the relay. While none is running, ACC's context asks up to three times
   in that conversation. A declined prompt and an ignored ask look the same, so the line can
-  return after a decline; after the third ask it stays quiet. Run
-  `sh "~/.gemini/config/acc/acc-relay.sh" start` to start it directly.
+  return after a decline; after the third ask it stays quiet. ACC's install allows that
+  command, so the agent starts it without an approval prompt; `acc doctor` names the rule when
+  it is missing. Run `sh "~/.gemini/config/acc/acc-relay.sh" start` to start it directly.
 
 `acc doctor` reports how many relays are running and, per session, whether a live transport is
 active. A relay ends with its client; nothing is left running after the TUI exits or after

@@ -11,7 +11,7 @@ import { bakeSkillCommand, blankJson, defaultAntigravityRelay, isShellWord, merg
   from "@agents-can-communicate/adapter-sdk";
 import { AccError, EXIT } from "@agents-can-communicate/protocol";
 
-import { agySettingsPath, cliWrapperPath, ensureAllowRule, inspectAllowRule,
+import { agySettingsPath, cliWrapperPath, ensureAllowRule, inspectAllowRule, inspectRelayRule,
   withdrawAllowRule } from "./allow-rule.mjs";
 import { relayShimName, relayStartCommand, runningRelays, stopRelays } from "./relays.mjs";
 
@@ -593,9 +593,11 @@ export async function detectAntigravity(context) {
   // Read from files only, so it is known for a client ACC did not run. It is
   // the client's own approval control over what a woken session can answer.
   const commandApproval = await inspectAllowRule(context);
-  const approval = { commandApproval,
+  const relayApproval = await inspectRelayRule(context);
+  const approval = { commandApproval, relayApproval,
     inboundDelivery: { state: commandApproval.state, diagnostic: commandApproval.diagnostic } };
   diagnostics.push(commandApproval.diagnostic);
+  if (relayApproval.state !== "unreadable") diagnostics.push(relayApproval.diagnostic);
   // The installer runs every adapter's detect and passes a null version for a
   // client it did not find. Asking agy then would spawn a binary the installer
   // could not run a moment ago, or - where it does exist but did not answer -
@@ -668,6 +670,11 @@ export async function detectAntigravity(context) {
         + "approval");
     } else if (commandApproval.state === "unreadable") {
       needsAction.push(commandApproval.diagnostic);
+    }
+    if (relayApproval.state === "prompts") {
+      needsAction.push(`acc install --adapter antigravity  # ${relayApproval.rule} is missing `
+        + `from permissions.allow in ${relayApproval.file}, so the agent asks before it starts `
+        + "live delivery");
     }
   }
   if (blocked !== null) {
