@@ -1,6 +1,7 @@
 # Indexed transaction reads for #241
 
-Status: proposed design for user review. No production implementation exists.
+Status: design approved by the user on 2026-10-05. Implementation-plan review
+is the next stage; no production implementation exists.
 Source baseline: release 0.9.0, `27ee77ac`. This document covers the full message
 lookup as requested, together with exact receipt reads.
 
@@ -263,7 +264,7 @@ as local Node 24, and show the working local result before any implementation PR
 ## Review and next stage
 
 The principal tradeoff is a versioned migration in exchange for a provable
-negative lookup without extra durable index writes. This proposal requires user
-review, particularly that transition, before an implementation plan is written.
+negative lookup without extra durable index writes. The user approved this
+design, including that transition, on 2026-10-05; an implementation plan may now be written.
 The plan must also prove lock ordering and the old-writer refusal on the actual
 installed artifact. Nothing in this document authorizes a release or merge.
