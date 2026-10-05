@@ -86,6 +86,62 @@
         "The first TUI session in a folder trusted at that launch hands every hook an empty workspacePaths even with --add-dir, so that session gets no ACC context and no relay prompt; the next launch in the now-trusted folder does."
       ],
       "result": "pass"
+    },
+    {
+      "client": "antigravity-desktop",
+      "version": "2.19.1",
+      "platform": "darwin-arm64",
+      "observedAt": "2026-10-04",
+      "capability": "lifecycle.sessionStart",
+      "fixture": "fixtures/desktop-2.19.1.json",
+      "provenance": "fixtures/certification-provenance.json",
+      "provenanceId": "desktop-session-start-2-19-1",
+      "idleBehavior": "fires when a conversation starts",
+      "busyBehavior": "fires before the first model invocation",
+      "authorityLevel": "advisory",
+      "limitations": [
+        "captured on the desktop app 2.19.1 (Antigravity.app) on darwin-arm64 with ACC 0.8.5's installed hooks, in one conversation of a probe project opened in the app",
+        "the hooks ran as direct children of the app's language server; no agy process took part"
+      ],
+      "result": "pass"
+    },
+    {
+      "client": "antigravity-desktop",
+      "version": "2.19.1",
+      "platform": "darwin-arm64",
+      "observedAt": "2026-10-04",
+      "capability": "context.beforeTurnInjection",
+      "fixture": "fixtures/desktop-2.19.1.json",
+      "provenance": "fixtures/certification-provenance.json",
+      "provenanceId": "desktop-pre-invocation-2-19-1",
+      "idleBehavior": "waits for the next invocation",
+      "busyBehavior": "not observed in the desktop app",
+      "authorityLevel": "context",
+      "limitations": [
+        "captured on the desktop app 2.19.1 (Antigravity.app) on darwin-arm64 with ACC 0.8.5's installed hooks, in one conversation of a probe project opened in the app",
+        "the hooks ran as direct children of the app's language server; no agy process took part",
+        "requires the injectSteps ephemeralMessage envelope, as Antigravity CLI"
+      ],
+      "result": "pass"
+    },
+    {
+      "client": "antigravity-desktop",
+      "version": "2.19.1",
+      "platform": "darwin-arm64",
+      "observedAt": "2026-10-04",
+      "capability": "delivery.nextTurn",
+      "fixture": "fixtures/desktop-2.19.1.json",
+      "provenance": "fixtures/certification-provenance.json",
+      "provenanceId": "desktop-pre-invocation-2-19-1",
+      "idleBehavior": "offers complete peer messages at the next invocation",
+      "busyBehavior": "not observed in the desktop app",
+      "authorityLevel": "context",
+      "limitations": [
+        "captured on the desktop app 2.19.1 (Antigravity.app) on darwin-arm64 with ACC 0.8.5's installed hooks, in one conversation of a probe project opened in the app",
+        "the hooks ran as direct children of the app's language server; no agy process took part",
+        "the agent's acc reply runs only outside the app's sandbox, which the app approves by its grants in ~/.gemini/config/config.json"
+      ],
+      "result": "pass"
     }
   ]
 }

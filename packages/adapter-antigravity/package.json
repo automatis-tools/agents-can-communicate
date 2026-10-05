@@ -16,6 +16,7 @@
     "fixtures/certification-provenance.json",
     "fixtures/SessionStart-1.2.7.json",
     "fixtures/PreInvocation-1.2.7.json",
+    "fixtures/desktop-2.19.1.json",
     "src/",
     "plugin/",
     "fixtures/delivery/antigravity-cli-1.2.7-relay-product.json",

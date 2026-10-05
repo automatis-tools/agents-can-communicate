@@ -212,6 +212,76 @@
           "sha256": "024c5c53915c0f09fac9b2ba118f1831eb97f26c6d4b28aacc4e4a2c5d7500ee"
         }
       ]
+    },
+    {
+      "client": "antigravity-desktop",
+      "version": "2.19.1",
+      "platform": "darwin-arm64",
+      "observedAt": "2026-10-04",
+      "id": "desktop-session-start-2-19-1",
+      "event": "SessionStart",
+      "fixture": "fixtures/desktop-2.19.1.json",
+      "claims": [
+        {
+          "capability": "lifecycle.sessionStart",
+          "result": "pass",
+          "outcome": {
+            "kind": "event-observed",
+            "idle": "fires when a conversation starts",
+            "busy": "fires before the first model invocation",
+            "authority": "advisory",
+            "limitations": [
+              "captured on the desktop app 2.19.1 (Antigravity.app) on darwin-arm64 with ACC 0.8.5's installed hooks, in one conversation of a probe project opened in the app",
+              "the hooks ran as direct children of the app's language server; no agy process took part"
+            ]
+          }
+        }
+      ],
+      "sha256": "973a6842060465228480df062170fa450db679fae7476979fc510f22e0d24bc1",
+      "tool": null
+    },
+    {
+      "client": "antigravity-desktop",
+      "version": "2.19.1",
+      "platform": "darwin-arm64",
+      "observedAt": "2026-10-04",
+      "id": "desktop-pre-invocation-2-19-1",
+      "event": "PreInvocation",
+      "fixture": "fixtures/desktop-2.19.1.json",
+      "claims": [
+        {
+          "capability": "context.beforeTurnInjection",
+          "result": "pass",
+          "outcome": {
+            "kind": "model-visible",
+            "idle": "waits for the next invocation",
+            "busy": "not observed in the desktop app",
+            "authority": "context",
+            "limitations": [
+              "captured on the desktop app 2.19.1 (Antigravity.app) on darwin-arm64 with ACC 0.8.5's installed hooks, in one conversation of a probe project opened in the app",
+              "the hooks ran as direct children of the app's language server; no agy process took part",
+              "requires the injectSteps ephemeralMessage envelope, as Antigravity CLI"
+            ]
+          }
+        },
+        {
+          "capability": "delivery.nextTurn",
+          "result": "pass",
+          "outcome": {
+            "kind": "model-visible",
+            "idle": "offers complete peer messages at the next invocation",
+            "busy": "not observed in the desktop app",
+            "authority": "context",
+            "limitations": [
+              "captured on the desktop app 2.19.1 (Antigravity.app) on darwin-arm64 with ACC 0.8.5's installed hooks, in one conversation of a probe project opened in the app",
+              "the hooks ran as direct children of the app's language server; no agy process took part",
+              "the agent's acc reply runs only outside the app's sandbox, which the app approves by its grants in ~/.gemini/config/config.json"
+            ]
+          }
+        }
+      ],
+      "sha256": "973a6842060465228480df062170fa450db679fae7476979fc510f22e0d24bc1",
+      "tool": null
     }
   ]
 }
