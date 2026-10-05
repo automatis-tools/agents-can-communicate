@@ -184,7 +184,7 @@ export function defineAdapter(manifest) {
   if (manifest.nativeDelivery !== undefined) {
     const client = manifest.client.certificationName ?? manifest.client.command;
     native.nativeDelivery = validateNativeDeliveryContract(manifest.nativeDelivery,
-      { certification, client });
+      { certification, client, clients: [...clients] });
     for (const method of NATIVE_METHODS) {
       if (typeof manifest[method] !== "function") {
         usage(`a native delivery contract requires ${method}()`, { id: manifest.id, method });

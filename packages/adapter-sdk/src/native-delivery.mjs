@@ -23,7 +23,7 @@ export { validateNativeActivationPlan } from "./native-activation.mjs";
 
 const orderedModes = modes => NATIVE_BINDING_MODES.filter(mode => modes.includes(mode));
 
-export function validateNativeDeliveryContract(value, { certification, client }) {
+export function validateNativeDeliveryContract(value, { certification, client, clients = [client] }) {
   // Consent to live delivery is what `acc install` recorded. Up to 0.7.x a
   // Claude shell shim could export it instead ("bootstrap-environment"); the
   // shim is gone, and the installation record is the one source left.
@@ -65,11 +65,19 @@ export function validateNativeDeliveryContract(value, { certification, client })
         + "is recorded by its evidence, and the anchor names the version alone "
         + "(docs/design/2026-09-26-native-delivery-across-platforms.md)");
     }
-    closed(anchor, ["version", "protocolContract"], "nativeDelivery anchor");
+    closed(anchor, ["version", "protocolContract"], "nativeDelivery anchor", ["client"]);
     if (parseStableVersion(anchor.version) === null) {
       usage(`nativeDelivery anchor ${index} version must be a stable version`);
     }
-    if (compareStableVersions(anchor.version, minimum) < 0) {
+    // An anchor may belong to another product the adapter serves (see
+    // client.variants). Its versions count on that product's own line, so the
+    // primary minimum says nothing about them.
+    const owner = Object.hasOwn(anchor, "client") ? anchor.client : client;
+    if (!clients.includes(owner)) {
+      usage(`nativeDelivery anchor ${anchor.version} names client ${owner}, which the adapter `
+        + "does not declare", { anchor });
+    }
+    if (owner === client && compareStableVersions(anchor.version, minimum) < 0) {
       usage(`nativeDelivery anchor ${index} version ${anchor.version} is below the minimum ${minimum}: `
         + "the minimum must be the first passing capture");
     }
@@ -79,7 +87,7 @@ export function validateNativeDeliveryContract(value, { certification, client })
     // Where the capture was taken is provenance the evidence row keeps; the
     // anchor is proven by a passing capture of this version on any platform.
     const proven = (certification?.evidence ?? []).some(item => item.result === "pass"
-      && item.capability === "delivery.livePush" && item.client === client
+      && item.capability === "delivery.livePush" && item.client === owner
       && item.version === anchor.version);
     if (!proven) {
       usage(`nativeDelivery anchor ${anchor.version} has no passing delivery.livePush certification`,
@@ -87,7 +95,18 @@ export function validateNativeDeliveryContract(value, { certification, client })
     }
     return { ...anchor };
   });
-  if (!anchors.some(anchor => compareStableVersions(anchor.version, minimum) === 0)) {
+  const owners = new Map();
+  for (const anchor of anchors) {
+    const owner = anchor.client ?? client;
+    const previous = owners.get(anchor.protocolContract);
+    if (previous !== undefined && previous !== owner) {
+      usage(`nativeDelivery protocol ${anchor.protocolContract} is anchored for both ${previous} `
+        + `and ${owner}`, { protocolContract: anchor.protocolContract });
+    }
+    owners.set(anchor.protocolContract, owner);
+  }
+  if (!anchors.some(anchor => (anchor.client ?? client) === client
+    && compareStableVersions(anchor.version, minimum) === 0)) {
     usage(`nativeDelivery minimum ${minimum} must be the first passing capture: no anchor matches it`);
   }
   if (!Array.isArray(value.knownBad)) usage("nativeDelivery.knownBad must be an array");
@@ -144,7 +163,7 @@ function knownBadHit(contract, order) {
 // validateNativeHandshake below, and the delivery router's own offer check,
 // which uses this function alone because a response already carries no probe
 // or handshake shape to check further).
-export function evaluateVersionContract(adapter, { clientVersion } = {}) {
+export function evaluateVersionContract(adapter, { clientVersion, protocolContract } = {}) {
   const contract = adapter?.nativeDelivery;
   const unsupported = { reasonCode: "native_delivery_unsupported", minimumVersion: null,
     protocolContract: null };
@@ -161,9 +180,18 @@ export function evaluateVersionContract(adapter, { clientVersion } = {}) {
   // already answers malformed input this way.
   const minimumVersion = isText(contract.minimum) ? contract.minimum : null;
   if (minimumVersion === null) return unsupported;
-  const anchor = (Array.isArray(contract.anchors) ? contract.anchors : [])
-    .find(item => item?.version === minimumVersion);
+  const anchors = Array.isArray(contract.anchors) ? contract.anchors : [];
+  const primary = adapter.client?.certificationName ?? adapter.client?.command;
+  const anchor = anchors.find(item => item?.version === minimumVersion
+    && (!isText(item?.client) || item.client === primary));
   if (anchor === undefined) return unsupported;
+  // Another product's protocol has its own floor - the first capture that
+  // anchored it - and the denylist, which names the primary product's
+  // versions, does not reach it. Asked about no protocol, or the primary one,
+  // the rule is the primary minimum as it always was.
+  if (isText(protocolContract) && protocolContract !== anchor.protocolContract) {
+    return protocolFloor(anchors, protocolContract, clientVersion);
+  }
   const facts = { minimumVersion, protocolContract: anchor.protocolContract };
   const order = versionOrder(clientVersion);
   if (order === null) return { ...facts, reasonCode: "version_unavailable" };
@@ -172,6 +200,31 @@ export function evaluateVersionContract(adapter, { clientVersion } = {}) {
   }
   if (knownBadHit(contract, order)) return { ...facts, reasonCode: "known_bad_version" };
   return { ...facts, reasonCode: null };
+}
+
+function protocolFloor(anchors, protocolContract, clientVersion) {
+  const own = anchors.filter(item => item?.protocolContract === protocolContract
+    && isText(item?.version));
+  if (own.length === 0) {
+    return { reasonCode: "protocol_mismatch", minimumVersion: null, protocolContract };
+  }
+  const minimumVersion = own.map(item => item.version)
+    .reduce((first, version) => (compareStableVersions(version, first) < 0 ? version : first));
+  const facts = { minimumVersion, protocolContract };
+  const order = versionOrder(clientVersion);
+  if (order === null) return { ...facts, reasonCode: "version_unavailable" };
+  if (compareVersionOrder(order, versionOrder(minimumVersion)) < 0) {
+    return { ...facts, reasonCode: "below_minimum_version" };
+  }
+  return { ...facts, reasonCode: null };
+}
+
+// The protocol a probe or handshake reports, when it is one an anchor names:
+// that protocol's own floor judges it. Any other value is left to the primary
+// rule, so it still ends as the protocol_mismatch it always was.
+function reportedProtocol(adapter, reported) {
+  return isText(reported) && (adapter?.nativeDelivery?.anchors ?? [])
+    .some(item => item?.protocolContract === reported) ? reported : undefined;
 }
 
 function validateNativeProbe(probe) {
@@ -199,7 +252,8 @@ export function evaluateNativeEligibility(adapter, { clientVersion, probe }) {
   // Only the version is read here; the shape is validated where it always was,
   // so a malformed probe still returns a closed result rather than throwing.
   const serving = isText(probe?.clientVersion) ? probe.clientVersion : clientVersion;
-  const rule = evaluateVersionContract(adapter, { clientVersion: serving });
+  const rule = evaluateVersionContract(adapter, { clientVersion: serving,
+    protocolContract: reportedProtocol(adapter, probe?.protocolContract) });
   const base = { eligible: false, reasonCode: null, minimumVersion: rule.minimumVersion,
     protocolContract: rule.protocolContract, modes: [] };
   const closedResult = reasonCode => deepFreeze({ ...base, reasonCode });
@@ -263,7 +317,8 @@ export function validateNativeHandshake(adapter, { clientVersion, handshake }) {
   // the version is read here; the shape is validated where it always was, so
   // a malformed handshake still returns a closed result rather than throwing.
   const serving = isText(handshake?.clientVersion) ? handshake.clientVersion : clientVersion;
-  const rule = evaluateVersionContract(adapter, { clientVersion: serving });
+  const rule = evaluateVersionContract(adapter, { clientVersion: serving,
+    protocolContract: reportedProtocol(adapter, handshake?.protocolContract) });
   const base = { ok: false, reasonCode: null, clientVersion: null,
     protocolContract: rule.protocolContract, modes: [],
     opaqueEndpointRef: null, leaseUntil: null };
