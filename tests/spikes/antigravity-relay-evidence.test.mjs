@@ -77,5 +77,5 @@ test("an installed-hook Antigravity pass needs its own product evidence", () => 
   assert.throws(() => validateCapture({ ...capture, packageSha256: "d".repeat(64) },
     { productEvidence: antigravityRun() }), /package SHA-256 matches product evidence/);
   assert.throws(() => validateCapture({ ...capture, client: "gemini-cli" },
-    { productEvidence: antigravityRun() }), /installed-hook capture client is one of codex-cli, antigravity-cli, claude-code/);
+    { productEvidence: antigravityRun() }), /installed-hook capture client is one of codex-cli, antigravity-cli, antigravity-desktop, claude-code/);
 });
