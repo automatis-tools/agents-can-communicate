@@ -1,16 +1,14 @@
 import assert from "node:assert/strict";
-import { execFile } from "node:child_process";
 import { mkdtemp, readFile, readdir, realpath, rm } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { homedir, tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
-import { promisify } from "node:util";
 
 import { EXIT } from "@agents-can-communicate/protocol";
 
 import { fixtureOwnerEnv } from "../helpers/fixture-owner.mjs";
+import { createDocsExecutor } from "../helpers/docs-executor.mjs";
 
-const run = promisify(execFile);
 const repo = path.resolve(import.meta.dirname, "..", "..");
 
 /**
@@ -88,29 +86,28 @@ function argv(command) {
  * vocabulary, not whether a real client supplies owner credentials. Real-client
  * ownership needs its own installed-artifact capture.
  */
-async function sandbox(t) {
+async function sandbox(t, executor) {
   const home = await realpath(await mkdtemp(path.join(tmpdir(), "acc-exec-home-")));
   const cwd = await realpath(await mkdtemp(path.join(tmpdir(), "acc-exec-cwd-")));
   const dataHome = await realpath(await mkdtemp(path.join(tmpdir(), "acc-exec-data-")));
   t.after(() => Promise.all([home, cwd, dataHome]
     .map(dir => rm(dir, { recursive: true, force: true }))));
-  const env = { ...process.env, HOME: home, ACC_DATA_HOME: dataHome,
+  const env = { ...process.env, HOME: home, USERPROFILE: home,
+    ACC_DATA_HOME: dataHome, ACC_NO_UPDATE_CHECK: "1",
     GIT_DIR: "", GIT_WORK_TREE: "" };
 
-  const child = run(process.execPath, [path.join(repo, "bin", "acc-hook.mjs"), "codex"],
+  await executor.hook("codex", { hook_event_name: "SessionStart",
+    session_id: "docs-reader", cwd, source: "startup" },
     { env: { ...env, ACC_PARTICIPANT: "reader" } });
-  child.child.stdin.end(JSON.stringify({ hook_event_name: "SessionStart",
-    session_id: "docs-reader", cwd, source: "startup" }));
-  await child;
   return { home, cwd, dataHome, env: { ...env, ...await fixtureOwnerEnv(dataHome, "docs-reader") } };
 }
 
 // A history cursor must exist in the selected list. Unlike an exact message
 // placeholder, an unknown cursor is a usage error. Obtain one through the
 // public API so the documented continuation command is actually exercised.
-async function historyCursor(place) {
-  const cli = async args => JSON.parse((await run(process.execPath,
-    [path.join(repo, "bin", "acc.mjs"), ...args, "--cwd", place.cwd, "--json"],
+async function historyCursor(place, executor) {
+  const cli = async args => JSON.parse((await executor.cli(
+    [...args, "--cwd", place.cwd, "--json"],
     { env: place.env })).stdout).data;
   for (let i = 0; i < 2; i += 1) {
     const session = await cli(["attach", "--participant", `docs_history_${i}`]);
@@ -125,17 +122,36 @@ async function historyCursor(place) {
 // The newest event sequence this workspace has issued, which is what a history
 // boundary has to name. A message-history cursor is a message id and would be
 // refused.
-async function eventCursor(place) {
-  const page = JSON.parse((await run(process.execPath,
-    [path.join(repo, "bin", "acc.mjs"), "sync", "--cwd", place.cwd, "--json"],
+async function eventCursor(place, executor) {
+  const page = JSON.parse((await executor.cli(
+    ["sync", "--cwd", place.cwd, "--json"],
     { env: place.env })).stdout).data;
   assert.ok(/^[0-9]{16}$/.test(page.cursor), "sync did not return an event cursor");
   return page.cursor;
 }
 
 test("every documented acc command is one the CLI accepts", async t => {
+  const executor = await createDocsExecutor(t, repo);
+  const state = () => ({ env: process.env, argv: process.argv, cwd: process.cwd(),
+    exitCode: process.exitCode, stdin: process.stdin, stdout: process.stdout, stderr: process.stderr,
+    homedir: homedir() });
+  const original = state();
+  const originalEnv = { ...process.env };
+  const restored = () => {
+    for (const [name, value] of Object.entries(original)) assert.ok(state()[name] === value, `leaked process.${name}`);
+    const changed = [...new Set([...Object.keys(process.env), ...Object.keys(originalEnv)])]
+      .filter(name => process.env[name] !== originalEnv[name]);
+    assert.deepEqual(changed, [], "leaked environment variable names");
+  };
+  const exit = async (args, env) => executor.cli(args, { env })
+    .then(() => 0, error => {
+      if (error.docsExecutorFailure || !Number.isInteger(error.code)) throw error;
+      return error.code;
+    });
   const rejected = [];
   let checked = 0;
+  let previousOwner = null;
+  let sandboxes = 0;
 
   for (const file of await documents()) {
     const commands = accCommands(await readFile(file, "utf8"));
@@ -143,14 +159,31 @@ test("every documented acc command is one the CLI accepts", async t => {
     // One sandbox per document, because a document is what a reader follows.
     // Sharing one made `acc finish` in the CLI reference close the session that
     // every later document's commands then failed to find.
-    const place = await sandbox(t);
+    const place = await sandbox(t, executor);
+    sandboxes += 1;
+    restored();
+    // Negative controls require both the actual parser and a handler-specific
+    // rule; a parser-only shortcut cannot make this documentation gate pass.
+    if (previousOwner === null) {
+      assert.deepEqual(await Promise.all([
+        exit(["sync", "--docs-unknown-option", "--cwd", place.cwd, "--json"], place.env),
+        exit(["inbox", "--message", "message_x", "--limit", "1", "--cwd", place.cwd, "--json"], place.env),
+      ]), [EXIT.USAGE, EXIT.USAGE], "parser/handler controls must reject invalid commands");
+    } else {
+      assert.equal(await exit(["inbox", "--cwd", place.cwd, "--json"],
+        { ...place.env, ...previousOwner }), EXIT.CONFLICT, "another document's owner must be refused");
+    }
+    assert.equal(await exit(["inbox", "--cwd", place.cwd, "--json"], place.env), 0,
+      "each document must have its own usable owner");
+    restored();
+    previousOwner = { ACC_SESSION: place.env.ACC_SESSION, ACC_GENERATION: place.env.ACC_GENERATION };
     for (const command of commands) {
       checked += 1;
       const parts = argv(command);
       const cursor = parts.indexOf("--cursor");
       if (parts[0] === "sync" && parts.includes("history")
         && cursor !== -1 && parts[cursor + 1] === "message_x") {
-        parts[cursor + 1] = await historyCursor(place);
+        parts[cursor + 1] = await historyCursor(place, executor);
       }
       // `prune --before` refuses a boundary the store never issued, so the
       // documented example is given one the store just handed out. Obtained
@@ -158,13 +191,16 @@ test("every documented acc command is one the CLI accepts", async t => {
       // documented command is then actually exercised rather than skipped.
       const before = parts.indexOf("--before");
       if (parts[0] === "prune" && before !== -1 && parts[before + 1] === "event_cursor") {
-        parts[before + 1] = await eventCursor(place);
+        parts[before + 1] = await eventCursor(place, executor);
       }
-      const result = await run(process.execPath,
-        [path.join(repo, "bin", "acc.mjs"), ...parts, "--cwd", place.cwd,
+      const result = await executor.cli(
+        [...parts, "--cwd", place.cwd,
           ...(parts.includes("--json") ? [] : ["--json"])],
         { env: place.env })
-        .then(() => ({ code: 0 }), error => ({ code: error.code, stdout: error.stdout ?? "" }));
+        .then(() => ({ code: 0 }), error => {
+          if (error.docsExecutorFailure || !Number.isInteger(error.code)) throw error;
+          return { code: error.code, stdout: error.stdout ?? "" };
+        }).finally(restored);
       // Exit 2 is the parser refusing: an option that does not exist, a value
       // missing, a required argument absent. Anything deeper is the command
       // working on a workspace this sandbox does not have, which is fine.
@@ -178,6 +214,11 @@ test("every documented acc command is one the CLI accepts", async t => {
   assert.equal(checked > 15, true, `only ${checked} documented commands were found`);
   assert.deepEqual(rejected, [],
     `documentation tells a reader to run something the CLI refuses:\n  ${rejected.join("\n  ")}`);
+  assert.equal(executor.stats.hooks, sandboxes, "every document must run SessionStart");
+  assert.ok(executor.stats.nested > 0, "install must execute the staged generation's version check");
+  assert.equal(executor.stats.subprocesses, 0, "documentation execution must not fork ACC");
+  t.diagnostic(`${checked} documented commands; ${executor.stats.cli} CLI, ${sandboxes} hook, `
+    + `${executor.stats.nested} installed-version entrypoint calls`);
 });
 
 /**
