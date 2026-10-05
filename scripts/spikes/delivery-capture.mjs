@@ -9,6 +9,7 @@
 // explain itself with at least one limitation. Prompts, answers, transcripts,
 // paths, and secrets have no field here by design.
 
+import { assertAntigravityDesktopRunEvidence } from "../e2e/antigravity-desktop-evidence.mjs";
 import { assertAntigravityRunEvidence } from "../e2e/antigravity-relay-evidence.mjs";
 import { assertClaudeInboxRunEvidence } from "../e2e/claude-inbox-evidence.mjs";
 import { assertRunEvidence } from "../e2e/codex-local-daemon-evidence.mjs";
@@ -20,6 +21,7 @@ export const CAPTURE_CAPABILITY = "native_delivery";
 export const INSTALLED_PRODUCT_EVIDENCE = Object.freeze({
   "codex-cli": assertRunEvidence,
   "antigravity-cli": assertAntigravityRunEvidence,
+  "antigravity-desktop": assertAntigravityDesktopRunEvidence,
   "claude-code": assertClaudeInboxRunEvidence,
 });
 const INSTALLED_PRODUCT_CLIENTS = Object.keys(INSTALLED_PRODUCT_EVIDENCE);

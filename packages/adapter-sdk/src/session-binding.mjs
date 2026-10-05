@@ -43,13 +43,17 @@ function assertBindingDeadline(deadlineAt) {
 }
 
 export async function storeSessionBinding({ runtimeDir, harnessSessionId, accSessionId,
-  generation, clientVersion, platform, clientPid, deadlineAt, storeVersion, runtimeRoot }) {
+  generation, clientVersion, clientName, platform, clientPid, deadlineAt, storeVersion, runtimeRoot }) {
   assertBindingDeadline(deadlineAt);
   const file = fileFor(runtimeDir, harnessSessionId);
   const record = { schemaVersion: SCHEMA_VERSION, harnessSessionId, accSessionId, generation };
   assertIdentity(record);
   await mkdir(path.dirname(file), { recursive: true });
   if (typeof clientVersion === "string" && clientVersion !== "") record.clientVersion = clientVersion;
+  // The product the session runs in, when it is one of the adapter's variants
+  // rather than its own client: its evidence and its version line are its own.
+  // A reader that predates the field ignores it.
+  if (typeof clientName === "string" && clientName !== "") record.clientName = clientName;
   if (typeof platform === "string" && platform !== "") record.platform = platform;
   // The vendor process this session runs in, resolved once at SessionStart.
   // A native endpoint is matched against it, so a binding without one can
@@ -106,6 +110,7 @@ export async function loadSessionBinding({ runtimeDir, harnessSessionId }) {
   assertIdentity(record, harnessSessionId);
   const binding = { accSessionId: record.accSessionId, generation: record.generation };
   if (typeof record.clientVersion === "string") binding.clientVersion = record.clientVersion;
+  if (typeof record.clientName === "string" && record.clientName !== "") binding.clientName = record.clientName;
   if (typeof record.platform === "string") binding.platform = record.platform;
   if (isPid(record.clientPid)) binding.clientPid = record.clientPid;
   return binding;
@@ -147,6 +152,8 @@ export async function listSessionBindings({ runtimeDir }) {
       accSessionId: record.accSessionId, generation: record.generation,
       ...(typeof record.clientVersion === "string"
         ? { clientVersion: record.clientVersion } : {}),
+      ...(typeof record.clientName === "string" && record.clientName !== ""
+        ? { clientName: record.clientName } : {}),
       ...(typeof record.platform === "string" ? { platform: record.platform } : {}),
       ...(isPid(record.clientPid) ? { clientPid: record.clientPid } : {}) });
   }

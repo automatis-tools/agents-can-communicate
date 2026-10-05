@@ -37,8 +37,10 @@ test("a shipped livePush capability has a capture, a matching anchor, and an acc
       assert.notEqual(contract, undefined, `${adapter.id} claims livePush with no native contract`);
       const client = adapter.client.certificationName ?? adapter.client.command;
       for (const anchor of contract.anchors) {
+        // An anchor for another product the adapter serves names that product.
+        const owner = anchor.client ?? client;
         const passing = adapter.certification.evidence.some(item => item.result === "pass"
-          && item.capability === "delivery.livePush" && item.client === client
+          && item.capability === "delivery.livePush" && item.client === owner
           && item.version === anchor.version);
         assert.equal(passing, true,
           `${adapter.id} anchor ${anchor.version} has no passing livePush capture`);

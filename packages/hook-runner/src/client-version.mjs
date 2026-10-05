@@ -25,6 +25,26 @@ export function probeClientVersion(adapter, { timeoutMs = 1_000 } = {}) {
   });
 }
 
+/**
+ * The executable a client process runs, when `ps` names it by absolute path and
+ * that path is the client's command: a desktop app starts its own build by full
+ * path (Claude.app's claude, ChatGPT.app's codex), and asking that file is
+ * asking the session's own build. Null otherwise, and always on Windows, whose
+ * process names carry no path.
+ */
+export function ownExecutable(entry, command) {
+  if (process.platform === "win32" || typeof entry?.comm !== "string") return null;
+  return path.isAbsolute(entry.comm) && path.basename(entry.comm) === command ? entry.comm : null;
+}
+
+/** That executable's `--version`, parsed like the PATH probe's; null on any failure. */
+export function probeExecutableVersion(file, versionArgs = ["--version"], { timeoutMs = 1_000 } = {}) {
+  return new Promise(resolve => {
+    execFile(file, versionArgs, { timeout: timeoutMs, killSignal: "SIGKILL", windowsHide: true },
+      (error, stdout, stderr) => resolve(error === null ? parseClientVersion(`${stdout}${stderr}`) : null));
+  });
+}
+
 // A package script the npm .cmd shim runs: `"%dp0%\<path inside the prefix>"`.
 const SHIM_TARGET = /"%dp0%\\([^"%]+\.(?:c|m)?js)"/gi;
 const DEPTH = 6;

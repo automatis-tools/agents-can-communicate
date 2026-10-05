@@ -15,8 +15,9 @@ import { clearPin, createGitProbe, resolveHookWorkspace, platformDataHome, runti
   writePin as writeRuntimePin }
   from "@agents-can-communicate/cli/hook-support";
 
-import { resolveClientPid } from "./client-pid.mjs";
-import { probeClientVersion as defaultProbeClientVersion } from "./client-version.mjs";
+import { resolveClient } from "./client-pid.mjs";
+import { ownExecutable, probeClientVersion as defaultProbeClientVersion, probeExecutableVersion }
+  from "./client-version.mjs";
 import { bindNative, callRelease, nativeActivationHintFor, nativeDiagnosticDeadline }
   from "./native-attempt.mjs";
 import { readProcessTable as defaultReadProcessTable } from "./process-table.mjs";
@@ -407,6 +408,63 @@ async function projectActivation(input, offered) {
   }
 }
 
+const STABLE_OR_PRERELEASE = /^\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$/;
+const isVersion = value => typeof value === "string" && STABLE_OR_PRERELEASE.test(value);
+
+/**
+ * Which of its products the adapter recognised the client as. A variant name
+ * the adapter does not declare is ignored together with the version it came
+ * with: that version counts on a line ACC has no evidence for.
+ */
+function declaredProduct(adapter, client) {
+  const name = client?.certificationName;
+  if (typeof name !== "string") return { clientName: undefined, version: client?.version };
+  const primary = adapter.client?.certificationName ?? adapter.client?.command;
+  if (name === primary) return { clientName: undefined, version: client.version };
+  const declared = (adapter.client?.variants ?? []).some(variant => variant?.certificationName === name);
+  return declared ? { clientName: name, version: client.version }
+    : { clientName: undefined, version: undefined };
+}
+
+/**
+ * The version the session's own client runs, or null to fall back to the PATH
+ * probe: what its command line named, then the adapter's reading of the
+ * running client (Claude Code's session registry), then the client's own
+ * executable when `ps` names it by full path. Each step is bounded by the
+ * hook's budget and fails open.
+ */
+async function runningClientVersion({ adapter, client, product, env, deadline }) {
+  if (client === null || client === undefined) return null;
+  if (isVersion(product.version)) return product.version;
+  const remaining = cap => Math.max(1, Math.min(cap, deadline - Date.now() - TABLE_RESERVE_MS));
+  if (typeof adapter.clientVersionOf === "function" && client.entry !== undefined) {
+    let timer;
+    const read = await Promise.race([
+      Promise.resolve().then(() => adapter.clientVersionOf({ pid: client.pid, entry: client.entry, env }))
+        .catch(() => null),
+      new Promise(resolve => { timer = setTimeout(() => resolve(null), remaining(500)); }),
+    ]).finally(() => clearTimeout(timer));
+    if (isVersion(read)) return read;
+  }
+  const file = ownExecutable(client.entry, adapter.client?.command);
+  if (file === null) return null;
+  return probeExecutableVersion(file, adapter.client?.versionArgs ?? ["--version"],
+    { timeoutMs: remaining(1_000) });
+}
+
+// Whether the client process a binding names has exited. Signal 0 delivers
+// nothing; EPERM means the process exists under another user.
+function clientGone(binding) {
+  const pid = binding?.clientPid;
+  if (!Number.isInteger(pid) || pid <= 0) return false;
+  try {
+    process.kill(pid, 0);
+    return false;
+  } catch (error) {
+    return error?.code === "ESRCH";
+  }
+}
+
 const HANDLERS = {
   // `knownClientPid` and `pins: false` are registration's (#167): it runs in
   // a peer's process, so the client's pid is handed over rather than found in
@@ -414,7 +472,7 @@ const HANDLERS = {
   // generation runs for the session until its first real hook pins its own.
   async sessionStart({ event, context, adapter, adapterId, binding, paths,
     readProcessTable, probeClientVersion, platform, deadline, knownClientPid, pins = true,
-    tableRead: started = null, mark = () => {} }) {
+    tableRead: started = null, mark = () => {}, clientRestarted = false }) {
     // Where this session's pin lives, resolved once and reused at every write
     // below. Beside `paths.root`, never inside it: see `managerRootFor`.
     const pinRoot = managerRootFor(context.dataHome);
@@ -443,17 +501,24 @@ const HANDLERS = {
     const tableRead = known || command === null ? null : started ?? Promise.resolve(readProcessTable({
       timeoutMs: Math.max(1, Math.min(PROCESS_TABLE_MS, deadline - Date.now() - TABLE_RESERVE_MS)) }));
     tableRead?.catch(() => {});
-    mark("probing the client version");
-    const clientVersion = await probeClientVersion(adapter,
+    // The binary on PATH answers in parallel, as the fallback: the version the
+    // running client names for itself, when it names one, wins below.
+    const pathVersion = probeClientVersion(adapter,
       { timeoutMs: Math.max(1, Math.min(1_000, deadline - Date.now())) });
-    assertHookBudget(deadline);
-    const clientFacts = { clientVersion, platform };
-    const capabilities = effectiveCapabilities(adapter, clientFacts);
     mark("reading the process table");
-    const pid = known ? knownClientPid : command === null ? null
-      : resolveClientPid({ table: await tableRead, from: process.pid, command,
-        clientPackage: adapter.client?.package });
+    const client = known ? { pid: knownClientPid } : command === null ? null
+      : resolveClient({ table: await tableRead, from: process.pid, command,
+        clientPackage: adapter.client?.package, identify: adapter.identifyClientProcess });
     assertHookBudget(deadline);
+    mark("probing the client version");
+    const product = declaredProduct(adapter, client);
+    const clientVersion = await runningClientVersion({ adapter, client, product, env: context.env,
+      deadline }) ?? await pathVersion;
+    assertHookBudget(deadline);
+    const clientFacts = { clientVersion, platform,
+      ...(product.clientName === undefined ? {} : { clientName: product.clientName }) };
+    const capabilities = effectiveCapabilities(adapter, clientFacts);
+    const pid = client?.pid ?? null;
     mark("opening the session");
     const clientPid = Number.isInteger(pid) && pid > 0 ? pid : undefined;
     const native = hookBinding => {
@@ -470,13 +535,18 @@ const HANDLERS = {
     };
     if (event.kind === "beforeTurn" && binding !== null) {
       // A genuine prompt can resume after an ephemeral removal or a durable
-      // close. Recheck after probes: a CLI replacement can run outside the
-      // native lifecycle lock. Never adopt that replacement's identity.
+      // close, or carry on a session whose client restarted. Recheck after
+      // probes: a CLI replacement can run outside the native lifecycle lock.
+      // Never adopt that replacement's identity.
+      // A session can also close between the turn's check and this one while
+      // its client was down; that is the closed-session resumption below,
+      // not a replacement.
       const previous = await context.service.locateSession(binding.accSessionId);
-      if (previous !== null && (previous.record.state !== "closed"
-        || previous.record.generation !== binding.generation)) {
-        throw new Error("the completed hook owner changed during turn registration");
-      }
+      const sameGeneration = previous?.record.generation === binding.generation;
+      const expected = previous === null
+        || sameGeneration && (previous.record.state === "closed"
+          || clientRestarted && previous.record.state === "open");
+      if (!expected) throw new Error("the completed hook owner changed during turn registration");
     }
     if (binding !== null) {
       const resumed = await context.service.resumeSession({
@@ -588,6 +658,21 @@ const HANDLERS = {
       // the crash-safe opening path, retaining its full published client facts
       // and its single native handshake rather than binding a second time.
       const started = await HANDLERS.sessionStart(input);
+      const fresh = await loadSessionBinding({ runtimeDir: paths.root,
+        harnessSessionId: event.sessionId });
+      const offered = await nativeActivationHintFor({ adapter, event,
+        nativeBinding: started.nativeBinding, binding: fresh, context, paths, deadline });
+      const turn = await projectActivation({ ...input, binding: fresh }, offered);
+      return { ...turn, nativeBinding: started.nativeBinding };
+    }
+    if (clientGone(binding)) {
+      // The client this session was bound to has exited, and a turn arrived
+      // anyway: the client restarted under the same conversation. Antigravity
+      // 2.0 reopens a conversation without a second SessionStart, so without
+      // this the session stayed bound to a dead process and lost live delivery
+      // for good. The start path finds the client running now, keeps this ACC
+      // session and generation, and binds again.
+      const started = await HANDLERS.sessionStart({ ...input, clientRestarted: true });
       const fresh = await loadSessionBinding({ runtimeDir: paths.root,
         harnessSessionId: event.sessionId });
       const offered = await nativeActivationHintFor({ adapter, event,

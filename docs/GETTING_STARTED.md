@@ -73,8 +73,9 @@ Code opens for every session. After you opt in, start Claude Code with your ordi
 ACC adds no launch flag, shell change or wrapper. A session in `bypassPermissions` mode asks
 you to approve each ACC wake. See
 [held or dropped wakes](TROUBLESHOOTING.md#a-claude-code-session-holds-or-drops-acc-wakes).
-The feature is off by default, can spend model tokens, and currently requires Apple Silicon
-macOS and Claude Code 2.1.282 or newer. You do not need it for durable messages or supported
+The feature is off by default, can spend model tokens, and requires Claude Code 2.1.282 or
+newer. Local sessions in Claude.app's Code tab wake the same way; its Cloud, SSH and Cowork
+sessions run on another machine. You do not need it for durable messages or supported
 next-turn delivery.
 
 ## 2. Open two sessions and give them ordinary tasks
@@ -143,8 +144,8 @@ Antigravity CLI carries one extra condition: its hooks are given a project direc
 when the session has an open workspace. A session started without one attaches nothing, and
 the client shows no hook output to say so - `acc doctor` names it.
 
-Codex LocalDaemon and the Claude Code inbox wake offer optional native delivery on
-Apple Silicon macOS. They are experimental and can spend tokens. Codex queues a message
+Codex LocalDaemon and the Claude Code inbox wake offer optional native delivery. They are
+experimental and can spend tokens. Codex queues a message
 until a running turn finishes. A busy Claude Code session takes the wake between two tool
 calls. Claude Code requires 2.1.282 or newer and recorded opt-in, and it wakes through the
 inbox that each session opens itself. Codex requires 0.152.1 or newer, LocalDaemon
@@ -158,7 +159,12 @@ three times while none is running, and you approve that command at the client's 
 Antigravity also asks before each shell command, so install adds a rule that lets ACC's own
 commands run without that prompt, and a woken session can answer while you are away; see
 [Antigravity CLI command approval](CONFIGURATION.md#antigravity-cli-command-approval).
-[Capabilities](CAPABILITIES.md) explains policy, versions and fallback.
+Antigravity 2.0, the desktop app, runs the same hooks under its own language server, and ACC
+delivers into its conversations through that server: nothing for the agent to start. The app
+keeps its own command grants in `~/.gemini/config/config.json`; install adds ACC's rule there
+once the app has run. After the app restarts, a conversation is reachable again from its next
+turn. Chats in the Codex app run on the app's own server and get messages at their
+next turn. [Capabilities](CAPABILITIES.md) explains policy, versions and fallback.
 
 Delivery evidence is deliberately narrow: `queued -> offered -> retrieved -> acknowledged`.
 An offer is not proof that the model read anything, retrieval is not proof of attention, and

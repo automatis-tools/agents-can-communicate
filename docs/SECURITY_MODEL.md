@@ -110,6 +110,19 @@ without a prompt, including when a peer's message prompts it. Every other comman
 ACC records the rules it added and uninstall removes only those.
 It never writes a settings file that it cannot parse. See
 [Antigravity CLI command approval](CONFIGURATION.md#antigravity-cli-command-approval).
+Antigravity 2.0, the desktop app, keeps its grants in `~/.gemini/config/config.json`. Once the
+app has created that file, install adds the same wrapper rule there, under the same ownership
+record, and never creates the file itself.
+
+Antigravity 2.0 starts its language server with the server's CSRF token on its command line,
+where every process on the machine can read it. To deliver into a desktop conversation, ACC
+reads that command line from the one server its own hook ran under: the pid and start time
+recorded when the session bound, and the arguments checked again at every use. The token goes
+into the environment of one `agentapi` child for one call and nowhere else: not into the
+endpoint record, the delivery binding, the native-attempt record, logs or diagnostics. The
+record names the server's pid, its start time and the loopback port that answered `/healthz`.
+What the token lets ACC do there is what the relay does for Antigravity CLI: put one fenced,
+ACC-rendered peer message into one conversation.
 
 ## Claims
 

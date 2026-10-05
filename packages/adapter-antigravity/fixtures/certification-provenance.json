@@ -212,6 +212,117 @@
           "sha256": "024c5c53915c0f09fac9b2ba118f1831eb97f26c6d4b28aacc4e4a2c5d7500ee"
         }
       ]
+    },
+    {
+      "client": "antigravity-desktop",
+      "version": "2.19.1",
+      "platform": "darwin-arm64",
+      "observedAt": "2026-10-04",
+      "id": "desktop-session-start-2-19-1",
+      "event": "SessionStart",
+      "fixture": "fixtures/desktop-2.19.1.json",
+      "claims": [
+        {
+          "capability": "lifecycle.sessionStart",
+          "result": "pass",
+          "outcome": {
+            "kind": "event-observed",
+            "idle": "fires when a conversation starts",
+            "busy": "fires before the first model invocation",
+            "authority": "advisory",
+            "limitations": [
+              "captured on the desktop app 2.19.1 (Antigravity.app) on darwin-arm64 with ACC 0.8.5's installed hooks, in one conversation of a probe project opened in the app",
+              "the hooks ran as direct children of the app's language server; no agy process took part"
+            ]
+          }
+        }
+      ],
+      "sha256": "973a6842060465228480df062170fa450db679fae7476979fc510f22e0d24bc1",
+      "tool": null
+    },
+    {
+      "client": "antigravity-desktop",
+      "version": "2.19.1",
+      "platform": "darwin-arm64",
+      "observedAt": "2026-10-04",
+      "id": "desktop-pre-invocation-2-19-1",
+      "event": "PreInvocation",
+      "fixture": "fixtures/desktop-2.19.1.json",
+      "claims": [
+        {
+          "capability": "context.beforeTurnInjection",
+          "result": "pass",
+          "outcome": {
+            "kind": "model-visible",
+            "idle": "waits for the next invocation",
+            "busy": "not observed in the desktop app",
+            "authority": "context",
+            "limitations": [
+              "captured on the desktop app 2.19.1 (Antigravity.app) on darwin-arm64 with ACC 0.8.5's installed hooks, in one conversation of a probe project opened in the app",
+              "the hooks ran as direct children of the app's language server; no agy process took part",
+              "requires the injectSteps ephemeralMessage envelope, as Antigravity CLI"
+            ]
+          }
+        },
+        {
+          "capability": "delivery.nextTurn",
+          "result": "pass",
+          "outcome": {
+            "kind": "model-visible",
+            "idle": "offers complete peer messages at the next invocation",
+            "busy": "not observed in the desktop app",
+            "authority": "context",
+            "limitations": [
+              "captured on the desktop app 2.19.1 (Antigravity.app) on darwin-arm64 with ACC 0.8.5's installed hooks, in one conversation of a probe project opened in the app",
+              "the hooks ran as direct children of the app's language server; no agy process took part",
+              "the agent's acc reply runs only outside the app's sandbox, which the app approves by its grants in ~/.gemini/config/config.json"
+            ]
+          }
+        }
+      ],
+      "sha256": "973a6842060465228480df062170fa450db679fae7476979fc510f22e0d24bc1",
+      "tool": null
+    },
+    {
+      "id": "native-delivery-2-19-1-desktop-product",
+      "client": "antigravity-desktop",
+      "version": "2.19.1",
+      "platform": "darwin-arm64",
+      "observedAt": "2026-10-05T04:34:55.036Z",
+      "fixture": "fixtures/delivery/antigravity-desktop-2.19.1-product.json",
+      "sha256": "1ef1b19b9069220726a72c548353f40a38e7c2585c69c5469b30cba9286d47e3",
+      "event": null,
+      "tool": null,
+      "claims": [
+        {
+          "capability": "delivery.livePush",
+          "result": "pass",
+          "outcome": {
+            "kind": "native-delivery-observed",
+            "idle": "offered",
+            "busy": "queued_after_turn",
+            "authority": "experimental",
+            "limitations": [
+              "Observed on darwin-arm64 with Antigravity 2.19.1, the desktop app (Antigravity.app), model Gemini 3.8 Flash, in one conversation of a probe project opened in the app, through a private candidate built from this branch and installed into an isolated ACC data home that the app was launched with.",
+              "No relay and no command for the agent to run: ACC found the app's language server as the hook's parent, read its endpoint from the server's command line at each bind and offer, and pushed through the server's own agentapi; the endpoint record carries the server's pid, start time and port, never the token.",
+              "An idle conversation woke with no user input. A message accepted while the model streamed a long answer was presented after that answer completed, uninterrupted. The desktop UI shows each push as a collapsed ACC peer message entry.",
+              "The agent's acc commands fail inside the app's sandbox and run once the model retries outside it; with the wrapper's grant already in ~/.gemini/config/config.json, that retry ran without an approval prompt.",
+              "With the app quit, a message stayed queued as recipient_offline. After the app restarted - a new language server, token and port - the conversation's first user turn bound it again, and the next push woke it.",
+              "The app runs no SessionStart for a conversation it reopens, so after a restart live delivery returns at the conversation's next turn, not before."
+            ]
+          }
+        }
+      ],
+      "productEvidence": {
+        "fixture": "fixtures/delivery/antigravity-desktop-2.19.1-product-evidence.json",
+        "sha256": "b3b0fdfd19970acd636a2ff433cd13527c9c9257efceef5c8675bca60f0888b1"
+      },
+      "historicalFixtures": [
+        {
+          "fixture": "fixtures/desktop-2.19.1.json",
+          "sha256": "973a6842060465228480df062170fa450db679fae7476979fc510f22e0d24bc1"
+        }
+      ]
     }
   ]
 }

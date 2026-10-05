@@ -21,6 +21,19 @@ const nativeDelivery = (client, version, observedAt, fixture, protocolContract, 
   tool: null, protocolContract, outcome: "native-delivery-observed", idleBehavior: idle,
   busyBehavior: busy, authorityLevel: "experimental", limitations }));
 
+const antigravityDesktopLimitations = Object.freeze([
+  "captured on the desktop app 2.19.1 (Antigravity.app) on darwin-arm64 with ACC 0.8.5's installed"
+    + " hooks, in one conversation of a probe project opened in the app",
+  "the hooks ran as direct children of the app's language server; no agy process took part",
+]);
+const antigravityDesktopLiveLimitations = Object.freeze([
+  "Observed on darwin-arm64 with Antigravity 2.19.1, the desktop app (Antigravity.app), model Gemini 3.8 Flash, in one conversation of a probe project opened in the app, through a private candidate built from this branch and installed into an isolated ACC data home that the app was launched with.",
+  "No relay and no command for the agent to run: ACC found the app's language server as the hook's parent, read its endpoint from the server's command line at each bind and offer, and pushed through the server's own agentapi; the endpoint record carries the server's pid, start time and port, never the token.",
+  "An idle conversation woke with no user input. A message accepted while the model streamed a long answer was presented after that answer completed, uninterrupted. The desktop UI shows each push as a collapsed ACC peer message entry.",
+  "The agent's acc commands fail inside the app's sandbox and run once the model retries outside it; with the wrapper's grant already in ~/.gemini/config/config.json, that retry ran without an approval prompt.",
+  "With the app quit, a message stayed queued as recipient_offline. After the app restarted - a new language server, token and port - the conversation's first user turn bound it again, and the next push woke it.",
+  "The app runs no SessionStart for a conversation it reopens, so after a restart live delivery returns at the conversation's next turn, not before.",
+]);
 const antigravityRelayLimitations = Object.freeze([
   "Observed on darwin-arm64 with Antigravity CLI 1.2.7 in the TUI, model Gemini 3.8 Flash, through a private candidate built from this branch and installed into an isolated ACC data home; print mode ends with its turn and runs no relay.",
   "The agent started the relay once for the conversation through run_command, after ACC's one-time context line named the command; the operator approved that command and each acc reply once at the client's permission prompt. ACC writes no permission rule.",
@@ -103,6 +116,23 @@ export const PASS_EXPECTATIONS = Object.freeze({
   ...nativeDelivery("antigravity-cli", "1.2.7", "2026-09-21T19:29:23.548Z",
     "fixtures/delivery/antigravity-cli-1.2.7-relay-product.json", "antigravity-agentapi-relay-v1", "offered",
     "queued_after_turn", antigravityRelayLimitations, ["delivery.livePush"])
+    .map(entry => ({ ...entry, launchMode: "ordinary-command-with-installed-hooks" })),
+  // Antigravity 2.0, the desktop app, on its own version line (2026-10-04).
+  ...withFacts("antigravity-desktop", "2.19.1", noEventField([
+    row("lifecycle.sessionStart", "fixtures/desktop-2.19.1.json", "SessionStart", null, "event-observed",
+      "fires when a conversation starts", "fires before the first model invocation", "advisory",
+      antigravityDesktopLimitations),
+    row("context.beforeTurnInjection", "fixtures/desktop-2.19.1.json", "PreInvocation", null, "model-visible",
+      "waits for the next invocation", "not observed in the desktop app", "context",
+      [...antigravityDesktopLimitations, "requires the injectSteps ephemeralMessage envelope, as Antigravity CLI"]),
+    row("delivery.nextTurn", "fixtures/desktop-2.19.1.json", "PreInvocation", null, "model-visible",
+      "offers complete peer messages at the next invocation", "not observed in the desktop app", "context",
+      [...antigravityDesktopLimitations, "the agent's acc reply runs only outside the app's sandbox, which the"
+        + " app approves by its grants in ~/.gemini/config/config.json"]),
+  ]), "2026-10-04"),
+  ...nativeDelivery("antigravity-desktop", "2.19.1", "2026-10-05T04:34:55.036Z",
+    "fixtures/delivery/antigravity-desktop-2.19.1-product.json", "antigravity-desktop-agentapi-v1", "offered",
+    "queued_after_turn", antigravityDesktopLiveLimitations, ["delivery.livePush"])
     .map(entry => ({ ...entry, launchMode: "ordinary-command-with-installed-hooks" }))],
   "adapter-claude-code": withFacts("claude-code", "2.1.233", [
     row("lifecycle.sessionStart", "fixtures/SessionStart.json", "SessionStart", null,

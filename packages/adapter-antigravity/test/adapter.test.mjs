@@ -67,7 +67,7 @@ test("every certified capability names a fixture shipped in this package", async
   const shipped = JSON.parse(await readFile(new URL("../package.json", import.meta.url))).files;
 
   for (const item of adapter.certification.evidence) {
-    assert.equal(item.client, "antigravity-cli");
+    assert.equal(["antigravity-cli", "antigravity-desktop"].includes(item.client), true, item.client);
     assert.equal(shipped.includes(item.fixture), true, `${item.fixture} is not shipped`);
     assert.equal(shipped.includes(item.provenance), true, `${item.provenance} is not shipped`);
     await readFile(new URL(`../${item.fixture}`, import.meta.url));

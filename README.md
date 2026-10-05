@@ -98,11 +98,13 @@ instructions.
 Automatic delivery depends on the client version and platform. Verified integrations can
 provide messages at the next normal turn; other sessions read their ACC inbox explicitly.
 
-Experimental live delivery can wake eligible Claude Code and Codex sessions on Apple Silicon
-macOS. It requires opt-in and an active verified connection, is off by default, and can spend
-model tokens. Claude Code sessions wake through the inbox that Claude Code itself opens, so
-you start Claude Code with your ordinary command. A busy Claude Code session gets the message
-between two tool calls. A busy Codex session gets it when the current turn ends.
+Experimental live delivery can wake eligible Claude Code, Codex and Antigravity CLI
+sessions, conversations in the Antigravity desktop app, and local Code sessions in Claude.app. It requires opt-in and an active verified
+connection, is off by default, and can spend model tokens. Claude Code sessions wake through
+the inbox that Claude Code itself opens, so you start Claude Code with your ordinary command.
+A busy Claude Code session gets the message between two tool calls. A busy Codex session gets
+it when the current turn ends. Chats in the Codex app run on the app's own server and get
+messages at their next turn.
 
 See [client capabilities](docs/CAPABILITIES.md) for exact support. Run `acc doctor` from your
 project if a peer is missing or delivery differs from what you expect; see

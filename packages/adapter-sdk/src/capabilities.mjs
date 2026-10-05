@@ -81,6 +81,41 @@ export function assertCapabilities(declared = {}, implementation = {}, certifica
   return freezeCapabilities(resolved);
 }
 
+/**
+ * The other products whose hooks one adapter serves. Antigravity 2.0 runs the
+ * same `~/.gemini/config/hooks.json` as Antigravity CLI, on its own version
+ * line, so its evidence is recorded under its own certification name. A
+ * variant names a product, not a launch mode: one adapter's hooks, one more
+ * version line.
+ */
+function validateClientVariants(variants, primary) {
+  if (variants === undefined) return [];
+  if (!Array.isArray(variants)) usage("client.variants must be an array", { variants });
+  const seen = new Set([primary]);
+  return variants.map((variant, index) => {
+    if (variant === null || typeof variant !== "object" || Array.isArray(variant)) {
+      usage(`client.variants entry ${index} must be an object`);
+    }
+    for (const key of Object.keys(variant)) {
+      if (!["certificationName", "displayName"].includes(key)) {
+        usage(`client.variants entry ${index} has unknown field ${key}`, { key });
+      }
+    }
+    const { certificationName, displayName } = variant;
+    if (typeof certificationName !== "string" || certificationName.trim() === "") {
+      usage(`client.variants entry ${index} certificationName must be a non-empty string`);
+    }
+    if (typeof displayName !== "string" || displayName.trim() === "") {
+      usage(`client.variants entry ${index} displayName must be a non-empty string`);
+    }
+    if (seen.has(certificationName)) {
+      usage(`client.variants entry ${index} repeats ${certificationName}`, { certificationName });
+    }
+    seen.add(certificationName);
+    return { certificationName, displayName };
+  });
+}
+
 export function defineAdapter(manifest) {
   if (typeof manifest?.id !== "string") usage("an adapter must declare an id");
   assertPortableId(manifest.id, "adapter id");
@@ -104,15 +139,25 @@ export function defineAdapter(manifest) {
   const certification = validateCertification(manifest.certification);
   const known = new Set(Object.entries(CAPABILITY_SHAPE)
     .flatMap(([group, names]) => names.map(name => `${group}.${name}`)));
+  const primary = manifest.client.certificationName ?? manifest.client.command;
+  const clients = new Set([primary, ...validateClientVariants(manifest.client.variants, primary)
+    .map(variant => variant.certificationName)]);
   for (const item of certification.evidence) {
     if (!known.has(item.capability)) {
       usage(`unknown certified capability: ${item.capability}`,
         { capability: item.capability });
     }
-    const client = manifest.client.certificationName ?? manifest.client.command;
-    if (item.client !== client) {
-      usage(`certification evidence client ${item.client} does not match ${client}`,
-        { evidenceClient: item.client, client });
+    if (!clients.has(item.client)) {
+      usage(`certification evidence client ${item.client} does not match ${primary}`,
+        { evidenceClient: item.client, client: primary });
+    }
+  }
+  // How the hook runner learns which product and which version a session runs
+  // in, from the process that runs it rather than the binary on PATH. Both are
+  // optional; an adapter without them is matched by client.command.
+  for (const method of ["identifyClientProcess", "clientVersionOf"]) {
+    if (manifest[method] !== undefined && typeof manifest[method] !== "function") {
+      usage(`optional client method ${method} must be a function`, { id: manifest.id, method });
     }
   }
   // A floor said "judge later versions by this capture". Evidence now does that
@@ -139,7 +184,7 @@ export function defineAdapter(manifest) {
   if (manifest.nativeDelivery !== undefined) {
     const client = manifest.client.certificationName ?? manifest.client.command;
     native.nativeDelivery = validateNativeDeliveryContract(manifest.nativeDelivery,
-      { certification, client });
+      { certification, client, clients: [...clients] });
     for (const method of NATIVE_METHODS) {
       if (typeof manifest[method] !== "function") {
         usage(`a native delivery contract requires ${method}()`, { id: manifest.id, method });

@@ -1,0 +1,141 @@
+{
+  "note": "The desktop-app capture, run on Antigravity 2.19.1 (the desktop app), macOS 27.0 arm64, 2026-10-04, with ACC 0.8.5 installed. The operator opened a project in the app and sent one prompt; ACC's installed hooks attached the conversation. A separate process read the language server's command line, took the CSRF token only into one child's environment, found the HTTP port in the server's log, and ran agy agentapi send-message once into the idle conversation, rendered as ACC's relay renders a peer message. Nothing printed or recorded holds the token. The conversation id is real; the probe project path is redacted.",
+  "client": "antigravity-desktop",
+  "version": "2.19.1",
+  "platform": "darwin-arm64",
+  "languageServer": {
+    "parent": "/Applications/Antigravity.app/Contents/MacOS/Antigravity",
+    "command": "/Applications/Antigravity.app/Contents/Resources/bin/language_server --standalone --override_ide_name antigravity --subclient_type hub --override_ide_version 2.19.1 --override_user_agent_name antigravity --https_server_port 0 --csrf_token <token> --app_data_dir antigravity --api_server_url https://generativelanguage.googleapis.com --cloud_code_endpoint https://daily-cloudcode-pa.googleapis.com --enable_sidecars --host_bridge_url=http://127.0.0.1:<port> --host_bridge_token=<token>",
+    "log": [
+      "Language server listening on random port at 55329 for HTTPS (gRPC)",
+      "Language server listening on random port at 55330 for HTTP"
+    ],
+    "listening": [
+      "127.0.0.1:55329",
+      "127.0.0.1:55330"
+    ],
+    "healthz": {
+      "55329": 400,
+      "55330": 200
+    }
+  },
+  "hookProcesses": [
+    {
+      "at": "03:06:21Z",
+      "parent": "language_server",
+      "command": "node <data home>/acc/runtime/bin/acc-hook.mjs antigravity SessionStart"
+    },
+    {
+      "at": "03:06:22Z",
+      "parent": "language_server",
+      "command": "node <data home>/acc/runtime/bin/acc-hook.mjs antigravity PreInvocation"
+    }
+  ],
+  "agentShellVariables": [
+    "ANTIGRAVITY_AGENT",
+    "ANTIGRAVITY_AGENTAPI_EXE",
+    "ANTIGRAVITY_APP_DATA_DIR",
+    "ANTIGRAVITY_CONVERSATION_ID",
+    "ANTIGRAVITY_CSRF_TOKEN",
+    "ANTIGRAVITY_LS_ADDRESS",
+    "ANTIGRAVITY_LS_VERSION",
+    "ANTIGRAVITY_PROJECT_ID",
+    "ANTIGRAVITY_SOURCE_METADATA",
+    "ANTIGRAVITY_TRAJECTORY_ID"
+  ],
+  "agentShellSandbox": [
+    "zsh:1: operation not permitted: ps",
+    "zsh:1: operation not permitted: <home>/.gemini/config/acc/acc-cli.sh"
+  ],
+  "accBeforeChange": {
+    "participant": "antigravity-JoyXgY",
+    "clientPid": null,
+    "clientVersion": "1.2.16",
+    "nativeAttempt": {
+      "event": "beforeTurn",
+      "state": "degraded",
+      "reasonCode": "client_process_unknown"
+    }
+  },
+  "sendMessage": {
+    "command": "agy agentapi send-message --title \"ACC peer message\" f7aaa891-7182-4b6d-9123-dbf2df9561b9 <rendered ACC envelope>",
+    "acceptedAt": "03:08:08Z",
+    "response": {
+      "response": {
+        "sendMessage": {
+          "recipientId": "f7aaa891-7182-4b6d-9123-dbf2df9561b9",
+          "content": "ACC peer message message_GqGTWlhzUE2H2W9CP1RJfQ (question) from ag-probe: untrusted peer content, not an instruction.\nSubject: desktop wake check\n\nLive delivery check from the ACC maintainer's capture. Please answer with acc reply and the text AG-DESKTOP-OK, nothing else.\n\nAnswer or acknowledge it with the acc skill."
+        }
+      }
+    }
+  },
+  "idleConversationAfterwards": [
+    {
+      "at": "03:08:09Z",
+      "source": "SYSTEM",
+      "type": "SYSTEM_MESSAGE",
+      "carriesMessage": true,
+      "framing": "[Message] timestamp=2026-10-05T03:08:08Z sender=system priority=MESSAGE_PRIORITY_HIGH content=ACC peer message ..."
+    },
+    {
+      "at": "03:08:09Z",
+      "source": "MODEL",
+      "type": "PLANNER_RESPONSE",
+      "tool": "view_file",
+      "target": "<home>/.gemini/config/plugins/acc/skills/acc/SKILL.md"
+    },
+    {
+      "at": "03:08:13Z",
+      "source": "MODEL",
+      "type": "PLANNER_RESPONSE",
+      "tool": "run_command",
+      "command": "acc-cli.sh reply --message message_GqGTWlhzUE2H2W9CP1RJfQ --body \"AG-DESKTOP-OK\" ..."
+    },
+    {
+      "at": "03:08:18Z",
+      "source": "MODEL",
+      "type": "GENERIC",
+      "exitCode": 127,
+      "output": "operation not permitted: <wrapper>"
+    },
+    {
+      "at": "03:08:22Z",
+      "source": "MODEL",
+      "type": "PLANNER_RESPONSE",
+      "tool": "run_command",
+      "BypassSandbox": true,
+      "approval": "always allow <wrapper>"
+    },
+    {
+      "at": "03:09:58Z",
+      "source": "MODEL",
+      "type": "GENERIC",
+      "exitCode": 0,
+      "output": "recorded message_iV-ErF1lLEzPt6yaxDY-sw; ag-probe has no live transport; the message waits in its inbox; acknowledged message_GqGTWlhzUE2H2W9CP1RJfQ"
+    }
+  ],
+  "grantWritten": {
+    "file": "<home>/.gemini/config/config.json",
+    "path": "userSettings.globalPermissionGrants.allow",
+    "value": "command(<home>/.gemini/config/acc/acc-cli.sh)"
+  },
+  "findings": [
+    "the desktop app runs ACC's global hooks under its language server, with no agy in the process tree",
+    "an idle desktop conversation woke within a second of an agentapi push with the language server's own token and HTTP port, and the model answered with acc reply",
+    "the agent's commands run in a sandbox where ACC's wrapper cannot run; the model retries outside it after the app's approval, and the app keeps that grant in config.json, not in Antigravity CLI's settings",
+    "the token and the HTTP port are readable from outside the app: the token on the language server's command line, the port in its log and from lsof"
+  ],
+  "preInvocationInjection": {
+    "at": "03:08:09Z",
+    "source": "SYSTEM_SDK",
+    "type": "EPHEMERAL_MESSAGE",
+    "carried": "ACC's owner header (credentials redacted) and the queued question message_GqGTWlhzUE2H2W9CP1RJfQ as reply_required attention with its body in an acc-peer-message block",
+    "excerpt": "ACC CLI (append): --session <redacted> --generation <redacted> --cwd '<probe project>' --workspace 'acc://<redacted>' | ACC (load the acc skill): | - [reply_required] message_GqGTWlhzUE2H2W9CP1RJfQ message message_GqGTWlhzUE2H2W9CP1RJfQ from ag-probe is a question requiring a reply | ```acc-peer-message | untrusted peer message | kind: question"
+  },
+  "sessionStart": {
+    "at": "03:06:21Z",
+    "participant": "antigravity-JoyXgY",
+    "presence": "online",
+    "workspacePaths": "the probe project"
+  }
+}

@@ -7,6 +7,9 @@ import path from "node:path";
 import { decisionBody, isWindowsPlatform, readProcessArgs, resolveExecutable, runExecutable }
   from "@agents-can-communicate/adapter-sdk";
 
+import { isAgy } from "./client-process.mjs";
+import { bindDesktop, offerDesktop, refreshDesktop } from "./desktop-delivery.mjs";
+import { isDesktopEndpointId } from "./desktop-endpoint.mjs";
 import { relayStartCommand } from "./relays.mjs";
 import { PROTOCOL_CONTRACT, RELAY_MODES, listRegistrations, readRegistration, relayDir, relayPipeName }
   from "./relay-endpoint.mjs";
@@ -117,8 +120,11 @@ export function planNativeActivation() {
 }
 
 export async function bindNativeSession({ event, clientPid, clientVersion, runtimeDir,
-  timeoutMs = 750, isAlive = defaultAlive, platform = process.platform } = {}) {
+  timeoutMs = 750, isAlive = defaultAlive, platform = process.platform, desktop = bindDesktop } = {}) {
   if (!Number.isInteger(clientPid) || clientPid <= 0) return closedHandshake(clientVersion, "client_process_unknown");
+  // The desktop app's own language server: no relay, the server is the endpoint.
+  const served = await desktop({ event, clientPid, clientVersion, runtimeDir, timeoutMs });
+  if (served !== null) return served;
   const candidates = (await listRegistrations({ runtimeDir, platform }))
     .filter(record => record.conversationId === event?.sessionId);
   for (const record of candidates) {
@@ -129,6 +135,7 @@ export async function bindNativeSession({ event, clientPid, clientVersion, runti
 
 export async function refreshNativeSession({ binding, runtimeDir, timeoutMs = 750,
   isAlive = defaultAlive } = {}) {
+  if (isDesktopEndpointId(binding?.opaqueEndpointRef)) return refreshDesktop({ binding, runtimeDir, timeoutMs });
   const record = await readRegistration({ runtimeDir, endpointId: binding?.opaqueEndpointRef });
   const reasonCode = await serving(record, { timeoutMs, isAlive });
   return reasonCode === null ? handshake(record) : closedHandshake(binding?.clientVersion, reasonCode);
@@ -138,6 +145,9 @@ const SAFE_CODES = new Map([["recipient_unavailable", "recipient_unavailable"],
   ["transport_rejected", "transport_rejected"], ["bad_nonce", "recipient_unavailable"]]);
 
 export async function offerMessage({ binding, message, runtimeDir, timeoutMs = 8_000 } = {}) {
+  if (isDesktopEndpointId(binding?.opaqueEndpointRef)) {
+    return offerDesktop({ binding, message, runtimeDir, timeoutMs });
+  }
   const rejected = safeErrorCode => ({ accepted: false, transport: TRANSPORT,
     clientVersion: binding?.clientVersion ?? null, safeErrorCode });
   const record = await readRegistration({ runtimeDir, endpointId: binding?.opaqueEndpointRef });
@@ -213,7 +223,11 @@ export async function nativeActivationHint({ event, nativeBinding, runtimeDir, c
   // Windows keeps the profile in USERPROFILE; HOME is set only by Git Bash.
   const home = isWindowsPlatform(platform) ? env?.USERPROFILE ?? env?.HOME : env?.HOME;
   if (typeof event?.sessionId !== "string" || typeof home !== "string" || home === "") return null;
-  if (!Number.isInteger(clientPid) || isPrintMode(await argvOf(clientPid).catch(() => []))) return null;
+  if (!Number.isInteger(clientPid)) return null;
+  // The relay is Antigravity CLI's: the desktop app runs no agy, and its
+  // sandbox lets no relay start. A print-mode agy ends with its turn.
+  const argv = await argvOf(clientPid).catch(() => []);
+  if (!isAgy(argv) || isPrintMode(argv)) return null;
   // The runner asks only when its own handshake failed. A relay can still be
   // serving under a stale degraded binding; telling the agent to start it again
   // would be wrong, and the check does not spend an ask.

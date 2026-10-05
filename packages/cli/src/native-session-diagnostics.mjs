@@ -73,7 +73,12 @@ export async function updateNativeSessions(adapters, { service, status, root, no
         : binding === undefined ? "unbound"
           : delivery === null ? (leased ? "active" : "degraded")
             : !delivery.deliverable ? "degraded" : leased ? "active" : "idle";
+      // A session in another product the adapter serves - Antigravity 2.0
+      // beside Antigravity CLI - is named by that product.
+      const product = (byAdapterId.get(entry.adapterId)?.client?.variants ?? [])
+        .find(variant => variant?.certificationName === owner?.clientName);
       native.sessions.push({ sessionId: peer.sessionId, participantId: peer.participantId,
+        ...(product === undefined ? {} : { displayName: product.displayName }),
         presence: peer.presence, runtime, clientVersion: binding?.clientVersion ?? null, delivery,
         lastAttempt: owner === null ? null : await loadNativeAttempt({ runtimeDir: root, ...owner }) });
     }
@@ -104,9 +109,12 @@ const failures = {
   session_generation_stale: "the session was replaced during the handshake",
   workspace_identity_unavailable: "the bound client session is no longer in this workspace; "
     + "start a new client session here",
-  // It stays embedded until it closes; a later service never adopts it.
+  // It stays embedded until it closes; a later service never adopts it. The
+  // Codex app runs every chat this way (openai/codex#41014), so a new chat
+  // there is embedded too; one started in a terminal is not.
   client_session_embedded: "the client runs this session on its own embedded service, which "
-    + "peers cannot reach; start a new client session while its local delivery service runs",
+    + "peers cannot reach; start a new client session in a terminal while its local delivery "
+    + "service runs (the Codex app runs every chat embedded)",
 };
 
 function describeAttempt(attempt) {
@@ -149,7 +157,7 @@ const RUNTIME_TEXT = { active: "local transport active", idle: "idle, lease laps
 
 export function nativeSessionLines(adapters) {
   return adapters.flatMap(entry => (entry.nativeDelivery.sessions ?? []).map(session =>
-    `  ${entry.displayName} session ${session.participantId} (${session.sessionId}): `
+    `  ${session.displayName ?? entry.displayName} session ${session.participantId} (${session.sessionId}): `
     + `${RUNTIME_TEXT[session.runtime] ?? session.runtime}; `
     + [describeDelivery(session), session.runtime === "idle" ? "the next send refreshes it" : null,
       describeAttempt(session.lastAttempt)].filter(part => part !== null).join("; ")));

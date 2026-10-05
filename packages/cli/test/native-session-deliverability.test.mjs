@@ -164,7 +164,8 @@ test("a session that runs embedded names the cause and what to do about it", () 
     lastAttempt: { at: NOW, event: "beforeTurn", state: "degraded",
       reasonCode: "client_session_embedded" } }] } }]);
   assert.match(line, /last attempt .*: the client runs this session on its own embedded service/);
-  assert.match(line, /start a new client session while its local delivery service runs/);
+  assert.match(line, /start a new client session in a terminal while its local delivery service runs/);
+  assert.match(line, /the Codex app runs every chat embedded/);
 });
 
 test("doctor names the launch option that kept a session embedded, and the fix", () => {
@@ -191,3 +192,10 @@ test("doctor sends the operator to Codex, not acc install, when Codex starts its
     assert.match(nativeRemediation(absent(false)).join("\n"),
       /acc install --adapter codex {2}# prepare the missing supported local service/);
   });
+
+test("a session in another product the adapter serves is named by that product", () => {
+  const [line] = nativeSessionLines([{ displayName: "Antigravity CLI", nativeDelivery: { sessions: [{
+    participantId: "antigravity-x", sessionId: "session_x", displayName: "Antigravity", runtime: "active",
+    delivery: null, lastAttempt: null }] } }]);
+  assert.match(line, /^ {2}Antigravity session antigravity-x \(session_x\): local transport active/);
+});

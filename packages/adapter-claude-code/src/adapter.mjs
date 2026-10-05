@@ -6,6 +6,7 @@ import { denyOutcome, injectOutcome, injectStartOwnerOutcome, normalizeClaudeHoo
 import { MIN_VERSION, PROTOCOL_CONTRACT, bindNativeSession, offerMessage, planNativeActivation,
   probeNativeDelivery, refreshNativeSession, retireNativeSession } from "./inbox-delivery.mjs";
 import { observedInboxDirectories } from "./inbox-observed-directories.mjs";
+import { claudeConfigDir, readSessionRecord } from "./inbox-registry.mjs";
 import { inboxSocketDirectories } from "./inbox-socket-directories.mjs";
 import { planClaudeInstall, detectClaude, installClaudePlugin, uninstallClaudePlugin } from "./install.mjs";
 
@@ -36,6 +37,11 @@ export function createClaudeCodeAdapter() {
     // decide whether the client is on this machine, so it has to be the
     // real command rather than the adapter id: `2.1.233 (Claude Code)`.
     client: { command: "claude", certificationName: "claude-code", versionArgs: ["--version"] },
+    // The build the session runs. Claude Code updates itself under running
+    // sessions and Claude.app runs a build of its own, so the `claude` on PATH
+    // can name another version; each session's registry record names its own.
+    clientVersionOf: async ({ pid, env }) => (await readSessionRecord({
+      configDir: claudeConfigDir(env), clientPid: pid }))?.version ?? null,
     certification,
     deliveryFallback: CLAUDE_DELIVERY_FALLBACK,
     capabilities: {

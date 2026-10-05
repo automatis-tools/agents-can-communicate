@@ -92,6 +92,30 @@ command that matches neither resolves nothing, and the failure is silent: the se
 `pid: null`, falls back to reading presence by age alone, and is not pinned to its
 generation, with nothing telling you why.
 
+Some vendors ship a second product that runs the same hooks: Antigravity 2.0, the desktop
+app, runs `~/.gemini/config/hooks.json` under its own language server, with no `agy`, on a
+version line of its own. Declare such a product as a variant and recognise its process:
+
+```js
+client: { command: "agy", certificationName: "antigravity-cli", versionArgs: ["--version"],
+  variants: [{ certificationName: "antigravity-desktop", displayName: "Antigravity" }] },
+identifyClientProcess: entry => /* null, or { certificationName, version } */,
+clientVersionOf: async ({ pid, entry, env }) => /* the running client's version, or null */,
+```
+
+- `identifyClientProcess(entry)` is called with each ancestor `{ comm, args }` before the
+  `client.command` match. It is synchronous and reads only the entry it is given; a throw is a
+  "no". A `certificationName` that names no declared variant is ignored, with its version.
+- Evidence may name a declared variant. A variant is judged only by its own evidence: its
+  versions count on its own line, so the primary client's captures never stand in for it.
+  Declaring a capability `true` still needs passing evidence of the primary client.
+- The session's version is, in order: the version `identifyClientProcess` returned, then
+  `clientVersionOf()`, then the client's own executable when `ps` names it by absolute path,
+  then `client.command` on `PATH`. The `PATH` probe alone named the wrong build for a
+  Claude.app session (its own claude, 2.1.286, against 2.1.289 on `PATH`) and for every
+  Claude Code session that outlived an in-place update; Claude Code's adapter therefore reads
+  the version from the session record Claude Code keeps for that pid.
+
 ## Declare only proven capabilities
 
 Fourteen booleans in four groups, declared in the manifest's `capabilities` object:
@@ -168,6 +192,11 @@ The rules `defineAdapter` enforces, and the ones the runtime applies:
   anchor must have passing `delivery.livePush` evidence for the same client and version, and
   the minimum must itself be an anchor. The platform an evidence row names is where the
   capture was taken; it is provenance, and the anchor names no platform.
+- An anchor may name a declared variant, `{ version, protocolContract, client }`, for a
+  delivery protocol only that product speaks. Each protocol's floor is its own first passing
+  capture: a handshake or probe is judged against the floor of the protocol it reports, and
+  one protocol cannot be anchored for two products. `minimum` stays the primary client's
+  first capture, and `knownBad` names the primary client's versions.
 - There is intentionally **no maximum version** and **no platform**. A newer release is
   admitted, on every platform, only when a current read-only feature probe
   (`probeNativeDelivery()`) and a per-session handshake (`bindNativeSession()`) both report

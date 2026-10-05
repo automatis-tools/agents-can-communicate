@@ -705,3 +705,67 @@ tool confirmation". Uninstall returned the settings file to its earlier bytes. E
 - Whether the client rewrites `settings.json` itself and keeps entries it did not write.
 - Whether a model always keeps the bare form rather than adding quotes.
 - Any other version or platform.
+
+## Antigravity 2.0, the desktop app, 2026-10-04
+
+Captured on Antigravity 2.19.1 (`/Applications/Antigravity.app`, signed by Google LLC) on
+macOS 27.0 arm64, with ACC 0.8.5 installed and Antigravity CLI 1.2.16 beside it. Issue #171's
+reporter first pushed into a desktop conversation; this is the capture on the maintainer's
+machine. Design: `docs/design/2026-10-04-desktop-clients.md`.
+
+- **One language server for the app.** `Antigravity` starts
+  `Contents/Resources/bin/language_server --standalone --override_ide_name antigravity
+  --subclient_type hub --override_ide_version 2.19.1 … --https_server_port 0 --csrf_token <uuid>
+  --app_data_dir antigravity …`. Every window and conversation is served by that one process.
+  It listens on two loopback ports; its log names them ("listening on random port at N for
+  HTTPS (gRPC)" and "… for HTTP"). A plain `GET /healthz` answers 200 on the HTTP port and 400
+  on the other, with no token.
+- **Hooks.** The app runs `~/.gemini/config/hooks.json`. `SessionStart` and `PreInvocation`
+  ran as direct children of `language_server` - no `agy`, no shell between them.
+  `PreInvocation` put the queued ACC message in front of the model.
+- **What ACC saw before this change.** A participant attached with `clientPid: null`,
+  `clientVersion: 1.2.16` (the `agy` on `PATH`) and native attempt
+  `degraded / client_process_unknown`, so the relay was never suggested.
+- **The tool shell.** It carries `ANTIGRAVITY_LS_ADDRESS`, `ANTIGRAVITY_CSRF_TOKEN`,
+  `ANTIGRAVITY_CONVERSATION_ID`, `ANTIGRAVITY_AGENTAPI_EXE` and six more, by name. Every command
+  runs in a sandbox: `ps` and ACC's `acc-cli.sh` both failed with `operation not permitted`.
+  The model then retried with `BypassSandbox`, which raised the app's approval prompt.
+- **Grants.** "Always allow" for the wrapper wrote `command(<wrapper>)` to
+  `~/.gemini/config/config.json` → `userSettings.globalPermissionGrants.allow`, beside
+  `permissionGrantsV2Migrated` and `sandboxEnabledAtV2Migration: true`. The app does not read
+  `~/.gemini/antigravity-cli/settings.json`: the CLI rule ACC writes there did not stop the
+  prompt. Install now adds the same rule to `config.json` when the app has created it.
+- **agentapi.** The app ships no `agy`; it installs `~/.gemini/antigravity/bin/agentapi`, a
+  script that runs `language_server agentapi "$@"`. The language server itself answers
+  `agentapi --help` (in 30 ms), `get-conversation-metadata` and `send-message`.
+- **A push.** `agentapi send-message` with the server's token and HTTP port woke an idle
+  conversation within a second. The model saw `[Message] … sender=system
+  priority=MESSAGE_PRIORITY_HIGH content=…`, read the `acc` skill from
+  `~/.gemini/config/plugins/acc`, and answered with `acc reply` once the sandbox bypass was
+  approved.
+- **First launch.** The app's wizard installed `/Applications/Antigravity IDE.app` and copied
+  `~/.gemini/antigravity` to `antigravity-ide` and `antigravity-backup`; the app added 241
+  files under `~/.gemini/config/plugins`, which Antigravity CLI also loads.
+
+**Product capture, 2026-10-05.** A private candidate built from this branch (version 0.8.99 so
+the managed runtime took it; package sha256 `c03096251a9e…`) was installed into an isolated data
+home, and the app was launched with that data home. All six cases passed
+(`fixtures/delivery/antigravity-desktop-2.19.1-product.json` and its evidence): D01 an idle
+conversation woke in about a second with no user input; D02 a push accepted six seconds into a
+4,113-character answer was shown after that answer, uninterrupted; D03 the woken agent's
+`acc reply` failed in the sandbox and ran on the model's retry outside it, with no approval
+prompt, because the wrapper's grant was in `config.json`; D04 a message resent with the same
+client message id kept its id and reached the model once; D05 with the app quit the message
+stayed queued as `recipient_offline`; D06 after the app restarted (new language server, token
+and port) the conversation's first turn bound it again and the next push woke it.
+
+D06 first failed: the app runs no `SessionStart` for a conversation it reopens, so the session
+stayed bound to the language server that had exited. The hook runner now treats a turn whose
+bound client process is gone as a client restart and finds the client again.
+
+What ACC does with this: `client-process.mjs` names the desktop server as the client
+(`antigravity-desktop`, at the version on its command line); `desktop-endpoint.mjs` and
+`desktop-delivery.mjs` bind and deliver through it with no relay; `desktop-allow-rule.mjs`
+writes the grant. Installing the integration still needs `agy`, whose `/hooks` read-back is
+the only proof a registration loaded. Linux and Windows desktop builds are uncaptured; the
+bind needs `lsof`, so a machine without it refuses by its own handshake.
