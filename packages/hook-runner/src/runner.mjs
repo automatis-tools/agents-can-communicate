@@ -538,11 +538,14 @@ const HANDLERS = {
       // close, or carry on a session whose client restarted. Recheck after
       // probes: a CLI replacement can run outside the native lifecycle lock.
       // Never adopt that replacement's identity.
+      // A session can also close between the turn's check and this one while
+      // its client was down; that is the closed-session resumption below,
+      // not a replacement.
       const previous = await context.service.locateSession(binding.accSessionId);
-      const expected = clientRestarted
-        ? previous?.record.state === "open" && previous.record.generation === binding.generation
-        : previous === null || (previous.record.state === "closed"
-          && previous.record.generation === binding.generation);
+      const sameGeneration = previous?.record.generation === binding.generation;
+      const expected = previous === null
+        || sameGeneration && (previous.record.state === "closed"
+          || clientRestarted && previous.record.state === "open");
       if (!expected) throw new Error("the completed hook owner changed during turn registration");
     }
     if (binding !== null) {

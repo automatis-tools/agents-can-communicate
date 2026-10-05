@@ -206,3 +206,32 @@ test("a turn while the client still runs keeps the client the session started wi
   assert.equal((await run("beforeTurn")).failed, undefined);
   assert.equal(reads, before, "a live client is not looked up again on every turn");
 });
+
+// Review of #254: a session can also close while its client is down. That
+// session resumes on the next turn, bound to the client running now.
+test("a turn after the client exited and its session closed resumes it on the client running now",
+  async t => {
+    const { spawnSync } = await import("node:child_process");
+    const gone = spawnSync(process.execPath, ["-e", ""]).pid;
+    const { root, dataHome } = await place(t);
+    const fixture = adapter({ identifyClientProcess: identifyDesktop });
+    const run = (kind, table) => runHook({ adapterId: fixture.id, adapters: { [fixture.id]: fixture },
+      dataHome, readProcessTable: async () => table, probeClientVersion: async () => "1.2.16",
+      payload: { kind, sessionId: "closed-while-down", cwd: root, targets: [] } });
+    const tableWith = pid => new Map([
+      [process.pid, { ppid: pid, comm: "node", args: "node /data/acc-hook.mjs fixture PreInvocation" }],
+      [pid, { ppid: 1, comm: "/Applications/Fixture.app/Contents/Resources/bin/language_server",
+        args: SERVER_ARGS }]]);
+
+    const started = await run("sessionStart", tableWith(gone));
+    await started.service.closeSession({ sessionId: started.accSessionId, generation: started.generation });
+    const turn = await run("beforeTurn", tableWith(process.ppid));
+
+    assert.equal(turn.failed, undefined, turn.reason);
+    const workspaces = path.join(dataHome, "acc", "workspaces");
+    const [workspace] = await readdir(workspaces);
+    const after = await loadSessionBinding({ runtimeDir: path.join(workspaces, workspace),
+      harnessSessionId: "closed-while-down" });
+    assert.equal(after.clientPid, process.ppid);
+    assert.equal(after.clientName, "fixture-desktop");
+  });
