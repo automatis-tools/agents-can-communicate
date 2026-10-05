@@ -85,9 +85,11 @@ export function planInstallation({ adapters, detected, context, action = "instal
     // with it (#253). Naming the client still removes it.
     if (action === "uninstall" && entry.present && recordedById.get(entry.adapterId) === undefined
       && !askedFor.has(entry.adapterId)) {
+      // Also what a second uninstall says: by then this home has no record left.
       skipped.push({ adapterId: entry.adapterId,
-        reason: `${entry.displayName ?? entry.adapterId} was not installed from this ACC data home; `
-          + `to remove its ACC wiring anyway, run acc uninstall --adapter ${entry.adapterId}` });
+        reason: `${entry.displayName ?? entry.adapterId} has no install record in this ACC data home, `
+          + "so ACC leaves it as it is; to remove ACC wiring another data home put there, run "
+          + `acc uninstall --adapter ${entry.adapterId}` });
       continue;
     }
     // An adapter can refuse itself for a reason that is nobody's fault and that

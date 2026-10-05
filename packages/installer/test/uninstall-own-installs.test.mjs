@@ -54,7 +54,7 @@ test("an uninstall leaves a client that another data home wired", async t => {
   assert.deepEqual(plan.operations.map(operation => operation.adapterId), []);
   const [skipped] = plan.skipped;
   assert.equal(skipped.adapterId, "kimi");
-  assert.match(skipped.reason, /not installed from this ACC data home/);
+  assert.match(skipped.reason, /no install record in this ACC data home/);
   assert.match(skipped.reason, /acc uninstall --adapter kimi/);
   assert.equal(await readFile(path.join(m.home, "config.toml"), "utf8"), wired);
   assert.equal((await loadOwnership({ dataHome: m.own })).installs.length, 1);
