@@ -1,5 +1,24 @@
 # Changelog
 
+## Unreleased — the plugin copy a running Claude Code session uses stays
+
+- `acc doctor` no longer reports Claude Code's plugin cache as edited when a running session
+  marks the previous copy in use. After an update, Claude Code wrote `.in_use/<pid>` into the
+  copy ACC keeps for sessions started before it, and doctor advised
+  `acc install --adapter claude_code` (#257). The ownership check now leaves the marker out, as it
+  leaves out `.orphaned_at`, and an install keeps every version whose marker names a live
+  process.
+
+| Candidate artifact | Value |
+|---|---|
+| Built from | `9d1f8b020700fb1042e84019b0957e3082d1e518` |
+| Tarball | `agents-can-communicate-0.9.0.tgz`, 554,998 bytes, 336 files |
+| sha256 | `2a1b287f52c69a91deb9b84e4fc886473fa13230061739370645437c41236876` |
+
+This unpublished development archive was measured with `npm pack`. See
+[the evidence](docs/release-evidence/unreleased-claude-in-use-markers.md).
+The package version remains `0.9.0` until a release prepares its own.
+
 ## 0.9.0 — release candidate
 
 - ACC installs and runs natively on Windows 10 and 11, with no WSL (#234). The store and the
