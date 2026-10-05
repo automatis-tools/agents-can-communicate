@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased — Antigravity starts its relay without asking
+
+- The Antigravity install also adds `command(sh "<home>/.gemini/config/acc/acc-relay.sh" start)`
+  to `permissions.allow`. The hook tells the agent to start its relay with that command, and
+  Antigravity CLI asked before running it: a session nobody watched never started its relay
+  and was never woken (end to end on Antigravity CLI 1.2.16, 2026-10-04). The rule is the
+  command in the words the client itself saves for "always allow". It has a claim of its own,
+  so an older ACC still reads the one it wrote, and uninstall removes it before the wrapper's.
+  `acc doctor` reports it and asks for `acc install --adapter antigravity` when it is missing.
+  Windows adds neither rule: the relay starts with `node`, and a rule on `node` would allow
+  every node command.
+
 ## Unreleased — native Windows
 
 Work in progress for #234. The design is in

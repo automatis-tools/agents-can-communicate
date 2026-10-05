@@ -175,6 +175,8 @@ export async function detectInstallation({ adapters, context, probe = spawnProbe
         if (detected.inboundDelivery) entry.inboundDelivery = detected.inboundDelivery;
         // Whether the client asks before each ACC command, and what would stop it.
         if (detected.commandApproval) entry.commandApproval = detected.commandApproval;
+        // Whether the command that starts live delivery asks first.
+        if (detected.relayApproval) entry.relayApproval = detected.relayApproval;
         if (detected.nativeSetup) entry.nativeSetup = detected.nativeSetup;
         entry.diagnostics = [...(detected.diagnostics ?? [])];
         // What a person has to do, as opposed to what is true. Adapters that

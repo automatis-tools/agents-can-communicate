@@ -40,7 +40,9 @@ export async function agyHome(t, { name = "acc-agy-allow-" } = {}) {
   };
   const read = () => readFile(settings, "utf8");
   const exists = () => stat(settings).then(() => true, () => false);
-  return { home, wrapper, settings, rule: `command(${wrapper})`, context, theirs, write,
+  // The rule for the command the agent runs to start live delivery.
+  const relay = `command(sh "${path.join(home, ".gemini", "config", "acc", "acc-relay.sh")}" start)`;
+  return { home, wrapper, settings, rule: `command(${wrapper})`, relay, context, theirs, write,
     read, exists, agy };
 }
 

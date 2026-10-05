@@ -98,7 +98,9 @@ test("a rule the operator already has stays theirs through install and uninstall
     const before = await fixture.read();
 
     await installAntigravity(fixture.context);
-    assert.equal(await fixture.read(), before, `${form}: install added a second rule`);
+    // Only the rule for the command that starts live delivery is ACC's to add.
+    assert.deepEqual(JSON.parse(await fixture.read()).permissions.allow, [own, fixture.relay],
+      `${form}: install added a second wrapper rule`);
     await uninstallAntigravity(fixture.context);
     assert.equal(await fixture.read(), before, `${form}: uninstall took the operator's rule`);
   }
@@ -138,7 +140,7 @@ test("a settings file that did not exist is created, then removed again", async 
 
   await installAntigravity(fixture.context);
   assert.equal(await fixture.read(),
-    `${JSON.stringify({ permissions: { allow: [fixture.rule] } }, null, 2)}\n`);
+    `${JSON.stringify({ permissions: { allow: [fixture.rule, fixture.relay] } }, null, 2)}\n`);
 
   await uninstallAntigravity(fixture.context);
   assert.equal(await fixture.exists(), false, "uninstall left the settings file ACC created");
