@@ -37,7 +37,9 @@ test("installed hooks bound the whole invocation and cancel undecided writes", a
     if (seams.length === 0) return result;
     let source = Buffer.from(result.source).toString();
     if (url.endsWith("/hook-runner/src/runner.mjs")) {
-      const timer = "timer = setTimeout(() => resolve({ ...fallback, timedOut: true }),";
+      // Match the call prefix so timeout diagnostics remain part of the real
+      // callback without coupling this seam to its other result fields.
+      const timer = "timer = setTimeout(() => resolve({ ...fallback, timedOut: true";
       assert.equal(source.split(timer).length, 2, "one installed hook budget timer");
       source = source.replace(timer, timer.replace("setTimeout", "globalThis.accDeadlineTimer"));
     }
