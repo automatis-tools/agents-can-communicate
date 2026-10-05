@@ -1034,7 +1034,9 @@ ACC reads that key per offer, only when its process start and pid domain are the
 stores it nowhere. It never reads the session's own `CLAUDE_CODE_MESSAGING_TOKEN`, which would
 skip the recipient's inbound settings. The probe reads the `claude.exe` an npm `.cmd` runs. On
 Windows, where every file reads as `0o666`, the profile's ACL is the boundary for the endpoint
-records instead of their mode.
+records instead of their mode. For the same reason ACC reads a key only from a configuration
+directory inside the user's profile: a `CLAUDE_CONFIG_DIR` elsewhere reads as
+`native_endpoint_unavailable`, and the session keeps next-turn delivery.
 
 The real-clients CI job runs Claude Code installed from npm against a model stub on 127.0.0.1,
 on Linux and on Windows, with live delivery on: a question from another session wakes the idle

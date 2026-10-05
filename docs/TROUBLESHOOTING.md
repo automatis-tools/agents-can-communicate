@@ -428,7 +428,9 @@ checkout history.
 - **A Claude Code session is not woken on Windows.** The wake authenticates with the key Claude
   Code publishes beside its session record (`<config>\sessions\<pid>.<hash>.key`). Run
   `acc doctor`: a session without that key, or whose pipe the machine no longer lists, waits for
-  its next turn.
+  its next turn. ACC trusts the key only in a configuration directory inside your user profile,
+  whose access list keeps it to your account. A session whose `CLAUDE_CONFIG_DIR` is elsewhere
+  reports `native_endpoint_unavailable` and also waits for its next turn.
 
 ## A write was blocked
 
