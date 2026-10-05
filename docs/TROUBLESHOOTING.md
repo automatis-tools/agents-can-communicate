@@ -144,6 +144,11 @@ user a notice once, a sender sees the cause beside `no live transport`, and doct
 the session line. Open a new Codex chat while the service runs; start it with
 `codex app-server daemon start` if Codex does not.
 
+The Codex app (inside ChatGPT.app) runs every chat this way: each window has its own app server
+and never uses the shared one (openai/codex#41014, read on 26.928). Its chats join ACC through
+the same hooks and get messages at their next turn; a chat started in a terminal is the one a
+peer can reach live.
+
 Some launch options make Codex run a chat embedded even while the service runs: `-c`/`--config`,
 `--enable`, `--disable`, `--search`, `-p`/`--profile`, `--oss`, `--strict-config`,
 `--dangerously-bypass-hook-trust` and `--no-daemon`, and also the `CODEX_EXEC_SERVER_URL`
@@ -366,6 +371,12 @@ first ACC command. `acc doctor` prints an `Antigravity CLI inbound:` line with w
   rule and approvals stay manual.
 - **The file cannot be read.** ACC leaves an invalid `settings.json` as it is. Repair it, then
   run `acc install --adapter antigravity` again.
+
+Antigravity 2.0, the desktop app, runs the agent's commands in a sandbox where ACC's wrapper
+cannot run, and the model then asks to run it outside the sandbox. The app decides that from
+its own grants in `~/.gemini/config/config.json`, never from Antigravity CLI's settings. ACC's
+install adds its rule there once the app has run, and `acc doctor` prints its state on a line
+that names the desktop app. Restart the app after an install if it was open.
 
 ## Grok shows no injected message
 

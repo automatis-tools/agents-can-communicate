@@ -991,3 +991,28 @@ every `acc reply` from a Codex shell to a Claude Code session ended `transport_p
 and waited for the recipient's next turn. The Codex adapter's COMPATIBILITY.md has the
 sandbox measurements. A live Codex-to-idle-Claude-Code wake with the new profile is not yet
 captured.
+
+## Claude.app's local Code sessions, 2026-10-04
+
+Captured on Claude.app 2.19675.0 (macOS 27.0 arm64) with ACC 0.8.5 and Claude Code 2.1.289 on
+`PATH`. A Code-tab session in the Local environment, opened with
+`claude://code/new?folder=<path>&q=<prompt>`:
+
+- **Process.** `Claude.app` → `Contents/Helpers/disclaimer` →
+  `~/Library/Application Support/Claude/claude-code/2.1.286/<hash>/claude.app/Contents/MacOS/claude`,
+  run through the Agent SDK. `ps` names it by full path.
+- **Registry.** `~/.claude/sessions/<pid>.json` with `kind: interactive`,
+  `entrypoint: claude-desktop`, `version: 2.1.286` and an inbox socket in `/tmp/cc-socks`. The
+  app passes no `CLAUDE_CONFIG_DIR` or `--bare`, so the session reads `~/.claude`, ACC's hooks
+  and the plugin included.
+- **Live.** A question sent at 02:59:39 UTC woke the idle session through its inbox;
+  `UserPromptSubmit` showed the body at 02:59:40; the model loaded the `acc` skill and answered
+  with `acc reply` at 02:59:49, and the original was acknowledged. No adapter change was
+  needed.
+- **Version.** The binding said 2.1.289, the `claude` on `PATH`, where the session ran
+  2.1.286. A terminal session that outlived an in-place update was wrong the same way (2.1.284
+  running, 2.1.289 reported). ACC now reads the version from the session's own registry record.
+- **Out of reach.** Cloud sessions run on Anthropic's machines, SSH sessions on the remote
+  host, and Cowork in a Linux VM; scheduled runs and side chats set `CLAUDE_CODE_HARBOR_KITE=0`,
+  which turns the inbox off. A session in `bypassPermissions` mode was not captured in the app,
+  which cannot show the approval dialog a held wake waits for.

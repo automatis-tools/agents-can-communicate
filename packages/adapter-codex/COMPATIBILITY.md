@@ -1326,3 +1326,22 @@ Codex without the option, moving a setting it sets into `config.toml`. The chat'
 now also printed as the hook's `systemMessage`, so the user sees it whatever the model answers;
 every other turn keeps plain-text output. An environment variable or a configuration loader
 does not appear on the command line, so those chats keep the advice for a missing daemon.
+
+## The Codex app runs every chat embedded — ChatGPT.app 26.928, 2026-10-04
+
+Read without starting a turn. The Codex desktop app now ships inside
+`/Applications/ChatGPT.app` (bundle `com.openai.codex`, build 12404) with its own codex 0.159.2
+at `Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS/codex`. Each window runs
+`codex app-server` over stdio and never connects to the shared daemon socket: the app uses the
+daemon only when `CODEX_APP_SERVER_USE_LOCAL_DAEMON=1` and no config override is passed, and
+it always passes two (openai/codex#41014, open). `CODEX_HOME` is `~/.codex`, so its threads run
+ACC's hooks: the rollouts carry `"originator":"codex_work_desktop"`, and ACC attached four of
+them with that private app server as the client process. Every live attempt then failed at the
+daemon's `thread/loaded/list` and was recorded as `handshake_failed`.
+
+ACC now recognises that host - `codex app-server` with no `--listen`, run from inside an app
+bundle - and records `client_session_embedded` without a launch option. The chat is told once
+that the Codex app runs it on its own server, and doctor says a chat started in a terminal is
+the one a peer can reach live. The thread is never loaded into the daemon: the writer lock
+then shows "This is open in another app" (openai/codex#37403). The app's internal IPC bus
+(`~/.codex/ipc/ipc.sock`) is undocumented and was not used.

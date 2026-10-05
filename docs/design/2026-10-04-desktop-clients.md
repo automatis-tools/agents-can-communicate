@@ -168,8 +168,8 @@ line), and runs `<language_server> agentapi send-message --title "ACC peer messa
 
 **Contract.** `nativeDelivery.anchors` gains
 `{ version: "2.19.1", protocolContract: "antigravity-desktop-agentapi-v1", client: "antigravity-desktop" }`,
-proven by the product capture below. `probeNativeDelivery` reports the CLI when `agy agentapi`
-exists, otherwise the desktop when its language server answers `agentapi --help`.
+proven by the product capture below. `probeNativeDelivery` stays the CLI's: installing the
+integration needs `agy` (see Out of scope), so the install-time probe always has it to ask.
 
 **Permissions.** Install adds `command(<acc-cli.sh>)` to
 `~/.gemini/config/config.json` → `userSettings.globalPermissionGrants.allow` when that file exists
