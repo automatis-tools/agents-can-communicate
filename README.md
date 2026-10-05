@@ -99,7 +99,7 @@ Automatic delivery depends on the client version and platform. Verified integrat
 provide messages at the next normal turn; other sessions read their ACC inbox explicitly.
 
 Experimental live delivery can wake eligible Claude Code, Codex and Antigravity CLI
-sessions, and local Code sessions in Claude.app. It requires opt-in and an active verified
+sessions, conversations in the Antigravity desktop app, and local Code sessions in Claude.app. It requires opt-in and an active verified
 connection, is off by default, and can spend model tokens. Claude Code sessions wake through
 the inbox that Claude Code itself opens, so you start Claude Code with your ordinary command.
 A busy Claude Code session gets the message between two tool calls. A busy Codex session gets

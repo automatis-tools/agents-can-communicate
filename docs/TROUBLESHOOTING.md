@@ -350,6 +350,12 @@ Live delivery needs four things, and `acc doctor` shows each:
   command, so the agent starts it without an approval prompt; `acc doctor` names the rule when
   it is missing. Run `sh "~/.gemini/config/acc/acc-relay.sh" start` to start it directly.
 
+In Antigravity 2.0, the desktop app, there is no relay: ACC delivers through the app's own
+language server, and `acc doctor` names such a session `Antigravity session`. A conversation is
+reachable from its first turn after the app starts. The app runs no session start for a
+conversation it reopens, so after a restart nothing reaches it live until someone sends it a
+prompt; the message waits in its inbox until then.
+
 `acc doctor` reports how many relays are running and, per session, whether a live transport is
 active. A relay ends with its client; nothing is left running after the TUI exits or after
 `acc uninstall`.

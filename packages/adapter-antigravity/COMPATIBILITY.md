@@ -747,6 +747,22 @@ machine. Design: `docs/design/2026-10-04-desktop-clients.md`.
   `~/.gemini/antigravity` to `antigravity-ide` and `antigravity-backup`; the app added 241
   files under `~/.gemini/config/plugins`, which Antigravity CLI also loads.
 
+**Product capture, 2026-10-05.** A private candidate built from this branch (version 0.8.99 so
+the managed runtime took it; package sha256 `c03096251a9e…`) was installed into an isolated data
+home, and the app was launched with that data home. All six cases passed
+(`fixtures/delivery/antigravity-desktop-2.19.1-product.json` and its evidence): D01 an idle
+conversation woke in about a second with no user input; D02 a push accepted six seconds into a
+4,113-character answer was shown after that answer, uninterrupted; D03 the woken agent's
+`acc reply` failed in the sandbox and ran on the model's retry outside it, with no approval
+prompt, because the wrapper's grant was in `config.json`; D04 a message resent with the same
+client message id kept its id and reached the model once; D05 with the app quit the message
+stayed queued as `recipient_offline`; D06 after the app restarted (new language server, token
+and port) the conversation's first turn bound it again and the next push woke it.
+
+D06 first failed: the app runs no `SessionStart` for a conversation it reopens, so the session
+stayed bound to the language server that had exited. The hook runner now treats a turn whose
+bound client process is gone as a client restart and finds the client again.
+
 What ACC does with this: `client-process.mjs` names the desktop server as the client
 (`antigravity-desktop`, at the version on its command line); `desktop-endpoint.mjs` and
 `desktop-delivery.mjs` bind and deliver through it with no relay; `desktop-allow-rule.mjs`

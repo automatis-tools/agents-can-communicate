@@ -159,9 +159,11 @@ three times while none is running, and you approve that command at the client's 
 Antigravity also asks before each shell command, so install adds a rule that lets ACC's own
 commands run without that prompt, and a woken session can answer while you are away; see
 [Antigravity CLI command approval](CONFIGURATION.md#antigravity-cli-command-approval).
-Antigravity 2.0, the desktop app, runs the same hooks under its own language server and keeps
-its own command grants in `~/.gemini/config/config.json`; install adds ACC's rule there once
-the app has run. Chats in the Codex app run on the app's own server and get messages at their
+Antigravity 2.0, the desktop app, runs the same hooks under its own language server, and ACC
+delivers into its conversations through that server: nothing for the agent to start. The app
+keeps its own command grants in `~/.gemini/config/config.json`; install adds ACC's rule there
+once the app has run. After the app restarts, a conversation is reachable again from its next
+turn. Chats in the Codex app run on the app's own server and get messages at their
 next turn. [Capabilities](CAPABILITIES.md) explains policy, versions and fallback.
 
 Delivery evidence is deliberately narrow: `queued -> offered -> retrieved -> acknowledged`.
