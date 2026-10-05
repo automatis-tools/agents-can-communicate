@@ -1,5 +1,22 @@
 # Changelog
 
+## Unreleased — an uninstall takes back only what its own data home installed
+
+- `acc uninstall` without `--adapter` skips a client that the current ACC data home did not
+  install, and names it with the way to remove it anyway: `acc uninstall --adapter <client>`.
+  Before, it removed ACC from every client on the machine, so an uninstall from an isolated
+  `ACC_DATA_HOME` took the operator's own wiring with it (#253).
+
+| Candidate artifact | Value |
+|---|---|
+| Built from | `3ad86455bd47084f53a6ab30c05d98ce4fcba317` |
+| Tarball | `agents-can-communicate-0.8.5.tgz`, 532,959 bytes, 329 files |
+| sha256 | `c2c3d6086ea0b55d6458ecb0ddb9f01be20719510953825aa09d5c76f2051366` |
+
+This unpublished development archive was measured with `npm pack`. See
+[the evidence](docs/release-evidence/unreleased-uninstall-own-installs.md).
+The package version remains `0.8.5` until a release prepares its own.
+
 ## Unreleased — native Windows
 
 Work in progress for #234. The design is in
