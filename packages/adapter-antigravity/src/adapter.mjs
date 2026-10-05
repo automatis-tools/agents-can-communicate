@@ -3,6 +3,7 @@ import { channelSocketDirectory, defineAdapter, projectContext, projectContextRe
 import certification from "../certification.json" with { type: "json" };
 
 import { DESKTOP_CLIENT, identifyClientProcess } from "./client-process.mjs";
+import { DESKTOP_PROTOCOL } from "./desktop-endpoint.mjs";
 import { denyOutcome, injectOutcome, normalizeAntigravityHook, stopOutcome } from "./hooks.mjs";
 import { detectAntigravity, doctorAntigravity, installAntigravity, planAntigravityInstall,
   preflightAntigravityUninstall, uninstallAntigravity } from "./install.mjs";
@@ -15,6 +16,8 @@ import { PROTOCOL_CONTRACT } from "./relay-endpoint.mjs";
 // capture until one of their own says otherwise, which is how certification
 // evidence reads everywhere since 0.6.2.
 export const ANTIGRAVITY_CLI_VERSION = "1.2.7";
+// The first passing product capture of live delivery into Antigravity 2.0.
+export const DESKTOP_FIRST_CAPTURE = "2.19.1";
 
 /**
  * Antigravity CLI.
@@ -81,7 +84,11 @@ export function createAntigravityAdapter() {
     // binding on every turn, and must not take the relay with it.
     nativeDelivery: {
       minimum: ANTIGRAVITY_CLI_VERSION,
-      anchors: [{ version: ANTIGRAVITY_CLI_VERSION, protocolContract: PROTOCOL_CONTRACT }],
+      anchors: [{ version: ANTIGRAVITY_CLI_VERSION, protocolContract: PROTOCOL_CONTRACT },
+        // Antigravity 2.0 pushes through its own language server, captured on
+        // its own version line; see desktop-delivery.mjs.
+        { version: DESKTOP_FIRST_CAPTURE, protocolContract: DESKTOP_PROTOCOL,
+          client: DESKTOP_CLIENT.certificationName }],
       knownBad: [], activationKinds: ["native-config"], policySource: "installation-record",
     },
     probeNativeDelivery, planNativeActivation, bindNativeSession, refreshNativeSession,

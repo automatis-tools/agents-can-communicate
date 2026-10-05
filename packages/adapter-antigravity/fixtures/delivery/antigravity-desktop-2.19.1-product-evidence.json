@@ -1,0 +1,156 @@
+{
+  "schemaVersion": 1,
+  "source": "real-client-capture",
+  "client": "antigravity-desktop",
+  "phase": "product",
+  "clientVersion": "2.19.1",
+  "platform": "darwin-arm64",
+  "packageSha256": "c03096251a9efd251ecd42c6bf489e8783a9515c83d85242645a3a31fcdc0c42",
+  "startedAt": "2026-10-05T04:28:11.000Z",
+  "finishedAt": "2026-10-05T04:34:55.036Z",
+  "scenarioCount": 6,
+  "passedCount": 6,
+  "failedCount": 0,
+  "cleanup": {
+    "attempted": true,
+    "outcome": "passed",
+    "ownedProcesses": "stopped",
+    "temporaryState": "removed"
+  },
+  "scenarios": [
+    {
+      "caseId": "D01",
+      "outcome": "passed",
+      "startedAt": "2026-10-05T04:31:33.000Z",
+      "finishedAt": "2026-10-05T04:34:04.170Z",
+      "messageId": "message_xZi2izsqCNWh-2NcIIoMXg",
+      "observations": [
+        {
+          "kind": "delivery",
+          "at": "2026-10-05T04:34:04.170Z",
+          "outcome": "offered"
+        },
+        {
+          "kind": "desktop-push",
+          "at": "2026-10-05T04:31:35Z",
+          "outcome": "pushed"
+        },
+        {
+          "kind": "model-turn",
+          "at": "2026-10-05T04:31:35Z",
+          "outcome": "started-without-user-input"
+        }
+      ]
+    },
+    {
+      "caseId": "D02",
+      "outcome": "passed",
+      "startedAt": "2026-10-05T04:28:11.000Z",
+      "finishedAt": "2026-10-05T04:28:59.690Z",
+      "messageId": "message__M-kSLcUzAkViQCcVZxWNA",
+      "observations": [
+        {
+          "kind": "delivery",
+          "at": "2026-10-05T04:28:59.690Z",
+          "outcome": "offered"
+        },
+        {
+          "kind": "desktop-push",
+          "at": "2026-10-05T04:28:31Z",
+          "outcome": "pushed"
+        },
+        {
+          "kind": "presentation",
+          "outcome": "after-running-turn",
+          "at": "2026-10-05T04:28:31.000Z"
+        }
+      ]
+    },
+    {
+      "caseId": "D03",
+      "outcome": "passed",
+      "startedAt": "2026-10-05T04:31:33.000Z",
+      "finishedAt": "2026-10-05T04:34:04.261Z",
+      "messageId": "message_xZi2izsqCNWh-2NcIIoMXg",
+      "observations": [
+        {
+          "kind": "answer",
+          "outcome": "recorded",
+          "at": "2026-10-05T04:31:51.000Z"
+        },
+        {
+          "kind": "receipt",
+          "outcome": "acknowledged",
+          "at": "2026-10-05T04:31:51.000Z"
+        },
+        {
+          "kind": "approval",
+          "outcome": "not-asked",
+          "at": "2026-10-05T04:31:45.000Z"
+        }
+      ]
+    },
+    {
+      "caseId": "D04",
+      "outcome": "passed",
+      "startedAt": "2026-10-05T04:34:04.000Z",
+      "finishedAt": "2026-10-05T04:34:41.447Z",
+      "messageId": "message_lhvipieTjJa-Kx3o4CgL1Q",
+      "observations": [
+        {
+          "kind": "desktop-push",
+          "at": "2026-10-05T04:34:06Z",
+          "outcome": "pushed-once"
+        },
+        {
+          "kind": "logical-message",
+          "outcome": "same-message-id",
+          "at": "2026-10-05T04:34:04.000Z"
+        }
+      ]
+    },
+    {
+      "caseId": "D05",
+      "outcome": "passed",
+      "startedAt": "2026-10-05T04:34:52.000Z",
+      "finishedAt": "2026-10-05T04:34:55.036Z",
+      "messageId": "message_mGC0UQYG2G23bsjsXuBI9w",
+      "observations": [
+        {
+          "kind": "delivery",
+          "at": "2026-10-05T04:34:55.036Z",
+          "outcome": "queued"
+        },
+        {
+          "kind": "client",
+          "outcome": "exited",
+          "at": "2026-10-05T04:34:54.000Z"
+        }
+      ]
+    },
+    {
+      "caseId": "D06",
+      "outcome": "passed",
+      "startedAt": "2026-10-05T04:29:19.000Z",
+      "finishedAt": "2026-10-05T04:31:16.352Z",
+      "messageId": "message_BY540lIYRss5JXqCTgB_0Q",
+      "observations": [
+        {
+          "kind": "delivery",
+          "at": "2026-10-05T04:31:16.352Z",
+          "outcome": "offered"
+        },
+        {
+          "kind": "desktop-push",
+          "at": "2026-10-05T04:30:03Z",
+          "outcome": "pushed"
+        },
+        {
+          "kind": "client",
+          "outcome": "restarted",
+          "at": "2026-10-05T04:29:19.000Z"
+        }
+      ]
+    }
+  ]
+}

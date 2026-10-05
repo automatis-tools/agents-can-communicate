@@ -21,6 +21,8 @@
     "plugin/",
     "fixtures/delivery/antigravity-cli-1.2.7-relay-product.json",
     "fixtures/delivery/antigravity-cli-1.2.7-relay-product-evidence.json",
+    "fixtures/delivery/antigravity-desktop-2.19.1-product.json",
+    "fixtures/delivery/antigravity-desktop-2.19.1-product-evidence.json",
     "fixtures/agentapi-live-push-1.2.7.json",
     "fixtures/live-push-surfaces-1.2.7.json",
     "fixtures/agentapi-error-answers-1.2.7.json",
