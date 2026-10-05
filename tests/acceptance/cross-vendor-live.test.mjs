@@ -225,15 +225,15 @@ test("packed release completes scripted cross-vendor fallback with explicit owne
   assert.deepEqual(await packed.snapshotClientFiles(), beforeInstall,
     "first uninstall did not restore the exact pre-install topology");
 
+  // The first uninstall took this home's records with it, so a second one has
+  // nothing of its own to take back: every client is skipped by name, and no
+  // file changes (#253).
   const repeated = await packed.acc(["uninstall", "--home", packed.clientHome], probeEnv);
   assert.deepEqual(repeated.failed, []);
-  assert.deepEqual(operationIds(repeated), ADAPTER_IDS);
-  assert.equal(repeated.operations.every(operation => operation.applied), true);
-  assert.equal(repeated.operations.every(operation =>
-    (operation.removed?.length ?? 0) === 0
-      && (operation.removedDirectories?.length ?? 0) === 0
-      && (operation.changes?.length ?? 0) === 0), true,
-  `second uninstall was not an idempotent no-op: ${JSON.stringify(repeated.operations)}`);
+  assert.deepEqual(operationIds(repeated), []);
+  assert.equal(ADAPTER_IDS.every(id => repeated.skipped.some(entry => entry.adapterId === id
+    && /no install record in this ACC data home/.test(entry.reason))), true,
+  `second uninstall did not name every client it left alone: ${JSON.stringify(repeated.skipped)}`);
   assert.deepEqual(await packed.snapshotClientFiles(), beforeInstall);
   assert.deepEqual(await readdir(packed.project), [],
     "packed ACC wrote runtime state into the user's project");

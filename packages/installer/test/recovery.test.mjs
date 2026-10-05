@@ -112,7 +112,8 @@ test("uninstall after a crash removes only what is still ACC's", async t => {
   await writeFile(path.join(plugin, "skills", "acc", "SKILL.md"), "my own notes\n");
 
   const result = await applyPlan({ plan: planInstallation({ adapters: list,
-    detected: detected(list), context, action: "uninstall" }),
+    detected: detected(list), context, action: "uninstall",
+    recorded: (await loadOwnership({ dataHome })).installs }),
     adapters: list, context, dataHome });
 
   const kimi = result.operations.find(entry => entry.adapterId === "kimi");

@@ -11,6 +11,8 @@ import { readdir } from "node:fs/promises";
 import path from "node:path";
 
 import { TEST_FILE_CONCURRENCY, nodeTestArguments, testBatches } from "./test-runner-plan.mjs";
+import { createPackedTemplate } from "../tests/helpers/packed-template.mjs";
+import { removeFixture } from "../tests/helpers/fixture-cleanup.mjs";
 
 const repo = path.resolve(import.meta.dirname, "..");
 
@@ -52,13 +54,21 @@ if (process.argv.includes("--list")) {
 // one command line, as it does on POSIX, runs as a single batch.
 const batches = testBatches(files.map(file => path.relative(repo, file)));
 const failed = [];
-for (const [index, batch] of batches.entries()) {
-  const code = await new Promise(resolve => {
-    spawn(process.execPath, nodeTestArguments(batch), { stdio: "inherit", cwd: repo })
-      .on("error", () => resolve(1))
-      .on("exit", exitCode => resolve(exitCode ?? 1));
-  });
-  if (code !== 0) failed.push(index + 1);
+// Build once for this invocation, including all Windows command-line batches.
+// Each scenario copies the installed consumer; none writes into this template.
+const template = await createPackedTemplate();
+try {
+  for (const [index, batch] of batches.entries()) {
+    const code = await new Promise(resolve => {
+      spawn(process.execPath, nodeTestArguments(batch), { stdio: "inherit", cwd: repo,
+        env: { ...process.env, ACC_TEST_PACKED_TEMPLATE: template } })
+        .on("error", () => resolve(1))
+        .on("exit", exitCode => resolve(exitCode ?? 1));
+    });
+    if (code !== 0) failed.push(index + 1);
+  }
+} finally {
+  await removeFixture(template);
 }
 if (batches.length > 1) {
   console.log(failed.length === 0 ? `all ${batches.length} batches passed`

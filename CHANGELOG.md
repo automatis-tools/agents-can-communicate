@@ -52,12 +52,29 @@ The package version remains `0.8.5` until a release prepares its own.
 
 | Candidate artifact | Value |
 |---|---|
-| Built from | `1c1adace3c47472b5d9e6a66cd7810bdc9635073` |
-| Tarball | `agents-can-communicate-0.8.5.tgz`, 533,774 bytes, 329 files |
-| sha256 | `93eb2e9b4434f9ea4a58478d34554a9c51add798d51b0bf2a2e1726dd908ebb7` |
+| Built from | `0942541108f105e0997eae2b5b53e5347b36697c` |
+| Tarball | `agents-can-communicate-0.8.5.tgz`, 534,260 bytes, 329 files |
+| sha256 | `5acf7157525bfdae7966494cbbbed9ce5ccea4038f999a8f6ad49bd6e1116007` |
 
 This unpublished development archive was measured with `npm pack`. See
 [the evidence](docs/release-evidence/unreleased-antigravity-relay-allow-rule.md).
+The package version remains `0.8.5` until a release prepares its own.
+
+## Unreleased — an uninstall takes back only what its own data home installed
+
+- `acc uninstall` without `--adapter` skips a client that the current ACC data home did not
+  install, and names it with the way to remove it anyway: `acc uninstall --adapter <client>`.
+  Before, it removed ACC from every client on the machine, so an uninstall from an isolated
+  `ACC_DATA_HOME` took the operator's own wiring with it (#253).
+
+| Candidate artifact | Value |
+|---|---|
+| Built from | `bd6436eaaf946db70cff649728e6d8508de5a8cb` |
+| Tarball | `agents-can-communicate-0.8.5.tgz`, 533,034 bytes, 329 files |
+| sha256 | `f3963c098d6ddac3d8fe5ae1b8c4335db0d03af54f12c5fabfd654df486bdfc5` |
+
+This unpublished development archive was measured with `npm pack`. See
+[the evidence](docs/release-evidence/unreleased-uninstall-own-installs.md).
 The package version remains `0.8.5` until a release prepares its own.
 
 ## Unreleased — native Windows
