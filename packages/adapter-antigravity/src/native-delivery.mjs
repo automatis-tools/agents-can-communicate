@@ -7,6 +7,7 @@ import path from "node:path";
 import { decisionBody, isWindowsPlatform, readProcessArgs, resolveExecutable, runExecutable }
   from "@agents-can-communicate/adapter-sdk";
 
+import { isAgy } from "./client-process.mjs";
 import { relayStartCommand } from "./relays.mjs";
 import { PROTOCOL_CONTRACT, RELAY_MODES, listRegistrations, readRegistration, relayDir, relayPipeName }
   from "./relay-endpoint.mjs";
@@ -213,7 +214,11 @@ export async function nativeActivationHint({ event, nativeBinding, runtimeDir, c
   // Windows keeps the profile in USERPROFILE; HOME is set only by Git Bash.
   const home = isWindowsPlatform(platform) ? env?.USERPROFILE ?? env?.HOME : env?.HOME;
   if (typeof event?.sessionId !== "string" || typeof home !== "string" || home === "") return null;
-  if (!Number.isInteger(clientPid) || isPrintMode(await argvOf(clientPid).catch(() => []))) return null;
+  if (!Number.isInteger(clientPid)) return null;
+  // The relay is Antigravity CLI's: the desktop app runs no agy, and its
+  // sandbox lets no relay start. A print-mode agy ends with its turn.
+  const argv = await argvOf(clientPid).catch(() => []);
+  if (!isAgy(argv) || isPrintMode(argv)) return null;
   // The runner asks only when its own handshake failed. A relay can still be
   // serving under a stale degraded binding; telling the agent to start it again
   // would be wrong, and the check does not spend an ask.

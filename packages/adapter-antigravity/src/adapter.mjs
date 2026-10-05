@@ -2,6 +2,7 @@ import { channelSocketDirectory, defineAdapter, projectContext, projectContextRe
   from "@agents-can-communicate/adapter-sdk";
 import certification from "../certification.json" with { type: "json" };
 
+import { DESKTOP_CLIENT, identifyClientProcess } from "./client-process.mjs";
 import { denyOutcome, injectOutcome, normalizeAntigravityHook, stopOutcome } from "./hooks.mjs";
 import { detectAntigravity, doctorAntigravity, installAntigravity, planAntigravityInstall,
   preflightAntigravityUninstall, uninstallAntigravity } from "./install.mjs";
@@ -63,7 +64,10 @@ export function createAntigravityAdapter() {
     // spawn: `agy --version` answers `1.2.7`. Presence liveness also walks the
     // hook's process ancestry for this basename to learn the client's own pid.
     client: { command: "agy", certificationName: "antigravity-cli",
-      versionArgs: ["--version"] },
+      versionArgs: ["--version"], variants: [DESKTOP_CLIENT] },
+    // Antigravity 2.0, the desktop app, runs these same hooks under its
+    // language server, which names its own version; see client-process.mjs.
+    identifyClientProcess,
     certification,
     capabilities: {
       lifecycle: { sessionStart: true },
