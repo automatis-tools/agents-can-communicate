@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
-import { mkdtemp, realpath, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, realpath, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -11,6 +11,7 @@ import { createCoordinationService } from "@agents-can-communicate/core";
 import { createFakeClock, createFakeIds, createMemoryStore } from "../helpers/memory-store.mjs";
 
 import { fixtureOwnerEnv } from "../helpers/fixture-owner.mjs";
+import { processFixtureEnv } from "../helpers/process-env.mjs";
 
 const run = promisify(execFile);
 const repo = path.resolve(import.meta.dirname, "..", "..");
@@ -98,9 +99,8 @@ async function workspace(t) {
   const base = await realpath(await mkdtemp(path.join(tmpdir(), "acc-scope-")));
   t.after(() => rm(base, { recursive: true, force: true }));
   const project = path.join(base, "project");
-  await run("mkdir", ["-p", project]);
-  const env = { ...process.env, ACC_DATA_HOME: path.join(base, "data"),
-    GIT_DIR: "", GIT_WORK_TREE: "" };
+  await mkdir(project, { recursive: true });
+  const env = await processFixtureEnv(base);
   const attach = async participant => {
     const child = run(process.execPath, [hook, "codex"],
       { env: { ...env, ACC_PARTICIPANT: participant } });
