@@ -9,9 +9,9 @@
 
 | Candidate artifact | Value |
 |---|---|
-| Built from | `3ad86455bd47084f53a6ab30c05d98ce4fcba317` |
-| Tarball | `agents-can-communicate-0.8.5.tgz`, 532,959 bytes, 329 files |
-| sha256 | `c2c3d6086ea0b55d6458ecb0ddb9f01be20719510953825aa09d5c76f2051366` |
+| Built from | `bd6436eaaf946db70cff649728e6d8508de5a8cb` |
+| Tarball | `agents-can-communicate-0.8.5.tgz`, 533,034 bytes, 329 files |
+| sha256 | `f3963c098d6ddac3d8fe5ae1b8c4335db0d03af54f12c5fabfd654df486bdfc5` |
 
 This unpublished development archive was measured with `npm pack`. See
 [the evidence](docs/release-evidence/unreleased-uninstall-own-installs.md).

@@ -2,9 +2,9 @@
 
 | Candidate artifact | Value |
 |---|---|
-| Built from | `3ad86455bd47084f53a6ab30c05d98ce4fcba317` |
-| Tarball | `agents-can-communicate-0.8.5.tgz`, 532,959 bytes, 329 files |
-| sha256 | `c2c3d6086ea0b55d6458ecb0ddb9f01be20719510953825aa09d5c76f2051366` |
+| Built from | `bd6436eaaf946db70cff649728e6d8508de5a8cb` |
+| Tarball | `agents-can-communicate-0.8.5.tgz`, 533,034 bytes, 329 files |
+| sha256 | `f3963c098d6ddac3d8fe5ae1b8c4335db0d03af54f12c5fabfd654df486bdfc5` |
 
 Fixes #253.
 
@@ -20,8 +20,9 @@ read the install records only for clients that had left it.
 ## What changed
 
 - `installer`: an uninstall skips a present client that the current data home has no install
-  record for, and says so: "was not installed from this ACC data home; to remove its ACC
-  wiring anyway, run acc uninstall --adapter <client>". Naming the client keeps removing it.
+  record for, and says so: "has no install record in this ACC data home, so ACC leaves it as
+  it is; to remove ACC wiring another data home put there, run acc uninstall --adapter
+  <client>". Naming the client keeps removing it.
 - Docs: CLI and troubleshooting.
 
 ## Tests
@@ -32,6 +33,11 @@ read the install records only for clients that had left it.
   it; a data home's own install is still removed.
 - Three existing tests now pass the install records into the uninstall plan, as `acc uninstall`
   always does.
+- `tests/acceptance/cross-vendor-live.test.mjs`: the packed release's second uninstall used to
+  visit every client as a no-op; the first one took this home's records, so it now skips every
+  client by name and still changes no file. The pre-push run caught that expectation, and the
+  skip line's first wording ("was not installed from this ACC data home") was wrong for it,
+  so the reason now reads the same for both cases.
 
 ## End to end after the change
 
@@ -39,7 +45,8 @@ The packed candidate, an isolated `HOME`, two data homes, Gemini CLI present on 
 2026-10-05.
 
 - Data home A installed the Gemini CLI integration.
-- `acc uninstall` from data home B reported `uninstalled 0 adapter(s)` and the skip line above;
+- `acc uninstall` from data home B reported `uninstalled 0 adapter(s)` and a skip line for Gemini
+  CLI (in the first wording, the same behaviour);
   every file in the home matched its pre-uninstall sha256.
 - `acc uninstall --adapter gemini_cli` from B removed the wiring.
 - After a fresh install from A, `acc uninstall` from A removed it.
