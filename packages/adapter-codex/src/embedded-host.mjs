@@ -104,9 +104,22 @@ export function embeddingOption(argv) {
  */
 export function desktopAppServer(argv) {
   const words = codexArguments(argv);
-  return words !== null && words[0] === "app-server"
-    && !words.some(word => word === "--listen" || word.startsWith("--listen="))
-    && /\.app\/Contents\//.test(argv[0] ?? "");
+  if (words === null || !/\.app\/Contents\//.test(argv[0] ?? "")) return false;
+  if (words.some(word => word === "--listen" || word.startsWith("--listen="))) return false;
+  // The app puts its config overrides before the subcommand:
+  // `codex -c features.code_mode_host=true app-server ...` (26.928).
+  return subcommandOf(words) === "app-server";
+}
+
+// The first word that is neither an option nor an option's value.
+function subcommandOf(words) {
+  let value = false;
+  for (const word of words) {
+    if (value) { value = false; continue; }
+    if (word.startsWith("-")) { value = VALUE_OPTIONS.has(word); continue; }
+    return word;
+  }
+  return null;
 }
 
 /**

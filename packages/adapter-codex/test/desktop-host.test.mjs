@@ -11,11 +11,19 @@ import { nativeActivationHint } from "../src/native-delivery.mjs";
 // window on a private app server over stdio, never the shared daemon, because
 // it always passes config overrides (openai/codex#41014). Its threads run
 // ACC's hooks with that server as their client process; read 2026-10-04.
+// The command line ChatGPT.app 26.928 started its server with (ps, 2026-10-05):
+// the config overrides come before the subcommand.
 const DESKTOP = ["/Applications/ChatGPT.app/Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS/codex",
-  "app-server", "-c", "features.code_review=true", "-c", "codex_app.enabled=true"];
+  "-c", "features.code_mode_host=true", "app-server", "--analytics-default-enabled",
+  "-c", "plugins.codex-app-tools@openai-bundled.mcp_servers.codex_app.enabled=true",
+  "-c", "plugins.code-review@openai-bundled.mcp_servers.code-review.enabled=true"];
 
 test("the Codex app's private app server is told from the daemon and from a TUI", () => {
   assert.equal(desktopAppServer(DESKTOP), true);
+  assert.equal(desktopAppServer([DESKTOP[0], "app-server", "-c", "x=1"]), true);
+  // The same bundle's other servers are not the chat's.
+  assert.equal(desktopAppServer([DESKTOP[0], "exec-server", "--remote", "https://example.test"]), false);
+  assert.equal(desktopAppServer([DESKTOP[0], "-c", "app-server"]), false, "a value is not a subcommand");
   assert.equal(desktopAppServer(["/Applications/Codex.app/Contents/Resources/codex", "app-server"]), true);
   // The shared daemon listens; a TUI has no app-server subcommand.
   assert.equal(desktopAppServer(["/Users/me/.codex/packages/standalone/releases/0.160.0/bin/codex",
