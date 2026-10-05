@@ -369,6 +369,11 @@ before leaving, request the concrete continuation and obtain a substantive reply
 | `acc help` | — |
 | `acc version` | — |
 
+`acc uninstall` takes back what the current ACC data home installed. A client on the machine
+that this data home has no install record for - one another data home wired, such as your own
+beside an isolated `ACC_DATA_HOME` - is skipped with the reason; name it with `--adapter` to
+remove its ACC wiring anyway.
+
 `--delivery off|actionable|all` is a per-client recipient policy request, not a capability
 switch, and the default is `off`. `--adapter` is repeatable to name several clients. An
 explicit `--delivery` applies uniformly and never prompts; omitting it on an interactive

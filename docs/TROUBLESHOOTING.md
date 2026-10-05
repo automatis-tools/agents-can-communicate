@@ -443,6 +443,10 @@ confirming no needed coordination state remains.
 ACC removes only bytes that still match its install record. Anything edited by the user is
 reported and retained. Remove those leftovers manually if desired.
 
+An uninstall also skips a client that the current data home did not install, and names it:
+its wiring belongs to another ACC data home. Run `acc uninstall --adapter <client>` to remove
+it from this one.
+
 Runtime state is outside the repository by design. `ACC_DATA_HOME` can relocate it, but ACC
 refuses a path inside any workspace root. Relocate the whole data directory; a symlink for
 that directory is supported. Install rejects a symlink that moves only the internal
