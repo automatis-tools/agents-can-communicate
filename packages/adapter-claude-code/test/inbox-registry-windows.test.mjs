@@ -36,7 +36,7 @@ test("windows: the session record names a named pipe and the process start", asy
   const { configDir } = await config(t);
   assert.deepEqual(await readSessionRecord({ configDir, clientPid: 1524, platform: "win32" }), {
     pid: 1524, sessionId: "93c83ef9-935f-4f9f-8fdc-456a9eec8da6", messagingSocketPath: PIPE,
-    cwd: "C:\\Users\\Ann\\project", procStart: PROC_START, pidDomain: "win32:host" });
+    cwd: "C:\\Users\\Ann\\project", version: null, procStart: PROC_START, pidDomain: "win32:host" });
 });
 
 test("windows: a record naming anything but a Claude inbox pipe is not read", async t => {

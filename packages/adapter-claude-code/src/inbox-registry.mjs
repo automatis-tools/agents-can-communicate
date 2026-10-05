@@ -18,6 +18,7 @@ const MAX_BYTES = 16_384;
 const KEY_MAX_BYTES = 4_096;
 const INBOX_PIPE = /^\\\\\.\\pipe\\((?:LOCAL\\)?cc-msg-[0-9a-f]{32})$/i;
 const PEER_TOKEN = /^[0-9a-f]{32}$/;
+const VERSION = /^\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$/;
 const own = info => typeof process.getuid !== "function" || info.uid === process.getuid();
 const text = value => (typeof value === "string" && value !== "" ? value : null);
 
@@ -55,6 +56,9 @@ export async function readSessionRecord({ configDir, clientPid, platform = proce
       && inbox
       ? { pid: record.pid, sessionId: record.sessionId, messagingSocketPath: record.messagingSocketPath,
         cwd: typeof record.cwd === "string" && paths.isAbsolute(record.cwd) ? record.cwd : null,
+        // The build this process runs, as Claude Code itself recorded it.
+        version: typeof record.version === "string" && VERSION.test(record.version)
+          ? record.version : null,
         ...(windows ? { procStart: text(record.procStart), pidDomain: text(record.pidDomain) } : {}) }
       : null;
   } catch {
