@@ -1,5 +1,42 @@
 # Changelog
 
+## Unreleased — the desktop apps of Antigravity, Claude Code and Codex
+
+- Antigravity 2.0, the desktop app, gets live delivery. It runs the same hooks under its own
+  language server, so ACC now knows a desktop conversation by that server and the version on
+  its command line, and judges it by the desktop's own evidence. ACC delivers through the
+  server's own `agentapi`, reading its endpoint when it binds and when it delivers and storing
+  no token; the agent starts nothing. A product capture on 2.19.1 passed all six cases: idle
+  wake, a push held until a long answer finished, an unattended `acc reply`, one presentation
+  of a resent message, queueing with the app quit, and a restart. Install adds the wrapper's
+  grant to `~/.gemini/config/config.json`, which the app reads instead of Antigravity CLI's
+  settings, once the app has created that file.
+- A session's version comes from the client that runs it. Claude Code sessions read it from
+  their own registry record: Claude.app runs a build of its own, and a session that outlived an
+  in-place update kept its version while `PATH` named the new one. A client started by full
+  path, such as the Codex app's codex, answers for itself.
+- A turn after the client restarted binds the session to the client running now. Antigravity's
+  desktop app reopens a conversation without a second session start, and the session stayed
+  bound to the server that had exited.
+- Chats in the Codex app, which runs each window on its own app server (openai/codex#41014),
+  are reported as `client_session_embedded` with a notice that has nothing to change, and doctor
+  no longer advises opening another chat there. They get messages at their next turn.
+- Adapter SDK: `client.variants`, `identifyClientProcess` and `clientVersionOf`; evidence and
+  native anchors may name a variant, and each delivery protocol is judged from its own first
+  capture.
+- Docs: live delivery is no longer described as Apple Silicon only, and Claude.app's local Code
+  sessions are named as supported.
+
+| Candidate artifact | Value |
+|---|---|
+| Built from | `a4042eec4d15c976f72391c563f6749521805ee9` |
+| Tarball | `agents-can-communicate-0.8.5.tgz`, 553,071 bytes, 336 files |
+| sha256 | `7a6b6f3f65f2d9ae21857d1261a0464523dbcb13b7bcf0b2d19f231806dd153d` |
+
+This unpublished development archive was measured with `npm pack`. See
+[the evidence](docs/release-evidence/unreleased-desktop-clients.md).
+The package version remains `0.8.5` until a release prepares its own.
+
 ## Unreleased — Antigravity starts its relay without asking
 
 - The Antigravity install also adds `command(sh "<home>/.gemini/config/acc/acc-relay.sh" start)`
