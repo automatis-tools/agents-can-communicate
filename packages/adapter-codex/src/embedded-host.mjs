@@ -96,14 +96,30 @@ export function embeddingOption(argv) {
 }
 
 /**
+ * Whether this command line is the Codex app's own app server: `codex
+ * app-server` that listens nowhere, run from inside an app bundle. Read on the
+ * Codex app in ChatGPT.app 26.928: every window serves its threads over stdio
+ * this way, never through the shared daemon (openai/codex#41014), so no other
+ * process can reach them.
+ */
+export function desktopAppServer(argv) {
+  const words = codexArguments(argv);
+  return words !== null && words[0] === "app-server"
+    && !words.some(word => word === "--listen" || word.startsWith("--listen="))
+    && /\.app\/Contents\//.test(argv[0] ?? "");
+}
+
+/**
  * For a host that was read and is an interactive TUI, `{ launchOption }` - the
- * option that keeps it embedded, or null when its command line shows none.
+ * option that keeps it embedded, or null when its command line shows none. For
+ * the Codex app's own app server, `{ launchOption: null, desktop: true }`.
  * Null for any other host or an unreadable one; never throws.
  */
 export async function embeddedHost(pid, argvOf = hostArgv) {
   try {
     const argv = await argvOf(pid);
-    return interactiveHost(argv) ? { launchOption: embeddingOption(argv) } : null;
+    if (interactiveHost(argv)) return { launchOption: embeddingOption(argv) };
+    return desktopAppServer(argv) ? { launchOption: null, desktop: true } : null;
   } catch {
     return null;
   }

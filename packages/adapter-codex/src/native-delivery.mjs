@@ -239,9 +239,20 @@ function embeddedNotice(launchOption) {
     + `it on its own app server. For live delivery, ${advice}.` };
 }
 
+// A chat the Codex app serves itself: nothing the user starts differently
+// changes that, so the notice says what happens instead of what to do.
+const DESKTOP_NOTICE = Object.freeze({
+  line: "ACC: live peer delivery is off in this Codex chat. The Codex app runs it on its own app "
+    + "server, which no other process can reach, so peer messages arrive with the user's next "
+    + "prompt. ACC has shown the user this.",
+  userMessage: "ACC: live peer delivery is off in this chat: the Codex app runs it on its own app "
+    + "server. Peer messages arrive with your next prompt.",
+});
+
 // One delivered notice per chat. The marker is created exclusively, so a
 // second turn finds it; a notice the runner did not deliver gives it back.
-export async function nativeActivationHint({ event, nativeBinding, runtimeDir }) {
+export async function nativeActivationHint({ event, nativeBinding, runtimeDir, clientPid,
+  argvOf = hostArgv }) {
   if (nativeBinding?.state !== "degraded" || nativeBinding.reasonCode !== "client_session_embedded"
     || typeof event?.sessionId !== "string" || event.sessionId === ""
     || typeof runtimeDir !== "string") return null;
@@ -253,7 +264,10 @@ export async function nativeActivationHint({ event, nativeBinding, runtimeDir })
   } catch {
     return null;
   }
-  return { ...embeddedNotice(nativeBinding.launchOption), release: () => rm(marker, { force: true }) };
+  const host = Number.isInteger(clientPid) && clientPid > 0 && !isLaunchOption(nativeBinding.launchOption)
+    ? await embeddedHost(clientPid, argvOf) : null;
+  const notice = host?.desktop === true ? DESKTOP_NOTICE : embeddedNotice(nativeBinding.launchOption);
+  return { ...notice, release: () => rm(marker, { force: true }) };
 }
 
 function renderText(message) {
