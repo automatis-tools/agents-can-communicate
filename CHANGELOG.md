@@ -50,7 +50,8 @@ Work in progress for #234. The design is in
   interactive Claude Code on Linux and Windows.
 - Live delivery reaches Codex on Windows through `codex app-server proxy`, which relays stdio to
   the daemon's AF_UNIX socket that Node cannot open there; ACC speaks the same WebSocket JSON-RPC
-  over the stdio of the managed `codex.exe` the daemon runs from. Measured with Codex 0.159.3
+  over the stdio of the managed `codex.exe` the daemon runs from: the standalone install when the
+  home has one, else the copy `app-server daemon start` installs. Measured with Codex 0.159.3
   under a standard user: a queued message reached the model. The daemon is proven without `ps`
   or `lsof`: its pid record's FILETIME against WMI's creation time, its command line, and the
   socket its directory lists (Node's `lstat` refuses the socket file with `EACCES`). Codex starts

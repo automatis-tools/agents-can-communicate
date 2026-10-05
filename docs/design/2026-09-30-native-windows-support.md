@@ -289,7 +289,9 @@ different installation.
   set ("start the Windows daemon from a non-elevated terminal"), and `runas /trustlevel:0x20000`
   does not clear it; the proxy refuses a socket path longer than `SUN_LEN`, so a deep
   `CODEX_HOME` cannot share the daemon; the daemon runs a managed copy under
-  `CODEX_HOME\packages\app-server-daemon\current\bin\codex.exe`. Run as a standard user,
+  `CODEX_HOME\packages\app-server-daemon\current\bin\codex.exe` when the home has no
+  standalone install. The proxy runs from the same package as the daemon, found in maintenance's
+  order: `packages\standalone` first, then `packages\app-server-daemon`. Run as a standard user,
   `daemon.pid` records `{pid, processStartTime}` with the start as a FILETIME string, WMI reports
   the same creation time to the microsecond, and the command line is the quoted, `\\?\`-prefixed
   release `codex.exe` running `app-server --listen unix:// --managed-daemon`. Node's `lstat`

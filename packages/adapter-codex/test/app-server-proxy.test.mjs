@@ -45,12 +45,36 @@ test("windows: the app server is reached through the proxy's stdio", async t => 
   assert.deepEqual(spawned, [socketPath, socketPath]);
 });
 
-// The daemon runs from the copy Codex installs under CODEX_HOME, so that copy
-// is there whenever there is a daemon to reach, and it is an .exe: started
-// without cmd.exe, whatever the socket path holds.
-test("windows: the proxy is the managed codex.exe the daemon runs", () => {
-  const socketPath = "C:\\Users\\Ann\\.codex\\app-server-control\\app-server-control.sock";
-  assert.deepEqual(proxyCommand(socketPath), {
-    file: "C:\\Users\\Ann\\.codex\\packages\\app-server-daemon\\current\\bin\\codex.exe",
-    args: ["app-server", "proxy", "--sock", socketPath] });
+// The proxy runs from the package the daemon runs from, found the way
+// maintenance finds it: the standalone install when the home has one, else the
+// copy `app-server daemon start` installs (measured on 0.159.3). Always an
+// .exe, so it starts without cmd.exe whatever the socket path holds. Building
+// the second path unconditionally left a home with only the standalone install
+// unreachable (review of #243).
+const HOME = "C:\\Users\\Ann\\.codex";
+const SOCKET = `${HOME}\\app-server-control\\app-server-control.sock`;
+const STANDALONE = `${HOME}\\packages\\standalone\\current\\bin\\codex.exe`;
+const SELF_INSTALLED = `${HOME}\\packages\\app-server-daemon\\current\\bin\\codex.exe`;
+const holding = (...files) => ({ exists: async file => files.includes(file) });
+
+test("windows: the proxy runs from the standalone install when the home has one", async () => {
+  assert.deepEqual(await proxyCommand(SOCKET, holding(STANDALONE, SELF_INSTALLED)),
+    { file: STANDALONE, args: ["app-server", "proxy", "--sock", SOCKET] });
 });
+
+test("windows: without a standalone install the proxy is the daemon's own copy", async () => {
+  assert.deepEqual(await proxyCommand(SOCKET, holding(SELF_INSTALLED)),
+    { file: SELF_INSTALLED, args: ["app-server", "proxy", "--sock", SOCKET] });
+});
+
+test("windows: a home with neither has no proxy, and the connect fails without spawning",
+  async () => {
+    assert.equal(await proxyCommand(SOCKET, holding()), null);
+    const peer = openCodexAppServer({ socketPath: SOCKET, timeoutMs: 2_000, platform: "win32",
+      resolveProxy: socketPath => proxyCommand(socketPath, holding()) });
+    try {
+      await assert.rejects(initializeCodex(peer), /no codex\.exe/);
+    } finally {
+      await peer.close();
+    }
+  });
