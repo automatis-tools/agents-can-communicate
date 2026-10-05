@@ -1,17 +1,17 @@
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
-import { mkdtemp, realpath, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, realpath, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { promisify } from "node:util";
 
 import { EXIT } from "@agents-can-communicate/protocol";
+import { processFixtureEnv } from "../helpers/process-env.mjs";
 
 const run = promisify(execFile);
 const repo = path.resolve(import.meta.dirname, "..", "..");
 const acc = path.join(repo, "bin", "acc.mjs");
-const hook = path.join(repo, "bin", "acc-hook.mjs");
 
 /**
  * Writing a workspace config decouples everyone already in the workspace.
@@ -32,18 +32,18 @@ async function attached(t, { sessions }) {
   const root = await realpath(await mkdtemp(path.join(tmpdir(), "acc-config-")));
   t.after(() => rm(root, { recursive: true, force: true }));
   const project = path.join(root, "project");
-  await run("mkdir", ["-p", project]);
-  const env = { ...process.env, ACC_DATA_HOME: path.join(root, "data"),
-    GIT_DIR: "", GIT_WORK_TREE: "" };
+  await mkdir(project, { recursive: true });
+  const env = await processFixtureEnv(root);
+  const cli = args => run(process.execPath, [acc, ...args, "--cwd", project], { env });
 
+  // Config protects every attached session, independently of how it started.
+  // Set up real owners through the CLI; hook timing is covered by hook tests.
   for (const { participant, harness } of sessions) {
-    const child = run("node", [hook, harness],
-      { env: { ...env, ACC_PARTICIPANT: participant } });
-    child.child.stdin.end(JSON.stringify({ hook_event_name: "SessionStart",
-      session_id: `h-${participant}`, cwd: project, source: "startup" }));
-    await child;
+    const result = JSON.parse((await cli(["attach", "--participant", participant,
+      "--harness", harness, "--json"])).stdout).data;
+    assert.equal(typeof result.sessionId, "string", `config fixture: ${participant} owner`);
+    assert.equal(typeof result.generation, "string", `config fixture: ${participant} generation`);
   }
-  const cli = args => run("node", [acc, ...args, "--cwd", project], { env });
   const live = async () => JSON.parse(
     (await cli(["status", "--json"])).stdout).data.counts.live;
   return { project, cli, live };

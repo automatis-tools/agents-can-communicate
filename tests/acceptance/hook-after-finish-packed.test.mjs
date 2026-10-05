@@ -5,11 +5,13 @@ import { createPackedAcc } from "../helpers/packed-acc.mjs";
 
 // Installed processes reproduce a native conversation that continues after
 // finish, without receiving another SessionStart. Real-client evidence is separate.
-function ownerFlags(stdout, adapterId) {
+function ownerFlags(result, adapterId) {
+  const { stdout } = result;
   const context = adapterId === "codex" ? stdout : stdout.trim() === "" ? ""
     : JSON.parse(stdout).hookSpecificOutput?.additionalContext ?? "";
   const match = /^ACC CLI \(append\): --session (\S+) --generation (\S+) --cwd .+$/m.exec(context);
-  assert.ok(match, "the next user turn must supply usable owner arguments");
+  assert.ok(match, "the next user turn must supply usable owner arguments: "
+    + JSON.stringify({ stdout, stderr: result.stderr, elapsedMs: result.elapsedMs }));
   return ["--session", match[1], "--generation", match[2]];
 }
 
@@ -17,11 +19,15 @@ for (const adapterId of ["claude_code", "codex"]) {
   test(`${adapterId} continues after partial finish with a fresh owner in the same conversation`, async t => {
     const packed = await createPackedAcc(t);
     const payload = { session_id: "native-conversation", cwd: packed.project };
-    const hook = name => packed.hook(adapterId, { ...payload, hook_event_name: name,
-      prompt: "Continue with my approval" });
+    const hook = async name => {
+      const started = performance.now();
+      const result = await packed.hook(adapterId, { ...payload, hook_event_name: name,
+        prompt: "Continue with my approval" });
+      return { ...result, elapsedMs: Math.round(performance.now() - started) };
+    };
     const snapshot = async () => (await packed.acc(["sync", "--scope", "full"])).snapshot;
     await hook("SessionStart");
-    const first = ownerFlags((await hook("UserPromptSubmit")).stdout, adapterId);
+    const first = ownerFlags(await hook("UserPromptSubmit"), adapterId);
     await packed.acc(["work", ...first, "--summary", "waiting for permission"]);
     await packed.acc(["claim", ...first, "--resource", "file:stock.mjs"]);
     const done = await packed.acc(["finish", ...first, "--status", "partial",
@@ -37,7 +43,7 @@ for (const adapterId of ["claude_code", "codex"]) {
     const staleHeartbeat = await packed.accError(["heartbeat", ...first]);
     assert.equal(staleHeartbeat?.code, 5);
 
-    const fresh = ownerFlags((await hook("UserPromptSubmit")).stdout, adapterId);
+    const fresh = ownerFlags(await hook("UserPromptSubmit"), adapterId);
     assert.notEqual(fresh[1], first[1]);
     assert.notEqual(fresh[3], first[3]);
     const claim = await packed.acc(["claim", ...fresh, "--resource", "file:stock.mjs"]);
@@ -51,14 +57,14 @@ for (const adapterId of ["claude_code", "codex"]) {
     assert.equal(after.sessions.length, 2);
     assert.equal(after.sessions.find(s => s.sessionId === fresh[1]).participantId,
       closed.participantId, "the native conversation keeps its participant address");
-    assert.deepEqual(ownerFlags((await hook("UserPromptSubmit")).stdout, adapterId), fresh);
+    assert.deepEqual(ownerFlags(await hook("UserPromptSubmit"), adapterId), fresh);
     await packed.acc(["finish", ...fresh, "--goal", "approved work complete"]);
     const beforeEnd = await snapshot();
     const closedFresh = beforeEnd.sessions.find(s => s.sessionId === fresh[1]);
     assert.equal(closedFresh.state, "closed");
     await hook("SessionEnd");
     assert.equal(await packed.findBinding(payload.session_id), null);
-    const next = ownerFlags((await hook("UserPromptSubmit")).stdout, adapterId);
+    const next = ownerFlags(await hook("UserPromptSubmit"), adapterId);
     const binding = await packed.findBinding(payload.session_id);
     assert.notDeepEqual(next, fresh);
     assert.equal(binding.accSessionId, next[1]);
@@ -75,10 +81,14 @@ for (const adapterId of ["claude_code", "codex"]) {
   test(`${adapterId} resumes a detached solo conversation whose ephemeral owner is absent`, async t => {
     const packed = await createPackedAcc(t);
     const payload = { session_id: "solo-conversation", cwd: packed.project };
-    const hook = name => packed.hook(adapterId, { ...payload, hook_event_name: name,
-      prompt: "Continue after detach" });
+    const hook = async name => {
+      const started = performance.now();
+      const result = await packed.hook(adapterId, { ...payload, hook_event_name: name,
+        prompt: "Continue after detach" });
+      return { ...result, elapsedMs: Math.round(performance.now() - started) };
+    };
     await hook("SessionStart");
-    const first = ownerFlags((await hook("UserPromptSubmit")).stdout, adapterId);
+    const first = ownerFlags(await hook("UserPromptSubmit"), adapterId);
     const before = await packed.acc(["status"]);
     assert.equal(before.materialised, false);
     assert.equal(before.counts.live, 1);
@@ -96,7 +106,7 @@ for (const adapterId of ["claude_code", "codex"]) {
       "a tool hook revived a completed owner without a genuine user turn");
     assert.deepEqual(await packed.findBinding(payload.session_id), oldBinding);
 
-    const fresh = ownerFlags((await hook("UserPromptSubmit")).stdout, adapterId);
+    const fresh = ownerFlags(await hook("UserPromptSubmit"), adapterId);
     assert.notEqual(fresh[1], first[1]);
     assert.notEqual(fresh[3], first[3]);
     const after = await packed.acc(["status"]);
@@ -106,7 +116,7 @@ for (const adapterId of ["claude_code", "codex"]) {
     assert.equal(after.participants[0].participantId, participantId);
     await packed.acc(["work", ...fresh, "--summary", "continued with fresh ownership"]);
     assert.equal((await packed.accError(["heartbeat", ...first]))?.code, 5);
-    assert.deepEqual(ownerFlags((await hook("UserPromptSubmit")).stdout, adapterId), fresh);
+    assert.deepEqual(ownerFlags(await hook("UserPromptSubmit"), adapterId), fresh);
     await hook("SessionEnd");
     assert.equal(await packed.findBinding(payload.session_id), null);
     assert.deepEqual((await packed.acc(["status"])).participants, []);

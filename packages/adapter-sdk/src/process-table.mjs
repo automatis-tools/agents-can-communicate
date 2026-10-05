@@ -121,6 +121,18 @@ async function windowsChain({ from, hops, run, timeoutMs, env }) {
   return [];
 }
 
+/**
+ * Windows: one process - pid, parent, image name, creation time as a FILETIME
+ * string (to the microsecond, as WMI keeps it) and command line - or null when
+ * it cannot be read.
+ */
+export async function readWindowsProcess(pid, { run = execFileAsync, timeoutMs = DEFAULT_TIMEOUT_MS,
+  env = process.env } = {}) {
+  if (!Number.isSafeInteger(pid) || pid <= 0) return null;
+  const [found] = await windowsChain({ from: pid, hops: 1, run, timeoutMs, env });
+  return found?.pid === pid ? found : null;
+}
+
 async function windowsTable({ from, run, timeoutMs, env }) {
   const table = new Map();
   let child = null;

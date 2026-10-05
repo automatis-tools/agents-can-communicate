@@ -17,6 +17,13 @@ const jsonNames = async (directory, root) =>
     .filter(entry => entry.isFile() && entry.name.endsWith(".json"))
     .map(entry => entry.name);
 
+// A store that never had an older ACC write a completion marker has no
+// directory for them.
+const jsonNamesIfPresent = (directory, root) => jsonNames(directory, root).catch(error => {
+  if (error.code === "ENOENT") return [];
+  throw error;
+});
+
 /**
  * Which transaction the store is in the middle of, or null when it cannot tell.
  *
@@ -40,16 +47,19 @@ async function activeTransaction(paths, root) {
 }
 
 /**
- * Condemn every journal entry that has been retired, with its completion marker.
+ * Condemn every journal entry but the one the pointer names open.
  *
- * `retireJournalEntry` calls `retainFile`, which by construction never unlinks,
- * so a completed entry was kept forever; `completeJournal` then wrote a marker
- * that nothing reads. Both halves go together: a marker outliving its entry
- * records the completion of a file nothing can find.
+ * Every pass runs under the writer lock, as every transaction does, so none is
+ * between preparing its entry and opening it: an entry the pointer does not
+ * name either finished or was never decided, and recovery reads only the one it
+ * names. That entry stays even when a marker says it completed - an older ACC
+ * wrote its marker before the pointer went idle, and a crash between the two
+ * leaves exactly that. A completion marker is all an older ACC knew to judge
+ * by; this one writes none, and the old ones leave with or without their entry.
  *
- * The marker directory is listed once rather than read per entry. A workspace
- * in daily use reaches thousands of retired transactions, and one open each
- * would be the cost this pass exists to remove.
+ * Both directories are listed once rather than read per entry. A workspace in
+ * daily use reaches thousands of retired transactions, and one open each would
+ * be the cost this pass exists to remove.
  */
 async function condemnRetiredJournals(paths, root, doomed, budget, deadlineAt) {
   let spent = 0;
@@ -57,16 +67,15 @@ async function condemnRetiredJournals(paths, root, doomed, budget, deadlineAt) {
   if (!active.known) return { spent, drained: true };
 
   const markerDirectory = path.join(paths.retained, "journal");
-  const completed = new Set(await jsonNames(markerDirectory, root));
-  for (const name of await jsonNames(paths.journal, root)) {
-    if (spent + 2 > budget || expired(deadlineAt)) return { spent, drained: false };
-    if (!completed.has(name)) continue;
-    // The marker is written before the pointer goes idle, so a crash between
-    // the two leaves a completed marker on the entry recovery still owns.
+  const markers = new Set(await jsonNamesIfPresent(markerDirectory, root));
+  const entries = new Set(await jsonNames(paths.journal, root));
+  for (const name of new Set([...entries, ...markers])) {
     if (path.basename(name, ".json") === active.transactionId) continue;
-    await condemn(path.join(paths.journal, name), doomed);
-    await condemn(path.join(markerDirectory, name), doomed);
-    spent += 2;
+    const found = [...entries.has(name) ? [path.join(paths.journal, name)] : [],
+      ...markers.has(name) ? [path.join(markerDirectory, name)] : []];
+    if (spent + found.length > budget || expired(deadlineAt)) return { spent, drained: false };
+    for (const file of found) await condemn(file, doomed);
+    spent += found.length;
   }
   return { spent, drained: true };
 }

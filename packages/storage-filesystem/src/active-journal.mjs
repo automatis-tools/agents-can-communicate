@@ -4,7 +4,7 @@ import path from "node:path";
 
 import { AccError, EXIT, assertPortableId } from "@agents-can-communicate/protocol";
 
-import { encode, publishAtomic } from "./atomic-json.mjs";
+import { encode, nameCommittedLater, publishAtomic } from "./atomic-json.mjs";
 import { withRegularNoFollow } from "./safe-file.mjs";
 
 const ACTIVE_JOURNAL_VERSION = 2;
@@ -181,7 +181,10 @@ export async function initialiseActiveJournal(paths, options) {
   const current = await readCurrent(paths, options.root);
   if (current !== null) return current.record;
   try {
-    await publishAtomic(activeJournalPath(paths, 0), encodeAuthority(genesis()), options);
+    // The first record any write publishes commits this name on Windows; a
+    // crash before it leaves no pointer, which the next open initialises.
+    await publishAtomic(activeJournalPath(paths, 0), encodeAuthority(genesis()),
+      { ...options, durability: nameCommittedLater(options.platform) });
   } catch (error) {
     if (error.code !== EXIT.CONFLICT) throw error;
   }

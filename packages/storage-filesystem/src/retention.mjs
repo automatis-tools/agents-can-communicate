@@ -111,15 +111,3 @@ export async function markEphemeral(paths, options, kind, id, state) {
   await publishAtomic(filePath, encode(record), options);
   return record;
 }
-
-function completionMarker(paths, transactionId) {
-  assertPortableId(transactionId, "transaction id");
-  const record = { retentionVersion: RETENTION_VERSION, transactionId };
-  return { record, filePath: path.join(paths.retained, "journal", `${transactionId}.json`) };
-}
-
-export async function completeJournal(paths, options, transactionId) {
-  const marker = completionMarker(paths, transactionId);
-  await publishAtomic(marker.filePath, encode(marker.record), options);
-  return marker.record;
-}
