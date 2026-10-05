@@ -3,7 +3,7 @@ import { chmodSync, existsSync, mkdirSync, unlinkSync } from "node:fs";
 import net from "node:net";
 import path from "node:path";
 
-import { channelSocketDirectory } from "@agents-can-communicate/adapter-sdk";
+import { channelSocketDirectory, isWindowsPlatform } from "@agents-can-communicate/adapter-sdk";
 
 import { PROTOCOL_CONTRACT, RELAY_MODES, newRelayId, removeRegistration, writeRegistration }
   from "./relay-endpoint.mjs";
@@ -52,13 +52,17 @@ export function createRelay({ runtimeDir, socketDir = channelSocketDirectory(), 
   leaseMs = 120_000,
   renewMs = 40_000, pidCheckMs = 5_000, probeMs = 60_000, lifetimeMs = 86_400_000,
   budgetBytes = 6_000, refreshBinding = null, onExit = () => {}, observe = () => {},
-  now = Date.now }) {
+  now = Date.now, platform = process.platform }) {
   // The binary picks the id first, so its log file can be named before the
   // relay exists; tests let the relay choose.
   const endpointId = requestedId ?? newRelayId();
   const nonce = randomBytes(32).toString("hex");
-  const socketPath = path.join(socketDir, `r${randomBytes(6).toString("hex")}.sock`);
-  if (Buffer.byteLength(socketPath) >= 104) throw new Error("relay socket path is too long");
+  // Windows: a named pipe whose 128 random bits only the private registration
+  // records; libuv creates the first instance, so no one can take the name first.
+  const windows = isWindowsPlatform(platform);
+  const socketPath = windows ? `\\\\.\\pipe\\acc-relay-${randomBytes(16).toString("hex")}`
+    : path.join(socketDir, `r${randomBytes(6).toString("hex")}.sock`);
+  if (!windows && Buffer.byteLength(socketPath) >= 104) throw new Error("relay socket path is too long");
   const seen = new Set();
   const connections = new Set();
   const timers = [];
@@ -140,7 +144,7 @@ export function createRelay({ runtimeDir, socketDir = channelSocketDirectory(), 
   async function renew() {
     if (closed) return;
     const next = record();
-    await writeRegistration({ runtimeDir, record: next });
+    await writeRegistration({ runtimeDir, record: next, platform });
     if (refreshBinding !== null) await Promise.resolve(refreshBinding(next.leaseUntil)).catch(() => {});
   }
 
@@ -150,8 +154,9 @@ export function createRelay({ runtimeDir, socketDir = channelSocketDirectory(), 
     for (const timer of timers) clearInterval(timer);
     for (const socket of connections) socket.destroy();
     if (server !== null) await new Promise(resolve => server.close(() => resolve()));
-    try { if (existsSync(socketPath)) unlinkSync(socketPath); } catch { /* already gone */ }
-    await removeRegistration({ runtimeDir, endpointId });
+    // A pipe goes with its server; a socket file stays behind until removed.
+    try { if (!windows && existsSync(socketPath)) unlinkSync(socketPath); } catch { /* already gone */ }
+    await removeRegistration({ runtimeDir, endpointId, platform });
     observe({ event: "relay_closed", reasonCode: reason });
     onExit(reason);
   }
@@ -163,18 +168,21 @@ export function createRelay({ runtimeDir, socketDir = channelSocketDirectory(), 
   }
 
   async function listen() {
-    mkdirSync(socketDir, { recursive: true, mode: 0o700 });
-    chmodSync(socketDir, 0o700);
-    if (existsSync(socketPath)) throw new Error("relay socket already exists");
+    if (!windows) {
+      mkdirSync(socketDir, { recursive: true, mode: 0o700 });
+      chmodSync(socketDir, 0o700);
+      if (existsSync(socketPath)) throw new Error("relay socket already exists");
+    }
     server = net.createServer(handleConnection);
     await new Promise((resolve, reject) => {
       server.once("error", reject);
+      if (windows) { server.listen(socketPath, resolve); return; }
       const previous = process.umask(0o177);
       server.listen(socketPath, () => { process.umask(previous); resolve(); });
     });
-    chmodSync(socketPath, 0o600);
+    if (!windows) chmodSync(socketPath, 0o600);
     const first = record();
-    await writeRegistration({ runtimeDir, record: first });
+    await writeRegistration({ runtimeDir, record: first, platform });
     const started = now();
     every(renewMs, renew);
     every(pidCheckMs, () => { if (!isAlive(agyPid)) return close("client_exited"); });

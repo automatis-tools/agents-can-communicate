@@ -414,7 +414,7 @@ const HANDLERS = {
   // generation runs for the session until its first real hook pins its own.
   async sessionStart({ event, context, adapter, adapterId, binding, paths,
     readProcessTable, probeClientVersion, platform, deadline, knownClientPid, pins = true,
-    tableRead: started = null }) {
+    tableRead: started = null, mark = () => {} }) {
     // Where this session's pin lives, resolved once and reused at every write
     // below. Beside `paths.root`, never inside it: see `managerRootFor`.
     const pinRoot = managerRootFor(context.dataHome);
@@ -443,18 +443,23 @@ const HANDLERS = {
     const tableRead = known || command === null ? null : started ?? Promise.resolve(readProcessTable({
       timeoutMs: Math.max(1, Math.min(PROCESS_TABLE_MS, deadline - Date.now() - TABLE_RESERVE_MS)) }));
     tableRead?.catch(() => {});
+    mark("probing the client version");
     const clientVersion = await probeClientVersion(adapter,
       { timeoutMs: Math.max(1, Math.min(1_000, deadline - Date.now())) });
     assertHookBudget(deadline);
     const clientFacts = { clientVersion, platform };
     const capabilities = effectiveCapabilities(adapter, clientFacts);
+    mark("reading the process table");
     const pid = known ? knownClientPid : command === null ? null
       : resolveClientPid({ table: await tableRead, from: process.pid, command,
         clientPackage: adapter.client?.package });
     assertHookBudget(deadline);
+    mark("opening the session");
     const clientPid = Number.isInteger(pid) && pid > 0 ? pid : undefined;
-    const native = hookBinding => bindNative({ adapter, event, hookBinding, ...clientFacts,
-      context, paths, deadline });
+    const native = hookBinding => {
+      mark("binding live delivery");
+      return bindNative({ adapter, event, hookBinding, ...clientFacts, context, paths, deadline });
+    };
     const metadata = {
       pid,
       enforcement: capabilities.guards?.beforeWrite === true ? "guarded" : "advisory",
@@ -723,6 +728,9 @@ export async function runHook({ adapterId, payload, adapters, dataHome, env,
   const deadline = Date.now() + budgetMs;
   const fallback = { stdout: "", exitCode: 0, decision: "allow", sessions: [], deadlineAt: deadline,
     commitOffers: async () => {} };
+  // Where the hook is, so a budget that runs out can say which step held it.
+  const trail = { phase: "reading the hook event" };
+  const mark = phase => { trail.phase = phase; };
   const execute = async () => {
     assertHookBudget(deadline);
     const adapter = adapters?.[adapterId];
@@ -736,6 +744,7 @@ export async function runHook({ adapterId, payload, adapters, dataHome, env,
       ? null : Promise.resolve(readProcessTable({ timeoutMs: Math.max(1,
         Math.min(PROCESS_TABLE_MS, deadline - Date.now() - TABLE_RESERVE_MS)) }));
     tableRead?.catch(() => {});
+    mark("finding the workspace");
     const context = await openContext({ event, adapterId, dataHome, runtime, env, deadline });
     assertOwnerQuotable(context.workspaceCwd, context.workspaceRef, String(platform).split("-")[0]);
     const handler = HANDLERS[event.kind];
@@ -743,23 +752,27 @@ export async function runHook({ adapterId, payload, adapters, dataHome, env,
     const invoke = async () => {
       assertHookBudget(deadline);
       if (lifecycle) {
+        mark("opening the store");
         // A previous holder may have died after journalling its session while
         // this process waited. Recover that write before interpreting its binding.
         const store = await openFilesystemStore({ root: context.paths.root, clock: runtime.clock,
           ids: runtime.ids, workspaceId: context.descriptor.id, deadlineAt: deadline });
         context.service = createCoordinationService({ store, clock: runtime.clock, ids: runtime.ids });
       }
+      mark("reading the session binding");
       const binding = await loadSessionBinding({ runtimeDir: context.paths.root,
         harnessSessionId: event.sessionId });
       assertHookBudget(deadline);
+      mark("handling the event");
       // The raw payload goes to a handler only to be handed back to the adapter
       // that produced it; nothing in core reads it.
       const result = handler === undefined ? {} : await handler({ event, context, adapter, adapterId,
         binding, paths: context.paths, payload,
-        readProcessTable, probeClientVersion, platform, deadline, tableRead });
+        readProcessTable, probeClientVersion, platform, deadline, tableRead, mark });
       return appendToolOwner(appendStartOwner(result, { event, context, adapter }),
         { event, binding, context, adapter });
     };
+    if (lifecycle) mark("waiting for the session lock");
     const work = lifecycle
       ? withSessionLifecycle({ root: context.paths.root, sessionId: event.sessionId,
         clock: runtime.clock, deadlineAt: deadline }, invoke)
@@ -782,6 +795,7 @@ export async function runHook({ adapterId, payload, adapters, dataHome, env,
     };
     delete result.offerInputs;
 
+    mark("reading the status");
     const status = await context.service.collectStatus({
       workspaceId: context.descriptor.id });
     assertHookBudget(deadline);
@@ -796,7 +810,7 @@ export async function runHook({ adapterId, payload, adapters, dataHome, env,
     // final status read. Store/binding deadlines fence undecided writes; an
     // activated journal still completes under its writer lock after expiry.
     const budget = new Promise(resolve => {
-      timer = setTimeout(() => resolve({ ...fallback, timedOut: true }),
+      timer = setTimeout(() => resolve({ ...fallback, timedOut: true, phase: trail.phase }),
         Math.max(0, deadline - Date.now()));
     });
     return await Promise.race([execute(), budget]);
@@ -804,7 +818,7 @@ export async function runHook({ adapterId, payload, adapters, dataHome, env,
     return { ...fallback, failed: true, reason: error.message,
       ...(error instanceof AccError && KNOWN_FAILURES.has(error.details?.reasonCode)
         ? { failureCode: error.details.reasonCode } : {}),
-      ...(Date.now() >= deadline ? { timedOut: true } : {}) };
+      ...(Date.now() >= deadline ? { timedOut: true, phase: trail.phase } : {}) };
   } finally {
     clearTimeout(timer);
   }

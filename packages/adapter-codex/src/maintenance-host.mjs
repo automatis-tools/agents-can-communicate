@@ -1,28 +1,29 @@
 import { execFile } from "node:child_process";
 import { constants } from "node:fs";
-import { access, lstat, open, realpath } from "node:fs/promises";
+import { access, lstat, realpath } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+
+import { closedTo, isWindowsPlatform, openRegularNoFollow, readWindowsProcess, resolveExecutable,
+  runExecutable } from "@agents-can-communicate/adapter-sdk";
+
 import { compareVersions, versionOrder } from "./app-server-client.mjs";
+import { DAEMON_LAYOUTS } from "./daemon-layouts.mjs";
+import { socketIsReady } from "./native-endpoint.mjs";
 
 export const MINIMUM_MAINTENANCE_CLI = "0.154.0";
 export const absolute = value => typeof value === "string" && path.isAbsolute(value)
   && !/[\0\r\n]/.test(value);
 export const failMaintenance = reasonCode => { throw Object.assign(new Error(reasonCode), { reasonCode }); };
 const own = info => typeof process.getuid !== "function" || info.uid === process.getuid();
+// `ps -o lstart` on POSIX; a FILETIME string on Windows, where Codex records one
+// and WMI reports one to the microsecond (measured on 0.159.3).
+const FILETIME = /^\d{15,19}$/;
 export const startTimeValid = value => typeof value === "string"
-  && /^[A-Z][a-z]{2} [A-Z][a-z]{2} [ \d]\d \d\d:\d\d:\d\d \d{4}$/.test(value);
-// The two packages a Codex daemon runs from, measured. The standalone install
-// keeps its PID in app-server.pid (0.154.0-0.159.0); a home with no standalone
-// package gets the daemon's own package from `app-server daemon start` on
-// 0.157.1 and newer, with its PID in daemon.pid (0.159.0, 2026-09-29). A home
-// that has the standalone package keeps using it, so it is looked for first.
-const DAEMON_LAYOUTS = Object.freeze([
-  { name: "standalone", packageDir: "packages/standalone", executables: ["current/bin/codex", "current/codex"],
-    pidFile: "app-server-daemon/app-server.pid" },
-  { name: "self-installed", packageDir: "packages/app-server-daemon", executables: ["current/bin/codex"],
-    pidFile: "app-server-daemon/daemon.pid" },
-]);
+  && (/^[A-Z][a-z]{2} [A-Z][a-z]{2} [ \d]\d \d\d:\d\d:\d\d \d{4}$/.test(value) || FILETIME.test(value));
+// WMI keeps a creation time in microseconds and a FILETIME counts tenths of one.
+const sameStart = (observed, recorded) => (FILETIME.test(observed ?? "") && FILETIME.test(recorded ?? "")
+  ? BigInt(observed) / 10n === BigInt(recorded) / 10n : observed === recorded);
 export const managedExecutablePaths = codexHome => DAEMON_LAYOUTS.flatMap(layout =>
   layout.executables.map(name => path.join(codexHome, layout.packageDir, name)));
 
@@ -41,6 +42,13 @@ export async function resolveLsof({ access: check = access } = {}) {
 }
 
 export function runMaintenanceCommand(command, args, options) {
+  // Windows finds codex as an npm .cmd, which starts only through cmd.exe.
+  if (process.platform === "win32") {
+    return runExecutable(command, args, { timeout: 20_000, ...options, maxBuffer: 131_072 })
+      .then(({ stdout, stderr }) => ({ status: 0, stdout, stderr }),
+        error => ({ status: typeof error?.code === "number" ? error.code : null,
+          stdout: error?.stdout ?? "", stderr: error?.stderr ?? "" }));
+  }
   return new Promise(resolve => execFile(command, args,
     { timeout: 20_000, ...options, maxBuffer: 131_072, windowsHide: true },
     (error, stdout, stderr) => resolve({ status: error ?
@@ -96,6 +104,11 @@ export async function metadataExists(file) {
 }
 
 async function resolveCli(pathEnv) {
+  if (process.platform === "win32") {
+    const found = await resolveExecutable("codex", { pathEnv });
+    if (found !== null) return found;
+    failMaintenance("maintenance_cli_unavailable");
+  }
   for (const directory of String(pathEnv ?? "").split(path.delimiter)) {
     if (!absolute(directory)) continue;
     const candidate = path.join(directory, "codex");
@@ -130,12 +143,12 @@ export async function probeMaintenanceInstall(paths, run) {
   return { cliPath, cliVersion: version, managedVersion };
 }
 
-export async function readMaintenancePid(file) {
+export async function readMaintenancePid(file, { platform = process.platform } = {}) {
   let handle;
   try {
-    handle = await open(file, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
+    handle = await openRegularNoFollow(file, undefined, { platform });
     const info = await handle.stat();
-    if (!info.isFile() || !own(info) || info.size > 4_096 || (info.mode & 0o022) !== 0) {
+    if (!info.isFile() || !own(info) || info.size > 4_096 || !closedTo(info, 0o022, { platform })) {
       failMaintenance("daemon_identity_unavailable");
     }
     const value = JSON.parse(await handle.readFile("utf8"));
@@ -146,7 +159,23 @@ export async function readMaintenancePid(file) {
   } finally { await handle?.close(); }
 }
 
-export async function observeMaintenanceProcess(pid, paths, run) {
+const processAlive = pid => {
+  try { process.kill(pid, 0); return true; } catch (error) { return error.code === "EPERM"; }
+};
+// Windows reads one process through WMI. An empty answer cannot tell a gone
+// process from an unreadable one, so whether the pid lives is asked first.
+const WINDOWS_SYSTEM = Object.freeze({ alive: processAlive,
+  readProcess: pid => readWindowsProcess(pid, { timeoutMs: 5_000 }) });
+
+export async function observeMaintenanceProcess(pid, paths, run, { system = WINDOWS_SYSTEM } = {}) {
+  if (isWindowsPlatform(paths.platform)) {
+    if (!system.alive(pid)) return { state: "dead" };
+    const found = await system.readProcess(pid).catch(() => null);
+    if (found?.pid !== pid || !startTimeValid(found.start) || typeof found.cmd !== "string") {
+      return { state: "unknown" };
+    }
+    return { state: "alive", processStartTime: found.start, command: found.cmd };
+  }
   const response = await run("/bin/ps", ["-p", String(pid), "-o", "lstart=,command="], paths.options);
   if (response.status === 1 && response.stdout === "" && response.stderr === "") return { state: "dead" };
   if (response.status !== 0) return { state: "unknown" };
@@ -170,15 +199,27 @@ export function socketListedIn(stdout, socketPaths) {
 // `--managed-daemon` appended. The executable must live in the package tree of
 // the installed layout and be the managed binary itself, however it is named.
 const DAEMON_COMMAND = /^(\/.+?) app-server --listen unix:\/\/(?: --managed-daemon)?$/;
+// Windows quotes the path and gives it the \\?\ prefix (measured on 0.159.3).
+const WINDOWS_DAEMON_COMMAND = /^"(?:\\\\\?\\)?([^"]+)" app-server --listen unix:\/\/(?: --managed-daemon)?$/;
 
-export async function verifyMaintenanceProcess(snapshot, paths, run, { lsof = resolveLsof } = {}) {
-  const process = await observeMaintenanceProcess(snapshot.pid, paths, run);
-  const executable = DAEMON_COMMAND.exec(process.command ?? "")?.[1] ?? null;
+export async function verifyMaintenanceProcess(snapshot, paths, run, { lsof = resolveLsof,
+  system = WINDOWS_SYSTEM } = {}) {
+  const windows = isWindowsPlatform(paths.platform);
+  const process = await observeMaintenanceProcess(snapshot.pid, paths, run, { system });
+  const executable = (windows ? WINDOWS_DAEMON_COMMAND : DAEMON_COMMAND).exec(process.command ?? "")?.[1]
+    ?? null;
   const packages = (paths.packageDir ?? path.join(paths.codexHome, "packages", "standalone")) + path.sep;
-  if (process.state !== "alive" || process.processStartTime !== snapshot.processStartTime
-    || executable === null || !executable.startsWith(packages)
-    || await realpath(executable).catch(() => null) !== await realpath(paths.managedPath)) {
+  const inside = executable !== null && (windows
+    ? executable.toLowerCase().startsWith(packages.toLowerCase()) : executable.startsWith(packages));
+  if (process.state !== "alive" || !sameStart(process.processStartTime, snapshot.processStartTime)
+    || !inside || await realpath(executable).catch(() => null) !== await realpath(paths.managedPath)) {
     failMaintenance("daemon_identity_unavailable");
+  }
+  // Windows has no lsof, and Node's lstat refuses the AF_UNIX socket file; Codex
+  // keeps the socket's directory to its user, and that directory lists it.
+  if (windows) {
+    if (!await socketIsReady(paths.socketPath, { platform: "win32" })) failMaintenance("daemon_socket_unproven");
+    return;
   }
   // 0.157.1 lists the socket by the path it listens on, not by the symlink it
   // reports; either names the same socket.
@@ -192,8 +233,8 @@ export async function verifyMaintenanceProcess(snapshot, paths, run, { lsof = re
   }
 }
 
-export async function approvedProcessIsDead(expected, paths, run) {
-  const observed = await observeMaintenanceProcess(expected.pid, paths, run);
+export async function approvedProcessIsDead(expected, paths, run, { system = WINDOWS_SYSTEM } = {}) {
+  const observed = await observeMaintenanceProcess(expected.pid, paths, run, { system });
   return observed.state === "dead" || (observed.state === "alive"
-    && observed.processStartTime !== expected.processStartTime);
+    && !sameStart(observed.processStartTime, expected.processStartTime));
 }
