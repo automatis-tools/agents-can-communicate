@@ -196,6 +196,22 @@ test("a client's orphan marker inside an owned tree is not an edit", async t => 
   assert.deepEqual(result.kept, []);
 });
 
+// Claude Code marks a cached version with `.in_use/<pid>`, named after a running
+// session. After `acc update` it stood in the previous version ACC keeps on
+// purpose, and doctor told the user to reinstall (2.1.286, 2026-10-05, #257).
+test("a session's in-use marker inside an owned tree is not an edit", async t => {
+  const { dataHome, target } = await place(t);
+  const tree = path.join(target, "cache", "acc-local");
+  await write(path.join(tree, "agents-can-communicate", "0.8.5", "hooks", "hooks.json"), "{}\n");
+  await write(path.join(tree, "agents-can-communicate", "0.9.0", "hooks", "hooks.json"), "{}\n");
+  await recordInstall({ dataHome, adapterId: "claude_code", version: "0.0.0",
+    artifacts: [{ path: tree, kind: "tree" }] });
+  await write(path.join(tree, "agents-can-communicate", "0.8.5", ".in_use", "82557"),
+    '{"pid":82557,"procStart":"Mon Oct  5 02:59:17 2026"}');
+
+  assert.deepEqual((await verifyOwned({ dataHome, adapterId: "claude_code" })).modified, []);
+});
+
 test("any other file added inside an owned tree still is an edit", async t => {
   const { dataHome, target } = await place(t);
   const tree = path.join(target, "cache", "acc-local");
