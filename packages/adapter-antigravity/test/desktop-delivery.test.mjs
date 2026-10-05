@@ -198,13 +198,16 @@ test("the server is read from ps: start time, executable, version and token", as
   const line = `${STARTED} ${EXECUTABLE} --standalone --override_ide_name antigravity `
     + `--override_ide_version 2.19.1 --https_server_port 0 --csrf_token ${TOKEN} --app_data_dir antigravity`;
   const run = stdout => async () => ({ ok: true, stdout: `${stdout}\n` });
+  const read = (pid, runner) => readDesktopServer(pid, { run: runner, platform: "darwin" });
 
-  assert.deepEqual(await readDesktopServer(77034, { run: run(line) }),
+  assert.deepEqual(await read(77034, run(line)),
     { startedAt: STARTED, executable: EXECUTABLE, version: "2.19.1", token: TOKEN });
-  assert.equal(await readDesktopServer(77034, { run: run(line.replace(`--csrf_token ${TOKEN} `, "")) }), null);
-  assert.equal(await readDesktopServer(77034, { run: run(`${STARTED} /Users/me/.local/bin/agy`) }), null);
-  assert.equal(await readDesktopServer(77034, { run: async () => ({ ok: false, stdout: "" }) }), null);
-  assert.equal(await readDesktopServer(0, { run: run(line) }), null);
+  assert.equal(await read(77034, run(line.replace(`--csrf_token ${TOKEN} `, ""))), null);
+  assert.equal(await read(77034, run(`${STARTED} /Users/me/.local/bin/agy`)), null);
+  assert.equal(await read(77034, async () => ({ ok: false, stdout: "" })), null);
+  assert.equal(await read(0, run(line)), null);
+  // A Windows desktop build is uncaptured: no reading there, whatever ps says.
+  assert.equal(await readDesktopServer(77034, { run: run(line), platform: "win32" }), null);
 });
 
 test("the listening ports are the server's loopback ones", async () => {

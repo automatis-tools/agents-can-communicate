@@ -132,8 +132,10 @@ const runFile = (file, args, { timeout }) => new Promise(resolve => {
  * command line that carries no token. The token is returned to the caller for
  * one `agentapi` call and is never stored.
  */
-export async function readDesktopServer(pid, { run = runFile, timeoutMs = 1_000 } = {}) {
-  if (!isPid(pid) || process.platform === "win32") return null;
+export async function readDesktopServer(pid, { run = runFile, timeoutMs = 1_000,
+  platform = process.platform } = {}) {
+  // Read through POSIX ps; a Windows desktop build is uncaptured.
+  if (!isPid(pid) || platform === "win32") return null;
   const { ok, stdout } = await run("/bin/ps", ["-ww", "-p", String(pid), "-o", "lstart=,args="],
     { timeout: timeoutMs });
   if (!ok) return null;
