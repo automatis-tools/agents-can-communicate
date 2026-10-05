@@ -117,8 +117,7 @@ handoff. ACC does not restart an exited client.
 supported platform, current probe and exact session binding. Under `actionable`,
 a `note` stays queued with `delivery_disabled`.
 
-For Codex, use your ordinary launch command with 0.152.1 or newer on Apple Silicon
-macOS. Its LocalDaemon infrastructure and trusted hooks must establish
+For Codex, use your ordinary launch command with 0.152.1 or newer. Its LocalDaemon infrastructure and trusted hooks must establish
 the receiver's exact thread and workspace. Embedded sessions, an absent socket,
 ambiguous recipients or failed identity checks retain durable inbox access.
 `acc doctor` reports readiness, consent and the current workspace's live channel separately.
@@ -183,8 +182,7 @@ or a connected MCP server does not by itself establish automatic delivery. `life
 manual` can also mean the current version has no certified session-end hook; it does not
 prove that no hooks ran.
 
-For Claude Code, use version 2.1.282 or newer on Apple Silicon macOS, and start it with
-your ordinary command. Each Claude Code session opens its own inbox socket. ACC reads the
+For Claude Code, use version 2.1.282 or newer, and start it with your ordinary command. Each Claude Code session opens its own inbox socket. ACC reads the
 socket path from `CLAUDE_CODE_MESSAGING_SOCKET` in the hook environment. ACC then checks that
 path against Claude Code's session registry `<config>/sessions/<pid>.json`, where
 `<config>` is `CLAUDE_CONFIG_DIR` or `~/.claude`. The pid and the socket must match for the
@@ -196,7 +194,6 @@ session again, so the next ordinary prompt retries a failed binding.
 - On native Windows, Claude Code serves its inbox on a named pipe that requires an auth
   line. ACC sends the key Claude Code publishes for other sessions of the same user; see
   [On Windows](#on-windows).
-- Linux is uncaptured for live delivery. A Linux session keeps next-turn delivery.
 - A wake that reached the session can still wait for your approval. See
   [the next section](#a-claude-code-session-holds-or-drops-acc-wakes).
 

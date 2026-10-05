@@ -106,10 +106,10 @@ recorded policy. ACC ignores `ACC_NATIVE_DELIVERY_POLICY`, `ACC_BYPASS` and
 A Claude Code session that started through the old shim keeps its Channel until it exits.
 Its next turn binds the inbox. Start new sessions with your ordinary `claude` command.
 
-The Claude Code live-delivery minimum is now 2.1.282 on Apple Silicon macOS. With an older
+The Claude Code live-delivery minimum is now 2.1.282. With an older
 Claude Code, live delivery stays off and the recorded policy is kept. Update Claude Code and
 start a new session: the recorded policy applies to it, with nothing to install again.
-`acc doctor` reports the state. Native Windows keeps next-turn delivery.
+`acc doctor` reports the state.
 
 This release adds no new store event type or field, so a store it writes stays readable by
 0.7.x. The Channel captures remain as history in
