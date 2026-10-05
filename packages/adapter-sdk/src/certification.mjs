@@ -178,12 +178,21 @@ function falseCapabilities() {
  * first capture, whose version is returned) or `recorded-failure` (a capture at
  * the returned version recorded the loss).
  */
-export function capabilityEvidence(adapter, { clientVersion, platform } = {}, capability) {
+export function capabilityEvidence(adapter, { clientVersion, platform, clientName } = {},
+  capability) {
   const [group, name] = capability.split(".");
   if (adapter.capabilities?.[group]?.[name] !== true) {
     return { granted: false, reason: "undeclared", version: null };
   }
-  const client = adapter.client?.certificationName ?? adapter.client?.command;
+  // `clientName` names the product the session runs in when it is one of the
+  // adapter's variants. Another product's evidence never stands in for it: its
+  // versions count on a different line. A name the adapter does not declare
+  // has no evidence at all.
+  const primary = adapter.client?.certificationName ?? adapter.client?.command;
+  const declared = [primary, ...(adapter.client?.variants ?? [])
+    .map(variant => variant?.certificationName)];
+  const client = typeof clientName === "string" ? clientName : primary;
+  if (!declared.includes(client)) return { granted: false, reason: "unobserved", version: null };
   const named = (adapter.certification?.evidence ?? [])
     .filter(item => item.client === client && item.capability === capability);
   if (named.length === 0) return { granted: false, reason: "unobserved", version: null };
