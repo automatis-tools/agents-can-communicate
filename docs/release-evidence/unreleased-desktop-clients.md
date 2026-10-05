@@ -2,9 +2,9 @@
 
 | Candidate artifact | Value |
 |---|---|
-| Built from | `b3f707f97df2d12db923b53465b9f990d2266668` |
-| Tarball | `agents-can-communicate-0.8.5.tgz`, 553,071 bytes, 336 files |
-| sha256 | `7a6b6f3f65f2d9ae21857d1261a0464523dbcb13b7bcf0b2d19f231806dd153d` |
+| Built from | `9cd6cb873a85a15c914a178d9421ddde5b3be795` |
+| Tarball | `agents-can-communicate-0.8.5.tgz`, 553,139 bytes, 336 files |
+| sha256 | `d45d7624f16d0b96ab9a44e6ce3fa0522dcae7f2420dd277b044883d870c119b` |
 
 Design: [2026-10-04-desktop-clients](../design/2026-10-04-desktop-clients.md). Follows issue
 #171, whose reporter pushed into a desktop Antigravity conversation with the language server's
@@ -62,7 +62,8 @@ Highlights:
   `native-variant-contracts.test.mjs`: a variant is judged by its own evidence and its own
   protocol floor, never by the primary client's.
 - `packages/hook-runner/test/running-client-identity.test.mjs`: version precedence, the
-  binding's `clientName`, and the restart rebind (from the D06 failure below).
+  binding's `clientName`, and the restart rebind (from the D06 failure below), including a
+  session that closed while its client was down (from the PR review).
 - `packages/adapter-antigravity/test/desktop-delivery.test.mjs`: bind, refresh, offer, a
   restarted server refused, and the token absent from every file under the data home.
 - `packages/adapter-codex/test/desktop-host.test.mjs`: pinned to the command line ChatGPT.app

@@ -29,9 +29,9 @@
 
 | Candidate artifact | Value |
 |---|---|
-| Built from | `b3f707f97df2d12db923b53465b9f990d2266668` |
-| Tarball | `agents-can-communicate-0.8.5.tgz`, 553,071 bytes, 336 files |
-| sha256 | `7a6b6f3f65f2d9ae21857d1261a0464523dbcb13b7bcf0b2d19f231806dd153d` |
+| Built from | `9cd6cb873a85a15c914a178d9421ddde5b3be795` |
+| Tarball | `agents-can-communicate-0.8.5.tgz`, 553,139 bytes, 336 files |
+| sha256 | `d45d7624f16d0b96ab9a44e6ce3fa0522dcae7f2420dd277b044883d870c119b` |
 
 This unpublished development archive was measured with `npm pack`. See
 [the evidence](docs/release-evidence/unreleased-desktop-clients.md).
