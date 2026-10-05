@@ -78,6 +78,18 @@ export function planInstallation({ adapters, detected, context, action = "instal
           + `if it is, wire it with --adapter ${entry.adapterId}` });
       continue;
     }
+    // An uninstall takes back what this data home installed. A client that is
+    // here but that this home has no record of was wired by another ACC data
+    // home - the operator's own, beside an isolated test home - or before this
+    // home kept records, and removing it unasked took the operator's wiring
+    // with it (#253). Naming the client still removes it.
+    if (action === "uninstall" && entry.present && recordedById.get(entry.adapterId) === undefined
+      && !askedFor.has(entry.adapterId)) {
+      skipped.push({ adapterId: entry.adapterId,
+        reason: `${entry.displayName ?? entry.adapterId} was not installed from this ACC data home; `
+          + `to remove its ACC wiring anyway, run acc uninstall --adapter ${entry.adapterId}` });
+      continue;
+    }
     // An adapter can refuse itself for a reason that is nobody's fault and that
     // no file on disk shows: Antigravity CLI cannot be wired until somebody
     // picks between a machine-wide and a per-workspace hook registration. It is
