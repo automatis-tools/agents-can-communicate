@@ -32,7 +32,10 @@ in a home with no rule of the operator's.
   install, and `withdrawAllowRule` takes it back first, then the wrapper's, so a file or
   container ACC created leaves last. Each rule has its own claim; the wrapper's keeps its name,
   so an older ACC still reads the claim it wrote. Windows adds neither rule: the relay starts
-  with `node`, and a rule on `node` would allow every node command.
+  with `node`, and a rule on `node` would allow every node command. Neither does a home whose
+  wrapper path needs quotes: without the wrapper's rule the agent still asks before each ACC
+  command (CI on #252: on a Windows host the POSIX form's wrapper path was not one shell word,
+  and the relay rule alone made the install write a file its plan did not name).
 - `adapter-antigravity/src/install.mjs`: detection reports `relayApproval`, and asks for
   `acc install --adapter antigravity` where ACC's wrapper is on disk and the rule is missing.
 - `installer`: detection carries `relayApproval`.
@@ -46,6 +49,8 @@ Each changed test was seen failing for its stated reason before the change that 
   question, detection reports the relay rule as allowed and ACC's, and uninstall restores the
   file byte for byte. The 0.8.1 machine, whose operator already had the relay rule, keeps it
   through install and uninstall; Windows still changes nothing.
+- `packages/adapter-antigravity/test/allow-rule-report.test.mjs`: in a home whose wrapper path
+  needs quotes, neither rule is written and the relay rule reads as unmatchable.
 - `packages/adapter-antigravity/test/allow-rule-install.test.mjs`: the operator's own wrapper
   rule stays theirs while ACC adds only the relay rule; a settings file ACC created holds both
   rules and is removed again at uninstall.

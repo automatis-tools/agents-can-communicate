@@ -10,7 +10,8 @@
   so an older ACC still reads the one it wrote, and uninstall removes it before the wrapper's.
   `acc doctor` reports it and asks for `acc install --adapter antigravity` when it is missing.
   Windows adds neither rule: the relay starts with `node`, and a rule on `node` would allow
-  every node command.
+  every node command. Nor does a home whose wrapper path needs quotes, where the wrapper's
+  rule cannot match: the agent would still ask before each ACC command.
 
 | Candidate artifact | Value |
 |---|---|

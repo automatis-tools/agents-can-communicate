@@ -250,7 +250,8 @@ client reads the file when it starts, so restart `agy` after install.
 
 The rule matches only a command whose first word is the path without quotes, so ACC's skill
 for this client writes the path without quotes. When your home path contains a space or a
-shell metacharacter, the path needs quotes, no rule can match it, and ACC adds none.
+shell metacharacter, the path needs quotes, no rule can match it, and ACC adds neither rule:
+without the wrapper's, the agent would still ask before each ACC command.
 `acc doctor` reports each rule as present, absent, or unable to apply, and asks for
 `acc install --adapter antigravity` when one of ACC's rules is missing.
 

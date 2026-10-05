@@ -234,6 +234,13 @@ export async function inspectRelayRule(context) {
       + "for the command that starts live delivery either: it runs `node`, and a rule on "
       + "`node` would let every node command through without asking" };
   }
+  // Without the wrapper's rule the agent still asks before each ACC command, so
+  // this one would only move the prompt one command later.
+  if (!isShellWord(cliWrapperPath(context.home, hostPlatform))) {
+    return { ...base, state: "unmatchable", diagnostic: "ACC adds no allow rule for the command "
+      + "that starts live delivery where it can add none for its wrapper: the agent would "
+      + "still ask before each ACC command" };
+  }
   const settings = await readSettings(file);
   if (settings.state === "unreadable") {
     return { ...base, state: "unreadable", diagnostic: `${file} ${settings.reason}, so ACC `
