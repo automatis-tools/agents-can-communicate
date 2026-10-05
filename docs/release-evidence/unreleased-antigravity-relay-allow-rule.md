@@ -1,5 +1,11 @@
 # Unreleased: Antigravity CLI starts its relay without an approval prompt
 
+| Candidate artifact | Value |
+|---|---|
+| Built from | `30f1340479b222151b0ba5573f149348946f71e6` |
+| Tarball | `agents-can-communicate-0.8.5.tgz`, 533,656 bytes, 329 files |
+| sha256 | `3242143cd3e295ea932cca9c8b73ff71165b4608ee4adbbe92eb5694ef30551f` |
+
 Follows [#214](unreleased-antigravity-acc-allow-rule.md), which allowed ACC's wrapper.
 
 ## What was measured before the change

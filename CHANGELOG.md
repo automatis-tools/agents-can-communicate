@@ -12,6 +12,16 @@
   Windows adds neither rule: the relay starts with `node`, and a rule on `node` would allow
   every node command.
 
+| Candidate artifact | Value |
+|---|---|
+| Built from | `30f1340479b222151b0ba5573f149348946f71e6` |
+| Tarball | `agents-can-communicate-0.8.5.tgz`, 533,656 bytes, 329 files |
+| sha256 | `3242143cd3e295ea932cca9c8b73ff71165b4608ee4adbbe92eb5694ef30551f` |
+
+This unpublished development archive was measured with `npm pack`. See
+[the evidence](docs/release-evidence/unreleased-antigravity-relay-allow-rule.md).
+The package version remains `0.8.5` until a release prepares its own.
+
 ## Unreleased — native Windows
 
 Work in progress for #234. The design is in
