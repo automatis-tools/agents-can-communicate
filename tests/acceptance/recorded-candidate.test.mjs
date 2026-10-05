@@ -60,6 +60,10 @@ const PACKED = Object.freeze([
 // while this file reported the record still described the tree.
 const UNDECLARED = Object.freeze(["packages/", "package.json"]);
 
+// Package tests are forbidden in the installed artifact. The real pack
+// inventory below checks this exclusion too, including bundled workspaces.
+const unpublishedTest = entry => /^packages\/[^/]+\/test\//.test(entry);
+
 const git = async (...argv) => {
   const env = { ...process.env };
   // Inherited from a hook or a test runner, these describe someone else's
@@ -88,10 +92,10 @@ test("the changelog's digest describes the code that is here now", async () => {
   // moment later - the right answer at the wrong time, when the fix is a
   // re-record and the commit is already made.
   const changed = [...new Set([
-    ...(await git("diff", "--name-only", `${recorded}..HEAD`, "--", ...PACKED)).split("\n"),
-    ...(await git("status", "--porcelain", "--", ...PACKED))
+    ...(await git("diff", "--name-only", "--no-renames", `${recorded}..HEAD`, "--", ...PACKED)).split("\n"),
+    ...(await git("status", "--porcelain", "--no-renames", "--", ...PACKED))
       .split("\n").map(line => line.slice(3)),
-  ])].filter(Boolean).sort();
+  ])].filter(entry => entry && !unpublishedTest(entry)).sort();
 
   assert.deepEqual(changed, [],
     `shipped code changed since ${recorded}, so the recorded digest describes nothing `
@@ -128,13 +132,13 @@ test("nothing reaches the tarball that this file would not notice changing", asy
   // carries mtimes, and the CI matrix builds on two platforms.
   const { stdout } = await runNpm(["pack", "--dry-run", "--json"], { cwd: repo });
   const [packed] = JSON.parse(stdout);
-  // Bundled workspaces arrive under `node_modules/` and are built from
-  // `packages/`, which the list above already watches.
+  // Map bundled paths back to source paths instead of exempting the whole
+  // bundle: a workspace accidentally publishing test/ must be caught here.
   const bundled = "node_modules/@agents-can-communicate/";
 
   const unwatched = packed.files.map(file => file.path)
-    .filter(entry => !entry.startsWith(bundled))
-    .filter(entry => !PACKED.some(watched => (watched.endsWith("/")
+    .map(entry => entry.startsWith(bundled) ? `packages/${entry.slice(bundled.length)}` : entry)
+    .filter(entry => unpublishedTest(entry) || !PACKED.some(watched => (watched.endsWith("/")
       ? entry.startsWith(watched) : entry === watched)))
     .sort();
 
