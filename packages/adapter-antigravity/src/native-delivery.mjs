@@ -8,6 +8,8 @@ import { decisionBody, isWindowsPlatform, readProcessArgs, resolveExecutable, ru
   from "@agents-can-communicate/adapter-sdk";
 
 import { isAgy } from "./client-process.mjs";
+import { bindDesktop, offerDesktop, refreshDesktop } from "./desktop-delivery.mjs";
+import { isDesktopEndpointId } from "./desktop-endpoint.mjs";
 import { relayStartCommand } from "./relays.mjs";
 import { PROTOCOL_CONTRACT, RELAY_MODES, listRegistrations, readRegistration, relayDir, relayPipeName }
   from "./relay-endpoint.mjs";
@@ -118,8 +120,11 @@ export function planNativeActivation() {
 }
 
 export async function bindNativeSession({ event, clientPid, clientVersion, runtimeDir,
-  timeoutMs = 750, isAlive = defaultAlive, platform = process.platform } = {}) {
+  timeoutMs = 750, isAlive = defaultAlive, platform = process.platform, desktop = bindDesktop } = {}) {
   if (!Number.isInteger(clientPid) || clientPid <= 0) return closedHandshake(clientVersion, "client_process_unknown");
+  // The desktop app's own language server: no relay, the server is the endpoint.
+  const served = await desktop({ event, clientPid, clientVersion, runtimeDir, timeoutMs });
+  if (served !== null) return served;
   const candidates = (await listRegistrations({ runtimeDir, platform }))
     .filter(record => record.conversationId === event?.sessionId);
   for (const record of candidates) {
@@ -130,6 +135,7 @@ export async function bindNativeSession({ event, clientPid, clientVersion, runti
 
 export async function refreshNativeSession({ binding, runtimeDir, timeoutMs = 750,
   isAlive = defaultAlive } = {}) {
+  if (isDesktopEndpointId(binding?.opaqueEndpointRef)) return refreshDesktop({ binding, runtimeDir, timeoutMs });
   const record = await readRegistration({ runtimeDir, endpointId: binding?.opaqueEndpointRef });
   const reasonCode = await serving(record, { timeoutMs, isAlive });
   return reasonCode === null ? handshake(record) : closedHandshake(binding?.clientVersion, reasonCode);
@@ -139,6 +145,9 @@ const SAFE_CODES = new Map([["recipient_unavailable", "recipient_unavailable"],
   ["transport_rejected", "transport_rejected"], ["bad_nonce", "recipient_unavailable"]]);
 
 export async function offerMessage({ binding, message, runtimeDir, timeoutMs = 8_000 } = {}) {
+  if (isDesktopEndpointId(binding?.opaqueEndpointRef)) {
+    return offerDesktop({ binding, message, runtimeDir, timeoutMs });
+  }
   const rejected = safeErrorCode => ({ accepted: false, transport: TRANSPORT,
     clientVersion: binding?.clientVersion ?? null, safeErrorCode });
   const record = await readRegistration({ runtimeDir, endpointId: binding?.opaqueEndpointRef });
