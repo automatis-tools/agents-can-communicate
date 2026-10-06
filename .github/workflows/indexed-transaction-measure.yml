@@ -59,5 +59,8 @@ jobs:
         if: always()
         with:
           name: indexed-transaction-windows
-          path: ${{ runner.temp }}/issue241/*.json
+          path: |
+            ${{ runner.temp }}/issue241/*.json
+            ${{ runner.temp }}/issue241/old-pack/*.tgz
+            ${{ runner.temp }}/issue241/candidate-pack/*.tgz
           retention-days: 7
