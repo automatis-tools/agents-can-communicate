@@ -56,12 +56,22 @@ const batches = testBatches(files.map(file => path.relative(repo, file)));
 const failed = [];
 // Build once for this invocation, including all Windows command-line batches.
 // Each scenario copies the installed consumer; none writes into this template.
+const templateStarted = performance.now();
 const template = await createPackedTemplate();
+console.log(`packed template in ${Math.round(performance.now() - templateStarted)} ms`);
 try {
   for (const [index, batch] of batches.entries()) {
+    // Measurement branch only: a concurrency override and a timing reporter,
+    // neither inherited by a runner a test starts.
+    const args = nodeTestArguments(batch);
+    const { ACC_MEASURE_CONCURRENCY: measuredConcurrency, ACC_MEASURE_TIMINGS: timings, ...childEnv } = process.env;
+    if (measuredConcurrency) args[1] = `--test-concurrency=${measuredConcurrency}`;
+    if (timings) args.splice(1, 0, "--test-reporter=spec", "--test-reporter-destination=stdout",
+      `--test-reporter=${path.join(repo, ".github", "probes", "file-timing-reporter.mjs")}`,
+      `--test-reporter-destination=${timings}.${index + 1}.jsonl`);
     const code = await new Promise(resolve => {
-      spawn(process.execPath, nodeTestArguments(batch), { stdio: "inherit", cwd: repo,
-        env: { ...process.env, ACC_TEST_PACKED_TEMPLATE: template } })
+      spawn(process.execPath, args, { stdio: "inherit", cwd: repo,
+        env: { ...childEnv, ACC_TEST_PACKED_TEMPLATE: template } })
         .on("error", () => resolve(1))
         .on("exit", exitCode => resolve(exitCode ?? 1));
     });

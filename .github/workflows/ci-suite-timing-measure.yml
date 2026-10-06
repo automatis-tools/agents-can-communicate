@@ -1,0 +1,73 @@
+name: CI suite timing measurement
+on:
+  push:
+    branches: [measure/ci-suite-timings]
+permissions:
+  contents: read
+jobs:
+  suite:
+    name: ${{ matrix.os }} · c${{ matrix.concurrency }} · cache ${{ matrix.cache }} · ${{ matrix.rep }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: windows-latest, concurrency: 2, cache: 'off', rep: a }
+          - { os: windows-latest, concurrency: 2, cache: 'off', rep: b }
+          - { os: windows-latest, concurrency: 3, cache: 'off', rep: a }
+          - { os: windows-latest, concurrency: 3, cache: 'off', rep: b }
+          - { os: windows-latest, concurrency: 4, cache: 'off', rep: a }
+          - { os: windows-latest, concurrency: 4, cache: 'off', rep: b }
+          - { os: windows-latest, concurrency: 2, cache: 'on', rep: a }
+          - { os: ubuntu-latest, concurrency: 4, cache: 'off', rep: a }
+          - { os: macos-latest, concurrency: 4, cache: 'off', rep: a }
+          - { os: macos-latest, concurrency: 3, cache: 'off', rep: a }
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24'
+      - name: Temporary files on the local disk
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $dir = Join-Path $env:RUNNER_TEMP 'tmp'
+          New-Item -ItemType Directory -Force $dir | Out-Null
+          "TEMP=$dir" >> $env:GITHUB_ENV
+          "TMP=$dir" >> $env:GITHUB_ENV
+      - name: Compile cache
+        if: matrix.cache == 'on'
+        shell: bash
+        run: echo "NODE_COMPILE_CACHE=$RUNNER_TEMP/node-compile-cache" >> "$GITHUB_ENV"
+      - run: npm ci
+      - name: Runner speed
+        run: node .github/probes/runner-speed.mjs "${{ runner.temp }}/runner-speed.json"
+      - name: Syntax, sequential and pooled
+        if: matrix.rep == 'a' && matrix.cache == 'off'
+        run: node .github/probes/syntax-check-pool.mjs
+      - name: Tests
+        id: tests
+        continue-on-error: true
+        run: npm test
+        env:
+          ACC_MEASURE_TIMINGS: ${{ runner.temp }}/timings/run
+          ACC_MEASURE_CONCURRENCY: ${{ matrix.concurrency }}
+          ACC_TEST_TIMEOUT_MS: '300000'
+          ACC_TEST_FORCE_EXIT: ${{ matrix.os == 'windows-latest' && '1' || '0' }}
+          GIT_DIR: ''
+          GIT_WORK_TREE: ''
+      - name: Summary
+        if: always()
+        shell: bash
+        run: |
+          node .github/probes/summarize-timings.mjs "$RUNNER_TEMP/timings/run" \
+            "${{ matrix.os }} c${{ matrix.concurrency }} cache ${{ matrix.cache }} ${{ matrix.rep }} (tests ${{ steps.tests.outcome }})"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: always()
+        with:
+          name: timings-${{ matrix.os }}-c${{ matrix.concurrency }}-${{ matrix.cache }}-${{ matrix.rep }}
+          path: |
+            ${{ runner.temp }}/timings/
+            ${{ runner.temp }}/runner-speed.json
+          retention-days: 7
