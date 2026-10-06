@@ -5,7 +5,7 @@ import path from "node:path";
 import test from "node:test";
 
 import { createCodexAdapter } from "../src/adapter.mjs";
-import { PARTICIPANT_COMMANDS, allowRuleText, rulesPath } from "../src/allow-rule.mjs";
+import { PARTICIPANT_COMMANDS, allowRuleText, rulesPath, writeAllowRule } from "../src/allow-rule.mjs";
 import { POSIX_FORM } from "../../../tests/helpers/platform-scope.mjs";
 
 /**
@@ -19,6 +19,12 @@ import { POSIX_FORM } from "../../../tests/helpers/platform-scope.mjs";
  * allows needs no approval, so it reaches no reviewer.
  */
 
+// A Windows host's temp paths hold backslashes, which a rule cannot take as
+// they are, so a POSIX-form install there writes no rule - as a Windows install
+// writes none at all (both tested below, on every host).
+const POSIX_PATHS = process.platform === "win32"
+  ? "this host's paths hold backslashes, and such a wrapper path gets no rule" : false;
+
 async function fixture(t) {
   const home = await realpath(await mkdtemp(path.join(tmpdir(), "acc-codex-rule-")));
   t.after(() => rm(home, { recursive: true, force: true }));
@@ -27,7 +33,7 @@ async function fixture(t) {
   return { context: { home, codexHome, hostPlatform: POSIX_FORM }, codexHome, shim };
 }
 
-test("install allows ACC's coordination commands through the wrapper, and nothing else", async t => {
+test("install allows ACC's coordination commands through the wrapper, and nothing else", { skip: POSIX_PATHS }, async t => {
   const { context, codexHome, shim } = await fixture(t);
 
   const result = await createCodexAdapter().install(context);
@@ -51,7 +57,7 @@ test("install declares the rule file it writes, so uninstall takes it back", asy
     [{ path: rulesPath(codexHome), kind: "tree" }]);
 });
 
-test("a rules file of the same name that ACC did not write stays the operator's", async t => {
+test("a rules file of the same name that ACC did not write stays the operator's", { skip: POSIX_PATHS }, async t => {
   const { context, codexHome } = await fixture(t);
   await mkdir(path.dirname(rulesPath(codexHome)), { recursive: true });
   const theirs = 'prefix_rule(pattern=["git", "status"], decision="allow")\n';
@@ -75,7 +81,7 @@ test("Windows gets no rule: how Codex matches a PowerShell command against one i
     .filter(item => item.path === rulesPath(codexHome)), []);
 });
 
-test("doctor reports the rule, and asks for a reinstall when it is missing", async t => {
+test("doctor reports the rule, and asks for a reinstall when it is missing", { skip: POSIX_PATHS }, async t => {
   const { context, codexHome } = await fixture(t);
   const adapter = createCodexAdapter();
   await adapter.install(context);
@@ -88,7 +94,7 @@ test("doctor reports the rule, and asks for a reinstall when it is missing", asy
   assert.ok(missing.needsAction.some(line => line.includes("acc install --adapter codex")));
 });
 
-test("uninstall takes ACC's rule back, and leaves one the operator edited", async t => {
+test("uninstall takes ACC's rule back, and leaves one the operator edited", { skip: POSIX_PATHS }, async t => {
   const { context, codexHome } = await fixture(t);
   const adapter = createCodexAdapter();
   await adapter.install(context);
@@ -105,7 +111,7 @@ test("uninstall takes ACC's rule back, and leaves one the operator edited", asyn
 
 // AI review of #261: a file that keeps ACC's header but drops `reply` is the
 // operator narrowing what skips approval, and a reinstall restored `reply`.
-test("a reinstall leaves an ACC rule the operator edited as it is", async t => {
+test("a reinstall leaves an ACC rule the operator edited as it is", { skip: POSIX_PATHS }, async t => {
   const { context, codexHome } = await fixture(t);
   const adapter = createCodexAdapter();
   await adapter.install(context);
@@ -121,7 +127,7 @@ test("a reinstall leaves an ACC rule the operator edited as it is", async t => {
   assert.equal(detected.needsAction.some(line => line.includes(rulesPath(codexHome))), false);
 });
 
-test("an unchanged ACC rule for an older wrapper path is replaced", async t => {
+test("an unchanged ACC rule for an older wrapper path is replaced", { skip: POSIX_PATHS }, async t => {
   const { context, codexHome } = await fixture(t);
   await mkdir(path.dirname(rulesPath(codexHome)), { recursive: true });
   await writeFile(rulesPath(codexHome), allowRuleText("/old/home/.agents/acc-local/plugins/agents-can-communicate/acc-cli.sh"));
@@ -130,4 +136,15 @@ test("an unchanged ACC rule for an older wrapper path is replaced", async t => {
 
   assert.ok(result.changes.includes(rulesPath(codexHome)));
   assert.equal((await readFile(rulesPath(codexHome), "utf8")).includes("/old/home/"), false);
+});
+
+test("a wrapper path a rule cannot hold as it is gets no rule", async t => {
+  const { codexHome } = await fixture(t);
+
+  const result = await writeAllowRule({ codexHome, cliShim: "C:\\Users\\me\\acc-cli.sh",
+    hostPlatform: POSIX_FORM });
+
+  assert.equal(result.file, null);
+  assert.ok(result.diagnostics.some(line => line.includes("cannot be written in a rule")));
+  await assert.rejects(readFile(rulesPath(codexHome), "utf8"), { code: "ENOENT" });
 });
