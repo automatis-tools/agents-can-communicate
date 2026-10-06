@@ -2,6 +2,7 @@ import { AccError, EXIT, SCHEMA_VERSION, advanceReceipt }
   from "@agents-can-communicate/protocol";
 
 import { receiptId, recordMessageInTransaction } from "./conversations.mjs";
+import { assertExactTransaction } from "./ports.mjs";
 import { messagePage, messageSummary } from "./message-pages.mjs";
 import { decisionView, isCurrentDecision } from "./decision-state.mjs";
 
@@ -124,11 +125,14 @@ export function createInboxService(ports, sessions) {
     const session = await requireOpen(input, "reply to a message");
     const now = clock.now();
     const replyId = ids.next("message");
-    return store.transaction(tx => {
+    return store.transaction(async tx => {
+      assertExactTransaction(tx);
+      await tx.load("message", input.messageId);
+      await tx.load("receipt", receiptId(input.messageId, session.participantId));
       const original = requireOwnedReceipt(tx, session, input.messageId);
       // A receipt settles delivery, not the conversation. Distinct replies may
       // follow an ack or an earlier answer; recording still enforces retry keys.
-      const recorded = recordMessageInTransaction({ tx, session, now, messageId: replyId, ids,
+      const recorded = await recordMessageInTransaction({ tx, session, now, messageId: replyId, ids,
         action: "reply to a message", input: {
           clientMessageId: input.clientMessageId,
           toParticipantIds: [original.message.fromParticipantId],
@@ -142,7 +146,7 @@ export function createInboxService(ports, sessions) {
         } });
       const receipt = advanceOwned(tx, session, input.messageId, "acknowledged", now).receipt;
       return { reply: recorded.message, receipt };
-    }, { kinds: ["participant", "session", "message", "receipt"] });
+    }, { kinds: ["participant", "session", "message", "receipt"], exactKinds: ["message", "receipt"] });
   }
 
   return { listInbox, readInbox, replyToMessage, acknowledgeMessage };

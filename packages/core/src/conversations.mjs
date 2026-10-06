@@ -1,53 +1,16 @@
 import { createHash } from "node:crypto";
-import { isDeepStrictEqual } from "node:util";
 import { AccError, EXIT, SCHEMA_VERSION, validateRecord }
   from "@agents-can-communicate/protocol";
 
 import { projectReleasedClaim, reconstructFinishRetry } from "./finish-retries.mjs";
 import { ensureMaterialised } from "./materialisation.mjs";
 import { nextTurnDelivery as selectNextTurnDelivery } from "./next-turn-delivery.mjs";
+import { assertExactTransaction } from "./ports.mjs";
+import { findMessageRetry } from "./message-retry.mjs";
 import { prepareDecisionChange } from "./decision-changes.mjs";
 
 export const receiptId = (messageId, participantId) => `receipt_${createHash("sha256")
   .update(JSON.stringify([messageId, participantId])).digest("base64url")}`;
-
-const logicalContent = message => ({
-  toParticipantIds: message.toParticipantIds,
-  kind: message.kind,
-  obligation: message.obligation,
-  subject: message.subject,
-  body: message.body,
-  inReplyTo: message.inReplyTo,
-  artifacts: message.artifacts,
-  handoff: message.handoff,
-  decisionChange: message.decisionChange ?? null,
-});
-
-const normalizedContent = input => logicalContent({
-  toParticipantIds: input.toParticipantIds ?? [],
-  kind: input.kind,
-  obligation: input.obligation,
-  subject: input.subject,
-  body: input.body,
-  inReplyTo: input.inReplyTo ?? null,
-  artifacts: input.artifacts ?? [],
-  handoff: input.handoff ?? null,
-  decisionChange: input.decisionChange,
-});
-
-function existingMessage(tx, session, input) {
-  const existing = tx.list("message", message =>
-    message.workspaceId === session.workspaceId
-    && message.fromParticipantId === session.participantId
-    && message.clientMessageId === input.clientMessageId).at(0);
-  if (existing !== undefined
-    && !isDeepStrictEqual(logicalContent(existing), normalizedContent(input))) {
-    throw new AccError(EXIT.CONFLICT,
-      "clientMessageId was already used with different message content",
-      { clientMessageId: input.clientMessageId, messageId: existing.messageId });
-  }
-  return existing;
-}
 
 function assertCurrentSession(tx, session, action) {
   const current = tx.get("session", session.sessionId);
@@ -114,9 +77,9 @@ function addressedRecipients(tx, message, session) {
   return unique;
 }
 
-function threadFor(tx, messageId, inReplyTo) {
+async function threadFor(tx, messageId, inReplyTo) {
   if (inReplyTo === null) return messageId;
-  const parent = tx.get("message", inReplyTo);
+  const parent = await tx.load("message", inReplyTo);
   if (parent === null) {
     throw new AccError(EXIT.DATA, "the message being replied to does not exist",
       { inReplyTo });
@@ -124,15 +87,16 @@ function threadFor(tx, messageId, inReplyTo) {
   return parent.threadId;
 }
 
-export function recordMessageInTransaction({ tx, session, input: raw, now, messageId, ids,
+export async function recordMessageInTransaction({ tx, session, input: raw, now, messageId, ids,
   action = "send a message" }) {
+  assertExactTransaction(tx);
   assertCurrentSession(tx, session, action);
   // Resolved before anything else reads the recipients, so the stored message
   // names real participants and a retry compares against the same content. A
   // record that kept the client name would address nobody when it is read back.
-  const input = prepareDecisionChange(tx, { ...raw,
+  const input = await prepareDecisionChange(tx, { ...raw,
     toParticipantIds: resolveAddressees(tx, raw.toParticipantIds ?? [], session) }, session);
-  const existing = existingMessage(tx, session, input);
+  const existing = await findMessageRetry(tx, session, input);
   if (existing !== undefined) {
     return { message: existing, recipientParticipantIds: [], created: false };
   }
@@ -141,7 +105,7 @@ export function recordMessageInTransaction({ tx, session, input: raw, now, messa
   const message = validateRecord("message", {
     schemaVersion: SCHEMA_VERSION,
     messageId,
-    threadId: threadFor(tx, messageId, inReplyTo),
+    threadId: await threadFor(tx, messageId, inReplyTo),
     clientMessageId: input.clientMessageId,
     workspaceId: session.workspaceId,
     fromParticipantId: session.participantId,
@@ -158,8 +122,10 @@ export function recordMessageInTransaction({ tx, session, input: raw, now, messa
     sentAt: now,
   });
   const recipientParticipantIds = addressedRecipients(tx, message, session);
+  await tx.load("message", messageId);
   tx.put("message", messageId, message);
   for (const participantId of recipientParticipantIds) {
+    await tx.load("receipt", receiptId(messageId, participantId));
     tx.put("receipt", receiptId(messageId, participantId), validateRecord("receipt", {
       schemaVersion: SCHEMA_VERSION,
       messageId,
@@ -202,9 +168,9 @@ export function createConversationService(ports, sessions) {
     const session = await requireSession(input, "send a message");
     await ensureMaterialised(ports, { workspaceId: session.workspaceId,
       descriptor: input.descriptor, reason: "durable_object" });
-    return store.transaction(tx => recordMessageInTransaction({ tx, session, input,
-      now: clock.now(), messageId: ids.next("message"), ids }).message,
-    { kinds: ["participant", "session", "message", "receipt"] });
+    return store.transaction(async tx => (await recordMessageInTransaction({ tx, session, input,
+      now: clock.now(), messageId: ids.next("message"), ids })).message,
+    { kinds: ["participant", "session", "message", "receipt"], exactKinds: ["message", "receipt"] });
   }
 
   async function finishSession(input) {
@@ -235,13 +201,15 @@ export function createConversationService(ports, sessions) {
       handoff,
     };
     const now = clock.now();
-    const outcome = await store.transaction(tx => {
+    const outcome = await store.transaction(async tx => {
+      assertExactTransaction(tx);
       const current = tx.get("session", session.sessionId);
       if (current === null || current.generation !== session.generation) {
         throw new AccError(EXIT.CONFLICT, "cannot finish from this session generation",
           { sessionId: session.sessionId });
       }
-      const existing = existingMessage(tx, session, messageInput);
+      const existing = await findMessageRetry(tx, session, { ...messageInput,
+        toParticipantIds: resolveAddressees(tx, messageInput.toParticipantIds, session) });
       if (existing !== undefined) {
         if (existing.fromSessionId !== session.sessionId) {
           throw new AccError(EXIT.CONFLICT,
@@ -256,7 +224,7 @@ export function createConversationService(ports, sessions) {
       }
       const releasedClaims = tx.list("claim",
         claim => claim.ownerSessionId === session.sessionId);
-      const recorded = recordMessageInTransaction({ tx, session, now,
+      const recorded = await recordMessageInTransaction({ tx, session, now,
         messageId: ids.next("message"), ids, action: "finish",
         input: messageInput });
       for (const claim of releasedClaims) {
@@ -278,7 +246,8 @@ export function createConversationService(ports, sessions) {
           releasedClaimIds: releasedClaims.map(claim => claim.claimId) } });
       return { retry: false, message: recorded.message,
         releasedClaims: releasedClaims.map(projectReleasedClaim), session: closed };
-    }, { kinds: ["participant", "session", "claim", "message", "receipt"] });
+    }, { kinds: ["participant", "session", "claim", "message", "receipt"],
+      exactKinds: ["message", "receipt"] });
     if (!outcome.retry) {
       return { message: outcome.message, releasedClaims: outcome.releasedClaims,
         session: outcome.session };
