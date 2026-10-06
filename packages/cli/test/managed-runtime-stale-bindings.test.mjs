@@ -7,6 +7,8 @@ import test from "node:test";
 import { SCHEMA_VERSION } from "@agents-can-communicate/protocol";
 import { openFilesystemStore } from "@agents-can-communicate/storage-filesystem";
 
+import { withSessionLifecycle } from "@agents-can-communicate/hook-runner/session-lifecycle";
+
 import { activatePending, sweepStaleBindings } from "../src/managed-runtime/activation.mjs";
 import { prepareRefresh } from "../src/managed-runtime/refresh.mjs";
 import { writeControl } from "../src/managed-runtime/state.mjs";
@@ -139,6 +141,34 @@ test("the sweep removes only the bindings that no longer name a possible client"
 
   assert.equal(removed, 3);
   assert.deepEqual(await f.remaining(), ["client.json", "live.json", "unknown.json"]);
+});
+
+// A hook renews a binding under its session's lifecycle lock, and the sweep
+// judges and removes under the same lock, so a renewal it waited on is what it
+// judges (AI review of #274). Removed at once, the binding would show the sweep
+// had taken another lock.
+test("the sweep waits on the hook's lifecycle lock and keeps a binding the hook renewed", async t => {
+  const f = await fixture(t);
+  await f.bind("renewed", "session_pruned");
+  const workspaceRoot = path.join(f.data, "acc", "workspaces", WORKSPACE);
+  let entered, release;
+  const holding = new Promise(resolve => { entered = resolve; });
+  const gate = new Promise(resolve => { release = resolve; });
+  const hook = withSessionLifecycle({ root: workspaceRoot, sessionId: "renewed",
+    clock: { now: () => new Date().toISOString() } }, async () => { entered(); await gate; });
+  await holding;
+
+  const sweep = sweepStaleBindings(f.root, { pidIsAlive: alive });
+  await new Promise(resolve => setTimeout(resolve, 300));
+  assert.deepEqual(await f.remaining(), ["renewed.json"], "the sweep must wait for the hook's lock");
+  await f.bind("renewed", "session_pruned", { clientPid: process.pid });
+  release();
+  await hook;
+
+  assert.equal(await sweep, 0);
+  assert.deepEqual(await f.remaining(), ["renewed.json"]);
+  assert.equal(JSON.parse(await readFile(path.join(workspaceRoot, "bindings", "renewed.json"), "utf8"))
+    .clientPid, process.pid);
 });
 
 // An older generation activates its successor with its own blocker rule, which

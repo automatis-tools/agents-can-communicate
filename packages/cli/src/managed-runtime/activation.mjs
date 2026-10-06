@@ -7,7 +7,7 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { classifySessionPresence } from "@agents-can-communicate/core";
 import { assertPortableId } from "@agents-can-communicate/protocol";
-import { readSessionRecord } from "@agents-can-communicate/storage-filesystem";
+import { readSessionRecord, withWriterMutex } from "@agents-can-communicate/storage-filesystem";
 import { listRuntimeHolds } from "./leases.mjs";
 import { confirmedDead, defaultPidIsAlive, withManagerLock } from "./mutex.mjs";
 import { reapPins } from "./pins.mjs";
@@ -103,31 +103,47 @@ export async function listNativeHolds(root, { pidIsAlive = defaultPidIsAlive, st
   return holds;
 }
 
+// The lock a hook holds while it loads, renews and publishes a binding: the
+// hook runner's session lifecycle mutex, keyed by the harness session id.
+const LIFECYCLE_LOCK_MS = 2_000;
+const lifecycleLocks = (workspaceRoot, harnessSessionId) => ({ locks: path.join(workspaceRoot,
+  "lifecycle-locks", createHash("sha256").update(String(harnessSessionId)).digest("hex")) });
+
 /** Remove the bindings without a client pid that listNativeHolds no longer
  * counts. An older generation activates its successor with its own rule, which
  * counts every one of them as a live client; it loads the pending generation's
- * refresh before it lists blockers, so that refresh calls this (#273). A file
- * that changed since it was judged - a hook rebinding the same harness session
- * - is left as it is. */
+ * refresh before it lists blockers, so that refresh calls this (#273). Each one
+ * is judged again and removed under its session's lifecycle lock, so a hook that
+ * renews it is either seen or comes after (AI review of #274); a lock that stays
+ * busy leaves the binding as it is. */
 export async function sweepStaleBindings(root, { pidIsAlive = defaultPidIsAlive } = {}) {
   const workspaces = path.join(path.dirname(await canonicalManagerRoot(root)), "workspaces");
   if (!await managedDirectory(workspaces)) return 0;
+  const clock = { now: () => new Date().toISOString() };
   let removed = 0;
   for (const entry of await readdir(workspaces, { withFileTypes: true })) {
     if (!entry.isDirectory()) continue;
-    const bindings = path.join(workspaces, entry.name, "bindings");
+    const workspaceRoot = path.join(workspaces, entry.name);
+    const bindings = path.join(workspaceRoot, "bindings");
     if (!await managedDirectory(bindings)) continue;
     let changed = false;
     for (const name of await readdir(bindings)) {
       if (!name.endsWith(".json")) continue;
       const file = path.join(bindings, name);
-      const record = await readManagedJson(file).catch(() => undefined);
-      if (record === undefined || record === null || clientPidOf(record) !== null) continue;
-      if (await isMcpContinuity(record, name, path.dirname(bindings), entry.name)) continue;
-      if (!await staleWithoutPid(path.dirname(bindings), entry.name, record, pidIsAlive)) continue;
-      const now = await readManagedJson(file).catch(() => undefined);
-      if (JSON.stringify(now) !== JSON.stringify(record)) continue;
-      await rm(file, { force: true });
+      const stale = async record => record !== undefined && record !== null
+        && clientPidOf(record) === null && typeof record.harnessSessionId === "string"
+        && !await isMcpContinuity(record, name, workspaceRoot, entry.name)
+        && staleWithoutPid(workspaceRoot, entry.name, record, pidIsAlive);
+      const judged = await readManagedJson(file).catch(() => undefined);
+      if (!await stale(judged)) continue;
+      const gone = await withWriterMutex(lifecycleLocks(workspaceRoot, judged.harnessSessionId),
+        { root: workspaceRoot, clock, deadlineAt: Date.now() + LIFECYCLE_LOCK_MS }, async () => {
+          const current = await readManagedJson(file).catch(() => undefined);
+          if (current?.harnessSessionId !== judged.harnessSessionId || !await stale(current)) return false;
+          await rm(file, { force: true });
+          return true;
+        }).catch(() => false);
+      if (!gone) continue;
       removed += 1;
       changed = true;
     }
