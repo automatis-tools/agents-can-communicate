@@ -241,3 +241,52 @@ test("windows: a read refused between two absent observations reads as absent", 
   await assert.rejects(openNoFollow("owner.json", constants.O_RDONLY, { platform: "win32", lstat, open }),
     error => error.code === "ENOENT" && error.cause?.code === "EPERM");
 });
+
+// Measured on windows-latest, eight writers electing one (2026-10-06): a waiting
+// writer's lstat of writer.lock\owner.json answered EPERM while another writer
+// removed the emptied lock with rmdir, and the read failed the writer instead of
+// letting it look again. A name inside a directory being deleted answers EPERM
+// until the deletion is done; what it settles to is the answer.
+const settling = (answers) => {
+  let calls = 0;
+  const lstat = async () => {
+    const answer = answers[Math.min(calls, answers.length - 1)];
+    calls += 1;
+    if (typeof answer === "string") throw Object.assign(new Error(answer), { code: answer });
+    return answer;
+  };
+  lstat.calls = () => calls;
+  return lstat;
+};
+const present = { isSymbolicLink: () => false, dev: 1n, ino: 7n };
+
+test("windows: a name refused to lstat while its directory is deleted reads as absent", async () => {
+  const lstat = settling(["EPERM", "EPERM", "ENOENT"]);
+  const open = failing("ENOENT", Infinity);
+  await assert.rejects(openNoFollow("owner.json", constants.O_RDONLY,
+    { platform: "win32", lstat, open, deadlineAt: later(), sleep: noSleep }), { code: "ENOENT" });
+  assert.equal(lstat.calls(), 3);
+});
+
+test("windows: a name refused to lstat for a moment is opened once it answers", async () => {
+  const lstat = settling(["EPERM", present]);
+  const handle = { stat: async () => ({ dev: 1n, ino: 7n }), close: async () => {} };
+  assert.equal(await openNoFollow("owner.json", constants.O_RDONLY,
+    { platform: "win32", lstat, open: async () => handle, deadlineAt: later(), sleep: noSleep }), handle);
+});
+
+test("windows: an open refused while the name is deleted, and lstat refused too, reads as absent", async () => {
+  const lstat = settling([present, "EPERM", "EPERM", "ENOENT"]);
+  const open = failing("EPERM", Infinity);
+  await assert.rejects(openNoFollow("owner.json", constants.O_RDONLY,
+    { platform: "win32", lstat, open, deadlineAt: later(), sleep: noSleep }),
+  error => error.code === "ENOENT" && error.cause?.code === "EPERM");
+});
+
+test("windows: an lstat refusal that outlasts the deadline keeps its EPERM", async () => {
+  const lstat = settling(["EPERM"]);
+  const open = failing("ENOENT", Infinity);
+  await assert.rejects(openNoFollow("owner.json", constants.O_RDONLY,
+    { platform: "win32", lstat, open, deadlineAt: Date.now() - 1, sleep: noSleep }), { code: "EPERM" });
+  assert.equal(open.calls(), 0, "a name that kept refusing was never opened");
+});

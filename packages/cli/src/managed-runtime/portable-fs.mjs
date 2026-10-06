@@ -74,8 +74,25 @@ export async function renameEntry(from, to, { platform = process.platform,
   }, error => BUSY.has(error.code), { deadlineAt, sleep });
 }
 
-const gone = (file, lstat) => lstat(file).then(() => false,
-  error => error.code === "ENOENT");
+// A name inside a directory another process is deleting - a waiting writer's
+// rmdir of a lock its owner emptied - answers lstat with EPERM until the
+// deletion is done (measured on windows-latest: lstat of writer.lock\owner.json
+// while eight writers elected one, 2026-10-06, and the waiting writer failed
+// instead of looking again). The name is asked again within the caller's
+// deadline: what it settles to is the answer, and an EPERM that outlasts the
+// deadline is kept.
+async function lstatSettled(file, lstat, { deadlineAt, sleep }) {
+  try {
+    return await retrying(() => lstat(file, { bigint: true }), error => error.code === "EPERM",
+      { deadlineAt, sleep });
+  } catch (error) {
+    if (error.code === "ENOENT") return null;
+    throw error;
+  }
+}
+
+const gone = (file, lstat, options) => lstatSettled(file, lstat, options)
+  .then(stat => stat === null, () => false);
 
 const refusedLink = file => Object.assign(
   new Error(`ELOOP: too many symbolic links encountered, open '${file}'`),
@@ -99,10 +116,7 @@ export async function openNoFollow(file, flags, { mode, platform = process.platf
   open = fs.open, lstat = fs.lstat, deadlineAt, sleep } = {}) {
   if (!isWindows(platform)) return open(file, flags | constants.O_NOFOLLOW, mode);
   for (let attempt = 1; ; attempt += 1) {
-    const before = await lstat(file, { bigint: true }).catch(error => {
-      if (error.code === "ENOENT") return null;
-      throw error;
-    });
+    const before = await lstatSettled(file, lstat, { deadlineAt, sleep });
     if (before?.isSymbolicLink()) throw refusedLink(file);
     // A scanner that opened the file without read sharing refuses every reader
     // with EBUSY until it lets go.
@@ -115,16 +129,14 @@ export async function openNoFollow(file, flags, { mode, platform = process.platf
       // that is still there keeps its EPERM, and so does a create on a name
       // that was free, which is a refused create.
       const refusedCreate = before === null && (flags & constants.O_CREAT) !== 0;
-      if (error.code !== "EPERM" || refusedCreate || !await gone(file, lstat)) throw error;
+      if (error.code !== "EPERM" || refusedCreate
+        || !await gone(file, lstat, { deadlineAt, sleep })) throw error;
       throw Object.assign(new Error(`ENOENT: no such file or directory, open '${file}'`,
         { cause: error }), { code: "ENOENT", syscall: "open", path: file });
     });
     try {
       const opened = await handle.stat({ bigint: true });
-      const named = await lstat(file, { bigint: true }).catch(error => {
-        if (error.code === "ENOENT") return null;
-        throw error;
-      });
+      const named = await lstatSettled(file, lstat, { deadlineAt, sleep });
       if (named?.isSymbolicLink()) throw refusedLink(file);
       if (named !== null && named.dev === opened.dev && named.ino === opened.ino) return handle;
       if (attempt >= SWAPS) throw refusedLink(file);
