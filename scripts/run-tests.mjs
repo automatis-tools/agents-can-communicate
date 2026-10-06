@@ -7,7 +7,7 @@
 // when a pattern matches nothing. The Windows CI job therefore ran zero tests
 // and reported success - green, and testing nothing.
 import { spawn } from "node:child_process";
-import { readdir } from "node:fs/promises";
+import { mkdir, readdir } from "node:fs/promises";
 import path from "node:path";
 
 import { TEST_FILE_CONCURRENCY, nodeTestArguments, testBatches } from "./test-runner-plan.mjs";
@@ -66,6 +66,7 @@ try {
     const args = nodeTestArguments(batch);
     const { ACC_MEASURE_CONCURRENCY: measuredConcurrency, ACC_MEASURE_TIMINGS: timings, ...childEnv } = process.env;
     if (measuredConcurrency) args[1] = `--test-concurrency=${measuredConcurrency}`;
+    if (timings) await mkdir(path.dirname(timings), { recursive: true });
     if (timings) args.splice(1, 0, "--test-reporter=spec", "--test-reporter-destination=stdout",
       `--test-reporter=${path.join(repo, ".github", "probes", "file-timing-reporter.mjs")}`,
       `--test-reporter-destination=${timings}.${index + 1}.jsonl`);
