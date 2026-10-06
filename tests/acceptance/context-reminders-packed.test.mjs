@@ -53,8 +53,13 @@ test(`an installed hook preserves a prior backlog with client ${clientVersion}`,
   await service.closeSession(owner(reader));
   await service.closeSession(owner(sender));
   await publishBacklogFixture({ memory, store, workspaceId: descriptor.id });
-  await packed.start({ adapterId: "claude_code", participantId: "reader",
-    harnessSessionId: "native-reader" });
+  // A SessionStart that fails open leaves the first turn to open another
+  // participant, which has no message here; only the start's stderr says why
+  // (the release suite on 2026-10-06 failed below without saying it).
+  const started = await packed.hook("claude_code", { hook_event_name: "SessionStart",
+    session_id: "native-reader", cwd: packed.project, source: "startup" },
+  { ACC_PARTICIPANT: "reader" });
+  assert.equal(started.stderr, "", "SessionStart must attach the reader");
   const freshSender = await packed.acc(["attach", "--participant", "sender"]);
   const body = "CURRENT_DECISION: use port 4317 for the new integration; review this change.";
   const fresh = await packed.acc(["request", "--session", freshSender.sessionId,
@@ -72,7 +77,8 @@ test(`an installed hook preserves a prior backlog with client ${clientVersion}`,
     return JSON.parse(output.stdout).hookSpecificOutput.additionalContext;
   };
   const first = await turn();
-  assert.equal(first.includes(body), true, "body delivery must follow the captured capability");
+  assert.equal(first.includes(body), true,
+    `body delivery must follow the captured capability; the turn carried:\n${first}`);
   assert.match(first, /40 replies/);
   assert.match(first, /20 acknowledgements/);
   assert.ok(first.includes(`[reply_required] ${fresh.message.messageId}`),

@@ -49,7 +49,7 @@ test("packed doctor migrates explicitly, preserves message bytes and supports se
 
 test("packed verified pending management code migrates only after old native holds exit", async t => {
   const f = await createPackedAcc(t);
-  const registry = await createUpdateRegistry(t, f, "0.9.99");
+  const registry = await createUpdateRegistry(t, f);
   await f.setClientVersions({ claude: "2.1.266" });
   await f.acc(["install", "--adapter", "claude_code", "--delivery", "off"]);
   await f.acc(["update", "--auto", "off"]);
@@ -62,7 +62,7 @@ test("packed verified pending management code migrates only after old native hol
   const manager = path.join(f.dataHome, "acc", "runtime"), controlFile = path.join(manager, "control.json");
   const before = JSON.parse(await readFile(controlFile));
   assert.equal(before.active.version, f.manifest.version, "staging must keep the installed release active");
-  assert.equal(before.pending.version, "0.9.99");
+  assert.equal(before.pending.version, registry.version);
   const requests = registry.requests.length;
   assert.equal((await f.accError(["doctor", "--migrate-store"])).code, EXIT.CONFLICT);
   assert.deepEqual(await readFile(state.file), state.before);
@@ -82,7 +82,7 @@ test("packed verified pending management code migrates only after old native hol
 // activation, because activation already waited until no older client held one.
 test("packed update moves an older store to the new contract by itself", async t => {
   const f = await createPackedAcc(t);
-  const registry = await createUpdateRegistry(t, f, "0.9.99");
+  const registry = await createUpdateRegistry(t, f);
   await f.setClientVersions({ claude: "2.1.266" });
   await f.acc(["install", "--adapter", "claude_code", "--delivery", "off"]);
   await f.acc(["update", "--auto", "off"]);

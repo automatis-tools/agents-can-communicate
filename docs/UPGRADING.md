@@ -25,6 +25,31 @@ runtime, contact npm, or restart clients. If it is interrupted, run it again.
 `doctor --repair` never migrates a store, and hooks never change a store's format. Runtime
 admission cannot see unmanaged direct library users; stop them before an update.
 
+## From 0.9.x
+
+Update as usual:
+
+```bash
+acc update
+acc version
+acc doctor
+```
+
+0.10.0 moves every store from contract 6 to 7, as described above. What you see:
+
+- **Activation waits for 0.9.x sessions.** A client session that started under 0.9.x holds
+  contract 6 until it ends. `acc update` downloads 0.10.0 and reports
+  `ACC 0.10.0 is ready; waiting for N active or unidentified process(es)`, and `acc doctor`
+  names them. A session you start while 0.10.0 waits still runs 0.9.x, so activation needs a
+  moment when no such session runs: end or restart them together.
+- **Stores move by themselves.** Right after 0.10.0 activates, it migrates every workspace's
+  store; you run no command.
+- **0.9.x and 0.10.0 never share a workspace.** 0.9.x code refuses a contract-7 store. This
+  matters only for a copy of ACC that runs outside the managed runtime, such as an npm-global
+  0.9.x on another `PATH` or a development checkout: update or stop it.
+- **Sending a message reads less of the store.** A send and its retries use a bounded index
+  instead of rereading unrelated messages and receipts.
+
 ## From 0.8.x
 
 Update as usual:

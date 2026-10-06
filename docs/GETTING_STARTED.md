@@ -1,6 +1,7 @@
 # Getting started
 
-Install ACC, open the AI sessions you already use, and give them related work. Supported
+Install ACC, open the AI sessions you already use in clients from different vendors, such as
+Claude Code and Codex, and give them related work. Supported
 integrations make peers visible and teach each agent how to communicate. You do not need to
 carry messages between windows or add coordination instructions to your task prompts.
 
@@ -16,8 +17,8 @@ pair or session-bound ACC MCP tools. See [CLI ownership](CLI.md#coordinate-from-
 ACC requires Node.js 24 or newer on macOS, Linux, or Windows 10 or 11. On Windows, read
 [Windows](#windows) below first.
 
-Already using ACC? Follow the [upgrade guide](UPGRADING.md) for the 0.4.x → 0.5.0
-update or the data-format boundary when upgrading from 0.3.1.
+Already using ACC? Follow the [upgrade guide](UPGRADING.md#from-09x): from 0.9.x, each
+store moves to contract 7 once no session still runs 0.9.x code.
 
 ```bash
 npm install -g agents-can-communicate

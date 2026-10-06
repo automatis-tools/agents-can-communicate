@@ -1,0 +1,40 @@
+name: Bug
+description: ACC did something wrong or failed, after it had worked or on a known setup.
+labels: ["bug"]
+body:
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What you did and what ACC or the client did.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Commands or prompts, in order, if you have them.
+    validations:
+      required: false
+  - type: textarea
+    id: doctor
+    attributes:
+      label: Output of acc doctor
+      description: Run `acc doctor` in the project where it happened and paste the output.
+      render: text
+    validations:
+      required: false
+  - type: input
+    id: setup
+    attributes:
+      label: Setup
+      description: ACC version (`acc version`), operating system, Node.js version, and the coding clients with their versions.
+      placeholder: ACC 0.10.0, macOS 15 arm64, Node 24.13, Claude Code 2.1.291, Codex 0.160.1
+    validations:
+      required: true

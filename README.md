@@ -1,33 +1,35 @@
 # Agents Can Communicate (ACC)
 
-**Let your AI coding sessions talk to each other.**
+**The message your clients can’t send each other.**
 
-ACC connects independent AI coding sessions in the clients you already use. They can ask each
-other questions, exchange reviews, and leave handoffs for another session to continue.
+Claude Code can message your other Claude Code sessions, and Codex can queue a message for
+another Codex session. Neither client offers a way to message the other’s sessions. ACC
+carries questions, reviews and handoffs between sessions in different vendors’ clients, on
+your machine.
 
 You open each client normally and choose its work. Every session keeps its own model,
 conversation, and permissions. Coordination runs locally, with no lead agent managing the
-others.
+others. If all your sessions run in one of these two clients, try its own messaging first.
 
 ```mermaid
 flowchart TB
     you["You choose the tools and work"]
     codex["Codex<br/>Feature A"]
     claude["Claude Code<br/>Feature B"]
-    gemini["Gemini CLI<br/>Feature C"]
+    antigravity["Antigravity CLI<br/>Feature C"]
     acc["Communication via ACC"]
 
     you -.-> codex
     you -.-> claude
-    you -.-> gemini
+    you -.-> antigravity
     codex <--> acc
     claude <--> acc
-    gemini <--> acc
+    antigravity <--> acc
 
-    subgraph handoff["When you switch models"]
+    subgraph handoff["When you switch clients"]
         direction LR
-        current["Current<br/>session"] --> saved["Handoff<br/>Done · Decisions<br/>Next steps"]
-        saved --> next["Next<br/>session"]
+        current["Claude Code<br/>session"] --> saved["Handoff<br/>Done · Decisions<br/>Next steps"]
+        saved --> next["Codex<br/>session"]
     end
     acc ~~~ handoff
 
@@ -35,7 +37,7 @@ flowchart TB
     classDef session fill:#fff,stroke:#ced4d9,color:#202a35
     classDef shared fill:#e8edff,stroke:#385cde,color:#202a35
     class you human
-    class codex,claude,gemini,current,next session
+    class codex,claude,antigravity,current,next session
     class acc,saved shared
     style handoff fill:transparent,stroke:#ced4d9
     linkStyle 3,4,5,6,7 stroke:#385cde,stroke-width:2px
@@ -43,14 +45,16 @@ flowchart TB
 
 ## When ACC helps
 
-- **Switch models mid-feature.** When a limit approaches or you want another model’s approach,
-  leave a handoff with decisions and unfinished work for the next session.
-- **Get a second opinion.** Ask another session to review a specific change and send its
-  findings directly to the implementing agent.
-- **Bring parallel features together.** Let sessions working on frontend and backend ask each
-  other about a shared API before building around different assumptions.
+- **Get a second opinion from another vendor’s model.** Ask a Codex session to review a change
+  your Claude Code session just made, and send its findings back to the session that wrote the
+  code.
+- **Bring parallel features together.** Let sessions in different clients ask each other about
+  a shared API before they build around different assumptions.
+- **Switch clients mid-feature.** When a limit approaches or another model suits the work
+  better, leave a handoff with decisions and unfinished work for a session in the client you
+  open next.
 
-## Try one handoff
+## Try one review across clients
 
 You’ll need **macOS, Linux or Windows 10/11, Node.js 24 or newer**, and supported coding
 clients on the same machine and operating-system user. On Windows, ACC runs natively, with no
@@ -66,45 +70,41 @@ The installer connects supported clients it finds. Follow its activation instruc
 any required hook or plugin trust, then restart your clients from the project directory. The
 [setup guide](docs/GETTING_STARTED.md) covers client-specific steps.
 
-For example, when pausing work on an account-registration feature, ask:
+Open Claude Code and Codex in the same project. After Claude Code has changed something, for
+example an account-registration form, ask it:
 
 ```text
-Save a partial handoff in ACC for the registration feature. Include
-what is done, our decisions, what remains, and what you actually
-verified. I will continue in another session.
+Ask the Codex session in ACC to review the registration form change
+you just made. Name the files and what it should check.
 ```
 
-Open another supported client in the same project and ask:
+Then ask Codex:
 
 ```text
-Continue the registration feature from its ACC handoff. Check the
-saved decisions against the current files, then take the next
-unfinished step. Ask me if the scope is unclear.
+Answer the review request in ACC. Read the files it names, check
+what it asks, and reply with what you found.
 ```
 
-The next session should identify the saved decision and begin the remaining work. It can find
-the handoff even if it was opened after the previous session stopped.
-
-Save the handoff while the first model can still respond. ACC preserves explicitly recorded
-context; it cannot recover details that were never saved.
+Codex should find the request without you pasting it, and Claude Code should see the findings
+at its next turn without you copying them back. The sender can check whether its message was
+delivered and answered.
 
 ## Client support
 
-Integrations are available for **Antigravity CLI, Claude Code, Codex, Gemini CLI, Grok, and
-Kimi Code**. Other
-clients can connect through [MCP](docs/MCP.md) with their own configuration and coordination
-instructions.
+Integrations are available for **Antigravity CLI, Claude Code, Codex, Grok, and Kimi Code**.
+Other clients can connect through [MCP](docs/MCP.md) with their own configuration and
+coordination instructions.
 
 Automatic delivery depends on the client version and platform. Verified integrations can
 provide messages at the next normal turn; other sessions read their ACC inbox explicitly.
 
 Experimental live delivery can wake eligible Claude Code, Codex and Antigravity CLI
-sessions, conversations in the Antigravity desktop app, and local Code sessions in Claude.app. It requires opt-in and an active verified
-connection, is off by default, and can spend model tokens. Claude Code sessions wake through
-the inbox that Claude Code itself opens, so you start Claude Code with your ordinary command.
-A busy Claude Code session gets the message between two tool calls. A busy Codex session gets
-it when the current turn ends. Chats in the Codex app run on the app's own server and get
-messages at their next turn.
+sessions, conversations in the Antigravity desktop app, and local Code sessions in Claude.app.
+It requires opt-in and an active verified connection, is off by default, and can spend model
+tokens. Claude Code sessions wake through the inbox that Claude Code itself opens, so you start
+Claude Code with your ordinary command. A busy Claude Code session gets the message between two
+tool calls. A busy Codex session gets it when the current turn ends. Chats in the Codex app run
+on the app’s own server and get messages at their next turn.
 
 See [client capabilities](docs/CAPABILITIES.md) for exact support. Run `acc doctor` from your
 project if a peer is missing or delivery differs from what you expect; see
@@ -125,9 +125,11 @@ Automatic updates are enabled on first install. Use `acc update --auto off` to d
 [update controls](docs/UPGRADING.md) for details.
 
 MIT-licensed and permanently noncommercial. Try it on one real task and
-[tell us how it went](https://github.com/automatis-tools/agents-can-communicate/discussions/categories/show-and-tell),
-including where you still had to carry messages yourself. Bugs belong in
-[issues](https://github.com/automatis-tools/agents-can-communicate/issues).
+[open an issue](https://github.com/automatis-tools/agents-can-communicate/issues/new/choose)
+with what happened: whether it worked, where it broke, or where you still had to carry
+messages between sessions yourself. If it worked, watch the repository’s releases to hear
+about the next one. Longer write-ups and setups are welcome in
+[Discussions](https://github.com/automatis-tools/agents-can-communicate/discussions).
 
 [Documentation](docs/index.md) ·
 [Contributing](https://github.com/automatis-tools/agents-can-communicate/blob/main/AGENTS.md)

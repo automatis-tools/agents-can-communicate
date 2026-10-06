@@ -1,5 +1,37 @@
 # Changelog
 
+## 0.10.0 — release candidate
+
+- Stores move to contract 7. A send and its retries read a rebuildable, bounded message and
+  receipt index instead of rereading unrelated records: in a matched 60-send fixture, cumulative
+  primary reads fall from 3900 to 360 (#241, PR #263).
+- ACC migrates each workspace's store by itself right after the update activates, and the
+  activation waits until no client runs 0.9.x code. Event, journal, message and receipt bytes
+  stay as they were (PR #264).
+- While a store waits for its migration, hooks fail open. Claude Code and Codex show a message
+  about it, and plain `acc doctor` names `acc doctor --migrate-store`, which migrates it at once
+  (PR #264).
+- 0.9.x code refuses a contract-7 store, so 0.9.x and 0.10.0 never share a workspace.
+- On Windows, a writer that waits for the store lock looks again when the lock's record is being
+  deleted, instead of failing with "cannot safely open regular file" (PR #269).
+- The README and docs lead with what ACC is for: messages between sessions in different
+  vendors' clients. They name Claude Code's and Codex's own session messaging, suggest that a
+  reader whose sessions all run in one of them try it first, and say what ACC adds over wiring
+  the two by hand. The first run is a review by another vendor's model. Gemini CLI leaves the README's client list; its integration and certification stay
+  in [Capabilities](docs/CAPABILITIES.md). Feedback goes to issues, with templates.
+
+| Candidate artifact | Value |
+|---|---|
+| Built from | `ba9f2375c0c90aeae63a1909b5ac51fdd18bcb04` |
+| Tarball | `agents-can-communicate-0.10.0.tgz`, 577,865 bytes, 351 files |
+| sha256 | `ed5c2d884def7e064515cbeac6adc3bad6214c2cdc7feba10f79134e9d601c50` |
+
+The exact archive passed clean installation verification, the 24 managed-update packed checks
+and the 3 store-migration packed checks. The published 0.9.1 updated itself to these bytes: the
+activation waited for a live 0.9.1 process, and once it exited, the next command activated
+0.10.0, which migrated the store. See [0.10.0 release evidence](docs/release-evidence/v0.10.0.md)
+for verification and limits. Earlier development records below retain their original provenance.
+
 ## Unreleased — a Windows writer looks again when the lock's record is being deleted
 
 - On Windows a writer waiting for the store lock could fail with "cannot safely open regular

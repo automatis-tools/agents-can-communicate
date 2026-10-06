@@ -1,10 +1,10 @@
 {
   "name": "agents-can-communicate",
-  "version": "0.9.1",
+  "version": "0.10.0",
   "accManagedUpdateProtocol": 2,
   "accStoreVersion": 7,
   "type": "module",
-  "description": "Local-first coordination for independently opened AI agent sessions.",
+  "description": "Local-first messaging between AI coding sessions in different vendors' clients, such as Claude Code and Codex.",
   "keywords": [
     "agents",
     "coordination",
@@ -14,7 +14,8 @@
     "hooks",
     "codex",
     "claude-code",
-    "gemini-cli",
+    "antigravity",
+    "cross-vendor",
     "kimi",
     "grok",
     "multi-agent",
