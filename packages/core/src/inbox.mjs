@@ -110,6 +110,10 @@ export function createInboxService(ports, sessions) {
     const session = await requireOpen(input, "acknowledge a message");
     const now = clock.now();
     return store.transaction(async tx => {
+      assertExactTransaction(tx);
+      await tx.load("session", input.sessionId);
+      await tx.load("message", input.messageId);
+      await tx.load("receipt", receiptId(input.messageId, session.participantId));
       await requireOpen(input, "acknowledge a message", tx);
       const { message, receipt } = requireOwnedReceipt(tx, session, input.messageId);
       if (message.obligation === "reply" && receipt.state !== "acknowledged") {
@@ -118,7 +122,7 @@ export function createInboxService(ports, sessions) {
           { messageId: input.messageId, obligation: message.obligation });
       }
       return advanceOwned(tx, session, input.messageId, "acknowledged", now).receipt;
-    }, { kinds: ["session", "message", "receipt"] });
+    }, { kinds: ["session", "message", "receipt"], exactKinds: ["session", "message", "receipt"] });
   }
 
   async function replyToMessage(input) {
