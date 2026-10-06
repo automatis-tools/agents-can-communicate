@@ -434,8 +434,9 @@ live, and native bindings still hold until observed client SessionEnd cleanup or
 process death; the vendor daemon can remain running after that lifecycle event. What
 changed is which of those holds keeps an update pending: only one whose declared store
 contract differs from the incoming version's, or that declares none at all. Unknown PIDs
-remain conservative holds until lifecycle cleanup. `acc finish`, presence TTL, and delivery
-off alone still do not prove native end. When a hold does block, close the relevant client
+remain conservative holds until lifecycle cleanup, except a binding whose session retention
+has removed, or whose session names an exited process (#273, 0.10.1). `acc finish`, presence
+TTL alone, and delivery off still do not prove native end. When a hold does block, close the relevant client
 sessions and persistent ACC processes to release it, or accept the eligible Codex service
 maintenance offer in `acc update`. Background updates never request fresh restart consent.
 Hooks never wait for a network download. If integration refresh temporarily prevents

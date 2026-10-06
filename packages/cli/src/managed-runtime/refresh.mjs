@@ -2,12 +2,16 @@ import path from "node:path";
 import { applyPlan, detectInstallation, livePolicyOf, loadOwnership, planInstallation }
   from "@agents-can-communicate/installer";
 import { ALL_ADAPTERS, clientContext, probeTimeout } from "../install-command.mjs";
+import { sweepStaleBindings } from "./activation.mjs";
 import { stablePaths, writeLaunchers } from "./launchers.mjs";
 import { bridgeLegacyMaintenance } from "./legacy-maintenance.mjs";
 
 /** Loaded from the candidate, so its own adapters supply its integration bytes. */
 export async function prepareRefresh({ control, root, env = process.env, callerProtocol = 1 }) {
   await bridgeLegacyMaintenance({ control, root, env, callerProtocol });
+  // An older generation lists its blockers right after this returns, by a rule
+  // that counts a binding without a client pid as a live client forever (#273).
+  await sweepStaleBindings(root).catch(() => {});
   const dataHome = path.dirname(path.dirname(root));
   const wanted = new Set(control.targets);
   const adapters = ALL_ADAPTERS().filter(adapter => wanted.has(adapter.id));

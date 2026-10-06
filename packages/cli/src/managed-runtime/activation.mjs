@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 // Kept above 300 lines because activation and generation retirement must use
 // the same validated runtime/native hold definitions under the admission mutex.
 // Splitting their safety rules risks disagreeing about which users are live.
-import { readdir } from "node:fs/promises";
+import { readdir, rm } from "node:fs/promises";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { assertPortableId } from "@agents-can-communicate/protocol";
@@ -45,6 +45,27 @@ async function isMcpContinuity(record, name, workspaceRoot, workspaceId) {
   } catch { return false; } // Ambiguous or corrupt ownership remains a safety hold.
 }
 
+const clientPidOf = record => record?.schemaVersion === 1 && Number.isSafeInteger(record.clientPid)
+  && record.clientPid > 0 ? record.clientPid : null;
+
+/** A binding that names no client process cannot be judged by its own facts;
+ * its session record can. Retention removes a session whose client is gone, and
+ * a session that recorded its client's pid names a process that has exited.
+ * Anything else - an open session with no pid, or a record that cannot be read
+ * - stays a hold, as a closed session with a live pid does. On 2026-10-06 the
+ * maintainer's 0.10.0 waited behind 32 such bindings from 0.5.10 to 0.9.0 that
+ * no client could clear (#273). */
+async function staleWithoutPid(workspaceRoot, workspaceId, record, pidIsAlive) {
+  if (record?.schemaVersion !== 1) return false;
+  let session;
+  try {
+    session = await readSessionRecord({ root: workspaceRoot, workspaceId,
+      sessionId: record.accSessionId, allowLegacyIdentity: true });
+  } catch { return false; }
+  if (session === null) return true;
+  return Number.isSafeInteger(session.pid) && session.pid > 0 && await confirmedDead(session.pid, pidIsAlive);
+}
+
 /** Native bindings outlive finish/TTL; MCP process lifetime is covered by its runtime lease. */
 export async function listNativeHolds(root, { pidIsAlive = defaultPidIsAlive, strict = false } = {}) {
   const workspaces = path.join(path.dirname(await canonicalManagerRoot(root)), "workspaces");
@@ -68,14 +89,47 @@ export async function listNativeHolds(root, { pidIsAlive = defaultPidIsAlive, st
       });
       if (record === undefined) continue; // Concurrent lifecycle removal, before fencing.
       if (await isMcpContinuity(record, name, path.dirname(bindings), entry.name)) continue;
-      const pid = record?.schemaVersion === 1 && Number.isSafeInteger(record.clientPid)
-        && record.clientPid > 0 ? record.clientPid : null;
+      const pid = clientPidOf(record);
       if (pid !== null && await confirmedDead(pid, pidIsAlive)) continue;
+      if (pid === null && await staleWithoutPid(path.dirname(bindings), entry.name, record, pidIsAlive)) continue;
       holds.push({ kind: "native", pid, reason: pid === null ? "unknown_client_pid" : "client_running",
         storeVersion: Number.isSafeInteger(record?.storeVersion) ? record.storeVersion : null });
     }
   }
   return holds;
+}
+
+/** Remove the bindings without a client pid that listNativeHolds no longer
+ * counts. An older generation activates its successor with its own rule, which
+ * counts every one of them as a live client; it loads the pending generation's
+ * refresh before it lists blockers, so that refresh calls this (#273). A file
+ * that changed since it was judged - a hook rebinding the same harness session
+ * - is left as it is. */
+export async function sweepStaleBindings(root, { pidIsAlive = defaultPidIsAlive } = {}) {
+  const workspaces = path.join(path.dirname(await canonicalManagerRoot(root)), "workspaces");
+  if (!await managedDirectory(workspaces)) return 0;
+  let removed = 0;
+  for (const entry of await readdir(workspaces, { withFileTypes: true })) {
+    if (!entry.isDirectory()) continue;
+    const bindings = path.join(workspaces, entry.name, "bindings");
+    if (!await managedDirectory(bindings)) continue;
+    let changed = false;
+    for (const name of await readdir(bindings)) {
+      if (!name.endsWith(".json")) continue;
+      const file = path.join(bindings, name);
+      const record = await readManagedJson(file).catch(() => undefined);
+      if (record === undefined || record === null || clientPidOf(record) !== null) continue;
+      if (await isMcpContinuity(record, name, path.dirname(bindings), entry.name)) continue;
+      if (!await staleWithoutPid(path.dirname(bindings), entry.name, record, pidIsAlive)) continue;
+      const now = await readManagedJson(file).catch(() => undefined);
+      if (JSON.stringify(now) !== JSON.stringify(record)) continue;
+      await rm(file, { force: true });
+      removed += 1;
+      changed = true;
+    }
+    if (changed) await syncDirectory(bindings);
+  }
+  return removed;
 }
 
 /** Unknown on either side cannot be compared, and an uncomparable contract

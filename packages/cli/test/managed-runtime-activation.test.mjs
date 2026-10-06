@@ -114,7 +114,6 @@ test("misleading or ambiguous MCP-like bindings retain native activation holds",
     ["wrong workspace", f => ({ ...f.record, harnessSessionId: "mcp:mcp_peer:other" })],
     ["unknown schema", f => ({ ...f.record, schemaVersion: 2 })],
     ["invalid owner id", f => ({ ...f.record, accSessionId: "../outside" })],
-    ["missing owner", f => ({ ...f.record, accSessionId: "session_absent" })],
     ["wrong generation", f => ({ ...f.record, generation: "generation_wrong" })],
     ["native pid", f => ({ ...f.record, clientPid: process.pid })],
     ["unknown native pid", f => ({ ...f.record, clientPid: null })],
@@ -144,6 +143,16 @@ test("misleading or ambiguous MCP-like bindings retain native activation holds",
     assert.equal((await activatePending(f.root, { prepare: async () => async () => ({ failed: [] }) }))
       .activated, false, label);
   }
+});
+
+// A binding whose session retention has removed names no possible client, in
+// whatever shape it was written, and no longer holds activation (#273).
+test("an MCP-shaped binding whose owner session is gone no longer holds activation", async t => {
+  const f = await mcpBinding(t);
+  await writeFile(f.file, JSON.stringify({ ...f.record, accSessionId: "session_absent" }));
+  assert.deepEqual(await listNativeHolds(f.root), []);
+  assert.equal((await activatePending(f.root, { prepare: async () => async () => ({ failed: [] }) }))
+    .activated, true);
 });
 
 test("published 0.3.1 MCP continuity is reusable without migration", async t => {
