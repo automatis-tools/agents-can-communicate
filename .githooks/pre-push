@@ -16,7 +16,7 @@ printf '%s\n' "$refs" | node "$(dirname "$0")/../scripts/check-commit-attributio
 # The lint step runs next, while git's own repository variables are still set,
 # so `git ls-files` resolves this repository without relying on discovery.
 echo "pre-push: syntax-checking tracked .mjs files"
-git ls-files -z '*.mjs' | xargs -0 -n1 node --check
+node "$(dirname "$0")/../scripts/check-syntax.mjs" --tracked
 
 # Git exports GIT_DIR, GIT_WORK_TREE and friends into every hook. The suite
 # spawns git inside temporary fixture repositories, and inheriting these makes
