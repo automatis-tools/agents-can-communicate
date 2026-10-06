@@ -52,6 +52,15 @@ test("explicit update enters the newer installed management implementation witho
   assert.equal((await readdir(f.root)).includes("leases"), false);
 });
 
+test("migration reaches newer management code while ordinary commands retain active admission", async t => {
+  const f = await fixture(t);
+  const migrated = await f.run(["doctor", "--migrate-store"]);
+  assert.equal(migrated.label, "installed");
+  assert.equal(migrated.options.managementOnly, true);
+  assert.equal((await readdir(f.root)).includes("leases"), false);
+  assert.equal((await f.run(["status"])).label, "active");
+});
+
 test("a verified protocol-two pending candidate provides update recovery even while activation is fenced", async t => {
   const f = await fixture(t);
   await writeControl(f.root, { ...f.control, phase: "activating" });

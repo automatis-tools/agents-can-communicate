@@ -239,6 +239,25 @@ unknown holder postponed, is recorded as unfinished, and the next ACC command an
 later starts the worker that finishes it. Parsed help, version, and update recovery remain
 available when workspace admission is unavailable.
 
+Store contract 7 adds exact transaction loads and two rebuildable indexes:
+`messageByClientKey` and `receiptsByMessage`. Content-addressed pages contain
+portable key tuples and record references, never message bodies. Each page is
+bounded by 32 entries and 64 KiB; radix branches have at most 16 children.
+Under the writer mutex, the cache is trusted only for the same workspace and the
+current idle journal generation. Every message/receipt put or remove advances
+that durable authority. Other journalled writes carry valid unchanged roots
+forward, while ordinary single-record heartbeats keep their direct publication.
+Authoritative writes commit first; cache pages and the manifest are unflushed
+derived data. Cache loss or corruption requires verified rebuilding and cannot
+turn a recorded message into a failed send.
+
+Contract 6 writers can bypass that authority, so migration is explicit.
+`doctor --migrate-store` holds runtime admission before the workspace writer
+mutex, refuses incompatible or unknown live holders, recovers decided journals,
+builds the complete cache, and durably replaces the identity last. The library
+requires explicit opt-in after unmanaged callers are quiesced. A hook never
+performs this migration. Record schemas and journal format 2 are unchanged.
+
 An independent worker downloads npm packages with lifecycle scripts disabled, checks exact
 stable package identity and the discovered integrity, and health-checks the staged runtime.
 Installer detection and planning happen before exclusive admission. The worker then checks

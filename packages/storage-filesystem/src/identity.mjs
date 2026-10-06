@@ -16,7 +16,8 @@ function assertIdentity(record, workspaceId, filePath, versions = [STORE_VERSION
       ? "store contract 6 requires explicit migration: stop other store users and run acc doctor --migrate-store"
       : "unknown store version";
     throw new AccError(EXIT.DATA, message, { filePath,
-      storeVersion: record?.storeVersion });
+      storeVersion: record?.storeVersion,
+      ...(record?.storeVersion === 6 ? { reasonCode: "store_migration_required" } : {}) });
   }
   if (Object.keys(record).sort().join(",") !== "initialisedAt,storeVersion,workspaceId"
     || typeof record.initialisedAt !== "string" || !Number.isFinite(Date.parse(record.initialisedAt))) {

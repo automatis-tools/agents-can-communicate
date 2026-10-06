@@ -57,6 +57,8 @@ function tryWrite(stream, output) {
 }
 
 const RECOVERY = new Map([
+  ["store_migration_required", ": store contract 6 requires explicit migration; stop old ACC"
+    + " clients and unmanaged store users, then run acc doctor --migrate-store in this workspace"],
   ["workspace_contains_runtime", ": workspace contains ACC runtime state; open a project"
     + " directory and restart the client (or set ACC_DATA_HOME outside the workspace)"],
   ["workspace_path_unquotable", ": this directory's path has a double quote, $, ` or %, which"

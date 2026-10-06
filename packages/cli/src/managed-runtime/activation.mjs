@@ -1,4 +1,7 @@
 import { createHash } from "node:crypto";
+// Kept above 300 lines because activation and generation retirement must use
+// the same validated runtime/native hold definitions under the admission mutex.
+// Splitting their safety rules risks disagreeing about which users are live.
 import { readdir } from "node:fs/promises";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
@@ -31,7 +34,11 @@ async function isMcpContinuity(record, name, workspaceRoot, workspaceId) {
     for (const id of [parts[1], parts[2], record.accSessionId, record.generation]) assertPortableId(id, "MCP continuity id");
     const expected = createHash("sha256").update(record.harnessSessionId).digest("hex").slice(0, 32) + ".json";
     if (name !== expected) return false;
-    const owner = await readSessionRecord({ root: workspaceRoot, workspaceId, sessionId: record.accSessionId });
+    // This is ownership metadata, never a service open or a write. Supported
+    // v6 continuity must remain classifiable before/after migrating another
+    // workspace; its actual process lifetime is still fenced by its lease.
+    const owner = await readSessionRecord({ root: workspaceRoot, workspaceId,
+      sessionId: record.accSessionId, allowLegacyIdentity: true });
     return owner?.harness === "mcp" && owner.participantId === parts[1]
       && owner.workspaceId === workspaceId && owner.sessionId === record.accSessionId
       && owner.generation === record.generation;
@@ -39,20 +46,26 @@ async function isMcpContinuity(record, name, workspaceRoot, workspaceId) {
 }
 
 /** Native bindings outlive finish/TTL; MCP process lifetime is covered by its runtime lease. */
-export async function listNativeHolds(root, { pidIsAlive = defaultPidIsAlive } = {}) {
+export async function listNativeHolds(root, { pidIsAlive = defaultPidIsAlive, strict = false } = {}) {
   const workspaces = path.join(path.dirname(await canonicalManagerRoot(root)), "workspaces");
   if (!await managedDirectory(workspaces)) return [];
   const holds = [];
   for (const entry of await readdir(workspaces, { withFileTypes: true })) {
     if (!entry.isDirectory()) {
-      if (entry.isSymbolicLink()) holds.push({ kind: "native", reason: "unknown_workspace" });
+      if (entry.isSymbolicLink()) {
+        if (strict) throw new Error("unsafe native workspace directory");
+        holds.push({ kind: "native", reason: "unknown_workspace" });
+      }
       continue;
     }
     const bindings = path.join(workspaces, entry.name, "bindings");
     if (!await managedDirectory(bindings)) continue;
     for (const name of await readdir(bindings)) {
       if (!name.endsWith(".json")) continue;
-      const record = await readManagedJson(path.join(bindings, name)).catch(() => null);
+      const record = await readManagedJson(path.join(bindings, name)).catch(error => {
+        if (strict) throw error;
+        return null;
+      });
       if (record === undefined) continue; // Concurrent lifecycle removal, before fencing.
       if (await isMcpContinuity(record, name, path.dirname(bindings), entry.name)) continue;
       const pid = record?.schemaVersion === 1 && Number.isSafeInteger(record.clientPid)
@@ -78,9 +91,9 @@ export const blocksActivation = (hold, incomingStoreVersion) =>
  * generation's, or when either side declares none.
  */
 export async function listActivationBlockers(root, { pidIsAlive = defaultPidIsAlive,
-  ignorePid = null, incomingStoreVersion = null } = {}) {
+  ignorePid = null, incomingStoreVersion = null, strictNative = false } = {}) {
   const leases = (await listRuntimeHolds(root, { pidIsAlive })).filter(lease => lease.pid !== ignorePid);
-  const native = await listNativeHolds(root, { pidIsAlive });
+  const native = await listNativeHolds(root, { pidIsAlive, strict: strictNative });
   const holds = [
     ...leases.map(({ pid, kind, runtime }) => ({ pid, kind, nativeBindings: 0,
       storeVersion: runtime?.storeVersion ?? null })),

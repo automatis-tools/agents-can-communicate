@@ -20,6 +20,7 @@ import { runConfigCommand } from "./config-command.mjs";
 import { ALL_ADAPTERS, runInstallCommand } from "./install-command.mjs";
 import { runDoctor } from "./doctor-command.mjs";
 import { runManagementDoctor } from "./managed-runtime/diagnostics.mjs";
+import { runStoreMigration } from "./store-migration-command.mjs";
 import { createGitProbe } from "./git-probe.mjs";
 import { canonicalClaim } from "./claim-spelling.mjs";
 import { platformDataHome, runtimePaths } from "./runtime-paths.mjs";
@@ -480,7 +481,7 @@ const HANDLERS = Object.freeze({
     return { data: result, text };
   },
 
-  doctor: async ({ options, context, runtime }) => runDoctor({ options, context, runtime }),
+  doctor: async input => input.options.migrateStore ? runStoreMigration(input) : runDoctor(input),
 
   update: async ({ options, runtime }) => runUpdateCommand({ options, runtime }),
 
@@ -518,8 +519,11 @@ export async function main(argv, runtime) {
   let parsed;
   try {
     parsed = parseArgs(argv);
-    const managementDoctor = runtime.managementOnly && parsed.command === "doctor" && !parsed.options.repair;
-    if (runtime.managementOnly && !managementDoctor && !["help", "version", "update"].includes(parsed.command)) {
+    const managementMigration = runtime.managementOnly && parsed.command === "doctor" && parsed.options.migrateStore;
+    const managementDoctor = runtime.managementOnly && parsed.command === "doctor"
+      && !parsed.options.repair && !parsed.options.migrateStore;
+    if (runtime.managementOnly && !managementDoctor && !managementMigration
+      && !["help", "version", "update"].includes(parsed.command)) {
       throw new AccError(EXIT.DATA, "runtime unavailable; retry after the update or run acc update to recover");
     }
     // `config` is the one command that must work on a workspace ACC cannot
@@ -547,6 +551,11 @@ export async function main(argv, runtime) {
     // for the clients it could and reports the one it could not. The data is
     // printed either way, and the command still fails.
     if (outcome != null) throw Object.assign(outcome, { details: { ...outcome.details, ...data } });
+    for (const diagnostic of context?.service?.store?.indexDiagnostics?.() ?? []) {
+      if (diagnostic.code === "index_unavailable") {
+        await write(runtime.stderr, `acc: transaction index unavailable (${diagnostic.reason}); the next indexed read will rebuild it\n`);
+      }
+    }
     // Machine mode writes exactly one JSON object to stdout and nothing else.
     if (parsed.options.json === true) await write(runtime.stdout, `${JSON.stringify(ok(data))}\n`);
     else if (text !== "") await write(runtime.stdout, `${human(text)}\n`);

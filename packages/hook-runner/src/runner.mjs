@@ -35,7 +35,7 @@ import { appendStartOwner, appendToolOwner, assertOwnerQuotable, ownerHeader, ow
 const DEFAULT_BUDGET_MS = 5_000;
 // Failures the hook output explains with advice of its own; any other error
 // text stays out of what the client shows.
-const KNOWN_FAILURES = new Set(["workspace_contains_runtime", "workspace_path_unquotable"]);
+const KNOWN_FAILURES = new Set(["workspace_contains_runtime", "workspace_path_unquotable", "store_migration_required"]);
 // Windows reads the table through WMI in Script Host, 145 ms on a
 // windows-latest runner, and through PowerShell where Script Host is off, whose
 // first start on a machine took 3.8 s. It gets more of the budget there, and
