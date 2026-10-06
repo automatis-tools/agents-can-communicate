@@ -24,6 +24,7 @@ import { listState, loadStateEnvelopes, readStateEnvelope } from "./state-reads.
 import { createTransactionView, transactionKinds } from "./transaction-view.mjs";
 import { createIndexCache } from "./index-cache.mjs";
 import { IndexCacheUnavailable } from "./index-pages.mjs";
+import { withIndexedPrune } from "./index-reclaim.mjs";
 
 // Kept cohesive above 300 lines because durable transactions and ephemeral
 // mutations must share this exact writer mutex. Splitting the two stores would
@@ -404,13 +405,18 @@ export async function openFilesystemStore({ root, clock, ids, workspaceId, failA
   async function reclaimRecords(plan, { limit, deadlineAt } = {}) {
     const bounded = Math.min(deadlineAt ?? Infinity, storeDeadline ?? Infinity);
     return withWriterMutex(paths, { ...publishOptions, deadlineAt: bounded }, async () => {
+      for (const entry of await readOpenJournals(paths, root)) await rollForward(paths, publishOptions, entry);
       // A function is decided here, holding the mutex, because eligibility is a
       // statement about relationships between records and not only about each
       // record. The generation on an entry proves that record did not change;
       // it says nothing about a session opening for a participant this was
       // about to remove. Deciding inside the lock is what closes that.
       const entries = typeof plan === "function" ? await plan() : plan;
-      return reclaimStateRecords(paths, entries, { root, limit, deadlineAt: bounded });
+      const reclaim = onCondemned => reclaimStateRecords(paths, entries,
+        { root, limit, deadlineAt: bounded, onCondemned });
+      if (!entries.some(entry => ["message", "receipt"].includes(entry.kind))) return reclaim();
+      return withIndexedPrune(paths, { ...publishOptions, ids,
+        firstSequence: pad(await nextSequence(paths, root)), deadlineAt: bounded }, reclaim);
     });
   }
 

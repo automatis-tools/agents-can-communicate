@@ -5,8 +5,9 @@ import { fileURLToPath } from "node:url";
 
 // Observe real descriptor operations; never replace store methods or durability.
 // Install at most one probe per test process, and restore it before leaving.
-export function createStoreIoProbe(root) {
+export function createStoreIoProbe(root, { trace = false } = {}) {
   const originals = new Map(), counts = new Map();
+  const events = [];
   const bucket = input => {
     if (typeof input !== "string" && !(input instanceof URL)) return null;
     const file = input instanceof URL ? fileURLToPath(input) : input;
@@ -36,7 +37,10 @@ export function createStoreIoProbe(root) {
         if (method === "readFile") { add(group, "reads"); add(group, "readBytes", bytes(result)); }
         if (method === "writeFile") { add(group, "writes"); add(group, "writeBytes", bytes(input[0])); }
         if (method === "write") { add(group, "writes"); add(group, "writeBytes", result.bytesWritten); }
-        if (method === "sync" || method === "datasync") add(group, "flushes");
+        if (method === "sync" || method === "datasync") {
+          add(group, "flushes");
+          if (trace) events.push({ operation: method, file: path.relative(root, String(args[0])) });
+        }
         return result;
       };
     }
@@ -47,6 +51,8 @@ export function createStoreIoProbe(root) {
     patch(name, async (...args) => {
       const result = await original(...args);
       add(bucket(args[0]), name);
+      if (trace && name === "rename" && bucket(args[0]) !== null) events.push({ operation: name,
+        from: path.relative(root, String(args[0])), to: path.relative(root, String(args[1])) });
       return result;
     });
   }
@@ -57,12 +63,14 @@ export function createStoreIoProbe(root) {
     for (const [key, count] of counts) {
       if (key.startsWith("state:") && key.endsWith("/reads")) stateByKind[key.slice(6, -6)] = count;
     }
-    return { stateReads: Object.values(stateByKind).reduce((sum, value) => sum + value, 0), stateByKind, io };
+    return { stateReads: Object.values(stateByKind).reduce((sum, value) => sum + value, 0), stateByKind, io,
+      ...(trace ? { trace: [...events] } : {}) };
   };
   return {
     snapshot,
     async capture(operation) {
       counts.clear();
+      events.length = 0;
       const started = performance.now(), result = await operation();
       return { result, elapsedMs: performance.now() - started, ...snapshot() };
     },

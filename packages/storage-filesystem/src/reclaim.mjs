@@ -7,6 +7,7 @@ import { listDirectoryEntries, readJsonIfPresent } from "./atomic-json.mjs";
 import { condemn, detachDoomed, discard, discardLeftovers, expired } from "./doomed-directory.mjs";
 import { assertSequence, raiseEventFloor, readEventFloor } from "./event-floor.mjs";
 import { statePath } from "./record-id.mjs";
+import { reclaimIndexPages } from "./index-reclaim.mjs";
 
 // Shared with the stage sweep that calls this, so one pass cannot spend two
 // budgets. Exported for the caller that wants to reclaim without a bound.
@@ -148,8 +149,14 @@ export async function reclaimRetired(paths,
 
   const removed = await discard(doomed, root, limit - spent, deadlineAt);
   reclaimed += removed.spent;
+  spent += removed.spent;
+  const indexes = journals.drained && markers.drained && removed.drained
+    ? await reclaimIndexPages(paths, { root, limit: limit - spent, deadlineAt })
+    : { reclaimed: 0, remaining: false };
+  reclaimed += indexes.reclaimed;
   return { reclaimed,
-    remaining: !journals.drained || !markers.drained || !removed.drained };
+    remaining: !journals.drained || !markers.drained || !removed.drained
+      || (indexes.remaining && !indexes.deferred) };
 }
 
 /**
@@ -172,7 +179,7 @@ export async function reclaimRetired(paths,
  * @returns {Promise<{ reclaimed: number, skipped: number, remaining: boolean }>}
  */
 export async function reclaimStateRecords(paths, entries,
-  { root, limit = RECLAIM_BUDGET, deadlineAt } = {}) {
+  { root, limit = RECLAIM_BUDGET, deadlineAt, onCondemned } = {}) {
   if (expired(deadlineAt)) return { reclaimed: 0, skipped: 0, remaining: entries.length > 0 };
   let spent = 0;
   let skipped = 0;
@@ -202,10 +209,13 @@ export async function reclaimStateRecords(paths, entries,
       continue;
     }
     await condemn(filePath, doomed);
+    await onCondemned?.(filePath, doomed);
     spent += 1;
     condemned += 1;
     try {
-      await condemn(path.join(paths.retained, "state", entry.kind, entry.id), doomed);
+      const markers = path.join(paths.retained, "state", entry.kind, entry.id);
+      await condemn(markers, doomed);
+      await onCondemned?.(markers, doomed);
       spent += 1;
       // Counted only when it moved. Most records own no marker directory at
       // all, and counting one anyway made `remaining` compare what was
