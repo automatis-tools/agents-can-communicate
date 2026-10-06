@@ -9,6 +9,8 @@ import { bakeSkillCommand, blankJson, blankText, removeIfEmpty, removeInstalledT
   tomlString, windowsHookCommand, writeCliShim, writeForeignJson, writeHookShim }
   from "@agents-can-communicate/adapter-sdk";
 import { AccError, EXIT } from "@agents-can-communicate/protocol";
+import { inspectAllowRule, removeAllowRule, ruleApplies, rulesPath, writeAllowRule }
+  from "./allow-rule.mjs";
 import { inspectConfig, readConfig, sandboxOwnership, writeTomlBlock } from "./config-block.mjs";
 import { outgoingStatus, prepareLivePermissions, removeLivePermissions } from "./live-permissions.mjs";
 
@@ -204,6 +206,7 @@ export async function installCodexPlugin({ home, agentsHome = home,
   // shim carries the pinning so each example can name one path.
   const cliShim = await writeCliShim({ dir: target, cli, node, dataHome, platform: hostPlatform });
   await bakeSkillCommand({ root: target, cliShim, platform: hostPlatform });
+  const allowRule = await writeAllowRule({ codexHome, cliShim, hostPlatform });
   const shim = await writeHookShim({ dir: target, adapterId: "codex",
     dataHome, runner, node, platform: hostPlatform });
   await writeJson(path.join(target, "hooks.json"),
@@ -256,11 +259,13 @@ export async function installCodexPlugin({ home, agentsHome = home,
   // The old comment here said the root was "what ACC owns", which was true only
   // while ACC invented its own marketplace name and so had a root to itself.
   // make the record stale the moment the plugin version changes.
-  return { ok: true, changes: [target, file, config, cachePath(codexHome)],
+  return { ok: true, changes: [target, file, config, cachePath(codexHome),
+    ...(allowRule.file === null ? [] : [allowRule.file])],
     needsAction: [HOOK_REVIEW, ...permissionActions,
       ...(permissions.skipLegacy ? [] : sandboxReview(before, config, stateRoot))],
     diagnostics: ["hooks require explicit trust in Codex before they run",
       ...(permissions.status ? [permissions.status.diagnostic] : []),
+      ...allowRule.diagnostics,
       ...(permissions.skipLegacy ? [] : sandboxReview(before, config, stateRoot))] };
 }
 
@@ -326,6 +331,9 @@ export async function uninstallCodexPlugin({ home, agentsHome = home,
       return value?.name === MARKETPLACE && (value.plugins ?? []).length === 0;
     } });
 
+  const rule = await removeAllowRule({ codexHome,
+    cliShim: path.join(pluginPath(agentsHome), "acc-cli.sh"), keep });
+  if (rule !== null) changes.push(rule);
   await removeInstalledTree(cachePath(codexHome), keep);
   await removeInstalledTree(pluginPath(agentsHome), keep);
   // The directories ACC made to hold those, once nothing is in them. They are
@@ -350,7 +358,7 @@ export async function uninstallCodexPlugin({ home, agentsHome = home,
 
 export async function detectCodex({ home, agentsHome = home,
   codexHome = path.join(home, ".codex"), stateRoot, clientVersion, platform, nativeDelivery,
-  receiverSockets }) {
+  receiverSockets, hostPlatform = process.platform }) {
   const marketplace = await readJson(marketplacePath(agentsHome), null);
   const published = (marketplace?.plugins ?? []).some(entry => entry.name === PLUGIN_NAME);
   const config = await readFile(configPath(codexHome), "utf8").catch(() => "");
@@ -360,6 +368,9 @@ export async function detectCodex({ home, agentsHome = home,
     .then(() => true).catch(() => false);
   const outgoingDelivery = outgoingStatus(config, { home, codexHome, stateRoot,
     file: configPath(codexHome), clientVersion, platform, receiverSockets });
+  const allowRule = published
+    ? await inspectAllowRule({ codexHome, cliShim: path.join(pluginPath(agentsHome), "acc-cli.sh"), hostPlatform })
+    : { state: "none", diagnostic: null };
   // Saved trust is not readiness. Codex compares every current definition's
   // hash and can disable a trusted hook. Even a commented or stale single record
   // previously suppressed this check. Leave verification to Codex's /hooks;
@@ -383,10 +394,12 @@ export async function detectCodex({ home, agentsHome = home,
       ? ["hook readiness is unverified by ACC; Codex checks whether each current "
         + "definition is enabled and trusted"]
       : []),
+    ...(allowRule.diagnostic === null ? [] : [allowRule.diagnostic]),
   ],
   needsAction: cached
     ? [HOOK_REVIEW, ...sandboxReview(config, configPath(codexHome), stateRoot),
-      ...(outgoingDelivery.state === "unverified" ? [outgoingDelivery.diagnostic] : [])]
+      ...(outgoingDelivery.state === "unverified" ? [outgoingDelivery.diagnostic] : []),
+      ...(allowRule.state === "missing" ? [allowRule.diagnostic] : [])]
     : [] };
 }
 
@@ -398,11 +411,13 @@ export async function detectCodex({ home, agentsHome = home,
  * this against what install actually reports changing.
  */
 export function planCodexInstall({ home, agentsHome = home,
-  codexHome = path.join(home, ".codex") }) {
+  codexHome = path.join(home, ".codex"), hostPlatform = process.platform }) {
   return [
     { path: pluginPath(agentsHome), kind: "tree" },
     { path: cachePath(codexHome), kind: "tree" },
     { path: marketplacePath(agentsHome), kind: "merge" },
     { path: configPath(codexHome), kind: "merge" },
+    // ACC's own file, so a fingerprint decides whether uninstall takes it back.
+    ...(ruleApplies(hostPlatform) ? [{ path: rulesPath(codexHome), kind: "tree" }] : []),
   ];
 }

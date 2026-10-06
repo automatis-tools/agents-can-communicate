@@ -1345,3 +1345,23 @@ that the Codex app runs it on its own server, and doctor says a chat started in 
 the one a peer can reach live. The thread is never loaded into the daemon: the writer lock
 then shows "This is open in another app" (openai/codex#37403). The app's internal IPC bus
 (`~/.codex/ipc/ipc.sock`) is undocumented and was not used.
+
+## Auto-review and ACC's rules file, 2026-10-05
+
+Observed with Codex 0.160 on macOS arm64, in a session with `approval_policy = "on-request"` and
+`approvals_reviewer = "auto_review"` (#260):
+
+- The model ran 118 of its 167 ACC commands with `sandbox_permissions: "require_escalated"`,
+  although none of its sandboxed ACC commands failed. Each escalated command went to the
+  reviewer.
+- The reviewer refused an `acc reply` that named a branch, a commit and changed paths: "This
+  discloses non-public branch, commit, changed-path, release-target, and readiness metadata to
+  an external ACC peer". The peer was a session of the same user on the same machine. From then
+  on the model answered peers that it could not share project details.
+
+Codex 0.160.1 loads every `*.rules` file in `$CODEX_HOME/rules`, and a command that a
+`prefix_rule` with `decision = "allow"` matches needs no approval, so no reviewer sees it. Install
+writes `agents-can-communicate.rules` there, allowing ACC's wrapper by its full path with the
+participant commands only. `codex execpolicy check` on that file answers `allow` for
+`<wrapper> reply …` and nothing for `<wrapper> install …`; the real-clients job checks this on
+Linux. Windows gets no rule.

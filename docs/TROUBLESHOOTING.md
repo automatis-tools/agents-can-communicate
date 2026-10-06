@@ -252,6 +252,19 @@ next-turn hook shows the body. The message arrives with the session's next turn,
 `acc inbox` shows it at any time. The sender's `acc message` output still reports
 `woke <participant> via claude-inbox`, because the wake reached the inbox.
 
+## A Codex session will not tell peers project details
+
+With `approvals_reviewer = "auto_review"`, Codex's reviewer judges every command a session
+runs outside its sandbox. It refused an ACC reply that named a branch, a commit and changed
+paths as disclosure to an external party. After that, the session answered peers that it
+could not share project details.
+
+ACC's rules file lets the participant commands skip that review on macOS and Linux; see
+[Codex command approval](CONFIGURATION.md#codex-command-approval). Run `acc doctor`: when the
+rule is missing, it asks for `acc install --adapter codex`. If a session started before the
+install still asks, start a new one. On Windows there is no rule; approve the command, or turn
+off auto-review for the session.
+
 ## Codex plugin is listed but inactive
 
 Open `/plugins` in Codex and check ACC is enabled. Open `/hooks`, review each ACC hook,

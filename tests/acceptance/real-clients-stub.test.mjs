@@ -87,6 +87,19 @@ test("real Claude Code and Codex attach through their hooks and carry a message 
 
     await acc(["install", "--adapter", "claude_code", "--adapter", "codex", "--delivery", "off",
       "--home", packed.clientHome]);
+    // The real Codex reads ACC's rule: a coordination command is allowed, so no
+    // approval and no auto-review sees it; install still asks (#260).
+    const rules = path.join(codexHome, "rules", "agents-can-communicate.rules");
+    if (process.platform !== "win32") {
+      const shim = path.join(packed.clientHome, ".agents", "acc-local", "plugins",
+        "agents-can-communicate", "acc-cli.sh");
+      const decide = async (...words) => JSON.parse((await run(bins[1], ["execpolicy", "check",
+        "--rules", rules, shim, ...words], { env })).stdout).decision ?? null;
+      assert.equal(await decide("reply", "--message", "m", "--body", "b"), "allow");
+      assert.equal(await decide("install", "--adapter", "codex"), null);
+    } else {
+      await assert.rejects(readFile(rules, "utf8"), { code: "ENOENT" });
+    }
     // Someone is already in the room: a manual CLI session, the way an agent in
     // any other client would be. With a second live session, each client's
     // attachment is durable rather than ephemeral.
@@ -143,4 +156,5 @@ test("real Claude Code and Codex attach through their hooks and carry a message 
     await acc(["uninstall", "--adapter", "claude_code", "--adapter", "codex", "--home", packed.clientHome]);
     const config = await readFile(path.join(codexHome, "config.toml"), "utf8");
     assert.equal(config.includes("agents-can-communicate"), false, config);
+    await assert.rejects(readFile(rules, "utf8"), { code: "ENOENT" });
   });
