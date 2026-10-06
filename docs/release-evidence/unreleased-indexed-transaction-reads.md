@@ -60,6 +60,14 @@ not activate. An unmanaged old binary refused a new open of the migrated store.
 Explicit candidate activation then preserved retry identity and allowed ack.
 This final-code installed-artifact test passed once in 11.54 seconds.
 
+## Full local suite
+
+`npm test` on evidence commit `300fac15`, Node 24.4.0 on macOS arm64, completed
+3152 tests: 3145 passed, zero failed, seven skipped, in 323.17 seconds
+(5 min 23 s). It ran once after the final review fix pass in a coordinated quiet
+window. This is a local gate result; no before/after whole-suite speedup is
+inferred from it. Syntax checks passed on all 724 tracked modules.
+
 ## Review and proof limits
 
 One independent whole-branch review found three Important defects, no Critical
