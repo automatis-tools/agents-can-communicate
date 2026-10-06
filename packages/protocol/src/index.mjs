@@ -12,3 +12,4 @@ export { CONFIG_FILENAME, CONFIG_SCHEMA_VERSION, RUNTIME_KEYS, defaultProjectCon
 export { RECEIPT_STATES, advanceReceipt } from "./states.mjs";
 export { assertMatchableResource, normaliseResource } from "./resources.mjs";
 export { assertDecisionChange } from "./decision-changes.mjs";
+export { TRANSACTION_INDEXES, assertIndexTuple, indexKeysFor } from "./transaction-indexes.mjs";
