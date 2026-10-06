@@ -29,18 +29,30 @@ async function fixture(t) {
   return { root, store, service, clock, sender, reader, send, offer, ids };
 }
 
-test("receipt operations read only their named state records at a 60-message backlog", async t => {
+test("steady sends do not scale primary reads with backlog; receipts read only their named state records", async t => {
   const f = await fixture(t), messages = [];
-  for (let i = 0; i < 60; i++) messages.push(await f.send(`client_${i}`));
   const probe = createStoreIoProbe(f.root);
   t.after(() => probe.stop());
+  const sends = {};
+  for (let i = 0; i < 60; i++) {
+    const measured = await probe.capture(() => f.send(`client_${i}`));
+    assert.equal(measured.indexFlushes, 0, "index bytes and publications never flush");
+    messages.push(measured.result);
+    if ([1, 20, 40, 60].includes(i + 1)) sends[i + 1] = measured;
+  }
+  assert.equal(sends[20].stateReads, sends[40].stateReads);
+  assert.equal(sends[40].stateReads, sends[60].stateReads);
+  assert(sends[20].stateReads > 0, "the probe observes actual primary reads");
+  for (const measurement of Object.values(sends)) {
+    assert(measurement.pageWrites > 0, "page publication counters are active");
+  }
   const read = await probe.capture(() => f.service.readReceipt(f.offer(messages[0])));
   const offered = await probe.capture(() => f.service.recordOfferSucceeded(f.offer(messages[0])));
   const ack = await probe.capture(() => f.service.acknowledgeMessage({ ...owner(f.reader),
     messageId: messages[0].messageId }));
   const failed = await probe.capture(() => f.service.recordOfferFailed({ ...f.offer(messages[1]),
     safeErrorCode: "transport_rejected" }));
-  t.diagnostic(JSON.stringify({ read, offered, ack, failed }));
+  t.diagnostic(JSON.stringify({ sends, read, offered, ack, failed }));
   assert.equal(read.stateReads, 2);
   assert.deepEqual(read.stateByKind, { receipt: 1, message: 1 });
   assert.equal(offered.stateReads, 3);
@@ -55,6 +67,20 @@ test("receipt operations read only their named state records at a 60-message bac
   const cold = await probe.capture(() => coldService.readReceipt(f.offer(messages[0])));
   assert.equal(cold.stateReads, 2);
   assert.equal(cold.result.state, "acknowledged");
+  const reopenedRetry = await probe.capture(() => coldService.sendMessage({ ...owner(f.sender),
+    clientMessageId: "client_0", toParticipantIds: ["reader"], kind: "note", obligation: "none",
+    subject: "client_0", body: "Same measured fixture" }));
+  assert.equal(reopenedRetry.result.messageId, messages[0].messageId);
+  assert.equal(reopenedRetry.stateByKind.message, 1);
+  assert.equal(reopenedRetry.stateByKind.receipt ?? 0, 0, "reopen never scans unrelated recipients");
+  await rm(path.join(f.root, "indexes"), { recursive: true });
+  const recovery = await probe.capture(() => coldService.sendMessage({ ...owner(f.sender),
+    clientMessageId: "client_0", toParticipantIds: ["reader"], kind: "note", obligation: "none",
+    subject: "client_0", body: "Same measured fixture" }));
+  assert.equal(recovery.result.messageId, messages[0].messageId);
+  assert(recovery.stateReads >= 120, "forced cache recovery is measured separately");
+  assert.equal(recovery.indexFlushes, 0);
+  t.diagnostic(JSON.stringify({ cold, reopenedRetry, recovery }));
 });
 
 test("an offer whose semantic owner is replaced while waiting refuses without changing its receipt", async t => {
