@@ -22,7 +22,8 @@ export async function withRegularNoFollow(filePath, root, flags, operation, open
     handle = await openNoFollow(filePath, flags, { open: openFile });
   } catch (error) {
     if (error.code === "ENOENT") throw error;
-    throw new AccError(EXIT.DATA, "cannot safely open regular file",
+    // Measurement branch only: the OS error in the message, where test output shows it.
+    throw new AccError(EXIT.DATA, `cannot safely open regular file [${error.code}: ${error.message}]`,
       { filePath, cause: error.message });
   }
   try {
