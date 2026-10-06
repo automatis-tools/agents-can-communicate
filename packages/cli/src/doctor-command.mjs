@@ -1,4 +1,7 @@
 import { mkdir, readdir, readFile, stat, writeFile } from "node:fs/promises";
+// Kept above 300 lines so store, installation and native-session findings feed
+// one report before service reads. Splitting the diagnostic assembly risks
+// opening an unreadable store before its failure has been reported.
 import { homedir } from "node:os";
 import path from "node:path";
 
@@ -311,6 +314,7 @@ export async function runDoctor({ options, context, runtime }) {
     materialised: status.materialised,
     protection: status.protection,
     store: report,
+    indexDiagnostics: service.store?.indexDiagnostics?.() ?? [],
     // Capabilities are reported from what is actually installed, never assumed.
     adapters,
     update,

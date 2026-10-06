@@ -39,7 +39,7 @@ export const COMMANDS = Object.freeze({
     "client-message-id"],
     repeated: ["completed", "remaining", "blocker"] },
   status: { required: [], optional: ["session", "generation", "participant"], flags: ["all"] },
-  doctor: { required: [], optional: ["home"], flags: ["repair"] },
+  doctor: { required: [], optional: ["home"], flags: ["repair", "migrate-store"] },
   // `--apply` rather than `--dry-run`: this is the one command that takes
   // records out of the store, so the reporting run is what happens by
   // default and meaning it is what has to be said out loud.
@@ -187,6 +187,9 @@ export function parseArgs(argv) {
     if (!Object.hasOwn(options, camel(name))) {
       usage(`${command} requires --${name}`, { command, option: name });
     }
+  }
+  if (command === "doctor" && options.repair && options.migrateStore) {
+    usage("doctor --repair and --migrate-store are separate operations");
   }
   return { command, options: subcommand === undefined ? options : { ...options, subcommand } };
 }

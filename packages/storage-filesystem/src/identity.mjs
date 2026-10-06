@@ -4,17 +4,26 @@ import { AccError, EXIT, assertPortableId } from "@agents-can-communicate/protoc
 
 import { encode, nameCommittedLater, publishAtomic, readJsonIfPresent } from "./atomic-json.mjs";
 
-export const STORE_VERSION = 6;
+export const STORE_VERSION = 7;
 
 export function identityPath(paths) {
   return path.join(paths.root, "protocol.json");
 }
 
-function assertIdentity(record, workspaceId, filePath) {
-  if (record?.storeVersion !== STORE_VERSION) {
-    throw new AccError(EXIT.DATA, "unknown store version", { filePath,
-      storeVersion: record?.storeVersion });
+function assertIdentity(record, workspaceId, filePath, versions = [STORE_VERSION]) {
+  if (!versions.includes(record?.storeVersion)) {
+    const message = record?.storeVersion === 6
+      ? "store contract 6 requires explicit migration: stop other store users and run acc doctor --migrate-store"
+      : "unknown store version";
+    throw new AccError(EXIT.DATA, message, { filePath,
+      storeVersion: record?.storeVersion,
+      ...(record?.storeVersion === 6 ? { reasonCode: "store_migration_required" } : {}) });
   }
+  if (Object.keys(record).sort().join(",") !== "initialisedAt,storeVersion,workspaceId"
+    || typeof record.initialisedAt !== "string" || !Number.isFinite(Date.parse(record.initialisedAt))) {
+    throw new AccError(EXIT.DATA, "invalid store identity", { filePath });
+  }
+  assertPortableId(record.workspaceId, "store workspace id");
   if (record.workspaceId !== workspaceId) {
     throw new AccError(EXIT.DATA, "store belongs to a different workspace",
       { filePath, expected: workspaceId, actual: record.workspaceId });
@@ -63,9 +72,12 @@ export async function requireStoreIdentity(paths, { workspaceId, clock, create =
 export async function readStoreIdentity(paths) {
   const found = await readJsonIfPresent(identityPath(paths), paths.root);
   if (found === null) return null;
-  if (found.value?.storeVersion !== STORE_VERSION) {
-    throw new AccError(EXIT.DATA, "unknown store version",
-      { filePath: identityPath(paths), storeVersion: found.value?.storeVersion });
-  }
-  return found.value;
+  return assertIdentity(found.value, found.value?.workspaceId, identityPath(paths));
+}
+
+export async function readMigrationIdentity(paths, workspaceId) {
+  assertPortableId(workspaceId, "workspace id");
+  const found = await readJsonIfPresent(identityPath(paths), paths.root);
+  if (found === null) throw new AccError(EXIT.DATA, "store is not initialised", { filePath: identityPath(paths) });
+  return assertIdentity(found.value, workspaceId, identityPath(paths), [6, STORE_VERSION]);
 }

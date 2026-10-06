@@ -5,3 +5,4 @@ export { readStoreIdentity, requireStoreIdentity, STORE_VERSION } from "./identi
 export { withWriterMutex } from "./writer-mutex.mjs";
 export { readSessionRecord } from "./session-read.mjs";
 export { openNoFollow } from "./portable-fs.mjs";
+export { migrateFilesystemStore } from "./store-migration.mjs";

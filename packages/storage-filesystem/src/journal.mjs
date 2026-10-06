@@ -5,6 +5,7 @@ import { AccError, EXIT, assertPortableId } from "@agents-can-communicate/protoc
 import { activateJournal, idleJournal, readActiveJournal } from "./active-journal.mjs";
 import { encode, nameCommittedLater, publishAtomic, readJsonIfPresent, retainFile }
   from "./atomic-json.mjs";
+import { recoverPruneDurability } from "./prune-durability.mjs";
 
 export const JOURNAL_VERSION = 2;
 
@@ -133,6 +134,7 @@ export async function readJournalCeiling(paths, root) {
 // twice changes nothing and a genuine conflict is never papered over.
 export async function rollForward(paths, options, entry) {
   const published = [];
+  if (entry.publications.length === 0) await recoverPruneDurability(paths, options);
   for (const publication of entry.publications) {
     const destination = publicationDestination(options.root, publication.path);
     if (publication.retainedPath !== null) {

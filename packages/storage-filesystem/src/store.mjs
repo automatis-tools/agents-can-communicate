@@ -1,10 +1,10 @@
 import { mkdir } from "node:fs/promises";
 import path from "node:path";
 
-import { AccError, EXIT, assertPortableId, validateRecord }
+import { AccError, EXIT, TRANSACTION_INDEXES, assertIndexTuple, assertPortableId, indexKeysFor, validateRecord }
   from "@agents-can-communicate/protocol";
 
-import { encode, listDirectoryEntries, listJsonFiles, publishAtomic, readJsonIfPresent,
+import { encode, listJsonFiles, publishAtomic, readJsonIfPresent,
   retainFile } from "./atomic-json.mjs";
 import { initialiseActiveJournal, readActiveJournal } from "./active-journal.mjs";
 import { publicationPath } from "./publication-path.mjs";
@@ -12,15 +12,19 @@ import { assertPublicationDeadline } from "./deadline.mjs";
 import { requireStoreIdentity } from "./identity.mjs";
 import { journalEntry, readJournalCeiling, readOpenJournals, rollForward, writeJournalEntry }
   from "./journal.mjs";
-import { assertEventBinding, assertStateBinding, eventPath, stateEnvelope, statePath }
+import { assertEventBinding, eventPath, stateEnvelope, statePath }
   from "./record-id.mjs";
-import { ephemeralIsDeleted, markEphemeral, stateDeletionPublication,
-  stateGenerationIsDeleted } from "./retention.mjs";
+import { ephemeralIsDeleted, markEphemeral, stateDeletionPublication } from "./retention.mjs";
 import { ensureManagedDirectory } from "./safe-directory.mjs";
 import { readEventFloor } from "./event-floor.mjs";
 import { reclaimStateRecords, trimEventLog } from "./reclaim.mjs";
 import { sweepIfDue } from "./stage-sweep.mjs";
 import { withWriterMutex } from "./writer-mutex.mjs";
+import { listState, loadStateEnvelopes, readStateEnvelope } from "./state-reads.mjs";
+import { createTransactionView, transactionKinds } from "./transaction-view.mjs";
+import { createIndexCache } from "./index-cache.mjs";
+import { IndexCacheUnavailable } from "./index-pages.mjs";
+import { withIndexedPrune } from "./index-reclaim.mjs";
 
 // Kept cohesive above 300 lines because durable transactions and ephemeral
 // mutations must share this exact writer mutex. Splitting the two stores would
@@ -53,34 +57,6 @@ const pad = value => String(value).padStart(SEQUENCE_WIDTH, "0");
 export function storePaths(root) {
   return Object.freeze(Object.fromEntries([["root", root],
     ...DIRECTORIES.map(name => [name, path.join(root, name)])]));
-}
-
-async function listState(paths, root, kind) {
-  const envelopes = [];
-  for (const filePath of await listJsonFiles(path.join(paths.state, kind), { root })) {
-    const found = await readJsonIfPresent(filePath, root);
-    if (found === null) continue;
-    const envelope = assertStateBinding(found.value, kind,
-      path.basename(filePath, ".json"), filePath);
-    if (await stateGenerationIsDeleted(paths, root, kind, envelope.id,
-      envelope.generation)) continue;
-    validateRecord(kind, envelope.record);
-    envelopes.push(envelope);
-  }
-  return envelopes;
-}
-
-async function loadAllState(paths, root, wanted = null) {
-  const loaded = new Map();
-  const kinds = (await listDirectoryEntries(paths.state, { root }))
-    .filter(entry => entry.isDirectory()).map(entry => entry.name)
-    .filter(kind => wanted === null || wanted.has(kind));
-  for (const kind of kinds) {
-    for (const envelope of await listState(paths, root, kind)) {
-      loaded.set(`${envelope.kind}:${envelope.id}`, envelope);
-    }
-  }
-  return loaded;
 }
 
 async function nextSequence(paths, root) {
@@ -118,6 +94,8 @@ export async function openFilesystemStore({ root, clock, ids, workspaceId, failA
   await requireStoreIdentity(paths, { workspaceId, clock, platform });
   for (const name of DIRECTORIES) await ensureManagedDirectory(root, paths[name]);
   const publishOptions = { root, tmpDir: paths.tmp, clock, failAt, platform };
+  const indexCache = createIndexCache({ paths, root, workspaceId, publishOptions,
+    loadPrimary: options => loadStateEnvelopes(paths, { root, ...options }, new Set(["message", "receipt"])) });
   await initialiseActiveJournal(paths, publishOptions);
 
   // Any journal left behind by a crashed writer is completed before the store
@@ -149,7 +127,7 @@ export async function openFilesystemStore({ root, clock, ids, workspaceId, failA
     return withWriterMutex(paths, { root, tmpDir: paths.tmp, clock, deadlineAt: storeDeadline }, async () => {
       const completed = [];
       for (const entry of await readOpenJournals(paths, root)) {
-        completed.push(...await rollForward(paths, { root, tmpDir: paths.tmp, clock }, entry));
+        completed.push(...await rollForward(paths, { root, tmpDir: paths.tmp, clock, platform }, entry));
       }
       return completed;
     });
@@ -170,87 +148,58 @@ export async function openFilesystemStore({ root, clock, ids, workspaceId, failA
    * these transactions make reads as "nothing conflicts" when it finds nothing.
    * Declaring nothing reads everything, which is what this always did.
    */
-  async function transaction(callback, { kinds, deadlineAt } = {}) {
+  async function transaction(callback, { kinds, exactKinds = [], deadlineAt } = {}) {
     // A caller may tighten this invocation's budget, never extend it.
     deadlineAt = Math.min(deadlineAt ?? Infinity, storeDeadline ?? Infinity);
-    const wanted = kinds === undefined ? null : new Set(kinds);
-    const declared = kind => {
-      if (wanted !== null && !wanted.has(kind)) {
-        throw new AccError(EXIT.DATA,
-          `this transaction did not declare ${kind}, so it was never read`,
-          { kind, declared: [...wanted] });
-      }
-      return kind;
-    };
+    const { eager } = transactionKinds(kinds, exactKinds);
     return withWriterMutex(paths, { ...publishOptions, deadlineAt }, async () => {
       assertPublicationDeadline(deadlineAt);
+      // An already-open handle may follow a writer that died after deciding.
+      // Recovery here holds this mutex directly, never trying to acquire it twice.
+      for (const entry of await readOpenJournals(paths, root)) await rollForward(paths, publishOptions, entry);
+      const before = await readActiveJournal(paths, root);
       // Reads are loaded once per transaction so get, list, and the generation
       // that put() compares against all describe the same instant.
-      const loaded = await loadAllState(paths, root, wanted);
-      const staged = new Map();
+      const loaded = await loadStateEnvelopes(paths, { root }, eager);
       const events = [];
       let sequence = await nextSequence(paths, root);
       const firstSequence = pad(sequence);
-      const entryFor = key => {
-        const entry = staged.get(key) ?? loaded.get(key) ?? null;
-        return entry?.removed === true ? null : entry;
-      };
-
-      const tx = Object.freeze({
-        get(kind, id) {
-          declared(kind);
-          return entryFor(`${kind}:${id}`)?.record ?? null;
+      const view = createTransactionView({ kinds, exactKinds, loaded, ids,
+        loadEnvelope: (kind, id) => {
+          assertPublicationDeadline(deadlineAt);
+          return readStateEnvelope(paths, { root, workspaceId }, kind, id);
         },
-        generationOf(kind, id) {
-          declared(kind);
-          return entryFor(`${kind}:${id}`)?.generation ?? null;
+        lookupIndex(index, tuple, context) {
+          assertIndexTuple(index, tuple);
+          const kind = TRANSACTION_INDEXES[index].kind;
+          context.declared(kind);
+          return indexCache.lookup(index, tuple, { active: before, staged: context.staged, deadlineAt,
+            verify: async id => {
+              const envelope = await context.read(kind, id);
+              if (envelope === null) return false;
+              if (!indexKeysFor(kind, envelope.record).some(key => key.index === index
+                && JSON.stringify(key.tuple) === JSON.stringify(tuple))) {
+                throw new IndexCacheUnavailable("invalid_source_reference");
+              }
+              return true;
+            } });
         },
-        list(kind, predicate = () => true) {
-          declared(kind);
-          const merged = new Map();
-          for (const source of [loaded, staged]) {
-            for (const [key, entry] of source) {
-              if (entry.kind === kind) merged.set(key, entry);
-            }
-          }
-          return [...merged.values()].filter(entry => entry.removed !== true)
-            .map(entry => entry.record).filter(predicate);
-        },
-        put(kind, id, record, expectedGeneration = null) {
-          declared(kind);
-          const key = `${kind}:${id}`;
-          const actual = entryFor(key)?.generation ?? null;
-          if (actual !== expectedGeneration) {
-            throw new AccError(EXIT.CONFLICT, `${kind} ${id} changed under this transaction`,
-              { kind, id, expectedGeneration, actualGeneration: actual });
-          }
-          validateRecord(kind, record);
-          const generation = ids.next("generation");
-          staged.set(key, { kind, id, record, generation });
-          return generation;
-        },
-        remove(kind, id, expectedGeneration = null) {
-          declared(kind);
-          const key = `${kind}:${id}`;
-          const actual = entryFor(key)?.generation ?? null;
-          if (actual !== expectedGeneration) {
-            throw new AccError(EXIT.CONFLICT, `${kind} ${id} changed under this transaction`,
-              { kind, id, expectedGeneration, actualGeneration: actual });
-          }
-          const persisted = loaded.get(key);
-          if (persisted === undefined) staged.delete(key);
-          else staged.set(key, { kind, id, generation: persisted.generation, removed: true });
-        },
-        append(event) {
+        appendEvent(event) {
           const stamped = { ...event, sequence: pad(sequence) };
           sequence += 1;
           validateRecord("event", stamped);
           events.push(stamped);
           return stamped;
-        },
-      });
-
-      const result = await callback(tx);
+        } });
+      const { tx, staged } = view;
+      let result;
+      try { result = await callback(tx); }
+      catch (error) {
+        await view.finish().catch(() => {});
+        throw error;
+      }
+      await view.finish();
+      const deltas = indexCache.prepareDeltas(loaded, staged);
 
       // Events are published before state records on purpose: the event log is
       // the authority, and a crash between the two is the window the journal
@@ -281,7 +230,7 @@ export async function openFilesystemStore({ root, clock, ids, workspaceId, failA
       // journalled write too, which the path below keeps.
       const [only] = staged.values();
       if (events.length === 0 && staged.size === 1 && only.removed !== true
-        && (await readActiveJournal(paths, root)).state === "idle") {
+        && !["message", "receipt"].includes(only.kind) && before.state === "idle") {
         assertPublicationDeadline(deadlineAt);
         await publishAtomic(statePath(paths, only.kind, only.id), publications[0].bytes,
           { ...publishOptions, replace: true, deadlineAt });
@@ -297,6 +246,7 @@ export async function openFilesystemStore({ root, clock, ids, workspaceId, failA
       await writeJournalEntry(paths, { ...publishOptions, deadlineAt }, entry);
       await failAt?.("after-journal");
       await rollForward(paths, publishOptions, entry);
+      await indexCache.commit({ before, after: await readActiveJournal(paths, root), deltas, deadlineAt });
       return result;
     });
   }
@@ -343,13 +293,8 @@ export async function openFilesystemStore({ root, clock, ids, workspaceId, failA
    * pass over every session the workspace ever had, several times a hook.
    */
   async function stateRecord(workspace, kind, id) {
-    const filePath = statePath(paths, kind, id);
-    const found = await readJsonIfPresent(filePath, root);
-    if (found === null) return null;
-    const envelope = assertStateBinding(found.value, kind, id, filePath);
-    if (await stateGenerationIsDeleted(paths, root, kind, envelope.id, envelope.generation)) return null;
-    validateRecord(kind, envelope.record);
-    return envelope.record.workspaceId === workspace ? envelope.record : null;
+    const envelope = await readStateEnvelope(paths, { root }, kind, id);
+    return envelope?.record.workspaceId === workspace ? envelope.record : null;
   }
 
   async function snapshot(workspace, { kinds } = {}) {
@@ -446,7 +391,7 @@ export async function openFilesystemStore({ root, clock, ids, workspaceId, failA
    */
   async function stateEnvelopes(workspace, { kinds } = {}) {
     const wanted = kinds === undefined ? null : new Set(kinds);
-    return [...(await loadAllState(paths, root, wanted)).values()]
+    return [...(await loadStateEnvelopes(paths, { root }, wanted)).values()]
       .filter(envelope => envelope.record.workspaceId === workspace);
   }
 
@@ -460,13 +405,18 @@ export async function openFilesystemStore({ root, clock, ids, workspaceId, failA
   async function reclaimRecords(plan, { limit, deadlineAt } = {}) {
     const bounded = Math.min(deadlineAt ?? Infinity, storeDeadline ?? Infinity);
     return withWriterMutex(paths, { ...publishOptions, deadlineAt: bounded }, async () => {
+      for (const entry of await readOpenJournals(paths, root)) await rollForward(paths, publishOptions, entry);
       // A function is decided here, holding the mutex, because eligibility is a
       // statement about relationships between records and not only about each
       // record. The generation on an entry proves that record did not change;
       // it says nothing about a session opening for a participant this was
       // about to remove. Deciding inside the lock is what closes that.
       const entries = typeof plan === "function" ? await plan() : plan;
-      return reclaimStateRecords(paths, entries, { root, limit, deadlineAt: bounded });
+      const reclaim = onCondemned => reclaimStateRecords(paths, entries,
+        { root, limit, deadlineAt: bounded, onCondemned });
+      if (!entries.some(entry => ["message", "receipt"].includes(entry.kind))) return reclaim();
+      return withIndexedPrune(paths, { ...publishOptions, ids,
+        firstSequence: pad(await nextSequence(paths, root)), deadlineAt: bounded }, reclaim);
     });
   }
 
@@ -484,5 +434,6 @@ export async function openFilesystemStore({ root, clock, ids, workspaceId, failA
   }
 
   return Object.freeze({ transaction, eventsSince, snapshot, stateRecord, stateEnvelopes,
-    reclaimRecords, trimHistory, ephemeral, paths, root, workspaceId });
+    reclaimRecords, trimHistory, ephemeral, paths, root, workspaceId,
+    indexDiagnostics: indexCache.diagnostics });
 }

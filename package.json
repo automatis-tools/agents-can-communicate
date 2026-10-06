@@ -2,7 +2,7 @@
   "name": "agents-can-communicate",
   "version": "0.9.1",
   "accManagedUpdateProtocol": 2,
-  "accStoreVersion": 6,
+  "accStoreVersion": 7,
   "type": "module",
   "description": "Local-first coordination for independently opened AI agent sessions.",
   "keywords": [

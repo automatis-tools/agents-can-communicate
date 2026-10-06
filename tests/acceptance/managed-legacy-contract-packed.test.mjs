@@ -44,14 +44,14 @@ test("packed launchers recover legacy admission and update with two live MCP ser
   for (const client of servers) {
     const lease = leases.find(item => item.pid === client.child.pid && item.kind === "acc-mcp");
     assert.ok(lease, "the real MCP server must publish its actual PID");
-    assert.equal(lease.runtime.storeVersion, 6, "legacy pointers must not poison newly admitted servers");
+    assert.equal(lease.runtime.storeVersion, f.manifest.accStoreVersion, "legacy pointers must not poison newly admitted servers");
   }
   const result = await f.acc(["update"], { ACC_NO_UPDATE_CHECK: "0",
     npm_config_registry: registry.url, npm_config_cache: path.join(f.root, "update-cache") });
   assert.equal(result.activated, true, JSON.stringify(result));
   const after = await state();
   assert.equal(after.active.version, registry.version);
-  assert.equal(after.active.storeVersion, 6);
+  assert.equal(after.active.storeVersion, f.manifest.accStoreVersion);
   assert.equal(after.pending, null);
   assert.equal(JSON.parse(await readFile(path.join(before.active.root, "package.json"))).version,
     f.manifest.version, "the live servers retain their original generation");

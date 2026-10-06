@@ -2,7 +2,7 @@ import { AccError, EXIT, assertDecisionChange } from "@agents-can-communicate/pr
 
 // Resolve inherited recipients before retry comparison. Target messages and
 // their recipient sets are immutable, so receipt advancement cannot alter a retry.
-export function prepareDecisionChange(tx, input, session) {
+export async function prepareDecisionChange(tx, input, session) {
   if (input.decisionChange !== undefined) {
     throw new AccError(EXIT.USAGE, "send a decision change using supersedes or withdraws");
   }
@@ -15,22 +15,27 @@ export function prepareDecisionChange(tx, input, session) {
     messageIds: input.supersedes ?? input.withdraws,
   });
   decisionChange.messageIds = [...decisionChange.messageIds].sort();
-  const targets = decisionChange.messageIds.map(messageId => {
-    const message = tx.get("message", messageId);
+  const targets = [];
+  for (const messageId of decisionChange.messageIds) {
+    const message = await tx.load("message", messageId);
     if (message?.kind !== "decision" || message.workspaceId !== session.workspaceId) {
       throw new AccError(EXIT.DATA, "a decision change must reference existing decisions in this workspace",
         { messageId });
     }
-    return message;
-  });
+    targets.push(message);
+  }
   if (new Set(input.toParticipantIds).size !== input.toParticipantIds.length) {
     throw new AccError(EXIT.USAGE, "a participant may be addressed only once");
   }
-  const targetIds = new Set(decisionChange.messageIds);
-  const inherited = [...targets.map(message => message.fromParticipantId),
-    ...tx.list("receipt", receipt => targetIds.has(receipt.messageId))
-      .map(receipt => receipt.recipientParticipantId)]
-    .filter(participantId => participantId !== session.participantId);
+  const inherited = targets.map(message => message.fromParticipantId);
+  for (const message of targets) {
+    for (const id of await tx.lookup("receiptsByMessage", [session.workspaceId, message.messageId])) {
+      const receipt = await tx.load("receipt", id);
+      if (receipt !== null && receipt.workspaceId === session.workspaceId
+        && receipt.messageId === message.messageId) inherited.push(receipt.recipientParticipantId);
+    }
+  }
   return { ...input, decisionChange,
-    toParticipantIds: [...new Set([...input.toParticipantIds, ...inherited])].sort() };
+    toParticipantIds: [...new Set([...input.toParticipantIds,
+      ...inherited.filter(id => id !== session.participantId)])].sort() };
 }

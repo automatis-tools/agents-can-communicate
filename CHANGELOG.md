@@ -1,5 +1,35 @@
 # Changelog
 
+## Unreleased — bounded message and receipt transaction reads
+
+- Message creation and retries use a rebuildable, bounded index instead of
+  rereading unrelated messages and receipts (#241). In a matched 60-send fixture,
+  cumulative primary reads fall from 3900 to 360; warmed sends at 20/40/60 messages
+  each read six records. Receipt read/offer/ack operations read 2/3/4 records.
+- The index is validated against the writer journal generation and generic record
+  updates; cache loss rebuilds from primary state without adding index flushes.
+- Store contract 7 requires an explicit `acc doctor --migrate-store` transition from
+  contract 6. Stop incompatible managed and unmanaged callers first. Migration
+  refuses live or unknown holders and preserves primary record bytes. Hooks fail
+  open with the migration remedy and never change the format themselves.
+- Interrupted indexed prune recovery makes its applied primary/marker retirement
+  durable before an idle checkpoint can validate a negative index.
+- Automatic index cleanup preserves bounded mark and sweep progress across store
+  opens. Intervening writers extend the verified live graph before deletion;
+  damaged progress restarts verification without adding index flushes (#263).
+
+| Candidate artifact | Value |
+|---|---|
+| Built from | `39079ea6fadeb944dbf913f8635175139faa0cf1` |
+| Tarball | `agents-can-communicate-0.9.1.tgz`, 573,530 bytes, 350 files |
+| sha256 | `711d0ee034437c5ceb399bac8f1e9effb9e22eb08323f340c7692fdacf10574d` |
+
+This unpublished development archive passed clean installation verification. See
+[the current archive evidence](docs/release-evidence/unreleased-index-reclaim-progress.md).
+Its metadata inherits version `0.9.1` from main; it is separate from the published
+contract-6 release below. Earlier indexed-read captures retain their original
+[archive and observation provenance](docs/release-evidence/unreleased-indexed-transaction-reads.md).
+
 ## 0.9.1 — release candidate
 
 - Codex sessions answer peers without auto-review. On macOS and Linux, install adds ACC's own

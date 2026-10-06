@@ -362,7 +362,7 @@ before leaving, request the concrete continuation and obtain a substantive reply
 |---|---|
 | `acc install` | `--adapter`, `--home`, `--delivery off|actionable|all`, `--dry-run`, `--downgrade` |
 | `acc uninstall` | `--adapter`, `--home`, `--dry-run` |
-| `acc doctor` | `--home`, `--repair` |
+| `acc doctor` | `--home`, `--repair`, `--migrate-store` |
 | `acc config init` | `--yes`, `--force` |
 | `acc config validate` | — |
 | `acc update` | `--check`, `--auto on\|off`, `--pin VERSION\|none`, `--yes`, `--apply` (alias) |
@@ -458,6 +458,16 @@ returns `scope: update` and `workspaceInspection: unavailable_during_update` wit
 workspace state; `doctor --repair` remains blocked. Native clients may still require hook trust
 or activation review. See [Upgrading](UPGRADING.md) for the initial 0.3.1 transition and
 recovery details.
+
+`acc doctor --migrate-store` explicitly migrates the selected workspace from store
+contract 6 to 7. Stop old ACC clients and any direct library callers first. The
+command fences runtime admission and refuses live holders with an old or unknown
+contract. It preserves primary records, prepares the message indexes, then changes
+the durable identity last. It neither installs a release nor restarts clients.
+`--repair` is a separate operation and never changes the store contract; the two
+flags cannot be combined. Hooks leave a version-6 identity unchanged and fail open
+with the migration remedy. Doctor JSON includes bounded `indexDiagnostics`; a cache
+failure after recording a message remains send success and is reported separately.
 
 ## Integrate a client lifecycle
 

@@ -1,9 +1,11 @@
 import assert from "node:assert/strict";
-import { readFile, readdir } from "node:fs/promises";
+import { mkdtemp, readFile, readdir, rm } from "node:fs/promises";
 import path from "node:path";
+import { tmpdir } from "node:os";
 import test from "node:test";
 
 import { createCoordinationService } from "@agents-can-communicate/core";
+import { openFilesystemStore } from "@agents-can-communicate/storage-filesystem";
 import { EXIT, SCHEMA_VERSION } from "@agents-can-communicate/protocol";
 
 import { createFakeClock, createFakeIds, createMemoryStore } from "../helpers/memory-store.mjs";
@@ -123,17 +125,25 @@ test("declaring nothing still reads everything", async () => {
   assert.equal(seen, 1);
 });
 
-test("the two stores enforce the same contract", async () => {
-  // A double that waves the declaration through lets a transaction reach for
-  // something it never read, pass every test, and find nothing in production.
-  const filesystem = await readFile(
-    path.join(repo, "packages", "storage-filesystem", "src", "store.mjs"), "utf8");
-  const double = await readFile(path.join(repo, "tests", "helpers", "memory-store.mjs"), "utf8");
-
-  for (const source of [filesystem, double]) {
-    assert.match(source, /did not declare \$\{kind\}/);
-    // Every reader and writer on the handle, not only the ones easy to reach.
-    assert.equal((source.match(/declared\(kind\)/g) ?? []).length, 5);
+test("the two stores enforce the same contract", async t => {
+  const clock = createFakeClock("2026-08-23T00:00:00.000Z");
+  const root = await mkdtemp(path.join(tmpdir(), "acc-scoped-contract-"));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const options = { clock, ids: createFakeIds(), workspaceId: "workspace_a" };
+  const stores = [createMemoryStore(options), await openFilesystemStore({ root, ...options })];
+  const record = { schemaVersion: SCHEMA_VERSION, workspaceId: "workspace_a",
+    displayName: "x", source: "directory", roots: ["/tmp/x"], createdAt: clock.now() };
+  for (const store of stores) {
+    await store.transaction(tx => tx.put("workspace", "workspace_a", record),
+      { kinds: ["workspace"] });
+    for (const access of [tx => tx.get("workspace", "workspace_a"),
+      tx => tx.generationOf("workspace", "workspace_a"), tx => tx.list("workspace"),
+      tx => tx.put("workspace", "workspace_a", record),
+      tx => tx.remove("workspace", "workspace_a")]) {
+      await assert.rejects(store.transaction(access, { kinds: ["session"] }),
+        { code: EXIT.DATA });
+    }
+    assert.deepEqual((await store.snapshot("workspace_a")).workspace, record);
   }
 });
 

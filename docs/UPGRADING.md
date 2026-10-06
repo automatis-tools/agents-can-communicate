@@ -1,5 +1,27 @@
 # Upgrading
 
+## Store contract 6 to 7
+
+When a runtime reports that a workspace still uses store contract 6, stop clients
+running old ACC code and any program that imports the store directly. In that
+workspace, run a current ACC that supports:
+
+```bash
+acc doctor --migrate-store
+```
+
+Migration refuses old or unknown live runtime holders. It builds the message and
+receipt indexes from validated live records, then replaces the store identity
+last. Message bytes, receipt bytes, workspace identity and initialization time are
+preserved. If interrupted, run the same command again. There is no reverse
+migration: version-6 code refuses a newly opened version-7 store.
+
+The command does not install or activate a runtime, contact npm, or restart
+clients. Complete any pending runtime update separately, then start clients with
+current code. `doctor --repair` never migrates a store. Hooks fail open on an
+unmigrated workspace and leave its identity unchanged. Runtime admission cannot
+prove that unmanaged direct library users stopped; the operator must quiesce them.
+
 ## From 0.8.x
 
 Update as usual:

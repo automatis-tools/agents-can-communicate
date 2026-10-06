@@ -1,6 +1,7 @@
 import { AccError, EXIT, SCHEMA_VERSION, advanceReceipt }
   from "@agents-can-communicate/protocol";
 
+import { assertExactTransaction } from "./ports.mjs";
 import { receiptId } from "./conversations.mjs";
 
 // How long a live offer may stand with nothing after it before the next turn
@@ -78,6 +79,12 @@ function requireReceipt(tx, messageId, recipientParticipantId) {
   return { message, receipt };
 }
 
+async function loadReceipt(tx, input) {
+  assertExactTransaction(tx);
+  await tx.load("receipt", receiptId(input.messageId, input.recipientParticipantId));
+  await tx.load("message", input.messageId);
+}
+
 function requireOfferableReceipt(tx, input, { allowRoomNextTurn }) {
   const found = requireReceipt(tx, input.messageId, input.recipientParticipantId);
   if (found.message.toParticipantIds.length === 0
@@ -105,8 +112,10 @@ export function createReceiptService(ports) {
   const { store, clock, ids } = ports;
 
   async function readReceipt(input) {
-    return store.transaction(tx => requireReceipt(tx, input.messageId,
-      input.recipientParticipantId).receipt, { kinds: ["message", "receipt"] });
+    return store.transaction(async tx => {
+      await loadReceipt(tx, input);
+      return requireReceipt(tx, input.messageId, input.recipientParticipantId).receipt;
+    }, { kinds: ["message", "receipt"], exactKinds: ["message", "receipt"] });
   }
 
   async function recordOfferSucceeded(input) {
@@ -116,7 +125,9 @@ export function createReceiptService(ports) {
         { messageId: input.messageId, transport: input.transport });
     }
     const now = clock.now();
-    return store.transaction(tx => {
+    return store.transaction(async tx => {
+      await loadReceipt(tx, input);
+      await tx.load("session", input.targetSessionId);
       const id = receiptId(input.messageId, input.recipientParticipantId);
       const receipt = requireOfferableReceipt(tx, input, { allowRoomNextTurn: true });
       const target = requireTarget(tx, input, { mustBeOpen: true });
@@ -153,7 +164,8 @@ export function createReceiptService(ports) {
       tx.put("receipt", id, offered, tx.generationOf("receipt", id));
       success({});
       return offered;
-    }, { kinds: ["session", "message", "receipt"], deadlineAt: input.deadlineAt });
+    }, { kinds: ["session", "message", "receipt"],
+      exactKinds: ["session", "message", "receipt"], deadlineAt: input.deadlineAt });
   }
 
   async function recordOfferFailed(input) {
@@ -162,7 +174,9 @@ export function createReceiptService(ports) {
         { safeErrorCode: input.safeErrorCode });
     }
     const now = clock.now();
-    return store.transaction(tx => {
+    return store.transaction(async tx => {
+      await loadReceipt(tx, input);
+      await tx.load("session", input.targetSessionId);
       const receipt = requireOfferableReceipt(tx, input, { allowRoomNextTurn: false });
       const target = requireTarget(tx, input, { mustBeOpen: false });
       return tx.append({ schemaVersion: SCHEMA_VERSION, eventId: ids.next("event"),
@@ -174,7 +188,7 @@ export function createReceiptService(ports) {
           targetGeneration: target.generation,
           transport: input.transport, adapterId: input.adapterId,
           clientVersion: input.clientVersion, safeErrorCode: input.safeErrorCode } });
-    }, { kinds: ["session", "message", "receipt"] });
+    }, { kinds: ["session", "message", "receipt"], exactKinds: ["session", "message", "receipt"] });
   }
 
   return { readReceipt, recordOfferSucceeded, recordOfferFailed };

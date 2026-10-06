@@ -4,12 +4,14 @@ import { AccError, EXIT } from "@agents-can-communicate/protocol";
  * @typedef {{ now(): string }} Clock
  * @typedef {{ next(kind: string): string }} IdSource
  * @typedef {{ get(kind: string, id: string): object | null,
+ *   load(kind: string, id: string): Promise<object | null>,
+ *   lookup(index: string, tuple: string[]): Promise<string[]>,
  *   generationOf(kind: string, id: string): string | null,
  *   list(kind: string, predicate?: (record: object) => boolean): object[],
  *   put(kind: string, id: string, record: object, expectedGeneration?: string | null): string,
  *   append(event: object): object }} CoordinationTransaction
  * @typedef {{ transaction(callback: (tx: CoordinationTransaction) => unknown,
- *   options?: { kinds?: string[], deadlineAt?: number }): Promise<unknown>,
+ *   options?: { kinds?: string[], exactKinds?: string[], deadlineAt?: number }): Promise<unknown>,
  *   eventsSince(workspaceId: string, cursor: string | null, limit: number): Promise<object>,
  *   snapshot(workspaceId: string): Promise<object> }} CoordinationStore
  */
@@ -25,6 +27,15 @@ const REQUIRED = Object.freeze({
 // port. They are deliberately outside transactions: they append no events and
 // vanish with their session.
 const EPHEMERAL = ["get", "put", "update", "delete", "list"];
+
+export function assertExactTransaction(tx) {
+  for (const method of ["load", "lookup"]) {
+    if (typeof tx?.[method] !== "function") {
+      throw new AccError(EXIT.USAGE, `the exact transaction port must implement ${method}()`,
+        { port: "store.transaction", method });
+    }
+  }
+}
 
 // Ports are validated at construction rather than at first use. A core that
 // silently falls back to ambient time or randomness produces tests that pass
