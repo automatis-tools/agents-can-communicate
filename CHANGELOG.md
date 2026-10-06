@@ -1,5 +1,26 @@
 # Changelog
 
+## Unreleased — bindings that name no client stop keeping a store-contract update pending
+
+- A native session binding that names no client process no longer holds a store-contract
+  update forever (#273). It stops holding when its session record is gone, names an exited
+  process, or, with no process recorded, is offline by ACC's presence rule: closed, or 30
+  minutes without a heartbeat. A live recorded process, or a record that cannot be read, still
+  holds. On the maintainer's Mac, 0.10.0 waited behind 32 such bindings written by 0.5.10 to
+  0.9.0, and closing every client could not clear them (2026-10-06).
+- Preparing an update removes these bindings, so 0.9.x, whose activator still counts them,
+  activates the fixed release by itself.
+
+| Candidate artifact | Value |
+|---|---|
+| Built from | `3d9d5a63e79785104cd1a4ca03b3a08043dbb01b` |
+| Tarball | `agents-can-communicate-0.10.0.tgz`, 579,275 bytes, 351 files |
+| sha256 | `39040602a43c3c5ed9eac6cc13fee8295c4daaa82961f478b50c34d666326ddb` |
+
+This unpublished development archive was measured with `npm pack`. See
+[the evidence](docs/release-evidence/unreleased-stale-native-bindings.md).
+The package version remains `0.10.0` until a release prepares its own.
+
 ## 0.10.0 — release candidate
 
 - Stores move to contract 7. A send and its retries read a rebuildable, bounded message and

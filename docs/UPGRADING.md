@@ -433,9 +433,11 @@ Running ACC processes, including idle MCP servers, still publish a hold for as l
 live, and native bindings still hold until observed client SessionEnd cleanup or confirmed
 process death; the vendor daemon can remain running after that lifecycle event. What
 changed is which of those holds keeps an update pending: only one whose declared store
-contract differs from the incoming version's, or that declares none at all. Unknown PIDs
-remain conservative holds until lifecycle cleanup. `acc finish`, presence TTL, and delivery
-off alone still do not prove native end. When a hold does block, close the relevant client
+contract differs from the incoming version's, or that declares none at all. From 0.10.1, a
+binding that names no client process stops holding when its session record is gone, names an
+exited process, or, with no process recorded, is offline: closed, or 30 minutes without a
+heartbeat (#273). For a binding that names its client, `acc finish`, presence TTL, and
+delivery off still do not prove native end. When a hold does block, close the relevant client
 sessions and persistent ACC processes to release it, or accept the eligible Codex service
 maintenance offer in `acc update`. Background updates never request fresh restart consent.
 Hooks never wait for a network download. If integration refresh temporarily prevents

@@ -135,8 +135,11 @@ for (const harness of ["mcp", "cli"]) {
     const f = await fixture(t), identity = JSON.parse(await readFile(f.identityFile));
     const owner = { schemaVersion: SCHEMA_VERSION, workspaceId: identity.workspaceId,
       sessionId: "session_mcp", participantId: "participant_a", generation: "generation_mcp", harness,
-      state: "closed", parentSessionId: null, checkoutRoot: null, branch: null, pid: null,
-      enforcement: "advisory", lifecycle: "manual", heartbeatCadenceMs: 30_000, startedAt: NOW, heartbeatAt: NOW };
+      // Open and heartbeating: a quiet or closed owner without a pid stops holding on its own
+      // (#273), and this case is about the continuity exemption, not presence.
+      state: "open", parentSessionId: null, checkoutRoot: null, branch: null, pid: null,
+      enforcement: "advisory", lifecycle: "manual", heartbeatCadenceMs: 30_000, startedAt: NOW,
+      heartbeatAt: new Date().toISOString() };
     await mkdir(path.join(f.paths.state, "session"), { recursive: true });
     await writeFile(path.join(f.paths.state, "session/session_mcp.json"), JSON.stringify({
       kind: "session", id: "session_mcp", generation: "generation_envelope", record: owner }));
