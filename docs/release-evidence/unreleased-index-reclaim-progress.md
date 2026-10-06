@@ -48,6 +48,17 @@ The warmed send/receipt count guards still pass. They do not infer that earlier
 Windows timings measured this new archive. Windows verification of this repair
 has not been observed at this capture.
 
+## Local full gate and merge follow-up
+
+The full gate at `8d072a86` ran 3157 tests in 445.84 seconds: 3149 passed, seven
+skipped and one failed. All new cleanup regressions passed. The sole failure was
+the packed migration test expecting the pre-merge literal `0.9.0` after main's
+version had become `0.9.1`. Its expectation now compares the retained active
+version with the installed fixture manifest; the actual packed migration file
+passed both tests in 14.84 seconds after correction. This test-only correction
+does not change the archive above. The complete corrected gate remains for the
+mandatory pre-push; this capture does not claim it has passed.
+
 ## Limits
 
 Progress stores a conservative superset: pages from an intervening retired root

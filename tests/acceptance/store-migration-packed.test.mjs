@@ -58,7 +58,7 @@ test("packed verified pending management code migrates only after old native hol
   assert.equal(staged.activated, false, JSON.stringify(staged));
   const manager = path.join(f.dataHome, "acc", "runtime"), controlFile = path.join(manager, "control.json");
   const before = JSON.parse(await readFile(controlFile));
-  assert.equal(before.active.version, "0.9.0");
+  assert.equal(before.active.version, f.manifest.version, "staging must keep the installed release active");
   assert.equal(before.pending.version, "0.9.99");
   const requests = registry.requests.length;
   assert.equal((await f.accError(["doctor", "--migrate-store"])).code, EXIT.CONFLICT);
