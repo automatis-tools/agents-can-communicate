@@ -41,7 +41,7 @@ export function createIndexCache({ paths, root, workspaceId, publishOptions, loa
     await phase("before-index-manifest");
     await io.writeManifest(manifest);
   }
-  async function rebuild(active, deadlineAt) {
+  async function rebuild(active, deadlineAt, { required = false } = {}) {
     // Authoritative reads stay outside every cache-error catch.
     const primaries = await loadPrimary({ deadlineAt });
     const deltas = Object.fromEntries(Object.keys(TRANSACTION_INDEXES).map(index => [index, []]));
@@ -77,6 +77,7 @@ export function createIndexCache({ paths, root, workspaceId, publishOptions, loa
     } catch (error) {
       if (!(error instanceof IndexCacheUnavailable)) throw error;
       note("index_unavailable", error.reason);
+      if (required) throw error;
     }
     return { manifest, tree };
   }
@@ -137,5 +138,6 @@ export function createIndexCache({ paths, root, workspaceId, publishOptions, loa
       note("index_unavailable", error instanceof IndexCacheUnavailable ? error.reason : "deadline_expired");
     }
   }
-  return Object.freeze({ lookup, prepareDeltas, commit, diagnostics: () => diagnostic.map(item => ({ ...item })) });
+  return Object.freeze({ lookup, prepareDeltas, commit, rebuild,
+    diagnostics: () => diagnostic.map(item => ({ ...item })) });
 }
