@@ -1,5 +1,30 @@
 # Changelog
 
+## 0.10.0 — release candidate
+
+- Stores move to contract 7. A send and its retries read a rebuildable, bounded message and
+  receipt index instead of rereading unrelated records: in a matched 60-send fixture, cumulative
+  primary reads fall from 3900 to 360 (#241, PR #263).
+- ACC migrates each workspace's store by itself right after the update activates, and the
+  activation waits until no client runs 0.9.x code. Event, journal, message and receipt bytes
+  stay as they were (PR #264).
+- While a store waits for its migration, hooks fail open. Claude Code and Codex show a message
+  about it, and plain `acc doctor` names `acc doctor --migrate-store`, which migrates it at once
+  (PR #264).
+- 0.9.x code refuses a contract-7 store, so 0.9.x and 0.10.0 never share a workspace.
+
+| Candidate artifact | Value |
+|---|---|
+| Built from | `a9edc13993eff618e230c8bf8f49a185bc82afdf` |
+| Tarball | `agents-can-communicate-0.10.0.tgz`, 576,895 bytes, 351 files |
+| sha256 | `a64974be6ce18375ada49071affb631dc2595ec2dc2671485f6754272423c733` |
+
+The exact archive passed clean installation verification, the 24 managed-update packed checks
+and the 3 store-migration packed checks. The published 0.9.1 updated itself to these bytes: the
+activation waited for a live 0.9.1 process, and once it exited, the next command activated
+0.10.0, which migrated the store. See [0.10.0 release evidence](docs/release-evidence/v0.10.0.md)
+for verification and limits. Earlier development records below retain their original provenance.
+
 ## Unreleased — older stores move to contract 7 by themselves
 
 - After an update activates a contract-7 runtime, ACC moves each contract-6 store of its data
