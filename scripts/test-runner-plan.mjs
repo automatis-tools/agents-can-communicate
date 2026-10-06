@@ -5,12 +5,15 @@
 // Bounding only file-level concurrency preserves the concurrency inside those
 // tests while keeping the release gate deterministic.
 //
-// Windows takes two. A process there starts in about five times the time and a
-// flush takes 8 to 23 ms against a fraction of one (measured on windows-latest),
-// and four heavy files at once on its four vCPUs - npm installs, packed tarballs -
-// left a hook in another file past its five-second budget. The suite still ran
-// in 35 minutes at four; two keeps it well inside the job's limit.
-export const fileConcurrency = (platform = process.platform) => (platform === "win32" ? 2 : 4);
+// Windows takes three. Two came first (2026-09-30), when the suite's temporary
+// files lived on the runner's remote system disk: a flush there took 8 to 23 ms
+// and four heavy files at once left a hook in another file past its five-second
+// budget. CI has kept them on the local disk since (a flush in 0.2-0.5 ms), and on
+// one windows-latest CPU (EPYC 7763) the suite then took 771 s at two, 618 and
+// 631 s at three, 590 s at four, with no failure (2026-10-06). At four each file
+// took half as long again as at two, at three a fifth longer: three keeps more
+// of the hooks' margin for nearly all of the gain.
+export const fileConcurrency = (platform = process.platform) => (platform === "win32" ? 3 : 4);
 export const TEST_FILE_CONCURRENCY = fileConcurrency();
 
 // CI sets ACC_TEST_TIMEOUT_MS so that one hung test fails with its name instead
