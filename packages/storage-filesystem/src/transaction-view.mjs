@@ -113,7 +113,19 @@ export function createTransactionView({ kinds, exactKinds = [], loaded, loadEnve
   });
   async function finish() {
     accepting = false;
-    await Promise.all(operations);
+    const drained = new Set();
+    let failed = false, reason;
+    // A rejection cannot release the writer while sibling reads still run.
+    // In-flight lookups may register further primary reads while we drain.
+    for (;;) {
+      const batch = [...operations].filter(operation => !drained.has(operation));
+      if (batch.length === 0) break;
+      for (const operation of batch) drained.add(operation);
+      for (const result of await Promise.allSettled(batch)) {
+        if (result.status === "rejected" && !failed) { failed = true; reason = result.reason; }
+      }
+    }
+    if (failed) throw reason;
   }
   return { tx, staged, finish };
 }

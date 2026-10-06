@@ -6,7 +6,7 @@ import { createIndexIO } from "./index-io.mjs";
 import { IndexCacheUnavailable } from "./index-pages.mjs";
 import { readStoreIdentity } from "./identity.mjs";
 import { journalEntry, writeJournalEntry } from "./journal.mjs";
-import { isWindows, syncEntry } from "./portable-fs.mjs";
+import { syncPruneDirectories } from "./prune-durability.mjs";
 import { assertManagedDirectory } from "./safe-directory.mjs";
 
 const children = page => page.type === "branch" ? page.children.map(([, hash]) => hash)
@@ -103,11 +103,7 @@ export async function withIndexedPrune(paths, options, operation) {
     // A decided/applied prefix must finish its durability even after its
     // caller's deadline. POSIX flushes names; the final Windows journal flush
     // commits every earlier NTFS metadata rename.
-    if (!isWindows(options.platform)) for (const directory of directories) {
-      try { await assertManagedDirectory(root, directory); }
-      catch (error) { if (error.code === "ENOENT") continue; throw error; }
-      await syncEntry(directory, directory, { platform: options.platform });
-    }
+    await syncPruneDirectories(root, directories, options);
     await options.failAt?.("before-indexed-prune-idle");
     await idleJournal(paths, { ...publish, root, durability: nameCommittedLater(options.platform) }, entry.transactionId);
   }

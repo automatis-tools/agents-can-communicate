@@ -1,8 +1,11 @@
 # Indexed transaction evidence for #241
 
 Local implementation: store contract 7, based on `c2816d40`.
-Production implementation measured at `ac2a58b8`; the final performance guard
-adds no shipped implementation changes. Captured on macOS with Node 24.4.0,
+Production implementation measured at `ac2a58b8`; later review fixes preserve
+filesystem duplicate-key ordering, drain rejected asynchronous reads under the
+writer and flush interrupted prune prefixes before recovery checkpoints idle.
+The elapsed observations below describe the earlier measured artifact; the
+final count guards run again after these fixes. Captured on macOS with Node 24.4.0,
 2026-10-05 local / 2026-10-06 UTC. Windows measurement remains outstanding.
 
 ## Actual installed artifacts
@@ -101,6 +104,15 @@ Prune gates also reject omitted authority fencing, deletion of reachable pages,
 omitted POSIX primary-directory sync, and a deadline applied to the final idle
 publication. They cover partial moves, retry-key reuse, history trimming,
 recovery, and deferring an unfinishable cache traversal to the daily pass.
+
+The independent whole-branch review identified three Important defects, with
+no Critical or Minor findings. Node 24 regressions failed before their fixes:
+prefix-ID duplicate ordering, a failed read releasing the writer while a sibling
+was still running, and process death skipping the prune finally fence. Recovery
+now conservatively flushes validated message/receipt and retention parents for
+an empty-publication prune journal before idling it. Process-exit tests cover
+both primary and deletion-marker moves. The descriptor ordering proves the
+recovery fence; an actual power-cut test has not been performed.
 
 Full drivers, mutation patches/assertions, artifact provenance and raw IO are
 retained separately at `/private/tmp/acc-241-evidence.l9riuq`. No benchmark

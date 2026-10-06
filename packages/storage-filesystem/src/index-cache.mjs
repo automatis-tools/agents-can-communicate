@@ -104,7 +104,8 @@ export function createIndexCache({ paths, root, workspaceId, publishOptions, loa
         if (entry.removed !== true && matches(kind, entry.record, index, tuple)) selected.add(entry.id);
       }
       const result = [];
-      for (const id of [...selected].sort((a, b) => a.localeCompare(b))) {
+      // Match eager listJsonFiles ordering, including prefix IDs such as a/a-b.
+      for (const id of [...selected].sort((a, b) => `${a}.json`.localeCompare(`${b}.json`))) {
         assertPublicationDeadline(deadlineAt);
         if (await verify(id)) result.push(id);
       }

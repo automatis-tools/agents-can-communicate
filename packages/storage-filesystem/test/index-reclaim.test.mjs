@@ -9,6 +9,8 @@ import { openFilesystemStore } from "../src/store.mjs";
 import { createIndexIO } from "../src/index-io.mjs";
 import { reclaimRetired } from "../src/reclaim.mjs";
 import { createStoreIoProbe } from "../../../tests/helpers/store-io-probe.mjs";
+import { runProcess } from "../../../tests/helpers/run-process.mjs";
+import { processFixtureEnv } from "../../../tests/helpers/process-env.mjs";
 import { createFakeClock, createFakeIds } from "../../../tests/helpers/memory-store.mjs";
 import { exactMessage, EXACT_WORKSPACE as WS, EXACT_NOW as NOW }
   from "../../../tests/helpers/exact-transaction-contract.mjs";
@@ -174,5 +176,45 @@ test("interruptions at prune phases recover with invalidated roots", async t => 
     assert.notEqual((await readActiveJournal(reopened.paths, f.root)).generation, before.generation);
     assert.deepEqual(await lookup(reopened), interruptedPhase === "after-indexed-prune-activated" ? ["message_a"] : []);
     assert.deepEqual(await lookup(reopened, "client_b"), ["message_b"]);
+  }
+});
+
+for (const withMarker of [false, true]) test(`process-exit prune recovery flushes primary retirement before idle and negative-cache publication (${withMarker ? "marker" : "record"} move)`, async t => {
+  const f = await fixture(t);
+  const entry = (await f.store.stateEnvelopes(WS, { kinds: ["message"] })).find(e => e.id === "message_a");
+  if (withMarker) await f.store.transaction(tx => tx.remove("message", entry.id,
+    tx.generationOf("message", entry.id)), { kinds: ["message"] });
+  const script = `
+    import { randomUUID } from "node:crypto";
+    import { openFilesystemStore } from ${JSON.stringify(new URL("../src/store.mjs", import.meta.url).href)};
+    import { createFakeClock } from ${JSON.stringify(new URL("../../../tests/helpers/memory-store.mjs", import.meta.url).href)};
+    let moves = 0;
+    const store = await openFilesystemStore({ root: process.argv[1], workspaceId: ${JSON.stringify(WS)},
+      clock: createFakeClock(${JSON.stringify(NOW)}), ids: { next: kind => kind + "_" + randomUUID() },
+      failAt: phase => { if (phase === "after-indexed-prune-move" && ++moves === ${withMarker ? 2 : 1}) process.exit(91); } });
+    await store.reclaimRecords([JSON.parse(process.argv[2])]);
+  `;
+  const child = await runProcess(["--input-type=module", "-e", script, f.root, JSON.stringify(entry)],
+    { timeoutMs: 10_000, env: await processFixtureEnv(path.join(f.root, "child-env")) });
+  assert.equal(child.code, 91, child.stderr);
+  assert.equal((await readActiveJournal(f.store.paths, f.root)).state, "open");
+  const probe = createStoreIoProbe(f.root, { trace: true });
+  t.after(() => probe.stop());
+  const measured = await probe.capture(async () => {
+    const reopened = await openFilesystemStore({ root: f.root, workspaceId: WS, clock: f.clock, ids: f.ids });
+    return lookup(reopened);
+  });
+  assert.deepEqual(measured.result, []);
+  const idle = measured.trace.findIndex(e => e.operation === "rename" && /^journal[/\\]active\.[01]$/.test(e.to));
+  const cache = measured.trace.findIndex(e => e.operation === "rename" && e.to === path.join("indexes", "v1", "cache.json"));
+  assert(idle >= 0 && cache > idle, "recovery is completed before the negative cache is checkpointed");
+  if (process.platform !== "win32") {
+    const flush = measured.trace.findIndex(e => e.operation === "sync" && e.file === path.join("state", "message"));
+    assert(flush >= 0 && flush < idle, "POSIX primary-directory flush precedes recovered idle");
+    if (withMarker) {
+      const markerFlush = measured.trace.findIndex(e => e.operation === "sync"
+        && e.file === path.join("retained", "state", "message"));
+      assert(markerFlush >= 0 && markerFlush < idle, "retired marker names are durable before recovered idle");
+    }
   }
 });

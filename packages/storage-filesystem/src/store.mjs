@@ -127,7 +127,7 @@ export async function openFilesystemStore({ root, clock, ids, workspaceId, failA
     return withWriterMutex(paths, { root, tmpDir: paths.tmp, clock, deadlineAt: storeDeadline }, async () => {
       const completed = [];
       for (const entry of await readOpenJournals(paths, root)) {
-        completed.push(...await rollForward(paths, { root, tmpDir: paths.tmp, clock }, entry));
+        completed.push(...await rollForward(paths, { root, tmpDir: paths.tmp, clock, platform }, entry));
       }
       return completed;
     });

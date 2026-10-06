@@ -58,10 +58,10 @@ for (const backend of ["memory", "filesystem"]) {
 
   test(`${backend}: duplicate generic keys preserve the original eager first match`, async t => {
     const f = await fixture(t, backend);
-    const first = await f.service.sendMessage(f.input("duplicate"));
+    const first = await f.service.sendMessage(f.input("template"));
     await f.raw.transaction(tx => {
-      tx.put("message", "message_z", { ...first, messageId: "message_z", threadId: "message_z" });
-      tx.put("message", "message_a", { ...first, messageId: "message_a", threadId: "message_a" });
+      for (const id of ["message_a", "message_a-b"]) tx.put("message", id, {
+        ...first, messageId: id, threadId: id, clientMessageId: "duplicate" });
     });
     const expected = await f.raw.transaction(tx => tx.list("message",
       message => message.clientMessageId === "duplicate").at(0));
