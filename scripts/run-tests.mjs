@@ -9,6 +9,7 @@
 import { spawn } from "node:child_process";
 import { mkdir, readdir } from "node:fs/promises";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 
 import { TEST_FILE_CONCURRENCY, nodeTestArguments, testBatches } from "./test-runner-plan.mjs";
 import { createPackedTemplate } from "../tests/helpers/packed-template.mjs";
@@ -68,7 +69,7 @@ try {
     if (measuredConcurrency) args[1] = `--test-concurrency=${measuredConcurrency}`;
     if (timings) await mkdir(path.dirname(timings), { recursive: true });
     if (timings) args.splice(1, 0, "--test-reporter=spec", "--test-reporter-destination=stdout",
-      `--test-reporter=${path.join(repo, ".github", "probes", "file-timing-reporter.mjs")}`,
+      `--test-reporter=${pathToFileURL(path.join(repo, ".github", "probes", "file-timing-reporter.mjs")).href}`,
       `--test-reporter-destination=${timings}.${index + 1}.jsonl`);
     const code = await new Promise(resolve => {
       spawn(process.execPath, args, { stdio: "inherit", cwd: repo,
