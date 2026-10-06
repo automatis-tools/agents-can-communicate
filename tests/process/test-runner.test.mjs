@@ -50,12 +50,11 @@ test("the runner bounds file concurrency without weakening process races", t => 
   });
   delete process.env.ACC_TEST_TIMEOUT_MS;
   delete process.env.ACC_TEST_FORCE_EXIT;
-  // Windows starts a process and flushes a file several times slower, and four
-  // heavy files at once on a four-vCPU windows-latest runner left a hook in one
-  // of them past its budget.
+  // Windows starts a process several times slower, and four files at once on a
+  // four-vCPU windows-latest runner make each of them half as slow again as two.
   assert.equal(fileConcurrency("linux"), 4);
   assert.equal(fileConcurrency("darwin"), 4);
-  assert.equal(fileConcurrency("win32"), 2);
+  assert.equal(fileConcurrency("win32"), 3);
   assert.equal(TEST_FILE_CONCURRENCY, fileConcurrency(process.platform));
   const concurrency = `--test-concurrency=${TEST_FILE_CONCURRENCY}`;
   assert.deepEqual(nodeTestArguments(["first.test.mjs", "second.test.mjs"]), [

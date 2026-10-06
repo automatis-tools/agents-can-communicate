@@ -29,8 +29,8 @@ jobs:
       - name: Install
         run: npm ci
 
-      - name: Syntax
-        run: npm run check
+      # No syntax step: the Lint workflow checks every tracked .mjs once, and
+      # here it held each job's tests back by 14-40 s (2026-10-06).
 
       # The suite's temporary files on the runner's local disk. Its system disk,
       # C:, is remote: beside the suite a 4 KB flush there took 10-33 ms at the

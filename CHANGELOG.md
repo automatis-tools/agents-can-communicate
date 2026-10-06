@@ -12,6 +12,9 @@
   which they show the user; before, the remedy went to stderr only. Plain `acc doctor` names
   `acc doctor --migrate-store` instead of calling the store's identity unreadable.
 - Every launcher module now imports only launcher modules, which a test checks.
+- The Windows test job runs three test files at a time instead of two, and no test job repeats
+  the syntax check the Lint workflow already runs. On one windows-latest CPU the suite took
+  771 s at two and 618-631 s at three, with no failure (2026-10-06).
 
 | Candidate artifact | Value |
 |---|---|
