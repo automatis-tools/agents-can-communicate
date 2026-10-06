@@ -26,16 +26,27 @@ export function createIndexIO({ paths, root, publishOptions }) {
       throw new IndexCacheUnavailable(error.code === "ENOENT" ? "missing_page" : "unsafe_cache_io", error);
     }
   };
-  const readBytes = file => withRegularNoFollow(file, root, "r", async (handle, stat) => {
-    if (stat.size > INDEX_PAGE_BYTES) throw new IndexCacheUnavailable("page_byte_limit");
-    return handle.readFile();
-  });
+  const readBytes = async file => {
+    const bytes = await withRegularNoFollow(file, root, "r", (handle, stat) =>
+      stat.size > INDEX_PAGE_BYTES ? null : handle.readFile());
+    if (bytes === null) throw new IndexCacheUnavailable("page_byte_limit");
+    return bytes;
+  };
   return Object.freeze({
     readPage: hash => cache(async () => decodeIndexPage(assertPageHash(hash),
       await readBytes(path.join(directory, "pages", hash + ".json")))),
     writePage: page => cache(async () => {
       const { hash, bytes } = encodeIndexPage(page);
-      await publishAtomic(path.join(directory, "pages", hash + ".json"), bytes, { ...options, replace: false });
+      const file = path.join(directory, "pages", hash + ".json");
+      let damaged = false;
+      try { damaged = !(await readBytes(file)).equals(bytes); }
+      catch (error) {
+        if (error instanceof IndexCacheUnavailable && error.reason === "page_byte_limit") damaged = true;
+        else if (error.code !== "ENOENT") throw error;
+      }
+      // Valid pages stay immutable. A safely opened but damaged cache file is
+      // replaced with the verified bytes for its existing content address.
+      await publishAtomic(file, bytes, { ...options, replace: damaged });
       return hash;
     }),
     readManifest: () => cache(async () => {

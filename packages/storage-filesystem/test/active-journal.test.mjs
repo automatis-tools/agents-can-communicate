@@ -207,7 +207,7 @@ test("a crash before idle keeps open authoritative and recovery idempotent", asy
   assert.equal((await reopenedAgain.snapshot(WORKSPACE)).workspace.displayName, "Example");
 });
 
-test("the writer mutex and active transition refuse a second active journal", async t => {
+test("the active transition refuses a second journal and retained writers recover before comparing generations", async t => {
   const crash = new Error("leave first journal active");
   let crashed = false;
   const { root, store } = await fixture(t, { failAt: async where => {
@@ -216,11 +216,15 @@ test("the writer mutex and active transition refuse a second active journal", as
   await assert.rejects(putWorkspace(store), crash);
   const first = await readActiveJournal(store.paths, root);
 
-  await assert.rejects(putWorkspace(store),
+  await assert.rejects(activateJournal(store.paths, { root, tmpDir: store.paths.tmp },
+    { transactionId: "transaction_second", firstSequence: "0000000000000001" }),
     error => error.code === EXIT.CONFLICT && /active journal/.test(error.message));
-
   assert.deepEqual(await readActiveJournal(store.paths, root), first);
   assert.equal(first.state, "open");
+  await assert.rejects(putWorkspace(store),
+    error => error.code === EXIT.CONFLICT && /changed under/.test(error.message));
+  assert.equal((await readActiveJournal(store.paths, root)).state, "idle");
+  assert.equal((await store.snapshot(WORKSPACE)).workspace.displayName, "Example");
 });
 
 test("completed historical journal volume never enters the active lookup", async t => {

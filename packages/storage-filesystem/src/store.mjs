@@ -1,7 +1,7 @@
 import { mkdir } from "node:fs/promises";
 import path from "node:path";
 
-import { AccError, EXIT, assertPortableId, validateRecord }
+import { AccError, EXIT, TRANSACTION_INDEXES, assertIndexTuple, assertPortableId, indexKeysFor, validateRecord }
   from "@agents-can-communicate/protocol";
 
 import { encode, listJsonFiles, publishAtomic, readJsonIfPresent,
@@ -22,6 +22,8 @@ import { sweepIfDue } from "./stage-sweep.mjs";
 import { withWriterMutex } from "./writer-mutex.mjs";
 import { listState, loadStateEnvelopes, readStateEnvelope } from "./state-reads.mjs";
 import { createTransactionView, transactionKinds } from "./transaction-view.mjs";
+import { createIndexCache } from "./index-cache.mjs";
+import { IndexCacheUnavailable } from "./index-pages.mjs";
 
 // Kept cohesive above 300 lines because durable transactions and ephemeral
 // mutations must share this exact writer mutex. Splitting the two stores would
@@ -91,6 +93,8 @@ export async function openFilesystemStore({ root, clock, ids, workspaceId, failA
   await requireStoreIdentity(paths, { workspaceId, clock, platform });
   for (const name of DIRECTORIES) await ensureManagedDirectory(root, paths[name]);
   const publishOptions = { root, tmpDir: paths.tmp, clock, failAt, platform };
+  const indexCache = createIndexCache({ paths, root, workspaceId, publishOptions,
+    loadPrimary: options => loadStateEnvelopes(paths, { root, ...options }, new Set(["message", "receipt"])) });
   await initialiseActiveJournal(paths, publishOptions);
 
   // Any journal left behind by a crashed writer is completed before the store
@@ -149,6 +153,10 @@ export async function openFilesystemStore({ root, clock, ids, workspaceId, failA
     const { eager } = transactionKinds(kinds, exactKinds);
     return withWriterMutex(paths, { ...publishOptions, deadlineAt }, async () => {
       assertPublicationDeadline(deadlineAt);
+      // An already-open handle may follow a writer that died after deciding.
+      // Recovery here holds this mutex directly, never trying to acquire it twice.
+      for (const entry of await readOpenJournals(paths, root)) await rollForward(paths, publishOptions, entry);
+      const before = await readActiveJournal(paths, root);
       // Reads are loaded once per transaction so get, list, and the generation
       // that put() compares against all describe the same instant.
       const loaded = await loadStateEnvelopes(paths, { root }, eager);
@@ -159,6 +167,21 @@ export async function openFilesystemStore({ root, clock, ids, workspaceId, failA
         loadEnvelope: (kind, id) => {
           assertPublicationDeadline(deadlineAt);
           return readStateEnvelope(paths, { root, workspaceId }, kind, id);
+        },
+        lookupIndex(index, tuple, context) {
+          assertIndexTuple(index, tuple);
+          const kind = TRANSACTION_INDEXES[index].kind;
+          context.declared(kind);
+          return indexCache.lookup(index, tuple, { active: before, staged: context.staged, deadlineAt,
+            verify: async id => {
+              const envelope = await context.read(kind, id);
+              if (envelope === null) return false;
+              if (!indexKeysFor(kind, envelope.record).some(key => key.index === index
+                && JSON.stringify(key.tuple) === JSON.stringify(tuple))) {
+                throw new IndexCacheUnavailable("invalid_source_reference");
+              }
+              return true;
+            } });
         },
         appendEvent(event) {
           const stamped = { ...event, sequence: pad(sequence) };
@@ -175,6 +198,7 @@ export async function openFilesystemStore({ root, clock, ids, workspaceId, failA
         throw error;
       }
       await view.finish();
+      const deltas = indexCache.prepareDeltas(loaded, staged);
 
       // Events are published before state records on purpose: the event log is
       // the authority, and a crash between the two is the window the journal
@@ -205,7 +229,7 @@ export async function openFilesystemStore({ root, clock, ids, workspaceId, failA
       // journalled write too, which the path below keeps.
       const [only] = staged.values();
       if (events.length === 0 && staged.size === 1 && only.removed !== true
-        && (await readActiveJournal(paths, root)).state === "idle") {
+        && !["message", "receipt"].includes(only.kind) && before.state === "idle") {
         assertPublicationDeadline(deadlineAt);
         await publishAtomic(statePath(paths, only.kind, only.id), publications[0].bytes,
           { ...publishOptions, replace: true, deadlineAt });
@@ -221,6 +245,7 @@ export async function openFilesystemStore({ root, clock, ids, workspaceId, failA
       await writeJournalEntry(paths, { ...publishOptions, deadlineAt }, entry);
       await failAt?.("after-journal");
       await rollForward(paths, publishOptions, entry);
+      await indexCache.commit({ before, after: await readActiveJournal(paths, root), deltas, deadlineAt });
       return result;
     });
   }
@@ -403,5 +428,6 @@ export async function openFilesystemStore({ root, clock, ids, workspaceId, failA
   }
 
   return Object.freeze({ transaction, eventsSince, snapshot, stateRecord, stateEnvelopes,
-    reclaimRecords, trimHistory, ephemeral, paths, root, workspaceId });
+    reclaimRecords, trimHistory, ephemeral, paths, root, workspaceId,
+    indexDiagnostics: indexCache.diagnostics });
 }

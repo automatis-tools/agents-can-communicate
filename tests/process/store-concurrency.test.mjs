@@ -12,6 +12,7 @@ import { EXIT, SCHEMA_VERSION } from "@agents-can-communicate/protocol";
 import { openFilesystemStore } from "../../packages/storage-filesystem/src/store.mjs";
 import { readOpenJournals } from "../../packages/storage-filesystem/src/journal.mjs";
 import { createFakeClock, createFakeIds } from "../helpers/memory-store.mjs";
+import { exactMessage } from "../helpers/exact-transaction-contract.mjs";
 
 const execFileAsync = promisify(execFile);
 const repoRoot = fileURLToPath(new URL("../..", import.meta.url));
@@ -189,4 +190,37 @@ test("a directory belonging to another workspace is still refused", async t => {
 
   assert.notEqual(refused, null, "a store belonging to another workspace was adopted");
   assert.match(refused.stdout, /different workspace/);
+});
+
+test("a reopened process uses the warm index and invalidates an earlier negative", async t => {
+  const root = await realpath(await mkdtemp(path.join(tmpdir(), "acc-index-process-")));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const store = await openFilesystemStore({ root, clock: createFakeClock(NOW),
+    ids: createFakeIds(), workspaceId: WORKSPACE });
+  await store.transaction(tx => {
+    tx.put("message", "message_a", exactMessage());
+    tx.put("message", "message_unrelated", exactMessage({ messageId: "message_unrelated",
+      threadId: "message_unrelated", clientMessageId: "client_unrelated" }));
+  }, { kinds: ["message"] });
+  const exact = { kinds: ["message"], exactKinds: ["message"] };
+  const key = client => [WORKSPACE, "participant_a", client];
+  await store.transaction(tx => tx.lookup("messageByClientKey", key("client_a")), exact);
+  assert.deepEqual(await store.transaction(tx => tx.lookup("messageByClientKey", key("client_child")), exact), []);
+  // Rebuilding in either process would read these invalid unrelated bytes.
+  await writeFile(path.join(root, "state/message/message_unrelated.json"), "invalid unrelated primary");
+  const script = `
+    import { openFilesystemStore } from ${JSON.stringify(storeModule)};
+    const store = await openFilesystemStore({ root: ${JSON.stringify(root)}, workspaceId: "workspace_a",
+      clock: { now: () => ${JSON.stringify(NOW)} }, ids: { next: kind => kind + "_child" } });
+    const options = ${JSON.stringify(exact)};
+    const warm = await store.transaction(tx => tx.lookup("messageByClientKey", ${JSON.stringify(key("client_a"))}), options);
+    await store.transaction(async tx => {
+      await tx.load("message", "message_child");
+      tx.put("message", "message_child", ${JSON.stringify(exactMessage({ messageId: "message_child", threadId: "message_child", clientMessageId: "client_child" }))});
+    }, options);
+    process.stdout.write(JSON.stringify(warm));
+  `;
+  const { stdout } = await execFileAsync(process.execPath, ["--input-type=module", "--eval", script], { cwd: repoRoot });
+  assert.deepEqual(JSON.parse(stdout), ["message_a"]);
+  assert.deepEqual(await store.transaction(tx => tx.lookup("messageByClientKey", key("client_child")), exact), ["message_child"]);
 });

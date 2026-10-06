@@ -40,23 +40,25 @@ export function createTransactionView({ kinds, exactKinds = [], loaded, loadEnve
     operation.catch(() => {}); // finish() propagates a rejected unawaited read under the lock.
     return operation;
   };
+  const read = async (kind, id) => {
+    declared(kind);
+    assertPortableId(kind, "record kind");
+    assertPortableId(id, "record id");
+    const key = `${kind}:${id}`;
+    if (staged.has(key) || loaded.has(key)) return entryFor(key);
+    if (!exact.has(kind)) return null;
+    if (!pending.has(key)) pending.set(key, track(Promise.resolve().then(() => loadEnvelope(kind, id))));
+    return pending.get(key);
+  };
   const tx = Object.freeze({
     async load(kind, id) {
       active();
-      declared(kind);
-      assertPortableId(kind, "record kind");
-      assertPortableId(id, "record id");
       const key = `${kind}:${id}`;
       if (!loaded.has(key)) {
-        if (!exact.has(kind)) loaded.set(key, null); // This kind was already completely read.
-        else {
-          if (!pending.has(key)) {
-            pending.set(key, track(Promise.resolve().then(() => loadEnvelope(kind, id))
-              .then(envelope => { loaded.set(key, envelope); })));
-          }
-          await pending.get(key);
-        }
+        const envelope = await read(kind, id);
+        loaded.set(key, envelope);
       }
+      else declared(kind);
       return entryFor(key)?.record ?? null;
     },
     async lookup(index, tuple) {
@@ -64,7 +66,7 @@ export function createTransactionView({ kinds, exactKinds = [], loaded, loadEnve
       if (typeof lookupIndex !== "function") {
         throw new AccError(EXIT.USAGE, "the transaction store does not support indexed lookup");
       }
-      return track(Promise.resolve().then(() => lookupIndex(index, tuple, { declared, loaded, staged })));
+      return track(Promise.resolve().then(() => lookupIndex(index, tuple, { declared, loaded, staged, read })));
     },
     get(kind, id) {
       loadedId(kind, id);

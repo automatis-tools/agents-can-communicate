@@ -1,4 +1,5 @@
-import { AccError, EXIT, assertPortableId, validateRecord } from "@agents-can-communicate/protocol";
+import { AccError, EXIT, TRANSACTION_INDEXES, assertIndexTuple, assertPortableId, indexKeysFor, validateRecord }
+  from "@agents-can-communicate/protocol";
 
 const SEQUENCE_WIDTH = 16;
 export const ZERO_CURSOR = "0".repeat(SEQUENCE_WIDTH);
@@ -58,9 +59,17 @@ export function createMemoryStore({ clock, ids, workspaceId }) {
           loadedIds.add(key(kind, id));
           return entry?.record ?? null;
         },
-        async lookup() {
+        async lookup(index, tuple) {
           if (!accepting) throw new AccError(EXIT.DATA, "transaction async reads are closed");
-          throw new AccError(EXIT.USAGE, "the transaction store does not support indexed lookup");
+          assertIndexTuple(index, tuple);
+          const kind = TRANSACTION_INDEXES[index].kind;
+          declared(kind);
+          return [...staged.values()].filter(entry => {
+            if (entry.kind !== kind) return false;
+            validateRecord(kind, entry.record);
+            return indexKeysFor(kind, entry.record).some(key => key.index === index
+              && JSON.stringify(key.tuple) === JSON.stringify(tuple));
+          }).map(entry => entry.id);
         },
         get(kind, id) {
           declared(kind, id);
@@ -256,7 +265,7 @@ export function createMemoryStore({ clock, ids, workspaceId }) {
 
   return Object.freeze({ transaction, eventsSince, snapshot, stateRecord, stateEnvelopes,
     reclaimRecords, trimHistory, ephemeral, clock, ids,
-    workspaceId });
+    workspaceId, indexDiagnostics: () => [] });
 }
 
 export function createFakeClock(startIso) {

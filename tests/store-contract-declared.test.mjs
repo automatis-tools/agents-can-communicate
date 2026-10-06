@@ -11,4 +11,5 @@ test("the package manifest declares the store contract it speaks", async () => {
   const manifest = JSON.parse(await readFile(new URL("../package.json", import.meta.url), "utf8"));
   assert.equal(manifest.accStoreVersion, STORE_VERSION);
   assert.equal(typeof manifest.accStoreVersion, "number");
+  assert.equal(STORE_VERSION, 7, "indexed negatives require the fenced writer contract");
 });
