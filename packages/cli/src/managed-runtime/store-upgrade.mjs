@@ -27,25 +27,42 @@ const workspacesOf = root => path.join(path.dirname(root), "workspaces");
 const systemClock = { now: () => new Date().toISOString() };
 const systemIds = { next: kind => createId(kind, randomBytes) };
 
-/** The stores in this data home whose contract is older than this code's. */
+/**
+ * The stores in this data home whose contract is older than this code's, and
+ * how many entries could not be read now. An entry that is not a store (no
+ * identity, not a directory, a link, a name that is no workspace id, another
+ * workspace's identity) is skipped; one whose identity or listing failed to
+ * read is counted, so the pass stays open and a later one retries it (AI review
+ * of #264: such a store was dropped and the pass recorded itself complete).
+ */
 export async function olderStores(root) {
   const workspaces = workspacesOf(root);
-  const names = await readdir(workspaces).catch(() => []);
-  const found = [];
+  let names;
+  try {
+    names = await readdir(workspaces);
+  } catch (error) {
+    return { stores: [], unreadable: error?.code === "ENOENT" ? 0 : 1 };
+  }
+  const stores = [];
+  let unreadable = 0;
   for (const name of names) {
     const dir = path.join(workspaces, name);
+    try { assertPortableId(name); } catch { continue; }
+    let identity;
     try {
-      assertPortableId(name);
       const info = await lstat(dir);
       if (!info.isDirectory() || info.isSymbolicLink()) continue;
-      const identity = JSON.parse(await readFile(path.join(dir, "protocol.json"), "utf8"));
-      if (identity?.workspaceId === name && Number.isSafeInteger(identity.storeVersion)
-        && identity.storeVersion < STORE_VERSION) {
-        found.push({ workspaceId: name, dir, storeVersion: identity.storeVersion });
-      }
-    } catch { /* Not a store, or not one this pass can read; the explicit command reports it. */ }
+      identity = JSON.parse(await readFile(path.join(dir, "protocol.json"), "utf8"));
+    } catch (error) {
+      if (error?.code !== "ENOENT") unreadable += 1;
+      continue;
+    }
+    if (identity?.workspaceId === name && Number.isSafeInteger(identity.storeVersion)
+      && identity.storeVersion < STORE_VERSION) {
+      stores.push({ workspaceId: name, dir, storeVersion: identity.storeVersion });
+    }
   }
-  return found;
+  return { stores, unreadable };
 }
 
 /**
@@ -59,7 +76,8 @@ export async function migrateOlderStores(root, { ignorePid = process.pid, clock 
   const outcomes = [];
   // Recorded even when this generation migrates nothing, so the launcher's
   // scheduler, which knows no contract, stops asking for a pass.
-  const stores = control.active.storeVersion === STORE_VERSION ? await olderStores(root) : [];
+  const { stores, unreadable } = control.active.storeVersion === STORE_VERSION
+    ? await olderStores(root) : { stores: [], unreadable: 0 };
   for (const store of stores) {
     let state;
     try {
@@ -79,8 +97,9 @@ export async function migrateOlderStores(root, { ignorePid = process.pid, clock 
     outcomes.push({ workspaceId: store.workspaceId, state });
   }
   await writeManagedJson(path.join(root, STORE_UPGRADE_MARKER), { schemaVersion: 1,
-    activeRoot: control.active.root, complete: outcomes.every(item => item.state === "migrated"),
-    pending: outcomes.filter(item => item.state !== "migrated").length,
+    activeRoot: control.active.root,
+    complete: unreadable === 0 && outcomes.every(item => item.state === "migrated"),
+    pending: unreadable + outcomes.filter(item => item.state !== "migrated").length,
     attemptedAt: new Date().toISOString() });
   return outcomes;
 }

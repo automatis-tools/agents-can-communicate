@@ -133,3 +133,24 @@ test("the scheduler starts a pass for a new generation, and retries an open one 
   assert.equal(await storeUpgradeDue(f.manager, control, { now: now + STORE_UPGRADE_RETRY_MS }), true,
     "tried a minute ago");
 });
+
+// AI review of #264: a store whose identity could not be read was left out of
+// the pass, which then recorded itself complete and was never retried.
+test("a store that cannot be read now keeps the pass open, and a later pass moves it", async t => {
+  const f = await fixture(t);
+  const older = await f.store("workspace_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", 6);
+  const bytes = await readFile(older, "utf8");
+  await writeFile(older, "{ half written");
+
+  const first = await migrateOlderStores(f.manager);
+
+  assert.deepEqual(first, []);
+  const marker = await readManagedJson(path.join(f.manager, STORE_UPGRADE_MARKER));
+  assert.equal(marker.complete, false);
+  assert.equal(marker.pending, 1);
+
+  await writeFile(older, bytes);
+  await migrateOlderStores(f.manager);
+  assert.equal(await f.versionOf(older), STORE_VERSION);
+  assert.equal((await readManagedJson(path.join(f.manager, STORE_UPGRADE_MARKER))).complete, true);
+});
