@@ -1,10 +1,13 @@
+import { execFile } from "node:child_process";
 import { createHash } from "node:crypto";
 // Kept above 300 lines because activation and generation retirement must use
 // the same validated runtime/native hold definitions under the admission mutex.
 // Splitting their safety rules risks disagreeing about which users are live.
-import { readdir, rm } from "node:fs/promises";
+import { readdir, rm, stat } from "node:fs/promises";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
+import { promisify } from "node:util";
+import { readWindowsProcess } from "@agents-can-communicate/adapter-sdk";
 import { classifySessionPresence } from "@agents-can-communicate/core";
 import { assertPortableId } from "@agents-can-communicate/protocol";
 import { readSessionRecord, withWriterMutex } from "@agents-can-communicate/storage-filesystem";
@@ -49,6 +52,46 @@ async function isMcpContinuity(record, name, workspaceRoot, workspaceId) {
 const clientPidOf = record => record?.schemaVersion === 1 && Number.isSafeInteger(record.clientPid)
   && record.clientPid > 0 ? record.clientPid : null;
 
+const execFileAsync = promisify(execFile);
+
+/** When a process started, in milliseconds since the epoch; null when it cannot be read. */
+export async function processStartedAt(pid, { platform = process.platform, run = execFileAsync } = {}) {
+  try {
+    if (platform === "win32") {
+      const found = await readWindowsProcess(pid, { timeoutMs: 5_000 });
+      if (found?.pid !== pid || typeof found.start !== "string" || !/^\d+$/.test(found.start)) return null;
+      // A FILETIME: 100-nanosecond intervals since 1601-01-01 UTC.
+      return Number(BigInt(found.start) / 10_000n) - 11_644_473_600_000;
+    }
+    const { stdout } = await run("/bin/ps", ["-p", String(pid), "-o", "lstart="],
+      { timeout: 2_000, env: { ...process.env, LC_ALL: "C" } });
+    const started = Date.parse(stdout.trim());
+    return Number.isFinite(started) ? started : null;
+  } catch { return null; }
+}
+
+/** A client runs when it writes its binding, so a process that started after
+ * the binding was last written is not that client: the operating system gave
+ * its pid to another program. On 2026-10-06 chrome-devtools-mcp and two IntelliJ
+ * helpers held three such pids and kept 0.10.1 pending (#276). `ps` counts whole
+ * seconds and a filesystem may too; a second of slack keeps a client's own
+ * process from reading as another. A start time that cannot be read decides
+ * nothing. */
+async function pidReused(pid, file, startedAt) {
+  const [started, written] = await Promise.all([startedAt(pid),
+    stat(file).then(info => info.mtimeMs, () => null)]);
+  return started !== null && written !== null && started > written + 1_000;
+}
+
+// One start-time reading per pid for one pass: a vendor service can hold several bindings.
+const perPass = startedAt => {
+  const seen = new Map();
+  return pid => {
+    if (!seen.has(pid)) seen.set(pid, Promise.resolve().then(() => startedAt(pid)).catch(() => null));
+    return seen.get(pid);
+  };
+};
+
 /** A binding that names no client process cannot be judged by its own facts;
  * its session record can. It is stale when the record is gone, when the record
  * names a process that has exited, or, with no process recorded, when ACC's own
@@ -57,7 +100,7 @@ const clientPidOf = record => record?.schemaVersion === 1 && Number.isSafeIntege
  * process, or a record or store that cannot be read, keeps the binding a hold.
  * On 2026-10-06 the maintainer's 0.10.0 waited behind 32 such bindings from
  * 0.5.10 to 0.9.0 that no client could clear (#273). */
-async function staleWithoutPid(workspaceRoot, workspaceId, record, pidIsAlive) {
+async function staleWithoutPid(workspaceRoot, workspaceId, record, pidIsAlive, file, startedAt) {
   if (record?.schemaVersion !== 1) return false;
   let session;
   try {
@@ -65,15 +108,19 @@ async function staleWithoutPid(workspaceRoot, workspaceId, record, pidIsAlive) {
       sessionId: record.accSessionId, allowLegacyIdentity: true });
   } catch { return false; }
   if (session === null) return true;
-  if (Number.isSafeInteger(session.pid) && session.pid > 0) return confirmedDead(session.pid, pidIsAlive);
+  if (Number.isSafeInteger(session.pid) && session.pid > 0) {
+    return await confirmedDead(session.pid, pidIsAlive) || pidReused(session.pid, file, startedAt);
+  }
   // No process to ask, so the probe is never called.
   return classifySessionPresence(session, new Date().toISOString(), () => true) === "offline";
 }
 
 /** Native bindings outlive finish/TTL; MCP process lifetime is covered by its runtime lease. */
-export async function listNativeHolds(root, { pidIsAlive = defaultPidIsAlive, strict = false } = {}) {
+export async function listNativeHolds(root, { pidIsAlive = defaultPidIsAlive, strict = false,
+  startedAt = processStartedAt } = {}) {
   const workspaces = path.join(path.dirname(await canonicalManagerRoot(root)), "workspaces");
   if (!await managedDirectory(workspaces)) return [];
+  const started = perPass(startedAt);
   const holds = [];
   for (const entry of await readdir(workspaces, { withFileTypes: true })) {
     if (!entry.isDirectory()) {
@@ -87,15 +134,17 @@ export async function listNativeHolds(root, { pidIsAlive = defaultPidIsAlive, st
     if (!await managedDirectory(bindings)) continue;
     for (const name of await readdir(bindings)) {
       if (!name.endsWith(".json")) continue;
-      const record = await readManagedJson(path.join(bindings, name)).catch(error => {
+      const file = path.join(bindings, name);
+      const record = await readManagedJson(file).catch(error => {
         if (strict) throw error;
         return null;
       });
       if (record === undefined) continue; // Concurrent lifecycle removal, before fencing.
       if (await isMcpContinuity(record, name, path.dirname(bindings), entry.name)) continue;
       const pid = clientPidOf(record);
-      if (pid !== null && await confirmedDead(pid, pidIsAlive)) continue;
-      if (pid === null && await staleWithoutPid(path.dirname(bindings), entry.name, record, pidIsAlive)) continue;
+      if (pid !== null && (await confirmedDead(pid, pidIsAlive) || await pidReused(pid, file, started))) continue;
+      if (pid === null && await staleWithoutPid(path.dirname(bindings), entry.name, record, pidIsAlive,
+        file, started)) continue;
       holds.push({ kind: "native", pid, reason: pid === null ? "unknown_client_pid" : "client_running",
         storeVersion: Number.isSafeInteger(record?.storeVersion) ? record.storeVersion : null });
     }
@@ -109,17 +158,21 @@ const LIFECYCLE_LOCK_MS = 2_000;
 const lifecycleLocks = (workspaceRoot, harnessSessionId) => ({ locks: path.join(workspaceRoot,
   "lifecycle-locks", createHash("sha256").update(String(harnessSessionId)).digest("hex")) });
 
-/** Remove the bindings without a client pid that listNativeHolds no longer
- * counts. An older generation activates its successor with its own rule, which
- * counts every one of them as a live client; it loads the pending generation's
- * refresh before it lists blockers, so that refresh calls this (#273). Each one
- * is judged again and removed under its session's lifecycle lock, so a hook that
- * renews it is either seen or comes after (AI review of #274); a lock that stays
- * busy leaves the binding as it is. */
-export async function sweepStaleBindings(root, { pidIsAlive = defaultPidIsAlive } = {}) {
+/** Remove the bindings that listNativeHolds no longer counts and an older
+ * generation still does: those without a client pid that are stale (#273), and
+ * those whose pid was given to another program (#276). An older generation
+ * activates its successor with its own rule, and loads the pending generation's
+ * refresh before it lists blockers, so that refresh calls this. A binding whose
+ * pid is merely dead holds nothing for either and stays, as the record a resumed
+ * conversation finds. Each one is judged again and removed under its session's
+ * lifecycle lock, so a hook that renews it is either seen or comes after (AI
+ * review of #274); a lock that stays busy leaves the binding as it is. */
+export async function sweepStaleBindings(root, { pidIsAlive = defaultPidIsAlive,
+  startedAt = processStartedAt } = {}) {
   const workspaces = path.join(path.dirname(await canonicalManagerRoot(root)), "workspaces");
   if (!await managedDirectory(workspaces)) return 0;
   const clock = { now: () => new Date().toISOString() };
+  const started = perPass(startedAt);
   let removed = 0;
   for (const entry of await readdir(workspaces, { withFileTypes: true })) {
     if (!entry.isDirectory()) continue;
@@ -130,10 +183,13 @@ export async function sweepStaleBindings(root, { pidIsAlive = defaultPidIsAlive 
     for (const name of await readdir(bindings)) {
       if (!name.endsWith(".json")) continue;
       const file = path.join(bindings, name);
-      const stale = async record => record !== undefined && record !== null
-        && clientPidOf(record) === null && typeof record.harnessSessionId === "string"
-        && !await isMcpContinuity(record, name, workspaceRoot, entry.name)
-        && staleWithoutPid(workspaceRoot, entry.name, record, pidIsAlive);
+      const stale = async record => {
+        if (record === undefined || record === null || typeof record.harnessSessionId !== "string"
+          || await isMcpContinuity(record, name, workspaceRoot, entry.name)) return false;
+        const pid = clientPidOf(record);
+        if (pid !== null) return !await confirmedDead(pid, pidIsAlive) && pidReused(pid, file, started);
+        return staleWithoutPid(workspaceRoot, entry.name, record, pidIsAlive, file, started);
+      };
       const judged = await readManagedJson(file).catch(() => undefined);
       if (!await stale(judged)) continue;
       const gone = await withWriterMutex(lifecycleLocks(workspaceRoot, judged.harnessSessionId),
@@ -165,9 +221,10 @@ export const blocksActivation = (hold, incomingStoreVersion) =>
  * generation's, or when either side declares none.
  */
 export async function listActivationBlockers(root, { pidIsAlive = defaultPidIsAlive,
-  ignorePid = null, incomingStoreVersion = null, strictNative = false } = {}) {
+  ignorePid = null, incomingStoreVersion = null, strictNative = false, startedAt } = {}) {
   const leases = (await listRuntimeHolds(root, { pidIsAlive })).filter(lease => lease.pid !== ignorePid);
-  const native = await listNativeHolds(root, { pidIsAlive, strict: strictNative });
+  const native = await listNativeHolds(root, { pidIsAlive, strict: strictNative,
+    ...(startedAt === undefined ? {} : { startedAt }) });
   const holds = [
     ...leases.map(({ pid, kind, runtime }) => ({ pid, kind, nativeBindings: 0,
       storeVersion: runtime?.storeVersion ?? null })),
@@ -364,7 +421,7 @@ const recipe = c => JSON.stringify([c.active, c.pending, c.home, c.targets, c.au
 
 /** Detection is outside the fence; every integration write and commit stays inside it. */
 export async function activatePending(root, { prepare = prepareCandidate, env = process.env,
-  pidIsAlive = defaultPidIsAlive, ignorePid = null, beforeActivation = null } = {}) {
+  pidIsAlive = defaultPidIsAlive, ignorePid = null, beforeActivation = null, startedAt } = {}) {
   root = await canonicalManagerRoot(root);
   const before = await readControl(root);
   if (!before?.pending) return { activated: false, reason: "no_pending_update" };
@@ -374,7 +431,7 @@ export async function activatePending(root, { prepare = prepareCandidate, env = 
     const current = await readControl(root);
     if (!current || recipe(current) !== recipe(before)) return { activated: false, reason: "state_changed" };
     if (beforeActivation) await beforeActivation(current);
-    const blockers = await listActivationBlockers(root, { pidIsAlive, ignorePid,
+    const blockers = await listActivationBlockers(root, { pidIsAlive, ignorePid, startedAt,
       incomingStoreVersion: current.pending.storeVersion });
     if (blockers.length) {
       const notice = activationBlockerNotice(current.pending.version, blockers);
