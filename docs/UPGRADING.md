@@ -57,6 +57,18 @@ closed. 0.10.1 judges such a binding by its session record and removes it while 
 the update, so the update from 0.9.x finishes once no 0.9.x session runs. From 0.10.0, 0.10.1
 keeps the store contract, so it activates without waiting for open sessions.
 
+If `acc update` keeps retrying a pending 0.10.0 or 0.10.1 and names processes that are not your
+clients, or `unknown client pid`, clear the pending release and update again:
+
+```bash
+acc update --pin none
+acc update
+```
+
+`--pin none` keeps following stable releases and drops a pending release that is not pinned.
+From 0.10.2, the update does this by itself: a pending release that cannot activate is replaced
+by a newer one, and a binding whose pid another program now has no longer holds the update.
+
 ## From 0.8.x
 
 Update as usual:

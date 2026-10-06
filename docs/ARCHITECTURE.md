@@ -272,8 +272,12 @@ running. A binding that names no client process is judged by its session record 
 exited, or, with no process recorded, when ACC's presence rule calls the session offline -
 closed, or 30 minutes without a heartbeat. A live recorded process, or a record that cannot be
 read, keeps it a hold. A client that wakes later runs its next hook through the launcher on
-the active generation. For a binding that names its client, presence TTL, `acc finish`, and
-delivery off do not prove native lifecycle end. Normal background updates never
+the active generation. A binding that names its client stops holding when that process exits,
+or when the process that now has its pid started after the binding was last written, since a
+client runs when it writes its binding (#276); a start time that cannot be read decides
+nothing. Otherwise presence TTL, `acc finish`, and delivery off do not prove native lifecycle
+end. A pending release that cannot activate is replaced by a newer one when `acc update` runs
+or an automatic check is due (#277). Normal background updates never
 restart a vendor daemon. An explicitly approved maintenance job can do so through the
 adapter lifecycle port: it waits for idle work, validates exact process identity, stops
 the service under the admission fence, refreshes integrations, and restores and verifies
