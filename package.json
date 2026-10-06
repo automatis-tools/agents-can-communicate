@@ -1,6 +1,6 @@
 {
   "name": "agents-can-communicate",
-  "version": "0.9.1",
+  "version": "0.10.0",
   "accManagedUpdateProtocol": 2,
   "accStoreVersion": 7,
   "type": "module",
