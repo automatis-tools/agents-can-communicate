@@ -15,9 +15,9 @@
 
 | Candidate artifact | Value |
 |---|---|
-| Built from | `ed5f4da7b17ca726cc5d476311b5d00dadc73685` |
-| Tarball | `agents-can-communicate-0.10.1.tgz`, 580,869 bytes, 351 files |
-| sha256 | `5467696e4ba57ee2b7375743d1f610fba3ef89d8de78294df99aa535d8402294` |
+| Built from | `2ff8cb9704616b0a3d93b83d8e030ff0bb528b9e` |
+| Tarball | `agents-can-communicate-0.10.1.tgz`, 580,985 bytes, 351 files |
+| sha256 | `7025372be6dcbdd67409781ae970d7387df1addfc280407ab0dbb3cbeaed91e5` |
 
 This unpublished development archive was measured with `npm pack`. See
 [the evidence](docs/release-evidence/unreleased-reused-pids-and-stuck-pending.md).

@@ -2,9 +2,9 @@
 
 | Candidate artifact | Value |
 |---|---|
-| Built from | `ed5f4da7b17ca726cc5d476311b5d00dadc73685` |
-| Tarball | `agents-can-communicate-0.10.1.tgz`, 580,869 bytes, 351 files |
-| sha256 | `5467696e4ba57ee2b7375743d1f610fba3ef89d8de78294df99aa535d8402294` |
+| Built from | `2ff8cb9704616b0a3d93b83d8e030ff0bb528b9e` |
+| Tarball | `agents-can-communicate-0.10.1.tgz`, 580,985 bytes, 351 files |
+| sha256 | `7025372be6dcbdd67409781ae970d7387df1addfc280407ab0dbb3cbeaed91e5` |
 
 Issues: #276, #277. Design:
 [2026-10-06-reused-pids-and-stuck-pending](../design/2026-10-06-reused-pids-and-stuck-pending.md).
@@ -43,8 +43,10 @@ On the maintainer's Mac on 2026-10-06, after 0.10.1 was published:
   process's own start time is read within 5 seconds of what `process.uptime()` gives.
 - New `managed-runtime-pending-supersede.test.mjs`. A blocked pending release is replaced
   through `acc update` and through a due automatic check, and not through a check that is not
-  due. One that activates is kept, and so is one no older than the release found. Three of
-  these tests failed before the change.
+  due. One that activates is kept, and so is one no older than the release found, which still
+  reports `processes_active`: `acc update` asks to restart a client service from it. Three of
+  these tests failed before the change. The packed manual-update check caught a first version
+  that dropped that reason.
 
 ## Upgrade from the published 0.9.1
 
