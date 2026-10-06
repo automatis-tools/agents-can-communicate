@@ -5,16 +5,18 @@ on:
 permissions:
   contents: read
 jobs:
-  suite:
-    name: suite · ${{ matrix.rep }}
+  election:
+    name: election loop · ${{ matrix.ref }}
     runs-on: windows-latest
     timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix:
-        rep: [a, b, c, d, e, f, g, h]
+        ref: [main, fix/windows-lstat-delete-pending]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ matrix.ref }}
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: '24'
@@ -26,32 +28,31 @@ jobs:
           "TEMP=$dir" >> $env:GITHUB_ENV
           "TMP=$dir" >> $env:GITHUB_ENV
       - run: npm ci
-      - name: Tests
-        continue-on-error: true
-        run: |
-          npm test 2>&1 | Tee-Object -FilePath (Join-Path $env:RUNNER_TEMP 'suite.log')
-          exit $LASTEXITCODE
-        env:
-          ACC_TEST_TIMEOUT_MS: '300000'
-          ACC_TEST_FORCE_EXIT: '1'
-          CI: 'true'
-          GIT_DIR: ''
-          GIT_WORK_TREE: ''
-      - name: Open refusals
-        if: always()
+      - name: Eight writers electing one, four loops of 150 beside each other
         shell: bash
         run: |
+          for loop in 1 2 3 4; do
+            ( for i in $(seq 1 150); do
+                node --test --test-name-pattern='concurrent owner publication elects one live writer' \
+                  packages/storage-filesystem/test/writer-mutex-reclamation.test.mjs > "$RUNNER_TEMP/election-$loop-$i.log" 2>&1 \
+                  || echo "loop $loop run $i failed"
+              done ) &
+          done
+          wait
+          cat "$RUNNER_TEMP"/election-*.log > "$RUNNER_TEMP/election.log"
           {
-            echo "### suite ${{ matrix.rep }}"
-            grep -E '^ℹ (tests|pass|fail)' "$RUNNER_TEMP/suite.log" || true
+            echo "### ${{ matrix.ref }}"
+            echo "runs: $(ls "$RUNNER_TEMP"/election-*-*.log | wc -l), failed: $(grep -l '^ℹ fail [1-9]' "$RUNNER_TEMP"/election-*-*.log | wc -l), passed: $(grep -l '^ℹ pass 1' "$RUNNER_TEMP"/election-*-*.log | wc -l)"
             echo '```'
-            grep -oE 'cannot safely open regular file \[[^]]*\]' "$RUNNER_TEMP/suite.log" | sed -E 's/[A-Z]:\\[^ '"'"']*//' | sort | uniq -c || true
-            grep -E '^✖ ' "$RUNNER_TEMP/suite.log" | sort -u || true
+            grep -oE "cannot safely [a-z]+ regular file[^']*|EPERM[^']*'[^']*'" "$RUNNER_TEMP/election.log" | sed -E "s/'[^']*'//" | sort | uniq -c || true
             echo '```'
           } | tee -a "$GITHUB_STEP_SUMMARY"
+        env:
+          GIT_DIR: ''
+          GIT_WORK_TREE: ''
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: suite-${{ matrix.rep }}
-          path: ${{ runner.temp }}/suite.log
+          name: election-${{ strategy.job-index }}
+          path: ${{ runner.temp }}/election.log
           retention-days: 7
