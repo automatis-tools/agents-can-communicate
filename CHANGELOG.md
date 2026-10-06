@@ -1,5 +1,28 @@
 # Changelog
 
+## Unreleased — older stores move to contract 7 by themselves
+
+- After an update activates a contract-7 runtime, ACC moves each contract-6 store of its data
+  home to contract 7 by itself, once no live client runs older ACC code: the same check the
+  activation and `acc doctor --migrate-store` use. With automatic updates on, a user who ran
+  nothing found every older workspace without coordination (2026-10-06). The pass runs in the
+  activating process and on the worker's passes, records `store-upgrade.json`, and is retried a
+  minute later while a store stays behind.
+- A hook that still meets an older store prints a `systemMessage` for Claude Code and Codex,
+  which they show the user; before, the remedy went to stderr only. Plain `acc doctor` names
+  `acc doctor --migrate-store` instead of calling the store's identity unreadable.
+- Every launcher module now imports only launcher modules, which a test checks.
+
+| Candidate artifact | Value |
+|---|---|
+| Built from | `0d79ea85cb2e8b13f9c2d30252bc81a05f110d50` |
+| Tarball | `agents-can-communicate-0.9.1.tgz`, 576,270 bytes, 351 files |
+| sha256 | `ff37f503eb3facfefd74404c6c7d68145ce67b21337428386f371803da79d2c9` |
+
+This unpublished development archive was measured with `npm pack`. See
+[the evidence](docs/release-evidence/unreleased-automatic-store-migration.md).
+The package version remains `0.9.1` until a release prepares its own.
+
 ## Unreleased — bounded message and receipt transaction reads
 
 - Message creation and retries use a rebuildable, bounded index instead of
