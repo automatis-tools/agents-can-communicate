@@ -1,3 +1,5 @@
+import os from "node:os";
+
 // The suite contains tests that deliberately create several independent ACC,
 // npm, tar, and Unix-socket processes. Letting Node run one test file per CPU
 // (18 on the release machine) multiplies those process races until a healthy
@@ -13,8 +15,36 @@
 // 631 s at three, 590 s at four, with no failure (2026-10-06). At four each file
 // took half as long again as at two, at three a fifth longer: three keeps more
 // of the hooks' margin for nearly all of the gain.
-export const fileConcurrency = (platform = process.platform) => (platform === "win32" ? 3 : 4);
-export const TEST_FILE_CONCURRENCY = fileConcurrency();
+//
+// A local macOS run that skips fsync (see skipsFsync) takes two thirds of the
+// machine's processors, up to twelve. The races above came with every flush a
+// 4 ms F_FULLFSYNC queued on one disk: on an 18-core Mac with them skipped the
+// suite took 124 s at six and 103 s at twelve, every test passing (2026-10-06).
+// A run that keeps its flushes stays at four.
+export function fileConcurrency(platform = process.platform,
+  { cpus = os.availableParallelism(), fsyncSkipped = false } = {}) {
+  if (platform === "win32") return 3;
+  if (!fsyncSkipped) return 4;
+  return Math.max(4, Math.min(12, Math.floor(cpus * 2 / 3)));
+}
+
+// Local macOS runs only. CI sets CI and keeps every flush on every platform;
+// ACC_TEST_REAL_FSYNC=1 keeps them locally. See scripts/test-skip-fsync.mjs.
+export const skipsFsync = ({ platform = process.platform, env = process.env } = {}) =>
+  platform === "darwin" && !env.CI && env.ACC_TEST_REAL_FSYNC !== "1";
+
+export const SKIP_FSYNC_PRELOAD = new URL("./test-skip-fsync.mjs", import.meta.url).href;
+
+// The environment the suite's processes start with: the preload rides in
+// NODE_OPTIONS, so every node process a test starts inherits it with the rest.
+export function testEnvironment(env = process.env, { platform = process.platform } = {}) {
+  if (!skipsFsync({ platform, env })) return { ...env };
+  const preload = `--import=${SKIP_FSYNC_PRELOAD}`;
+  const options = env.NODE_OPTIONS ?? "";
+  return { ...env, NODE_OPTIONS: options.includes(preload) ? options : `${options} ${preload}`.trim() };
+}
+
+export const TEST_FILE_CONCURRENCY = fileConcurrency(process.platform, { fsyncSkipped: skipsFsync() });
 
 // CI sets ACC_TEST_TIMEOUT_MS so that one hung test fails with its name instead
 // of holding the whole job until the runner's own limit.

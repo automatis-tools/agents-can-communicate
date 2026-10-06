@@ -15,6 +15,12 @@
 - The Windows test job runs three test files at a time instead of two, and no test job repeats
   the syntax check the Lint workflow already runs. On one windows-latest CPU the suite took
   771 s at two and 618-631 s at three, with no failure (2026-10-06).
+- A local macOS run of the suite skips fsync and runs up to twelve test files at a time; it took
+  288 s with every flush and six files, 103 s without them at twelve, every test passing
+  (2026-10-06). Node flushes on macOS with F_FULLFSYNC, 4 ms a call, and the suite makes about
+  59,400. CI keeps every flush on every platform, and `ACC_TEST_REAL_FSYNC=1` keeps them locally.
+  The syntax check of the pre-push hook and the Lint workflow runs as many files at once as the
+  machine has processors.
 
 | Candidate artifact | Value |
 |---|---|

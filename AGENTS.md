@@ -24,6 +24,9 @@ npm test           # the whole suite; refuses to pass on an empty file list
 npm pack && node scripts/verify-package.mjs   # what a user actually receives
 ```
 
+On macOS outside CI, `npm test` skips fsync and runs more test files at once: each flush there
+is a 4 ms F_FULLFSYNC. `ACC_TEST_REAL_FSYNC=1 npm test` keeps every flush; CI always does.
+
 Enable the commit-msg and pre-push gates once per clone:
 
 ```bash
