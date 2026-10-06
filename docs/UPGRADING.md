@@ -60,6 +60,7 @@ keeps the store contract, so it activates without waiting for open sessions.
 If `acc update` keeps retrying a pending 0.10.0 or 0.10.1 and names processes that are not your
 clients, or `unknown client pid`, clear the pending release and update again:
 
+<!-- test:illustration needs an installed ACC with a release pending; a fresh sandbox has neither -->
 ```bash
 acc update --pin none
 acc update

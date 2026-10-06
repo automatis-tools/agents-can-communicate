@@ -73,8 +73,10 @@ test("a release no newer than the pending one leaves it pending", async t => {
   const f = await fixture(t);
   const same = { ...f.ports, discover: async () => { f.calls.push("discover"); return { version: "0.10.0" }; } };
 
-  await performUpdate(f.root, { ...same, force: true });
+  const result = await performUpdate(f.root, { ...same, force: true });
 
   assert.deepEqual(f.calls, ["activate 0.10.0", "discover"]);
   assert.equal((await readControl(f.root)).pending.version, "0.10.0");
+  // The command asks to restart a client service from this reason.
+  assert.equal(result.reason, "processes_active");
 });
