@@ -3,14 +3,13 @@
 **The message your clients can’t send each other.**
 
 Claude Code can message your other Claude Code sessions, and Codex can queue a message for
-another Codex session. A Claude Code session and a Codex session still cannot reach each other.
-ACC carries questions, reviews and handoffs between sessions in different vendors’ clients, on
+another Codex session. Neither client offers a way to message the other’s sessions. ACC
+carries questions, reviews and handoffs between sessions in different vendors’ clients, on
 your machine.
 
 You open each client normally and choose its work. Every session keeps its own model,
 conversation, and permissions. Coordination runs locally, with no lead agent managing the
-others. If every session you run is Claude Code, or every one is Codex, the client’s own
-messaging is enough.
+others. If all your sessions run in one of these two clients, try its own messaging first.
 
 ```mermaid
 flowchart TB

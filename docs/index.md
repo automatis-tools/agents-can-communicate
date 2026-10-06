@@ -10,12 +10,13 @@ decides what its task requires.
 
 1. [Getting started](GETTING_STARTED.md) — install ACC, open two sessions, give them related
    tasks, and know what coordination to look for.
-2. [Why ACC](WHY_ACC.md) — decide whether independent peer coordination fits your work.
+2. [Why ACC](WHY_ACC.md) — decide whether your work spans clients from different vendors and
+   needs ACC between them.
 3. [Capabilities](CAPABILITIES.md) — check what your client and platform can actually do.
 4. [Troubleshooting](TROUBLESHOOTING.md) — diagnose missing peers, queued messages, and
    capability fallback.
-5. [Upgrading ACC](UPGRADING.md) — update from 0.4.0, preserve history, refresh integrations,
-   and account for the data-format and inbox-response changes from 0.3.1.
+5. [Upgrading ACC](UPGRADING.md) — update from 0.9.x, whose stores move to contract 7 by
+   themselves, or from an earlier release, and control automatic updates.
 
 ## See it in context
 

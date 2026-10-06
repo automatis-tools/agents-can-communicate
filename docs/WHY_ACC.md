@@ -2,9 +2,9 @@
 
 ACC fits work that spans clients from different vendors. Claude Code sessions can message
 each other through Claude Code's
-[cross-session messaging](https://code.claude.com/docs/en/cross-session-messaging), and Codex
-sessions can queue messages for each other with `codex queue`. A Claude Code session and a
-Codex session still cannot reach each other. When you ask another vendor's model for a review,
+[cross-session messaging](https://code.claude.com/docs/en/cross-session-messaging), and
+`codex queue` queues a message for another Codex session. Neither client offers a way to
+message the other's sessions. When you ask another vendor's model for a review,
 build related features in two clients, or switch clients in the middle of a feature, the
 sessions need to ask and answer each other without making you carry every sentence between
 windows.
@@ -21,8 +21,8 @@ resources, and hand off context.
 
 ```mermaid
 flowchart TD
-  A["Do your sessions run in clients from different vendors?"] -->|no| V["The client's own messaging is likely enough"]
-  A -->|yes| B["Must they keep separate ownership and permissions?"]
+  A["Do all your sessions run in Claude Code, or all in Codex?"] -->|yes| V["Try the client's own messaging first"]
+  A -->|no| B["Must they keep separate ownership and permissions?"]
   B -->|no| M["A managed agent runtime may fit better"]
   B -->|yes| C["Do they need direct questions, durable replies, or claim awareness?"]
   C -->|yes| Y["ACC fits this workflow"]
@@ -49,19 +49,26 @@ Claims support communication; they are not the product's center. The useful loop
 retrieve, reply, acknowledge, and hand off. A claim merely makes “I am changing this”
 actionable before two sessions collide.
 
-## Why not an MCP server alone?
+## What hooks add over an MCP server or a script
 
 A model calls an MCP tool only when it decides to: the tool sits in its list, and the session
 remembers it or does not. ACC installs hooks in each supported client, so peers and their
 messages arrive in the turn by themselves, and with live delivery enabled a message can wake a
-session that is not polling for anything. The sender also sees what happened to a message,
-not only that it was sent. For clients without an integration, ACC offers its own
-[MCP server](MCP.md); without hooks, the agent there reads its inbox when it chooses to.
+session that is not polling for anything. For clients without an integration, ACC offers its
+own [MCP server](MCP.md); without hooks, the agent there reads its inbox when it chooses to.
+
+Claude Code documents its inbox socket for scripts and hooks, and `codex queue` is a command
+any process can run, so two sessions can be wired together by hand. What that leaves to you is
+what ACC does: one list of peers across clients, so a session finds the other without a socket
+path or a thread id; a reply that returns to the sender in its own client; messages and
+handoffs kept for a session that is closed or not open yet; receipts that show what happened
+to each message; and instructions installed in each client, so agents use it without being
+told how.
 
 ## Choose another layer when
 
-Use the client's own messaging when every session runs in Claude Code, or every one in Codex.
-Choose a managed runtime if you want the system to create agents, assign execution state,
+Try the client's own messaging first when every session runs in Claude Code, or every one in
+Codex; Claude Code's also reaches your sessions on other machines. Choose a managed runtime if you want the system to create agents, assign execution state,
 select models, spend token budgets, or control ongoing agent execution. Choose a tracker when
 you need organizational planning. Choose a hosted service when participants must
 coordinate across machines.

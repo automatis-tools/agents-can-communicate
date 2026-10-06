@@ -11,21 +11,28 @@ Both large vendors now carry messages between their own sessions:
 - Codex has `codex queue` from 0.149.0 (2026-08-20). Codex 0.160.1 describes it as "Queue a
   message for an existing session" (`codex queue --help`, checked 2026-10-06).
 
-Each reaches only its own sessions. The README still opens with "Let your AI coding sessions
-talk to each other", which promises a single-vendor reader what the client already does. The
-part nobody covers is between vendors on one machine: a Claude Code session and a Codex
-session cannot reach each other.
+Each reaches only its own sessions. They differ: Claude Code's is a tool the model calls on
+its own, and it also reaches sessions on other machines and in the cloud; `codex queue` is a
+command a person or a script runs, and Codex's agent message board serves one session's own
+team of sub-agents. Claude Code also documents its inbox socket for scripts and hooks.
+
+The README still opened with "Let your AI coding sessions talk to each other", which promises
+a single-vendor reader what the client already does. The part neither vendor covers is between
+vendors on one machine: neither client offers a way to message the other's sessions.
 
 ## Decision
 
 Every public text leads with that gap and names the vendor features as given:
 
 - **Headline.** "The message your clients can't send each other." The first paragraph says
-  what Claude Code and Codex each do, that neither reaches the other, and that ACC carries
+  what Claude Code and Codex each do, that neither offers a way to message the other's
+  sessions, and that ACC carries
   questions, reviews and handoffs between sessions in different vendors' clients, locally. It
   says "carries", never "wakes": live delivery stays opt-in and is described further down.
-- **One vendor.** A reader whose sessions all run in Claude Code, or all in Codex, is told
-  that the client's own messaging is enough.
+- **One vendor.** A reader whose sessions all run in Claude Code, or all in Codex, is told to
+  try the client's own messaging first. The texts say "neither client offers a way to message
+  the other's sessions", never "they cannot reach each other": a script can post into a
+  Claude Code socket or run `codex queue`.
 - **Scenarios**, in this order: a second opinion from another vendor's model; parallel
   features in different clients; a switch of clients mid-feature. The first-run example is a
   review: Claude Code asks a Codex session to review its change and gets the findings back.
@@ -35,8 +42,11 @@ Every public text leads with that gap and names the vendor features as given:
 - **Feedback.** The README sends people to issues, with first-run and bug templates; the
   first-run template asks how the person found ACC. A person whose first run worked is asked
   to watch releases. Discussions stay for longer write-ups.
-- **Why not an MCP server.** `docs/WHY_ACC.md` answers it by mechanism: a model has to decide
-  to call an MCP tool, while ACC's hooks bring peers and messages into the turn by themselves.
+- **Why not an MCP server or a script.** `docs/WHY_ACC.md` answers both by mechanism: a model
+  has to decide to call an MCP tool, while ACC's hooks bring peers and messages into the turn
+  by themselves; and wiring the socket and `codex queue` by hand leaves out the shared list of
+  peers, replies back to the sender's client, messages kept for closed sessions, receipts, and
+  instructions in each client.
 
 ## Files
 
