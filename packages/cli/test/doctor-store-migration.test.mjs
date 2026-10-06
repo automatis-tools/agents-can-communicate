@@ -179,8 +179,11 @@ test("admission stays fenced through workspace migration", async t => {
 // ambiguous, and named no migration (2026-10-06).
 test("plain doctor names the migration for an older store instead of calling it unreadable", async t => {
   const f = await fixture(t);
+  // Plain doctor resolves the platform's data directory, which on Windows is
+  // LOCALAPPDATA - present on every real Windows account, absent from this fixture.
+  const local = path.join(f.root, "home", "AppData", "Local");
 
-  const result = await f.run(["doctor"]);
+  const result = await f.run(["doctor"], { env: { ...f.runtime.env, LOCALAPPDATA: local, USERPROFILE: path.join(f.root, "home") } });
 
   assert.equal(result.code, EXIT.DATA);
   assert.match(result.body.error.message, /acc doctor --migrate-store/);
