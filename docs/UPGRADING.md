@@ -2,25 +2,28 @@
 
 ## Store contract 6 to 7
 
-When a runtime reports that a workspace still uses store contract 6, stop clients
-running old ACC code and any program that imports the store directly. In that
-workspace, run a current ACC that supports:
+ACC moves each workspace's store from contract 6 to 7 by itself, right after an update
+activates a contract-7 runtime. The activation already waits until no client runs older ACC
+code, so at that point the migration is safe. It builds the message and receipt indexes from
+validated live records, then replaces the store identity last. Message bytes, receipt bytes,
+workspace identity and initialization time are preserved. There is no reverse migration:
+version-6 code refuses a version-7 store.
+
+A store that a live older client still holds, or whose migration fails, stays on contract 6.
+The next ACC command or hook a minute or more later retries it. Until then, coordination is
+paused in that workspace: Claude Code and Codex show a message about it, other clients write it
+to stderr, `acc status` names it, and `acc doctor` names the command. To migrate a workspace at
+once, stop older ACC clients and any program that imports the store directly, then run in that
+workspace:
 
 ```bash
 acc doctor --migrate-store
 ```
 
-Migration refuses old or unknown live runtime holders. It builds the message and
-receipt indexes from validated live records, then replaces the store identity
-last. Message bytes, receipt bytes, workspace identity and initialization time are
-preserved. If interrupted, run the same command again. There is no reverse
-migration: version-6 code refuses a newly opened version-7 store.
-
-The command does not install or activate a runtime, contact npm, or restart
-clients. Complete any pending runtime update separately, then start clients with
-current code. `doctor --repair` never migrates a store. Hooks fail open on an
-unmigrated workspace and leave its identity unchanged. Runtime admission cannot
-prove that unmanaged direct library users stopped; the operator must quiesce them.
+The command refuses old or unknown live runtime holders, does not install or activate a
+runtime, contact npm, or restart clients. If it is interrupted, run it again.
+`doctor --repair` never migrates a store, and hooks never change a store's format. Runtime
+admission cannot see unmanaged direct library users; stop them before an update.
 
 ## From 0.8.x
 

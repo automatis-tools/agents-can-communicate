@@ -174,3 +174,16 @@ test("admission stays fenced through workspace migration", async t => {
   assert.equal((await acquireRuntime(f.manager)).runtime.storeVersion, 6,
     "migration does not install or activate another release");
 });
+
+// Plain doctor called a contract-6 store's identity unreadable and the store
+// ambiguous, and named no migration (2026-10-06).
+test("plain doctor names the migration for an older store instead of calling it unreadable", async t => {
+  const f = await fixture(t);
+
+  const result = await f.run(["doctor"]);
+
+  assert.equal(result.code, EXIT.DATA);
+  assert.match(result.body.error.message, /acc doctor --migrate-store/);
+  assert.doesNotMatch(result.body.error.message, /ambiguous|unreadable/);
+  assert.equal(result.body.error.details.reasonCode, "store_migration_required");
+});

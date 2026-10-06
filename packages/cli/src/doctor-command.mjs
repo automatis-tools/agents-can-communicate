@@ -277,6 +277,16 @@ export async function runDoctor({ options, context, runtime }) {
   // took the diagnosis with it: one truncated file and `acc doctor` answered
   // "invalid JSON record", naming nothing, while `inspect` had already found
   // the file and put it in a list nobody ever saw.
+  // A contract-6 store is not ambiguous: its identity read and named its
+  // version. Before this, doctor called `protocol.json` unreadable and named no
+  // migration, on the one store a user just updated into (2026-10-06).
+  if (report.migrationRequired === true) {
+    throw new AccError(EXIT.DATA, "this workspace's store uses an older contract; ACC migrates it "
+      + "by itself once no older ACC client runs. To migrate it now, stop older ACC clients and run "
+      + "acc doctor --migrate-store", { workspaceId: context.descriptor.id, source: context.descriptor.source,
+      runtimeRoot: root, reasonCode: "store_migration_required", adapters,
+      remediation: ["acc doctor --migrate-store"] });
+  }
   if (!report.healthy) {
     const broken = [...report.blocked, ...report.corrupt];
     throw new AccError(EXIT.DATA,

@@ -120,3 +120,15 @@ export function injectStartOwnerOutcome(context) {
   return { stdout: `${JSON.stringify({ hookSpecificOutput: {
     hookEventName: "SessionStart", additionalContext: context } })}\n`, stderr: "", exitCode: 0 };
 }
+
+/**
+ * A line for the user when a hook fails open for a reason they can act on.
+ *
+ * Claude Code shows a hook's `systemMessage` to the user and never sends it to
+ * the model; a failed-open hook's stderr it shows to no one. Only on a session
+ * start and before a turn, the two hooks whose output a person is reading.
+ */
+export function failOpenNotice({ kind, message }) {
+  if (kind !== "sessionStart" && kind !== "beforeTurn") return null;
+  return JSON.stringify({ systemMessage: message });
+}

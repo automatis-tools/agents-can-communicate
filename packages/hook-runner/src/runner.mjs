@@ -822,6 +822,7 @@ export async function runHook({ adapterId, payload, adapters, dataHome, env,
     if (adapter === undefined) throw new Error(`no adapter named ${adapterId}`);
 
     const event = await adapter.normalizeHook(payload, { args });
+    trail.kind = event.kind;
     // A session start reads the process table once, and it depends on nothing
     // below: it starts now, while the store opens. On Windows it is the part
     // of a start that runs another program.
@@ -900,12 +901,31 @@ export async function runHook({ adapterId, payload, adapters, dataHome, env,
     });
     return await Promise.race([execute(), budget]);
   } catch (error) {
+    const failureCode = error instanceof AccError && KNOWN_FAILURES.has(error.details?.reasonCode)
+      ? error.details.reasonCode : null;
     return { ...fallback, failed: true, reason: error.message,
-      ...(error instanceof AccError && KNOWN_FAILURES.has(error.details?.reasonCode)
-        ? { failureCode: error.details.reasonCode } : {}),
+      ...(failureCode === null ? {} : { failureCode }),
+      ...(failureCode === "store_migration_required"
+        ? { stdout: migrationNotice(adapters?.[adapterId], trail.kind) } : {}),
       ...(Date.now() >= deadline ? { timedOut: true, phase: trail.phase } : {}) };
   } finally {
     clearTimeout(timer);
+  }
+}
+
+// What a person reads when their workspace's store waits for its migration: a
+// client that shows hook output to the user says so, instead of the stderr line
+// no client showed (2026-10-06). Never a hook input or error text.
+const MIGRATION_NOTICE = "ACC: coordination is paused in this workspace until its store moves "
+  + "to the new format. ACC does this by itself once older ACC clients have stopped; to do it "
+  + "now, stop them and run: acc doctor --migrate-store";
+function migrationNotice(adapter, kind) {
+  if (typeof adapter?.failOpenNotice !== "function" || typeof kind !== "string") return "";
+  try {
+    const rendered = adapter.failOpenNotice({ kind, message: MIGRATION_NOTICE });
+    return typeof rendered === "string" ? rendered : "";
+  } catch {
+    return "";
   }
 }
 

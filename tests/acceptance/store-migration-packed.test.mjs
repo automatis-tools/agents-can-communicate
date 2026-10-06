@@ -32,6 +32,9 @@ test("packed doctor migrates explicitly, preserves message bytes and supports se
   const hook = await f.hook("claude_code", { hook_event_name: "SessionStart", session_id: "unmigrated_fixture",
     cwd: f.project, source: "startup" }, { ACC_PARTICIPANT: "unmigrated_client" });
   assert.match(hook.stderr, /doctor --migrate-store/);
+  // The user sees it too: Claude Code shows a hook's systemMessage and not its
+  // stderr, which was the only place the remedy went (2026-10-06).
+  assert.match(JSON.parse(hook.stdout).systemMessage, /acc doctor --migrate-store/);
   assert.deepEqual(await readFile(state.file), state.before, "a hook must not migrate automatically");
   const migrated = await f.acc(["doctor", "--migrate-store"]);
   assert.deepEqual([migrated.fromVersion, migrated.toVersion, migrated.migrated], [6, 7, true]);
@@ -71,4 +74,27 @@ test("packed verified pending management code migrates only after old native hol
   assert.deepEqual(after.active, before.active, "migration must not activate another release");
   assert.deepEqual(after.pending, before.pending);
   assert.equal(JSON.parse(await readFile(state.file)).storeVersion, 7);
+});
+
+// With automatic updates on, a user who ran nothing found every older workspace
+// without coordination after the update (2026-10-06). The activated
+// generation now moves the data home's older stores itself, right after its
+// activation, because activation already waited until no older client held one.
+test("packed update moves an older store to the new contract by itself", async t => {
+  const f = await createPackedAcc(t);
+  const registry = await createUpdateRegistry(t, f, "0.9.99");
+  await f.setClientVersions({ claude: "2.1.266" });
+  await f.acc(["install", "--adapter", "claude_code", "--delivery", "off"]);
+  await f.acc(["update", "--auto", "off"]);
+  const state = await v6(f);
+
+  const updated = await f.acc(["update"], { ACC_NO_UPDATE_CHECK: "0", npm_config_registry: registry.url,
+    npm_config_cache: path.join(f.root, "update-cache") });
+
+  assert.equal(updated.activated, true, JSON.stringify(updated));
+  assert.equal(JSON.parse(await readFile(state.file)).storeVersion, 7);
+  const marker = JSON.parse(await readFile(path.join(f.dataHome, "acc", "runtime", "store-upgrade.json")));
+  assert.equal(marker.complete, true);
+  const sender = await f.acc(["attach", "--participant", "after", "--harness", "cli"]);
+  assert.equal(typeof sender.sessionId, "string");
 });
