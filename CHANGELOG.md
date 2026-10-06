@@ -12,12 +12,14 @@
   about it, and plain `acc doctor` names `acc doctor --migrate-store`, which migrates it at once
   (PR #264).
 - 0.9.x code refuses a contract-7 store, so 0.9.x and 0.10.0 never share a workspace.
+- On Windows, a writer that waits for the store lock looks again when the lock's record is being
+  deleted, instead of failing with "cannot safely open regular file" (PR #269).
 
 | Candidate artifact | Value |
 |---|---|
-| Built from | `a9edc13993eff618e230c8bf8f49a185bc82afdf` |
-| Tarball | `agents-can-communicate-0.10.0.tgz`, 576,895 bytes, 351 files |
-| sha256 | `a64974be6ce18375ada49071affb631dc2595ec2dc2671485f6754272423c733` |
+| Built from | `31741504ca8a028af07882efea679bfab1a801bd` |
+| Tarball | `agents-can-communicate-0.10.0.tgz`, 577,239 bytes, 351 files |
+| sha256 | `30bcb2f43b5adc1714fd007171e2fea2d7c038bfdea94e84641567c8be8be119` |
 
 The exact archive passed clean installation verification, the 24 managed-update packed checks
 and the 3 store-migration packed checks. The published 0.9.1 updated itself to these bytes: the
