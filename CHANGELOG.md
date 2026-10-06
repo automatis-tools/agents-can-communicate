@@ -9,16 +9,16 @@
   and the reviewer refused a reply that named a branch and changed paths as disclosure to "an
   external ACC peer"; from then on the session told every peer it could not share project
   details (#260). `acc install`, `uninstall`, `update` and `config` still ask. A same-named file
-  ACC did not write stays the operator's, doctor asks for `acc install --adapter codex` when the
+  ACC did not write stays the operator's, and so does ACC's file once edited; doctor asks for `acc install --adapter codex` when the
   rule is missing, and uninstall takes an unchanged rule back. Windows gets no rule.
 - Every client's skill says that a peer is another AI session of the same user on this machine,
   and that a send reaches no one off the machine.
 
 | Candidate artifact | Value |
 |---|---|
-| Built from | `dd3c3c1e8fd691eaae515cb30e35a2cb9302db9f` |
-| Tarball | `agents-can-communicate-0.9.0.tgz`, 557,646 bytes, 337 files |
-| sha256 | `32253419172c4c9a926807edfa21a5002c0405d3472ddf672c96b5404b40f024` |
+| Built from | `24517ccb3cb32f15c46ad2925fdddbc44bb7c987` |
+| Tarball | `agents-can-communicate-0.9.0.tgz`, 557,998 bytes, 337 files |
+| sha256 | `9ad0cb139fd6c7af8ee74a0b4058e666387825b28b8e6b6dfe2178eb350d3a12` |
 
 This unpublished development archive was measured with `npm pack`. See
 [the evidence](docs/release-evidence/unreleased-codex-acc-allow-rule.md).
