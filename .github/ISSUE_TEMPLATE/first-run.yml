@@ -1,0 +1,33 @@
+name: First run
+description: What happened the first time you tried ACC, whether it worked, broke, or something in between.
+labels: ["first-run"]
+body:
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: A few lines are enough. If it broke, paste the error.
+    validations:
+      required: true
+  - type: input
+    id: setup
+    attributes:
+      label: Setup
+      description: Operating system and architecture, Node.js version, and which coding clients.
+      placeholder: macOS 15 arm64, Node 24.13, Claude Code and Codex
+    validations:
+      required: true
+  - type: textarea
+    id: still-manual
+    attributes:
+      label: What did you still have to carry between the sessions yourself?
+      description: The part ACC did not carry for you.
+    validations:
+      required: false
+  - type: input
+    id: found-via
+    attributes:
+      label: How did you find ACC?
+      description: A post, a search, a list, a colleague. It tells us which places reach people.
+    validations:
+      required: false

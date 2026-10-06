@@ -1,6 +1,7 @@
 # Getting started
 
-Install ACC, open the AI sessions you already use, and give them related work. Supported
+Install ACC, open the AI sessions you already use in clients from different vendors, such as
+Claude Code and Codex, and give them related work. Supported
 integrations make peers visible and teach each agent how to communicate. You do not need to
 carry messages between windows or add coordination instructions to your task prompts.
 

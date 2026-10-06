@@ -1,7 +1,8 @@
 # ACC documentation
 
-ACC adds peer awareness and communication to AI sessions you open yourself. You continue
-to give each agent ordinary work; supported integrations tell agents about their peers and
+ACC carries questions, reviews and handoffs between AI sessions you open yourself in clients
+from different vendors, such as Claude Code and Codex. You continue to give each agent
+ordinary work; supported integrations tell agents about their peers and
 teach them how to coordinate when it is useful. The agents remain independent, and each
 decides what its task requires.
 
