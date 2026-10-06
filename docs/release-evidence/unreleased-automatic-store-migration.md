@@ -69,11 +69,23 @@ The tests of the new behaviour were seen failing before the change, except where
   UserPromptSubmit reported `Completed` with ACC's output and the turn ran. Exec mode prints no
   systemMessage.
 
+## On a copy of the maintainer's data home
+
+42 contract-6 stores, 102 MB, copied from the maintainer's own data home, 2026-10-06, with a
+managed control naming a contract-7 active generation:
+
+- With the stores' bindings as they were, all 42 stayed on contract 6 as `blocked`: the bindings
+  named the maintainer's live Claude Code and Codex sessions. The same holds block the activation
+  of a contract-7 runtime, so on a real update this pass runs only after they exit.
+- With the bindings removed, all 42 migrated in 4.7 s: median 13 ms, the slowest two 1.1 s each.
+  The admission mutex is held for one store at a time, so a hook waits at most about a second,
+  and one that arrives during the slowest store fails open once.
+
 ## Limits
 
 - Codex's TUI display of this plain systemMessage shape was not measured; the field's display was
   measured on 0.147.0, 0.155.1 and 0.159.1 with `hookSpecificOutput` beside it.
 - Unmanaged direct users of a store are invisible to the blocker check, as for the explicit
   command.
-- The migration of a large store holds the admission mutex for its duration; the release check
-  measures it on a copy of the maintainer's data home.
+- The migration of a large store holds the admission mutex for its duration (1.1 s for the
+  largest of the maintainer's stores).
