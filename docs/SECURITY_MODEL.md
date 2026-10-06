@@ -103,6 +103,12 @@ unchanged; edited or newly referenced settings remain intact. See
 [Codex outgoing permissions](CONFIGURATION.md#codex-outgoing-permissions). Configuration
 readiness does not prove that an active session's overrides permit a live offer.
 
+On macOS and Linux, installing the Codex adapter also writes ACC's own Codex rules file. It
+allows ACC's wrapper to run the commands a participant runs, such as `message` and `reply`,
+without an approval, so Codex's auto-review never judges a message to a local peer. Install,
+uninstall, update and config still ask. See
+[Codex command approval](CONFIGURATION.md#codex-command-approval).
+
 Antigravity CLI asks before each shell command. Installing its adapter adds two rules to that
 client's `permissions.allow`: a prefix rule for ACC's own wrapper path, and the exact command
 that starts the relay. The agent then runs every ACC command, and starts live delivery,
