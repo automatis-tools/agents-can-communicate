@@ -10,7 +10,7 @@ import { spawn } from "node:child_process";
 import { readdir } from "node:fs/promises";
 import path from "node:path";
 
-import { TEST_FILE_CONCURRENCY, nodeTestArguments, testBatches } from "./test-runner-plan.mjs";
+import { TEST_FILE_CONCURRENCY, nodeTestArguments, skipsFsync, testBatches, testEnvironment } from "./test-runner-plan.mjs";
 import { createPackedTemplate } from "../tests/helpers/packed-template.mjs";
 import { removeFixture } from "../tests/helpers/fixture-cleanup.mjs";
 
@@ -42,6 +42,10 @@ if (files.length === 0) {
 }
 
 console.log(`running ${files.length} test file(s) at concurrency ${TEST_FILE_CONCURRENCY}`);
+if (skipsFsync()) {
+  console.log("fsync is skipped in this local macOS run (F_FULLFSYNC, about 4 ms each); "
+    + "ACC_TEST_REAL_FSYNC=1 keeps it");
+}
 
 // `--list` prints what would run and stops. The suite uses it to assert the
 // discovery is not empty without running itself recursively.
@@ -61,7 +65,7 @@ try {
   for (const [index, batch] of batches.entries()) {
     const code = await new Promise(resolve => {
       spawn(process.execPath, nodeTestArguments(batch), { stdio: "inherit", cwd: repo,
-        env: { ...process.env, ACC_TEST_PACKED_TEMPLATE: template } })
+        env: { ...testEnvironment(), ACC_TEST_PACKED_TEMPLATE: template } })
         .on("error", () => resolve(1))
         .on("exit", exitCode => resolve(exitCode ?? 1));
     });

@@ -16,7 +16,7 @@ jobs:
           # The attribution check reads every commit message, not just the tip.
           fetch-depth: 0
       - name: Syntax-check tracked .mjs files
-        run: git ls-files -z '*.mjs' | xargs -0 -n1 node --check
+        run: node scripts/check-syntax.mjs --tracked
       - name: Refuse Claude attribution in commit messages
         run: node scripts/check-commit-attribution.mjs --history HEAD
       - name: Refuse Claude attribution in the pull request description
