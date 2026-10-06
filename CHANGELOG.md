@@ -1,5 +1,29 @@
 # Changelog
 
+## 0.10.1 — release candidate
+
+- The update from 0.9.x finishes once no 0.9.x session runs. 0.10.0 counted a native binding
+  that names no client process as a live client forever, so on the maintainer's Mac it stayed
+  pending behind 32 bindings left by sessions of 0.5.10 to 0.9.0 after every session had
+  closed. 0.10.1 judges such a binding by its session record and removes the stale ones while
+  it prepares the update; 0.9.x, which still counts them, then activates it by itself (#273,
+  PR #274).
+- From 0.10.0, 0.10.1 keeps store contract 7 and activates without waiting for open sessions;
+  0.10.0 and 0.10.1 share a workspace.
+
+| Candidate artifact | Value |
+|---|---|
+| Built from | `17e525713d3d5ddba69578081b174356f2549015` |
+| Tarball | `agents-can-communicate-0.10.1.tgz`, 579,454 bytes, 351 files |
+| sha256 | `b899b2ca496c2ee920ac3899ba6259e45ce534af05b2bc32d115d28a7cc94d8b` |
+
+The exact archive passed clean installation verification, the 24 managed-update packed checks
+and the 3 store-migration packed checks. The published 0.9.1 updated itself to these bytes,
+also with stale bindings that the published 0.10.0 could not get past, and the published 0.10.0
+updated itself without waiting for a live 0.10.0 process. See
+[0.10.1 release evidence](docs/release-evidence/v0.10.1.md) for verification and limits.
+Earlier development records below retain their original provenance.
+
 ## Unreleased — bindings that name no client stop keeping a store-contract update pending
 
 - A native session binding that names no client process no longer holds a store-contract

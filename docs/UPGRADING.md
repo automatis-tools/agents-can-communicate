@@ -50,6 +50,13 @@ acc doctor
 - **Sending a message reads less of the store.** A send and its retries use a bounded index
   instead of rereading unrelated messages and receipts.
 
+0.10.1 lets this update finish where 0.10.0 could stay pending. A session that ended without
+naming its client process could leave a native binding that 0.10.0 counted as a live client
+forever, so `acc update` kept reporting `unknown client pid` holds after every session had
+closed. 0.10.1 judges such a binding by its session record and removes it while it prepares
+the update, so the update from 0.9.x finishes once no 0.9.x session runs. From 0.10.0, 0.10.1
+keeps the store contract, so it activates without waiting for open sessions.
+
 ## From 0.8.x
 
 Update as usual:
