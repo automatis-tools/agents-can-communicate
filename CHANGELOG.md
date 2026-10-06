@@ -14,16 +14,21 @@
   open with the migration remedy and never change the format themselves.
 - Interrupted indexed prune recovery makes its applied primary/marker retirement
   durable before an idle checkpoint can validate a negative index.
+- Automatic index cleanup preserves bounded mark and sweep progress across store
+  opens. Intervening writers extend the verified live graph before deletion;
+  damaged progress restarts verification without adding index flushes (#263).
 
 | Candidate artifact | Value |
 |---|---|
-| Built from | `ddc927ab8bc6dd71c15bda98d9bcbd20777f00bd` |
-| Tarball | `agents-can-communicate-0.9.0.tgz`, 572,314 bytes, 349 files |
-| sha256 | `33c33013eef12d476855745682f4a177cc92263613c8d723ac89b19eaf3dffc6` |
+| Built from | `39079ea6fadeb944dbf913f8635175139faa0cf1` |
+| Tarball | `agents-can-communicate-0.9.1.tgz`, 573,530 bytes, 350 files |
+| sha256 | `711d0ee034437c5ceb399bac8f1e9effb9e22eb08323f340c7692fdacf10574d` |
 
 This unpublished development archive passed clean installation verification. See
-[the evidence](docs/release-evidence/unreleased-indexed-transaction-reads.md).
-The package version remains `0.9.0`; Windows measurement is outstanding.
+[the current archive evidence](docs/release-evidence/unreleased-index-reclaim-progress.md).
+Its metadata inherits version `0.9.1` from main; it is separate from the published
+contract-6 release below. Earlier indexed-read captures retain their original
+[archive and observation provenance](docs/release-evidence/unreleased-indexed-transaction-reads.md).
 
 ## 0.9.1 — release candidate
 
