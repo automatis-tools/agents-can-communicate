@@ -15,16 +15,16 @@
 - On Windows, a writer that waits for the store lock looks again when the lock's record is being
   deleted, instead of failing with "cannot safely open regular file" (PR #269).
 - The README and docs lead with what ACC is for: messages between sessions in different
-  vendors' clients. They name Claude Code's and Codex's own session messaging and send a reader
-  whose sessions all run in one of them to it. The first run is a review by another vendor's
-  model. Gemini CLI leaves the README's client list; its integration and certification stay
+  vendors' clients. They name Claude Code's and Codex's own session messaging, suggest that a
+  reader whose sessions all run in one of them try it first, and say what ACC adds over wiring
+  the two by hand. The first run is a review by another vendor's model. Gemini CLI leaves the README's client list; its integration and certification stay
   in [Capabilities](docs/CAPABILITIES.md). Feedback goes to issues, with templates.
 
 | Candidate artifact | Value |
 |---|---|
-| Built from | `e972dfbe4c7405158ec79374956e7db1a388e541` |
-| Tarball | `agents-can-communicate-0.10.0.tgz`, 577,709 bytes, 351 files |
-| sha256 | `6ce5114f2899bfc82b750c493c5253d4d51034d5283415c4dc12d06348d8cb26` |
+| Built from | `ba9f2375c0c90aeae63a1909b5ac51fdd18bcb04` |
+| Tarball | `agents-can-communicate-0.10.0.tgz`, 577,865 bytes, 351 files |
+| sha256 | `ed5c2d884def7e064515cbeac6adc3bad6214c2cdc7feba10f79134e9d601c50` |
 
 The exact archive passed clean installation verification, the 24 managed-update packed checks
 and the 3 store-migration packed checks. The published 0.9.1 updated itself to these bytes: the
