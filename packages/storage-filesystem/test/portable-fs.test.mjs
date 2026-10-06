@@ -290,3 +290,28 @@ test("windows: an lstat refusal that outlasts the deadline keeps its EPERM", asy
     { platform: "win32", lstat, open, deadlineAt: Date.now() - 1, sleep: noSleep }), { code: "EPERM" });
   assert.equal(open.calls(), 0, "a name that kept refusing was never opened");
 });
+
+// Measured on windows-latest, 600 elections of one writer among eight with the
+// lstat refusals settled (2026-10-06): one open was refused with EPERM while the
+// record it named was deleted, and by the time the name was looked at again the
+// lock had a new owner and the name a new file. That name changed hands; it is
+// opened afresh, as a swap noticed after the open is.
+const owner = ino => ({ isSymbolicLink: () => false, dev: 1n, ino });
+
+test("windows: an open refused while the lock changed hands opens the new record", async () => {
+  const lstat = settling([owner(7n), owner(8n), owner(8n), owner(8n)]);
+  const handle = { stat: async () => ({ dev: 1n, ino: 8n }), close: async () => {} };
+  const open = failing("EPERM", 1, async () => handle);
+  assert.equal(await openNoFollow("owner.json", constants.O_RDONLY,
+    { platform: "win32", lstat, open, deadlineAt: later(), sleep: noSleep }), handle);
+  assert.equal(open.calls(), 2);
+});
+
+test("windows: an open refused while the name keeps changing hands keeps its EPERM", async () => {
+  let ino = 0n;
+  const lstat = async () => owner(ino += 1n);
+  const open = failing("EPERM", Infinity);
+  await assert.rejects(openNoFollow("owner.json", constants.O_RDONLY,
+    { platform: "win32", lstat, open, deadlineAt: later(), sleep: noSleep }), { code: "EPERM" });
+  assert.equal(open.calls(), 3, "a name that changes hands is opened afresh a few times, not forever");
+});
