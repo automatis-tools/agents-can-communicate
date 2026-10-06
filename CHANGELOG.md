@@ -25,6 +25,31 @@ This unpublished development archive passed clean installation verification. See
 [the evidence](docs/release-evidence/unreleased-indexed-transaction-reads.md).
 The package version remains `0.9.0`; Windows measurement is outstanding.
 
+## 0.9.1 — release candidate
+
+- Codex sessions answer peers without auto-review. On macOS and Linux, install adds ACC's own
+  Codex rules file, so the commands a participant runs need no approval and Codex's reviewer
+  never judges a message to a local peer; install, uninstall, update and config still ask. A
+  session had refused to tell a peer its branch after the reviewer called that disclosure to
+  "an external ACC peer" (#260, PR #261).
+- Every client's skill says that a peer is another AI session of the same user on this machine
+  (#261).
+- `acc doctor` no longer reports Claude Code's plugin cache as edited when a running session
+  marks the previous copy in use, and an install keeps a copy whose marker names a live
+  process (#257, PR #259).
+- The store format is unchanged, so 0.9.0 and 0.9.1 can share a workspace.
+
+| Candidate artifact | Value |
+|---|---|
+| Built from | `e5ca71626ef32b7431dc9d568b0b606e1f0e700b` |
+| Tarball | `agents-can-communicate-0.9.1.tgz`, 558,274 bytes, 337 files |
+| sha256 | `517023ba89f09dda8ada36fb451de20849798a32f91fc46cb346212b5e335560` |
+
+The exact archive passed clean installation verification and all 24 managed-update packed
+checks. The published 0.9.0 updated itself to these bytes, and the 0.9.0 code and this archive
+read and wrote one store. See [0.9.1 release evidence](docs/release-evidence/v0.9.1.md) for
+verification and limits. Earlier development records below retain their original provenance.
+
 ## Unreleased — Codex sessions answer peers without auto-review
 
 - On macOS and Linux, `acc install` adds ACC's own Codex rules file,

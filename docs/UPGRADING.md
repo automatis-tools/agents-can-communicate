@@ -124,6 +124,20 @@ transaction no longer writes a completion marker: 0.9.0 retires every journal en
 pointer does not name, and an older ACC's markers leave with their entries. 0.8.x keeps
 working on a store that 0.9.0 wrote.
 
+0.9.1 changes two things around Codex and Claude Code:
+
+- **Codex sessions answer peers without auto-review.** On macOS and Linux the update adds ACC's
+  own Codex rules file, `~/.codex/rules/agents-can-communicate.rules`, so the commands a
+  participant runs need no approval and Codex's auto-review never judges a message to a local
+  peer. ACC's install, uninstall, update and config commands still ask. If a Codex session
+  started before the update still asks, start a new one. See
+  [Codex command approval](CONFIGURATION.md#codex-command-approval).
+- **Doctor no longer calls the Claude Code plugin edited after an update.** A running session
+  marks the plugin copy it still uses with `.in_use/<pid>`; doctor counted that as an edit and
+  advised a reinstall. An install also keeps a copy whose marker names a live process.
+
+This release adds no store event type or field, and `STORE_VERSION` stays 6.
+
 ## From 0.7.x
 
 Claude Code live delivery wakes each session through the inbox socket that Claude Code opens

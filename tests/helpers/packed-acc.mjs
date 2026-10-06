@@ -183,17 +183,21 @@ export async function createPackedAcc(t, options = {}) {
 
   // An entry point can start ACC's detached runtime worker (#208 reclaim, an
   // update), which outlives the command by design and writes under the data
-  // home. A test whose client ran hooks waits for it before the directory goes:
-  // no worker process for this data home, and no manager lock held.
+  // home. A client's hooks do the same at its end: closing a real Claude Code's
+  // terminal runs its SessionEnd hook, which records the session's close in the
+  // data home while removal walks it, and removal failed with ENOTEMPTY (1 run
+  // in 5, 0.9.1 release check). A test whose client ran hooks waits before the
+  // directory goes: no manager lock held, and no process working in this
+  // fixture, named by its real path or by the /tmp alias of it.
   const workersQuiet = async (timeoutMs = 30_000) => {
     const runtime = path.join(dataHome, "acc", "runtime");
     const locks = [path.join(runtime, "worker", "manager.lock"),
       path.join(runtime, "worker", "poller", "manager.lock")];
+    const names = [...new Set([root, root.replace(/^\/private\//, "/")])];
     const running = async () => {
       if (process.platform === "win32") return false;
       const { stdout } = await run("ps", ["-Ao", "args="]).catch(() => ({ stdout: "" }));
-      return stdout.split("\n").some(line => line.includes("acc-update-worker.mjs")
-        && line.includes(runtime));
+      return stdout.split("\n").some(line => names.some(name => line.includes(name)));
     };
     const end = Date.now() + timeoutMs;
     while (Date.now() < end) {
