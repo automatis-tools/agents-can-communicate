@@ -6,13 +6,14 @@ permissions:
   contents: read
 jobs:
   election:
-    name: election loop · ${{ matrix.ref }}
+    name: election loop · ${{ matrix.ref }} · ${{ matrix.rep }}
     runs-on: windows-latest
     timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix:
-        ref: [main, fix/windows-lstat-delete-pending]
+        ref: [fix/windows-lstat-delete-pending]
+        rep: [a, b]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -41,7 +42,7 @@ jobs:
           wait
           cat "$RUNNER_TEMP"/election-*.log > "$RUNNER_TEMP/election.log"
           {
-            echo "### ${{ matrix.ref }}"
+            echo "### ${{ matrix.ref }} ${{ matrix.rep }}"
             echo "runs: $(ls "$RUNNER_TEMP"/election-*-*.log | wc -l), failed: $(grep -l '^ℹ fail [1-9]' "$RUNNER_TEMP"/election-*-*.log | wc -l), passed: $(grep -l '^ℹ pass 1' "$RUNNER_TEMP"/election-*-*.log | wc -l)"
             echo '```'
             grep -oE "cannot safely [a-z]+ regular file[^']*|EPERM[^']*'[^']*'" "$RUNNER_TEMP/election.log" | sed -E "s/'[^']*'//" | sort | uniq -c || true
