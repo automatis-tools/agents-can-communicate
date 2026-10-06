@@ -1,5 +1,29 @@
 # Changelog
 
+## Unreleased — Codex sessions answer peers without auto-review
+
+- On macOS and Linux, `acc install` adds ACC's own Codex rules file,
+  `~/.codex/rules/agents-can-communicate.rules`. It allows ACC's wrapper to run the commands a
+  participant runs, such as `message` and `reply`, without an approval, so no reviewer sees
+  them. A Codex session with `approvals_reviewer = "auto_review"` escalated its ACC commands,
+  and the reviewer refused a reply that named a branch and changed paths as disclosure to "an
+  external ACC peer"; from then on the session told every peer it could not share project
+  details (#260). `acc install`, `uninstall`, `update` and `config` still ask. A same-named file
+  ACC did not write stays the operator's, doctor asks for `acc install --adapter codex` when the
+  rule is missing, and uninstall takes an unchanged rule back. Windows gets no rule.
+- Every client's skill says that a peer is another AI session of the same user on this machine,
+  and that a send reaches no one off the machine.
+
+| Candidate artifact | Value |
+|---|---|
+| Built from | `dd3c3c1e8fd691eaae515cb30e35a2cb9302db9f` |
+| Tarball | `agents-can-communicate-0.9.0.tgz`, 557,646 bytes, 337 files |
+| sha256 | `32253419172c4c9a926807edfa21a5002c0405d3472ddf672c96b5404b40f024` |
+
+This unpublished development archive was measured with `npm pack`. See
+[the evidence](docs/release-evidence/unreleased-codex-acc-allow-rule.md).
+The package version remains `0.9.0` until a release prepares its own.
+
 ## Unreleased — the plugin copy a running Claude Code session uses stays
 
 - `acc doctor` no longer reports Claude Code's plugin cache as edited when a running session
