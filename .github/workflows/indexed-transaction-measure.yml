@@ -1,0 +1,63 @@
+name: Indexed transaction measurement
+on:
+  push:
+    branches: [measure/indexed-transactions]
+permissions:
+  contents: read
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: '24.4.0'
+      - name: Local temporary disk
+        shell: pwsh
+        run: |
+          $dir = Join-Path $env:RUNNER_TEMP 'tmp'
+          New-Item -ItemType Directory -Force $dir | Out-Null
+          "TEMP=$dir" >> $env:GITHUB_ENV
+          "TMP=$dir" >> $env:GITHUB_ENV
+      - run: npm ci
+      - name: Install exact old and candidate archives without lifecycle scripts
+        shell: pwsh
+        run: |
+          $evidence = Join-Path $env:RUNNER_TEMP 'issue241'
+          $oldPack = Join-Path $evidence 'old-pack'
+          $newPack = Join-Path $evidence 'candidate-pack'
+          New-Item -ItemType Directory -Force $oldPack, $newPack | Out-Null
+          $oldArchive = Join-Path $oldPack 'agents-can-communicate-0.9.0.tgz'
+          Invoke-WebRequest 'https://registry.npmjs.org/agents-can-communicate/-/agents-can-communicate-0.9.0.tgz' -OutFile $oldArchive
+          $digest = (Get-FileHash $oldArchive -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($digest -ne 'df4700148f5710536155af47b05a0f211d5c8a5d09dee5c945e2b5a5303881c6') { throw 'Published predecessor digest mismatch' }
+          npm pack --pack-destination $newPack --json | Out-File (Join-Path $evidence 'candidate-pack.json') -Encoding utf8
+          if ($LASTEXITCODE -ne 0) { throw 'Candidate pack failed' }
+          $archives = @(Get-ChildItem $newPack -Filter '*.tgz')
+          if ($archives.Count -ne 1) { throw 'Expected exactly one candidate archive' }
+          $oldConsumer = Join-Path $evidence 'old-consumer'
+          $newConsumer = Join-Path $evidence 'candidate-consumer'
+          npm install --prefix $oldConsumer $oldArchive --ignore-scripts --no-audit --no-fund --offline
+          if ($LASTEXITCODE -ne 0) { throw 'Old artifact install failed' }
+          npm install --prefix $newConsumer $archives[0].FullName --ignore-scripts --no-audit --no-fund --offline
+          if ($LASTEXITCODE -ne 0) { throw 'Candidate artifact install failed' }
+          @{ source = $env:GITHUB_SHA; oldSha256 = $digest; candidateSha256 = (Get-FileHash $archives[0].FullName -Algorithm SHA256).Hash.ToLowerInvariant() } | ConvertTo-Json | Out-File (Join-Path $evidence 'provenance.json') -Encoding utf8
+      - name: Sequential identical-fixture pair and count assertions
+        shell: pwsh
+        run: |
+          $evidence = Join-Path $env:RUNNER_TEMP 'issue241'
+          node .github/probes/measure-transaction-artifact.mjs $env:GITHUB_WORKSPACE $evidence old
+          if ($LASTEXITCODE -ne 0) { throw 'Old measurement failed' }
+          node .github/probes/measure-transaction-artifact.mjs $env:GITHUB_WORKSPACE $evidence candidate
+          if ($LASTEXITCODE -ne 0) { throw 'Candidate measurement failed' }
+          node .github/probes/compare-transaction-measurements.mjs $evidence
+          if ($LASTEXITCODE -ne 0) { throw 'Measurement guards failed' }
+        env:
+          ACC_NO_UPDATE_CHECK: '1'
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: always()
+        with:
+          name: indexed-transaction-windows
+          path: ${{ runner.temp }}/issue241/*.json
+          retention-days: 7
