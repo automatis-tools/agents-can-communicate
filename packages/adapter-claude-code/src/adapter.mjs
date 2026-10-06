@@ -2,7 +2,8 @@ import { defineAdapter, projectContext, projectContextResult }
   from "@agents-can-communicate/adapter-sdk";
 import certification from "../certification.json" with { type: "json" };
 
-import { denyOutcome, injectOutcome, injectStartOwnerOutcome, normalizeClaudeHook } from "./hooks.mjs";
+import { denyOutcome, failOpenNotice, injectOutcome, injectStartOwnerOutcome, normalizeClaudeHook }
+  from "./hooks.mjs";
 import { MIN_VERSION, PROTOCOL_CONTRACT, bindNativeSession, offerMessage, planNativeActivation,
   probeNativeDelivery, refreshNativeSession, retireNativeSession } from "./inbox-delivery.mjs";
 import { observedInboxDirectories } from "./inbox-observed-directories.mjs";
@@ -110,6 +111,7 @@ export function createClaudeCodeAdapter() {
 
     denyOutcome,
     injectOutcome,
+    failOpenNotice,
     injectStartOwnerOutcome,
     normalizeHook: payload => normalizeClaudeHook(payload),
     renderContext: (sync, options) => projectContext(sync, options),

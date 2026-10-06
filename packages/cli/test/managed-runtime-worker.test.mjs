@@ -182,13 +182,17 @@ test("a generation that has not reclaimed yet gets a worker even with nothing to
   const f = await fixture(t, { auto: false, checkedAt: new Date().toISOString() });
   await mkdir(path.join(f.active.root, "bin"), { recursive: true });
   await writeFile(path.join(f.active.root, "bin", "acc-update-worker.mjs"), STUB_WORKER);
-  f.defer(() => startedWorkersExited(f.root, 2));
+  f.defer(() => startedWorkersExited(f.root, 3));
   const control = await readControl(f.root);
   assert.equal(await scheduleWorker(f.root, control, WORKER_ENV), true);
   await writeFile(path.join(f.root, "reclaim.json"), JSON.stringify({ schemaVersion: 1,
     activeRoot: f.active.root }));
+  assert.equal(await scheduleWorker(f.root, control, WORKER_ENV), true,
+    "reclaimed, but this generation has not looked for older stores yet");
+  await writeFile(path.join(f.root, "store-upgrade.json"), JSON.stringify({ schemaVersion: 1,
+    activeRoot: f.active.root, complete: true }));
   assert.equal(await scheduleWorker(f.root, control, WORKER_ENV), false,
-    "once this generation has reclaimed, nothing is due");
+    "once this generation has reclaimed and moved its stores, nothing is due");
   await writeFile(path.join(f.root, "reclaim.json"), JSON.stringify({ schemaVersion: 1,
     activeRoot: path.join(f.root, "generations", "previous") }));
   assert.equal(await scheduleWorker(f.root, control, WORKER_ENV), true,

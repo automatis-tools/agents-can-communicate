@@ -181,6 +181,12 @@ export function defineAdapter(manifest) {
   if (manifest.inboundSockets !== undefined && typeof manifest.inboundSockets !== "function") {
     usage("optional inboundSockets must be a function", { id: manifest.id });
   }
+  // `failOpenNotice({ kind, message })` renders a line the user sees when a hook
+  // fails open for a reason the user can act on, or returns null. Only a client
+  // whose hook output reaches the user declares it.
+  if (manifest.failOpenNotice !== undefined && typeof manifest.failOpenNotice !== "function") {
+    usage("optional failOpenNotice must be a function", { id: manifest.id });
+  }
   if (manifest.nativeDelivery !== undefined) {
     const client = manifest.client.certificationName ?? manifest.client.command;
     native.nativeDelivery = validateNativeDeliveryContract(manifest.nativeDelivery,

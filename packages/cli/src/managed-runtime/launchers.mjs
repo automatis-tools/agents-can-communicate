@@ -5,7 +5,7 @@ import { ENTRY_KINDS, RETIRED_ENTRY_KINDS } from "./entry.mjs";
 import { removeTree, renameEntry, renameReplacing } from "./portable-fs.mjs";
 import { managedDirectory, syncDirectory } from "./state.mjs";
 
-const MODULES = ["entry.mjs", "command-prefix.mjs", "state.mjs", "generation-files.mjs",
+export const MODULES = ["entry.mjs", "command-prefix.mjs", "state.mjs", "generation-files.mjs",
   "mutex.mjs", "leases.mjs", "schedule.mjs", "policy.mjs", "portable-fs.mjs"];
 async function durableFile(file, bytes, mode = 0o600) {
   const handle = await open(file, "wx", mode);

@@ -20,11 +20,27 @@ async function reclaimDue(root, control) {
   return !Number.isFinite(attempted) || Date.now() - attempted >= RECLAIM_RETRY_MS;
 }
 
+// The active generation has not yet moved this data home's older stores to its
+// contract (#263; `store-upgrade.json`, which its worker writes on every pass),
+// or a pass left a store behind a minute or more ago. Until it succeeds that
+// workspace has no coordination, so the retry is soon. This module is copied
+// into every launcher and imports only launcher modules; an import of the
+// migration itself failed every hook with ERR_MODULE_NOT_FOUND (2026-10-06).
+export const STORE_UPGRADE_RETRY_MS = 60_000;
+export async function storeUpgradeDue(root, control, { now = Date.now() } = {}) {
+  let marker;
+  try { marker = await readManagedJson(path.join(root, "store-upgrade.json")); } catch { return false; }
+  if (marker?.activeRoot !== control.active.root) return true;
+  if (marker.complete !== false) return false;
+  const attempted = Date.parse(marker.attemptedAt);
+  return !Number.isFinite(attempted) || now - attempted >= STORE_UPGRADE_RETRY_MS;
+}
+
 /** No network waits here: this only starts an independent background process. */
 export async function scheduleWorker(root, control, { env = process.env } = {}) {
   if (!control?.active) return false;
   const update = control.auto && !networkDisabled(env) && (control.pending || checkDue(control));
-  if (!update && !await reclaimDue(root, control)) return false;
+  if (!update && !await reclaimDue(root, control) && !await storeUpgradeDue(root, control)) return false;
   try {
     for (const directory of [path.join(root, "worker"), path.join(root, "worker", "poller")]) {
       const owner = await readManagedJson(path.join(directory, "manager.lock", "owner.json"));

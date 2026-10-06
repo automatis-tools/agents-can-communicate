@@ -1,5 +1,6 @@
 #!/usr/bin/env node
-// Private detached updater. It never opens workspace state or runs a model.
+// Private detached updater. It never runs a model; the only workspace state it
+// opens is an older store it migrates to this generation's contract.
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { runWorker, recordWorkerFailure } from "@agents-can-communicate/cli/managed-worker";

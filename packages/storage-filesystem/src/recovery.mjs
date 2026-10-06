@@ -18,8 +18,11 @@ import { withWriterMutex } from "./writer-mutex.mjs";
  * trimmedThrough: string|null }} RepairReport */
 
 const report = ({ repaired = [], blocked = [], corrupt = [], swept = 0, staged = 0,
-  partials = 0, retired = 0, trimmedThrough = null }) => ({
+  partials = 0, retired = 0, trimmedThrough = null, migrationRequired = false }) => ({
   healthy: blocked.length === 0 && corrupt.length === 0,
+  // An older contract, not an unreadable file: the identity read and named its
+  // version. The reader names the migration rather than calling it ambiguous.
+  ...(migrationRequired ? { migrationRequired: true } : {}),
   repaired: [...repaired].sort(),
   blocked: [...blocked].sort(),
   corrupt: [...corrupt].sort(),
@@ -75,7 +78,8 @@ async function inspect(root) {
     identity = await readStoreIdentity(paths);
   } catch (error) {
     blocked.push(path.join(root, "protocol.json"));
-    return { paths, identity: null, pending, blocked, corrupt, reason: error.message };
+    return { paths, identity: null, pending, blocked, corrupt, reason: error.message,
+      migrationRequired: error?.details?.reasonCode === "store_migration_required" };
   }
   if (identity === null) blocked.push(path.join(root, "protocol.json"));
 
@@ -123,6 +127,7 @@ export async function diagnoseFilesystemStore({ root }) {
   return report({
     blocked: state.blocked,
     corrupt: state.corrupt,
+    migrationRequired: state.migrationRequired === true,
     repaired: state.pending.map(entry => entry.transactionId),
     ...await countStaging(state.paths, root),
   });
@@ -133,7 +138,8 @@ export async function repairFilesystemStore({ root, clock }) {
   if (state.blocked.length > 0 || state.corrupt.length > 0) {
     // Fail closed. Completing a journal on top of state we cannot even read
     // would turn an ambiguous store into a confidently wrong one.
-    return report({ blocked: state.blocked, corrupt: state.corrupt });
+    return report({ blocked: state.blocked, corrupt: state.corrupt,
+      migrationRequired: state.migrationRequired === true });
   }
   // No early return for an empty journal any more: a store with nothing to roll
   // forward is exactly the store whose staging directory needs reclaiming.

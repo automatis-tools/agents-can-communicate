@@ -9,7 +9,7 @@ import { createCodexDiscovery } from "./native-discovery.mjs";
 export { sameMaintenanceIdentity } from "./maintenance.mjs";
 
 import { CODEX_QUEUE_MINIMUM, PROTOCOL_CONTRACT } from "./app-server-client.mjs";
-import { allowOutcome, denyOutcome, injectOutcome, normalizeCodexHook }
+import { allowOutcome, denyOutcome, failOpenNotice, injectOutcome, normalizeCodexHook }
   from "./hooks.mjs";
 import { planCodexInstall, detectCodex, installCodexPlugin, preflightCodexUninstall,
   uninstallCodexPlugin } from "./install.mjs";
@@ -121,6 +121,7 @@ export function createCodexAdapter() {
     denyOutcome,
     allowOutcome,
     injectOutcome,
+    failOpenNotice,
     normalizeHook: payload => normalizeCodexHook(payload),
     renderContext: (sync, options) => projectContext(sync, options),
     renderContextResult: (sync, options) => projectContextResult(sync, options),

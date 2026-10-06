@@ -1067,3 +1067,13 @@ over stream-json outside the app. None of them wrote a marker. In each, a reinst
 old copy while the session ran, and the session still took a message afterwards, with ACC's hook
 output: the session read its hooks from the new copy. What writes the marker on the maintainer's
 machine, a session open for many hours or Claude.app itself, is unmeasured.
+
+## A hook's systemMessage reaches the user, 2026-10-06
+
+Claude Code 2.1.289 in its terminal, against a model stub, with the packed candidate of the
+automatic store migration and a workspace whose store waits for its migration. The SessionStart
+hook failed open and printed `{"systemMessage": "ACC: coordination is paused in this workspace
+…"}` on stdout; the terminal showed `SessionStart:startup says: ACC: coordination is paused in
+this workspace …` and no hook error. Before, the same failure wrote its remedy to stderr only,
+which a successful hook's terminal does not show. ACC prints that line only on SessionStart and
+UserPromptSubmit, and only when the store waits for its migration.

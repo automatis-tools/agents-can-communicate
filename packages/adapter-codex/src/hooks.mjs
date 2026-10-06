@@ -160,3 +160,14 @@ export function injectOutcome(context, notice) {
     hookSpecificOutput: { hookEventName: "UserPromptSubmit", additionalContext: context } }),
   stderr: "", exitCode: 0 };
 }
+
+/**
+ * A line for the user when a hook fails open for a reason they can act on: the
+ * hook's `systemMessage`, which Codex shows in the chat and never sends to the
+ * model (0.147.0, 0.155.1 and 0.159.1). Only on a session start and before a
+ * turn, the two events where that display was measured.
+ */
+export function failOpenNotice({ kind, message }) {
+  if (kind !== "sessionStart" && kind !== "beforeTurn") return null;
+  return JSON.stringify({ systemMessage: message });
+}

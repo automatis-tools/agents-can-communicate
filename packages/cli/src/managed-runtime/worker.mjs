@@ -7,6 +7,7 @@ import { downloadRelease, fetchRelease, newerVersion } from "./download.mjs";
 import { withManagerLock } from "./mutex.mjs";
 import { readControl, writeControl, writeManagedJson } from "./state.mjs";
 import { releaseStagingHold } from "./staging.mjs";
+import { migrateOlderStores } from "./store-upgrade.mjs";
 import { MAINTENANCE_ACTIVE, maintenanceNotice, maintenanceReport, readMaintenance } from "./maintenance-state.mjs";
 import { requestMaintenance } from "./maintenance.mjs";
 
@@ -103,6 +104,10 @@ export async function reclaimAsActive(root, generationRoot) {
       activeRoot: control.active.root, complete: result?.postponed !== true && !own,
       attemptedAt: new Date().toISOString() });
   } catch { /* Best effort; the next pass reclaims again. */ }
+  // This generation's stores, moved to its contract once no older client holds
+  // one. In the activating process its own older lease is not a holder.
+  try { await migrateOlderStores(root, { ignorePid: process.pid }); }
+  catch { /* Best effort; the scheduler retries an incomplete pass. */ }
 }
 
 /** One poller may wait; the update lock stays available between its passes. */

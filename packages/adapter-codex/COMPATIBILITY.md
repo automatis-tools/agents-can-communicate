@@ -1365,3 +1365,12 @@ writes `agents-can-communicate.rules` there, allowing ACC's wrapper by its full 
 participant commands only. `codex execpolicy check` on that file answers `allow` for
 `<wrapper> reply …` and nothing for `<wrapper> install …`; the real-clients job checks this on
 Linux. Windows gets no rule.
+
+## A failed-open hook's systemMessage, 2026-10-06
+
+When a workspace's store waits for its migration, ACC's SessionStart and UserPromptSubmit hooks
+fail open and print `{"systemMessage": "ACC: coordination is paused in this workspace …"}`. With
+`codex exec` 0.160.1 against a model stub, both hooks reported `Completed` with that output and
+the turn ran; exec mode prints no systemMessage. The TUI's display of a hook's systemMessage was
+measured with a probe hook on 0.147.0, 0.155.1 and 0.159.1 (above); this plain shape, without
+`hookSpecificOutput`, was not measured in the TUI.
