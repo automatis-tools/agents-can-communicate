@@ -10,6 +10,7 @@ import { promisify } from "node:util";
 import { cleanupStack, removeFixture } from "./fixture-cleanup.mjs";
 import { fixtureOwnerEnv } from "./fixture-owner.mjs";
 import { preparePackedConsumer } from "./packed-template.mjs";
+import { runtimeWorkersQuiet } from "./runtime-workers.mjs";
 
 const run = promisify(execFile);
 const repo = path.resolve(import.meta.dirname, "..", "..");
@@ -181,31 +182,9 @@ export async function createPackedAcc(t, options = {}) {
     });
   };
 
-  // An entry point can start ACC's detached runtime worker (#208 reclaim, an
-  // update), which outlives the command by design and writes under the data
-  // home. A client's hooks do the same at its end: closing a real Claude Code's
-  // terminal runs its SessionEnd hook, which records the session's close in the
-  // data home while removal walks it, and removal failed with ENOTEMPTY (1 run
-  // in 5, 0.9.1 release check). A test whose client ran hooks waits before the
-  // directory goes: no manager lock held, and no process working in this
-  // fixture, named by its real path or by the /tmp alias of it.
-  const workersQuiet = async (timeoutMs = 30_000) => {
-    const runtime = path.join(dataHome, "acc", "runtime");
-    const locks = [path.join(runtime, "worker", "manager.lock"),
-      path.join(runtime, "worker", "poller", "manager.lock")];
-    const names = [...new Set([root, root.replace(/^\/private\//, "/")])];
-    const running = async () => {
-      if (process.platform === "win32") return false;
-      const { stdout } = await run("ps", ["-Ao", "args="]).catch(() => ({ stdout: "" }));
-      return stdout.split("\n").some(line => names.some(name => line.includes(name)));
-    };
-    const end = Date.now() + timeoutMs;
-    while (Date.now() < end) {
-      const held = await Promise.all(locks.map(lock => lstat(lock).then(() => true, () => false)));
-      if (!held.some(Boolean) && !await running()) return;
-      await new Promise(resolve => setTimeout(resolve, 200));
-    }
-  };
+  // A test whose client ran hooks waits before the directory goes: no manager
+  // lock held, and no process working anywhere in this fixture.
+  const workersQuiet = (timeoutMs = 30_000) => runtimeWorkersQuiet(dataHome, { roots: [root], timeoutMs });
 
   return { root, defer, repo, pack, consumer, project, dataHome, clientHome, clientBin, workersQuiet,
     tarball, installed, accBin, hookBin, mcpBin, env, acc, accError, commandTrace,
