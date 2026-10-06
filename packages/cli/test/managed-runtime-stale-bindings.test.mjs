@@ -39,11 +39,13 @@ async function fixture(t) {
   const workspace = path.join(data, "acc", "workspaces", WORKSPACE);
   const store = await openFilesystemStore({ root: workspace, workspaceId: WORKSPACE,
     clock: createFakeClock(NOW), ids: createFakeIds() });
-  const session = (sessionId, pid) => store.transaction(tx => tx.put("session", sessionId, {
-    schemaVersion: SCHEMA_VERSION, workspaceId: WORKSPACE, sessionId, participantId: `p_${sessionId}`,
-    generation: `generation_${sessionId}`, harness: "claude_code", state: "open", parentSessionId: null,
-    checkoutRoot: null, branch: null, pid, enforcement: "advisory", lifecycle: "managed",
-    heartbeatCadenceMs: 30_000, startedAt: NOW, heartbeatAt: NOW }), { kinds: ["session"] });
+  // Presence is judged against the real clock, so a heartbeat is set relative to it.
+  const session = (sessionId, pid, { state = "open", quietMs = 0 } = {}) => store.transaction(tx =>
+    tx.put("session", sessionId, { schemaVersion: SCHEMA_VERSION, workspaceId: WORKSPACE, sessionId,
+      participantId: `p_${sessionId}`, generation: `generation_${sessionId}`, harness: "claude_code",
+      state, parentSessionId: null, checkoutRoot: null, branch: null, pid, enforcement: "advisory",
+      lifecycle: "managed", heartbeatCadenceMs: 30_000, startedAt: NOW,
+      heartbeatAt: new Date(Date.now() - quietMs).toISOString() }), { kinds: ["session"] });
   // The identity a 0.9.x store carries, as on the machine the defect was found.
   const identity = path.join(workspace, "protocol.json");
   await writeFile(identity, JSON.stringify({ ...JSON.parse(await readFile(identity, "utf8")), storeVersion: 6 }));
@@ -78,7 +80,27 @@ test("a binding without a client pid whose session names an exited process does 
   assert.equal(result.activated, true, JSON.stringify(result));
 });
 
-test("a binding without a client pid whose open session names no process still blocks", async t => {
+test("a binding without a client pid whose session names no process and has gone quiet does not block", async t => {
+  const f = await fixture(t);
+  await f.session("session_quiet", null, { quietMs: 2 * 60 * 60_000 });
+  await f.bind("quiet", "session_quiet");
+
+  const result = await f.activate();
+
+  assert.equal(result.activated, true, JSON.stringify(result));
+});
+
+test("a binding without a client pid whose session was closed does not block", async t => {
+  const f = await fixture(t);
+  await f.session("session_closed", null, { state: "closed" });
+  await f.bind("closed", "session_closed");
+
+  const result = await f.activate();
+
+  assert.equal(result.activated, true, JSON.stringify(result));
+});
+
+test("a binding without a client pid whose open session names no process and heartbeats still blocks", async t => {
   const f = await fixture(t);
   await f.session("session_unknown", null);
   await f.bind("unknown", "session_unknown");
@@ -103,17 +125,19 @@ test("a binding without a client pid whose session names a live process still bl
 test("the sweep removes only the bindings that no longer name a possible client", async t => {
   const f = await fixture(t);
   await f.session("session_exited", DEAD_PID);
+  await f.session("session_quiet", null, { quietMs: 2 * 60 * 60_000 });
   await f.session("session_unknown", null);
-  await f.session("session_live", process.pid);
+  await f.session("session_live", process.pid, { quietMs: 2 * 24 * 60 * 60_000 });
   await f.bind("pruned", "session_pruned");
   await f.bind("exited", "session_exited");
+  await f.bind("quiet", "session_quiet");
   await f.bind("unknown", "session_unknown");
   await f.bind("live", "session_live");
   await f.bind("client", "session_pruned", { clientPid: process.pid });
 
   const removed = await sweepStaleBindings(f.root, { pidIsAlive: alive });
 
-  assert.equal(removed, 2);
+  assert.equal(removed, 3);
   assert.deepEqual(await f.remaining(), ["client.json", "live.json", "unknown.json"]);
 });
 

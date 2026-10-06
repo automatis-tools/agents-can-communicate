@@ -83,7 +83,8 @@ async function mcpBinding(t) {
   const f = await fixture(t);
   const workspaceId = "project", participantId = "mcp_peer";
   const runtimeDir = path.join(f.dataHome, "acc", "workspaces", workspaceId);
-  const clock = { now: () => "2026-09-08T12:00:00.000Z" };
+  // A session that is still heartbeating: a quiet one without a pid stops holding (#273).
+  const clock = { now: () => new Date().toISOString() };
   const ids = { next: createId };
   const store = await openFilesystemStore({ root: runtimeDir, workspaceId, clock, ids });
   const service = createCoordinationService({ store, clock, ids });

@@ -267,12 +267,13 @@ every integration, and only publishes the new active pointer after all applicati
 remains fenced and repairs forward, with the old active pointer retained but normal
 workspace admission unavailable until recovery completes. Native bindings cease holding
 after observed SessionEnd cleanup or confirmed process death; the vendor daemon may remain
-running. Unknown PIDs remain holds until lifecycle cleanup, with one exception: a binding
-that names no client process stops holding once retention has removed its session, or once
-its session names a process that has exited. Retention removes only an offline session, a
-confirmed dead pid or a full day without a heartbeat, and a client that wakes after it runs its
-next hook through the launcher on the active generation (#273). Presence TTL alone, `acc
-finish`, and delivery off do not prove native lifecycle end. Normal background updates never
+running. A binding that names no client process is judged by its session record instead
+(#273): it stops holding when the record is gone, when the record names a process that has
+exited, or, with no process recorded, when ACC's presence rule calls the session offline -
+closed, or 30 minutes without a heartbeat. A live recorded process, or a record that cannot be
+read, keeps it a hold. A client that wakes later runs its next hook through the launcher on
+the active generation. For a binding that names its client, presence TTL, `acc finish`, and
+delivery off do not prove native lifecycle end. Normal background updates never
 restart a vendor daemon. An explicitly approved maintenance job can do so through the
 adapter lifecycle port: it waits for idle work, validates exact process identity, stops
 the service under the admission fence, refreshes integrations, and restores and verifies

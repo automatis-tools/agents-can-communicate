@@ -5,6 +5,7 @@ import { createHash } from "node:crypto";
 import { readdir, rm } from "node:fs/promises";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
+import { classifySessionPresence } from "@agents-can-communicate/core";
 import { assertPortableId } from "@agents-can-communicate/protocol";
 import { readSessionRecord } from "@agents-can-communicate/storage-filesystem";
 import { listRuntimeHolds } from "./leases.mjs";
@@ -49,12 +50,13 @@ const clientPidOf = record => record?.schemaVersion === 1 && Number.isSafeIntege
   && record.clientPid > 0 ? record.clientPid : null;
 
 /** A binding that names no client process cannot be judged by its own facts;
- * its session record can. Retention removes a session whose client is gone, and
- * a session that recorded its client's pid names a process that has exited.
- * Anything else - an open session with no pid, or a record that cannot be read
- * - stays a hold, as a closed session with a live pid does. On 2026-10-06 the
- * maintainer's 0.10.0 waited behind 32 such bindings from 0.5.10 to 0.9.0 that
- * no client could clear (#273). */
+ * its session record can. It is stale when the record is gone, when the record
+ * names a process that has exited, or, with no process recorded, when ACC's own
+ * presence rule calls the session offline - closed, or quiet past the floor for
+ * an unknown process - the rule retention removes sessions by. A live recorded
+ * process, or a record or store that cannot be read, keeps the binding a hold.
+ * On 2026-10-06 the maintainer's 0.10.0 waited behind 32 such bindings from
+ * 0.5.10 to 0.9.0 that no client could clear (#273). */
 async function staleWithoutPid(workspaceRoot, workspaceId, record, pidIsAlive) {
   if (record?.schemaVersion !== 1) return false;
   let session;
@@ -63,7 +65,9 @@ async function staleWithoutPid(workspaceRoot, workspaceId, record, pidIsAlive) {
       sessionId: record.accSessionId, allowLegacyIdentity: true });
   } catch { return false; }
   if (session === null) return true;
-  return Number.isSafeInteger(session.pid) && session.pid > 0 && await confirmedDead(session.pid, pidIsAlive);
+  if (Number.isSafeInteger(session.pid) && session.pid > 0) return confirmedDead(session.pid, pidIsAlive);
+  // No process to ask, so the probe is never called.
+  return classifySessionPresence(session, new Date().toISOString(), () => true) === "offline";
 }
 
 /** Native bindings outlive finish/TTL; MCP process lifetime is covered by its runtime lease. */
