@@ -6,13 +6,15 @@
   file" instead of looking again. Its lstat of the lock's owner record answered EPERM while
   another writer removed the emptied lock (windows-latest, 2026-10-06: one suite in eight at three
   files, and main's Windows job twice). Such a name is now asked again within the writer's
-  deadline: an absent one reads as absent, and an EPERM that outlasts the deadline is kept.
+  deadline: an absent one reads as absent, and an EPERM that outlasts the deadline is kept. An
+  open refused while the lock changed hands opens the new record. In 600 elections of one writer
+  among eight on windows-latest, 11 failed on main.
 
 | Candidate artifact | Value |
 |---|---|
-| Built from | `776f6b31cc4d1004ab86af469aef7ade6523b8b7` |
-| Tarball | `agents-can-communicate-0.9.1.tgz`, 576,801 bytes, 351 files |
-| sha256 | `d50bf5e4a315133df3700288f082dcffa55c173055593bdeaecaa8e762d8b95b` |
+| Built from | `eeba358929d1acbae4534491201141272fbae0fb` |
+| Tarball | `agents-can-communicate-0.9.1.tgz`, 576,882 bytes, 351 files |
+| sha256 | `4bb33aa276aaac59e79132b7bbf4dbfdb710e5d8c2a3fae68a88f37d115c359d` |
 
 This unpublished development archive was measured with `npm pack`. See
 [the evidence](docs/release-evidence/unreleased-windows-lstat-delete-pending.md).
