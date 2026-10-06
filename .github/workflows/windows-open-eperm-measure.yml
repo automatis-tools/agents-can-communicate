@@ -12,7 +12,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        rep: [a, b, c]
+        rep: [a, b, c, d, e, f, g, h]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
@@ -28,8 +28,9 @@ jobs:
       - run: npm ci
       - name: Tests
         continue-on-error: true
-        shell: bash
-        run: npm test 2>&1 | tee "$RUNNER_TEMP/suite.log"; exit "${PIPESTATUS[0]}"
+        run: |
+          npm test 2>&1 | Tee-Object -FilePath (Join-Path $env:RUNNER_TEMP 'suite.log')
+          exit $LASTEXITCODE
         env:
           ACC_TEST_TIMEOUT_MS: '300000'
           ACC_TEST_FORCE_EXIT: '1'
@@ -53,49 +54,4 @@ jobs:
         with:
           name: suite-${{ matrix.rep }}
           path: ${{ runner.temp }}/suite.log
-          retention-days: 7
-
-  focused:
-    name: transaction-read-cost under load
-    runs-on: windows-latest
-    timeout-minutes: 60
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        with:
-          node-version: '24'
-      - name: Temporary files on the local disk
-        shell: pwsh
-        run: |
-          $dir = Join-Path $env:RUNNER_TEMP 'tmp'
-          New-Item -ItemType Directory -Force $dir | Out-Null
-          "TEMP=$dir" >> $env:GITHUB_ENV
-          "TMP=$dir" >> $env:GITHUB_ENV
-      - run: npm ci
-      - name: Three loops of the file beside each other, 40 runs each
-        shell: bash
-        run: |
-          for loop in 1 2 3; do
-            ( for i in $(seq 1 40); do
-                node --test tests/process/transaction-read-cost.test.mjs > "$RUNNER_TEMP/focused-$loop-$i.log" 2>&1 || echo "loop $loop run $i failed"
-              done ) &
-          done
-          wait
-          cat "$RUNNER_TEMP"/focused-*.log > "$RUNNER_TEMP/focused.log"
-          {
-            echo "### focused"
-            echo "runs: $(ls "$RUNNER_TEMP"/focused-*-*.log | wc -l), failed: $(grep -l '^ℹ fail [1-9]' "$RUNNER_TEMP"/focused-*-*.log | wc -l)"
-            echo '```'
-            grep -oE 'cannot safely open regular file \[[^]]*\]' "$RUNNER_TEMP/focused.log" | sed -E 's/[A-Z]:\\[^ '"'"']*//' | sort | uniq -c || true
-            grep -E '^✖ ' "$RUNNER_TEMP/focused.log" | sort | uniq -c || true
-            echo '```'
-          } | tee -a "$GITHUB_STEP_SUMMARY"
-        env:
-          GIT_DIR: ''
-          GIT_WORK_TREE: ''
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
-        if: always()
-        with:
-          name: focused
-          path: ${{ runner.temp }}/focused.log
           retention-days: 7
