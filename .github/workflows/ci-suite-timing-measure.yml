@@ -13,13 +13,12 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { os: windows-latest, concurrency: 2, cache: 'off', rep: a }
-          - { os: windows-latest, concurrency: 2, cache: 'off', rep: b }
-          - { os: windows-latest, concurrency: 3, cache: 'off', rep: a }
-          - { os: windows-latest, concurrency: 3, cache: 'off', rep: b }
-          - { os: windows-latest, concurrency: 4, cache: 'off', rep: a }
-          - { os: windows-latest, concurrency: 4, cache: 'off', rep: b }
-          - { os: windows-latest, concurrency: 2, cache: 'on', rep: a }
+          - { os: macos-latest, concurrency: 4, cache: 'off', rep: a }
+          - { os: macos-latest, concurrency: 4, cache: 'off', rep: b }
+          - { os: macos-latest, concurrency: 5, cache: 'off', rep: a }
+          - { os: macos-latest, concurrency: 5, cache: 'off', rep: b }
+          - { os: macos-latest, concurrency: 6, cache: 'off', rep: a }
+          - { os: macos-latest, concurrency: 6, cache: 'off', rep: b }
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
@@ -41,7 +40,7 @@ jobs:
       - name: Runner speed
         run: node .github/probes/runner-speed.mjs "${{ runner.temp }}/runner-speed.json"
       - name: Syntax, sequential and pooled
-        if: matrix.rep == 'a' && matrix.cache == 'off'
+        if: false
         run: node .github/probes/syntax-check-pool.mjs
       - name: Tests
         id: tests
