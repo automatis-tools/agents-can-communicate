@@ -15,9 +15,9 @@
 
 | Candidate artifact | Value |
 |---|---|
-| Built from | `0d79ea85cb2e8b13f9c2d30252bc81a05f110d50` |
-| Tarball | `agents-can-communicate-0.9.1.tgz`, 576,270 bytes, 351 files |
-| sha256 | `ff37f503eb3facfefd74404c6c7d68145ce67b21337428386f371803da79d2c9` |
+| Built from | `dc2e93ba6d1567f19d3811b658c32a77e50f6219` |
+| Tarball | `agents-can-communicate-0.9.1.tgz`, 576,535 bytes, 351 files |
+| sha256 | `c9fb10b7e3a6fadc32fe77a30fe370b34d1b0dbb1b6b19cc863829f8c1da4c19` |
 
 This unpublished development archive was measured with `npm pack`. See
 [the evidence](docs/release-evidence/unreleased-automatic-store-migration.md).

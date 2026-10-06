@@ -2,9 +2,9 @@
 
 | Candidate artifact | Value |
 |---|---|
-| Built from | `0d79ea85cb2e8b13f9c2d30252bc81a05f110d50` |
-| Tarball | `agents-can-communicate-0.9.1.tgz`, 576,270 bytes, 351 files |
-| sha256 | `ff37f503eb3facfefd74404c6c7d68145ce67b21337428386f371803da79d2c9` |
+| Built from | `dc2e93ba6d1567f19d3811b658c32a77e50f6219` |
+| Tarball | `agents-can-communicate-0.9.1.tgz`, 576,535 bytes, 351 files |
+| sha256 | `c9fb10b7e3a6fadc32fe77a30fe370b34d1b0dbb1b6b19cc863829f8c1da4c19` |
 
 Design: [2026-10-06-automatic-store-migration](../design/2026-10-06-automatic-store-migration.md).
 
@@ -47,7 +47,8 @@ The tests of the new behaviour were seen failing before the change, except where
 - `packages/cli/test/managed-runtime-store-upgrade.test.mjs`: every older store migrates and the
   pass is complete; a live older lease blocks it and the pass stays open; the activating process's
   own lease does not; an older generation migrates nothing but records the pass; one failing store
-  does not stop the others; the scheduler's due rule.
+  does not stop the others; the scheduler's due rule; a store whose identity cannot be read keeps
+  the pass open and a later pass moves it (from the AI review of #264; failed before its fix).
 - `packages/cli/test/doctor-store-migration.test.mjs`: plain doctor names the command (failed on
   main's doctor).
 - `packages/cli/test/managed-runtime-launcher-modules.test.mjs`: every launcher module imports
