@@ -115,10 +115,10 @@ test("an unverified referenced page suppresses all unreachable-page deletion", a
   assert.deepEqual((await readdir(directory)).sort(), before);
 });
 
-test("maintenance defers a graph larger than its remaining budget until the next daily pass", async t => {
+test("maintenance with no index budget leaves the pass due for the next open", async t => {
   const f = await fixture(t);
   const result = await reclaimRetired(f.store.paths, { root: f.root, limit: 4 });
-  assert.equal(result.remaining, false, "an unfinishable cache traversal must not force a sweep on every hook");
+  assert.equal(result.remaining, true, "exhausting earlier cleanup must not park index progress for a whole day");
   assert.deepEqual(await lookup(f.store), ["message_a"]);
 });
 

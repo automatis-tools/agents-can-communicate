@@ -4,6 +4,7 @@ import { listDirectoryEntries, nameCommittedLater } from "./atomic-json.mjs";
 import { condemn, detachDoomed, discard, expired } from "./doomed-directory.mjs";
 import { createIndexIO } from "./index-io.mjs";
 import { IndexCacheUnavailable } from "./index-pages.mjs";
+import { readReclaimProgress, writeReclaimProgress } from "./index-reclaim-progress.mjs";
 import { readStoreIdentity } from "./identity.mjs";
 import { journalEntry, writeJournalEntry } from "./journal.mjs";
 import { syncPruneDirectories } from "./prune-durability.mjs";
@@ -13,8 +14,10 @@ const children = page => page.type === "branch" ? page.children.map(([, hash]) =
   : page.type === "leaf" ? [...page.entries.map(entry => entry.ids), page.next].filter(Boolean)
     : [page.next].filter(Boolean);
 
-// The caller holds the writer mutex. Traversal and deletion share one budget;
-// until the complete graph is verified, no page is proven unused.
+// The caller holds the writer mutex. Persist both mark and sweep progress: a
+// live graph or a directory larger than one pass must eventually finish. Roots
+// added by intervening writers are marked before sweeping resumes. Previously
+// marked roots stay in the conservative live superset until the next cycle.
 export async function reclaimIndexPages(paths, { root, roots, limit = 512, deadlineAt } = {}) {
   let spent = 0, reclaimed = 0;
   const result = (remaining, deferred = false) => ({ reclaimed, remaining, spent, deferred });
@@ -22,7 +25,7 @@ export async function reclaimIndexPages(paths, { root, roots, limit = 512, deadl
   const directory = path.join(root, "indexes", "v1", "pages");
   try { await assertManagedDirectory(root, directory); }
   catch (error) { return result(error.code !== "ENOENT", error.code !== "ENOENT"); }
-  if (limit <= 0) return result(true, true);
+  if (limit < 4) return result(true);
   const io = createIndexIO({ paths, root, publishOptions: {} });
   if (roots === undefined) {
     let manifest;
@@ -35,41 +38,70 @@ export async function reclaimIndexPages(paths, { root, roots, limit = 512, deadl
       || manifest.workspaceId !== identity?.workspaceId) return result(true, true);
     roots = manifest.roots;
   }
-  const reachable = new Set(), pending = Object.values(roots).filter(Boolean);
+  const progress = await readReclaimProgress(root);
+  spent += 1;
+  // Reserve the checkpoint publication within the same budget as page work.
+  const budget = limit - 1;
+  const reachable = new Set(progress.visited), pending = progress.pending;
+  for (const hash of Object.values(roots).filter(Boolean)) {
+    if (!reachable.has(hash) && !pending.includes(hash)) pending.push(hash);
+  }
+  const checkpoint = async (remaining) => {
+    progress.visited = [...reachable];
+    progress.done = !remaining;
+    try {
+      await writeReclaimProgress(paths, root, progress, deadlineAt);
+      spent += 1;
+      return result(remaining);
+    } catch { return result(true, true); }
+  };
   try {
     while (pending.length > 0) {
       const hash = pending.pop();
       if (reachable.has(hash)) continue;
-      if (spent >= limit || expired(deadlineAt)) return result(true, true);
+      if (spent >= budget || expired(deadlineAt)) {
+        pending.push(hash);
+        return checkpoint(true);
+      }
       spent += 1;
       pending.push(...children(await io.readPage(hash)));
       reachable.add(hash);
     }
   } catch (error) {
-    if (error instanceof IndexCacheUnavailable) return result(true, true);
+    if (error instanceof IndexCacheUnavailable) {
+      // A former root can disappear while the cache rebuilds. Do not let an
+      // unreadable old stack poison every later pass; restart from authority.
+      pending.length = 0;
+      reachable.clear();
+      progress.cursor = null;
+      await checkpoint(false);
+      return result(true, true);
+    }
     throw error;
   }
   let entries;
   try { entries = await listDirectoryEntries(directory, { root }); }
   catch { return result(true, true); } // Cache paths alone are optional maintenance.
   let doomed, reserved = 0, remaining = false;
+  entries.sort((left, right) => left.name < right.name ? -1 : left.name > right.name ? 1 : 0);
   for (const entry of entries) {
-    if (spent + reserved >= limit || expired(deadlineAt)) { remaining = true; break; }
+    if (!/^[a-f0-9]{64}\.json$/.test(entry.name) || (progress.cursor !== null && entry.name <= progress.cursor)) continue;
+    if (spent + reserved >= budget || expired(deadlineAt)) { remaining = true; break; }
     spent += 1;
-    if (!entry.isFile() || !/^[a-f0-9]{64}\.json$/.test(entry.name)
-      || reachable.has(entry.name.slice(0, -5))) continue;
-    if (spent + reserved + 2 > limit) { remaining = true; break; }
+    if (!entry.isFile() || reachable.has(entry.name.slice(0, -5))) { progress.cursor = entry.name; continue; }
+    if (spent + reserved + 2 > budget) { remaining = true; break; }
     doomed ??= await detachDoomed(root);
     await assertManagedDirectory(root, directory);
     await condemn(path.join(directory, entry.name), doomed);
     spent += 1; reserved += 1;
+    progress.cursor = entry.name;
   }
   if (doomed !== undefined) {
-    const removed = await discard(doomed, root, limit - spent, deadlineAt);
+    const removed = await discard(doomed, root, budget - spent, deadlineAt);
     reclaimed += removed.spent; spent += removed.spent;
     remaining ||= !removed.drained;
   }
-  return result(remaining, remaining && reclaimed === 0 && reserved === 0);
+  return checkpoint(remaining);
 }
 
 async function discardCache(root, collect) {
