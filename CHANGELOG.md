@@ -1,5 +1,23 @@
 # Changelog
 
+## Unreleased — a Windows writer looks again when the lock's record is being deleted
+
+- On Windows a writer waiting for the store lock could fail with "cannot safely open regular
+  file" instead of looking again. Its lstat of the lock's owner record answered EPERM while
+  another writer removed the emptied lock (windows-latest, 2026-10-06: one suite in eight at three
+  files, and main's Windows job twice). Such a name is now asked again within the writer's
+  deadline: an absent one reads as absent, and an EPERM that outlasts the deadline is kept.
+
+| Candidate artifact | Value |
+|---|---|
+| Built from | `776f6b31cc4d1004ab86af469aef7ade6523b8b7` |
+| Tarball | `agents-can-communicate-0.9.1.tgz`, 576,801 bytes, 351 files |
+| sha256 | `d50bf5e4a315133df3700288f082dcffa55c173055593bdeaecaa8e762d8b95b` |
+
+This unpublished development archive was measured with `npm pack`. See
+[the evidence](docs/release-evidence/unreleased-windows-lstat-delete-pending.md).
+The package version remains `0.9.1` until a release prepares its own.
+
 ## Unreleased — older stores move to contract 7 by themselves
 
 - After an update activates a contract-7 runtime, ACC moves each contract-6 store of its data
