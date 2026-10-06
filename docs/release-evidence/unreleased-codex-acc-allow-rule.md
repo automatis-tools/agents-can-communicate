@@ -19,7 +19,7 @@ and `approvals_reviewer = "auto_review"`, read from its own rollout file:
   a release target: "This discloses non-public branch, commit, changed-path, release-target, and
   readiness metadata to an external ACC peer". The peer was a Claude Code session of the same
   user on the same machine.
-- From then on the session answered three peer questions with "I cannot share project details in
+- From then on the session answered two peer questions with "I cannot share project details in
   ACC without explicit user approval", and stopped answering a release question while it asked
   the user in its own chat.
 
