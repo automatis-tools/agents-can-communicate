@@ -18,32 +18,42 @@ async function dataHome(t) {
   return root;
 }
 
+// The test holds what it waits on and lets go itself, so no clock decides the
+// outcome: the wait must still be pending while the thing is held, and end once
+// it is gone.
+const pause = ms => new Promise(resolve => { setTimeout(resolve, ms); });
+function watch(home) {
+  const state = { settled: false };
+  state.done = runtimeWorkersQuiet(home, { timeoutMs: 60_000 }).then(() => { state.settled = true; });
+  return state;
+}
+
 test("the wait lasts while a worker's manager lock is held", async t => {
   const home = await dataHome(t);
   const lock = path.join(home, "acc", "runtime", "worker", "poller", "manager.lock");
   await mkdir(lock, { recursive: true });
-  const released = new Promise(resolve => setTimeout(() => rm(lock, { recursive: true }).then(resolve), 600));
-  const started = performance.now();
-  await runtimeWorkersQuiet(home, { timeoutMs: 10_000 });
-  const waited = performance.now() - started;
-  await released;
-  assert.equal(waited >= 550, true, "returned while the lock was still held");
+  const wait = watch(home);
+  await pause(600);
+  assert.equal(wait.settled, false, "returned while the lock was still held");
+  await rm(lock, { recursive: true });
+  await wait.done;
 });
 
 test("the wait lasts while a process names the data home", { skip: process.platform === "win32"
   ? "Windows has no ps here; removal there is retried instead" : false }, async t => {
   const home = await dataHome(t);
-  const worker = spawn(process.execPath, ["-e", "setTimeout(() => {}, 700)", path.join(home, "acc", "runtime")],
-    { stdio: "ignore" });
-  const exited = new Promise(resolve => worker.on("exit", resolve));
+  // Lives until its input closes, which only this test does.
+  const worker = spawn(process.execPath, ["-e", "process.stdin.resume()", path.join(home, "acc", "runtime")],
+    { stdio: ["pipe", "ignore", "ignore"] });
   t.after(() => worker.exitCode === null && worker.kill());
   await new Promise(resolve => worker.once("spawn", resolve));
-  const started = performance.now();
-  await runtimeWorkersQuiet(home, { timeoutMs: 10_000 });
-  // ps stops listing the process before this one hears of its exit, so the
-  // time is what shows the wait.
-  assert.equal(performance.now() - started >= 500, true, "returned while the process ran");
+  const wait = watch(home);
+  await pause(600);
+  assert.equal(wait.settled, false, "returned while the process ran");
+  const exited = new Promise(resolve => worker.once("exit", resolve));
+  worker.stdin.end();
   await exited;
+  await wait.done;
 });
 
 test("a quiet data home is not waited on", async t => {
