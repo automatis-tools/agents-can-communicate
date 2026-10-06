@@ -13,9 +13,9 @@
 
 | Candidate artifact | Value |
 |---|---|
-| Built from | `5daba112191e99cc089e29c8e7c7d7ec7ad3809d` |
-| Tarball | `agents-can-communicate-0.10.0.tgz`, 578,928 bytes, 351 files |
-| sha256 | `83833715f069c701d17a7ad02ef5e9af39c3ac1c7a98ca90207b69f332293643` |
+| Built from | `3d9d5a63e79785104cd1a4ca03b3a08043dbb01b` |
+| Tarball | `agents-can-communicate-0.10.0.tgz`, 579,275 bytes, 351 files |
+| sha256 | `39040602a43c3c5ed9eac6cc13fee8295c4daaa82961f478b50c34d666326ddb` |
 
 This unpublished development archive was measured with `npm pack`. See
 [the evidence](docs/release-evidence/unreleased-stale-native-bindings.md).

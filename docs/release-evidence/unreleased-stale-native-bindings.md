@@ -2,9 +2,9 @@
 
 | Candidate artifact | Value |
 |---|---|
-| Built from | `5daba112191e99cc089e29c8e7c7d7ec7ad3809d` |
-| Tarball | `agents-can-communicate-0.10.0.tgz`, 578,928 bytes, 351 files |
-| sha256 | `83833715f069c701d17a7ad02ef5e9af39c3ac1c7a98ca90207b69f332293643` |
+| Built from | `3d9d5a63e79785104cd1a4ca03b3a08043dbb01b` |
+| Tarball | `agents-can-communicate-0.10.0.tgz`, 579,275 bytes, 351 files |
+| sha256 | `39040602a43c3c5ed9eac6cc13fee8295c4daaa82961f478b50c34d666326ddb` |
 
 Issue: #273. Design: [2026-10-06-stale-native-bindings](../design/2026-10-06-stale-native-bindings.md).
 
@@ -23,8 +23,9 @@ open sessions whose recorded process had exited. 27 were written by 0.8.5, 2 by 
   by its session record. It is no hold when the record is gone, names an exited process, or,
   with no process recorded, is offline by `classifySessionPresence` (closed, or 30 minutes
   without a heartbeat). A live recorded process, an unreadable record or a missing store keeps
-  it a hold. `sweepStaleBindings` removes exactly those bindings, and leaves a file that
-  changed since it was judged.
+  it a hold. `sweepStaleBindings` removes exactly those bindings. It judges each one again
+  and removes it under the hook runner's session lifecycle mutex, the lock a hook holds while
+  it renews a binding, and leaves the binding when that lock stays busy (AI review of #274).
 - `cli/managed-runtime/refresh.mjs`: `prepareRefresh` calls `sweepStaleBindings` first. An
   older generation's activator imports the pending generation's `prepareRefresh` before it lists
   blockers by its own rule.
@@ -34,7 +35,9 @@ open sessions whose recorded process had exited. 27 were written by 0.8.5, 2 by 
 - New `managed-runtime-stale-bindings.test.mjs`: a binding without a pid stops holding for a
   removed session, an exited process, a closed session and a quiet one; it keeps holding for a
   heartbeating session without a pid and for a live process; the sweep removes only the stale
-  ones; `prepareRefresh` removes them. Four of these failed before the change.
+  ones; `prepareRefresh` removes them. Four of these failed before the change. Another holds
+  the hook runner's lifecycle lock, checks that the sweep waits for it, renews the binding and
+  checks that it survives; with the sweep's lock key changed, it fails.
 - `managed-runtime-activation.test.mjs`: an MCP-shaped binding whose owner session is gone no
   longer holds (it was one of the "misleading" cases); the fixture session heartbeats on the
   real clock, so the other cases still test the continuity exemption.
