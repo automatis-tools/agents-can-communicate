@@ -1,5 +1,30 @@
 # Changelog
 
+## Unreleased — bounded message and receipt transaction reads
+
+- Message creation and retries use a rebuildable, bounded index instead of
+  rereading unrelated messages and receipts (#241). In a matched 60-send fixture,
+  cumulative primary reads fall from 3900 to 360; warmed sends at 20/40/60 messages
+  each read six records. Receipt read/offer/ack operations read 2/3/4 records.
+- The index is validated against the writer journal generation and generic record
+  updates; cache loss rebuilds from primary state without adding index flushes.
+- Store contract 7 requires an explicit `acc doctor --migrate-store` transition from
+  contract 6. Stop incompatible managed and unmanaged callers first. Migration
+  refuses live or unknown holders and preserves primary record bytes. Hooks fail
+  open with the migration remedy and never change the format themselves.
+- Interrupted indexed prune recovery makes its applied primary/marker retirement
+  durable before an idle checkpoint can validate a negative index.
+
+| Candidate artifact | Value |
+|---|---|
+| Built from | `ddc927ab8bc6dd71c15bda98d9bcbd20777f00bd` |
+| Tarball | `agents-can-communicate-0.9.0.tgz`, 572,314 bytes, 349 files |
+| sha256 | `33c33013eef12d476855745682f4a177cc92263613c8d723ac89b19eaf3dffc6` |
+
+This unpublished development archive passed clean installation verification. See
+[the evidence](docs/release-evidence/unreleased-indexed-transaction-reads.md).
+The package version remains `0.9.0`; Windows measurement is outstanding.
+
 ## Unreleased — Codex sessions answer peers without auto-review
 
 - On macOS and Linux, `acc install` adds ACC's own Codex rules file,
