@@ -246,6 +246,18 @@ test("a new branch cannot carry an attributed commit that another remote branch 
   assert.equal(deleted.code, 0, deleted.stderr);
 });
 
+// The hook syntax-checks every tracked module before the suite; the check runs
+// in a pool, and a module that does not parse still stops the push by name.
+test("the pre-push hook refuses a tracked module that does not parse", async t => {
+  const { root, git } = await scratch(t, { PATH: await stubNpmPath(t) });
+  await writeFile(path.join(root, "broken.mjs"), "export const = 1;\n");
+  await git(["add", "broken.mjs"]);
+  assert.equal((await git(["commit", "-q", "-m", "chore: a module that does not parse"])).code, 0);
+  const refused = await git(["push", "-q", "origin", "main"]);
+  assert.notEqual(refused.code, 0, "a push carrying a module that does not parse went through");
+  assert.match(refused.stderr, /broken\.mjs/);
+});
+
 // A throwaway measurement branch carries a probe for a CI runner, nothing that
 // is merged or packed: its push runs the attribution and lint gates, not the
 // suite. The stub npm fails, so a push that ran the suite would be refused.

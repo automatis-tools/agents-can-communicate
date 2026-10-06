@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtemp, readFile, readdir, realpath, rm } from "node:fs/promises";
+import { mkdtemp, readFile, readdir, realpath } from "node:fs/promises";
 import { homedir, tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -8,6 +8,8 @@ import { EXIT } from "@agents-can-communicate/protocol";
 
 import { fixtureOwnerEnv } from "../helpers/fixture-owner.mjs";
 import { createDocsExecutor } from "../helpers/docs-executor.mjs";
+import { removeFixture } from "../helpers/fixture-cleanup.mjs";
+import { runtimeWorkersQuiet } from "../helpers/runtime-workers.mjs";
 
 const repo = path.resolve(import.meta.dirname, "..", "..");
 
@@ -90,8 +92,11 @@ async function sandbox(t, executor) {
   const home = await realpath(await mkdtemp(path.join(tmpdir(), "acc-exec-home-")));
   const cwd = await realpath(await mkdtemp(path.join(tmpdir(), "acc-exec-cwd-")));
   const dataHome = await realpath(await mkdtemp(path.join(tmpdir(), "acc-exec-data-")));
-  t.after(() => Promise.all([home, cwd, dataHome]
-    .map(dir => rm(dir, { recursive: true, force: true }))));
+  // `acc install` starts ACC's detached runtime worker in this data home.
+  t.after(async () => {
+    await runtimeWorkersQuiet(dataHome);
+    await Promise.all([home, cwd, dataHome].map(removeFixture));
+  });
   const env = { ...process.env, HOME: home, USERPROFILE: home,
     ACC_DATA_HOME: dataHome, ACC_NO_UPDATE_CHECK: "1",
     GIT_DIR: "", GIT_WORK_TREE: "" };
