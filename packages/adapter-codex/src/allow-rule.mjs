@@ -59,6 +59,22 @@ async function current(file) {
   }
 }
 
+/**
+ * Whether a file still holds exactly what ACC generates, for whichever wrapper
+ * path it names. Only such a file is ACC's to replace or remove: one that keeps
+ * the header but drops a command is the operator narrowing what skips approval,
+ * and a reinstall must not widen it again (AI review of #261).
+ */
+export function accGenerated(text) {
+  const named = /pattern = \[("(?:[^"\\]|\\.)*")/.exec(text ?? "");
+  if (named === null) return false;
+  try {
+    return text === allowRuleText(JSON.parse(named[1]));
+  } catch {
+    return false;
+  }
+}
+
 /** Write ACC's rule. Returns the file it changed, or null, and what to say. */
 export async function writeAllowRule({ codexHome, cliShim, hostPlatform }) {
   if (!ruleApplies(hostPlatform)) return { file: null, diagnostics: [] };
@@ -71,6 +87,10 @@ export async function writeAllowRule({ codexHome, cliShim, hostPlatform }) {
   if (existing !== null && !existing.startsWith(HEADER)) {
     return { file: null, diagnostics: [`${file} is not ACC's, so ACC left it as it is; `
       + "Codex asks before each escalated ACC command"] };
+  }
+  if (existing !== null && !accGenerated(existing)) {
+    return { file: null, diagnostics: [`${file} was edited since ACC wrote it, so ACC left it as `
+      + "it is; review it, or delete it and run acc install --adapter codex"] };
   }
   const text = allowRuleText(cliShim);
   if (existing === text) return { file: null, diagnostics: [] };
@@ -90,6 +110,9 @@ export async function inspectAllowRule({ codexHome, cliShim, hostPlatform }) {
   if (existing !== null && !existing.startsWith(HEADER)) {
     return { state: "foreign", diagnostic: `${file} is not ACC's; Codex asks before each escalated ACC command` };
   }
+  if (existing !== null && !accGenerated(existing)) {
+    return { state: "edited", diagnostic: `${file} was edited since ACC wrote it; ACC leaves it as it is` };
+  }
   return { state: "missing", diagnostic: "Codex asks before each escalated ACC command, and auto-review "
     + `can refuse one: ${file} is missing or out of date. Run acc install --adapter codex` };
 }
@@ -98,9 +121,9 @@ export async function inspectAllowRule({ codexHome, cliShim, hostPlatform }) {
  * Take ACC's rule back. Only a file that still holds exactly what ACC wrote goes;
  * an edited one, or one the installer's ownership record kept, stays.
  */
-export async function removeAllowRule({ codexHome, cliShim, keep = [] }) {
+export async function removeAllowRule({ codexHome, keep = [] }) {
   const file = rulesPath(codexHome);
-  if (keep.includes(file) || await current(file) !== allowRuleText(cliShim)) return null;
+  if (keep.includes(file) || !accGenerated(await current(file))) return null;
   await rm(file, { force: true });
   return file;
 }

@@ -237,7 +237,9 @@ Codex loads every `*.rules` file in that directory. A command the rule allows ne
 approval, so no reviewer sees it. Only ACC's wrapper and only the commands a participant runs
 are allowed: `acc install`, `uninstall`, `update` and `config` still ask. Install does not ask
 about the rule; it is part of ACC's Codex integration, as its hooks are. A file of that name
-that ACC did not write stays yours, and ACC adds no rule then. A wrapper path that a rule cannot
+that ACC did not write stays yours, and ACC adds no rule then. So does ACC's file once you edit
+it, for example to take a command out: reinstall and update leave it as it is, and doctor
+reports it as edited. A wrapper path that a rule cannot
 hold as it is gets none either. `acc uninstall` removes the file while it is unchanged, and
 `acc doctor` asks for `acc install --adapter codex` when it is missing. Windows gets no rule:
 how Codex matches a PowerShell command against one is unmeasured.

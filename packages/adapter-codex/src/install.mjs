@@ -331,8 +331,7 @@ export async function uninstallCodexPlugin({ home, agentsHome = home,
       return value?.name === MARKETPLACE && (value.plugins ?? []).length === 0;
     } });
 
-  const rule = await removeAllowRule({ codexHome,
-    cliShim: path.join(pluginPath(agentsHome), "acc-cli.sh"), keep });
+  const rule = await removeAllowRule({ codexHome, keep });
   if (rule !== null) changes.push(rule);
   await removeInstalledTree(cachePath(codexHome), keep);
   await removeInstalledTree(pluginPath(agentsHome), keep);

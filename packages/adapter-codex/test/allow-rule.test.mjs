@@ -5,7 +5,7 @@ import path from "node:path";
 import test from "node:test";
 
 import { createCodexAdapter } from "../src/adapter.mjs";
-import { PARTICIPANT_COMMANDS, rulesPath } from "../src/allow-rule.mjs";
+import { PARTICIPANT_COMMANDS, allowRuleText, rulesPath } from "../src/allow-rule.mjs";
 import { POSIX_FORM } from "../../../tests/helpers/platform-scope.mjs";
 
 /**
@@ -101,4 +101,33 @@ test("uninstall takes ACC's rule back, and leaves one the operator edited", asyn
   await writeFile(rulesPath(codexHome), edited);
   await adapter.uninstall(context);
   assert.equal(await readFile(rulesPath(codexHome), "utf8"), edited);
+});
+
+// AI review of #261: a file that keeps ACC's header but drops `reply` is the
+// operator narrowing what skips approval, and a reinstall restored `reply`.
+test("a reinstall leaves an ACC rule the operator edited as it is", async t => {
+  const { context, codexHome } = await fixture(t);
+  const adapter = createCodexAdapter();
+  await adapter.install(context);
+  const narrowed = (await readFile(rulesPath(codexHome), "utf8")).replace('"reply", ', "");
+  await writeFile(rulesPath(codexHome), narrowed);
+
+  const result = await adapter.install(context);
+
+  assert.equal(await readFile(rulesPath(codexHome), "utf8"), narrowed);
+  assert.ok(result.diagnostics.some(line => line.includes("edited")));
+  const detected = await adapter.detect(context);
+  assert.ok(detected.diagnostics.some(line => line.includes("edited")));
+  assert.equal(detected.needsAction.some(line => line.includes(rulesPath(codexHome))), false);
+});
+
+test("an unchanged ACC rule for an older wrapper path is replaced", async t => {
+  const { context, codexHome } = await fixture(t);
+  await mkdir(path.dirname(rulesPath(codexHome)), { recursive: true });
+  await writeFile(rulesPath(codexHome), allowRuleText("/old/home/.agents/acc-local/plugins/agents-can-communicate/acc-cli.sh"));
+
+  const result = await createCodexAdapter().install(context);
+
+  assert.ok(result.changes.includes(rulesPath(codexHome)));
+  assert.equal((await readFile(rulesPath(codexHome), "utf8")).includes("/old/home/"), false);
 });
