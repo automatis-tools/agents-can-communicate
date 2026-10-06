@@ -41,6 +41,11 @@ file, so the refusal was kept as if the name had refused it.
   opened afresh, up to the three swaps a name changing after the open is allowed. A name still
   naming what it named keeps its EPERM.
 
+## What was measured after the change
+
+The same loop on `06ab99d2`, with both changes, twice (run 37501485535): 1,200 runs, none
+failed.
+
 ## Tests
 
 `packages/storage-filesystem/test/portable-fs.test.mjs`, with the Windows fakes. The first three

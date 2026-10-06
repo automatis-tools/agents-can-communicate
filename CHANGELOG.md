@@ -8,7 +8,7 @@
   files, and main's Windows job twice). Such a name is now asked again within the writer's
   deadline: an absent one reads as absent, and an EPERM that outlasts the deadline is kept. An
   open refused while the lock changed hands opens the new record. In 600 elections of one writer
-  among eight on windows-latest, 11 failed on main.
+  among eight on windows-latest, 11 failed on main; with both changes 1,200 ran and none failed.
 
 | Candidate artifact | Value |
 |---|---|
