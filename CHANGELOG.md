@@ -1,5 +1,28 @@
 # Changelog
 
+## Unreleased — a reused pid is no client, and a stuck pending update gives way
+
+- A native binding whose pid another program now has no longer holds a store-contract update
+  (#276). A client runs when it writes its binding, so a process that started after the binding
+  was last written is not that client. With 0.10.1 pending on the maintainer's Mac, 3 of the 6
+  holders were chrome-devtools-mcp and two IntelliJ Tailwind helpers on the pids of Claude Code
+  sessions from 2026-09-30 to 2026-10-05; with this rule the holders are the 3 real clients. The
+  pending generation's refresh removes such bindings for an older activator.
+- A pending release that cannot activate no longer keeps a newer one out (#277). `acc update`,
+  and the automatic update once a check is due, stage a newer release in its place. 0.10.1
+  reached that machine only after `acc update --pin none` cleared 0.10.0; the upgrade guide
+  says so for a machine whose updater predates this.
+
+| Candidate artifact | Value |
+|---|---|
+| Built from | `2ff8cb9704616b0a3d93b83d8e030ff0bb528b9e` |
+| Tarball | `agents-can-communicate-0.10.1.tgz`, 580,985 bytes, 351 files |
+| sha256 | `7025372be6dcbdd67409781ae970d7387df1addfc280407ab0dbb3cbeaed91e5` |
+
+This unpublished development archive was measured with `npm pack`. See
+[the evidence](docs/release-evidence/unreleased-reused-pids-and-stuck-pending.md).
+The package version remains `0.10.1` until a release prepares its own.
+
 ## 0.10.1 — release candidate
 
 - The update from 0.9.x finishes once no 0.9.x session runs. 0.10.0 counted a native binding

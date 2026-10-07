@@ -32,8 +32,18 @@ export async function performUpdate(root, { force = false, check = false, env = 
   }
   if (!force && !check && !initial.auto) return { ...data, checked: false, reason: "auto_off" };
   // Recovery is local; the hard no-network override must not strand a partial refresh.
+  let baseline = initial.active.version;
+  let attempt = null;
   if (initial.pending && !check && (force || !networkDisabled(env))) {
-    return { ...data, ...await activate(root, { env, ignorePid }), checked: false };
+    attempt = await activate(root, { env, ignorePid });
+    // A pending release that cannot activate kept every later one out: on
+    // 2026-10-06 0.10.0 stayed pending behind stale bindings, and the 0.10.1
+    // that fixed them reached the machine only after its pending release was
+    // cleared by hand (#277). Once a check is due, or when asked, a newer
+    // release is staged in its place.
+    if (attempt.activated || attempt.reason !== "processes_active" || networkDisabled(env)
+      || !force && !checkDue(initial)) return { ...data, ...attempt, checked: false };
+    baseline = initial.pending.version;
   }
   if (networkDisabled(env)) return { ...data, checked: false, reason: "network_disabled" };
   if (!force && !check && !checkDue(initial)) return { ...data, checked: false, reason: "not_due" };
@@ -44,7 +54,9 @@ export async function performUpdate(root, { force = false, check = false, env = 
   const release = await discover({ pin: initial.pin, env });
   const newer = newerVersion(release.version, initial.active.version);
   const checked = { ...data, checked: true, latest: release.version, newer };
-  if (check || !newer) return checked;
+  // Nothing newer than a blocked pending release: report the activation that
+  // waits, as before - the caller asks to restart a client service from it.
+  if (check || !newerVersion(release.version, baseline)) return attempt === null ? checked : { ...checked, ...attempt };
   const generation = await download(root, release, { env });
   // generation.hold has protected this candidate since it was staged;
   // release it once this publish attempt resolves either way - published,
