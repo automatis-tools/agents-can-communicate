@@ -1,5 +1,30 @@
 # Changelog
 
+## 0.10.2 — release candidate
+
+- A native binding whose pid another program now has no longer holds a store-contract update
+  (#276, PR #278). A client runs when it writes its binding, so a process that started after the
+  binding was last written is not that client; the pending generation's refresh removes such
+  bindings for an older activator. With 0.10.1 pending on the maintainer's Mac,
+  chrome-devtools-mcp and two IntelliJ Tailwind helpers held three such pids.
+- A pending release that cannot activate gives way to a newer one (#277, PR #278): `acc update`,
+  and the automatic update once a check is due, stage the newer release in its place. A machine
+  whose updater predates this clears a stuck pending release with `acc update --pin none`, then
+  `acc update`, as the upgrade guide says.
+
+| Candidate artifact | Value |
+|---|---|
+| Built from | `fb1222a1411cabf9ea539ce56008a479182778f8` |
+| Tarball | `agents-can-communicate-0.10.2.tgz`, 580,985 bytes, 351 files |
+| sha256 | `6e3d63508379246a971947ccd66c5e544e8a53932f4f95e9f179e85b40fa4ceb` |
+
+The exact archive passed clean installation verification, the 24 managed-update packed checks
+and the 3 store-migration packed checks. The published 0.9.1 updated itself to these bytes past
+a live 0.9.1 process once it exited, past stale bindings and past a reused pid; with a pending
+0.10.1 it reached them through the documented way out. The published 0.10.0 and 0.10.1 updated
+themselves at once. See [0.10.2 release evidence](docs/release-evidence/v0.10.2.md) for
+verification and limits. Earlier development records below retain their original provenance.
+
 ## Unreleased — a reused pid is no client, and a stuck pending update gives way
 
 - A native binding whose pid another program now has no longer holds a store-contract update
