@@ -1,5 +1,29 @@
 # Changelog
 
+## 0.10.3 — release candidate
+
+- A process that has exited but that its parent has not collected (a zombie) no longer counts
+  as a live client (#280, PR #282). A native binding, an ACC lease and a pin that name one hold
+  nothing, and the pending generation's refresh removes zombie bindings and leases for an older
+  activator. The Codex maintenance job confirms a daemon stop that leaves one and starts the
+  service again. On the maintainer's Mac the Codex daemon stayed a zombie under Codex's own
+  pid-update-loop and kept 0.10.2 pending.
+- `acc doctor` no longer reports a failed or cancelled maintenance job once its release is
+  active (#281, PR #282).
+
+| Candidate artifact | Value |
+|---|---|
+| Built from | `d1f1a5bc788a76d8f586415ce5ec598e025a4638` |
+| Tarball | `agents-can-communicate-0.10.3.tgz`, 582,379 bytes, 351 files |
+| sha256 | `94bff1849b8abd642d576fa0f5c71806d2012108c3ccac43a5119b82acc1025f` |
+
+The exact archive passed clean installation verification, the 24 managed-update packed checks
+and the 3 store-migration packed checks. The published 0.9.1 updated itself to these bytes past
+a live 0.9.1 process once it exited, past stale bindings, a reused pid and a zombie; with a
+pending 0.10.2 it staged these bytes in its place without help. The published 0.10.0, 0.10.1
+and 0.10.2 updated themselves at once. See [0.10.3 release evidence](docs/release-evidence/v0.10.3.md)
+for verification and limits. Earlier development records below retain their original provenance.
+
 ## Unreleased — a zombie has exited, and doctor drops a failure its release outlived
 
 - A process that has exited but that its parent has not collected (a zombie) no longer counts
