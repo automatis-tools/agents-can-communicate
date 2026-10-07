@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { readProcessArgs, readProcessTable, splitWindowsCommandLine }
+import { processIsZombie, readProcessArgs, readProcessTable, splitWindowsCommandLine }
   from "../src/process-table.mjs";
 
 // What the Windows script prints: the chain from the asking process upward,
@@ -134,4 +134,22 @@ test("posix: the table and arguments still come from ps", async () => {
   const table = await readProcessTable({ platform: "darwin", run });
   assert.deepEqual(table.get(100), { ppid: 1, comm: "claude", args: "claude --resume" });
   assert.deepEqual(await readProcessArgs(100, { platform: "darwin", run }), ["claude", "--resume"]);
+});
+
+// A real zombie: the shell's background child exits, and the program the shell
+// became never collects it (#280).
+test("a process that exited and waits for its parent reads as a zombie", { skip: process.platform === "win32" }, async t => {
+  const { spawn } = await import("node:child_process");
+  const parent = spawn("/bin/sh", ["-c", "sleep 0.1 & echo $!; exec sleep 5"], { stdio: ["ignore", "pipe", "ignore"] });
+  t.after(() => parent.kill("SIGKILL"));
+  const pid = Number((await new Promise(resolve => parent.stdout.once("data", resolve))).toString().trim());
+  let zombie = null;
+  for (let i = 0; i < 40 && zombie !== true; i += 1) {
+    await new Promise(resolve => setTimeout(resolve, 50));
+    zombie = await processIsZombie(pid);
+  }
+
+  assert.equal(zombie, true);
+  assert.equal(await processIsZombie(process.pid), false);
+  assert.equal(await processIsZombie(parent.pid), false);
 });

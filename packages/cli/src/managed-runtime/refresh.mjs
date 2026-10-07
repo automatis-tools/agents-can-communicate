@@ -2,7 +2,9 @@ import path from "node:path";
 import { applyPlan, detectInstallation, livePolicyOf, loadOwnership, planInstallation }
   from "@agents-can-communicate/installer";
 import { ALL_ADAPTERS, clientContext, probeTimeout } from "../install-command.mjs";
+import { processIsZombie } from "@agents-can-communicate/adapter-sdk";
 import { sweepStaleBindings } from "./activation.mjs";
+import { listRuntimeHolds } from "./leases.mjs";
 import { stablePaths, writeLaunchers } from "./launchers.mjs";
 import { bridgeLegacyMaintenance } from "./legacy-maintenance.mjs";
 
@@ -12,6 +14,9 @@ export async function prepareRefresh({ control, root, env = process.env, callerP
   // An older generation lists its blockers right after this returns, by a rule
   // that counts a binding without a client pid as a live client forever (#273).
   await sweepStaleBindings(root).catch(() => {});
+  // It counts a zombie's lease as a live ACC process too (#280); a zombie's lease
+  // is removed like a dead process's.
+  await listRuntimeHolds(root, { zombie: processIsZombie }).catch(() => {});
   const dataHome = path.dirname(path.dirname(root));
   const wanted = new Set(control.targets);
   const adapters = ALL_ADAPTERS().filter(adapter => wanted.has(adapter.id));

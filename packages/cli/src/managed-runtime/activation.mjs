@@ -7,7 +7,7 @@ import { readdir, rm, stat } from "node:fs/promises";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { promisify } from "node:util";
-import { readWindowsProcess } from "@agents-can-communicate/adapter-sdk";
+import { processIsZombie, readWindowsProcess } from "@agents-can-communicate/adapter-sdk";
 import { classifySessionPresence } from "@agents-can-communicate/core";
 import { assertPortableId } from "@agents-can-communicate/protocol";
 import { readSessionRecord, withWriterMutex } from "@agents-can-communicate/storage-filesystem";
@@ -83,11 +83,18 @@ async function pidReused(pid, file, startedAt) {
   return started !== null && written !== null && started > written + 1_000;
 }
 
-// One start-time reading per pid for one pass: a vendor service can hold several bindings.
-const perPass = startedAt => {
+// A zombie has exited; only its parent has not collected it, and kill(pid, 0)
+// still succeeds for it. On 2026-10-06 the Codex daemon `daemon stop` ended
+// stayed one under Codex's own pid-update-loop and kept 0.10.2 pending (#280).
+// A state that cannot be read decides nothing.
+const exitedProcess = async (pid, pidIsAlive, zombie) =>
+  await confirmedDead(pid, pidIsAlive) || await zombie(pid) === true;
+
+// One reading per pid for one pass: a vendor service can hold several bindings.
+const perPass = read => {
   const seen = new Map();
   return pid => {
-    if (!seen.has(pid)) seen.set(pid, Promise.resolve().then(() => startedAt(pid)).catch(() => null));
+    if (!seen.has(pid)) seen.set(pid, Promise.resolve().then(() => read(pid)).catch(() => null));
     return seen.get(pid);
   };
 };
@@ -100,7 +107,7 @@ const perPass = startedAt => {
  * process, or a record or store that cannot be read, keeps the binding a hold.
  * On 2026-10-06 the maintainer's 0.10.0 waited behind 32 such bindings from
  * 0.5.10 to 0.9.0 that no client could clear (#273). */
-async function staleWithoutPid(workspaceRoot, workspaceId, record, pidIsAlive, file, startedAt) {
+async function staleWithoutPid(workspaceRoot, workspaceId, record, pidIsAlive, file, startedAt, zombie) {
   if (record?.schemaVersion !== 1) return false;
   let session;
   try {
@@ -109,7 +116,7 @@ async function staleWithoutPid(workspaceRoot, workspaceId, record, pidIsAlive, f
   } catch { return false; }
   if (session === null) return true;
   if (Number.isSafeInteger(session.pid) && session.pid > 0) {
-    return await confirmedDead(session.pid, pidIsAlive) || pidReused(session.pid, file, startedAt);
+    return await exitedProcess(session.pid, pidIsAlive, zombie) || pidReused(session.pid, file, startedAt);
   }
   // No process to ask, so the probe is never called.
   return classifySessionPresence(session, new Date().toISOString(), () => true) === "offline";
@@ -117,10 +124,10 @@ async function staleWithoutPid(workspaceRoot, workspaceId, record, pidIsAlive, f
 
 /** Native bindings outlive finish/TTL; MCP process lifetime is covered by its runtime lease. */
 export async function listNativeHolds(root, { pidIsAlive = defaultPidIsAlive, strict = false,
-  startedAt = processStartedAt } = {}) {
+  startedAt = processStartedAt, zombie = processIsZombie } = {}) {
   const workspaces = path.join(path.dirname(await canonicalManagerRoot(root)), "workspaces");
   if (!await managedDirectory(workspaces)) return [];
-  const started = perPass(startedAt);
+  const started = perPass(startedAt), zombieNow = perPass(zombie);
   const holds = [];
   for (const entry of await readdir(workspaces, { withFileTypes: true })) {
     if (!entry.isDirectory()) {
@@ -142,9 +149,10 @@ export async function listNativeHolds(root, { pidIsAlive = defaultPidIsAlive, st
       if (record === undefined) continue; // Concurrent lifecycle removal, before fencing.
       if (await isMcpContinuity(record, name, path.dirname(bindings), entry.name)) continue;
       const pid = clientPidOf(record);
-      if (pid !== null && (await confirmedDead(pid, pidIsAlive) || await pidReused(pid, file, started))) continue;
+      if (pid !== null && (await exitedProcess(pid, pidIsAlive, zombieNow)
+        || await pidReused(pid, file, started))) continue;
       if (pid === null && await staleWithoutPid(path.dirname(bindings), entry.name, record, pidIsAlive,
-        file, started)) continue;
+        file, started, zombieNow)) continue;
       holds.push({ kind: "native", pid, reason: pid === null ? "unknown_client_pid" : "client_running",
         storeVersion: Number.isSafeInteger(record?.storeVersion) ? record.storeVersion : null });
     }
@@ -159,8 +167,9 @@ const lifecycleLocks = (workspaceRoot, harnessSessionId) => ({ locks: path.join(
   "lifecycle-locks", createHash("sha256").update(String(harnessSessionId)).digest("hex")) });
 
 /** Remove the bindings that listNativeHolds no longer counts and an older
- * generation still does: those without a client pid that are stale (#273), and
- * those whose pid was given to another program (#276). An older generation
+ * generation still does: those without a client pid that are stale (#273),
+ * those whose pid was given to another program (#276), and those whose client
+ * is a zombie (#280). An older generation
  * activates its successor with its own rule, and loads the pending generation's
  * refresh before it lists blockers, so that refresh calls this. A binding whose
  * pid is merely dead holds nothing for either and stays, as the record a resumed
@@ -168,11 +177,11 @@ const lifecycleLocks = (workspaceRoot, harnessSessionId) => ({ locks: path.join(
  * lifecycle lock, so a hook that renews it is either seen or comes after (AI
  * review of #274); a lock that stays busy leaves the binding as it is. */
 export async function sweepStaleBindings(root, { pidIsAlive = defaultPidIsAlive,
-  startedAt = processStartedAt } = {}) {
+  startedAt = processStartedAt, zombie = processIsZombie } = {}) {
   const workspaces = path.join(path.dirname(await canonicalManagerRoot(root)), "workspaces");
   if (!await managedDirectory(workspaces)) return 0;
   const clock = { now: () => new Date().toISOString() };
-  const started = perPass(startedAt);
+  const started = perPass(startedAt), zombieNow = perPass(zombie);
   let removed = 0;
   for (const entry of await readdir(workspaces, { withFileTypes: true })) {
     if (!entry.isDirectory()) continue;
@@ -187,8 +196,11 @@ export async function sweepStaleBindings(root, { pidIsAlive = defaultPidIsAlive,
         if (record === undefined || record === null || typeof record.harnessSessionId !== "string"
           || await isMcpContinuity(record, name, workspaceRoot, entry.name)) return false;
         const pid = clientPidOf(record);
-        if (pid !== null) return !await confirmedDead(pid, pidIsAlive) && pidReused(pid, file, started);
-        return staleWithoutPid(workspaceRoot, entry.name, record, pidIsAlive, file, started);
+        if (pid !== null) {
+          return !await confirmedDead(pid, pidIsAlive)
+            && (await zombieNow(pid) === true || pidReused(pid, file, started));
+        }
+        return staleWithoutPid(workspaceRoot, entry.name, record, pidIsAlive, file, started, zombieNow);
       };
       const judged = await readManagedJson(file).catch(() => undefined);
       if (!await stale(judged)) continue;
@@ -221,9 +233,12 @@ export const blocksActivation = (hold, incomingStoreVersion) =>
  * generation's, or when either side declares none.
  */
 export async function listActivationBlockers(root, { pidIsAlive = defaultPidIsAlive,
-  ignorePid = null, incomingStoreVersion = null, strictNative = false, startedAt } = {}) {
-  const leases = (await listRuntimeHolds(root, { pidIsAlive })).filter(lease => lease.pid !== ignorePid);
-  const native = await listNativeHolds(root, { pidIsAlive, strict: strictNative,
+  ignorePid = null, incomingStoreVersion = null, strictNative = false, startedAt,
+  zombie = processIsZombie } = {}) {
+  const zombieNow = perPass(zombie);
+  const leases = (await listRuntimeHolds(root, { pidIsAlive, zombie: zombieNow }))
+    .filter(lease => lease.pid !== ignorePid);
+  const native = await listNativeHolds(root, { pidIsAlive, strict: strictNative, zombie: zombieNow,
     ...(startedAt === undefined ? {} : { startedAt }) });
   const holds = [
     ...leases.map(({ pid, kind, runtime }) => ({ pid, kind, nativeBindings: 0,
@@ -303,8 +318,11 @@ async function resolveCandidate(value) {
 // reclaimed need to tell that from a pass that found nothing to remove.
 const POSTPONED = Object.freeze({ removed: [], postponed: true });
 
-export async function reclaimGenerations({ root, active = null, pidIsAlive = defaultPidIsAlive } = {}) {
+export async function reclaimGenerations({ root, active = null, pidIsAlive = defaultPidIsAlive,
+  zombie = processIsZombie } = {}) {
   root = await canonicalManagerRoot(root);
+  // A lease or a pin of a client that exited uncollected keeps no generation (#280).
+  const zombieNow = perPass(zombie);
   return withManagerLock(root, async () => {
     const generations = path.join(root, "generations");
     if (!await managedDirectory(generations)) return { removed: [] };
@@ -343,7 +361,7 @@ export async function reclaimGenerations({ root, active = null, pidIsAlive = def
       if (resolved.root) referenced.add(resolved.root);
     }
     let holds;
-    try { holds = await listRuntimeHolds(root, { pidIsAlive }); }
+    try { holds = await listRuntimeHolds(root, { pidIsAlive, zombie: zombieNow }); }
     catch { return POSTPONED; } // An unreadable lease is an unknown holder.
     for (const lease of holds) {
       const resolved = await resolveCandidate(lease.runtime?.root);
@@ -353,7 +371,7 @@ export async function reclaimGenerations({ root, active = null, pidIsAlive = def
     // A client that exits without a clean session end leaves its pin behind;
     // reap confirmed-dead ones before treating every remaining pin as live,
     // the same way admission already reaps confirmed-dead leases.
-    await reapPins({ root, pidIsAlive });
+    await reapPins({ root, pidIsAlive, zombie: zombieNow });
     const pins = path.join(root, "pins");
     if (await managedDirectory(pins)) {
       for (const name of await readdir(pins)) {
@@ -421,7 +439,7 @@ const recipe = c => JSON.stringify([c.active, c.pending, c.home, c.targets, c.au
 
 /** Detection is outside the fence; every integration write and commit stays inside it. */
 export async function activatePending(root, { prepare = prepareCandidate, env = process.env,
-  pidIsAlive = defaultPidIsAlive, ignorePid = null, beforeActivation = null, startedAt } = {}) {
+  pidIsAlive = defaultPidIsAlive, ignorePid = null, beforeActivation = null, startedAt, zombie } = {}) {
   root = await canonicalManagerRoot(root);
   const before = await readControl(root);
   if (!before?.pending) return { activated: false, reason: "no_pending_update" };
@@ -432,7 +450,7 @@ export async function activatePending(root, { prepare = prepareCandidate, env = 
     if (!current || recipe(current) !== recipe(before)) return { activated: false, reason: "state_changed" };
     if (beforeActivation) await beforeActivation(current);
     const blockers = await listActivationBlockers(root, { pidIsAlive, ignorePid, startedAt,
-      incomingStoreVersion: current.pending.storeVersion });
+      ...(zombie === undefined ? {} : { zombie }), incomingStoreVersion: current.pending.storeVersion });
     if (blockers.length) {
       const notice = activationBlockerNotice(current.pending.version, blockers);
       await writeControl(root, { ...current, notice });
@@ -466,7 +484,8 @@ export async function activatePending(root, { prepare = prepareCandidate, env = 
   // turn an already-completed activation into a reported failure - it can
   // always run again on the next activation.
   if (outcome.activated) {
-    try { await reclaimGenerations({ root, active: activatedRoot, pidIsAlive }); }
+    try { await reclaimGenerations({ root, active: activatedRoot, pidIsAlive,
+      ...(zombie === undefined ? {} : { zombie }) }); }
     catch { /* Best effort; never fails an activation that already succeeded. */ }
     // The reclaim above is this, older, code's rule (#208). The activated
     // generation's own rule runs next, from its own files as its refresh did,

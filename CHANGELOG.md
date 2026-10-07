@@ -1,5 +1,27 @@
 # Changelog
 
+## Unreleased — a zombie has exited, and doctor drops a failure its release outlived
+
+- A process that has exited but that its parent has not collected (a zombie) no longer counts
+  as a live client (#280). A native binding, an ACC lease and a pin that name one hold nothing,
+  and the Codex maintenance job confirms a daemon stop that leaves one and starts the service
+  again. A process state that cannot be read still holds. On the maintainer's Mac on
+  2026-10-06, the Codex daemon that `daemon stop` ended stayed a zombie under Codex's own
+  pid-update-loop: the job refused the restart and 0.10.2 stayed pending. The pending
+  generation's refresh removes zombie bindings and leases for an older activator.
+- `acc doctor` no longer reports a failed or cancelled maintenance job once its release is
+  active (#281). On that Mac it said to run `acc update` to retry an update already done.
+
+| Candidate artifact | Value |
+|---|---|
+| Built from | `1dded551bd9c7e3288e4af2a3eebf9b866c6ac3f` |
+| Tarball | `agents-can-communicate-0.10.2.tgz`, 582,379 bytes, 351 files |
+| sha256 | `b2bfac02ed99ae8de51a5c076fc42d2307791da2fae158620c371afc0d17ea47` |
+
+This unpublished development archive was measured with `npm pack`. See
+[the evidence](docs/release-evidence/unreleased-zombie-and-stale-maintenance.md).
+The package version remains `0.10.2` until a release prepares its own.
+
 ## 0.10.2 — release candidate
 
 - A native binding whose pid another program now has no longer holds a store-contract update

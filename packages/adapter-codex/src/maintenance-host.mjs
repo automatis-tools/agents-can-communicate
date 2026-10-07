@@ -181,6 +181,12 @@ export async function observeMaintenanceProcess(pid, paths, run, { system = WIND
   if (response.status !== 0) return { state: "unknown" };
   const match = /^(.{24})\s+(.+)$/.exec(response.stdout.trim());
   if (!match || !startTimeValid(match[1])) return { state: "unknown" };
+  // A zombie has exited; only its parent has not collected it. `ps` names it
+  // `<defunct>` on macOS and `[name] <defunct>` on Linux. On 2026-10-06 the
+  // daemon `daemon stop` ended stayed one under Codex's own pid-update-loop,
+  // and reading it as alive left the stop unverified and the start refused
+  // (#280).
+  if (/<defunct>$/.test(match[2])) return { state: "dead" };
   return { state: "alive", processStartTime: match[1], command: match[2] };
 }
 

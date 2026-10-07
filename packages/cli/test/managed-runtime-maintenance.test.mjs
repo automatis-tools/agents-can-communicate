@@ -160,6 +160,37 @@ test("expired approval and a failed stop cannot refresh integrations", async t =
   assert.equal((await readMaintenance(g.root)).reasonCode, "service_identity_changed");
 });
 
+// On 2026-10-06 the maintainer's Codex job for 0.10.2 ended failed, a later
+// acc update activated 0.10.2, and doctor still said to run acc update to
+// retry it (#281).
+test("a failed job whose target release became active by another path is not reported", async t => {
+  const f = await fixture(t); await approve(f);
+  f.adapter.stopForMaintenance = async () => ({ ok: false, reasonCode: "service_identity_changed" });
+  await execute(f);
+  assert.equal((await readMaintenance(f.root)).status, "failed");
+  let diagnostic = await managedUpdateDiagnostic(f.root, await readControl(f.root), "0.4.3");
+  assert.equal(diagnostic.maintenance?.status, "failed", "a failed job for a release still pending is reported");
+  assert.match(diagnostic.notice, /maintenance failed/);
+
+  assert.equal((await f.activate(f.root, { pidIsAlive: () => false })).activated, true);
+  diagnostic = await managedUpdateDiagnostic(f.root, await readControl(f.root), "0.4.4");
+  assert.equal(diagnostic.maintenance, undefined, JSON.stringify(diagnostic));
+  assert.equal(diagnostic.notice, "ACC 0.4.4 is active.");
+});
+
+test("a cancelled job whose target release is active is not reported, a completed one still is", async t => {
+  const f = await fixture(t); await approve(f);
+  await execute(f, { now: () => Date.now() + 16 * 60_000 });
+  const job = await readMaintenance(f.root);
+  assert.equal((await f.activate(f.root, { pidIsAlive: () => false })).activated, true);
+  const control = await readControl(f.root);
+  for (const [status, reported] of [["cancelled", false], ["completed", true]]) {
+    await writeFile(path.join(f.root, "maintenance.json"), JSON.stringify({ ...job, status }));
+    const diagnostic = await managedUpdateDiagnostic(f.root, control, "0.4.4");
+    assert.equal(diagnostic.maintenance?.status, reported ? status : undefined, status);
+  }
+});
+
 test("integration failure restores the service and keeps the runtime fenced for recovery", async t => {
   const f = await fixture(t); await approve(f);
   await execute(f, { activate: (root, options) => activatePending(root, { ...options,
