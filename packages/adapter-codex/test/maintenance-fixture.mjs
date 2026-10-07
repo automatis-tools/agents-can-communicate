@@ -91,6 +91,10 @@ export async function maintenanceFixture(t, { binLayout = false } = {}) {
   const run = async (command, args, options) => {
     if (command === "/bin/ps") {
       if (state.processUnknown) return { status: 1, stdout: "", stderr: "permission denied" };
+      // A stopped daemon its parent has not collected: ps lists it, as `<defunct>`.
+      if (!state.running && state.zombie && Number(args[1]) === state.zombie.pid) {
+        return ok(`${state.zombie.start} <defunct>\n`);
+      }
       if (!state.running || Number(args[1]) !== state.pid) return { status: 1, stdout: "", stderr: "" };
       return ok(`${state.processStartTime} ${state.processCommand ?? `${managedPath} app-server --listen unix://`}\n`);
     }
@@ -110,6 +114,7 @@ export async function maintenanceFixture(t, { binLayout = false } = {}) {
     if (action === "stop") { commands.push(action);
       if (state.stopThrows) throw new Error("private vendor command failure");
       if (state.stopFails) return { status: 1, stdout: "", stderr: "private vendor command failure" };
+      if (state.zombieAfterStop) state.zombie = { pid: state.pid, start: state.processStartTime };
       await stop();
       if (state.unknownAfterStop) state.processUnknown = true;
       return ok('{"status":"stopped"}\n'); }

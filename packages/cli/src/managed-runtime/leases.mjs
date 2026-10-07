@@ -31,8 +31,10 @@ export async function acquireRuntime(root, { pid = process.pid, kind = "cli" } =
 /** Management decisions call this under withManagerLock to exclude admissions.
  * Records are immutable and uniquely named; confirmed-dead cleanup also works
  * outside a transaction. No release-on-return or timestamp expiry exists.
+ * A decision passes `zombie` so a holder that exited but was never collected
+ * holds nothing (#280); admission leaves it out and spawns no process.
  */
-export async function listRuntimeHolds(root, { pidIsAlive = defaultPidIsAlive } = {}) {
+export async function listRuntimeHolds(root, { pidIsAlive = defaultPidIsAlive, zombie = null } = {}) {
   root = await canonicalManagerRoot(root);
   if (!await managedDirectory(root)) return [];
   const directory = path.join(root, "leases");
@@ -50,7 +52,7 @@ export async function listRuntimeHolds(root, { pidIsAlive = defaultPidIsAlive } 
       || typeof lease.kind !== "string" || !lease.kind
       || !Number.isFinite(Date.parse(lease.createdAt))) throw new Error("invalid runtime lease");
     const runtime = await validateRuntime(root, lease.runtime);
-    if (await confirmedDead(lease.pid, pidIsAlive)) {
+    if (await confirmedDead(lease.pid, pidIsAlive) || zombie !== null && await zombie(lease.pid) === true) {
       await rm(file, { force: true });
       removed = true;
     } else holds.push({ ...lease, runtime });

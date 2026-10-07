@@ -155,6 +155,19 @@ test("unknown process death retains maintenance even after the vendor stop repor
   assert.deepEqual(h.commands, ["stop"]);
 });
 
+// `codex app-server daemon stop` can leave the daemon a zombie under Codex's own
+// pid-update-loop until that parent collects it. On 2026-10-06 this kept the
+// maintainer's daemon "unverified" and refused its restart (#280).
+test("a daemon left as a zombie after the stop counts as stopped, and the start goes ahead", unixSocketHost, async t => {
+  const h = await maintenanceFixture(t), expected = await h.inspectMaintenance(h.context);
+  h.state.zombieAfterStop = true;
+  const stopped = await h.stopForMaintenance({ context: h.context, expected });
+  assert.equal(stopped.ok, true, JSON.stringify(stopped));
+  const started = await h.startAfterMaintenance({ context: h.context, expected });
+  assert.equal(started.ok, true, JSON.stringify(started));
+  assert.deepEqual(h.commands, ["stop", "start"]);
+});
+
 test("malformed thread or queue metadata never certifies an empty workload", unixSocketHost, async t => {
   const h = await maintenanceFixture(t);
   for (const queueResponse of [{}, { data: null }, { data: [null] }, { data: [], nextCursor: "more" }]) {

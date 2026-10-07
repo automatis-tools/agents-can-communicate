@@ -73,6 +73,22 @@ test("lsof's Linux shape, with the socket type appended, proves the socket", asy
   assert.equal(socketListedIn(`n${path.dirname(h.socketPath)} type=STREAM\n`, h.socketPath), false);
 });
 
+// A real zombie on this host: the shell's background child exits and the
+// program the shell became never collects it, as Codex's pid-update-loop left
+// the stopped daemon on 2026-10-06 (#280). The ubuntu job measures Linux's ps.
+test("the real ps of this host reports a zombie the service host reads as dead", unixHost, async t => {
+  const { spawn } = await import("node:child_process");
+  const parent = spawn("/bin/sh", ["-c", "sleep 0.1 & echo $!; exec sleep 5"], { stdio: ["ignore", "pipe", "ignore"] });
+  t.after(() => parent.kill("SIGKILL"));
+  const pid = Number((await new Promise(resolve => parent.stdout.once("data", resolve))).toString().trim());
+  let observed;
+  for (let i = 0; i < 40 && observed?.state !== "dead"; i += 1) {
+    await new Promise(resolve => setTimeout(resolve, 50));
+    observed = await observeMaintenanceProcess(pid, { options: { env: process.env } }, runMaintenanceCommand);
+  }
+  assert.equal(observed.state, "dead", JSON.stringify(observed));
+});
+
 // Measured on the host this runs on, so the ubuntu job of the CI matrix
 // measures Linux: /bin/ps prints this process's start time in the 24-character
 // form the host parses, and lsof resolves to a real executable or to nothing.

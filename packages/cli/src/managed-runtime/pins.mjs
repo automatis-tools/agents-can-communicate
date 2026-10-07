@@ -115,7 +115,7 @@ export async function resolvePinnedGeneration({ root, harnessSessionId, active }
  * already reaps dead leases; pins follow the same confirmed-death rule. A pin
  * that names no client, which 0.8.0 and earlier wrote when the pid was not yet
  * known, is reaped outright: nothing could ever prove its session over. */
-export async function reapPins({ root, pidIsAlive = defaultPidIsAlive } = {}) {
+export async function reapPins({ root, pidIsAlive = defaultPidIsAlive, zombie = null } = {}) {
   root = await canonicalManagerRoot(root);
   const directory = path.join(root, "pins");
   if (!await managedDirectory(directory)) return;
@@ -125,7 +125,8 @@ export async function reapPins({ root, pidIsAlive = defaultPidIsAlive } = {}) {
     const file = path.join(directory, name);
     const record = await readManagedJson(file).catch(() => null);
     if (record?.schemaVersion !== SCHEMA_VERSION) continue; // Unknown shape: an unknown holder.
-    if (!isPid(record.clientPid) || await confirmedDead(record.clientPid, pidIsAlive)) {
+    if (!isPid(record.clientPid) || await confirmedDead(record.clientPid, pidIsAlive)
+      || zombie !== null && await zombie(record.clientPid) === true) {
       await rm(file, { force: true });
       removed = true;
     }

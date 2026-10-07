@@ -27,7 +27,12 @@ export async function managedUpdateDiagnostic(root, manager, running) {
       : activationBlockerNotice(manager.pending.version, blockers),
     ...(blockers === null ? {} : { holds: blockers.length, blockers }) };
   const maintenance = await readMaintenance(root);
-  if (maintenance && (maintenance.target.root === (manager.pending ?? manager.active).root
+  // A job that failed or was cancelled for the release that is now active is
+  // history: another path activated it, and "run acc update to retry" asked
+  // for an update already done (#281). A completed job still reports its restart.
+  const settled = maintenance && manager.pending === null && maintenance.target.root === manager.active.root
+    && ["failed", "cancelled"].includes(maintenance.status);
+  if (maintenance && !settled && (maintenance.target.root === (manager.pending ?? manager.active).root
     || MAINTENANCE_ACTIVE.includes(maintenance.status))) {
     update.maintenance = maintenanceReport(maintenance);
     update.notice = maintenanceNotice(maintenance);

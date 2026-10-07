@@ -166,6 +166,26 @@ export async function readProcessTable({ platform = process.platform, from = pro
 }
 
 /**
+ * Whether a process has exited and only waits for its parent to collect it -
+ * the POSIX zombie, `ps` state `Z`. `kill(pid, 0)` succeeds for one and `ps`
+ * still lists its start time, so a liveness check that stops there calls it
+ * alive: on 2026-10-06 a stopped Codex daemon left as a zombie under Codex's
+ * own pid-update-loop kept an ACC update blocked and its restart refused
+ * (#280). True or false when `ps` answers; null when it does not. Windows has
+ * no such state.
+ */
+export async function processIsZombie(pid, { platform = process.platform, run = execFileAsync,
+  timeoutMs = 2_000 } = {}) {
+  if (platform === "win32") return false;
+  try {
+    const { stdout } = await run("/bin/ps", ["-p", String(pid), "-o", "stat="],
+      { timeout: timeoutMs, env: { ...process.env, LC_ALL: "C" } });
+    const state = String(stdout).trim();
+    return state === "" ? null : state.startsWith("Z");
+  } catch { return null; }
+}
+
+/**
  * The words one process was started with, or null when they cannot be read.
  *
  * POSIX splits `ps -o args=` on whitespace, as every caller did before. Windows
