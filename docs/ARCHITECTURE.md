@@ -275,7 +275,9 @@ read, keeps it a hold. A client that wakes later runs its next hook through the 
 the active generation. A binding that names its client stops holding when that process exits,
 or when the process that now has its pid started after the binding was last written, since a
 client runs when it writes its binding (#276); a start time that cannot be read decides
-nothing. Otherwise presence TTL, `acc finish`, and delivery off do not prove native lifecycle
+nothing. A zombie, a process that has exited but that its parent has not collected, counts as
+exited for a binding, an ACC lease and a pin (#280); a process state that cannot be read
+decides nothing. Otherwise presence TTL, `acc finish`, and delivery off do not prove native lifecycle
 end. A pending release that cannot activate is replaced by a newer one when `acc update` runs
 or an automatic check is due (#277). Normal background updates never
 restart a vendor daemon. An explicitly approved maintenance job can do so through the

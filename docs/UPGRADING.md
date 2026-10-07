@@ -69,6 +69,8 @@ acc update
 `--pin none` keeps following stable releases and drops a pending release that is not pinned.
 From 0.10.2, the update does this by itself: a pending release that cannot activate is replaced
 by a newer one, and a binding whose pid another program now has no longer holds the update.
+From 0.10.3, a process that has exited but that its parent has not collected (a zombie, `Z` in
+`ps`) no longer holds it either.
 
 ## From 0.8.x
 
@@ -368,7 +370,10 @@ PID/start time, executable, socket ownership and versions before stopping the se
 It refreshes integrations, starts the service again and verifies the result. If refreshing
 integrations fails, it still restores the service and reports the incomplete update.
 A later update worker can resume an already approved recovery without another question.
+A daemon that its parent leaves as a zombie after the stop counts as stopped, and the worker
+starts the service again.
 `acc doctor --json` exposes `update.maintenance`; ordinary `acc doctor` describes its state.
+A failed or cancelled job is no longer reported once its release is active by another path.
 A current launcher can use the newer management reader while the old runtime is active.
 When admission is blocked, doctor returns an update-only report without inspecting the
 workspace or repairing it. Older launchers gain this reader after activation, or through
