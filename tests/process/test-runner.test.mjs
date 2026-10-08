@@ -65,7 +65,8 @@ test("the runner bounds file concurrency without weakening process races", t => 
   assert.equal(fileConcurrency("darwin", { cpus: 64, fsyncSkipped: true }), 12);
   assert.equal(fileConcurrency("darwin", { cpus: 18, fsyncSkipped: false }), 4);
   assert.equal(fileConcurrency("win32", { cpus: 18, fsyncSkipped: true }), 3);
-  assert.equal(TEST_FILE_CONCURRENCY, fileConcurrency(process.platform, { fsyncSkipped: skipsFsync() }));
+  assert.equal(TEST_FILE_CONCURRENCY, fileConcurrency(process.platform, { fsyncSkipped: skipsFsync(),
+    limit: process.env.ACC_TEST_FILE_CONCURRENCY }));
   const concurrency = `--test-concurrency=${TEST_FILE_CONCURRENCY}`;
   assert.deepEqual(nodeTestArguments(["first.test.mjs", "second.test.mjs"]), [
     "--test",
@@ -78,6 +79,15 @@ test("the runner bounds file concurrency without weakening process races", t => 
   process.env.ACC_TEST_FORCE_EXIT = "1";
   assert.deepEqual(nodeTestArguments(["first.test.mjs"]),
     ["--test", concurrency, "--test-timeout=600000", "--test-force-exit", "first.test.mjs"]);
+});
+
+test("an explicit file concurrency limit can reduce pressure without raising the tested ceiling", () => {
+  assert.equal(fileConcurrency("darwin", { cpus: 18, fsyncSkipped: true, limit: "4" }), 4);
+  assert.equal(fileConcurrency("win32", { limit: "12" }), 3);
+  assert.equal(fileConcurrency("linux", { limit: "1" }), 1);
+  for (const limit of ["0", "-1", "1.5", "invalid", ""]) {
+    assert.throws(() => fileConcurrency("darwin", { limit }), /ACC_TEST_FILE_CONCURRENCY/);
+  }
 });
 
 // Measured on windows-latest: 345 absolute test paths make a command line past

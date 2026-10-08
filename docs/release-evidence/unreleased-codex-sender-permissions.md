@@ -85,3 +85,17 @@ The initial baseline run failed seven installation checks because it inherited
 `CODEX_HOME`. The corrected runner and isolated final run passed those checks.
 An intermediate full run failed only the existing candidate-provenance gate,
 which required the new commit and artifact record now shown above.
+
+## Verification under machine load
+
+A subsequent pre-push run at file concurrency 12 hit a store-lock deadline in
+`claude-native-delivery.test.mjs`. The unchanged scenario took over 13 seconds in
+that run and passed alone in 0.56 seconds. The host exposed 18 CPUs and reported
+load averages of approximately 25, 45, and 38 after the failed run.
+
+The test runner now accepts `ACC_TEST_FILE_CONCURRENCY` to reduce file pressure.
+The override cannot raise the existing platform ceiling. It does not change the
+file list, test timeouts, fsync policy, or concurrency inside test cases. The new
+guard failed with `12 !== 4` before implementation. All 10 runner tests then
+passed, and discovery still selected 410 files with the override set to 4.
+This test-only adjustment does not change the recorded package bytes.

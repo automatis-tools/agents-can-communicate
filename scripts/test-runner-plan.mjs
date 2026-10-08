@@ -22,10 +22,17 @@ import os from "node:os";
 // suite took 124 s at six and 103 s at twelve, every test passing (2026-10-06).
 // A run that keeps its flushes stays at four.
 export function fileConcurrency(platform = process.platform,
-  { cpus = os.availableParallelism(), fsyncSkipped = false } = {}) {
-  if (platform === "win32") return 3;
-  if (!fsyncSkipped) return 4;
-  return Math.max(4, Math.min(12, Math.floor(cpus * 2 / 3)));
+  { cpus = os.availableParallelism(), fsyncSkipped = false, limit } = {}) {
+  const ceiling = platform === "win32" ? 3 : !fsyncSkipped ? 4
+    : Math.max(4, Math.min(12, Math.floor(cpus * 2 / 3)));
+  if (limit === undefined) return ceiling;
+  const requested = Number(limit);
+  if (!Number.isSafeInteger(requested) || requested < 1) {
+    throw new Error("ACC_TEST_FILE_CONCURRENCY must be a positive integer");
+  }
+  // Busy development machines can reduce file pressure. The races inside
+  // each test remain unchanged, and an override cannot raise the proven cap.
+  return Math.min(ceiling, requested);
 }
 
 // Local macOS runs only. CI sets CI and keeps every flush on every platform;
@@ -49,7 +56,8 @@ export function testEnvironment(env = process.env, { platform = process.platform
   return { ...env, NODE_OPTIONS: options.includes(preload) ? options : `${options} ${preload}`.trim() };
 }
 
-export const TEST_FILE_CONCURRENCY = fileConcurrency(process.platform, { fsyncSkipped: skipsFsync() });
+export const TEST_FILE_CONCURRENCY = fileConcurrency(process.platform, {
+  fsyncSkipped: skipsFsync(), limit: process.env.ACC_TEST_FILE_CONCURRENCY });
 
 // CI sets ACC_TEST_TIMEOUT_MS so that one hung test fails with its name instead
 // of holding the whole job until the runner's own limit.
