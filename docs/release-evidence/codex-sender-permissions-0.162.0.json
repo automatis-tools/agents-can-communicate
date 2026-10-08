@@ -1,0 +1,83 @@
+{
+  "startedAt": "2026-10-08T23:00:00.585Z",
+  "source": "installed-artifact and real Codex daemon",
+  "scenarios": [
+    {
+      "name": "sandboxed expired-binding send",
+      "at": "2026-10-08T23:00:07.005Z",
+      "messageId": "message_e6nzMWj0fGooXGLzb7zfXQ",
+      "delivery": [
+        {
+          "recipientParticipantId": "probe-receiver",
+          "outcome": "queued",
+          "transport": "durable",
+          "errorCode": "transport_permission_denied"
+        }
+      ]
+    },
+    {
+      "name": "approved retry of the same recorded send",
+      "at": "2026-10-08T23:00:08.396Z",
+      "messageId": "message_e6nzMWj0fGooXGLzb7zfXQ",
+      "delivery": [
+        {
+          "recipientParticipantId": "probe-receiver",
+          "outcome": "offered",
+          "transport": "codex-app-server"
+        }
+      ]
+    },
+    {
+      "name": "idle receiver automatically executes the marker",
+      "at": "2026-10-08T23:00:27.712Z",
+      "activeObserved": true,
+      "marker": "passed",
+      "manualPromptsAfterSend": 0
+    }
+  ],
+  "sourceCommit": "9f86a40ba2fdb87b3d89fa1e0061cef1ad4a6d35",
+  "artifact": {
+    "filename": "agents-can-communicate-0.10.3.tgz",
+    "bytes": 583402,
+    "sha256": "858127d3d57d07ca66e720a44dfdc3d7bac8078ab9ef79de9dfd21e9bb2dba97"
+  },
+  "clientVersion": "0.162.0",
+  "receiver": {
+    "threadId": "01a11dbe-c2b9-7aa1-9055-a0a004b23877",
+    "initialStatus": {
+      "type": "idle"
+    }
+  },
+  "counts": {
+    "recorded": 1,
+    "failures": 1,
+    "offers": 1
+  },
+  "outcome": "passed",
+  "cleanup": {
+    "fixtureRemoved": true,
+    "threadArchived": true
+  },
+  "finishedAt": "2026-10-08T23:00:27.819Z",
+  "platform": "darwin-arm64",
+  "packageVersion": "0.10.3",
+  "fileCount": 351,
+  "limits": [
+    "Candidate installation used a 0.153.4 detection shim in a temporary home to prevent service setup. The live daemon and receiver used real Codex 0.162.0.",
+    "Receiver registration used the candidate adapter and core APIs. This capture does not recertify native startup hooks.",
+    "Approved execution was measured, not automatic approval-rule matching.",
+    "No Windows, Linux, or active-turn injection capture."
+  ],
+  "validation": {
+    "fullSuite": {
+      "tests": 3222,
+      "passed": 3214,
+      "skipped": 8,
+      "failed": 0
+    },
+    "syntaxModules": 740,
+    "packageVerification": "passed",
+    "permissionSwallowingMutation": "rejected",
+    "review": "no remaining blocker"
+  }
+}
