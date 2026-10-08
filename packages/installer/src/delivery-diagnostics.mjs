@@ -10,6 +10,7 @@ const REASONS = Object.freeze({
   known_bad_version: "this client version has a known native delivery failure",
   native_endpoint_unavailable: "the client's local delivery service is unavailable",
   native_session_unavailable: "the local delivery service has no loaded client session",
+  transport_permission_denied: "the calling process lacks permission to access the local delivery channel",
   feature_probe_failed: "the native protocol probe did not succeed",
   probe_timeout: "the native protocol probe timed out",
   probe_version_mismatch: "the local service and CLI versions differ",

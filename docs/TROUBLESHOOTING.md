@@ -158,6 +158,16 @@ delivery, start Codex without it; put a setting you need in `config.toml` instea
 If a reply stays queued with `transport_permission_denied`, the sender's permissions
 blocked local transport. This is distinct from an unavailable recipient. The message was
 recorded successfully; the error does not mean it was read or acknowledged.
+For Codex sends, use the exact installed ACC wrapper through the client's approved
+command path (`exec_command` with `sandbox_permissions: "require_escalated"`). The
+installed ACC prefix rule can authorize that command. Keep it separate from other
+shell commands. If delivery was already attempted, retry the same arguments and
+the original `--client-message-id` printed by the CLI. This retries the recorded
+message instead of recording another one. An initial execution refusal records
+nothing; a refused retry does not erase an earlier recorded message.
+On Codex 0.162.0 on macOS, even an installed socket allowlist did not permit direct
+access to the daemon socket from the sandbox. A configured profile alone therefore
+does not prove that a sandboxed sender can reach another Codex session.
 On Codex 0.153.4 or newer, rerun `acc install --adapter codex` with existing
 live consent. Add `--delivery actionable` when new consent is required, then start a new session.
 With ACC 0.8.0 or 0.8.1, every live offer from a Codex session to Claude Code failed this way:

@@ -82,8 +82,8 @@ test("a valid refresh extends the existing binding and caps its lease at 120 sec
     },
   };
 
-  assert.equal(await refreshExpiredBinding({ service, adapter, binding: f.binding,
-    runtimeDir: f.store.root, clock: f.clock, timeoutMs: 321 }), true);
+  assert.equal((await refreshExpiredBinding({ service, adapter, binding: f.binding,
+    runtimeDir: f.store.root, clock: f.clock, timeoutMs: 321 })).refreshed, true);
   assert.equal(nativeCalls, 1);
   assert.equal(refreshCalls, 1);
   assert.equal(publishCalls, 0);
@@ -110,8 +110,8 @@ test("refresh refuses invalid identity and lease handshakes", async () => {
     } };
     const adapter = adapterWith(async () => result);
 
-    assert.equal(await refreshExpiredBinding({ service, adapter, binding: f.binding,
-      runtimeDir: f.store.root, clock: f.clock }), false, name);
+    assert.equal((await refreshExpiredBinding({ service, adapter, binding: f.binding,
+      runtimeDir: f.store.root, clock: f.clock })).refreshed, false, name);
     assert.equal(refreshCalls, 0, name);
   }
 });
@@ -120,14 +120,14 @@ test("a refresh handshake reporting a different but eligible version still succe
   const f = await fixture();
   const adapter = adapterWith(async () => handshake({ clientVersion: "1.2.9" }));
 
-  assert.equal(await refreshExpiredBinding({ service: f.service, adapter, binding: f.binding,
-    runtimeDir: f.store.root, clock: f.clock }), true);
+  assert.equal((await refreshExpiredBinding({ service: f.service, adapter, binding: f.binding,
+    runtimeDir: f.store.root, clock: f.clock })).refreshed, true);
 });
 
 test("missing refresh support leaves the expired binding untouched", async () => {
   const f = await fixture();
-  assert.equal(await refreshExpiredBinding({ service: f.service, adapter: adapterWith(undefined),
-    binding: f.binding, runtimeDir: f.store.root, clock: f.clock }), false);
+  assert.equal((await refreshExpiredBinding({ service: f.service, adapter: adapterWith(undefined),
+    binding: f.binding, runtimeDir: f.store.root, clock: f.clock })).refreshed, false);
   assert.deepEqual(await f.service.listDeliveryBindings({ participantId: "models",
     now: f.clock.now() }), []);
 });
@@ -140,9 +140,9 @@ test("post-refresh state must still name the same current endpoint", async () =>
       opaqueEndpointRef: "endpoint:replacement", leaseUntil: "2026-09-01T20:04:00.001Z" });
   } };
 
-  assert.equal(await refreshExpiredBinding({ service,
+  assert.equal((await refreshExpiredBinding({ service,
     adapter: adapterWith(async () => handshake()), binding: f.binding,
-    runtimeDir: f.store.root, clock: f.clock }), false);
+    runtimeDir: f.store.root, clock: f.clock })).refreshed, false);
   const [replacement] = await f.service.listDeliveryBindings({
     participantId: "models", now: f.clock.now() });
   assert.equal(replacement.opaqueEndpointRef, "endpoint:replacement");
@@ -156,8 +156,8 @@ test("retirement during the RPC cannot be revived", async () => {
     return handshake();
   });
 
-  assert.equal(await refreshExpiredBinding({ service: f.service, adapter, binding: f.binding,
-    runtimeDir: f.store.root, clock: f.clock }), false);
+  assert.equal((await refreshExpiredBinding({ service: f.service, adapter, binding: f.binding,
+    runtimeDir: f.store.root, clock: f.clock })).refreshed, false);
   assert.deepEqual(await f.service.listDeliveryBindings({ participantId: "models",
     now: f.clock.now(), includeExpired: true }), []);
 });

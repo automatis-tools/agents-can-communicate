@@ -168,22 +168,25 @@ async function bindAttempt({ event, clientPid, clientVersion, runtimeDir,
 // what `codex --version` printed, and a daemon that had updated under its CLI
 // was refused here on that difference alone.
 async function receiverFor(binding, runtimeDir, platform = process.platform) {
-  const endpoint = await readNativeEndpoint({ runtimeDir, endpointId: binding?.opaqueEndpointRef, platform });
-  return endpoint !== null && await socketIsReady(endpoint.socketPath, { platform }) ? endpoint : null;
+  const endpoint = await readNativeEndpoint({ runtimeDir, endpointId: binding?.opaqueEndpointRef,
+    platform, throwPermissionErrors: true });
+  return endpoint !== null && await socketIsReady(endpoint.socketPath,
+    { platform, throwPermissionErrors: true }) ? endpoint : null;
 }
 
 export async function refreshNativeSession({ binding, runtimeDir, timeoutMs = 750,
   now = Date.now, open = openCodexAppServer, platform = process.platform } = {}) {
   const rejected = reason => closed(binding?.clientVersion, reason);
-  const endpoint = await receiverFor(binding, runtimeDir, platform);
-  if (endpoint === null) return rejected("handshake_failed");
   try {
+    const endpoint = await receiverFor(binding, runtimeDir, platform);
+    if (endpoint === null) return rejected("handshake_failed");
     return await usingPeer(endpoint.socketPath, timeoutMs, open, async peer => {
       const { reasonCode, servingVersion } = await verifyReceiver(peer, endpoint);
       return reasonCode === null
         ? handshake({ ...endpoint, clientVersion: servingVersion }, now) : rejected(reasonCode);
     });
   } catch (error) {
+    if (["EPERM", "EACCES"].includes(error?.code)) return rejected("transport_permission_denied");
     return rejected(error?.code === "ETIMEDOUT" ? "handshake_timeout" : "handshake_failed");
   }
 }
@@ -192,9 +195,9 @@ export async function offerMessage({ binding, message, runtimeDir, timeoutMs = 5
   open = openCodexAppServer, platform = process.platform } = {}) {
   const rejected = safeErrorCode => ({ accepted: false, transport: "codex-app-server",
     clientVersion: binding?.clientVersion ?? null, safeErrorCode });
-  const endpoint = await receiverFor(binding, runtimeDir, platform);
-  if (endpoint === null) return rejected("recipient_unavailable");
   try {
+    const endpoint = await receiverFor(binding, runtimeDir, platform);
+    if (endpoint === null) return rejected("recipient_unavailable");
     return await usingPeer(endpoint.socketPath, timeoutMs, open, async peer => {
       const { reasonCode, servingVersion } = await verifyReceiver(peer, endpoint);
       if (reasonCode !== null) return rejected(reasonCode === "handshake_timeout" ? "transport_error"

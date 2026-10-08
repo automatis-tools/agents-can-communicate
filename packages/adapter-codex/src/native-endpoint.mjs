@@ -50,18 +50,25 @@ async function directory(runtimeDir, create = false, platform = process.platform
  * 0.159.3), so there the socket counts while its directory lists it; Codex keeps
  * that directory to its user.
  */
-export async function socketIsReady(socketPath, { platform = process.platform } = {}) {
+export async function socketIsReady(socketPath, { platform = process.platform,
+  throwPermissionErrors = false } = {}) {
   if (isWindowsPlatform(platform)) {
     if (!absolute(socketPath)) return false;
     const name = path.basename(socketPath).toLowerCase();
-    const names = await readdir(path.dirname(socketPath)).catch(() => []);
+    const names = await readdir(path.dirname(socketPath)).catch(error => {
+      if (throwPermissionErrors && ["EPERM", "EACCES"].includes(error.code)) throw error;
+      return [];
+    });
     return names.some(entry => entry.toLowerCase() === name);
   }
   if (!absolute(socketPath)) return false;
   try {
     const info = await lstat(socketPath);
     return info.isSocket() && !info.isSymbolicLink() && own(info);
-  } catch { return false; }
+  } catch (error) {
+    if (throwPermissionErrors && ["EPERM", "EACCES"].includes(error.code)) throw error;
+    return false;
+  }
 }
 
 /** The socket a control socket path leads to, or null. Codex 0.157.1 keeps a
@@ -104,7 +111,8 @@ export async function writeNativeEndpoint({ runtimeDir, record, platform = proce
 
 // Expired records are metadata for revalidation, never proof of reachability.
 // Refuse links and oversized files before reading; no foreign error text escapes.
-export async function readNativeEndpoint({ runtimeDir, endpointId, platform = process.platform }) {
+export async function readNativeEndpoint({ runtimeDir, endpointId, platform = process.platform,
+  throwPermissionErrors = false }) {
   if (typeof endpointId !== "string" || !ENDPOINT.test(endpointId)) return null;
   let handle;
   try {
@@ -116,7 +124,10 @@ export async function readNativeEndpoint({ runtimeDir, endpointId, platform = pr
     }
     const record = JSON.parse(await handle.readFile("utf8"));
     return valid(record) && record.endpointId === endpointId ? record : null;
-  } catch { return null; }
+  } catch (error) {
+    if (throwPermissionErrors && ["EPERM", "EACCES"].includes(error.code)) throw error;
+    return null;
+  }
   finally { await handle?.close().catch(() => null); }
 }
 
