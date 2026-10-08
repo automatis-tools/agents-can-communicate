@@ -122,6 +122,17 @@ test("the suite's processes inherit the preload once, beside options already set
   assert.equal(testEnvironment({}, { platform: "linux" }).NODE_OPTIONS, undefined);
 });
 
+test("the suite cannot redirect fixture installs into the calling client's home", () => {
+  const inherited = { CODEX_HOME: "/operator/codex", AGENTS_HOME: "/operator/agents", KEEP: "1" };
+  for (const platform of ["darwin", "linux", "win32"]) {
+    const env = testEnvironment(inherited, { platform });
+    assert.equal(env.CODEX_HOME, undefined);
+    assert.equal(env.AGENTS_HOME, undefined);
+    assert.equal(env.KEEP, "1");
+  }
+  assert.equal(inherited.CODEX_HOME, "/operator/codex", "the caller's environment is unchanged");
+});
+
 test("with the preload, no flush reaches the disk and the bytes are still written", async t => {
   const root = await mkdtemp(path.join(tmpdir(), "acc-skip-fsync-"));
   t.after(() => rm(root, { recursive: true, force: true }));

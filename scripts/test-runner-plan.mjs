@@ -38,6 +38,11 @@ export const SKIP_FSYNC_PRELOAD = new URL("./test-skip-fsync.mjs", import.meta.u
 // The environment the suite's processes start with: the preload rides in
 // NODE_OPTIONS, so every node process a test starts inherits it with the rest.
 export function testEnvironment(env = process.env, { platform = process.platform } = {}) {
+  // Install fixtures supply their own HOME. These overrides take precedence
+  // over it and otherwise send their writes into the invoking agent's setup.
+  env = { ...env };
+  delete env.CODEX_HOME;
+  delete env.AGENTS_HOME;
   if (!skipsFsync({ platform, env })) return { ...env };
   const preload = `--import=${SKIP_FSYNC_PRELOAD}`;
   const options = env.NODE_OPTIONS ?? "";
