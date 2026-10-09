@@ -5,7 +5,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 
-import { bakeSkillCommand, blankJson, defaultAntigravityRelay, isShellWord, mergeEnv, ownVersion,
+import { bakeSkillCommand, blankJson, compareVersionOrder, versionOrder, defaultAntigravityRelay, isShellWord, mergeEnv, ownVersion,
   removeIfEmpty, shellQuote, shortPath, stampPluginVersion, windowsHookCommand, writeCliShim,
   writeForeignJson, writeHookShim, writeNodeShim }
   from "@agents-can-communicate/adapter-sdk";
@@ -426,7 +426,8 @@ export async function installAntigravity(context) {
   const allow = await ensureAllowRule(context);
   // Antigravity 2.0 keeps grants of its own, read only where it has run.
   const desktop = await ensureDesktopRule(context);
-  const indicatorChanges = await configureIndicator(context, context.indicator === "on");
+  const indicatorChanges = await configureIndicator(context, context.indicator === "on"
+    && compareVersionOrder(versionOrder(context.clientVersion), versionOrder("1.0.6")) >= 0);
   const changes = [shimDir(home), file, pluginInstallPath(home), vendorManifestPath(home),
     ...allow.changes, ...desktop.changes, ...indicatorChanges];
 

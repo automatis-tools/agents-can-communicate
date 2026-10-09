@@ -107,3 +107,13 @@ test("refresh never claims status-line presentation fields the user edited", asy
   assert.deepEqual((await json(file)).statusLine,
     { type: "command", command: "my-status", padding: 3, stack_with_default: false });
 });
+
+test("an Antigravity version below the status-line floor keeps its existing command", async t => {
+  const context = await fixture(t);
+  const file = path.join(context.home, ".gemini", "antigravity-cli", "settings.json");
+  await mkdir(path.dirname(file), { recursive: true });
+  const statusLine = { type: "command", command: "user-status" };
+  await writeFile(file, JSON.stringify({ statusLine }));
+  await installAntigravity({ ...context, clientVersion: "1.0.5" });
+  assert.deepEqual((await json(file)).statusLine, statusLine);
+});
