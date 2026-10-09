@@ -1,5 +1,28 @@
 # Changelog
 
+## 0.10.4 — release candidate
+
+- Codex sender permission failures remain `transport_permission_denied` instead
+  of an unavailable-recipient diagnosis, including during expired binding refresh
+  (#285, PR #286).
+- The CLI prints the original retry key. The refreshed Codex skill uses approved
+  execution for outgoing commands and reuses the recorded message on retry.
+- Verification isolates client homes, supports reduced file concurrency on busy
+  hosts, preserves POSIX test scope on Windows, and controls retirement-test time.
+
+| Candidate artifact | Value |
+|---|---|
+| Built from | `c116ce943b16cc0e7875d5ece47da5d36acf78b1` |
+| Tarball | `agents-can-communicate-0.10.4.tgz`, 583,640 bytes, 351 files |
+| sha256 | `f714e20ce25f3f50ce5bf619ed6edbbc15ab9dd6391b3f1c4326b8b4c80aed5d` |
+
+The exact archive passed clean package verification and 27 managed/store checks.
+The published 0.10.3 updated to these bytes with a live MCP process, preserved the
+question and configuration, and refreshed the skill. Real-client hook delivery,
+Claude idle wake, and Codex approved retry with automatic wake passed locally.
+See [0.10.4 release evidence](docs/release-evidence/v0.10.4.md) for provenance and limits.
+Earlier records below retain their original source and artifact facts.
+
 ## Unreleased — Codex sender permission recovery
 
 - Codex socket metadata and endpoint permission failures now remain
