@@ -1,5 +1,21 @@
 # Upgrading
 
+## From 0.10.3
+
+Update as usual with `acc update`. Version 0.10.4 preserves sender permission
+failures as `transport_permission_denied`, including when access to socket
+metadata or an expired delivery binding is denied. The CLI prints the original
+retry key so the same recorded message can be offered again without a duplicate.
+
+The refreshed Codex skill uses the client's approved command path for outgoing
+ACC messages. ACC's existing exact-wrapper rule can authorize those commands.
+An initial execution refusal records no message; a refused retry preserves an
+earlier durable message. See [sender permissions](TROUBLESHOOTING.md#i-enabled-live-delivery-but-got-fallback)
+for the recovery procedure.
+
+This release keeps store contract 7 and adds no data migration. The update
+refreshes installed integrations while preserving their recorded delivery policy.
+
 ## Store contract 6 to 7
 
 ACC moves each workspace's store from contract 6 to 7 by itself, right after an update
