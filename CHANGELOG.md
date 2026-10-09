@@ -5,6 +5,8 @@
 - Optional Claude Code and Antigravity CLI indicators show incoming reception as
   `ACC ●`, `ACC ● · turn`, or `ACC ● · inbox`. Known failures retain `!` and the
   available fallback, with an explanation and recovery step (#284).
+- In Claude Code, only the status glyph uses a non-dim theme color. The name and
+  qualifier retain the ordinary footer color, with no background.
 - The indicator reads local state without ACC writes or client socket probes.
   Idle sessions remain active when a delivery lease expires. A failed send or
   endpoint verification is a separate observation.
@@ -14,9 +16,9 @@
 
 | Candidate artifact | Value |
 |---|---|
-| Built from | `2ee8bc08392c5511e7d21158498ce892406e5eb6` |
-| Tarball | `agents-can-communicate-0.10.4.tgz`, 593,436 bytes, 359 files |
-| sha256 | `a508333d868afd22eafbedda327922596b00301eab3103439fe1ab8cf6c3cf15` |
+| Built from | `2c4ef6747d4ce2e84031298d26020182de06d72d` |
+| Tarball | `agents-can-communicate-0.10.4.tgz`, 593,791 bytes, 359 files |
+| sha256 | `85bbdacb461325301fc72042ddb286c12a9c1e1aa458c87e97635834b212c166` |
 
 The exact archive passed clean installation verification. The feature's packed
 integration check exercised the installed module and stable reader after removal

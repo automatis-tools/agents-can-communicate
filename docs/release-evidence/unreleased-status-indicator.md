@@ -4,12 +4,12 @@ Recorded 2026-10-09 on macOS arm64. This is development work for #284, not a rel
 
 | Artifact | Observation |
 |---|---|
-| Source commit | `2ee8bc08392c5511e7d21158498ce892406e5eb6` |
+| Source commit | `2c4ef6747d4ce2e84031298d26020182de06d72d` |
 | Source state before packing | Clean worktree; all feature and gate files committed |
 | Package | `agents-can-communicate-0.10.4.tgz` |
-| Size | 593,436 bytes |
+| Size | 593,791 bytes |
 | Entries | 359 |
-| SHA-256 | `a508333d868afd22eafbedda327922596b00301eab3103439fe1ab8cf6c3cf15` |
+| SHA-256 | `85bbdacb461325301fc72042ddb286c12a9c1e1aa458c87e97635834b212c166` |
 | Node used for verification | 24.4.0 |
 
 The archive was saved separately, then passed to `node scripts/verify-package.mjs`.
@@ -18,9 +18,10 @@ above was captured before packing; it is not inferred from the verifier's curren
 
 ## Checks
 
-- `npm ci` and syntax checks passed. The final syntax run covered 754 modules.
-- Eighteen focused tests passed for state classification, read-only execution,
-  generation checks, delivery observations, installer ownership, and launcher lifetime.
+- `npm ci` and syntax checks passed. The final syntax run covered 755 modules.
+- Twenty-two focused tests passed for state classification, read-only execution,
+  generation checks, delivery observations, installer ownership, launcher lifetime,
+  and glyph-only theme styling without a background.
 - The packed feature test passed. It installed the npm artifact, enabled the Claude
   module, removed the initial npm copy, and executed the stable reader. It then loaded
   the installed module through its host API boundary, retained an existing footer label,
@@ -28,9 +29,10 @@ above was captured before packing; it is not inferred from the verifier's curren
 - Clean artifact verification passed: all binaries were installed; all packed Markdown
   links resolved; no forbidden files were present; non-Git coordination worked; and
   install/uninstall restored the client-home topology, modes, links, and bytes.
-- Three deliberate mutations failed the relevant assertions: treating lease expiry as
+- Four deliberate mutations failed the relevant assertions: treating lease expiry as
   disconnection, reclaiming a later user edit during uninstall, and attempting a write
-  from the public reader. The unmutated tests passed again after restoration.
+  from the public reader, and dimming the status glyph. The unmutated tests passed
+  again after restoration.
 - Review reproductions failed before their fixes: an update losing the reader executable,
   a recorded send failure staying green, and failed verification of an expired endpoint
   staying green. Their regressions now pass.
@@ -47,8 +49,11 @@ Claude Code 2.1.295 loaded the installed module in a native TUI with external ne
 blocked. Its validator first rejected a nested helper receiving `$`; moving that helper to
 module scope passed validation. The TUI showed the bounded startup label and `ACC !`, while
 `user-status-preserved` remained visible. `/acc-status` printed the reason and recovery step.
-The unchanged problem produced one diagnostic. The renderer uses the client's native
-`SessionMode.modes` list, including its own spacing and layout.
+The unchanged problem produced one diagnostic. The first renderer appended the native `SessionMode.modes` list. User testing
+showed that this dimmed the successful dot to gray. The corrected renderer preserves
+the native footer reference and colors only a separate glyph. An offline light-theme
+capture emitted RGB `102,102,102` for `ACC` and RGB `44,122,57` with bold styling
+for the dot. No ACC element sets a background color.
 
 Antigravity CLI 1.3.2 invoked the configured command and displayed `ACC ! · acc doctor`
 below its project-trust screen. The client required a loopback listener; external networking
@@ -60,7 +65,7 @@ wake, injection, guard, or native delivery capability is claimed. There is no ne
 native UI capture; the Windows integration uses the existing validated Node-shim strategy.
 
 The [browser preview](assets/status-indicator-preview.jpg) uses actual filesystem fixtures
-and the production reader. It demonstrates the approved labels and failure explanation;
+and the production reader. It demonstrates the indicator on a light background;
 it is a local preview, not a screenshot of a native client.
 
 Reproduce that preview from the source checkout with `node scripts/preview-indicator.mjs`.
