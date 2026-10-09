@@ -16,6 +16,7 @@ async function durableFile(file, bytes, mode = 0o600) {
 export const stablePaths = root => ({
   cli: path.join(root, "bin", "acc.mjs"), runner: path.join(root, "bin", "acc-hook.mjs"),
   antigravityRelay: path.join(root, "bin", "acc-antigravity-relay.mjs"),
+  indicatorRunner: path.join(root, "bin", "acc-indicator.mjs"),
 });
 
 /** Publish immutable launcher modules, then atomically replace each tiny entry.
@@ -47,9 +48,10 @@ export async function writeLaunchers(root, packageRoot) {
   } finally { await removeTree(staging); }
   const bin = path.join(root, "bin");
   await managedDirectory(bin, { create: true });
-  for (const kind of ENTRY_KINDS) {
-    const bytes = `#!/usr/bin/env node\nimport { runEntry } from "../launchers/${id}/entry.mjs";\n`
-      + `await runEntry(${JSON.stringify({ kind, packageRoot, managerRoot: root, managedRequired: true })});\n`;
+  for (const kind of [...ENTRY_KINDS, "acc-indicator"]) {
+    const entry = kind === "acc-indicator" ? "runIndicatorEntry" : "runEntry";
+    const bytes = `#!/usr/bin/env node\nimport { ${entry} } from "../launchers/${id}/entry.mjs";\n`
+      + `await ${entry}(${JSON.stringify({ kind, packageRoot, managerRoot: root, managedRequired: true })});\n`;
     const temporary = path.join(bin, `.${randomUUID()}.tmp`);
     try {
       await durableFile(temporary, bytes, 0o700);

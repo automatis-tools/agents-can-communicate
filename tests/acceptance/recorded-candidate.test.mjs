@@ -33,6 +33,7 @@ const PACKED = Object.freeze([
   "docs/ARCHITECTURE.md",
   "docs/CAPABILITIES.md",
   "docs/CLI.md",
+  "docs/STATUS_INDICATOR.md",
   "docs/CONCEPTS.md",
   "docs/CONFIGURATION.md",
   "docs/DESIGN_DECISIONS.md",

@@ -1077,3 +1077,25 @@ hook failed open and printed `{"systemMessage": "ACC: coordination is paused in 
 this workspace …` and no hook error. Before, the same failure wrote its remedy to stderr only,
 which a successful hook's terminal does not show. ACC prints that line only on SessionStart and
 UserPromptSubmit, and only when the store waits for its migration.
+
+## Status indicator surface — 2026-10-09
+
+Claude Code 2.1.295 on macOS arm64 loaded the installed indicator hooks module.
+Its native `SessionMode` label showed `ACC …`, then `ACC !`; the separately configured
+`user-status-preserved` command remained visible. `/acc-status` printed the unregistered
+state and recovery command. The module printed one diagnostic for the unchanged failure.
+The vendor validator rejected a nested helper receiving `$`; the shipped helper is at
+module scope and passes that validator. The renderer appends to `e.props.modes`, retaining
+the native footer layout and existing mode labels.
+
+These captures used a separate ACC data home and a network-denied native TUI. The sandbox
+refused Node child-process probes, so this capture proves rendering and the diagnostic
+command, not registration or a new delivery capability. Filesystem fixtures cover normal
+reception, expired leases, generation replacement, and observed send failures. The packed
+integration test loads the installed module and exercises its stable executable after the
+initial npm package is removed.
+
+The 2.1.287 installation floor comes from the vendor's documented mods availability;
+earlier builds were not exercised in this capture. Client policy may disable user mods.
+See [the indicator contract](../../docs/STATUS_INDICATOR.md) and
+[artifact evidence](../../docs/release-evidence/unreleased-status-indicator.md).
