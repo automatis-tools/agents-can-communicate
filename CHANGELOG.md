@@ -14,9 +14,9 @@
 
 | Candidate artifact | Value |
 |---|---|
-| Built from | `f452d255b50548bdd956e6df0c6d2a3544633ece` |
-| Tarball | `agents-can-communicate-0.10.4.tgz`, 593,423 bytes, 359 files |
-| sha256 | `8401215772d8ce5d70d69d979934750e8e40b23159eb4fc412fb5e967d954d47` |
+| Built from | `2ee8bc08392c5511e7d21158498ce892406e5eb6` |
+| Tarball | `agents-can-communicate-0.10.4.tgz`, 593,436 bytes, 359 files |
+| sha256 | `a508333d868afd22eafbedda327922596b00301eab3103439fe1ab8cf6c3cf15` |
 
 The exact archive passed clean installation verification. The feature's packed
 integration check exercised the installed module and stable reader after removal
