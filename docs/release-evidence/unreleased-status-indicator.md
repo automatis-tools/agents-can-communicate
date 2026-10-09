@@ -4,12 +4,12 @@ Recorded 2026-10-09 on macOS arm64. This is development work for #284, not a rel
 
 | Artifact | Observation |
 |---|---|
-| Source commit | `f452d255b50548bdd956e6df0c6d2a3544633ece` |
+| Source commit | `2ee8bc08392c5511e7d21158498ce892406e5eb6` |
 | Source state before packing | Clean worktree; all feature and gate files committed |
 | Package | `agents-can-communicate-0.10.4.tgz` |
-| Size | 593,423 bytes |
+| Size | 593,436 bytes |
 | Entries | 359 |
-| SHA-256 | `8401215772d8ce5d70d69d979934750e8e40b23159eb4fc412fb5e967d954d47` |
+| SHA-256 | `a508333d868afd22eafbedda327922596b00301eab3103439fe1ab8cf6c3cf15` |
 | Node used for verification | 24.4.0 |
 
 The archive was saved separately, then passed to `node scripts/verify-package.mjs`.
@@ -19,7 +19,7 @@ above was captured before packing; it is not inferred from the verifier's curren
 ## Checks
 
 - `npm ci` and syntax checks passed. The final syntax run covered 754 modules.
-- Seventeen focused tests passed for state classification, read-only execution,
+- Eighteen focused tests passed for state classification, read-only execution,
   generation checks, delivery observations, installer ownership, and launcher lifetime.
 - The packed feature test passed. It installed the npm artifact, enabled the Claude
   module, removed the initial npm copy, and executed the stable reader. It then loaded
