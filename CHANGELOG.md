@@ -1,5 +1,25 @@
 # Changelog
 
+## Unreleased — Codex sender permission recovery
+
+- Codex socket metadata and endpoint permission failures now remain
+  `transport_permission_denied`, including during an expired binding refresh (#285).
+- The CLI prints the original retry key. The Codex skill uses approved execution
+  for outgoing ACC commands and retries the recorded message without a duplicate.
+- The test runner isolates client-home overrides from installation fixtures.
+
+| Candidate artifact | Value |
+|---|---|
+| Built from | `9f86a40ba2fdb87b3d89fa1e0061cef1ad4a6d35` |
+| Tarball | `agents-can-communicate-0.10.3.tgz`, 583,402 bytes, 351 files |
+| sha256 | `858127d3d57d07ca66e720a44dfdc3d7bac8078ab9ef79de9dfd21e9bb2dba97` |
+
+The installed candidate delivered one recorded message after a sandbox denial and
+an approved retry. The real Codex 0.162.0 receiver started automatically and wrote
+its test marker. See [verification and limits](docs/release-evidence/unreleased-codex-sender-permissions.md).
+This development candidate is not a new release. Existing release records below
+retain their original provenance.
+
 ## 0.10.3 — release candidate
 
 - A process that has exited but that its parent has not collected (a zombie) no longer counts

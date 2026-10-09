@@ -132,7 +132,12 @@ export function createDeliveryRouter({ service, adapters, clock, readLivePolicy,
     if (Date.parse(binding.leaseUntil) <= Date.parse(now)) {
       const refreshed = await refreshExpiredBinding({ service, adapter, binding,
         runtimeDir: service.store?.root, clock });
-      if (!refreshed) return durable(participantId, "recipient_unavailable");
+      if (!refreshed.refreshed) {
+        if (refreshed.errorCode === "transport_permission_denied") {
+          await recordFailure(binding, message, participantId, "live-adapter", refreshed.errorCode);
+        }
+        return durable(participantId, refreshed.errorCode);
+      }
       const current = (await service.listDeliveryBindings({
         participantId, now: clock.now() })).filter(item => item.sessionId === binding.sessionId
           && item.generation === binding.generation

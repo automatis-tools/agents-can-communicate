@@ -29,6 +29,8 @@ export const NATIVE_REASON_CODES = Object.freeze([
   "prerelease_not_captured", "below_minimum_version", "known_bad_version",
   "feature_probe_failed", "probe_timeout", "probe_version_mismatch", "protocol_mismatch",
   "native_endpoint_unavailable", "native_session_unavailable",
+  // A caller can be denied access to a healthy receiver's local transport.
+  "transport_permission_denied",
   "handshake_failed", "handshake_timeout", "handshake_version_mismatch",
   "session_generation_stale", "client_process_unknown", "unsupported_shell",
   // The current session's canonical workspace identity could not be verified.

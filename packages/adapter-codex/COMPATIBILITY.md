@@ -1,5 +1,34 @@
 # Codex compatibility
 
+## Sender socket permissions and approved recovery, 2026-10-08
+
+Issue #285, Codex 0.162.0 on macOS arm64. In a sender sandbox, `lstat` of the
+daemon socket returned `EPERM` before ACC opened a connection. The installed
+`acc-workspace` profile also denied metadata reads and connections. Additional
+socket and filesystem-read grants in an isolated child profile did not remove
+that denial. The same receivers passed verification outside the sandbox.
+
+ACC previously converted that metadata denial into `recipient_unavailable`.
+Offers now report `transport_permission_denied` for denied endpoint reads,
+socket metadata, and connections. Refresh preserves the same reason, and the
+router records a failed offer when permissions prevent an expired lease refresh.
+No receiver identity check or sandbox restriction is removed.
+
+An installed candidate was measured with one real idle Codex thread and an
+expired ACC binding. The sandboxed CLI send recorded one durable question and
+reported the permission failure. An approved execution of the same command and
+client message ID offered that original question. Codex started automatically,
+wrote the authorized test marker, and returned to idle without another prompt.
+A further retry produced neither another message nor another offer event.
+The test thread was archived and its temporary fixture removed.
+
+The Codex skill selects approved execution for outgoing commands and retains
+the original retry key. ACC's existing exact-wrapper rule can authorize these
+commands. The live capture used approved tool execution; automatic approval-rule
+matching was not re-measured in that capture. No Windows or Linux client was
+measured, and no in-turn injection capability is added. Older coarse failure
+events do not establish whether their original cause was this permission denial.
+
 ## Missing service prerequisite (2026-09-13)
 
 A development ACC archive was installed with real npm Codex 0.154.0 on

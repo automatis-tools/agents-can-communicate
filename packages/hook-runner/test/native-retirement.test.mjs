@@ -12,7 +12,7 @@ function fixture({ firstReadError = false, successor = false, clearFails = false
   let stored = { ...prior };
   let reads = 0;
   const calls = [];
-  return { calls, store: { ephemeral: { async get() {
+  return { calls, get reads() { return reads; }, store: { ephemeral: { async get() {
     reads += 1;
     if (hangs && reads === 1) return new Promise(() => {});
     if (firstReadError && reads === 1) throw new Error("unreadable");
@@ -46,10 +46,20 @@ test("failed retirement or successor publication cannot clean an endpoint", asyn
   }
 });
 
-test("metadata read failure cannot prevent primary retirement", async () => {
+test("metadata read failure cannot prevent primary retirement", async t => {
+  // The observation gets half of an 80 ms deadline. A real 40 ms timer can
+  // resume after all 80 ms on a loaded runner, where skipping clear is correct.
+  // Control elapsed time so this tests retirement after the observation budget.
+  t.mock.timers.enable({ apis: ["Date", "setTimeout"], now: 0 });
   for (const options of [{ firstReadError: true }, { hangs: true }]) {
     const service = fixture(options);
-    await run(service, async () => service.calls.push(["cleanup"]));
+    const pending = run(service, async () => service.calls.push(["cleanup"]));
+    if (options.hangs) {
+      await Promise.resolve();
+      assert.equal(service.reads, 1);
+      t.mock.timers.tick(40);
+    }
+    await pending;
     assert.deepEqual(service.calls.map(call => call[0]), ["clear"]);
   }
 });

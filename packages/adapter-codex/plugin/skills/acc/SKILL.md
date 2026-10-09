@@ -16,6 +16,25 @@ Use this skill when hook context reports peers or actionable attention, or
 the user asks for coordination between sessions. An `ACC CLI (append):` header
 by itself supplies identity for later use; continue the user's ordinary work.
 
+### Send through Codex's approved command path
+
+Run `message`, `request`, `reply`, and `finish` with `exec_command` and
+`sandbox_permissions: "require_escalated"`. Put the installed `{{ACC}}` wrapper
+first in the command. ACC's installed prefix rule can then authorize that exact
+local command. Do not combine it with other shell commands. These sends stay
+on this machine and reach the user's own agent sessions.
+
+Codex can deny its daemon socket inside the sandbox even when the ACC profile
+allows the socket. The approved command path preserves that sandbox boundary.
+An initial execution refusal records no message. If a retry is refused, the
+earlier recorded message remains durable. Report which case occurred.
+
+Choose a distinct `--client-message-id` for each new send. If delivery reports
+`transport_permission_denied`, retry the same command through approved execution
+with the same key and content. The CLI prints the original key when it generated
+one. A retry uses the recorded message and offers it again only while queued.
+Use normal sandboxed execution for local reads and claims.
+
 ## Use your own CLI credentials
 
 When this turn's ACC hook supplies `ACC CLI (append):`, append those exact
