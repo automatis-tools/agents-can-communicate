@@ -1,6 +1,23 @@
 import { spawn } from "node:child_process";
 import { readFile } from "node:fs/promises";
 import { readIndicator, indicatorFailure } from "./indicator.mjs";
+import { ALL_ADAPTERS } from "./install-command.mjs";
+
+function statusLine(report, adapterId) {
+  let label = report.label;
+  try {
+    const render = ALL_ADAPTERS().find(adapter => adapter.id === adapterId)?.statusIndicator?.renderText;
+    const rendered = render?.(report);
+    if (typeof rendered === "string") label = rendered;
+  } catch { /* A display extension cannot prevent the closed diagnostic. */ }
+  return label + (report.health === "problem" ? " · acc doctor" : "");
+}
+
+function output(report, options) {
+  if (options.json) return JSON.stringify(report);
+  if (options.details) return [report.label, report.detail, report.action].filter(Boolean).join("\n");
+  return statusLine(report, options.adapter);
+}
 
 async function input(stream) {
   let source = "";
@@ -38,7 +55,7 @@ export async function runIndicator({ argv = process.argv.slice(2), stdin = proce
   let report = indicatorFailure();
   // Includes a stalled stdin or filesystem, not just time spent awaiting JS.
   const timeout = setTimeout(() => {
-    stdout.write(options.json ? JSON.stringify(indicatorFailure()) + "\n" : "ACC ! · acc doctor\n",
+    stdout.write(output(indicatorFailure(), options) + "\n",
       () => process.exit(0));
   }, 1500);
   try {
@@ -57,8 +74,5 @@ export async function runIndicator({ argv = process.argv.slice(2), stdin = proce
     if (previous) stdout.write(previous + "\n");
   } catch { /* A status renderer fails open with a closed, actionable diagnostic. */ }
   finally { clearTimeout(timeout); }
-  const text = options.json ? JSON.stringify(report) : options.details
-    ? [report.label, report.detail, report.action].filter(Boolean).join("\n")
-    : report.label + (report.health === "problem" ? " · acc doctor" : "");
-  stdout.write(text + "\n");
+  stdout.write(output(report, options) + "\n");
 }

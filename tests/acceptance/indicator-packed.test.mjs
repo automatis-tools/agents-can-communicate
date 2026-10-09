@@ -3,9 +3,10 @@ import { execFile } from "node:child_process";
 import { readFile, rm } from "node:fs/promises";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
-import { promisify } from "node:util";
+import { promisify, stripVTControlCharacters } from "node:util";
 import test from "node:test";
 import { createPackedAcc } from "../helpers/packed-acc.mjs";
+import { createIndicatorFixture } from "../helpers/indicator-fixture.mjs";
 
 const exec = promisify(execFile);
 test("the installed indicator survives the initial package and its mod preserves native labels", async t => {
@@ -62,4 +63,17 @@ test("the installed indicator survives the initial package and its mod preserves
     { env, cwd: f.project });
   await stable(["install", "--adapter", "claude_code", "--indicator", "off", "--delivery", "off", "--home", f.clientHome]);
   assert.equal(JSON.parse(await readFile(path.join(plugin, "hooks", "hooks.json"), "utf8")).modules, undefined);
+});
+
+test("the installed Antigravity reader emits a colored glyph through a pipe with writes forbidden", async t => {
+  const f = await createPackedAcc(t);
+  const state = await createIndicatorFixture(t, { adapterId: "antigravity", version: "1.3.2" });
+  await state.service.publishDeliveryBinding(state.binding);
+  const { stdout } = await exec(process.execPath,
+    ["--permission", "--allow-fs-read=*", path.join(f.installed, "bin", "acc-indicator.mjs"),
+      "--adapter", "antigravity", "--native-session", "native-session"],
+    { env: { ...f.env, ACC_DATA_HOME: state.dataHome }, cwd: f.project });
+  assert.equal(stripVTControlCharacters(stdout), "ACC ●\n");
+  assert.deepEqual(stdout.split(/\x1b\[[0-9;]*m/g), ["ACC ", "●", "\n"]);
+  assert.match(stdout, /\x1b\[22;1;38;2;44;122;57m●\x1b\[22;39m/);
 });

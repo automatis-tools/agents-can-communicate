@@ -7,6 +7,10 @@ In Claude Code, only the status glyph carries color: green for `●`, warning co
 `!`, and neutral for `…`. The glyph uses the client's theme without dimming. The name
 and `turn`/`inbox` qualifier keep the ordinary footer color. No background is added.
 
+Antigravity's command emits ANSI foreground color around only the glyph, even when
+stdout is a pipe. Existing installed commands need no new arguments. `--json` and
+`--details` keep their plain, uncolored output.
+
 | Display | Meaning |
 |---|---|
 | `ACC ●` | ACC is active. This chat has an automatic delivery binding with no newer recorded failure. A busy client can queue a request. |
