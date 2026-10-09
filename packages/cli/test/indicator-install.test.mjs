@@ -3,7 +3,7 @@ import { execFile } from "node:child_process";
 import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { promisify } from "node:util";
+import { promisify, stripVTControlCharacters } from "node:util";
 import test from "node:test";
 import { parseArgs } from "../src/args.mjs";
 import { installClaudePlugin, uninstallClaudePlugin } from "../../adapter-claude-code/src/install.mjs";
@@ -74,7 +74,8 @@ test("Antigravity preserves and runs an existing status command and restores it 
   const { stdout } = await exec(process.execPath, ["--input-type=module", "-e",
     `import {spawn} from 'node:child_process'; const p=spawn(process.argv[1],{shell:true,env:process.env}); p.stdout.pipe(process.stdout); p.stdin.end('{"session_id":"absent"}');` , installed.command],
   { env: { ...process.env, ACC_DATA_HOME: context.dataHome }, timeout: 5000 });
-  assert.match(stdout, /^user-status:absent\nACC !/);
+  assert.match(stripVTControlCharacters(stdout), /^user-status:absent\nACC !/);
+  assert.match(stdout, /ACC \x1b\[[0-9;]+m!\x1b\[22;39m/);
   await installAntigravity(context);
   assert.equal((await json(file)).statusLine.command, installed.command, "reinstall must not nest wrappers");
   await installAntigravity({ ...context, indicator: "off" });

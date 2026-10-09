@@ -786,3 +786,17 @@ documentation; the renderer was exercised on 1.3.2.
 
 See [the indicator contract](../../docs/STATUS_INDICATOR.md) and
 [artifact evidence](../../docs/release-evidence/unreleased-status-indicator.md).
+
+### Piped indicator color correction — 2026-10-09
+
+User testing on 1.3.2 showed a black `ACC ●`: the command printed an unstyled
+label, while the earlier color correction applied only to the Claude mod.
+Antigravity now declares its own text renderer. It emits ANSI foreground and
+intensity codes around only `●` or `!`, then resets those attributes before any
+qualifier or recovery text. It never sets a background.
+
+Tests run the actual command with piped stdin/stdout, as the client does. They
+verify green for a healthy binding, warning color for a recorded failure, and
+uncolored JSON/details, including a stalled-input timeout. The installed-package
+test runs the colored reader with filesystem writes and child processes forbidden.
+No new arguments or client-side configuration are required for an existing command.

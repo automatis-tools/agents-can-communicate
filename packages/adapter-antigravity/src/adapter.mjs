@@ -10,6 +10,7 @@ import { detectAntigravity, doctorAntigravity, installAntigravity, planAntigravi
 import { bindNativeSession, nativeActivationHint, offerMessage, planNativeActivation,
   probeNativeDelivery, refreshNativeSession } from "./native-delivery.mjs";
 import { PROTOCOL_CONTRACT } from "./relay-endpoint.mjs";
+import { renderAntigravityIndicator } from "./indicator-render.mjs";
 
 // The version this client has been captured on. Nothing earlier was measured,
 // and later releases - this client ships every few days - are judged by this
@@ -63,7 +64,8 @@ export function createAntigravityAdapter() {
   return defineAdapter({
     id: "antigravity",
     displayName: "Antigravity CLI",
-    statusIndicator: { minimumVersion: "1.0.6", reload: "start a new CLI session" },
+    statusIndicator: { minimumVersion: "1.0.6", reload: "start a new CLI session",
+      renderText: renderAntigravityIndicator },
     // What the official installer puts on PATH, and what a version probe has to
     // spawn: `agy --version` answers `1.2.7`. Presence liveness also walks the
     // hook's process ancestry for this basename to learn the client's own pid.
