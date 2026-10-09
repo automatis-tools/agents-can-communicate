@@ -4,12 +4,12 @@ Recorded 2026-10-09 on macOS arm64. This is development work for #284, not a rel
 
 | Artifact | Observation |
 |---|---|
-| Source commit | `2c4ef6747d4ce2e84031298d26020182de06d72d` |
+| Source commit | `40bab3cdf3ec6161f242602514dc029d3af0e91a` |
 | Source state before packing | Clean worktree; all feature and gate files committed |
 | Package | `agents-can-communicate-0.10.4.tgz` |
-| Size | 593,791 bytes |
-| Entries | 359 |
-| SHA-256 | `85bbdacb461325301fc72042ddb286c12a9c1e1aa458c87e97635834b212c166` |
+| Size | 594,253 bytes |
+| Entries | 360 |
+| SHA-256 | `b414db6b393e33e9ebabf28f230f527b44b429bc578e7ec3ccb2abb72ef14fa6` |
 | Node used for verification | 24.4.0 |
 
 The archive was saved separately, then passed to `node scripts/verify-package.mjs`.
@@ -18,20 +18,23 @@ above was captured before packing; it is not inferred from the verifier's curren
 
 ## Checks
 
-- `npm ci` and syntax checks passed. The final syntax run covered 755 modules.
-- Twenty-two focused tests passed for state classification, read-only execution,
+- `npm ci` and syntax checks passed. The final syntax run covered 757 modules.
+- Twenty-five focused tests passed for state classification, read-only execution,
   generation checks, delivery observations, installer ownership, launcher lifetime,
-  and glyph-only theme styling without a background.
-- The packed feature test passed. It installed the npm artifact, enabled the Claude
+  and glyph-only theme styling without a background. The Antigravity checks cover
+  piped output and plain JSON/details, including a stalled-input timeout.
+- Both packed feature tests passed. The first installed the npm artifact, enabled the Claude
   module, removed the initial npm copy, and executed the stable reader. It then loaded
   the installed module through its host API boundary, retained an existing footer label,
   printed one diagnostic for a stable failure, and disabled the module again.
+  The second executed the installed Antigravity reader through a pipe, with writes
+  and child processes forbidden, and observed color around only the healthy dot.
 - Clean artifact verification passed: all binaries were installed; all packed Markdown
   links resolved; no forbidden files were present; non-Git coordination worked; and
   install/uninstall restored the client-home topology, modes, links, and bytes.
-- Four deliberate mutations failed the relevant assertions: treating lease expiry as
-  disconnection, reclaiming a later user edit during uninstall, and attempting a write
-  from the public reader, and dimming the status glyph. The unmutated tests passed
+- Five deliberate mutations failed the relevant assertions: treating lease expiry as
+  disconnection, reclaiming a later user edit during uninstall, attempting a write
+  from the public reader, dimming the status glyph, and removing the Antigravity renderer registration. The unmutated tests passed
   again after restoration.
 - Review reproductions failed before their fixes: an update losing the reader executable,
   a recorded send failure staying green, and failed verification of an expired endpoint
@@ -58,6 +61,14 @@ for the dot. No ACC element sets a background color.
 Antigravity CLI 1.3.2 invoked the configured command and displayed `ACC ! · acc doctor`
 below its project-trust screen. The client required a loopback listener; external networking
 remained blocked. The temporary status-line setting was restored after the observation.
+
+After local installation of the candidate above, a second offline capture used the
+unchanged installed Antigravity command and an isolated empty data home. The native
+TUI emitted RGB `150,108,30` and bold only for `!`; `ACC` and the diagnostic suffix
+retained the default foreground. No background was set. The test PTY had its inherited
+`NO_COLOR=1` unset for this color observation. The packed-reader check separately
+verified RGB `44,122,57` on a healthy dot. This fixes the user-observed black dot:
+Antigravity had previously received a label with no ANSI foreground sequence.
 
 Limits: authentication, a subsequent model turn, and end-to-end native registration were
 not exercised in these offline UI captures. The sandbox refused Node process probes. No new
