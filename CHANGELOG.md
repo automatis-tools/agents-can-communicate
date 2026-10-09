@@ -1,5 +1,29 @@
 # Changelog
 
+## Unreleased — per-session ACC indicator
+
+- Optional Claude Code and Antigravity CLI indicators show incoming reception as
+  `ACC ●`, `ACC ● · turn`, or `ACC ● · inbox`. Known failures retain `!` and the
+  available fallback, with an explanation and recovery step (#284).
+- The indicator reads local state without ACC writes or client socket probes.
+  Idle sessions remain active when a delivery lease expires. A failed send or
+  endpoint verification is a separate observation.
+- `acc install --indicator on|off` preserves the user's status-line configuration
+  and the saved preference across updates. The managed reader follows the active
+  generation without taking a runtime lease.
+
+| Candidate artifact | Value |
+|---|---|
+| Built from | `f452d255b50548bdd956e6df0c6d2a3544633ece` |
+| Tarball | `agents-can-communicate-0.10.4.tgz`, 593,423 bytes, 359 files |
+| sha256 | `8401215772d8ce5d70d69d979934750e8e40b23159eb4fc412fb5e967d954d47` |
+
+The exact archive passed clean installation verification. The feature's packed
+integration check exercised the installed module and stable reader after removal
+of the original package. See [verification and limits](docs/release-evidence/unreleased-status-indicator.md).
+This is an unpublished development candidate. Existing release records retain
+their original source and artifact facts.
+
 ## 0.10.4 — release candidate
 
 - Codex sender permission failures remain `transport_permission_denied` instead
