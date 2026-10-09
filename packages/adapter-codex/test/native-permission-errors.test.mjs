@@ -10,7 +10,7 @@ import { posixTransportTest as test } from "../../../tests/helpers/platform-scop
 // test never exercised. Root bypasses chmod, so that host cannot prove this case.
 for (const denied of ["socket metadata", "endpoint record"]) {
   test(`denied ${denied} remains a sender permission failure for offer and refresh`,
-    { skip: process.getuid?.() === 0 && "root bypasses filesystem permissions" }, async t => {
+    { skip: process.getuid?.() === 0 ? "root bypasses filesystem permissions" : undefined }, async t => {
       const h = await nativeFixture(t);
       const bound = await bindNativeSession(h);
       const binding = { opaqueEndpointRef: bound.opaqueEndpointRef, clientVersion: bound.clientVersion };
