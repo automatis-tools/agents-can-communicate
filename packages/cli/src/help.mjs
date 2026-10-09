@@ -72,7 +72,7 @@ const CHOICES = Object.freeze({
   finish: { status: HANDOFF_STATUSES },
   message: { type: GENERIC_MESSAGE_KINDS, obligation: OBLIGATIONS },
   sync: { scope: ["delta", "full", "history"], type: MESSAGE_KINDS },
-  install: { delivery: LIVE_POLICIES, adapter: ADAPTER_IDS },
+  install: { delivery: LIVE_POLICIES, adapter: ADAPTER_IDS, indicator: ["on", "off"] },
   uninstall: { adapter: ADAPTER_IDS },
 });
 
@@ -80,6 +80,7 @@ const NOTES = Object.freeze({
   doctor: ["--repair completes recoverable writes without changing the store contract.",
     "--migrate-store explicitly changes contract 6 to 7 after old clients and unmanaged store users stop; it cannot be combined with --repair."],
   install: ["Without --delivery, one default-No question covers all selected clients that need a decision.",
+    "--indicator on|off controls the compact indicator in supported clients; omission preserves the saved choice (initially off).",
     "--delivery actionable|all gives explicit complete-setup consent; --delivery off disables incoming automatic requests.",
     "A dry run does not prompt, write configuration, or start a service. Service readiness does not establish a session binding."],
   attach: ["Native hooks already manage their own session. Attach only for a manual CLI session.",

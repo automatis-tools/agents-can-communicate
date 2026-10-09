@@ -11,7 +11,7 @@ export { NATIVE_ACTIVATION_KINDS, NATIVE_BINDING_MODES, NATIVE_REASON_CODES,
   from "./native-delivery.mjs";
 export { EVENT_KINDS, NORMALIZED_EVENT_KEYS, normalizedEvent } from "./events.mjs";
 export { assertRunner, bakeSkillCommand, defaultAntigravityRelay, defaultCli, isShellWord,
-  defaultRunner, removeInstalledTree, runnerExists, shellQuote, writeCliShim, writeHookShim, writeNodeShim }
+  defaultRunner, defaultIndicator, removeInstalledTree, runnerExists, shellQuote, writeCliShim, writeHookShim, writeNodeShim }
   from "./hook-shim.mjs";
 export { BEGIN, END, removeTomlBlock, renderBlock, stripBlock, tomlString, writeTomlBlock }
   from "./toml-block.mjs";
@@ -28,6 +28,7 @@ export { clearSessionBinding, listSessionBindings, loadSessionBinding,
   from "./session-binding.mjs";
 
 export { clearNativeAttempt, loadNativeAttempt, storeNativeAttempt } from "./native-attempt.mjs";
+export { OFFER_ERRORS, loadOfferObservation, storeOfferObservation } from "./offer-observation.mjs";
 export { channelSocketDirectory } from "./channel-directory.mjs";
 export { processIsZombie, readProcessArgs, readProcessTable, readWindowsProcess, splitWindowsCommandLine }
   from "./process-table.mjs";

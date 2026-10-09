@@ -25,3 +25,16 @@ export async function readSessionRecord({ root, workspaceId, sessionId, allowLeg
   if (ephemeral === null || await ephemeralIsDeleted(paths, root, "session", sessionId)) return null;
   return validateRecord("session", ephemeral.value);
 }
+
+/** Read the one session's transport metadata without recovery, locks or renewal. */
+export async function readDeliveryBindingRecord({ root, workspaceId, sessionId }) {
+  assertPortableId(sessionId, "session id");
+  const paths = storePaths(root);
+  await requireStoreIdentity(paths, { workspaceId, create: false });
+  const value = await readJsonIfPresent(
+    path.join(paths.ephemeral, "deliveryBinding", `${sessionId}.json`), root);
+  if (value === null || await ephemeralIsDeleted(paths, root, "deliveryBinding", sessionId)) return null;
+  const binding = validateRecord("deliveryBinding", value.value);
+  if (binding.sessionId !== sessionId) throw new Error("delivery binding does not match its path");
+  return binding;
+}

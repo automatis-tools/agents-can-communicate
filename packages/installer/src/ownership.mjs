@@ -121,7 +121,7 @@ async function saveOwnership({ dataHome, record }) {
  */
 export async function recordInstall({ dataHome, adapterId, version, accVersion = null,
   artifacts, createdDirectories = [], deliveryPolicy, deliveryDecision,
-  nativeActivation = null }) {
+  nativeActivation = null, indicator }) {
   const stamped = await Promise.all(artifacts.map(async artifact => ({
     path: artifact.path,
     kind: artifact.kind ?? "file",
@@ -141,6 +141,7 @@ export async function recordInstall({ dataHome, adapterId, version, accVersion =
       { adapterId, version, accVersion, artifacts: stamped,
         ...(directories.length === 0 ? {} : { createdDirectories: directories }),
         ...(deliveryPolicy === undefined ? {} : { deliveryPolicy }),
+        ...(indicator === undefined ? {} : { indicator }),
         ...(retainedDeliveryDecision === undefined ? {} : {
           deliveryDecision: retainedDeliveryDecision,
         }),

@@ -7,7 +7,7 @@ import path from "node:path";
 import { AccError, EXIT } from "@agents-can-communicate/protocol";
 import { fileURLToPath } from "node:url";
 
-import { acccreatedFile, bakeSkillCommand, blankJson,
+import { acccreatedFile, bakeSkillCommand, blankJson, defaultIndicator, compareVersionOrder, versionOrder,
   mergeOwnedEntries, ownedEntries,
   keepVersions, ownVersion, stampPluginVersion,
   removeIfEmpty,
@@ -181,7 +181,7 @@ async function execFormHooks(file, node) {
 }
 
 /** A plugin tree with the shim written and the skill's command baked in. */
-async function layOutPlugin(target, { runner, node, cli, hostPlatform }) {
+async function layOutPlugin(target, { runner, node, cli, hostPlatform, indicator, indicatorRunner, clientVersion }) {
   await rm(target, { recursive: true, force: true });
   await cp(bundle, target, { recursive: true });
   // The skill ships with a placeholder where the command belongs: `acc` is not
@@ -194,6 +194,15 @@ async function layOutPlugin(target, { runner, node, cli, hostPlatform }) {
   await writeHookShim({ dir: path.join(target, "hooks"), adapterId: "claude_code",
     runner, node, platform: hostPlatform });
   if (hostPlatform === "win32") await execFormHooks(path.join(target, "hooks", "hooks.json"), node);
+  if (indicator === "on" && compareVersionOrder(versionOrder(clientVersion), versionOrder("2.1.287")) >= 0) {
+    const hooksFile = path.join(target, "hooks", "hooks.json");
+    const hooks = await readJson(hooksFile, {});
+    await writeJson(hooksFile, { ...hooks, modules: ["./indicator.mjs"] });
+    const moduleFile = path.join(target, "hooks", "indicator.mjs");
+    const source = await readFile(moduleFile, "utf8");
+    await writeFile(moduleFile, source.replace("__ACC_NODE__", JSON.stringify(node))
+      .replace("__ACC_INDICATOR__", JSON.stringify(indicatorRunner ?? defaultIndicator())));
+  } else await rm(path.join(target, "hooks", "indicator.mjs"), { force: true });
   // The copy the client reads says which ACC wrote it. The shipped manifest
   // carries no version, so there is nothing in the repository to fall out of
   // step - which is how every client came to report 0.1.6 while running 0.1.9.
@@ -202,7 +211,8 @@ async function layOutPlugin(target, { runner, node, cli, hostPlatform }) {
 }
 
 export async function installClaudePlugin({ configDir, runner, cli, keepPreviousVersion = null,
-  node = process.execPath, now = new Date(), hostPlatform = process.platform }) {
+  node = process.execPath, now = new Date(), hostPlatform = process.platform,
+  indicator = "off", indicatorRunner, clientVersion }) {
   // Everything this will merge into, read before a byte is written. A settings
   // file that will not parse used to be discovered after the plugin tree was
   // already on disk, and the install then failed with nineteen files left
@@ -219,12 +229,13 @@ export async function installClaudePlugin({ configDir, runner, cli, keepPrevious
   const source = sourceDir(configDir);
   const cached = cachePath(configDir, version);
 
-  await layOutPlugin(source, { runner, node, cli, hostPlatform });
+  const layout = { runner, node, cli, hostPlatform, indicator, indicatorRunner, clientVersion };
+  await layOutPlugin(source, layout);
   await writeJson(marketplaceFile(configDir), marketplaceManifest());
   // The copy the client runs from. Written here rather than asking the user to
   // run `claude plugin install`, exactly as the Codex adapter does, because the
   // command's only effect is this copy plus the two registry entries below.
-  await layOutPlugin(cached, { runner, node, cli, hostPlatform });
+  await layOutPlugin(cached, layout);
   // The copy just written, plus the one an upgrade moved off. A client caches a
   // plugin under its version, so every upgrade would otherwise leave the previous
   // release's tree beside this one - invisible while the version never moved,

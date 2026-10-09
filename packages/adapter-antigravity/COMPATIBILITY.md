@@ -769,3 +769,20 @@ What ACC does with this: `client-process.mjs` names the desktop server as the cl
 writes the grant. Installing the integration still needs `agy`, whose `/hooks` read-back is
 the only proof a registration loaded. Linux and Windows desktop builds are uncaptured; the
 bind needs `lsof`, so a machine without it refuses by its own handshake.
+
+## Status indicator surface — 2026-10-09
+
+Antigravity CLI 1.3.2 on macOS arm64 invoked the configured indicator command and displayed
+`ACC ! · acc doctor` below its project-trust screen. External networking was denied;
+loopback was allowed for the client's required listener. Authentication and subsequent
+model turns were not exercised. The temporary user status-line configuration was restored
+immediately after the capture. This is UI evidence, not a new live-delivery certification.
+
+The installer composes an existing status command, preserving its stdin payload. Automated
+execution checks prove composition, repeated install, restoration, and retention of later
+user edits. Windows uses the existing Node-shim and short-path command strategy. This
+change has no new native Windows UI capture. The 1.0.6 floor for stacking comes from vendor
+documentation; the renderer was exercised on 1.3.2.
+
+See [the indicator contract](../../docs/STATUS_INDICATOR.md) and
+[artifact evidence](../../docs/release-evidence/unreleased-status-indicator.md).

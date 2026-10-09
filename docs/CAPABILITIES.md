@@ -28,6 +28,9 @@ Run `acc doctor` in the project when observed behavior differs from this page. I
 the installed client version, platform, effective capability, and fallback instead of
 assuming that a newer or differently packaged client behaves like a captured one.
 
+The optional [ACC indicator](STATUS_INDICATOR.md) shows this chat's reception mode and
+known failures in supported client footers. It reads local state; it is not a transport probe.
+
 ## Certified support
 
 Each column names the version that recorded the capture, on `darwin-arm64`. Every later

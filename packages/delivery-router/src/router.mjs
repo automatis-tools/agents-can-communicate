@@ -1,12 +1,10 @@
-import { NATIVE_REASON_CODES, evaluateVersionContract, isLaunchOption }
+import { NATIVE_REASON_CODES, evaluateVersionContract, isLaunchOption, OFFER_ERRORS, storeOfferObservation }
   from "@agents-can-communicate/adapter-sdk";
 
 import { lastNativeReason } from "./native-reason.mjs";
 import { refreshExpiredBinding } from "./refresh-binding.mjs";
 
-const SAFE_ERRORS = new Set(["ambiguous_recipient_sessions", "delivery_disabled",
-  "recipient_busy", "recipient_unavailable", "transport_error", "transport_rejected", "transport_permission_denied",
-  "unsupported_client_version"]);
+const SAFE_ERRORS = new Set(OFFER_ERRORS);
 const NAMED_LIVE_TRANSPORTS = new Set(["claude-inbox", "codex-app-server"]);
 
 const adaptersById = adapters => adapters instanceof Map
@@ -50,6 +48,10 @@ function safeTransport(value, opaqueEndpointRef) {
 export function createDeliveryRouter({ service, adapters, clock, readLivePolicy,
   readNativeReason = input => lastNativeReason({ runtimeDir: service.store?.root, ...input }) }) {
   const registry = adaptersById(adapters);
+  const observeOffer = (binding, reasonCode = null) => storeOfferObservation({
+    runtimeDir: service.store?.root, workspaceId: service.store?.workspaceId,
+    sessionId: binding.sessionId, generation: binding.generation, at: clock.now(),
+    state: reasonCode === null ? "active" : "degraded", reasonCode });
 
   // A session that bound no live transport may have said why: the reason its
   // own last native attempt recorded, from the closed vocabulary only, and the
@@ -82,6 +84,7 @@ export function createDeliveryRouter({ service, adapters, clock, readLivePolicy,
       targetGeneration: binding.generation,
       transport: safeTransport(transport, binding.opaqueEndpointRef), adapterId: binding.adapterId,
       clientVersion: binding.clientVersion, safeErrorCode }).catch(() => null);
+    await observeOffer(binding, safeErrorCode);
   }
 
   async function offerTo(message, participantId, now) {
@@ -135,7 +138,7 @@ export function createDeliveryRouter({ service, adapters, clock, readLivePolicy,
       if (!refreshed.refreshed) {
         if (refreshed.errorCode === "transport_permission_denied") {
           await recordFailure(binding, message, participantId, "live-adapter", refreshed.errorCode);
-        }
+        } else await observeOffer(binding, refreshed.errorCode);
         return durable(participantId, refreshed.errorCode);
       }
       const current = (await service.listDeliveryBindings({
@@ -216,6 +219,7 @@ export function createDeliveryRouter({ service, adapters, clock, readLivePolicy,
     // shown and leave it out of the very turn the wake started. The receipt
     // stays queued; the hook records the offer once its stdout carried the body.
     if (adapter.nativeDelivery?.offerKind === "wake") {
+      await observeOffer(binding, response.pendingApproval === true ? "inbound_approval_required" : null);
       // The client took the wake but holds it for its user's approval.
       return { recipientParticipantId: participantId, outcome: "woken", transport,
         ...(response.pendingApproval === true ? { pendingApproval: true } : {}) };
@@ -229,6 +233,7 @@ export function createDeliveryRouter({ service, adapters, clock, readLivePolicy,
       await recordFailure(binding, message, participantId, transport, "transport_error");
       return durable(participantId, "transport_error");
     }
+    await observeOffer(binding);
     return { recipientParticipantId: participantId, outcome: "offered", transport };
   }
 
