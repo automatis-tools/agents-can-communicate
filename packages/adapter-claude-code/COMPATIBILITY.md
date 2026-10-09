@@ -1099,3 +1099,16 @@ The 2.1.287 installation floor comes from the vendor's documented mods availabil
 earlier builds were not exercised in this capture. Client policy may disable user mods.
 See [the indicator contract](../../docs/STATUS_INDICATOR.md) and
 [artifact evidence](../../docs/release-evidence/unreleased-status-indicator.md).
+
+### Contrast correction — 2026-10-09
+
+A user screenshot showed that adding the whole label to `SessionMode.modes` made
+the successful dot gray. The renderer now retains the native footer reference and
+draws its own Text nodes. Only the status glyph uses the `success` or `warning`
+theme color, with `bold: true` and `dimColor: false`; no node adds a background.
+
+An isolated Claude Code 2.1.295 TUI emitted RGB `102,102,102` for `ACC` and RGB
+`44,122,57` with bold styling for `●` in the light theme. The existing custom
+status-line output remained present. This capture used an offline visual fixture,
+not another user's terminal window. The installed-module tests also verify the
+normal and failure colors, the neutral startup glyph, and unchanged native props.

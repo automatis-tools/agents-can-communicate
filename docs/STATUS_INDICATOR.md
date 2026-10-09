@@ -3,6 +3,10 @@
 The indicator describes incoming messages for the current chat. It does not describe
 other chats, confirm that a message was read, or promise when an agent will answer.
 
+In Claude Code, only the status glyph carries color: green for `●`, warning color for
+`!`, and neutral for `…`. The glyph uses the client's theme without dimming. The name
+and `turn`/`inbox` qualifier keep the ordinary footer color. No background is added.
+
 | Display | Meaning |
 |---|---|
 | `ACC ●` | ACC is active. This chat has an automatic delivery binding with no newer recorded failure. A busy client can queue a request. |

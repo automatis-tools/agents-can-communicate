@@ -36,12 +36,21 @@ test("the installed indicator survives the initial package and its mod preserves
     clock: { now: async () => now, every: (_ms, fn) => { tick = fn; } },
     command: { register: async () => {} },
     process: { run: async ([command, ...args]) => exec(command, args, { env, cwd: f.project }) },
-    ui: { log: async line => logs.push(line), invalidate: () => {} } };
+    ui: { log: async line => logs.push(line), invalidate: () => {}, resolve: () => ({
+      Box: props => ({ type: "Box", ...props }), Text: props => ({ type: "Text", ...props }),
+    }) } };
   await handlers.get("session.start")($, {}, async e => e);
   now += 6000;
   await tick();
-  const rendered = await handlers.get("ui.render")($, { props: { modes: ["existing-mode"] } }, async e => e);
-  assert.deepEqual(rendered.props.modes, ["existing-mode", "ACC !"]);
+  const event = { props: { modes: ["existing-mode"] } };
+  const native = { type: "engine", ref: "existing-mode" };
+  const rendered = await handlers.get("ui.render")($, event, async passed => {
+    assert.deepEqual(passed, event);
+    return native;
+  });
+  assert.deepEqual(rendered.children[0], native);
+  assert.equal(rendered.children.filter(node => node.type === "Text")
+    .map(node => node.children.join("")).join(""), " ACC !");
   assert.equal(logs.length, 1);
   assert.match(logs[0], /acc doctor/);
   now += 6000;
