@@ -51,6 +51,16 @@ export function register(on) {
     return { text: [report.label, report.detail, report.action].filter(Boolean).join("\n") };
   });
   on("ui.render", { component: "SessionMode" }, async ($, e, next) => {
-    return next({ ...e, props: { ...e.props, modes: [...e.props.modes, report.label] } });
+    const { Box, Text } = $.ui.resolve(e);
+    const symbol = report.health === "ready" ? "●" : report.health === "problem" ? "!" : "…";
+    const color = report.health === "ready" ? "success" : report.health === "problem" ? "warning" : "inactive";
+    const qualifier = ["turn", "inbox"].includes(report.reception) ? ` · ${report.reception}` : "";
+    // Native mode strings are all dimmed. Keep their rendering intact and put
+    // only ACC's glyph in its own non-dim Text, using the light/dark theme colors.
+    return Box({ flexDirection: "row", children: [await next(e),
+      Text({ color: "inactive", children: [" ACC "] }),
+      Text({ color, bold: true, dimColor: false, children: [symbol] }),
+      ...(qualifier ? [Text({ color: "inactive", children: [qualifier] })] : []),
+    ] });
   });
 }
