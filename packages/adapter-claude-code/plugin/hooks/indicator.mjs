@@ -53,10 +53,11 @@ export function register(on) {
   on("ui.render", { component: "SessionMode" }, async ($, e, next) => {
     const { Box, Text } = $.ui.resolve(e);
     const symbol = report.health === "ready" ? "●" : report.health === "problem" ? "!" : "…";
-    const color = report.health === "ready" ? "success" : report.health === "problem" ? "warning" : "inactive";
+    const color = report.health === "ready" ? "#2c7a39" : report.health === "problem" ? "warning" : "inactive";
     const qualifier = ["turn", "inbox"].includes(report.reception) ? ` · ${report.reception}` : "";
     // Native mode strings are all dimmed. Keep their rendering intact and put
-    // only ACC's glyph in its own non-dim Text, using the light/dark theme colors.
+    // only ACC's glyph in its own non-dim Text. Match Antigravity's ready green
+    // exactly instead of allowing Claude's success theme color to desaturate it.
     return Box({ flexDirection: "row", children: [await next(e),
       Text({ color: "inactive", children: [" ACC "] }),
       Text({ color, bold: true, dimColor: false, children: [symbol] }),
