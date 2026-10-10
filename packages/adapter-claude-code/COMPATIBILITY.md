@@ -1112,3 +1112,16 @@ An isolated Claude Code 2.1.295 TUI emitted RGB `102,102,102` for `ACC` and RGB
 status-line output remained present. This capture used an offline visual fixture,
 not another user's terminal window. The installed-module tests also verify the
 normal and failure colors, the neutral startup glyph, and unchanged native props.
+
+### Match Antigravity green — 2026-10-10
+
+User testing found Claude's theme-dependent `success` green paler than the
+Antigravity dot. The ready glyph now uses the same fixed RGB `44,122,57`
+(`#2c7a39`) as Antigravity. It retains bold, non-dim styling; text and backgrounds
+are unchanged. The warning and startup glyphs retain their theme colors.
+The installed-module assertions fail when the ready glyph uses `success` again.
+
+An isolated offline Claude Code 2.1.296 TUI loaded the installed module with a
+healthy-state fixture reader and emitted `38;2;44;122;57` plus bold for `●`.
+This proves the raw color reaches the terminal. It does not certify registration
+or delivery; no model turn ran.

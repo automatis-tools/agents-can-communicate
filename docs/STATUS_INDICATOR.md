@@ -4,7 +4,8 @@ The indicator describes incoming messages for the current chat. It does not desc
 other chats, confirm that a message was read, or promise when an agent will answer.
 
 In Claude Code, only the status glyph carries color: green for `●`, warning color for
-`!`, and neutral for `…`. The glyph uses the client's theme without dimming. The name
+`!`, and neutral for `…`. Both clients use the same fixed green (`#2c7a39`) for
+`●`, without dimming. Claude uses its theme for the other states. The name
 and `turn`/`inbox` qualifier keep the ordinary footer color. No background is added.
 
 Antigravity's command emits ANSI foreground color around only the glyph, even when

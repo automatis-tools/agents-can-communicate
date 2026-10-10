@@ -7,11 +7,11 @@ import test from "node:test";
 import { installClaudePlugin } from "../src/install.mjs";
 
 for (const [health, reception, symbol, color] of [
-  ["ready", "automatic", "●", "success"],
-  ["ready", "turn", "●", "success"],
+  ["ready", "automatic", "●", "#2c7a39"],
+  ["ready", "turn", "●", "#2c7a39"],
   ["problem", "turn", "!", "warning"],
   ["starting", null, "…", "inactive"],
-]) test(`${health}/${reception}: only the status glyph gets a non-dim theme color, without a background`, async t => {
+]) test(`${health}/${reception}: only the status glyph gets its non-dim color, without a background`, async t => {
   const root = await mkdtemp(path.join(tmpdir(), "acc-dot-render-"));
   t.after(() => rm(root, { recursive: true, force: true }));
   await installClaudePlugin({ configDir: root, clientVersion: "2.1.295", indicator: "on" });
