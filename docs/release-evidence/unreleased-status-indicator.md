@@ -234,3 +234,26 @@ original payload in the composed line. Separate tests retain real Node command a
 shell-pipeline coverage. No product timeout changed. All 20 focused tests passed
 locally and on both platforms with file concurrency three in
 [run 38167473317](https://github.com/automatis-tools/agents-can-communicate/actions/runs/38167473317).
+
+
+## CI guard follow-up — 2026-10-11
+
+The full run on `ce68230f` passed Linux and macOS. Windows still exceeded Kimi's
+composition-fixture deadline under load, even with the fast stdin copier. The
+composition driver now uses a controlled clock to test exact data flow separately
+from deadline behavior. The real process and outer-deadline regressions remain.
+A mutation that replaced the previous command's stdin failed both composition tests.
+No runtime clock, deadline or indicator behavior changed.
+
+That Windows run also failed the migration test tool's replacement-root guard.
+The helper used Number-valued filesystem IDs, which can round distinct 64-bit IDs
+to the same value. It now requests BigInt stats. A deterministic filesystem-boundary
+regression models IDs `9007199254740992n` and `9007199254740993n`, while retaining real
+directory replacement, removal and preserved-byte assertions. It failed before the
+fix and when BigInt was deliberately removed, then passed after restoration. The
+original failing CI run did not capture its IDs, so its exact collision is inferred.
+
+All 26 focused footer and migration checks passed with concurrency three on Windows
+and macOS in [run 38169135451](https://github.com/automatis-tools/agents-can-communicate/actions/runs/38169135451).
+The migration helper and tests are excluded from the npm artifact. Its source commit
+and SHA-256 above remain unchanged.

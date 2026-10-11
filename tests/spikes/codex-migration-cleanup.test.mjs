@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
 import { lstat, mkdir, mkdtemp, readFile, realpath, rename, rm, rmdir, symlink, writeFile }
   from "node:fs/promises";
+import fs from "node:fs/promises";
+import { syncBuiltinESMExports } from "node:module";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -66,6 +68,37 @@ test("migration cleanup refuses a replacement root and preserves its bytes", asy
   await symlink(retained, root);
   await assert.rejects(cleanup, /identity changed/);
   assert.ok((await lstat(retained)).isDirectory());
+});
+
+test("migration cleanup distinguishes file IDs that round to the same Number", async t => {
+  const root = await fixture(t);
+  const retained = `${root}-retained`;
+  t.after(() => rm(retained, { recursive: true, force: true }));
+  const original = fs.lstat;
+  let replaced = false;
+  // Model the Windows 64-bit file-ID boundary while keeping directories,
+  // replacement and removal real. Local filesystems may use smaller IDs.
+  const stub = t.mock.method(fs, "lstat", async (target, options) => {
+    const stat = await original(target, options);
+    if (target === root) {
+      const fileId = replaced ? 9007199254740993n : 9007199254740992n;
+      stat.ino = options?.bigint ? fileId : Number(fileId);
+    }
+    return stat;
+  });
+  syncBuiltinESMExports();
+  try {
+    const cleanup = await ownMigrationCleanup(root, []);
+    await rename(root, retained);
+    await mkdir(root);
+    await writeFile(path.join(root, "unowned"), "preserve large-ID replacement");
+    replaced = true;
+    await assert.rejects(cleanup, /identity changed/);
+    assert.equal(await readFile(path.join(root, "unowned"), "utf8"), "preserve large-ID replacement");
+  } finally {
+    stub.mock.restore();
+    syncBuiltinESMExports();
+  }
 });
 
 test("migration cleanup does not suppress unrelated removal errors or claim retained roots removed", async t => {

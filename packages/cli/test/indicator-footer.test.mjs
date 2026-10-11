@@ -3,11 +3,19 @@ import {execFile} from 'node:child_process';
 import {writeFile} from 'node:fs/promises';
 import path from 'node:path';
 import {promisify,stripVTControlCharacters} from 'node:util';
+import {pathToFileURL} from 'node:url';
 import test from 'node:test';
 import {createIndicatorFixture} from '../../../tests/helpers/indicator-fixture.mjs';
 const exec=promisify(execFile);
-async function run(f,adapter,payload,args=[]) {
- const p=exec(process.execPath,[path.resolve('bin/acc-indicator.mjs'),'--adapter',adapter,...args],
+async function run(f,adapter,payload,args=[],controlledClock=false) {
+ let entry=path.resolve('bin/acc-indicator.mjs');
+ if(controlledClock) {
+  entry=path.join(f.root,'composition-driver.mjs');
+  await writeFile(entry,`import {mock} from 'node:test';
+   import {runIndicator} from ${JSON.stringify(pathToFileURL(path.resolve('packages/cli/src/indicator-command.mjs')).href)};
+   mock.timers.enable({apis:['setTimeout']}); await runIndicator();`);
+ }
+ const p=exec(process.execPath,[entry,'--adapter',adapter,...args],
   {env:{...process.env,ACC_DATA_HOME:f.dataHome},timeout:4000});
  p.child.stdin.end(JSON.stringify(payload));return (await p).stdout;
 }
@@ -27,11 +35,11 @@ for(const [adapter,version,id] of [['kimi','2.1.1','sessionId'],['grok','1.0.46'
  test(`${adapter}: existing custom command receives identical stdin and stays on the first line`,async t=>{
   const f=await createIndicatorFixture(t,{adapterId:adapter,version});
   const marker=path.join(f.root,'marker.json');
-  // Composition must not benchmark a second Node startup inside Kimi's 80 ms
-  // command budget. Node stdin and shell pipelines have separate regressions.
+  // Check composition independently of runner scheduling. Separate deadline
+  // tests advance time and assert real process cleanup and diagnostic output.
   await writeFile(marker,JSON.stringify({previous:{command:process.platform==='win32'?'more':'cat'}}));
   const payload={[id]:'native-session'};
-  const out=stripVTControlCharacters(await run(f,adapter,payload,['--previous',marker]));
+  const out=stripVTControlCharacters(await run(f,adapter,payload,['--previous',marker],true));
   assert.equal(out,`ACC ● · ${adapter==='kimi'?'turn':'inbox'} │ ${JSON.stringify(payload)}\n`);
  });
 }

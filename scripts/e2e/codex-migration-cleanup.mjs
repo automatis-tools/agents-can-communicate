@@ -13,12 +13,13 @@ export async function ownMigrationCleanup(root, ownedPids, {
 } = {}) {
   assert.match(path.basename(root), /^acc-legacy-migration-[A-Za-z0-9]+$/);
   assert.equal(await realpath(root), root, "migration root must be canonical");
-  const identity = await lstat(root);
+  // Windows file IDs are 64-bit; Number stats can merge distinct identities.
+  const identity = await lstat(root, { bigint: true });
   assert.ok(identity.isDirectory() && !identity.isSymbolicLink());
   return async () => {
     for (const pid of ownedPids) assert.equal(alive(pid), false, "owned migration daemon is still alive");
     for (let attempt = 0; attempt < attempts; attempt++) {
-      const current = await lstat(root).catch(error => {
+      const current = await lstat(root, { bigint: true }).catch(error => {
         if (error.code === "ENOENT") return null;
         throw error;
       });
@@ -30,7 +31,7 @@ export async function ownMigrationCleanup(root, ownedPids, {
       catch (error) {
         if (error.code !== "ENOTEMPTY" || attempt + 1 === attempts) throw error;
       }
-      const remains = await lstat(root).catch(error => {
+      const remains = await lstat(root, { bigint: true }).catch(error => {
         if (error.code === "ENOENT") return null;
         throw error;
       });
