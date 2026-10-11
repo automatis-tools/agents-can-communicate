@@ -30,6 +30,8 @@ An idle chat does not lose its indicator because its heartbeat or delivery lease
 The sender verifies and renews an expired lease when it next attempts delivery. The badge
 uses local observations. It does not test the endpoint on each refresh. Lease validity is
 available in JSON as `leaseCurrent`, separately from reception and health.
+Offer diagnostics are published separately from delivery. A slow diagnostic write
+does not hold up offers to the next participant or change delivery receipts.
 
 ## Enable or disable
 
@@ -64,6 +66,8 @@ adds `acc doctor` to the compact line. Run that command in the project for diagn
 The Antigravity wrapper runs an existing enabled command with a 700 ms limit and a 64 KiB
 output limit. A disabled old command stays disabled. Disabling ACC restores only the
 fields ACC changed and still owns. A user replacement command takes precedence.
+Removing or replacing Antigravity's ACC command also survives repeated updates.
+To add ACC again after that edit, disable the indicator and then enable it.
 
 On POSIX, timeout, output overflow and indicator cancellation stop the previous
 command's owned process group. Windows uses a detached Node launcher because a

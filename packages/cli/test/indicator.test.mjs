@@ -3,11 +3,23 @@ import { readdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
+import { setTimeout } from "node:timers/promises";
 import test from "node:test";
 import { createIndicatorFixture as fixture } from "../../../tests/helpers/indicator-fixture.mjs";
 import { storeSessionBinding } from "@agents-can-communicate/adapter-sdk";
 import { createDeliveryRouter } from "@agents-can-communicate/delivery-router";
 import { createClaudeCodeAdapter } from "@agents-can-communicate/adapter-claude-code";
+
+async function waitForLabel(f, expected) {
+  const deadline = Date.now() + 5000;
+  let actual;
+  do {
+    actual = (await f.read()).label;
+    if (actual === expected) return;
+    await setTimeout(10);
+  } while (Date.now() < deadline);
+  assert.equal(actual, expected, "the asynchronously published offer observation did not appear");
+}
 
 
 async function snapshot(root) {
@@ -116,10 +128,10 @@ test("an actual recorded offer failure changes the badge until a later successfu
     return router.offer(message);
   };
   assert.equal((await send("denied"))[0].errorCode, "transport_permission_denied");
-  assert.equal((await f.read()).label, "ACC ! · turn");
+  await waitForLabel(f, "ACC ! · turn");
   accepted = true;
   assert.equal((await send("accepted"))[0].outcome, "woken");
-  assert.equal((await f.read()).label, "ACC ●");
+  await waitForLabel(f, "ACC ●");
 });
 
 test("the public indicator command works when all filesystem writes and child processes are forbidden", async t => {
@@ -150,5 +162,5 @@ test("a failed verification of an expired endpoint becomes a known failure", asy
     clientMessageId: "refresh-failure", toParticipantIds: ["tester"], kind: "question", obligation: "reply",
     subject: "test", body: "test", artifacts: [], inReplyTo: null });
   assert.equal((await router.offer(message))[0].errorCode, "recipient_unavailable");
-  assert.equal((await f.read()).label, "ACC ! · turn");
+  await waitForLabel(f, "ACC ! · turn");
 });
