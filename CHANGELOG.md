@@ -2,14 +2,17 @@
 
 ## Unreleased — per-session ACC indicator
 
-- Optional Claude Code and Antigravity CLI indicators show incoming reception as
+- Optional Claude Code, Antigravity CLI, Kimi Code and Grok indicators show incoming reception as
   `ACC ●`, `ACC ● · turn`, or `ACC ● · inbox`. Known failures retain `!` and the
   available fallback, with an explanation and recovery step (#284).
-- Both clients use the same fixed green for the healthy dot. In Claude Code the
+- All supported clients use the same fixed green for the healthy dot. In Claude Code the
   glyph is bold and non-dim; the name and qualifier retain the ordinary footer
   color, with no background.
 - Antigravity colors only the glyph even when the status command runs through a
   pipe. Existing installed commands use the correction without new arguments.
+- Kimi and Grok compose an existing status command or available native footer
+  fields. Kimi's snapshot cannot retain goal/task badges and thinking effort; its
+  native context line remains. TOML ownership preserves later user edits.
 - The indicator reads local state without ACC writes or client socket probes.
   Idle sessions remain active when a delivery lease expires. A failed send or
   endpoint verification is a separate observation.
@@ -19,9 +22,9 @@
 
 | Candidate artifact | Value |
 |---|---|
-| Built from | `2d5bd55b025f937a60ba172dc73f1fcf0fd3d2c5` |
-| Tarball | `agents-can-communicate-0.10.4.tgz`, 594,326 bytes, 360 files |
-| sha256 | `f2a9f11ca154e8b55066de873129376a69eddacd2be17de7d487a95323185ec7` |
+| Built from | `43f2d7154f97d203daaa88c207972b2142f55fb7` |
+| Tarball | `agents-can-communicate-0.10.4.tgz`, 600,216 bytes, 368 files |
+| sha256 | `5f2c069a7f791f43c875243710bf05e9744ba5455acebe62aff5330a5178f116` |
 
 The exact archive passed clean installation verification. The feature's packed
 integration check exercised the installed module and stable reader after removal
