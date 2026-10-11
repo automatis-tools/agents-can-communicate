@@ -2,6 +2,7 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { Worker } from "node:worker_threads";
 import { assertPortableId } from "@agents-can-communicate/protocol";
+import { captureOfferOrder, validOfferOrder } from "./offer-observation-order.mjs";
 
 export const OFFER_ERRORS = Object.freeze(["ambiguous_recipient_sessions", "delivery_disabled",
   "recipient_busy", "recipient_unavailable", "transport_error", "transport_rejected",
@@ -17,8 +18,10 @@ export async function loadOfferObservation({ runtimeDir, sessionId, generation }
     const record = JSON.parse(await readFile(offerObservationPath(runtimeDir, sessionId), "utf8"));
     if (record.schemaVersion !== 1 || record.sessionId !== sessionId || record.generation !== generation
       || !Number.isFinite(Date.parse(record.at)) || !["active", "degraded"].includes(record.state)
-      || !(record.reasonCode === null || OFFER_ERRORS.includes(record.reasonCode))) return null;
-    return { at: record.at, state: record.state, reasonCode: record.reasonCode };
+      || !(record.reasonCode === null || OFFER_ERRORS.includes(record.reasonCode))
+      || (record.order !== undefined && !validOfferOrder(record.order))) return null;
+    return { at: record.at, state: record.state, reasonCode: record.reasonCode,
+      ...(record.order === undefined ? {} : { order: record.order }) };
   } catch { return null; }
 }
 
@@ -29,7 +32,7 @@ export async function storeOfferObservation(input) {
   let worker, timer;
   try {
     worker = new Worker(new URL("./offer-observation-writer.mjs", import.meta.url), {
-      workerData: { ...input, deadlineAt: Date.now() + 1500 },
+      workerData: { ...input, order: captureOfferOrder(), deadlineAt: Date.now() + 1500 },
     });
     const done = new Promise(resolve => {
       worker.once("message", value => resolve(value === true));

@@ -65,6 +65,11 @@ The Antigravity wrapper runs an existing enabled command with a 700 ms limit and
 output limit. A disabled old command stays disabled. Disabling ACC restores only the
 fields ACC changed and still owns. A user replacement command takes precedence.
 
+On POSIX, timeout, output overflow and indicator cancellation stop the previous
+command's owned process group. On Windows, ACC stops the still-running footer shell
+and its descendants with `taskkill /T /F`. Scripts that leave background processes
+running after the shell exits must stop those processes themselves on Windows.
+
 ## Kimi and Grok composition
 
 ACC puts its compact badge first so a narrow terminal cannot truncate it behind a long
@@ -106,7 +111,9 @@ managed launcher resolves the active runtime on each call. A concurrent update c
 one failed read; a later refresh can recover without retaining the outgoing generation.
 
 The router publishes an optional, bounded observation after a transport accepts or rejects
-a send. The indicator compares it with the latest hook handshake for the same generation.
+a send. For records with equal timestamps, a delayed older write cannot replace a newer
+success or failure.
+The indicator compares the resulting observation with the latest hook handshake for the same generation.
 This diagnostic contains only time, outcome, and a closed reason code. Delivery receipts
 and immutable history remain authoritative. An unavailable diagnostic cannot fail a send.
 
