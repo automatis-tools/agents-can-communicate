@@ -1,5 +1,27 @@
 # Changelog
 
+## Unreleased — atomic batch claim and release
+
+- CLI repeated selectors and MCP arrays acquire or release complete resource sets
+  atomically (#290). A failed acquisition leaves existing claims and leases unchanged.
+- `release --all` releases only the current session's claims and keeps presence and
+  intent open. Scalar results and single-target force release remain compatible.
+- Batch conflict text identifies requested resources and blocking owners. Help and
+  all six bundled skills describe batch operations and retry behavior.
+
+| Development artifact | Value |
+|---|---|
+| Built from | `6eb44d324b4bd9a248f334506a994c77fe9e1577` |
+| Tarball | `agents-can-communicate-0.10.4.tgz`, 588,255 bytes, 354 files |
+| sha256 | `0f7ec890fc2b5da2d3d9bf3701bfd670eafb475be2a29dd1d0888040f3b4c1a1` |
+
+The exact archive passed clean package verification. Installed CLI/MCP batches,
+independent-process contention, and generation checks passed; mutations caught
+partial acquisitions, releases, and missing text diagnostics. See
+[development evidence](docs/release-evidence/unreleased-batch-claims.md).
+This is not a new published release. Earlier records retain their original provenance.
+
+
 ## 0.10.4 — release candidate
 
 - Codex sender permission failures remain `transport_permission_denied` instead
