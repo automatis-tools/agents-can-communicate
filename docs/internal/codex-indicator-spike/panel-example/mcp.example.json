@@ -1,0 +1,16 @@
+{
+  "mcpServers": {
+    "acc_panel": {
+      "type": "stdio",
+      "command": "<absolute Node24 path>",
+      "args": [
+        "<absolute panel-example/server.mjs path>"
+      ],
+      "env": {
+        "ACC_PANEL_NODE": "<absolute Node24 path>",
+        "ACC_PANEL_READER": "<absolute installed acc-indicator.mjs path>",
+        "ACC_DATA_HOME": "<isolated ACC data home>"
+      }
+    }
+  }
+}

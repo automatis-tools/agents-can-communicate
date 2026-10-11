@@ -1,5 +1,43 @@
 # Changelog
 
+## Unreleased — per-session ACC indicator
+
+- Optional Claude Code, Antigravity CLI, Kimi Code and Grok indicators show incoming reception as
+  `ACC ●`, `ACC ● · turn`, or `ACC ● · inbox`. Known failures retain `!` and the
+  available fallback, with an explanation and recovery step (#284).
+- All supported clients use the same fixed green for the healthy dot. In Claude Code the
+  glyph is bold and non-dim; the name and qualifier retain the ordinary footer
+  color, with no background.
+- Antigravity colors only the glyph even when the status command runs through a
+  pipe. Existing installed commands use the correction without new arguments.
+- Kimi and Grok compose an existing status command or available native footer
+  fields. Kimi's snapshot cannot retain goal/task badges and thinking effort; its
+  native context line remains. TOML ownership preserves later user edits.
+- Prior footer commands are stopped on timeout, excessive output and indicator cancellation.
+  A detached Node launcher preserves Windows shell input and output during cleanup.
+  Equal-time delivery observations retain caller order, so an older worker cannot
+  overwrite a newer success or failure.
+- Antigravity retains user replacements and removals across repeated updates.
+  Optional offer diagnostics no longer delay delivery to the next participant.
+- The indicator reads local state without ACC writes or client socket probes.
+  Idle sessions remain active when a delivery lease expires. A failed send or
+  endpoint verification is a separate observation.
+- `acc install --indicator on|off` preserves the user's status-line configuration
+  and the saved preference across updates. The managed reader follows the active
+  generation without taking a runtime lease.
+
+| Candidate artifact | Value |
+|---|---|
+| Built from | `dda4ec9978ef2823b83f6ccfdce32cb3fb188480` |
+| Tarball | `agents-can-communicate-0.10.4.tgz`, 607,055 bytes, 374 files |
+| sha256 | `609b6c36c820dcff2530666bb9e50630d67d4ccfeeee1db6f9e47c78b3fe526d` |
+
+The exact archive passed clean installation verification. The feature's packed
+integration check exercised the installed module and stable reader after removal
+of the original package. See [verification and limits](docs/release-evidence/unreleased-status-indicator.md).
+This is an unpublished development candidate. Existing release records retain
+their original source and artifact facts.
+
 ## Unreleased — atomic batch claim and release
 
 - CLI repeated selectors and MCP arrays acquire or release complete resource sets
@@ -20,7 +58,6 @@ independent-process contention, and generation checks passed; mutations caught
 partial acquisitions, releases, and missing text diagnostics. See
 [development evidence](docs/release-evidence/unreleased-batch-claims.md).
 This is not a new published release. Earlier records retain their original provenance.
-
 
 ## 0.10.4 — release candidate
 

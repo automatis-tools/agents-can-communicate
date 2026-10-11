@@ -1,3 +1,4 @@
+import {configureKimiIndicator, planKimiIndicator} from "./indicator-install.mjs";
 import { cp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 
@@ -125,8 +126,8 @@ const registerPlugin = (registry, root) => {
     plugins: [...plugins, { id: PLUGIN_NAME, root, source: "local", enabled: true }] };
 };
 
-export async function installKimiPlugin({ home, runner = defaultRunner(), node, cli,
-  hostPlatform = process.platform }) {
+export async function installKimiPlugin(context) {
+  const {home, runner = defaultRunner(), node, cli, hostPlatform = process.platform} = context;
   // A hook whose command does not exist fails silently, on every event, for as
   // long as it stays installed: the client reports nothing and ACC simply never
   // sees a session. Writing that entry and hoping is worse than refusing.
@@ -135,6 +136,7 @@ export async function installKimiPlugin({ home, runner = defaultRunner(), node, 
   // plugin tree is laid down that nothing will then be able to remove.
   const registered = await readJson(registryPath(home), { version: 1, plugins: [] });
 
+  const indicatorChanges = await configureKimiIndicator(context, context.indicator === "on");
   const target = pluginPath(home);
   await rm(target, { recursive: true, force: true });
   await cp(bundle, target, { recursive: true });
@@ -161,13 +163,15 @@ export async function installKimiPlugin({ home, runner = defaultRunner(), node, 
   await writeForeignJson(registry, registerPlugin(registered, target),
     { readFile, writeFile, mkdir });
 
-  return { ok: true, changes: [target, file, registry], diagnostics: [] };
+  return { ok: true, changes: [target, file, registry, ...indicatorChanges], diagnostics: context.indicator === "on"
+    ? ["Kimi custom status line retains model, mode, cwd and branch; native context stays below. Goal and task badges are unavailable in the status payload."] : [] };
 }
 
-export async function uninstallKimiPlugin({ home, keep = [] }) {
+export async function uninstallKimiPlugin(context) {
+  const {home, keep = []} = context;
   const file = configPath(home);
   const existing = await readText(file, null);
-  const changes = [];
+  const changes = await configureKimiIndicator(context, false);
   if (existing !== null) {
     const stripped = stripBlock(existing);
     if (stripped !== existing) changes.push(file);
@@ -218,8 +222,10 @@ export async function detectKimi({ home, runner = defaultRunner() }) {
  * The paths an install would write, without writing them. Same helpers as the
  * install, so a dry run cannot drift from what actually happens.
  */
-export function planKimiInstall({ home }) {
+export function planKimiInstall(context) {
+  const {home} = context;
   return [
+    ...planKimiIndicator(context),
     { path: pluginPath(home), kind: "tree" },
     { path: configPath(home), kind: "merge" },
     { path: registryPath(home), kind: "merge" },

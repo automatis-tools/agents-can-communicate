@@ -1,0 +1,9 @@
+{
+  "mutation": "Bypass host metadata validation and return absent threadId",
+  "mutantExitCode": 1,
+  "originalExitCode": 0,
+  "mutantFailedNamedTest": true,
+  "originalSourceUnchanged": true,
+  "mutantOutput": "\u2716 status fails closed without valid host metadata before calling the reader (1.325334ms)\n\u2714 only host metadata selects the native conversation (0.165875ms)\n\u2139 tests 2\n\u2139 suites 0\n\u2139 pass 1\n\u2139 fail 1\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 53.420167\n\n\u2716 failing tests:\n\ntest at test-binding.mjs:5:1\n\u2716 status fails closed without valid host metadata before calling the reader (1.325334ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n  \n  false !== true\n  \n      at TestContext.<anonymous> (file:///private/tmp/acc-codex-indicator-spike/panel/mutation-vlhyc72b/test-binding.mjs:9:12)\n      at async Test.run (node:internal/test_runner/test:1069:7)\n      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:332:3) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: false,\n    expected: true,\n    operator: 'strictEqual'\n  }\n",
+  "originalOutput": "\u2714 status fails closed without valid host metadata before calling the reader (0.443791ms)\n\u2714 only host metadata selects the native conversation (0.094375ms)\n\u2139 tests 2\n\u2139 suites 0\n\u2139 pass 2\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 47.03125\n"
+}

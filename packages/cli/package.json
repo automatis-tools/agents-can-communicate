@@ -6,6 +6,7 @@
   "exports": {
     ".": "./src/index.mjs",
     "./hook-support": "./src/hook-support.mjs",
+    "./indicator": "./src/indicator-command.mjs",
     "./managed-entry": "./src/managed-runtime/entry.mjs",
     "./managed-worker": "./src/managed-runtime/worker.mjs"
   },

@@ -39,6 +39,7 @@ export async function applyPlan({ plan, adapters, context, dataHome, dryRun = fa
         const createdDirectories = await missingArtifactParents({ home: context.home,
           artifacts: operation.artifacts });
         const installContext = { ...context,
+          indicator: operation.indicator,
           clientVersion: operation.clientVersion, platform: operation.platform,
           requestedLivePolicy: operation.livePolicy ?? "off",
           livePolicy: operation.configuredLivePolicy ?? operation.effectiveLivePolicy ?? "off" };
@@ -71,10 +72,12 @@ export async function applyPlan({ plan, adapters, context, dataHome, dryRun = fa
           version: operation.clientVersion ?? null, accVersion,
           artifacts: operation.artifacts, createdDirectories,
           deliveryPolicy: operation.livePolicy, deliveryDecision: operation.deliveryDecision,
+          indicator: operation.indicator,
           nativeActivation: native });
         results.operations.push({ ...operation, applied: true,
           needsAction: outcome.needsAction ?? [],
           changes: outcome.changes ?? [], diagnostics: [
+            ...(operation.indicatorDiagnostic === undefined ? [] : [operation.indicatorDiagnostic]),
             ...(operation.deliveryDiagnostic === undefined
               ? [] : [operation.deliveryDiagnostic]),
             ...(outcome.diagnostics ?? []),

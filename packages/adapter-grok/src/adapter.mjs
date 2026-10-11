@@ -1,3 +1,5 @@
+import { preflightGrokIndicator } from "./indicator-install.mjs";
+import { grokIndicator } from "./indicator.mjs";
 import { defineAdapter, projectContext, projectContextResult }
   from "@agents-can-communicate/adapter-sdk";
 import certification from "../certification.json" with { type: "json" };
@@ -22,6 +24,7 @@ export const GROK_VERSION = "1.0.13";
 export function createGrokAdapter() {
   return defineAdapter({
     id: "grok",
+    statusIndicator: grokIndicator,
     displayName: "Grok",
     // Native Mach-O at ~/.grok/bin/grok. `ps -o comm=` on 1.0.13 reports `grok`.
     client: { command: "grok", certificationName: "grok", versionArgs: ["--version"] },
@@ -41,6 +44,7 @@ export function createGrokAdapter() {
     planInstall: context => planGrokInstall(forClient(context)),
     detect: context => detectGrok(forClient(context)),
     install: context => installGrokHooks(forClient(context)),
+    preflightUninstall: context => preflightGrokIndicator(forClient(context)),
     uninstall: context => uninstallGrokHooks(forClient(context)),
 
     doctor: async context => {

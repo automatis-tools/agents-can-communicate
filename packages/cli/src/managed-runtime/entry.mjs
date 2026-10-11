@@ -32,6 +32,25 @@ export function invokedDirectly(url) {
   catch { return false; }
 }
 
+/** The display is an observation, not an admitted runtime user. A stable
+ * launcher resolves the active generation on every refresh, so an old plugin
+ * never retains a path that a same-contract update may reclaim. A concurrent
+ * replacement fails open and the next display refresh tries the new pointer. */
+export async function runIndicatorEntry({ managerRoot }) {
+  try {
+    const root = await canonicalManagerRoot(managerRoot);
+    const control = await readControl(root);
+    if (!control) throw new Error("indicator runtime missing");
+    await import(pathToFileURL(path.join(control.active.root, "bin", "acc-indicator.mjs")).href);
+  } catch {
+    const report = { health: "problem", reception: null, reasonCode: "indicator_unavailable",
+      label: "ACC !", detail: "ACC's installed indicator is unavailable.",
+      action: "Run acc update to finish runtime activation, or acc install --indicator on to repair it." };
+    process.stdout.write(process.argv.includes("--json") ? JSON.stringify(report) + "\n"
+      : "ACC ! · acc doctor\n");
+  }
+}
+
 function unavailable(kind) {
   // Never reflect control file content or payloads into a client diagnostic.
   if (kind === "acc-hook" || kind === "acc-antigravity-relay") {

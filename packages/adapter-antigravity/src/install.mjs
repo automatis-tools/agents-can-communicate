@@ -5,7 +5,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 
-import { bakeSkillCommand, blankJson, defaultAntigravityRelay, isShellWord, mergeEnv, ownVersion,
+import { bakeSkillCommand, blankJson, compareVersionOrder, versionOrder, defaultAntigravityRelay, isShellWord, mergeEnv, ownVersion,
   removeIfEmpty, shellQuote, shortPath, stampPluginVersion, windowsHookCommand, writeCliShim,
   writeForeignJson, writeHookShim, writeNodeShim }
   from "@agents-can-communicate/adapter-sdk";
@@ -15,6 +15,7 @@ import { agySettingsPath, cliWrapperPath, ensureAllowRule, inspectAllowRule, ins
   withdrawAllowRule } from "./allow-rule.mjs";
 import { ensureDesktopRule, inspectDesktopRule, withdrawDesktopRule } from "./desktop-allow-rule.mjs";
 import { relayShimName, relayStartCommand, runningRelays, stopRelays } from "./relays.mjs";
+import { configureIndicator } from "./indicator-install.mjs";
 
 const run = promisify(execFile);
 
@@ -425,8 +426,10 @@ export async function installAntigravity(context) {
   const allow = await ensureAllowRule(context);
   // Antigravity 2.0 keeps grants of its own, read only where it has run.
   const desktop = await ensureDesktopRule(context);
+  const indicatorChanges = await configureIndicator(context, context.indicator === "on"
+    && compareVersionOrder(versionOrder(context.clientVersion), versionOrder("1.0.6")) >= 0);
   const changes = [shimDir(home), file, pluginInstallPath(home), vendorManifestPath(home),
-    ...allow.changes, ...desktop.changes];
+    ...allow.changes, ...desktop.changes, ...indicatorChanges];
 
   const diagnostics = [...allow.diagnostics, ...desktop.diagnostics];
   const needsAction = [...allow.needsAction, ...desktop.needsAction];
@@ -495,7 +498,7 @@ export async function installAntigravity(context) {
  */
 export async function uninstallAntigravity(context) {
   const { home, keep = [] } = context;
-  const changes = [];
+  const changes = await configureIndicator(context, false);
   const diagnostics = [];
   // Nothing may keep running once ACC is gone. A relay holds a live session
   // endpoint in memory, so it is stopped here rather than left to find out.
@@ -744,7 +747,7 @@ export function planAntigravityInstall(context) {
   // match: a wrapper path that needs quotes gets none.
   const plugin = [{ path: pluginInstallPath(context.home), kind: "merge" },
     { path: vendorManifestPath(context.home), kind: "merge" },
-    ...(isShellWord(cliWrapperPath(context.home, context.hostPlatform))
+    ...(context.indicator === "on" || isShellWord(cliWrapperPath(context.home, context.hostPlatform))
       ? [{ path: agySettingsPath(context.home), kind: "merge" }] : [])];
   if (locationChoice(context) !== null) {
     return [shim, ...plugin,

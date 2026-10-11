@@ -1077,3 +1077,51 @@ hook failed open and printed `{"systemMessage": "ACC: coordination is paused in 
 this workspace …` and no hook error. Before, the same failure wrote its remedy to stderr only,
 which a successful hook's terminal does not show. ACC prints that line only on SessionStart and
 UserPromptSubmit, and only when the store waits for its migration.
+
+## Status indicator surface — 2026-10-09
+
+Claude Code 2.1.295 on macOS arm64 loaded the installed indicator hooks module.
+Its native `SessionMode` label showed `ACC …`, then `ACC !`; the separately configured
+`user-status-preserved` command remained visible. `/acc-status` printed the unregistered
+state and recovery command. The module printed one diagnostic for the unchanged failure.
+The vendor validator rejected a nested helper receiving `$`; the shipped helper is at
+module scope and passes that validator. The renderer appends to `e.props.modes`, retaining
+the native footer layout and existing mode labels.
+
+These captures used a separate ACC data home and a network-denied native TUI. The sandbox
+refused Node child-process probes, so this capture proves rendering and the diagnostic
+command, not registration or a new delivery capability. Filesystem fixtures cover normal
+reception, expired leases, generation replacement, and observed send failures. The packed
+integration test loads the installed module and exercises its stable executable after the
+initial npm package is removed.
+
+The 2.1.287 installation floor comes from the vendor's documented mods availability;
+earlier builds were not exercised in this capture. Client policy may disable user mods.
+See [the indicator contract](../../docs/STATUS_INDICATOR.md) and
+[artifact evidence](../../docs/release-evidence/unreleased-status-indicator.md).
+
+### Contrast correction — 2026-10-09
+
+A user screenshot showed that adding the whole label to `SessionMode.modes` made
+the successful dot gray. The renderer now retains the native footer reference and
+draws its own Text nodes. Only the status glyph uses the `success` or `warning`
+theme color, with `bold: true` and `dimColor: false`; no node adds a background.
+
+An isolated Claude Code 2.1.295 TUI emitted RGB `102,102,102` for `ACC` and RGB
+`44,122,57` with bold styling for `●` in the light theme. The existing custom
+status-line output remained present. This capture used an offline visual fixture,
+not another user's terminal window. The installed-module tests also verify the
+normal and failure colors, the neutral startup glyph, and unchanged native props.
+
+### Match Antigravity green — 2026-10-10
+
+User testing found Claude's theme-dependent `success` green paler than the
+Antigravity dot. The ready glyph now uses the same fixed RGB `44,122,57`
+(`#2c7a39`) as Antigravity. It retains bold, non-dim styling; text and backgrounds
+are unchanged. The warning and startup glyphs retain their theme colors.
+The installed-module assertions fail when the ready glyph uses `success` again.
+
+An isolated offline Claude Code 2.1.296 TUI loaded the installed module with a
+healthy-state fixture reader and emitted `38;2;44;122;57` plus bold for `●`.
+This proves the raw color reaches the terminal. It does not certify registration
+or delivery; no model turn ran.

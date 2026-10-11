@@ -168,3 +168,16 @@ all `unobserved`; no client, leader, or ACP server was started by it. The redact
 is under `fixtures/delivery/` and `certification.json` stays without native evidence:
 `delivery.livePush` and `delivery.replyRoute` remain absent, installation wires hooks and
 the skill only, and messages stay durable for `acc inbox`.
+
+## Status indicator — 1.0.46, 2026-10-10
+
+The status command receives `session_id` equal to the CLI session id in two isolated
+sessions; no session environment variable was present. ANSI RGB `44,122,57` rendered, and
+`refresh_interval = 1` produced idle invocations about every second. The built-in mode and
+shortcut footer stayed below the custom status row. The client caps commands at ten seconds.
+
+The command replaces the optional built-in row. ACC composes an existing command or the
+configured cwd/model/context/cost/turn-timer/session-name values from the same snapshot.
+This capture used an isolated home, an invalid dummy key and a custom model with external
+network denied. No model prompt or inference call ran. Only this version was captured;
+Windows rendering was not captured. No new delivery capability is claimed.

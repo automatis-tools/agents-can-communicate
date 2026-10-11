@@ -307,7 +307,7 @@ test("the manifest declares the binaries and the engine it was certified on", as
   const manifest = JSON.parse(await readFile(path.join(repo, "package.json"), "utf8"));
 
   assert.deepEqual(Object.keys(manifest.bin ?? {}).sort(),
-    ["acc", "acc-hook", "acc-mcp"]);
+    ["acc", "acc-hook", "acc-indicator", "acc-mcp"]);
   assert.equal(manifest.private, undefined, "a private package cannot be published");
   assert.equal(manifest.license, "MIT");
   // Pinned to the production LTS line, never a Current-only release.
