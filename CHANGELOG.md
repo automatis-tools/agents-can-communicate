@@ -14,6 +14,7 @@
   fields. Kimi's snapshot cannot retain goal/task badges and thinking effort; its
   native context line remains. TOML ownership preserves later user edits.
 - Prior footer commands are stopped on timeout, excessive output and indicator cancellation.
+  A detached Node launcher preserves Windows shell input and output during cleanup.
   Equal-time delivery observations retain caller order, so an older worker cannot
   overwrite a newer success or failure.
 - The indicator reads local state without ACC writes or client socket probes.
@@ -25,9 +26,9 @@
 
 | Candidate artifact | Value |
 |---|---|
-| Built from | `319ccb7fb2e814bda1696061fad03e784df4b0d5` |
-| Tarball | `agents-can-communicate-0.10.4.tgz`, 601,811 bytes, 370 files |
-| sha256 | `2cd9db312ce231d6246984cdb4a25a0297703bd04504c3d8ce042e7c39eace48` |
+| Built from | `dacde24fd96c1811b2300bce9ae21f06f50f360b` |
+| Tarball | `agents-can-communicate-0.10.4.tgz`, 602,217 bytes, 371 files |
+| sha256 | `00b172294cb5ca762919c35887e2a7fe1b5aef6a7cc41cede4565d1154a0a078` |
 
 The exact archive passed clean installation verification. The feature's packed
 integration check exercised the installed module and stable reader after removal

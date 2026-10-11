@@ -171,3 +171,44 @@ fsync policy and supported file-concurrency setting.
 The complete local suite passed after these corrections: 3,295 tests, 3,287 passed,
 8 skipped, 0 failures, at the supported file concurrency of four. Native Windows
 execution of the new process cleanup cases still requires the PR CI run after push.
+
+
+## Windows shell follow-up — 2026-10-11
+
+The preceding review candidate passed Linux and macOS CI. Its Windows job failed
+four tests: previous footer output in Kimi, Grok and Antigravity, and output-limit
+cleanup. This follow-up supersedes its Windows subprocess implementation.
+
+A minimal Windows probe isolated the cause. A normal shell read stdin and returned
+its output, while a detached `cmd.exe` stalled. Direct detached Node execution
+worked. Changing pipe mode did not help; explicit shell redirection reported an
+invalid handle for stdin. The correction uses a detached Node launcher that starts
+a normal hidden shell with inherited stdin/stdout. The launcher is the owned root
+for `taskkill /T /F`. A startup message starts the previous-command budget; launcher
+startup also has a limit. The enclosing indicator deadline is unchanged.
+
+Two new regressions verify exact stdin through a shell command and a shell pipeline.
+Both failed against the detached-shell implementation in
+[Windows run 38165624465](https://github.com/automatis-tools/agents-can-communicate/actions/runs/38165624465).
+The corrected implementation passed all 20 focused tests in
+[Windows run 38165787567](https://github.com/automatis-tools/agents-can-communicate/actions/runs/38165787567),
+including Kimi's existing composition test and all four descendant-cleanup cases.
+This run used measurement commit `ddb6eb09`; the source commit below retains the
+same implementation with clarified comments and published documentation. The same
+20 tests passed locally. No existing assertions or display deadlines were relaxed.
+
+| Artifact | Observation |
+|---|---|
+| Source commit | `dacde24fd96c1811b2300bce9ae21f06f50f360b` |
+| Source state before packing | Clean; Windows fix, regression tests and documentation committed |
+| Package | `agents-can-communicate-0.10.4.tgz` |
+| Size | 602,217 bytes |
+| Entries | 371 |
+| SHA-256 | `00b172294cb5ca762919c35887e2a7fe1b5aef6a7cc41cede4565d1154a0a078` |
+| Node used for verification | 24.4.0 |
+
+The exact archive passed clean installation, non-Git operation and uninstall
+restoration checks. The first full local run executed 3,297 tests: 3,288 passed,
+8 were skipped, and only the recorded-candidate gate failed because it ran before
+the candidate table was updated. All three candidate checks passed after the
+update. The mandatory pre-push suite runs after this evidence commit.
