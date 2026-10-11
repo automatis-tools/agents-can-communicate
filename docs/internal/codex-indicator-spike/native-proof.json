@@ -1,0 +1,31 @@
+{
+  "client": "Codex TUI 0.162.1 experimental build",
+  "upstreamCommit": "092d3acd6bec3e3a14bdc7e7a2810ab628ab759d",
+  "nativeRenderingVerified": true,
+  "activeNativeThreadMatched": true,
+  "providerCalls": 135,
+  "observedStates": [
+    "problem",
+    "ready",
+    "problem",
+    "ready"
+  ],
+  "medianPollMs": 1002.0,
+  "modelTurns": 0,
+  "userOrAssistantMessages": 0,
+  "healthyGlyphRgb": [
+    44,
+    122,
+    57
+  ],
+  "bold": true,
+  "backgroundAdded": false,
+  "builtInModelPreserved": true,
+  "failureFooter": "ACC ! \u00b7 turn \u00b7 acc doctor",
+  "inputDuringTransitions": false,
+  "fixtureScope": "Normal SDK/store APIs created disposable ACC state for the captured native thread UUID; rendering and read-only observation, not delivery certification.",
+  "focusedTestsPassed": 9,
+  "exactColorMutationRejected": true,
+  "desktopNativeRenderingVerified": false,
+  "desktopBlocker": "Computer Use is not allowed to use the app 'com.openai.codex' for safety reasons."
+}

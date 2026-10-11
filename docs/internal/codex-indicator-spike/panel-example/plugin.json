@@ -1,0 +1,14 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "acc-ui-probe",
+  "version": "0.0.1",
+  "description": "Temporary read-only ACC conversation panel feasibility probe.",
+  "extensions": {
+    "com.openai": {
+      "interface": {
+        "displayName": "ACC status probe",
+        "shortDescription": "Read-only conversation status"
+      }
+    }
+  }
+}

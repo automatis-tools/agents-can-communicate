@@ -1,0 +1,203 @@
+{
+  "startedAt": "2026-10-11T02:04:38.263964+00:00",
+  "binary": "<user-home>/.local/bin/codex",
+  "runPath": "/private/tmp/acc-codex-indicator-spike/panel/runs/20261010-220438",
+  "networkPolicy": "(version 1) (allow default) (deny network*)",
+  "credentialsInherited": false,
+  "usesRealSessions": false,
+  "assertions": {
+    "nativeResourceReadable": true,
+    "absentBoundToNativeThread": true,
+    "objectBoundToNativeThread": true,
+    "spoofOverwriteBoundToNativeThread": true,
+    "primitiveMetaFailsClosed": true,
+    "initialZeroTurnsAndStillIdle": true,
+    "noTurnRequests": true,
+    "noTurnNotifications": true,
+    "readerDidNotCreateDataFiles": true
+  },
+  "initialize": {
+    "userAgent": "acc-panel-probe/0.162.1 (Mac OS 27.0.0; arm64) unknown (acc-panel-probe; 0.0.1)",
+    "codexHome": "/private/tmp/acc-codex-indicator-spike/panel/runs/20261010-220438/codex-home",
+    "platformFamily": "unix",
+    "platformOs": "macos"
+  },
+  "syntheticThreadId": "01a128b4-782f-7fb1-83e8-f2c5fb34ec03",
+  "serverCatalog": {
+    "data": [
+      {
+        "name": "acc_panel",
+        "runtimeStatus": "connected",
+        "pluginId": null,
+        "httpOrigin": null,
+        "serverInfo": {
+          "name": "acc-panel-spike",
+          "title": null,
+          "version": "0.0.1",
+          "description": null,
+          "icons": null,
+          "websiteUrl": null
+        },
+        "serverCapabilities": {
+          "resources": {},
+          "tools": {}
+        },
+        "tools": {
+          "acc_status": {
+            "name": "acc_status",
+            "title": "Refresh ACC status",
+            "description": "Read ACC status for the host-bound conversation.",
+            "inputSchema": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": false
+            },
+            "annotations": {
+              "readOnlyHint": true,
+              "destructiveHint": false,
+              "idempotentHint": true,
+              "openWorldHint": false
+            },
+            "_meta": {
+              "ui": {
+                "visibility": [
+                  "app"
+                ]
+              }
+            }
+          },
+          "acc_panel": {
+            "name": "acc_panel",
+            "title": "ACC status",
+            "description": "Open a read-only ACC status panel for this conversation.",
+            "inputSchema": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": false
+            },
+            "annotations": {
+              "readOnlyHint": true,
+              "destructiveHint": false,
+              "idempotentHint": true,
+              "openWorldHint": false
+            },
+            "_meta": {
+              "ui": {
+                "resourceUri": "ui://acc/panel",
+                "visibility": [
+                  "app"
+                ]
+              },
+              "openai/ui": {
+                "entrypoints": [
+                  {
+                    "type": "thread"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "toolsError": null,
+        "resources": [
+          {
+            "mimeType": "text/html;profile=mcp-app",
+            "name": "ACC panel",
+            "uri": "ui://acc/panel"
+          }
+        ],
+        "resourceTemplates": [],
+        "authStatus": "unsupported"
+      }
+    ],
+    "nextCursor": null
+  },
+  "resourceSha256": "256cb96df507ca6d3dc053fa252e6ad66110d3c5550dda348290a3312c155c81",
+  "toolResults": {
+    "absentMeta": {
+      "content": [],
+      "structuredContent": {
+        "binding": {
+          "source": "host-meta",
+          "threadId": "01a128b4-782f-7fb1-83e8-f2c5fb34ec03"
+        },
+        "status": {
+          "health": "problem",
+          "reception": null,
+          "reasonCode": "not_registered",
+          "leaseCurrent": null,
+          "label": "ACC !",
+          "detail": "This chat is not registered with ACC.",
+          "action": "Send a prompt to run the session hooks. If ACC is still absent, run acc doctor and check the plugin is enabled."
+        }
+      },
+      "isError": false
+    },
+    "objectMeta": {
+      "content": [],
+      "structuredContent": {
+        "binding": {
+          "source": "host-meta",
+          "threadId": "01a128b4-782f-7fb1-83e8-f2c5fb34ec03"
+        },
+        "status": {
+          "health": "problem",
+          "reception": null,
+          "reasonCode": "not_registered",
+          "leaseCurrent": null,
+          "label": "ACC !",
+          "detail": "This chat is not registered with ACC.",
+          "action": "Send a prompt to run the session hooks. If ACC is still absent, run acc doctor and check the plugin is enabled."
+        }
+      },
+      "isError": false
+    },
+    "forgedMeta": {
+      "content": [],
+      "structuredContent": {
+        "binding": {
+          "source": "host-meta",
+          "threadId": "01a128b4-782f-7fb1-83e8-f2c5fb34ec03"
+        },
+        "status": {
+          "health": "problem",
+          "reception": null,
+          "reasonCode": "not_registered",
+          "leaseCurrent": null,
+          "label": "ACC !",
+          "detail": "This chat is not registered with ACC.",
+          "action": "Send a prompt to run the session hooks. If ACC is still absent, run acc doctor and check the plugin is enabled."
+        }
+      },
+      "isError": false
+    },
+    "primitiveMeta": {
+      "error": {
+        "code": -32603,
+        "message": "tool call failed for `acc_panel/acc_status`: MCP tool request _meta must be a JSON object, got \"invalid-meta\""
+      }
+    }
+  },
+  "historyNote": "Ephemeral threads reject includeTurns=true. Zero-inference evidence is empty initial turns, still-idle status, and absence of turn requests/notifications.",
+  "passed": true,
+  "methodsSent": [
+    "initialize",
+    "thread/start",
+    "mcpServerStatus/list",
+    "mcpServer/resource/read",
+    "mcpServer/tool/call",
+    "mcpServer/tool/call",
+    "mcpServer/tool/call",
+    "mcpServer/tool/call",
+    "thread/read"
+  ],
+  "notificationMethods": [
+    "mcpServer/startupStatus/updated",
+    "remoteControl/status/changed",
+    "thread/started"
+  ],
+  "stderr": [
+    "WARNING: proceeding, even though we could not create PATH aliases: Refusing to create helper binaries under temporary dir \"/private/tmp/acc-codex-indicator-spike/panel/runs/20261010-220438\" (codex_home: AbsolutePathBuf(\"/private/tmp/acc-codex-indicator-spike/panel/runs/20261010-220438/codex-home\"))"
+  ],
+  "temporaryStateRemoved": true
+}
