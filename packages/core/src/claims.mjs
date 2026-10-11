@@ -1,6 +1,7 @@
-import { AccError, EXIT, SCHEMA_VERSION, assertMatchableResource, createId,
-  normaliseResource, validateRecord } from "@agents-can-communicate/protocol";
+import { AccError, EXIT, SCHEMA_VERSION, createId, validateRecord }
+  from "@agents-can-communicate/protocol";
 
+import { claimResources, releaseSelectors, selectReleaseClaims } from "./claim-selectors.mjs";
 import { ensureMaterialised } from "./materialisation.mjs";
 import { classifySessionPresence } from "./sessions.mjs";
 
@@ -33,10 +34,11 @@ const isLive = (claim, now) => Date.parse(claim.expiresAt) > Date.parse(now);
 export function createClaimService(ports, sessions) {
   const { store, clock, ids, pidIsAlive } = ports;
 
-  async function requireOwner(input, action, tx) {
+  async function requireOwner(input, action, tx, allowEphemeral = false) {
     const current = tx === undefined
       ? (await sessions.locateSession(input.sessionId, input.workspaceId))?.record
-      : tx.get("session", input.sessionId);
+      : tx.get("session", input.sessionId)
+        ?? (allowEphemeral ? await store.ephemeral.get("session", input.sessionId) : null);
     if (current == null || current.state !== "open") {
       throw new AccError(EXIT.CONFLICT, `cannot ${action} from a session that is not open`,
         { sessionId: input.sessionId });
@@ -65,63 +67,63 @@ export function createClaimService(ports, sessions) {
     });
   }
 
-  async function acquireClaim(input) {
+  async function acquire(input, resources, batch) {
     const session = await requireOwner(input, "claim");
-    // One name for one file, decided here rather than at each surface, so a
-    // claim taken over MCP and one taken from the CLI mean the same thing - and
-    // a shape that could never match is refused rather than stored.
-    assertMatchableResource(input.resource, message => {
-      throw new AccError(EXIT.USAGE, message, { resource: input.resource });
-    });
-    const resource = normaliseResource(input.resource);
+    resources = claimResources(resources);
     const workspaceId = session.workspaceId;
     await ensureMaterialised(ports, { workspaceId, descriptor: input.descriptor,
       reason: "durable_object" });
-    const now = clock.now();
-    const expiresAt = new Date(Date.parse(now) + (input.leaseSeconds ?? 1800) * 1000)
-      .toISOString();
-    // Only to name the owner of a conflicting claim in the error.
-    const snapshot = await store.snapshot(workspaceId, { kinds: ["session"] });
-
-    let record = null;
-    await store.transaction(async tx => {
+    return store.transaction(async tx => {
       await requireOwner(input, "claim", tx);
-      const live = tx.list("claim", claim => isLive(claim, now));
-      // This session's own claim on this resource, live or lapsed. Looking only
-      // among the live ones left the expired record behind and made a fresh one
-      // beside it, so taking a resource back after a lease ran out reported
-      // success while the workspace still held a dead claim saying otherwise -
-      // and the owner went on being told its claim had run out.
-      const mine = tx.list("claim", claim => claim.ownerSessionId === session.sessionId
-        && claim.resource === resource).at(0);
-      const blocking = live.find(claim => overlaps(claim.resource, resource)
-        && claim.ownerSessionId !== session.sessionId
-        && (claim.mode === "exclusive" || input.mode === "exclusive"));
-      if (blocking !== undefined) throw conflictWith(blocking, session, now, snapshot.sessions);
-
-      const claimId = mine?.claimId ?? createId("claim");
-      record = validateRecord("claim", {
-        schemaVersion: SCHEMA_VERSION,
-        claimId,
-        workspaceId,
-        ownerSessionId: session.sessionId,
-        resource,
-        mode: input.mode ?? "exclusive",
-        enforcement: input.enforcement ?? "advisory",
-        reason: input.reason,
-        // A lapsed claim taken again is a new period of holding it, not a
-        // continuation of one that ended.
-        acquiredAt: mine !== undefined && isLive(mine, now) ? mine.acquiredAt : now,
-        expiresAt,
-        generation: ids.next("generation"),
+      const now = clock.now();
+      const expiresAt = new Date(Date.parse(now) + (input.leaseSeconds ?? 1800) * 1000)
+        .toISOString();
+      const existing = tx.list("claim");
+      const live = existing.filter(claim => isLive(claim, now));
+      const mode = input.mode ?? "exclusive";
+      const conflicts = resources.flatMap(resource => live
+        .filter(claim => overlaps(claim.resource, resource)
+          && claim.ownerSessionId !== session.sessionId
+          && (claim.mode === "exclusive" || mode === "exclusive"))
+        .map(claim => ({ requestedResource: resource,
+          ...conflictWith(claim, session, now, tx.list("session")).details })));
+      if (conflicts.length > 0) {
+        if (!batch) {
+          const { requestedResource, ...details } = conflicts[0];
+          throw new AccError(EXIT.CONFLICT, "the resource is already claimed", details);
+        }
+        throw new AccError(EXIT.CONFLICT, "the batch has claimed resources", { conflicts });
+      }
+      // Validate every record before staging a write, including renewals.
+      const records = resources.map(resource => {
+        const mine = existing.find(claim => claim.ownerSessionId === session.sessionId
+          && claim.resource === resource);
+        const claimId = mine?.claimId ?? createId("claim");
+        return { mine, record: validateRecord("claim", {
+          schemaVersion: SCHEMA_VERSION,
+          claimId,
+          workspaceId,
+          ownerSessionId: session.sessionId,
+          resource,
+          mode,
+          enforcement: input.enforcement ?? "advisory",
+          reason: input.reason,
+          // Reuse a lapsed record, but start a new period of holding it.
+          acquiredAt: mine !== undefined && isLive(mine, now) ? mine.acquiredAt : now,
+          expiresAt,
+          generation: ids.next("generation"),
+        }) };
       });
-      tx.put("claim", claimId, record, tx.generationOf("claim", claimId));
-      tx.append({ schemaVersion: SCHEMA_VERSION, eventId: ids.next("event"), workspaceId,
-        actorSessionId: session.sessionId, type: mine === undefined ? "claim.acquired"
-          : "claim.renewed", occurredAt: now,
-        payload: { claimId, resource, mode: record.mode } });
+      for (const { mine, record } of records) {
+        const { claimId, resource } = record;
+        tx.put("claim", claimId, record, tx.generationOf("claim", claimId));
+        tx.append({ schemaVersion: SCHEMA_VERSION, eventId: ids.next("event"), workspaceId,
+          actorSessionId: session.sessionId, type: mine === undefined ? "claim.acquired"
+            : "claim.renewed", occurredAt: now,
+          payload: { claimId, resource, mode: record.mode } });
+      }
+      return records.map(item => item.record);
     }, { kinds: ["session", "claim"] });
-    return record;
   }
 
   async function renewClaim(input) {
@@ -146,40 +148,42 @@ export function createClaimService(ports, sessions) {
     return record;
   }
 
-  async function removeClaim(input, { authority, reason }) {
+  async function removeClaims(input, selectors, { authority = null, reason = null } = {}) {
     const session = await requireOwner(input, "release");
-    const now = clock.now();
-    await store.transaction(async tx => {
-      await requireOwner(input, "release", tx);
-      const existing = tx.get("claim", input.claimId);
-      if (existing === null) {
-        throw new AccError(EXIT.CONFLICT, "the claim does not exist", { claimId: input.claimId });
+    return store.transaction(async tx => {
+      await requireOwner(input, "release", tx, true);
+      const now = clock.now();
+      const selected = selectReleaseClaims(tx, selectors, session.sessionId);
+      for (const existing of selected) {
+        const owned = existing.ownerSessionId === session.sessionId;
+        if (!owned && authority !== "human" && authority !== "policy") {
+          throw new AccError(EXIT.CONFLICT,
+            "force release requires human or policy authority",
+            { claimId: existing.claimId, authority });
+        }
       }
-      const owned = existing.ownerSessionId === session.sessionId;
-      // Force release is an authority decision, not a peer decision. A
-      // coordinator lease does not extend outside its own workstream.
-      if (!owned && authority !== "human" && authority !== "policy") {
-        throw new AccError(EXIT.CONFLICT,
-          "force release requires human or policy authority",
-          { claimId: input.claimId, authority: authority ?? null });
+      for (const existing of selected) {
+        const owned = existing.ownerSessionId === session.sessionId;
+        // Remove the live record; per-resource events retain its history.
+        tx.remove("claim", existing.claimId, tx.generationOf("claim", existing.claimId));
+        tx.append({ schemaVersion: SCHEMA_VERSION, eventId: ids.next("event"),
+          workspaceId: existing.workspaceId, actorSessionId: session.sessionId,
+          type: owned ? "claim.released" : "claim.force_released", occurredAt: now,
+          payload: { claimId: existing.claimId, authority,
+            reason, replacedGeneration: existing.generation } });
       }
-      // The claim record is removed rather than tombstoned: a released claim is
-      // not a claim, and every consumer of a snapshot would otherwise have to
-      // re-derive liveness. The event log keeps the history.
-      tx.remove("claim", input.claimId, tx.generationOf("claim", input.claimId));
-      tx.append({ schemaVersion: SCHEMA_VERSION, eventId: ids.next("event"),
-        workspaceId: existing.workspaceId, actorSessionId: session.sessionId,
-        type: owned ? "claim.released" : "claim.force_released", occurredAt: now,
-        payload: { claimId: input.claimId, authority: authority ?? null,
-          reason: reason ?? null, replacedGeneration: existing.generation } });
+      return selected;
     }, { kinds: ["session", "claim"] });
   }
 
   return {
-    acquireClaim,
+    acquireClaim: async input => (await acquire(input, [input.resource], false))[0],
+    acquireClaims: input => acquire(input, input.resources, true),
     renewClaim,
-    releaseClaim: input => removeClaim(input, { authority: null, reason: null }),
-    forceReleaseClaim: input => removeClaim(input,
-      { authority: input.authority, reason: input.reason }),
+    releaseClaims: async input => removeClaims(input, releaseSelectors(input)),
+    releaseClaim: async input => { await removeClaims(input, { claimIds: [input.claimId] }); },
+    forceReleaseClaim: async input => { await removeClaims(input, { claimIds: [input.claimId] },
+      { authority: input.authority, reason: input.reason });
+    },
   };
 }
