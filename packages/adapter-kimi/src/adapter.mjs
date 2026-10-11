@@ -1,3 +1,5 @@
+import { preflightKimiIndicator } from "./indicator-install.mjs";
+import { kimiIndicator } from "./indicator.mjs";
 import { defineAdapter, projectContext, projectContextResult }
   from "@agents-can-communicate/adapter-sdk";
 import certification from "../certification.json" with { type: "json" };
@@ -28,6 +30,7 @@ export const KIMI_CODE_VERSION = "0.36.1";
 export function createKimiAdapter() {
   return defineAdapter({
     id: "kimi",
+    statusIndicator: kimiIndicator,
     displayName: "Kimi Code",
     // The binary this client actually installs. Probed for a version to
     // decide whether the client is on this machine, so it has to be the
@@ -57,6 +60,7 @@ export function createKimiAdapter() {
     planInstall: context => planKimiInstall(forClient(context)),
     detect: context => detectKimi(forClient(context)),
     install: context => installKimiPlugin(forClient(context)),
+    preflightUninstall: context => preflightKimiIndicator(forClient(context)),
     uninstall: context => uninstallKimiPlugin(forClient(context)),
 
     doctor: async context => {

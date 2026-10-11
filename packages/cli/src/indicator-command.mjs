@@ -1,22 +1,21 @@
+import { readTomlIndicatorSettings } from "@agents-can-communicate/adapter-sdk";
 import { spawn } from "node:child_process";
 import { readFile } from "node:fs/promises";
 import { readIndicator, indicatorFailure } from "./indicator.mjs";
 import { ALL_ADAPTERS } from "./install-command.mjs";
 
-function statusLine(report, adapterId) {
-  let label = report.label;
-  try {
-    const render = ALL_ADAPTERS().find(adapter => adapter.id === adapterId)?.statusIndicator?.renderText;
-    const rendered = render?.(report);
-    if (typeof rendered === "string") label = rendered;
-  } catch { /* A display extension cannot prevent the closed diagnostic. */ }
-  return label + (report.health === "problem" ? " · acc doctor" : "");
-}
-
-function output(report, options) {
+function output(report, options, context) {
   if (options.json) return JSON.stringify(report);
   if (options.details) return [report.label, report.detail, report.action].filter(Boolean).join("\n");
-  return statusLine(report, options.adapter);
+  const extension = context.extension;
+  let label = report.label;
+  try { label = extension?.renderText?.(report) ?? label; }
+  catch { /* A display extension cannot prevent the diagnostic. */ }
+  const indicator = label + (report.health === "problem" ? " · acc doctor" : "");
+  try {
+    if (extension?.composeText) return extension.composeText({ ...context, indicator });
+  } catch { /* Keep the diagnostic if the footer cannot be composed. */ }
+  return [context.previous, indicator].filter(Boolean).join("\n");
 }
 
 async function input(stream) {
@@ -28,15 +27,14 @@ async function input(stream) {
   return source;
 }
 
-// The user's existing status command gets exactly the same stdin. Only the
-// Antigravity installer supplies this file, from the command it wrapped.
-async function previousOutput(file, payload) {
-  if (!file) return "";
-  const { previous } = JSON.parse(await readFile(file, "utf8"));
-  if (previous?.enabled === false || typeof previous?.command !== "string" || !previous.command) return "";
+// The user's existing status command gets exactly the original stdin. The
+// installer stores it as data, never as shell text interpolated into ACC's command.
+async function previousOutput(previous, payload, timeout) {
+  if (previous?.enabled === false || ["builtin", "disabled", "off", "none", "hidden"].includes(previous?.type)
+    || typeof previous?.command !== "string" || !previous.command) return "";
   return new Promise(resolve => {
     const child = spawn(previous.command, { shell: true, stdio: ["pipe", "pipe", "ignore"],
-      windowsHide: true, timeout: 700 });
+      windowsHide: true, timeout });
     let text = "";
     child.stdout.on("data", chunk => {
       text += chunk;
@@ -51,13 +49,8 @@ async function previousOutput(file, payload) {
 
 export async function runIndicator({ argv = process.argv.slice(2), stdin = process.stdin,
   stdout = process.stdout } = {}) {
-  const options = {};
-  let report = indicatorFailure();
-  // Includes a stalled stdin or filesystem, not just time spent awaiting JS.
-  const timeout = setTimeout(() => {
-    stdout.write(output(indicatorFailure(), options) + "\n",
-      () => process.exit(0));
-  }, 1500);
+  const options = {}, context = { payload: {}, previous: "", settings: {} };
+  let report = indicatorFailure(), timeout;
   try {
     for (let i = 0; i < argv.length; i++) {
       const flag = argv[i];
@@ -66,13 +59,24 @@ export async function runIndicator({ argv = process.argv.slice(2), stdin = proce
         && typeof argv[i + 1] === "string") options[flag.slice(2)] = argv[++i];
       else throw new Error("invalid indicator option");
     }
+    context.extension = ALL_ADAPTERS().find(adapter => adapter.id === options.adapter)?.statusIndicator;
+    const plain = options.json || options.details;
+    timeout = setTimeout(() => {
+      stdout.write(output(indicatorFailure(), options, context) + "\n", () => process.exit(0));
+    }, plain ? 1500 : context.extension?.budgetMs ?? 1500);
     const source = options["native-session"] ? "{}" : await input(stdin);
-    const payload = source.trim() ? JSON.parse(source) : {};
+    context.payload = source.trim() ? JSON.parse(source) : {};
     report = await readIndicator({ adapterId: options.adapter,
-      nativeSessionId: options["native-session"] ?? payload.conversation_id ?? payload.session_id });
-    const previous = await previousOutput(options.previous, source);
-    if (previous) stdout.write(previous + "\n");
-  } catch { /* A status renderer fails open with a closed, actionable diagnostic. */ }
+      nativeSessionId: options["native-session"] ?? (context.extension?.nativeSessionId
+        ? context.extension.nativeSessionId(context.payload)
+        : context.payload.conversation_id ?? context.payload.session_id) });
+    if (options.previous && !plain) {
+      const saved = JSON.parse(await readFile(options.previous, "utf8"));
+      context.settings = await readTomlIndicatorSettings(saved);
+      context.previous = await previousOutput(saved.previous, source,
+        context.extension?.previousTimeoutMs ?? 700);
+    }
+  } catch { /* A status renderer fails open with an actionable diagnostic. */ }
   finally { clearTimeout(timeout); }
-  stdout.write(output(report, options) + "\n");
+  stdout.write(output(report, options, context) + "\n");
 }
