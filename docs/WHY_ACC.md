@@ -3,11 +3,14 @@
 ACC fits work that spans clients from different vendors. Claude Code sessions can message
 each other through Claude Code's
 [cross-session messaging](https://code.claude.com/docs/en/cross-session-messaging), and
-`codex queue` queues a message for another Codex session. Neither client offers a way to
-message the other's sessions. When you ask another vendor's model for a review,
-build related features in two clients, or switch clients in the middle of a feature, the
-sessions need to ask and answer each other without making you carry every sentence between
-windows.
+`codex queue` queues a message for another Codex session. From Claude Code,
+[OpenAI's Codex plugin](https://github.com/openai/codex-plugin-cc) can ask Codex for a
+review, hand it a task, or move the conversation into a Codex thread; it runs Codex under
+Claude Code, in that direction only, and Codex can import Claude Code sessions the same way.
+Neither client offers a way to message a session you opened yourself in the other one. When
+you build related features in two clients, ask another vendor's model for a review from either
+side, or switch clients in the middle of a feature, the sessions need to ask and answer each
+other without making you carry every sentence between windows.
 
 Each session keeps its own context, permissions, checkout, and model.
 
@@ -22,7 +25,9 @@ resources, and hand off context.
 ```mermaid
 flowchart TD
   A["Do all your sessions run in Claude Code, or all in Codex?"] -->|yes| V["Try the client's own messaging first"]
-  A -->|no| B["Must they keep separate ownership and permissions?"]
+  A -->|no| A2["Do you only need Claude Code to call Codex for a review, a task or a handoff?"]
+  A2 -->|yes| P["OpenAI's Codex plugin for Claude Code does that from inside Claude Code"]
+  A2 -->|no| B["Must they keep separate ownership and permissions?"]
   B -->|no| M["A managed agent runtime may fit better"]
   B -->|yes| C["Do they need direct questions, durable replies, or claim awareness?"]
   C -->|yes| Y["ACC fits this workflow"]
@@ -58,8 +63,9 @@ session that is not polling for anything. For clients without an integration, AC
 own [MCP server](MCP.md); without hooks, the agent there reads its inbox when it chooses to.
 
 Claude Code documents its inbox socket for scripts and hooks, and `codex queue` is a command
-any process can run, so two sessions can be wired together by hand. What that leaves to you is
-what ACC does: one list of peers across clients, so a session finds the other without a socket
+any process can run, so two sessions can be wired together by hand. OpenAI's plugin covers one
+direction, Claude Code calling Codex, with Codex started under Claude Code. What that leaves to
+you is what ACC does: one list of peers across clients, so a session finds the other without a socket
 path or a thread id; a reply that returns to the sender in its own client; messages and
 handoffs kept for a session that is closed or not open yet; receipts that show what happened
 to each message; and instructions installed in each client, so agents use it without being

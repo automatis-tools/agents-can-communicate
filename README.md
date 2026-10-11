@@ -3,9 +3,11 @@
 **The message your clients can’t send each other.**
 
 Claude Code can message your other Claude Code sessions, and Codex can queue a message for
-another Codex session. Neither client offers a way to message the other’s sessions. ACC
-carries questions, reviews and handoffs between sessions in different vendors’ clients, on
-your machine.
+another Codex session. From Claude Code, OpenAI’s Codex plugin can ask Codex for a review,
+hand it a task or move the conversation into Codex; it runs Codex under Claude Code, in that
+direction only. Neither client offers a way to message a session you opened yourself in the
+other one. ACC carries questions, reviews and handoffs between those sessions, in either
+direction, on your machine.
 
 You open each client normally and choose its work. Every session keeps its own model,
 conversation, and permissions. Coordination runs locally, with no lead agent managing the
@@ -45,16 +47,17 @@ flowchart TB
 
 ## When ACC helps
 
-- **Get a second opinion from another vendor’s model.** Ask a Codex session to review a change
-  your Claude Code session just made, and send its findings back to the session that wrote the
-  code.
-- **Bring parallel features together.** Let sessions in different clients ask each other about
-  a shared API before they build around different assumptions.
+- **Run parallel work across clients.** Start each task in whichever client has limit left,
+  and let the sessions see who is working on what, ask each other about a shared API, and
+  agree who takes which issue before they build around different assumptions.
+- **Get a second opinion from another vendor’s model, in either direction.** Ask a Codex
+  session you already have open to review a change your Claude Code session just made, and
+  send its findings back to the session that wrote the code; or let Codex ask Claude Code.
 - **Switch clients mid-feature.** When a limit approaches or another model suits the work
-  better, leave a handoff with decisions and unfinished work for a session in the client you
-  open next.
+  better, leave a handoff with decisions, unfinished work and what was verified, rather than a
+  transcript, for a session in the client you open next.
 
-## Try one review across clients
+## Try one feature across two clients
 
 You’ll need **macOS, Linux or Windows 10/11, Node.js 24 or newer**, and supported coding
 clients on the same machine and operating-system user. On Windows, ACC runs natively, with no
@@ -70,24 +73,29 @@ The installer connects supported clients it finds. Follow its activation instruc
 any required hook or plugin trust, then restart your clients from the project directory. The
 [setup guide](docs/GETTING_STARTED.md) covers client-specific steps.
 
-Open Claude Code and Codex in the same project. After Claude Code has changed something, for
-example an account-registration form, ask it:
+Open Claude Code and Codex in the same project and give each one its own part of one feature.
+Ask Codex:
 
 ```text
-Ask the Codex session in ACC to review the registration form change
-you just made. Name the files and what it should check.
+Add an account-registration endpoint.
 ```
 
-Then ask Codex:
+And ask Claude Code:
 
 ```text
-Answer the review request in ACC. Read the files it names, check
-what it asks, and reply with what you found.
+Build the account-registration screen.
 ```
 
-Codex should find the request without you pasting it, and Claude Code should see the findings
-at its next turn without you copying them back. The sender can check whether its message was
-delivered and answered.
+Those are the whole prompts. Each session sees that the other is present and what it is
+working on. When the screen needs the endpoint’s request and response shape, the Claude Code
+session can ask the Codex session and get the answer at its next turn, without you carrying
+it across; the sender can check whether its question was delivered and answered. The agents
+decide when to coordinate; ACC does not guarantee they will notice every dependency.
+
+The same channel carries a review: ask the session that made a change to request a review
+from the other session in ACC, naming the files, and ask the other to answer it. The
+[setup guide](docs/GETTING_STARTED.md#2-open-two-sessions-and-give-them-ordinary-tasks)
+walks through both.
 
 ## Client support
 
