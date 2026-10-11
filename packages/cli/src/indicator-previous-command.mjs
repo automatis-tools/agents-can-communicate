@@ -1,5 +1,6 @@
 import { spawn } from "node:child_process";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 const LIMIT = 64 * 1024;
 
@@ -10,12 +11,12 @@ function stopTree(child) {
     try { process.kill(-child.pid, "SIGKILL"); } catch { /* Already gone. */ }
     return;
   }
-  // Keep the shell alive until taskkill discovers its descendants. Killing the
-  // shell first loses that relationship; an exited PID must never be reused.
+  // Keep the owned launcher alive until taskkill discovers its descendants.
+  // Killing it first loses that relationship; an exited PID must never be reused.
   if (child.exitCode !== null || child.signalCode !== null) return;
   const root = process.env.SystemRoot ?? process.env.SYSTEMROOT ?? "C:\\Windows";
   return new Promise(resolve => {
-    // Both processes must survive the indicator's outer deadline: libuv kills
+    // Launcher and cleanup must survive the outer deadline: libuv kills
     // non-detached Windows children when their spawning Node process exits.
     const killer = spawn(path.win32.join(root, "System32", "taskkill.exe"),
       ["/pid", String(child.pid), "/T", "/F"], { detached: true, windowsHide: true, stdio: "ignore" });
@@ -47,13 +48,18 @@ export async function previousOutput(previous, payload, timeout, signal) {
       Promise.resolve(cleanup).catch(() => {}).finally(() => {
         child?.stdin?.destroy();
         child?.stdout?.destroy();
+        if (child?.connected) child.disconnect();
         child?.unref();
         resolve(text.slice(0, LIMIT).trimEnd());
       });
     };
     try {
-      child = spawn(previous.command, { shell: true, detached: true,
-        stdio: ["pipe", "pipe", "ignore"], windowsHide: true });
+      const windows = process.platform === "win32";
+      child = windows
+        ? spawn(process.execPath, [fileURLToPath(new URL("./indicator-previous-windows.mjs", import.meta.url)), previous.command],
+          { detached: true, stdio: ["pipe", "pipe", "ignore", "ipc"], windowsHide: true })
+        : spawn(previous.command, { shell: true, detached: true,
+          stdio: ["pipe", "pipe", "ignore"], windowsHide: true });
       child.stdout.on("data", chunk => {
         if (settled) return;
         text += chunk;
@@ -63,7 +69,14 @@ export async function previousOutput(previous, payload, timeout, signal) {
       child.once("error", finish);
       child.once("close", finish);
       signal?.addEventListener("abort", finish, { once: true });
-      timer = setTimeout(finish, timeout);
+      // The command budget starts when the Windows launcher starts the shell.
+      // Startup is bounded too; the enclosing indicator deadline can abort both.
+      timer = setTimeout(finish, windows ? 1000 : timeout);
+      if (windows) child.once("message", message => {
+        if (settled || message !== "started") return;
+        clearTimeout(timer);
+        timer = setTimeout(finish, timeout);
+      });
       child.stdin.end(payload);
       if (signal?.aborted) finish();
     } catch { finish(); }

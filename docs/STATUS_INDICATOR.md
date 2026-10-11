@@ -66,8 +66,10 @@ output limit. A disabled old command stays disabled. Disabling ACC restores only
 fields ACC changed and still owns. A user replacement command takes precedence.
 
 On POSIX, timeout, output overflow and indicator cancellation stop the previous
-command's owned process group. On Windows, ACC stops the still-running footer shell
-and its descendants with `taskkill /T /F`. Scripts that leave background processes
+command's owned process group. Windows uses a detached Node launcher because a
+detached shell loses its standard input handles. The launcher starts a hidden shell
+with the original stdin/stdout. ACC stops the launcher and its descendants with
+`taskkill /T /F`. Scripts that leave background processes
 running after the shell exits must stop those processes themselves on Windows.
 
 ## Kimi and Grok composition
