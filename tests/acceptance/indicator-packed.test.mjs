@@ -77,3 +77,27 @@ test("the installed Antigravity reader emits a colored glyph through a pipe with
   assert.deepEqual(stdout.split(/\x1b\[[0-9;]*m/g), ["ACC ", "●", "\n"]);
   assert.match(stdout, /\x1b\[22;1;38;2;44;122;57m●\x1b\[22;39m/);
 });
+
+for (const [adapterId, version, key, suffix] of [
+  ["kimi", "2.1.1", "sessionId", "turn"], ["grok", "1.0.46", "session_id", "inbox"],
+]) test(`the installed ${adapterId} command reads its exact native payload and keeps footer information`, async t => {
+  const f = await createPackedAcc(t);
+  const state = await createIndicatorFixture(t, { adapterId, version });
+  await f.setClientVersions({ [adapterId]: version });
+  await f.acc(["install", "--adapter", adapterId, "--indicator", "on", "--delivery", "off"]);
+  const file = path.join(f.clientHome, adapterId === "kimi" ? ".kimi-code" : ".grok",
+    adapterId === "kimi" ? "tui.toml" : "config.toml");
+  assert.match(await readFile(file, "utf8"), /acc-indicator/);
+  const payload = { [key]: "native-session", cwd: "/tmp/project",
+    model: adapterId === "kimi" ? "K3" : { display_name: "Grok" }, context_window: { used_percentage: 12 } };
+  const child = exec(process.execPath, ["--permission", "--allow-fs-read=*",
+    path.join(f.dataHome, "acc", "runtime", "bin", "acc-indicator.mjs"), "--adapter", adapterId],
+  { env: { ...f.env, ACC_DATA_HOME: state.dataHome }, cwd: f.project });
+  child.child.stdin.end(JSON.stringify(payload));
+  const { stdout } = await child;
+  assert.match(stripVTControlCharacters(stdout), new RegExp(`^ACC ● · ${suffix} │`));
+  assert.match(stdout, /\x1b\[22;1;38;2;44;122;57m●/);
+  assert.match(stdout, /project/);
+  await f.acc(["install", "--adapter", adapterId, "--indicator", "off", "--delivery", "off"]);
+  await assert.rejects(readFile(file), { code: "ENOENT" });
+});

@@ -1,3 +1,4 @@
+import {configureGrokIndicator, grokIndicatorPaths} from "./indicator-install.mjs";
 import { cp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -64,9 +65,10 @@ const withShim = (wiring, shim, windowsNode = null) => ({
     }))])),
 });
 
-export async function installGrokHooks({ grokHome, home, runner, cli, node,
-  hostPlatform = process.platform }) {
+export async function installGrokHooks(context) {
+  const {grokHome, home, runner, cli, node, hostPlatform = process.platform} = context;
   const root = grokHome ?? grokHomeOf({ home, grokHome });
+  const indicatorChanges = await configureGrokIndicator(context, context.indicator === "on");
   const template = await readJson(path.join(bundle, "hooks", "hooks.json"), { hooks: {} });
   const shim = await writeHookShim({ dir: path.join(root, "hooks"), adapterId: "grok",
     runner, node, name: SHIM_NAME, platform: hostPlatform });
@@ -80,12 +82,13 @@ export async function installGrokHooks({ grokHome, home, runner, cli, node,
 
   await writeJson(hooksFile(root), withShim(template, shim,
     hostPlatform === "win32" ? node ?? process.execPath : null));
-  return { ok: true, changes: [hooksFile(root), shim, skills], diagnostics: [] };
+  return { ok: true, changes: [hooksFile(root), shim, skills, ...indicatorChanges], diagnostics: [] };
 }
 
-export async function uninstallGrokHooks({ grokHome, home, keep = [], hostPlatform }) {
+export async function uninstallGrokHooks(context) {
+  const {grokHome, home, keep = [], hostPlatform} = context;
   const root = grokHome ?? grokHomeOf({ home, grokHome });
-  const changes = [];
+  const changes = await configureGrokIndicator(context, false);
   for (const target of [hooksFile(root), shimPath(root, hostPlatform), skillPath(root)]) {
     if (await removeInstalledTree(target, keep)) changes.push(target);
   }
@@ -104,8 +107,10 @@ export async function detectGrok({ grokHome, home }) {
 }
 
 export function planGrokInstall(context) {
-  const root = grokHomeOf(context);
+  const root = grokHomeOf(context), indicator = grokIndicatorPaths(context);
   return [
+    {path: indicator.file, kind: "merge"},
+    ...(context.hostPlatform === "win32" && context.indicator === "on" ? [{path: indicator.shim, kind: "tree"}] : []),
     { path: hooksFile(root), kind: "tree" },
     { path: shimPath(root, context.hostPlatform), kind: "tree" },
     { path: skillPath(root), kind: "tree" },
