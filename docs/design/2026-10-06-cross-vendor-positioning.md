@@ -96,4 +96,3 @@ Changes to the public texts, in the working copy on 2026-10-08:
   sentence; a review alone is what the plugin does in one command.
 - `docs/WHY_ACC.md` names the plugin in its first paragraph, adds a branch for it to the fit
   diagram, and mentions it in the "hooks over an MCP server or a script" section.
-
