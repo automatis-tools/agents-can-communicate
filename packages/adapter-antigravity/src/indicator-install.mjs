@@ -44,6 +44,9 @@ export async function configureIndicator(context, enabled) {
     return [file];
   }
   const ours = saved && existing?.statusLine?.command === saved.installed.command;
+  // Keep the marker after a user replacement or removal, so later updates do
+  // not mistake it for a first install. Explicit disable clears this history.
+  if (saved && !ours) return [];
   const previous = ours ? saved.previous : existing?.statusLine ?? null;
   if (previous !== null && (previous.type !== "command" || typeof previous.command !== "string")) {
     throw new Error("ACC cannot compose this statusLine type; keep it and configure the indicator manually");

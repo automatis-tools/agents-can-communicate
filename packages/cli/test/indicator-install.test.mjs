@@ -83,14 +83,49 @@ test("Antigravity preserves and runs an existing status command and restores it 
   assert.equal((await json(file)).theme, "dark");
 });
 
-test("Antigravity uninstall keeps a status command the user changed after installation", async t => {
+test("Antigravity updates and uninstall keep a status command the user changed after installation", async t => {
   const context = await fixture(t);
   await installAntigravity(context);
   const file = path.join(context.home, ".gemini", "antigravity-cli", "settings.json");
   const changed = { type: "command", command: "my-new-status" };
   await writeFile(file, JSON.stringify({ ...(await json(file)), statusLine: changed }));
+  for (let update = 0; update < 2; update++) {
+    await installAntigravity({ ...context, indicatorRunner: path.join(context.home, `runner-${update}.mjs`) });
+    assert.deepEqual((await json(file)).statusLine, changed);
+  }
   await uninstallAntigravity(context);
   assert.deepEqual((await json(file)).statusLine, changed);
+});
+
+for (const removeFile of [false, true]) {
+  test(`Antigravity updates keep a user-removed ${removeFile ? "settings file" : "statusLine"} absent`, async t => {
+    const context = await fixture(t);
+    const file = path.join(context.home, ".gemini", "antigravity-cli", "settings.json");
+    await configureIndicator(context, true);
+    if (removeFile) await rm(file);
+    else await writeFile(file, JSON.stringify({ theme: "dark" }));
+    for (const enabled of [true, true, false]) {
+      await configureIndicator(context, enabled);
+      if (removeFile) await assert.rejects(readFile(file), { code: "ENOENT" });
+      else assert.deepEqual(await json(file), { theme: "dark" });
+    }
+  });
+}
+
+test("Antigravity disable preserves a replacement and explicit re-enable composes it anew", async t => {
+  const context = await fixture(t);
+  const file = path.join(context.home, ".gemini", "antigravity-cli", "settings.json");
+  await configureIndicator(context, true);
+  const changed = { type: "command", command: "my-new-status", enabled: false, padding: 3 };
+  await writeFile(file, JSON.stringify({ statusLine: changed, theme: "dark" }));
+  for (const enabled of [true, true, false, false]) {
+    await configureIndicator(context, enabled);
+    assert.deepEqual(await json(file), { statusLine: changed, theme: "dark" });
+  }
+  await configureIndicator(context, true);
+  assert.notEqual((await json(file)).statusLine.command, changed.command);
+  await configureIndicator(context, false);
+  assert.deepEqual(await json(file), { statusLine: changed, theme: "dark" });
 });
 
 test("refresh never claims status-line presentation fields the user edited", async t => {
@@ -102,11 +137,23 @@ test("refresh never claims status-line presentation fields the user edited", asy
   const edited = await json(file);
   edited.statusLine.padding = 3;
   edited.statusLine.stack_with_default = false;
+  edited.statusLine.enabled = false;
   await writeFile(file, JSON.stringify(edited));
-  await configureIndicator(context, true);
+  for (let update = 0; update < 2; update++) {
+    const indicatorRunner = path.join(context.home, `runner-${update}.mjs`);
+    const expected = `refreshed-indicator-${update}`;
+    await writeFile(indicatorRunner, `process.stdout.write(${JSON.stringify(expected)});\n`);
+    await configureIndicator({ ...context, indicatorRunner }, true);
+    const statusLine = (await json(file)).statusLine;
+    const { stdout } = await exec(process.execPath, ["--input-type=module", "-e",
+      `import {spawn} from 'node:child_process'; const p=spawn(process.argv[1],{shell:true,stdio:['ignore','pipe','inherit']}); p.stdout.pipe(process.stdout); p.on('exit',code=>{process.exitCode=code??1});`,
+      statusLine.command], { env: { ...process.env, ACC_DATA_HOME: context.dataHome }, timeout: 5000 });
+    assert.equal(stdout, expected, "refresh must execute the updated runner");
+    assert.deepEqual({ ...statusLine, command: edited.statusLine.command }, edited.statusLine);
+  }
   await configureIndicator(context, false);
   assert.deepEqual((await json(file)).statusLine,
-    { type: "command", command: "my-status", padding: 3, stack_with_default: false });
+    { type: "command", command: "my-status", padding: 3, stack_with_default: false, enabled: false });
 });
 
 test("an Antigravity version below the status-line floor keeps its existing command", async t => {
