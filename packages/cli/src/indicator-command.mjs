@@ -1,5 +1,5 @@
 import { readTomlIndicatorSettings } from "@agents-can-communicate/adapter-sdk";
-import { spawn } from "node:child_process";
+import { previousOutput } from "./indicator-previous-command.mjs";
 import { readFile } from "node:fs/promises";
 import { readIndicator, indicatorFailure } from "./indicator.mjs";
 import { ALL_ADAPTERS } from "./install-command.mjs";
@@ -27,30 +27,11 @@ async function input(stream) {
   return source;
 }
 
-// The user's existing status command gets exactly the original stdin. The
-// installer stores it as data, never as shell text interpolated into ACC's command.
-async function previousOutput(previous, payload, timeout) {
-  if (previous?.enabled === false || ["builtin", "disabled", "off", "none", "hidden"].includes(previous?.type)
-    || typeof previous?.command !== "string" || !previous.command) return "";
-  return new Promise(resolve => {
-    const child = spawn(previous.command, { shell: true, stdio: ["pipe", "pipe", "ignore"],
-      windowsHide: true, timeout });
-    let text = "";
-    child.stdout.on("data", chunk => {
-      text += chunk;
-      if (Buffer.byteLength(text) > 64 * 1024) child.kill();
-    });
-    child.stdin.on("error", () => {});
-    child.on("error", () => resolve(""));
-    child.on("close", () => resolve(text.slice(0, 64 * 1024).trimEnd()));
-    child.stdin.end(payload);
-  });
-}
-
 export async function runIndicator({ argv = process.argv.slice(2), stdin = process.stdin,
   stdout = process.stdout } = {}) {
   const options = {}, context = { payload: {}, previous: "", settings: {} };
-  let report = indicatorFailure(), timeout;
+  let report = indicatorFailure(), timeout, expired = false;
+  const controller = new AbortController();
   try {
     for (let i = 0; i < argv.length; i++) {
       const flag = argv[i];
@@ -62,6 +43,8 @@ export async function runIndicator({ argv = process.argv.slice(2), stdin = proce
     context.extension = ALL_ADAPTERS().find(adapter => adapter.id === options.adapter)?.statusIndicator;
     const plain = options.json || options.details;
     timeout = setTimeout(() => {
+      expired = true;
+      controller.abort();
       stdout.write(output(indicatorFailure(), options, context) + "\n", () => process.exit(0));
     }, plain ? 1500 : context.extension?.budgetMs ?? 1500);
     const source = options["native-session"] ? "{}" : await input(stdin);
@@ -74,9 +57,9 @@ export async function runIndicator({ argv = process.argv.slice(2), stdin = proce
       const saved = JSON.parse(await readFile(options.previous, "utf8"));
       context.settings = await readTomlIndicatorSettings(saved);
       context.previous = await previousOutput(saved.previous, source,
-        context.extension?.previousTimeoutMs ?? 700);
+        context.extension?.previousTimeoutMs ?? 700, controller.signal);
     }
   } catch { /* A status renderer fails open with an actionable diagnostic. */ }
-  finally { clearTimeout(timeout); }
-  stdout.write(output(report, options, context) + "\n");
+  finally { clearTimeout(timeout); controller.abort(); }
+  if (!expired) stdout.write(output(report, options, context) + "\n");
 }
