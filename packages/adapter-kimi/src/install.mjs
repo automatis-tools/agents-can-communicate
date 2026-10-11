@@ -1,4 +1,4 @@
-import {configureKimiIndicator, kimiIndicatorPaths} from "./indicator-install.mjs";
+import {configureKimiIndicator, planKimiIndicator} from "./indicator-install.mjs";
 import { cp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 
@@ -224,10 +224,8 @@ export async function detectKimi({ home, runner = defaultRunner() }) {
  */
 export function planKimiInstall(context) {
   const {home} = context;
-  const indicator = kimiIndicatorPaths(context);
   return [
-    {path: indicator.file, kind: "merge"},
-    ...(context.hostPlatform === "win32" && context.indicator === "on" ? [{path: indicator.shim, kind: "tree"}] : []),
+    ...planKimiIndicator(context),
     { path: pluginPath(home), kind: "tree" },
     { path: configPath(home), kind: "merge" },
     { path: registryPath(home), kind: "merge" },
