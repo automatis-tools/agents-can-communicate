@@ -7,6 +7,8 @@ import { promisify, stripVTControlCharacters } from "node:util";
 import test from "node:test";
 import { createPackedAcc } from "../helpers/packed-acc.mjs";
 import { createIndicatorFixture } from "../helpers/indicator-fixture.mjs";
+import { mergeEnv, readTomlIndicatorSettings } from "@agents-can-communicate/adapter-sdk";
+import { runInShell } from "../helpers/host-shells.mjs";
 
 const exec = promisify(execFile);
 test("the installed indicator survives the initial package and its mod preserves native labels", async t => {
@@ -87,9 +89,21 @@ for (const [adapterId, version, key, suffix] of [
   await f.acc(["install", "--adapter", adapterId, "--indicator", "on", "--delivery", "off"]);
   const file = path.join(f.clientHome, adapterId === "kimi" ? ".kimi-code" : ".grok",
     adapterId === "kimi" ? "tui.toml" : "config.toml");
-  assert.match(await readFile(file, "utf8"), /acc-indicator/);
+  const settings = await readTomlIndicatorSettings({ file,
+    table: adapterId === "kimi" ? ["status_line"] : ["ui", "status_line"] });
   const payload = { [key]: "native-session", cwd: "/tmp/project",
     model: adapterId === "kimi" ? "K3" : { display_name: "Grok" }, context_window: { used_percentage: 12 } };
+  // Execute the configured command, including the Windows shim. An unregistered
+  // native ID gives a deterministic footer without measuring the host's UI deadline
+  // against a busy parallel CI worker; classification is checked separately below.
+  const commandResult = await runInShell(process.platform === "win32" ? "cmd" : "sh", settings.command,
+    { cwd: f.project, env: mergeEnv(f.env, { ACC_DATA_HOME: state.dataHome,
+      PATH: [path.dirname(process.execPath), f.env.PATH].join(path.delimiter) }),
+      input: JSON.stringify({ ...payload, [key]: "unregistered-native-session" }) });
+  const commandText = stripVTControlCharacters(commandResult.stdout);
+  assert.match(commandText, /^ACC ! · acc doctor │/);
+  assert.match(commandText, adapterId === "kimi" ? /K3/ : /Grok/);
+  assert.match(commandText, /project/);
   const child = exec(process.execPath, ["--permission", "--allow-fs-read=*",
     path.join(f.dataHome, "acc", "runtime", "bin", "acc-indicator.mjs"), "--adapter", adapterId, "--json"],
   { env: { ...f.env, ACC_DATA_HOME: state.dataHome }, cwd: f.project });
