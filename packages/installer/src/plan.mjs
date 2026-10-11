@@ -14,7 +14,7 @@ import { LIVE_POLICIES, describeActivation, describeDeactivation, planActivation
  */
 export function planInstallation({ adapters, detected, context, action = "install",
   recorded = [], accVersion = null, allowDowngrade = false, requested = [],
-  deliveryByAdapter = {}, deliveryDecisionByAdapter = {}, allowServiceSetup = false }) {
+  deliveryByAdapter = {}, deliveryDecisionByAdapter = {}, allowServiceSetup = false, indicator }) {
   if (!["install", "uninstall"].includes(action)) {
     throw new AccError(EXIT.USAGE, `unknown installation action: ${action}`, { action });
   }
@@ -157,7 +157,13 @@ export function planInstallation({ adapters, detected, context, action = "instal
       : null;
     const deliverySummary = action === "install"
       ? describeInstallDelivery(entry, delivery, effectiveLivePolicy) : null;
-    const installContext = { ...context, requestedLivePolicy: delivery,
+    const indicatorPreference = indicator ?? recordedById.get(entry.adapterId)?.indicator ?? "off";
+    const indicatorDiagnostic = indicatorPreference !== "on" ? null : !adapter.statusIndicator
+      ? `${adapter.displayName} indicator: not supported in this client's native status line`
+      : entry.version == null || isOlder(entry.version, adapter.statusIndicator.minimumVersion)
+        ? `${adapter.displayName} indicator requires client ${adapter.statusIndicator.minimumVersion} or later`
+        : `${adapter.displayName} indicator: enabled; ${adapter.statusIndicator.reload}`;
+    const installContext = { ...context, indicator: indicatorPreference, requestedLivePolicy: delivery,
       livePolicy: configuredLivePolicy, clientVersion: entry.version, platform: entry.platform };
     const nativeServiceSetup = action === "install" && allowServiceSetup && delivery !== "off"
       && deliveryDecision.completeSetup === true ? entry.nativeServiceSetup : undefined;
@@ -192,6 +198,8 @@ export function planInstallation({ adapters, detected, context, action = "instal
       clientPresent: entry.present === true,
       alreadyInstalled: entry.installed === true,
       livePolicy: delivery,
+      indicator: indicatorPreference,
+      ...(indicatorDiagnostic === null ? {} : { indicatorDiagnostic }),
       effectiveLivePolicy,
       ...(action === "install" ? { deliveryDecision } : {}),
       ...(retainedActivation ? { configuredLivePolicy, retainedNativeActivation: retainedActivation } : {}),
@@ -205,6 +213,7 @@ export function planInstallation({ adapters, detected, context, action = "instal
       // Said in the operator's terms, not in paths: which files ACC creates
       // outright and which belong to the user and are only edited.
       summary: [
+        ...(indicatorDiagnostic === null ? [] : [indicatorDiagnostic]),
         ...(entry.present ? [] : [`${adapter.displayName ?? adapter.id} is no longer on `
           + "this machine; removing what ACC recorded writing"]),
         ...(deliverySummary === null ? [] : [deliverySummary]),

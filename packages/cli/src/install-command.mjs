@@ -224,6 +224,9 @@ export function actedOn(result) {
 }
 
 export async function runInstallCommand({ options, runtime, action = "install" }) {
+  if (options.indicator !== undefined && !["on", "off"].includes(options.indicator)) {
+    throw new AccError(EXIT.USAGE, "--indicator must be on or off");
+  }
   const adapters = selectAdapters(options.adapter);
   const home = options.home ?? runtime.env?.HOME ?? homedir();
   const { data: dataHome } = platformPaths({ platform: runtime.platform,
@@ -261,6 +264,7 @@ export async function runInstallCommand({ options, runtime, action = "install" }
     ? await decideDelivery({ options, detected, recorded, runtime, dryRun })
     : { deliveryByAdapter: {}, asked: [], notes: [] };
   const plan = planInstallation({ adapters, detected, context, action, recorded,
+    indicator: options.indicator,
     accVersion, allowDowngrade: options.downgrade === true, requested,
     deliveryByAdapter: decided.deliveryByAdapter,
     deliveryDecisionByAdapter: decided.deliveryDecisionByAdapter,

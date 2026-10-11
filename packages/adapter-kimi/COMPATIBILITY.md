@@ -197,3 +197,17 @@ supported surfaces reach a server ACC would own or launch, not the session a use
 themselves. The adapter declares no `nativeDelivery` contract and keeps `delivery.livePush`
 and `delivery.replyRoute` false; messages remain durable for the certified next-turn hook
 and heartbeat or for `acc inbox`.
+
+## Status indicator — 2.1.1, 2026-10-10
+
+The status command receives camelCase `sessionId`, matching native SessionStart and
+UserPromptSubmit `session_id` in an isolated session. Before the first message it is empty.
+ANSI RGB `44,122,57` was displayed; only the first output line replaces the first footer.
+The native context line remains. Model, cwd, gitBranch, permissionMode, planMode and context
+fields were observed. Goals, task counts, thinking effort, swarm/tower and detailed Git
+state are absent from the snapshot and cannot be reproduced by the ACC footer.
+
+The client enforces 300 ms per command and caches the last successful line on failure.
+ACC uses a 180 ms internal bound after module loading and 80 ms for a previous command.
+An isolated localhost provider returned one canned turn to prove session identity; no
+external provider or personal configuration was used. This is UI evidence only.

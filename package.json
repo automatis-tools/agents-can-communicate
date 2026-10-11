@@ -43,6 +43,7 @@
   },
   "bin": {
     "acc": "bin/acc.mjs",
+    "acc-indicator": "bin/acc-indicator.mjs",
     "acc-mcp": "bin/acc-mcp.mjs",
     "acc-hook": "bin/acc-hook.mjs"
   },
@@ -52,6 +53,7 @@
     "docs/ARCHITECTURE.md",
     "docs/CAPABILITIES.md",
     "docs/CLI.md",
+    "docs/STATUS_INDICATOR.md",
     "docs/CONCEPTS.md",
     "docs/CONFIGURATION.md",
     "docs/DESIGN_DECISIONS.md",

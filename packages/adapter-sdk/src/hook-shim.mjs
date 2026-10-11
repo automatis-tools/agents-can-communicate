@@ -58,6 +58,7 @@ const ownBinary = name => {
 };
 
 export const defaultRunner = () => ownBinary("acc-hook.mjs");
+export const defaultIndicator = () => ownBinary("acc-indicator.mjs");
 export const defaultAntigravityRelay = () => ownBinary("acc-antigravity-relay.mjs");
 
 export const runnerExists = async runner => {

@@ -1,5 +1,37 @@
 # Changelog
 
+## Unreleased — per-session ACC indicator
+
+- Optional Claude Code, Antigravity CLI, Kimi Code and Grok indicators show incoming reception as
+  `ACC ●`, `ACC ● · turn`, or `ACC ● · inbox`. Known failures retain `!` and the
+  available fallback, with an explanation and recovery step (#284).
+- All supported clients use the same fixed green for the healthy dot. In Claude Code the
+  glyph is bold and non-dim; the name and qualifier retain the ordinary footer
+  color, with no background.
+- Antigravity colors only the glyph even when the status command runs through a
+  pipe. Existing installed commands use the correction without new arguments.
+- Kimi and Grok compose an existing status command or available native footer
+  fields. Kimi's snapshot cannot retain goal/task badges and thinking effort; its
+  native context line remains. TOML ownership preserves later user edits.
+- The indicator reads local state without ACC writes or client socket probes.
+  Idle sessions remain active when a delivery lease expires. A failed send or
+  endpoint verification is a separate observation.
+- `acc install --indicator on|off` preserves the user's status-line configuration
+  and the saved preference across updates. The managed reader follows the active
+  generation without taking a runtime lease.
+
+| Candidate artifact | Value |
+|---|---|
+| Built from | `51b9b8aec13a7ef8b7826b70f1966023f866070b` |
+| Tarball | `agents-can-communicate-0.10.4.tgz`, 600,332 bytes, 368 files |
+| sha256 | `0262ed0252c1574fbcbb485428d1d45f14a1bf7f7f0ce57848bfe47da836912d` |
+
+The exact archive passed clean installation verification. The feature's packed
+integration check exercised the installed module and stable reader after removal
+of the original package. See [verification and limits](docs/release-evidence/unreleased-status-indicator.md).
+This is an unpublished development candidate. Existing release records retain
+their original source and artifact facts.
+
 ## 0.10.4 — release candidate
 
 - Codex sender permission failures remain `transport_permission_denied` instead

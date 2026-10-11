@@ -360,7 +360,7 @@ before leaving, request the concrete continuation and obtain a substantive reply
 
 | Command | Flags |
 |---|---|
-| `acc install` | `--adapter`, `--home`, `--delivery off|actionable|all`, `--dry-run`, `--downgrade` |
+| `acc install` | `--adapter`, `--home`, `--delivery off|actionable|all`, `--indicator on|off`, `--dry-run`, `--downgrade` |
 | `acc uninstall` | `--adapter`, `--home`, `--dry-run` |
 | `acc doctor` | `--home`, `--repair`, `--migrate-store` |
 | `acc config init` | `--yes`, `--force` |

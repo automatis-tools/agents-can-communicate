@@ -57,7 +57,7 @@ export const COMMANDS = Object.freeze({
   // `--downgrade` because an older acc first on PATH will otherwise rewire every
   // client to itself, and the only symptom is a guard behaving like the version
   // it came from.
-  install: { required: [], optional: ["home", "delivery"], repeated: ["adapter"],
+  install: { required: [], optional: ["home", "delivery", "indicator"], repeated: ["adapter"],
     flags: ["dry-run", "downgrade"] },
   // `--dry-run` on both, because the preview was computed for either action and
   // only `install` could ask for it. Removal is the side that reaches into a

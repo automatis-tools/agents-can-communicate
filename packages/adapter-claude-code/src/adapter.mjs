@@ -34,6 +34,7 @@ export function createClaudeCodeAdapter() {
   return defineAdapter({
     id: "claude_code",
     displayName: "Claude Code",
+    statusIndicator: { minimumVersion: "2.1.287", reload: "run /reload-plugins in the open session" },
     // The binary this client actually installs. Probed for a version to
     // decide whether the client is on this machine, so it has to be the
     // real command rather than the adapter id: `2.1.233 (Claude Code)`.

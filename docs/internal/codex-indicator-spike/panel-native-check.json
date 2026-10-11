@@ -1,0 +1,13 @@
+{
+  "verified": false,
+  "status": "blocked",
+  "attempt": "cua.getApp('com.openai.codex')",
+  "toolResult": "Computer Use is not allowed to use the app 'com.openai.codex' for safety reasons.",
+  "appLaunched": false,
+  "productionRegistrationMade": false,
+  "productionFilesChanged": [],
+  "browserMockPresentedAsNative": false,
+  "mcpAppsSurfaceAvailable": false,
+  "source": "https://developers.openai.com/plugins/build/plugins#install-a-local-plugin-manually",
+  "loadingNote": "Official local plugin instructions require a desktop restart to discover or refresh local files; no restart was performed. The permitted native UI tool rejected the target before access."
+}
