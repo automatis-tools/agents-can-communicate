@@ -1,5 +1,32 @@
 # Changelog
 
+## 0.11.0 — combined release candidate
+
+- Ship atomic batch claim/release from PR #291 together with the per-session
+  indicators from PR #288, including its latest review and test-cleanup fixes.
+- Optional Claude Code, Antigravity CLI, Kimi Code and Grok indicators show
+  reception and failures while preserving the user's footer configuration.
+- Antigravity preserves user replacements across updates. Optional diagnostic
+  writes do not delay offers or delivery to the next participant.
+- Preserve the independent-session positioning documentation and all earlier
+  source, artifact and native capture records.
+
+| Candidate artifact | Value |
+|---|---|
+| Built from | `2244dba7a94ab27fe6c7152f813cfd1ab49b26b2` |
+| Tarball | `agents-can-communicate-0.11.0.tgz`, 607,574 bytes, 374 files |
+| sha256 | `dea2bb1d94212f35099f4b90e03cf99020ff574def26d4da757c1feda046c521` |
+
+The exact archive passed package verification and an upgrade from published
+0.10.4 with the old MCP process alive, preserved question/configuration, and all
+374 source/archive/installed files equal. The CLI and read-only indicator survived
+removal of the initial npm installation. A repack after the test-only cleanup fix
+produced identical bytes. Separately packed source passed 31 managed, indicator
+and migration checks, plus two real-client model-stub checks. The browser preview
+used production rendering and filesystem fixtures.
+See [combined candidate evidence](docs/release-evidence/v0.11.0.md) for provenance.
+This candidate supersedes the earlier batch-only candidate below and is not published.
+
 ## 0.11.0 — release candidate
 
 - Acquire and release multiple resources atomically through repeated CLI selectors
