@@ -4,12 +4,12 @@ Recorded 2026-10-09; updated 2026-10-10 on macOS arm64. This is development work
 
 | Artifact | Observation |
 |---|---|
-| Source commit | `43f2d7154f97d203daaa88c207972b2142f55fb7` |
+| Source commit | `51b9b8aec13a7ef8b7826b70f1966023f866070b` |
 | Source state before packing | Clean worktree; all feature and gate files committed |
 | Package | `agents-can-communicate-0.10.4.tgz` |
-| Size | 600,216 bytes |
+| Size | 600,332 bytes |
 | Entries | 368 |
-| SHA-256 | `5f2c069a7f791f43c875243710bf05e9744ba5455acebe62aff5330a5178f116` |
+| SHA-256 | `0262ed0252c1574fbcbb485428d1d45f14a1bf7f7f0ce57848bfe47da836912d` |
 | Node used for verification | 24.4.0 |
 
 The archive was saved separately, then passed to `node scripts/verify-package.mjs`.
@@ -31,7 +31,8 @@ above was captured before packing; it is not inferred from the verifier's curren
   The second executed the installed Antigravity reader through a pipe, with writes
   and child processes forbidden, and observed color around only the healthy dot.
   The Kimi and Grok tests enabled the installed integration, passed each native
-  payload through the stable reader with writes forbidden, and disabled it again.
+  payload through the stable reader with writes forbidden, rendered the packed
+  adapter footer, and disabled it again.
 - Clean artifact verification passed: all binaries were installed; all packed Markdown
   links resolved; no forbidden files were present; non-Git coordination worked; and
   install/uninstall restored the client-home topology, modes, links, and bytes.
@@ -117,3 +118,10 @@ external network denial. Windows rendering was not captured.
 The browser preview now includes both composed rows, using production rendering
 and filesystem fixtures. The Kimi snapshot lacks goal/task/effort and rich Git
 fields, which the documentation explicitly lists as unavailable in its custom row.
+
+The first extension-wide suite found extra footer paths in plans with the indicator
+off; both adapters now plan those paths only when supported/enabled or when removing
+a recorded indicator. The Grok selected-home packed checks pass again. A parallel
+packed Kimi test also reached the intentional short UI deadline under test-runner
+load. Classification in that packed test now uses the normal JSON diagnostic budget;
+actual UI timing is verified separately by the native 300 ms capture above.
