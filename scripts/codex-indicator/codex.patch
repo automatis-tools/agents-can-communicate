@@ -1,0 +1,824 @@
+diff --git a/codex-rs/cli/src/main.rs b/codex-rs/cli/src/main.rs
+index 8d062a2..4a7036a 100644
+--- a/codex-rs/cli/src/main.rs
++++ b/codex-rs/cli/src/main.rs
+@@ -872,6 +872,15 @@ fn resolve_windows_update_command_from_path(
+ }
+
+ fn run_update_command() -> anyhow::Result<()> {
++    // Local ACC builds delegate only after Clap identifies the update subcommand.
++    // Forward the original argv, including global options, to the vendor CLI.
++    if let Some(original) = std::env::var_os("CODEX_STATUS_PROVIDER_ORIGINAL_CLI") {
++        let status = std::process::Command::new(original)
++            .args(std::env::args_os().skip(1))
++            .env_remove("CODEX_STATUS_PROVIDER_ORIGINAL_CLI")
++            .status()?;
++        std::process::exit(status.code().unwrap_or(1));
++    }
+     #[cfg(debug_assertions)]
+     {
+         anyhow::bail!(
+diff --git a/codex-rs/tui/src/app/event_dispatch.rs b/codex-rs/tui/src/app/event_dispatch.rs
+index 2979e0a..1ba6cd0 100644
+--- a/codex-rs/tui/src/app/event_dispatch.rs
++++ b/codex-rs/tui/src/app/event_dispatch.rs
+@@ -3209,6 +3209,9 @@ impl App {
+                     }
+                 }
+             }
++            AppEvent::ExternalStatusUpdated(update) => {
++                self.chat_widget.on_external_status_updated(update);
++            }
+             AppEvent::StatusLineBranchUpdated { cwd, branch } => {
+                 self.chat_widget.set_status_line_branch(cwd, branch);
+                 self.refresh_status_line();
+diff --git a/codex-rs/tui/src/app_event.rs b/codex-rs/tui/src/app_event.rs
+index 4c6ede3..2806dcf 100644
+--- a/codex-rs/tui/src/app_event.rs
++++ b/codex-rs/tui/src/app_event.rs
+@@ -1575,6 +1575,9 @@ pub(crate) enum AppEvent {
+     /// Launch the external editor after a normal draw has completed.
+     LaunchExternalEditor,
+
++    /// Experimental local provider completion, scoped to its widget and thread.
++    ExternalStatusUpdated(crate::external_status_provider::ProviderUpdate),
++
+     /// Async update of the current git branch for status line rendering.
+     StatusLineBranchUpdated {
+         cwd: PathBuf,
+diff --git a/codex-rs/tui/src/chatwidget.rs b/codex-rs/tui/src/chatwidget.rs
+index 7dbb54b..92e186a 100644
+--- a/codex-rs/tui/src/chatwidget.rs
++++ b/codex-rs/tui/src/chatwidget.rs
+@@ -721,6 +721,8 @@ pub(crate) struct ChatWidget {
+     session_network_proxy: Option<SessionNetworkProxyRuntime>,
+     // Shared latch so we only warn once about invalid status-line item IDs.
+     status_line_invalid_items_warned: Arc<AtomicBool>,
++    // Experimental local provider; owns cached spans and cancels pending work on drop.
++    external_status_provider: crate::external_status_provider::ExternalStatusProvider,
+     // Shared latch so we only warn once about invalid terminal-title item IDs.
+     terminal_title_invalid_items_warned: Arc<AtomicBool>,
+     // Last terminal title emitted, to avoid writing duplicate OSC updates.
+@@ -1180,6 +1182,9 @@ impl ChatWidget {
+             self.refresh_terminal_title();
+         }
+         self.refresh_status_line_if_workspace_headline_due();
++        if self.poll_external_status_provider() {
++            self.refresh_status_line();
++        }
+         self.refresh_thread_usage_if_settlement_due();
+     }
+
+diff --git a/codex-rs/tui/src/chatwidget/constructor.rs b/codex-rs/tui/src/chatwidget/constructor.rs
+index dc5adf7..98d4a91 100644
+--- a/codex-rs/tui/src/chatwidget/constructor.rs
++++ b/codex-rs/tui/src/chatwidget/constructor.rs
+@@ -259,6 +259,8 @@ impl ChatWidget {
+             instruction_source_paths: Vec::new(),
+             session_network_proxy: None,
+             status_line_invalid_items_warned,
++            external_status_provider:
++                crate::external_status_provider::ExternalStatusProvider::from_env(),
+             terminal_title_invalid_items_warned,
+             last_terminal_title: None,
+             last_terminal_title_requires_action: false,
+diff --git a/codex-rs/tui/src/chatwidget/status_surfaces.rs b/codex-rs/tui/src/chatwidget/status_surfaces.rs
+index 46727cf..ffe9959 100644
+--- a/codex-rs/tui/src/chatwidget/status_surfaces.rs
++++ b/codex-rs/tui/src/chatwidget/status_surfaces.rs
+@@ -200,6 +200,7 @@ impl ChatWidget {
+     }
+
+     fn refresh_status_line_from_selections(&mut self, selections: &StatusSurfaceSelections) {
++        self.poll_external_status_provider();
+         let enabled = !selections.status_line_items.is_empty();
+         self.bottom_pane.set_status_line_enabled(enabled);
+         if !enabled {
+@@ -215,10 +216,15 @@ impl ChatWidget {
+             }
+         }
+
+-        self.set_status_line(status_line_from_segments(
++        let line = status_line_from_segments(
+             segments,
+             self.local_settings.tui.status_line_use_colors,
+             self.thread_id,
++        );
++        self.set_status_line(self.external_status_provider.compose_with(
++            line,
++            self.local_settings.tui.status_line_use_colors
++                && !std::env::var_os("NO_COLOR").is_some_and(|value| !value.is_empty()),
+         ));
+         let hyperlink_url = selections
+             .status_line_items
+@@ -228,6 +234,35 @@ impl ChatWidget {
+         self.set_status_line_hyperlink(hyperlink_url);
+     }
+
++    pub(super) fn poll_external_status_provider(&mut self) -> bool {
++        let context = self
++            .thread_id
++            .filter(|_| !self.configured_status_line_items().is_empty())
++            .map(
++                |thread_id| crate::external_status_provider::ProviderContext {
++                    thread_id,
++                    cwd: self.status_line_cwd().to_path_buf(),
++                },
++            );
++        self.external_status_provider.poll(
++            context,
++            &self.app_event_tx,
++            &self.frame_requester,
++            Instant::now(),
++        )
++    }
++
++    pub(crate) fn on_external_status_updated(
++        &mut self,
++        update: crate::external_status_provider::ProviderUpdate,
++    ) {
++        // Reconcile current identity before accepting any asynchronous completion.
++        let context_changed = self.poll_external_status_provider();
++        if self.external_status_provider.apply(update) || context_changed {
++            self.refresh_status_line();
++        }
++    }
++
+     /// Clears the terminal title Codex most recently wrote, if any.
+     ///
+     /// This does not attempt to restore the shell or terminal's previous title;
+diff --git a/codex-rs/tui/src/external_status_process.rs b/codex-rs/tui/src/external_status_process.rs
+new file mode 100644
+index 0000000..5b05823
+--- /dev/null
++++ b/codex-rs/tui/src/external_status_process.rs
+@@ -0,0 +1,75 @@
++//! A bounded local command whose process group is owned by one footer request.
++use super::MAX_OUTPUT_BYTES;
++use super::ProviderContext;
++use super::parse_output;
++use ratatui::text::Line;
++use std::process::Stdio;
++use std::time::Duration;
++use tokio::io::AsyncReadExt;
++use tokio::io::AsyncWriteExt;
++use tokio::process::Command;
++
++#[cfg(unix)]
++struct ProcessGroup(u32);
++
++#[cfg(unix)]
++impl Drop for ProcessGroup {
++    fn drop(&mut self) {
++        // The command creates this group before exec. It contains only this request's
++        // provider and descendants. Drop runs on timeout, cancellation and success.
++        unsafe {
++            libc::kill(-(self.0 as i32), libc::SIGKILL);
++        }
++    }
++}
++
++pub(super) async fn run_provider(
++    argv: &[String],
++    context: &ProviderContext,
++    timeout: Duration,
++) -> Result<Option<Line<'static>>, &'static str> {
++    tokio::time::timeout(timeout, async {
++        let executable = argv.first().ok_or("missing provider executable")?;
++        let mut command = Command::new(executable);
++        command
++            .args(&argv[1..])
++            .stdin(Stdio::piped())
++            .stdout(Stdio::piped())
++            .stderr(Stdio::null())
++            .kill_on_drop(true);
++        #[cfg(unix)]
++        command.process_group(0);
++        let mut child = command.spawn().map_err(|_| "provider spawn failed")?;
++        #[cfg(unix)]
++        let _group = ProcessGroup(child.id().ok_or("missing provider pid")?);
++        let mut input = serde_json::to_vec(context).map_err(|_| "invalid provider input")?;
++        input.push(b'\n');
++        let mut stdin = child.stdin.take().ok_or("missing provider stdin")?;
++        stdin
++            .write_all(&input)
++            .await
++            .map_err(|_| "provider stdin failed")?;
++        drop(stdin);
++        let stdout = child.stdout.take().ok_or("missing provider stdout")?;
++        let mut bytes = Vec::new();
++        stdout
++            .take((MAX_OUTPUT_BYTES + 1) as u64)
++            .read_to_end(&mut bytes)
++            .await
++            .map_err(|_| "provider stdout failed")?;
++        if bytes.len() > MAX_OUTPUT_BYTES {
++            return Err("provider output too large");
++        }
++        if !child
++            .wait()
++            .await
++            .map_err(|_| "provider wait failed")?
++            .success()
++        {
++            return Err("provider failed");
++        }
++        parse_output(&bytes)
++    })
++    .await
++    .map_err(|_| "provider timed out")?
++}
+diff --git a/codex-rs/tui/src/external_status_provider.rs b/codex-rs/tui/src/external_status_provider.rs
+new file mode 100644
+index 0000000..850810e
+--- /dev/null
++++ b/codex-rs/tui/src/external_status_provider.rs
+@@ -0,0 +1,271 @@
++//! Opt-in native footer provider for the local Codex build. `CODEX_STATUS_PROVIDER` is a JSON argv array.
++//! The trusted local executable receives `{thread_id,cwd}` on stdin and returns
++//! `{spans:[{text,foreground?:[r,g,b],bold?:bool}]}`. No shell, model, or transcript is involved.
++//! Cached spans refresh each second; explicit colors bypass theme softening without a background.
++
++use crate::app_event::AppEvent;
++use crate::app_event_sender::AppEventSender;
++use crate::style::secondary_text_style;
++use crate::terminal_palette::rgb_color;
++use crate::tui::FrameRequester;
++use codex_protocol::ThreadId;
++use ratatui::style::Style;
++use ratatui::text::Line;
++use ratatui::text::Span;
++use serde::Deserialize;
++use serde::Serialize;
++use std::path::PathBuf;
++use std::sync::atomic::AtomicU64;
++use std::sync::atomic::Ordering;
++use std::time::Duration;
++use std::time::Instant;
++use tokio::task::JoinHandle;
++
++#[path = "external_status_process.rs"]
++mod process;
++use process::run_provider;
++
++const POLL_INTERVAL: Duration = Duration::from_secs(1);
++const PROVIDER_TIMEOUT: Duration = Duration::from_millis(500);
++const MAX_OUTPUT_BYTES: usize = 4096;
++const MAX_TEXT_BYTES: usize = 256;
++static NEXT_INSTANCE: AtomicU64 = AtomicU64::new(1);
++
++#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
++pub(crate) struct ProviderContext {
++    pub(crate) thread_id: ThreadId,
++    pub(crate) cwd: PathBuf,
++}
++
++#[derive(Clone, Debug, PartialEq, Eq)]
++struct RequestKey {
++    instance: u64,
++    sequence: u64,
++    context: ProviderContext,
++}
++
++#[derive(Debug)]
++pub(crate) struct ProviderUpdate {
++    key: RequestKey,
++    line: Option<Line<'static>>,
++}
++
++struct PendingRequest {
++    key: RequestKey,
++    task: JoinHandle<()>,
++}
++
++pub(crate) struct ExternalStatusProvider {
++    failure_line: Option<Line<'static>>,
++    argv: Option<Vec<String>>,
++    instance: u64,
++    sequence: u64,
++    context: Option<ProviderContext>,
++    pending: Option<PendingRequest>,
++    next_poll_at: Option<Instant>,
++    line: Option<Line<'static>>,
++}
++
++impl ExternalStatusProvider {
++    pub(crate) fn from_env() -> Self {
++        let argv = std::env::var("CODEX_STATUS_PROVIDER")
++            .ok()
++            .and_then(|value| parse_argv(&value).ok());
++        let mut provider = Self::new(argv);
++        provider.failure_line = std::env::var("CODEX_STATUS_PROVIDER_FALLBACK")
++            .ok()
++            .and_then(|value| parse_output(value.as_bytes()).ok())
++            .flatten();
++        provider
++    }
++
++    fn new(argv: Option<Vec<String>>) -> Self {
++        Self {
++            failure_line: None,
++            argv,
++            instance: NEXT_INSTANCE.fetch_add(1, Ordering::Relaxed),
++            sequence: 0,
++            context: None,
++            pending: None,
++            next_poll_at: None,
++            line: None,
++        }
++    }
++
++    pub(crate) fn enabled(&self) -> bool {
++        self.argv.is_some()
++    }
++
++    /// Returns whether a context change invalidated the displayed value.
++    pub(crate) fn poll(
++        &mut self,
++        context: Option<ProviderContext>,
++        tx: &AppEventSender,
++        frame: &FrameRequester,
++        now: Instant,
++    ) -> bool {
++        if !self.enabled() {
++            return false;
++        }
++        let changed = self.context != context;
++        if changed {
++            self.cancel_pending();
++            self.context = context;
++            self.line = None;
++            self.next_poll_at = None;
++        }
++        let Some(context) = self.context.clone() else {
++            return changed;
++        };
++        if self.pending.is_none() && self.next_poll_at.is_none_or(|deadline| now >= deadline) {
++            self.sequence += 1;
++            let key = RequestKey {
++                instance: self.instance,
++                sequence: self.sequence,
++                context,
++            };
++            let argv = self.argv.clone().unwrap_or_default();
++            let event_key = key.clone();
++            let tx = tx.clone();
++            let failure_line = self.failure_line.clone();
++            let task = tokio::spawn(async move {
++                let line = match run_provider(&argv, &event_key.context, PROVIDER_TIMEOUT).await {
++                    Ok(line) => line,
++                    Err(error) => {
++                        tracing::debug!(error, "external status provider unavailable");
++                        failure_line
++                    }
++                };
++                tx.send(AppEvent::ExternalStatusUpdated(ProviderUpdate {
++                    key: event_key,
++                    line,
++                }));
++            });
++            self.pending = Some(PendingRequest { key, task });
++            self.next_poll_at = Some(now + POLL_INTERVAL);
++        }
++        let delay = self.next_poll_at.map_or(POLL_INTERVAL, |deadline| {
++            let remaining = deadline.saturating_duration_since(now);
++            if remaining.is_zero() {
++                POLL_INTERVAL
++            } else {
++                remaining
++            }
++        });
++        frame.schedule_frame_in(delay);
++        changed
++    }
++
++    pub(crate) fn apply(&mut self, update: ProviderUpdate) -> bool {
++        if self.pending.as_ref().map(|pending| &pending.key) != Some(&update.key)
++            || self.context.as_ref() != Some(&update.key.context)
++        {
++            return false;
++        }
++        self.cancel_pending();
++        self.line = update.line;
++        true
++    }
++
++    pub(crate) fn compose_with(
++        &self,
++        line: Option<Line<'static>>,
++        use_colors: bool,
++    ) -> Option<Line<'static>> {
++        let Some(external) = &self.line else {
++            return line;
++        };
++        let mut line = line.unwrap_or_default();
++        let mut spans = external.spans.clone();
++        if !line.spans.is_empty() {
++            spans.push(Span::styled(" · ", secondary_text_style()));
++        }
++        if !use_colors {
++            for span in &mut spans {
++                span.style.fg = None;
++            }
++        }
++        spans.append(&mut line.spans);
++        line.spans = spans;
++        Some(line)
++    }
++
++    fn cancel_pending(&mut self) {
++        if let Some(pending) = self.pending.take() {
++            pending.task.abort();
++        }
++    }
++}
++
++impl Drop for ExternalStatusProvider {
++    fn drop(&mut self) {
++        self.cancel_pending();
++    }
++}
++
++fn parse_argv(value: &str) -> Result<Vec<String>, &'static str> {
++    if value.len() > MAX_OUTPUT_BYTES {
++        return Err("provider argv too large");
++    }
++    let argv: Vec<String> = serde_json::from_str(value).map_err(|_| "invalid provider argv")?;
++    if argv.is_empty() || argv[0].is_empty() || argv.iter().any(|arg| arg.contains('\0')) {
++        return Err("provider argv must contain an executable");
++    }
++    Ok(argv)
++}
++
++#[derive(Deserialize)]
++#[serde(deny_unknown_fields)]
++struct Output {
++    spans: Vec<OutputSpan>,
++}
++
++#[derive(Deserialize)]
++#[serde(deny_unknown_fields)]
++struct OutputSpan {
++    text: String,
++    foreground: Option<[u8; 3]>,
++    #[serde(default)]
++    bold: bool,
++}
++
++fn parse_output(bytes: &[u8]) -> Result<Option<Line<'static>>, &'static str> {
++    if bytes.len() > MAX_OUTPUT_BYTES {
++        return Err("provider output too large");
++    }
++    let output: Output = serde_json::from_slice(bytes).map_err(|_| "invalid provider output")?;
++    if output.spans.len() > 16
++        || output
++            .spans
++            .iter()
++            .map(|span| span.text.len())
++            .sum::<usize>()
++            > MAX_TEXT_BYTES
++        || output
++            .spans
++            .iter()
++            .any(|span| span.text.chars().any(char::is_control))
++    {
++        return Err("invalid provider text");
++    }
++    let spans: Vec<_> = output
++        .spans
++        .into_iter()
++        .filter(|span| !span.text.is_empty())
++        .map(|span| {
++            let mut style = Style::default();
++            if let Some([r, g, b]) = span.foreground {
++                style = style.fg(rgb_color((r, g, b)));
++            }
++            if span.bold {
++                style = style.bold();
++            }
++            Span::styled(span.text, style)
++        })
++        .collect();
++    Ok((!spans.is_empty()).then(|| Line::from(spans)))
++}
++
++#[cfg(test)]
++#[path = "external_status_provider_tests.rs"]
++mod tests;
+diff --git a/codex-rs/tui/src/external_status_provider_tests.rs b/codex-rs/tui/src/external_status_provider_tests.rs
+new file mode 100644
+index 0000000..c7d4293
+--- /dev/null
++++ b/codex-rs/tui/src/external_status_provider_tests.rs
+@@ -0,0 +1,299 @@
++use super::*;
++use pretty_assertions::assert_eq;
++use ratatui::style::Modifier;
++
++fn argv(command: &str) -> Vec<String> {
++    vec!["/bin/sh".into(), "-c".into(), command.into()]
++}
++
++fn context(thread_id: ThreadId) -> ProviderContext {
++    ProviderContext {
++        thread_id,
++        cwd: std::env::temp_dir(),
++    }
++}
++
++#[test]
++fn parses_explicit_glyph_color_without_theme_softening_or_background() {
++    let line =
++        parse_output(br#"{"spans":[{"text":"\u25cf","foreground":[44,122,57],"bold":true}]}"#)
++            .unwrap()
++            .unwrap();
++    assert_eq!(line.spans.len(), 1);
++    assert_eq!(line.spans[0].content, "●");
++    assert_eq!(line.spans[0].style.fg, Some(rgb_color((44, 122, 57))));
++    assert_eq!(line.spans[0].style.bg, None);
++    assert!(line.spans[0].style.add_modifier.contains(Modifier::BOLD));
++}
++
++#[test]
++fn rejects_control_sequences_invalid_colors_and_oversized_content() {
++    for bytes in [
++        br#"{"spans":[{"text":"\u001b[32m"}]}"#.as_slice(),
++        br#"{"spans":[{"text":"first\nsecond"}]}"#,
++        br#"{"spans":[{"text":"x","foreground":[256,0,0]}]}"#,
++        br#"{"spans":[{"text":"x","background":[0,0,0]}]}"#,
++        b"not json",
++    ] {
++        assert!(parse_output(bytes).is_err());
++    }
++    let oversized = serde_json::to_vec(&serde_json::json!({
++        "spans": [{ "text": "x".repeat(MAX_TEXT_BYTES + 1) }]
++    }))
++    .unwrap();
++    assert!(parse_output(&oversized).is_err());
++    assert!(parse_output(&vec![b' '; MAX_OUTPUT_BYTES + 1]).is_err());
++    assert_eq!(parse_output(br#"{"spans":[]}"#).unwrap(), None);
++}
++
++#[test]
++fn leads_with_external_spans_without_replacing_or_reordering_builtin_items() {
++    let mut provider = ExternalStatusProvider::new(None);
++    provider.line =
++        parse_output(br#"{"spans":[{"text":"\u25cf","foreground":[44,122,57]}]}"#).unwrap();
++    let builtin = Line::from("model · project · Context 50% left");
++    let rendered = provider.compose_with(Some(builtin.clone()), true).unwrap();
++    assert_eq!(rendered.spans[0].content, "●");
++    assert_eq!(rendered.spans[0].style.fg, Some(rgb_color((44, 122, 57))));
++    assert_eq!(rendered.spans[1].content, " · ");
++    assert_eq!(rendered.spans[2], builtin.spans[0]);
++}
++
++#[test]
++fn external_glyph_survives_native_footer_truncation() {
++    let mut provider = ExternalStatusProvider::new(None);
++    provider.line =
++        parse_output(br#"{"spans":[{"text":"\u25cf","foreground":[44,122,57]}]}"#).unwrap();
++    let builtin = Line::from("model · /very/long/project/directory · long-thread-identifier");
++    let line = provider.compose_with(Some(builtin), true).unwrap();
++    let truncated = crate::line_truncation::truncate_line_with_ellipsis_if_overflow(line, 20);
++    assert_eq!(truncated.spans[0].content, "●");
++    assert_eq!(truncated.spans[0].style.fg, Some(rgb_color((44, 122, 57))));
++    assert!(truncated.width() <= 20);
++}
++
++#[test]
++fn opt_in_accepts_only_nonempty_bounded_argv() {
++    assert_eq!(
++        parse_argv(r#"["/tmp/provider","--json"]"#).unwrap(),
++        ["/tmp/provider", "--json"]
++    );
++    for value in [
++        "[]",
++        r#"[""]"#,
++        r#""/tmp/provider --json""#,
++        "null",
++        r#"["bad\u0000path"]"#,
++    ] {
++        assert!(parse_argv(value).is_err());
++    }
++}
++
++#[cfg(unix)]
++#[tokio::test]
++async fn provider_receives_exact_thread_and_cwd_as_json_stdin() {
++    let context = context(ThreadId::new());
++    let directory = tempfile::tempdir().unwrap();
++    let capture = directory.path().join("input.json");
++    let mut command = argv("cat > \"$1\"; printf '{\"spans\":[{\"text\":\"ok\"}]}'");
++    command.push("provider-test".into());
++    command.push(capture.to_str().unwrap().into());
++    let line = run_provider(&command, &context, PROVIDER_TIMEOUT)
++        .await
++        .unwrap()
++        .unwrap();
++    assert_eq!(line.spans[0].content, "ok");
++
++    let input = std::fs::read(capture).unwrap();
++    let decoded: serde_json::Value = serde_json::from_slice(&input).unwrap();
++    assert_eq!(decoded["thread_id"], context.thread_id.to_string());
++    assert_eq!(decoded["cwd"], context.cwd.to_string_lossy().as_ref());
++}
++
++#[cfg(unix)]
++#[tokio::test]
++async fn rejects_flooding_failed_and_timed_out_processes() {
++    let context = context(ThreadId::new());
++    assert_eq!(
++        run_provider(&argv("exec sleep 5"), &context, Duration::from_millis(30)).await,
++        Err("provider timed out")
++    );
++    assert_eq!(
++        run_provider(&argv("exec yes x"), &context, PROVIDER_TIMEOUT).await,
++        Err("provider output too large")
++    );
++    assert!(
++        run_provider(&argv("exit 1"), &context, PROVIDER_TIMEOUT)
++            .await
++            .is_err()
++    );
++}
++
++#[tokio::test]
++async fn poll_is_cached_until_due_and_rejects_old_thread_and_widget_results() {
++    let mut provider = ExternalStatusProvider::new(Some(argv("exec sleep 5")));
++    let (tx, _rx) = tokio::sync::mpsc::unbounded_channel();
++    let tx = AppEventSender::new(tx);
++    let frame = FrameRequester::test_dummy();
++    let a = context(ThreadId::new());
++    let b = context(ThreadId::new());
++    let now = Instant::now();
++    provider.poll(None, &tx, &frame, now);
++    assert!(provider.pending.is_none());
++    provider.poll(Some(a.clone()), &tx, &frame, now);
++    let first = provider.pending.as_ref().unwrap().key.clone();
++    provider.poll(
++        Some(a.clone()),
++        &tx,
++        &frame,
++        now + Duration::from_millis(200),
++    );
++    assert_eq!(provider.pending.as_ref().unwrap().key, first);
++    assert!(provider.apply(ProviderUpdate {
++        key: first.clone(),
++        line: Some(Line::from("first"))
++    }));
++    provider.poll(
++        Some(a.clone()),
++        &tx,
++        &frame,
++        now + Duration::from_millis(900),
++    );
++    assert!(provider.pending.is_none());
++    provider.poll(Some(a.clone()), &tx, &frame, now + POLL_INTERVAL);
++    let second = provider.pending.as_ref().unwrap().key.clone();
++    assert_ne!(second, first);
++    assert!(provider.apply(ProviderUpdate {
++        key: second.clone(),
++        line: None
++    }));
++    assert!(
++        provider.line.is_none(),
++        "a failed refresh clears previous success"
++    );
++
++    provider.poll(Some(b), &tx, &frame, now + POLL_INTERVAL);
++    assert!(provider.line.is_none());
++    provider.poll(Some(a.clone()), &tx, &frame, now + POLL_INTERVAL);
++    assert!(!provider.apply(ProviderUpdate {
++        key: second,
++        line: Some(Line::from("stale A"))
++    }));
++
++    let mut replacement = ExternalStatusProvider::new(Some(argv("exec sleep 5")));
++    replacement.poll(Some(a), &tx, &frame, now);
++    assert!(!replacement.apply(ProviderUpdate {
++        key: first,
++        line: Some(Line::from("old widget"))
++    }));
++    let current = provider.pending.as_ref().unwrap().key.clone();
++    assert!(provider.apply(ProviderUpdate {
++        key: current,
++        line: None
++    }));
++    assert!(provider.line.is_none());
++}
++
++#[cfg(unix)]
++#[tokio::test]
++async fn idle_provider_schedules_native_frame_and_refreshes_without_input() {
++    let mut provider = ExternalStatusProvider::new(Some(argv(
++        "cat >/dev/null; printf '{\"spans\":[{\"text\":\"idle\"}]}'",
++    )));
++    let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
++    let tx = AppEventSender::new(tx);
++    let (draw_tx, mut draws) = tokio::sync::broadcast::channel(8);
++    let frame = FrameRequester::new(draw_tx);
++    let context = context(ThreadId::new());
++    provider.poll(Some(context.clone()), &tx, &frame, Instant::now());
++    let Some(AppEvent::ExternalStatusUpdated(first)) =
++        tokio::time::timeout(Duration::from_secs(2), rx.recv())
++            .await
++            .unwrap()
++    else {
++        panic!("expected provider completion");
++    };
++    let first_key = first.key.clone();
++    assert!(provider.apply(first));
++    tokio::time::timeout(Duration::from_secs(2), draws.recv())
++        .await
++        .unwrap()
++        .unwrap();
++    provider.poll(Some(context), &tx, &frame, Instant::now());
++    let Some(AppEvent::ExternalStatusUpdated(second)) =
++        tokio::time::timeout(Duration::from_secs(2), rx.recv())
++            .await
++            .unwrap()
++    else {
++        panic!("expected idle refresh");
++    };
++    assert_ne!(second.key, first_key);
++    assert!(provider.apply(second));
++    assert_eq!(provider.line.as_ref().unwrap().spans[0].content, "idle");
++}
++
++#[cfg(unix)]
++#[tokio::test]
++async fn timeout_cleans_up_provider_descendants() {
++    let directory = tempfile::tempdir().unwrap();
++    let marker = directory.path().join("orphan-finished");
++    let mut command = argv("(sleep 0.4; touch \"$1\") & wait");
++    command.push("provider-test".into());
++    command.push(marker.to_str().unwrap().into());
++    assert_eq!(
++        run_provider(
++            &command,
++            &context(ThreadId::new()),
++            Duration::from_millis(100)
++        )
++        .await,
++        Err("provider timed out")
++    );
++    tokio::time::sleep(Duration::from_millis(650)).await;
++    assert!(
++        !marker.exists(),
++        "timed-out provider descendants must not keep running"
++    );
++}
++
++#[test]
++fn disabled_colors_keep_the_badge_readable_without_coloring_any_span() {
++    let mut provider = ExternalStatusProvider::new(None);
++    provider.line = parse_output(
++        br#"{"spans":[{"text":"ACC "},{"text":"!","foreground":[150,108,30],"bold":true}]}"#,
++    )
++    .unwrap();
++    let line = provider
++        .compose_with(Some(Line::from("model")), false)
++        .unwrap();
++    assert_eq!(line.to_string(), "ACC ! · model");
++    assert!(line.spans.iter().all(|span| span.style.fg.is_none()));
++}
++
++#[cfg(unix)]
++#[tokio::test]
++async fn failed_provider_replaces_cached_success_with_configured_recovery() {
++    let mut provider = ExternalStatusProvider::new(Some(argv("exit 1")));
++    provider.failure_line = Some(Line::from("ACC ! · acc doctor"));
++    provider.line = Some(Line::from("ACC ●"));
++    let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
++    let tx = AppEventSender::new(tx);
++    provider.poll(
++        Some(context(ThreadId::new())),
++        &tx,
++        &FrameRequester::test_dummy(),
++        Instant::now(),
++    );
++    let Some(AppEvent::ExternalStatusUpdated(update)) =
++        tokio::time::timeout(Duration::from_secs(2), rx.recv())
++            .await
++            .unwrap()
++    else {
++        panic!("expected failure update")
++    };
++    assert!(provider.apply(update));
++    assert_eq!(
++        provider.line.as_ref().map(Line::to_string),
++        Some("ACC ! · acc doctor".into())
++    );
++}
+diff --git a/codex-rs/tui/src/lib.rs b/codex-rs/tui/src/lib.rs
+index dc0fbd0..5ffee64 100644
+--- a/codex-rs/tui/src/lib.rs
++++ b/codex-rs/tui/src/lib.rs
+@@ -130,6 +130,7 @@ mod copy_input_guard;
+ pub(crate) mod custom_terminal;
+ mod daybreak;
+ mod experimental_features;
++mod external_status_provider;
+ mod markdown_copy;
+ mod permission_discovery;
+ mod pets;
