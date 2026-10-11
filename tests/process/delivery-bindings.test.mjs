@@ -15,6 +15,7 @@ import { recordAndOffer } from "../../packages/cli/src/main.mjs";
 
 import { fakePath, platformEnv, writeFakeClient } from "../helpers/fake-client.mjs";
 import { createFakeIds } from "../helpers/memory-store.mjs";
+import { waitForWorkers } from "../helpers/fixture-cleanup.mjs";
 
 const run = promisify(execFile);
 const repo = path.resolve(import.meta.dirname, "..", "..");
@@ -22,6 +23,7 @@ const acc = path.join(repo, "bin", "acc.mjs");
 const shellLiteral = value => `'${String(value).replaceAll("'", "'\"'\"'")}'`;
 
 async function machine(t) {
+  waitForWorkers(t);
   const home = await realpath(await mkdtemp(path.join(tmpdir(), "acc-delivery-home-")));
   const dataHome = await realpath(await mkdtemp(path.join(tmpdir(), "acc-delivery-data-")));
   const project = path.join(home, "project");

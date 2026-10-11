@@ -9,6 +9,21 @@
 // cleanup although every assertion passed.
 import { rm } from "node:fs/promises";
 
+/** Register before directory cleanup. Optional diagnostic workers can still
+ * write after an in-process offer returns, so keep their fixtures until exit. */
+export function waitForWorkers(t) {
+  const active = new Map();
+  const track = worker => active.set(worker, new Promise(resolve => {
+    worker.once("exit", () => { active.delete(worker); resolve(); });
+  }));
+  process.on("worker", track);
+  t.after(async () => {
+    process.off("worker", track);
+    for (const worker of active.keys()) worker.ref();
+    await Promise.all(active.values());
+  });
+}
+
 /**
  * A cleanup stack for `t`: each deferred function runs after the test, newest
  * first, the reverse of the order the resources were acquired. Every function

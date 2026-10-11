@@ -320,3 +320,22 @@ combined run. The restored router regression file passed again after mutation ch
 The exact archive passed clean installation, non-Git operation and exact uninstall
 restoration checks. Syntax checks covered 788 modules. The full suite runs after
 this artifact record update.
+
+## Diagnostic worker fixture cleanup — 2026-10-11
+
+CI run `38175463504` passed Linux and Windows but failed one macOS cleanup.
+The in-process delivery test removed its runtime while an optional diagnostic
+worker still used it. The failed operation was `rmdir` with `ENOTEMPTY`.
+
+Delivery and indicator fixtures now wait for their real workers to exit before
+removing directories. The helper registers before directory cleanup and keeps
+active workers referenced during teardown. It does not await diagnostics during
+the offer or change production deadlines.
+
+A test-only preload delayed the real diagnostic worker by 500 ms and rejected
+fixture removal while that worker remained active. The original fixture failed;
+the corrected fixture passed. Removing the teardown await failed the same check,
+and restoring it passed again. All 28 focused delivery and indicator tests passed
+with real filesystem operations and local transports. Syntax checks passed for
+788 modules. These test helpers and this evidence record are excluded from the
+npm artifact; the source and SHA-256 recorded above remain valid.

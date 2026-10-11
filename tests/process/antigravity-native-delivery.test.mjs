@@ -13,6 +13,7 @@ import { openFilesystemStore } from "@agents-can-communicate/storage-filesystem"
 import { activateAntigravityRelay } from "../../bin/entrypoints/antigravity-relay-binding.mjs";
 import { createFakeIds } from "../helpers/memory-store.mjs";
 import { posixTransportTest as test } from "../helpers/platform-scope.mjs";
+import { waitForWorkers } from "../helpers/fixture-cleanup.mjs";
 
 const CONVERSATION = "3ed65ea5-31f2-4ddf-b6c7-e3c85a9a3c29";
 
@@ -21,6 +22,7 @@ const CONVERSATION = "3ed65ea5-31f2-4ddf-b6c7-e3c85a9a3c29";
 // message routed by the real delivery router through the real adapter into it.
 // Only `agy agentapi` is replaced; its captured answers are covered elsewhere.
 async function place(t) {
+  waitForWorkers(t);
   const root = await realpath(await mkdtemp("/tmp/acc-agnd-"));
   const runtimeDir = path.join(root, "workspace");
   const dataHome = path.join(root, "data");

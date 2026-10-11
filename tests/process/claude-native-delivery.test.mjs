@@ -11,6 +11,7 @@ import { readInstalledLivePolicy, recordInstall } from "@agents-can-communicate/
 
 import { runHook } from "../../packages/hook-runner/src/runner.mjs";
 import { posixTransportTest as test } from "../helpers/platform-scope.mjs";
+import { waitForWorkers } from "../helpers/fixture-cleanup.mjs";
 
 // The installed path end to end, short of the vendor: the real hook binds a
 // Claude Code session to its inbox, the real router offers a peer's question
@@ -23,6 +24,7 @@ const CLAUDE_PID = process.ppid;
 const CLAUDE_SESSION = "6665aab9-5400-477d-9010-1cad40dfe9d7";
 
 async function place(t) {
+  waitForWorkers(t);
   // A socket path must stay under 104 bytes on macOS, so the whole fixture
   // lives under /tmp rather than the per-user tmpdir.
   const root = await realpath(await mkdtemp("/tmp/acc-cnd-"));

@@ -8,10 +8,12 @@ import { storeSessionBinding, storeNativeAttempt } from "@agents-can-communicate
 import { recordInstall } from "@agents-can-communicate/installer";
 import * as cli from "../../packages/cli/src/index.mjs";
 import { createFakeClock, createFakeIds } from "./memory-store.mjs";
+import { waitForWorkers } from "./fixture-cleanup.mjs";
 
 const NOW = "2026-10-09T04:00:00.000Z";
 
 export async function createIndicatorFixture(t, { adapterId = "claude_code", version = "2.1.295" } = {}) {
+  waitForWorkers(t);
   const root = await realpath(await mkdtemp(path.join(tmpdir(), "acc-indicator-")));
   t.after(() => rm(root, { recursive: true, force: true }));
   const dataHome = path.join(root, "data");

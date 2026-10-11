@@ -12,6 +12,7 @@ import { establishNativeBinding } from "../../packages/hook-runner/src/native-bi
 import { controlledCodexDaemon, THREAD } from "../helpers/codex-daemon.mjs";
 import { createFakeIds } from "../helpers/memory-store.mjs";
 import { posixTransportTest as test } from "../helpers/platform-scope.mjs";
+import { waitForWorkers } from "../helpers/fixture-cleanup.mjs";
 
 // The seam this file exists for: the hook runner publishes the delivery
 // binding, the Codex adapter writes the endpoint record, and the receiver
@@ -33,6 +34,7 @@ async function directory(t, prefix) {
 }
 
 async function seam(t) {
+  waitForWorkers(t);
   const cwd = await directory(t, "acc-seam-cwd-");
   const root = await directory(t, "acc-seam-store-");
   const daemon = await controlledCodexDaemon(t, { cwd });

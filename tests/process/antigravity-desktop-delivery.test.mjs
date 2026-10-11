@@ -13,6 +13,7 @@ import { openFilesystemStore } from "@agents-can-communicate/storage-filesystem"
 
 import { createFakeIds } from "../helpers/memory-store.mjs";
 import { posixTransportTest as test } from "../helpers/platform-scope.mjs";
+import { waitForWorkers } from "../helpers/fixture-cleanup.mjs";
 
 const CONVERSATION = "f7aaa891-7182-4b6d-9123-dbf2df9561b9";
 const TOKEN = "c740d75d-38f7-4b4d-bf37-processtest";
@@ -83,6 +84,7 @@ async function startServer(t, root) {
 }
 
 async function place(t) {
+  waitForWorkers(t);
   const root = await realpath(await mkdtemp("/tmp/acc-agdesk-"));
   t.after(() => rm(root, { recursive: true, force: true }));
   const server = await startServer(t, root);
