@@ -45,6 +45,25 @@ exclusive mode, advisory or guarded enforcement, reason, and lease timestamps. C
 acquisition and conflict detection are atomic. Presence becoming stale never releases a
 claim; expiry or an explicit release does.
 
+Batch acquisition validates a nonempty resource list before writing. Duplicate resources
+after normalization are rejected. Mode, enforcement, reason, and lease apply to the whole
+batch. If any requested resource conflicts, no claim is created or renewed. Batch error
+`details.conflicts` lists the blocked requested resources and their blocking claims.
+A successful repeated acquisition renews the owner's existing claims on those resources.
+
+Batch release selects claims by IDs, canonical resources, or the calling session's whole
+owned set. Exactly one selector family is accepted. Explicit selectors must be nonempty
+and unique after normalization. A missing or foreign target prevents every removal.
+The whole-set selector releases only that session's claims in its workspace and succeeds
+when the set is empty, including for a solo ephemeral session. Batch release has no
+force-release authority. The existing single-claim human or policy release remains separate.
+
+Explicit release retries still fail once their targets were removed. A whole-set retry
+selects the current owned set, which can include claims acquired after the first call.
+Release keeps the session and intent open. Clearing intent, acknowledging messages, and
+finishing with a handoff remain separate operations. Batch operations retain individual
+claim records and per-claim events. They add no record schema or event type.
+
 ## Message envelope
 
 Every message contains:

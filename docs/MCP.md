@@ -50,8 +50,8 @@ successfully yet refuse tool calls; that is distinct from a protocol handshake f
 | `acc_status` | — | — |
 | `acc_sync` | — | `cursor`, `scope: delta|full|history`, `limit: 1..500`, `kind`, `messageId`, `current` |
 | `acc_work` | `summary` and `mode`, or `clear: true` | `state`, `resourceHints` |
-| `acc_claim` | `action`; `resource` for acquire, `claimId` for renew | `mode`, `reason`, `leaseSeconds` where valid |
-| `acc_release` | `claimId` | — |
+| `acc_claim` | `action`; exactly one of `resource` or `resources` for acquire, `claimId` for renew | `mode`, `reason`, `leaseSeconds` where valid |
+| `acc_release` | exactly one of `claimId`, `claimIds`, `resource`, `resources`, or `all: true` | — |
 | `acc_message` | `to`, `subject`, `body` | `kind`, `obligation`, `clientMessageId`, `supersedes`, `withdraws` |
 | `acc_request` | `toParticipantId`, `title` | `detail`, `clientMessageId` |
 | `acc_inbox` | — | `messageId`, `cursor`, `limit: 1..500` |
@@ -107,6 +107,46 @@ An addressed handoff requires a participant already known to the workspace. For 
 session that has not joined, omit `toParticipantId` to leave a workspace handoff. A later
 session can recover that historical handoff through the history list and exact read;
 its addressed inbox will not contain past workspace broadcasts.
+
+## Acquire and release claims
+
+Acquire one resource with `acc_claim {action: "acquire", resource: "file:src/a.mjs"}`.
+Use a nonempty `resources` array for an atomic batch:
+
+```json
+{
+  "action": "acquire",
+  "resources": ["file:src/a.mjs", "file:src/b.mjs"],
+  "mode": "exclusive",
+  "reason": "updating both modules",
+  "leaseSeconds": 1800
+}
+```
+
+Shared mode, reason, and lease apply to every resource. Duplicate resources after
+normalization are rejected. A conflict changes no claims, including existing leases.
+Batch error `details.conflicts` identifies each blocked requested resource and its holders.
+Repeating acquisition renews this session's existing claims on those resources.
+`action: "renew"` still accepts only one `claimId` and its optional lease.
+
+Release uses one mutually exclusive selector: `claimId`, a nonempty `claimIds` array,
+`resource`, a nonempty `resources` array, or `all: true`. For example,
+`acc_release {resources: ["file:src/a.mjs", "file:src/b.mjs"]}` releases both claims atomically.
+Duplicate selectors after normalization are rejected. Explicit targets must exist and
+belong to this session. A missing or foreign target fails without removing any claims.
+MCP offers no force-release authority.
+
+`acc_release {all: true}` releases only this session's current claims in its workspace.
+An empty set succeeds, including for a solo ephemeral session. Release keeps the session
+and intent open. `acc_work {clear: true}` clears intent, `acc_ack` acknowledges a message,
+and `acc_finish` records a handoff and closes presence.
+
+Scalar acquisition returns the existing Claim. Scalar release returns `{released: claimId}`.
+Array acquisition returns `{claims: [...]}`. Array release and `all: true` return
+`{released: [...]}`. Array inputs keep these shapes even with one element.
+`all: true` can return `{released: []}`.
+Repeating an explicit release after its targets were removed remains an error.
+Each `all: true` call selects the current owned set, so a retry can release newly acquired claims.
 
 ## Account for the manual boundary
 

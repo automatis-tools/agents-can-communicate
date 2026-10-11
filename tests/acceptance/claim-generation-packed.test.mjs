@@ -32,7 +32,8 @@ test("installed claim writes reject owners closed or replaced before commit", as
     assert.deepEqual((await store.eventsSince(workspaceId, null, 100)).events, []);
   });
 
-  for (const operation of ["acquireClaim", "renewClaim", "releaseClaim", "forceReleaseClaim"]) {
+  for (const operation of ["acquireClaim", "acquireClaims", "renewClaim", "releaseClaim",
+    "releaseClaims", "forceReleaseClaim"]) {
     for (const transition of ["close", "replace"]) {
       await t.test(`${operation} refuses a concurrent ${transition}`, async () => {
         const store = await openFilesystemStore({ root: path.join(packed.root,
@@ -64,8 +65,10 @@ test("installed claim writes reject owners closed or replaced before commit", as
           return store.transaction(callback, options);
         } };
         const racing = createCoordinationService({ store: racingStore, clock, ids });
-        const input = { ...owner(original), ...claimInput, claimId: claim.claimId,
-          authority: "human", reason: "late operation" };
+        const input = { ...owner(original), ...(operation === "acquireClaims"
+          ? { ...claimInput, resources: ["file:src/a.mjs", "file:src/b.mjs"] }
+          : operation === "releaseClaims" ? { all: true }
+            : { ...claimInput, claimId: claim.claimId, authority: "human" }), reason: "late operation" };
         await assert.rejects(racing[operation](input), error => error.code === 5);
         assert.equal(armed, false, "the lifecycle change did not run");
         assert.deepEqual(await inspect(), checkpoint, "a stale owner changed claims or events");
