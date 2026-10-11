@@ -1,0 +1,83 @@
+{
+  "binarySha256": "3b7d2092fe456cf1fb134af5f2fa6ea462f7fec4c6112544ff0c96fc71065f2c",
+  "bytes": 396624768,
+  "baseCommit": "092d3acd6bec3e3a14bdc7e7a2810ab628ab759d",
+  "platform": "darwin-arm64",
+  "scope": "Explicitly installed local Codex CLI build; not stock Codex or desktop support",
+  "patchSha256": "67ad2f05313e4d09d1127e2ee2cf7afc208adf6056d316f76f7bd9bdd5832977",
+  "accSuite": {
+    "total": 3282,
+    "passed": 3274,
+    "skipped": 8,
+    "failed": 0,
+    "fileConcurrency": 4
+  },
+  "nodeFocused": {
+    "passed": 11,
+    "failed": 0
+  },
+  "nativeProviderTests": {
+    "passed": 12,
+    "failed": 0
+  },
+  "nativeRendering": {
+    "installedCommand": true,
+    "states": [
+      "ready",
+      "problem/turn",
+      "ready"
+    ],
+    "idleRefresh": true,
+    "inputDuringTransitions": false,
+    "modelTurns": 0,
+    "healthyGlyphRgb": [
+      44,
+      122,
+      57
+    ],
+    "bold": true,
+    "dim": false,
+    "backgroundAdded": false,
+    "builtinFooterPreserved": true,
+    "noColorVerified": true,
+    "colorsDisabledVerified": true,
+    "emptyFooterVerified": true,
+    "fixture": "Disposable ACC state for exact native thread, created via SDK; no message-delivery certification"
+  },
+  "cliSmoke": [
+    "version",
+    "help",
+    "resume --help",
+    "fork --help",
+    "exec --help",
+    "app-server --help"
+  ],
+  "updateRouting": {
+    "optionsBeforeCommand": true,
+    "exitCodePreserved": true,
+    "configValueDoesNotRoute": true,
+    "realUpdatePerformed": false
+  },
+  "upstreamTuiSuite": {
+    "passed": 5665,
+    "failed": 39,
+    "ignored": 4,
+    "snapshotFailures": 36,
+    "snapshotCause": "Release 0.162.1 output differs from upstream 0.0.0 fixtures",
+    "baselineReproduced": [
+      "app::tests::app_server_thread_replacement_clears_previous_transcript_before_replay",
+      "app::tests::session_lifecycle_requests::transcript_alt_beginning_loads_every_older_history_page",
+      "pets::tests::kitty_local_file_pet_image_uses_file_reference_without_inline_payload"
+    ],
+    "broadRunOnlyFailure": "app::tests::safety_buffering::agents_overview_acknowledges_inactive_steer_before_interrupt: inline snapshots used in loop; passed alone on unmodified upstream"
+  },
+  "publicAccArtifactSha256": "0262ed0252c1574fbcbb485428d1d45f14a1bf7f7f0ce57848bfe47da836912d",
+  "normalCodexConfigChanged": false,
+  "originalCodexBinaryChanged": false,
+  "rollbackTested": true,
+  "cliUnitTests": {
+    "passed": 328,
+    "ignored": 1,
+    "failed": 0
+  }
+}
