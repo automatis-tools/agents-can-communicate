@@ -13,6 +13,9 @@
 - Kimi and Grok compose an existing status command or available native footer
   fields. Kimi's snapshot cannot retain goal/task badges and thinking effort; its
   native context line remains. TOML ownership preserves later user edits.
+- Prior footer commands are stopped on timeout, excessive output and indicator cancellation.
+  Equal-time delivery observations retain caller order, so an older worker cannot
+  overwrite a newer success or failure.
 - The indicator reads local state without ACC writes or client socket probes.
   Idle sessions remain active when a delivery lease expires. A failed send or
   endpoint verification is a separate observation.
@@ -22,9 +25,9 @@
 
 | Candidate artifact | Value |
 |---|---|
-| Built from | `51b9b8aec13a7ef8b7826b70f1966023f866070b` |
-| Tarball | `agents-can-communicate-0.10.4.tgz`, 600,332 bytes, 368 files |
-| sha256 | `0262ed0252c1574fbcbb485428d1d45f14a1bf7f7f0ce57848bfe47da836912d` |
+| Built from | `319ccb7fb2e814bda1696061fad03e784df4b0d5` |
+| Tarball | `agents-can-communicate-0.10.4.tgz`, 601,811 bytes, 370 files |
+| sha256 | `2cd9db312ce231d6246984cdb4a25a0297703bd04504c3d8ce042e7c39eace48` |
 
 The exact archive passed clean installation verification. The feature's packed
 integration check exercised the installed module and stable reader after removal

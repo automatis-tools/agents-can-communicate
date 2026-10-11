@@ -125,3 +125,49 @@ a recorded indicator. The Grok selected-home packed checks pass again. A paralle
 packed Kimi test also reached the intentional short UI deadline under test-runner
 load. Classification in that packed test now uses the normal JSON diagnostic budget;
 actual UI timing is verified separately by the native 300 ms capture above.
+
+
+## Review corrections — 2026-10-11
+
+The earlier capture and artifact records above retain their original provenance.
+This follow-up changes process cleanup and diagnostic ordering, not the rendered UI.
+
+| Artifact | Observation |
+|---|---|
+| Source commit | `319ccb7fb2e814bda1696061fad03e784df4b0d5` |
+| Source state before packing | Clean; both fixes, tests and published documentation committed |
+| Package | `agents-can-communicate-0.10.4.tgz` |
+| Size | 601,811 bytes |
+| Entries | 370 |
+| SHA-256 | `2cd9db312ce231d6246984cdb4a25a0297703bd04504c3d8ce042e7c39eace48` |
+| Node used for verification | 24.4.0 |
+
+The saved archive passed `node scripts/verify-package.mjs`, including clean install,
+non-Git operation, and exact uninstall restoration. Syntax checks covered 777 modules.
+All 28 focused indicator checks passed, including 11 new regressions.
+
+- A real previous-footer grandchild kept an IPC connection open after the old
+  timeout implementation returned. The corrected timeout, cancellation, output
+  overflow and outer-deadline paths close that connection. The outer deadline emits
+  only one diagnostic. A shell-only kill mutation failed these assertions.
+- Real observation workers published a newer result before an older result at the
+  same millisecond. Both success-after-failure and failure-after-success retain the
+  newer caller order. Tests also cover duplicate publication, ordinary date ordering,
+  order comparison across Node processes, caller-supplied order rejection, and legacy
+  records without an order. Removing the equal-time comparison failed the regressions.
+- POSIX commands own a process group. Windows uses detached shell and cleanup
+  processes, so the indicator's own exit cannot terminate cleanup before it finishes.
+  Windows scripts that leave background processes after their shell exits must manage
+  those processes themselves; cleanup does not guess ownership from an exited PID.
+- The existing browser preview was run against the updated production reader and
+  real filesystem fixtures. No new native UI or message-delivery capability is claimed.
+
+The initial parallel focused run overlapped filesystem-heavy preview startup and
+hit the existing deadline in `kimi: existing custom command receives identical stdin
+and stays on the first line` once. All 28 checks passed sequentially;
+no display budget was increased. The full repository gate uses its normal local
+fsync policy and supported file-concurrency setting.
+
+The complete local suite passed after these corrections: 3,295 tests, 3,287 passed,
+8 skipped, 0 failures, at the supported file concurrency of four. Native Windows
+execution of the new process cleanup cases still requires the PR CI run after push.
