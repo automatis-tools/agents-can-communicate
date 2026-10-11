@@ -64,18 +64,42 @@ Do this once, not every turn. Update it only when the scope or mode materially
 changes. `--hint` is important: it lets ACC match your plan against a peer's
 claim. Intent is awareness, not permission.
 
-Before changing shared files, claim the smallest useful resource:
+Before changing shared files, claim the smallest useful resources in one operation:
 
 ```bash
-{{ACC}} claim --resource 'file:packages/core/**' --reason "porting the store"
+{{ACC}} claim --resource 'file:packages/core/**' \
+  --resource 'file:packages/protocol/**' --reason "porting the claim model"
 ```
 
-Exit 5 means a conflict. Do not work around it silently. Narrow your scope,
-contact the owner, or ask the human. Give a claim back explicitly when useful:
+Repeat `--resource` for an atomic batch, or supply it once for one claim.
+Shared mode, enforcement, reason, and lease apply to every resource. Duplicate resources after
+normalization are rejected. Exit 5 means a conflict: no claim is created or
+renewed. Batch `details.conflicts` names blocked resources and their holders.
+Narrow your scope, contact the owner, or ask the human. Repeating a successful
+claim command renews your existing claims on those resources.
+
+Release selected claims when useful:
 
 ```bash
-{{ACC}} release --resource 'file:packages/core/**'
+{{ACC}} release --resource 'file:packages/core/**' \
+  --resource 'file:packages/protocol/**'
 ```
+
+Choose exactly one selector family: repeated `--resource`, repeated `--claim`,
+or `--all`. Duplicate selectors after normalization are rejected. A missing or
+foreign explicit target fails without releasing any claims. Repeating an explicit release after its targets were removed is an error.
+Batch release accepts no force-release authority.
+
+To release all your claims while keeping your session and intent open:
+
+```bash
+{{ACC}} release --all
+```
+
+This selects only your session's current claims in its workspace. An empty set
+succeeds. Each retry selects the current set and can release newly acquired claims.
+Use `work --clear` to clear intent, `ack` to acknowledge a message, and `finish`
+to record a handoff and close your ACC presence.
 
 ## Communicate only when it changes another agent's work
 

@@ -5,6 +5,7 @@ import { clearSessionBinding, loadSessionBinding, storeSessionBinding }
 
 import { readResource } from "./resources.mjs";
 import { validateToolInput } from "./input-validator.mjs";
+import { claimTool, releaseTool, validateClaimSelectors } from "./claim-tools.mjs";
 import { PUBLIC_TOOLS, RESOURCES } from "./tools.mjs";
 import { createProtocol } from "./protocol.mjs";
 
@@ -133,14 +134,9 @@ async function callTool(name, args, context) {
       return service.setIntent({ ...owner, summary: args.summary, mode: args.mode,
         state: args.state, resourceHints: args.resourceHints ?? [] });
     case "acc_claim":
-      if (args.action === "renew") return service.renewClaim({ ...owner,
-        claimId: args.claimId, leaseSeconds: args.leaseSeconds });
-      return service.acquireClaim({ ...owner, resource: args.resource,
-        mode: args.mode ?? "exclusive", enforcement: "advisory",
-        reason: args.reason ?? "unspecified", leaseSeconds: args.leaseSeconds });
+      return claimTool(service, owner, args);
     case "acc_release":
-      await service.releaseClaim({ ...owner, claimId: args.claimId });
-      return { released: args.claimId };
+      return releaseTool(service, owner, args);
     case "acc_message": {
       const kind = args.kind ?? "note";
       const toParticipantIds = args.to ?? [];
@@ -219,13 +215,16 @@ async function handle(message, context) {
           throw new AccError(EXIT.USAGE, `unknown tool: ${params.name}`, { name: params.name });
         }
         validateToolInput(tool.inputSchema, args);
-        const value = await callTool(params.name, args, context);
+        const value = await callTool(params.name, validateClaimSelectors(params.name, args), context);
         return { content: [{ type: "text", text: JSON.stringify(value, null, 2) }],
           structuredContent: value };
       } catch (error) {
         // A failing operation is a tool result, not a transport failure: the
         // model must see it and be able to react.
+        const batchConflict = params.name === "acc_claim"
+          && params.arguments?.resources !== undefined && error.details?.conflicts !== undefined;
         return { isError: true,
+          ...(batchConflict ? { structuredContent: { code: error.code, details: error.details } } : {}),
           content: [{ type: "text", text: `${params.name}: ${error.message}` }] };
       }
     }

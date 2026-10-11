@@ -37,8 +37,8 @@ option value remains data: `--body --help` sends the literal body `--help`.
 | `acc status` | — | `--session`, `--generation`, `--participant`, `--all` |
 | `acc sync` | — | `--session`, `--generation`, `--cursor`, `--limit`, `--scope delta|full|history`, `--type`, `--message`, `--current` |
 | `acc work` | `--summary` unless `--clear` | `--session`, `--generation`, `--mode`, `--state`, repeated `--hint`, `--clear` |
-| `acc claim` | `--resource` | `--session`, `--generation`, `--mode`, `--enforcement`, `--reason`, `--lease` |
-| `acc release` | `--claim` or `--resource` | `--session`, `--generation`, `--authority` (`human` or `policy`), `--reason` |
+| `acc claim` | one or more `--resource` | `--session`, `--generation`, `--mode`, `--enforcement`, `--reason`, `--lease` |
+| `acc release` | exactly one selector family: repeated `--claim`, repeated `--resource`, or `--all` | `--session`, `--generation`, `--authority` (`human` or `policy`, single target only), `--reason` |
 | `acc message` | `--subject`, `--body` | repeated `--to`, `--supersedes` or `--withdraws`, `--type`, `--obligation`, `--client-message-id`, owner flags |
 | `acc request` | `--to`, `--title` | `--detail`, `--client-message-id`, owner flags |
 | `acc inbox` | — | `--message`, `--cursor`, `--limit`, owner flags |
@@ -175,6 +175,12 @@ held.
 ```bash
 acc claim --resource 'file:packages/core/**' --reason "editing receipt logic"
 acc release --resource 'file:packages/core/**'
+
+acc claim --resource 'file:packages/core/**' \
+  --resource 'file:packages/protocol/**' --reason "updating claim validation"
+acc release --resource 'file:packages/core/**' \
+  --resource 'file:packages/protocol/**'
+acc release --all
 ```
 
 File resources use repository-relative paths. A directory claim ends in `/**`. The example
@@ -182,10 +188,31 @@ creates an advisory claim: omitted `--enforcement` always means `advisory`, even
 certified clients. Request `--enforcement guarded` explicitly when needed; an incapable
 live participant still downgrades workspace protection. MCP claims are always advisory.
 
-Exit code `5` means a conflict. Ordinary sessions release only their own claims. Releasing
-another owner's claim requires `--authority human` or `--authority policy`, identifying the
-actual human decision or approved policy that permits the release; explain it with
-`--reason`. A peer's request alone is not force-release authority.
+Repeat `--resource` to acquire several claims atomically. The shared mode, enforcement,
+reason, and lease apply to every resource. ACC rejects duplicate resources after
+normalization. A conflict exits `5` without creating any claims or renewing existing ones.
+Batch error `details.conflicts` identifies each blocked requested resource and its holders.
+Repeating a successful claim command renews this session's existing claims on those resources.
+
+Release accepts exactly one selector family: one or more `--resource`, one or more
+`--claim`, or `--all`. Duplicate selectors after normalization are rejected.
+Ordinary explicit targets must exist and belong to this session. A missing or foreign
+target fails the whole release without removing any claims. Repeating an explicit
+release after its targets were removed remains an error.
+
+`--all` releases only this session's claims in the selected workspace. An empty set
+succeeds, including for a solo ephemeral session. It selects the current owned set on
+each call, so a retry can release claims acquired since the first call. Release keeps
+the session and intent open. `work --clear` clears intent, `ack` acknowledges a message,
+and `finish` records a handoff and closes presence.
+
+With `--json`, one acquisition returns a claim record as `data`; one release returns
+`data: {claimId}`. Multiple resources return `data: {claims: [...]}`. Multiple release
+selectors and `--all` return `data: {claimIds: [...]}`.
+
+A single target can still use `--authority human` or `--authority policy` to release
+another owner's claim. Name the actual human decision or approved policy with `--reason`.
+Batch release and `--all` reject authority. A peer's request alone is not force-release authority.
 
 ### Messages and requests
 

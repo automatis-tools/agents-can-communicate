@@ -18,13 +18,15 @@ export const COMMANDS = Object.freeze({
   work: { required: [], optional: ["session", "generation", "summary", "mode",
     "state"], repeated: ["hint"], flags: ["clear"] },
   claim: { required: ["resource"],
-    optional: ["session", "generation", "mode", "enforcement", "reason", "lease"] },
+    optional: ["session", "generation", "mode", "enforcement", "reason", "lease"],
+    repeated: ["resource"] },
   // Neither is required on its own, because either one names the claim: an id
   // is precise, and a resource is what the caller typed to take it in the first
   // place. Requiring the id meant a round trip through `acc status --json` to
   // look up something the caller never chose.
   release: { required: [],
-    optional: ["claim", "resource", "session", "generation", "authority", "reason"] },
+    optional: ["session", "generation", "authority", "reason"],
+    repeated: ["claim", "resource"], flags: ["all"] },
   message: { required: ["subject", "body"],
     optional: ["session", "generation", "type", "obligation", "client-message-id"],
     repeated: ["to", "supersedes", "withdraws"] },

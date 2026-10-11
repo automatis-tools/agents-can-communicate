@@ -33,8 +33,8 @@ const SUMMARY = Object.freeze({
   prune: "report what this workspace no longer needs; --apply to reclaim it",
   sync: "events since a cursor, or bounded message history",
   work: "publish what this session is doing, or --clear when it has stopped",
-  claim: "reserve a resource; exit 5 when someone else already holds it",
-  release: "give a claim back",
+  claim: "reserve resources atomically; exit 5 when a peer holds one",
+  release: "give selected claims back, or --all for this session",
   ack: "acknowledge receipt without accepting work or writing an answer",
   message: "send a typed message to named participants",
   inbox: "list pending message headers; --message reads one complete message",
@@ -87,8 +87,12 @@ const NOTES = Object.freeze({
     "--cadence is a positive interval in milliseconds."],
   work: ["Provide --summary unless using --clear. Default mode: edit; default state: active."],
   claim: ["--lease is in seconds. Default mode: exclusive; default enforcement: advisory.",
-    "For files, use file:src/a.mjs or file:src/**. A claim may conflict with a peer."],
-  release: ["Provide --claim or --resource. Releasing another owner's claim requires human or policy authority."],
+    "Repeat --resource for an atomic batch. A conflict changes no claims, including existing leases.",
+    "For files, use file:src/a.mjs or file:src/**. Duplicate canonical resources are rejected."],
+  release: ["Choose repeated --claim, repeated --resource, or --all. Never combine selector families.",
+    "Explicit lists succeed completely or change no claims. --all releases only this session's claims and keeps it open.",
+    "An empty --all succeeds. A repeated explicit release of missing claims remains an error.",
+    "Releasing another owner's claim requires human or policy authority and a single selector."],
   message: ["Default type: note. question/request require --to and obligation reply; note uses none.",
     "decision permits none, or acknowledge when addressed. Use reply for answers and finish for handoffs.",
     "For decisions, repeat --supersedes or --withdraws with 1..16 prior decision IDs; never combine the two.",
@@ -148,11 +152,13 @@ export function commandHelpText(command) {
   const lines = [`acc ${name} - ${summary}`, "", `Usage: acc ${name}${suffix} [options]`, ""];
   for (const [key, label] of [["required", "Required"], ["optional", "Optional"],
     ["repeated", "Repeatable"], ["flags", "Flags"]]) {
-    if (command[key].length === 0) continue;
+    const options = command[key].filter(option => key !== "repeated" || !command.required.includes(option));
+    if (options.length === 0) continue;
     lines.push(`${label}:`);
-    for (const option of command[key]) {
+    for (const option of options) {
       const value = key === "flags" ? "" : ` <${choices[option]?.join("|") ?? "value"}>`;
-      lines.push(`  --${option}${value}`);
+      const repeatable = key === "required" && command.repeated.includes(option) ? " (repeatable)" : "";
+      lines.push(`  --${option}${value}${repeatable}`);
     }
     lines.push("");
   }
