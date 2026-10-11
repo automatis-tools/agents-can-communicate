@@ -1,0 +1,62 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+:root { color-scheme: light dark; font: 15px system-ui,sans-serif; }
+body { margin: 24px; } h1 { font-size: 18px; margin-bottom: 24px; }
+#summary { font-size: 24px; font-weight: 600; } #summary::before { content:'●'; margin-right:10px; color:#a68231; }
+#summary.ready::before { color:#289460; } p { line-height:1.5; } #detail { opacity:.8; }
+button { padding:8px 12px; border-radius:8px; border:1px solid #8885; background:transparent; color:inherit; }
+#binding { font-size:12px; opacity:.6; overflow-wrap:anywhere; } #notice { font-size:12px; opacity:.65; }
+</style></head><body>
+<h1>ACC</h1><div id="summary">Connecting to this conversation…</div>
+<p id="detail">The host must identify the conversation before status can be read.</p>
+<button id="refresh" type="button">Refresh</button><p id="binding"></p>
+<p id="notice">Read-only status. Updates do not send a chat message.</p>
+<script>
+const pending = new Map(); let nextId = 1, initialized = false, busy = false;
+const summary = document.querySelector('#summary'), detail = document.querySelector('#detail');
+function request(method, params) {
+  return new Promise((resolve,reject) => {
+    const id = nextId++, timer = setTimeout(() => { pending.delete(id); reject(new Error('Host did not respond')); },8000);
+    pending.set(id,{resolve,reject,timer});
+    parent.postMessage({jsonrpc:'2.0',id,method,params},'*');
+  });
+}
+function render(result) {
+  if (result.isError || !result.structuredContent?.binding?.threadId) throw new Error('Conversation identity is unavailable');
+  const {status,binding} = result.structuredContent;
+  summary.textContent = status.label || (status.health === 'ready' ? 'ACC ready' : 'ACC needs attention');
+  summary.className = status.health === 'ready' ? 'ready' : '';
+  detail.textContent = status.detail || status.reasonCode || '';
+  document.querySelector('#binding').textContent = 'This conversation: ' + binding.threadId;
+}
+function showError(error) {
+  summary.textContent = 'ACC status unavailable'; summary.className = '';
+  detail.textContent = error.message; document.querySelector('#binding').textContent = '';
+}
+async function refresh() {
+  if (!initialized || busy || document.hidden) return;
+  busy = true;
+  try { render(await request('tools/call',{name:'acc_status',arguments:{},_meta:{}})); }
+  catch (error) { showError(error); } finally { busy = false; }
+}
+addEventListener('message', event => {
+  if (event.source !== parent || !event.data || event.data.jsonrpc !== '2.0') return;
+  const message = event.data, waiter = pending.get(message.id);
+  if (waiter) { clearTimeout(waiter.timer); pending.delete(message.id);
+    message.error ? waiter.reject(new Error(message.error.message)) : waiter.resolve(message.result); }
+  if (message.method === 'ui/notifications/tool-result') {
+    try { render(message.params); } catch(error) { showError(error); }
+  }
+});
+document.querySelector('#refresh').onclick = refresh;
+addEventListener('visibilitychange', refresh);
+(async () => {
+  if (parent === window) return showError(new Error('Open this panel from a compatible native MCP App host.'));
+  try {
+    await request('ui/initialize',{protocolVersion:'2026-01-26',appInfo:{name:'ACC panel probe',version:'0.0.1'},appCapabilities:{}});
+    parent.postMessage({jsonrpc:'2.0',method:'ui/notifications/initialized',params:{}},'*');
+    initialized = true; await refresh(); setInterval(refresh,3000);
+  } catch(error) { showError(error); }
+})();
+</script></body></html>

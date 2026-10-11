@@ -1,0 +1,85 @@
+{
+  "scope": "temporary-home-only",
+  "productionFilesChanged": [],
+  "commands": [
+    {
+      "args": [
+        "plugin",
+        "marketplace",
+        "add",
+        "/private/tmp/acc-codex-indicator-spike/panel",
+        "--json"
+      ],
+      "exitCode": 0,
+      "result": {
+        "marketplaceName": "acc-ui-probe",
+        "installedRoot": "/private/tmp/acc-codex-indicator-spike/panel",
+        "alreadyAdded": false
+      }
+    },
+    {
+      "args": [
+        "plugin",
+        "add",
+        "acc-ui-probe@acc-ui-probe",
+        "--json"
+      ],
+      "exitCode": 0,
+      "result": {
+        "pluginId": "acc-ui-probe@acc-ui-probe",
+        "name": "acc-ui-probe",
+        "marketplaceName": "acc-ui-probe",
+        "version": "0.0.1",
+        "installedPath": "/private/tmp/acc-codex-indicator-spike/panel/install-m664_oe0/codex-home/plugins/cache/acc-ui-probe/acc-ui-probe/0.0.1",
+        "authPolicy": "ON_INSTALL"
+      }
+    },
+    {
+      "args": [
+        "plugin",
+        "remove",
+        "acc-ui-probe@acc-ui-probe",
+        "--json"
+      ],
+      "exitCode": 0,
+      "result": {
+        "pluginId": "acc-ui-probe@acc-ui-probe",
+        "name": "acc-ui-probe",
+        "marketplaceName": "acc-ui-probe"
+      }
+    },
+    {
+      "args": [
+        "plugin",
+        "marketplace",
+        "remove",
+        "acc-ui-probe",
+        "--json"
+      ],
+      "exitCode": 0,
+      "result": {
+        "marketplaceName": "acc-ui-probe",
+        "installedRoot": null
+      }
+    }
+  ],
+  "installedFilesMatch": true,
+  "installedManifest": {
+    "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+    "name": "acc-ui-probe",
+    "version": "0.0.1",
+    "description": "Temporary read-only ACC conversation panel feasibility probe.",
+    "extensions": {
+      "com.openai": {
+        "interface": {
+          "displayName": "ACC status probe",
+          "shortDescription": "Read-only conversation status"
+        }
+      }
+    }
+  },
+  "configAfterInstall": "cli_auth_credentials_store = \"file\"\nmcp_oauth_credentials_store = \"file\"\n[analytics]\nenabled = false\n\n[marketplaces.acc-ui-probe]\nsource_type = \"local\"\nsource = \"/private/tmp/acc-codex-indicator-spike/panel\"\n\n[plugins.\"acc-ui-probe@acc-ui-probe\"]\nenabled = true\n",
+  "installedCacheRemoved": true,
+  "configRestoredByteExactly": true,
+  "passed": true
+}
