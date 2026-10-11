@@ -17,10 +17,11 @@
 | Tarball | `agents-can-communicate-0.11.0.tgz`, 588,778 bytes, 354 files |
 | sha256 | `b466c866f1901582de2f89428dfb9f0600821bc45d4e027ba44637c232f08c87` |
 
-The exact archive passed clean package verification, 27 managed/store checks, and
-an upgrade from published 0.10.4 with a live MCP process and preserved question/configuration.
-All 354 source, archive and installed files matched. Real Claude Code/Codex hook
-delivery and idle Claude inbox wake passed locally against a model stub.
+The exact archive passed clean package verification and an upgrade from published
+0.10.4 with a live MCP process and preserved question/configuration. All 354 source,
+archive and installed files matched. Separately packed source passed 27 managed/store
+checks and real Claude Code/Codex hook delivery and idle Claude inbox wake against
+a local model stub. The full suite passed: 3288 tests, 8 skips, no failures.
 See [0.11.0 candidate evidence](docs/release-evidence/v0.11.0.md) for provenance and limits.
 This candidate is not published; earlier release records retain their original facts.
 
