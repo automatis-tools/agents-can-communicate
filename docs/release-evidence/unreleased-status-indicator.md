@@ -280,3 +280,43 @@ Earlier capture and artifact records above retain their original source hashes.
 `npm ci` and syntax checks passed; syntax covered 787 modules. The exact archive
 passed clean installation, non-Git operation and exact uninstall restoration.
 The mandatory full pre-push suite runs after this evidence update.
+
+
+## Post-rebase review corrections — 2026-10-11
+
+The full CI run on `80f91369` passed on Linux, macOS and Windows after the conflict
+resolution. Review 5484741850 identified two further issues, corrected here.
+
+Antigravity now preserves a user replacement or removal across repeated updates.
+The retained marker distinguishes that choice from a first installation. Disable
+and uninstall preserve the edit; an explicit off/on cycle starts fresh composition.
+Four regressions failed before the fix and when a mutation removed the marker on
+mismatch. The healthy-refresh test executes each configured runner through the host
+shell, including the Windows shim form, while retaining edited presentation fields.
+Ignoring the supplied runner failed that execution assertion.
+
+The router starts optional observations without awaiting them. Durable receipt and
+history operations remain awaited. Four real held-mutex cases verify that the
+result and next recipient proceed before the diagnostic worker finishes. Rejection,
+endpoint refresh failure, wake and successful offer paths are covered. Further tests
+verify writer failure cannot rewrite delivery and that a short-lived caller can
+still publish after reporting dispatch. The SDK's existing bounded 1.5-second timer
+remains; it can retain process shutdown without blocking offers. Reintroducing await
+failed all four ordering cases. Unreferencing the timer failed subprocess persistence.
+
+All 127 focused installer, router, indicator and observation-order tests passed in a
+combined run. The restored router regression file passed again after mutation checks.
+
+| Artifact | Observation |
+|---|---|
+| Source commit | `dda4ec9978ef2823b83f6ccfdce32cb3fb188480` |
+| Source state before packing | Clean; both review fixes, regressions and documentation committed |
+| Package | `agents-can-communicate-0.10.4.tgz` |
+| Size | 607,055 bytes |
+| Entries | 374 |
+| SHA-256 | `609b6c36c820dcff2530666bb9e50630d67d4ccfeeee1db6f9e47c78b3fe526d` |
+| Node used for verification | 24.4.0 |
+
+The exact archive passed clean installation, non-Git operation and exact uninstall
+restoration checks. Syntax checks covered 788 modules. The full suite runs after
+this artifact record update.

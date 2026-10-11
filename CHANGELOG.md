@@ -17,6 +17,8 @@
   A detached Node launcher preserves Windows shell input and output during cleanup.
   Equal-time delivery observations retain caller order, so an older worker cannot
   overwrite a newer success or failure.
+- Antigravity retains user replacements and removals across repeated updates.
+  Optional offer diagnostics no longer delay delivery to the next participant.
 - The indicator reads local state without ACC writes or client socket probes.
   Idle sessions remain active when a delivery lease expires. A failed send or
   endpoint verification is a separate observation.
@@ -26,9 +28,9 @@
 
 | Candidate artifact | Value |
 |---|---|
-| Built from | `28913dcc5b70153a9bb4aafeadee70ff55c41aef` |
-| Tarball | `agents-can-communicate-0.10.4.tgz`, 606,791 bytes, 374 files |
-| sha256 | `008722dd5a32aa663c98ee11380f0d25f376484abe06154dd6b0c1d42acfbce7` |
+| Built from | `dda4ec9978ef2823b83f6ccfdce32cb3fb188480` |
+| Tarball | `agents-can-communicate-0.10.4.tgz`, 607,055 bytes, 374 files |
+| sha256 | `609b6c36c820dcff2530666bb9e50630d67d4ccfeeee1db6f9e47c78b3fe526d` |
 
 The exact archive passed clean installation verification. The feature's packed
 integration check exercised the installed module and stable reader after removal
