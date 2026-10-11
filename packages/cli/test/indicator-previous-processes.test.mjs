@@ -6,6 +6,7 @@ import net from "node:net";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
+import { pathToFileURL } from "node:url";
 import { previousOutput } from "../src/indicator-previous-command.mjs";
 
 function within(promise, ms, message) {
@@ -89,15 +90,28 @@ test("the outer indicator deadline cancels a footer that starts late", async t =
   const f = await processFixture(t, { partial: true });
   const marker = path.join(f.root, "marker.json");
   await writeFile(marker, JSON.stringify({ previous: { command: f.command } }));
-  const child = spawn(process.execPath, [path.resolve("bin/acc-indicator.mjs"), "--adapter", "antigravity",
-    "--previous", marker], { env: { ...process.env, ACC_DATA_HOME: f.root }, stdio: ["pipe", "pipe", "pipe"] });
+  const driver = path.join(f.root, "indicator.mjs");
+  // Advance the reader's clock after its modules load. A parent-side sleep can
+  // expire during a slow import and accidentally exercise the footer's timer.
+  await writeFile(driver, `import {mock} from 'node:test';
+    import {PassThrough} from 'node:stream';
+    import {runIndicator} from ${JSON.stringify(pathToFileURL(path.resolve("packages/cli/src/indicator-command.mjs")).href)};
+    mock.timers.enable({apis:['setTimeout']});
+    const stdin=new PassThrough();
+    const pending=runIndicator({argv:process.argv.slice(2),stdin});
+    mock.timers.tick(1000);
+    stdin.end('{"conversation_id":"unregistered"}');
+    process.once('message',()=>mock.timers.tick(500));
+    await pending;`);
+  const child = spawn(process.execPath, [driver, "--adapter", "antigravity",
+    "--previous", marker], { env: { ...process.env, ACC_DATA_HOME: f.root }, stdio: ["ignore", "pipe", "pipe", "ipc"] });
   let output = "";
   child.stdout.on("data", chunk => { output += chunk; });
   child.stderr.resume();
   const exited = new Promise(resolve => child.once("exit", resolve));
-  const inputTimer = setTimeout(() => child.stdin.end(JSON.stringify({ conversation_id: "unregistered" })), 1200);
-  t.after(() => { clearTimeout(inputTimer); if (child.exitCode === null && child.signalCode === null) child.kill(); });
+  t.after(() => { if (child.exitCode === null && child.signalCode === null) child.kill(); });
   await within(f.ready, 4000, "the footer must start before the outer deadline");
+  child.send("deadline");
   assert.equal(await within(exited, 4000, "outer indicator deadline did not return"), 0);
   await within(f.closed, 1500, "outer deadline left a previous footer's child running");
   assert.match(output, /ACC/);

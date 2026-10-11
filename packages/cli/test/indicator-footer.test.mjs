@@ -26,11 +26,13 @@ for(const [adapter,version,id] of [['kimi','2.1.1','sessionId'],['grok','1.0.46'
  });
  test(`${adapter}: existing custom command receives identical stdin and stays on the first line`,async t=>{
   const f=await createIndicatorFixture(t,{adapterId:adapter,version});
-  const file=path.join(f.root,'previous.mjs'),marker=path.join(f.root,'marker.json');
-  await writeFile(file,`let s='';for await(const c of process.stdin)s+=c;console.log('mine:'+JSON.parse(s).${id});`);
-  await writeFile(marker,JSON.stringify({previous:{command:`"${process.execPath}" "${file}"`}}));
-  const out=stripVTControlCharacters(await run(f,adapter,{[id]:'native-session'},['--previous',marker]));
-  assert.match(out,/^ACC ● · (turn|inbox) │ mine:native-session\n$/);
+  const marker=path.join(f.root,'marker.json');
+  // Composition must not benchmark a second Node startup inside Kimi's 80 ms
+  // command budget. Node stdin and shell pipelines have separate regressions.
+  await writeFile(marker,JSON.stringify({previous:{command:process.platform==='win32'?'more':'cat'}}));
+  const payload={[id]:'native-session'};
+  const out=stripVTControlCharacters(await run(f,adapter,payload,['--previous',marker]));
+  assert.equal(out,`ACC ● · ${adapter==='kimi'?'turn':'inbox'} │ ${JSON.stringify(payload)}\n`);
  });
 }
 test('Kimi welcome screen retains its footer without a spurious registration error',async t=>{

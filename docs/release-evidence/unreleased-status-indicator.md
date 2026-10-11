@@ -212,3 +212,25 @@ restoration checks. The first full local run executed 3,297 tests: 3,288 passed,
 8 were skipped, and only the recorded-candidate gate failed because it ran before
 the candidate table was updated. All three candidate checks passed after the
 update. The mandatory pre-push suite runs after this evidence commit.
+
+
+## Timing-test follow-up — 2026-10-11
+
+Full CI on `88e87364` passed on Linux. macOS exposed a race in the outer-deadline
+test: its parent-side input delay could expire during module loading, causing the
+previous-command timeout to run first. Windows passed the new process and stream
+regressions, but the Kimi composition fixture exceeded the display deadline while
+starting another Node process under full-suite load.
+
+These corrections change tests only; the artifact above remains current. The
+outer-deadline driver now advances its clock after importing the production reader,
+then waits for a real descendant before triggering the outer deadline. A 900 ms
+import delay failed the old test and passed the corrected test. Removing the
+production outer cancellation made the corrected test fail because the real
+descendant's IPC connection stayed open. Production code was restored afterward.
+
+The composition fixture now uses a fast system stdin copier and asserts the entire
+original payload in the composed line. Separate tests retain real Node command and
+shell-pipeline coverage. No product timeout changed. All 20 focused tests passed
+locally and on both platforms with file concurrency three in
+[run 38167473317](https://github.com/automatis-tools/agents-can-communicate/actions/runs/38167473317).
