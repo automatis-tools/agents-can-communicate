@@ -91,10 +91,18 @@ for (const [adapterId, version, key, suffix] of [
   const payload = { [key]: "native-session", cwd: "/tmp/project",
     model: adapterId === "kimi" ? "K3" : { display_name: "Grok" }, context_window: { used_percentage: 12 } };
   const child = exec(process.execPath, ["--permission", "--allow-fs-read=*",
-    path.join(f.dataHome, "acc", "runtime", "bin", "acc-indicator.mjs"), "--adapter", adapterId],
+    path.join(f.dataHome, "acc", "runtime", "bin", "acc-indicator.mjs"), "--adapter", adapterId, "--json"],
   { env: { ...f.env, ACC_DATA_HOME: state.dataHome }, cwd: f.project });
   child.child.stdin.end(JSON.stringify(payload));
-  const { stdout } = await child;
+  const report = JSON.parse((await child).stdout);
+  assert.equal(report.health, "ready");
+  assert.equal(report.reception, suffix);
+  // Classification uses the normal diagnostic budget during the parallel suite.
+  // The native Kimi capture separately measures its strict 300 ms UI deadline.
+  const packed = await import(pathToFileURL(path.join(f.installed, "node_modules",
+    "@agents-can-communicate", `adapter-${adapterId}`, "src", "indicator.mjs")).href);
+  const extension = packed[`${adapterId}Indicator`];
+  const stdout = extension.composeText({payload, indicator: extension.renderText(report)});
   assert.match(stripVTControlCharacters(stdout), new RegExp(`^ACC ● · ${suffix} │`));
   assert.match(stdout, /\x1b\[22;1;38;2;44;122;57m●/);
   assert.match(stdout, /project/);

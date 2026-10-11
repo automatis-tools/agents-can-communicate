@@ -1,4 +1,4 @@
-import {configureGrokIndicator, grokIndicatorPaths} from "./indicator-install.mjs";
+import {configureGrokIndicator, planGrokIndicator} from "./indicator-install.mjs";
 import { cp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -107,10 +107,9 @@ export async function detectGrok({ grokHome, home }) {
 }
 
 export function planGrokInstall(context) {
-  const root = grokHomeOf(context), indicator = grokIndicatorPaths(context);
+  const root = grokHomeOf(context);
   return [
-    {path: indicator.file, kind: "merge"},
-    ...(context.hostPlatform === "win32" && context.indicator === "on" ? [{path: indicator.shim, kind: "tree"}] : []),
+    ...planGrokIndicator(context),
     { path: hooksFile(root), kind: "tree" },
     { path: shimPath(root, context.hostPlatform), kind: "tree" },
     { path: skillPath(root), kind: "tree" },
