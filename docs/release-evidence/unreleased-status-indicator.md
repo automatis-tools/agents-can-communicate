@@ -257,3 +257,26 @@ All 26 focused footer and migration checks passed with concurrency three on Wind
 and macOS in [run 38169135451](https://github.com/automatis-tools/agents-can-communicate/actions/runs/38169135451).
 The migration helper and tests are excluded from the npm artifact. Its source commit
 and SHA-256 above remain unchanged.
+
+
+## Rebase onto batch-claims main — 2026-10-11
+
+PR #291 added a separate Unreleased section while this work was open. Rebasing
+onto `2e50ea988d96f73ea0c245687ab1e15c7b5af7cf` conflicted only in `CHANGELOG.md`.
+Both sections were retained, including the batch candidate's original artifact
+facts. The 24-commit range comparison confirmed that all code patches were unchanged.
+Earlier capture and artifact records above retain their original source hashes.
+
+| Artifact | Observation |
+|---|---|
+| Source commit | `28913dcc5b70153a9bb4aafeadee70ff55c41aef` |
+| Source state before packing | Clean, after replaying all PR commits on current main |
+| Package | `agents-can-communicate-0.10.4.tgz` |
+| Size | 606,791 bytes |
+| Entries | 374 |
+| SHA-256 | `008722dd5a32aa663c98ee11380f0d25f376484abe06154dd6b0c1d42acfbce7` |
+| Node used for verification | 24.4.0 |
+
+`npm ci` and syntax checks passed; syntax covered 787 modules. The exact archive
+passed clean installation, non-Git operation and exact uninstall restoration.
+The mandatory full pre-push suite runs after this evidence update.
