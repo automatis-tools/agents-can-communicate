@@ -92,7 +92,10 @@ export function createClaimService(ports, sessions) {
           const { requestedResource, ...details } = conflicts[0];
           throw new AccError(EXIT.CONFLICT, "the resource is already claimed", details);
         }
-        throw new AccError(EXIT.CONFLICT, "the batch has claimed resources", { conflicts });
+        const message = "batch claim conflicts:\n" + conflicts.map(conflict =>
+          `${conflict.requestedResource} overlaps ${conflict.resource}, held by ${conflict.ownerSessionId}`)
+          .join("\n");
+        throw new AccError(EXIT.CONFLICT, message, { conflicts });
       }
       // Validate every record before staging a write, including renewals.
       const records = resources.map(resource => {

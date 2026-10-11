@@ -27,7 +27,10 @@ async function fixture(t) {
     const result = await run(["attach", "--participant", participant, "--harness", "cli"]);
     assert.equal(result.code, 0, JSON.stringify(result)); return result.data;
   };
-  return { run, attach };
+  const raw = async args => exec(process.execPath, [binary, ...args], { cwd, env })
+    .then(result => ({ code: 0, ...result }), error => ({ code: error.code, stdout: error.stdout,
+      stderr: error.stderr }));
+  return { run, raw, attach };
 }
 
 test("CLI batch claim and both release selector lists change the complete set", async t => {
@@ -106,4 +109,16 @@ test("CLI batch conflict identifies blockers without retaining earlier resources
   assert.equal(conflict.code, 5, JSON.stringify(conflict));
   assert.equal(conflict.error.details.conflicts[0].ownerSessionId, b.sessionId);
   assert.deepEqual((await f.run(["status"])).data.claims.map(c => c.claimId), [blocked.data.claimId]);
+});
+
+test("plain CLI batch errors name every requested resource and blocking owner", async t => {
+  const f = await fixture(t), a = await f.attach("alice"), b = await f.attach("bob");
+  await f.run(["claim", ...owner(b), "--resource", "file:blocked/**",
+    "--resource", "file:other.mjs"]);
+  const denied = await f.raw(["claim", ...owner(a), "--resource", "file:blocked/a.mjs",
+    "--resource", "file:other.mjs"]);
+  assert.equal(denied.code, 5);
+  for (const value of ["file:blocked/a.mjs", "file:blocked/**", "file:other.mjs", b.sessionId]) {
+    assert.equal(denied.stderr.includes(value), true, `plain error omitted ${value}: ${denied.stderr}`);
+  }
 });

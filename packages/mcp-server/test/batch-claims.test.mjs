@@ -61,6 +61,10 @@ test("MCP batch conflict leaves every claim unchanged and exposes all blocker ow
     assert.equal(snapshot.claims.some(claim => claim.resource === "file:free.mjs"), false);
     assert.equal(typeof rejected.structuredContent, "object", "batch conflicts need structured details");
     assert.equal(rejected.structuredContent.code, 5);
+    for (const value of ["file:src/api.mjs", "file:src/**", "file:docs/guide.md", "file:docs/**",
+      blockers[0].ownerSessionId, blockers[1].ownerSessionId]) {
+      assert.equal(rejected.content[0].text.includes(value), true, `text-only result omitted ${value}`);
+    }
     assert.deepEqual(rejected.structuredContent.details.conflicts.map(conflict => ({
       requestedResource: conflict.requestedResource, resource: conflict.resource,
       claimId: conflict.claimId, ownerSessionId: conflict.ownerSessionId,
