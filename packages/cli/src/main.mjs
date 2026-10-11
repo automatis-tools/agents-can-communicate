@@ -23,46 +23,13 @@ import { runDoctor } from "./doctor-command.mjs";
 import { runManagementDoctor } from "./managed-runtime/diagnostics.mjs";
 import { runStoreMigration } from "./store-migration-command.mjs";
 import { createGitProbe } from "./git-probe.mjs";
-import { canonicalClaim } from "./claim-spelling.mjs";
+import { runClaimCommand, runReleaseCommand } from "./claim-command.mjs";
 import { platformDataHome, runtimePaths } from "./runtime-paths.mjs";
 import { resolveOwner } from "./session-owner.mjs";
 import { discoverWorkspace } from "./workspace-discovery.mjs";
 import { resolveSavedHookWorkspace } from "./hook-workspace.mjs";
 
 const DEFAULT_CADENCE_MS = 30_000;
-
-/**
- * The claim a caller means when they name a resource instead of an id.
- *
- * `acc claim` takes `--resource`; `acc release` took `--claim`. The asymmetry
- * cost every caller - a person and an agent alike - a round trip through
- * `acc status --json` to find an id they never chose. The id is still accepted,
- * and is still the precise answer when two sessions hold the same resource and
- * an authority is releasing someone else's.
- */
-async function claimOn(options, context) {
-  if (options.resource === undefined) {
-    throw new AccError(EXIT.USAGE,
-      "release needs the claim to give back: --resource is what you claimed, "
-      + "--claim is its id");
-  }
-  const resource = await canonicalClaim(options.resource, context.descriptor);
-  const { claims } = await context.service.collectStatus({});
-  // An authority releasing another session's claim is not looking for its own.
-  const mine = claims.filter(claim => claim.resource === resource
-    && (options.authority !== undefined || claim.ownerSessionId === options.session));
-
-  if (mine.length === 0) {
-    throw new AccError(EXIT.DATA, `no claim on ${resource} to release`,
-      { resource, held: claims.map(claim => claim.resource) });
-  }
-  if (mine.length > 1) {
-    throw new AccError(EXIT.DATA,
-      `${mine.length} claims on ${resource}; name the one you mean with --claim`,
-      { resource, claims: mine.map(claim => claim.claimId) });
-  }
-  return mine[0].claimId;
-}
 
 /**
  * Where this workspace's state lives, without reading a byte of it.
@@ -327,25 +294,8 @@ const HANDLERS = Object.freeze({
     return { data: intent, text: `intent: ${intent.summary}` };
   },
 
-  claim: async ({ options, context }) => {
-    const claim = await context.service.acquireClaim({ sessionId: options.session,
-      generation: options.generation,
-      resource: await canonicalClaim(options.resource, context.descriptor),
-      mode: options.mode ?? "exclusive", enforcement: options.enforcement ?? "advisory",
-      reason: options.reason ?? "unspecified",
-      leaseSeconds: options.lease ? positiveNumber(options.lease, "lease") : undefined,
-      descriptor: context.descriptor });
-    return { data: claim, text: `claimed ${claim.resource}` };
-  },
-
-  release: async ({ options, context }) => {
-    const claimId = options.claim ?? await claimOn(options, context);
-    const request = { claimId, sessionId: options.session,
-      generation: options.generation, authority: options.authority, reason: options.reason };
-    if (options.authority === undefined) await context.service.releaseClaim(request);
-    else await context.service.forceReleaseClaim(request);
-    return { data: { claimId }, text: `released ${claimId}` };
-  },
+  claim: runClaimCommand,
+  release: runReleaseCommand,
 
   message: async ({ options, context }) => {
     const kind = options.type ?? "note";

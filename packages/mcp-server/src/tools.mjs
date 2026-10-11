@@ -19,6 +19,10 @@ const object = (properties, required = []) => ({
 
 const string = description => ({ type: "string", description });
 const stringList = description => ({ type: "array", items: { type: "string" }, description });
+const selector = description => ({ ...string(description), minLength: 1 });
+const selectors = description => ({ type: "array", items: { type: "string", minLength: 1 },
+  minItems: 1, uniqueItems: true, description });
+const releaseFields = ["claimId", "claimIds", "resource", "resources", "all"];
 
 export const PUBLIC_TOOLS = Object.freeze([
   {
@@ -68,31 +72,45 @@ export const PUBLIC_TOOLS = Object.freeze([
   },
   {
     name: "acc_claim",
-    description: `Acquire or renew a claim on a resource URI. Claims are `
+    description: `Acquire one resource or atomically acquire a nonempty resources array; renew by claimId. `
+      + `resource returns a Claim; resources returns {claims: [...]}, including one-item arrays. `
+      + `A conflicting batch acquires nothing and lists every conflicting holder in structuredContent.details.conflicts. Claims are `
       + `workspace-wide and advisory here: this client has no write guard, so a claim `
       + `informs peers rather than preventing an edit. ${MUTATION_POLL}`,
     inputSchema: { ...object({
-      resource: string("Resource URI, for example file:packages/core/**."),
+      resource: selector("One resource URI, exclusive with resources; for example file:packages/core/**."),
+      resources: selectors("Resource URIs for one atomic acquisition; unique after normalization and exclusive with resource."),
       action: { type: "string", enum: ["acquire", "renew"] },
       mode: { type: "string", enum: ["shared", "exclusive"] },
       reason: string("Why the resource is being claimed."),
       leaseSeconds: { type: "integer", minimum: 1,
         description: "Lease length; the claim expires without renewal." },
-      claimId: string("Required for renew."),
+      claimId: selector("Required for renew; renew accepts one claimId only."),
     }, ["action"]), oneOf: [
       { properties: { action: { const: "acquire" } }, required: ["resource"],
-        not: { required: ["claimId"] } },
+        not: { anyOf: ["resources", "claimId"].map(field => ({ required: [field] })) } },
+      { properties: { action: { const: "acquire" } }, required: ["resources"],
+        not: { anyOf: ["resource", "claimId"].map(field => ({ required: [field] })) } },
       { properties: { action: { const: "renew" } }, required: ["claimId"],
-        not: { anyOf: ["resource", "mode", "reason"]
+        not: { anyOf: ["resource", "resources", "mode", "reason"]
           .map(field => ({ required: [field] })) } },
     ] },
   },
   {
     name: "acc_release",
-    description: `Release a claim this session owns. ${MUTATION_POLL}`,
-    inputSchema: object({
-      claimId: string("The claim to release."),
-    }, ["claimId"]),
+    description: `Release only claims this session owns, with exactly one of claimId, claimIds, resource, `
+      + `resources, or all: true. Arrays release atomically. Scalar selectors return {released: id}; `
+      + `arrays and all return {released: [ids]}, including an empty all result. `
+      + `all keeps this session's presence and intent open. ${MUTATION_POLL}`,
+    inputSchema: { ...object({
+      claimId: selector("One claim to release."),
+      claimIds: selectors("Claim IDs to release atomically."),
+      resource: selector("One exact resource URI this session holds."),
+      resources: selectors("Exact resource URIs to release atomically; unique after normalization."),
+      all: { type: "boolean", const: true, description: "Release every claim owned by this session." },
+    }), oneOf: releaseFields.map(field => ({ required: [field],
+      not: { anyOf: releaseFields.filter(other => other !== field)
+        .map(other => ({ required: [other] })) } })) },
   },
   {
     name: "acc_message",

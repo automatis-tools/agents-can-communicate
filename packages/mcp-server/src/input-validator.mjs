@@ -43,6 +43,12 @@ function validateSchema(schema, value, path) {
     }
   } else if (schema.type === "array") {
     if (!Array.isArray(value)) fail(path, "must be an array");
+    if (schema.minItems !== undefined && value.length < schema.minItems) {
+      fail(path, `must contain at least ${schema.minItems} item(s)`);
+    }
+    if (schema.uniqueItems === true && new Set(value).size !== value.length) {
+      fail(path, "must contain unique items");
+    }
     if (schema.items !== undefined) {
       value.forEach((item, index) => validateSchema(schema.items, item, `${path}[${index}]`));
     }
@@ -52,6 +58,9 @@ function validateSchema(schema, value, path) {
     fail(path, "must be a boolean");
   } else if (schema.type === "integer" && !Number.isInteger(value)) {
     fail(path, "must be an integer");
+  }
+  if (schema.minLength !== undefined && value.length < schema.minLength) {
+    fail(path, `must contain at least ${schema.minLength} character(s)`);
   }
 
   if (schema.minimum !== undefined && value < schema.minimum) {
