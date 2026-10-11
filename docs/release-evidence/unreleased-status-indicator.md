@@ -4,12 +4,12 @@ Recorded 2026-10-09; updated 2026-10-10 on macOS arm64. This is development work
 
 | Artifact | Observation |
 |---|---|
-| Source commit | `2d5bd55b025f937a60ba172dc73f1fcf0fd3d2c5` |
+| Source commit | `43f2d7154f97d203daaa88c207972b2142f55fb7` |
 | Source state before packing | Clean worktree; all feature and gate files committed |
 | Package | `agents-can-communicate-0.10.4.tgz` |
-| Size | 594,326 bytes |
-| Entries | 360 |
-| SHA-256 | `f2a9f11ca154e8b55066de873129376a69eddacd2be17de7d487a95323185ec7` |
+| Size | 600,216 bytes |
+| Entries | 368 |
+| SHA-256 | `5f2c069a7f791f43c875243710bf05e9744ba5455acebe62aff5330a5178f116` |
 | Node used for verification | 24.4.0 |
 
 The archive was saved separately, then passed to `node scripts/verify-package.mjs`.
@@ -18,28 +18,33 @@ above was captured before packing; it is not inferred from the verifier's curren
 
 ## Checks
 
-- `npm ci` and syntax checks passed. The final syntax run covered 757 modules.
-- Seven focused color tests passed for glyph-only rendering and the shared ready
+- `npm ci` and syntax checks passed. The final syntax run covered 768 modules.
+- 87 focused tests passed for glyph-only rendering and the shared ready
   green. The Antigravity checks cover piped output and plain JSON/details, including
   a stalled-input timeout. The complete suite also covers state classification,
   read-only execution, generation checks, delivery observations, installer ownership,
   and launcher lifetime.
-- Both packed feature tests passed. The first installed the npm artifact, enabled the Claude
+- Four packed feature tests passed. The first installed the npm artifact, enabled the Claude
   module, removed the initial npm copy, and executed the stable reader. It then loaded
   the installed module through its host API boundary, retained an existing footer label,
   printed one diagnostic for a stable failure, and disabled the module again.
   The second executed the installed Antigravity reader through a pipe, with writes
   and child processes forbidden, and observed color around only the healthy dot.
+  The Kimi and Grok tests enabled the installed integration, passed each native
+  payload through the stable reader with writes forbidden, and disabled it again.
 - Clean artifact verification passed: all binaries were installed; all packed Markdown
   links resolved; no forbidden files were present; non-Git coordination worked; and
   install/uninstall restored the client-home topology, modes, links, and bytes.
-- Five deliberate mutations failed the relevant assertions: treating lease expiry as
+- Additional extension mutations rejected the wrong Kimi session field and reclaiming
+  a user-replaced TOML status command. Five earlier deliberate mutations failed the relevant assertions: treating lease expiry as
   disconnection, reclaiming a later user edit during uninstall, attempting a write
   from the public reader, dimming the status glyph, and removing the Antigravity renderer registration. The unmutated tests passed
   again after restoration.
 - Review reproductions failed before their fixes: an update losing the reader executable,
   a recorded send failure staying green, and failed verification of an expired endpoint
-  staying green. Their regressions now pass.
+  staying green. Their regressions now pass. Extension review also reproduced four issues before
+  correction: accepting a different client's session field, stale user footer items,
+  conflicting nested TOML tables, and a failed config write blocking retries.
 
 The first full-suite development run found two corrupt-settings regressions, the new
 binary mode/inventory omissions, and stale candidate provenance. The settings and inventory
@@ -89,3 +94,26 @@ it is a local preview, not a screenshot of a native client.
 
 Reproduce that preview from the source checkout with `node scripts/preview-indicator.mjs`.
 The fixture state is outside the repository and is removed when the preview exits normally.
+
+## Kimi and Grok extension observations
+
+Kimi Code 2.1.1 passed `sessionId` equal to its native SessionStart and
+UserPromptSubmit identity. One canned localhost-provider turn established this
+identity; no external inference ran. Its unmodified installed ACC status command
+then rendered `ACC ● · turn`, model and cwd, with the native context line below.
+Ten subprocess runs with the native payload took 80.94–91.92 ms under a 300 ms
+timeout. A normal SDK-created UI fixture supplied ACC state because the offline
+sandbox denied a process probe during native ACC registration. This is rendering
+and identity evidence, not a new registration or delivery certificate.
+
+Grok 1.0.46 passed the exact CLI session UUID as `session_id`. Idle refreshes with
+`refresh_interval = 1` ran approximately once per second. The unmodified installed
+ACC command rendered `ACC ● · inbox` with cwd/model/context and also composed an
+existing custom command. Only the glyph received RGB `44,122,57` and bold; native
+shortcuts stayed below. A normal SDK-created UI fixture supplied ACC state; no
+model prompt or inference call ran. Both captures used isolated client homes and
+external network denial. Windows rendering was not captured.
+
+The browser preview now includes both composed rows, using production rendering
+and filesystem fixtures. The Kimi snapshot lacks goal/task/effort and rich Git
+fields, which the documentation explicitly lists as unavailable in its custom row.
