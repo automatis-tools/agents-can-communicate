@@ -1,5 +1,29 @@
 # Changelog
 
+## 0.11.0 — release candidate
+
+- Acquire and release multiple resources atomically through repeated CLI selectors
+  or MCP arrays (#290, PR #291). Conflicts change no claims or existing leases.
+- `release --all` releases only this session's claims and keeps presence and intent
+  open. Existing scalar results and single-target force release remain compatible.
+- Batch conflict text identifies each requested resource and blocking owner.
+  CLI help and all six bundled skills describe the new commands and retry behavior.
+- Documentation distinguishes independently opened peer sessions from vendor-managed
+  delegation and preserves the previously uncommitted positioning work.
+
+| Candidate artifact | Value |
+|---|---|
+| Built from | `a519de8eb65e6bea6df6152aaf97d82133f4dbc5` |
+| Tarball | `agents-can-communicate-0.11.0.tgz`, 588,778 bytes, 354 files |
+| sha256 | `b466c866f1901582de2f89428dfb9f0600821bc45d4e027ba44637c232f08c87` |
+
+The exact archive passed clean package verification, 27 managed/store checks, and
+an upgrade from published 0.10.4 with a live MCP process and preserved question/configuration.
+All 354 source, archive and installed files matched. Real Claude Code/Codex hook
+delivery and idle Claude inbox wake passed locally against a model stub.
+See [0.11.0 candidate evidence](docs/release-evidence/v0.11.0.md) for provenance and limits.
+This candidate is not published; earlier release records retain their original facts.
+
 ## Unreleased — per-session ACC indicator
 
 - Optional Claude Code, Antigravity CLI, Kimi Code and Grok indicators show incoming reception as
