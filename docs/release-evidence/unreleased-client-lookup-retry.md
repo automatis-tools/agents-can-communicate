@@ -9,7 +9,7 @@ artifact, whose original record remains unchanged.
 
 | Fact | Value |
 |---|---|
-| Source commit | `94b9bbae9661e6009f188bb22ef9619b98eb32ea` |
+| Source commit | `aad0696717b6a56312a49583543d2c894908eadb` |
 | Source state at pack time | clean feature worktree |
 | Archive | `agents-can-communicate-0.11.0.tgz` |
 | Archive size | 608,582 bytes |
@@ -19,6 +19,9 @@ artifact, whose original record remains unchanged.
 
 `node scripts/verify-package.mjs` passed on the clean worktree and reported the same
 digest as a separate `npm pack`.
+The fix is commit `94b9bbae`. The recorded commit adds only the Kimi footer test change
+from PR #293, which this machine's load needs for a stable suite; the archive packed
+from both commits has identical bytes.
 
 ## Cause
 
