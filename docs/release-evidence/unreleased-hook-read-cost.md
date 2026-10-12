@@ -27,6 +27,8 @@ asking for it, now passing `includeSessions: true`, and two shard tests that fai
 this checkout: `scripts/run-tests.mjs --list` exited before a pipe took more than 64 KiB
 of its output, and this worktree's longer path pushed the list past it. It now finishes
 writing first.
+After the recorded commit, with only this record added, the full suite ran 3426 tests:
+3418 passed, 8 were skipped, none failed, at load average 19–28.
 
 ## Cause
 
