@@ -1,0 +1,43 @@
+name: Entry point start times
+on:
+  push:
+    branches: [measure/load-only-needed-modules]
+permissions:
+  contents: read
+jobs:
+  startup:
+    name: ${{ matrix.os }} · ${{ matrix.rep }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: windows-latest, rep: a }
+          - { os: windows-latest, rep: b }
+          - { os: ubuntu-latest, rep: a }
+          - { os: macos-latest, rep: a }
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24'
+      - name: Temporary files on the local disk
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $dir = Join-Path $env:RUNNER_TEMP 'tmp'
+          New-Item -ItemType Directory -Force $dir | Out-Null
+          "TEMP=$dir" >> $env:GITHUB_ENV
+          "TMP=$dir" >> $env:GITHUB_ENV
+      - run: npm ci
+      - name: Main before the change
+        shell: bash
+        run: |
+          git worktree add "$RUNNER_TEMP/base" "$(git merge-base HEAD origin/main)"
+          cd "$RUNNER_TEMP/base" && npm ci
+      - name: Start times
+        shell: bash
+        run: node .github/probes/startup-compare.mjs 25 "$RUNNER_TEMP/startup.json" "main=$RUNNER_TEMP/base" "change=."
