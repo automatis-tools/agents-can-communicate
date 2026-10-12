@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtemp, realpath, rm } from "node:fs/promises";
+import { mkdtemp, realpath } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
@@ -12,7 +12,7 @@ import { establishNativeBinding } from "../../packages/hook-runner/src/native-bi
 import { controlledCodexDaemon, THREAD } from "../helpers/codex-daemon.mjs";
 import { createFakeIds } from "../helpers/memory-store.mjs";
 import { posixTransportTest as test } from "../helpers/platform-scope.mjs";
-import { waitForWorkers } from "../helpers/fixture-cleanup.mjs";
+import { cleanupStack, removeFixture, waitForWorkers } from "../helpers/fixture-cleanup.mjs";
 
 // The seam this file exists for: the hook runner publishes the delivery
 // binding, the Codex adapter writes the endpoint record, and the receiver
@@ -27,17 +27,19 @@ const DETECTED_CLI = "0.154.0";
 const CAPTURED = "darwin-arm64";
 const shortTmp = () => (process.platform === "win32" ? tmpdir() : "/tmp");
 
-async function directory(t, prefix) {
-  const created = await realpath(await mkdtemp(path.join(shortTmp(), prefix)));
-  t.after(() => rm(created, { recursive: true, force: true }));
-  return created;
-}
+const directory = async prefix => realpath(await mkdtemp(path.join(shortTmp(), prefix)));
 
 async function seam(t) {
   waitForWorkers(t);
-  const cwd = await directory(t, "acc-seam-cwd-");
-  const root = await directory(t, "acc-seam-store-");
+  // The daemon closes before the directories go, and each directory goes even
+  // when the other could not. A failed removal used to skip the daemon's own
+  // cleanup, and its listening socket then held the test process open forever.
+  const cwd = await directory("acc-seam-cwd-");
+  const root = await directory("acc-seam-store-");
   const daemon = await controlledCodexDaemon(t, { cwd });
+  const defer = cleanupStack(t);
+  defer(() => removeFixture(cwd));
+  defer(() => removeFixture(root));
   daemon.state.version = SERVING;
   const clock = { now: () => new Date().toISOString() };
   const ids = createFakeIds();
