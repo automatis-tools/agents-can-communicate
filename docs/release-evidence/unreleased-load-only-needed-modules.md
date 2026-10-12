@@ -9,20 +9,21 @@ differ from the published 0.11.0 artifact, whose original record remains unchang
 
 | Fact | Value |
 |---|---|
-| Source commit | `955fe94267a373eadcc9e3e1fa50540d2d009f4a` |
+| Source commit | `cacecc2d5696731254128fb5a7c553cb93cca224` |
 | Source state at pack time | clean feature worktree |
 | Archive | `agents-can-communicate-0.11.0.tgz` |
-| Archive size | 610,227 bytes |
+| Archive size | 610,302 bytes |
 | Packed files | 376 |
-| SHA-256 | `a01304320bb1f2100be8244fc5a1a3cc4864f2f6b2b8ac3a3bb05a4d19e3e769` |
+| SHA-256 | `e5a6d903af543388648dc149eb3b90214ae780b5197f68d00a2e3d105f91d5dc` |
 | Local environment | macOS, Node 26.5.1 |
 
 `node scripts/verify-package.mjs` passed on the clean worktree and reported the same
 digest as a separate `npm pack`.
-After the recorded commit, with only this record added, the full suite ran 3399 tests:
-3391 passed, 8 were skipped, none failed. The machine's load average was 19–37.
-The eighth skip is the Gemini uninstall test, which skips itself when Gemini CLI
-answers its version probe.
+The pull request's AI review found that session discovery loaded the installed
+clients' adapters before its 2.5 s budget applied, so a loader that never settled could
+hold `acc status`. The recorded commit loads them within that budget; a test with a
+loader that never answers returned in about 200 ms, and failed after its 5 s limit
+without the change.
 
 ## Cause
 
