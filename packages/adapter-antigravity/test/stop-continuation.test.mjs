@@ -22,7 +22,7 @@ async function place(t) {
   t.after(() => Promise.all([rm(root, { recursive: true, force: true }),
     rm(dataHome, { recursive: true, force: true })]));
   const adapters = { antigravity: createAntigravityAdapter() };
-  const invoke = (payload, eventName) => runHook({ adapterId: "antigravity", payload,
+  const invoke = (payload, eventName) => runHook({ includeSessions: true, adapterId: "antigravity", payload,
     args: [eventName], adapters, dataHome, readProcessTable: async () => new Map(),
     probeClientVersion: async () => "1.2.7", platform: "darwin-arm64" });
   const as = async (name, conversationId, extra = {}) => ({ ...await captured(name),
