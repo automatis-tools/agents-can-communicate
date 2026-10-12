@@ -212,8 +212,8 @@ per-session lines in `acc doctor`, or `nativeDelivery.sessions[].lastAttempt` in
 
 - An absent or `off` policy means the installation record has no live-delivery consent
   for that client. Run `acc install --adapter <adapter> --delivery actionable` (or `all`).
-- `client_process_unknown` means ACC could not identify the client process. A new client
-  session repeats that lookup.
+- `client_process_unknown` means ACC could not identify the client process, for example
+  when a loaded machine slowed the lookup at session start. Each later prompt repeats it.
 - For Claude Code, `native_endpoint_unavailable` means the hook environment had no
   `CLAUDE_CODE_MESSAGING_SOCKET`, or the socket failed ACC's safety checks.
   `native_session_unavailable` means the session registry is missing or names another

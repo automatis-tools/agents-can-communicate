@@ -102,19 +102,31 @@ export function resolveClient({ table, from, command, clientPackage, identify,
     const entry = table.get(current);
     if (entry === undefined || seen.has(current)) return null;
     seen.add(current);
-    const product = recognised(identify, entry);
-    if (product !== null) {
-      return { pid: current, entry, certificationName: product.certificationName,
-        version: product.version };
-    }
-    // `ps` reports some entries bare (`claude`) and some with a path
-    // (`/bin/zsh`), so the comparison has to be on the basename.
-    if (imageName(entry.comm) === command
-      || scriptsOf(entry, clientPackage).some(name => name === command || name === CLIENT_PACKAGE)) {
-      return { pid: current, entry, certificationName: undefined, version: undefined };
-    }
+    const match = clientMatch(entry, { command, clientPackage, identify });
+    if (match !== null) return { pid: current, entry, ...match };
     if (entry.ppid === current || entry.ppid <= 1) return null;
     current = entry.ppid;
   }
   return null;
+}
+
+/** What one process-table entry is as the declared client, or null. */
+function clientMatch(entry, { command, clientPackage, identify }) {
+  const product = recognised(identify, entry);
+  if (product !== null) {
+    return { certificationName: product.certificationName, version: product.version };
+  }
+  // `ps` reports some entries bare (`claude`) and some with a path
+  // (`/bin/zsh`), so the comparison has to be on the basename.
+  if (imageName(entry.comm) === command
+    || scriptsOf(entry, clientPackage).some(name => name === command || name === CLIENT_PACKAGE)) {
+    return { certificationName: undefined, version: undefined };
+  }
+  return null;
+}
+
+/** Whether one entry is the client, as `resolveClient` would decide: a table
+ * read can stop there instead of reading the client's own parents. */
+export function isClientProcess(entry, { command, clientPackage, identify }) {
+  return clientMatch(entry, { command, clientPackage, identify }) !== null;
 }

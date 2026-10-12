@@ -34,7 +34,7 @@ export const indicatorFailure = (reasonCode = "state_unreadable") => result({
 
 const actions = {
   client_session_embedded: "This session has no shared delivery service. Run acc doctor to see the launch option and how to open a supported session.",
-  client_process_unknown: "Open a new client session so ACC can identify its process; then run acc doctor.",
+  client_process_unknown: "Send a prompt: each prompt looks for the client process again. If this stays, run acc doctor.",
   transport_permission_denied: "Allow the sending command to access the local delivery channel; acc doctor shows the affected session.",
   handshake_version_mismatch: "Update the client's delivery service to a supported version; acc doctor shows the version in use.",
   native_policy_off: "Automatic delivery is disabled in ACC settings. Run acc install --delivery actionable to enable it.",

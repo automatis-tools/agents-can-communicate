@@ -47,10 +47,11 @@ test("stops after the hop limit", () => {
   assert.equal(resolveClientPid({ table: deep, from: 1, command: "claude", maxHops: 5 }), null);
 });
 
-test("parses a ps table, including commands containing spaces", async () => {
-  const stdout = "  100     1 claude\n  150   100 /bin/zsh\n"
+test("parses ps output, including commands containing spaces", async () => {
+  const tree = "  100     1 claude\n  150   100 /bin/zsh\n"
     + "  200   150 /Applications/Some App.app/Contents/MacOS/app\n";
-  const table = await readProcessTable({ platform: "darwin", run: async () => ({ stdout }) });
+  const table = await readProcessTable({ platform: "darwin", from: 200,
+    run: fakePs({ tree, args: "" }) });
 
   assert.equal(table.get(100).comm, "claude");
   assert.equal(table.get(150).ppid, 100);
@@ -134,17 +135,23 @@ test("without arguments a node script client is not found, as before", () => {
   assert.equal(resolveClientPid({ table: withoutArgs, from: 46101, command: "gemini" }), null);
 });
 
-// ps is asked twice at once: once for the tree, once for each command line.
-const fakePs = ({ tree, args }) => async (file, argv, options) => {
-  if (argv.join(" ").includes("args=")) {
-    if (args instanceof Error) throw args;
-    return { stdout: args, options };
-  }
-  return { stdout: tree, options };
-};
+// ps is asked twice at once for each process on the chain: once for its parent
+// and executable, once for its command line. The fake answers from a whole
+// table's text with the line of the pid asked about.
+function fakePs({ tree, args }) {
+  return async (file, argv, options) => {
+    const pid = argv[argv.indexOf("-p") + 1];
+    const line = text => text.split("\n").filter(row => row.trim().split(/\s+/)[0] === pid).join("\n");
+    if (argv.join(" ").includes("args=")) {
+      if (args instanceof Error) throw args;
+      return { stdout: line(args), options };
+    }
+    return { stdout: line(tree), options };
+  };
+}
 
 test("reads each process's command line beside its parent and executable", async () => {
-  const table = await readProcessTable({ platform: "darwin", run: fakePs({
+  const table = await readProcessTable({ platform: "darwin", from: 46032, run: fakePs({
     tree: `46006     1 node\n46032 46006 ${NODE}\n`,
     args: `46006 node ${GEMINI} -p hello\n`
       + `46032 ${NODE} --max-old-space-size=65536 ${GEMINI} -p "two words"\n` }) });
@@ -154,22 +161,23 @@ test("reads each process's command line beside its parent and executable", async
 });
 
 test("a failed command-line read leaves the table as it was before", async () => {
-  const table = await readProcessTable({ platform: "darwin", run: fakePs({
+  const table = await readProcessTable({ platform: "darwin", from: 200, run: fakePs({
     tree: "  100     1 claude\n  200   100 node\n", args: new Error("ENOMEM") }) });
 
   assert.deepEqual(table.get(100), { ppid: 1, comm: "claude" });
   assert.deepEqual(table.get(200), { ppid: 100, comm: "node" });
 });
 
-test("both reads share the caller's timeout", async () => {
+test("both reads of a process share what is left of the caller's timeout", async () => {
   const seen = [];
   await readProcessTable({ platform: "darwin", timeoutMs: 250, run: async (file, argv, options) => {
     seen.push({ args: argv.join(" ").includes("args="), timeout: options.timeout,
       maxBuffer: options.maxBuffer });
     return { stdout: "" };
   } });
-  assert.deepEqual(seen.map(read => read.timeout), [250, 250]);
-  // Command lines outgrow execFile's 1 MiB default long before the tree does.
+  assert.equal(seen.length, 2);
+  for (const read of seen) assert.ok(read.timeout > 0 && read.timeout <= 250);
+  // One command line can reach ARG_MAX (1 MiB on macOS), execFile's default.
   assert.ok(seen.find(read => read.args).maxBuffer > 1024 * 1024);
 });
 

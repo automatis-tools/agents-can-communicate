@@ -99,7 +99,7 @@ export async function updateNativeSessions(adapters, { service, status, root, no
 const failures = {
   transport_permission_denied: "this command cannot access the local delivery channel; "
     + "check the sender's command permissions",
-  client_process_unknown: "the client process could not be identified; start a new client session",
+  client_process_unknown: "the client process could not be identified; the next prompt looks for it again",
   handshake_failed: "the session handshake failed; check the client's integration/channel setup",
   handshake_timeout: "the session handshake timed out; check the local channel and retry on the next turn",
   // Since the contract gate shipped, this reason means the version now serving

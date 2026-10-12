@@ -12,33 +12,45 @@ const DEFAULT_TIMEOUT_MS = 1_000;
 const LINE = /^\s*(\d+)\s+(\d+)\s+(.+?)\s*$/;
 // A pid, then the whole rest of the line: a command line has spaces anywhere.
 const ARGS_LINE = /^\s*(\d+)\s+(.+?)\s*$/;
-// Command lines are long; measured at 231 KB for 1,137 processes on a desktop
-// Mac, a quarter of execFile's default buffer.
+// One command line can reach ARG_MAX, 1 MiB on macOS and execFile's default
+// buffer; Windows reads several in one answer.
 const ARGS_BUFFER = 16 * 1024 * 1024;
 
 // Deep enough for a client that wraps its hook in a shell and a launcher.
 const WINDOWS_HOPS = 8;
 
-async function posixTable({ run, timeoutMs }) {
-  const options = { timeout: timeoutMs, killSignal: "SIGKILL", windowsHide: true };
-  const [tree, commandLines] = await Promise.all([
-    run("ps", ["-o", "pid=,ppid=,comm=", "-A"], options).then(({ stdout }) => stdout, () => null),
-    run("ps", ["-A", "-o", "pid=,args="], { ...options, maxBuffer: ARGS_BUFFER })
-      .then(({ stdout }) => stdout, () => ""),
-  ]);
-  if (typeof tree !== "string") return new Map();
-  const args = new Map();
-  for (const line of String(commandLines).split("\n")) {
-    const match = ARGS_LINE.exec(line);
-    if (match !== null) args.set(Number(match[1]), match[2]);
-  }
+// Deep enough for a client that wraps its hook in a shell and a launcher.
+const POSIX_HOPS = 8;
+
+/**
+ * The chain from `from` upward, one `ps -p` per process. Reading every
+ * process's command line took 830-1430 ms at load average 69 on a Mac with
+ * 1,900 processes (2026-10-12), past the hook's limit; one process took 7 ms.
+ * The limit bounds the whole walk. `until` ends it at the process the caller
+ * is looking for, so nothing above the client is read.
+ */
+async function posixChain({ from, run, timeoutMs, until }) {
+  const deadline = Date.now() + timeoutMs;
   const table = new Map();
-  for (const line of tree.split("\n")) {
-    const match = LINE.exec(line);
-    if (match === null) continue;
-    const pid = Number(match[1]);
-    table.set(pid, { ppid: Number(match[2]), comm: match[3],
-      ...(args.has(pid) ? { args: args.get(pid) } : {}) });
+  let next = Number(from);
+  for (let hop = 0; hop < POSIX_HOPS && next > 1 && !table.has(next); hop += 1) {
+    const timeout = deadline - Date.now();
+    if (timeout <= 0) break;
+    const options = { timeout, killSignal: "SIGKILL", windowsHide: true };
+    const pid = String(next);
+    const [tree, commandLine] = await Promise.all([
+      run("ps", ["-o", "pid=,ppid=,comm=", "-p", pid], options).then(({ stdout }) => String(stdout), () => ""),
+      run("ps", ["-o", "pid=,args=", "-p", pid], { ...options, maxBuffer: ARGS_BUFFER })
+        .then(({ stdout }) => String(stdout), () => ""),
+    ]);
+    const match = LINE.exec(tree.trim());
+    if (match === null || Number(match[1]) !== next) break;
+    const args = ARGS_LINE.exec(commandLine.trim());
+    const entry = { ppid: Number(match[2]), comm: match[3],
+      ...(args !== null && Number(args[1]) === next ? { args: args[2] } : {}) };
+    table.set(next, entry);
+    if (typeof until === "function" && until(entry)) break;
+    next = entry.ppid;
   }
   return table;
 }
@@ -154,15 +166,16 @@ async function windowsTable({ from, run, timeoutMs, env }) {
  * Processes on this machine, as pid -> parent, executable and, when it could be
  * read, command line.
  *
- * POSIX reads the whole table with `ps`. Windows reads the chain from `from`
- * upward - the only part a hook asks about - with a creation time for each hop.
- * A failed read is an empty map, never an error: an empty table resolves no
- * client, which is the "nobody knows" answer every caller already handles.
+ * Both platforms read the chain from `from` upward - the only part a hook asks
+ * about. POSIX asks `ps` one process at a time and stops early where `until`
+ * says; Windows reads up to eight hops in one query, with a creation time for
+ * each. A failed read is an empty map, never an error: an empty table resolves
+ * no client, which is the "nobody knows" answer every caller already handles.
  */
 export async function readProcessTable({ platform = process.platform, from = process.pid,
-  run = execFileAsync, timeoutMs = DEFAULT_TIMEOUT_MS, env = process.env } = {}) {
+  run = execFileAsync, timeoutMs = DEFAULT_TIMEOUT_MS, env = process.env, until } = {}) {
   if (platform === "win32") return windowsTable({ from, run, timeoutMs, env });
-  return posixTable({ run, timeoutMs });
+  return posixChain({ from, run, timeoutMs, until });
 }
 
 /**

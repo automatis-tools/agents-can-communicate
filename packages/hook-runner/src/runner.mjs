@@ -15,7 +15,7 @@ import { clearPin, createGitProbe, resolveHookWorkspace, platformDataHome, runti
   writePin as writeRuntimePin }
   from "@agents-can-communicate/cli/hook-support";
 
-import { resolveClient } from "./client-pid.mjs";
+import { isClientProcess, resolveClient } from "./client-pid.mjs";
 import { ownExecutable, probeClientVersion as defaultProbeClientVersion, probeExecutableVersion }
   from "./client-version.mjs";
 import { bindNative, callRelease, nativeActivationHintFor, nativeDiagnosticDeadline }
@@ -43,6 +43,17 @@ const KNOWN_FAILURES = new Set(["workspace_contains_runtime", "workspace_path_un
 const WINDOWS = process.platform === "win32";
 const PROCESS_TABLE_MS = WINDOWS ? 3_000 : 1_000;
 const TABLE_RESERVE_MS = WINDOWS ? 500 : 0;
+
+// How this adapter's client is recognised in a process table.
+const clientOf = adapter => ({ command: adapter.client?.command ?? null,
+  clientPackage: adapter.client?.package, identify: adapter.identifyClientProcess });
+
+// One bounded table read for a hook, which ends at the client it is looking for.
+function readClientTable(readProcessTable, adapter, deadline) {
+  return Promise.resolve(readProcessTable({
+    timeoutMs: Math.max(1, Math.min(PROCESS_TABLE_MS, deadline - Date.now() - TABLE_RESERVE_MS)),
+    until: entry => isClientProcess(entry, clientOf(adapter)) }));
+}
 
 function assertHookBudget(deadline, message = "hook deadline expired") {
   if (Date.now() >= deadline) throw new Error(message);
@@ -498,8 +509,8 @@ const HANDLERS = {
     // each can start a program. A session start began the read already, when
     // its event was known. Handled here so a probe that fails first leaves no
     // rejection unobserved.
-    const tableRead = known || command === null ? null : started ?? Promise.resolve(readProcessTable({
-      timeoutMs: Math.max(1, Math.min(PROCESS_TABLE_MS, deadline - Date.now() - TABLE_RESERVE_MS)) }));
+    const tableRead = known || command === null ? null
+      : started ?? readClientTable(readProcessTable, adapter, deadline);
     tableRead?.catch(() => {});
     // The binary on PATH answers in parallel, as the fallback: the version the
     // running client names for itself, when it names one, wins below.
@@ -507,8 +518,7 @@ const HANDLERS = {
       { timeoutMs: Math.max(1, Math.min(1_000, deadline - Date.now())) });
     mark("reading the process table");
     const client = known ? { pid: knownClientPid } : command === null ? null
-      : resolveClient({ table: await tableRead, from: process.pid, command,
-        clientPackage: adapter.client?.package, identify: adapter.identifyClientProcess });
+      : resolveClient({ table: await tableRead, from: process.pid, ...clientOf(adapter) });
     assertHookBudget(deadline);
     mark("probing the client version");
     const product = declaredProduct(adapter, client);
@@ -535,9 +545,9 @@ const HANDLERS = {
     };
     if (event.kind === "beforeTurn" && binding !== null) {
       // A genuine prompt can resume after an ephemeral removal or a durable
-      // close, or carry on a session whose client restarted. Recheck after
-      // probes: a CLI replacement can run outside the native lifecycle lock.
-      // Never adopt that replacement's identity.
+      // close, or carry on a session whose client restarted or was found only
+      // now. Recheck after probes: a CLI replacement can run outside the
+      // native lifecycle lock. Never adopt that replacement's identity.
       // A session can also close between the turn's check and this one while
       // its client was down; that is the closed-session resumption below,
       // not a replacement.
@@ -665,14 +675,25 @@ const HANDLERS = {
       const turn = await projectActivation({ ...input, binding: fresh }, offered);
       return { ...turn, nativeBinding: started.nativeBinding };
     }
-    if (clientGone(binding)) {
+    // A start that could not find its client opened the session without it:
+    // on 2026-10-12, at load average 56-84, the table read outlasted its limit.
+    // Every turn looks again until the client is found; nothing else would,
+    // and the session would stay without live delivery for its whole life.
+    const known = Number.isInteger(binding.clientPid) && binding.clientPid > 0;
+    const found = known || clientOf(adapter).command === null ? null
+      : await readClientTable(input.readProcessTable, adapter, deadline);
+    const lateClient = found !== null
+      && resolveClient({ table: found, from: process.pid, ...clientOf(adapter) }) !== null;
+    if (lateClient || clientGone(binding)) {
       // The client this session was bound to has exited, and a turn arrived
       // anyway: the client restarted under the same conversation. Antigravity
       // 2.0 reopens a conversation without a second SessionStart, so without
       // this the session stayed bound to a dead process and lost live delivery
       // for good. The start path finds the client running now, keeps this ACC
-      // session and generation, and binds again.
-      const started = await HANDLERS.sessionStart({ ...input, clientRestarted: true });
+      // session and generation, and binds again. A client found only now
+      // takes the same path, with the table this turn already read.
+      const started = await HANDLERS.sessionStart({ ...input, clientRestarted: true,
+        ...(lateClient ? { tableRead: Promise.resolve(found) } : {}) });
       const fresh = await loadSessionBinding({ runtimeDir: paths.root,
         harnessSessionId: event.sessionId });
       const offered = await nativeActivationHintFor({ adapter, event,
@@ -827,8 +848,7 @@ export async function runHook({ adapterId, payload, adapters, dataHome, env,
     // below: it starts now, while the store opens. On Windows it is the part
     // of a start that runs another program.
     const tableRead = event.kind !== "sessionStart" || (adapter.client?.command ?? null) === null
-      ? null : Promise.resolve(readProcessTable({ timeoutMs: Math.max(1,
-        Math.min(PROCESS_TABLE_MS, deadline - Date.now() - TABLE_RESERVE_MS)) }));
+      ? null : readClientTable(readProcessTable, adapter, deadline);
     tableRead?.catch(() => {});
     mark("finding the workspace");
     const context = await openContext({ event, adapterId, dataHome, runtime, env, deadline });
