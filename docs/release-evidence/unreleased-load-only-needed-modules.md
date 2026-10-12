@@ -19,6 +19,10 @@ differ from the published 0.11.0 artifact, whose original record remains unchang
 
 `node scripts/verify-package.mjs` passed on the clean worktree and reported the same
 digest as a separate `npm pack`.
+After the recorded commit, with only this record added, the full suite ran 3399 tests:
+3391 passed, 8 were skipped, none failed. The machine's load average was 19–37.
+The eighth skip is the Gemini uninstall test, which skips itself when Gemini CLI
+answers its version probe.
 
 ## Cause
 
@@ -82,6 +86,21 @@ on the same machine, with an isolated data home. Medians:
 
 macOS, M5 Max, load average 27–35. The hook's minimum was 138 ms on main and 136 ms
 here; its median moved within the noise of a loaded machine.
+
+GitHub-hosted runners ran the same comparison, Node 24, 25 runs each,
+[run 38286386633](https://github.com/automatis-tools/agents-can-communicate/actions/runs/38286386633)
+from branch `measure/load-only-needed-modules`. Medians, main then this change:
+
+| Runner | `node -e 0` | `acc version` | `acc help` | indicator read | hook |
+|---|---|---|---|---|---|
+| windows-latest, AMD EPYC 7763 | 42 / 42 ms | 284 / 89 ms | 286 / 88 ms | 244 / 143 ms | 534 / 513 ms |
+| windows-latest, Xeon 8370C | 47 / 46 ms | 276 / 93 ms | 280 / 91 ms | 242 / 145 ms | 540 / 515 ms |
+| ubuntu-latest, AMD EPYC 7763 | 25 / 24 ms | 194 / 62 ms | 193 / 61 ms | 169 / 97 ms | 317 / 302 ms |
+| macos-latest, Apple M1 | 37 / 36 ms | 160 / 73 ms | 162 / 75 ms | 168 / 113 ms | 303 / 284 ms |
+
+On Windows `acc version` starts in a third of its former time, and an indicator read
+in about 60 percent. A hook starts about 4 percent sooner there; it already loaded one
+adapter, and what it still loads is the store, core and the SDK it runs.
 
 ## Tests
 
