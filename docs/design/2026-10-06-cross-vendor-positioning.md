@@ -66,3 +66,33 @@ Every public text leads with that gap and names the vendor features as given:
   changes, and the monthly review checks for it.
 - Published articles and posts are not edited.
 - Words the texts avoid: first, only, any client, any session, instantly.
+
+## Addendum 2026-10-08: OpenAI's Codex plugin for Claude Code
+
+The 2026-10-06 check looked for A2A and for session-to-session messaging and missed a vendor
+path that has existed since 2026-03-30:
+[openai/codex-plugin-cc](https://github.com/openai/codex-plugin-cc), OpenAI's official plugin
+for Claude Code. From Claude Code it offers `/codex:review` and `/codex:adversarial-review`
+(Codex reviews the current changes), `/codex:rescue` (a task handed to Codex as a background
+job through the Codex app server) and `/codex:transfer` (the current Claude Code session
+becomes a Codex thread through Codex's external-agent session importer, with the transcript).
+Codex also imports Claude Code sessions and configuration on its own, one way.
+
+What it does not do: it starts Codex under Claude Code and never addresses a Codex session the
+person opened themselves; there is no Codex → Claude Code direction. So "neither client offers
+a way to message the other's sessions" stays true as written, but two of the three README
+scenarios are available to a Claude Code reader from the vendor, in that direction.
+
+Changes to the public texts, in the working copy on 2026-10-08:
+
+- The README's first paragraph names the plugin as a vendor function, next to cross-session
+  messaging and `codex queue`, and narrows the claim to "a session you opened yourself in the
+  other one", "in either direction".
+- The scenario order becomes: parallel work across clients; a second opinion in either
+  direction; a switch of clients mid-feature, with the handoff described as decisions,
+  unfinished work and what was verified, rather than a transcript.
+- The first-run example changes from a review across clients to one feature across two
+  clients (the endpoint-and-screen pair from the setup guide), with the review as a second
+  sentence; a review alone is what the plugin does in one command.
+- `docs/WHY_ACC.md` names the plugin in its first paragraph, adds a branch for it to the fit
+  diagram, and mentions it in the "hooks over an MCP server or a script" section.
