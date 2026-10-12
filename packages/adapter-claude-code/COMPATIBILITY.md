@@ -1125,3 +1125,24 @@ An isolated offline Claude Code 2.1.296 TUI loaded the installed module with a
 healthy-state fixture reader and emitted `38;2;44;122;57` plus bold for `●`.
 This proves the raw color reaches the terminal. It does not certify registration
 or delivery; no model turn ran.
+
+### Indicator read bound — 2026-10-12
+
+Users saw the indicator print "could not read this session's state" again and again
+in every open Claude Code 2.1.296 session on a loaded Mac (load average 56–84 on
+18 cores). The reader was healthy: run directly, 40 reads took 154–227 ms and all
+answered. Inside Claude, a probe module repeated the indicator's exact
+`$.process.run` once per second: 108 reads took 176–1300 ms (median 526 ms), and
+3 were rejected as "still running after 1200ms", one of them at session start.
+The module killed reads that would have answered, before the reader's own 1.5 s
+deadline. Each healthy read re-armed the diagnostic, so each lost read printed it again.
+
+The module now allows five seconds per read. A failed or unanswered read keeps the
+last observed state; three in a row show `!` and print one diagnostic. A slow read
+says it did not answer and does not suggest reinstalling. In the real Claude
+Code 2.1.296 TUI, a fixture reader that slept 1.5 s on every second read made
+the previous module print the diagnostic 8 times in 100 s; the new module printed
+none. With 6 s sleeps on every second read, it also printed none. With every read
+sleeping 6 s, it printed one diagnostic and drew `!` once.
+These sessions disabled the installed ACC plugin and read one registered session's
+state. They prove the indicator's timing and messages, not registration or delivery.
