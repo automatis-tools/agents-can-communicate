@@ -1,5 +1,27 @@
 # Changelog
 
+## Unreleased — Claude indicator read bound
+
+- The Claude Code indicator no longer prints "could not read this session's state"
+  for reads that Claude stopped waiting for. On a loaded Mac the reader's start took
+  up to 1.3 s inside Claude, and the 1.2 s bound killed reads that would have answered.
+- Each read now has five seconds. A failed or unanswered read keeps the last observed
+  state; three in a row show `!` and print one diagnostic. A slow read says so and does
+  not suggest reinstalling.
+
+| Development artifact | Value |
+|---|---|
+| Built from | `03c12de4688a3044fb190c8c27af703a445165c0` |
+| Tarball | `agents-can-communicate-0.11.0.tgz`, 608,110 bytes, 374 files |
+| sha256 | `20c9240f7bdb5ce180082e2cbf086097d17a609820befae7cc751d2b31552c01` |
+
+The exact archive passed package verification. In the real Claude Code 2.1.296 TUI,
+a reader that answered slowly on every second read made the previous module print
+the diagnostic 8 times in 100 s and the new module none. See
+[development evidence](docs/release-evidence/unreleased-claude-indicator-read-bound.md).
+This is not a new published release.
+The package version remains `0.11.0` until a release prepares its own.
+
 ## 0.11.0 — combined release candidate
 
 - Ship atomic batch claim/release from PR #291 together with the per-session

@@ -17,7 +17,7 @@ stdout is a pipe. Existing installed commands need no new arguments. `--json` an
 | `ACC ●` | ACC is active. This chat has an automatic delivery binding with no newer recorded failure. A busy client can queue a request. |
 | `ACC ● · turn` | ACC is active. Messages arrive on the next normal turn. |
 | `ACC ● · inbox` | ACC is active. The agent reads messages through `acc inbox`. This does not imply a polling schedule. |
-| `ACC …` | The Claude indicator is reading state or waiting for startup hooks, for at most five seconds. |
+| `ACC …` | The Claude indicator is reading state or waiting up to five seconds for startup hooks. Failed reads keep it until a read answers or three reads in a row fail. |
 | `ACC ! · turn` or `ACC ! · inbox` | ACC observed a failure. The qualifier names the remaining reception path. |
 | `ACC !` | The chat is not registered, or the indicator cannot read its state. |
 
@@ -60,7 +60,10 @@ indicator and keeps status-line settings that the user changed.
 
 Claude prints one diagnostic when a new problem appears. `/acc-status` shows the current
 explanation and recovery step without a model request. Healthy refreshes do not print
-messages. Antigravity's command surface has no equivalent notification: only a problem
+messages. A read that fails or does not answer describes the indicator, not the chat.
+The badge keeps the last observed state until three reads in a row fail; only then
+does it show `!` and print the diagnostic. A slow read says so and does not suggest
+reinstalling, because a reinstall cannot make a busy machine answer sooner. Antigravity's command surface has no equivalent notification: only a problem
 adds `acc doctor` to the compact line. Run that command in the project for diagnostics.
 
 The Antigravity wrapper runs an existing enabled command with a 700 ms limit and a 64 KiB
@@ -125,4 +128,6 @@ and immutable history remain authoritative. An unavailable diagnostic cannot fai
 
 An unreadable state produces a closed error and a recovery command. It never renders raw
 file content. A command stops waiting after 1.5 seconds. Claude refreshes every five seconds,
-with one-second checks during its bounded startup period.
+with one-second checks during its bounded startup period. Claude allows each read five
+seconds: on a loaded machine the command's own start took up to 1.3 seconds inside
+Claude, before its 1.5-second wait begins.
