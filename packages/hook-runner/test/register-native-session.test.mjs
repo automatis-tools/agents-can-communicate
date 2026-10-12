@@ -158,3 +158,14 @@ test("discovery that loads adapters on demand loads the installed ones only", as
   assert.deepEqual(asked, ["hosted"]);
   assert.deepEqual(result.map(item => item.participantId), [participantFor("hosted", "thread-1")]);
 });
+
+test("adapters that load past the budget cannot hold status either", async t => {
+  const h = await setup(t);
+  const started = Date.now();
+  const result = await registerDiscoveredSessions({ dataHome: h.dataHome, env: {},
+    budgetMs: 200, loadAdapters: () => new Promise(() => {}) });
+  assert.deepEqual(result, []);
+  assert.ok(Date.now() - started < 1_000, `returned after ${Date.now() - started} ms`);
+  assert.deepEqual(await registerDiscoveredSessions({ dataHome: h.dataHome, env: {},
+    loadAdapters: async () => { throw new Error("cannot load"); } }), []);
+});

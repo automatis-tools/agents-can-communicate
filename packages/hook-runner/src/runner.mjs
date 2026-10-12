@@ -1027,10 +1027,16 @@ export async function registerDiscoveredSessions({ adapters, loadAdapters, works
   let installed, registry = adapters;
   try {
     installed = new Set((await loadOwnership({ dataHome })).installs.map(entry => entry.adapterId));
-    // A caller that loads adapters on demand loads only the installed ones (#270).
-    if (typeof loadAdapters === "function") registry = await loadAdapters([...installed]);
   } catch {
     return registered;
+  }
+  // A caller that loads adapters on demand loads only the installed ones (#270),
+  // within the same budget: a loader that fails or has not answered when it runs
+  // out leaves nothing to ask, the answer for a client with no adapter.
+  if (typeof loadAdapters === "function") {
+    const loaded = await withinBudget(() => loadAdapters([...installed]));
+    if (Array.isArray(loaded)) return registered;
+    registry = loaded;
   }
   for (const adapter of Object.values(registry ?? {})) {
     if (typeof adapter?.discoverNativeSessions !== "function" || !installed.has(adapter.id)) continue;
