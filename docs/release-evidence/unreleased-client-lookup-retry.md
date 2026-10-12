@@ -23,6 +23,10 @@ The fix is commit `94b9bbae`. The recorded commit merges main after PR #293, so 
 archive also carries the Claude indicator read bound. Its last commit moves two
 process-table tests to a controlled clock: at load average about 60 a real 40 ms timer
 let one process into a 100 ms walk. The archive bytes did not change.
+At the recorded commit the full suite ran 3391 tests: 3383 passed, 8 were skipped,
+none failed. The machine's load average was 25–56 during the run. The eighth skip is
+the Gemini uninstall test, which skips itself when Gemini CLI answers its version probe;
+under heavier load that probe passed its 3 s limit and the test ran.
 
 ## Cause
 
