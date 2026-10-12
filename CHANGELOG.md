@@ -12,9 +12,9 @@
 
 | Development artifact | Value |
 |---|---|
-| Built from | `aad0696717b6a56312a49583543d2c894908eadb` |
-| Tarball | `agents-can-communicate-0.11.0.tgz`, 608,582 bytes, 374 files |
-| sha256 | `57695a53b3f84ecba5b6fcf15010cddce2155b5603f915eac8b50e6546f88634` |
+| Built from | `1dc9a9e67f678e127e5d4113dc49bfb443ad186c` |
+| Tarball | `agents-can-communicate-0.11.0.tgz`, 609,126 bytes, 374 files |
+| sha256 | `78625791a732a9f081638423cecec30e1009667dd2329bce01860176d5c0bef3` |
 
 The exact archive passed package verification. The hook runner, run under a real
 Claude Code process with a slow `ps` at session start, bound the session to that

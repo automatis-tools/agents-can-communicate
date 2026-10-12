@@ -9,21 +9,18 @@ artifact, whose original record remains unchanged.
 
 | Fact | Value |
 |---|---|
-| Source commit | `aad0696717b6a56312a49583543d2c894908eadb` |
+| Source commit | `1dc9a9e67f678e127e5d4113dc49bfb443ad186c` |
 | Source state at pack time | clean feature worktree |
 | Archive | `agents-can-communicate-0.11.0.tgz` |
-| Archive size | 608,582 bytes |
+| Archive size | 609,126 bytes |
 | Packed files | 374 |
-| SHA-256 | `57695a53b3f84ecba5b6fcf15010cddce2155b5603f915eac8b50e6546f88634` |
+| SHA-256 | `78625791a732a9f081638423cecec30e1009667dd2329bce01860176d5c0bef3` |
 | Local environment | macOS, Node 26.5.1 |
 
 `node scripts/verify-package.mjs` passed on the clean worktree and reported the same
 digest as a separate `npm pack`.
-The fix is commit `94b9bbae`. The recorded commit adds only the Kimi footer test change
-from PR #293, which this machine's load needs for a stable suite; the archive packed
-from both commits has identical bytes.
-At the recorded commit the full suite ran 3385 tests: 3378 passed, 7 were skipped,
-none failed. The machine's load average was about 94 during the run.
+The fix is commit `94b9bbae`. The recorded commit merges main after PR #293, so the
+archive also carries the Claude indicator read bound.
 
 ## Cause
 
@@ -81,7 +78,7 @@ Main's whole-table read took 77–83 ms for about 1,880 processes and named the 
 
 ## Real-process evidence
 
-At the recorded commit, at load average 89, `bin/acc-hook.mjs` ran as a real hook process,
+At the recorded commit, at load average 81, `bin/acc-hook.mjs` ran as a real hook process,
 as a child of a shell whose parent was
 the running Claude Code 2.1.296 process (pid 89125). It used an isolated
 `ACC_DATA_HOME`, a fixture session id, and no Claude messaging socket. SessionStart ran
