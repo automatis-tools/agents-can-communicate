@@ -19,8 +19,11 @@ export async function startCodexDaemonServer({ socketPath, cwd, version = "0.152
   const server = http.createServer((request, response) => response.writeHead(404).end());
   const state = { queue: [], loaded: ["other", THREAD], cwd, version, calls: [] };
   const sockets = new Set();
-  server.on("upgrade", (request, socket) => {
+  server.on("connection", socket => {
     sockets.add(socket);
+    socket.once("close", () => sockets.delete(socket));
+  });
+  server.on("upgrade", (request, socket) => {
     socket.write("HTTP/1.1 101 Switching Protocols\r\nConnection: Upgrade\r\nUpgrade: websocket\r\n"
       + `Sec-WebSocket-Accept: ${acceptKey(request.headers["sec-websocket-key"])}\r\n\r\n`);
     let buffer = Buffer.alloc(0);

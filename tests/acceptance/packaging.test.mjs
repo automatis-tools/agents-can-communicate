@@ -4,13 +4,14 @@ import { mkdir, mkdtemp, readFile, readdir, realpath, rm, writeFile }
   from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import test from "node:test";
+import test, { after } from "node:test";
 import { pathToFileURL } from "node:url";
 import { promisify } from "node:util";
 
 import { resolveExecutable, runExecutable } from "@agents-can-communicate/adapter-sdk";
 
 import { runNpm } from "../helpers/npm-run.mjs";
+import { preparePackedArchive } from "../helpers/packed-template.mjs";
 
 const run = promisify(execFile);
 const repo = path.resolve(import.meta.dirname, "..", "..");
@@ -42,13 +43,12 @@ async function filesContaining(root, needle) {
  * nothing has to be rewritten at build time. These tests exist because the
  * failure mode is invisible in development, where the symlinks are always there.
  */
-async function packed(t) {
-  const into = await realpath(await mkdtemp(path.join(tmpdir(), "acc-pack-")));
-  t.after(() => rm(into, { recursive: true, force: true }));
-  const { stdout } = await runNpm(["pack", "--pack-destination", into],
-    { cwd: repo, env: { ...process.env } });
-  const name = stdout.trim().split("\n").at(-1);
-  return { into, tarball: path.join(into, name) };
+const archiveRoot = await realpath(await mkdtemp(path.join(tmpdir(), "acc-pack-")));
+after(() => rm(archiveRoot, { recursive: true, force: true }));
+let archive;
+async function packed() {
+  archive ??= preparePackedArchive(archiveRoot).then(tarball => ({ into: archiveRoot, tarball }));
+  return archive;
 }
 
 const manifestOf = async tarball => JSON.parse((await run("tar",
@@ -59,7 +59,7 @@ const entriesOf = async tarball => (await run("tar", ["-tzf", tarball])).stdout
   .split(/\r?\n/).filter(Boolean).map(entry => entry.replace(/^package\//, ""));
 
 test("the tarball carries the workspaces where imports can find them", async t => {
-  const { tarball } = await packed(t);
+  const { tarball } = await packed();
 
   const intendedVersion = JSON.parse(
     await readFile(path.join(repo, "package.json"), "utf8")).version;
@@ -103,7 +103,7 @@ test("the tarball carries the workspaces where imports can find them", async t =
 });
 
 test("nothing private, local, or irrelevant is published", async t => {
-  const { tarball } = await packed(t);
+  const { tarball } = await packed();
 
   const entries = await entriesOf(tarball);
   const top = new Set(entries.map(entry => entry.split("/")[0]));
@@ -128,7 +128,7 @@ test("nothing private, local, or irrelevant is published", async t => {
 });
 
 test("every packaged certification reference resolves inside its adapter", async t => {
-  const { tarball } = await packed(t);
+  const { tarball } = await packed();
   const entries = await entriesOf(tarball);
   const certifications = entries.filter(entry =>
     /^node_modules\/@agents-can-communicate\/adapter-[^/]+\/certification\.json$/.test(entry));
@@ -154,7 +154,7 @@ test("every packaged certification reference resolves inside its adapter", async
 });
 
 test("no absolute path from this machine survives into the tarball", async t => {
-  const { tarball, into } = await packed(t);
+  const { tarball, into } = await packed();
   const extracted = path.join(into, "extracted");
 
   // Not `mkdir -p`: on Windows that is a cmd builtin, not something execFile
@@ -172,7 +172,7 @@ test("no absolute path from this machine survives into the tarball", async t => 
 });
 
 test("a clean install runs the CLI and attaches a session", async t => {
-  const { tarball } = await packed(t);
+  const { tarball } = await packed();
   const consumer = await realpath(await mkdtemp(path.join(tmpdir(), "acc-consumer-")));
   const dataHome = await realpath(await mkdtemp(path.join(tmpdir(), "acc-consumer-data-")));
   t.after(() => Promise.all([rm(consumer, { recursive: true, force: true }),
@@ -238,7 +238,7 @@ test("the committed lockfile is the one these manifests produce", async t => {
 });
 
 test("the installed package can find the binaries it names", async t => {
-  const { tarball } = await packed(t);
+  const { tarball } = await packed();
   const consumer = await realpath(await mkdtemp(path.join(tmpdir(), "acc-runner-")));
   t.after(() => rm(consumer, { recursive: true, force: true }));
   await writeFile(path.join(consumer, "package.json"),

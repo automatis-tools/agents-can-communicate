@@ -132,45 +132,6 @@ test("a publication survives the sweep taking its staging directory away", async
   assert.equal((await readdir(paths.stage)).length, 1);
 });
 
-test("a boundary that is not a sequence is refused", async t => {
-  const { store: opened } = await store(t);
-
-  await assert.rejects(opened.trimHistory("yesterday"),
-    error => error.code === EXIT.USAGE);
-});
-
-test("trimming leaves no detached directory behind", async t => {
-  const { root, store: opened } = await store(t);
-  const sequences = await appendEvents(opened, 3);
-
-  await opened.trimHistory(sequences[1]);
-
-  assert.deepEqual((await readdir(root)).filter(name => name.startsWith("stage.sweeping-")), []);
-});
-
-test("a publication survives the sweep taking its staging directory away", async t => {
-  const root = await realpath(await mkdtemp(path.join(tmpdir(), "acc-stage-race-")));
-  t.after(() => rm(root, { recursive: true, force: true }));
-  const paths = storePaths(root);
-  await mkdir(paths.tmp, { recursive: true });
-  await mkdir(paths.stage, { recursive: true });
-  await mkdir(path.join(root, "state"), { recursive: true });
-
-  // The sweep empties `stage/` by renaming it aside and recreating it. A
-  // publication that began before that swap used to arrive at a name that was
-  // gone, and failed a write whose bytes were already linked into place. The
-  // seam puts the swap exactly inside that window.
-  await publishAtomic(path.join(root, "state", "record.json"), Buffer.from("{}\n"), {
-    root,
-    tmpDir: paths.tmp,
-    stageDir: paths.stage,
-    afterAccepted: () => rename(paths.stage, path.join(root, "stage.taken-aside")),
-  });
-
-  assert.deepEqual(await readdir(path.join(root, "state")), ["record.json"]);
-  assert.equal((await readdir(paths.stage)).length, 1);
-});
-
 test("a floor past the safe integer range refuses rather than repeating a sequence", async t => {
   const { root, store: opened } = await store(t);
   const [first] = await appendEvents(opened, 1);

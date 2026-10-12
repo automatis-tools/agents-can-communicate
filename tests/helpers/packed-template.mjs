@@ -7,16 +7,35 @@ import { runNpm } from "./npm-run.mjs";
 
 const repo = path.resolve(import.meta.dirname, "..", "..");
 
-async function installConsumer(root) {
+async function packArchive(root) {
   const pack = path.join(root, "pack");
-  const consumer = path.join(root, "consumer");
   await mkdir(pack, { recursive: true });
+  const { stdout } = await runNpm(["pack", "--pack-destination", pack],
+    { cwd: repo, env: { ...process.env } });
+  return path.join(pack, stdout.trim().split("\n").at(-1));
+}
+
+async function copiedArchive(root) {
+  const archives = (await readdir(path.join(root, "pack"))).filter(name => name.endsWith(".tgz"));
+  if (archives.length !== 1) throw new Error("packed template must contain exactly one archive");
+  return path.join(root, "pack", archives[0]);
+}
+
+// Archive inspection needs the exact run artifact, without copying the whole
+// installed dependency tree. The copy remains private for destructive probes.
+export async function preparePackedArchive(root, { fresh = false } = {}) {
+  const template = fresh ? null : process.env.ACC_TEST_PACKED_TEMPLATE;
+  if (!template) return packArchive(root);
+  await cp(path.join(template, "pack"), path.join(root, "pack"), { recursive: true });
+  return copiedArchive(root);
+}
+
+async function installConsumer(root) {
+  const tarball = await packArchive(root);
+  const consumer = path.join(root, "consumer");
   await mkdir(consumer, { recursive: true });
   await writeFile(path.join(consumer, "package.json"),
     '{"name":"packed-v02-consumer","version":"1.0.0","private":true}\n');
-  const { stdout } = await runNpm(["pack", "--pack-destination", pack],
-    { cwd: repo, env: { ...process.env } });
-  const tarball = path.join(pack, stdout.trim().split("\n").at(-1));
   await runNpm(["install", "--offline", "--silent", tarball], { cwd: consumer });
   return tarball;
 }
@@ -42,7 +61,5 @@ export async function preparePackedConsumer(root, { fresh = false } = {}) {
     await cp(path.join(template, directory), path.join(root, directory),
       { recursive: true, verbatimSymlinks: true });
   }
-  const archives = (await readdir(path.join(root, "pack"))).filter(name => name.endsWith(".tgz"));
-  if (archives.length !== 1) throw new Error("packed template must contain exactly one archive");
-  return path.join(root, "pack", archives[0]);
+  return copiedArchive(root);
 }

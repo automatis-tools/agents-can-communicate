@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { EXIT, SCHEMA_VERSION } from "@agents-can-communicate/protocol";
-import { runStoreContract } from "../../core/test/service-contract.test.mjs";
+import { runStoreContract } from "../../../tests/helpers/store-contract.mjs";
 import { createFakeClock, createFakeIds, createMemoryStore }
   from "../../../tests/helpers/memory-store.mjs";
 import { openFilesystemStore } from "../src/store.mjs";

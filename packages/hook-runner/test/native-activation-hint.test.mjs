@@ -188,9 +188,12 @@ test("a hint that misses the runner's budget releases the reservation", async t 
   }));
 
   assert.equal(result.stdout.includes(ASK), false);
-  await Promise.race([released, new Promise((_resolve, reject) => {
-    setTimeout(() => reject(new Error("release was not called")), 2_000);
-  })]);
+  let timer;
+  try {
+    await Promise.race([released, new Promise((_resolve, reject) => {
+      timer = setTimeout(() => reject(new Error("release was not called")), 2_000);
+    })]);
+  } finally { clearTimeout(timer); }
 });
 
 test("a stdout write that completes keeps the ask", async t => {

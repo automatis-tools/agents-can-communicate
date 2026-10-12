@@ -6,22 +6,18 @@ import path from "node:path";
 import test from "node:test";
 import { promisify } from "node:util";
 
+import { preparePackedArchive } from "../helpers/packed-template.mjs";
+
 const run = promisify(execFile);
-const repo = path.resolve(import.meta.dirname, "..", "..");
-const isWindows = process.platform === "win32";
-const runNpm = (args, options = {}) => (isWindows
-  ? run("npm.cmd", args.map(argument => `"${argument}"`), { ...options, shell: true })
-  : run("npm", args, options));
 
 async function pack(t) {
   const into = await realpath(await mkdtemp(path.join(tmpdir(), "acc-links-")));
   t.after(() => rm(into, { recursive: true, force: true }));
-  const { stdout } = await runNpm(["pack", "--pack-destination", into], { cwd: repo });
-  return path.join(into, stdout.trim().split("\n").at(-1));
+  return preparePackedArchive(into);
 }
 
 const entries = async tarball => new Set((await run("tar", ["-tzf", tarball])).stdout
-  .split("\n").filter(Boolean).map(item => item.replace(/^package\//, "")));
+  .split(/\r?\n/).filter(Boolean).map(item => item.replace(/^package\//, "")));
 
 const source = async (tarball, entry) => (await run("tar",
   ["-xzOf", tarball, `package/${entry}`])).stdout;

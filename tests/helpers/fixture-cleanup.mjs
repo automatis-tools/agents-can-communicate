@@ -18,13 +18,18 @@ export function waitForWorkers(t) {
   }));
   process.on("worker", track);
   t.after(async () => {
-    // Node announces a worker on the next tick, and a test that starts one in
-    // its last step ends first: this hook began before the announcement, so it
-    // stopped listening and removed the directory the worker was writing.
-    await new Promise(resolve => setImmediate(resolve));
-    process.off("worker", track);
-    for (const worker of active.keys()) worker.ref();
-    await Promise.all(active.values());
+    try {
+      // Worker construction queues its process event. Keep listening while
+      // draining, including writers started by another writer finishing.
+      do {
+        await new Promise(resolve => setImmediate(resolve));
+        for (const worker of active.keys()) worker.ref();
+        await Promise.all(active.values());
+        await new Promise(resolve => setImmediate(resolve));
+      } while (active.size > 0);
+    } finally {
+      process.off("worker", track);
+    }
   });
 }
 
