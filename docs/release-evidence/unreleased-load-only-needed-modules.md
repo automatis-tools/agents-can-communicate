@@ -24,6 +24,8 @@ clients' adapters before its 2.5 s budget applied, so a loader that never settle
 hold `acc status`. The recorded commit loads them within that budget; a test with a
 loader that never answers returned in about 200 ms, and failed after its 5 s limit
 without the change.
+After the recorded commit, with only this record added, the full suite ran 3400 tests:
+3393 passed, 7 were skipped, none failed. The machine's load average was 41–79.
 
 ## Cause
 
