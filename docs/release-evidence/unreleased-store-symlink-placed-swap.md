@@ -62,5 +62,6 @@ The new check passed 30 runs in a row at load average about 96 on this Mac.
 The first full suite on this branch failed `every variable the code reads from the
 environment is written down`: the scan skipped each file whose absolute path held a
 `test` directory, and this checkout lives under `.gitworktrees/test/`. It now judges the
-path inside the checkout. With that fix, the full suite ran 3391 tests: 3383 passed,
-8 were skipped, none failed, at load average 18–60.
+path inside the checkout. After the recorded merge of main, with only this record
+added, the full suite ran 3400 tests: 3392 passed, 8 were skipped, none failed, at load
+average 34–78.
