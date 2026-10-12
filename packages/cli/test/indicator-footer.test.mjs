@@ -24,12 +24,14 @@ for(const [adapter,version,id] of [['kimi','2.1.1','sessionId'],['grok','1.0.46'
   const f=await createIndicatorFixture(t,{adapterId:adapter,version});
   const payload={[id]:'native-session',model:adapter==='kimi'?'K3':{display_name:'Grok'},cwd:'/tmp/demo\x1b[31m\nBAD',
    context_window:{used_percentage:12},permissionMode:'auto',planMode:true};
-  const out=await run(f,adapter,payload);
+  // Composition and sanitising only: a loaded machine misses the real 180 ms
+  // Kimi budget. Separate deadline tests advance time themselves.
+  const out=await run(f,adapter,payload,[],true);
   assert.match(out,/\x1b\[22;1;38;2;44;122;57m●/);
   assert.match(stripVTControlCharacters(out),adapter==='kimi'?/^ACC ● · turn │ auto · plan · K3/:/^ACC ● · inbox │/);
   assert.equal(out.trimEnd().includes('\n'),false);
   assert.equal(out.includes('\x1b[31m'),false);
-  const wrong=await run(f,adapter,{...payload,[id]:'different'});
+  const wrong=await run(f,adapter,{...payload,[id]:'different'},[],true);
   assert.match(stripVTControlCharacters(wrong),/^ACC !/);
  });
  test(`${adapter}: existing custom command receives identical stdin and stays on the first line`,async t=>{
@@ -64,6 +66,6 @@ test('Kimi footer follows a user item edit without reinstalling ACC',async t=>{
  await configureKimiIndicator(context,true);
  const {readFile}=await import('node:fs/promises');
  await writeFile(file,(await readFile(file,'utf8')).replace('["cwd"]','["model"]'));
- const out=stripVTControlCharacters(await run(f,'kimi',{sessionId:'native-session',model:'K3',cwd:'/tmp/hidden'},['--previous',marker]));
+ const out=stripVTControlCharacters(await run(f,'kimi',{sessionId:'native-session',model:'K3',cwd:'/tmp/hidden'},['--previous',marker],true));
  assert.equal(out,'ACC ● · turn │ K3\n');
 });
