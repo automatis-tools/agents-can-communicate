@@ -21,6 +21,8 @@ artifact, whose original record remains unchanged.
 digest as a separate `npm pack`.
 The fix itself is commit `609e4120`. The recorded commit adds only a test change;
 the archive packed from both commits has identical bytes.
+At the recorded commit the full suite ran 3385 tests: 3378 passed, 7 were skipped,
+none failed. The machine's load average was about 100 during the run.
 
 ## Cause
 
