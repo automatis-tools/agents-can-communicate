@@ -2,7 +2,7 @@ import { readTomlIndicatorSettings } from "@agents-can-communicate/adapter-sdk";
 import { previousOutput } from "./indicator-previous-command.mjs";
 import { readFile } from "node:fs/promises";
 import { readIndicator, indicatorFailure } from "./indicator.mjs";
-import { ALL_ADAPTERS } from "./install-command.mjs";
+import { loadAdapter } from "./adapter-catalog.mjs";
 
 function output(report, options, context) {
   if (options.json) return JSON.stringify(report);
@@ -40,7 +40,7 @@ export async function runIndicator({ argv = process.argv.slice(2), stdin = proce
         && typeof argv[i + 1] === "string") options[flag.slice(2)] = argv[++i];
       else throw new Error("invalid indicator option");
     }
-    context.extension = ALL_ADAPTERS().find(adapter => adapter.id === options.adapter)?.statusIndicator;
+    context.extension = (await loadAdapter(options.adapter))?.statusIndicator;
     const plain = options.json || options.details;
     timeout = setTimeout(() => {
       expired = true;

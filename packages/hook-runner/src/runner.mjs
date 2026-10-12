@@ -1011,8 +1011,8 @@ export async function registerNativeSession({ adapterId, adapters, event: target
  * register those in this workspace. Bounded by one budget and fail-open; the
  * answer lists what was registered and is otherwise informational.
  */
-export async function registerDiscoveredSessions({ adapters, workspaceId, dataHome, env = {},
-  budgetMs = 2_500, runtime, probeClientVersion, platform }) {
+export async function registerDiscoveredSessions({ adapters, loadAdapters, workspaceId, dataHome,
+  env = {}, budgetMs = 2_500, runtime, probeClientVersion, platform }) {
   const deadline = Date.now() + budgetMs;
   const remaining = () => Math.max(0, deadline - Date.now());
   // An adapter that ignores its timeout must not hold status: its answer is
@@ -1024,19 +1024,21 @@ export async function registerDiscoveredSessions({ adapters, workspaceId, dataHo
       .finally(() => clearTimeout(timer));
   };
   const registered = [];
-  let installed;
+  let installed, registry = adapters;
   try {
     installed = new Set((await loadOwnership({ dataHome })).installs.map(entry => entry.adapterId));
+    // A caller that loads adapters on demand loads only the installed ones (#270).
+    if (typeof loadAdapters === "function") registry = await loadAdapters([...installed]);
   } catch {
     return registered;
   }
-  for (const adapter of Object.values(adapters ?? {})) {
+  for (const adapter of Object.values(registry ?? {})) {
     if (typeof adapter?.discoverNativeSessions !== "function" || !installed.has(adapter.id)) continue;
     const found = await withinBudget(() => adapter.discoverNativeSessions({ env,
       timeoutMs: remaining() }));
     for (const candidate of Array.isArray(found) ? found : []) {
       if (remaining() === 0) return registered;
-      const result = await registerNativeSession({ adapterId: adapter.id, adapters,
+      const result = await registerNativeSession({ adapterId: adapter.id, adapters: registry,
         event: { sessionId: candidate?.sessionId, cwd: candidate?.cwd }, clientPid: candidate?.clientPid,
         workspaceId, dataHome, env, budgetMs: remaining(),
         ...(runtime ? { runtime } : {}), ...(probeClientVersion ? { probeClientVersion } : {}),

@@ -5,6 +5,12 @@
   "type": "module",
   "exports": {
     ".": "./src/index.mjs",
+    "./adapters": "./src/adapter-catalog.mjs",
+    "./confirm": "./src/confirm.mjs",
+    "./git-probe": "./src/git-probe.mjs",
+    "./main": "./src/main.mjs",
+    "./runtime-paths": "./src/runtime-paths.mjs",
+    "./workspace-discovery": "./src/workspace-discovery.mjs",
     "./hook-support": "./src/hook-support.mjs",
     "./indicator": "./src/indicator-command.mjs",
     "./managed-entry": "./src/managed-runtime/entry.mjs",

@@ -3,12 +3,14 @@ import { randomBytes } from "node:crypto";
 
 import { EXIT, createId } from "@agents-can-communicate/protocol";
 import { createCoordinationService } from "@agents-can-communicate/core";
-import { readInstalledLivePolicy } from "@agents-can-communicate/installer";
+import { readInstalledLivePolicy } from "@agents-can-communicate/installer/live-policy";
 import { createDeliveryRouter } from "@agents-can-communicate/delivery-router";
 import { registerDiscoveredSessions } from "@agents-can-communicate/hook-runner";
 import { openFilesystemStore } from "@agents-can-communicate/storage-filesystem";
-import { ALL_ADAPTERS, createGitProbe, discoverWorkspace, platformDataHome, runtimePaths }
-  from "@agents-can-communicate/cli";
+import { loadAdapter, loadAdapters } from "@agents-can-communicate/cli/adapters";
+import { createGitProbe } from "@agents-can-communicate/cli/git-probe";
+import { platformDataHome, runtimePaths } from "@agents-can-communicate/cli/runtime-paths";
+import { discoverWorkspace } from "@agents-can-communicate/cli/workspace-discovery";
 import { serve } from "@agents-can-communicate/mcp-server";
 
 export async function main({ managerRoot = null, packageRoot } = {}) {
@@ -46,7 +48,6 @@ const paths = runtimePaths({
 const store = await openFilesystemStore({ root: paths.root, clock, ids,
   workspaceId: descriptor.id });
 const service = createCoordinationService({ store, clock, ids });
-const adapters = Object.fromEntries(ALL_ADAPTERS().map(adapter => [adapter.id, adapter]));
 
 await serve({
   input: process.stdin,
@@ -54,14 +55,15 @@ await serve({
   log: message => process.stderr.write(`acc-mcp: ${message}\n`),
   context: {
     service,
-    deliveryRouter: createDeliveryRouter({ service, adapters, clock,
+    // Each recipient's adapter loads with the first message routed to it (#270).
+    deliveryRouter: createDeliveryRouter({ service, loadAdapter, clock,
       readLivePolicy: ({ adapter }) => readInstalledLivePolicy({ dataHome,
         adapterId: adapter.id }) }),
     workspaceId: descriptor.id,
     participantId,
     descriptor,
     runtimeDir: paths.root,
-    registerNativeSessions: () => registerDiscoveredSessions({ adapters,
+    registerNativeSessions: () => registerDiscoveredSessions({ loadAdapters,
       workspaceId: descriptor.id, dataHome, env: process.env }),
   },
 });

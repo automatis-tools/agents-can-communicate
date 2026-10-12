@@ -4,7 +4,7 @@ import path from "node:path";
 import { parentPort, workerData } from "node:worker_threads";
 
 import { assertPortableId } from "@agents-can-communicate/protocol";
-import { withWriterMutex } from "@agents-can-communicate/storage-filesystem";
+import { withWriterMutex } from "@agents-can-communicate/storage-filesystem/writer-mutex";
 import { loadNativeAttempt, nativeAttemptFrom } from "./native-attempt.mjs";
 
 const keyFor = harnessSessionId => createHash("sha256").update(String(harnessSessionId))

@@ -4,7 +4,8 @@
   "private": true,
   "type": "module",
   "exports": {
-    ".": "./src/index.mjs"
+    ".": "./src/index.mjs",
+    "./writer-mutex": "./src/writer-mutex.mjs"
   },
   "files": [
     "src/"

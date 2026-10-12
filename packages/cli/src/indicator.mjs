@@ -4,8 +4,8 @@ import { assertPortableId } from "@agents-can-communicate/protocol";
 import { effectiveCapabilities, loadNativeAttempt, loadSessionBinding, loadOfferObservation }
   from "@agents-can-communicate/adapter-sdk";
 import { readDeliveryBindingRecord, readSessionRecord } from "@agents-can-communicate/storage-filesystem";
-import { readInstalledLivePolicyState } from "@agents-can-communicate/installer";
-import { ALL_ADAPTERS } from "./install-command.mjs";
+import { readInstalledLivePolicyState } from "@agents-can-communicate/installer/live-policy";
+import { loadAdapter } from "./adapter-catalog.mjs";
 import { canonicalManagerRoot, managedDirectory, readManagedJson } from "./managed-runtime/state.mjs";
 import { platformDataHome, runtimePaths } from "./runtime-paths.mjs";
 
@@ -47,7 +47,7 @@ const actions = {
 export async function readIndicator({ adapterId, nativeSessionId,
   dataHome = platformDataHome(), now = new Date().toISOString() }) {
   try {
-    const adapter = ALL_ADAPTERS().find(item => item.id === adapterId);
+    const adapter = await loadAdapter(adapterId);
     if (!adapter || typeof nativeSessionId !== "string" || !nativeSessionId
       || nativeSessionId.length > 4096) return indicatorFailure("not_registered");
     const key = createHash("sha256").update(JSON.stringify([adapterId, nativeSessionId])).digest("hex");

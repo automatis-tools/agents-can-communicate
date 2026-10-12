@@ -11,11 +11,11 @@ import { createRelay } from "@agents-can-communicate/adapter-antigravity/relay";
 import { listRegistrations, newRelayId, relayDir } from "@agents-can-communicate/adapter-antigravity/relay-endpoint";
 import { findConversation, spawnRelay, startRelay } from "@agents-can-communicate/adapter-antigravity/relay-start";
 import { loadSessionBinding, readProcessArgs } from "@agents-can-communicate/adapter-sdk";
-import { platformDataHome } from "@agents-can-communicate/cli";
+import { platformDataHome } from "@agents-can-communicate/cli/runtime-paths";
 import { createCoordinationService } from "@agents-can-communicate/core";
 import { resolveClientPid } from "@agents-can-communicate/hook-runner/client-pid";
 import { readProcessTable } from "@agents-can-communicate/hook-runner/process-table";
-import { readInstalledLivePolicy } from "@agents-can-communicate/installer";
+import { readInstalledLivePolicy } from "@agents-can-communicate/installer/live-policy";
 import { createId } from "@agents-can-communicate/protocol";
 import { openFilesystemStore } from "@agents-can-communicate/storage-filesystem";
 
