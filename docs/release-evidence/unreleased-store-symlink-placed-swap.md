@@ -10,20 +10,19 @@ remains unchanged. Only tests changed; no shipped module did.
 
 | Fact | Value |
 |---|---|
-| Source commit | `66d8f42cdddc46299a4a5cd5ca08a7b195a58059` |
+| Source commit | `7a8f008876817af46aaa6f71c3e89f543508d7cb` |
 | Source state at pack time | clean feature worktree |
 | Archive | `agents-can-communicate-0.11.0.tgz` |
-| Archive size | 609,126 bytes |
-| Packed files | 374 |
-| SHA-256 | `78625791a732a9f081638423cecec30e1009667dd2329bce01860176d5c0bef3` |
+| Archive size | 610,302 bytes |
+| Packed files | 376 |
+| SHA-256 | `e5a6d903af543388648dc149eb3b90214ae780b5197f68d00a2e3d105f91d5dc` |
 | Local environment | macOS, Node 26.5.1 |
 
 `node scripts/verify-package.mjs` passed on the clean worktree and reported the same
-digest as a separate `npm pack`. The archive's bytes equal main's at `e03124fb`: tests
-are not packed, but the recorded commit covers them.
-The branch also carries commit `83fd29d5`, the `waitForWorkers` fix from the module
-loading branch (#296): without it the full suite on this machine can hang in
-`tests/process/native-binding-reaches-the-receiver.test.mjs`.
+digest as a separate `npm pack`. The recorded commit merges main after #296, and the
+archive's bytes equal that pull request's candidate: tests are not packed, but the
+recorded commit covers them. Commit `83fd29d5` here is the same `waitForWorkers` fix
+#296 carried.
 
 ## Cause
 

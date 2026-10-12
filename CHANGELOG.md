@@ -12,9 +12,9 @@
 
 | Development artifact | Value |
 |---|---|
-| Built from | `66d8f42cdddc46299a4a5cd5ca08a7b195a58059` |
-| Tarball | `agents-can-communicate-0.11.0.tgz`, 609,126 bytes, 374 files |
-| sha256 | `78625791a732a9f081638423cecec30e1009667dd2329bce01860176d5c0bef3` |
+| Built from | `7a8f008876817af46aaa6f71c3e89f543508d7cb` |
+| Tarball | `agents-can-communicate-0.11.0.tgz`, 610,302 bytes, 376 files |
+| sha256 | `e5a6d903af543388648dc149eb3b90214ae780b5197f68d00a2e3d105f91d5dc` |
 
 Only tests changed; the archive passed package verification. See
 [development evidence](docs/release-evidence/unreleased-store-symlink-placed-swap.md).
