@@ -1,7 +1,9 @@
 import assert from "node:assert/strict";
+import { execFile } from "node:child_process";
 import { readFile, readdir } from "node:fs/promises";
 import path from "node:path";
 import test from "node:test";
+import { promisify } from "node:util";
 
 import { createClaudeCodeAdapter } from "@agents-can-communicate/adapter-claude-code";
 import { createCodexAdapter } from "@agents-can-communicate/adapter-codex";
@@ -11,6 +13,7 @@ import { createGrokAdapter } from "@agents-can-communicate/adapter-grok";
 import { createKimiAdapter } from "@agents-can-communicate/adapter-kimi";
 
 const repo = path.resolve(import.meta.dirname, "..", "..");
+const run = promisify(execFile);
 
 // Every adapter that declares delivery.livePush must have, together, all three:
 // a passing livePush capture at the anchored version/platform, a minimum anchor
@@ -64,4 +67,30 @@ test("the release workflow creates its pack destination before npm writes there"
 
   assert.notEqual(prepare, -1, "release.yml never creates dist/");
   assert.ok(prepare < pack, "release.yml creates dist/ only after npm needs it");
+});
+
+test("release and CI pass bounded test deadlines to the real runner plan", async () => {
+  for (const name of ["ci", "release"]) {
+    const workflow = await readFile(path.join(repo, ".github", "workflows", `${name}.yml`), "utf8");
+    const testSteps = [...workflow.matchAll(/(?:^        |^      - )run: npm test[^\n]*\n        env:\n((?:          .+\n)+)/gm)];
+    assert.ok(testSteps.length > 0, `${name} has no test environment`);
+    for (const [, block] of testSteps) {
+      const env = { ...process.env };
+      // Feed the workflow's literal environment through the runner, rather
+      // than checking that YAML happens to contain a timeout-shaped string.
+      for (const [, key, value] of block.matchAll(/^          (\w+): '([^']*)'$/gm)) env[key] = value;
+      const code = `import { nodeTestArguments, testEnvironment, FILE_WATCHDOG_PRELOAD }
+        from './scripts/test-runner-plan.mjs';
+        const env = testEnvironment(process.env, { platform: 'linux' });
+        console.log(JSON.stringify({ args: nodeTestArguments(['probe.test.mjs']),
+          timeout: Number(env.ACC_TEST_FILE_TIMEOUT_MS),
+          preload: FILE_WATCHDOG_PRELOAD }));`;
+      const { stdout } = await run(process.execPath, ["--input-type=module", "-e", code],
+        { cwd: repo, env });
+      const plan = JSON.parse(stdout);
+      assert.equal(plan.args.includes("--test-timeout=300000"), true, name);
+      assert.ok(plan.timeout > 0 && plan.timeout <= 600_000, `${name} file deadline is unbounded`);
+      assert.ok(plan.args.includes(`--import=${plan.preload}`), `${name} does not start the file watchdog`);
+    }
+  }
 });
